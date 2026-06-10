@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tzitzis Quest 🎯</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue: #185FA5; --blue-light: #E6F1FB; --blue-mid: #378ADD;
+    --teal: #0F6E56; --teal-light: #E1F5EE; --teal-mid: #1D9E75;
+    --amber: #854F0B; --amber-light: #FAEEDA; --amber-mid: #BA7517;
+    --coral: #993C1D; --coral-light: #FAECE7; --coral-mid: #D85A30;
+    --purple: #534AB7; --purple-light: #EEEDFE; --purple-mid: #7F77DD;
+    --green: #3B6D11; --green-light: #EAF3DE; --green-mid: #639922;
+    --gray-bg: #f8f7f4; --gray-card: #ffffff; --gray-border: #e2e0d8;
+    --text: #2C2C2A; --text-muted: #5F5E5A;
+    --radius: 14px; --radius-sm: 8px;
+    --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--gray-bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* ---- HEADER ---- */
+  #header {
+    background: linear-gradient(135deg, #1a3a6e 0%, #2a5ca8 60%, #1D9E75 100%);
+    color: white;
+    padding: 1.5rem 2rem 1rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  #header::before {
+    content: "✡";
+    position: absolute; top: -20px; left: 30px;
+    font-size: 80px; opacity: 0.08;
+  }
+  #header::after {
+    content: "✡";
+    position: absolute; bottom: -20px; right: 30px;
+    font-size: 80px; opacity: 0.08;
+  }
+  #header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.5px; }
+  #header p { opacity: 0.85; margin-top: 4px; font-size: 1rem; }
+
+  /* ---- SCORE BAR ---- */
+  #score-bar {
+    background: white;
+    border-bottom: 1px solid var(--gray-border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.75rem 2rem;
+    flex-wrap: wrap; gap: 12px;
+    position: sticky; top: 0; z-index: 10;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .score-item { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; }
+  .score-num { font-size: 1.3rem; font-weight: 700; color: var(--blue); }
+  .stars { font-size: 1.2rem; }
+  #progress-wrap { flex: 1; min-width: 120px; max-width: 200px; }
+  #progress-bar {
+    height: 8px; background: #e8e6e0;
+    border-radius: 99px; overflow: hidden;
+  }
+  #progress-fill {
+    height: 100%; background: linear-gradient(90deg, var(--blue-mid), var(--teal-mid));
+    border-radius: 99px; transition: width 0.4s ease;
+    width: 0%;
+  }
+  #progress-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 3px; }
+
+  /* ---- MAIN AREA ---- */
+  #main { max-width: 800px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+  /* ---- SECTION SELECTOR (MAP) ---- */
+  #map-screen { display: block; }
+  #game-screen { display: none; }
+  #result-screen { display: none; }
+
+  .map-title {
+    font-size: 1.4rem; font-weight: 700; margin-bottom: 0.5rem;
+    text-align: center;
+  }
+  .map-subtitle {
+    text-align: center; color: var(--text-muted);
+    margin-bottom: 2rem; font-size: 0.95rem;
+  }
+  .map-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+  }
+  .map-card {
+    background: white; border: 1.5px solid var(--gray-border);
+    border-radius: var(--radius); padding: 1.25rem 1rem;
+    cursor: pointer; transition: all 0.2s;
+    text-align: center; position: relative;
+  }
+  .map-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+  .map-card.locked { opacity: 0.45; cursor: not-allowed; }
+  .map-card.completed { border-color: var(--teal-mid); background: var(--teal-light); }
+  .map-icon { font-size: 2.2rem; margin-bottom: 8px; }
+  .map-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
+  .map-card p { font-size: 0.78rem; color: var(--text-muted); }
+  .map-badge {
+    position: absolute; top: 8px; right: 10px;
+    font-size: 0.7rem; font-weight: 600;
+    padding: 2px 8px; border-radius: 99px;
+  }
+  .badge-new { background: var(--amber-light); color: var(--amber); }
+  .badge-done { background: var(--teal-light); color: var(--teal); }
+  .badge-locked { background: #e8e6e0; color: var(--text-muted); }
+
+  /* ---- GAME AREA ---- */
+  .activity-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 1.5rem;
+  }
+  .back-btn {
+    background: none; border: 1.5px solid var(--gray-border);
+    border-radius: 8px; padding: 6px 14px;
+    font-size: 0.85rem; cursor: pointer; color: var(--text-muted);
+  }
+  .back-btn:hover { background: white; }
+  .activity-title { font-size: 1.2rem; font-weight: 700; }
+  .activity-icon { font-size: 1.5rem; }
+
+  .question-card {
+    background: white; border-radius: var(--radius);
+    border: 1.5px solid var(--gray-border);
+    padding: 1.75rem; margin-bottom: 1.25rem;
+    box-shadow: var(--shadow);
+  }
+  .q-label {
+    font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 0.75rem;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .q-label .type-badge {
+    background: var(--blue-light); color: var(--blue);
+    padding: 2px 10px; border-radius: 99px;
+    font-size: 0.7rem; text-transform: none; letter-spacing: 0;
+  }
+  .q-text {
+    font-size: 1.05rem; font-weight: 600; margin-bottom: 1.25rem; line-height: 1.5;
+  }
+
+  /* DRAG & DROP */
+  .drag-container {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-bottom: 1rem;
+  }
+  .drag-item {
+    background: var(--blue-light); border: 2px dashed var(--blue-mid);
+    border-radius: var(--radius-sm); padding: 10px 14px;
+    font-size: 0.9rem; font-weight: 500; cursor: grab;
+    display: flex; align-items: center; gap: 8px;
+    user-select: none; transition: all 0.15s;
+  }
+  .drag-item:active { cursor: grabbing; opacity: 0.7; }
+  .drag-item.dragging { opacity: 0.4; }
+  .drag-item.correct { background: var(--teal-light); border-color: var(--teal-mid); color: var(--teal); border-style: solid; }
+  .drag-item.wrong { background: var(--coral-light); border-color: var(--coral-mid); color: var(--coral); border-style: solid; }
+  .drag-handle { color: var(--text-muted); font-size: 1rem; }
+  .drop-zone {
+    min-height: 52px; background: #f8f7f4;
+    border: 2px dashed #c8c5bc; border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; color: var(--text-muted);
+    transition: all 0.15s; padding: 6px;
+    flex-wrap: wrap; gap: 6px;
+  }
+  .drop-zone.dragover { background: var(--blue-light); border-color: var(--blue-mid); }
+
+  /* FILL IN THE BLANK */
+  .blank-sentence {
+    font-size: 1rem; line-height: 2; margin-bottom: 1rem;
+  }
+  .blank-input {
+    display: inline-block; border: none; border-bottom: 2.5px solid var(--blue-mid);
+    background: transparent; font-size: 1rem; font-family: inherit;
+    min-width: 100px; padding: 0 4px; outline: none;
+    color: var(--blue); font-weight: 600; text-align: center;
+  }
+  .blank-input.correct { border-color: var(--teal-mid); color: var(--teal); }
+  .blank-input.wrong { border-color: var(--coral-mid); color: var(--coral); }
+  .word-bank {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 1rem;
+  }
+  .word-chip {
+    background: var(--purple-light); border: 1.5px solid var(--purple-mid);
+    color: var(--purple); padding: 5px 14px; border-radius: 99px;
+    font-size: 0.85rem; font-weight: 600; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .word-chip:hover { background: var(--purple-mid); color: white; }
+  .word-chip.used { opacity: 0.35; cursor: default; pointer-events: none; }
+
+  /* TRUE/FALSE SWIPE */
+  .tf-card {
+    background: var(--gray-bg); border: 2px solid var(--gray-border);
+    border-radius: var(--radius); padding: 1.5rem;
+    font-size: 1rem; text-align: center; line-height: 1.5;
+    margin-bottom: 1rem; font-weight: 500;
+    min-height: 80px; display: flex; align-items: center; justify-content: center;
+  }
+  .tf-buttons { display: flex; gap: 12px; justify-content: center; }
+  .tf-btn {
+    flex: 1; max-width: 160px; padding: 14px;
+    border: 2px solid; border-radius: var(--radius-sm);
+    font-size: 1rem; font-weight: 700; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .tf-true { border-color: var(--teal-mid); background: var(--teal-light); color: var(--teal); }
+  .tf-true:hover { background: var(--teal-mid); color: white; }
+  .tf-false { border-color: var(--coral-mid); background: var(--coral-light); color: var(--coral); }
+  .tf-false:hover { background: var(--coral-mid); color: white; }
+  .tf-btn.selected-correct { background: var(--teal-mid) !important; color: white !important; border-color: var(--teal-mid) !important; }
+  .tf-btn.selected-wrong { background: var(--coral-mid) !important; color: white !important; border-color: var(--coral-mid) !important; }
+
+  /* SORTING / SEQUENCING */
+  .sort-list { display: flex; flex-direction: column; gap: 8px; }
+  .sort-item {
+    background: var(--amber-light); border: 1.5px solid var(--amber-mid);
+    color: var(--amber); padding: 10px 14px;
+    border-radius: var(--radius-sm); cursor: grab;
+    font-size: 0.9rem; font-weight: 500;
+    display: flex; align-items: center; gap: 10px;
+    user-select: none;
+  }
+  .sort-item.dragging { opacity: 0.4; }
+  .sort-num {
+    background: var(--amber-mid); color: white;
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: 700; flex-shrink: 0;
+  }
+  .sort-item.correct-pos { background: var(--teal-light); border-color: var(--teal-mid); color: var(--teal); }
+  .sort-item.correct-pos .sort-num { background: var(--teal-mid); }
+  .sort-item.wrong-pos { background: var(--coral-light); border-color: var(--coral-mid); color: var(--coral); }
+  .sort-item.wrong-pos .sort-num { background: var(--coral-mid); }
+
+  /* MATCHING */
+  .match-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .match-col { display: flex; flex-direction: column; gap: 8px; }
+  .match-item {
+    background: white; border: 2px solid var(--gray-border);
+    border-radius: var(--radius-sm); padding: 10px 12px;
+    font-size: 0.85rem; cursor: pointer; transition: all 0.15s;
+    min-height: 48px; display: flex; align-items: center;
+  }
+  .match-item.selected { border-color: var(--purple-mid); background: var(--purple-light); }
+  .match-item.matched-correct { border-color: var(--teal-mid); background: var(--teal-light); color: var(--teal); pointer-events: none; }
+  .match-item.matched-wrong { border-color: var(--coral-mid); background: var(--coral-light); color: var(--coral); }
+
+  /* FEEDBACK */
+  .feedback {
+    padding: 14px 18px; border-radius: var(--radius-sm);
+    font-size: 0.9rem; margin-top: 12px; font-weight: 500;
+    display: none; line-height: 1.5;
+  }
+  .feedback.show { display: block; }
+  .feedback.correct-fb { background: var(--teal-light); color: var(--teal); border: 1.5px solid var(--teal-mid); }
+  .feedback.wrong-fb { background: var(--coral-light); color: var(--coral); border: 1.5px solid var(--coral-mid); }
+
+  /* BUTTONS */
+  .btn-primary {
+    background: linear-gradient(135deg, var(--blue), var(--blue-mid));
+    color: white; border: none; padding: 12px 28px;
+    border-radius: var(--radius-sm); font-size: 1rem;
+    font-weight: 600; cursor: pointer; transition: all 0.2s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-check {
+    background: var(--green-light); color: var(--green);
+    border: 2px solid var(--green-mid); padding: 10px 24px;
+    border-radius: var(--radius-sm); font-size: 0.95rem;
+    font-weight: 600; cursor: pointer; transition: all 0.15s;
+    margin-top: 12px;
+  }
+  .btn-check:hover { background: var(--green-mid); color: white; }
+  .btn-next {
+    background: var(--blue-light); color: var(--blue);
+    border: 2px solid var(--blue-mid); padding: 10px 24px;
+    border-radius: var(--radius-sm); font-size: 0.95rem;
+    font-weight: 600; cursor: pointer; display: none; margin-top: 8px;
+    transition: all 0.15s;
+  }
+  .btn-next:hover { background: var(--blue-mid); color: white; }
+
+  /* RESULT */
+  #result-screen {
+    text-align: center; padding: 2rem 1rem;
+  }
+  .result-emoji { font-size: 5rem; margin-bottom: 1rem; }
+  .result-title { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .result-score { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 2rem; }
+  .result-stars { font-size: 2rem; margin-bottom: 1.5rem; letter-spacing: 4px; }
+  .fact-box {
+    background: var(--amber-light); border: 1.5px solid var(--amber-mid);
+    color: var(--amber); border-radius: var(--radius);
+    padding: 1.25rem; margin-bottom: 1.5rem; text-align: left;
+    font-size: 0.95rem; line-height: 1.6;
+  }
+  .fact-box strong { display: block; margin-bottom: 4px; font-size: 1rem; }
+
+  /* CELEBRATION */
+  @keyframes pop { 0%{transform:scale(0.5);opacity:0} 70%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+  .pop { animation: pop 0.35s ease forwards; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+  .shake { animation: shake 0.3s ease; }
+
+  /* QUESTION COUNTER */
+  .q-counter {
+    display: flex; gap: 6px; margin-bottom: 1rem;
+  }
+  .q-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--gray-border); transition: all 0.3s;
+  }
+  .q-dot.done { background: var(--teal-mid); }
+  .q-dot.current { background: var(--blue-mid); transform: scale(1.3); }
+
+  @media (max-width: 500px) {
+    #header h1 { font-size: 1.4rem; }
+    #main { padding: 1.25rem 1rem 3rem; }
+    .match-grid { grid-template-columns: 1fr; }
+    .tf-btn { padding: 10px; font-size: 0.9rem; }
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>✡ Tzitzis Quest</h1>
+  <p>Learn the Mitzvah of Tzitzis & Tallis Katan through fun activities!</p>
+</div>
+
+<div id="score-bar">
+  <div class="score-item">
+    <span>⭐</span>
+    <span class="score-num" id="score-display">0</span>
+    <span style="font-size:0.8rem;color:var(--text-muted)">points</span>
+  </div>
+  <div id="progress-wrap">
+    <div id="progress-bar"><div id="progress-fill"></div></div>
+    <div id="progress-label">0 of 9 topics</div>
+  </div>
+  <div class="score-item">
+    <span class="stars" id="stars-display">☆☆☆</span>
+  </div>
+</div>
+
+<div id="main">
+  <!-- MAP SCREEN -->
+  <div id="map-screen">
+    <p class="map-title">🗺️ Choose Your Adventure</p>
+    <p class="map-subtitle">Complete all 9 topics to become a Tzitzis Expert!</p>
+    <div class="map-grid" id="map-grid"></div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="game-screen">
+    <div class="activity-header">
+      <button class="back-btn" onclick="goToMap()">← Map</button>
+      <span class="activity-icon" id="act-icon"></span>
+      <span class="activity-title" id="act-title"></span>
+    </div>
+    <div class="q-counter" id="q-counter"></div>
+    <div id="question-container"></div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+      <button class="btn-check" id="btn-check" onclick="checkAnswer()">✓ Check Answer</button>
+      <button class="btn-next" id="btn-next" onclick="nextQuestion()">Next →</button>
+    </div>
+  </div>
+
+  <!-- RESULT SCREEN -->
+  <div id="result-screen" id="result-screen">
+    <div class="result-emoji" id="res-emoji"></div>
+    <div class="result-title" id="res-title"></div>
+    <div class="result-score" id="res-score"></div>
+    <div class="result-stars" id="res-stars"></div>
+    <div class="fact-box" id="res-fact"></div>
+    <button class="btn-primary" onclick="goToMap()">🗺️ Back to Map</button>
+  </div>
+</div>
+
+<script>
+const TOPICS = [
+  {
+    id: 0, icon: "⭐", title: "Why Tzitzis Matters",
+    desc: "The mitzvah's importance",
+    color: "blue",
+    questions: [
+      {
+        type: "truefalse",
+        q: "The mitzvah of Tzitzis (ציצית) is considered equal in importance to ALL the other mitzvos combined.",
+        answer: true,
+        feedback: "✅ That's right! The Gemara teaches that Tzitzis is equal in weight to all the mitzvos — it is an incredibly important mitzvah!"
+      },
+      {
+        type: "fillblank",
+        q: "A person should wear a טלית קטן the entire ___.",
+        blanks: ["day"],
+        bank: ["morning", "day", "night", "week"],
+        feedback: "✅ Correct! We wear the טלית קטן the entire day so we are always reminded of the mitzvos."
+      },
+      {
+        type: "sort",
+        q: "Put these tzitzis facts in order from most basic to most careful:",
+        items: [
+          { text: "Wear a טלית קטן at all", pos: 1 },
+          { text: "Wear it the whole day", pos: 2 },
+          { text: "Buy a nice, high-quality one", pos: 3 },
+          { text: "Make sure the tzitzis are always kosher", pos: 4 }
+        ],
+        feedback: "✅ Great ordering! We start with the basic mitzvah, then improve step by step to the most careful level."
+      }
+    ]
+  },
+  {
+    id: 1, icon: "🧵", title: "Materials & Linen",
+    desc: "Wool, linen & שעטנז",
+    color: "amber",
+    questions: [
+      {
+        type: "truefalse",
+        q: "It is a good idea to make a טלית קטן out of linen.",
+        answer: false,
+        feedback: "❌ Not quite! We do NOT make a טלית קטן from linen. There is a concern of שעטנז — mixing wool and linen is forbidden!"
+      },
+      {
+        type: "fillblank",
+        q: "The best טלית קטן is made from ___.",
+        blanks: ["wool"],
+        bank: ["cotton", "linen", "wool", "silk"],
+        feedback: "✅ Correct! Wool is the best material for a טלית קטן."
+      },
+      {
+        type: "matching",
+        q: "Match each material to what it means for tzitzis:",
+        pairs: [
+          { left: "🐑 Wool", right: "Best for a טלית קטן" },
+          { left: "🌿 Linen", right: "Should NOT be used — שעטנז concern" },
+          { left: "🧶 Wool strings on linen", right: "Creates שעטנז problem" },
+          { left: "🧵 Strings matching garment", right: "The ideal, if possible" }
+        ],
+        feedback: "✅ Excellent! You understand the materials of Tzitzis."
+      }
+    ]
+  },
+  {
+    id: 2, icon: "📐", title: "The Hole Placement",
+    desc: "Where to make the hole",
+    color: "purple",
+    questions: [
+      {
+        type: "truefalse",
+        q: "The hole for the tzitzis string can be placed anywhere you like on the corner of the garment.",
+        answer: false,
+        feedback: "❌ Incorrect! The hole must be placed in a specific area — not too close to the edge, and not too far from the corner either!"
+      },
+      {
+        type: "drag",
+        q: "Sort these statements about hole placement into TRUE or FALSE:",
+        items: [
+          { text: "The hole must be within a specific area near the corner", correct: "true" },
+          { text: "The hole can be right at the very edge of the garment", correct: "false" },
+          { text: "Measurement is from the edge of the cloth, not the hem", correct: "true" },
+          { text: "You don't need to measure — just guess", correct: "false" }
+        ],
+        feedback: "✅ Great sorting! Careful measurement before making the hole is very important."
+      },
+      {
+        type: "fillblank",
+        q: "When measuring where to place the hole, we measure from the ___ of the cloth, not from the hem stitching.",
+        blanks: ["edge"],
+        bank: ["middle", "edge", "top", "corner"],
+        feedback: "✅ Right! We always measure from the edge of the cloth itself."
+      }
+    ]
+  },
+  {
+    id: 3, icon: "🔢", title: "Tying the Tzitzis",
+    desc: "Knots and windings",
+    color: "teal",
+    questions: [
+      {
+        type: "fillblank",
+        q: "There are ___ double knots in the tzitzis.",
+        blanks: ["five"],
+        bank: ["three", "four", "five", "seven"],
+        feedback: "✅ Correct! There are five double knots, with groups of windings between them."
+      },
+      {
+        type: "drag",
+        q: "The common custom for wrappings — sort these numbers in the correct order:",
+        items: [
+          { text: "7 wrappings — first group", correct: "correct" },
+          { text: "8 wrappings — second group", correct: "correct" },
+          { text: "11 wrappings — third group", correct: "correct" },
+          { text: "13 wrappings — fourth group", correct: "correct" }
+        ],
+        isOrdering: true,
+        feedback: "✅ The sequence is 7, 8, 11, 13 — these numbers have beautiful significance in Torah learning!"
+      },
+      {
+        type: "truefalse",
+        q: "The strings of tzitzis should be left to tangle together — it doesn't matter if they're separated.",
+        answer: false,
+        feedback: "❌ No! The strings should be separated from each other so they do NOT become tangled. This is important to keep them kosher and beautiful."
+      }
+    ]
+  },
+  {
+    id: 4, icon: "🔍", title: "Checking Tzitzis",
+    desc: "Keep them kosher!",
+    color: "coral",
+    questions: [
+      {
+        type: "sort",
+        q: "Put these steps in the correct order for checking your tzitzis before davening:",
+        items: [
+          { text: "Hold the tzitzis in your hand", pos: 1 },
+          { text: "Check that strings are not torn or invalid", pos: 2 },
+          { text: "Make sure there are enough kosher strings", pos: 3 },
+          { text: "Say the bracha and put on the tallis", pos: 4 }
+        ],
+        feedback: "✅ Perfect order! Always check before making the bracha, not after."
+      },
+      {
+        type: "truefalse",
+        q: "After washing your tallis katan, it's especially important to check the tzitzis.",
+        answer: true,
+        feedback: "✅ Yes! Washing can cause strings to tangle or fray. Always check after washing!"
+      },
+      {
+        type: "fillblank",
+        q: "A person should check the tzitzis before making a ___.",
+        blanks: ["bracha"],
+        bank: ["meal", "bracha", "nap", "walk"],
+        feedback: "✅ Correct! We check before making the bracha so we are sure the tzitzis are kosher."
+      }
+    ]
+  },
+  {
+    id: 5, icon: "👕", title: "Wearing Properly",
+    desc: "Wearing with respect",
+    color: "green",
+    questions: [
+      {
+        type: "truefalse",
+        q: "It's okay to tuck in the tzitzis strings completely so nobody can see them.",
+        answer: false,
+        feedback: "❌ The tzitzis should hang visibly! The whole point is to see them and remember the mitzvos."
+      },
+      {
+        type: "drag",
+        q: "Sort these actions into RESPECTFUL or DISRESPECTFUL:",
+        items: [
+          { text: "Letting tzitzis hang visibly", correct: "respectful" },
+          { text: "Being careful not to step on tzitzis", correct: "respectful" },
+          { text: "Stepping on your tzitzis strings", correct: "disrespectful" },
+          { text: "Treating tzitzis with holiness and care", correct: "respectful" }
+        ],
+        feedback: "✅ We treat tzitzis with respect because they are used for a mitzvah!"
+      },
+      {
+        type: "fillblank",
+        q: "The garment should not be mostly sewn closed; it should still count as a ___ -cornered garment.",
+        blanks: ["four"],
+        bank: ["two", "three", "four", "six"],
+        feedback: "✅ Right! The garment must have four corners — that's what makes it require tzitzis."
+      }
+    ]
+  },
+  {
+    id: 6, icon: "🙏", title: "The Bracha",
+    desc: "Making the blessing",
+    color: "blue",
+    questions: [
+      {
+        type: "truefalse",
+        q: "The bracha on tzitzis should be said AFTER wrapping yourself in the tallis.",
+        answer: false,
+        feedback: "❌ The bracha should be said BEFORE wrapping! We say brachos before doing the mitzvah."
+      },
+      {
+        type: "sort",
+        q: "Put the steps for putting on a tallis in the correct order:",
+        items: [
+          { text: "Hold the tallis ready", pos: 1 },
+          { text: "Say the bracha", pos: 2 },
+          { text: "Wrap yourself in the tallis", pos: 3 },
+          { text: "Have kavana about the mitzvah", pos: 4 }
+        ],
+        feedback: "✅ Perfect! Bracha first, then the mitzvah action."
+      },
+      {
+        type: "matching",
+        q: "Match each concept to its correct description:",
+        pairs: [
+          { left: "🤔 Kavana", right: "Thinking that Hashem commanded us to wear Tzitzis" },
+          { left: "📿 Tzitzis", right: "Remind us to remember all the mitzvos" },
+          { left: "🔄 Remove and replace", right: "May need a new bracha depending on the situation" },
+          { left: "⏰ Before wrapping", right: "When to say the bracha" }
+        ],
+        feedback: "✅ Excellent! You understand the brachos for tzitzis very well."
+      }
+    ]
+  },
+  {
+    id: 7, icon: "💎", title: "Respect for Tzitzis",
+    desc: "Treating them with care",
+    color: "purple",
+    questions: [
+      {
+        type: "truefalse",
+        q: "You can throw your tzitzis around or toss them carelessly — it doesn't matter.",
+        answer: false,
+        feedback: "❌ No! Tzitzis should never be thrown around disrespectfully. They are used for a mitzvah and deserve holiness and care."
+      },
+      {
+        type: "drag",
+        q: "Sort these actions into DO or DON'T:",
+        items: [
+          { text: "Dispose of worn-out tzitzis respectfully", correct: "do" },
+          { text: "Throw tzitzis around casually", correct: "dont" },
+          { text: "Enter dirty places with exposed tzitzis unnecessarily", correct: "dont" },
+          { text: "Treat tzitzis with holiness since they remind us of mitzvos", correct: "do" }
+        ],
+        feedback: "✅ Great! Since tzitzis remind us of Hashem's mitzvos, we treat them with extra care."
+      },
+      {
+        type: "fillblank",
+        q: "Since tzitzis remind a person about ___, they should be treated with holiness and care.",
+        blanks: ["mitzvos"],
+        bank: ["Shabbos", "mitzvos", "davening", "Torah"],
+        feedback: "✅ Exactly! Tzitzis remind us to keep ALL the mitzvos — so we treat them with great respect."
+      }
+    ]
+  },
+  {
+    id: 8, icon: "🌟", title: "The Big Review",
+    desc: "Master quiz — all topics!",
+    color: "amber",
+    isFinal: true,
+    questions: [
+      {
+        type: "matching",
+        q: "Big review — match each rule to the correct topic:",
+        pairs: [
+          { left: "Equal to ALL mitzvos", right: "Why Tzitzis Matters" },
+          { left: "Not too close, not too far", right: "Hole Placement" },
+          { left: "7, 8, 11, 13 windings", right: "Tying the Tzitzis" },
+          { left: "Check before the bracha", right: "Checking Tzitzis" }
+        ],
+        feedback: "✅ Amazing! You've mastered the key rules of Tzitzis!"
+      },
+      {
+        type: "drag",
+        q: "Sort these facts into TRUE or FALSE for the final challenge:",
+        items: [
+          { text: "Wool strings work for any type of garment", correct: "true" },
+          { text: "Linen is the best material for a טלית קטן", correct: "false" },
+          { text: "Tzitzis strings should be separated, not tangled", correct: "true" },
+          { text: "You can throw old tzitzis in the regular trash", correct: "false" }
+        ],
+        feedback: "✅ Excellent! You really know your Tzitzis rules!"
+      },
+      {
+        type: "sort",
+        q: "Put these concepts in order from the garment to the bracha:",
+        items: [
+          { text: "Garment must have four corners", pos: 1 },
+          { text: "Hole placed in the right spot", pos: 2 },
+          { text: "Strings tied with proper knots", pos: 3 },
+          { text: "Check strings are kosher", pos: 4 },
+          { text: "Say the bracha and wear it!", pos: 5 }
+        ],
+        feedback: "🌟 PERFECT! You've completed the Tzitzis Quest! You are a true Tzitzis Expert!"
+      }
+    ]
+  }
+];
+
+const STATE = {
+  score: 0,
+  completed: new Set(),
+  currentTopic: null,
+  currentQ: 0,
+  answered: false,
+  qScore: 0,
+  dragSrc: null
+};
+
+// ---- INIT ----
+function init() {
+  renderMap();
+  updateScoreBar();
+}
+
+function renderMap() {
+  const grid = document.getElementById("map-grid");
+  grid.innerHTML = "";
+  TOPICS.forEach((t, i) => {
+    const done = STATE.completed.has(i);
+    const locked = i === 8 && STATE.completed.size < 7;
+    const div = document.createElement("div");
+    div.className = "map-card" + (done ? " completed" : "") + (locked ? " locked" : "");
+    div.innerHTML = `
+      <div class="map-icon">${t.icon}</div>
+      <h3>${t.title}</h3>
+      <p>${t.desc}</p>
+      <span class="map-badge ${done ? 'badge-done' : locked ? 'badge-locked' : 'badge-new'}">
+        ${done ? '✓ Done' : locked ? '🔒 Locked' : 'Play →'}
+      </span>
+    `;
+    if (!locked) div.onclick = () => startTopic(i);
+    grid.appendChild(div);
+  });
+}
+
+function updateScoreBar() {
+  document.getElementById("score-display").textContent = STATE.score;
+  const pct = (STATE.completed.size / 9) * 100;
+  document.getElementById("progress-fill").style.width = pct + "%";
+  document.getElementById("progress-label").textContent = STATE.completed.size + " of 9 topics";
+  const stars = STATE.score >= 800 ? "⭐⭐⭐" : STATE.score >= 400 ? "⭐⭐☆" : STATE.score > 0 ? "⭐☆☆" : "☆☆☆";
+  document.getElementById("stars-display").textContent = stars;
+}
+
+// ---- NAVIGATION ----
+function goToMap() {
+  document.getElementById("map-screen").style.display = "block";
+  document.getElementById("game-screen").style.display = "none";
+  document.getElementById("result-screen").style.display = "none";
+  renderMap();
+  updateScoreBar();
+}
+
+function startTopic(id) {
+  const t = TOPICS[id];
+  STATE.currentTopic = id;
+  STATE.currentQ = 0;
+  STATE.qScore = 0;
+  STATE.answered = false;
+  document.getElementById("map-screen").style.display = "none";
+  document.getElementById("result-screen").style.display = "none";
+  document.getElementById("game-screen").style.display = "block";
+  document.getElementById("act-icon").textContent = t.icon;
+  document.getElementById("act-title").textContent = t.title;
+  renderQCounter();
+  renderQuestion();
+}
+
+function renderQCounter() {
+  const t = TOPICS[STATE.currentTopic];
+  const c = document.getElementById("q-counter");
+  c.innerHTML = t.questions.map((_, i) => `<div class="q-dot ${i < STATE.currentQ ? 'done' : i === STATE.currentQ ? 'current' : ''}"></div>`).join("");
+}
+
+// ---- QUESTION RENDERING ----
+function renderQuestion() {
+  STATE.answered = false;
+  const t = TOPICS[STATE.currentTopic];
+  const q = t.questions[STATE.currentQ];
+  const btn = document.getElementById("btn-check");
+  const btnN = document.getElementById("btn-next");
+  btn.style.display = "inline-flex"; btn.disabled = false;
+  btnN.style.display = "none";
+  renderQCounter();
+
+  const container = document.getElementById("question-container");
+  container.innerHTML = "";
+
+  const card = document.createElement("div");
+  card.className = "question-card";
+
+  const typeName = {truefalse:"True or False", fillblank:"Fill in the Blank", drag:"Sort It!", sort:"Put in Order", matching:"Match It!"};
+  card.innerHTML = `
+    <div class="q-label">Question ${STATE.currentQ+1} <span class="type-badge">${typeName[q.type]}</span></div>
+    <div class="q-text">${q.q}</div>
+    <div id="q-body"></div>
+    <div class="feedback" id="feedback"></div>
+  `;
+  container.appendChild(card);
+
+  const body = document.getElementById("q-body");
+  if (q.type === "truefalse") renderTF(body, q);
+  else if (q.type === "fillblank") renderFill(body, q);
+  else if (q.type === "drag") renderDrag(body, q);
+  else if (q.type === "sort") renderSort(body, q);
+  else if (q.type === "matching") renderMatch(body, q);
+}
+
+function renderTF(body, q) {
+  body.innerHTML = `
+    <div class="tf-buttons">
+      <button class="tf-btn tf-true" id="tf-true" onclick="selectTF(true)">✅ True</button>
+      <button class="tf-btn tf-false" id="tf-false" onclick="selectTF(false)">❌ False</button>
+    </div>
+  `;
+  body._selected = null;
+  body.selectTF = (v) => { body._selected = v; };
+}
+
+function selectTF(val) {
+  document.getElementById("tf-true").classList.remove("selected-correct","selected-wrong");
+  document.getElementById("tf-false").classList.remove("selected-correct","selected-wrong");
+  const btn = val ? document.getElementById("tf-true") : document.getElementById("tf-false");
+  btn.classList.add("selected-correct");
+  document.getElementById("q-body")._selected = val;
+}
+
+function renderFill(body, q) {
+  let html = '<div class="blank-sentence">';
+  const parts = q.q.split("___");
+  parts.forEach((p, i) => {
+    html += p;
+    if (i < parts.length - 1) html += `<input class="blank-input" id="blank-${i}" type="text" placeholder="?" autocomplete="off" />`;
+  });
+  html += '</div>';
+  html += '<div class="word-bank" id="word-bank">';
+  q.bank.forEach(w => { html += `<span class="word-chip" onclick="fillWord('${w}')">${w}</span>`; });
+  html += '</div>';
+  body.innerHTML = html;
+  document.getElementById("btn-check").disabled = false;
+}
+
+function fillWord(word) {
+  const input = document.querySelector(".blank-input:not([data-filled])");
+  if (!input) return;
+  input.value = word;
+  input.dataset.filled = word;
+  const chip = [...document.querySelectorAll(".word-chip")].find(c => c.textContent === word && !c.classList.contains("used"));
+  if (chip) chip.classList.add("used");
+}
+
+function renderDrag(body, q) {
+  const cats = [...new Set(q.items.map(i => i.correct))];
+  let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">';
+  cats.forEach(cat => {
+    const label = {true:"✅ TRUE", false:"❌ FALSE", correct:"✅ Correct", respectful:"🤝 Respectful", disrespectful:"🚫 Disrespectful", do:"✅ DO", dont:"❌ DON'T"}[cat] || cat;
+    html += `<div>
+      <div style="font-size:0.8rem;font-weight:600;color:var(--text-muted);margin-bottom:6px;">${label}</div>
+      <div class="drop-zone" id="drop-${cat}" data-cat="${cat}" ondragover="dragOver(event)" ondrop="dropItem(event)">(drop here)</div>
+    </div>`;
+  });
+  html += '</div>';
+  html += '<div class="drag-container" id="drag-source">';
+  [...q.items].sort(() => Math.random()-0.5).forEach((item, i) => {
+    html += `<div class="drag-item" draggable="true" id="di-${i}" data-idx="${i}" data-correct="${item.correct}" ondragstart="dragStart(event)">
+      <span class="drag-handle">⠿</span> ${item.text}
+    </div>`;
+  });
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+function renderSort(body, q) {
+  const shuffled = [...q.items].sort(() => Math.random()-0.5);
+  let html = '<div class="sort-list" id="sort-list">';
+  shuffled.forEach((item, i) => {
+    html += `<div class="sort-item" draggable="true" id="si-${i}" data-pos="${item.pos}" ondragstart="sortDragStart(event)" ondragover="sortDragOver(event)" ondrop="sortDrop(event)">
+      <div class="sort-num">${i+1}</div>
+      <span>${item.text}</span>
+    </div>`;
+  });
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+function renderMatch(body, q) {
+  const rights = [...q.pairs].sort(() => Math.random()-0.5).map(p => p.right);
+  let html = '<div class="match-grid"><div class="match-col" id="match-left">';
+  q.pairs.forEach((p, i) => {
+    html += `<div class="match-item" id="ml-${i}" data-idx="${i}" onclick="matchSelect('left',${i})">${p.left}</div>`;
+  });
+  html += '</div><div class="match-col" id="match-right">';
+  rights.forEach((r, i) => {
+    html += `<div class="match-item" id="mr-${i}" data-val="${r}" onclick="matchSelect('right',${i})">${r}</div>`;
+  });
+  html += '</div></div>';
+  body.innerHTML = html;
+  window._matchState = { selectedLeft: null, selectedRight: null, pairs: q.pairs, matched: 0 };
+}
+
+// ---- DRAG HANDLERS ----
+function dragStart(e) { e.dataTransfer.setData("text", e.target.id); }
+function dragOver(e) { e.preventDefault(); e.currentTarget.classList.add("dragover"); }
+function dropItem(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove("dragover");
+  const id = e.dataTransfer.getData("text");
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.parentElement.removeChild(el);
+  e.currentTarget.appendChild(el);
+  if (e.currentTarget.textContent.includes("(drop here)")) {
+    e.currentTarget.querySelector("span")?.remove();
+  }
+}
+
+let _sortDragSrc = null;
+function sortDragStart(e) { _sortDragSrc = e.target; e.dataTransfer.effectAllowed = "move"; }
+function sortDragOver(e) { e.preventDefault(); }
+function sortDrop(e) {
+  e.preventDefault();
+  if (_sortDragSrc === e.currentTarget) return;
+  const list = document.getElementById("sort-list");
+  const items = [...list.children];
+  const srcIdx = items.indexOf(_sortDragSrc);
+  const tgtIdx = items.indexOf(e.currentTarget);
+  if (srcIdx < tgtIdx) list.insertBefore(_sortDragSrc, e.currentTarget.nextSibling);
+  else list.insertBefore(_sortDragSrc, e.currentTarget);
+  items.forEach((el,i) => el.querySelector(".sort-num").textContent = i+1);
+}
+
+function matchSelect(side, idx) {
+  const ms = window._matchState;
+  if (side === "left") {
+    document.querySelectorAll(".match-item[id^=ml-]").forEach(e => e.classList.remove("selected"));
+    const el = document.getElementById("ml-"+idx);
+    if (el.classList.contains("matched-correct")) return;
+    el.classList.add("selected");
+    ms.selectedLeft = idx;
+  } else {
+    document.querySelectorAll(".match-item[id^=mr-]").forEach(e => e.classList.remove("selected"));
+    const el = document.getElementById("mr-"+idx);
+    if (el.classList.contains("matched-correct")) return;
+    el.classList.add("selected");
+    ms.selectedRight = idx;
+  }
+  if (ms.selectedLeft !== null && ms.selectedRight !== null) {
+    const lEl = document.getElementById("ml-"+ms.selectedLeft);
+    const rEl = document.getElementById("mr-"+ms.selectedRight);
+    const rVal = rEl.dataset.val;
+    const correctRight = ms.pairs[ms.selectedLeft].right;
+    if (rVal === correctRight) {
+      lEl.classList.add("matched-correct"); rEl.classList.add("matched-correct");
+      ms.matched++;
+    } else {
+      lEl.classList.add("matched-wrong"); rEl.classList.add("matched-wrong");
+      setTimeout(() => { lEl.classList.remove("matched-wrong","selected"); rEl.classList.remove("matched-wrong","selected"); }, 700);
+    }
+    ms.selectedLeft = null; ms.selectedRight = null;
+  }
+}
+
+// ---- CHECK ----
+function checkAnswer() {
+  if (STATE.answered) return;
+  const t = TOPICS[STATE.currentTopic];
+  const q = t.questions[STATE.currentQ];
+  let correct = false;
+
+  if (q.type === "truefalse") {
+    const sel = document.getElementById("q-body")._selected;
+    if (sel === null) { alert("Please select True or False!"); return; }
+    correct = sel === q.answer;
+    const trueBtn = document.getElementById("tf-true");
+    const falseBtn = document.getElementById("tf-false");
+    trueBtn.classList.remove("selected-correct","selected-wrong");
+    falseBtn.classList.remove("selected-correct","selected-wrong");
+    if (q.answer) trueBtn.classList.add("selected-correct"); else falseBtn.classList.add("selected-correct");
+    if (sel !== q.answer) (sel ? trueBtn : falseBtn).classList.add("selected-wrong");
+  }
+  else if (q.type === "fillblank") {
+    const inputs = document.querySelectorAll(".blank-input");
+    let allCorrect = true;
+    inputs.forEach((inp, i) => {
+      const val = inp.value.trim().toLowerCase();
+      const expected = q.blanks[i].toLowerCase();
+      if (val === expected) inp.classList.add("correct");
+      else { inp.classList.add("wrong"); allCorrect = false; }
+    });
+    correct = allCorrect;
+  }
+  else if (q.type === "drag") {
+    const cats = [...new Set(q.items.map(i => i.correct))];
+    let allCorrect = true;
+    cats.forEach(cat => {
+      const zone = document.getElementById("drop-"+cat);
+      zone.querySelectorAll(".drag-item").forEach(el => {
+        if (el.dataset.correct === cat) el.classList.add("correct");
+        else { el.classList.add("wrong"); allCorrect = false; }
+      });
+    });
+    correct = allCorrect;
+  }
+  else if (q.type === "sort") {
+    const list = document.getElementById("sort-list");
+    const items = [...list.children];
+    let allCorrect = true;
+    items.forEach((el, i) => {
+      if (parseInt(el.dataset.pos) === i+1) el.classList.add("correct-pos");
+      else { el.classList.add("wrong-pos"); allCorrect = false; }
+    });
+    correct = allCorrect;
+  }
+  else if (q.type === "matching") {
+    const ms = window._matchState;
+    correct = ms.matched === ms.pairs.length;
+    if (!correct) {
+      document.querySelectorAll(".match-item:not(.matched-correct)").forEach(el => el.classList.add("matched-wrong"));
+    }
+  }
+
+  STATE.answered = true;
+  const pts = correct ? 30 : 10;
+  STATE.qScore += pts;
+  STATE.score += pts;
+  updateScoreBar();
+
+  const fb = document.getElementById("feedback");
+  fb.textContent = q.feedback + (correct ? "" : "\n\nKeep trying — you'll get it!");
+  fb.className = "feedback show " + (correct ? "correct-fb" : "wrong-fb");
+  fb.classList.add("pop");
+
+  document.getElementById("btn-check").style.display = "none";
+  document.getElementById("btn-next").style.display = "inline-flex";
+}
+
+function nextQuestion() {
+  STATE.currentQ++;
+  const t = TOPICS[STATE.currentTopic];
+  if (STATE.currentQ >= t.questions.length) {
+    showResult();
+  } else {
+    renderQuestion();
+  }
+}
+
+// ---- RESULT ----
+function showResult() {
+  const topicId = STATE.currentTopic;
+  STATE.completed.add(topicId);
+  const maxPts = TOPICS[topicId].questions.length * 30;
+  const pct = Math.round((STATE.qScore / maxPts) * 100);
+
+  document.getElementById("game-screen").style.display = "none";
+  document.getElementById("result-screen").style.display = "block";
+
+  const emoji = pct === 100 ? "🏆" : pct >= 70 ? "🌟" : "👍";
+  const title = pct === 100 ? "Perfect Score!" : pct >= 70 ? "Great Job!" : "Keep Learning!";
+  const stars = pct === 100 ? "⭐⭐⭐" : pct >= 70 ? "⭐⭐☆" : "⭐☆☆";
+
+  document.getElementById("res-emoji").textContent = emoji;
+  document.getElementById("res-title").textContent = title;
+  document.getElementById("res-score").textContent = `You scored ${STATE.qScore} out of ${maxPts} points (${pct}%)`;
+  document.getElementById("res-stars").textContent = stars;
+
+  const facts = [
+    "Did you know? Wearing Tzitzis is so important that our Sages say it's equal to ALL the mitzvos together!",
+    "The גמרא tells us that Tzitzis protects a person — it reminds us of Hashem and all His commandments!",
+    "The numbers 7, 8, 11, 13 in the windings add up to 39 — the same gematria as Hashem is One (ה׳ אחד)!",
+    "Wool Tzitzis work for any type of garment — it is the most mehudar (beautiful) material!",
+    "We check our Tzitzis before davening so we can say the bracha with confidence that they are kosher!",
+    "The Tzitzis string was originally meant to include a blue (תכלת) string — a reminder of the sea, sky, and Hashem's throne!",
+    "Wearing a טלית קטן shows we carry the mitzvos with us everywhere we go — even outside shul!"
+  ];
+  document.getElementById("res-fact").innerHTML = `<strong>💡 Fun Torah Fact:</strong> ${facts[topicId % facts.length]}`;
+
+  updateScoreBar();
+}
+
+init();
+</script>
+</body>
+</html>
