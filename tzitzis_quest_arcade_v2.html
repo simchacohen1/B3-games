@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Tzitzis Quest Arcade</title>
+<style>
+  :root{
+    --bg:#f4f1ff;
+    --card:#ffffff;
+    --ink:#202033;
+    --accent:#6d4cff;
+    --accent2:#ffb703;
+    --good:#2a9d8f;
+    --bad:#e76f51;
+    --soft:#ebe6ff;
+    --shadow:0 10px 24px rgba(40,30,90,.16);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: radial-gradient(circle at top left,#fff7cc,transparent 30%), linear-gradient(135deg,#f4f1ff,#e7f8ff);
+    color:var(--ink);
+    min-height:100vh;
+  }
+  header{
+    padding:18px 22px;
+    background:linear-gradient(90deg,#5b42e8,#8f5cff);
+    color:white;
+    box-shadow:var(--shadow);
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header h1{margin:0;font-size:30px}
+  header .sub{font-size:15px;opacity:.95;margin-top:4px}
+  .wrap{max-width:1180px;margin:18px auto;padding:0 14px 30px}
+  .topbar{
+    display:grid;
+    grid-template-columns: 1fr auto auto auto;
+    gap:10px;
+    align-items:center;
+    margin-bottom:15px;
+  }
+  .meter{
+    background:white;
+    border-radius:999px;
+    padding:8px;
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+  .meter > div{
+    height:18px;
+    width:0%;
+    border-radius:999px;
+    background:linear-gradient(90deg,#2a9d8f,#ffb703);
+    transition:.4s;
+  }
+  .pill{
+    background:white;
+    padding:10px 14px;
+    border-radius:18px;
+    box-shadow:var(--shadow);
+    font-weight:700;
+  }
+  button{
+    border:0;
+    background:var(--accent);
+    color:white;
+    padding:10px 15px;
+    border-radius:14px;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow:0 6px 14px rgba(109,76,255,.25);
+  }
+  button:hover{filter:brightness(1.07)}
+  button.secondary{background:#495057}
+  button.good{background:var(--good)}
+  button.bad{background:var(--bad)}
+  button.gold{background:#f59f00;color:#271b00}
+  .card{
+    background:rgba(255,255,255,.92);
+    border-radius:24px;
+    padding:20px;
+    box-shadow:var(--shadow);
+    border:1px solid rgba(255,255,255,.8);
+  }
+  .screen{display:none}
+  .screen.active{display:block}
+  .grid{display:grid;gap:16px}
+  .two{grid-template-columns:1fr 1fr}
+  .three{grid-template-columns:repeat(3,1fr)}
+  .center{text-align:center}
+  .big{font-size:27px;font-weight:900}
+  .he{font-size:28px;font-weight:900;direction:rtl}
+  .muted{opacity:.75}
+  .level-btn{
+    display:flex;
+    gap:12px;
+    align-items:center;
+    text-align:left;
+    width:100%;
+    background:white;
+    color:var(--ink);
+    border:3px solid var(--soft);
+    box-shadow:var(--shadow);
+    margin:10px 0;
+    font-size:18px;
+  }
+  .level-btn.done{border-color:var(--good);background:#effffb}
+  .icon{
+    width:46px;height:46px;border-radius:50%;
+    display:grid;place-items:center;
+    background:var(--soft);
+    font-size:26px;
+    flex:0 0 46px;
+  }
+  .feedback{
+    min-height:42px;
+    font-size:20px;
+    font-weight:800;
+    margin-top:12px;
+  }
+  .success{color:var(--good)}
+  .wrong{color:var(--bad)}
+  .wordbank,.dropzones{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .tile{
+    background:white;
+    border:3px solid #d8d2ff;
+    border-radius:16px;
+    padding:12px 14px;
+    font-weight:800;
+    cursor:grab;
+    box-shadow:0 6px 12px rgba(0,0,0,.08);
+    user-select:none;
+  }
+  .tile:active{cursor:grabbing}
+  .zone{
+    min-height:88px;
+    border:3px dashed #b8aeff;
+    background:#faf9ff;
+    border-radius:18px;
+    padding:10px;
+    flex:1 1 260px;
+  }
+  .zone h3{margin:0 0 8px}
+  .zone.over{background:#eeeaff}
+  .zone .tile{display:inline-block;margin:5px;font-size:14px}
+  .garment-area{
+    position:relative;
+    height:380px;
+    background:#fefefe;
+    border-radius:24px;
+    border:4px solid #d6d1ee;
+    overflow:hidden;
+  }
+  .garment{
+    position:absolute;
+    left:50%;top:50%;
+    transform:translate(-50%,-50%);
+    width:500px;height:260px;
+    background:#f8f7ed;
+    border:5px solid #c7b99a;
+    border-radius:22px;
+  }
+  .garment:before,.garment:after{
+    content:"";
+    position:absolute;
+    top:0;
+    width:125px;height:120px;
+    background:white;
+    border-bottom:5px solid #c7b99a;
+  }
+  .garment:before{left:187px;border-left:5px solid #c7b99a;border-right:5px solid #c7b99a;border-radius:0 0 20px 20px}
+  .hem{
+    position:absolute;
+    inset:22px;
+    border:4px dashed #a0845c;
+    border-radius:16px;
+    opacity:.75;
+    pointer-events:none;
+  }
+  .corner-note{
+    position:absolute;bottom:18px;left:18px;
+    background:#fff3bf;padding:8px 10px;border-radius:12px;font-weight:800;
+  }
+  .target{
+    position:absolute;
+    width:78px;height:78px;
+    border:5px solid var(--good);
+    background:rgba(42,157,143,.15);
+    left:25px;bottom:25px;
+    border-radius:18px;
+  }
+  .too-close{
+    position:absolute;width:20px;height:95px;left:0;bottom:0;background:rgba(231,111,81,.15)
+  }
+  .too-far{
+    position:absolute;width:190px;height:190px;left:120px;bottom:80px;background:rgba(231,111,81,.08);border-radius:30px;
+  }
+  .hole{
+    position:absolute;width:28px;height:28px;background:#333;border-radius:50%;
+    transform:translate(-50%,-50%);
+    display:none;
+    box-shadow:0 0 0 5px white;
+  }
+  .mini-tzitzis{
+    width:130px;height:210px;margin:0 auto;position:relative;
+    background:linear-gradient(90deg,transparent 45%,#d9c8a0 46% 54%,transparent 55%);
+  }
+  .string{position:absolute;top:18px;width:6px;height:170px;background:#555;border-radius:5px}
+  .s1{left:45px}.s2{left:55px}.s3{left:67px}.s4{left:79px}
+  .knot{
+    position:absolute;left:38px;width:58px;height:10px;border-radius:10px;background:#222;
+  }
+  .wraps{position:absolute;left:44px;width:46px;border-left:5px solid #222;border-right:5px solid #222;border-radius:8px}
+  .case{
+    background:#fff;
+    border:3px solid #ddd;
+    border-radius:20px;
+    padding:14px;
+    cursor:pointer;
+    min-height:170px;
+  }
+  .case:hover{border-color:var(--accent)}
+  .case.selected.goodsel{border-color:var(--good);background:#effffb}
+  .case.selected.badsel{border-color:var(--bad);background:#fff1ed}
+  .choice-big{
+    font-size:18px;
+    display:block;
+    margin:8px auto;
+    min-width:220px;
+  }
+  .badge{
+    display:inline-block;padding:6px 10px;border-radius:999px;
+    background:#fff3bf;font-weight:900;margin:3px;
+  }
+  .match-row{
+    display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0;
+  }
+  .match-target{
+    background:#f5f3ff;border:3px solid #c6bbff;min-height:54px;border-radius:14px;padding:8px;font-weight:800;
+  }
+  .shake{animation:shake .25s}
+  @keyframes shake{25%{transform:translateX(4px)}50%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+  .pop{animation:pop .35s}
+  @keyframes pop{50%{transform:scale(1.07)}}
+  .confetti{
+    position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:99;
+  }
+  .confetti span{
+    position:absolute;top:-20px;
+    animation:fall 1.9s linear forwards;
+    font-size:24px;
+  }
+  @keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+  @media(max-width:800px){
+    .two,.three{grid-template-columns:1fr}
+    .topbar{grid-template-columns:1fr 1fr}
+    .garment{width:90%;height:230px}
+  }
+
+  .arcade-hud{
+    display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center;
+    background:linear-gradient(90deg,#fff,#fff7cc);
+    border:3px solid #ffe066;
+    border-radius:18px;
+    padding:10px;
+    box-shadow:var(--shadow);
+    margin-bottom:14px;
+  }
+  .hud-box{
+    background:#202033;color:white;
+    border-radius:14px;
+    padding:9px 12px;
+    font-weight:900;
+    min-width:95px;
+    text-align:center;
+    border:2px solid #ffb703;
+  }
+  .boss-wrap{margin:10px auto;max-width:720px}
+  .boss-label{font-weight:900;text-align:center;margin-bottom:5px}
+  .bossbar{
+    height:26px;background:#2b2d42;border-radius:999px;padding:4px;overflow:hidden;border:2px solid #111;
+  }
+  .bossbar div{
+    height:100%;width:100%;background:linear-gradient(90deg,#e76f51,#ffb703);
+    border-radius:999px;transition:.35s;
+  }
+  .start-panel{
+    background:linear-gradient(135deg,#202033,#5532c8);
+    color:white;
+    border-radius:28px;
+    padding:28px;
+    text-align:center;
+    box-shadow:var(--shadow);
+    border:4px solid #ffb703;
+  }
+  .start-panel h2{font-size:42px;margin:5px}
+  .arcade-title{
+    font-size:54px;font-weight:1000;letter-spacing:1px;
+    text-shadow:0 4px 0 #000,0 0 18px #ffde59;
+  }
+  .powerups{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:12px 0}
+  .power{
+    background:#fff;color:#202033;border:3px solid #ffb703;border-radius:16px;
+    padding:8px 10px;font-weight:900;box-shadow:0 6px 0 #c77d00;
+  }
+  .power.used{opacity:.45;filter:grayscale(1)}
+  .float-score{
+    position:fixed;z-index:120;font-size:34px;font-weight:1000;color:#ffb703;
+    text-shadow:0 2px 0 #000;pointer-events:none;animation:floatUp .9s ease-out forwards;
+  }
+  @keyframes floatUp{to{transform:translateY(-80px) scale(1.3);opacity:0}}
+  .flash-good{animation:flashGood .35s}
+  @keyframes flashGood{50%{background:#d8fff5}}
+  .flash-bad{animation:flashBad .35s}
+  @keyframes flashBad{50%{background:#ffe1d9}}
+  .coin{
+    position:absolute;font-size:28px;animation:coinSpin 1.1s ease-out forwards;z-index:90;pointer-events:none;
+  }
+  @keyframes coinSpin{to{transform:translateY(-100px) rotateY(720deg);opacity:0}}
+  .bonus-target{
+    position:fixed;right:18px;bottom:18px;background:#ffb703;color:#2b2100;
+    padding:12px 16px;border-radius:18px;font-weight:1000;box-shadow:var(--shadow);
+    border:3px solid #fff;z-index:50;display:none;
+  }
+  .timer-warning{animation:pulseRed .5s infinite alternate}
+  @keyframes pulseRed{from{background:#202033}to{background:#e76f51}}
+  .arcade-mode .card{border:3px solid rgba(255,183,3,.65)}
+  .enemy{
+    font-size:64px;filter:drop-shadow(0 6px 2px rgba(0,0,0,.25));
+    animation:bob 1.2s infinite alternate ease-in-out;
+  }
+  @keyframes bob{to{transform:translateY(-8px)}}
+
+</style>
+</head>
+<body>
+<header>
+  <h1>🎮 Tzitzis Quest Arcade</h1>
+  <div class="sub">Learn the halachos by doing: sort, measure, build, check, and choose!</div>
+</header>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="meter"><div id="bar"></div></div>
+    <div class="pill">⭐ Score: <span id="score">0</span></div>
+    <div class="pill">🏆 Levels: <span id="doneCount">0</span>/8</div>
+    <button class="secondary" onclick="showMenu()">Menu</button>
+  </div>
+
+
+  <div class="arcade-hud" id="arcadeHud" style="display:none">
+    <div class="hud-box">❤️ Lives<br><span id="lives">3</span></div>
+    <div class="hud-box">⏱ Time<br><span id="timeLeft">60</span></div>
+    <div class="hud-box">🔥 Combo<br><span id="combo">0</span></div>
+    <div class="hud-box">🪙 Coins<br><span id="coins">0</span></div>
+    <div class="hud-box">⚡ Mode<br><span id="modeName">Arcade</span></div>
+  </div>
+  <div class="boss-wrap" id="bossWrap" style="display:none">
+    <div class="boss-label"><span class="enemy">🧶</span> Untangle the Tzitzis Boss!</div>
+    <div class="bossbar"><div id="bossHP"></div></div>
+  </div>
+  <div class="bonus-target" id="bonusTarget">⚡ Bonus active!</div>
+
+  <section id="menu" class="screen active card">
+    <div class="start-panel">
+      <div class="arcade-title">TZITZIS QUEST</div>
+      <h2>Arcade Mode</h2>
+      <p class="big">Beat 8 challenges, earn coins, keep your lives, and defeat the Tangled Tzitzis Boss!</p>
+      <div class="powerups">
+        <span class="power" id="shieldPower">🛡️ Shield: blocks one mistake</span>
+        <span class="power" id="timePower">⏰ Time Freeze: +20 seconds</span>
+        <span class="power" id="doublePower">💥 Double Points: next win</span>
+      </div>
+      <button class="gold" onclick="startArcade()">Start Arcade!</button>
+    </div>
+    <div id="levelList"></div>
+  </section>
+
+  <section id="level1" class="screen card">
+    <h2>Level 1: Mitzvah Power Sort</h2>
+    <p>Drag each idea into the correct basket.</p>
+    <div class="wordbank" id="bank1"></div>
+    <div class="dropzones">
+      <div class="zone" data-kind="importance"><h3>🌟 Importance / Whole Day</h3></div>
+      <div class="zone" data-kind="garment"><h3>👕 Good Tallis Katan</h3></div>
+      <div class="zone" data-kind="checking"><h3>🔎 Be Careful It Is Kosher</h3></div>
+    </div>
+    <button class="good" onclick="checkSort1()">Check</button>
+    <div id="fb1" class="feedback"></div>
+  </section>
+
+  <section id="level2" class="screen card">
+    <h2>Level 2: Linen & Shaatnez Customs</h2>
+    <p>Put the signs in the right place.</p>
+    <div class="wordbank" id="bank2"></div>
+    <div class="dropzones">
+      <div class="zone" data-kind="avoid"><h3>🚫 Avoid</h3></div>
+      <div class="zone" data-kind="reason"><h3>⚠️ Reason</h3></div>
+      <div class="zone" data-kind="custom"><h3>✅ Custom</h3></div>
+    </div>
+    <button class="good" onclick="checkSort2()">Check</button>
+    <div id="fb2" class="feedback"></div>
+  </section>
+
+  <section id="level3" class="screen card">
+    <h2>Level 3: Place the Hole</h2>
+    <p>Click on the tallis corner where the hole belongs. Not too close, not too far. Measure from the cloth edge, not the hem stitching.</p>
+    <div class="garment-area">
+      <div class="garment" id="garment" onclick="placeHole(event)">
+        <div class="hem"></div>
+        <div class="target"></div>
+        <div class="too-close"></div>
+        <div class="too-far"></div>
+        <div class="hole" id="hole"></div>
+        <div class="corner-note">Click near this corner</div>
+      </div>
+    </div>
+    <button class="good" onclick="checkHole()">Check Hole</button>
+    <div id="fb3" class="feedback"></div>
+  </section>
+
+  <section id="level4" class="screen card">
+    <h2>Level 4: Build the Knots & Wraps</h2>
+    <p>Build the common order: double knot, 7 wraps, double knot, 8 wraps, double knot, 11 wraps, double knot, 13 wraps, double knot.</p>
+    <div class="two grid">
+      <div>
+        <h3>Pieces</h3>
+        <div class="wordbank" id="bank4"></div>
+      </div>
+      <div>
+        <h3>Your Tzitzis Order</h3>
+        <div class="zone" id="tzitzisBuild" style="min-height:300px"></div>
+      </div>
+    </div>
+    <button class="secondary" onclick="resetLevel4()">Reset</button>
+    <button class="good" onclick="checkBuild()">Check</button>
+    <div id="fb4" class="feedback"></div>
+  </section>
+
+  <section id="level5" class="screen card">
+    <h2>Level 5: String Materials Match</h2>
+    <p>Drag the string rule to the matching explanation.</p>
+    <div class="wordbank" id="bank5"></div>
+    <div class="match-row"><div class="match-target" data-answer="lishma">Must be made for the mitzvah</div><div class="zone smallzone"></div></div>
+    <div class="match-row"><div class="match-target" data-answer="wool">Works for any garment</div><div class="zone smallzone"></div></div>
+    <div class="match-row"><div class="match-target" data-answer="match">Best if strings fit the garment material</div><div class="zone smallzone"></div></div>
+    <div class="match-row"><div class="match-target" data-answer="quality">Will last and not rip easily</div><div class="zone smallzone"></div></div>
+    <button class="good" onclick="checkMatch5()">Check</button>
+    <div id="fb5" class="feedback"></div>
+  </section>
+
+  <section id="level6" class="screen card">
+    <h2>Level 6: Tzitzis Inspector</h2>
+    <p>Click all the cases that need fixing or careful checking before a bracha.</p>
+    <div class="three grid" id="cases6"></div>
+    <button class="good" onclick="checkCases6()">Check Inspection</button>
+    <div id="fb6" class="feedback"></div>
+  </section>
+
+  <section id="level7" class="screen card">
+    <h2>Level 7: Respect Meter</h2>
+    <p>For each scene, decide: respectful or not respectful?</p>
+    <div id="sceneBox" class="card center"></div>
+    <div class="center">
+      <button class="choice-big good" onclick="answerScene(true)">Respectful ✅</button>
+      <button class="choice-big bad" onclick="answerScene(false)">Not Respectful 🚫</button>
+    </div>
+    <div id="fb7" class="feedback center"></div>
+  </section>
+
+  <section id="level8" class="screen card">
+    <h2>Level 8: Bracha & Kavana Sequence</h2>
+    <p>Drag the steps into the right order.</p>
+    <div class="wordbank" id="bank8"></div>
+    <div class="zone" id="order8" style="min-height:250px"></div>
+    <button class="secondary" onclick="resetLevel8()">Reset</button>
+    <button class="good" onclick="checkOrder8()">Check Order</button>
+    <div id="fb8" class="feedback"></div>
+  </section>
+
+  <section id="win" class="screen card center">
+    <div class="he">כל הכבוד!</div>
+    <h2>You completed Tzitzis Quest Arcade!</h2>
+    <p class="big">Final Score: <span id="finalScore"></span></p>
+    <p>
+      <span class="badge">Knots & Wraps Builder</span>
+      <span class="badge">Hole Measuring Expert</span>
+      <span class="badge">Tzitzis Inspector</span>
+      <span class="badge">Respect Champion</span>
+    </p>
+    <button class="gold" onclick="restart()">Play Again</button>
+  </section>
+</div>
+<div class="confetti" id="confetti"></div>
+
+<script>
+
+let arcadeStarted=false;
+let lives=3, combo=0, coins=0, timeLeft=60, timerId=null, shield=true, timeFreeze=true, doublePoints=true, doubleActive=false;
+function startArcade(){
+  arcadeStarted=true;
+  document.body.classList.add("arcade-mode");
+  document.getElementById("arcadeHud").style.display="flex";
+  document.getElementById("bossWrap").style.display="block";
+  lives=3; combo=0; coins=0; timeLeft=90; shield=true; timeFreeze=true; doublePoints=true; doubleActive=false;
+  completed={}; score=0;
+  initAll(); updateArcadeHud(); updateTop();
+  clearInterval(timerId);
+  timerId=setInterval(()=>{
+    if(!arcadeStarted) return;
+    timeLeft--;
+    if(timeLeft<=10) document.getElementById("timeLeft").parentElement.classList.add("timer-warning");
+    if(timeLeft<=0){ loseLife("Time ran out!"); timeLeft=45; }
+    updateArcadeHud();
+  },1000);
+}
+function updateArcadeHud(){
+  document.getElementById("lives").textContent=lives;
+  document.getElementById("timeLeft").textContent=timeLeft;
+  document.getElementById("combo").textContent=combo;
+  document.getElementById("coins").textContent=coins;
+  const hp=Math.max(0,100-(Object.keys(completed).length/8*100));
+  document.getElementById("bossHP").style.width=hp+"%";
+  document.getElementById("shieldPower").className="power "+(shield?"":"used");
+  document.getElementById("timePower").className="power "+(timeFreeze?"":"used");
+  document.getElementById("doublePower").className="power "+(doublePoints?"":"used");
+  document.getElementById("bonusTarget").style.display=doubleActive?"block":"none";
+}
+function arcadeCorrect(points=100){
+  combo++;
+  const bonus = combo>=3 ? 50 : 0;
+  let add = points + bonus;
+  if(doubleActive){ add*=2; doubleActive=false; }
+  coins += 5 + combo;
+  score += add;
+  floatScore("+"+add+" ⭐");
+  playTone(740,.08); setTimeout(()=>playTone(980,.08),90);
+  document.body.classList.add("flash-good");
+  setTimeout(()=>document.body.classList.remove("flash-good"),350);
+  if(combo===3 && timeFreeze){ timeLeft+=20; timeFreeze=false; floatScore("+20 sec ⏰"); }
+  if(combo===5 && doublePoints){ doubleActive=true; doublePoints=false; floatScore("DOUBLE POINTS READY 💥"); }
+  updateArcadeHud();
+}
+function arcadeWrong(msg="Mistake!"){
+  combo=0;
+  if(shield){
+    shield=false;
+    floatScore("Shield saved you 🛡️");
+    playTone(330,.12);
+  }else{
+    loseLife(msg);
+  }
+  document.body.classList.add("flash-bad");
+  setTimeout(()=>document.body.classList.remove("flash-bad"),350);
+  updateArcadeHud();
+}
+function loseLife(msg){
+  lives--;
+  floatScore("-1 ❤️");
+  playTone(180,.18);
+  if(lives<=0){
+    clearInterval(timerId);
+    arcadeStarted=false;
+    alert("Game over! Press Start Arcade to try again.");
+    showMenu();
+  }
+}
+function floatScore(txt){
+  const d=document.createElement("div");
+  d.className="float-score";
+  d.textContent=txt;
+  d.style.left=(window.innerWidth/2-80+Math.random()*120)+"px";
+  d.style.top=(window.innerHeight/2-40+Math.random()*80)+"px";
+  document.body.appendChild(d);
+  setTimeout(()=>d.remove(),1000);
+}
+function coinBurst(){
+  for(let i=0;i<8;i++){
+    const c=document.createElement("span");
+    c.className="coin"; c.textContent="🪙";
+    c.style.left=(40+Math.random()*50)+"vw";
+    c.style.top=(55+Math.random()*20)+"vh";
+    document.body.appendChild(c);
+    setTimeout(()=>c.remove(),1200);
+  }
+}
+function playTone(freq=660,dur=.1){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    osc.frequency.value=freq; osc.type="square";
+    gain.gain.value=.035;
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start();
+    setTimeout(()=>{osc.stop();ctx.close();},dur*1000);
+  }catch(e){}
+}
+
+const levels = [
+  ["level1","🌟","Mitzvah Power Sort"],
+  ["level2","🧵","Linen & Shaatnez"],
+  ["level3","📏","Place the Hole"],
+  ["level4","🪢","Knots & Wraps Builder"],
+  ["level5","🐑","String Materials Match"],
+  ["level6","🔎","Tzitzis Inspector"],
+  ["level7","👕","Respect Meter"],
+  ["level8","🙏","Bracha & Kavana Sequence"]
+];
+let score = 0;
+let completed = {};
+let dragged = null;
+let holePoint = null;
+let sceneIndex = 0;
+let sceneCorrect = 0;
+
+function updateTop(){
+  document.getElementById("score").textContent = score;
+  const d = Object.keys(completed).length;
+  document.getElementById("doneCount").textContent = d;
+  document.getElementById("bar").style.width = (d/8*100)+"%";
+  renderMenu();
+  if(d===8){
+    clearInterval(timerId);
+    arcadeStarted=false;
+    document.getElementById("finalScore").textContent = score;
+    show("win");
+    confetti();
+  }
+}
+function renderMenu(){
+  const list = document.getElementById("levelList");
+  list.innerHTML = "";
+  levels.forEach(([id,icon,title])=>{
+    const b = document.createElement("button");
+    b.className = "level-btn " + (completed[id] ? "done" : "");
+    b.onclick = ()=>show(id);
+    b.innerHTML = `<span class="icon">${icon}</span><span><b>${title}</b><br><span class="muted">${completed[id] ? "Completed ✅" : "Click to play"}</span></span>`;
+    list.appendChild(b);
+  });
+}
+function show(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+function showMenu(){ show("menu"); updateTop(); }
+function finish(id, points=100){
+  if(!completed[id]){
+    completed[id]=true;
+    if(arcadeStarted){ arcadeCorrect(points); coinBurst(); }
+    else score += points;
+    confetti();
+  }
+  updateTop();
+}
+function makeTile(text, kind){
+  const t = document.createElement("div");
+  t.className = "tile";
+  t.draggable = true;
+  t.textContent = text;
+  t.dataset.kind = kind;
+  t.addEventListener("dragstart", e=>{dragged=t;});
+  return t;
+}
+function setupDrops(){
+  document.querySelectorAll(".zone").forEach(z=>{
+    z.addEventListener("dragover", e=>{e.preventDefault(); z.classList.add("over");});
+    z.addEventListener("dragleave", ()=>z.classList.remove("over"));
+    z.addEventListener("drop", e=>{
+      e.preventDefault(); z.classList.remove("over");
+      if(dragged){
+        if(z.classList.contains("smallzone") && z.querySelector(".tile")) return;
+        z.appendChild(dragged);
+        dragged=null;
+      }
+    });
+  });
+}
+let wrongCooldown=false;
+function setFeedback(id, ok, msg){
+  const fb=document.getElementById(id);
+  fb.className="feedback " + (ok?"success":"wrong");
+  fb.textContent=msg;
+  fb.classList.remove("pop","shake");
+  void fb.offsetWidth;
+  fb.classList.add(ok?"pop":"shake");
+  if(arcadeStarted && !ok && !wrongCooldown){
+    wrongCooldown=true;
+    arcadeWrong(msg);
+    setTimeout(()=>wrongCooldown=false,900);
+  }
+}
+
+function initLevel1(){
+  const items = [
+    ["ציצית is equal to all the mitzvos","importance"],
+    ["Try very hard to fulfill it properly","importance"],
+    ["Wear a טלית קטן the entire day","importance"],
+    ["Best טלית קטן is wool","garment"],
+    ["Should still be a four-cornered garment","garment"],
+    ["Buy a nice one if you can afford it","garment"],
+    ["Make sure the tzitzis are kosher","checking"]
+  ];
+  const bank = document.getElementById("bank1"); bank.innerHTML="";
+  shuffle(items).forEach(i=>bank.appendChild(makeTile(i[0],i[1])));
+}
+function checkSort1(){ checkZones("level1","fb1",1); }
+
+function initLevel2(){
+  const items = [
+    ["Do not make a טלית קטן from linen","avoid"],
+    ["Wool strings on linen can be שעטנז","reason"],
+    ["Even according to lenient opinions, we avoid it","custom"]
+  ];
+  const bank = document.getElementById("bank2"); bank.innerHTML="";
+  shuffle(items).forEach(i=>bank.appendChild(makeTile(i[0],i[1])));
+}
+function checkSort2(){ checkZones("level2","fb2",2); }
+
+function checkZones(level, fb, num){
+  let ok=true, total=0, placed=0;
+  document.querySelectorAll(`#level${num} .zone`).forEach(z=>{
+    const kind=z.dataset.kind;
+    z.querySelectorAll(".tile").forEach(t=>{
+      total++; placed++;
+      if(t.dataset.kind !== kind) ok=false;
+    });
+  });
+  const bankCount = document.querySelectorAll(`#bank${num} .tile`).length;
+  if(bankCount>0) ok=false;
+  if(ok){ setFeedback(fb,true,"Excellent! You sorted the concepts correctly."); finish(level,100);}
+  else setFeedback(fb,false,"Some signs are in the wrong basket. Try again!");
+}
+
+function placeHole(e){
+  const g=document.getElementById("garment");
+  const r=g.getBoundingClientRect();
+  const x=e.clientX-r.left, y=e.clientY-r.top;
+  const h=document.getElementById("hole");
+  h.style.left=x+"px"; h.style.top=y+"px"; h.style.display="block";
+  holePoint={x,y,w:r.width,h:r.height};
+}
+function checkHole(){
+  if(!holePoint){setFeedback("fb3",false,"Click a spot first."); return;}
+  const x=holePoint.x, y=holePoint.y, h=holePoint.h;
+  const fromLeft=x, fromBottom=h-y;
+  const ok = fromLeft>=25 && fromLeft<=103 && fromBottom>=25 && fromBottom<=103;
+  if(ok){setFeedback("fb3",true,"Great measuring! The hole is not too close and not too far."); finish("level3",120);}
+  else if(fromLeft<25 || fromBottom<25) setFeedback("fb3",false,"Too close to the edge! Move it a little farther from the cloth edge.");
+  else setFeedback("fb3",false,"Too far from the corner! Move it closer to the corner area.");
+}
+
+function initLevel4(){
+  const parts = [
+    ["Double knot","knot"],["7 wraps","7"],["Double knot","knot"],["8 wraps","8"],
+    ["Double knot","knot"],["11 wraps","11"],["Double knot","knot"],["13 wraps","13"],["Double knot","knot"]
+  ];
+  const bank=document.getElementById("bank4"); bank.innerHTML="";
+  document.getElementById("tzitzisBuild").innerHTML="";
+  parts.forEach((p,i)=>bank.appendChild(makeTile(p[0],p[1]+"-"+i)));
+}
+function resetLevel4(){ initLevel4(); setupDrops(); }
+function checkBuild(){
+  const expected = ["knot","7","knot","8","knot","11","knot","13","knot"];
+  const actual = [...document.querySelectorAll("#tzitzisBuild .tile")].map(t=>t.dataset.kind.split("-")[0]);
+  if(actual.length!==9){setFeedback("fb4",false,"You need all 9 pieces."); return;}
+  const ok = actual.every((v,i)=>v===expected[i]);
+  if(ok){setFeedback("fb4",true,"Perfect! 5 double knots with 7, 8, 11, and 13 wraps."); finish("level4",150);}
+  else setFeedback("fb4",false,"Check the order: knot, 7, knot, 8, knot, 11, knot, 13, knot.");
+}
+
+function initLevel5(){
+  const bank=document.getElementById("bank5"); bank.innerHTML="";
+  document.querySelectorAll("#level5 .smallzone").forEach(z=>z.innerHTML="");
+  [
+    ["לשמה","lishma"],["Wool strings","wool"],["Match material","match"],["Good-quality strings","quality"]
+  ].forEach(i=>bank.appendChild(makeTile(i[0],i[1])));
+}
+function checkMatch5(){
+  let ok=true;
+  document.querySelectorAll("#level5 .match-row").forEach(row=>{
+    const answer=row.querySelector(".match-target").dataset.answer;
+    const tile=row.querySelector(".tile");
+    if(!tile || tile.dataset.kind!==answer) ok=false;
+  });
+  if(ok){setFeedback("fb5",true,"Correct! You matched the string material rules."); finish("level5",100);}
+  else setFeedback("fb5",false,"One match is not right yet. Try again.");
+}
+
+function initLevel6(){
+  const cases = [
+    ["After washing, the strings are tangled.", true, "Check carefully after washing or tangling."],
+    ["One string looks torn.", true, "Make sure strings are not torn or possul."],
+    ["All strings are straight and strong.", false, "This looks okay."],
+    ["The knots became loose.", true, "Knots should be tight and secure."],
+    ["The strings are separated nicely.", false, "Separated strings are good."],
+    ["A string ripped in a way that may make it possul.", true, "Fix before wearing with a bracha."]
+  ];
+  const box=document.getElementById("cases6"); box.innerHTML="";
+  cases.forEach((c,idx)=>{
+    const div=document.createElement("div");
+    div.className="case";
+    div.dataset.fix=c[1];
+    div.innerHTML=`<h3>${idx+1}. ${c[0]}</h3><p class="muted">${c[2]}</p>`;
+    div.onclick=()=>div.classList.toggle("selected");
+    box.appendChild(div);
+  });
+}
+function checkCases6(){
+  let ok=true;
+  document.querySelectorAll("#cases6 .case").forEach(c=>{
+    const should=c.dataset.fix==="true";
+    const sel=c.classList.contains("selected");
+    c.classList.remove("goodsel","badsel");
+    if(sel) c.classList.add(should?"goodsel":"badsel");
+    if(should!==sel) ok=false;
+  });
+  if(ok){setFeedback("fb6",true,"You found exactly what needs checking or fixing!"); finish("level6",130);}
+  else setFeedback("fb6",false,"Select only the cases that need fixing/checking before a bracha.");
+}
+
+const scenes = [
+  ["The tzitzis hang visibly and are worn respectfully.", true],
+  ["Someone throws tzitzis across the room.", false],
+  ["A boy is careful not to step on his tzitzis.", true],
+  ["A worn-out tallis is disposed of respectfully.", true],
+  ["Someone drags exposed tzitzis on the floor.", false],
+  ["A person treats tzitzis with care because they are used for a mitzvah.", true]
+];
+function initLevel7(){
+  sceneIndex=0; sceneCorrect=0; showScene();
+}
+function showScene(){
+  document.getElementById("sceneBox").innerHTML = `<h2>Scene ${sceneIndex+1}/6</h2><p class="big">${scenes[sceneIndex][0]}</p>`;
+  document.getElementById("fb7").textContent="";
+}
+function answerScene(ans){
+  const ok = ans===scenes[sceneIndex][1];
+  if(ok){sceneCorrect++; setFeedback("fb7",true,"Correct!");}
+  else setFeedback("fb7",false,"Not quite.");
+  sceneIndex++;
+  setTimeout(()=>{
+    if(sceneIndex>=scenes.length){
+      if(sceneCorrect>=5){setFeedback("fb7",true,`Great! You got ${sceneCorrect}/6.`); finish("level7",120);}
+      else {sceneIndex=0; sceneCorrect=0; setFeedback("fb7",false,"Try the respect scenes again."); setTimeout(showScene,900);}
+    } else showScene();
+  },650);
+}
+
+function initLevel8(){
+  const steps = [
+    ["Check tzitzis before bracha","1"],
+    ["Get ready to put on the tallis","2"],
+    ["Say the bracha before wrapping","3"],
+    ["Have kavana: Hashem commanded tzitzis to remember mitzvos","4"],
+    ["Wrap/wear the tallis respectfully","5"]
+  ];
+  const bank=document.getElementById("bank8"); bank.innerHTML="";
+  document.getElementById("order8").innerHTML="";
+  shuffle(steps).forEach(i=>bank.appendChild(makeTile(i[0],i[1])));
+}
+function resetLevel8(){ initLevel8(); setupDrops(); }
+function checkOrder8(){
+  const actual=[...document.querySelectorAll("#order8 .tile")].map(t=>t.dataset.kind);
+  if(actual.length!==5){setFeedback("fb8",false,"Use all 5 steps."); return;}
+  const ok=actual.join("")==="12345";
+  if(ok){setFeedback("fb8",true,"Excellent sequence! Check, bracha before wrapping, kavana, then wear respectfully."); finish("level8",120);}
+  else setFeedback("fb8",false,"Put the steps in the order a person would do them.");
+}
+
+function shuffle(arr){
+  return arr.map(x=>[Math.random(),x]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+}
+function confetti(){
+  const c=document.getElementById("confetti");
+  for(let i=0;i<45;i++){
+    const s=document.createElement("span");
+    s.textContent=["🎉","⭐","✨","🧵","🏆"][Math.floor(Math.random()*5)];
+    s.style.left=Math.random()*100+"vw";
+    s.style.animationDelay=(Math.random()*0.35)+"s";
+    c.appendChild(s);
+    setTimeout(()=>s.remove(),2300);
+  }
+}
+function restart(){
+  score=0; completed={};
+  initAll();
+  updateTop();
+  showMenu();
+}
+function initAll(){
+  initLevel1(); initLevel2(); initLevel4(); initLevel5(); initLevel6(); initLevel7(); initLevel8();
+  document.getElementById("hole").style.display="none"; holePoint=null;
+  setupDrops();
+}
+initAll();
+updateTop();
+</script>
+</body>
+</html>
