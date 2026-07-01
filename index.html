@@ -41,6 +41,57 @@
         transform: translateY(-4px);
         box-shadow: 0 6px 14px rgba(0,0,0,0.15);
     }
+
+    .hidden {
+        display: none !important;
+    }
+
+    .admin-button {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        z-index: 9999;
+        border: none;
+        border-radius: 999px;
+        padding: 10px 16px;
+        background: #1f2937;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    }
+
+    .admin-panel {
+        position: fixed;
+        top: 60px;
+        right: 12px;
+        width: 280px;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 14px 32px rgba(0,0,0,0.18);
+        padding: 16px;
+        text-align: left;
+        z-index: 9999;
+    }
+
+    .admin-panel h2 {
+        margin: 0 0 12px;
+        font-size: 20px;
+    }
+
+    .admin-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 10px 0;
+        font-size: 15px;
+    }
+
+    .disabled-note {
+        margin-top: 40px;
+        color: #4b5563;
+    }
 </style>
 </head>
 
@@ -48,71 +99,136 @@
     <h1>B3 Games</h1>
 
     <div class="game-container">
-        <a class="game-card" href="tzitzis_game.html">Tzitzis Game</a>
-        <a class="game-card" href="tzitzis_quest_arcade_v2.html">Tzitzis Quest Arcade</a>
-        <a class="game-card" href="kahoot_word_quiz_engine_paste_only_any_perek.html">Kahoot Word Quiz Engine</a>
+        <a class="game-card" data-game-id="tzitzis-game" href="tzitzis_game.html">Tzitzis Game</a>
+        <a class="game-card" data-game-id="tzitzis-quest-arcade" href="tzitzis_quest_arcade_v2.html">Tzitzis Quest Arcade</a>
+        <a class="game-card" data-game-id="kahoot-word-quiz" href="kahoot_word_quiz_engine_paste_only_any_perek.html">Kahoot Word Quiz Engine</a>
     </div>
 
-    <!-- Admin-only toggle button (hidden until admin mode is unlocked) -->
-    <button id="adminToggle" style="position:fixed; top:10px; right:10px; display:none; z-index:9999;">
-      Toggle Site
-    </button>
+    <p id="disabledMessage" class="disabled-note hidden">All games are currently disabled.</p>
+
+    <button id="adminAccessButton" class="admin-button">Admin</button>
+
+    <div id="adminPanel" class="admin-panel hidden">
+      <h2>Game Controls</h2>
+      <div class="admin-row">
+        <label for="siteEnabledToggle">Site enabled</label>
+        <input id="siteEnabledToggle" type="checkbox">
+      </div>
+      <div id="gameToggles"></div>
+    </div>
 
     <script>
-      /* -----------------------------
-         1. ADMIN PASSWORD
-      ------------------------------ */
-      const adminPassword = "SimchaSecret123"; // change this
+      const adminPassword = "SimchaSecret123";
+      const defaultSiteEnabled = true;
 
-      const adminToggle = document.getElementById("adminToggle");
+      const adminAccessButton = document.getElementById("adminAccessButton");
+      const adminPanel = document.getElementById("adminPanel");
+      const siteEnabledToggle = document.getElementById("siteEnabledToggle");
+      const gameToggles = document.getElementById("gameToggles");
+      const disabledMessage = document.getElementById("disabledMessage");
+      const gameCards = Array.from(document.querySelectorAll(".game-card"));
 
-      /* -----------------------------
-         2. CHECK IF ADMIN MODE IS ON
-      ------------------------------ */
-      const isAdmin = localStorage.getItem("isAdmin") === "true";
-      if (isAdmin) {
-          adminToggle.style.display = "block";
+      const gameDefinitions = gameCards.map((card) => ({
+          id: card.dataset.gameId,
+          name: card.textContent.trim(),
+          element: card
+      }));
+
+      const storedGameAvailability = JSON.parse(localStorage.getItem("gameAvailability") || "{}");
+      let siteEnabled = localStorage.getItem("siteEnabled");
+      siteEnabled = siteEnabled === null ? defaultSiteEnabled : siteEnabled === "true";
+
+      function isGameEnabled(gameId) {
+          return storedGameAvailability[gameId] !== false;
       }
 
-      /* -----------------------------
-         3. PRESS "A" TO ENTER ADMIN MODE
-      ------------------------------ */
-      window.addEventListener("keydown", (e) => {
-          if (e.key === "A") {
-              const pass = prompt("Enter admin password:");
-              if (pass === adminPassword) {
-                  localStorage.setItem("isAdmin", "true");
-                  adminToggle.style.display = "block";
-                  alert("Admin mode enabled");
+      function saveSiteEnabled(nextValue) {
+          localStorage.setItem("siteEnabled", String(nextValue));
+          siteEnabled = nextValue;
+      }
+
+      function saveGameEnabled(gameId, nextValue) {
+          storedGameAvailability[gameId] = nextValue;
+          localStorage.setItem("gameAvailability", JSON.stringify(storedGameAvailability));
+      }
+
+      function renderGames() {
+          let visibleCount = 0;
+
+          gameDefinitions.forEach((game) => {
+              const shouldShow = siteEnabled && isGameEnabled(game.id);
+              game.element.classList.toggle("hidden", !shouldShow);
+              if (shouldShow) {
+                  visibleCount += 1;
               }
+          });
+
+          disabledMessage.classList.toggle("hidden", visibleCount !== 0);
+      }
+
+      function renderAdminPanel() {
+          siteEnabledToggle.checked = siteEnabled;
+          gameToggles.innerHTML = "";
+
+          gameDefinitions.forEach((game) => {
+              const row = document.createElement("div");
+              row.className = "admin-row";
+
+              const label = document.createElement("label");
+              label.setAttribute("for", `toggle-${game.id}`);
+              label.textContent = game.name;
+
+              const input = document.createElement("input");
+              input.type = "checkbox";
+              input.id = `toggle-${game.id}`;
+              input.checked = isGameEnabled(game.id);
+              input.addEventListener("change", () => {
+                  saveGameEnabled(game.id, input.checked);
+                  renderGames();
+              });
+
+              row.appendChild(label);
+              row.appendChild(input);
+              gameToggles.appendChild(row);
+          });
+      }
+
+      function unlockAdminMode() {
+          localStorage.setItem("isAdmin", "true");
+          adminPanel.classList.remove("hidden");
+          renderAdminPanel();
+      }
+
+      if (localStorage.getItem("isAdmin") === "true") {
+          adminPanel.classList.remove("hidden");
+      }
+
+      adminAccessButton.addEventListener("click", () => {
+          const isAdmin = localStorage.getItem("isAdmin") === "true";
+          if (isAdmin) {
+              adminPanel.classList.toggle("hidden");
+              if (!adminPanel.classList.contains("hidden")) {
+                  renderAdminPanel();
+              }
+              return;
+          }
+
+          const pass = prompt("Enter admin password:");
+          if (pass === adminPassword) {
+              unlockAdminMode();
+              alert("Admin mode enabled");
+          } else if (pass !== null) {
+              alert("Wrong password");
           }
       });
 
-      /* -----------------------------
-         4. TOGGLE ACTIVE/INACTIVE
-      ------------------------------ */
-      adminToggle.onclick = () => {
-          let current = localStorage.getItem("siteActive") === "true";
-          localStorage.setItem("siteActive", (!current).toString());
-          location.reload();
-      };
+      siteEnabledToggle.addEventListener("change", () => {
+          saveSiteEnabled(siteEnabledToggle.checked);
+          renderGames();
+      });
 
-      /* -----------------------------
-         5. APPLY ACTIVE/INACTIVE MODE
-         (IMPORTANT: Do NOT wipe the page)
-      ------------------------------ */
-      const siteActive = localStorage.getItem("siteActive") === "true";
-
-      if (!siteActive) {
-          const msg = document.createElement("div");
-          msg.innerHTML = `
-            <div style="text-align:center; margin-top:80px; font-family:sans-serif;">
-              <h1>B3 Games are currently disabled</h1>
-              <p>Please check back later.</p>
-            </div>
-          `;
-          document.body.prepend(msg);
-      }
+      renderGames();
+      renderAdminPanel();
     </script>
 
 </body>
