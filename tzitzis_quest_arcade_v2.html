@@ -336,8 +336,19 @@
   @keyframes bob{to{transform:translateY(-8px)}}
 
 </style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="site-settings.js"></script>
 </head>
 <body>
+<script>
+  window.B3SiteSettings.readOnce().then((settings) => {
+    if (!settings.siteEnabled || settings.games["tzitzis-quest-arcade"] === false) {
+      window.location.replace("index.html");
+    }
+  });
+</script>
 <header>
   <h1>🎮 Tzitzis Quest Arcade</h1>
   <div class="sub">Learn the halachos by doing: sort, measure, build, check, and choose!</div>
