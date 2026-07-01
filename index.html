@@ -1,14 +1,56 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>B3 Games</title>
+<meta charset="UTF-8">
+<title>B3 Games</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #f5f7fa;
+        text-align: center;
+        padding: 40px;
+    }
+
+    h1 {
+        font-size: 48px;
+        margin-bottom: 30px;
+        color: #333;
+    }
+
+    .game-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        max-width: 400px;
+        margin: auto;
+    }
+
+    .game-card {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        font-size: 24px;
+        font-weight: bold;
+        color: #333;
+        text-decoration: none;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .game-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 6px 14px rgba(0,0,0,0.15);
+    }
+</style>
 </head>
+
 <body>
-  <h1>B3 Games</h1>
-  <ul>
-    <li><a href="tzitzis_game.html">Tzitzis Game</a></li>
-    <li><a href="tzitzis_quest_arcade_v2.html">Tzitzis Quest Arcade</a></li>
-    <li><a href="kahoot_word_quiz_engine_paste_only_any_perek.html">Kahoot Word Quiz Engine</a></li>
-  </ul>
+    <h1>B3 Games</h1>
+
+    <div class="game-container">
+        <a class="game-card" href="tzitzis_game.html">Tzitzis Game</a>
+        <a class="game-card" href="tzitzis_quest_arcade_v2.html">Tzitzis Quest Arcade</a>
+        <a class="game-card" href="kahoot_word_quiz_engine_paste_only_any_perek.html">Kahoot Word Quiz Engine</a>
+    </div>
 </body>
 </html>
