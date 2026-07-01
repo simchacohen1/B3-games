@@ -53,54 +53,67 @@
         <a class="game-card" href="kahoot_word_quiz_engine_paste_only_any_perek.html">Kahoot Word Quiz Engine</a>
     </div>
 
-    <!-- Admin-only toggle button (hidden until you unlock admin mode) -->
+    <!-- Admin-only toggle button (hidden until admin mode is unlocked) -->
     <button id="adminToggle" style="position:fixed; top:10px; right:10px; display:none; z-index:9999;">
       Toggle Site
     </button>
 
     <script>
-      // 1. Set your admin password
-      const adminPassword = "SimchaSecret123"; // change this to your own secret
+      /* -----------------------------
+         1. ADMIN PASSWORD
+      ------------------------------ */
+      const adminPassword = "SimchaSecret123"; // change this
 
       const adminToggle = document.getElementById("adminToggle");
 
-      // 2. Check if this browser is already in admin mode
+      /* -----------------------------
+         2. CHECK IF ADMIN MODE IS ON
+      ------------------------------ */
       const isAdmin = localStorage.getItem("isAdmin") === "true";
-
       if (isAdmin) {
           adminToggle.style.display = "block";
       }
 
-      // 3. Press "A" to enter admin mode on this browser
+      /* -----------------------------
+         3. PRESS "A" TO ENTER ADMIN MODE
+      ------------------------------ */
       window.addEventListener("keydown", (e) => {
           if (e.key === "A") {
               const pass = prompt("Enter admin password:");
               if (pass === adminPassword) {
                   localStorage.setItem("isAdmin", "true");
                   adminToggle.style.display = "block";
-                  alert("Admin mode enabled on this browser");
+                  alert("Admin mode enabled");
               }
           }
       });
 
-      // 4. Toggle site active/inactive when button is clicked
+      /* -----------------------------
+         4. TOGGLE ACTIVE/INACTIVE
+      ------------------------------ */
       adminToggle.onclick = () => {
           let current = localStorage.getItem("siteActive") === "true";
           localStorage.setItem("siteActive", (!current).toString());
           location.reload();
       };
 
-      // 5. Apply active/inactive mode
+      /* -----------------------------
+         5. APPLY ACTIVE/INACTIVE MODE
+         (IMPORTANT: Do NOT wipe the page)
+      ------------------------------ */
       const siteActive = localStorage.getItem("siteActive") === "true";
 
       if (!siteActive) {
-          document.body.innerHTML = `
+          const msg = document.createElement("div");
+          msg.innerHTML = `
             <div style="text-align:center; margin-top:80px; font-family:sans-serif;">
               <h1>B3 Games are currently disabled</h1>
               <p>Please check back later.</p>
             </div>
           `;
+          document.body.prepend(msg);
       }
     </script>
+
 </body>
 </html>
