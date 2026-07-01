@@ -348,6 +348,12 @@
       window.location.replace("index.html");
     }
   });
+
+  window.B3SiteSettings.subscribe((settings) => {
+    if (!settings.siteEnabled || settings.games["tzitzis-quest-arcade"] === false) {
+      window.location.replace("index.html");
+    }
+  });
 </script>
 <header>
   <h1>🎮 Tzitzis Quest Arcade</h1>
