@@ -105,7 +105,12 @@
       <div class="toolbar"><button class="btn purple" onclick="loadPastedData()">Use Pasted Words</button><button class="btn dark" onclick="clearWords()">Clear Words</button></div>
       <div id="importStatus" class="small-note"></div>
     </div>
-    <h2>Select Pesukim</h2><div id="pesukim" class="pesukim"></div>
+    <h2>Select Pesukim</h2>
+<div class="toolbar">
+<button class="btn purple" onclick="toggleAllPesukim(true)">Select All</button>
+<button class="btn dark" onclick="toggleAllPesukim(false)">Clear All</button>
+</div>
+<div id="pesukim" class="pesukim"></div>
     <div class="toolbar"><button class="btn primary" onclick="startGame()">Start Game ▶</button></div>
   </div>
 </section>
@@ -147,8 +152,8 @@ function shuffleArray(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.
 function speak(text){ if(!$('hoverSpeech').checked) return; if(!('speechSynthesis' in window)) return; speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.rate=.92; speechSynthesis.speak(u); }
 function stopSpeak(){ if('speechSynthesis' in window) speechSynthesis.cancel(); }
 function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); $(id).classList.add('active'); }
-function setupPesukim(){ const pes=[...new Set(ALL_QUESTIONS.map(q=>q.posuk))]; $('pesukim').innerHTML=pes.map(p=>`<label class="pasuk-chip"><input type="checkbox" value="${p}" checked>י״ח:${p}</label>`).join(''); }
-function selectAll(val){ document.querySelectorAll('#pesukim input').forEach(i=>i.checked=val); }
+function setupPesukim(){ const pes=[...new Set(ALL_QUESTIONS.map(q=>q.posuk))]; $('pesukim').innerHTML=pes.map(p=>`<label class="pasuk-chip"><input type="checkbox" value="${p}">י״ח:${p}</label>`).join(''); }
+function toggleAllPesukim(val){ document.querySelectorAll("#pesukim input").forEach(i=>i.checked=val); }
 function startGame(){
   const selected=[...document.querySelectorAll('#pesukim input:checked')].map(i=>i.value);
   let pool=ALL_QUESTIONS.filter(q=>selected.includes(q.posuk));
