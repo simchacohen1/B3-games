@@ -336,8 +336,19 @@
     .tf-btn { padding: 10px; font-size: 0.9rem; }
   }
 </style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="site-settings.js"></script>
 </head>
 <body>
+<script>
+  window.B3SiteSettings.readOnce().then((settings) => {
+    if (!settings.siteEnabled || settings.games["tzitzis-game"] === false) {
+      window.location.replace("index.html");
+    }
+  });
+</script>
 
 <div id="header">
   <h1>✡ Tzitzis Quest</h1>

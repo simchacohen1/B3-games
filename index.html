@@ -93,6 +93,10 @@
         color: #4b5563;
     }
 </style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="site-settings.js"></script>
 </head>
 
 <body>
@@ -110,6 +114,7 @@
 
     <div id="adminPanel" class="admin-panel hidden">
       <h2>Game Controls</h2>
+      <p id="adminStatus" class="disabled-note" style="margin-top:0; margin-bottom:12px;"></p>
       <div class="admin-row">
         <label for="siteEnabledToggle">Site enabled</label>
         <input id="siteEnabledToggle" type="checkbox">
@@ -119,13 +124,13 @@
 
     <script>
       const adminPassword = "SimchaSecret123";
-      const defaultSiteEnabled = true;
-
+      const settingsApi = window.B3SiteSettings;
       const adminAccessButton = document.getElementById("adminAccessButton");
       const adminPanel = document.getElementById("adminPanel");
       const siteEnabledToggle = document.getElementById("siteEnabledToggle");
       const gameToggles = document.getElementById("gameToggles");
       const disabledMessage = document.getElementById("disabledMessage");
+      const adminStatus = document.getElementById("adminStatus");
       const gameCards = Array.from(document.querySelectorAll(".game-card"));
 
       const gameDefinitions = gameCards.map((card) => ({
@@ -134,29 +139,13 @@
           element: card
       }));
 
-      const storedGameAvailability = JSON.parse(localStorage.getItem("gameAvailability") || "{}");
-      let siteEnabled = localStorage.getItem("siteEnabled");
-      siteEnabled = siteEnabled === null ? defaultSiteEnabled : siteEnabled === "true";
-
-      function isGameEnabled(gameId) {
-          return storedGameAvailability[gameId] !== false;
-      }
-
-      function saveSiteEnabled(nextValue) {
-          localStorage.setItem("siteEnabled", String(nextValue));
-          siteEnabled = nextValue;
-      }
-
-      function saveGameEnabled(gameId, nextValue) {
-          storedGameAvailability[gameId] = nextValue;
-          localStorage.setItem("gameAvailability", JSON.stringify(storedGameAvailability));
-      }
+      let currentSettings = settingsApi.defaultSettings;
 
       function renderGames() {
           let visibleCount = 0;
 
           gameDefinitions.forEach((game) => {
-              const shouldShow = siteEnabled && isGameEnabled(game.id);
+              const shouldShow = currentSettings.siteEnabled && currentSettings.games[game.id] !== false;
               game.element.classList.toggle("hidden", !shouldShow);
               if (shouldShow) {
                   visibleCount += 1;
@@ -167,7 +156,10 @@
       }
 
       function renderAdminPanel() {
-          siteEnabledToggle.checked = siteEnabled;
+          adminStatus.textContent = settingsApi.getMode() === "firebase"
+              ? "Live mode: changes affect everyone."
+              : "Preview mode: add your Firebase values in firebase-config.js to make changes live for everyone.";
+          siteEnabledToggle.checked = currentSettings.siteEnabled;
           gameToggles.innerHTML = "";
 
           gameDefinitions.forEach((game) => {
@@ -181,10 +173,15 @@
               const input = document.createElement("input");
               input.type = "checkbox";
               input.id = `toggle-${game.id}`;
-              input.checked = isGameEnabled(game.id);
-              input.addEventListener("change", () => {
-                  saveGameEnabled(game.id, input.checked);
-                  renderGames();
+              input.checked = currentSettings.games[game.id] !== false;
+              input.addEventListener("change", async () => {
+                  try {
+                      currentSettings.games[game.id] = input.checked;
+                      renderGames();
+                      await settingsApi.updateGameEnabled(game.id, input.checked);
+                  } catch (error) {
+                      alert("Could not save game setting.");
+                  }
               });
 
               row.appendChild(label);
@@ -222,13 +219,21 @@
           }
       });
 
-      siteEnabledToggle.addEventListener("change", () => {
-          saveSiteEnabled(siteEnabledToggle.checked);
-          renderGames();
+      siteEnabledToggle.addEventListener("change", async () => {
+          try {
+              currentSettings.siteEnabled = siteEnabledToggle.checked;
+              renderGames();
+              await settingsApi.updateSiteEnabled(siteEnabledToggle.checked);
+          } catch (error) {
+              alert("Could not save site setting.");
+          }
       });
 
-      renderGames();
-      renderAdminPanel();
+      settingsApi.subscribe((settings) => {
+          currentSettings = settings;
+          renderGames();
+          renderAdminPanel();
+      });
     </script>
 
 </body>
