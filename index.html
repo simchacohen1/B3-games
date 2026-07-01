@@ -52,5 +52,55 @@
         <a class="game-card" href="tzitzis_quest_arcade_v2.html">Tzitzis Quest Arcade</a>
         <a class="game-card" href="kahoot_word_quiz_engine_paste_only_any_perek.html">Kahoot Word Quiz Engine</a>
     </div>
+
+    <!-- Admin-only toggle button (hidden until you unlock admin mode) -->
+    <button id="adminToggle" style="position:fixed; top:10px; right:10px; display:none; z-index:9999;">
+      Toggle Site
+    </button>
+
+    <script>
+      // 1. Set your admin password
+      const adminPassword = "SimchaSecret123"; // change this to your own secret
+
+      const adminToggle = document.getElementById("adminToggle");
+
+      // 2. Check if this browser is already in admin mode
+      const isAdmin = localStorage.getItem("isAdmin") === "true";
+
+      if (isAdmin) {
+          adminToggle.style.display = "block";
+      }
+
+      // 3. Press "A" to enter admin mode on this browser
+      window.addEventListener("keydown", (e) => {
+          if (e.key === "A") {
+              const pass = prompt("Enter admin password:");
+              if (pass === adminPassword) {
+                  localStorage.setItem("isAdmin", "true");
+                  adminToggle.style.display = "block";
+                  alert("Admin mode enabled on this browser");
+              }
+          }
+      });
+
+      // 4. Toggle site active/inactive when button is clicked
+      adminToggle.onclick = () => {
+          let current = localStorage.getItem("siteActive") === "true";
+          localStorage.setItem("siteActive", (!current).toString());
+          location.reload();
+      };
+
+      // 5. Apply active/inactive mode
+      const siteActive = localStorage.getItem("siteActive") === "true";
+
+      if (!siteActive) {
+          document.body.innerHTML = `
+            <div style="text-align:center; margin-top:80px; font-family:sans-serif;">
+              <h1>B3 Games are currently disabled</h1>
+              <p>Please check back later.</p>
+            </div>
+          `;
+      }
+    </script>
 </body>
 </html>
