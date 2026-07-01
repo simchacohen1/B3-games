@@ -86,6 +86,12 @@
       window.location.replace("index.html");
     }
   });
+
+  window.B3SiteSettings.subscribe((settings) => {
+    if (!settings.siteEnabled || settings.games["kahoot-word-quiz"] === false) {
+      window.location.replace("index.html");
+    }
+  });
 </script>
 <section id="start" class="screen active">
   <div class="panel">

@@ -348,6 +348,12 @@
       window.location.replace("index.html");
     }
   });
+
+  window.B3SiteSettings.subscribe((settings) => {
+    if (!settings.siteEnabled || settings.games["tzitzis-game"] === false) {
+      window.location.replace("index.html");
+    }
+  });
 </script>
 
 <div id="header">
