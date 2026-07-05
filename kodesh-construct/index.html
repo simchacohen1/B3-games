@@ -1,0 +1,2345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kodesh Construct Prototype</title>
+  <style>
+    :root {
+      --sand: #f1d17c;
+      --gold: #e7a92e;
+      --gold-deep: #ca8621;
+      --beam: #855228;
+      --beam-dark: #553113;
+      --beam-soft: #aa7447;
+      --ink: #22150d;
+      --paper: #fff8e5;
+      --paper-2: #f7ecc8;
+      --sky: #f9edd1;
+      --accent-red: #df6b4f;
+      --accent-blue: #4f80cc;
+      --accent-green: #5e9967;
+      --accent-yellow: #d7ca46;
+      --shadow: rgba(34, 21, 13, 0.18);
+      --shadow-strong: rgba(34, 21, 13, 0.28);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.45), transparent 22%),
+        radial-gradient(circle at bottom right, rgba(126, 76, 24, 0.12), transparent 28%),
+        repeating-linear-gradient(
+          135deg,
+          #efc951 0,
+          #efc951 14px,
+          #e6bb39 14px,
+          #e6bb39 28px
+        );
+    }
+
+    .shell {
+      width: min(1120px, calc(100% - 24px));
+      margin: 16px auto;
+      background:
+        linear-gradient(180deg, rgba(255,250,234,0.98), rgba(248,232,176,0.98));
+      border: 7px solid #f5df96;
+      box-shadow: 0 22px 50px var(--shadow-strong);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .shell::before,
+    .shell::after {
+      content: "";
+      position: absolute;
+      width: 160px;
+      height: 160px;
+      background: radial-gradient(circle, rgba(255,255,255,0.35), transparent 70%);
+      pointer-events: none;
+    }
+
+    .shell::before {
+      top: -50px;
+      left: -40px;
+    }
+
+    .shell::after {
+      bottom: -70px;
+      right: -40px;
+    }
+
+    .hero {
+      position: relative;
+      padding: 26px 28px 22px;
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.44), transparent 28%),
+        linear-gradient(180deg, rgba(255,240,182,0.98), rgba(245,203,84,0.96));
+      border-bottom: 5px solid #d5a225;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 16px 18px;
+      border: 3px solid rgba(65,39,15,0.82);
+      border-radius: 28px;
+      box-shadow:
+        inset 0 0 0 2px rgba(255,250,234,0.48),
+        0 0 0 8px rgba(255,223,130,0.28);
+      pointer-events: none;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto 42px 18px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(65,39,15,0.55), transparent);
+      pointer-events: none;
+    }
+
+    .hero-kicker {
+      position: relative;
+      margin: 0 0 10px;
+      text-align: center;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.34em;
+      text-transform: uppercase;
+      color: rgba(65,39,15,0.78);
+    }
+
+    h1 {
+      position: relative;
+      margin: 0;
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 22px;
+      flex-wrap: wrap;
+      text-align: center;
+      font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+      line-height: 0.96;
+      text-shadow: 4px 4px 0 rgba(0, 0, 0, 0.12);
+    }
+
+    .hero-hebrew {
+      font-size: clamp(3.2rem, 7vw, 5.8rem);
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .hero-english {
+      font-size: clamp(2.8rem, 5.6vw, 5.1rem);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .subtitle {
+      position: relative;
+      margin: 12px auto 0;
+      max-width: 640px;
+      text-align: center;
+      font-size: clamp(1rem, 1.7vw, 1.28rem);
+      font-weight: 700;
+      line-height: 1.25;
+      color: rgba(65,39,15,0.86);
+    }
+
+    .mode-switch {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+      padding: 20px 24px 28px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,251,239,0.98), rgba(249,236,194,0.98));
+      border: 4px solid var(--beam-dark);
+      box-shadow: 0 14px 24px rgba(95, 57, 24, 0.18);
+      transition: transform 150ms ease, box-shadow 150ms ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card:hover,
+    .card:focus-within {
+      transform: translateY(-6px);
+      box-shadow: 0 20px 30px rgba(95, 57, 24, 0.24);
+    }
+
+    .card-top {
+      height: 120px;
+      border-bottom: 4px solid var(--beam-dark);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.18), rgba(0,0,0,0.08)),
+        repeating-linear-gradient(
+          90deg,
+          rgba(255,255,255,0.08) 0,
+          rgba(255,255,255,0.08) 16px,
+          transparent 16px,
+          transparent 32px
+        );
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-top::before,
+    .card-top::after {
+      content: "";
+      position: absolute;
+      width: 18px;
+      top: 0;
+      bottom: 0;
+      background: linear-gradient(180deg, #b47b3f, #855126);
+      border-left: 2px solid var(--beam-dark);
+      border-right: 2px solid var(--beam-dark);
+    }
+
+    .card-top::before { left: 0; }
+    .card-top::after { right: 0; }
+
+    .tools {
+      position: absolute;
+      inset: auto 18px 12px;
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      font-size: 2.15rem;
+      filter: drop-shadow(0 2px 0 rgba(0,0,0,0.16));
+    }
+
+    .label {
+      padding: 14px 14px 18px;
+      text-align: center;
+      color: #fff;
+    }
+
+    .label strong,
+    .label span {
+      display: block;
+    }
+
+    .label strong {
+      font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+      font-size: 1.92rem;
+      line-height: 1.02;
+      margin-bottom: 4px;
+    }
+
+    .label span {
+      font-size: 0.98rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      opacity: 0.92;
+    }
+
+    .brown { background: #8d5c34; }
+    .yellow { background: #d5ca32; color: var(--ink); }
+    .red { background: #eb6c57; }
+    .blue { background: #5d89d8; }
+
+    .card button {
+      width: 100%;
+      padding: 14px;
+      border: 0;
+      background: transparent;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      color: inherit;
+    }
+
+    .menu-copy {
+      padding: 10px 16px 2px;
+      text-align: center;
+      font-size: 0.84rem;
+      line-height: 1.25;
+      opacity: 0.74;
+    }
+
+    .menu-actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      padding: 0 14px 14px;
+    }
+
+    .menu-action {
+      padding: 11px 12px;
+      border: 2px solid rgba(29,22,15,0.22);
+      background: linear-gradient(180deg, rgba(255,255,255,0.65), rgba(255,239,194,0.8));
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      color: inherit;
+      transition: transform 120ms ease, background 120ms ease;
+    }
+
+    .menu-action.alt {
+      background: linear-gradient(180deg, rgba(255,249,230,0.9), rgba(241,226,184,0.92));
+    }
+
+    .menu-action:hover,
+    .menu-action:focus-visible {
+      transform: translateY(-2px);
+      background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(249,229,167,0.95));
+    }
+
+    .play-area {
+      display: none;
+      padding: 24px 24px 28px;
+      background:
+        linear-gradient(180deg, rgba(255,248,221,0.96), rgba(251,235,184,0.98));
+    }
+
+    .play-area.active,
+    .summary.active {
+      display: block;
+    }
+
+    .status-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .pill {
+      padding: 9px 15px;
+      border-radius: 999px;
+      border: 2px solid rgba(29,22,15,0.18);
+      background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(245,234,204,0.95));
+      font-size: 1.02rem;
+      font-weight: 700;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.65);
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    .panel {
+      padding: 20px;
+      background: linear-gradient(180deg, rgba(255,253,243,0.82), rgba(249,238,206,0.75));
+      border: 3px solid rgba(95,57,24,0.85);
+      box-shadow:
+        inset 0 0 0 2px rgba(255,255,255,0.24),
+        0 12px 22px rgba(95,57,24,0.08);
+    }
+
+    .panel h2,
+    .panel h3,
+    .summary h2 {
+      margin-top: 0;
+    }
+
+    .mode-chip {
+      background: rgba(29,22,15,0.88);
+      color: #fff;
+    }
+
+    .prompt {
+      font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+      font-size: 2.7rem;
+      line-height: 1.08;
+      margin-bottom: 16px;
+      color: #4a2207;
+    }
+
+    .mini-note {
+      display: none;
+    }
+
+    .workbench {
+      margin: 20px 0 18px;
+      padding: 22px;
+      min-height: 150px;
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.32), transparent 30%),
+        linear-gradient(180deg, rgba(255,205,92,0.28), rgba(238,151,58,0.22)),
+        #f4dfb4;
+      border: 4px dashed rgba(95,57,24,0.8);
+      border-radius: 20px;
+    }
+
+    .word-row,
+    .bank-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .word-row {
+      direction: rtl;
+      justify-content: flex-end;
+    }
+
+    .token {
+      padding: 16px 20px;
+      border: 0;
+      border-bottom: 6px solid rgba(0,0,0,0.16);
+      background: linear-gradient(180deg, #fffbe7, #ffd86f);
+      box-shadow: 0 6px 0 rgba(29,22,15,0.1);
+      font: inherit;
+      font-size: 2.2rem;
+      font-weight: 800;
+      cursor: pointer;
+      border-radius: 14px 14px 8px 8px;
+    }
+
+    .token:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .token.placed {
+      background: linear-gradient(180deg, #fff4be, #ffbf47);
+    }
+
+    .token.correct {
+      background: linear-gradient(180deg, #ddffbf, #94dd67);
+    }
+
+    .token.wrong {
+      background: linear-gradient(180deg, #ffd5cb, #ff8a73);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .action {
+      padding: 14px 20px;
+      border: 2px solid var(--beam-dark);
+      background: linear-gradient(180deg, #fff8dd, #f0c95f);
+      font: inherit;
+      font-size: 1.26rem;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 5px 0 rgba(95,57,24,0.16);
+      border-radius: 12px;
+    }
+
+    .action.primary {
+      background: linear-gradient(180deg, #533321, #21140d);
+      color: #fff;
+    }
+
+    .feedback {
+      min-height: 36px;
+      margin-top: 18px;
+      font-size: 1.5rem;
+      font-weight: 800;
+    }
+
+    .feedback.good { color: #1c6b35; }
+    .feedback.bad { color: #9c2f1b; }
+
+    .feedback.cheer {
+      animation: cheer-pop 280ms ease-out;
+    }
+
+    @keyframes cheer-pop {
+      0% {
+        transform: scale(0.96);
+        opacity: 0.6;
+      }
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .mode-panel[hidden] {
+      display: none;
+    }
+
+    .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .choice-btn {
+      min-height: 78px;
+      padding: 14px 12px;
+      border: 3px solid rgba(95,57,24,0.84);
+      background: rgba(255,248,221,0.94);
+      font: inherit;
+      font-size: 1.45rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 140ms ease, box-shadow 140ms ease;
+    }
+
+    .choice-btn:hover,
+    .choice-btn:focus-visible {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 18px rgba(95,57,24,0.18);
+    }
+
+    .choice-btn.correct {
+      background: #cbefb6;
+    }
+
+    .choice-btn.wrong {
+      background: #ffc3b7;
+    }
+
+    .choice-btn:disabled {
+      opacity: 0.9;
+      cursor: default;
+    }
+
+    .helper-callout {
+      display: none;
+    }
+
+    .repair-preview {
+      margin-top: 18px;
+      padding: 18px 16px;
+      background: linear-gradient(180deg, rgba(255,249,227,0.96), rgba(244,223,180,0.9));
+      border: 3px dashed rgba(95,57,24,0.7);
+    }
+
+    .repair-word {
+      display: flex;
+      direction: rtl;
+      justify-content: flex-end;
+      gap: 10px;
+      min-height: 54px;
+      margin-bottom: 10px;
+    }
+
+    .repair-caption {
+      display: none;
+    }
+
+    .mode-root {
+      margin: 2px 0 16px;
+      font-size: 1.7rem;
+      font-weight: 900;
+      color: #4a2207;
+    }
+
+    .tower-stage {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 16px;
+      align-items: end;
+      margin-top: 18px;
+    }
+
+    .tower-well {
+      min-height: 280px;
+      padding: 14px;
+      background: linear-gradient(180deg, rgba(255,249,227,0.95), rgba(239,216,163,0.92));
+      border: 3px dashed rgba(95,57,24,0.7);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .tower-stack {
+      width: min(220px, 100%);
+      display: flex;
+      flex-direction: column-reverse;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tower-block {
+      width: 100%;
+      padding: 10px 12px;
+      text-align: center;
+      border: 3px solid rgba(95,57,24,0.88);
+      background: linear-gradient(180deg, #f7d05b, #e8b93a);
+      font-weight: 700;
+      box-shadow: 0 6px 0 rgba(95,57,24,0.18);
+    }
+
+    .tower-block.placeholder {
+      opacity: 0.45;
+      background: linear-gradient(180deg, #f2e8c2, #e4d5a0);
+    }
+
+    .tower-stats {
+      display: grid;
+      gap: 12px;
+    }
+
+    .drag-stage {
+      display: grid;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .drop-lane {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      align-items: center;
+    }
+
+    .drop-slot {
+      min-height: 150px;
+      padding: 12px 18px;
+      border: 3px dashed rgba(95,57,24,0.7);
+      background: rgba(255,249,227,0.92);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 2.15rem;
+      font-weight: 800;
+      line-height: 1.05;
+      border-radius: 22px;
+    }
+
+    .drop-slot.active {
+      background: #fff1b9;
+      border-style: solid;
+    }
+
+    .drop-slot.filled {
+      border-style: solid;
+      background: #cbefb6;
+    }
+
+    .root-slot {
+      min-height: 150px;
+      padding: 12px 18px;
+      border: 3px solid rgba(95,57,24,0.88);
+      background: linear-gradient(180deg, rgba(255,249,227,0.96), rgba(239,216,163,0.92));
+      text-align: center;
+      font-size: 2.05rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.05;
+      border-radius: 22px;
+    }
+
+    .drag-bank {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .drag-token {
+      padding: 16px 20px;
+      border: 3px solid rgba(95,57,24,0.88);
+      background: linear-gradient(180deg, #fffbe7, #ffd86f);
+      font: inherit;
+      font-size: 2rem;
+      font-weight: 800;
+      cursor: grab;
+      user-select: none;
+      border-radius: 14px;
+    }
+
+    .drag-token:active {
+      cursor: grabbing;
+    }
+
+    .drag-token.used {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .drag-token.selected {
+      background: #ffe08a;
+      outline: 3px solid rgba(29,22,15,0.4);
+    }
+
+    .sort-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .sort-column {
+      padding: 14px;
+      min-height: 220px;
+      border: 3px dashed rgba(95,57,24,0.7);
+      background: rgba(255,249,227,0.92);
+    }
+
+    .sort-column h3 {
+      margin: 0 0 12px;
+    }
+
+    .sort-dropzone {
+      min-height: 140px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-content: flex-start;
+    }
+
+    .sort-dropzone.active {
+      background: rgba(255,241,185,0.6);
+    }
+
+    .sort-bank {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .arcade-stage {
+      display: grid;
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .arcade-track {
+      position: relative;
+      min-height: 130px;
+      overflow: hidden;
+      border: 3px dashed rgba(95,57,24,0.7);
+      background: linear-gradient(180deg, rgba(255,249,227,0.96), rgba(239,216,163,0.92));
+    }
+
+    .arcade-lane {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 4px;
+      background: rgba(95,57,24,0.25);
+      transform: translateY(-50%);
+    }
+
+    .arcade-cart {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 12px 14px;
+      border: 3px solid rgba(95,57,24,0.88);
+      background: #fff4c8;
+      font-size: 1.8rem;
+      font-weight: 800;
+      box-shadow: 0 6px 0 rgba(95,57,24,0.18);
+      transition: left 160ms linear;
+    }
+
+    .arcade-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    .clue-list {
+      display: grid;
+      gap: 10px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .clue-list li {
+      padding: 12px 14px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.84), rgba(249,239,210,0.9));
+      border-left: 6px solid var(--gold);
+    }
+
+    #sidePanel {
+      display: none;
+    }
+
+    #contextRow {
+      display: none;
+    }
+
+    .summary {
+      display: none;
+      padding: 24px;
+      background:
+        linear-gradient(180deg, rgba(255,248,221,0.95), rgba(252,229,162,0.96));
+    }
+
+    .summary-box {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 24px;
+      text-align: center;
+      border: 4px solid var(--beam-dark);
+      background: linear-gradient(180deg, rgba(255,255,255,0.8), rgba(248,235,198,0.88));
+    }
+
+    .big-score {
+      font-size: clamp(2.6rem, 8vw, 4.8rem);
+      margin: 8px 0 14px;
+    }
+
+    .footer-note {
+      padding: 18px 24px 24px;
+      background: rgba(255,239,188,0.88);
+      border-top: 3px solid #d6ab4b;
+      font-size: 1rem;
+    }
+
+    .hub-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      padding: 16px 20px 8px;
+      background: linear-gradient(180deg, rgba(255,248,223,0.9), rgba(249,236,194,0.82));
+      border-bottom: 2px solid rgba(214,171,75,0.7);
+    }
+
+    .hub-select {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 2px solid rgba(29,22,15,0.18);
+      background: rgba(255,255,255,0.8);
+      font: inherit;
+      font-weight: 700;
+    }
+
+    @media (max-width: 900px) {
+      .board {
+        grid-template-columns: 1fr;
+      }
+
+      .hero::before {
+        inset: 14px 16px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        width: min(100%, calc(100% - 12px));
+        margin: 6px auto;
+      }
+
+      .hero {
+        padding: 18px 14px 16px;
+      }
+
+      .hero::before {
+        inset: 10px 10px;
+        border-radius: 22px;
+      }
+
+      .hero::after {
+        inset: auto 26px 14px;
+      }
+
+      .hero-kicker {
+        font-size: 0.68rem;
+        letter-spacing: 0.24em;
+      }
+
+      h1 {
+        gap: 8px;
+      }
+
+      .hero-hebrew,
+      .hero-english {
+        width: 100%;
+      }
+
+      .mode-switch,
+      .play-area,
+      .summary {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      .label strong {
+        font-size: 1.6rem;
+      }
+
+      .token {
+        font-size: 1.2rem;
+      }
+
+      .drop-lane {
+        grid-template-columns: 1fr;
+      }
+
+      .drop-slot {
+        min-height: 118px;
+        font-size: 1.85rem;
+      }
+
+      .root-slot {
+        min-height: 118px;
+        max-width: none;
+        width: 100%;
+        margin: 0;
+        font-size: 1.85rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-kicker">Tools • Words • Builds</div>
+      <h1><span class="hero-hebrew">קודש</span><span class="hero-english">Construct</span></h1>
+      <p class="subtitle">Choose a skill set and play.</p>
+    </section>
+
+    <section class="hub-bar">
+      <label class="pill" for="difficultySelect">Level</label>
+      <select class="hub-select" id="difficultySelect">
+        <option value="1" selected>Level 1</option>
+        <option value="2">Level 2</option>
+        <option value="3">Level 3</option>
+      </select>
+    </section>
+
+    <section class="mode-switch" id="menu"></section>
+
+    <section class="play-area" id="playArea">
+      <div class="status-bar">
+        <div class="pill-row">
+          <div class="pill" id="modeName">Mode</div>
+          <div class="pill mode-chip" id="gameModePill">Build Bench</div>
+          <div class="pill" id="roundCount">Round 1 / 6</div>
+          <div class="pill" id="scoreCount">Score 0</div>
+          <div class="pill" id="streakCount">Streak 0</div>
+        </div>
+        <button class="action" id="backToMenu" type="button">Back to Menu</button>
+      </div>
+
+      <div class="board">
+        <section class="panel">
+          <h2 id="roundTitle" class="mode-title">Build the Word</h2>
+          <div class="prompt" id="promptText"></div>
+          <div class="mode-root" id="modeRoot"></div>
+          <div class="pill-row" id="contextRow">
+            <div class="pill" id="baseWord"></div>
+            <div class="pill" id="targetMeaning"></div>
+          </div>
+          <p class="mini-note" id="hintText"></p>
+
+          <div class="mode-panel" id="buildPanel">
+            <div class="workbench">
+              <div class="word-row" id="answerRow"></div>
+            </div>
+
+            <h3>Build Bank</h3>
+            <div class="bank-row" id="bankRow"></div>
+
+            <div class="actions">
+              <button class="action" id="clearBtn" type="button">Clear</button>
+              <button class="action" id="undoBtn" type="button">Undo</button>
+              <button class="action" id="nextBtn" type="button" hidden>Next Round</button>
+            </div>
+          </div>
+
+          <div class="mode-panel" id="pickPanel" hidden>
+            <div class="helper-callout" id="pickerRule"></div>
+            <div class="choice-grid" id="choiceGrid"></div>
+            <div class="actions">
+              <button class="action" id="pickShuffleBtn" type="button">Shuffle Choices</button>
+              <button class="action" id="pickNextBtn" type="button" hidden>Next Round</button>
+            </div>
+          </div>
+
+          <div class="mode-panel" id="fixPanel" hidden>
+            <div class="helper-callout" id="fixRule"></div>
+            <div class="repair-preview">
+              <div class="repair-word" id="repairWord"></div>
+              <div class="repair-caption" id="repairCaption"></div>
+            </div>
+            <div class="choice-grid" id="fixChoiceGrid"></div>
+            <div class="actions">
+              <button class="action" id="fixShuffleBtn" type="button">New Mistake Pattern</button>
+              <button class="action" id="fixNextBtn" type="button" hidden>Next Round</button>
+            </div>
+          </div>
+
+          <div class="mode-panel" id="towerPanel" hidden>
+            <div class="helper-callout" id="towerRule"></div>
+            <div class="tower-stage">
+              <div class="tower-well">
+                <div class="tower-stack" id="towerStack"></div>
+              </div>
+              <div class="tower-stats">
+                <div class="pill" id="towerHeight">Tower Height 0</div>
+                <div class="pill" id="towerGoal">Goal 6 floors</div>
+                <div class="helper-callout">Every correct answer adds one floor. Keep the streak alive to climb faster.</div>
+              </div>
+            </div>
+            <div class="choice-grid" id="towerChoiceGrid"></div>
+            <div class="actions">
+              <button class="action" id="towerShuffleBtn" type="button">Shuffle Choices</button>
+              <button class="action" id="towerNextBtn" type="button" hidden>Next Floor</button>
+            </div>
+          </div>
+
+          <div class="mode-panel" id="dragPanel" hidden>
+            <div class="helper-callout" id="dragRule"></div>
+            <div class="drag-stage">
+              <div class="drop-lane">
+                <div class="drop-slot" id="dragLeftSlot" data-slot="left">Suffix</div>
+                <div class="root-slot" id="dragRootSlot"></div>
+                <div class="drop-slot" id="dragRightSlot" data-slot="right">Prefix</div>
+              </div>
+              <div class="drag-bank" id="dragBank"></div>
+            </div>
+            <div class="actions">
+              <button class="action" id="dragResetBtn" type="button">Reset Drag Board</button>
+              <button class="action" id="dragNextBtn" type="button" hidden>Next Round</button>
+            </div>
+          </div>
+
+          <div class="mode-panel" id="sortPanel" hidden>
+            <div class="helper-callout" id="sortRule"></div>
+            <div class="sort-columns">
+              <div class="sort-column">
+                <h3 id="sortSuffixLabel">Suffix Bin</h3>
+                <div class="sort-dropzone" id="sortSuffixZone" data-zone="suffix"></div>
+              </div>
+              <div class="sort-column">
+                <h3 id="sortPrefixLabel">Prefix Bin</h3>
+                <div class="sort-dropzone" id="sortPrefixZone" data-zone="prefix"></div>
+              </div>
+            </div>
+            <div class="sort-bank" id="sortBank"></div>
+            <div class="actions">
+              <button class="action" id="sortResetBtn" type="button">Reset Sort</button>
+              <button class="action" id="sortNextBtn" type="button" hidden>Next Round</button>
+            </div>
+          </div>
+
+          <div class="mode-panel" id="arcadePanel" hidden>
+            <div class="helper-callout" id="arcadeRule"></div>
+            <div class="arcade-stage">
+              <div class="arcade-track" id="arcadeTrack">
+                <div class="arcade-lane"></div>
+                <div class="arcade-cart" id="arcadeCart"></div>
+              </div>
+              <div class="pill-row">
+                <div class="pill" id="arcadeLives">Lives 3</div>
+                <div class="pill" id="arcadeCaught">Caught 0</div>
+              </div>
+              <div class="arcade-controls">
+                <button class="action primary" id="arcadeCatchBtn" type="button">Catch</button>
+                <button class="action" id="arcadeSkipBtn" type="button">Skip</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="feedback" id="feedback"></div>
+        </section>
+
+        <aside class="panel" id="sidePanel">
+          <h3 id="sideTitle">How This Prototype Works</h3>
+          <ul class="clue-list" id="sideList">
+            <li>Click tiles to assemble the word on the workbench.</li>
+            <li>Prefixes belong on the right side of a Hebrew word and suffixes belong on the left.</li>
+            <li>You get points for correct builds and bonus streak points for back-to-back success.</li>
+            <li>This is a fast proof of concept, so the content set is intentionally small and editable.</li>
+          </ul>
+        </aside>
+      </div>
+    </section>
+
+    <section class="summary" id="summary">
+      <div class="summary-box">
+        <h2>Shift Complete</h2>
+        <div class="big-score" id="finalScore">0 / 6</div>
+        <p id="summaryText"></p>
+        <div class="actions" style="justify-content:center;">
+          <button class="action primary" id="playAgain" type="button">Play This Set Again</button>
+          <button class="action" id="chooseAnother" type="button">Choose Another Set</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="footer-note">
+      Prototype goal: prove a shared game shell with multiple practice styles before expanding into a fuller learning arcade with more modes, art, sound, and curriculum data.
+    </section>
+  </main>
+
+  <script src="kodesh-construct-data.js?v=4"></script>
+  <script>
+    const NONE_CHOICE = "__NONE__";
+    const STORAGE_KEY = "kodesh-construct-progress-v1";
+    const SORT_PREFIX_PIECES = ["ב", "ל", "מ", "כ", "ו", "א", "נ"];
+    const SORT_SUFFIX_PIECES = ["ך", "ם", "נו", "תי"];
+    const decks = window.KODESH_CONSTRUCT_DECKS || [];
+    window.KODESH_CONSTRUCT_DECKS = decks;
+
+    const modeDetails = {
+      build: {
+        label: "Build Bench",
+        menuText: "Build Bench",
+        sideTitle: "Build Bench",
+        sideTips: [
+          "Click tiles to assemble the word on the workbench.",
+          "Prefixes belong on the right side of a Hebrew word and suffixes belong on the left.",
+          "Use this mode when students need slower, more visual construction practice.",
+          "This mode is best for learning how the pieces fit together."
+        ]
+      },
+      pick: {
+        label: "Affix Picker",
+        menuText: "Affix Picker",
+        sideTitle: "Affix Picker",
+        sideTips: [
+          "Read the meaning prompt, then choose the correct affix quickly.",
+          "This mode isolates the prefix or suffix before full word building.",
+          "Wrong answers break the streak, so it works well for fluency practice.",
+          "It is a good bridge between guided learning and fast arcade-style review."
+        ]
+      },
+      fix: {
+        label: "Fix-It Shop",
+        menuText: "Fix-It Shop",
+        sideTitle: "Fix-It Shop",
+        sideTips: [
+          "Inspect a broken form and decide what needs to be repaired.",
+          "Some mistakes use the wrong affix and some put the affix on the wrong side.",
+          "This mode teaches students to diagnose mistakes instead of only answering fresh prompts.",
+          "It is especially good for review after students know the basic rules."
+        ]
+      },
+      tower: {
+        label: "Tower Builder",
+        menuText: "Tower Builder",
+        sideTitle: "Tower Builder",
+        sideTips: [
+          "Answer correctly to add floors to your tower.",
+          "This mode reuses quick affix choices, but turns them into visible progress.",
+          "A correct streak keeps the build moving and makes review feel more like a game.",
+          "It is a simple first progression mode that can later add hazards, timers, or themes."
+        ]
+      },
+      drag: {
+        label: "Drag Builder",
+        menuText: "Drag Builder",
+        sideTitle: "Drag Builder",
+        sideTips: [
+          "Drag the piece into the correct side of the Hebrew word.",
+          "Prefixes must land on the right and suffixes must land on the left.",
+          "This mode gives students a more physical spatial action than clicking choices.",
+          "It is the best current mode for teaching side placement directly."
+        ]
+      },
+      sort: {
+        label: "Sorting Yard",
+        menuText: "Sorting Yard",
+        sideTitle: "Sorting Yard",
+        sideTips: [
+          "Sort pieces into the prefix and suffix bins.",
+          "This mode teaches students to classify the pieces themselves, not just answer a prompt.",
+          "It works especially well for mixed review across different skill families.",
+          "It adds a clean concept-check mechanic that is different from building and choosing."
+        ]
+      },
+      arcade: {
+        label: "Conveyor Catch",
+        menuText: "Conveyor Catch",
+        sideTitle: "Conveyor Catch",
+        sideTips: [
+          "Watch the moving cart and decide fast whether to catch it or let it pass.",
+          "This mode pushes fluency and quick recognition instead of careful construction.",
+          "Correct catches build confidence; wrong catches cost lives.",
+          "It is the first step toward a more arcade-style review pack."
+        ]
+      }
+    };
+
+    const menu = document.getElementById("menu");
+    const playArea = document.getElementById("playArea");
+    const summary = document.getElementById("summary");
+    const modeName = document.getElementById("modeName");
+    const gameModePill = document.getElementById("gameModePill");
+    const difficultySelect = document.getElementById("difficultySelect");
+    const roundCount = document.getElementById("roundCount");
+    const scoreCount = document.getElementById("scoreCount");
+    const streakCount = document.getElementById("streakCount");
+    const roundTitle = document.getElementById("roundTitle");
+    const promptText = document.getElementById("promptText");
+    const modeRoot = document.getElementById("modeRoot");
+    const baseWord = document.getElementById("baseWord");
+    const targetMeaning = document.getElementById("targetMeaning");
+    const hintText = document.getElementById("hintText");
+    const answerRow = document.getElementById("answerRow");
+    const bankRow = document.getElementById("bankRow");
+    const buildPanel = document.getElementById("buildPanel");
+    const pickPanel = document.getElementById("pickPanel");
+    const fixPanel = document.getElementById("fixPanel");
+    const choiceGrid = document.getElementById("choiceGrid");
+    const pickerRule = document.getElementById("pickerRule");
+    const fixRule = document.getElementById("fixRule");
+    const repairWord = document.getElementById("repairWord");
+    const repairCaption = document.getElementById("repairCaption");
+    const fixChoiceGrid = document.getElementById("fixChoiceGrid");
+    const towerPanel = document.getElementById("towerPanel");
+    const towerRule = document.getElementById("towerRule");
+    const towerStack = document.getElementById("towerStack");
+    const towerHeight = document.getElementById("towerHeight");
+    const towerGoal = document.getElementById("towerGoal");
+    const towerChoiceGrid = document.getElementById("towerChoiceGrid");
+    const dragPanel = document.getElementById("dragPanel");
+    const dragRule = document.getElementById("dragRule");
+    const dragLeftSlot = document.getElementById("dragLeftSlot");
+    const dragRightSlot = document.getElementById("dragRightSlot");
+    const dragRootSlot = document.getElementById("dragRootSlot");
+    const dragBank = document.getElementById("dragBank");
+    const sortPanel = document.getElementById("sortPanel");
+    const sortRule = document.getElementById("sortRule");
+    const sortPrefixLabel = document.getElementById("sortPrefixLabel");
+    const sortSuffixLabel = document.getElementById("sortSuffixLabel");
+    const sortPrefixZone = document.getElementById("sortPrefixZone");
+    const sortSuffixZone = document.getElementById("sortSuffixZone");
+    const sortBank = document.getElementById("sortBank");
+    const arcadePanel = document.getElementById("arcadePanel");
+    const arcadeRule = document.getElementById("arcadeRule");
+    const arcadeCart = document.getElementById("arcadeCart");
+    const arcadeLives = document.getElementById("arcadeLives");
+    const arcadeCaught = document.getElementById("arcadeCaught");
+    const feedback = document.getElementById("feedback");
+    const nextBtn = document.getElementById("nextBtn");
+    const pickNextBtn = document.getElementById("pickNextBtn");
+    const fixNextBtn = document.getElementById("fixNextBtn");
+    const towerNextBtn = document.getElementById("towerNextBtn");
+    const dragNextBtn = document.getElementById("dragNextBtn");
+    const sortNextBtn = document.getElementById("sortNextBtn");
+    const sideTitle = document.getElementById("sideTitle");
+    const sideList = document.getElementById("sideList");
+    const finalScore = document.getElementById("finalScore");
+    const summaryText = document.getElementById("summaryText");
+
+    let activeDeck = null;
+    let activeGameMode = "build";
+    let roundIndex = 0;
+    let score = 0;
+    let streak = 0;
+    let builtAnswer = [];
+    let checked = false;
+    let pickerOptions = [];
+    let fixOptions = [];
+    let currentFix = null;
+    let towerOptions = [];
+    let towerFloors = [];
+    let dragOptions = [];
+    let draggedPiece = null;
+    let selectedDragPiece = null;
+    let dragPlacement = { left: null, right: null };
+    let sortItems = [];
+    let selectedSortPiece = null;
+    let sortPlacement = { prefix: [], suffix: [] };
+    let arcadeLivesLeft = 3;
+    let arcadeCaughtCount = 0;
+    let arcadeCurrent = null;
+    let autoAdvanceTimer = null;
+    let sessionCount = 0;
+    let bestScore = 0;
+    let currentDifficultyCap = 1;
+    let progressState = { completions: {}, bestByMode: {} };
+
+    function shuffle(list) {
+      const clone = [...list];
+      for (let i = clone.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [clone[i], clone[j]] = [clone[j], clone[i]];
+      }
+      return clone;
+    }
+
+    function safeStorageGet() {
+      try {
+        return JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "null");
+      } catch {
+        return null;
+      }
+    }
+
+    function loadProgress() {
+      const saved = safeStorageGet();
+      if (!saved) return;
+      sessionCount = saved.sessionCount || 0;
+      bestScore = saved.bestScore || 0;
+      currentDifficultyCap = saved.currentDifficultyCap || 1;
+      progressState = {
+        completions: saved.completions || {},
+        bestByMode: saved.bestByMode || {}
+      };
+    }
+
+    function saveProgress() {
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          sessionCount,
+          bestScore,
+          currentDifficultyCap,
+          completions: progressState.completions,
+          bestByMode: progressState.bestByMode
+        }));
+      } catch {
+        // Ignore storage failures and keep the arcade playable.
+      }
+    }
+
+    function completionKey(deckId, mode) {
+      return `${deckId}:${mode}`;
+    }
+
+    function currentCard() {
+      return filteredCards()[roundIndex];
+    }
+
+    function filteredCards() {
+      return activeDeck.cards
+        .filter((card) => (card.difficulty || 1) <= currentDifficultyCap)
+        .sort((a, b) => {
+          const aDifficulty = a.difficulty || 1;
+          const bDifficulty = b.difficulty || 1;
+          const aPriority = aDifficulty === currentDifficultyCap ? 0 : 1;
+          const bPriority = bDifficulty === currentDifficultyCap ? 0 : 1;
+          if (aPriority !== bPriority) return aPriority - bPriority;
+          return bDifficulty - aDifficulty;
+        });
+    }
+
+    function isPrefixDeck(deck = activeDeck) {
+      return deck.affixType === "prefix";
+    }
+
+    function isVerbSortDeck(deck = activeDeck) {
+      return deck && (deck.id === "future" || deck.id === "past");
+    }
+
+    function getSortConfig() {
+      if (isVerbSortDeck()) {
+        return {
+          leftKey: "past",
+          leftLabel: "Past",
+          rightKey: "future",
+          rightLabel: "Future"
+        };
+      }
+
+      return {
+        leftKey: "suffix",
+        leftLabel: "Suffix Bin",
+        rightKey: "prefix",
+        rightLabel: "Prefix Bin"
+      };
+    }
+
+    function buildSurfaceWord(card) {
+      return (card.answer || []).join("");
+    }
+
+    function getCorrectAffix(card) {
+      if (activeDeck.affixType === "prefix") {
+        return card.answer[0] || "";
+      }
+      return card.answer.length > 1 ? card.answer[card.answer.length - 1] : "";
+    }
+
+    function displayAffix(affix) {
+      return affix === NONE_CHOICE ? "No suffix needed" : affix;
+    }
+
+    function renderMenu() {
+      menu.innerHTML = "";
+      decks.forEach((deck) => {
+        const visibleCount = deck.cards.filter((card) => (card.difficulty || 1) <= currentDifficultyCap).length;
+        const completedModes = Object.keys(modeDetails).filter((mode) => progressState.completions[completionKey(deck.id, mode)]).length;
+        const card = document.createElement("article");
+        card.className = "card";
+        card.innerHTML = `
+          <div class="card-top">
+            <div class="tools">${deck.icon}</div>
+          </div>
+          <div class="label ${deck.colorClass}">
+            <strong>${deck.hebrew}</strong>
+            <strong>${deck.title}</strong>
+            <span>${deck.affixType === "prefix" ? "Prefixes belong on the right" : "Suffixes belong on the left"}</span>
+          </div>
+          <div class="menu-copy">Level ${currentDifficultyCap} • ${visibleCount} cards • ${completedModes}/${Object.keys(modeDetails).length} cleared</div>
+          <div class="menu-actions">
+            <button class="menu-action" type="button" data-deck="${deck.id}" data-mode="build">Build Bench</button>
+            <button class="menu-action alt" type="button" data-deck="${deck.id}" data-mode="drag">Drag Builder</button>
+            <button class="menu-action alt" type="button" data-deck="${deck.id}" data-mode="sort">Sorting Yard</button>
+            <button class="menu-action alt" type="button" data-deck="${deck.id}" data-mode="pick">Affix Picker</button>
+            <button class="menu-action alt" type="button" data-deck="${deck.id}" data-mode="fix">Fix-It Shop</button>
+            <button class="menu-action alt" type="button" data-deck="${deck.id}" data-mode="tower">Tower Builder</button>
+            <button class="menu-action alt" type="button" data-deck="${deck.id}" data-mode="arcade">Conveyor Catch</button>
+          </div>
+        `;
+        menu.appendChild(card);
+      });
+    }
+
+    function updateSidebar() {
+      const details = modeDetails[activeGameMode];
+      sideTitle.textContent = details.sideTitle;
+      sideList.innerHTML = "";
+      details.sideTips.forEach((tip) => {
+        const item = document.createElement("li");
+        item.textContent = tip;
+        sideList.appendChild(item);
+      });
+    }
+
+    function updateScoreboard() {
+      modeName.textContent = activeDeck.title;
+      gameModePill.textContent = modeDetails[activeGameMode].label;
+      roundCount.textContent = `Round ${roundIndex + 1} / ${filteredCards().length}`;
+      scoreCount.textContent = `Score ${score}`;
+      streakCount.textContent = `Streak ${streak}`;
+    }
+
+    function updateHub() {
+      difficultySelect.value = String(currentDifficultyCap);
+    }
+
+    function startDeck(deckId, mode) {
+      activeDeck = decks.find((deck) => deck.id === deckId);
+      activeGameMode = mode;
+      roundIndex = 0;
+      score = 0;
+      streak = 0;
+      currentDifficultyCap = Number(difficultySelect.value || 1);
+      builtAnswer = [];
+      checked = false;
+      pickerOptions = [];
+      fixOptions = [];
+      currentFix = null;
+      towerOptions = [];
+      towerFloors = [];
+      dragOptions = [];
+      draggedPiece = null;
+      selectedDragPiece = null;
+      dragPlacement = { left: null, right: null };
+      sortItems = [];
+      selectedSortPiece = null;
+      sortPlacement = { prefix: [], suffix: [] };
+      arcadeLivesLeft = 3;
+      arcadeCaughtCount = 0;
+      arcadeCurrent = null;
+      summary.classList.remove("active");
+      menu.style.display = "none";
+      playArea.classList.add("active");
+      updateSidebar();
+      renderRound();
+    }
+
+    function renderRound() {
+      const card = currentCard();
+      if (autoAdvanceTimer) {
+        clearTimeout(autoAdvanceTimer);
+        autoAdvanceTimer = null;
+      }
+      builtAnswer = [];
+      checked = false;
+      feedback.textContent = "";
+      feedback.className = "feedback";
+      nextBtn.hidden = true;
+      pickNextBtn.hidden = true;
+      fixNextBtn.hidden = true;
+      towerNextBtn.hidden = true;
+      dragNextBtn.hidden = true;
+      sortNextBtn.hidden = true;
+      updateScoreboard();
+      baseWord.textContent = `Base: ${card.root} (${card.rootMeaning})`;
+      targetMeaning.textContent = `Target: ${card.meaning}`;
+      modeRoot.textContent = `${card.root} (${card.rootMeaning})`;
+      modeRoot.hidden = activeGameMode === "sort";
+
+      if (activeGameMode === "build") {
+        roundTitle.textContent = "Build";
+        promptText.textContent = `Build: "${card.meaning}"`;
+        hintText.textContent = isPrefixDeck()
+          ? "Tip: in Hebrew, place the prefix on the right side of the root."
+          : "Tip: in Hebrew, place the suffix on the left side of the root.";
+        buildPanel.hidden = false;
+        pickPanel.hidden = true;
+        fixPanel.hidden = true;
+        towerPanel.hidden = true;
+        dragPanel.hidden = true;
+        sortPanel.hidden = true;
+        arcadePanel.hidden = true;
+        renderBuildRound();
+      } else if (activeGameMode === "drag") {
+        roundTitle.textContent = "Drag";
+        promptText.textContent = `Drag: "${card.meaning}"`;
+        hintText.textContent = isPrefixDeck()
+          ? "Drag the prefix to the right side of the root."
+          : "Drag the suffix to the left side of the root.";
+        buildPanel.hidden = true;
+        pickPanel.hidden = true;
+        fixPanel.hidden = true;
+        towerPanel.hidden = true;
+        dragPanel.hidden = false;
+        sortPanel.hidden = true;
+        arcadePanel.hidden = true;
+        renderDragRound();
+      } else if (activeGameMode === "sort") {
+        roundTitle.textContent = "Sort";
+        promptText.textContent = "Sort the pieces";
+        hintText.textContent = "Use what you know about the piece itself, not just this one target meaning.";
+        buildPanel.hidden = true;
+        pickPanel.hidden = true;
+        fixPanel.hidden = true;
+        towerPanel.hidden = true;
+        dragPanel.hidden = true;
+        sortPanel.hidden = false;
+        arcadePanel.hidden = true;
+        renderSortRound();
+      } else if (activeGameMode === "arcade") {
+        roundTitle.textContent = "Catch";
+        promptText.textContent = `Catch: "${card.meaning}"`;
+        hintText.textContent = "Quick choice: catch the right cart, skip the wrong one.";
+        buildPanel.hidden = true;
+        pickPanel.hidden = true;
+        fixPanel.hidden = true;
+        towerPanel.hidden = true;
+        dragPanel.hidden = true;
+        sortPanel.hidden = true;
+        arcadePanel.hidden = false;
+        renderArcadeRound();
+      } else if (activeGameMode === "pick") {
+        roundTitle.textContent = "Pick";
+        promptText.textContent = `Pick: "${card.meaning}"`;
+        hintText.textContent = isPrefixDeck()
+          ? "Fast rule: the prefix belongs on the right side once the word is built."
+          : "Fast rule: the suffix belongs on the left side once the word is built.";
+        buildPanel.hidden = true;
+        pickPanel.hidden = false;
+        fixPanel.hidden = true;
+        towerPanel.hidden = true;
+        dragPanel.hidden = true;
+        sortPanel.hidden = true;
+        arcadePanel.hidden = true;
+        renderPickerRound();
+      } else if (activeGameMode === "fix") {
+        roundTitle.textContent = "Fix";
+        promptText.textContent = `Fix: "${card.meaning}"`;
+        hintText.textContent = "Look for the wrong affix or the affix placed on the wrong side of the root.";
+        buildPanel.hidden = true;
+        pickPanel.hidden = true;
+        fixPanel.hidden = false;
+        towerPanel.hidden = true;
+        dragPanel.hidden = true;
+        sortPanel.hidden = true;
+        arcadePanel.hidden = true;
+        renderFixRound();
+      } else {
+        roundTitle.textContent = "Tower";
+        promptText.textContent = `Tower: "${card.meaning}"`;
+        hintText.textContent = "Every correct answer adds a new level to your tower.";
+        buildPanel.hidden = true;
+        pickPanel.hidden = true;
+        fixPanel.hidden = true;
+        towerPanel.hidden = false;
+        dragPanel.hidden = true;
+        sortPanel.hidden = true;
+        arcadePanel.hidden = true;
+        renderTowerRound();
+      }
+    }
+
+    function renderBuildRound() {
+      const card = currentCard();
+      answerRow.innerHTML = "";
+      bankRow.innerHTML = "";
+
+      shuffle(card.bank).forEach((piece) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "token";
+        button.textContent = piece;
+        button.dataset.piece = piece;
+        button.addEventListener("click", () => addPiece(piece));
+        bankRow.appendChild(button);
+      });
+
+      renderWorkbench();
+      syncBankState();
+    }
+
+    function renderDragRound() {
+      const card = currentCard();
+      const correctAffix = getCorrectAffix(card) || NONE_CHOICE;
+      const distractors = card.bank.filter((piece) => piece !== card.root && piece !== correctAffix);
+      dragOptions = shuffle([correctAffix, ...distractors]).slice(0, Math.max(2, Math.min(4, 1 + distractors.length)));
+      if (!dragOptions.includes(correctAffix)) {
+        dragOptions[0] = correctAffix;
+      }
+      draggedPiece = null;
+      selectedDragPiece = null;
+      dragPlacement = { left: null, right: null };
+      dragRule.textContent = isPrefixDeck()
+        ? `Place the correct prefix on the right side of ${card.root}. Ignore the left slot.`
+        : `Place the correct suffix on the left side of ${card.root}. Ignore the right slot.`;
+      dragRootSlot.textContent = `${card.root} (${card.rootMeaning})`;
+      renderDragBoard();
+    }
+
+    function renderSortRound() {
+      const sortConfig = getSortConfig();
+      sortSuffixLabel.textContent = sortConfig.leftLabel;
+      sortPrefixLabel.textContent = sortConfig.rightLabel;
+      sortSuffixZone.dataset.zone = sortConfig.leftKey;
+      sortPrefixZone.dataset.zone = sortConfig.rightKey;
+
+      if (isVerbSortDeck()) {
+        const futureDeck = decks.find((deck) => deck.id === "future");
+        const pastDeck = decks.find((deck) => deck.id === "past");
+        const futureItems = shuffle(
+          futureDeck.cards
+            .filter((card) => (card.difficulty || 1) <= currentDifficultyCap)
+            .map((card) => ({ piece: buildSurfaceWord(card), type: "future" }))
+        ).slice(0, 4);
+        const pastItems = shuffle(
+          pastDeck.cards
+            .filter((card) => (card.difficulty || 1) <= currentDifficultyCap)
+            .map((card) => ({ piece: buildSurfaceWord(card), type: "past" }))
+        ).slice(0, 4);
+        sortItems = shuffle([...pastItems, ...futureItems]);
+        sortRule.textContent = "Sort the full words by tense.";
+      } else {
+        const prefixItems = shuffle([...SORT_PREFIX_PIECES]).slice(0, 4);
+        const suffixItems = shuffle([...SORT_SUFFIX_PIECES]).slice(0, 4);
+        sortItems = shuffle([
+          ...prefixItems.map((piece) => ({ piece, type: "prefix" })),
+          ...suffixItems.map((piece) => ({ piece, type: "suffix" }))
+        ]);
+        sortRule.textContent = `Current focus: ${activeDeck.title}. Sort all pieces by what they are, even if they come from other sets.`;
+      }
+      selectedSortPiece = null;
+      sortPlacement = {
+        [sortConfig.leftKey]: [],
+        [sortConfig.rightKey]: []
+      };
+      renderSortBoard();
+    }
+
+    function renderSortBoard() {
+      const sortConfig = getSortConfig();
+      renderSortZone(sortPrefixZone, sortConfig.rightKey);
+      renderSortZone(sortSuffixZone, sortConfig.leftKey);
+
+      sortBank.innerHTML = "";
+      sortItems.forEach((item) => {
+        const alreadyPlaced = Object.values(sortPlacement).some((entries) => entries.includes(item.piece));
+        const token = document.createElement("div");
+        token.className = "drag-token";
+        token.textContent = item.piece;
+        token.draggable = !checked && !alreadyPlaced;
+        if (alreadyPlaced) {
+          token.classList.add("used");
+        } else {
+          if (selectedSortPiece === item.piece) token.classList.add("selected");
+          token.addEventListener("click", () => {
+            if (checked) return;
+            selectedSortPiece = item.piece;
+            renderSortBoard();
+          });
+          token.addEventListener("dragstart", (event) => {
+            event.dataTransfer.setData("text/plain", item.piece);
+          });
+        }
+        sortBank.appendChild(token);
+      });
+    }
+
+    function renderSortZone(zone, type) {
+      zone.innerHTML = "";
+      sortPlacement[type].forEach((piece) => {
+        const token = document.createElement("div");
+        token.className = "drag-token used";
+        token.textContent = piece;
+        zone.appendChild(token);
+      });
+    }
+
+    function renderArcadeRound() {
+      const card = currentCard();
+      const correctAffix = getCorrectAffix(card) || NONE_CHOICE;
+      const wrongAffix = getWrongAffix(card);
+      const showCorrect = Math.random() > 0.45;
+      const shownAffix = showCorrect ? correctAffix : wrongAffix;
+      arcadeCurrent = { shownAffix, correctAffix, isCorrect: shownAffix === correctAffix };
+      arcadeRule.textContent = isPrefixDeck()
+        ? `Catch the cart only if it shows the right prefix for ${card.root}.`
+        : `Catch the cart only if it shows the right suffix for ${card.root}.`;
+      arcadeLives.textContent = `Lives ${arcadeLivesLeft}`;
+      arcadeCaught.textContent = `Caught ${arcadeCaughtCount}`;
+      arcadeCart.textContent = displayAffix(shownAffix);
+      arcadeCart.style.left = "6%";
+      setTimeout(() => {
+        arcadeCart.style.left = "72%";
+      }, 40);
+    }
+
+    function renderDragBoard() {
+      dragLeftSlot.textContent = dragPlacement.left || "Suffix";
+      dragRightSlot.textContent = dragPlacement.right || "Prefix";
+      dragLeftSlot.classList.toggle("filled", Boolean(dragPlacement.left));
+      dragRightSlot.classList.toggle("filled", Boolean(dragPlacement.right));
+
+      dragBank.innerHTML = "";
+      dragOptions.forEach((piece) => {
+        const token = document.createElement("div");
+        token.className = "drag-token";
+        token.textContent = displayAffix(piece);
+        token.draggable = !checked;
+        token.dataset.piece = piece;
+        const used = dragPlacement.left === piece || dragPlacement.right === piece;
+        if (used) {
+          token.classList.add("used");
+          token.draggable = false;
+        } else {
+          if (selectedDragPiece === piece) {
+            token.classList.add("selected");
+          }
+          token.addEventListener("dragstart", (event) => {
+            draggedPiece = piece;
+            event.dataTransfer.setData("text/plain", piece);
+          });
+          token.addEventListener("click", () => {
+            if (checked) return;
+            selectedDragPiece = piece;
+            renderDragBoard();
+          });
+        }
+        dragBank.appendChild(token);
+      });
+    }
+
+    function renderWorkbench(resultClass = "") {
+      answerRow.innerHTML = "";
+
+      if (!builtAnswer.length) {
+        const placeholder = document.createElement("div");
+        placeholder.className = "pill";
+        placeholder.textContent = "Workbench empty";
+        answerRow.appendChild(placeholder);
+        return;
+      }
+
+      builtAnswer.forEach((piece, index) => {
+        const token = document.createElement("button");
+        token.type = "button";
+        token.className = `token placed ${resultClass}`.trim();
+        token.textContent = piece;
+        token.addEventListener("click", () => removePiece(index));
+        answerRow.appendChild(token);
+      });
+    }
+
+    function syncBankState() {
+      const usedCounts = builtAnswer.reduce((counts, piece) => {
+        counts[piece] = (counts[piece] || 0) + 1;
+        return counts;
+      }, {});
+
+      Array.from(bankRow.children).forEach((button) => {
+        const piece = button.dataset.piece;
+        const used = usedCounts[piece] || 0;
+        const totalAvailable = currentCard().bank.filter((entry) => entry === piece).length;
+        button.disabled = used >= totalAvailable;
+      });
+    }
+
+    function addPiece(piece) {
+      if (checked) return;
+      const available = currentCard().bank.filter((entry) => entry === piece).length;
+      const used = builtAnswer.filter((entry) => entry === piece).length;
+      if (used >= available) return;
+      builtAnswer.push(piece);
+      renderWorkbench();
+      syncBankState();
+      if (builtAnswer.length >= currentCard().answer.length) {
+        checkBuild();
+      }
+    }
+
+    function removePiece(index) {
+      if (checked) return;
+      builtAnswer.splice(index, 1);
+      renderWorkbench();
+      syncBankState();
+    }
+
+    function clearBuild() {
+      if (checked || activeGameMode !== "build") return;
+      builtAnswer = [];
+      renderWorkbench();
+      syncBankState();
+      feedback.textContent = "";
+      feedback.className = "feedback";
+    }
+
+    function undoBuild() {
+      if (checked || activeGameMode !== "build" || !builtAnswer.length) return;
+      builtAnswer.pop();
+      renderWorkbench();
+      syncBankState();
+    }
+
+    function markRound(correct, goodText, badText) {
+      checked = true;
+      if (correct) {
+        streak += 1;
+        score += 10 + Math.max(0, streak - 1) * 2;
+        feedback.textContent = goodText;
+        feedback.className = "feedback good cheer";
+      } else {
+        streak = 0;
+        feedback.textContent = badText;
+        feedback.className = "feedback bad";
+      }
+      updateScoreboard();
+    }
+
+    function checkBuild() {
+      if (checked || activeGameMode !== "build") return;
+      const card = currentCard();
+      const correct = JSON.stringify(builtAnswer) === JSON.stringify(card.answer);
+      markRound(
+        correct,
+        `Great job! ${card.answer.join("")} is right for "${card.meaning}".`,
+        `Not quite. The correct build is ${card.answer.join(" + ")}.`
+      );
+      renderWorkbench(correct ? "correct" : "wrong");
+      nextBtn.hidden = false;
+    }
+
+    function buildChoicePool(card) {
+      const correctAffix = getCorrectAffix(card) || NONE_CHOICE;
+      const localDistractors = card.bank.filter((piece) => piece !== card.root && piece !== correctAffix);
+      const deckDistractors = activeDeck.cards
+        .map((entry) => getCorrectAffix(entry) || NONE_CHOICE)
+        .filter((piece) => piece !== correctAffix);
+
+      const uniqueChoices = [...new Set([correctAffix, ...shuffle([...localDistractors, ...deckDistractors])])];
+      if (correctAffix === NONE_CHOICE && !uniqueChoices.includes(NONE_CHOICE)) {
+        uniqueChoices.push(NONE_CHOICE);
+      }
+      return shuffle(uniqueChoices.slice(0, 4));
+    }
+
+    function getWrongAffix(card) {
+      const correctAffix = getCorrectAffix(card) || NONE_CHOICE;
+      const options = shuffle(
+        [...new Set(
+          activeDeck.cards
+            .map((entry) => getCorrectAffix(entry) || NONE_CHOICE)
+            .filter((piece) => piece !== correctAffix)
+        )]
+      );
+      return options[0] || correctAffix;
+    }
+
+    function buildWrongForm(card, wrongAffix, issueType) {
+      if (issueType === "wrong-side") {
+        return activeDeck.affixType === "prefix"
+          ? [card.root, wrongAffix]
+          : [wrongAffix, card.root];
+      }
+
+      if (activeDeck.affixType === "prefix") {
+        return [wrongAffix, card.root];
+      }
+      return wrongAffix === NONE_CHOICE ? [card.root] : [card.root, wrongAffix];
+    }
+
+    function renderPickerRound() {
+      const card = currentCard();
+      const correctAffix = getCorrectAffix(card) || NONE_CHOICE;
+      pickerRule.textContent = isPrefixDeck()
+        ? `Rule reminder: once built, the correct prefix sits on the right side of ${card.root}.`
+        : `Rule reminder: once built, the correct suffix sits on the left side of ${card.root}.`;
+      pickerOptions = buildChoicePool(card);
+      if (!pickerOptions.includes(correctAffix)) {
+        pickerOptions[0] = correctAffix;
+        pickerOptions = shuffle(pickerOptions);
+      }
+      renderChoiceButtons();
+    }
+
+    function renderChoiceButtons() {
+      choiceGrid.innerHTML = "";
+      pickerOptions.forEach((choice) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "choice-btn";
+        button.textContent = displayAffix(choice);
+        button.dataset.choice = choice;
+        button.addEventListener("click", () => chooseAffix(choice));
+        choiceGrid.appendChild(button);
+      });
+    }
+
+    function renderTowerStack() {
+      towerStack.innerHTML = "";
+      const totalFloors = activeDeck.cards.length;
+      const visibleFloors = filteredCards().length;
+      for (let i = 0; i < totalFloors; i += 1) {
+        const block = document.createElement("div");
+        block.className = "tower-block";
+        if (i < towerFloors.length) {
+          block.textContent = towerFloors[i];
+        } else {
+          block.classList.add("placeholder");
+          block.textContent = `Floor ${i + 1}`;
+        }
+        towerStack.appendChild(block);
+      }
+      towerHeight.textContent = `Tower Height ${towerFloors.length}`;
+      towerGoal.textContent = `Goal ${visibleFloors} floors`;
+    }
+
+    function renderTowerRound() {
+      const card = currentCard();
+      const correctAffix = getCorrectAffix(card) || NONE_CHOICE;
+      towerRule.textContent = isPrefixDeck()
+        ? `Tower rule: pick the prefix that belongs on the right side of ${card.root}.`
+        : `Tower rule: pick the suffix that belongs on the left side of ${card.root}.`;
+      towerOptions = buildChoicePool(card);
+      if (!towerOptions.includes(correctAffix)) {
+        towerOptions[0] = correctAffix;
+        towerOptions = shuffle(towerOptions);
+      }
+      renderTowerStack();
+      towerChoiceGrid.innerHTML = "";
+      towerOptions.forEach((choice) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "choice-btn";
+        button.textContent = displayAffix(choice);
+        button.dataset.choice = choice;
+        button.addEventListener("click", () => chooseTowerAffix(choice));
+        towerChoiceGrid.appendChild(button);
+      });
+    }
+
+    function renderFixRound() {
+      const card = currentCard();
+      const correctAffix = getCorrectAffix(card) || NONE_CHOICE;
+      const wrongAffix = getWrongAffix(card);
+      const issueType = shuffle(["wrong-affix", "wrong-side"])[0];
+      currentFix = {
+        card,
+        correctAffix,
+        wrongAffix,
+        issueType,
+        shownForm: buildWrongForm(card, issueType === "wrong-side" ? correctAffix : wrongAffix, issueType)
+      };
+
+      fixRule.textContent = issueType === "wrong-side"
+        ? `Repair rule: the affix is correct, but it is sitting on the wrong side of ${card.root}.`
+        : `Repair rule: the affix placement is fine, but the chosen ${activeDeck.affixType} is wrong.`;
+      repairCaption.textContent = `Broken build shown for "${card.meaning}"`;
+
+      repairWord.innerHTML = "";
+      currentFix.shownForm.forEach((piece) => {
+        const token = document.createElement("div");
+        token.className = "token placed wrong";
+        token.textContent = displayAffix(piece);
+        repairWord.appendChild(token);
+      });
+
+      const correctLabel = currentFix.issueType === "wrong-side"
+        ? `Move ${displayAffix(correctAffix)} to the ${activeDeck.affixType === "prefix" ? "right" : "left"} side`
+        : `Replace ${displayAffix(wrongAffix)} with ${displayAffix(correctAffix)}`;
+
+      fixOptions = currentFix.issueType === "wrong-side"
+        ? [
+            correctLabel,
+            `Replace ${displayAffix(correctAffix)} with ${displayAffix(wrongAffix)}`,
+            `Remove ${displayAffix(correctAffix)} completely`,
+            "Keep it the same"
+          ]
+        : [
+            correctLabel,
+            `Move ${displayAffix(wrongAffix)} to the ${activeDeck.affixType === "prefix" ? "right" : "left"} side`,
+            `Keep ${displayAffix(wrongAffix)} and rebuild ${card.root}`,
+            `Use no ${activeDeck.affixType}`
+          ];
+
+      fixChoiceGrid.innerHTML = "";
+      shuffle(fixOptions).forEach((choice) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "choice-btn";
+        button.textContent = choice;
+        button.dataset.choice = choice;
+        button.addEventListener("click", () => chooseFix(choice, correctLabel));
+        fixChoiceGrid.appendChild(button);
+      });
+    }
+
+    function chooseAffix(choice) {
+      if (checked || activeGameMode !== "pick") return;
+      const card = currentCard();
+      const correctAffix = getCorrectAffix(card) || NONE_CHOICE;
+      const correct = choice === correctAffix;
+      markRound(
+        correct,
+        `Nice! ${displayAffix(correctAffix)} matches "${card.meaning}".`,
+        `Not quite. The correct ${activeDeck.affixType} is ${displayAffix(correctAffix)}.`
+      );
+
+      Array.from(choiceGrid.children).forEach((button) => {
+        const buttonChoice = button.dataset.choice;
+        button.disabled = true;
+        if (buttonChoice === correctAffix) {
+          button.classList.add("correct");
+        } else if (buttonChoice === choice) {
+          button.classList.add("wrong");
+        }
+      });
+
+      pickNextBtn.hidden = false;
+    }
+
+    function chooseFix(choice, correctLabel) {
+      if (checked || activeGameMode !== "fix") return;
+      const correct = choice === correctLabel;
+      markRound(
+        correct,
+        `Excellent! ${correctLabel} repairs "${currentCard().meaning}".`,
+        `Not quite. The repair is: ${correctLabel}.`
+      );
+
+      Array.from(fixChoiceGrid.children).forEach((button) => {
+        button.disabled = true;
+        if (button.dataset.choice === correctLabel) {
+          button.classList.add("correct");
+        } else if (button.dataset.choice === choice) {
+          button.classList.add("wrong");
+        }
+      });
+
+      fixNextBtn.hidden = false;
+    }
+
+    function chooseTowerAffix(choice) {
+      if (checked || activeGameMode !== "tower") return;
+      const card = currentCard();
+      const correctAffix = getCorrectAffix(card) || NONE_CHOICE;
+      const correct = choice === correctAffix;
+      if (correct) {
+        towerFloors.push(card.meaning);
+      }
+      markRound(
+        correct,
+        `Great! ${displayAffix(correctAffix)} adds a floor for "${card.meaning}".`,
+        `Not quite. ${displayAffix(correctAffix)} was the right ${activeDeck.affixType}. The tower stays where it is.`
+      );
+
+      Array.from(towerChoiceGrid.children).forEach((button) => {
+        const buttonChoice = button.dataset.choice;
+        button.disabled = true;
+        if (buttonChoice === correctAffix) {
+          button.classList.add("correct");
+        } else if (buttonChoice === choice) {
+          button.classList.add("wrong");
+        }
+      });
+
+      renderTowerStack();
+      towerNextBtn.hidden = false;
+    }
+
+    function handleDragOver(event) {
+      if (checked || activeGameMode !== "drag") return;
+      event.preventDefault();
+      event.currentTarget.classList.add("active");
+    }
+
+    function handleDragLeave(event) {
+      event.currentTarget.classList.remove("active");
+    }
+
+    function handleDrop(event) {
+      if (checked || activeGameMode !== "drag") return;
+      event.preventDefault();
+      event.currentTarget.classList.remove("active");
+      const slot = event.currentTarget.dataset.slot;
+      const piece = event.dataTransfer.getData("text/plain") || draggedPiece;
+      if (!piece) return;
+
+      if (dragPlacement.left === piece) dragPlacement.left = null;
+      if (dragPlacement.right === piece) dragPlacement.right = null;
+      dragPlacement[slot] = piece;
+      draggedPiece = null;
+      selectedDragPiece = null;
+      renderDragBoard();
+      if ((slot === "right" && isPrefixDeck()) || (slot === "left" && !isPrefixDeck())) {
+        checkDragPlacement();
+      }
+    }
+
+    function placeSelectedPiece(slot) {
+      if (checked || activeGameMode !== "drag" || !selectedDragPiece) return;
+      const piece = selectedDragPiece;
+      if (dragPlacement.left === piece) dragPlacement.left = null;
+      if (dragPlacement.right === piece) dragPlacement.right = null;
+      dragPlacement[slot] = piece;
+      selectedDragPiece = null;
+      renderDragBoard();
+      if ((slot === "right" && isPrefixDeck()) || (slot === "left" && !isPrefixDeck())) {
+        checkDragPlacement();
+      }
+    }
+
+    function resetDragBoard() {
+      if (checked || activeGameMode !== "drag") return;
+      dragPlacement = { left: null, right: null };
+      draggedPiece = null;
+      selectedDragPiece = null;
+      renderDragBoard();
+    }
+
+    function checkDragPlacement() {
+      if (checked || activeGameMode !== "drag") return;
+      const correctAffix = getCorrectAffix(currentCard()) || NONE_CHOICE;
+      const correct = isPrefixDeck()
+        ? dragPlacement.right === correctAffix && !dragPlacement.left
+        : dragPlacement.left === correctAffix && !dragPlacement.right;
+
+      markRound(
+        correct,
+        `Yes! ${displayAffix(correctAffix)} is on the right side for "${currentCard().meaning}".`,
+        `Not quite. ${displayAffix(correctAffix)} belongs on the ${isPrefixDeck() ? "right" : "left"} side.`
+      );
+      dragNextBtn.hidden = false;
+      renderDragBoard();
+    }
+
+    function placeSortPiece(zone, piece) {
+      Object.keys(sortPlacement).forEach((key) => {
+        sortPlacement[key] = sortPlacement[key].filter((entry) => entry !== piece);
+      });
+      sortPlacement[zone].push(piece);
+      selectedSortPiece = null;
+      renderSortBoard();
+      const allPlaced = sortItems.length === Object.values(sortPlacement).reduce((sum, entries) => sum + entries.length, 0);
+      if (allPlaced) {
+        checkSortBoard();
+      }
+    }
+
+    function handleSortDrop(event) {
+      if (checked || activeGameMode !== "sort") return;
+      event.preventDefault();
+      event.currentTarget.classList.remove("active");
+      const piece = event.dataTransfer.getData("text/plain");
+      if (!piece) return;
+      placeSortPiece(event.currentTarget.dataset.zone, piece);
+    }
+
+    function handleSortOver(event) {
+      if (checked || activeGameMode !== "sort") return;
+      event.preventDefault();
+      event.currentTarget.classList.add("active");
+    }
+
+    function handleSortLeave(event) {
+      event.currentTarget.classList.remove("active");
+    }
+
+    function placeSelectedSortPiece(zone) {
+      if (checked || activeGameMode !== "sort" || !selectedSortPiece) return;
+      placeSortPiece(zone, selectedSortPiece);
+    }
+
+    function resetSortBoard() {
+      if (checked || activeGameMode !== "sort") return;
+      selectedSortPiece = null;
+      const sortConfig = getSortConfig();
+      sortPlacement = {
+        [sortConfig.leftKey]: [],
+        [sortConfig.rightKey]: []
+      };
+      renderSortBoard();
+    }
+
+    function checkSortBoard() {
+      if (checked || activeGameMode !== "sort") return;
+      const allPlaced = sortItems.length === Object.values(sortPlacement).reduce((sum, entries) => sum + entries.length, 0);
+      const correct = allPlaced && sortItems.every((item) => sortPlacement[item.type].includes(item.piece));
+      markRound(
+        correct,
+        isVerbSortDeck()
+          ? "Great sorting! Every word is in the right tense pile."
+          : "Great sorting! Every piece is in the right bin.",
+        isVerbSortDeck()
+          ? "Not quite. Some words are in the wrong tense pile or still unsorted."
+          : "Not quite. Some pieces are in the wrong bin or still unsorted."
+      );
+      sortNextBtn.hidden = false;
+      renderSortBoard();
+    }
+
+    function resolveArcade(decision) {
+      if (checked || activeGameMode !== "arcade" || !arcadeCurrent) return;
+      const caughtCorrectly = decision === "catch" && arcadeCurrent.isCorrect;
+      const skippedCorrectly = decision === "skip" && !arcadeCurrent.isCorrect;
+      const correct = caughtCorrectly || skippedCorrectly;
+      if (caughtCorrectly) {
+        arcadeCaughtCount += 1;
+      }
+      if (!correct) {
+        arcadeLivesLeft = Math.max(0, arcadeLivesLeft - 1);
+      }
+      markRound(
+        correct,
+        caughtCorrectly
+          ? `Awesome! You caught ${displayAffix(arcadeCurrent.correctAffix)} right on time.`
+          : `Nice! You let the wrong cart pass.`,
+        arcadeCurrent.isCorrect
+          ? `Too bad. ${displayAffix(arcadeCurrent.correctAffix)} should have been caught.`
+          : `Too bad. That cart should have been skipped.`
+      );
+      arcadeLives.textContent = `Lives ${arcadeLivesLeft}`;
+      arcadeCaught.textContent = `Caught ${arcadeCaughtCount}`;
+      autoAdvanceTimer = window.setTimeout(() => {
+        autoAdvanceTimer = null;
+        nextRound();
+      }, 950);
+    }
+
+    function shuffleChoices() {
+      if (checked || activeGameMode !== "pick") return;
+      pickerOptions = shuffle(pickerOptions);
+      renderChoiceButtons();
+    }
+
+    function shuffleFixPattern() {
+      if (checked || activeGameMode !== "fix") return;
+      renderFixRound();
+    }
+
+    function shuffleTowerChoices() {
+      if (checked || activeGameMode !== "tower") return;
+      towerOptions = shuffle(towerOptions);
+      renderTowerRound();
+    }
+
+    function nextRound() {
+      const totalRounds = filteredCards().length;
+      if (roundIndex < totalRounds - 1) {
+        roundIndex += 1;
+        renderRound();
+        return;
+      }
+      showSummary();
+    }
+
+    function showSummary() {
+      playArea.classList.remove("active");
+      summary.classList.add("active");
+      sessionCount += 1;
+      bestScore = Math.max(bestScore, score);
+      progressState.completions[completionKey(activeDeck.id, activeGameMode)] = true;
+      progressState.bestByMode[completionKey(activeDeck.id, activeGameMode)] = Math.max(
+        progressState.bestByMode[completionKey(activeDeck.id, activeGameMode)] || 0,
+        score
+      );
+      saveProgress();
+      updateHub();
+      finalScore.textContent = `${score} points`;
+      summaryText.textContent =
+        `You finished ${activeDeck.title} in ${modeDetails[activeGameMode].label}. Final score: ${score}. Best score for this mode: ${progressState.bestByMode[completionKey(activeDeck.id, activeGameMode)]}. The arcade now includes construction, drag placement, sorting, repair, progression, and fluency play built on the same curriculum set.`;
+    }
+
+    function goToMenu() {
+      if (autoAdvanceTimer) {
+        clearTimeout(autoAdvanceTimer);
+        autoAdvanceTimer = null;
+      }
+      playArea.classList.remove("active");
+      summary.classList.remove("active");
+      menu.style.display = "grid";
+      activeDeck = null;
+    }
+
+    menu.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-deck][data-mode]");
+      if (!button) return;
+      startDeck(button.dataset.deck, button.dataset.mode);
+    });
+
+    document.getElementById("nextBtn").addEventListener("click", nextRound);
+    document.getElementById("pickNextBtn").addEventListener("click", nextRound);
+    document.getElementById("fixNextBtn").addEventListener("click", nextRound);
+    document.getElementById("towerNextBtn").addEventListener("click", nextRound);
+    document.getElementById("dragNextBtn").addEventListener("click", nextRound);
+    document.getElementById("sortNextBtn").addEventListener("click", nextRound);
+    document.getElementById("pickShuffleBtn").addEventListener("click", shuffleChoices);
+    document.getElementById("fixShuffleBtn").addEventListener("click", shuffleFixPattern);
+    document.getElementById("towerShuffleBtn").addEventListener("click", shuffleTowerChoices);
+    document.getElementById("dragResetBtn").addEventListener("click", resetDragBoard);
+    document.getElementById("sortResetBtn").addEventListener("click", resetSortBoard);
+    document.getElementById("arcadeCatchBtn").addEventListener("click", () => resolveArcade("catch"));
+    document.getElementById("arcadeSkipBtn").addEventListener("click", () => resolveArcade("skip"));
+    document.getElementById("clearBtn").addEventListener("click", clearBuild);
+    document.getElementById("undoBtn").addEventListener("click", undoBuild);
+    document.getElementById("backToMenu").addEventListener("click", goToMenu);
+    document.getElementById("playAgain").addEventListener("click", () => startDeck(activeDeck.id, activeGameMode));
+    document.getElementById("chooseAnother").addEventListener("click", goToMenu);
+    difficultySelect.addEventListener("change", () => {
+      currentDifficultyCap = Number(difficultySelect.value || 1);
+      updateHub();
+      renderMenu();
+      saveProgress();
+    });
+
+    [dragLeftSlot, dragRightSlot].forEach((slot) => {
+      slot.addEventListener("dragover", handleDragOver);
+      slot.addEventListener("dragleave", handleDragLeave);
+      slot.addEventListener("drop", handleDrop);
+      slot.addEventListener("click", () => placeSelectedPiece(slot.dataset.slot));
+    });
+
+    [sortPrefixZone, sortSuffixZone].forEach((zone) => {
+      zone.addEventListener("dragover", handleSortOver);
+      zone.addEventListener("dragleave", handleSortLeave);
+      zone.addEventListener("drop", handleSortDrop);
+      zone.addEventListener("click", () => placeSelectedSortPiece(zone.dataset.zone));
+    });
+
+    loadProgress();
+    renderMenu();
+    updateHub();
+  </script>
+</body>
+</html>
