@@ -3,11 +3,12 @@
   const LOCAL_FALLBACK_KEY = "b3SiteSettingsFallback";
   const defaultSettings = {
     siteEnabled: true,
-    games: {
-      "tzitzis-game": true,
-      "tzitzis-quest-arcade": true,
-      "kahoot-word-quiz": true
-    }
+  games: {
+  "tzitzis-game": true,
+  "tzitzis-quest-arcade": true,
+  "kahoot-word-quiz": true,
+  "kodesh-construct": true
+}
   };
 
   function cloneDefaultSettings() {
