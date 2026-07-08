@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="site-settings.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kodesh Construct Prototype</title>
@@ -2580,6 +2584,20 @@
   </style>
 </head>
 <body>
+
+  <script>
+  window.B3SiteSettings.readOnce().then((settings) => {
+    if (!settings.siteEnabled || settings.games["kodesh-construct"] === false) {
+      window.location.replace("index.html");
+    }
+  });
+
+  window.B3SiteSettings.subscribe((settings) => {
+    if (!settings.siteEnabled || settings.games["kodesh-construct"] === false) {
+      window.location.replace("index.html");
+    }
+  });
+</script>
   <div class="cheer-burst" id="cheerBurst"></div>
   <main class="shell">
     <section class="hero">
