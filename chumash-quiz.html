@@ -104,13 +104,13 @@ window.B3SiteSettings.subscribe((settings) => {
 </script>
 <script>
   window.B3SiteSettings.readOnce().then((settings) => {
-    if (!settings.siteEnabled || settings.games["kahoot-word-quiz"] === false) {
+    if (!settings.siteEnabled || settings.games["chumash-quiz"] === false) {
       window.location.replace("index.html");
     }
   });
 
   window.B3SiteSettings.subscribe((settings) => {
-    if (!settings.siteEnabled || settings.games["kahoot-word-quiz"] === false) {
+    if (!settings.siteEnabled || settings.games["chumash-quiz"] === false) {
       window.location.replace("index.html");
     }
   });
