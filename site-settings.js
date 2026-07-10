@@ -7,7 +7,8 @@
   "tzitzis-game": true,
   "tzitzis-quest-arcade": true,
   "kahoot-word-quiz": true,
-  "kodesh-construct": true
+  "kodesh-construct": true,
+    "chumash-quiz": true,
 }
   };
 
