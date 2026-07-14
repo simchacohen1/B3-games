@@ -6,5 +6,5 @@ https://simchacohen1.github.io/B3-games/chumash-quiz.html
 ### Tzitzis Game
 https://simchacohen1.github.io/B3-games/tzitzis_game.html
 
-### kahoot Game
-https://simchacohen1.github.io/B3-games/kahoot_word_quiz_engine_paste_only_any_perek.html
+### Dvarim Game
+https://simchacohen1.github.io/B3-games/Devarim_chumash.html
