@@ -7,4 +7,4 @@ https://simchacohen1.github.io/B3-games/chumash-quiz.html
 https://simchacohen1.github.io/B3-games/tzitzis_game.html
 
 ### Dvarim Game
-https://simchacohen1.github.io/B3-games/Devarim_chumash.html
+https://simchacohen1.github.io/B3-games/kahoot_teacher_teams_v2 (1).html
