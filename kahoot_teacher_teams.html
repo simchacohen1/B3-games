@@ -41,7 +41,17 @@
   .hebrew { direction:rtl; font-size:clamp(52px,11vw,112px); font-weight:900; margin:10px 0 8px; line-height:1.05; }
   .prompt { font-size:22px; font-weight:800; color:#555; }
   .general-question { direction:ltr; unicode-bidi:isolate; font-size:clamp(30px,5vw,58px); line-height:1.25; }
-  .general-question.hebrew-focus { direction:rtl; unicode-bidi:isolate; font-size:clamp(52px,9vw,94px); line-height:1.08; margin:14px 0 10px; }
+  .general-question.hebrew-focus {
+    direction:rtl;
+    unicode-bidi:isolate;
+    font-size:clamp(34px,7vw,82px);
+    line-height:1.18;
+    margin:14px 0 10px;
+    max-width:100%;
+    white-space:normal;
+    overflow-wrap:anywhere;
+    word-break:normal;
+  }
   .general-question.english-focus { direction:ltr; unicode-bidi:isolate; font-size:clamp(30px,5vw,58px); line-height:1.2; margin:16px 0 10px; }
   .general-question .hebrew-run { direction:rtl; unicode-bidi:isolate; display:inline-block; }
   .question-detail { min-height:0; margin:0 0 6px; font-size:clamp(20px,2.4vw,30px); font-weight:900; color:#46178f; direction:ltr; unicode-bidi:isolate; }
@@ -223,6 +233,16 @@ function renderQuestion(){
   const display=buildQuestionDisplay(q);
   $('questionDetail').innerHTML=display.detailHtml;
   $('questionText').className=`general-question ${display.hasHebrew ? 'hebrew-focus' : 'english-focus'}`;
+  if(display.hasHebrew){
+    const phraseLength=String(display.mainText || '').replace(/\s+/g,' ').trim().length;
+    const phraseWords=String(display.mainText || '').trim().split(/\s+/).filter(Boolean).length;
+    $('questionText').style.fontSize =
+      phraseWords >= 8 || phraseLength > 70 ? 'clamp(26px,4.2vw,52px)' :
+      phraseWords >= 5 || phraseLength > 45 ? 'clamp(30px,5vw,62px)' :
+      phraseWords >= 3 || phraseLength > 28 ? 'clamp(34px,6vw,72px)' : '';
+  } else {
+    $('questionText').style.fontSize='';
+  }
   $('questionText').innerHTML=display.mainHtml;
   $('supportText').textContent=display.prompt;
   let opts=[...new Set([q.answer, ...(q.options||[])].filter(Boolean))];
@@ -317,11 +337,18 @@ function csvCell(v){ return '"'+String(v??'').replace(/"/g,'""')+'"'; }
 
 
 function extractHebrewRuns(value){
-  return (String(value ?? '').match(/[֐-׿יִ-ﯯ][֐-׿יִ-ﯯְ-ׇ‌‍׳״\-־'"]*/g) || []).filter(Boolean);
+  // Keep an entire Hebrew phrase together, including spaces between its words.
+  const hebrewWord = `[֐-׿יִ-ﯯ][֐-׿יִ-ﯯְ-ׇ‌‍׳״\\-־'"]*`;
+  const phrasePattern = new RegExp(`${hebrewWord}(?:\\s+${hebrewWord})*`, 'g');
+  return (String(value ?? '').match(phrasePattern) || [])
+    .map(run => run.trim())
+    .filter(Boolean);
 }
 function stripHebrew(value){
+  const hebrewWord = `[֐-׿יִ-ﯯ][֐-׿יִ-ﯯְ-ׇ‌‍׳״\\-־'"]*`;
+  const phrasePattern = new RegExp(`${hebrewWord}(?:\\s+${hebrewWord})*`, 'g');
   return String(value ?? '')
-    .replace(/[֐-׿יִ-ﯯ][֐-׿יִ-ﯯְ-ׇ‌‍׳״\-־'"]*/g,' ')
+    .replace(phrasePattern,' ')
     .replace(/\s+/g,' ')
     .replace(/\s+([?.!,])/g,'$1')
     .trim();
@@ -366,11 +393,12 @@ function buildQuestionDisplay(q){
       hasHebrew:true,
       detailHtml:detail ? formatMixedText(detail) : '',
       mainHtml:formatMixedText(main),
+      mainText:main,
       prompt
     };
   }
 
-  return {hasHebrew:false, detailHtml:'', mainHtml:formatMixedText(question), prompt:''};
+  return {hasHebrew:false, detailHtml:'', mainHtml:formatMixedText(question), mainText:question, prompt:''};
 }
 
 function formatMixedText(value){
