@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tent Trail Trivia - Teacher</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  body { font-family: Calibri, Arial, sans-serif; background: #fdf6ec; margin: 0; padding: 20px; color: #3a2417; }
+  h1 { text-align: center; color: #b85042; margin-bottom: 4px; }
+  .subtitle { text-align: center; color: #7d5236; margin-bottom: 20px; font-style: italic; }
+  .panel { max-width: 700px; margin: 0 auto 24px auto; background: white; border-radius: 12px; border: 1px solid #d9a85c; padding: 24px; text-align: center; }
+  .qnum { color: #7d5236; font-size: 13px; margin-bottom: 8px; }
+  .qhebrew { font-size: 30px; font-weight: bold; margin-bottom: 10px; }
+  .qtext { font-size: 20px; margin-bottom: 16px; }
+  .answer { font-size: 18px; color: #3b6d11; font-weight: bold; min-height: 26px; margin-bottom: 16px; }
+  .controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+  .controls button { font-size: 15px; padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; color: white; }
+  .btn-next { background: #7d5236; }
+  .btn-reveal { background: #d9a85c; color: #3a2417; }
+  .btn-clear { background: #999; }
+  .buzzed { max-width: 700px; margin: 0 auto 24px auto; text-align: center; }
+  .buzzed-name { font-size: 26px; font-weight: bold; color: #b85042; background: #e7e8d1; display: inline-block; padding: 10px 20px; border-radius: 10px; }
+  .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; max-width: 900px; margin: 0 auto; }
+  .team { background: #e7e8d1; border-radius: 10px; padding: 10px; text-align: center; }
+  .team .name { font-weight: bold; font-size: 14px; margin-bottom: 4px; }
+  .team .score { font-size: 20px; font-weight: bold; color: #b85042; }
+  .team button { font-size: 11px; margin: 2px; padding: 3px 6px; border-radius: 6px; border: 1px solid #7d5236; background: white; cursor: pointer; }
+  .link-box { max-width: 700px; margin: 0 auto 20px auto; background: #f0ece0; border-radius: 8px; padding: 10px; text-align: center; font-size: 13px; word-break: break-all; }
+  .posuk-picker { max-width: 900px; margin: 0 auto 24px auto; background: white; border-radius: 12px; border: 1px solid #d9a85c; padding: 16px; }
+  .posuk-picker-title { text-align: center; color: #7d5236; font-size: 14px; margin-bottom: 10px; }
+  .posuk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; }
+  .posuk-btn { font-size: 14px; padding: 8px 0; border-radius: 6px; border: 1px solid #d9a85c; background: #f0ece0; color: #3a2417; cursor: pointer; }
+  .posuk-btn.active { background: #b85042; color: white; border-color: #b85042; }
+</style>
+</head>
+<body>
+
+<h1>Tent Trail Trivia</h1>
+<div class="subtitle">Teacher control screen - Vayeira, Perek 18</div>
+
+<div class="link-box">Send students this page's URL with <b>player.html</b> instead of <b>teacher.html</b> in the address.</div>
+
+<div style="text-align:center; margin-bottom:20px;">
+  <button id="enableSoundBtn" onclick="enableSound()" style="font-size:15px; padding:10px 18px; border-radius:8px; border:none; cursor:pointer; background:#3b6d11; color:white;">Click here to enable sound</button>
+  <button id="resetGameBtn" onclick="resetGame()" style="font-size:15px; padding:10px 18px; border-radius:8px; border:none; cursor:pointer; background:#b85042; color:white; margin-left:8px;">Reset game (clear all names)</button>
+  <span id="soundStatus" style="margin-left:10px; color:#7d5236;"></span>
+</div>
+
+<div class="posuk-picker">
+  <div class="posuk-picker-title">Jump to any posuk:</div>
+  <div class="posuk-grid" id="posukGrid"></div>
+</div>
+
+<div class="panel">
+  <div class="qnum" id="qnum">Posuk 1</div>
+  <div class="qhebrew" id="qhebrew"></div>
+  <div class="qtext" id="qtext"></div>
+  <div class="answer" id="answer"></div>
+  <div class="controls">
+    <button class="btn-reveal" onclick="reveal()">Show answer</button>
+    <button class="btn-clear" onclick="clearBuzz()">Clear buzzer</button>
+    <button class="btn-next" onclick="prevPosuk()">Previous posuk</button>
+    <button class="btn-next" onclick="nextPosuk()">Next posuk</button>
+  </div>
+</div>
+
+<div class="buzzed">
+  <div style="margin-bottom:8px; color:#7d5236;">First to buzz in:</div>
+  <div class="buzzed-name" id="buzzedName">Waiting...</div>
+</div>
+
+<div class="board" id="board"></div>
+
+<script>
+// ---- REPLACE WITH YOUR FIREBASE CONFIG ----
+const firebaseConfig = {
+  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
+  authDomain: "b3-games.firebaseapp.com",
+  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
+  projectId: "b3-games",
+  storageBucket: "b3-games.firebasestorage.app",
+  messagingSenderId: "568530046190",
+  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
+};
+// --------------------------------------------
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const gameRef = db.ref("tentTrailTrivia");
+
+// One entry per posuk in Perek 18. "posuk" is the posuk number (1-33).
+// heb: a key word/phrase from that posuk. en: the question. ans: the answer.
+const questions = [
+  { posuk: 1,  heb: "וַיֵּרָא אֵלָיו",              en: "This phrase means...", ans: "Hashem appeared to him (Avrohom)" },
+  { posuk: 2,  heb: "שְׁלֹשָׁה אֲנָשִׁים נִצָּבִים",  en: "How many men (malachim) did Avrohom see standing near him?", ans: "Three" },
+  { posuk: 3,  heb: "אִם נָא מָצָאתִי חֵן בְּעֵינֶיךָ", en: "'Chein' in this posuk means...", ans: "Favor / good will" },
+  { posuk: 4,  heb: "יֻקַּח נָא מְעַט מַיִם",         en: "What did Avrohom offer to bring first?", ans: "A little water, to wash their feet" },
+  { posuk: 5,  heb: "וְסַעֲדוּ לִבְּכֶם",             en: "This phrase means...", ans: "Refresh/sustain yourselves" },
+  { posuk: 6,  heb: "וַיְמַהֵר אַבְרָהָם הָאֹהֱלָה",   en: "'Vayemaher' means...", ans: "He hurried" },
+  { posuk: 7,  heb: "בֶּן בָּקָר רַךְ וָטוֹב",         en: "What did Avrohom run to get from the herd?", ans: "A tender, good calf" },
+  { posuk: 8,  heb: "חֶמְאָה וְחָלָב",                en: "This phrase means...", ans: "Butter and milk" },
+  { posuk: 9,  heb: "אַיֵּה שָׂרָה אִשְׁתֶּךָ",        en: "What did the malachim ask Avrohom?", ans: "'Where is Sarah your wife?'" },
+  { posuk: 10, heb: "כָּעֵת חַיָּה",                  en: "What did Hashem promise would happen 'at this time next year'?", ans: "Sarah would have a son" },
+  { posuk: 11, heb: "זְקֵנִים בָּאִים בַּיָּמִים",     en: "This phrase describes Avrohom and Sarah as...", ans: "Old, advanced in years" },
+  { posuk: 12, heb: "וַתִּצְחַק שָׂרָה בְּקִרְבָּהּ",   en: "'Vatitzchak' means...", ans: "And she laughed" },
+  { posuk: 13, heb: "לָמָּה זֶּה צָחֲקָה שָׂרָה",       en: "What did Hashem ask Avrohom?", ans: "Why did Sarah laugh?" },
+  { posuk: 14, heb: "הֲיִפָּלֵא מֵה' דָּבָר",           en: "This phrase teaches us that...", ans: "Nothing is too wondrous/hard for Hashem" },
+  { posuk: 15, heb: "וַתְּכַחֵשׁ שָׂרָה",              en: "Why did Sarah deny that she laughed?", ans: "Because she was afraid" },
+  { posuk: 16, heb: "וַיַּשְׁקִפוּ עַל פְּנֵי סְדֹם",   en: "This phrase means the malachim...", ans: "Looked out toward Sedom" },
+  { posuk: 17, heb: "הַמְכַסֶּה אֲנִי מֵאַבְרָהָם",     en: "What did Hashem say about Avrohom?", ans: "Should I hide from Avrohom what I am about to do?" },
+  { posuk: 18, heb: "לְגוֹי גָּדוֹל וְעָצוּם",          en: "This phrase means Avrohom would become...", ans: "A great and mighty nation" },
+  { posuk: 19, heb: "כִּי יְדַעְתִּיו",                en: "Why did Hashem choose Avrohom, according to this posuk?", ans: "To teach his children to do tzedakah and mishpat" },
+  { posuk: 20, heb: "זַעֲקַת סְדֹם וַעֲמֹרָה",          en: "This phrase means...", ans: "The outcry/complaint against Sedom and Amora" },
+  { posuk: 21, heb: "אֵרְדָה נָּא וְאֶרְאֶה",           en: "This phrase means...", ans: "I will go down and see" },
+  { posuk: 22, heb: "וְאַבְרָהָם עוֹדֶנּוּ עֹמֵד",       en: "What was Avrohom still doing before Hashem?", ans: "Standing (davening/praying)" },
+  { posuk: 23, heb: "וַיִּגַּשׁ אַבְרָהָם",              en: "'Vayigash' means...", ans: "He drew near / approached" },
+  { posuk: 24, heb: "אוּלַי יֵשׁ חֲמִשִּׁים צַדִּיקִם",  en: "How many tzadikim did Avrohom first ask Hashem about?", ans: "Fifty" },
+  { posuk: 25, heb: "חָלִלָה לְּךָ",                   en: "This phrase means...", ans: "It would be a desecration/unthinkable for You" },
+  { posuk: 26, heb: "וְנָשָׂאתִי לְכָל הַמָּקוֹם",      en: "What did Hashem answer if 50 tzadikim were found?", ans: "He would spare the entire place" },
+  { posuk: 27, heb: "אָנֹכִי עָפָר וָאֵפֶר",            en: "This phrase shows Avrohom's...", ans: "Humility - 'I am but dust and ashes'" },
+  { posuk: 28, heb: "אוּלַי יַחְסְרוּן חֲמִשִּׁים הַצַּדִּיקִם חֲמִשָּׁה", en: "Avrohom asks: what if there are 5 fewer than fifty tzadikim?", ans: "Forty-five" },
+  { posuk: 29, heb: "אוּלַי יִמָּצְאוּן שָׁם אַרְבָּעִים", en: "Avrohom lowers his request to how many?", ans: "Forty" },
+  { posuk: 30, heb: "אוּלַי יִמָּצְאוּן שָׁם שְׁלֹשִׁים", en: "Avrohom lowers his request to how many?", ans: "Thirty" },
+  { posuk: 31, heb: "אוּלַי יִמָּצְאוּן שָׁם עֶשְׂרִים",  en: "Avrohom lowers his request to how many?", ans: "Twenty" },
+  { posuk: 32, heb: "בַּעֲבוּר הָעֲשָׂרָה",             en: "What is the final, lowest number Avrohom asks about?", ans: "Ten" },
+  { posuk: 33, heb: "וַיֵּלֶךְ ה' כַּאֲשֶׁר כִּלָּה",    en: "This phrase means...", ans: "Hashem went, once He finished speaking" }
+];
+
+function loadQuestion(qIndex) {
+  const q = questions[qIndex] || questions[0];
+  document.getElementById('qnum').textContent = 'Posuk ' + q.posuk;
+  document.getElementById('qhebrew').textContent = q.heb;
+  document.getElementById('qtext').textContent = q.en;
+  highlightActivePosuk(qIndex);
+}
+
+function buildPosukGrid() {
+  const grid = document.getElementById('posukGrid');
+  grid.innerHTML = '';
+  questions.forEach((q, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'posuk-btn';
+    btn.id = 'posukBtn' + i;
+    btn.textContent = q.posuk;
+    btn.onclick = () => goToPosuk(i);
+    grid.appendChild(btn);
+  });
+}
+
+function highlightActivePosuk(qIndex) {
+  questions.forEach((q, i) => {
+    const btn = document.getElementById('posukBtn' + i);
+    if (btn) btn.classList.toggle('active', i === qIndex);
+  });
+}
+
+function goToPosuk(qIndex) {
+  ensureAudioAwake();
+  gameRef.child('qIndex').set(qIndex);
+  gameRef.child('revealed').set(false);
+  gameRef.child('buzzedBy').set(null);
+}
+
+function nextPosuk() {
+  gameRef.child('qIndex').once('value', snap => {
+    const current = snap.val() || 0;
+    goToPosuk((current + 1) % questions.length);
+  });
+}
+
+function prevPosuk() {
+  gameRef.child('qIndex').once('value', snap => {
+    const current = snap.val() || 0;
+    goToPosuk((current - 1 + questions.length) % questions.length);
+  });
+}
+
+function ensureAudioAwake() {
+  if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+    sharedAudioCtx.resume();
+  }
+}
+
+function reveal() {
+  ensureAudioAwake();
+  gameRef.child('revealed').set(true);
+}
+
+function clearBuzz() {
+  ensureAudioAwake();
+  gameRef.child('buzzedBy').set(null);
+}
+
+function adjustScore(name, delta) {
+  ensureAudioAwake();
+  const scoresRef = gameRef.child('scores').child(sanitize(name));
+  scoresRef.transaction(current => (current || 0) + delta);
+}
+
+function sanitize(name) {
+  return name.replace(/[.#$\[\]]/g, '_');
+}
+
+function resetGame() {
+  ensureAudioAwake();
+  const sure = confirm("This will erase ALL player names and scores for a fresh start. Continue?");
+  if (!sure) return;
+  gameRef.set({
+    qIndex: 0,
+    revealed: false,
+    buzzedBy: null,
+    scores: null
+  });
+  document.getElementById('soundStatus').textContent = 'Game reset - names cleared';
+}
+
+let sharedAudioCtx = null;
+
+function enableSound() {
+  sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = sharedAudioCtx.createOscillator();
+  const gain = sharedAudioCtx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(440, sharedAudioCtx.currentTime);
+  gain.gain.setValueAtTime(0.2, sharedAudioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, sharedAudioCtx.currentTime + 0.15);
+  osc.connect(gain);
+  gain.connect(sharedAudioCtx.destination);
+  osc.start();
+  osc.stop(sharedAudioCtx.currentTime + 0.15);
+  document.getElementById('soundStatus').textContent = 'Sound enabled';
+}
+
+function playAlertSound() {
+  try {
+    if (!sharedAudioCtx) {
+      document.getElementById('soundStatus').textContent = 'No audio context - click enable sound';
+      return;
+    }
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume();
+    }
+    const ctx = sharedAudioCtx;
+    [660, 880].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.15);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.15 + 0.2);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.15);
+      osc.stop(ctx.currentTime + i * 0.15 + 0.2);
+    });
+    document.getElementById('soundStatus').textContent = 'Alert fired (state: ' + ctx.state + ')';
+  } catch (err) {
+    document.getElementById('soundStatus').textContent = 'Sound error: ' + err.message;
+  }
+}
+
+let lastBuzzedBy = null;
+
+buildPosukGrid();
+
+gameRef.on('value', snapshot => {
+  const data = snapshot.val() || {};
+  const qIndex = data.qIndex || 0;
+  loadQuestion(qIndex);
+  document.getElementById('answer').textContent = data.revealed ? questions[qIndex].ans : '';
+  document.getElementById('buzzedName').textContent = data.buzzedBy || 'Waiting...';
+
+  if (data.buzzedBy && data.buzzedBy !== lastBuzzedBy) {
+    document.getElementById('soundStatus').textContent = 'Buzz detected: ' + data.buzzedBy;
+    playAlertSound();
+  }
+  lastBuzzedBy = data.buzzedBy || null;
+
+  const scores = data.scores || {};
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  Object.keys(scores).sort().forEach(name => {
+    const div = document.createElement('div');
+    div.className = 'team';
+    div.innerHTML =
+      '<div class="name">' + name + '</div>' +
+      '<div class="score">' + scores[name] + '</div>' +
+      '<button onclick="adjustScore(\'' + name + '\',1)">+1</button>' +
+      '<button onclick="adjustScore(\'' + name + '\',-1)">-1</button>';
+    board.appendChild(div);
+  });
+});
+</script>
+
+</body>
+</html>
