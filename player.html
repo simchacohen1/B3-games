@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tent Trail Trivia - Play</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  body { font-family: Calibri, Arial, sans-serif; background: #fdf6ec; margin: 0; padding: 20px; color: #3a2417; text-align: center; }
+  h1 { color: #b85042; margin-bottom: 4px; }
+  .subtitle { color: #7d5236; margin-bottom: 20px; font-style: italic; }
+  .name-box { max-width: 400px; margin: 0 auto 30px auto; }
+  .name-box input { font-size: 18px; padding: 10px; width: 70%; border-radius: 8px; border: 1px solid #d9a85c; }
+  .name-box button { font-size: 16px; padding: 10px 16px; border-radius: 8px; border: none; background: #7d5236; color: white; cursor: pointer; margin-left: 6px; }
+  .panel { max-width: 500px; margin: 0 auto 24px auto; background: white; border-radius: 12px; border: 1px solid #d9a85c; padding: 24px; }
+  .qnum { color: #7d5236; font-size: 13px; margin-bottom: 8px; }
+  .qhebrew { font-size: 32px; font-weight: bold; margin-bottom: 10px; }
+  .qtext { font-size: 20px; margin-bottom: 20px; }
+  .buzz-btn { font-size: 24px; padding: 24px 40px; border-radius: 50%; border: none; background: #b85042; color: white; cursor: pointer; width: 160px; height: 160px; }
+  .buzz-btn:disabled { background: #ccc; cursor: not-allowed; }
+  .status { margin-top: 16px; font-size: 16px; color: #7d5236; }
+  .score-display { margin-top: 20px; font-size: 18px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<h1>Tent Trail Trivia</h1>
+<div class="subtitle">Vayeira, Perek 18</div>
+
+<div class="name-box" id="nameBox">
+  <input type="text" id="nameInput" placeholder="Type your name" />
+  <button onclick="joinGame()">Join</button>
+</div>
+
+<div id="gameArea" class="hidden">
+  <div class="panel">
+    <div class="qnum" id="qnum">Posuk 1</div>
+    <div class="qhebrew" id="qhebrew"></div>
+    <div class="qtext" id="qtext"></div>
+    <button class="buzz-btn" id="buzzBtn" onclick="buzzIn()">BUZZ IN</button>
+    <div class="status" id="status"></div>
+  </div>
+  <div class="score-display">Your score: <span id="myScore">0</span></div>
+</div>
+
+<script>
+// ---- REPLACE WITH YOUR FIREBASE CONFIG (same as teacher.html) ----
+const firebaseConfig = {
+  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
+  authDomain: "b3-games.firebaseapp.com",
+  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
+  projectId: "b3-games",
+  storageBucket: "b3-games.firebasestorage.app",
+  messagingSenderId: "568530046190",
+  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
+};
+// --------------------------------------------------------------------
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const gameRef = db.ref("tentTrailTrivia");
+
+// Must match teacher.html: same posuk order, just without the "ans" field.
+const questions = [
+  { posuk: 1,  heb: "וַיֵּרָא אֵלָיו",              en: "This phrase means..." },
+  { posuk: 2,  heb: "שְׁלֹשָׁה אֲנָשִׁים נִצָּבִים",  en: "How many men (malachim) did Avrohom see standing near him?" },
+  { posuk: 3,  heb: "אִם נָא מָצָאתִי חֵן בְּעֵינֶיךָ", en: "'Chein' in this posuk means..." },
+  { posuk: 4,  heb: "יֻקַּח נָא מְעַט מַיִם",         en: "What did Avrohom offer to bring first?" },
+  { posuk: 5,  heb: "וְסַעֲדוּ לִבְּכֶם",             en: "This phrase means..." },
+  { posuk: 6,  heb: "וַיְמַהֵר אַבְרָהָם הָאֹהֱלָה",   en: "'Vayemaher' means..." },
+  { posuk: 7,  heb: "בֶּן בָּקָר רַךְ וָטוֹב",         en: "What did Avrohom run to get from the herd?" },
+  { posuk: 8,  heb: "חֶמְאָה וְחָלָב",                en: "This phrase means..." },
+  { posuk: 9,  heb: "אַיֵּה שָׂרָה אִשְׁתֶּךָ",        en: "What did the malachim ask Avrohom?" },
+  { posuk: 10, heb: "כָּעֵת חַיָּה",                  en: "What did Hashem promise would happen 'at this time next year'?" },
+  { posuk: 11, heb: "זְקֵנִים בָּאִים בַּיָּמִים",     en: "This phrase describes Avrohom and Sarah as..." },
+  { posuk: 12, heb: "וַתִּצְחַק שָׂרָה בְּקִרְבָּהּ",   en: "'Vatitzchak' means..." },
+  { posuk: 13, heb: "לָמָּה זֶּה צָחֲקָה שָׂרָה",       en: "What did Hashem ask Avrohom?" },
+  { posuk: 14, heb: "הֲיִפָּלֵא מֵה' דָּבָר",           en: "This phrase teaches us that..." },
+  { posuk: 15, heb: "וַתְּכַחֵשׁ שָׂרָה",              en: "Why did Sarah deny that she laughed?" },
+  { posuk: 16, heb: "וַיַּשְׁקִפוּ עַל פְּנֵי סְדֹם",   en: "This phrase means the malachim..." },
+  { posuk: 17, heb: "הַמְכַסֶּה אֲנִי מֵאַבְרָהָם",     en: "What did Hashem say about Avrohom?" },
+  { posuk: 18, heb: "לְגוֹי גָּדוֹל וְעָצוּם",          en: "This phrase means Avrohom would become..." },
+  { posuk: 19, heb: "כִּי יְדַעְתִּיו",                en: "Why did Hashem choose Avrohom, according to this posuk?" },
+  { posuk: 20, heb: "זַעֲקַת סְדֹם וַעֲמֹרָה",          en: "This phrase means..." },
+  { posuk: 21, heb: "אֵרְדָה נָּא וְאֶרְאֶה",           en: "This phrase means..." },
+  { posuk: 22, heb: "וְאַבְרָהָם עוֹדֶנּוּ עֹמֵד",       en: "What was Avrohom still doing before Hashem?" },
+  { posuk: 23, heb: "וַיִּגַּשׁ אַבְרָהָם",              en: "'Vayigash' means..." },
+  { posuk: 24, heb: "אוּלַי יֵשׁ חֲמִשִּׁים צַדִּיקִם",  en: "How many tzadikim did Avrohom first ask Hashem about?" },
+  { posuk: 25, heb: "חָלִלָה לְּךָ",                   en: "This phrase means..." },
+  { posuk: 26, heb: "וְנָשָׂאתִי לְכָל הַמָּקוֹם",      en: "What did Hashem answer if 50 tzadikim were found?" },
+  { posuk: 27, heb: "אָנֹכִי עָפָר וָאֵפֶר",            en: "This phrase shows Avrohom's..." },
+  { posuk: 28, heb: "אוּלַי יַחְסְרוּן חֲמִשִּׁים הַצַּדִּיקִם חֲמִשָּׁה", en: "Avrohom asks: what if there are 5 fewer than fifty tzadikim?" },
+  { posuk: 29, heb: "אוּלַי יִמָּצְאוּן שָׁם אַרְבָּעִים", en: "Avrohom lowers his request to how many?" },
+  { posuk: 30, heb: "אוּלַי יִמָּצְאוּן שָׁם שְׁלֹשִׁים", en: "Avrohom lowers his request to how many?" },
+  { posuk: 31, heb: "אוּלַי יִמָּצְאוּן שָׁם עֶשְׂרִים",  en: "Avrohom lowers his request to how many?" },
+  { posuk: 32, heb: "בַּעֲבוּר הָעֲשָׂרָה",             en: "What is the final, lowest number Avrohom asks about?" },
+  { posuk: 33, heb: "וַיֵּלֶךְ ה' כַּאֲשֶׁר כִּלָּה",    en: "This phrase means..." }
+];
+
+let myName = "";
+
+function sanitize(name) {
+  return name.replace(/[.#$\[\]]/g, '_');
+}
+
+function joinGame() {
+  const val = document.getElementById('nameInput').value.trim();
+  if (!val) return;
+  myName = sanitize(val);
+  gameRef.child('scores').child(myName).transaction(current => current || 0);
+  document.getElementById('nameBox').classList.add('hidden');
+  document.getElementById('gameArea').classList.remove('hidden');
+}
+
+let sharedPlayerCtx = null;
+
+function playBuzzSound() {
+  if (!sharedPlayerCtx) {
+    sharedPlayerCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (sharedPlayerCtx.state === "suspended") { sharedPlayerCtx.resume(); }
+  const ctx = sharedPlayerCtx;
+  const notes = [523, 659, 784];
+  notes.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.08);
+    gain.gain.setValueAtTime(0.001, ctx.currentTime + i * 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + i * 0.08 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.08 + 0.25);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime + i * 0.08);
+    osc.stop(ctx.currentTime + i * 0.08 + 0.25);
+  });
+}
+
+function buzzIn() {
+  playBuzzSound();
+  gameRef.child('buzzedBy').transaction(current => current || myName);
+}
+
+gameRef.on('value', snapshot => {
+  const data = snapshot.val() || {};
+  const qIndex = data.qIndex || 0;
+  const q = questions[qIndex] || questions[0];
+  document.getElementById('qnum').textContent = 'Posuk ' + q.posuk;
+  document.getElementById('qhebrew').textContent = q.heb;
+  document.getElementById('qtext').textContent = q.en;
+
+  const buzzBtn = document.getElementById('buzzBtn');
+  const status = document.getElementById('status');
+  if (data.buzzedBy) {
+    buzzBtn.disabled = true;
+    status.textContent = data.buzzedBy === myName ? "You buzzed in first!" : data.buzzedBy + " buzzed in first.";
+  } else {
+    buzzBtn.disabled = false;
+    status.textContent = "";
+  }
+
+  if (myName && data.scores && data.scores[myName] !== undefined) {
+    document.getElementById('myScore').textContent = data.scores[myName];
+  }
+});
+</script>
+
+</body>
+</html>
