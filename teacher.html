@@ -36,6 +36,11 @@
 
 <div class="link-box">Send students this page's URL with <b>player.html</b> instead of <b>teacher.html</b> in the address.</div>
 
+<div style="text-align:center; margin-bottom:20px;">
+  <button id="enableSoundBtn" onclick="enableSound()" style="font-size:15px; padding:10px 18px; border-radius:8px; border:none; cursor:pointer; background:#3b6d11; color:white;">Click here to enable sound</button>
+  <span id="soundStatus" style="margin-left:10px; color:#7d5236;"></span>
+</div>
+
 <div class="panel">
   <div class="qnum" id="qnum">Question 1 of 10</div>
   <div class="qhebrew" id="qhebrew"></div>
@@ -115,12 +120,53 @@ function sanitize(name) {
   return name.replace(/[.#$\[\]]/g, '_');
 }
 
+let sharedAudioCtx = null;
+
+function enableSound() {
+  sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = sharedAudioCtx.createOscillator();
+  const gain = sharedAudioCtx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(440, sharedAudioCtx.currentTime);
+  gain.gain.setValueAtTime(0.2, sharedAudioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, sharedAudioCtx.currentTime + 0.15);
+  osc.connect(gain);
+  gain.connect(sharedAudioCtx.destination);
+  osc.start();
+  osc.stop(sharedAudioCtx.currentTime + 0.15);
+  document.getElementById('soundStatus').textContent = 'Sound enabled';
+}
+
+function playAlertSound() {
+  if (!sharedAudioCtx) return;
+  const ctx = sharedAudioCtx;
+  [660, 880].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.15);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.15 + 0.2);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime + i * 0.15);
+    osc.stop(ctx.currentTime + i * 0.15 + 0.2);
+  });
+}
+
+let lastBuzzedBy = null;
+
 gameRef.on('value', snapshot => {
   const data = snapshot.val() || {};
   const qIndex = data.qIndex || 0;
   loadQuestion(qIndex);
   document.getElementById('answer').textContent = data.revealed ? questions[qIndex].ans : '';
   document.getElementById('buzzedName').textContent = data.buzzedBy || 'Waiting...';
+
+  if (data.buzzedBy && data.buzzedBy !== lastBuzzedBy) {
+    playAlertSound();
+  }
+  lastBuzzedBy = data.buzzedBy || null;
 
   const scores = data.scores || {};
   const board = document.getElementById('board');
