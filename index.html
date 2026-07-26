@@ -65,7 +65,7 @@
         position: fixed;
         top: 60px;
         right: 12px;
-        width: 280px;
+        width: 300px;
         background: white;
         border-radius: 16px;
         box-shadow: 0 14px 32px rgba(0,0,0,0.18);
@@ -88,12 +88,37 @@
         font-size: 15px;
     }
 
+    .admin-action {
+        width: 100%;
+        border: none;
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-top: 8px;
+        background: #1f2937;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .admin-action.secondary {
+        background: #e5e7eb;
+        color: #111827;
+    }
+
     .disabled-note {
         margin-top: 40px;
         color: #4b5563;
     }
+
+    .admin-message {
+        font-size: 13px;
+        line-height: 1.4;
+        color: #4b5563;
+        margin: 0 0 12px;
+    }
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="site-settings.js"></script>
@@ -106,9 +131,8 @@
         <a class="game-card" data-game-id="tzitzis-game" href="tzitzis_game.html">Tzitzis Game</a>
         <a class="game-card" data-game-id="tzitzis-quest-arcade" href="tzitzis_quest_arcade_v2.html">Tzitzis Quest Arcade</a>
         <a class="game-card" data-game-id="kahoot-word-quiz" href="kahoot_word_quiz_engine_paste_only_any_perek.html">Kahoot Word Quiz Engine</a>
-      <a class="game-card" data-game-id="kodesh-construct" href="kodesh-construct.html">Dikduk Arcade</a>
-       <a class="game-card" data-game-id="chumash-quiz" href="chumash-quiz.html"> Chumash Quiz </a>
-
+        <a class="game-card" data-game-id="kodesh-construct" href="kodesh-construct.html">Dikduk Arcade</a>
+        <a class="game-card" data-game-id="chumash-quiz" href="chumash-quiz.html">Chumash Quiz</a>
     </div>
 
     <p id="disabledMessage" class="disabled-note hidden">All games are currently disabled.</p>
@@ -117,19 +141,27 @@
 
     <div id="adminPanel" class="admin-panel hidden">
       <h2>Game Controls</h2>
-      <p id="adminStatus" class="disabled-note" style="margin-top:0; margin-bottom:12px;"></p>
-      <div class="admin-row">
-        <label for="siteEnabledToggle">Site enabled</label>
-        <input id="siteEnabledToggle" type="checkbox">
+      <p id="adminStatus" class="admin-message">Checking sign-in…</p>
+
+      <button id="signInButton" class="admin-action">Sign in with Google</button>
+      <button id="signOutButton" class="admin-action secondary hidden">Sign out</button>
+
+      <div id="adminControls" class="hidden">
+        <div class="admin-row">
+          <label for="siteEnabledToggle">Site enabled</label>
+          <input id="siteEnabledToggle" type="checkbox">
+        </div>
+        <div id="gameToggles"></div>
       </div>
-      <div id="gameToggles"></div>
     </div>
 
     <script>
-      const adminPassword = "SimchaSecret123";
       const settingsApi = window.B3SiteSettings;
       const adminAccessButton = document.getElementById("adminAccessButton");
       const adminPanel = document.getElementById("adminPanel");
+      const adminControls = document.getElementById("adminControls");
+      const signInButton = document.getElementById("signInButton");
+      const signOutButton = document.getElementById("signOutButton");
       const siteEnabledToggle = document.getElementById("siteEnabledToggle");
       const gameToggles = document.getElementById("gameToggles");
       const disabledMessage = document.getElementById("disabledMessage");
@@ -143,13 +175,19 @@
       }));
 
       let currentSettings = settingsApi.defaultSettings;
+      let currentUser = null;
+      let isAuthorizedAdmin = false;
 
       function renderGames() {
           let visibleCount = 0;
 
           gameDefinitions.forEach((game) => {
-              const shouldShow = currentSettings.siteEnabled && currentSettings.games[game.id] !== false;
+              const shouldShow =
+                  currentSettings.siteEnabled &&
+                  currentSettings.games[game.id] !== false;
+
               game.element.classList.toggle("hidden", !shouldShow);
+
               if (shouldShow) {
                   visibleCount += 1;
               }
@@ -159,9 +197,27 @@
       }
 
       function renderAdminPanel() {
-          adminStatus.textContent = settingsApi.getMode() === "firebase"
-              ? "Live mode: changes affect everyone."
-              : "Preview mode: add your Firebase values in firebase-config.js to make changes live for everyone.";
+          const signedIn = Boolean(currentUser);
+
+          signInButton.classList.toggle("hidden", signedIn);
+          signOutButton.classList.toggle("hidden", !signedIn);
+          adminControls.classList.toggle("hidden", !isAuthorizedAdmin);
+
+          if (!signedIn) {
+              adminStatus.textContent =
+                  "Sign in with the authorized Google account to change game settings.";
+              return;
+          }
+
+          if (!isAuthorizedAdmin) {
+              adminStatus.textContent =
+                  `Signed in as ${currentUser.email || "an unauthorized account"}. This account cannot edit settings.`;
+              return;
+          }
+
+          adminStatus.textContent =
+              `Signed in as ${currentUser.email}. Changes affect everyone.`;
+
           siteEnabledToggle.checked = currentSettings.siteEnabled;
           gameToggles.innerHTML = "";
 
@@ -177,13 +233,20 @@
               input.type = "checkbox";
               input.id = `toggle-${game.id}`;
               input.checked = currentSettings.games[game.id] !== false;
+
               input.addEventListener("change", async () => {
+                  const oldValue = !input.checked;
+
                   try {
                       currentSettings.games[game.id] = input.checked;
                       renderGames();
                       await settingsApi.updateGameEnabled(game.id, input.checked);
                   } catch (error) {
-                      alert("Could not save game setting.");
+                      currentSettings.games[game.id] = oldValue;
+                      input.checked = oldValue;
+                      renderGames();
+                      alert("Could not save this game setting. Make sure you are signed in with the authorized account.");
+                      console.error(error);
                   }
               });
 
@@ -193,43 +256,51 @@
           });
       }
 
-      function unlockAdminMode() {
-          localStorage.setItem("isAdmin", "true");
-          adminPanel.classList.remove("hidden");
-          renderAdminPanel();
-      }
-
-      if (localStorage.getItem("isAdmin") === "true") {
-          adminPanel.classList.remove("hidden");
-      }
-
       adminAccessButton.addEventListener("click", () => {
-          const isAdmin = localStorage.getItem("isAdmin") === "true";
-          if (isAdmin) {
-              adminPanel.classList.toggle("hidden");
-              if (!adminPanel.classList.contains("hidden")) {
-                  renderAdminPanel();
-              }
-              return;
+          adminPanel.classList.toggle("hidden");
+          if (!adminPanel.classList.contains("hidden")) {
+              renderAdminPanel();
           }
+      });
 
-          const pass = prompt("Enter admin password:");
-          if (pass === adminPassword) {
-              unlockAdminMode();
-              alert("Admin mode enabled");
-          } else if (pass !== null) {
-              alert("Wrong password");
+      signInButton.addEventListener("click", async () => {
+          try {
+              await settingsApi.signInWithGoogle();
+          } catch (error) {
+              alert("Google sign-in did not complete.");
+              console.error(error);
+          }
+      });
+
+      signOutButton.addEventListener("click", async () => {
+          try {
+              await settingsApi.signOut();
+          } catch (error) {
+              alert("Could not sign out.");
+              console.error(error);
           }
       });
 
       siteEnabledToggle.addEventListener("change", async () => {
+          const oldValue = !siteEnabledToggle.checked;
+
           try {
               currentSettings.siteEnabled = siteEnabledToggle.checked;
               renderGames();
               await settingsApi.updateSiteEnabled(siteEnabledToggle.checked);
           } catch (error) {
-              alert("Could not save site setting.");
+              currentSettings.siteEnabled = oldValue;
+              siteEnabledToggle.checked = oldValue;
+              renderGames();
+              alert("Could not save the site setting. Make sure you are signed in with the authorized account.");
+              console.error(error);
           }
+      });
+
+      settingsApi.onAuthStateChanged((user, authorized) => {
+          currentUser = user;
+          isAuthorizedAdmin = authorized;
+          renderAdminPanel();
       });
 
       settingsApi.subscribe((settings) => {
@@ -238,6 +309,5 @@
           renderAdminPanel();
       });
     </script>
-
 </body>
 </html>

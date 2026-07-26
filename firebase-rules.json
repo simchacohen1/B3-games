@@ -1,0 +1,14 @@
+{
+  "rules": {
+    "b3Games": {
+      ".read": true,
+      ".write": "auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true"
+    },
+    "tentTrailTrivia": {
+      ".read": true,
+      ".write": "auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true"
+    },
+    ".read": false,
+    ".write": false
+  }
+}
