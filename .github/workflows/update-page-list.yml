@@ -1,0 +1,38 @@
+name: Update automatic page list
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "**/*.html"
+      - "generate_page_list.py"
+      - ".github/workflows/update-page-list.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-list:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate all-pages.html
+        run: python3 generate_page_list.py
+
+      - name: Commit updated list
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add all-pages.html
+          if git diff --cached --quiet; then
+            echo "No changes needed."
+          else
+            git commit -m "Automatically update page list"
+            git push
+          fi
