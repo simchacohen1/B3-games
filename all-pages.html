@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>All Pages</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f4f7fb;
+      color: #172033;
+    }
+    header {
+      background: white;
+      border-bottom: 1px solid #dfe5ee;
+      padding: 28px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    .wrap { max-width: 1000px; margin: auto; }
+    h1 { margin: 0 0 8px; font-size: 30px; }
+    p { margin: 0; color: #5d6879; }
+    main { padding: 24px 20px 50px; }
+    #search {
+      width: 100%;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      border: 1px solid #cbd4e1;
+      border-radius: 12px;
+      font-size: 17px;
+      background: white;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      min-height: 130px;
+      padding: 18px;
+      text-decoration: none;
+      color: inherit;
+      background: white;
+      border: 1px solid #dfe5ee;
+      border-radius: 14px;
+      box-shadow: 0 3px 10px rgba(20, 35, 60, .06);
+      transition: transform .12s ease, box-shadow .12s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 7px 18px rgba(20, 35, 60, .12);
+    }
+    .title { font-size: 19px; font-weight: 700; }
+    .filename { color: #667085; font-size: 13px; overflow-wrap: anywhere; }
+    .date { color: #8791a1; font-size: 12px; margin-top: auto; }
+    .empty { background: white; padding: 24px; border-radius: 14px; }
+    .home {
+      display: inline-block;
+      margin-top: 12px;
+      color: #2457c5;
+      text-decoration: none;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>All Pages</h1>
+      <p>This list updates automatically whenever an HTML file is uploaded, renamed, or deleted.</p>
+      <a class="home" href="index.html">← Main site</a>
+    </div>
+  </header>
+  <main>
+    <div class="wrap">
+      <input id="search" type="search" placeholder="Search pages…" aria-label="Search pages">
+      <div class="grid" id="grid">
+
+      <a class="card" href="Elul_Yom_Kippur_Class_Slides_ENGAGED (3).html">
+        <span class="title">Elul → Yom Kippur — Class Slides</span>
+        <span class="filename">Elul_Yom_Kippur_Class_Slides_ENGAGED (3).html</span>
+        <span class="date">Updated Aug 04, 2026</span>
+      </a>
+
+      <a class="card" href="player.html">
+        <span class="title">Tent Trail Trivia - Play</span>
+        <span class="filename">player.html</span>
+        <span class="date">Updated Jul 21, 2026</span>
+      </a>
+
+      <a class="card" href="teacher.html">
+        <span class="title">Tent Trail Trivia - Teacher</span>
+        <span class="filename">teacher.html</span>
+        <span class="date">Updated Jul 21, 2026</span>
+      </a>
+
+      <a class="card" href="kahoot_teacher_teams.html">
+        <span class="title">Kahoot-Style All Question Types Quiz Engine</span>
+        <span class="filename">kahoot_teacher_teams.html</span>
+        <span class="date">Updated Jul 17, 2026</span>
+      </a>
+
+      <a class="card" href="Devarim_chumash.html">
+        <span class="title">Kahoot-Style All Question Types Quiz Engine</span>
+        <span class="filename">Devarim_chumash.html</span>
+        <span class="date">Updated Jul 14, 2026</span>
+      </a>
+
+      <a class="card" href="chumash-quiz.html">
+        <span class="title">Kahoot-Style All Question Types Quiz Engine</span>
+        <span class="filename">chumash-quiz.html</span>
+        <span class="date">Updated Jul 10, 2026</span>
+      </a>
+
+      <a class="card" href="kodesh-construct.html">
+        <span class="title">Kodesh Construct Prototype</span>
+        <span class="filename">kodesh-construct.html</span>
+        <span class="date">Updated Jul 08, 2026</span>
+      </a>
+
+      <a class="card" href="kahoot_word_quiz_engine_paste_only_any_perek.html">
+        <span class="title">Kahoot-Style Word Quiz Engine</span>
+        <span class="filename">kahoot_word_quiz_engine_paste_only_any_perek.html</span>
+        <span class="date">Updated Jul 01, 2026</span>
+      </a>
+
+      <a class="card" href="tzitzis_quest_arcade_v2.html">
+        <span class="title">Tzitzis Quest Arcade</span>
+        <span class="filename">tzitzis_quest_arcade_v2.html</span>
+        <span class="date">Updated Jul 01, 2026</span>
+      </a>
+
+      <a class="card" href="tzitzis_game.html">
+        <span class="title">Tzitzis Quest 🎯</span>
+        <span class="filename">tzitzis_game.html</span>
+        <span class="date">Updated Jul 01, 2026</span>
+      </a>
+      </div>
+    </div>
+  </main>
+  <script>
+    const search = document.getElementById('search');
+    const cards = [...document.querySelectorAll('.card')];
+    search.addEventListener('input', () => {
+      const term = search.value.toLowerCase().trim();
+      cards.forEach(card => {
+        card.style.display = card.textContent.toLowerCase().includes(term) ? '' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>
