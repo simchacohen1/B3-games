@@ -800,7 +800,14 @@ async function toggleRecording(type, btnEl){
   if(activeRecordingType){ return; } // another recording in progress
   try{
     const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
-    mediaRecorder = new MediaRecorder(stream);
+    // Low bitrate is plenty for a few seconds of spoken Hebrew/translation —
+    // keeps the recording small so it uploads (and saves) much faster,
+    // which matters a lot on shared classroom WiFi.
+    let recorderOptions = { audioBitsPerSecond: 32000 };
+    if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus')){
+      recorderOptions.mimeType = 'audio/webm;codecs=opus';
+    }
+    mediaRecorder = new MediaRecorder(stream, recorderOptions);
     recordingChunks = [];
     activeRecordingType = type;
     btnEl.classList.add('recording');
@@ -855,19 +862,36 @@ document.getElementById('saveBtn').onclick = async () => {
       posukText: currentPosukText
     };
 
+    // Upload both recordings at the same time instead of one after the
+    // other — cuts save time roughly in half when a student records both
+    // the Hebrew reading and the translation before saving.
+    const uploadTasks = [];
+
     if(currentAudio.hebrew){
       const hebrewPath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_hebrew_' + attemptId + '.webm';
-      await storage.ref(hebrewPath).put(currentAudio.hebrew);
-      record.hebrewAudioURL = await storage.ref(hebrewPath).getDownloadURL();
-      record.hebrewScore = currentRating.hebrew;
+      uploadTasks.push(
+        storage.ref(hebrewPath).put(currentAudio.hebrew)
+          .then(() => storage.ref(hebrewPath).getDownloadURL())
+          .then(url => {
+            record.hebrewAudioURL = url;
+            record.hebrewScore = currentRating.hebrew;
+          })
+      );
     }
 
     if(currentAudio.translate){
       const translatePath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_translate_' + attemptId + '.webm';
-      await storage.ref(translatePath).put(currentAudio.translate);
-      record.translationAudioURL = await storage.ref(translatePath).getDownloadURL();
-      record.translationScore = currentRating.translate;
+      uploadTasks.push(
+        storage.ref(translatePath).put(currentAudio.translate)
+          .then(() => storage.ref(translatePath).getDownloadURL())
+          .then(url => {
+            record.translationAudioURL = url;
+            record.translationScore = currentRating.translate;
+          })
+      );
     }
+
+    await Promise.all(uploadTasks);
 
     await attemptRef.set(record);
 
