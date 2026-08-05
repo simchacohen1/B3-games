@@ -508,7 +508,7 @@ async function fetchChapter(perekNum){
   if(chapterCache[perekNum]) return chapterCache[perekNum];
   // v2 cache key: bumped so students' browsers refetch corrected text instead of
   // serving an old cached copy from before the shaimos/nikud fixes were added.
-  const cacheKey = 'posukPractice_ch_v3_' + perekNum;
+  const cacheKey = 'posukPractice_ch_v5_' + perekNum;
   const localCached = localStorage.getItem(cacheKey);
   if(localCached){
     const arr = JSON.parse(localCached);
@@ -546,29 +546,39 @@ function abbreviateShaimos(text){
 }
 
 /* ---------- Manual nikud corrections ----------
-   Sefaria's text is generally reliable, but if you (Simcha) ever spot a wrong
-   vowel/word while spot-checking against a printed Chumash, add an entry here.
+   Sefaria's text is generally reliable. If you (Simcha) ever spot a genuinely
+   wrong vowel/word while spot-checking against a printed Chumash, add an
+   entry here — tell Claude the perek, posuk, and word, no code changes needed.
    Key format: "perek_posuk" using the Tanach chapter/verse numbers (e.g. "18_1"
-   for Genesis 18:1). Each entry is a list of [wrongForm, correctForm] pairs.
-   Example already added below: Genesis 18:1, the word meaning "entrance"
-   (segol under the Peh) was coming through with a kamatz instead. */
+   for Genesis 18:1).
+
+   IMPORTANT: each fix matches by CONSONANT SKELETON, not by exact nikud
+   characters — Sefaria's underlying text can encode identical-looking vowel
+   points in ways that don't match a literal string search. So a fix finds
+   "consonant [any vowel marks] consonant [any vowel marks] ..." and forces
+   the whole word to the correct pointed form. Only add an entry once you've
+   confirmed with a fresh page load (not a cached one) that the text is
+   actually wrong — Sefaria's Genesis 18:1 was checked and is correct as-is,
+   so no entry is needed for it.
+
+   Each entry: { consonants: [array of Hebrew consonant letters in the word],
+                 correct: 'the fully-pointed correct form to substitute in' } */
 const MANUAL_CORRECTIONS = {
-  '18_1': [
-    ['פָּתַח', 'פֶּתַח']
-  ]
+  // Example format, currently empty — add entries here as needed:
+  // '18_1': [ { consonants: ['פ','ת','ח'], correct: 'פֶּתַח' } ]
 };
 function applyManualCorrections(text, perekNum, posukNum){
   const key = perekNum + '_' + posukNum;
   const fixes = MANUAL_CORRECTIONS[key];
   if(!fixes) return text;
-  // Normalize to NFC first: Hebrew nikud/dagesh marks can arrive from Sefaria
-  // in a different internal combining-mark order than how we typed the
-  // correction table, which would otherwise make an exact match silently fail.
-  text = text.normalize('NFC');
-  fixes.forEach(([wrong, right]) => {
-    const wrongNorm = wrong.normalize('NFC');
-    const rightNorm = right.normalize('NFC');
-    text = text.split(wrongNorm).join(rightNorm);
+  // Nikud + trope only — deliberately excludes maqaf (05BE), paseq (05C0),
+  // and sof pasuq (05C3), which are punctuation rather than vowel/cantillation
+  // marks. Including them would let this pattern accidentally swallow the
+  // maqaf that often sits directly after a word like this one.
+  const HEBREW_POINTS = '[\\u0591-\\u05BD\\u05BF\\u05C1\\u05C2\\u05C4-\\u05C7]*';
+  fixes.forEach(({ consonants, correct }) => {
+    const pattern = new RegExp(HEBREW_POINTS + consonants.join(HEBREW_POINTS) + HEBREW_POINTS, 'g');
+    text = text.replace(pattern, correct);
   });
   return text;
 }
