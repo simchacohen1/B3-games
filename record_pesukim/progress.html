@@ -145,21 +145,21 @@
   .posuk-grid{
     display:grid;
     grid-template-columns: repeat(10, 1fr);
-    gap: 6px;
+    gap: 8px;
     margin-top: 4px;
     direction: rtl;
   }
   @media (max-width: 560px){
-    .posuk-grid{ grid-template-columns: repeat(5, 1fr); }
+    .posuk-grid{ grid-template-columns: repeat(5, 1fr); gap: 10px; }
   }
   .posuk-tile{
     aspect-ratio: 1 / 1;
-    border-radius: 8px;
+    border-radius: 10px;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     font-family:'Quicksand', sans-serif;
     cursor:pointer;
     border: none;
-    padding: 2px;
+    padding: 4px;
     transition: transform .08s ease;
     text-decoration: none;
     overflow: hidden;
@@ -168,15 +168,15 @@
   .posuk-tile .tile-num{
     font-family: 'Noto Serif Hebrew', serif;
     font-weight:700;
-    font-size:1.05rem;
+    font-size:1.55rem;
     line-height:1;
   }
   .posuk-tile .tile-score{
-    font-size:0.5rem;
+    font-size:0.68rem;
     font-weight:600;
-    line-height:1.05;
+    line-height:1.1;
     text-align:center;
-    margin-top:2px;
+    margin-top:4px;
     opacity:0.9;
   }
   .posuk-tile.tile-none{
