@@ -146,6 +146,82 @@
   .bar-fill{ height:100%; border-radius:999px; }
   .bar-fill.hebrew{ background: var(--navy); }
   .bar-fill.translate{ background: var(--rimon); }
+
+  /* ---------- Student tile grid (By Student tab) ---------- */
+  .student-head{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .student-head h2{ margin:0; }
+  .mini-tabs{ display:flex; gap:6px; }
+  .mini-tab-btn{
+    font-family:'Quicksand', sans-serif; font-weight:700; font-size:0.78rem;
+    border: 2px solid var(--gold); background:#fff; color: var(--ink-soft);
+    border-radius: 999px; padding: 6px 14px; cursor:pointer;
+  }
+  .mini-tab-btn.active{ background: var(--rimon); border-color: var(--rimon-dark, var(--rimon)); color:#fff; }
+  .perek-label{
+    font-family:'Frank Ruhl Libre', serif; font-weight:700; color: var(--rimon);
+    margin: 14px 0 6px; display:flex; justify-content:space-between; align-items:baseline;
+  }
+  .perek-label .summary{ font-family:'Quicksand', sans-serif; font-weight:600; font-size:0.78rem; color: var(--ink-soft); }
+  .posuk-grid{
+    display:grid; grid-template-columns: repeat(10, 1fr); gap: 8px; direction: rtl;
+  }
+  @media (max-width: 560px){ .posuk-grid{ grid-template-columns: repeat(5, 1fr); gap: 10px; } }
+  .posuk-tile{
+    aspect-ratio: 1 / 1; border-radius: 10px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family:'Quicksand', sans-serif; cursor:pointer; border: none; padding: 4px;
+    transition: transform .08s ease; overflow: hidden;
+  }
+  .posuk-tile:active{ transform: scale(0.94); }
+  .posuk-tile.selected{ outline: 3px solid var(--navy); outline-offset: 2px; }
+  .posuk-tile .tile-num{ font-family: 'Noto Serif Hebrew', serif; font-weight:700; font-size:1.4rem; line-height:1; }
+  .posuk-tile .tile-score{ font-size:0.62rem; font-weight:600; line-height:1.1; text-align:center; margin-top:4px; opacity:0.9; }
+  .posuk-tile.tile-none{ background: #fff; border: 2px dashed var(--ink-soft); color: var(--ink-soft); }
+  .posuk-tile.tile-high{ background: #C9E4A6; color: #33511E; }
+  .posuk-tile.tile-mid{ background: var(--gold-light); color: var(--ink); }
+  .posuk-tile.tile-low{ background: #EFC1C1; color: #7A2626; }
+  #posukDetail{ margin-top:18px; }
+  #posukDetail:empty{ margin-top:0; }
+
+  /* ---------- Class Roster tab ---------- */
+  .roster-table{ width:100%; border-collapse: collapse; }
+  .roster-table th{
+    text-align:left; font-size:0.78rem; color: var(--ink-soft); font-weight:700;
+    padding: 6px 10px; border-bottom: 2px solid var(--gold);
+  }
+  .roster-row{ cursor:pointer; }
+  .roster-row:hover{ background: #f7efd8; }
+  .roster-row td{ padding: 10px; border-bottom: 1px dashed #d8c9a0; font-size:0.9rem; }
+  .roster-row .rname{ font-weight:700; }
+  .status-pill{
+    display:inline-block; border-radius:999px; padding:3px 12px; font-size:0.75rem; font-weight:700;
+  }
+  .status-pill.high{ background:#C9E4A6; color:#33511E; }
+  .status-pill.mid{ background: var(--gold-light); color: var(--ink); }
+  .status-pill.low{ background:#EFC1C1; color:#7A2626; }
+  .status-pill.none{ background:#e8e0c8; color: var(--ink-soft); }
+
+  /* ---------- Class Stats tab ---------- */
+  .stat-cards{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+  .stat-card{
+    flex:1; min-width:130px; background:#fff; border-radius:12px; padding:14px 12px; text-align:center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .stat-card .num{ font-family:'Frank Ruhl Libre', serif; font-size:1.6rem; font-weight:700; color: var(--rimon); }
+  .stat-card .lbl{ font-size:0.72rem; color: var(--ink-soft); font-weight:600; margin-top:2px; }
+  .section-title{ font-family:'Frank Ruhl Libre', serif; color: var(--rimon); margin: 20px 0 10px; font-size:1.1rem; }
+  .bucket-chart{ display:flex; gap:14px; align-items:flex-end; height:120px; background:#fff; border-radius:12px; padding:14px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .bucket-col{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+  .bucket-bar{ width:100%; border-radius:8px 8px 0 0; }
+  .bucket-bar.high{ background:#9FCB6B; }
+  .bucket-bar.mid{ background: var(--gold); }
+  .bucket-bar.low{ background:#D97A7A; }
+  .bucket-col .bucket-count{ font-weight:700; font-size:0.85rem; margin-bottom:4px; }
+  .bucket-col .bucket-lbl{ font-size:0.7rem; color: var(--ink-soft); margin-top:6px; text-align:center; }
+  .activity-chart{ display:flex; gap:6px; align-items:flex-end; height:100px; background:#fff; border-radius:12px; padding:14px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .activity-col{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+  .activity-bar{ width:100%; background: var(--navy); border-radius:4px 4px 0 0; min-height:2px; }
+  .activity-col .activity-lbl{ font-size:0.62rem; color: var(--ink-soft); margin-top:5px; }
 </style>
 </head>
 <body>
@@ -173,7 +249,8 @@
       <div class="main-panel">
         <div class="tab-bar">
           <button class="tab-btn active" id="studentTabBtn">👤 By Student</button>
-          <button class="tab-btn" id="summaryTabBtn">📊 Class Summary</button>
+          <button class="tab-btn" id="rosterTabBtn">📋 Class Roster</button>
+          <button class="tab-btn" id="summaryTabBtn">📊 Class Stats</button>
         </div>
         <div id="mainContent" class="empty-msg">Select a student to view their practice history.</div>
       </div>
@@ -221,18 +298,125 @@ document.getElementById('enterBtn').onclick = () => {
 
 let activeStudentId = null;
 let studentsMap = {}; // id -> name
+let studentsInfo = {}; // id -> { name, lastActive }
 
 const PARSHA_ORDER = { "Vayeira": 0, "ChayeiSarah": 1, "Toldos": 2 };
 
+/* =========================================================
+   PARSHA / PEREK / POSUK MAP + Hebrew numerals — kept identical
+   to student.html / progress.html so ranges & labels line up.
+   ========================================================= */
+const PARSHA_CONFIG = {
+  "Vayeira":      [ {num:18}, {num:19}, {num:20}, {num:21}, {num:22} ],
+  "Chayei Sarah": [ {num:23}, {num:24}, {num:25, maxPosuk:18} ],
+  "Toldos":       [ {num:25, minPosuk:19}, {num:26}, {num:27}, {num:28, maxPosuk:9} ]
+};
+
+const HEB_HUNDREDS = ['','ק','ר','ש','ת'];
+const HEB_TENS = ['','י','כ','ל','מ','נ','ס','ע','פ','צ'];
+const HEB_ONES = ['','א','ב','ג','ד','ה','ו','ז','ח','ט'];
+
+function hebrewLetters(num){
+  let n = num;
+  let letters = '';
+  while(n >= 400){ letters += 'ת'; n -= 400; }
+  if(n >= 100){
+    letters += HEB_HUNDREDS[Math.floor(n / 100)];
+    n = n % 100;
+  }
+  if(n === 15){
+    letters += 'טו';
+    n = 0;
+  } else if(n === 16){
+    letters += 'טז';
+    n = 0;
+  } else {
+    if(n >= 10){
+      letters += HEB_TENS[Math.floor(n / 10)];
+      n = n % 10;
+    }
+    if(n > 0){
+      letters += HEB_ONES[n];
+    }
+  }
+  return letters;
+}
+
+function hebrewNumeral(num){
+  const letters = hebrewLetters(num);
+  if(!letters) return String(num);
+  if(letters.length === 1) return letters + '׳';
+  return letters.slice(0, -1) + '״' + letters.slice(-1);
+}
+
+function scoreTier(score){
+  if(score >= 8) return 'high';
+  if(score >= 5) return 'mid';
+  return 'low';
+}
+
+const LOCAL_TEXT = { 18: new Array(33) }; // only length matters here
+
+let chapterCache = {};
+async function fetchChapterLength(perekNum){
+  if(chapterCache[perekNum]) return chapterCache[perekNum];
+  if(LOCAL_TEXT[perekNum]){
+    chapterCache[perekNum] = LOCAL_TEXT[perekNum].length;
+    return chapterCache[perekNum];
+  }
+  const cacheKey = 'posukPractice_ch_v7_' + perekNum;
+  const localCached = localStorage.getItem(cacheKey);
+  if(localCached){
+    const len = JSON.parse(localCached).length;
+    chapterCache[perekNum] = len;
+    return len;
+  }
+  try{
+    const res = await fetch('https://www.sefaria.org/api/texts/Genesis.' + perekNum + '?context=0&pad=0');
+    const data = await res.json();
+    const len = (data.he || []).length;
+    chapterCache[perekNum] = len;
+    return len;
+  }catch(err){
+    console.error('Could not determine chapter length for perek', perekNum, err);
+    return null;
+  }
+}
+
+function getPerekRangeStatic(perekNum){
+  let min = Infinity, max = -Infinity, needsFetch = false;
+  Object.values(PARSHA_CONFIG).forEach(chapters => {
+    const ch = chapters.find(c => c.num === perekNum);
+    if(ch){
+      min = Math.min(min, ch.minPosuk || 1);
+      if(ch.maxPosuk){ max = Math.max(max, ch.maxPosuk); }
+      else { needsFetch = true; }
+    }
+  });
+  return { min, max, needsFetch };
+}
+
+async function getPerekRange(perekNum){
+  const { min, max, needsFetch } = getPerekRangeStatic(perekNum);
+  if(!needsFetch) return { min, max };
+  const len = await fetchChapterLength(perekNum);
+  return { min, max: len ? Math.max(max, len) : max };
+}
+
 document.getElementById('studentTabBtn').onclick = () => setTab('student');
+document.getElementById('rosterTabBtn').onclick = () => setTab('roster');
 document.getElementById('summaryTabBtn').onclick = () => setTab('summary');
 
 function setTab(tab){
   document.getElementById('studentTabBtn').classList.toggle('active', tab === 'student');
+  document.getElementById('rosterTabBtn').classList.toggle('active', tab === 'roster');
   document.getElementById('summaryTabBtn').classList.toggle('active', tab === 'summary');
   if(tab === 'summary'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
     loadClassSummary();
+  }else if(tab === 'roster'){
+    [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
+    loadRoster();
   }else if(activeStudentId){
     const el = [...document.querySelectorAll('.student-item')].find(e => e.dataset.id === activeStudentId);
     if(el) selectStudent(activeStudentId, studentsMap[activeStudentId], el);
@@ -255,6 +439,7 @@ async function loadStudents(){
       .sort((a,b) => a[1].name.localeCompare(b[1].name))
       .forEach(([id, info]) => {
         studentsMap[id] = info.name;
+        studentsInfo[id] = info;
         const div = document.createElement('div');
         div.className = 'student-item';
         div.dataset.id = id;
@@ -269,8 +454,102 @@ async function loadStudents(){
   }
 }
 
+/* ---------- Shared cache of every attempt, every student ----------
+   Roster and Class Stats both need the full tree; fetch it once and
+   reuse until the teacher explicitly refreshes. */
+let allAttemptsCache = null;
+async function loadAllAttempts(forceRefresh){
+  if(allAttemptsCache && !forceRefresh) return allAttemptsCache;
+  const snap = await db.ref('posukPractice/attempts').once('value');
+  allAttemptsCache = snap.val() || {};
+  return allAttemptsCache;
+}
+
+/* Reduce one student's raw posukMap (posukKey -> attemptId -> {...})
+   down to simple stats used by the Roster and Class Stats tabs. */
+function computeStudentStats(posukMap){
+  let scores = [];
+  let posukCount = 0;
+  Object.values(posukMap || {}).forEach(attemptMap => {
+    const attempts = Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp);
+    const latest = attempts[0];
+    posukCount++;
+    if(typeof latest.hebrewScore === 'number') scores.push(latest.hebrewScore);
+    if(typeof latest.translationScore === 'number') scores.push(latest.translationScore);
+  });
+  const avg = scores.length ? scores.reduce((a,b) => a+b, 0) / scores.length : null;
+  return { posukCount, avg };
+}
+
+/* ---------- Class Roster ---------- */
+async function loadRoster(){
+  const mainEl = document.getElementById('mainContent');
+  mainEl.innerHTML = '<div class="loading">Building class roster…</div>';
+  try{
+    const allAttempts = await loadAllAttempts();
+    const rows = Object.entries(studentsMap).map(([id, name]) => {
+      const stats = computeStudentStats(allAttempts[id]);
+      const lastActive = studentsInfo[id] && studentsInfo[id].lastActive
+        ? new Date(studentsInfo[id].lastActive).toLocaleDateString() : '—';
+      return { id, name, ...stats, lastActive };
+    });
+
+    if(rows.length === 0){
+      mainEl.innerHTML = '<h2>Class Roster</h2><div class="empty-msg">No students yet.</div>';
+      return;
+    }
+
+    // Students needing the most support float to the top; students with
+    // no recordings at all sort to the very bottom.
+    rows.sort((a,b) => {
+      if(a.avg === null && b.avg === null) return a.name.localeCompare(b.name);
+      if(a.avg === null) return 1;
+      if(b.avg === null) return -1;
+      return a.avg - b.avg;
+    });
+
+    let html = `<h2>Class Roster</h2>
+      <table class="roster-table">
+        <thead><tr>
+          <th>Student</th><th>Pesukim Recorded</th><th>Avg Score</th><th>Status</th><th>Last Active</th>
+        </tr></thead><tbody>`;
+    rows.forEach(r => {
+      const tier = r.avg === null ? 'none' : scoreTier(r.avg);
+      const tierLabel = tier === 'high' ? 'Doing Well' : tier === 'mid' ? 'Making Progress' : tier === 'low' ? 'Needs Support' : 'Not Started';
+      const avgLabel = r.avg === null ? '—' : r.avg.toFixed(1) + '/10';
+      html += `<tr class="roster-row" data-id="${r.id}">
+        <td class="rname">${r.name}</td>
+        <td>${r.posukCount}</td>
+        <td>${avgLabel}</td>
+        <td><span class="status-pill ${tier}">${tierLabel}</span></td>
+        <td>${r.lastActive}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+    mainEl.innerHTML = html;
+
+    mainEl.querySelectorAll('.roster-row').forEach(row => {
+      row.onclick = () => {
+        const id = row.dataset.id;
+        setTab('student');
+        const el = [...document.querySelectorAll('.student-item')].find(e => e.dataset.id === id);
+        if(el) selectStudent(id, studentsMap[id], el);
+      };
+    });
+  }catch(err){
+    mainEl.innerHTML = '<div class="empty-msg">Could not build the class roster.</div>';
+    console.error(err);
+  }
+}
+
+let studentActiveTab = 'translation'; // 'translation' | 'reading', for the currently-viewed student
+let studentPosukData = {}; // posukKey -> { attempts, latest } for the currently-viewed student
+let studentPerekData = {}; // perekNum -> posukNum -> posukKey, for the currently-viewed student
+let selectedPosukKey = null;
+
 async function selectStudent(id, name, el){
   activeStudentId = id;
+  selectedPosukKey = null;
   [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
   el.classList.add('active');
 
@@ -285,40 +564,118 @@ async function selectStudent(id, name, el){
       return;
     }
 
-    let html = '<h2>' + name + '</h2>';
-    // val is keyed by posukKey -> { attemptId: {...} }
-    const posukKeys = sortPosukKeys(Object.keys(val));
-    posukKeys.forEach(posukKey => {
-      const attempts = Object.values(val[posukKey]).sort((a,b) => b.timestamp - a.timestamp);
-      const latest = attempts[0];
-      const refLabel = formatRefLabel(posukKey);
-      html += `<div class="posuk-group">
-        <h3>${refLabel}</h3>
-        <div class="posuk-hebrew">${latest.posukText || ''}</div>`;
-      attempts.forEach(a => {
-        const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
-        let lines = `<div class="top-line"><strong>${dateStr}</strong></div>`;
-        if(a.hebrewAudioURL){
-          lines += `<div class="top-line">
-            <span>🎙️ Hebrew reading — <span class="score-pill">${a.hebrewScore}/10 · ${RATING_LABELS[a.hebrewScore-1]}</span></span>
-            <audio controls src="${a.hebrewAudioURL}"></audio>
-          </div>`;
-        }
-        if(a.translationAudioURL){
-          lines += `<div class="top-line">
-            <span>🌐 Translation — <span class="score-pill">${a.translationScore}/10 · ${RATING_LABELS[a.translationScore-1]}</span></span>
-            <audio controls src="${a.translationAudioURL}"></audio>
-          </div>`;
-        }
-        html += `<div class="attempt-row">${lines}</div>`;
-      });
-      html += `</div>`;
+    // Reshape into perek -> posuk -> posukKey, and cache each posukKey's
+    // attempts so tapping a tile can show detail without re-fetching.
+    studentPosukData = {};
+    studentPerekData = {};
+    Object.entries(val).forEach(([posukKey, attemptMap]) => {
+      const attempts = Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp);
+      studentPosukData[posukKey] = { attempts, latest: attempts[0] };
+      const parts = posukKey.split('_');
+      if(parts.length < 3) return;
+      const posukNum = parseInt(parts[parts.length - 1]);
+      const perekNum = parseInt(parts[parts.length - 2]);
+      if(!perekNum || !posukNum) return;
+      if(!studentPerekData[perekNum]) studentPerekData[perekNum] = {};
+      studentPerekData[perekNum][posukNum] = posukKey;
     });
-    mainEl.innerHTML = html;
+
+    mainEl.innerHTML = `
+      <div class="student-head">
+        <h2>${name}</h2>
+        <div class="mini-tabs">
+          <button class="mini-tab-btn ${studentActiveTab==='translation'?'active':''}" id="studentTranslationBtn">🌐 Translation</button>
+          <button class="mini-tab-btn ${studentActiveTab==='reading'?'active':''}" id="studentReadingBtn">🎙️ Reading</button>
+        </div>
+      </div>
+      <div id="studentGridWrap"></div>
+      <div id="posukDetail"></div>`;
+    document.getElementById('studentTranslationBtn').onclick = () => { studentActiveTab = 'translation'; renderStudentGrid(); };
+    document.getElementById('studentReadingBtn').onclick = () => { studentActiveTab = 'reading'; renderStudentGrid(); };
+
+    await renderStudentGrid();
+    if(selectedPosukKey) renderPosukDetail(selectedPosukKey);
   }catch(err){
     mainEl.innerHTML = '<div class="empty-msg">Could not load this student\'s recordings.</div>';
     console.error(err);
   }
+}
+
+async function renderStudentGrid(){
+  document.querySelectorAll('.mini-tab-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(studentActiveTab === 'translation' ? 'studentTranslationBtn' : 'studentReadingBtn');
+  if(btn) btn.classList.add('active');
+
+  const wrap = document.getElementById('studentGridWrap');
+  wrap.innerHTML = '';
+  const scoreField = studentActiveTab === 'translation' ? 'translationScore' : 'hebrewScore';
+  const perekNums = Object.keys(studentPerekData).map(Number).sort((a,b) => a - b);
+
+  if(perekNums.length === 0){
+    wrap.innerHTML = '<div class="empty-msg">No recordings yet.</div>';
+    return;
+  }
+
+  for(const perekNum of perekNums){
+    const range = await getPerekRange(perekNum);
+    const posuksThisPerek = studentPerekData[perekNum];
+    let doneCount = 0;
+
+    const label = document.createElement('div');
+    label.className = 'perek-label';
+    label.innerHTML = `<span>פרק ${hebrewNumeral(perekNum)}</span><span class="summary" id="teacherPerekSummary${perekNum}"></span>`;
+
+    const grid = document.createElement('div');
+    grid.className = 'posuk-grid';
+
+    for(let posukNum = range.min; posukNum <= range.max; posukNum++){
+      const posukKey = posuksThisPerek[posukNum];
+      const record = posukKey ? studentPosukData[posukKey].latest : null;
+      const score = record ? record[scoreField] : null;
+      if(score) doneCount++;
+
+      const tile = document.createElement('div');
+      tile.className = 'posuk-tile ' + (score ? 'tile-' + scoreTier(score) : 'tile-none') + (posukKey === selectedPosukKey ? ' selected' : '');
+      tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${score ? RATING_LABELS[score - 1] : '—'}</span>`;
+      if(posukKey){
+        tile.onclick = () => { selectedPosukKey = posukKey; renderStudentGrid(); renderPosukDetail(posukKey); };
+      }
+      grid.appendChild(tile);
+    }
+
+    label.querySelector('#teacherPerekSummary' + perekNum).textContent = `${doneCount}/${range.max - range.min + 1} pesukim done`;
+    wrap.appendChild(label);
+    wrap.appendChild(grid);
+  }
+}
+
+function renderPosukDetail(posukKey){
+  const detailEl = document.getElementById('posukDetail');
+  if(!detailEl) return;
+  const { attempts, latest } = studentPosukData[posukKey];
+  const refLabel = formatRefLabel(posukKey);
+  let html = `<div class="posuk-group">
+    <h3>${refLabel}</h3>
+    <div class="posuk-hebrew">${latest.posukText || ''}</div>`;
+  attempts.forEach(a => {
+    const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    let lines = `<div class="top-line"><strong>${dateStr}</strong></div>`;
+    if(a.hebrewAudioURL){
+      lines += `<div class="top-line">
+        <span>🎙️ Hebrew reading — <span class="score-pill">${a.hebrewScore}/10 · ${RATING_LABELS[a.hebrewScore-1]}</span></span>
+        <audio controls src="${a.hebrewAudioURL}"></audio>
+      </div>`;
+    }
+    if(a.translationAudioURL){
+      lines += `<div class="top-line">
+        <span>🌐 Translation — <span class="score-pill">${a.translationScore}/10 · ${RATING_LABELS[a.translationScore-1]}</span></span>
+        <audio controls src="${a.translationAudioURL}"></audio>
+      </div>`;
+    }
+    html += `<div class="attempt-row">${lines}</div>`;
+  });
+  html += `</div>`;
+  detailEl.innerHTML = html;
 }
 
 /* ---------- Shared helpers ---------- */
@@ -353,12 +710,81 @@ async function loadClassSummary(){
   const mainEl = document.getElementById('mainContent');
   mainEl.innerHTML = '<div class="loading">Crunching class averages…</div>';
   try{
-    const snap = await db.ref('posukPractice/attempts').once('value');
-    const val = snap.val();
-    if(!val){
-      mainEl.innerHTML = '<h2>Class Summary</h2><div class="empty-msg">No recordings yet.</div>';
+    const val = await loadAllAttempts();
+    if(!val || Object.keys(val).length === 0){
+      mainEl.innerHTML = '<h2>Class Stats</h2><div class="empty-msg">No recordings yet.</div>';
       return;
     }
+
+    /* ---- Overview: class average + doing-well/struggling buckets ---- */
+    const buckets = { high: 0, mid: 0, low: 0 };
+    let allScores = [];
+    Object.values(val).forEach(posukMap => {
+      const stats = computeStudentStats(posukMap);
+      if(stats.avg !== null){
+        buckets[scoreTier(stats.avg)]++;
+        allScores.push(stats.avg);
+      }
+    });
+    const classAvg = allScores.length ? allScores.reduce((a,b)=>a+b,0) / allScores.length : null;
+    const studentsWithData = allScores.length;
+    const maxBucket = Math.max(buckets.high, buckets.mid, buckets.low, 1);
+
+    /* ---- Activity trend: attempts per week, last 8 weeks ---- */
+    const now = Date.now();
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    const weekCounts = new Array(8).fill(0); // index 0 = 8 weeks ago ... 7 = this week
+    Object.values(val).forEach(posukMap => {
+      Object.values(posukMap).forEach(attemptMap => {
+        Object.values(attemptMap).forEach(a => {
+          const weeksAgo = Math.floor((now - a.timestamp) / weekMs);
+          const idx = 7 - weeksAgo;
+          if(idx >= 0 && idx <= 7) weekCounts[idx]++;
+        });
+      });
+    });
+    const maxWeekCount = Math.max(...weekCounts, 1);
+
+    let html = '<h2>Class Stats</h2>';
+    html += `<div class="stat-cards">
+      <div class="stat-card"><div class="num">${classAvg !== null ? classAvg.toFixed(1) : '—'}</div><div class="lbl">Class Avg Score</div></div>
+      <div class="stat-card"><div class="num">${buckets.high}</div><div class="lbl">Doing Well</div></div>
+      <div class="stat-card"><div class="num">${buckets.mid}</div><div class="lbl">Making Progress</div></div>
+      <div class="stat-card"><div class="num">${buckets.low}</div><div class="lbl">Needs Support</div></div>
+    </div>`;
+
+    if(studentsWithData > 0){
+      html += `<div class="section-title">How the Class Is Doing</div>
+        <div class="bucket-chart">
+          <div class="bucket-col">
+            <div class="bucket-count">${buckets.high}</div>
+            <div class="bucket-bar high" style="height:${(buckets.high/maxBucket)*100}%"></div>
+            <div class="bucket-lbl">Doing Well</div>
+          </div>
+          <div class="bucket-col">
+            <div class="bucket-count">${buckets.mid}</div>
+            <div class="bucket-bar mid" style="height:${(buckets.mid/maxBucket)*100}%"></div>
+            <div class="bucket-lbl">Making Progress</div>
+          </div>
+          <div class="bucket-col">
+            <div class="bucket-count">${buckets.low}</div>
+            <div class="bucket-bar low" style="height:${(buckets.low/maxBucket)*100}%"></div>
+            <div class="bucket-lbl">Needs Support</div>
+          </div>
+        </div>`;
+    }
+
+    html += `<div class="section-title">Activity — Last 8 Weeks</div>
+      <div class="activity-chart">`;
+    weekCounts.forEach((count, i) => {
+      const weeksAgo = 7 - i;
+      const lbl = weeksAgo === 0 ? 'This wk' : weeksAgo + 'wk ago';
+      html += `<div class="activity-col">
+        <div class="activity-bar" style="height:${(count/maxWeekCount)*100}%" title="${count} attempts"></div>
+        <div class="activity-lbl">${lbl}</div>
+      </div>`;
+    });
+    html += `</div>`;
 
     // val is keyed by studentId -> posukKey -> attemptId -> {...}
     const byPosuk = {}; // posukKey -> { posukText, students: [{name, hebrewScore, translationScore}], totalAttempts }
@@ -381,7 +807,7 @@ async function loadClassSummary(){
     });
 
     const posukKeys = sortPosukKeys(Object.keys(byPosuk));
-    let html = '<h2>Class Summary</h2>';
+    html += '<div class="section-title">Per-Posuk Breakdown</div>';
     if(posukKeys.length === 0){
       html += '<div class="empty-msg">No recordings yet.</div>';
     }
