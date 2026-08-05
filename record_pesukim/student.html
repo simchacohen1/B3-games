@@ -555,6 +555,7 @@ async function fetchChapter(perekNum){
     const pesukim = LOCAL_TEXT[perekNum].map((raw, idx) => {
       let text = abbreviateShaimos(raw);
       text = applyManualCorrections(text, perekNum, idx + 1);
+      text = stripMeteg(text);
       return text;
     });
     chapterCache[perekNum] = pesukim;
@@ -563,7 +564,7 @@ async function fetchChapter(perekNum){
 
   // v2 cache key: bumped so students' browsers refetch corrected text instead of
   // serving an old cached copy from before the shaimos/nikud fixes were added.
-  const cacheKey = 'posukPractice_ch_v6_' + perekNum;
+  const cacheKey = 'posukPractice_ch_v7_' + perekNum;
   const localCached = localStorage.getItem(cacheKey);
   if(localCached){
     const arr = JSON.parse(localCached);
@@ -594,6 +595,16 @@ function stripTags(html){
    For classroom display we replace it with the standard ה׳ abbreviation.
    Match the four consonants י-ה-ו-ה with any nikud/trop marks in between,
    so it catches the Name regardless of exactly which vowel points Sefaria used. */
+function stripMeteg(text){
+  // The Meteg mark (U+05BD) is a cantillation-adjacent stress marker.
+  // In our display font (Noto Serif Hebrew) it can visually fuse with an
+  // adjacent vowel point (e.g. Segol or Patach) making the combined shape
+  // misread as a different vowel (e.g. Kamatz) at classroom font sizes.
+  // Since Meteg isn't needed for 3rd-grade reading/translation practice,
+  // we strip it out entirely from locally-supplied text before display.
+  return text.replace(/\u05BD/g, '');
+}
+
 function abbreviateShaimos(text){
   const HEBREW_POINTS = '[\\u0591-\\u05C7]*';
   const shemPattern = new RegExp('י' + HEBREW_POINTS + 'ה' + HEBREW_POINTS + 'ו' + HEBREW_POINTS + 'ה' + HEBREW_POINTS, 'g');
