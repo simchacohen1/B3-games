@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Posuk Practice Scroll</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --parchment: #F1E7CE;
+    --parchment-dark: #E4D4AC;
+    --ink: #3B2A1E;
+    --ink-soft: #6B5842;
+    --rimon: #8C2F39;
+    --rimon-dark: #6E1F28;
+    --gold: #C9A227;
+    --gold-light: #E4C662;
+    --tent-navy: #24344A;
+    --shadow: rgba(59,42,30,0.25);
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0;
+    background: radial-gradient(circle at 20% 10%, #F6EEDA 0%, #E9DBB8 55%, #DCC998 100%);
+    font-family: 'Quicksand', sans-serif;
+    color: var(--ink);
+    min-height:100vh;
+  }
+  .wrap{
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 28px 18px 60px;
+  }
+  header.top{
+    text-align:center;
+    margin-bottom: 22px;
+  }
+  header.top h1{
+    font-family: 'Frank Ruhl Libre', serif;
+    font-weight:700;
+    font-size: 2rem;
+    color: var(--rimon-dark);
+    margin: 0 0 4px;
+    letter-spacing: 0.5px;
+  }
+  header.top p{
+    margin:0;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+  }
+  .name-gate{
+    background: var(--parchment);
+    border: 2px solid var(--gold);
+    border-radius: 14px;
+    padding: 22px;
+    text-align:center;
+    box-shadow: 0 6px 18px var(--shadow);
+  }
+  .name-gate input{
+    font-family:'Quicksand', sans-serif;
+    font-size:1.1rem;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 2px solid var(--gold);
+    width: 70%;
+    max-width: 320px;
+    margin: 12px 0;
+  }
+  .btn{
+    font-family:'Quicksand', sans-serif;
+    font-weight:700;
+    font-size: 1rem;
+    border: none;
+    border-radius: 999px;
+    padding: 12px 26px;
+    cursor:pointer;
+    color:#fff;
+    background: var(--rimon);
+    box-shadow: 0 4px 0 var(--rimon-dark);
+    transition: transform .08s ease;
+  }
+  .btn:active{ transform: translateY(3px); box-shadow: 0 1px 0 var(--rimon-dark); }
+  .btn.gold{ background: var(--gold); box-shadow: 0 4px 0 #97781a; color: var(--ink); }
+  .btn.gold:active{ box-shadow: 0 1px 0 #97781a; }
+  .btn:disabled{ opacity:0.45; cursor:not-allowed; box-shadow:none; }
+  .btn.small{ padding:8px 16px; font-size:0.85rem; }
+
+  .selectors{
+    display:flex; gap:10px; flex-wrap:wrap;
+    margin: 18px 0;
+  }
+  select{
+    flex:1; min-width: 140px;
+    font-family:'Quicksand', sans-serif;
+    font-size: 1rem;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 2px solid var(--ink-soft);
+    background: #fff;
+  }
+
+  .scroll{
+    position: relative;
+    background: var(--parchment);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(140,47,57,0.03) 0px, rgba(140,47,57,0.03) 1px, transparent 1px, transparent 26px);
+    border-radius: 18px;
+    border: 3px double var(--gold);
+    padding: 34px 22px;
+    margin: 14px 0 22px;
+    min-height: 160px;
+    box-shadow: 0 8px 24px var(--shadow), inset 0 0 40px rgba(140,47,57,0.05);
+    display:flex; align-items:center; justify-content:center;
+    text-align:center;
+  }
+  .scroll .placeholder{ color: var(--ink-soft); font-style: italic; font-size:1rem; }
+  .posuk-text{
+    font-family: 'Noto Serif Hebrew', serif;
+    font-size: 2.4rem;
+    line-height: 1.9;
+    direction: rtl;
+    color: var(--ink);
+  }
+  .posuk-ref{
+    font-family:'Quicksand', sans-serif;
+    font-weight:600;
+    color: var(--rimon-dark);
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    position:absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--gold-light);
+    padding: 2px 14px;
+    border-radius: 999px;
+  }
+
+  .task-card{
+    background:#fff;
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 14px rgba(59,42,30,0.12);
+    border-left: 6px solid var(--tent-navy);
+  }
+  .task-card.translate{ border-left-color: var(--rimon); }
+  .task-card h3{
+    font-family:'Frank Ruhl Libre', serif;
+    margin: 0 0 10px;
+    font-size: 1.15rem;
+    color: var(--tent-navy);
+  }
+  .task-card.translate h3{ color: var(--rimon-dark); }
+
+  .record-row{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .seal-btn{
+    width: 62px; height:62px;
+    border-radius: 50%;
+    border: none;
+    cursor:pointer;
+    background: radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold) 60%, #97781a 100%);
+    box-shadow: 0 4px 0 #6e5813, 0 6px 12px rgba(0,0,0,0.25);
+    color: var(--ink);
+    font-size: 1.4rem;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .seal-btn.recording{
+    background: radial-gradient(circle at 35% 30%, #ff9d8f, var(--rimon) 60%, var(--rimon-dark) 100%);
+    animation: pulse 1.1s infinite;
+  }
+  @keyframes pulse{
+    0%{ box-shadow: 0 4px 0 #6e1f28, 0 0 0 0 rgba(140,47,57,0.5); }
+    70%{ box-shadow: 0 4px 0 #6e1f28, 0 0 0 14px rgba(140,47,57,0); }
+    100%{ box-shadow: 0 4px 0 #6e1f28, 0 0 0 0 rgba(140,47,57,0); }
+  }
+  audio{ flex:1; min-width:180px; height:38px; }
+  .status-tag{
+    font-size:0.8rem;
+    font-weight:600;
+    color: var(--ink-soft);
+  }
+
+  .rating-scale{
+    display:flex; flex-wrap:wrap; gap:6px; margin-top:12px;
+  }
+  .rating-scale button{
+    font-family:'Quicksand', sans-serif;
+    font-size: 0.72rem;
+    font-weight:700;
+    text-align:center;
+    border-radius: 10px;
+    border: 2px solid var(--ink-soft);
+    background:#fff;
+    color: var(--ink-soft);
+    padding: 8px 4px;
+    width: calc(20% - 6px);
+    cursor:pointer;
+    line-height:1.3;
+  }
+  .rating-scale button .num{ display:block; font-size:1.05rem; }
+  .rating-scale button.selected{
+    background: var(--gold);
+    border-color: #97781a;
+    color: var(--ink);
+  }
+  .rating-scale button:disabled{ cursor:not-allowed; opacity:0.5; }
+
+  .save-row{ text-align:center; margin: 20px 0; }
+
+  .history{
+    margin-top: 30px;
+  }
+  .history h2{
+    font-family:'Frank Ruhl Libre', serif;
+    color: var(--tent-navy);
+    font-size: 1.25rem;
+    border-bottom: 2px solid var(--gold);
+    padding-bottom: 6px;
+  }
+  .attempt{
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(59,42,30,0.1);
+    font-size: 0.9rem;
+  }
+  .attempt .row{ display:flex; justify-content:space-between; align-items:center; margin: 4px 0; flex-wrap:wrap; gap:6px;}
+  .attempt .label{ color: var(--ink-soft); font-weight:600; min-width: 130px; }
+  .attempt audio{ height:32px; }
+  .score-pill{
+    display:inline-block;
+    background: var(--gold-light);
+    color: var(--ink);
+    font-weight:700;
+    border-radius: 999px;
+    padding: 3px 12px;
+    font-size:0.8rem;
+  }
+  .msg{ text-align:center; color: var(--ink-soft); font-size:0.85rem; margin-top:8px; min-height:1.2em; }
+  .hidden{ display:none !important; }
+  footer.who{
+    text-align:center; margin-top:26px; font-size:0.8rem; color: var(--ink-soft);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>📜 Posuk Practice Scroll</h1>
+    <p>Read it. Record it. Grade yourself!</p>
+  </header>
+
+  <!-- STEP 0: Name entry -->
+  <div id="nameGate" class="name-gate">
+    <div>What's your name?</div>
+    <input id="studentNameInput" type="text" placeholder="Type your name here" maxlength="30">
+    <div><button class="btn gold" id="startBtn">Start Practicing</button></div>
+  </div>
+
+  <!-- Main app (hidden until name entered) -->
+  <div id="app" class="hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-weight:700;">👋 <span id="studentNameLabel"></span></div>
+      <button class="btn small" id="switchStudentBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">Not you?</button>
+    </div>
+
+    <div class="selectors">
+      <select id="parshaSelect">
+        <option value="">Choose Parsha</option>
+        <option value="Vayeira">Vayeira</option>
+        <option value="Chayei Sarah">Chayei Sarah</option>
+        <option value="Toldos">Toldos</option>
+      </select>
+      <select id="perekSelect" disabled><option value="">Perek</option></select>
+      <select id="posukSelect" disabled><option value="">Posuk</option></select>
+    </div>
+
+    <div class="scroll" id="scrollBox">
+      <span class="posuk-ref hidden" id="posukRef"></span>
+      <div class="placeholder" id="scrollPlaceholder">Pick a Parsha, Perek, and Posuk above to begin 📖</div>
+      <div class="posuk-text hidden" id="posukText"></div>
+    </div>
+    <div class="msg" id="fetchMsg"></div>
+
+    <div id="recordingArea" class="hidden">
+
+      <!-- Hebrew reading task -->
+      <div class="task-card">
+        <h3>1️⃣ Read the Hebrew Words</h3>
+        <div class="record-row">
+          <button class="seal-btn" id="hebrewRecordBtn" title="Record">🎙️</button>
+          <audio id="hebrewAudioPlayback" controls class="hidden"></audio>
+          <span class="status-tag" id="hebrewStatus">Not recorded yet</span>
+        </div>
+        <div class="rating-scale" id="hebrewRating"></div>
+      </div>
+
+      <!-- Reading + translation task -->
+      <div class="task-card translate">
+        <h3>2️⃣ Read &amp; Translate the Posuk</h3>
+        <div class="record-row">
+          <button class="seal-btn" id="translateRecordBtn" title="Record">🎙️</button>
+          <audio id="translateAudioPlayback" controls class="hidden"></audio>
+          <span class="status-tag" id="translateStatus">Not recorded yet</span>
+        </div>
+        <div class="rating-scale" id="translateRating"></div>
+      </div>
+
+      <div class="save-row">
+        <button class="btn" id="saveBtn" disabled>💾 Save This Attempt</button>
+        <div class="msg" id="saveMsg"></div>
+      </div>
+
+      <div class="history">
+        <h2>📈 My Past Attempts on This Posuk</h2>
+        <div id="historyList"><div class="msg">No attempts yet — record above and save!</div></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="who">Nigri Shluchim Online School · 3rd Grade Chumash</footer>
+</div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+
+<script>
+/* =========================================================
+   FIREBASE CONFIG — paste the SAME config object you use in
+   your other B3 Games files (Tent Trail Trivia, etc.)
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "PASTE_YOUR_API_KEY",
+  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://PASTE_YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "PASTE_YOUR_PROJECT",
+  storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
+  messagingSenderId: "PASTE_ME",
+  appId: "PASTE_ME"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const storage = firebase.storage();
+
+/* =========================================================
+   PARSHA / PEREK / POSUK MAP (Sefaria "Genesis" chapters)
+   ========================================================= */
+const PARSHA_CONFIG = {
+  "Vayeira":      [ {num:18}, {num:19}, {num:20}, {num:21}, {num:22} ],
+  "Chayei Sarah": [ {num:23}, {num:24}, {num:25, maxPosuk:18} ],
+  "Toldos":       [ {num:25, minPosuk:19}, {num:26}, {num:27}, {num:28, maxPosuk:9} ]
+};
+
+const RATING_LABELS = [
+  "Just Starting", "Trying Hard", "Getting There", "Making Progress", "Doing Okay",
+  "Pretty Good", "Really Good", "Great Job", "Excellent", "Perfect!"
+];
+
+let studentId = null;
+let studentName = null;
+let currentAudio = { hebrew: null, translate: null };
+let currentRating = { hebrew: null, translate: null };
+let currentPosukKey = null; // "Parsha_perek_posuk"
+let currentPosukText = "";
+let mediaRecorder = null;
+let recordingChunks = [];
+let activeRecordingType = null; // 'hebrew' | 'translate'
+let chapterCache = {}; // cache fetched Sefaria chapters this session
+
+/* ---------- Name gate ---------- */
+function slugify(name){
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+}
+
+document.getElementById('startBtn').onclick = () => {
+  const val = document.getElementById('studentNameInput').value.trim();
+  if(!val){ return; }
+  studentName = val;
+  studentId = slugify(val);
+  localStorage.setItem('posukPractice_studentName', studentName);
+  localStorage.setItem('posukPractice_studentId', studentId);
+  enterApp();
+};
+
+document.getElementById('switchStudentBtn').onclick = () => {
+  localStorage.removeItem('posukPractice_studentName');
+  localStorage.removeItem('posukPractice_studentId');
+  location.reload();
+};
+
+function enterApp(){
+  document.getElementById('nameGate').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('studentNameLabel').textContent = studentName;
+  db.ref('posukPractice/students/' + studentId).set({
+    name: studentName,
+    lastActive: firebase.database.ServerValue.TIMESTAMP
+  });
+}
+
+window.addEventListener('load', () => {
+  const savedId = localStorage.getItem('posukPractice_studentId');
+  const savedName = localStorage.getItem('posukPractice_studentName');
+  if(savedId && savedName){
+    studentId = savedId;
+    studentName = savedName;
+    enterApp();
+  }
+});
+
+/* ---------- Parsha / Perek / Posuk selectors ---------- */
+const parshaSelect = document.getElementById('parshaSelect');
+const perekSelect = document.getElementById('perekSelect');
+const posukSelect = document.getElementById('posukSelect');
+
+parshaSelect.onchange = () => {
+  perekSelect.innerHTML = '<option value="">Perek</option>';
+  posukSelect.innerHTML = '<option value="">Posuk</option>';
+  posukSelect.disabled = true;
+  resetScroll();
+  const parsha = parshaSelect.value;
+  if(!parsha){ perekSelect.disabled = true; return; }
+  PARSHA_CONFIG[parsha].forEach(ch => {
+    const opt = document.createElement('option');
+    opt.value = ch.num;
+    opt.textContent = 'Perek ' + ch.num;
+    perekSelect.appendChild(opt);
+  });
+  perekSelect.disabled = false;
+};
+
+perekSelect.onchange = async () => {
+  posukSelect.innerHTML = '<option value="">Posuk</option>';
+  resetScroll();
+  const parsha = parshaSelect.value;
+  const perekNum = parseInt(perekSelect.value);
+  if(!perekNum){ posukSelect.disabled = true; return; }
+  const chConfig = PARSHA_CONFIG[parsha].find(c => c.num === perekNum);
+  document.getElementById('fetchMsg').textContent = 'Loading pesukim…';
+  try{
+    const pesukim = await fetchChapter(perekNum);
+    const min = chConfig.minPosuk || 1;
+    const max = chConfig.maxPosuk || pesukim.length;
+    for(let i = min; i <= max; i++){
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = 'Posuk ' + i;
+      posukSelect.appendChild(opt);
+    }
+    posukSelect.disabled = false;
+    document.getElementById('fetchMsg').textContent = '';
+  }catch(err){
+    document.getElementById('fetchMsg').textContent = 'Could not load text from Sefaria — check your internet connection.';
+    console.error(err);
+  }
+};
+
+posukSelect.onchange = async () => {
+  const parsha = parshaSelect.value;
+  const perekNum = parseInt(perekSelect.value);
+  const posukNum = parseInt(posukSelect.value);
+  if(!posukNum){ resetScroll(); return; }
+  document.getElementById('fetchMsg').textContent = 'Loading posuk…';
+  try{
+    const pesukim = await fetchChapter(perekNum);
+    const text = pesukim[posukNum - 1];
+    showPosuk(parsha, perekNum, posukNum, text);
+    document.getElementById('fetchMsg').textContent = '';
+  }catch(err){
+    document.getElementById('fetchMsg').textContent = 'Could not load this posuk.';
+    console.error(err);
+  }
+};
+
+async function fetchChapter(perekNum){
+  if(chapterCache[perekNum]) return chapterCache[perekNum];
+  const cacheKey = 'posukPractice_ch_' + perekNum;
+  const localCached = localStorage.getItem(cacheKey);
+  if(localCached){
+    const arr = JSON.parse(localCached);
+    chapterCache[perekNum] = arr;
+    return arr;
+  }
+  const res = await fetch('https://www.sefaria.org/api/texts/Genesis.' + perekNum + '?context=0&pad=0');
+  const data = await res.json();
+  const pesukim = (data.he || []).map(stripTags);
+  chapterCache[perekNum] = pesukim;
+  localStorage.setItem(cacheKey, JSON.stringify(pesukim));
+  return pesukim;
+}
+
+function stripTags(html){
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return div.textContent || div.innerText || '';
+}
+
+function resetScroll(){
+  document.getElementById('scrollPlaceholder').classList.remove('hidden');
+  document.getElementById('posukText').classList.add('hidden');
+  document.getElementById('posukRef').classList.add('hidden');
+  document.getElementById('recordingArea').classList.add('hidden');
+  currentPosukKey = null;
+}
+
+function showPosuk(parsha, perekNum, posukNum, text){
+  currentPosukKey = parsha.replace(/\s+/g,'') + '_' + perekNum + '_' + posukNum;
+  currentPosukText = text;
+  document.getElementById('scrollPlaceholder').classList.add('hidden');
+  const textEl = document.getElementById('posukText');
+  textEl.textContent = text;
+  textEl.classList.remove('hidden');
+  const refEl = document.getElementById('posukRef');
+  refEl.textContent = parsha + ' · Perek ' + perekNum + ' · Posuk ' + posukNum;
+  refEl.classList.remove('hidden');
+  document.getElementById('recordingArea').classList.remove('hidden');
+  resetRecordingUI();
+  loadHistory();
+}
+
+/* ---------- Rating scale builder ---------- */
+function buildRatingScale(containerId, type){
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  RATING_LABELS.forEach((label, idx) => {
+    const num = idx + 1;
+    const btn = document.createElement('button');
+    btn.innerHTML = '<span class="num">' + num + '</span>' + label;
+    btn.disabled = true;
+    btn.onclick = () => {
+      currentRating[type] = num;
+      [...container.children].forEach(c => c.classList.remove('selected'));
+      btn.classList.add('selected');
+      updateSaveButton();
+    };
+    container.appendChild(btn);
+  });
+}
+buildRatingScale('hebrewRating', 'hebrew');
+buildRatingScale('translateRating', 'translate');
+
+function enableRating(type){
+  const container = document.getElementById(type + 'Rating');
+  [...container.children].forEach(c => c.disabled = false);
+}
+
+/* ---------- Recording logic ---------- */
+function resetRecordingUI(){
+  ['hebrew','translate'].forEach(type => {
+    currentAudio[type] = null;
+    currentRating[type] = null;
+    document.getElementById(type + 'AudioPlayback').classList.add('hidden');
+    document.getElementById(type + 'Status').textContent = 'Not recorded yet';
+    const ratingContainer = document.getElementById(type + 'Rating');
+    [...ratingContainer.children].forEach(c => { c.disabled = true; c.classList.remove('selected'); });
+  });
+  updateSaveButton();
+}
+
+async function toggleRecording(type, btnEl){
+  if(activeRecordingType === type){
+    // stop
+    mediaRecorder.stop();
+    return;
+  }
+  if(activeRecordingType){ return; } // another recording in progress
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    mediaRecorder = new MediaRecorder(stream);
+    recordingChunks = [];
+    activeRecordingType = type;
+    btnEl.classList.add('recording');
+    btnEl.textContent = '⏹️';
+    document.getElementById(type + 'Status').textContent = 'Recording…';
+
+    mediaRecorder.ondataavailable = e => recordingChunks.push(e.data);
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordingChunks, { type:'audio/webm' });
+      currentAudio[type] = blob;
+      const url = URL.createObjectURL(blob);
+      const audioEl = document.getElementById(type + 'AudioPlayback');
+      audioEl.src = url;
+      audioEl.classList.remove('hidden');
+      document.getElementById(type + 'Status').textContent = 'Recorded — listen, then grade yourself below';
+      enableRating(type);
+      btnEl.classList.remove('recording');
+      btnEl.textContent = '🎙️';
+      activeRecordingType = null;
+      stream.getTracks().forEach(t => t.stop());
+      updateSaveButton();
+    };
+    mediaRecorder.start();
+  }catch(err){
+    alert('Could not access the microphone. Please allow microphone permission.');
+    console.error(err);
+  }
+}
+
+document.getElementById('hebrewRecordBtn').onclick = function(){ toggleRecording('hebrew', this); };
+document.getElementById('translateRecordBtn').onclick = function(){ toggleRecording('translate', this); };
+
+function updateSaveButton(){
+  const ready = currentAudio.hebrew && currentAudio.translate && currentRating.hebrew && currentRating.translate;
+  document.getElementById('saveBtn').disabled = !ready;
+}
+
+/* ---------- Save attempt ---------- */
+document.getElementById('saveBtn').onclick = async () => {
+  if(!currentPosukKey) return;
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.disabled = true;
+  document.getElementById('saveMsg').textContent = 'Saving your recordings…';
+  try{
+    const timestamp = Date.now();
+    const attemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
+    const attemptId = attemptRef.key;
+
+    const hebrewPath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_hebrew_' + attemptId + '.webm';
+    const translatePath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_translate_' + attemptId + '.webm';
+
+    await storage.ref(hebrewPath).put(currentAudio.hebrew);
+    const hebrewURL = await storage.ref(hebrewPath).getDownloadURL();
+    await storage.ref(translatePath).put(currentAudio.translate);
+    const translateURL = await storage.ref(translatePath).getDownloadURL();
+
+    await attemptRef.set({
+      timestamp: timestamp,
+      posukText: currentPosukText,
+      hebrewScore: currentRating.hebrew,
+      hebrewAudioURL: hebrewURL,
+      translationScore: currentRating.translate,
+      translationAudioURL: translateURL
+    });
+
+    document.getElementById('saveMsg').textContent = '✅ Saved! Great job.';
+    resetRecordingUI();
+    loadHistory();
+  }catch(err){
+    document.getElementById('saveMsg').textContent = 'Something went wrong saving. Try again.';
+    console.error(err);
+  }finally{
+    setTimeout(() => { document.getElementById('saveMsg').textContent=''; }, 3500);
+  }
+};
+
+/* ---------- History ---------- */
+async function loadHistory(){
+  const listEl = document.getElementById('historyList');
+  listEl.innerHTML = '<div class="msg">Loading…</div>';
+  try{
+    const snap = await db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).once('value');
+    const val = snap.val();
+    if(!val){
+      listEl.innerHTML = '<div class="msg">No attempts yet — record above and save!</div>';
+      return;
+    }
+    const attempts = Object.values(val).sort((a,b) => b.timestamp - a.timestamp);
+    listEl.innerHTML = '';
+    attempts.forEach(a => {
+      const div = document.createElement('div');
+      div.className = 'attempt';
+      const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+      div.innerHTML = `
+        <div class="row"><span>${dateStr}</span></div>
+        <div class="row"><span class="label">🎙️ Hebrew reading</span><span class="score-pill">${a.hebrewScore}/10 · ${RATING_LABELS[a.hebrewScore-1]}</span></div>
+        <div class="row"><audio controls src="${a.hebrewAudioURL}"></audio></div>
+        <div class="row"><span class="label">🌐 Translation</span><span class="score-pill">${a.translationScore}/10 · ${RATING_LABELS[a.translationScore-1]}</span></div>
+        <div class="row"><audio controls src="${a.translationAudioURL}"></audio></div>
+      `;
+      listEl.appendChild(div);
+    });
+  }catch(err){
+    listEl.innerHTML = '<div class="msg">Could not load history.</div>';
+    console.error(err);
+  }
+}
+</script>
+</body>
+</html>
