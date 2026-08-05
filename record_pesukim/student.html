@@ -338,6 +338,7 @@
 
       <div class="save-row">
         <button class="btn" id="saveBtn" disabled>💾 Save This Attempt</button>
+        <button class="btn gold hidden" id="nextPosukBtn" style="margin-left:8px;">▶️ Next Posuk</button>
         <div class="msg" id="saveMsg"></div>
       </div>
 
@@ -501,6 +502,70 @@ posukSelect.onchange = async () => {
   }catch(err){
     document.getElementById('fetchMsg').textContent = 'Could not load this posuk.';
     console.error(err);
+  }
+};
+
+/* ---------- Next Posuk button ----------
+   Lets a student move straight to the next posuk after saving, without
+   re-touching the dropdowns each time — handles rolling into the next
+   perek, and even the next parsha, once the current one runs out. */
+document.getElementById('nextPosukBtn').onclick = async () => {
+  const nextBtn = document.getElementById('nextPosukBtn');
+  nextBtn.disabled = true;
+  try{
+    const parsha = parshaSelect.value;
+    const perekNum = parseInt(perekSelect.value);
+
+    // 1) Try the next posuk within the current perek's dropdown.
+    const posukOpts = Array.from(posukSelect.options).filter(o => o.value !== '');
+    const curPosukIdx = posukOpts.findIndex(o => parseInt(o.value) === parseInt(posukSelect.value));
+    if(curPosukIdx > -1 && curPosukIdx < posukOpts.length - 1){
+      posukSelect.value = posukOpts[curPosukIdx + 1].value;
+      await posukSelect.onchange();
+      return;
+    }
+
+    // 2) Out of pesukim in this perek — try the next perek in this parsha.
+    const chapters = PARSHA_CONFIG[parsha];
+    const perekIdx = chapters.findIndex(c => c.num === perekNum);
+    if(perekIdx > -1 && perekIdx < chapters.length - 1){
+      perekSelect.value = chapters[perekIdx + 1].num;
+      await perekSelect.onchange();
+      const firstPosukOpt = Array.from(posukSelect.options).find(o => o.value !== '');
+      if(firstPosukOpt){
+        posukSelect.value = firstPosukOpt.value;
+        await posukSelect.onchange();
+      }
+      return;
+    }
+
+    // 3) Out of perakim in this parsha — try the next parsha entirely.
+    const parshaOrder = Object.keys(PARSHA_CONFIG);
+    const parshaIdx = parshaOrder.indexOf(parsha);
+    if(parshaIdx > -1 && parshaIdx < parshaOrder.length - 1){
+      parshaSelect.value = parshaOrder[parshaIdx + 1];
+      parshaSelect.onchange();
+      const firstPerekOpt = Array.from(perekSelect.options).find(o => o.value !== '');
+      if(firstPerekOpt){
+        perekSelect.value = firstPerekOpt.value;
+        await perekSelect.onchange();
+        const firstPosukOpt = Array.from(posukSelect.options).find(o => o.value !== '');
+        if(firstPosukOpt){
+          posukSelect.value = firstPosukOpt.value;
+          await posukSelect.onchange();
+        }
+      }
+      return;
+    }
+
+    // 4) Genuinely at the very last posuk of the very last perek.
+    document.getElementById('saveMsg').textContent = "🎉 You've finished all the pesukim!";
+    nextBtn.classList.add('hidden');
+  }catch(err){
+    document.getElementById('fetchMsg').textContent = 'Could not load the next posuk.';
+    console.error(err);
+  }finally{
+    nextBtn.disabled = false;
   }
 };
 
@@ -673,6 +738,7 @@ function showPosuk(parsha, perekNum, posukNum, text){
   refEl.textContent = parsha + ' · Perek ' + perekNum + ' · Posuk ' + posukNum;
   refEl.classList.remove('hidden');
   document.getElementById('recordingArea').classList.remove('hidden');
+  document.getElementById('nextPosukBtn').classList.add('hidden'); // re-hide until this new posuk is saved
   resetRecordingUI();
   loadHistory();
 }
@@ -808,6 +874,7 @@ document.getElementById('saveBtn').onclick = async () => {
     document.getElementById('saveMsg').textContent = '✅ Saved! Great job.';
     resetRecordingUI();
     loadHistory();
+    document.getElementById('nextPosukBtn').classList.remove('hidden');
   }catch(err){
     document.getElementById('saveMsg').textContent = 'Something went wrong saving. Try again.';
     console.error(err);
