@@ -561,8 +561,14 @@ function applyManualCorrections(text, perekNum, posukNum){
   const key = perekNum + '_' + posukNum;
   const fixes = MANUAL_CORRECTIONS[key];
   if(!fixes) return text;
+  // Normalize to NFC first: Hebrew nikud/dagesh marks can arrive from Sefaria
+  // in a different internal combining-mark order than how we typed the
+  // correction table, which would otherwise make an exact match silently fail.
+  text = text.normalize('NFC');
   fixes.forEach(([wrong, right]) => {
-    text = text.split(wrong).join(right);
+    const wrongNorm = wrong.normalize('NFC');
+    const rightNorm = right.normalize('NFC');
+    text = text.split(wrongNorm).join(rightNorm);
   });
   return text;
 }
