@@ -508,7 +508,7 @@ async function fetchChapter(perekNum){
   if(chapterCache[perekNum]) return chapterCache[perekNum];
   // v2 cache key: bumped so students' browsers refetch corrected text instead of
   // serving an old cached copy from before the shaimos/nikud fixes were added.
-  const cacheKey = 'posukPractice_ch_v2_' + perekNum;
+  const cacheKey = 'posukPractice_ch_v3_' + perekNum;
   const localCached = localStorage.getItem(cacheKey);
   if(localCached){
     const arr = JSON.parse(localCached);
