@@ -223,6 +223,16 @@
   .activity-bar{ width:100%; background: var(--navy); border-radius:4px 4px 0 0; min-height:2px; }
   .activity-col .activity-lbl{ font-size:0.62rem; color: var(--ink-soft); margin-top:5px; }
   .dur{ font-size:0.72rem; opacity:0.75; font-weight:600; }
+
+  /* ---------- Class Stats: collapsible perek accordion ---------- */
+  .perek-section{ border-bottom: 1px dashed #d8c9a0; margin-bottom: 4px; }
+  .perek-header{ cursor:pointer; user-select:none; margin: 10px 0; }
+  .perek-header .arrow{ display:inline-block; transition: transform .15s ease; margin-inline-end:6px; font-size:0.8em; }
+  .perek-section.expanded .perek-header .arrow{ transform: rotate(90deg); }
+  .perek-body{ display:none; padding-bottom:12px; }
+  .perek-section.expanded .perek-body{ display:block; }
+  .class-posuk-detail-inline{ margin-top:14px; }
+  .class-posuk-detail-inline:empty{ margin-top:0; }
   .not-done-list{ font-size:0.85rem; color: var(--ink-soft); line-height:1.5; }
 </style>
 </head>
@@ -745,100 +755,40 @@ function sortPosukKeys(keys){
 }
 
 /* ---------- Class Summary ---------- */
+let classActiveSkill = 'translation'; // 'translation' | 'reading' -- one global toggle for the whole tab
+let expandedPerekNum = null; // only one perek open (accordion) at a time; null = all collapsed
+let lastAttemptsVal = null; // cached attempts tree so toggling skill/expand doesn't need a re-fetch
+
 async function loadClassSummary(){
   const mainEl = document.getElementById('mainContent');
   mainEl.innerHTML = '<div class="loading">Crunching class averages…</div>';
   try{
     const val = await loadAllAttempts();
+    lastAttemptsVal = val;
     if(!val || Object.keys(val).length === 0){
       mainEl.innerHTML = '<h2>Class Stats</h2><div class="empty-msg">No recordings yet.</div>';
       return;
     }
 
-    /* ---- Overview: class average + doing-well/struggling buckets ---- */
-    const buckets = { high: 0, mid: 0, low: 0 };
-    let allScores = [];
-    Object.values(val).forEach(posukMap => {
-      const stats = computeStudentStats(posukMap);
-      if(stats.avg !== null){
-        buckets[scoreTier(stats.avg)]++;
-        allScores.push(stats.avg);
-      }
-    });
-    const classAvg = allScores.length ? allScores.reduce((a,b)=>a+b,0) / allScores.length : null;
-    const studentsWithData = allScores.length;
-    const maxBucket = Math.max(buckets.high, buckets.mid, buckets.low, 1);
-
-    /* ---- Activity trend: attempts per week, last 8 weeks ---- */
-    const now = Date.now();
-    const weekMs = 7 * 24 * 60 * 60 * 1000;
-    const weekCounts = new Array(8).fill(0); // index 0 = 8 weeks ago ... 7 = this week
-    Object.values(val).forEach(posukMap => {
-      Object.values(posukMap).forEach(attemptMap => {
-        Object.values(attemptMap).forEach(a => {
-          const weeksAgo = Math.floor((now - a.timestamp) / weekMs);
-          const idx = 7 - weeksAgo;
-          if(idx >= 0 && idx <= 7) weekCounts[idx]++;
-        });
-      });
-    });
-    const maxWeekCount = Math.max(...weekCounts, 1);
-
     let html = '<h2>Class Stats</h2>';
-    html += `<div class="stat-cards">
-      <div class="stat-card"><div class="num">${classAvg !== null ? classAvg.toFixed(1) : '—'}</div><div class="lbl">Class Avg Score</div></div>
-      <div class="stat-card"><div class="num">${buckets.high}</div><div class="lbl">Doing Well</div></div>
-      <div class="stat-card"><div class="num">${buckets.mid}</div><div class="lbl">Making Progress</div></div>
-      <div class="stat-card"><div class="num">${buckets.low}</div><div class="lbl">Needs Support</div></div>
+    html += `<div class="mini-tabs" style="margin-bottom:6px;">
+      <button class="mini-tab-btn ${classActiveSkill==='translation'?'active':''}" id="classTranslationBtn">🌐 Translation</button>
+      <button class="mini-tab-btn ${classActiveSkill==='reading'?'active':''}" id="classReadingBtn">🎙️ Reading</button>
     </div>`;
-
-    if(studentsWithData > 0){
-      html += `<div class="section-title">How the Class Is Doing</div>
-        <div class="bucket-chart">
-          <div class="bucket-col">
-            <div class="bucket-count">${buckets.high}</div>
-            <div class="bucket-bar high" style="height:${(buckets.high/maxBucket)*100}%"></div>
-            <div class="bucket-lbl">Doing Well</div>
-          </div>
-          <div class="bucket-col">
-            <div class="bucket-count">${buckets.mid}</div>
-            <div class="bucket-bar mid" style="height:${(buckets.mid/maxBucket)*100}%"></div>
-            <div class="bucket-lbl">Making Progress</div>
-          </div>
-          <div class="bucket-col">
-            <div class="bucket-count">${buckets.low}</div>
-            <div class="bucket-bar low" style="height:${(buckets.low/maxBucket)*100}%"></div>
-            <div class="bucket-lbl">Needs Support</div>
-          </div>
-        </div>`;
-    }
-
-    html += `<div class="section-title">Activity — Last 8 Weeks</div>
-      <div class="activity-chart">`;
-    weekCounts.forEach((count, i) => {
-      const weeksAgo = 7 - i;
-      const lbl = weeksAgo === 0 ? 'This wk' : weeksAgo + 'wk ago';
-      html += `<div class="activity-col">
-        <div class="activity-bar" style="height:${(count/maxWeekCount)*100}%" title="${count} attempts"></div>
-        <div class="activity-lbl">${lbl}</div>
-      </div>`;
-    });
-    html += `</div>`;
-
-    html += `<div class="section-title">🗺️ Posuk Coverage — tap a posuk to see every student's status</div>
-      <div id="classPosukGridWrap"></div>
-      <div id="classPosukDetail"></div>`;
+    html += `<div id="classPosukGridWrap"></div>`;
     mainEl.innerHTML = html;
 
+    document.getElementById('classTranslationBtn').onclick = () => { classActiveSkill = 'translation'; renderClassPosukGrid(lastAttemptsVal); };
+    document.getElementById('classReadingBtn').onclick = () => { classActiveSkill = 'reading'; renderClassPosukGrid(lastAttemptsVal); };
+
     await renderClassPosukGrid(val);
-    if(selectedClassPosukKey) renderClassPosukDetail(selectedClassPosukKey);
   }catch(err){
     mainEl.innerHTML = '<div class="empty-msg">Could not load class summary.</div>';
     console.error(err);
   }
 }
 
-let classPosukData = {}; // posukKey -> { doneList, notDoneList, posukText }
+let classPosukData = {}; // posukKey -> { doneList, notDoneList, posukText } for the currently active skill
 let selectedClassPosukKey = null;
 
 async function renderClassPosukGrid(val){
@@ -851,75 +801,108 @@ async function renderClassPosukGrid(val){
     wrap.innerHTML = '<div class="empty-msg">No students yet.</div>';
     return;
   }
+  const scoreField = classActiveSkill === 'translation' ? 'translationScore' : 'hebrewScore';
+  const audioField = classActiveSkill === 'translation' ? 'translationAudioURL' : 'hebrewAudioURL';
 
   const perekNums = getAllPerekNums();
   for(const perekNum of perekNums){
     const range = await getPerekRange(perekNum);
-    const label = document.createElement('div');
-    label.className = 'perek-label';
-    label.innerHTML = `<span>פרק ${hebrewNumeral(perekNum)}</span><span class="summary" id="classPerekSummary${perekNum}"></span>`;
+    const isExpanded = expandedPerekNum === perekNum;
+
+    const section = document.createElement('div');
+    section.className = 'perek-section' + (isExpanded ? ' expanded' : '');
+
+    const header = document.createElement('div');
+    header.className = 'perek-label perek-header';
+    header.innerHTML = `<span><span class="arrow">▶</span>פרק ${hebrewNumeral(perekNum)}</span><span class="summary" id="classPerekSummary${perekNum}"></span>`;
+    header.onclick = () => {
+      expandedPerekNum = isExpanded ? null : perekNum;
+      selectedClassPosukKey = null;
+      renderClassPosukGrid(val);
+    };
+
+    const body = document.createElement('div');
+    body.className = 'perek-body';
 
     const grid = document.createElement('div');
     grid.className = 'posuk-grid';
     let perekStarted = 0, perekTotal = 0;
 
-    for(let posukNum = range.min; posukNum <= range.max; posukNum++){
-      const slug = resolveParshaSlug(perekNum, posukNum);
-      if(!slug) continue;
-      const posukKey = `${slug}_${perekNum}_${posukNum}`;
-      perekTotal++;
+    if(isExpanded){
+      for(let posukNum = range.min; posukNum <= range.max; posukNum++){
+        const slug = resolveParshaSlug(perekNum, posukNum);
+        if(!slug) continue;
+        const posukKey = `${slug}_${perekNum}_${posukNum}`;
+        perekTotal++;
 
-      const doneList = [];
-      let posukText = '';
-      Object.entries(studentsMap).forEach(([studentId, name]) => {
-        const attemptMap = val[studentId] && val[studentId][posukKey];
-        if(attemptMap){
-          const attempts = Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp);
-          const latest = attempts[0];
-          doneList.push({ studentId, name, latest });
-          if(!posukText && latest.posukText) posukText = latest.posukText;
-        }
-      });
-      const doneIds = new Set(doneList.map(d => d.studentId));
-      const notDoneList = Object.entries(studentsMap)
-        .filter(([sid]) => !doneIds.has(sid))
-        .map(([, name]) => name);
+        const doneList = [];
+        let posukText = '';
+        Object.entries(studentsMap).forEach(([studentId, name]) => {
+          const attemptMap = val[studentId] && val[studentId][posukKey];
+          if(attemptMap){
+            const attempts = Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp);
+            const latest = attempts.find(a => typeof a[scoreField] === 'number') || null;
+            if(latest){
+              doneList.push({ studentId, name, latest });
+              if(!posukText && latest.posukText) posukText = latest.posukText;
+            }
+          }
+        });
+        const doneIds = new Set(doneList.map(d => d.studentId));
+        const notDoneList = Object.entries(studentsMap)
+          .filter(([sid]) => !doneIds.has(sid))
+          .map(([, name]) => name);
 
-      if(doneList.length) perekStarted++;
+        if(doneList.length) perekStarted++;
 
-      let scores = [];
-      doneList.forEach(d => {
-        if(typeof d.latest.hebrewScore === 'number') scores.push(d.latest.hebrewScore);
-        if(typeof d.latest.translationScore === 'number') scores.push(d.latest.translationScore);
-      });
-      const avg = scores.length ? scores.reduce((a,b) => a+b, 0) / scores.length : null;
+        const scores = doneList.map(d => d.latest[scoreField]).filter(s => typeof s === 'number');
+        const avg = scores.length ? scores.reduce((a,b) => a+b, 0) / scores.length : null;
 
-      classPosukData[posukKey] = { doneList, notDoneList, posukText };
+        classPosukData[posukKey] = { doneList, notDoneList, posukText };
 
-      const tile = document.createElement('div');
-      tile.className = 'posuk-tile ' + (avg !== null ? 'tile-' + scoreTier(avg) : 'tile-none') + (posukKey === selectedClassPosukKey ? ' selected' : '');
-      tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${doneList.length}/${totalStudents}</span>`;
-      tile.onclick = () => {
-        // Only swap which tile is highlighted + refresh the detail panel —
-        // do NOT rebuild the whole grid here (that's async/slow and was
-        // racing with the detail render, which is why clicks looked broken).
-        const prevSelected = wrap.querySelector('.posuk-tile.selected');
-        if(prevSelected) prevSelected.classList.remove('selected');
-        tile.classList.add('selected');
-        selectedClassPosukKey = posukKey;
-        renderClassPosukDetail(posukKey);
-      };
-      grid.appendChild(tile);
+        const tile = document.createElement('div');
+        tile.className = 'posuk-tile ' + (avg !== null ? 'tile-' + scoreTier(avg) : 'tile-none') + (posukKey === selectedClassPosukKey ? ' selected' : '');
+        tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${doneList.length}/${totalStudents}</span>`;
+        tile.onclick = () => {
+          const prevSelected = grid.querySelector('.posuk-tile.selected');
+          if(prevSelected) prevSelected.classList.remove('selected');
+          tile.classList.add('selected');
+          selectedClassPosukKey = posukKey;
+          renderClassPosukDetail(posukKey, body);
+        };
+        grid.appendChild(tile);
+      }
+    }else{
+      // Collapsed: still need started/total counts for the header summary,
+      // without building tiles (keeps collapsed sections cheap).
+      for(let posukNum = range.min; posukNum <= range.max; posukNum++){
+        const slug = resolveParshaSlug(perekNum, posukNum);
+        if(!slug) continue;
+        perekTotal++;
+        const posukKey = `${slug}_${perekNum}_${posukNum}`;
+        const started = Object.keys(studentsMap).some(studentId => {
+          const attemptMap = val[studentId] && val[studentId][posukKey];
+          return attemptMap && Object.values(attemptMap).some(a => typeof a[scoreField] === 'number');
+        });
+        if(started) perekStarted++;
+      }
     }
 
-    label.querySelector('#classPerekSummary' + perekNum).textContent = `${perekStarted}/${perekTotal} pesukim started`;
-    wrap.appendChild(label);
-    wrap.appendChild(grid);
+    header.querySelector('#classPerekSummary' + perekNum).textContent = `${perekStarted}/${perekTotal} pesukim started`;
+    body.appendChild(grid);
+    body.appendChild(Object.assign(document.createElement('div'), { className: 'class-posuk-detail-inline' }));
+    section.appendChild(header);
+    section.appendChild(body);
+    wrap.appendChild(section);
+
+    if(isExpanded && selectedClassPosukKey && classPosukData[selectedClassPosukKey]){
+      renderClassPosukDetail(selectedClassPosukKey, body);
+    }
   }
 }
 
-function renderClassPosukDetail(posukKey){
-  const detailEl = document.getElementById('classPosukDetail');
+function renderClassPosukDetail(posukKey, bodyEl){
+  const detailEl = bodyEl.querySelector('.class-posuk-detail-inline');
   if(!detailEl) return;
   const data = classPosukData[posukKey];
   if(!data) return;
@@ -927,9 +910,13 @@ function renderClassPosukDetail(posukKey){
   const doneCount = data.doneList.length;
   const notDoneCount = total - doneCount;
   const refLabel = formatRefLabel(posukKey);
+  const skillLabel = classActiveSkill === 'translation' ? '🌐 Translation' : '🎙️ Reading';
+  const audioField = classActiveSkill === 'translation' ? 'translationAudioURL' : 'hebrewAudioURL';
+  const scoreField = classActiveSkill === 'translation' ? 'translationScore' : 'hebrewScore';
+  const durKey = classActiveSkill === 'translation' ? 'tr' : 'heb';
 
   let html = `<div class="posuk-group">
-    <h3>${refLabel}</h3>
+    <h3>${refLabel} — ${skillLabel}</h3>
     ${data.posukText ? `<div class="posuk-hebrew">${data.posukText}</div>` : ''}
     <div class="summary-meta" style="margin-bottom:10px;">${doneCount} of ${total} student${total===1?'':'s'} recorded this posuk${notDoneCount > 0 ? ' · ' + notDoneCount + ' not yet' : ''}</div>`;
 
@@ -940,16 +927,10 @@ function renderClassPosukDetail(posukKey){
       const a = entry.latest;
       const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
       let lines = `<div class="top-line"><strong>${entry.name}</strong><span class="summary-meta">${dateStr}</span></div>`;
-      if(a.hebrewAudioURL){
+      if(a[audioField]){
         lines += `<div class="top-line">
-          <span>🎙️ Hebrew — <span class="score-pill">${a.hebrewScore}/10 · ${RATING_LABELS[a.hebrewScore-1]}</span> <span class="dur" id="dur_${entry.studentId}_heb">⏱ …</span></span>
-          <audio controls src="${a.hebrewAudioURL}"></audio>
-        </div>`;
-      }
-      if(a.translationAudioURL){
-        lines += `<div class="top-line">
-          <span>🌐 Translation — <span class="score-pill">${a.translationScore}/10 · ${RATING_LABELS[a.translationScore-1]}</span> <span class="dur" id="dur_${entry.studentId}_tr">⏱ …</span></span>
-          <audio controls src="${a.translationAudioURL}"></audio>
+          <span>${skillLabel} — <span class="score-pill">${a[scoreField]}/10 · ${RATING_LABELS[a[scoreField]-1]}</span> <span class="dur" id="dur_${entry.studentId}_${durKey}">⏱ …</span></span>
+          <audio controls src="${a[audioField]}"></audio>
         </div>`;
       }
       html += `<div class="attempt-row">${lines}</div>`;
@@ -967,15 +948,9 @@ function renderClassPosukDetail(posukKey){
   // files themselves only for the posuk currently being viewed.
   data.doneList.forEach(entry => {
     const a = entry.latest;
-    if(a.hebrewAudioURL){
-      getAudioDuration(a.hebrewAudioURL).then(d => {
-        const el = document.getElementById(`dur_${entry.studentId}_heb`);
-        if(el) el.textContent = d ? '⏱ ' + formatDuration(d) : '';
-      });
-    }
-    if(a.translationAudioURL){
-      getAudioDuration(a.translationAudioURL).then(d => {
-        const el = document.getElementById(`dur_${entry.studentId}_tr`);
+    if(a[audioField]){
+      getAudioDuration(a[audioField]).then(d => {
+        const el = document.getElementById(`dur_${entry.studentId}_${durKey}`);
         if(el) el.textContent = d ? '⏱ ' + formatDuration(d) : '';
       });
     }
