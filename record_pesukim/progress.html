@@ -142,16 +142,46 @@
   }
   .perek-section.expanded .perek-body{ display:block; }
 
-  .posuk-row{
-    display:flex; justify-content:space-between; align-items:center;
+  .posuk-grid{
+    display:grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 6px;
+    margin-top: 4px;
+  }
+  @media (max-width: 560px){
+    .posuk-grid{ grid-template-columns: repeat(5, 1fr); }
+  }
+  .posuk-tile{
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family:'Quicksand', sans-serif;
+    cursor:pointer;
+    border: none;
+    padding: 2px;
+    transition: transform .08s ease;
+  }
+  .posuk-tile:active{ transform: scale(0.94); }
+  .posuk-tile .tile-num{ font-size:0.62rem; font-weight:600; opacity:0.85; line-height:1; }
+  .posuk-tile .tile-score{ font-size:0.95rem; font-weight:700; line-height:1.2; }
+  .posuk-tile.tile-none{
+    background: #fff;
+    border: 2px dashed var(--ink-soft);
+    color: var(--ink-soft);
+  }
+  .posuk-tile.tile-high{ background: #C9E4A6; color: #33511E; }
+  .posuk-tile.tile-mid{ background: var(--gold-light); color: var(--ink); }
+  .posuk-tile.tile-low{ background: #EFC1C1; color: #7A2626; }
+
+  .tile-detail{
+    margin-top: 10px;
     background:#fff;
     border-radius: 10px;
     padding: 10px 14px;
-    margin-bottom: 8px;
-    font-size:0.9rem;
+    font-size:0.88rem;
+    box-shadow: 0 2px 8px rgba(59,42,30,0.1);
   }
-  .posuk-row .posuk-label{ font-weight:700; color: var(--ink); }
-  .score-pill{
+  .tile-detail .score-pill{
     display:inline-block;
     background: var(--gold-light);
     color: var(--ink);
@@ -159,12 +189,7 @@
     border-radius: 999px;
     padding: 3px 12px;
     font-size:0.8rem;
-  }
-  .score-pill.none{
-    background: transparent;
-    border: 2px dashed var(--ink-soft);
-    color: var(--ink-soft);
-    font-weight:600;
+    margin-left:8px;
   }
 
   .msg{ text-align:center; color: var(--ink-soft); font-size:0.9rem; margin-top:14px; }
@@ -374,6 +399,12 @@ async function renderPerekList(){
   }
 }
 
+function scoreTier(score){
+  if(score >= 8) return 'high';
+  if(score >= 5) return 'mid';
+  return 'low';
+}
+
 function buildPerekSection(perekNum, range){
   const scoreField = activeTab === 'translation' ? 'translationScore' : 'hebrewScore';
   const posukScores = perekData[perekNum] || {};
@@ -395,26 +426,41 @@ function buildPerekSection(perekNum, range){
   const body = document.createElement('div');
   body.className = 'perek-body';
 
+  const grid = document.createElement('div');
+  grid.className = 'posuk-grid';
+
+  const detail = document.createElement('div');
+  detail.className = 'tile-detail hidden';
+
   for(let posukNum = range.min; posukNum <= range.max; posukNum++){
     const record = posukScores[posukNum];
     const score = record ? record[scoreField] : null;
     if(score) doneCount++;
 
-    const row = document.createElement('div');
-    row.className = 'posuk-row';
-    if(score){
-      row.innerHTML = `<span class="posuk-label">Posuk ${posukNum}</span><span class="score-pill">${score}/10 · ${RATING_LABELS[score - 1]}</span>`;
-    } else {
-      row.innerHTML = `<span class="posuk-label">Posuk ${posukNum}</span><span class="score-pill none">Not recorded yet</span>`;
-    }
-    body.appendChild(row);
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'posuk-tile ' + (score ? 'tile-' + scoreTier(score) : 'tile-none');
+    tile.innerHTML = `<span class="tile-num">${posukNum}</span><span class="tile-score">${score ? score : '—'}</span>`;
+    tile.onclick = () => showTileDetail(posukNum, score, detail);
+    grid.appendChild(tile);
   }
 
   header.querySelector('#perekSummary' + perekNum).textContent = `${doneCount}/${total} pesukim done`;
 
+  body.appendChild(grid);
+  body.appendChild(detail);
   section.appendChild(header);
   section.appendChild(body);
   return section;
+}
+
+function showTileDetail(posukNum, score, detailEl){
+  if(score){
+    detailEl.innerHTML = `<strong>Posuk ${posukNum}</strong><span class="score-pill">${score}/10 · ${RATING_LABELS[score - 1]}</span>`;
+  } else {
+    detailEl.innerHTML = `<strong>Posuk ${posukNum}</strong> — Not recorded yet`;
+  }
+  detailEl.classList.remove('hidden');
 }
 </script>
 </body>
