@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Posuk Practice — Teacher Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy: #1F2D3D;
+    --navy-light: #2E4257;
+    --parchment: #F1E7CE;
+    --gold: #C9A227;
+    --gold-light: #E4C662;
+    --rimon: #8C2F39;
+    --ink: #24344A;
+    --ink-soft: #5A6C82;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; font-family:'Quicksand', sans-serif;
+    background: linear-gradient(180deg, var(--navy) 0%, #16202c 100%);
+    color: #E9E4D4;
+    min-height:100vh;
+  }
+  .wrap{ max-width: 1000px; margin:0 auto; padding: 26px 18px 60px; }
+  header{ text-align:center; margin-bottom: 20px; }
+  header h1{
+    font-family:'Frank Ruhl Libre', serif;
+    color: var(--gold-light);
+    margin:0 0 4px;
+    font-size: 1.8rem;
+  }
+  header p{ margin:0; color:#B7C2D0; font-size:0.9rem; }
+
+  .gate{
+    max-width: 360px; margin: 60px auto; background:#26374A; border-radius:14px;
+    padding:24px; text-align:center; border: 2px solid var(--gold);
+  }
+  .gate input{
+    font-size:1.1rem; padding:10px 14px; border-radius:10px; border:none; width:100%;
+    margin: 12px 0; text-align:center;
+  }
+
+  .btn{
+    font-family:'Quicksand', sans-serif; font-weight:700; border:none; border-radius:999px;
+    padding: 10px 22px; cursor:pointer; color:#fff; background: var(--rimon);
+    box-shadow: 0 4px 0 #6e1f28;
+  }
+  .btn:active{ transform: translateY(2px); box-shadow:none; }
+  .btn.gold{ background: var(--gold); color:var(--ink); box-shadow: 0 4px 0 #97781a; }
+
+  .layout{ display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
+  .students-panel{
+    flex: 0 0 240px;
+    background:#26374A;
+    border-radius: 14px;
+    padding: 14px;
+    max-height: 75vh;
+    overflow-y:auto;
+  }
+  .students-panel h2{ font-size:1rem; color: var(--gold-light); margin:0 0 10px; }
+  .student-item{
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor:pointer;
+    margin-bottom: 6px;
+    font-weight:600;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .student-item:hover{ background: #32475e; }
+  .student-item.active{ background: var(--gold); color: var(--ink); }
+  .student-item .last-active{ font-size:0.7rem; opacity:0.7; font-weight:500; }
+
+  .main-panel{
+    flex: 1 1 500px;
+    background: var(--parchment);
+    color: var(--ink);
+    border-radius: 16px;
+    padding: 20px;
+    min-height: 400px;
+  }
+  .main-panel h2{
+    font-family:'Frank Ruhl Libre', serif;
+    color: var(--rimon);
+    margin-top:0;
+  }
+  .filters{ display:flex; gap:8px; margin-bottom: 14px; flex-wrap:wrap; }
+  .filters select{
+    padding:8px 10px; border-radius:8px; border:2px solid var(--ink-soft); font-family:'Quicksand', sans-serif;
+  }
+
+  .posuk-group{
+    background:#fff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .posuk-group h3{
+    font-family:'Frank Ruhl Libre', serif;
+    margin:0 0 4px;
+    color: var(--ink);
+    font-size:1rem;
+  }
+  .posuk-hebrew{
+    font-family:'Noto Serif Hebrew', serif;
+    direction:rtl;
+    font-size:1.3rem;
+    color:#3B2A1E;
+    margin: 4px 0 10px;
+  }
+  .attempt-row{
+    border-top: 1px dashed #ccc;
+    padding: 8px 0;
+    font-size:0.85rem;
+  }
+  .attempt-row .top-line{ display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:4px;}
+  .score-pill{
+    background: var(--gold-light); border-radius:999px; padding:2px 10px; font-weight:700; font-size:0.75rem;
+  }
+  audio{ height:32px; max-width: 240px; }
+  .empty-msg{ color: var(--ink-soft); text-align:center; padding: 40px 0; }
+  .loading{ color: var(--ink-soft); text-align:center; padding:20px 0; }
+
+  .tab-bar{ display:flex; gap:8px; margin-bottom:16px; }
+  .tab-btn{
+    font-family:'Quicksand', sans-serif; font-weight:700; font-size:0.85rem;
+    border: 2px solid var(--ink-soft); background:#fff; color: var(--ink-soft);
+    border-radius: 999px; padding: 8px 18px; cursor:pointer;
+  }
+  .tab-btn.active{ background: var(--rimon); border-color: var(--rimon); color:#fff; }
+
+  .summary-row{
+    background:#fff; border-radius:12px; padding:14px 16px; margin-bottom:12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .summary-row .top-line{ display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px; }
+  .summary-row h3{ font-family:'Frank Ruhl Libre', serif; margin:0; font-size:1rem; color:var(--ink); }
+  .summary-meta{ font-size:0.75rem; color: var(--ink-soft); }
+  .avg-bars{ display:flex; gap:18px; margin-top:10px; flex-wrap:wrap; }
+  .avg-bar{ flex:1; min-width:180px; }
+  .avg-bar .bar-label{ display:flex; justify-content:space-between; font-size:0.78rem; font-weight:700; margin-bottom:4px; color: var(--ink-soft); }
+  .bar-track{ background:#e8e0c8; border-radius:999px; height:10px; overflow:hidden; }
+  .bar-fill{ height:100%; border-radius:999px; }
+  .bar-fill.hebrew{ background: var(--navy); }
+  .bar-fill.translate{ background: var(--rimon); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="gate" class="gate">
+    <div>Teacher Passcode</div>
+    <input id="passcodeInput" type="password" placeholder="Enter passcode">
+    <button class="btn gold" id="enterBtn">Enter Dashboard</button>
+    <div id="gateMsg" style="font-size:0.8rem;margin-top:8px;color:#ffb3b3;"></div>
+  </div>
+
+  <div id="dashboard" style="display:none;">
+    <header>
+      <h1>📖 Posuk Practice — Teacher Dashboard</h1>
+      <p>Review recordings and self-grades for every student</p>
+    </header>
+
+    <div class="layout">
+      <div class="students-panel">
+        <h2>Students</h2>
+        <div id="studentList" class="loading">Loading students…</div>
+      </div>
+
+      <div class="main-panel">
+        <div class="tab-bar">
+          <button class="tab-btn active" id="studentTabBtn">👤 By Student</button>
+          <button class="tab-btn" id="summaryTabBtn">📊 Class Summary</button>
+        </div>
+        <div id="mainContent" class="empty-msg">Select a student to view their practice history.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+
+<script>
+/* Paste the SAME firebaseConfig used in student.html and your other B3 Games files */
+const firebaseConfig = {
+  apiKey: "PASTE_YOUR_API_KEY",
+  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://PASTE_YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "PASTE_YOUR_PROJECT",
+  storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
+  messagingSenderId: "PASTE_ME",
+  appId: "PASTE_ME"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* Simple client-side passcode gate — NOT real security, just keeps casual visitors out.
+   Change this to whatever you'd like. */
+const TEACHER_PASSCODE = "vayeira5786";
+
+const RATING_LABELS = [
+  "Just Starting", "Trying Hard", "Getting There", "Making Progress", "Doing Okay",
+  "Pretty Good", "Really Good", "Great Job", "Excellent", "Perfect!"
+];
+
+document.getElementById('enterBtn').onclick = () => {
+  const val = document.getElementById('passcodeInput').value;
+  if(val === TEACHER_PASSCODE){
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    loadStudents();
+  }else{
+    document.getElementById('gateMsg').textContent = 'Incorrect passcode.';
+  }
+};
+
+let activeStudentId = null;
+let studentsMap = {}; // id -> name
+
+const PARSHA_ORDER = { "Vayeira": 0, "ChayeiSarah": 1, "Toldos": 2 };
+
+document.getElementById('studentTabBtn').onclick = () => setTab('student');
+document.getElementById('summaryTabBtn').onclick = () => setTab('summary');
+
+function setTab(tab){
+  document.getElementById('studentTabBtn').classList.toggle('active', tab === 'student');
+  document.getElementById('summaryTabBtn').classList.toggle('active', tab === 'summary');
+  if(tab === 'summary'){
+    [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
+    loadClassSummary();
+  }else if(activeStudentId){
+    const el = [...document.querySelectorAll('.student-item')].find(e => e.dataset.id === activeStudentId);
+    if(el) selectStudent(activeStudentId, studentsMap[activeStudentId], el);
+  }else{
+    document.getElementById('mainContent').innerHTML = '<div class="empty-msg">Select a student to view their practice history.</div>';
+  }
+}
+
+async function loadStudents(){
+  const listEl = document.getElementById('studentList');
+  try{
+    const snap = await db.ref('posukPractice/students').once('value');
+    const val = snap.val();
+    if(!val){
+      listEl.innerHTML = '<div class="empty-msg">No students yet.</div>';
+      return;
+    }
+    listEl.innerHTML = '';
+    Object.entries(val)
+      .sort((a,b) => a[1].name.localeCompare(b[1].name))
+      .forEach(([id, info]) => {
+        studentsMap[id] = info.name;
+        const div = document.createElement('div');
+        div.className = 'student-item';
+        div.dataset.id = id;
+        const lastActive = info.lastActive ? new Date(info.lastActive).toLocaleDateString() : '';
+        div.innerHTML = `<span>${info.name}</span><span class="last-active">${lastActive}</span>`;
+        div.onclick = () => { setTab('student'); selectStudent(id, info.name, div); };
+        listEl.appendChild(div);
+      });
+  }catch(err){
+    listEl.innerHTML = '<div class="empty-msg">Could not load students.</div>';
+    console.error(err);
+  }
+}
+
+async function selectStudent(id, name, el){
+  activeStudentId = id;
+  [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+
+  const mainEl = document.getElementById('mainContent');
+  mainEl.innerHTML = '<div class="loading">Loading ' + name + '\'s practice history…</div>';
+
+  try{
+    const snap = await db.ref('posukPractice/attempts/' + id).once('value');
+    const val = snap.val();
+    if(!val){
+      mainEl.innerHTML = '<h2>' + name + '</h2><div class="empty-msg">No recordings yet.</div>';
+      return;
+    }
+
+    let html = '<h2>' + name + '</h2>';
+    // val is keyed by posukKey -> { attemptId: {...} }
+    const posukKeys = sortPosukKeys(Object.keys(val));
+    posukKeys.forEach(posukKey => {
+      const attempts = Object.values(val[posukKey]).sort((a,b) => b.timestamp - a.timestamp);
+      const latest = attempts[0];
+      const refLabel = formatRefLabel(posukKey);
+      html += `<div class="posuk-group">
+        <h3>${refLabel}</h3>
+        <div class="posuk-hebrew">${latest.posukText || ''}</div>`;
+      attempts.forEach(a => {
+        const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+        html += `<div class="attempt-row">
+          <div class="top-line"><strong>${dateStr}</strong></div>
+          <div class="top-line">
+            <span>🎙️ Hebrew reading — <span class="score-pill">${a.hebrewScore}/10 · ${RATING_LABELS[a.hebrewScore-1]}</span></span>
+            <audio controls src="${a.hebrewAudioURL}"></audio>
+          </div>
+          <div class="top-line">
+            <span>🌐 Translation — <span class="score-pill">${a.translationScore}/10 · ${RATING_LABELS[a.translationScore-1]}</span></span>
+            <audio controls src="${a.translationAudioURL}"></audio>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    });
+    mainEl.innerHTML = html;
+  }catch(err){
+    mainEl.innerHTML = '<div class="empty-msg">Could not load this student\'s recordings.</div>';
+    console.error(err);
+  }
+}
+
+/* ---------- Shared helpers ---------- */
+function parsePosukKey(posukKey){
+  // format: ParshaSlug_perek_posuk  e.g. "ChayeiSarah_24_10"
+  const parts = posukKey.split('_');
+  const posuk = parseInt(parts.pop());
+  const perek = parseInt(parts.pop());
+  const parshaSlug = parts.join('');
+  return { parshaSlug, perek, posuk };
+}
+
+function formatRefLabel(posukKey){
+  const { parshaSlug, perek, posuk } = parsePosukKey(posukKey);
+  const parshaName = parshaSlug === 'ChayeiSarah' ? 'Chayei Sarah' : parshaSlug;
+  return `${parshaName} · Perek ${perek} · Posuk ${posuk}`;
+}
+
+function sortPosukKeys(keys){
+  return keys.sort((a, b) => {
+    const pa = parsePosukKey(a), pb = parsePosukKey(b);
+    const orderA = PARSHA_ORDER[pa.parshaSlug] ?? 99;
+    const orderB = PARSHA_ORDER[pb.parshaSlug] ?? 99;
+    if(orderA !== orderB) return orderA - orderB;
+    if(pa.perek !== pb.perek) return pa.perek - pb.perek;
+    return pa.posuk - pb.posuk;
+  });
+}
+
+/* ---------- Class Summary ---------- */
+async function loadClassSummary(){
+  const mainEl = document.getElementById('mainContent');
+  mainEl.innerHTML = '<div class="loading">Crunching class averages…</div>';
+  try{
+    const snap = await db.ref('posukPractice/attempts').once('value');
+    const val = snap.val();
+    if(!val){
+      mainEl.innerHTML = '<h2>Class Summary</h2><div class="empty-msg">No recordings yet.</div>';
+      return;
+    }
+
+    // val is keyed by studentId -> posukKey -> attemptId -> {...}
+    const byPosuk = {}; // posukKey -> { posukText, students: [{name, hebrewScore, translationScore}], totalAttempts }
+
+    Object.entries(val).forEach(([studentId, posukMap]) => {
+      const studentName = studentsMap[studentId] || studentId;
+      Object.entries(posukMap).forEach(([posukKey, attemptMap]) => {
+        const attempts = Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp);
+        const latest = attempts[0];
+        if(!byPosuk[posukKey]){
+          byPosuk[posukKey] = { posukText: latest.posukText || '', students: [], totalAttempts: 0 };
+        }
+        byPosuk[posukKey].students.push({
+          name: studentName,
+          hebrewScore: latest.hebrewScore,
+          translationScore: latest.translationScore
+        });
+        byPosuk[posukKey].totalAttempts += attempts.length;
+      });
+    });
+
+    const posukKeys = sortPosukKeys(Object.keys(byPosuk));
+    let html = '<h2>Class Summary</h2>';
+    if(posukKeys.length === 0){
+      html += '<div class="empty-msg">No recordings yet.</div>';
+    }
+    posukKeys.forEach(posukKey => {
+      const group = byPosuk[posukKey];
+      const n = group.students.length;
+      const avgHebrew = group.students.reduce((s,x) => s + x.hebrewScore, 0) / n;
+      const avgTranslate = group.students.reduce((s,x) => s + x.translationScore, 0) / n;
+      const refLabel = formatRefLabel(posukKey);
+      html += `<div class="summary-row">
+        <div class="top-line">
+          <h3>${refLabel}</h3>
+          <span class="summary-meta">${n} student${n===1?'':'s'} · ${group.totalAttempts} attempt${group.totalAttempts===1?'':'s'}</span>
+        </div>
+        <div class="posuk-hebrew" style="font-size:1.05rem;">${group.posukText}</div>
+        <div class="avg-bars">
+          <div class="avg-bar">
+            <div class="bar-label"><span>🎙️ Hebrew avg</span><span>${avgHebrew.toFixed(1)}/10</span></div>
+            <div class="bar-track"><div class="bar-fill hebrew" style="width:${avgHebrew*10}%"></div></div>
+          </div>
+          <div class="avg-bar">
+            <div class="bar-label"><span>🌐 Translation avg</span><span>${avgTranslate.toFixed(1)}/10</span></div>
+            <div class="bar-track"><div class="bar-fill translate" style="width:${avgTranslate*10}%"></div></div>
+          </div>
+        </div>
+      </div>`;
+    });
+    mainEl.innerHTML = html;
+  }catch(err){
+    mainEl.innerHTML = '<div class="empty-msg">Could not load class summary.</div>';
+    console.error(err);
+  }
+}
+</script>
+</body>
+</html>
