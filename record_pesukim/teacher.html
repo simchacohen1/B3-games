@@ -900,8 +900,13 @@ async function renderClassPosukGrid(val){
       tile.className = 'posuk-tile ' + (avg !== null ? 'tile-' + scoreTier(avg) : 'tile-none') + (posukKey === selectedClassPosukKey ? ' selected' : '');
       tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${doneList.length}/${totalStudents}</span>`;
       tile.onclick = () => {
+        // Only swap which tile is highlighted + refresh the detail panel —
+        // do NOT rebuild the whole grid here (that's async/slow and was
+        // racing with the detail render, which is why clicks looked broken).
+        const prevSelected = wrap.querySelector('.posuk-tile.selected');
+        if(prevSelected) prevSelected.classList.remove('selected');
+        tile.classList.add('selected');
         selectedClassPosukKey = posukKey;
-        renderClassPosukGrid(val);
         renderClassPosukDetail(posukKey);
       };
       grid.appendChild(tile);
