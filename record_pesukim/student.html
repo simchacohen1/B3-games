@@ -115,6 +115,7 @@
     box-shadow: 0 8px 24px var(--shadow), inset 0 0 40px rgba(140,47,57,0.05);
     display:flex; align-items:center; justify-content:center;
     text-align:center;
+    transition: padding .2s ease, min-height .2s ease;
   }
   .scroll .placeholder{ color: var(--ink-soft); font-style: italic; font-size:1rem; }
   .posuk-text{
@@ -123,6 +124,7 @@
     line-height: 1.9;
     direction: rtl;
     color: var(--ink);
+    transition: font-size .2s ease, line-height .2s ease;
   }
   .posuk-ref{
     font-family:'Quicksand', sans-serif;
@@ -139,6 +141,29 @@
     padding: 2px 14px;
     border-radius: 999px;
   }
+  /* Once the student scrolls down toward the recording area, shrink the
+     sticky posuk box down to a slim strip — keeps it visible for reference
+     (per Simcha's request) without it looming over the record buttons. */
+  .scroll.compact{
+    padding: 10px 20px;
+    min-height: 0;
+  }
+  .scroll.compact .posuk-text{
+    font-size: 1.25rem;
+    line-height: 1.4;
+  }
+  .scroll.compact .posuk-ref{
+    top: 4px;
+  }
+  .btn.ghost-delete{
+    background: transparent;
+    color: var(--ink-soft);
+    box-shadow: none;
+    border: 2px solid var(--ink-soft);
+    padding: 6px 14px;
+    font-size: 0.85rem;
+  }
+  .btn.ghost-delete:active{ transform:none; box-shadow:none; }
 
   .task-card{
     background:#fff;
@@ -295,19 +320,13 @@
     </div>
 
     <div class="selectors">
-      <select id="parshaSelect">
-        <option value="">Choose Parsha</option>
-        <option value="Vayeira">Vayeira</option>
-        <option value="Chayei Sarah">Chayei Sarah</option>
-        <option value="Toldos">Toldos</option>
-      </select>
-      <select id="perekSelect" disabled><option value="">Perek</option></select>
+      <select id="perekSelect"><option value="">Choose Perek</option></select>
       <select id="posukSelect" disabled><option value="">Posuk</option></select>
     </div>
 
     <div class="scroll" id="scrollBox">
       <span class="posuk-ref hidden" id="posukRef"></span>
-      <div class="placeholder" id="scrollPlaceholder">Pick a Parsha, Perek, and Posuk above to begin 📖</div>
+      <div class="placeholder" id="scrollPlaceholder">Pick a Perek and Posuk above to begin 📖</div>
       <div class="posuk-text hidden" id="posukText"></div>
     </div>
     <div class="msg" id="fetchMsg"></div>
@@ -320,6 +339,7 @@
         <div class="record-row">
           <button class="seal-btn" id="hebrewRecordBtn" title="Record">🎙️</button>
           <audio id="hebrewAudioPlayback" controls class="hidden"></audio>
+          <button class="btn ghost-delete hidden" id="hebrewDeleteBtn" title="Delete this recording">🗑️ Delete</button>
           <span class="status-tag" id="hebrewStatus">Not recorded yet</span>
         </div>
         <div class="rating-scale" id="hebrewRating"></div>
@@ -331,6 +351,7 @@
         <div class="record-row">
           <button class="seal-btn" id="translateRecordBtn" title="Record">🎙️</button>
           <audio id="translateAudioPlayback" controls class="hidden"></audio>
+          <button class="btn ghost-delete hidden" id="translateDeleteBtn" title="Delete this recording">🗑️ Delete</button>
           <span class="status-tag" id="translateStatus">Not recorded yet</span>
         </div>
         <div class="rating-scale" id="translateRating"></div>
@@ -383,6 +404,31 @@ const PARSHA_CONFIG = {
   "Chayei Sarah": [ {num:23}, {num:24}, {num:25, maxPosuk:18} ],
   "Toldos":       [ {num:25, minPosuk:19}, {num:26}, {num:27}, {num:28, maxPosuk:9} ]
 };
+
+/* Flattened, ordered list of every perek across all three parshas, with
+   perek 25 (which is split between Chayei Sarah and Toldos) appearing
+   only once — lets the student pick a perek directly without first
+   picking a parsha. */
+const ALL_PERAKIM = [];
+Object.values(PARSHA_CONFIG).forEach(chapters => {
+  chapters.forEach(ch => {
+    if(!ALL_PERAKIM.includes(ch.num)) ALL_PERAKIM.push(ch.num);
+  });
+});
+
+/* Given a perek + posuk, figures out which parsha it belongs to — needed
+   because perek 25 itself spans two parshas (1-18 is Chayei Sarah,
+   19+ is Toldos). */
+function resolveParsha(perekNum, posukNum){
+  for(const [parsha, chapters] of Object.entries(PARSHA_CONFIG)){
+    const ch = chapters.find(c => c.num === perekNum);
+    if(!ch) continue;
+    const min = ch.minPosuk || 1;
+    const max = ch.maxPosuk || Infinity;
+    if(posukNum >= min && posukNum <= max) return parsha;
+  }
+  return null;
+}
 
 const RATING_LABELS = [
   "Just Starting", "Trying Hard", "Getting There", "Making Progress", "Doing Okay",
@@ -441,39 +487,57 @@ window.addEventListener('load', () => {
   }
 });
 
-/* ---------- Parsha / Perek / Posuk selectors ---------- */
-const parshaSelect = document.getElementById('parshaSelect');
+/* ---------- Sticky posuk box: shrink on scroll ----------
+   The posuk stays pinned at the top on purpose (so it's visible while
+   recording), but a student scrolling down to the record buttons doesn't
+   need it full-size the whole time. Once they scroll past a small
+   threshold, shrink it to a slim strip so it stops covering the
+   record/save controls below. */
+const scrollBox = document.getElementById('scrollBox');
+let posukBoxCompact = false;
+window.addEventListener('scroll', () => {
+  const shouldBeCompact = window.scrollY > 40;
+  if(shouldBeCompact !== posukBoxCompact){
+    posukBoxCompact = shouldBeCompact;
+    scrollBox.classList.toggle('compact', shouldBeCompact);
+  }
+}, { passive: true });
+
+/* ---------- Perek / Posuk selectors ----------
+   Simcha asked to drop the separate "choose a parsha" step — the student
+   just picks a perek directly and the parsha is figured out automatically
+   (needed because perek 25 itself is split between Chayei Sarah and
+   Toldos, so a posuk's parsha can depend on which posuk within perek 25
+   is picked, not just the perek number). */
 const perekSelect = document.getElementById('perekSelect');
 const posukSelect = document.getElementById('posukSelect');
 
-parshaSelect.onchange = () => {
-  perekSelect.innerHTML = '<option value="">Perek</option>';
-  posukSelect.innerHTML = '<option value="">Posuk</option>';
-  posukSelect.disabled = true;
-  resetScroll();
-  const parsha = parshaSelect.value;
-  if(!parsha){ perekSelect.disabled = true; return; }
-  PARSHA_CONFIG[parsha].forEach(ch => {
-    const opt = document.createElement('option');
-    opt.value = ch.num;
-    opt.textContent = 'Perek ' + ch.num;
-    perekSelect.appendChild(opt);
-  });
-  perekSelect.disabled = false;
-};
+ALL_PERAKIM.forEach(num => {
+  const opt = document.createElement('option');
+  opt.value = num;
+  opt.textContent = 'Perek ' + num;
+  perekSelect.appendChild(opt);
+});
 
 perekSelect.onchange = async () => {
   posukSelect.innerHTML = '<option value="">Posuk</option>';
   resetScroll();
-  const parsha = parshaSelect.value;
   const perekNum = parseInt(perekSelect.value);
   if(!perekNum){ posukSelect.disabled = true; return; }
-  const chConfig = PARSHA_CONFIG[parsha].find(c => c.num === perekNum);
   document.getElementById('fetchMsg').textContent = 'Loading pesukim…';
   try{
     const pesukim = await fetchChapter(perekNum);
-    const min = chConfig.minPosuk || 1;
-    const max = chConfig.maxPosuk || pesukim.length;
+    // A perek can span two parshas (perek 25 splits between Chayei Sarah
+    // and Toldos), so combine the posuk range across every chapter-entry
+    // that matches this perek number.
+    let min = Infinity, max = -Infinity;
+    Object.values(PARSHA_CONFIG).forEach(chapters => {
+      const ch = chapters.find(c => c.num === perekNum);
+      if(ch){
+        min = Math.min(min, ch.minPosuk || 1);
+        max = Math.max(max, ch.maxPosuk || pesukim.length);
+      }
+    });
     for(let i = min; i <= max; i++){
       const opt = document.createElement('option');
       opt.value = i;
@@ -489,7 +553,6 @@ perekSelect.onchange = async () => {
 };
 
 posukSelect.onchange = async () => {
-  const parsha = parshaSelect.value;
   const perekNum = parseInt(perekSelect.value);
   const posukNum = parseInt(posukSelect.value);
   if(!posukNum){ resetScroll(); return; }
@@ -497,6 +560,7 @@ posukSelect.onchange = async () => {
   try{
     const pesukim = await fetchChapter(perekNum);
     const text = pesukim[posukNum - 1];
+    const parsha = resolveParsha(perekNum, posukNum);
     showPosuk(parsha, perekNum, posukNum, text);
     document.getElementById('fetchMsg').textContent = '';
   }catch(err){
@@ -508,12 +572,11 @@ posukSelect.onchange = async () => {
 /* ---------- Next Posuk button ----------
    Lets a student move straight to the next posuk after saving, without
    re-touching the dropdowns each time — handles rolling into the next
-   perek, and even the next parsha, once the current one runs out. */
+   perek once the current one runs out. */
 document.getElementById('nextPosukBtn').onclick = async () => {
   const nextBtn = document.getElementById('nextPosukBtn');
   nextBtn.disabled = true;
   try{
-    const parsha = parshaSelect.value;
     const perekNum = parseInt(perekSelect.value);
 
     // 1) Try the next posuk within the current perek's dropdown.
@@ -525,11 +588,10 @@ document.getElementById('nextPosukBtn').onclick = async () => {
       return;
     }
 
-    // 2) Out of pesukim in this perek — try the next perek in this parsha.
-    const chapters = PARSHA_CONFIG[parsha];
-    const perekIdx = chapters.findIndex(c => c.num === perekNum);
-    if(perekIdx > -1 && perekIdx < chapters.length - 1){
-      perekSelect.value = chapters[perekIdx + 1].num;
+    // 2) Out of pesukim in this perek — move on to the next perek overall.
+    const perekIdx = ALL_PERAKIM.indexOf(perekNum);
+    if(perekIdx > -1 && perekIdx < ALL_PERAKIM.length - 1){
+      perekSelect.value = ALL_PERAKIM[perekIdx + 1];
       await perekSelect.onchange();
       const firstPosukOpt = Array.from(posukSelect.options).find(o => o.value !== '');
       if(firstPosukOpt){
@@ -539,26 +601,7 @@ document.getElementById('nextPosukBtn').onclick = async () => {
       return;
     }
 
-    // 3) Out of perakim in this parsha — try the next parsha entirely.
-    const parshaOrder = Object.keys(PARSHA_CONFIG);
-    const parshaIdx = parshaOrder.indexOf(parsha);
-    if(parshaIdx > -1 && parshaIdx < parshaOrder.length - 1){
-      parshaSelect.value = parshaOrder[parshaIdx + 1];
-      parshaSelect.onchange();
-      const firstPerekOpt = Array.from(perekSelect.options).find(o => o.value !== '');
-      if(firstPerekOpt){
-        perekSelect.value = firstPerekOpt.value;
-        await perekSelect.onchange();
-        const firstPosukOpt = Array.from(posukSelect.options).find(o => o.value !== '');
-        if(firstPosukOpt){
-          posukSelect.value = firstPosukOpt.value;
-          await posukSelect.onchange();
-        }
-      }
-      return;
-    }
-
-    // 4) Genuinely at the very last posuk of the very last perek.
+    // 3) Genuinely at the very last posuk of the very last perek.
     document.getElementById('saveMsg').textContent = "🎉 You've finished all the pesukim!";
     nextBtn.classList.add('hidden');
   }catch(err){
@@ -785,11 +828,29 @@ function resetRecordingUI(){
     currentAudio[type] = null;
     currentRating[type] = null;
     document.getElementById(type + 'AudioPlayback').classList.add('hidden');
+    document.getElementById(type + 'DeleteBtn').classList.add('hidden');
     document.getElementById(type + 'Status').textContent = 'Not recorded yet';
     buildRatingScale(type + 'Rating', type); // rebuild slider back to disabled/default state
   });
   updateSaveButton();
 }
+
+// Lets a student re-do a recording they don't like, before saving —
+// clears the audio, hides the delete button again, and resets that
+// task's rating slider back to its default state.
+function deleteRecording(type){
+  currentAudio[type] = null;
+  currentRating[type] = null;
+  const audioEl = document.getElementById(type + 'AudioPlayback');
+  audioEl.removeAttribute('src');
+  audioEl.classList.add('hidden');
+  document.getElementById(type + 'DeleteBtn').classList.add('hidden');
+  document.getElementById(type + 'Status').textContent = 'Not recorded yet';
+  buildRatingScale(type + 'Rating', type);
+  updateSaveButton();
+}
+document.getElementById('hebrewDeleteBtn').onclick = () => deleteRecording('hebrew');
+document.getElementById('translateDeleteBtn').onclick = () => deleteRecording('translate');
 
 async function toggleRecording(type, btnEl){
   if(activeRecordingType === type){
@@ -822,6 +883,7 @@ async function toggleRecording(type, btnEl){
       const audioEl = document.getElementById(type + 'AudioPlayback');
       audioEl.src = url;
       audioEl.classList.remove('hidden');
+      document.getElementById(type + 'DeleteBtn').classList.remove('hidden');
       document.getElementById(type + 'Status').textContent = 'Recorded — listen, then grade yourself below';
       enableRating(type);
       btnEl.classList.remove('recording');
@@ -958,13 +1020,17 @@ async function loadHistory(){
       listEl.innerHTML = '<div class="msg">No attempts yet — record above and save!</div>';
       return;
     }
-    const attempts = Object.values(val).sort((a,b) => b.timestamp - a.timestamp);
+    // Keep each attempt's Firebase key (not just its data) so a saved
+    // attempt can be individually deleted later.
+    const attempts = Object.entries(val)
+      .map(([id, a]) => ({ id, ...a }))
+      .sort((a,b) => b.timestamp - a.timestamp);
     listEl.innerHTML = '';
     attempts.forEach(a => {
       const div = document.createElement('div');
       div.className = 'attempt';
       const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
-      let rowsHtml = `<div class="row"><span>${dateStr}</span></div>`;
+      let rowsHtml = `<div class="row"><span>${dateStr}</span><button class="btn ghost-delete attempt-delete-btn">🗑️ Delete</button></div>`;
       if(a.hebrewAudioURL){
         rowsHtml += `
         <div class="row"><span class="label">🎙️ Hebrew reading</span><span class="score-pill">${a.hebrewScore}/10 · ${RATING_LABELS[a.hebrewScore-1]}</span></div>
@@ -976,10 +1042,37 @@ async function loadHistory(){
         <div class="row"><audio controls src="${a.translationAudioURL}"></audio></div>`;
       }
       div.innerHTML = rowsHtml;
+      const delBtn = div.querySelector('.attempt-delete-btn');
+      delBtn.onclick = () => deleteAttempt(a, delBtn);
       listEl.appendChild(div);
     });
   }catch(err){
     listEl.innerHTML = '<div class="msg">Could not load history.</div>';
+    console.error(err);
+  }
+}
+
+// Lets a student remove a previously-saved attempt (both the audio files
+// in Storage and the record in the database) if they don't want it kept.
+async function deleteAttempt(attempt, btnEl){
+  if(!confirm('Delete this saved attempt? This cannot be undone.')) return;
+  btnEl.disabled = true;
+  btnEl.textContent = 'Deleting…';
+  try{
+    const fileDeletes = [];
+    if(attempt.hebrewAudioURL){
+      fileDeletes.push(storage.refFromURL(attempt.hebrewAudioURL).delete().catch(() => {}));
+    }
+    if(attempt.translationAudioURL){
+      fileDeletes.push(storage.refFromURL(attempt.translationAudioURL).delete().catch(() => {}));
+    }
+    await Promise.all(fileDeletes);
+    await db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey + '/' + attempt.id).remove();
+    loadHistory();
+  }catch(err){
+    btnEl.disabled = false;
+    btnEl.textContent = '🗑️ Delete';
+    alert('Could not delete this attempt. Please try again.');
     console.error(err);
   }
 }
