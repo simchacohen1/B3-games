@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Progress — Posuk Practice Scroll</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --parchment: #F1E7CE;
+    --parchment-dark: #E4D4AC;
+    --ink: #3B2A1E;
+    --ink-soft: #6B5842;
+    --rimon: #8C2F39;
+    --rimon-dark: #6E1F28;
+    --gold: #C9A227;
+    --gold-light: #E4C662;
+    --tent-navy: #24344A;
+    --shadow: rgba(59,42,30,0.25);
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0;
+    background: radial-gradient(circle at 20% 10%, #F6EEDA 0%, #E9DBB8 55%, #DCC998 100%);
+    font-family: 'Quicksand', sans-serif;
+    color: var(--ink);
+    min-height:100vh;
+  }
+  .wrap{
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 28px 18px 60px;
+  }
+  header.top{
+    text-align:center;
+    margin-bottom: 18px;
+  }
+  header.top h1{
+    font-family: 'Frank Ruhl Libre', serif;
+    font-weight:700;
+    font-size: 2rem;
+    color: var(--rimon-dark);
+    margin: 0 0 4px;
+    letter-spacing: 0.5px;
+  }
+  header.top p{
+    margin:0;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+  }
+  .btn{
+    font-family:'Quicksand', sans-serif;
+    font-weight:700;
+    font-size: 1rem;
+    border: none;
+    border-radius: 999px;
+    padding: 12px 26px;
+    cursor:pointer;
+    color:#fff;
+    background: var(--rimon);
+    box-shadow: 0 4px 0 var(--rimon-dark);
+    transition: transform .08s ease;
+  }
+  .btn:active{ transform: translateY(3px); box-shadow: 0 1px 0 var(--rimon-dark); }
+  .btn.gold{ background: var(--gold); box-shadow: 0 4px 0 #97781a; color: var(--ink); }
+  .btn.gold:active{ box-shadow: 0 1px 0 #97781a; }
+  .btn.small{ padding:8px 16px; font-size:0.85rem; }
+
+  .top-row{
+    display:flex; justify-content:space-between; align-items:center;
+    gap:8px; flex-wrap:wrap; margin-bottom:18px;
+  }
+  .top-row a{ text-decoration:none; }
+  .greeting{ font-weight:700; }
+
+  .name-gate{
+    background: var(--parchment);
+    border: 2px solid var(--gold);
+    border-radius: 14px;
+    padding: 22px;
+    text-align:center;
+    box-shadow: 0 6px 18px var(--shadow);
+  }
+  .name-gate a{ color: var(--rimon-dark); font-weight:700; }
+
+  /* ---------- Tabs ---------- */
+  .tabs{
+    display:flex; gap:8px; margin-bottom:18px;
+  }
+  .tab-btn{
+    flex:1;
+    font-family:'Quicksand', sans-serif;
+    font-weight:700;
+    font-size: 0.95rem;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 2px solid var(--gold);
+    background: #fff;
+    color: var(--ink-soft);
+    cursor:pointer;
+  }
+  .tab-btn.active{
+    background: var(--rimon);
+    border-color: var(--rimon-dark);
+    color: #fff;
+  }
+
+  /* ---------- Perek accordion ---------- */
+  .perek-section{
+    background: var(--parchment);
+    border: 2px solid var(--gold);
+    border-radius: 14px;
+    margin-bottom: 14px;
+    overflow:hidden;
+    box-shadow: 0 4px 12px var(--shadow);
+  }
+  .perek-header{
+    display:flex; justify-content:space-between; align-items:center;
+    padding: 14px 18px;
+    cursor:pointer;
+    font-family:'Frank Ruhl Libre', serif;
+    font-weight:700;
+    font-size:1.1rem;
+    color: var(--rimon-dark);
+  }
+  .perek-header .summary{
+    font-family:'Quicksand', sans-serif;
+    font-weight:600;
+    font-size:0.85rem;
+    color: var(--ink-soft);
+  }
+  .perek-header .chevron{
+    transition: transform .15s ease;
+    font-size:0.9rem;
+    color: var(--ink-soft);
+  }
+  .perek-section.expanded .chevron{ transform: rotate(90deg); }
+  .perek-body{
+    display:none;
+    padding: 0 18px 14px;
+  }
+  .perek-section.expanded .perek-body{ display:block; }
+
+  .posuk-row{
+    display:flex; justify-content:space-between; align-items:center;
+    background:#fff;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    font-size:0.9rem;
+  }
+  .posuk-row .posuk-label{ font-weight:700; color: var(--ink); }
+  .score-pill{
+    display:inline-block;
+    background: var(--gold-light);
+    color: var(--ink);
+    font-weight:700;
+    border-radius: 999px;
+    padding: 3px 12px;
+    font-size:0.8rem;
+  }
+  .score-pill.none{
+    background: transparent;
+    border: 2px dashed var(--ink-soft);
+    color: var(--ink-soft);
+    font-weight:600;
+  }
+
+  .msg{ text-align:center; color: var(--ink-soft); font-size:0.9rem; margin-top:14px; }
+  .hidden{ display:none !important; }
+  footer.who{
+    text-align:center; margin-top:26px; font-size:0.8rem; color: var(--ink-soft);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>📊 My Progress</h1>
+    <p>See how you're doing, posuk by posuk</p>
+  </header>
+
+  <!-- Shown if no student is signed in on this browser -->
+  <div id="noStudentGate" class="name-gate hidden">
+    <div>We don't know who you are yet!</div>
+    <div style="margin-top:10px;"><a href="student.html">← Go back and type your name in first</a></div>
+  </div>
+
+  <!-- Main progress app -->
+  <div id="app" class="hidden">
+    <div class="top-row">
+      <div class="greeting">👋 <span id="studentNameLabel"></span></div>
+      <a href="student.html" class="btn small gold">← Back to Practice</a>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="translationTabBtn">🌐 Translation</button>
+      <button class="tab-btn" id="readingTabBtn">🎙️ Reading</button>
+    </div>
+
+    <div id="perekList"></div>
+    <div class="msg" id="statusMsg">Loading your progress…</div>
+  </div>
+
+  <footer class="who">Nigri Shluchim Online School · Posuk Practice Scroll</footer>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
+  authDomain: "b3-games.firebaseapp.com",
+  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
+  projectId: "b3-games",
+  storageBucket: "b3-games.firebasestorage.app",
+  messagingSenderId: "568530046190",
+  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* =========================================================
+   PARSHA / PEREK / POSUK MAP — kept identical to student.html
+   so posuk ranges line up exactly with what students can record.
+   ========================================================= */
+const PARSHA_CONFIG = {
+  "Vayeira":      [ {num:18}, {num:19}, {num:20}, {num:21}, {num:22} ],
+  "Chayei Sarah": [ {num:23}, {num:24}, {num:25, maxPosuk:18} ],
+  "Toldos":       [ {num:25, minPosuk:19}, {num:26}, {num:27}, {num:28, maxPosuk:9} ]
+};
+
+const RATING_LABELS = [
+  "Just Starting", "Trying Hard", "Getting There", "Making Progress", "Doing Okay",
+  "Pretty Good", "Really Good", "Great Job", "Excellent", "Perfect!"
+];
+
+/* Locally-verified chapter text (only used here to know a chapter's true
+   length when it isn't capped by maxPosuk — mirrors student.html). */
+const LOCAL_TEXT = {
+  18: new Array(33) // only the count matters here, not the actual words
+};
+
+let chapterCache = {};
+async function fetchChapterLength(perekNum){
+  if(chapterCache[perekNum]) return chapterCache[perekNum];
+  if(LOCAL_TEXT[perekNum]){
+    chapterCache[perekNum] = LOCAL_TEXT[perekNum].length;
+    return chapterCache[perekNum];
+  }
+  const cacheKey = 'posukPractice_ch_v7_' + perekNum;
+  const localCached = localStorage.getItem(cacheKey);
+  if(localCached){
+    const len = JSON.parse(localCached).length;
+    chapterCache[perekNum] = len;
+    return len;
+  }
+  try{
+    const res = await fetch('https://www.sefaria.org/api/texts/Genesis.' + perekNum + '?context=0&pad=0');
+    const data = await res.json();
+    const len = (data.he || []).length;
+    chapterCache[perekNum] = len;
+    return len;
+  }catch(err){
+    console.error('Could not determine chapter length for perek', perekNum, err);
+    return null;
+  }
+}
+
+function getPerekRangeStatic(perekNum){
+  let min = Infinity, max = -Infinity, needsFetch = false;
+  Object.values(PARSHA_CONFIG).forEach(chapters => {
+    const ch = chapters.find(c => c.num === perekNum);
+    if(ch){
+      min = Math.min(min, ch.minPosuk || 1);
+      if(ch.maxPosuk){ max = Math.max(max, ch.maxPosuk); }
+      else { needsFetch = true; }
+    }
+  });
+  return { min, max, needsFetch };
+}
+
+async function getPerekRange(perekNum){
+  const { min, max, needsFetch } = getPerekRangeStatic(perekNum);
+  if(!needsFetch) return { min, max };
+  const len = await fetchChapterLength(perekNum);
+  return { min, max: len ? Math.max(max, len) : max };
+}
+
+/* ---------- Student identity (shared with student.html via localStorage) ---------- */
+let studentId = localStorage.getItem('posukPractice_studentId');
+let studentName = localStorage.getItem('posukPractice_studentName');
+
+let activeTab = 'translation'; // 'translation' | 'reading'
+let perekData = {}; // perekNum -> { posukNum -> latestAttemptRecord }
+let expandedState = {}; // perekNum -> bool
+
+window.addEventListener('load', () => {
+  if(!studentId || !studentName){
+    document.getElementById('noStudentGate').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('studentNameLabel').textContent = studentName;
+  loadProgress();
+});
+
+document.getElementById('translationTabBtn').onclick = () => switchTab('translation');
+document.getElementById('readingTabBtn').onclick = () => switchTab('reading');
+
+function switchTab(tab){
+  activeTab = tab;
+  document.getElementById('translationTabBtn').classList.toggle('active', tab === 'translation');
+  document.getElementById('readingTabBtn').classList.toggle('active', tab === 'reading');
+  renderPerekList();
+}
+
+/* ---------- Load every attempt this student has ever saved ---------- */
+async function loadProgress(){
+  const statusMsg = document.getElementById('statusMsg');
+  try{
+    const snap = await db.ref('posukPractice/attempts/' + studentId).once('value');
+    const val = snap.val();
+    if(!val){
+      statusMsg.textContent = "You haven't recorded any pesukim yet — go practice and come back!";
+      return;
+    }
+
+    perekData = {};
+    Object.entries(val).forEach(([posukKey, attemptsObj]) => {
+      // posukKey looks like "Vayeira_18_2" — parsha has no spaces/underscores
+      // of its own, so the last two pieces are always perek and posuk.
+      const parts = posukKey.split('_');
+      if(parts.length < 3) return;
+      const posukNum = parseInt(parts[parts.length - 1]);
+      const perekNum = parseInt(parts[parts.length - 2]);
+      if(!perekNum || !posukNum) return;
+
+      const attempts = Object.values(attemptsObj);
+      const latest = attempts.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+
+      if(!perekData[perekNum]) perekData[perekNum] = {};
+      perekData[perekNum][posukNum] = latest;
+
+      // Perakim the student has already started should be expanded by default.
+      if(!(perekNum in expandedState)) expandedState[perekNum] = true;
+    });
+
+    statusMsg.textContent = '';
+    await renderPerekList();
+  }catch(err){
+    statusMsg.textContent = 'Could not load your progress — check your internet connection.';
+    console.error(err);
+  }
+}
+
+/* ---------- Render ---------- */
+async function renderPerekList(){
+  const listEl = document.getElementById('perekList');
+  const perekNums = Object.keys(perekData).map(Number).sort((a,b) => a - b);
+
+  if(perekNums.length === 0){
+    listEl.innerHTML = '';
+    return;
+  }
+
+  listEl.innerHTML = '';
+  for(const perekNum of perekNums){
+    const range = await getPerekRange(perekNum);
+    const section = buildPerekSection(perekNum, range);
+    listEl.appendChild(section);
+  }
+}
+
+function buildPerekSection(perekNum, range){
+  const scoreField = activeTab === 'translation' ? 'translationScore' : 'hebrewScore';
+  const posukScores = perekData[perekNum] || {};
+
+  let doneCount = 0;
+  const total = range.max - range.min + 1;
+
+  const section = document.createElement('div');
+  section.className = 'perek-section' + (expandedState[perekNum] ? ' expanded' : '');
+
+  const header = document.createElement('div');
+  header.className = 'perek-header';
+  header.innerHTML = `<span>Perek ${perekNum}</span><span class="summary" id="perekSummary${perekNum}"></span><span class="chevron">▶</span>`;
+  header.onclick = () => {
+    expandedState[perekNum] = !expandedState[perekNum];
+    section.classList.toggle('expanded', expandedState[perekNum]);
+  };
+
+  const body = document.createElement('div');
+  body.className = 'perek-body';
+
+  for(let posukNum = range.min; posukNum <= range.max; posukNum++){
+    const record = posukScores[posukNum];
+    const score = record ? record[scoreField] : null;
+    if(score) doneCount++;
+
+    const row = document.createElement('div');
+    row.className = 'posuk-row';
+    if(score){
+      row.innerHTML = `<span class="posuk-label">Posuk ${posukNum}</span><span class="score-pill">${score}/10 · ${RATING_LABELS[score - 1]}</span>`;
+    } else {
+      row.innerHTML = `<span class="posuk-label">Posuk ${posukNum}</span><span class="score-pill none">Not recorded yet</span>`;
+    }
+    body.appendChild(row);
+  }
+
+  header.querySelector('#perekSummary' + perekNum).textContent = `${doneCount}/${total} pesukim done`;
+
+  section.appendChild(header);
+  section.appendChild(body);
+  return section;
+}
+</script>
+</body>
+</html>
