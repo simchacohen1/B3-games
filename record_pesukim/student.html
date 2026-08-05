@@ -293,12 +293,12 @@
     </div>
 
     <div class="selectors">
-      <select id="perekSelect"><option value="">Choose Perek</option></select>
+      <select id="perekSelect"><option value="">Choose פרק</option></select>
       <select id="posukSelect" disabled><option value="">Posuk</option></select>
     </div>
 
     <div class="scroll" id="scrollBox">
-      <div class="placeholder" id="scrollPlaceholder">Pick a Perek and Posuk above to begin 📖</div>
+      <div class="placeholder" id="scrollPlaceholder">Pick a פרק and Posuk above to begin 📖</div>
       <div class="posuk-text hidden" id="posukText"></div>
     </div>
     <div class="msg" id="fetchMsg"></div>
@@ -407,6 +407,48 @@ const RATING_LABELS = [
   "Pretty Good", "Really Good", "Great Job", "Excellent", "Perfect!"
 ];
 
+/* ---------- Hebrew gematria numerals ----------
+   Converts perek/posuk numbers into traditional Hebrew letter numerals,
+   with geresh (׳) for single-letter numbers and gershayim (״) before the
+   last letter for multi-letter numbers. 15 and 16 use the traditional
+   ט״ו / ט״ז substitution instead of spelling part of Hashem's name. */
+const HEB_HUNDREDS = ['','ק','ר','ש','ת'];
+const HEB_TENS = ['','י','כ','ל','מ','נ','ס','ע','פ','צ'];
+const HEB_ONES = ['','א','ב','ג','ד','ה','ו','ז','ח','ט'];
+
+function hebrewLetters(num){
+  let n = num;
+  let letters = '';
+  while(n >= 400){ letters += 'ת'; n -= 400; }
+  if(n >= 100){
+    letters += HEB_HUNDREDS[Math.floor(n / 100)];
+    n = n % 100;
+  }
+  if(n === 15){
+    letters += 'טו';
+    n = 0;
+  } else if(n === 16){
+    letters += 'טז';
+    n = 0;
+  } else {
+    if(n >= 10){
+      letters += HEB_TENS[Math.floor(n / 10)];
+      n = n % 10;
+    }
+    if(n > 0){
+      letters += HEB_ONES[n];
+    }
+  }
+  return letters;
+}
+
+function hebrewNumeral(num){
+  const letters = hebrewLetters(num);
+  if(!letters) return String(num);
+  if(letters.length === 1) return letters + '׳';
+  return letters.slice(0, -1) + '״' + letters.slice(-1);
+}
+
 let studentId = null;
 let studentName = null;
 let currentAudio = { hebrew: null, translate: null };
@@ -447,6 +489,24 @@ function enterApp(){
     name: studentName,
     lastActive: firebase.database.ServerValue.TIMESTAMP
   });
+  applyDeepLinkFromURL();
+}
+
+/* ---------- Deep link from My Progress ----------
+   Lets a tile on progress.html link straight to a specific perek/posuk
+   here, as if the student had picked it from the dropdowns themselves. */
+function applyDeepLinkFromURL(){
+  const params = new URLSearchParams(window.location.search);
+  const perekParam = parseInt(params.get('perek'));
+  const posukParam = parseInt(params.get('posuk'));
+  if(!perekParam || !ALL_PERAKIM.includes(perekParam)) return;
+  perekSelect.value = perekParam;
+  Promise.resolve(perekSelect.onchange()).then(() => {
+    if(posukParam){
+      posukSelect.value = posukParam;
+      posukSelect.onchange();
+    }
+  });
 }
 
 window.addEventListener('load', () => {
@@ -471,7 +531,7 @@ const posukSelect = document.getElementById('posukSelect');
 ALL_PERAKIM.forEach(num => {
   const opt = document.createElement('option');
   opt.value = num;
-  opt.textContent = 'Perek ' + num;
+  opt.textContent = 'פרק ' + hebrewNumeral(num);
   perekSelect.appendChild(opt);
 });
 
@@ -497,7 +557,7 @@ perekSelect.onchange = async () => {
     for(let i = min; i <= max; i++){
       const opt = document.createElement('option');
       opt.value = i;
-      opt.textContent = 'Posuk ' + i;
+      opt.textContent = 'Posuk ' + hebrewNumeral(i);
       posukSelect.appendChild(opt);
     }
     posukSelect.disabled = false;
