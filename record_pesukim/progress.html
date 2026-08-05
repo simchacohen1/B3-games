@@ -147,6 +147,7 @@
     grid-template-columns: repeat(10, 1fr);
     gap: 6px;
     margin-top: 4px;
+    direction: rtl;
   }
   @media (max-width: 560px){
     .posuk-grid{ grid-template-columns: repeat(5, 1fr); }
@@ -160,10 +161,24 @@
     border: none;
     padding: 2px;
     transition: transform .08s ease;
+    text-decoration: none;
+    overflow: hidden;
   }
   .posuk-tile:active{ transform: scale(0.94); }
-  .posuk-tile .tile-num{ font-size:0.62rem; font-weight:600; opacity:0.85; line-height:1; }
-  .posuk-tile .tile-score{ font-size:0.95rem; font-weight:700; line-height:1.2; }
+  .posuk-tile .tile-num{
+    font-family: 'Noto Serif Hebrew', serif;
+    font-weight:700;
+    font-size:1.05rem;
+    line-height:1;
+  }
+  .posuk-tile .tile-score{
+    font-size:0.5rem;
+    font-weight:600;
+    line-height:1.05;
+    text-align:center;
+    margin-top:2px;
+    opacity:0.9;
+  }
   .posuk-tile.tile-none{
     background: #fff;
     border: 2px dashed var(--ink-soft);
@@ -172,25 +187,6 @@
   .posuk-tile.tile-high{ background: #C9E4A6; color: #33511E; }
   .posuk-tile.tile-mid{ background: var(--gold-light); color: var(--ink); }
   .posuk-tile.tile-low{ background: #EFC1C1; color: #7A2626; }
-
-  .tile-detail{
-    margin-top: 10px;
-    background:#fff;
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-size:0.88rem;
-    box-shadow: 0 2px 8px rgba(59,42,30,0.1);
-  }
-  .tile-detail .score-pill{
-    display:inline-block;
-    background: var(--gold-light);
-    color: var(--ink);
-    font-weight:700;
-    border-radius: 999px;
-    padding: 3px 12px;
-    font-size:0.8rem;
-    margin-left:8px;
-  }
 
   .msg{ text-align:center; color: var(--ink-soft); font-size:0.9rem; margin-top:14px; }
   .hidden{ display:none !important; }
@@ -261,6 +257,44 @@ const RATING_LABELS = [
   "Just Starting", "Trying Hard", "Getting There", "Making Progress", "Doing Okay",
   "Pretty Good", "Really Good", "Great Job", "Excellent", "Perfect!"
 ];
+
+/* ---------- Hebrew gematria numerals (mirrors student.html) ---------- */
+const HEB_HUNDREDS = ['','ק','ר','ש','ת'];
+const HEB_TENS = ['','י','כ','ל','מ','נ','ס','ע','פ','צ'];
+const HEB_ONES = ['','א','ב','ג','ד','ה','ו','ז','ח','ט'];
+
+function hebrewLetters(num){
+  let n = num;
+  let letters = '';
+  while(n >= 400){ letters += 'ת'; n -= 400; }
+  if(n >= 100){
+    letters += HEB_HUNDREDS[Math.floor(n / 100)];
+    n = n % 100;
+  }
+  if(n === 15){
+    letters += 'טו';
+    n = 0;
+  } else if(n === 16){
+    letters += 'טז';
+    n = 0;
+  } else {
+    if(n >= 10){
+      letters += HEB_TENS[Math.floor(n / 10)];
+      n = n % 10;
+    }
+    if(n > 0){
+      letters += HEB_ONES[n];
+    }
+  }
+  return letters;
+}
+
+function hebrewNumeral(num){
+  const letters = hebrewLetters(num);
+  if(!letters) return String(num);
+  if(letters.length === 1) return letters + '׳';
+  return letters.slice(0, -1) + '״' + letters.slice(-1);
+}
 
 /* Locally-verified chapter text (only used here to know a chapter's true
    length when it isn't capped by maxPosuk — mirrors student.html). */
@@ -417,7 +451,7 @@ function buildPerekSection(perekNum, range){
 
   const header = document.createElement('div');
   header.className = 'perek-header';
-  header.innerHTML = `<span>Perek ${perekNum}</span><span class="summary" id="perekSummary${perekNum}"></span><span class="chevron">▶</span>`;
+  header.innerHTML = `<span>פרק ${hebrewNumeral(perekNum)}</span><span class="summary" id="perekSummary${perekNum}"></span><span class="chevron">▶</span>`;
   header.onclick = () => {
     expandedState[perekNum] = !expandedState[perekNum];
     section.classList.toggle('expanded', expandedState[perekNum]);
@@ -429,38 +463,27 @@ function buildPerekSection(perekNum, range){
   const grid = document.createElement('div');
   grid.className = 'posuk-grid';
 
-  const detail = document.createElement('div');
-  detail.className = 'tile-detail hidden';
-
   for(let posukNum = range.min; posukNum <= range.max; posukNum++){
     const record = posukScores[posukNum];
     const score = record ? record[scoreField] : null;
     if(score) doneCount++;
 
-    const tile = document.createElement('button');
-    tile.type = 'button';
+    // Tapping a tile takes the student straight to that posuk on the
+    // recording page itself, as if they'd picked it from the dropdowns —
+    // their existing recording/history is right there ready to review.
+    const tile = document.createElement('a');
+    tile.href = `student.html?perek=${perekNum}&posuk=${posukNum}`;
     tile.className = 'posuk-tile ' + (score ? 'tile-' + scoreTier(score) : 'tile-none');
-    tile.innerHTML = `<span class="tile-num">${posukNum}</span><span class="tile-score">${score ? score : '—'}</span>`;
-    tile.onclick = () => showTileDetail(posukNum, score, detail);
+    tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${score ? RATING_LABELS[score - 1] : '—'}</span>`;
     grid.appendChild(tile);
   }
 
   header.querySelector('#perekSummary' + perekNum).textContent = `${doneCount}/${total} pesukim done`;
 
   body.appendChild(grid);
-  body.appendChild(detail);
   section.appendChild(header);
   section.appendChild(body);
   return section;
-}
-
-function showTileDetail(posukNum, score, detailEl){
-  if(score){
-    detailEl.innerHTML = `<strong>Posuk ${posukNum}</strong><span class="score-pill">${score}/10 · ${RATING_LABELS[score - 1]}</span>`;
-  } else {
-    detailEl.innerHTML = `<strong>Posuk ${posukNum}</strong> — Not recorded yet`;
-  }
-  detailEl.classList.remove('hidden');
 }
 </script>
 </body>
