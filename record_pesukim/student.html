@@ -101,7 +101,9 @@
   }
 
   .scroll{
-    position: relative;
+    position: sticky;
+    top: 8px;
+    z-index: 30;
     background: var(--parchment);
     background-image:
       repeating-linear-gradient(0deg, rgba(140,47,57,0.03) 0px, rgba(140,47,57,0.03) 1px, transparent 1px, transparent 26px);
@@ -184,29 +186,52 @@
   }
 
   .rating-scale{
-    display:flex; flex-wrap:wrap; gap:6px; margin-top:12px;
+    margin-top:14px;
   }
-  .rating-scale button{
-    font-family:'Quicksand', sans-serif;
-    font-size: 0.72rem;
-    font-weight:700;
+  .rating-slider-label{
     text-align:center;
-    border-radius: 10px;
-    border: 2px solid var(--ink-soft);
-    background:#fff;
-    color: var(--ink-soft);
-    padding: 8px 4px;
-    width: calc(20% - 6px);
-    cursor:pointer;
-    line-height:1.3;
-  }
-  .rating-scale button .num{ display:block; font-size:1.05rem; }
-  .rating-scale button.selected{
-    background: var(--gold);
-    border-color: #97781a;
+    font-family:'Quicksand', sans-serif;
+    font-weight:700;
+    font-size: 1rem;
     color: var(--ink);
+    margin-bottom: 8px;
   }
-  .rating-scale button:disabled{ cursor:not-allowed; opacity:0.5; }
+  .rating-slider-label .num{
+    color: var(--rimon-dark);
+  }
+  .rating-slider{
+    -webkit-appearance:none;
+    appearance:none;
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #e2c67a, var(--gold) 50%, var(--rimon) 100%);
+    outline:none;
+    cursor:pointer;
+  }
+  .rating-slider::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    appearance:none;
+    width: 30px; height:30px;
+    border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold) 60%, #97781a 100%);
+    border: 2px solid #fff;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    cursor:pointer;
+  }
+  .rating-slider::-moz-range-thumb{
+    width: 30px; height:30px;
+    border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold) 60%, #97781a 100%);
+    border: 2px solid #fff;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    cursor:pointer;
+  }
+  .rating-slider:disabled{ cursor:not-allowed; opacity:0.45; }
+  .rating-scale-ticks{
+    display:flex; justify-content:space-between;
+    font-size:0.65rem; color: var(--ink-soft); margin-top:4px; padding: 0 2px;
+  }
 
   .save-row{ text-align:center; margin: 20px 0; }
 
@@ -337,15 +362,14 @@
    your other B3 Games files (Tent Trail Trivia, etc.)
    ========================================================= */
 const firebaseConfig = {
-  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
-  authDomain: "b3-games.firebaseapp.com",
-  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
-  projectId: "b3-games",
-  storageBucket: "b3-games.firebasestorage.app",
-  messagingSenderId: "568530046190",
-  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
+  apiKey: "PASTE_YOUR_API_KEY",
+  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://PASTE_YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "PASTE_YOUR_PROJECT",
+  storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
+  messagingSenderId: "PASTE_ME",
+  appId: "PASTE_ME"
 };
-
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const storage = firebase.storage();
@@ -482,7 +506,9 @@ posukSelect.onchange = async () => {
 
 async function fetchChapter(perekNum){
   if(chapterCache[perekNum]) return chapterCache[perekNum];
-  const cacheKey = 'posukPractice_ch_' + perekNum;
+  // v2 cache key: bumped so students' browsers refetch corrected text instead of
+  // serving an old cached copy from before the shaimos/nikud fixes were added.
+  const cacheKey = 'posukPractice_ch_v2_' + perekNum;
   const localCached = localStorage.getItem(cacheKey);
   if(localCached){
     const arr = JSON.parse(localCached);
@@ -491,7 +517,12 @@ async function fetchChapter(perekNum){
   }
   const res = await fetch('https://www.sefaria.org/api/texts/Genesis.' + perekNum + '?context=0&pad=0');
   const data = await res.json();
-  const pesukim = (data.he || []).map(stripTags);
+  const pesukim = (data.he || []).map((html, idx) => {
+    let text = stripTags(html);
+    text = abbreviateShaimos(text);
+    text = applyManualCorrections(text, perekNum, idx + 1);
+    return text;
+  });
   chapterCache[perekNum] = pesukim;
   localStorage.setItem(cacheKey, JSON.stringify(pesukim));
   return pesukim;
@@ -501,6 +532,39 @@ function stripTags(html){
   const div = document.createElement('div');
   div.innerHTML = html;
   return div.textContent || div.innerText || '';
+}
+
+/* ---------- Shaimos handling ----------
+   Sefaria's text spells out the four-letter Name in full, with nikud.
+   For classroom display we replace it with the standard ה׳ abbreviation.
+   Match the four consonants י-ה-ו-ה with any nikud/trop marks in between,
+   so it catches the Name regardless of exactly which vowel points Sefaria used. */
+function abbreviateShaimos(text){
+  const HEBREW_POINTS = '[\\u0591-\\u05C7]*';
+  const shemPattern = new RegExp('י' + HEBREW_POINTS + 'ה' + HEBREW_POINTS + 'ו' + HEBREW_POINTS + 'ה' + HEBREW_POINTS, 'g');
+  return text.replace(shemPattern, 'ה\u05F3'); // ה׳
+}
+
+/* ---------- Manual nikud corrections ----------
+   Sefaria's text is generally reliable, but if you (Simcha) ever spot a wrong
+   vowel/word while spot-checking against a printed Chumash, add an entry here.
+   Key format: "perek_posuk" using the Tanach chapter/verse numbers (e.g. "18_1"
+   for Genesis 18:1). Each entry is a list of [wrongForm, correctForm] pairs.
+   Example already added below: Genesis 18:1, the word meaning "entrance"
+   (segol under the Peh) was coming through with a kamatz instead. */
+const MANUAL_CORRECTIONS = {
+  '18_1': [
+    ['פָּתַח', 'פֶּתַח']
+  ]
+};
+function applyManualCorrections(text, perekNum, posukNum){
+  const key = perekNum + '_' + posukNum;
+  const fixes = MANUAL_CORRECTIONS[key];
+  if(!fixes) return text;
+  fixes.forEach(([wrong, right]) => {
+    text = text.split(wrong).join(right);
+  });
+  return text;
 }
 
 function resetScroll(){
@@ -526,30 +590,40 @@ function showPosuk(parsha, perekNum, posukNum, text){
   loadHistory();
 }
 
-/* ---------- Rating scale builder ---------- */
+/* ---------- Rating scale builder (slider) ---------- */
 function buildRatingScale(containerId, type){
   const container = document.getElementById(containerId);
-  container.innerHTML = '';
-  RATING_LABELS.forEach((label, idx) => {
-    const num = idx + 1;
-    const btn = document.createElement('button');
-    btn.innerHTML = '<span class="num">' + num + '</span>' + label;
-    btn.disabled = true;
-    btn.onclick = () => {
-      currentRating[type] = num;
-      [...container.children].forEach(c => c.classList.remove('selected'));
-      btn.classList.add('selected');
-      updateSaveButton();
-    };
-    container.appendChild(btn);
+  const sliderId = type + 'Slider';
+  const labelId = type + 'SliderLabel';
+  container.innerHTML =
+    '<div class="rating-slider-label" id="' + labelId + '">Record above, then drag to rate yourself</div>' +
+    '<input type="range" min="1" max="10" step="1" value="5" class="rating-slider" id="' + sliderId + '" disabled>' +
+    '<div class="rating-scale-ticks"><span>1</span><span>10</span></div>';
+
+  const slider = document.getElementById(type + 'Slider');
+  const label = document.getElementById(type + 'SliderLabel');
+
+  function refreshLabel(){
+    const num = parseInt(slider.value);
+    label.innerHTML = '<span class="num">' + num + '/10</span> — ' + RATING_LABELS[num - 1];
+  }
+
+  slider.addEventListener('input', () => {
+    currentRating[type] = parseInt(slider.value);
+    refreshLabel();
+    updateSaveButton();
   });
 }
 buildRatingScale('hebrewRating', 'hebrew');
 buildRatingScale('translateRating', 'translate');
 
 function enableRating(type){
-  const container = document.getElementById(type + 'Rating');
-  [...container.children].forEach(c => c.disabled = false);
+  const slider = document.getElementById(type + 'Slider');
+  slider.disabled = false;
+  const label = document.getElementById(type + 'SliderLabel');
+  label.innerHTML = '<span class="num">' + slider.value + '/10</span> — ' + RATING_LABELS[parseInt(slider.value) - 1];
+  // record the default slider position as the rating unless the student drags it further
+  currentRating[type] = parseInt(slider.value);
 }
 
 /* ---------- Recording logic ---------- */
@@ -559,8 +633,7 @@ function resetRecordingUI(){
     currentRating[type] = null;
     document.getElementById(type + 'AudioPlayback').classList.add('hidden');
     document.getElementById(type + 'Status').textContent = 'Not recorded yet';
-    const ratingContainer = document.getElementById(type + 'Rating');
-    [...ratingContainer.children].forEach(c => { c.disabled = true; c.classList.remove('selected'); });
+    buildRatingScale(type + 'Rating', type); // rebuild slider back to disabled/default state
   });
   updateSaveButton();
 }
@@ -608,7 +681,8 @@ document.getElementById('hebrewRecordBtn').onclick = function(){ toggleRecording
 document.getElementById('translateRecordBtn').onclick = function(){ toggleRecording('translate', this); };
 
 function updateSaveButton(){
-  const ready = currentAudio.hebrew && currentAudio.translate && currentRating.hebrew && currentRating.translate;
+  // Save is allowed as soon as EITHER recording exists — no need to do both.
+  const ready = !!(currentAudio.hebrew || currentAudio.translate);
   document.getElementById('saveBtn').disabled = !ready;
 }
 
@@ -617,28 +691,32 @@ document.getElementById('saveBtn').onclick = async () => {
   if(!currentPosukKey) return;
   const saveBtn = document.getElementById('saveBtn');
   saveBtn.disabled = true;
-  document.getElementById('saveMsg').textContent = 'Saving your recordings…';
+  document.getElementById('saveMsg').textContent = 'Saving your recording…';
   try{
     const timestamp = Date.now();
     const attemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
     const attemptId = attemptRef.key;
 
-    const hebrewPath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_hebrew_' + attemptId + '.webm';
-    const translatePath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_translate_' + attemptId + '.webm';
-
-    await storage.ref(hebrewPath).put(currentAudio.hebrew);
-    const hebrewURL = await storage.ref(hebrewPath).getDownloadURL();
-    await storage.ref(translatePath).put(currentAudio.translate);
-    const translateURL = await storage.ref(translatePath).getDownloadURL();
-
-    await attemptRef.set({
+    const record = {
       timestamp: timestamp,
-      posukText: currentPosukText,
-      hebrewScore: currentRating.hebrew,
-      hebrewAudioURL: hebrewURL,
-      translationScore: currentRating.translate,
-      translationAudioURL: translateURL
-    });
+      posukText: currentPosukText
+    };
+
+    if(currentAudio.hebrew){
+      const hebrewPath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_hebrew_' + attemptId + '.webm';
+      await storage.ref(hebrewPath).put(currentAudio.hebrew);
+      record.hebrewAudioURL = await storage.ref(hebrewPath).getDownloadURL();
+      record.hebrewScore = currentRating.hebrew;
+    }
+
+    if(currentAudio.translate){
+      const translatePath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_translate_' + attemptId + '.webm';
+      await storage.ref(translatePath).put(currentAudio.translate);
+      record.translationAudioURL = await storage.ref(translatePath).getDownloadURL();
+      record.translationScore = currentRating.translate;
+    }
+
+    await attemptRef.set(record);
 
     document.getElementById('saveMsg').textContent = '✅ Saved! Great job.';
     resetRecordingUI();
@@ -668,13 +746,18 @@ async function loadHistory(){
       const div = document.createElement('div');
       div.className = 'attempt';
       const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
-      div.innerHTML = `
-        <div class="row"><span>${dateStr}</span></div>
+      let rowsHtml = `<div class="row"><span>${dateStr}</span></div>`;
+      if(a.hebrewAudioURL){
+        rowsHtml += `
         <div class="row"><span class="label">🎙️ Hebrew reading</span><span class="score-pill">${a.hebrewScore}/10 · ${RATING_LABELS[a.hebrewScore-1]}</span></div>
-        <div class="row"><audio controls src="${a.hebrewAudioURL}"></audio></div>
+        <div class="row"><audio controls src="${a.hebrewAudioURL}"></audio></div>`;
+      }
+      if(a.translationAudioURL){
+        rowsHtml += `
         <div class="row"><span class="label">🌐 Translation</span><span class="score-pill">${a.translationScore}/10 · ${RATING_LABELS[a.translationScore-1]}</span></div>
-        <div class="row"><audio controls src="${a.translationAudioURL}"></audio></div>
-      `;
+        <div class="row"><audio controls src="${a.translationAudioURL}"></audio></div>`;
+      }
+      div.innerHTML = rowsHtml;
       listEl.appendChild(div);
     });
   }catch(err){
