@@ -284,9 +284,12 @@
 
   <!-- Main app (hidden until name entered) -->
   <div id="app" class="hidden">
-    <div style="display:flex;justify-content:space-between;align-items:center;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
       <div style="font-weight:700;">👋 <span id="studentNameLabel"></span></div>
-      <button class="btn small" id="switchStudentBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">Not you?</button>
+      <div style="display:flex;gap:8px;">
+        <a href="progress.html" class="btn small gold" style="text-decoration:none;display:inline-block;">📊 My Progress</a>
+        <button class="btn small" id="switchStudentBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">Not you?</button>
+      </div>
     </div>
 
     <div class="selectors">
