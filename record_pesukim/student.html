@@ -850,8 +850,24 @@ function updateSaveButton(){
 document.getElementById('saveBtn').onclick = async () => {
   if(!currentPosukKey) return;
   const saveBtn = document.getElementById('saveBtn');
+  const saveMsg = document.getElementById('saveMsg');
   saveBtn.disabled = true;
-  document.getElementById('saveMsg').textContent = 'Saving your recording…';
+  saveMsg.textContent = 'Saving your recording…';
+
+  // Log blob sizes to the console — if these are large (hundreds of KB+
+  // for a few seconds of speech), the bottleneck is recording size, not
+  // Firebase. If they're small (a few KB–tens of KB) and it's still slow,
+  // the bottleneck is the internet connection itself, not this app.
+  if(currentAudio.hebrew) console.log('Hebrew recording size:', Math.round(currentAudio.hebrew.size/1024), 'KB');
+  if(currentAudio.translate) console.log('Translation recording size:', Math.round(currentAudio.translate.size/1024), 'KB');
+
+  // If this is still going after 6 seconds, tell the student it's likely
+  // their internet connection rather than leaving them staring at "Saving…"
+  // with no explanation.
+  const slowNotice = setTimeout(() => {
+    saveMsg.textContent = 'Still saving… this can take a bit on a slow connection.';
+  }, 6000);
+
   try{
     const timestamp = Date.now();
     const attemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
@@ -862,6 +878,16 @@ document.getElementById('saveBtn').onclick = async () => {
       posukText: currentPosukText
     };
 
+    // Track real upload progress per file so "Saving…" reflects what's
+    // actually happening instead of sitting there with no feedback.
+    const progress = { hebrew: null, translate: null };
+    function refreshProgressMsg(){
+      const parts = [];
+      if(progress.hebrew !== null) parts.push('Hebrew ' + progress.hebrew + '%');
+      if(progress.translate !== null) parts.push('Translation ' + progress.translate + '%');
+      if(parts.length) saveMsg.textContent = 'Saving… ' + parts.join(' · ');
+    }
+
     // Upload both recordings at the same time instead of one after the
     // other — cuts save time roughly in half when a student records both
     // the Hebrew reading and the translation before saving.
@@ -869,8 +895,14 @@ document.getElementById('saveBtn').onclick = async () => {
 
     if(currentAudio.hebrew){
       const hebrewPath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_hebrew_' + attemptId + '.webm';
+      progress.hebrew = 0;
+      const task = storage.ref(hebrewPath).put(currentAudio.hebrew);
+      task.on('state_changed', snap => {
+        progress.hebrew = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        refreshProgressMsg();
+      });
       uploadTasks.push(
-        storage.ref(hebrewPath).put(currentAudio.hebrew)
+        task
           .then(() => storage.ref(hebrewPath).getDownloadURL())
           .then(url => {
             record.hebrewAudioURL = url;
@@ -881,8 +913,14 @@ document.getElementById('saveBtn').onclick = async () => {
 
     if(currentAudio.translate){
       const translatePath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_translate_' + attemptId + '.webm';
+      progress.translate = 0;
+      const task = storage.ref(translatePath).put(currentAudio.translate);
+      task.on('state_changed', snap => {
+        progress.translate = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        refreshProgressMsg();
+      });
       uploadTasks.push(
-        storage.ref(translatePath).put(currentAudio.translate)
+        task
           .then(() => storage.ref(translatePath).getDownloadURL())
           .then(url => {
             record.translationAudioURL = url;
@@ -895,15 +933,17 @@ document.getElementById('saveBtn').onclick = async () => {
 
     await attemptRef.set(record);
 
-    document.getElementById('saveMsg').textContent = '✅ Saved! Great job.';
+    clearTimeout(slowNotice);
+    saveMsg.textContent = '✅ Saved! Great job.';
     resetRecordingUI();
     loadHistory();
     document.getElementById('nextPosukBtn').classList.remove('hidden');
   }catch(err){
-    document.getElementById('saveMsg').textContent = 'Something went wrong saving. Try again.';
+    clearTimeout(slowNotice);
+    saveMsg.textContent = 'Something went wrong saving. Try again.';
     console.error(err);
   }finally{
-    setTimeout(() => { document.getElementById('saveMsg').textContent=''; }, 3500);
+    setTimeout(() => { saveMsg.textContent=''; }, 3500);
   }
 };
 
