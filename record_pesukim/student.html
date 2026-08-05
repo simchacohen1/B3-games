@@ -504,11 +504,66 @@ posukSelect.onchange = async () => {
   }
 };
 
+/* ---------- Locally-verified chapter text ----------
+   Sefaria's live API can differ from its own website's more complete edition
+   (we hit exactly this with Genesis 18:1's nikud), so chapters get moved
+   here permanently once Simcha has supplied and verified the real text.
+   Perakim not yet added here still fall back to the live Sefaria API below.
+   Each entry is a plain array, pesukim[0] = posuk 1, pesukim[1] = posuk 2, etc. */
+const LOCAL_TEXT = {
+  18: [
+    'וַיֵּרָ֤א אֵלָיו֙ יְהֹוָ֔ה בְּאֵלֹנֵ֖י מַמְרֵ֑א וְה֛וּא יֹשֵׁ֥ב פֶּֽתַח־הָאֹ֖הֶל כְּחֹ֥ם הַיּֽוֹם׃',
+    'וַיִּשָּׂ֤א עֵינָיו֙ וַיַּ֔רְא וְהִנֵּה֙ שְׁלֹשָׁ֣ה אֲנָשִׁ֔ים נִצָּבִ֖ים עָלָ֑יו וַיַּ֗רְא וַיָּ֤רׇץ לִקְרָאתָם֙ מִפֶּ֣תַח הָאֹ֔הֶל וַיִּשְׁתַּ֖חוּ אָֽרְצָה׃',
+    'וַיֹּאמַ֑ר אֲדֹנָ֗י אִם־נָ֨א מָצָ֤אתִי חֵן֙ בְּעֵינֶ֔יךָ אַל־נָ֥א תַעֲבֹ֖ר מֵעַ֥ל עַבְדֶּֽךָ׃',
+    'יֻקַּֽח־נָ֣א מְעַט־מַ֔יִם וְרַחֲצ֖וּ רַגְלֵיכֶ֑ם וְהִֽשָּׁעֲנ֖וּ תַּ֥חַת הָעֵֽץ׃',
+    'וְאֶקְחָ֨ה פַת־לֶ֜חֶם וְסַעֲד֤וּ לִבְּכֶם֙ אַחַ֣ר תַּעֲבֹ֔רוּ כִּֽי־עַל־כֵּ֥ן עֲבַרְתֶּ֖ם עַֽל־עַבְדְּכֶ֑ם וַיֹּ֣אמְר֔וּ כֵּ֥ן תַּעֲשֶׂ֖ה כַּאֲשֶׁ֥ר דִּבַּֽרְתָּ׃',
+    'וַיְמַהֵ֧ר אַבְרָהָ֛ם הָאֹ֖הֱלָה אֶל־שָׂרָ֑ה וַיֹּ֗אמֶר מַהֲרִ֞י שְׁלֹ֤שׁ סְאִים֙ קֶ֣מַח סֹ֔לֶת ל֖וּשִׁי וַעֲשִׂ֥י עֻגֽוֹת׃',
+    'וְאֶל־הַבָּקָ֖ר רָ֣ץ אַבְרָהָ֑ם וַיִּקַּ֨ח בֶּן־בָּקָ֜ר רַ֤ךְ וָטוֹב֙ וַיִּתֵּ֣ן אֶל־הַנַּ֔עַר וַיְמַהֵ֖ר לַעֲשׂ֥וֹת אֹתֽוֹ׃',
+    'וַיִּקַּ֨ח חֶמְאָ֜ה וְחָלָ֗ב וּבֶן־הַבָּקָר֙ אֲשֶׁ֣ר עָשָׂ֔ה וַיִּתֵּ֖ן לִפְנֵיהֶ֑ם וְהֽוּא־עֹמֵ֧ד עֲלֵיהֶ֛ם תַּ֥חַת הָעֵ֖ץ וַיֹּאכֵֽלוּ׃',
+    'וַיֹּאמְר֣וּ אֵׄלָ֔יׄוׄ אַיֵּ֖ה שָׂרָ֣ה אִשְׁתֶּ֑ךָ וַיֹּ֖אמֶר הִנֵּ֥ה בָאֹֽהֶל׃',
+    'וַיֹּ֗אמֶר שׁ֣וֹב אָשׁ֤וּב אֵלֶ֙יךָ֙ כָּעֵ֣ת חַיָּ֔ה וְהִנֵּה־בֵ֖ן לְשָׂרָ֣ה אִשְׁתֶּ֑ךָ וְשָׂרָ֥ה שֹׁמַ֛עַת פֶּ֥תַח הָאֹ֖הֶל וְה֥וּא אַחֲרָֽיו׃',
+    'וְאַבְרָהָ֤ם וְשָׂרָה֙ זְקֵנִ֔ים בָּאִ֖ים בַּיָּמִ֑ים חָדַל֙ לִהְי֣וֹת לְשָׂרָ֔ה אֹ֖רַח כַּנָּשִֽׁים׃',
+    'וַתִּצְחַ֥ק שָׂרָ֖ה בְּקִרְבָּ֣הּ לֵאמֹ֑ר אַחֲרֵ֤י בְלֹתִי֙ הָֽיְתָה־לִּ֣י עֶדְנָ֔ה וַֽאדֹנִ֖י זָקֵֽן׃',
+    'וַיֹּ֥אמֶר יְהֹוָ֖ה אֶל־אַבְרָהָ֑ם לָ֣מָּה זֶּה֩ צָחֲקָ֨ה שָׂרָ֜ה לֵאמֹ֗ר הַאַ֥ף אֻמְנָ֛ם אֵלֵ֖ד וַאֲנִ֥י זָקַֽנְתִּי׃',
+    'הֲיִפָּלֵ֥א מֵיְהֹוָ֖ה דָּבָ֑ר לַמּוֹעֵ֞ד אָשׁ֥וּב אֵלֶ֛יךָ כָּעֵ֥ת חַיָּ֖ה וּלְשָׂרָ֥ה בֵֽן׃',
+    'וַתְּכַחֵ֨שׁ שָׂרָ֧ה ׀ לֵאמֹ֛ר לֹ֥א צָחַ֖קְתִּי כִּ֣י ׀ יָרֵ֑אָה וַיֹּ֥אמֶֽר ׀ לֹ֖א כִּ֥י צָחָֽקְתְּ׃',
+    'וַיָּקֻ֤מוּ מִשָּׁם֙ הָֽאֲנָשִׁ֔ים וַיַּשְׁקִ֖פוּ עַל־פְּנֵ֣י סְדֹ֑ם וְאַ֨בְרָהָ֔ם הֹלֵ֥ךְ עִמָּ֖ם לְשַׁלְּחָֽם׃',
+    'וַֽיהֹוָ֖ה אָמָ֑ר הַֽמְכַסֶּ֤ה אֲנִי֙ מֵֽאַבְרָהָ֔ם אֲשֶׁ֖ר אֲנִ֥י עֹשֶֽׂה׃',
+    'וְאַ֨בְרָהָ֔ם הָי֧וֹ יִֽהְיֶ֛ה לְג֥וֹי גָּד֖וֹל וְעָצ֑וּם וְנִ֨בְרְכוּ־ב֔וֹ כֹּ֖ל גּוֹיֵ֥י הָאָֽרֶץ׃',
+    'כִּ֣י יְדַעְתִּ֗יו לְמַ֩עַן֩ אֲשֶׁ֨ר יְצַוֶּ֜ה אֶת־בָּנָ֤יו וְאֶת־בֵּיתוֹ֙ אַחֲרָ֔יו וְשָֽׁמְרוּ֙ דֶּ֣רֶךְ יְהֹוָ֔ה לַעֲשׂ֥וֹת צְדָקָ֖ה וּמִשְׁפָּ֑ט לְמַ֗עַן הָבִ֤יא יְהֹוָה֙ עַל־אַבְרָהָ֔ם אֵ֥ת אֲשֶׁר־דִּבֶּ֖ר עָלָֽיו׃',
+    'וַיֹּ֣אמֶר יְהֹוָ֔ה זַעֲקַ֛ת סְדֹ֥ם וַעֲמֹרָ֖ה כִּי־רָ֑בָּה וְחַ֨טָּאתָ֔ם כִּ֥י כָבְדָ֖ה מְאֹֽד׃',
+    'אֵֽרְדָה־נָּ֣א וְאֶרְאֶ֔ה הַכְּצַעֲקָתָ֛הּ הַבָּ֥אָה אֵלַ֖י עָשׂ֣וּ ׀ כָּלָ֑ה וְאִם־לֹ֖א אֵדָֽעָה׃',
+    'וַיִּפְנ֤וּ מִשָּׁם֙ הָֽאֲנָשִׁ֔ים וַיֵּלְכ֖וּ סְדֹ֑מָה וְאַ֨בְרָהָ֔ם עוֹדֶ֥נּוּ עֹמֵ֖ד לִפְנֵ֥י יְהֹוָֽה׃',
+    'וַיִּגַּ֥שׁ אַבְרָהָ֖ם וַיֹּאמַ֑ר הַאַ֣ף תִּסְפֶּ֔ה צַדִּ֖יק עִם־רָשָֽׁע׃',
+    'אוּלַ֥י יֵ֛שׁ חֲמִשִּׁ֥ים צַדִּיקִ֖ם בְּת֣וֹךְ הָעִ֑יר הַאַ֤ף תִּסְפֶּה֙ וְלֹא־תִשָּׂ֣א לַמָּק֔וֹם לְמַ֛עַן חֲמִשִּׁ֥ים הַצַּדִּיקִ֖ם אֲשֶׁ֥ר בְּקִרְבָּֽהּ׃',
+    'חָלִ֨לָה לְּךָ֜ מֵעֲשֹׂ֣ת׀ כַּדָּבָ֣ר הַזֶּ֗ה לְהָמִ֤ית צַדִּיק֙ עִם־רָשָׁ֔ע וְהָיָ֥ה כַצַּדִּ֖יק כָּרָשָׁ֑ע חָלִ֣לָה לָּ֔ךְ הֲשֹׁפֵט֙ כׇּל־הָאָ֔רֶץ לֹ֥א יַעֲשֶׂ֖ה מִשְׁפָּֽט׃',
+    'וַיֹּ֣אמֶר יְהֹוָ֔ה אִם־אֶמְצָ֥א בִסְדֹ֛ם חֲמִשִּׁ֥ים צַדִּיקִ֖ם בְּת֣וֹךְ הָעִ֑יר וְנָשָׂ֥אתִי לְכׇל־הַמָּק֖וֹם בַּעֲבוּרָֽם׃',
+    'וַיַּ֥עַן אַבְרָהָ֖ם וַיֹּאמַ֑ר הִנֵּה־נָ֤א הוֹאַ֙לְתִּי֙ לְדַבֵּ֣ר אֶל־אֲדֹנָ֔י וְאָנֹכִ֖י עָפָ֥ר וָאֵֽפֶר׃',
+    'א֠וּלַ֠י יַחְסְר֞וּן חֲמִשִּׁ֤ים הַצַּדִּיקִם֙ חֲמִשָּׁ֔ה הֲתַשְׁחִ֥ית בַּחֲמִשָּׁ֖ה אֶת־כׇּל־הָעִ֑יר וַיֹּ֙אמֶר֙ לֹ֣א אַשְׁחִ֔ית אִם־אֶמְצָ֣א שָׁ֔ם אַרְבָּעִ֖ים וַחֲמִשָּֽׁה׃',
+    'וַיֹּ֨סֶף ע֜וֹד לְדַבֵּ֤ר אֵלָיו֙ וַיֹּאמַ֔ר אוּלַ֛י יִמָּצְא֥וּן שָׁ֖ם אַרְבָּעִ֑ים וַיֹּ֙אמֶר֙ לֹ֣א אֶֽעֱשֶׂ֔ה בַּעֲב֖וּר הָאַרְבָּעִֽים׃',
+    'וַ֠יֹּ֠אמֶר אַל־נָ֞א יִ֤חַר לַֽאדֹנָי֙ וַאֲדַבֵּ֔רָה אוּלַ֛י יִמָּצְא֥וּן שָׁ֖ם שְׁלֹשִׁ֑ים וַיֹּ֙אמֶר֙ לֹ֣א אֶֽעֱשֶׂ֔ה אִם־אֶמְצָ֥א שָׁ֖ם שְׁלֹשִֽׁים׃',
+    'וַיֹּ֗אמֶר הִנֵּֽה־נָ֤א הוֹאַ֙לְתִּי֙ לְדַבֵּ֣ר אֶל־אֲדֹנָ֔י אוּלַ֛י יִמָּצְא֥וּן שָׁ֖ם עֶשְׂרִ֑ים וַיֹּ֙אמֶר֙ לֹ֣א אַשְׁחִ֔ית בַּעֲב֖וּר הָֽעֶשְׂרִֽים׃',
+    'וַ֠יֹּ֠אמֶר אַל־נָ֞א יִ֤חַר לַֽאדֹנָי֙ וַאֲדַבְּרָ֣ה אַךְ־הַפַּ֔עַם אוּלַ֛י יִמָּצְא֥וּן שָׁ֖ם עֲשָׂרָ֑ה וַיֹּ֙אמֶר֙ לֹ֣א אַשְׁחִ֔ית בַּעֲב֖וּר הָעֲשָׂרָֽה׃',
+    'וַיֵּ֣לֶךְ יְהֹוָ֔ה כַּאֲשֶׁ֣ר כִּלָּ֔ה לְדַבֵּ֖ר אֶל־אַבְרָהָ֑ם וְאַבְרָהָ֖ם שָׁ֥ב לִמְקֹמֽוֹ׃'
+  ]
+};
+
 async function fetchChapter(perekNum){
   if(chapterCache[perekNum]) return chapterCache[perekNum];
+
+  if(LOCAL_TEXT[perekNum]){
+    const pesukim = LOCAL_TEXT[perekNum].map((raw, idx) => {
+      let text = abbreviateShaimos(raw);
+      text = applyManualCorrections(text, perekNum, idx + 1);
+      return text;
+    });
+    chapterCache[perekNum] = pesukim;
+    return pesukim;
+  }
+
   // v2 cache key: bumped so students' browsers refetch corrected text instead of
   // serving an old cached copy from before the shaimos/nikud fixes were added.
-  const cacheKey = 'posukPractice_ch_v5_' + perekNum;
+  const cacheKey = 'posukPractice_ch_v6_' + perekNum;
   const localCached = localStorage.getItem(cacheKey);
   if(localCached){
     const arr = JSON.parse(localCached);
@@ -546,26 +601,31 @@ function abbreviateShaimos(text){
 }
 
 /* ---------- Manual nikud corrections ----------
-   Sefaria's text is generally reliable. If you (Simcha) ever spot a genuinely
-   wrong vowel/word while spot-checking against a printed Chumash, add an
-   entry here — tell Claude the perek, posuk, and word, no code changes needed.
+   Sefaria's API (the source this app fetches from) can differ from what
+   Sefaria's own website displays — it turns out Genesis 18:1's API text uses
+   a kamatz under the Peh in "entrance", while the website's fuller edition
+   correctly uses a segol. If you (Simcha) ever spot a genuinely wrong vowel
+   while spot-checking against a printed Chumash, add an entry here — tell
+   Claude the perek, posuk, and word, no code changes needed.
    Key format: "perek_posuk" using the Tanach chapter/verse numbers (e.g. "18_1"
    for Genesis 18:1).
 
-   IMPORTANT: each fix matches by CONSONANT SKELETON, not by exact nikud
-   characters — Sefaria's underlying text can encode identical-looking vowel
-   points in ways that don't match a literal string search. So a fix finds
-   "consonant [any vowel marks] consonant [any vowel marks] ..." and forces
-   the whole word to the correct pointed form. Only add an entry once you've
-   confirmed with a fresh page load (not a cached one) that the text is
-   actually wrong — Sefaria's Genesis 18:1 was checked and is correct as-is,
-   so no entry is needed for it.
+   IMPORTANT: a fix locates the word by CONSONANT SKELETON only ("consonant
+   [any vowel/trope marks] consonant [any vowel/trope marks] ...") and then
+   surgically swaps just the one wrong vowel CHARACTER for the right one
+   inside that word — everything else in the word (dagesh, meteg, trope,
+   any other vowels) is left completely untouched. This means it's safe to
+   apply even if the fetched text already happens to be correct (nothing
+   to replace, so nothing changes) — unlike replacing the whole word, which
+   would have clobbered legitimate trope marks Sefaria attaches to it.
 
-   Each entry: { consonants: [array of Hebrew consonant letters in the word],
-                 correct: 'the fully-pointed correct form to substitute in' } */
+   Each entry: { consonants: [Hebrew consonants in the word],
+                 wrongVowel: 'the single incorrect vowel character',
+                 rightVowel: 'the single correct vowel character' } */
 const MANUAL_CORRECTIONS = {
-  // Example format, currently empty — add entries here as needed:
-  // '18_1': [ { consonants: ['פ','ת','ח'], correct: 'פֶּתַח' } ]
+  '18_1': [
+    { consonants: ['פ','ת','ח'], wrongVowel: '\u05B8', rightVowel: '\u05B6' } // kamatz -> segol
+  ]
 };
 function applyManualCorrections(text, perekNum, posukNum){
   const key = perekNum + '_' + posukNum;
@@ -576,9 +636,9 @@ function applyManualCorrections(text, perekNum, posukNum){
   // marks. Including them would let this pattern accidentally swallow the
   // maqaf that often sits directly after a word like this one.
   const HEBREW_POINTS = '[\\u0591-\\u05BD\\u05BF\\u05C1\\u05C2\\u05C4-\\u05C7]*';
-  fixes.forEach(({ consonants, correct }) => {
+  fixes.forEach(({ consonants, wrongVowel, rightVowel }) => {
     const pattern = new RegExp(HEBREW_POINTS + consonants.join(HEBREW_POINTS) + HEBREW_POINTS, 'g');
-    text = text.replace(pattern, correct);
+    text = text.replace(pattern, (match) => match.split(wrongVowel).join(rightVowel));
   });
   return text;
 }
