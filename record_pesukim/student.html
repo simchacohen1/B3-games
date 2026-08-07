@@ -260,6 +260,27 @@
   .comp-result.correct .comp-badge{ background:#4C9A4C; }
   .comp-result.partial .comp-badge{ background: var(--gold); color: var(--ink); }
   .comp-result.incorrect .comp-badge{ background: var(--rimon); }
+  .speak-btn{
+    border:none; background:transparent; cursor:pointer;
+    font-size:1.1rem; line-height:1; padding:2px 4px; flex-shrink:0;
+    opacity:0.75;
+  }
+  .speak-btn:hover{ opacity:1; }
+  .speak-btn:active{ transform: scale(0.9); }
+
+  .clarify-box{
+    margin-top: 12px;
+    background: #FBF0D9;
+    border: 2px solid var(--gold);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .clarify-question-row{
+    display:flex; align-items:flex-start; gap:8px;
+    font-weight:600; color: var(--ink);
+    margin-bottom: 10px;
+  }
+  .clarify-question-row .q-icon{ font-size:1.1rem; }
 
   .save-row{ text-align:center; margin: 20px 0; }
 
@@ -374,6 +395,23 @@
         </div>
         <div class="comp-status" id="comprehensionGradingMsg"></div>
         <div class="comp-result hidden" id="comprehensionResult"></div>
+
+        <!-- Clarify follow-up: shown only when the AI grader is unsure and
+             needs one more spoken answer from the student before it can
+             give a final verdict. -->
+        <div class="clarify-box hidden" id="clarifyBox">
+          <div class="clarify-question-row">
+            <span class="q-icon">🤔</span>
+            <span id="clarifyQuestionText"></span>
+            <button class="speak-btn" id="clarifyReplayBtn" title="Hear this question again">🔊</button>
+          </div>
+          <div class="record-row">
+            <button class="seal-btn" id="clarifyRecordBtn" title="Record your answer">🎙️</button>
+            <audio id="clarifyAudioPlayback" controls class="hidden"></audio>
+            <button class="btn ghost-delete hidden" id="clarifyDeleteBtn" title="Delete this recording">🗑️ Delete</button>
+            <span class="status-tag" id="clarifyStatus">Not recorded yet</span>
+          </div>
+        </div>
       </div>
 
       <div class="save-row">
@@ -506,17 +544,61 @@ function hebrewNumeral(num){
 
 let studentId = null;
 let studentName = null;
-let currentAudio = { hebrew: null, translate: null, comprehension: null };
+let currentAudio = { hebrew: null, translate: null, comprehension: null, clarify: null };
 let currentRating = { hebrew: null, translate: null };
 let comprehensionTranscript = "";
 let comprehensionVerdict = null;   // 'correct' | 'partial' | 'incorrect'
 let comprehensionFeedback = "";
+let clarifyQuestion = "";          // set when the grader comes back "unsure"
+let clarifyTranscript = "";        // student's spoken answer to clarifyQuestion
 let currentPosukKey = null; // "Parsha_perek_posuk"
 let currentPosukText = "";
 let mediaRecorder = null;
 let recordingChunks = [];
-let activeRecordingType = null; // 'hebrew' | 'translate' | 'comprehension'
+let activeRecordingType = null; // 'hebrew' | 'translate' | 'comprehension' | 'clarify'
 let chapterCache = {}; // cache fetched Sefaria chapters this session
+
+/* ---------- Text-to-speech (reads comprehension feedback + clarifying
+   questions aloud in a male voice) ----------
+   Uses the browser's built-in SpeechSynthesis API — no server/API cost.
+   Voice lists load asynchronously in some browsers, so we cache the best
+   male voice once 'voiceschanged' fires (or immediately if already
+   available, e.g. Safari). */
+let ttsMaleVoice = null;
+const MALE_VOICE_PREFERENCES = [
+  'Google UK English Male', 'Microsoft David', 'Microsoft Guy', 'Microsoft Mark',
+  'Daniel', 'Alex', 'Fred', 'Google US English Male'
+];
+function pickMaleVoice(){
+  const voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+  if(!voices.length) return null;
+  for(const pref of MALE_VOICE_PREFERENCES){
+    const match = voices.find(v => v.name.toLowerCase().includes(pref.toLowerCase()));
+    if(match) return match;
+  }
+  // Fall back to anything with "male" in its name/description.
+  const anyMale = voices.find(v => /\bmale\b/i.test(v.name));
+  if(anyMale) return anyMale;
+  // Last resort: first English voice, or just the first voice available.
+  return voices.find(v => v.lang && v.lang.startsWith('en')) || voices[0];
+}
+if(window.speechSynthesis){
+  ttsMaleVoice = pickMaleVoice();
+  window.speechSynthesis.onvoiceschanged = () => { ttsMaleVoice = pickMaleVoice(); };
+}
+
+function speakText(text){
+  if(!window.speechSynthesis || !text) return;
+  try{
+    window.speechSynthesis.cancel(); // don't stack multiple readings
+    const utter = new SpeechSynthesisUtterance(text);
+    if(!ttsMaleVoice) ttsMaleVoice = pickMaleVoice();
+    if(ttsMaleVoice) utter.voice = ttsMaleVoice;
+    utter.rate = 0.95;
+    utter.pitch = 0.9; // nudges even a non-explicitly-male voice lower
+    window.speechSynthesis.speak(utter);
+  }catch(e){ console.error('Speech synthesis error:', e); }
+}
 
 /* ---------- Speech recognition (comprehension task only) ----------
    Runs alongside the audio recording so we get English text of what the
@@ -527,8 +609,11 @@ const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechReco
 let speechRecognizer = null;
 let speechRecognitionSupported = !!SpeechRecognitionAPI;
 
-function startSpeechRecognition(){
-  comprehensionTranscript = "";
+function startSpeechRecognition(targetType){
+  // targetType: 'comprehension' | 'clarify' — decides which transcript
+  // variable gets filled in as results come in.
+  if(targetType === 'clarify'){ clarifyTranscript = ""; }
+  else { comprehensionTranscript = ""; }
   if(!speechRecognitionSupported) return;
   speechRecognizer = new SpeechRecognitionAPI();
   speechRecognizer.lang = 'en-US';
@@ -539,7 +624,8 @@ function startSpeechRecognition(){
     for(let i = 0; i < event.results.length; i++){
       finalText += event.results[i][0].transcript + ' ';
     }
-    comprehensionTranscript = finalText.trim();
+    if(targetType === 'clarify'){ clarifyTranscript = finalText.trim(); }
+    else { comprehensionTranscript = finalText.trim(); }
   };
   speechRecognizer.onerror = (e) => {
     console.error('Speech recognition error:', e.error);
@@ -936,6 +1022,22 @@ function resetComprehensionResult(){
   const resultEl = document.getElementById('comprehensionResult');
   resultEl.classList.add('hidden');
   resultEl.innerHTML = '';
+  if(window.speechSynthesis) window.speechSynthesis.cancel();
+  resetClarify();
+}
+
+function resetClarify(){
+  clarifyQuestion = "";
+  clarifyTranscript = "";
+  currentAudio.clarify = null;
+  const box = document.getElementById('clarifyBox');
+  box.classList.add('hidden');
+  document.getElementById('clarifyQuestionText').textContent = '';
+  const audioEl = document.getElementById('clarifyAudioPlayback');
+  audioEl.removeAttribute('src');
+  audioEl.classList.add('hidden');
+  document.getElementById('clarifyDeleteBtn').classList.add('hidden');
+  document.getElementById('clarifyStatus').textContent = 'Not recorded yet';
 }
 
 function resetRecordingUI(){
@@ -968,6 +1070,10 @@ function deleteRecording(type){
   document.getElementById(type + 'Status').textContent = 'Not recorded yet';
   if(type === 'comprehension'){
     resetComprehensionResult();
+  } else if(type === 'clarify'){
+    // Let the student redo just their clarifying answer — keep the
+    // question on screen rather than resetting the whole comprehension task.
+    clarifyTranscript = "";
   } else {
     currentRating[type] = null;
     buildRatingScale(type + 'Rating', type);
@@ -977,6 +1083,7 @@ function deleteRecording(type){
 document.getElementById('hebrewDeleteBtn').onclick = () => deleteRecording('hebrew');
 document.getElementById('translateDeleteBtn').onclick = () => deleteRecording('translate');
 document.getElementById('comprehensionDeleteBtn').onclick = () => deleteRecording('comprehension');
+document.getElementById('clarifyDeleteBtn').onclick = () => deleteRecording('clarify');
 
 async function toggleRecording(type, btnEl){
   if(activeRecordingType === type){
@@ -1001,10 +1108,11 @@ async function toggleRecording(type, btnEl){
     btnEl.textContent = '⏹️';
     document.getElementById(type + 'Status').textContent = 'Recording…';
 
-    if(type === 'comprehension'){
-      startSpeechRecognition();
+    if(type === 'comprehension' || type === 'clarify'){
+      startSpeechRecognition(type);
       if(!speechRecognitionSupported){
-        document.getElementById('comprehensionGradingMsg').textContent =
+        const msgTarget = type === 'clarify' ? 'clarifyStatus' : 'comprehensionGradingMsg';
+        document.getElementById(msgTarget).textContent =
           "This browser can't turn speech into text — try Chrome for this task.";
       }
     }
@@ -1029,6 +1137,10 @@ async function toggleRecording(type, btnEl){
         // Give the recognizer a beat to fire its final onresult callback
         // before we grab the transcript and send it off for grading.
         setTimeout(() => gradeComprehensionAttempt(), 400);
+      } else if(type === 'clarify'){
+        stopSpeechRecognition();
+        document.getElementById(type + 'Status').textContent = 'Recorded — checking…';
+        setTimeout(() => gradeClarificationAttempt(), 400);
       } else {
         document.getElementById(type + 'Status').textContent = 'Recorded — listen, then grade yourself below';
         enableRating(type);
@@ -1045,6 +1157,8 @@ async function toggleRecording(type, btnEl){
 document.getElementById('hebrewRecordBtn').onclick = function(){ toggleRecording('hebrew', this); };
 document.getElementById('translateRecordBtn').onclick = function(){ toggleRecording('translate', this); };
 document.getElementById('comprehensionRecordBtn').onclick = function(){ toggleRecording('comprehension', this); };
+document.getElementById('clarifyRecordBtn').onclick = function(){ toggleRecording('clarify', this); };
+document.getElementById('clarifyReplayBtn').onclick = () => speakText(clarifyQuestion);
 
 /* ---------- Comprehension grading (computer-graded, no self-rating) ---------- */
 async function gradeComprehensionAttempt(){
@@ -1079,19 +1193,87 @@ async function gradeComprehensionAttempt(){
     });
     if(!res.ok) throw new Error('Grading request failed');
     const data = await res.json();
-    comprehensionVerdict = data.verdict;
-    comprehensionFeedback = data.feedback || '';
 
-    const badgeText = { correct: '✅ Got it!', partial: '🤔 Almost', incorrect: '💡 Try again' }[comprehensionVerdict] || '';
-    resultEl.className = 'comp-result ' + comprehensionVerdict;
-    resultEl.innerHTML = '<span class="comp-badge">' + badgeText + '</span><span>' + comprehensionFeedback + '</span>';
-    resultEl.classList.remove('hidden');
-    gradingMsg.textContent = '';
-    document.getElementById('comprehensionStatus').textContent = 'Recorded — listen above';
+    if(data.verdict === 'unsure'){
+      // AI couldn't tell yet — show its follow-up question and let the
+      // student record a spoken answer. comprehensionVerdict stays null,
+      // so Save stays disabled until gradeClarificationAttempt() settles it.
+      clarifyQuestion = data.clarifyQuestion || '';
+      document.getElementById('clarifyQuestionText').textContent = clarifyQuestion;
+      document.getElementById('clarifyBox').classList.remove('hidden');
+      gradingMsg.textContent = '';
+      document.getElementById('comprehensionStatus').textContent = 'Recorded — one more question below';
+      speakText(clarifyQuestion);
+      updateSaveButton();
+      return;
+    }
+
+    showComprehensionResult(data.verdict, data.feedback || '');
   }catch(err){
     console.error(err);
     gradingMsg.textContent = 'Could not check your answer — check your internet and try again.';
     document.getElementById('comprehensionStatus').textContent = 'Recorded';
+  }
+  updateSaveButton();
+}
+
+/* Renders the final correct/partial/incorrect result (whether it came
+   straight from the first grading pass or after a clarify follow-up),
+   and reads the feedback aloud in a male voice. */
+function showComprehensionResult(verdict, feedback){
+  const gradingMsg = document.getElementById('comprehensionGradingMsg');
+  const resultEl = document.getElementById('comprehensionResult');
+  comprehensionVerdict = verdict;
+  comprehensionFeedback = feedback;
+
+  const badgeText = { correct: '✅ Got it!', partial: '🤔 Almost', incorrect: '💡 Try again' }[verdict] || '';
+  resultEl.className = 'comp-result ' + verdict;
+  resultEl.innerHTML =
+    '<span class="comp-badge">' + badgeText + '</span>' +
+    '<span>' + comprehensionFeedback + '</span>' +
+    '<button class="speak-btn" id="compReplayBtn" title="Hear this again">🔊</button>';
+  resultEl.classList.remove('hidden');
+  document.getElementById('compReplayBtn').onclick = () => speakText(comprehensionFeedback);
+  gradingMsg.textContent = '';
+  document.getElementById('comprehensionStatus').textContent = 'Recorded — listen above';
+  speakText(comprehensionFeedback);
+}
+
+/* ---------- Clarify follow-up grading (second pass) ----------
+   Sends the original transcript + the clarifying question + the
+   student's spoken answer back to the same Cloud Function, which must
+   commit to a final correct/partial/incorrect verdict this time. */
+async function gradeClarificationAttempt(){
+  const clarifyStatus = document.getElementById('clarifyStatus');
+
+  if(!clarifyTranscript){
+    clarifyStatus.textContent = speechRecognitionSupported
+      ? "Didn't catch that — try recording again, a little closer to the mic."
+      : "This browser can't turn speech into text — try Chrome for this task.";
+    updateSaveButton();
+    return;
+  }
+
+  clarifyStatus.textContent = 'Checking your answer…';
+
+  try{
+    const res = await fetch(GRADE_COMPREHENSION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        posukText: currentPosukText,
+        transcript: comprehensionTranscript,
+        clarifyQuestion: clarifyQuestion,
+        clarificationTranscript: clarifyTranscript
+      })
+    });
+    if(!res.ok) throw new Error('Grading request failed');
+    const data = await res.json();
+    clarifyStatus.textContent = 'Recorded';
+    showComprehensionResult(data.verdict, data.feedback || '');
+  }catch(err){
+    console.error(err);
+    clarifyStatus.textContent = 'Could not check your answer — check your internet and try again.';
   }
   updateSaveButton();
 }
@@ -1209,6 +1391,28 @@ document.getElementById('saveBtn').onclick = async () => {
       );
     }
 
+    // If the AI needed a clarifying follow-up before it could grade the
+    // comprehension task, save that Q&A alongside it so the history (and
+    // Simcha, reviewing later) can see the fuller picture.
+    if(currentAudio.clarify){
+      const clarifyPath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_clarify_' + attemptId + '.webm';
+      progress.clarify = 0;
+      const task = storage.ref(clarifyPath).put(currentAudio.clarify);
+      task.on('state_changed', snap => {
+        progress.clarify = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        refreshProgressMsg();
+      });
+      uploadTasks.push(
+        task
+          .then(() => storage.ref(clarifyPath).getDownloadURL())
+          .then(url => {
+            record.comprehensionClarifyQuestion = clarifyQuestion;
+            record.comprehensionClarifyAudioURL = url;
+            record.comprehensionClarifyTranscript = clarifyTranscript;
+          })
+      );
+    }
+
     await Promise.all(uploadTasks);
 
     await attemptRef.set(record);
@@ -1267,6 +1471,16 @@ async function loadHistory(){
         if(a.comprehensionTranscript){
           rowsHtml += `<div class="row" style="font-style:italic;color:var(--ink-soft);">"${a.comprehensionTranscript}"</div>`;
         }
+        if(a.comprehensionClarifyQuestion){
+          rowsHtml += `
+          <div class="row"><span class="label">🤔 Follow-up</span><span style="color:var(--ink-soft);">"${a.comprehensionClarifyQuestion}"</span></div>`;
+          if(a.comprehensionClarifyAudioURL){
+            rowsHtml += `<div class="row"><audio controls src="${a.comprehensionClarifyAudioURL}"></audio></div>`;
+          }
+          if(a.comprehensionClarifyTranscript){
+            rowsHtml += `<div class="row" style="font-style:italic;color:var(--ink-soft);">"${a.comprehensionClarifyTranscript}"</div>`;
+          }
+        }
       }
       div.innerHTML = rowsHtml;
       const delBtn = div.querySelector('.attempt-delete-btn');
@@ -1295,6 +1509,9 @@ async function deleteAttempt(attempt, btnEl){
     }
     if(attempt.comprehensionAudioURL){
       fileDeletes.push(storage.refFromURL(attempt.comprehensionAudioURL).delete().catch(() => {}));
+    }
+    if(attempt.comprehensionClarifyAudioURL){
+      fileDeletes.push(storage.refFromURL(attempt.comprehensionClarifyAudioURL).delete().catch(() => {}));
     }
     await Promise.all(fileDeletes);
     await db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey + '/' + attempt.id).remove();
