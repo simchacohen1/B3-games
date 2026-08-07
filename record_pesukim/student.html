@@ -1235,6 +1235,9 @@ function showComprehensionResult(verdict, feedback){
   document.getElementById('compReplayBtn').onclick = () => speakText(comprehensionFeedback);
   gradingMsg.textContent = '';
   document.getElementById('comprehensionStatus').textContent = 'Recorded — listen above';
+  // Once a final verdict is shown (including after a clarify follow-up
+  // resolves), the clarify question box should no longer stay visible.
+  document.getElementById('clarifyBox').classList.add('hidden');
 }
 
 /* ---------- Clarify follow-up grading (second pass) ----------
