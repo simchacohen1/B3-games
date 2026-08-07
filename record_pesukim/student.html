@@ -462,6 +462,16 @@ const storage = firebase.storage();
 const GRADE_COMPREHENSION_URL = "https://gradecomprehension-fr7n3lmy3q-uc.a.run.app";
 
 /* =========================================================
+   TEXT-TO-SPEECH — Cloud Function URL
+   PASTE YOUR TTS CLOUD FUNCTION URL HERE once you deploy it
+   (Firebase prints it after `firebase deploy --only functions:synthesizeSpeech`,
+   looks like https://synthesizespeech-xxxxxxxxxx-uc.a.run.app)
+   Until this is set, the 🔊 buttons fall back to the browser's built-in
+   (robotic-sounding) voice automatically — nothing breaks either way.
+   ========================================================= */
+const SYNTHESIZE_SPEECH_URL = "PASTE YOUR TTS CLOUD FUNCTION URL HERE";
+
+/* =========================================================
    PARSHA / PEREK / POSUK MAP (Sefaria "Genesis" chapters)
    ========================================================= */
 const PARSHA_CONFIG = {
@@ -559,8 +569,55 @@ let activeRecordingType = null; // 'hebrew' | 'translate' | 'comprehension' | 'c
 let chapterCache = {}; // cache fetched Sefaria chapters this session
 
 /* ---------- Text-to-speech (reads comprehension feedback + clarifying
-   questions aloud in a male voice) ----------
-   Uses the browser's built-in SpeechSynthesis API — no server/API cost.
+   questions aloud) ----------
+   Primary path: sends the text to the synthesizeSpeech Cloud Function,
+   which uses Google Cloud's natural-sounding Neural2 voice and returns
+   real MP3 audio. Results are cached per exact sentence so replaying the
+   same feedback twice doesn't re-fetch. If SYNTHESIZE_SPEECH_URL isn't
+   set yet, or the request ever fails (offline, quota, etc.), this quietly
+   falls back to the browser's built-in voice below so the button never
+   just does nothing. */
+const ttsAudioCache = new Map();
+let ttsAudioEl = null;
+
+async function speakText(text){
+  if(!text) return;
+  if(!SYNTHESIZE_SPEECH_URL || SYNTHESIZE_SPEECH_URL.indexOf('PASTE') === 0){
+    speakTextBrowserFallback(text);
+    return;
+  }
+  try{
+    if(!ttsAudioEl) ttsAudioEl = new Audio();
+    ttsAudioEl.pause();
+
+    let audioUrl = ttsAudioCache.get(text);
+    if(!audioUrl){
+      const res = await fetch(SYNTHESIZE_SPEECH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      if(!res.ok) throw new Error('TTS request failed');
+      const data = await res.json();
+      const byteChars = atob(data.audioContent);
+      const byteNumbers = new Array(byteChars.length);
+      for(let i = 0; i < byteChars.length; i++){
+        byteNumbers[i] = byteChars.charCodeAt(i);
+      }
+      const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'audio/mp3' });
+      audioUrl = URL.createObjectURL(blob);
+      ttsAudioCache.set(text, audioUrl);
+    }
+    ttsAudioEl.src = audioUrl;
+    await ttsAudioEl.play();
+  }catch(e){
+    console.error('TTS Cloud Function error, falling back to browser voice:', e);
+    speakTextBrowserFallback(text);
+  }
+}
+
+/* ---------- Browser-voice fallback (used only if the Cloud Function
+   above is unreachable or hasn't been deployed yet) ----------
    Voice lists load asynchronously in some browsers, so we cache the best
    male voice once 'voiceschanged' fires (or immediately if already
    available, e.g. Safari). */
@@ -587,7 +644,7 @@ if(window.speechSynthesis){
   window.speechSynthesis.onvoiceschanged = () => { ttsMaleVoice = pickMaleVoice(); };
 }
 
-function speakText(text){
+function speakTextBrowserFallback(text){
   if(!window.speechSynthesis || !text) return;
   try{
     window.speechSynthesis.cancel(); // don't stack multiple readings
