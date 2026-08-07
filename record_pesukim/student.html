@@ -1203,7 +1203,6 @@ async function gradeComprehensionAttempt(){
       document.getElementById('clarifyBox').classList.remove('hidden');
       gradingMsg.textContent = '';
       document.getElementById('comprehensionStatus').textContent = 'Recorded — one more question below';
-      speakText(clarifyQuestion);
       updateSaveButton();
       return;
     }
@@ -1218,8 +1217,8 @@ async function gradeComprehensionAttempt(){
 }
 
 /* Renders the final correct/partial/incorrect result (whether it came
-   straight from the first grading pass or after a clarify follow-up),
-   and reads the feedback aloud in a male voice. */
+   straight from the first grading pass or after a clarify follow-up).
+   Audio is opt-in only — tap the speaker button to hear it read aloud. */
 function showComprehensionResult(verdict, feedback){
   const gradingMsg = document.getElementById('comprehensionGradingMsg');
   const resultEl = document.getElementById('comprehensionResult');
@@ -1231,12 +1230,11 @@ function showComprehensionResult(verdict, feedback){
   resultEl.innerHTML =
     '<span class="comp-badge">' + badgeText + '</span>' +
     '<span>' + comprehensionFeedback + '</span>' +
-    '<button class="speak-btn" id="compReplayBtn" title="Hear this again">🔊</button>';
+    '<button class="speak-btn" id="compReplayBtn" title="Hear this read aloud">🔊</button>';
   resultEl.classList.remove('hidden');
   document.getElementById('compReplayBtn').onclick = () => speakText(comprehensionFeedback);
   gradingMsg.textContent = '';
   document.getElementById('comprehensionStatus').textContent = 'Recorded — listen above';
-  speakText(comprehensionFeedback);
 }
 
 /* ---------- Clarify follow-up grading (second pass) ----------
@@ -1523,7 +1521,6 @@ async function deleteAttempt(attempt, btnEl){
     console.error(err);
   }
 }
-  
 </script>
 </body>
 </html>
