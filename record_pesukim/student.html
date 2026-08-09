@@ -344,11 +344,14 @@
     <p>Read it. Record it. Grade yourself!</p>
   </header>
 
-  <!-- STEP 0: Name entry -->
+  <!-- STEP 0: Name entry (gated by class PIN + teacher-approved name list) -->
   <div id="nameGate" class="name-gate">
+    <div>Class PIN</div>
+    <input id="classPinInput" type="password" placeholder="Ask your teacher" maxlength="20" inputmode="numeric">
     <div>What's your name?</div>
     <input id="studentNameInput" type="text" placeholder="Type your name here" maxlength="30">
     <div><button class="btn gold" id="startBtn">Start Practicing</button></div>
+    <div id="nameGateMsg" style="font-size:0.85rem;margin-top:10px;color:#b33;min-height:1.2em;"></div>
   </div>
 
   <!-- Main app (hidden until name entered) -->
@@ -705,14 +708,62 @@ function slugify(name){
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
 }
 
-document.getElementById('startBtn').onclick = () => {
+function setNameGateMsg(text){
+  document.getElementById('nameGateMsg').textContent = text || '';
+}
+
+// Checks the entered PIN against posukPractice/settings/classPin, and the
+// entered name (slugified) against the teacher-approved list at
+// posukPractice/allowedStudents. Both must pass before a student can get in.
+// This exists so anyone who has the link can't just type in any name and
+// show up as "a student" in the teacher dashboard - the teacher has to add
+// the name first, and know the class PIN.
+async function checkAccess(name, pin){
+  const slug = slugify(name);
+  if(!slug){ return { ok:false, reason:'Please type your name.' }; }
+
+  const [pinSnap, allowedSnap] = await Promise.all([
+    db.ref('posukPractice/settings/classPin').once('value'),
+    db.ref('posukPractice/allowedStudents/' + slug).once('value')
+  ]);
+
+  const realPin = pinSnap.val();
+  if(realPin && String(pin).trim() !== String(realPin).trim()){
+    return { ok:false, reason:'Incorrect PIN. Ask your teacher.' };
+  }
+  if(!allowedSnap.exists()){
+    return { ok:false, reason:'Ask your teacher to add your name first.' };
+  }
+  return { ok:true, slug };
+}
+
+document.getElementById('startBtn').onclick = async () => {
   const val = document.getElementById('studentNameInput').value.trim();
+  const pin = document.getElementById('classPinInput').value.trim();
   if(!val){ return; }
-  studentName = val;
-  studentId = slugify(val);
-  localStorage.setItem('posukPractice_studentName', studentName);
-  localStorage.setItem('posukPractice_studentId', studentId);
-  enterApp();
+
+  const startBtn = document.getElementById('startBtn');
+  startBtn.disabled = true;
+  setNameGateMsg('Checking…');
+  try{
+    const result = await checkAccess(val, pin);
+    if(!result.ok){
+      setNameGateMsg(result.reason);
+      startBtn.disabled = false;
+      return;
+    }
+    setNameGateMsg('');
+    studentName = val;
+    studentId = result.slug;
+    localStorage.setItem('posukPractice_studentName', studentName);
+    localStorage.setItem('posukPractice_studentId', studentId);
+    enterApp();
+  }catch(e){
+    console.error('Access check failed:', e);
+    setNameGateMsg('Could not check access. Try again.');
+  }finally{
+    startBtn.disabled = false;
+  }
 };
 
 document.getElementById('switchStudentBtn').onclick = () => {
@@ -749,10 +800,25 @@ function applyDeepLinkFromURL(){
   });
 }
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   const savedId = localStorage.getItem('posukPractice_studentId');
   const savedName = localStorage.getItem('posukPractice_studentName');
   if(savedId && savedName){
+    // Still re-check the roster (not the PIN) on every visit, in case the
+    // teacher has since removed this name - a saved browser shouldn't be
+    // able to bypass that.
+    try{
+      const allowedSnap = await db.ref('posukPractice/allowedStudents/' + savedId).once('value');
+      if(!allowedSnap.exists()){
+        localStorage.removeItem('posukPractice_studentName');
+        localStorage.removeItem('posukPractice_studentId');
+        return;
+      }
+    }catch(e){
+      console.error('Roster re-check failed:', e);
+      // If we can't reach Firebase, fail open rather than locking out a
+      // returning student over a network hiccup.
+    }
     studentId = savedId;
     studentName = savedName;
     enterApp();

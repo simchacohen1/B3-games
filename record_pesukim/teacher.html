@@ -263,6 +263,7 @@
           <button class="tab-btn active" id="studentTabBtn">👤 By Student</button>
           <button class="tab-btn" id="rosterTabBtn">📋 Class Roster</button>
           <button class="tab-btn" id="summaryTabBtn">📊 Class Stats</button>
+          <button class="tab-btn" id="accessTabBtn">🔑 Manage Access</button>
         </div>
         <div id="mainContent" class="empty-msg">Select a student to view their practice history.</div>
       </div>
@@ -459,17 +460,22 @@ function getAudioDuration(url){
 document.getElementById('studentTabBtn').onclick = () => setTab('student');
 document.getElementById('rosterTabBtn').onclick = () => setTab('roster');
 document.getElementById('summaryTabBtn').onclick = () => setTab('summary');
+document.getElementById('accessTabBtn').onclick = () => setTab('access');
 
 function setTab(tab){
   document.getElementById('studentTabBtn').classList.toggle('active', tab === 'student');
   document.getElementById('rosterTabBtn').classList.toggle('active', tab === 'roster');
   document.getElementById('summaryTabBtn').classList.toggle('active', tab === 'summary');
+  document.getElementById('accessTabBtn').classList.toggle('active', tab === 'access');
   if(tab === 'summary'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
     loadClassSummary();
   }else if(tab === 'roster'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
     loadRoster();
+  }else if(tab === 'access'){
+    [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
+    loadAccessTab();
   }else if(activeStudentId){
     const el = [...document.querySelectorAll('.student-item')].find(e => e.dataset.id === activeStudentId);
     if(el) selectStudent(activeStudentId, studentsMap[activeStudentId], el);
@@ -601,6 +607,123 @@ async function loadRoster(){
     });
   }catch(err){
     mainEl.innerHTML = '<div class="empty-msg">Could not build the class roster.</div>';
+    console.error(err);
+  }
+}
+
+// Must match student.html's slugify exactly - this is the key used both to
+// gate entry there and to manage the approved-name list here.
+function slugify(name){
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+}
+
+// "Manage Access" tab: lets the teacher set/change the class PIN and
+// maintain the list of approved student names. student.html checks both
+// of these (posukPractice/settings/classPin and posukPractice/allowedStudents)
+// before letting anyone past the name gate, so random people with the link
+// can't show up as "students" without the teacher adding them first.
+async function loadAccessTab(){
+  const mainEl = document.getElementById('mainContent');
+  mainEl.innerHTML = '<div class="loading">Loading access settings…</div>';
+  try{
+    const [pinSnap, allowedSnap] = await Promise.all([
+      db.ref('posukPractice/settings/classPin').once('value'),
+      db.ref('posukPractice/allowedStudents').once('value')
+    ]);
+    const currentPin = pinSnap.val() || '';
+    const allowedVal = allowedSnap.val() || {};
+    const approvedNames = Object.entries(allowedVal)
+      .map(([slug, info]) => ({ slug, name: (info && info.name) || slug }))
+      .sort((a,b) => a.name.localeCompare(b.name));
+
+    let html = `<h2>🔑 Manage Access</h2>
+      <div class="empty-msg" style="text-align:left;margin-bottom:18px;">
+        Students need BOTH the class PIN and an approved name to get into the app.
+        Add a name here before sharing the link with a new student.
+      </div>
+      <div style="margin-bottom:24px;">
+        <div style="font-weight:700;margin-bottom:6px;">Class PIN</div>
+        <input id="pinInput" type="text" value="${currentPin}" placeholder="e.g. 1234"
+          style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:160px;">
+        <button class="btn small gold" id="savePinBtn" style="margin-left:8px;">Save PIN</button>
+        <span id="pinSaveMsg" style="margin-left:10px;font-size:0.85rem;"></span>
+      </div>
+      <div>
+        <div style="font-weight:700;margin-bottom:6px;">Approved Students (${approvedNames.length})</div>
+        <input id="newApprovedName" type="text" placeholder="Student's name" maxlength="30"
+          style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:220px;">
+        <button class="btn small gold" id="addApprovedBtn">Add Student</button>
+        <span id="addApprovedMsg" style="margin-left:10px;font-size:0.85rem;"></span>
+        <table class="roster-table" style="margin-top:14px;">
+          <thead><tr><th>Name</th><th style="width:90px;"></th></tr></thead>
+          <tbody id="approvedList">
+            ${approvedNames.length === 0
+              ? '<tr><td colspan="2" class="empty-msg">No approved students yet.</td></tr>'
+              : approvedNames.map(a => `<tr data-slug="${a.slug}">
+                  <td>${a.name}</td>
+                  <td><button class="btn small remove-approved-btn" style="background:#8a3a3a;box-shadow:0 4px 0 #5c2626;">Remove</button></td>
+                </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    mainEl.innerHTML = html;
+
+    document.getElementById('savePinBtn').onclick = async () => {
+      const val = document.getElementById('pinInput').value.trim();
+      const msgEl = document.getElementById('pinSaveMsg');
+      try{
+        await db.ref('posukPractice/settings/classPin').set(val);
+        msgEl.style.color = '#8fd694';
+        msgEl.textContent = 'Saved!';
+      }catch(e){
+        msgEl.style.color = '#ffb3b3';
+        msgEl.textContent = 'Could not save.';
+        console.error(e);
+      }
+    };
+
+    document.getElementById('addApprovedBtn').onclick = async () => {
+      const nameVal = document.getElementById('newApprovedName').value.trim();
+      const msgEl = document.getElementById('addApprovedMsg');
+      if(!nameVal){ return; }
+      const slug = slugify(nameVal);
+      if(!slug){
+        msgEl.style.color = '#ffb3b3';
+        msgEl.textContent = 'Please enter a valid name.';
+        return;
+      }
+      try{
+        await db.ref('posukPractice/allowedStudents/' + slug).set({
+          name: nameVal,
+          addedAt: firebase.database.ServerValue.TIMESTAMP
+        });
+        document.getElementById('newApprovedName').value = '';
+        msgEl.style.color = '#8fd694';
+        msgEl.textContent = 'Added!';
+        loadAccessTab();
+      }catch(e){
+        msgEl.style.color = '#ffb3b3';
+        msgEl.textContent = 'Could not add.';
+        console.error(e);
+      }
+    };
+
+    mainEl.querySelectorAll('.remove-approved-btn').forEach(btn => {
+      btn.onclick = async () => {
+        const row = btn.closest('tr');
+        const slug = row.dataset.slug;
+        // This only removes permission for that name to log in going forward;
+        // it does NOT delete any existing student data, attempts, or recordings.
+        try{
+          await db.ref('posukPractice/allowedStudents/' + slug).remove();
+          loadAccessTab();
+        }catch(e){
+          console.error(e);
+        }
+      };
+    });
+  }catch(err){
+    mainEl.innerHTML = '<div class="empty-msg">Could not load access settings.</div>';
     console.error(err);
   }
 }
