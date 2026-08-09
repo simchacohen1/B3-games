@@ -341,7 +341,7 @@
 
   <header class="top">
     <h1>📜 Posuk Practice Scroll</h1>
-    <p>Read it. Record it. Grade yourself!</p>
+    <p>Read the posuk. Explain what it means. See how you did!</p>
   </header>
 
   <!-- STEP 0: Name entry (gated by class PIN + teacher-approved name list) -->
@@ -365,8 +365,8 @@
     </div>
 
     <div class="selectors">
-      <select id="perekSelect"><option value="">Choose פרק</option></select>
-      <select id="posukSelect" disabled><option value="">Posuk</option></select>
+      <select id="perekSelect"><option value="">פרק</option></select>
+      <select id="posukSelect" disabled><option value="">פסוק</option></select>
     </div>
 
     <div class="scroll" id="scrollBox">
@@ -842,7 +842,7 @@ ALL_PERAKIM.forEach(num => {
 });
 
 perekSelect.onchange = async () => {
-  posukSelect.innerHTML = '<option value="">Posuk</option>';
+  posukSelect.innerHTML = '<option value="">פסוק</option>';
   resetScroll();
   const perekNum = parseInt(perekSelect.value);
   if(!perekNum){ posukSelect.disabled = true; return; }
@@ -863,7 +863,7 @@ perekSelect.onchange = async () => {
     for(let i = min; i <= max; i++){
       const opt = document.createElement('option');
       opt.value = i;
-      opt.textContent = 'Posuk ' + hebrewNumeral(i);
+      opt.textContent = 'פסוק ' + hebrewNumeral(i);
       posukSelect.appendChild(opt);
     }
     posukSelect.disabled = false;
