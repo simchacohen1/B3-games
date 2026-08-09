@@ -243,9 +243,11 @@
     padding: 12px 16px;
     font-size: 0.9rem;
     display:flex;
+    flex-wrap: wrap;
     align-items:center;
     gap:10px;
   }
+  .comp-result.excellent{ background:#E4EAF4; border:2px solid var(--tent-navy); }
   .comp-result.correct{ background:#E4F4E4; border:2px solid #4C9A4C; }
   .comp-result.partial{ background:#FBF0D9; border:2px solid var(--gold); }
   .comp-result.incorrect{ background:#F6E1E1; border:2px solid var(--rimon); }
@@ -257,9 +259,19 @@
     white-space:nowrap;
     color:#fff;
   }
+  .comp-result.excellent .comp-badge{ background: var(--tent-navy); }
   .comp-result.correct .comp-badge{ background:#4C9A4C; }
   .comp-result.partial .comp-badge{ background: var(--gold); color: var(--ink); }
   .comp-result.incorrect .comp-badge{ background: var(--rimon); }
+  .hebrew-word-breakdown{
+    width:100%; font-family:'Noto Serif Hebrew', serif; font-size:1.3rem;
+    direction:rtl; line-height:1.6; margin-top:8px;
+  }
+  .hebrew-word-breakdown .word-ok{ color:#3D7A3D; }
+  .hebrew-word-breakdown .word-miss{
+    color: var(--rimon-dark); text-decoration: underline;
+    text-decoration-style: wavy; text-underline-offset: 3px;
+  }
   .speak-btn{
     border:none; background:transparent; cursor:pointer;
     font-size:1.1rem; line-height:1; padding:2px 4px; flex-shrink:0;
@@ -359,7 +371,7 @@
 
     <div id="recordingArea" class="hidden">
 
-      <!-- Hebrew reading task -->
+      <!-- Hebrew reading task (computer-graded, same scorer as Kol Emes) -->
       <div class="task-card">
         <h3>1️⃣ Read the Hebrew Words</h3>
         <div class="record-row">
@@ -368,7 +380,8 @@
           <button class="btn ghost-delete hidden" id="hebrewDeleteBtn" title="Delete this recording">🗑️ Delete</button>
           <span class="status-tag" id="hebrewStatus">Not recorded yet</span>
         </div>
-        <div class="rating-scale" id="hebrewRating"></div>
+        <div class="comp-status" id="hebrewGradingMsg"></div>
+        <div class="comp-result hidden" id="hebrewResult"></div>
       </div>
 
       <!-- Reading + translation task -->
@@ -460,6 +473,12 @@ const storage = firebase.storage();
    looks like https://gradecomprehension-xxxxxxxxxx-uc.a.run.app)
    ========================================================= */
 const GRADE_COMPREHENSION_URL = "https://gradecomprehension-fr7n3lmy3q-uc.a.run.app";
+
+/* =========================================================
+   HEBREW READING SCORER — same backend Kol Emes uses
+   ========================================================= */
+const HEBREW_SCORE_URL = "https://posuk-scorer.onrender.com/score";
+
 
 /* =========================================================
    TEXT-TO-SPEECH — Cloud Function URL
@@ -555,17 +574,22 @@ let studentId = null;
 let studentName = null;
 let currentAudio = { hebrew: null, translate: null, comprehension: null, clarify: null };
 let currentRating = { hebrew: null, translate: null };
+let hebrewScore = null;            // percentage from the Kol Emes scorer, 0-100
+let hebrewTranscript = "";         // what the scorer heard, for the history view
 let comprehensionTranscript = "";
-let comprehensionVerdict = null;   // 'correct' | 'partial' | 'incorrect'
+let comprehensionVerdict = null;   // 'excellent' | 'correct' | 'partial' | 'incorrect'
 let comprehensionFeedback = "";
 let clarifyQuestion = "";          // set when the grader comes back "unsure"
 let clarifyTranscript = "";        // student's spoken answer to clarifyQuestion
 let currentPosukKey = null; // "Parsha_perek_posuk"
+let currentPosukNum = null; // plain verse number (e.g. 1, 2, 3…), what the scorer expects
 let currentPosukText = "";
+let currentPosukTranslation = ""; // accepted English translation, used as the grading "answer key"
 let mediaRecorder = null;
 let recordingChunks = [];
 let activeRecordingType = null; // 'hebrew' | 'translate' | 'comprehension' | 'clarify'
-let chapterCache = {}; // cache fetched Sefaria chapters this session
+let chapterCache = {}; // cache fetched Sefaria Hebrew chapters this session
+let translationCache = {}; // cache fetched Sefaria English chapters this session
 
 /* ---------- Text-to-speech (reads comprehension feedback + clarifying
    questions aloud) ----------
@@ -811,8 +835,19 @@ posukSelect.onchange = async () => {
   try{
     const pesukim = await fetchChapter(perekNum);
     const text = pesukim[posukNum - 1];
+    // Fetch the English translation too — this becomes the "answer key"
+    // the AI grades comprehension against instead of interpreting the
+    // Hebrew itself. If this fails, comprehension grading will still
+    // fall back to Claude's own reading (see gradeComprehensionAttempt).
+    let translation = '';
+    try{
+      const translations = await fetchChapterTranslation(perekNum);
+      translation = translations[posukNum - 1] || '';
+    }catch(err){
+      console.error('Could not load translation for grading', err);
+    }
     const parsha = resolveParsha(perekNum, posukNum);
-    showPosuk(parsha, perekNum, posukNum, text);
+    showPosuk(parsha, perekNum, posukNum, text, translation);
     document.getElementById('fetchMsg').textContent = '';
   }catch(err){
     document.getElementById('fetchMsg').textContent = 'Could not load this posuk.';
@@ -943,6 +978,47 @@ async function fetchChapter(perekNum){
   return pesukim;
 }
 
+/* Fetches the accepted English translation for a perek, used as the
+   "answer key" the AI grades comprehension against — instead of asking
+   the AI to interpret the Hebrew itself. Prefers the Metsudah Chumash
+   translation (the standard traditional English Chumash); falls back to
+   Sefaria's default English version if Metsudah isn't digitized for
+   that sefer/perek, so grading never breaks entirely. */
+async function fetchChapterTranslation(perekNum){
+  if(translationCache[perekNum]) return translationCache[perekNum];
+
+  const cacheKey = 'posukPractice_translation_v1_' + perekNum;
+  const localCached = localStorage.getItem(cacheKey);
+  if(localCached){
+    const arr = JSON.parse(localCached);
+    translationCache[perekNum] = arr;
+    return arr;
+  }
+
+  let english = [];
+  try{
+    const res = await fetch('https://www.sefaria.org/api/texts/Genesis.' + perekNum +
+      '?context=0&pad=0&ven=Metsudah_Chumash,_Metsudah_Publications,_2009');
+    const data = await res.json();
+    english = data.text || [];
+  }catch(err){
+    console.error('Metsudah fetch failed, will fall back', err);
+  }
+
+  // Fallback: Metsudah has no coverage for this perek (empty/missing text) —
+  // use whatever default English translation Sefaria has instead.
+  if(!english.length || english.every(t => !t || !stripTags(t).trim())){
+    const res = await fetch('https://www.sefaria.org/api/texts/Genesis.' + perekNum + '?context=0&pad=0');
+    const data = await res.json();
+    english = data.text || [];
+  }
+
+  const cleaned = english.map(stripTags);
+  translationCache[perekNum] = cleaned;
+  localStorage.setItem(cacheKey, JSON.stringify(cleaned));
+  return cleaned;
+}
+
 function stripTags(html){
   const div = document.createElement('div');
   div.innerHTML = html;
@@ -1018,11 +1094,14 @@ function resetScroll(){
   document.getElementById('posukText').classList.add('hidden');
   document.getElementById('recordingArea').classList.add('hidden');
   currentPosukKey = null;
+  currentPosukTranslation = "";
 }
 
-function showPosuk(parsha, perekNum, posukNum, text){
+function showPosuk(parsha, perekNum, posukNum, text, translation){
   currentPosukKey = parsha.replace(/\s+/g,'') + '_' + perekNum + '_' + posukNum;
+  currentPosukNum = posukNum;
   currentPosukText = text;
+  currentPosukTranslation = translation || "";
   document.getElementById('scrollPlaceholder').classList.add('hidden');
   const textEl = document.getElementById('posukText');
   textEl.textContent = text;
@@ -1057,7 +1136,6 @@ function buildRatingScale(containerId, type){
     updateSaveButton();
   });
 }
-buildRatingScale('hebrewRating', 'hebrew');
 buildRatingScale('translateRating', 'translate');
 
 function enableRating(type){
@@ -1096,15 +1174,29 @@ function resetClarify(){
   document.getElementById('clarifyStatus').textContent = 'Not recorded yet';
 }
 
+function resetHebrewResult(){
+  hebrewScore = null;
+  hebrewTranscript = "";
+  document.getElementById('hebrewGradingMsg').textContent = '';
+  const resultEl = document.getElementById('hebrewResult');
+  resultEl.classList.add('hidden');
+  resultEl.innerHTML = '';
+}
+
 function resetRecordingUI(){
-  ['hebrew','translate'].forEach(type => {
-    currentAudio[type] = null;
-    currentRating[type] = null;
-    document.getElementById(type + 'AudioPlayback').classList.add('hidden');
-    document.getElementById(type + 'DeleteBtn').classList.add('hidden');
-    document.getElementById(type + 'Status').textContent = 'Not recorded yet';
-    buildRatingScale(type + 'Rating', type); // rebuild slider back to disabled/default state
-  });
+  currentAudio.hebrew = null;
+  document.getElementById('hebrewAudioPlayback').classList.add('hidden');
+  document.getElementById('hebrewDeleteBtn').classList.add('hidden');
+  document.getElementById('hebrewStatus').textContent = 'Not recorded yet';
+  resetHebrewResult();
+
+  currentAudio.translate = null;
+  currentRating.translate = null;
+  document.getElementById('translateAudioPlayback').classList.add('hidden');
+  document.getElementById('translateDeleteBtn').classList.add('hidden');
+  document.getElementById('translateStatus').textContent = 'Not recorded yet';
+  buildRatingScale('translateRating', 'translate'); // rebuild slider back to disabled/default state
+
   currentAudio.comprehension = null;
   document.getElementById('comprehensionAudioPlayback').classList.add('hidden');
   document.getElementById('comprehensionDeleteBtn').classList.add('hidden');
@@ -1115,8 +1207,8 @@ function resetRecordingUI(){
 
 // Lets a student re-do a recording they don't like, before saving —
 // clears the audio, hides the delete button again, and resets that
-// task's rating slider (or, for comprehension, its graded result) back
-// to its default state.
+// task's rating slider (or, for comprehension/hebrew, its graded result)
+// back to its default state.
 function deleteRecording(type){
   currentAudio[type] = null;
   const audioEl = document.getElementById(type + 'AudioPlayback');
@@ -1124,7 +1216,9 @@ function deleteRecording(type){
   audioEl.classList.add('hidden');
   document.getElementById(type + 'DeleteBtn').classList.add('hidden');
   document.getElementById(type + 'Status').textContent = 'Not recorded yet';
-  if(type === 'comprehension'){
+  if(type === 'hebrew'){
+    resetHebrewResult();
+  } else if(type === 'comprehension'){
     resetComprehensionResult();
   } else if(type === 'clarify'){
     // Let the student redo just their clarifying answer — keep the
@@ -1197,6 +1291,9 @@ async function toggleRecording(type, btnEl){
         stopSpeechRecognition();
         document.getElementById(type + 'Status').textContent = 'Recorded — checking…';
         setTimeout(() => gradeClarificationAttempt(), 400);
+      } else if(type === 'hebrew'){
+        document.getElementById(type + 'Status').textContent = 'Recorded — scoring…';
+        scoreHebrewReading();
       } else {
         document.getElementById(type + 'Status').textContent = 'Recorded — listen, then grade yourself below';
         enableRating(type);
@@ -1215,6 +1312,63 @@ document.getElementById('translateRecordBtn').onclick = function(){ toggleRecord
 document.getElementById('comprehensionRecordBtn').onclick = function(){ toggleRecording('comprehension', this); };
 document.getElementById('clarifyRecordBtn').onclick = function(){ toggleRecording('clarify', this); };
 document.getElementById('clarifyReplayBtn').onclick = () => speakText(clarifyQuestion);
+
+/* ---------- Hebrew reading auto-grading (same backend as Kol Emes) ----------
+   Sends the recording + the posuk's exact text to the scorer, which
+   transcribes it and compares word-by-word. Shows a percentage plus a
+   word-by-word breakdown, same as the standalone Kol Emes page. */
+async function scoreHebrewReading(){
+  const gradingMsg = document.getElementById('hebrewGradingMsg');
+  const resultEl = document.getElementById('hebrewResult');
+  resultEl.classList.add('hidden');
+  hebrewScore = null;
+  hebrewTranscript = "";
+
+  if(!currentAudio.hebrew){ updateSaveButton(); return; }
+
+  gradingMsg.textContent = 'Listening to your reading…';
+
+  const formData = new FormData();
+  formData.append("name", studentName || "student");
+  formData.append("posuk", currentPosukNum || "");
+  formData.append("posukText", currentPosukText);
+  formData.append("audio", currentAudio.hebrew, "recording.webm");
+
+  try{
+    const res = await fetch(HEBREW_SCORE_URL, { method: 'POST', body: formData });
+    if(!res.ok) throw new Error('Scoring request failed');
+    const data = await res.json();
+    hebrewScore = data.score;
+    hebrewTranscript = data.transcription || "";
+    showHebrewResult(data);
+    document.getElementById('hebrewStatus').textContent = 'Recorded — see your score above';
+  }catch(err){
+    console.error(err);
+    gradingMsg.textContent = 'Could not check your reading — check your internet and try again.';
+    document.getElementById('hebrewStatus').textContent = 'Recorded';
+  }
+  updateSaveButton();
+}
+
+function showHebrewResult(data){
+  const gradingMsg = document.getElementById('hebrewGradingMsg');
+  const resultEl = document.getElementById('hebrewResult');
+  const tier = data.score >= 80 ? 'correct' : (data.score >= 50 ? 'partial' : 'incorrect');
+
+  let wordsHtml = "";
+  if(Array.isArray(data.words) && data.words.length){
+    wordsHtml = '<div class="hebrew-word-breakdown">' +
+      data.words.map(w => '<span class="' + (w.match ? 'word-ok' : 'word-miss') + '">' + w.word + '</span>').join(' ') +
+      '</div>';
+  }
+
+  resultEl.className = 'comp-result ' + tier;
+  resultEl.innerHTML =
+    '<span class="comp-badge">' + data.score + '%</span>' +
+    wordsHtml;
+  resultEl.classList.remove('hidden');
+  gradingMsg.textContent = '';
+}
 
 /* ---------- Comprehension grading (computer-graded, no self-rating) ---------- */
 async function gradeComprehensionAttempt(){
@@ -1245,7 +1399,7 @@ async function gradeComprehensionAttempt(){
     const res = await fetch(GRADE_COMPREHENSION_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ posukText: currentPosukText, transcript: comprehensionTranscript })
+      body: JSON.stringify({ posukText: currentPosukText, posukTranslation: currentPosukTranslation, transcript: comprehensionTranscript })
     });
     if(!res.ok) throw new Error('Grading request failed');
     const data = await res.json();
@@ -1281,7 +1435,7 @@ function showComprehensionResult(verdict, feedback){
   comprehensionVerdict = verdict;
   comprehensionFeedback = feedback;
 
-  const badgeText = { correct: '✅ Got it!', partial: '🤔 Almost', incorrect: '💡 Try again' }[verdict] || '';
+  const badgeText = { excellent: '🌟 Excellent!', correct: '✅ Got it!', partial: '🤔 Almost', incorrect: '💡 Try again' }[verdict] || '';
   resultEl.className = 'comp-result ' + verdict;
   resultEl.innerHTML =
     '<span class="comp-badge">' + badgeText + '</span>' +
@@ -1319,6 +1473,7 @@ async function gradeClarificationAttempt(){
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         posukText: currentPosukText,
+        posukTranslation: currentPosukTranslation,
         transcript: comprehensionTranscript,
         clarifyQuestion: clarifyQuestion,
         clarificationTranscript: clarifyTranscript
@@ -1337,9 +1492,14 @@ async function gradeClarificationAttempt(){
 
 function updateSaveButton(){
   // Save is allowed as soon as at least one task has something recorded.
-  // The comprehension task additionally needs a grading verdict back
-  // before it counts as "ready" (there's no self-rating fallback for it).
-  const ready = !!(currentAudio.hebrew || currentAudio.translate || (currentAudio.comprehension && comprehensionVerdict));
+  // The hebrew and comprehension tasks are computer-graded with no
+  // self-rating fallback, so each additionally needs its graded result
+  // back before it counts as "ready".
+  const ready = !!(
+    (currentAudio.hebrew && hebrewScore !== null) ||
+    currentAudio.translate ||
+    (currentAudio.comprehension && comprehensionVerdict)
+  );
   document.getElementById('saveBtn').disabled = !ready;
 }
 
@@ -1373,7 +1533,8 @@ document.getElementById('saveBtn').onclick = async () => {
 
     const record = {
       timestamp: timestamp,
-      posukText: currentPosukText
+      posukText: currentPosukText,
+      posukTranslation: currentPosukTranslation
     };
 
     // Track real upload progress per file so "Saving…" reflects what's
@@ -1405,7 +1566,8 @@ document.getElementById('saveBtn').onclick = async () => {
           .then(() => storage.ref(hebrewPath).getDownloadURL())
           .then(url => {
             record.hebrewAudioURL = url;
-            record.hebrewScore = currentRating.hebrew;
+            record.hebrewScore = hebrewScore;
+            record.hebrewTranscript = hebrewTranscript;
           })
       );
     }
@@ -1442,7 +1604,7 @@ document.getElementById('saveBtn').onclick = async () => {
           .then(url => {
             record.comprehensionAudioURL = url;
             record.comprehensionTranscript = comprehensionTranscript;
-            record.comprehensionVerdict = comprehensionVerdict; // 'correct' | 'partial' | 'incorrect'
+            record.comprehensionVerdict = comprehensionVerdict; // 'excellent' | 'correct' | 'partial' | 'incorrect'
             record.comprehensionFeedback = comprehensionFeedback;
           })
       );
@@ -1511,8 +1673,14 @@ async function loadHistory(){
       const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
       let rowsHtml = `<div class="row"><span>${dateStr}</span><button class="btn ghost-delete attempt-delete-btn">🗑️ Delete</button></div>`;
       if(a.hebrewAudioURL){
+        // Older saved attempts used the 1-10 self-rating slider; newer ones
+        // use the automatic scorer's 0-100 percentage. Tell them apart by
+        // range so old history entries still display correctly.
+        const hebrewScorePill = (typeof a.hebrewScore === 'number' && a.hebrewScore > 10)
+          ? a.hebrewScore + '%'
+          : a.hebrewScore + '/10 · ' + RATING_LABELS[a.hebrewScore - 1];
         rowsHtml += `
-        <div class="row"><span class="label">🎙️ Hebrew reading</span><span class="score-pill">${a.hebrewScore}/10 · ${RATING_LABELS[a.hebrewScore-1]}</span></div>
+        <div class="row"><span class="label">🎙️ Hebrew reading</span><span class="score-pill">${hebrewScorePill}</span></div>
         <div class="row"><audio controls src="${a.hebrewAudioURL}"></audio></div>`;
       }
       if(a.translationAudioURL){
@@ -1521,7 +1689,7 @@ async function loadHistory(){
         <div class="row"><audio controls src="${a.translationAudioURL}"></audio></div>`;
       }
       if(a.comprehensionAudioURL){
-        const verdictLabel = { correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[a.comprehensionVerdict] || a.comprehensionVerdict || '';
+        const verdictLabel = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[a.comprehensionVerdict] || a.comprehensionVerdict || '';
         rowsHtml += `
         <div class="row"><span class="label">🧠 Comprehension</span><span class="score-pill">${verdictLabel}</span></div>
         <div class="row"><audio controls src="${a.comprehensionAudioURL}"></audio></div>`;
