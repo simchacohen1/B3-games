@@ -217,7 +217,7 @@
     </div>
 
     <div class="tabs">
-      <button class="tab-btn active" id="translationTabBtn">🌐 Translation</button>
+      <button class="tab-btn active" id="comprehensionTabBtn">🧠 Comprehension</button>
       <button class="tab-btn" id="readingTabBtn">🎙️ Reading</button>
     </div>
 
@@ -253,10 +253,14 @@ const PARSHA_CONFIG = {
   "Toldos":       [ {num:25, minPosuk:19}, {num:26}, {num:27}, {num:28, maxPosuk:9} ]
 };
 
-const RATING_LABELS = [
-  "Just Starting", "Trying Hard", "Getting There", "Making Progress", "Doing Okay",
-  "Pretty Good", "Really Good", "Great Job", "Excellent", "Perfect!"
-];
+/* Comprehension is graded as a category, not a 1-10 rating, so it gets
+   its own label/tier map instead of RATING_LABELS. */
+const VERDICT_INFO = {
+  excellent: { label: '🌟 Excellent', tier: 'high' },
+  correct:   { label: '✅ Got it',    tier: 'high' },
+  partial:   { label: '🤔 Almost',    tier: 'mid'  },
+  incorrect: { label: '💡 Try again', tier: 'low'  }
+};
 
 /* ---------- Hebrew gematria numerals (mirrors student.html) ---------- */
 const HEB_HUNDREDS = ['','ק','ר','ש','ת'];
@@ -352,7 +356,7 @@ async function getPerekRange(perekNum){
 let studentId = localStorage.getItem('posukPractice_studentId');
 let studentName = localStorage.getItem('posukPractice_studentName');
 
-let activeTab = 'translation'; // 'translation' | 'reading'
+let activeTab = 'comprehension'; // 'comprehension' | 'reading'
 let perekData = {}; // perekNum -> { posukNum -> latestAttemptRecord }
 let expandedState = {}; // perekNum -> bool
 
@@ -366,12 +370,12 @@ window.addEventListener('load', () => {
   loadProgress();
 });
 
-document.getElementById('translationTabBtn').onclick = () => switchTab('translation');
+document.getElementById('comprehensionTabBtn').onclick = () => switchTab('comprehension');
 document.getElementById('readingTabBtn').onclick = () => switchTab('reading');
 
 function switchTab(tab){
   activeTab = tab;
-  document.getElementById('translationTabBtn').classList.toggle('active', tab === 'translation');
+  document.getElementById('comprehensionTabBtn').classList.toggle('active', tab === 'comprehension');
   document.getElementById('readingTabBtn').classList.toggle('active', tab === 'reading');
   renderPerekList();
 }
@@ -433,14 +437,14 @@ async function renderPerekList(){
   }
 }
 
-function scoreTier(score){
-  if(score >= 8) return 'high';
-  if(score >= 5) return 'mid';
+/* hebrewScore is a 0-100 percentage from the automatic reading scorer. */
+function pctTier(score){
+  if(score >= 80) return 'high';
+  if(score >= 50) return 'mid';
   return 'low';
 }
 
 function buildPerekSection(perekNum, range){
-  const scoreField = activeTab === 'translation' ? 'translationScore' : 'hebrewScore';
   const posukScores = perekData[perekNum] || {};
 
   let doneCount = 0;
@@ -465,16 +469,32 @@ function buildPerekSection(perekNum, range){
 
   for(let posukNum = range.min; posukNum <= range.max; posukNum++){
     const record = posukScores[posukNum];
-    const score = record ? record[scoreField] : null;
-    if(score) doneCount++;
+
+    let tier = null;
+    let label = '—';
+    if(activeTab === 'reading'){
+      const score = record ? record.hebrewScore : null;
+      if(typeof score === 'number'){
+        tier = pctTier(score);
+        label = score + '%';
+        doneCount++;
+      }
+    }else{
+      const verdict = record ? record.comprehensionVerdict : null;
+      if(verdict && VERDICT_INFO[verdict]){
+        tier = VERDICT_INFO[verdict].tier;
+        label = VERDICT_INFO[verdict].label;
+        doneCount++;
+      }
+    }
 
     // Tapping a tile takes the student straight to that posuk on the
     // recording page itself, as if they'd picked it from the dropdowns —
     // their existing recording/history is right there ready to review.
     const tile = document.createElement('a');
     tile.href = `student.html?perek=${perekNum}&posuk=${posukNum}`;
-    tile.className = 'posuk-tile ' + (score ? 'tile-' + scoreTier(score) : 'tile-none');
-    tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${score ? RATING_LABELS[score - 1] : '—'}</span>`;
+    tile.className = 'posuk-tile ' + (tier ? 'tile-' + tier : 'tile-none');
+    tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${label}</span>`;
     grid.appendChild(tile);
   }
 

@@ -292,10 +292,13 @@ const db = firebase.database();
    Change this to whatever you'd like. */
 const TEACHER_PASSCODE = "vayeira5786";
 
-const RATING_LABELS = [
-  "Just Starting", "Trying Hard", "Getting There", "Making Progress", "Doing Okay",
-  "Pretty Good", "Really Good", "Great Job", "Excellent", "Perfect!"
-];
+/* Comprehension is graded as a category, not a 1-10 rating. */
+const VERDICT_INFO = {
+  excellent: { label: '🌟 Excellent', tier: 'high' },
+  correct:   { label: '✅ Got it',    tier: 'high' },
+  partial:   { label: '🤔 Almost',    tier: 'mid'  },
+  incorrect: { label: '💡 Try again', tier: 'low'  }
+};
 
 document.getElementById('enterBtn').onclick = () => {
   const val = document.getElementById('passcodeInput').value;
@@ -361,9 +364,10 @@ function hebrewNumeral(num){
   return letters.slice(0, -1) + '״' + letters.slice(-1);
 }
 
-function scoreTier(score){
-  if(score >= 8) return 'high';
-  if(score >= 5) return 'mid';
+/* hebrewScore is a 0-100 percentage from the automatic reading scorer. */
+function pctTier(score){
+  if(score >= 80) return 'high';
+  if(score >= 50) return 'mid';
   return 'low';
 }
 
@@ -517,17 +521,20 @@ async function loadAllAttempts(forceRefresh){
 /* Reduce one student's raw posukMap (posukKey -> attemptId -> {...})
    down to simple stats used by the Roster and Class Stats tabs. */
 function computeStudentStats(posukMap){
-  let scores = [];
+  let hebrewScores = [];
+  let verdictCounts = { excellent: 0, correct: 0, partial: 0, incorrect: 0 };
   let posukCount = 0;
   Object.values(posukMap || {}).forEach(attemptMap => {
     const attempts = Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp);
     const latest = attempts[0];
     posukCount++;
-    if(typeof latest.hebrewScore === 'number') scores.push(latest.hebrewScore);
-    if(typeof latest.translationScore === 'number') scores.push(latest.translationScore);
+    if(typeof latest.hebrewScore === 'number') hebrewScores.push(latest.hebrewScore);
+    if(latest.comprehensionVerdict && verdictCounts.hasOwnProperty(latest.comprehensionVerdict)){
+      verdictCounts[latest.comprehensionVerdict]++;
+    }
   });
-  const avg = scores.length ? scores.reduce((a,b) => a+b, 0) / scores.length : null;
-  return { posukCount, avg };
+  const avg = hebrewScores.length ? hebrewScores.reduce((a,b) => a+b, 0) / hebrewScores.length : null;
+  return { posukCount, avg, verdictCounts };
 }
 
 /* ---------- Class Roster ---------- */
@@ -560,17 +567,24 @@ async function loadRoster(){
     let html = `<h2>Class Roster</h2>
       <table class="roster-table">
         <thead><tr>
-          <th>Student</th><th>Pesukim Recorded</th><th>Avg Score</th><th>Status</th><th>Last Active</th>
+          <th>Student</th><th>Pesukim Recorded</th><th>Avg Reading %</th><th>Comprehension</th><th>Last Active</th>
         </tr></thead><tbody>`;
     rows.forEach(r => {
-      const tier = r.avg === null ? 'none' : scoreTier(r.avg);
+      const tier = r.avg === null ? 'none' : pctTier(r.avg);
       const tierLabel = tier === 'high' ? 'Doing Well' : tier === 'mid' ? 'Making Progress' : tier === 'low' ? 'Needs Support' : 'Not Started';
-      const avgLabel = r.avg === null ? '—' : r.avg.toFixed(1) + '/10';
+      const avgLabel = r.avg === null ? '—' : Math.round(r.avg) + '%';
+      const vc = r.verdictCounts;
+      const compParts = [];
+      if(vc.excellent) compParts.push('🌟' + vc.excellent);
+      if(vc.correct) compParts.push('✅' + vc.correct);
+      if(vc.partial) compParts.push('🤔' + vc.partial);
+      if(vc.incorrect) compParts.push('💡' + vc.incorrect);
+      const compLabel = compParts.length ? compParts.join(' ') : '—';
       html += `<tr class="roster-row" data-id="${r.id}">
         <td class="rname">${r.name}</td>
         <td>${r.posukCount}</td>
         <td>${avgLabel}</td>
-        <td><span class="status-pill ${tier}">${tierLabel}</span></td>
+        <td><span class="status-pill ${tier}">${tierLabel}</span> <span style="margin-left:6px;">${compLabel}</span></td>
         <td>${r.lastActive}</td>
       </tr>`;
     });
@@ -591,7 +605,7 @@ async function loadRoster(){
   }
 }
 
-let studentActiveTab = 'translation'; // 'translation' | 'reading', for the currently-viewed student
+let studentActiveTab = 'comprehension'; // 'comprehension' | 'reading', for the currently-viewed student
 let studentPosukData = {}; // posukKey -> { attempts, latest } for the currently-viewed student
 let studentPerekData = {}; // perekNum -> posukNum -> posukKey, for the currently-viewed student
 let selectedPosukKey = null;
@@ -633,13 +647,13 @@ async function selectStudent(id, name, el){
       <div class="student-head">
         <h2>${name}</h2>
         <div class="mini-tabs">
-          <button class="mini-tab-btn ${studentActiveTab==='translation'?'active':''}" id="studentTranslationBtn">🌐 Translation</button>
+          <button class="mini-tab-btn ${studentActiveTab==='comprehension'?'active':''}" id="studentComprehensionBtn">🧠 Comprehension</button>
           <button class="mini-tab-btn ${studentActiveTab==='reading'?'active':''}" id="studentReadingBtn">🎙️ Reading</button>
         </div>
       </div>
       <div id="studentGridWrap"></div>
       <div id="posukDetail"></div>`;
-    document.getElementById('studentTranslationBtn').onclick = () => { studentActiveTab = 'translation'; renderStudentGrid(); };
+    document.getElementById('studentComprehensionBtn').onclick = () => { studentActiveTab = 'comprehension'; renderStudentGrid(); };
     document.getElementById('studentReadingBtn').onclick = () => { studentActiveTab = 'reading'; renderStudentGrid(); };
 
     await renderStudentGrid();
@@ -652,12 +666,11 @@ async function selectStudent(id, name, el){
 
 async function renderStudentGrid(){
   document.querySelectorAll('.mini-tab-btn').forEach(b => b.classList.remove('active'));
-  const btn = document.getElementById(studentActiveTab === 'translation' ? 'studentTranslationBtn' : 'studentReadingBtn');
+  const btn = document.getElementById(studentActiveTab === 'comprehension' ? 'studentComprehensionBtn' : 'studentReadingBtn');
   if(btn) btn.classList.add('active');
 
   const wrap = document.getElementById('studentGridWrap');
   wrap.innerHTML = '';
-  const scoreField = studentActiveTab === 'translation' ? 'translationScore' : 'hebrewScore';
   const perekNums = Object.keys(studentPerekData).map(Number).sort((a,b) => a - b);
 
   if(perekNums.length === 0){
@@ -680,12 +693,28 @@ async function renderStudentGrid(){
     for(let posukNum = range.min; posukNum <= range.max; posukNum++){
       const posukKey = posuksThisPerek[posukNum];
       const record = posukKey ? studentPosukData[posukKey].latest : null;
-      const score = record ? record[scoreField] : null;
-      if(score) doneCount++;
+
+      let tier = null;
+      let tileLabel = '—';
+      if(studentActiveTab === 'reading'){
+        const score = record ? record.hebrewScore : null;
+        if(typeof score === 'number'){
+          tier = pctTier(score);
+          tileLabel = score + '%';
+          doneCount++;
+        }
+      }else{
+        const verdict = record ? record.comprehensionVerdict : null;
+        if(verdict && VERDICT_INFO[verdict]){
+          tier = VERDICT_INFO[verdict].tier;
+          tileLabel = VERDICT_INFO[verdict].label;
+          doneCount++;
+        }
+      }
 
       const tile = document.createElement('div');
-      tile.className = 'posuk-tile ' + (score ? 'tile-' + scoreTier(score) : 'tile-none') + (posukKey === selectedPosukKey ? ' selected' : '');
-      tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${score ? RATING_LABELS[score - 1] : '—'}</span>`;
+      tile.className = 'posuk-tile ' + (tier ? 'tile-' + tier : 'tile-none') + (posukKey === selectedPosukKey ? ' selected' : '');
+      tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${tileLabel}</span>`;
       if(posukKey){
         tile.onclick = () => { selectedPosukKey = posukKey; renderStudentGrid(); renderPosukDetail(posukKey); };
       }
@@ -711,15 +740,19 @@ function renderPosukDetail(posukKey){
     let lines = `<div class="top-line"><strong>${dateStr}</strong></div>`;
     if(a.hebrewAudioURL){
       lines += `<div class="top-line">
-        <span>🎙️ Hebrew reading — <span class="score-pill">${a.hebrewScore}/10 · ${RATING_LABELS[a.hebrewScore-1]}</span></span>
+        <span>🎙️ Hebrew reading — <span class="score-pill">${a.hebrewScore}%</span></span>
         <audio controls src="${a.hebrewAudioURL}"></audio>
       </div>`;
     }
-    if(a.translationAudioURL){
+    if(a.comprehensionAudioURL){
+      const vi = VERDICT_INFO[a.comprehensionVerdict] || { label: a.comprehensionVerdict || '' };
       lines += `<div class="top-line">
-        <span>🌐 Translation — <span class="score-pill">${a.translationScore}/10 · ${RATING_LABELS[a.translationScore-1]}</span></span>
-        <audio controls src="${a.translationAudioURL}"></audio>
+        <span>🧠 Comprehension — <span class="score-pill">${vi.label}</span></span>
+        <audio controls src="${a.comprehensionAudioURL}"></audio>
       </div>`;
+      if(a.comprehensionFeedback){
+        lines += `<div class="summary-meta" style="margin-top:2px;">${a.comprehensionFeedback}</div>`;
+      }
     }
     html += `<div class="attempt-row">${lines}</div>`;
   });
@@ -755,7 +788,7 @@ function sortPosukKeys(keys){
 }
 
 /* ---------- Class Summary ---------- */
-let classActiveSkill = 'translation'; // 'translation' | 'reading' -- one global toggle for the whole tab
+let classActiveSkill = 'comprehension'; // 'comprehension' | 'reading' -- one global toggle for the whole tab
 let expandedPerekNum = null; // only one perek open (accordion) at a time; null = all collapsed
 let lastAttemptsVal = null; // cached attempts tree so toggling skill/expand doesn't need a re-fetch
 
@@ -772,13 +805,13 @@ async function loadClassSummary(){
 
     let html = '<h2>Class Stats</h2>';
     html += `<div class="mini-tabs" style="margin-bottom:6px;">
-      <button class="mini-tab-btn ${classActiveSkill==='translation'?'active':''}" id="classTranslationBtn">🌐 Translation</button>
+      <button class="mini-tab-btn ${classActiveSkill==='comprehension'?'active':''}" id="classComprehensionBtn">🧠 Comprehension</button>
       <button class="mini-tab-btn ${classActiveSkill==='reading'?'active':''}" id="classReadingBtn">🎙️ Reading</button>
     </div>`;
     html += `<div id="classPosukGridWrap"></div>`;
     mainEl.innerHTML = html;
 
-    document.getElementById('classTranslationBtn').onclick = () => { classActiveSkill = 'translation'; renderClassPosukGrid(lastAttemptsVal); };
+    document.getElementById('classComprehensionBtn').onclick = () => { classActiveSkill = 'comprehension'; renderClassPosukGrid(lastAttemptsVal); };
     document.getElementById('classReadingBtn').onclick = () => { classActiveSkill = 'reading'; renderClassPosukGrid(lastAttemptsVal); };
 
     await renderClassPosukGrid(val);
@@ -791,6 +824,33 @@ async function loadClassSummary(){
 let classPosukData = {}; // posukKey -> { doneList, notDoneList, posukText } for the currently active skill
 let selectedClassPosukKey = null;
 
+/* Returns { tier, label } for a given attempt record + active skill, or
+   null if that skill wasn't attempted on this record. Reading is a 0-100
+   percentage; comprehension is a category (excellent/correct/partial/
+   incorrect), so it needs its own tier mapping rather than an average. */
+function skillInfo(record, skill){
+  if(!record) return null;
+  if(skill === 'reading'){
+    if(typeof record.hebrewScore !== 'number') return null;
+    return { tier: pctTier(record.hebrewScore), label: record.hebrewScore + '%' };
+  }
+  const v = record.comprehensionVerdict;
+  if(!v || !VERDICT_INFO[v]) return null;
+  return { tier: VERDICT_INFO[v].tier, label: VERDICT_INFO[v].label };
+}
+
+/* For a class-wide tile, there's no single "average" verdict, so we color
+   the tile by whichever tier most of the class landed in (ties favor the
+   more cautious/lower tier, so a struggling half isn't masked). */
+function majorityTier(tiers){
+  if(!tiers.length) return null;
+  const counts = { high: 0, mid: 0, low: 0 };
+  tiers.forEach(t => counts[t]++);
+  if(counts.low >= counts.mid && counts.low >= counts.high) return 'low';
+  if(counts.mid >= counts.high) return 'mid';
+  return 'high';
+}
+
 async function renderClassPosukGrid(val){
   const wrap = document.getElementById('classPosukGridWrap');
   if(!wrap) return;
@@ -801,8 +861,7 @@ async function renderClassPosukGrid(val){
     wrap.innerHTML = '<div class="empty-msg">No students yet.</div>';
     return;
   }
-  const scoreField = classActiveSkill === 'translation' ? 'translationScore' : 'hebrewScore';
-  const audioField = classActiveSkill === 'translation' ? 'translationAudioURL' : 'hebrewAudioURL';
+  const audioField = classActiveSkill === 'reading' ? 'hebrewAudioURL' : 'comprehensionAudioURL';
 
   const perekNums = getAllPerekNums();
   for(const perekNum of perekNums){
@@ -841,7 +900,7 @@ async function renderClassPosukGrid(val){
           const attemptMap = val[studentId] && val[studentId][posukKey];
           if(attemptMap){
             const attempts = Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp);
-            const latest = attempts.find(a => typeof a[scoreField] === 'number') || null;
+            const latest = attempts.find(a => skillInfo(a, classActiveSkill)) || null;
             if(latest){
               doneList.push({ studentId, name, latest });
               if(!posukText && latest.posukText) posukText = latest.posukText;
@@ -855,13 +914,13 @@ async function renderClassPosukGrid(val){
 
         if(doneList.length) perekStarted++;
 
-        const scores = doneList.map(d => d.latest[scoreField]).filter(s => typeof s === 'number');
-        const avg = scores.length ? scores.reduce((a,b) => a+b, 0) / scores.length : null;
+        const tiers = doneList.map(d => skillInfo(d.latest, classActiveSkill).tier);
+        const overallTier = majorityTier(tiers);
 
         classPosukData[posukKey] = { doneList, notDoneList, posukText };
 
         const tile = document.createElement('div');
-        tile.className = 'posuk-tile ' + (avg !== null ? 'tile-' + scoreTier(avg) : 'tile-none') + (posukKey === selectedClassPosukKey ? ' selected' : '');
+        tile.className = 'posuk-tile ' + (overallTier !== null ? 'tile-' + overallTier : 'tile-none') + (posukKey === selectedClassPosukKey ? ' selected' : '');
         tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${doneList.length}/${totalStudents}</span>`;
         tile.onclick = () => {
           const prevSelected = grid.querySelector('.posuk-tile.selected');
@@ -882,7 +941,7 @@ async function renderClassPosukGrid(val){
         const posukKey = `${slug}_${perekNum}_${posukNum}`;
         const started = Object.keys(studentsMap).some(studentId => {
           const attemptMap = val[studentId] && val[studentId][posukKey];
-          return attemptMap && Object.values(attemptMap).some(a => typeof a[scoreField] === 'number');
+          return attemptMap && Object.values(attemptMap).some(a => skillInfo(a, classActiveSkill));
         });
         if(started) perekStarted++;
       }
@@ -910,10 +969,9 @@ function renderClassPosukDetail(posukKey, bodyEl){
   const doneCount = data.doneList.length;
   const notDoneCount = total - doneCount;
   const refLabel = formatRefLabel(posukKey);
-  const skillLabel = classActiveSkill === 'translation' ? '🌐 Translation' : '🎙️ Reading';
-  const audioField = classActiveSkill === 'translation' ? 'translationAudioURL' : 'hebrewAudioURL';
-  const scoreField = classActiveSkill === 'translation' ? 'translationScore' : 'hebrewScore';
-  const durKey = classActiveSkill === 'translation' ? 'tr' : 'heb';
+  const skillLabel = classActiveSkill === 'reading' ? '🎙️ Reading' : '🧠 Comprehension';
+  const audioField = classActiveSkill === 'reading' ? 'hebrewAudioURL' : 'comprehensionAudioURL';
+  const durKey = classActiveSkill === 'reading' ? 'heb' : 'comp';
 
   let html = `<div class="posuk-group">
     <h3>${refLabel} — ${skillLabel}</h3>
@@ -928,10 +986,14 @@ function renderClassPosukDetail(posukKey, bodyEl){
       const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
       let lines = `<div class="top-line"><strong>${entry.name}</strong><span class="summary-meta">${dateStr}</span></div>`;
       if(a[audioField]){
+        const info = skillInfo(a, classActiveSkill);
         lines += `<div class="top-line">
-          <span>${skillLabel} — <span class="score-pill">${a[scoreField]}/10 · ${RATING_LABELS[a[scoreField]-1]}</span> <span class="dur" id="dur_${entry.studentId}_${durKey}">⏱ …</span></span>
+          <span>${skillLabel} — <span class="score-pill">${info ? info.label : '—'}</span> <span class="dur" id="dur_${entry.studentId}_${durKey}">⏱ …</span></span>
           <audio controls src="${a[audioField]}"></audio>
         </div>`;
+        if(classActiveSkill === 'comprehension' && a.comprehensionFeedback){
+          lines += `<div class="summary-meta" style="margin-top:2px;">${a.comprehensionFeedback}</div>`;
+        }
       }
       html += `<div class="attempt-row">${lines}</div>`;
     });
