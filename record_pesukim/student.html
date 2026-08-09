@@ -1145,6 +1145,7 @@ function resetScroll(){
 }
 
 function showPosuk(parsha, perekNum, posukNum, text, translation){
+  text = stripMeteg(text); // remove before storing/displaying so it can't visually fuse with an adjacent vowel
   currentPosukKey = parsha.replace(/\s+/g,'') + '_' + perekNum + '_' + posukNum;
   currentPosukNum = posukNum;
   currentPerekNum = perekNum;
