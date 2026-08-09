@@ -746,7 +746,16 @@ async function selectStudent(id, name, el){
     const snap = await db.ref('posukPractice/attempts/' + id).once('value');
     const val = snap.val();
     if(!val){
-      mainEl.innerHTML = '<h2>' + name + '</h2><div class="empty-msg">No recordings yet.</div>';
+      mainEl.innerHTML = `
+        <div class="student-head">
+          <h2>${name}</h2>
+          <div class="mini-tabs">
+            <button class="btn small" id="resetStudentBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">↩️ Reset Progress</button>
+            <button class="btn small" id="removeStudentBtn" style="background:#8a3a3a;box-shadow:0 4px 0 #5c2626;">🗑️ Remove Student</button>
+          </div>
+        </div>
+        <div class="empty-msg">No recordings yet.</div>`;
+      wireStudentAdminButtons(id, name);
       return;
     }
 
@@ -772,18 +781,69 @@ async function selectStudent(id, name, el){
         <div class="mini-tabs">
           <button class="mini-tab-btn ${studentActiveTab==='comprehension'?'active':''}" id="studentComprehensionBtn">🧠 Comprehension</button>
           <button class="mini-tab-btn ${studentActiveTab==='reading'?'active':''}" id="studentReadingBtn">🎙️ Reading</button>
+          <button class="btn small" id="resetStudentBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">↩️ Reset Progress</button>
+          <button class="btn small" id="removeStudentBtn" style="background:#8a3a3a;box-shadow:0 4px 0 #5c2626;">🗑️ Remove Student</button>
         </div>
       </div>
       <div id="studentGridWrap"></div>
       <div id="posukDetail"></div>`;
     document.getElementById('studentComprehensionBtn').onclick = () => { studentActiveTab = 'comprehension'; renderStudentGrid(); };
     document.getElementById('studentReadingBtn').onclick = () => { studentActiveTab = 'reading'; renderStudentGrid(); };
+    wireStudentAdminButtons(id, name);
 
     await renderStudentGrid();
     if(selectedPosukKey) renderPosukDetail(selectedPosukKey);
   }catch(err){
     mainEl.innerHTML = '<div class="empty-msg">Could not load this student\'s recordings.</div>';
     console.error(err);
+  }
+}
+
+// Wires up the Remove/Reset buttons shown in a student's detail view.
+// Kept separate from selectStudent since it's called from two different
+// innerHTML branches (has-recordings and no-recordings-yet).
+function wireStudentAdminButtons(id, name){
+  const resetBtn = document.getElementById('resetStudentBtn');
+  const removeBtn = document.getElementById('removeStudentBtn');
+  if(resetBtn) resetBtn.onclick = () => resetStudentProgress(id, name);
+  if(removeBtn) removeBtn.onclick = () => removeStudentEntirely(id, name);
+}
+
+// Clears a student's recordings/scores but leaves them as an approved
+// student, so they can start over from scratch without needing to be
+// re-added to the roster.
+async function resetStudentProgress(id, name){
+  if(!confirm(`Reset all progress for ${name}? This deletes their recordings and scores but keeps them as an approved student.`)) return;
+  try{
+    await db.ref('posukPractice/attempts/' + id).remove();
+    alert(`${name}'s progress has been reset.`);
+    selectStudent(id, name, document.querySelector(`.student-item[data-id="${id}"]`) || document.createElement('div'));
+  }catch(e){
+    console.error(e);
+    alert('Could not reset progress. Please try again.');
+  }
+}
+
+// Fully removes a student: their entry in the students list, all their
+// attempts/recordings, AND their spot on the approved-names list (so they'd
+// need to be re-added before they could log back in under that name).
+async function removeStudentEntirely(id, name){
+  if(!confirm(`Remove ${name} completely? This deletes their recordings, scores, and approval to log in. This can't be undone.`)) return;
+  try{
+    await Promise.all([
+      db.ref('posukPractice/students/' + id).remove(),
+      db.ref('posukPractice/attempts/' + id).remove(),
+      db.ref('posukPractice/allowedStudents/' + id).remove()
+    ]);
+    delete studentsMap[id];
+    delete studentsInfo[id];
+    activeStudentId = null;
+    document.getElementById('mainContent').innerHTML = '<div class="empty-msg">Select a student to view their practice history.</div>';
+    loadStudents();
+    alert(`${name} has been removed.`);
+  }catch(e){
+    console.error(e);
+    alert('Could not remove student. Please try again.');
   }
 }
 
