@@ -685,45 +685,6 @@ function speakTextBrowserFallback(text){
   }catch(e){ console.error('Speech synthesis error:', e); }
 }
 
-/* ---------- Speech recognition (comprehension task only) ----------
-   Runs alongside the audio recording so we get English text of what the
-   student said, which is what gets graded. Chrome/Edge support this well;
-   Safari/Firefox support is limited, so we degrade gracefully if it's
-   missing (see startSpeechRecognition). */
-const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-let speechRecognizer = null;
-let speechRecognitionSupported = !!SpeechRecognitionAPI;
-
-function startSpeechRecognition(targetType){
-  // targetType: 'comprehension' | 'clarify' — decides which transcript
-  // variable gets filled in as results come in.
-  if(targetType === 'clarify'){ clarifyTranscript = ""; }
-  else { comprehensionTranscript = ""; }
-  if(!speechRecognitionSupported) return;
-  speechRecognizer = new SpeechRecognitionAPI();
-  speechRecognizer.lang = 'en-US';
-  speechRecognizer.continuous = true;
-  speechRecognizer.interimResults = false;
-  speechRecognizer.onresult = (event) => {
-    let finalText = '';
-    for(let i = 0; i < event.results.length; i++){
-      finalText += event.results[i][0].transcript + ' ';
-    }
-    if(targetType === 'clarify'){ clarifyTranscript = finalText.trim(); }
-    else { comprehensionTranscript = finalText.trim(); }
-  };
-  speechRecognizer.onerror = (e) => {
-    console.error('Speech recognition error:', e.error);
-  };
-  try{ speechRecognizer.start(); }catch(e){ console.error(e); }
-}
-
-function stopSpeechRecognition(){
-  if(speechRecognizer){
-    try{ speechRecognizer.stop(); }catch(e){}
-  }
-}
-
 /* ---------- Name gate ---------- */
 function slugify(name){
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
@@ -1387,15 +1348,6 @@ async function toggleRecording(type, btnEl){
     btnEl.textContent = '⏹️';
     document.getElementById(type + 'Status').textContent = 'Recording…';
 
-    if(type === 'comprehension' || type === 'clarify'){
-      startSpeechRecognition(type);
-      if(!speechRecognitionSupported){
-        const msgTarget = type === 'clarify' ? 'clarifyStatus' : 'comprehensionGradingMsg';
-        document.getElementById(msgTarget).textContent =
-          "This browser can't turn speech into text — try Chrome for this task.";
-      }
-    }
-
     mediaRecorder.ondataavailable = e => recordingChunks.push(e.data);
     mediaRecorder.onstop = () => {
       const blob = new Blob(recordingChunks, { type:'audio/webm' });
@@ -1411,15 +1363,11 @@ async function toggleRecording(type, btnEl){
       stream.getTracks().forEach(t => t.stop());
 
       if(type === 'comprehension'){
-        stopSpeechRecognition();
-        document.getElementById(type + 'Status').textContent = 'Recorded';
-        // Give the recognizer a beat to fire its final onresult callback
-        // before we grab the transcript and send it off for grading.
-        setTimeout(() => gradeComprehensionAttempt(), 400);
+        document.getElementById(type + 'Status').textContent = 'Recorded — listening…';
+        gradeComprehensionAttempt();
       } else if(type === 'clarify'){
-        stopSpeechRecognition();
-        document.getElementById(type + 'Status').textContent = 'Recorded — checking…';
-        setTimeout(() => gradeClarificationAttempt(), 400);
+        document.getElementById(type + 'Status').textContent = 'Recorded — listening…';
+        gradeClarificationAttempt();
       } else if(type === 'hebrew'){
         document.getElementById(type + 'Status').textContent = 'Recorded — scoring…';
         scoreHebrewReading();
@@ -1494,7 +1442,10 @@ function showHebrewResult(data){
   gradingMsg.textContent = '';
 }
 
-/* ---------- Comprehension grading (computer-graded, no self-rating) ---------- */
+/* ---------- Comprehension grading (computer-graded, no self-rating) ----------
+   The recording is uploaded as-is; the Cloud Function transcribes it
+   server-side (Google Speech-to-Text, boosted for Chumash names) and
+   grades it in one round trip. */
 async function gradeComprehensionAttempt(){
   const gradingMsg = document.getElementById('comprehensionGradingMsg');
   const resultEl = document.getElementById('comprehensionResult');
@@ -1502,34 +1453,38 @@ async function gradeComprehensionAttempt(){
   comprehensionVerdict = null;
   comprehensionFeedback = "";
 
-  if(!comprehensionTranscript){
-    gradingMsg.textContent = speechRecognitionSupported
-      ? "Didn't catch that — try recording again, a little closer to the mic."
-      : "This browser can't turn speech into text — try Chrome for this task.";
-    return;
-  }
+  if(!currentAudio.comprehension) return;
 
   if(!GRADE_COMPREHENSION_URL || GRADE_COMPREHENSION_URL.indexOf('PASTE') === 0){
     gradingMsg.textContent = "Grading isn't set up yet (Cloud Function URL missing).";
     return;
   }
 
-  gradingMsg.textContent = 'Checking your answer…';
+  gradingMsg.textContent = 'Listening to your answer…';
   document.getElementById('comprehensionStatus').textContent = 'Recorded — grading…';
 
   try{
-    const res = await fetch(GRADE_COMPREHENSION_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ posukText: currentPosukText, posukTranslation: currentPosukTranslation, transcript: comprehensionTranscript })
-    });
+    const formData = new FormData();
+    formData.append('audio', currentAudio.comprehension, 'recording.webm');
+    formData.append('posukText', currentPosukText || '');
+    formData.append('posukTranslation', currentPosukTranslation || '');
+
+    const res = await fetch(GRADE_COMPREHENSION_URL, { method: 'POST', body: formData });
     if(!res.ok) throw new Error('Grading request failed');
     const data = await res.json();
+
+    if(data.verdict === 'no_speech'){
+      gradingMsg.textContent = "Didn't catch that — try recording again, a little closer to the mic.";
+      document.getElementById('comprehensionStatus').textContent = 'Recorded';
+      return;
+    }
+
+    comprehensionTranscript = data.transcript || "";
 
     if(data.verdict === 'unsure'){
       // AI couldn't tell yet — show its follow-up question and let the
       // student record a spoken answer. comprehensionVerdict stays null,
-      // so Save stays disabled until gradeClarificationAttempt() settles it.
+      // so nothing autosaves until gradeClarificationAttempt() settles it.
       clarifyQuestion = data.clarifyQuestion || '';
       document.getElementById('clarifyQuestionText').textContent = clarifyQuestion;
       document.getElementById('clarifyBox').classList.remove('hidden');
@@ -1572,35 +1527,36 @@ async function showComprehensionResult(verdict, feedback){
 }
 
 /* ---------- Clarify follow-up grading (second pass) ----------
-   Sends the original transcript + the clarifying question + the
-   student's spoken answer back to the same Cloud Function, which must
-   commit to a final correct/partial/incorrect verdict this time. */
+   Uploads the clarify recording along with the original transcript (from
+   the first pass) and the clarifying question; the Cloud Function
+   transcribes the new audio and must commit to a final
+   correct/partial/incorrect verdict this time. */
 async function gradeClarificationAttempt(){
   const clarifyStatus = document.getElementById('clarifyStatus');
 
-  if(!clarifyTranscript){
-    clarifyStatus.textContent = speechRecognitionSupported
-      ? "Didn't catch that — try recording again, a little closer to the mic."
-      : "This browser can't turn speech into text — try Chrome for this task.";
-    return;
-  }
+  if(!currentAudio.clarify) return;
 
-  clarifyStatus.textContent = 'Checking your answer…';
+  clarifyStatus.textContent = 'Listening to your answer…';
 
   try{
-    const res = await fetch(GRADE_COMPREHENSION_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        posukText: currentPosukText,
-        posukTranslation: currentPosukTranslation,
-        transcript: comprehensionTranscript,
-        clarifyQuestion: clarifyQuestion,
-        clarificationTranscript: clarifyTranscript
-      })
-    });
+    const formData = new FormData();
+    formData.append('audio', currentAudio.clarify, 'recording.webm');
+    formData.append('posukText', currentPosukText || '');
+    formData.append('posukTranslation', currentPosukTranslation || '');
+    formData.append('mode', 'clarify');
+    formData.append('originalTranscript', comprehensionTranscript || '');
+    formData.append('clarifyQuestion', clarifyQuestion || '');
+
+    const res = await fetch(GRADE_COMPREHENSION_URL, { method: 'POST', body: formData });
     if(!res.ok) throw new Error('Grading request failed');
     const data = await res.json();
+
+    if(data.verdict === 'no_speech'){
+      clarifyStatus.textContent = "Didn't catch that — try recording again, a little closer to the mic.";
+      return;
+    }
+
+    clarifyTranscript = data.transcript || "";
     clarifyStatus.textContent = 'Recorded';
     await showComprehensionResult(data.verdict, data.feedback || '');
   }catch(err){
