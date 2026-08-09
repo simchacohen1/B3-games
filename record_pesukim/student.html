@@ -599,6 +599,7 @@ let comprehensionSavedStoragePath = null;
 let clarifySavedStoragePath = null;
 let currentPosukKey = null; // "Parsha_perek_posuk"
 let currentPosukNum = null; // plain verse number (e.g. 1, 2, 3…), what the scorer expects
+let currentPerekNum = null; // perek number — needed alongside posuk since posuk numbers repeat across perakim
 let currentPosukText = "";
 let currentPosukTranslation = ""; // accepted English translation, used as the grading "answer key"
 let mediaRecorder = null;
@@ -1077,6 +1078,7 @@ function resetScroll(){
 function showPosuk(parsha, perekNum, posukNum, text, translation){
   currentPosukKey = parsha.replace(/\s+/g,'') + '_' + perekNum + '_' + posukNum;
   currentPosukNum = posukNum;
+  currentPerekNum = perekNum;
   currentPosukText = text;
   currentPosukTranslation = translation || "";
   document.getElementById('scrollPlaceholder').classList.add('hidden');
@@ -1413,6 +1415,7 @@ async function scoreHebrewReading(){
 
   const formData = new FormData();
   formData.append("name", studentName || "student");
+  formData.append("perek", currentPerekNum || "");
   formData.append("posuk", currentPosukNum || "");
   formData.append("posukText", currentPosukText);
   formData.append("audio", currentAudio.hebrew, "recording.webm");
