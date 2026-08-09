@@ -182,52 +182,41 @@
     color: var(--ink-soft);
   }
 
-  .rating-scale{
-    margin-top:14px;
+  .task-tabs{
+    display:flex; gap:8px;
+    margin-bottom:14px;
   }
-  .rating-slider-label{
-    text-align:center;
+  .tab-btn{
+    flex:1;
     font-family:'Quicksand', sans-serif;
     font-weight:700;
-    font-size: 1rem;
-    color: var(--ink);
-    margin-bottom: 8px;
+    font-size:0.92rem;
+    padding:12px 10px;
+    border-radius:12px;
+    border:2px solid var(--ink-soft);
+    background:#fff;
+    color:var(--ink-soft);
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:6px;
   }
-  .rating-slider-label .num{
+  .tab-btn.active{
+    border-color: var(--rimon);
     color: var(--rimon-dark);
+    background: var(--parchment);
+    box-shadow: 0 3px 0 var(--gold);
   }
-  .rating-slider{
-    -webkit-appearance:none;
-    appearance:none;
-    width: 100%;
-    height: 10px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, #e2c67a, var(--gold) 50%, var(--rimon) 100%);
-    outline:none;
-    cursor:pointer;
-  }
-  .rating-slider::-webkit-slider-thumb{
-    -webkit-appearance:none;
-    appearance:none;
-    width: 30px; height:30px;
-    border-radius:50%;
-    background: radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold) 60%, #97781a 100%);
-    border: 2px solid #fff;
-    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-    cursor:pointer;
-  }
-  .rating-slider::-moz-range-thumb{
-    width: 30px; height:30px;
-    border-radius:50%;
-    background: radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold) 60%, #97781a 100%);
-    border: 2px solid #fff;
-    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-    cursor:pointer;
-  }
-  .rating-slider:disabled{ cursor:not-allowed; opacity:0.45; }
-  .rating-scale-ticks{
-    display:flex; justify-content:space-between;
-    font-size:0.65rem; color: var(--ink-soft); margin-top:4px; padding: 0 2px;
+  .tab-check{ font-size:0.9rem; }
+
+  .nudge-banner{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    flex-wrap:wrap;
+    background:#FBF0D9;
+    border:2px solid var(--gold);
+    border-radius:12px;
+    padding:12px 16px;
+    margin-bottom:16px;
+    font-weight:600;
+    color:var(--ink);
   }
 
   .comp-status{
@@ -371,8 +360,23 @@
 
     <div id="recordingArea" class="hidden">
 
+      <!-- Tab switcher: only one task shown at a time. Each recording is
+           graded and saved automatically — there is no separate "Save"
+           step. A checkmark appears on a tab once that task has been
+           completed and saved for this posuk. -->
+      <div class="task-tabs">
+        <button class="tab-btn active" id="tabReadingBtn">1️⃣ Read the Hebrew <span class="tab-check hidden" id="readingCheck">✅</span></button>
+        <button class="tab-btn" id="tabComprehensionBtn">🧠 Show You Understand <span class="tab-check hidden" id="comprehensionCheck">✅</span></button>
+      </div>
+
+      <!-- Reminder to try the other task, shown after one is saved. -->
+      <div class="nudge-banner hidden" id="nudgeBanner">
+        <span id="nudgeText"></span>
+        <button class="btn small gold" id="nudgeSwitchBtn">Switch</button>
+      </div>
+
       <!-- Hebrew reading task (computer-graded, same scorer as Kol Emes) -->
-      <div class="task-card">
+      <div class="task-card" id="readingPanel">
         <h3>1️⃣ Read the Hebrew Words</h3>
         <div class="record-row">
           <button class="seal-btn" id="hebrewRecordBtn" title="Record">🎙️</button>
@@ -384,21 +388,9 @@
         <div class="comp-result hidden" id="hebrewResult"></div>
       </div>
 
-      <!-- Reading + translation task -->
-      <div class="task-card translate">
-        <h3>2️⃣ Read &amp; Translate the Posuk</h3>
-        <div class="record-row">
-          <button class="seal-btn" id="translateRecordBtn" title="Record">🎙️</button>
-          <audio id="translateAudioPlayback" controls class="hidden"></audio>
-          <button class="btn ghost-delete hidden" id="translateDeleteBtn" title="Delete this recording">🗑️ Delete</button>
-          <span class="status-tag" id="translateStatus">Not recorded yet</span>
-        </div>
-        <div class="rating-scale" id="translateRating"></div>
-      </div>
-
       <!-- Comprehension check (computer-graded) -->
-      <div class="task-card comprehension">
-        <h3>3️⃣ Show You Understand</h3>
+      <div class="task-card comprehension hidden" id="comprehensionPanel">
+        <h3>🧠 Show You Understand</h3>
         <p style="margin:0 0 10px;color:var(--ink-soft);font-size:0.9rem;">In your own words, say what is happening in this posuk. Don't worry about exact words — just explain it like you'd tell a friend!</p>
         <div class="record-row">
           <button class="seal-btn" id="comprehensionRecordBtn" title="Record">🎙️</button>
@@ -428,9 +420,7 @@
       </div>
 
       <div class="save-row">
-        <button class="btn" id="saveBtn" disabled>💾 Save This Attempt</button>
-        <button class="btn gold hidden" id="nextPosukBtn" style="margin-left:8px;">▶️ Next Posuk</button>
-        <div class="msg" id="saveMsg"></div>
+        <button class="btn gold hidden" id="nextPosukBtn">▶️ Next Posuk</button>
       </div>
 
       <div class="history">
@@ -572,8 +562,7 @@ function hebrewNumeral(num){
 
 let studentId = null;
 let studentName = null;
-let currentAudio = { hebrew: null, translate: null, comprehension: null, clarify: null };
-let currentRating = { hebrew: null, translate: null };
+let currentAudio = { hebrew: null, comprehension: null, clarify: null };
 let hebrewScore = null;            // percentage from the Kol Emes scorer, 0-100
 let hebrewTranscript = "";         // what the scorer heard, for the history view
 let comprehensionTranscript = "";
@@ -581,6 +570,22 @@ let comprehensionVerdict = null;   // 'excellent' | 'correct' | 'partial' | 'inc
 let comprehensionFeedback = "";
 let clarifyQuestion = "";          // set when the grader comes back "unsure"
 let clarifyTranscript = "";        // student's spoken answer to clarifyQuestion
+
+/* ---------- Tabs (one task visible at a time) ---------- */
+let activeTab = 'reading'; // 'reading' | 'comprehension'
+
+/* ---------- Autosave tracking ----------
+   Each task is graded and saved automatically the moment grading
+   finishes — there's no manual "Save" step anymore. Both tasks for the
+   same posuk-visit share one attempt record in the database, created
+   the moment the first task finishes; the second task's autosave just
+   adds its fields onto that same record. */
+let currentAttemptRef = null;
+let currentAttemptId = null;
+let attemptSaved = { hebrew: false, comprehension: false };
+let hebrewSavedStoragePath = null;
+let comprehensionSavedStoragePath = null;
+let clarifySavedStoragePath = null;
 let currentPosukKey = null; // "Parsha_perek_posuk"
 let currentPosukNum = null; // plain verse number (e.g. 1, 2, 3…), what the scorer expects
 let currentPosukText = "";
@@ -888,7 +893,7 @@ document.getElementById('nextPosukBtn').onclick = async () => {
     }
 
     // 3) Genuinely at the very last posuk of the very last perek.
-    document.getElementById('saveMsg').textContent = "🎉 You've finished all the pesukim!";
+    document.getElementById('fetchMsg').textContent = "🎉 You've finished all the pesukim!";
     nextBtn.classList.add('hidden');
   }catch(err){
     document.getElementById('fetchMsg').textContent = 'Could not load the next posuk.';
@@ -1112,39 +1117,35 @@ function showPosuk(parsha, perekNum, posukNum, text, translation){
   loadHistory();
 }
 
-/* ---------- Rating scale builder (slider) ---------- */
-function buildRatingScale(containerId, type){
-  const container = document.getElementById(containerId);
-  const sliderId = type + 'Slider';
-  const labelId = type + 'SliderLabel';
-  container.innerHTML =
-    '<div class="rating-slider-label" id="' + labelId + '">Record above, then drag to rate yourself</div>' +
-    '<input type="range" min="1" max="10" step="1" value="5" class="rating-slider" id="' + sliderId + '" disabled>' +
-    '<div class="rating-scale-ticks"><span>1</span><span>10</span></div>';
-
-  const slider = document.getElementById(type + 'Slider');
-  const label = document.getElementById(type + 'SliderLabel');
-
-  function refreshLabel(){
-    const num = parseInt(slider.value);
-    label.innerHTML = '<span class="num">' + num + '/10</span> — ' + RATING_LABELS[num - 1];
-  }
-
-  slider.addEventListener('input', () => {
-    currentRating[type] = parseInt(slider.value);
-    refreshLabel();
-    updateSaveButton();
-  });
+/* ---------- Tab switching ----------
+   Only one task is visible at a time so the page doesn't feel cluttered.
+   Switching tabs never loses anything already recorded — it's purely a
+   visibility toggle. */
+function setActiveTab(tab){
+  activeTab = tab;
+  document.getElementById('readingPanel').classList.toggle('hidden', tab !== 'reading');
+  document.getElementById('comprehensionPanel').classList.toggle('hidden', tab !== 'comprehension');
+  document.getElementById('tabReadingBtn').classList.toggle('active', tab === 'reading');
+  document.getElementById('tabComprehensionBtn').classList.toggle('active', tab === 'comprehension');
+  hideNudge();
 }
-buildRatingScale('translateRating', 'translate');
+document.getElementById('tabReadingBtn').onclick = () => setActiveTab('reading');
+document.getElementById('tabComprehensionBtn').onclick = () => setActiveTab('comprehension');
 
-function enableRating(type){
-  const slider = document.getElementById(type + 'Slider');
-  slider.disabled = false;
-  const label = document.getElementById(type + 'SliderLabel');
-  label.innerHTML = '<span class="num">' + slider.value + '/10</span> — ' + RATING_LABELS[parseInt(slider.value) - 1];
-  // record the default slider position as the rating unless the student drags it further
-  currentRating[type] = parseInt(slider.value);
+/* ---------- Nudge banner ----------
+   Shown after one task autosaves, to remind the student (without forcing
+   them) to also try the other task. */
+function showNudge(otherTask){
+  const banner = document.getElementById('nudgeBanner');
+  const text = otherTask === 'hebrew'
+    ? "🎉 Nice work! Don't forget to also read the Hebrew words."
+    : "🎉 Nice work! Don't forget to also show you understand.";
+  document.getElementById('nudgeText').textContent = text;
+  document.getElementById('nudgeSwitchBtn').onclick = () => setActiveTab(otherTask === 'hebrew' ? 'reading' : 'comprehension');
+  banner.classList.remove('hidden');
+}
+function hideNudge(){
+  document.getElementById('nudgeBanner').classList.add('hidden');
 }
 
 /* ---------- Recording logic ---------- */
@@ -1190,19 +1191,24 @@ function resetRecordingUI(){
   document.getElementById('hebrewStatus').textContent = 'Not recorded yet';
   resetHebrewResult();
 
-  currentAudio.translate = null;
-  currentRating.translate = null;
-  document.getElementById('translateAudioPlayback').classList.add('hidden');
-  document.getElementById('translateDeleteBtn').classList.add('hidden');
-  document.getElementById('translateStatus').textContent = 'Not recorded yet';
-  buildRatingScale('translateRating', 'translate'); // rebuild slider back to disabled/default state
-
   currentAudio.comprehension = null;
   document.getElementById('comprehensionAudioPlayback').classList.add('hidden');
   document.getElementById('comprehensionDeleteBtn').classList.add('hidden');
   document.getElementById('comprehensionStatus').textContent = 'Not recorded yet';
   resetComprehensionResult();
-  updateSaveButton();
+
+  // Fresh posuk visit — nothing saved yet, back to the reading tab.
+  currentAttemptRef = null;
+  currentAttemptId = null;
+  attemptSaved = { hebrew: false, comprehension: false };
+  hebrewSavedStoragePath = null;
+  comprehensionSavedStoragePath = null;
+  clarifySavedStoragePath = null;
+  document.getElementById('readingCheck').classList.add('hidden');
+  document.getElementById('comprehensionCheck').classList.add('hidden');
+  document.getElementById('nextPosukBtn').classList.add('hidden');
+  hideNudge();
+  setActiveTab('reading');
 }
 
 // Lets a student re-do a recording they don't like, before saving —
@@ -1218,22 +1224,145 @@ function deleteRecording(type){
   document.getElementById(type + 'Status').textContent = 'Not recorded yet';
   if(type === 'hebrew'){
     resetHebrewResult();
+    if(attemptSaved.hebrew) removeSavedTask('hebrew');
   } else if(type === 'comprehension'){
     resetComprehensionResult();
+    if(attemptSaved.comprehension) removeSavedTask('comprehension');
   } else if(type === 'clarify'){
     // Let the student redo just their clarifying answer — keep the
     // question on screen rather than resetting the whole comprehension task.
     clarifyTranscript = "";
-  } else {
-    currentRating[type] = null;
-    buildRatingScale(type + 'Rating', type);
   }
-  updateSaveButton();
 }
 document.getElementById('hebrewDeleteBtn').onclick = () => deleteRecording('hebrew');
-document.getElementById('translateDeleteBtn').onclick = () => deleteRecording('translate');
 document.getElementById('comprehensionDeleteBtn').onclick = () => deleteRecording('comprehension');
 document.getElementById('clarifyDeleteBtn').onclick = () => deleteRecording('clarify');
+
+/* If a student is embarrassed by an already-autosaved recording and
+   deletes it, this removes it from Firebase too (both the audio file in
+   Storage and the fields on the shared attempt record) — not just the
+   on-screen state. If neither task ends up saved anymore, the whole
+   attempt record is removed. */
+async function removeSavedTask(task){
+  attemptSaved[task] = false;
+  document.getElementById(task === 'hebrew' ? 'readingCheck' : 'comprehensionCheck').classList.add('hidden');
+  if(!currentAttemptRef) return;
+  try{
+    const fields = (task === 'hebrew')
+      ? { hebrewAudioURL: null, hebrewScore: null, hebrewTranscript: null }
+      : { comprehensionAudioURL: null, comprehensionTranscript: null, comprehensionVerdict: null,
+          comprehensionFeedback: null, comprehensionClarifyQuestion: null,
+          comprehensionClarifyAudioURL: null, comprehensionClarifyTranscript: null };
+    await currentAttemptRef.update(fields);
+
+    const storagePath = task === 'hebrew' ? hebrewSavedStoragePath : comprehensionSavedStoragePath;
+    if(storagePath) storage.ref(storagePath).delete().catch(() => {});
+    if(task === 'hebrew') hebrewSavedStoragePath = null;
+    else {
+      comprehensionSavedStoragePath = null;
+      if(clarifySavedStoragePath){
+        storage.ref(clarifySavedStoragePath).delete().catch(() => {});
+        clarifySavedStoragePath = null;
+      }
+    }
+
+    if(!attemptSaved.hebrew && !attemptSaved.comprehension){
+      await currentAttemptRef.remove();
+      currentAttemptRef = null;
+      currentAttemptId = null;
+    }
+    loadHistory();
+  }catch(err){
+    console.error('Could not remove saved task from history', err);
+  }
+}
+
+/* Called once a task finishes its first successful autosave. Shows the
+   checkmark on that task's tab, reveals "Next Posuk", and nudges toward
+   the other task if it isn't done yet. */
+function markTaskSaved(task){
+  attemptSaved[task] = true;
+  document.getElementById(task === 'hebrew' ? 'readingCheck' : 'comprehensionCheck').classList.remove('hidden');
+  document.getElementById('nextPosukBtn').classList.remove('hidden');
+  const other = task === 'hebrew' ? 'comprehension' : 'hebrew';
+  if(!attemptSaved[other]) showNudge(other);
+  else hideNudge();
+  loadHistory();
+}
+
+/* ---------- Autosave ----------
+   Runs the moment a task finishes grading successfully. Both tasks share
+   one attempt record per posuk-visit, created by whichever task saves
+   first; the other task's autosave just adds its fields to that same
+   record via update() rather than overwriting it. */
+async function autosaveHebrew(){
+  if(!currentAudio.hebrew || hebrewScore === null || !currentPosukKey) return;
+  try{
+    if(!currentAttemptRef){
+      currentAttemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
+      currentAttemptId = currentAttemptRef.key;
+    }
+    const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_hebrew_' + currentAttemptId + '.webm';
+    await storage.ref(path).put(currentAudio.hebrew);
+    const url = await storage.ref(path).getDownloadURL();
+    await currentAttemptRef.update({
+      timestamp: Date.now(),
+      posukText: currentPosukText,
+      posukTranslation: currentPosukTranslation,
+      hebrewAudioURL: url,
+      hebrewScore: hebrewScore,
+      hebrewTranscript: hebrewTranscript
+    });
+    hebrewSavedStoragePath = path;
+    markTaskSaved('hebrew');
+  }catch(err){
+    console.error('Autosave (hebrew) failed', err);
+    const gradingMsg = document.getElementById('hebrewGradingMsg');
+    gradingMsg.textContent = (gradingMsg.textContent ? gradingMsg.textContent + ' ' : '') +
+      "Couldn't save automatically — check your internet connection.";
+  }
+}
+
+async function autosaveComprehension(){
+  if(!currentAudio.comprehension || !comprehensionVerdict || !currentPosukKey) return;
+  try{
+    if(!currentAttemptRef){
+      currentAttemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
+      currentAttemptId = currentAttemptRef.key;
+    }
+    const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_comprehension_' + currentAttemptId + '.webm';
+    await storage.ref(path).put(currentAudio.comprehension);
+    const url = await storage.ref(path).getDownloadURL();
+    comprehensionSavedStoragePath = path;
+
+    const update = {
+      timestamp: Date.now(),
+      posukText: currentPosukText,
+      posukTranslation: currentPosukTranslation,
+      comprehensionAudioURL: url,
+      comprehensionTranscript: comprehensionTranscript,
+      comprehensionVerdict: comprehensionVerdict,
+      comprehensionFeedback: comprehensionFeedback
+    };
+
+    if(currentAudio.clarify){
+      const clarifyPath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_clarify_' + currentAttemptId + '.webm';
+      await storage.ref(clarifyPath).put(currentAudio.clarify);
+      update.comprehensionClarifyQuestion = clarifyQuestion;
+      update.comprehensionClarifyAudioURL = await storage.ref(clarifyPath).getDownloadURL();
+      update.comprehensionClarifyTranscript = clarifyTranscript;
+      clarifySavedStoragePath = clarifyPath;
+    }
+
+    await currentAttemptRef.update(update);
+    markTaskSaved('comprehension');
+  }catch(err){
+    console.error('Autosave (comprehension) failed', err);
+    const gradingMsg = document.getElementById('comprehensionGradingMsg');
+    gradingMsg.textContent = (gradingMsg.textContent ? gradingMsg.textContent + ' ' : '') +
+      "Couldn't save automatically — check your internet connection.";
+  }
+}
 
 async function toggleRecording(type, btnEl){
   if(activeRecordingType === type){
@@ -1294,11 +1423,7 @@ async function toggleRecording(type, btnEl){
       } else if(type === 'hebrew'){
         document.getElementById(type + 'Status').textContent = 'Recorded — scoring…';
         scoreHebrewReading();
-      } else {
-        document.getElementById(type + 'Status').textContent = 'Recorded — listen, then grade yourself below';
-        enableRating(type);
       }
-      updateSaveButton();
     };
     mediaRecorder.start();
   }catch(err){
@@ -1308,7 +1433,6 @@ async function toggleRecording(type, btnEl){
 }
 
 document.getElementById('hebrewRecordBtn').onclick = function(){ toggleRecording('hebrew', this); };
-document.getElementById('translateRecordBtn').onclick = function(){ toggleRecording('translate', this); };
 document.getElementById('comprehensionRecordBtn').onclick = function(){ toggleRecording('comprehension', this); };
 document.getElementById('clarifyRecordBtn').onclick = function(){ toggleRecording('clarify', this); };
 document.getElementById('clarifyReplayBtn').onclick = () => speakText(clarifyQuestion);
@@ -1324,7 +1448,7 @@ async function scoreHebrewReading(){
   hebrewScore = null;
   hebrewTranscript = "";
 
-  if(!currentAudio.hebrew){ updateSaveButton(); return; }
+  if(!currentAudio.hebrew){ return; }
 
   gradingMsg.textContent = 'Listening to your reading…';
 
@@ -1342,12 +1466,12 @@ async function scoreHebrewReading(){
     hebrewTranscript = data.transcription || "";
     showHebrewResult(data);
     document.getElementById('hebrewStatus').textContent = 'Recorded — see your score above';
+    await autosaveHebrew();
   }catch(err){
     console.error(err);
     gradingMsg.textContent = 'Could not check your reading — check your internet and try again.';
     document.getElementById('hebrewStatus').textContent = 'Recorded';
   }
-  updateSaveButton();
 }
 
 function showHebrewResult(data){
@@ -1382,13 +1506,11 @@ async function gradeComprehensionAttempt(){
     gradingMsg.textContent = speechRecognitionSupported
       ? "Didn't catch that — try recording again, a little closer to the mic."
       : "This browser can't turn speech into text — try Chrome for this task.";
-    updateSaveButton();
     return;
   }
 
   if(!GRADE_COMPREHENSION_URL || GRADE_COMPREHENSION_URL.indexOf('PASTE') === 0){
     gradingMsg.textContent = "Grading isn't set up yet (Cloud Function URL missing).";
-    updateSaveButton();
     return;
   }
 
@@ -1413,7 +1535,6 @@ async function gradeComprehensionAttempt(){
       document.getElementById('clarifyBox').classList.remove('hidden');
       gradingMsg.textContent = '';
       document.getElementById('comprehensionStatus').textContent = 'Recorded — one more question below';
-      updateSaveButton();
       return;
     }
 
@@ -1423,13 +1544,12 @@ async function gradeComprehensionAttempt(){
     gradingMsg.textContent = 'Could not check your answer — check your internet and try again.';
     document.getElementById('comprehensionStatus').textContent = 'Recorded';
   }
-  updateSaveButton();
 }
 
 /* Renders the final correct/partial/incorrect result (whether it came
    straight from the first grading pass or after a clarify follow-up).
    Audio is opt-in only — tap the speaker button to hear it read aloud. */
-function showComprehensionResult(verdict, feedback){
+async function showComprehensionResult(verdict, feedback){
   const gradingMsg = document.getElementById('comprehensionGradingMsg');
   const resultEl = document.getElementById('comprehensionResult');
   comprehensionVerdict = verdict;
@@ -1448,6 +1568,7 @@ function showComprehensionResult(verdict, feedback){
   // Once a final verdict is shown (including after a clarify follow-up
   // resolves), the clarify question box should no longer stay visible.
   document.getElementById('clarifyBox').classList.add('hidden');
+  await autosaveComprehension();
 }
 
 /* ---------- Clarify follow-up grading (second pass) ----------
@@ -1461,7 +1582,6 @@ async function gradeClarificationAttempt(){
     clarifyStatus.textContent = speechRecognitionSupported
       ? "Didn't catch that — try recording again, a little closer to the mic."
       : "This browser can't turn speech into text — try Chrome for this task.";
-    updateSaveButton();
     return;
   }
 
@@ -1482,173 +1602,12 @@ async function gradeClarificationAttempt(){
     if(!res.ok) throw new Error('Grading request failed');
     const data = await res.json();
     clarifyStatus.textContent = 'Recorded';
-    showComprehensionResult(data.verdict, data.feedback || '');
+    await showComprehensionResult(data.verdict, data.feedback || '');
   }catch(err){
     console.error(err);
     clarifyStatus.textContent = 'Could not check your answer — check your internet and try again.';
   }
-  updateSaveButton();
 }
-
-function updateSaveButton(){
-  // Save is allowed as soon as at least one task has something recorded.
-  // The hebrew and comprehension tasks are computer-graded with no
-  // self-rating fallback, so each additionally needs its graded result
-  // back before it counts as "ready".
-  const ready = !!(
-    (currentAudio.hebrew && hebrewScore !== null) ||
-    currentAudio.translate ||
-    (currentAudio.comprehension && comprehensionVerdict)
-  );
-  document.getElementById('saveBtn').disabled = !ready;
-}
-
-/* ---------- Save attempt ---------- */
-document.getElementById('saveBtn').onclick = async () => {
-  if(!currentPosukKey) return;
-  const saveBtn = document.getElementById('saveBtn');
-  const saveMsg = document.getElementById('saveMsg');
-  saveBtn.disabled = true;
-  saveMsg.textContent = 'Saving your recording…';
-
-  // Log blob sizes to the console — if these are large (hundreds of KB+
-  // for a few seconds of speech), the bottleneck is recording size, not
-  // Firebase. If they're small (a few KB–tens of KB) and it's still slow,
-  // the bottleneck is the internet connection itself, not this app.
-  if(currentAudio.hebrew) console.log('Hebrew recording size:', Math.round(currentAudio.hebrew.size/1024), 'KB');
-  if(currentAudio.translate) console.log('Translation recording size:', Math.round(currentAudio.translate.size/1024), 'KB');
-  if(currentAudio.comprehension) console.log('Comprehension recording size:', Math.round(currentAudio.comprehension.size/1024), 'KB');
-
-  // If this is still going after 6 seconds, tell the student it's likely
-  // their internet connection rather than leaving them staring at "Saving…"
-  // with no explanation.
-  const slowNotice = setTimeout(() => {
-    saveMsg.textContent = 'Still saving… this can take a bit on a slow connection.';
-  }, 6000);
-
-  try{
-    const timestamp = Date.now();
-    const attemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
-    const attemptId = attemptRef.key;
-
-    const record = {
-      timestamp: timestamp,
-      posukText: currentPosukText,
-      posukTranslation: currentPosukTranslation
-    };
-
-    // Track real upload progress per file so "Saving…" reflects what's
-    // actually happening instead of sitting there with no feedback.
-    const progress = { hebrew: null, translate: null };
-    function refreshProgressMsg(){
-      const parts = [];
-      if(progress.hebrew !== null) parts.push('Hebrew ' + progress.hebrew + '%');
-      if(progress.translate !== null) parts.push('Translation ' + progress.translate + '%');
-      if(progress.comprehension !== null) parts.push('Comprehension ' + progress.comprehension + '%');
-      if(parts.length) saveMsg.textContent = 'Saving… ' + parts.join(' · ');
-    }
-
-    // Upload all recordings at the same time instead of one after the
-    // other — cuts save time down when a student records more than one
-    // task before saving.
-    const uploadTasks = [];
-
-    if(currentAudio.hebrew){
-      const hebrewPath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_hebrew_' + attemptId + '.webm';
-      progress.hebrew = 0;
-      const task = storage.ref(hebrewPath).put(currentAudio.hebrew);
-      task.on('state_changed', snap => {
-        progress.hebrew = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
-        refreshProgressMsg();
-      });
-      uploadTasks.push(
-        task
-          .then(() => storage.ref(hebrewPath).getDownloadURL())
-          .then(url => {
-            record.hebrewAudioURL = url;
-            record.hebrewScore = hebrewScore;
-            record.hebrewTranscript = hebrewTranscript;
-          })
-      );
-    }
-
-    if(currentAudio.translate){
-      const translatePath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_translate_' + attemptId + '.webm';
-      progress.translate = 0;
-      const task = storage.ref(translatePath).put(currentAudio.translate);
-      task.on('state_changed', snap => {
-        progress.translate = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
-        refreshProgressMsg();
-      });
-      uploadTasks.push(
-        task
-          .then(() => storage.ref(translatePath).getDownloadURL())
-          .then(url => {
-            record.translationAudioURL = url;
-            record.translationScore = currentRating.translate;
-          })
-      );
-    }
-
-    if(currentAudio.comprehension){
-      const comprehensionPath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_comprehension_' + attemptId + '.webm';
-      progress.comprehension = 0;
-      const task = storage.ref(comprehensionPath).put(currentAudio.comprehension);
-      task.on('state_changed', snap => {
-        progress.comprehension = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
-        refreshProgressMsg();
-      });
-      uploadTasks.push(
-        task
-          .then(() => storage.ref(comprehensionPath).getDownloadURL())
-          .then(url => {
-            record.comprehensionAudioURL = url;
-            record.comprehensionTranscript = comprehensionTranscript;
-            record.comprehensionVerdict = comprehensionVerdict; // 'excellent' | 'correct' | 'partial' | 'incorrect'
-            record.comprehensionFeedback = comprehensionFeedback;
-          })
-      );
-    }
-
-    // If the AI needed a clarifying follow-up before it could grade the
-    // comprehension task, save that Q&A alongside it so the history (and
-    // Simcha, reviewing later) can see the fuller picture.
-    if(currentAudio.clarify){
-      const clarifyPath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_clarify_' + attemptId + '.webm';
-      progress.clarify = 0;
-      const task = storage.ref(clarifyPath).put(currentAudio.clarify);
-      task.on('state_changed', snap => {
-        progress.clarify = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
-        refreshProgressMsg();
-      });
-      uploadTasks.push(
-        task
-          .then(() => storage.ref(clarifyPath).getDownloadURL())
-          .then(url => {
-            record.comprehensionClarifyQuestion = clarifyQuestion;
-            record.comprehensionClarifyAudioURL = url;
-            record.comprehensionClarifyTranscript = clarifyTranscript;
-          })
-      );
-    }
-
-    await Promise.all(uploadTasks);
-
-    await attemptRef.set(record);
-
-    clearTimeout(slowNotice);
-    saveMsg.textContent = '✅ Saved! Great job.';
-    resetRecordingUI();
-    loadHistory();
-    document.getElementById('nextPosukBtn').classList.remove('hidden');
-  }catch(err){
-    clearTimeout(slowNotice);
-    saveMsg.textContent = 'Something went wrong saving. Try again.';
-    console.error(err);
-  }finally{
-    setTimeout(() => { saveMsg.textContent=''; }, 3500);
-  }
-};
 
 /* ---------- History ---------- */
 async function loadHistory(){
