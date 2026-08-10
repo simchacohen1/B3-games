@@ -1531,7 +1531,7 @@ async function toggleRecording(type, btnEl){
     activeRecordingType = type;
     btnEl.classList.add('recording');
     btnEl.textContent = '⏹️';
-    document.getElementById(type + 'Status').textContent = 'Recording…';
+    document.getElementById(type + 'Status').textContent = 'Get ready…';
 
     mediaRecorder.ondataavailable = e => recordingChunks.push(e.data);
     mediaRecorder.onstop = () => {
@@ -1564,7 +1564,17 @@ async function toggleRecording(type, btnEl){
         scoreHebrewReading();
       }
     };
-    mediaRecorder.start();
+    // The microphone stream can take a brief moment to actually start
+    // capturing clean audio right after permission is granted/the track
+    // is created — starting the recorder instantly risks clipping the
+    // student's first syllable or word before the mic is truly live.
+    // A short warm-up delay before mediaRecorder.start() gives the stream
+    // a beat to settle, and only then do we tell the student to go, so
+    // what they say lines up with what's actually being captured.
+    setTimeout(() => {
+      mediaRecorder.start();
+      document.getElementById(type + 'Status').textContent = 'Recording…';
+    }, 300);
   }catch(err){
     alert('Could not access the microphone. Please allow microphone permission.');
     console.error(err);
