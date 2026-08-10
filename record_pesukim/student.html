@@ -327,12 +327,19 @@
   #prevPosukBtn{ left: calc(50vw - 466px); }
   #nextPosukBtn{ right: calc(50vw - 466px); }
   @media (max-width: 959px){
+    /* On mobile, the sticky posuk box (z-index 30) scrolls up over
+       anything vertically centered, so the arrows are pinned to the top
+       corners instead — above the posuk box, out of its way entirely —
+       rather than floating mid-screen where it can cover them. */
     .nav-arrow{
+      top: 10px;
+      transform: none;
       width: 44px; height: 44px;
       font-size: 1.1rem;
       opacity: 0.5;
       background: rgba(201,162,39,0.55) !important;
       box-shadow: none;
+      z-index: 40;
     }
     .nav-arrow:hover, .nav-arrow:focus, .nav-arrow:active{ opacity: 1; }
     #prevPosukBtn{ left: 8px; }
