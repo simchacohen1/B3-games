@@ -150,8 +150,8 @@
     position:relative;
     z-index:1;
   }
-  .task-card.translate{ border-left-color: var(--rimon); }
-  .task-card.comprehension{ border-left-color: var(--gold); }
+  .task-card.translate{ border-left-color: var(--rimon); border-radius: 0 16px 16px 16px; }
+  .task-card.comprehension{ border-left-color: var(--gold); border-radius: 16px 0 16px 16px; }
   .task-card.comprehension h3{ color: #8a6d1a; }
   .task-card h3{
     font-family:'Frank Ruhl Libre', serif;
@@ -190,7 +190,7 @@
   }
 
   .task-tabs{
-    display:flex; gap:6px;
+    display:flex; gap:0;
     margin-bottom:0;
     position:relative;
     z-index:2;
@@ -201,7 +201,7 @@
     font-weight:700;
     font-size:0.92rem;
     padding:13px 10px;
-    border-radius:14px 14px 0 0;
+    border-radius:0;
     border:2px solid transparent;
     border-bottom:none;
     background: var(--parchment-dark);
@@ -211,6 +211,8 @@
     display:flex; align-items:center; justify-content:center; gap:6px;
     transition: opacity 0.15s ease, background 0.15s ease;
   }
+  .tab-btn:first-child{ border-radius:14px 0 0 0; }
+  .tab-btn:last-child{ border-radius:0 14px 0 0; }
   .tab-btn:hover{ opacity:0.85; }
   .tab-btn.active{
     opacity:1;
@@ -298,6 +300,17 @@
   .clarify-question-row .q-icon{ font-size:1.1rem; }
 
   .save-row{ text-align:center; margin: 20px 0; }
+  .posuk-nav-row{ display:flex; justify-content:center; gap:16px; }
+  .nav-arrow{
+    font-size: 1.4rem;
+    padding: 10px 26px;
+    border-radius: 999px;
+  }
+  .nav-arrow:disabled{
+    opacity: 0.4;
+    box-shadow: none;
+    cursor: default;
+  }
 
   .history{
     margin-top: 30px;
@@ -436,8 +449,9 @@
         </div>
       </div>
 
-      <div class="save-row">
-        <button class="btn gold hidden" id="nextPosukBtn">▶️ Next Posuk</button>
+      <div class="save-row posuk-nav-row">
+        <button class="btn gold nav-arrow" id="prevPosukBtn" title="Previous posuk">◀️</button>
+        <button class="btn gold nav-arrow" id="nextPosukBtn" title="Next posuk">▶️</button>
       </div>
 
       <div class="history">
@@ -580,6 +594,11 @@ function hebrewNumeral(num){
 let studentId = null;
 let studentName = null;
 let currentAudio = { hebrew: null, comprehension: null, clarify: null };
+// The MIME type the browser actually recorded in for each type (e.g. iPhones
+// typically can't record webm and silently use something else instead) —
+// tracked so uploads can send an accurate filename/extension instead of
+// always claiming ".webm" regardless of what was really recorded.
+let currentAudioExt = { hebrew: 'webm', comprehension: 'webm', clarify: 'webm' };
 let hebrewScore = null;            // percentage from the Kol Emes scorer, 0-100
 let hebrewTranscript = "";         // what the scorer heard, for the history view
 let comprehensionTranscript = "";
@@ -902,48 +921,73 @@ posukSelect.onchange = async () => {
   }
 };
 
-/* ---------- Next Posuk button ----------
-   Lets a student move straight to the next posuk after saving, without
-   re-touching the dropdowns each time — handles rolling into the next
-   perek once the current one runs out. */
-document.getElementById('nextPosukBtn').onclick = async () => {
-  const nextBtn = document.getElementById('nextPosukBtn');
-  nextBtn.disabled = true;
+/* ---------- Posuk navigation arrows ----------
+   Always-visible previous/next arrows so a student can move through
+   pesukim freely in either direction, not just forward after saving.
+   Each handles rolling into the adjacent perek once the current one's
+   pesukim run out in that direction. */
+async function goToPosuk(direction){
+  const btn = document.getElementById(direction === 1 ? 'nextPosukBtn' : 'prevPosukBtn');
+  btn.disabled = true;
   try{
     const perekNum = parseInt(perekSelect.value);
-
-    // 1) Try the next posuk within the current perek's dropdown.
+    if(!perekNum) return;
     const posukOpts = Array.from(posukSelect.options).filter(o => o.value !== '');
     const curPosukIdx = posukOpts.findIndex(o => parseInt(o.value) === parseInt(posukSelect.value));
-    if(curPosukIdx > -1 && curPosukIdx < posukOpts.length - 1){
-      posukSelect.value = posukOpts[curPosukIdx + 1].value;
+    const targetIdx = curPosukIdx + direction;
+
+    // 1) Target posuk is still within the current perek's dropdown.
+    if(curPosukIdx > -1 && targetIdx >= 0 && targetIdx < posukOpts.length){
+      posukSelect.value = posukOpts[targetIdx].value;
       await posukSelect.onchange();
+      updateNavArrows();
       return;
     }
 
-    // 2) Out of pesukim in this perek — move on to the next perek overall.
+    // 2) Out of pesukim in this direction within this perek — move to the
+    //    adjacent perek and land on its first (or last) posuk.
     const perekIdx = ALL_PERAKIM.indexOf(perekNum);
-    if(perekIdx > -1 && perekIdx < ALL_PERAKIM.length - 1){
-      perekSelect.value = ALL_PERAKIM[perekIdx + 1];
+    const targetPerekIdx = perekIdx + direction;
+    if(perekIdx > -1 && targetPerekIdx >= 0 && targetPerekIdx < ALL_PERAKIM.length){
+      perekSelect.value = ALL_PERAKIM[targetPerekIdx];
       await perekSelect.onchange();
-      const firstPosukOpt = Array.from(posukSelect.options).find(o => o.value !== '');
-      if(firstPosukOpt){
-        posukSelect.value = firstPosukOpt.value;
+      const opts = Array.from(posukSelect.options).filter(o => o.value !== '');
+      const edgeOpt = direction === 1 ? opts[0] : opts[opts.length - 1];
+      if(edgeOpt){
+        posukSelect.value = edgeOpt.value;
         await posukSelect.onchange();
       }
+      updateNavArrows();
       return;
     }
 
-    // 3) Genuinely at the very last posuk of the very last perek.
-    document.getElementById('fetchMsg').textContent = "🎉 You've finished all the pesukim!";
-    nextBtn.classList.add('hidden');
+    // 3) Genuinely at the very first/last posuk of the very first/last perek.
+    document.getElementById('fetchMsg').textContent = direction === 1
+      ? "🎉 You've finished all the pesukim!"
+      : "You're at the very first posuk.";
   }catch(err){
-    document.getElementById('fetchMsg').textContent = 'Could not load the next posuk.';
+    document.getElementById('fetchMsg').textContent = 'Could not load that posuk.';
     console.error(err);
   }finally{
-    nextBtn.disabled = false;
+    btn.disabled = false;
   }
-};
+}
+document.getElementById('nextPosukBtn').onclick = () => goToPosuk(1);
+document.getElementById('prevPosukBtn').onclick = () => goToPosuk(-1);
+
+// Disables an arrow only at the true start/end of the whole pesukim list
+// (first posuk of the first perek, or last posuk of the last perek) —
+// otherwise both arrows stay enabled and visible at all times.
+function updateNavArrows(){
+  const prevBtn = document.getElementById('prevPosukBtn');
+  const nextBtn = document.getElementById('nextPosukBtn');
+  const perekNum = parseInt(perekSelect.value);
+  const posukOpts = Array.from(posukSelect.options).filter(o => o.value !== '');
+  const curPosukIdx = posukOpts.findIndex(o => parseInt(o.value) === parseInt(posukSelect.value));
+  const perekIdx = ALL_PERAKIM.indexOf(perekNum);
+  prevBtn.disabled = (perekIdx === 0 && curPosukIdx === 0);
+  nextBtn.disabled = (perekIdx === ALL_PERAKIM.length - 1 && curPosukIdx === posukOpts.length - 1);
+}
 
 /* ---------- Locally-verified chapter text ----------
    Sefaria's live API can differ from its own website's more complete edition
@@ -1161,7 +1205,7 @@ function showPosuk(parsha, perekNum, posukNum, text, translation){
     .join('');
   textEl.classList.remove('hidden');
   document.getElementById('recordingArea').classList.remove('hidden');
-  document.getElementById('nextPosukBtn').classList.add('hidden'); // re-hide until this new posuk is saved
+  updateNavArrows(); // arrows stay visible always; this just disables at the true start/end
   resetRecordingUI();
   loadHistory();
 }
@@ -1255,7 +1299,6 @@ function resetRecordingUI(){
   clarifySavedStoragePath = null;
   document.getElementById('readingCheck').classList.add('hidden');
   document.getElementById('comprehensionCheck').classList.add('hidden');
-  document.getElementById('nextPosukBtn').classList.add('hidden');
   hideNudge();
   setActiveTab('reading');
 }
@@ -1327,12 +1370,11 @@ async function removeSavedTask(task){
 }
 
 /* Called once a task finishes its first successful autosave. Shows the
-   checkmark on that task's tab, reveals "Next Posuk", and nudges toward
-   the other task if it isn't done yet. */
+   checkmark on that task's tab, and nudges toward the other task if it
+   isn't done yet — the posuk nav arrows stay visible/enabled regardless. */
 function markTaskSaved(task){
   attemptSaved[task] = true;
   document.getElementById(task === 'hebrew' ? 'readingCheck' : 'comprehensionCheck').classList.remove('hidden');
-  document.getElementById('nextPosukBtn').classList.remove('hidden');
   const other = task === 'hebrew' ? 'comprehension' : 'hebrew';
   if(!attemptSaved[other]) showNudge(other);
   else hideNudge();
@@ -1413,6 +1455,17 @@ async function autosaveComprehension(){
   }
 }
 
+// Maps a recorded MIME type to a matching file extension for upload, so
+// the server receives a filename that actually reflects the audio format
+// (previously always claimed ".webm" even on phones that recorded
+// something else entirely, which could confuse server-side transcription).
+function mimeTypeToExtension(mimeType){
+  if(mimeType.includes('mp4')) return 'mp4';
+  if(mimeType.includes('aac')) return 'aac';
+  if(mimeType.includes('ogg')) return 'ogg';
+  return 'webm';
+}
+
 async function toggleRecording(type, btnEl){
   if(activeRecordingType === type){
     // stop
@@ -1420,14 +1473,26 @@ async function toggleRecording(type, btnEl){
     return;
   }
   if(activeRecordingType){ return; } // another recording in progress
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined'){
+    alert("This browser can't record audio. Please try a newer version of Chrome or Safari.");
+    return;
+  }
   try{
     const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
     // Low bitrate is plenty for a few seconds of spoken Hebrew/translation —
     // keeps the recording small so it uploads (and saves) much faster,
     // which matters a lot on shared classroom WiFi.
     let recorderOptions = { audioBitsPerSecond: 32000 };
-    if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus')){
-      recorderOptions.mimeType = 'audio/webm;codecs=opus';
+    // iPhones/iPads (Safari) generally can't record webm at all, so trying
+    // only "audio/webm;codecs=opus" would leave Safari to silently fall
+    // back to some other type on its own. Trying types in this order finds
+    // whatever the current browser actually supports, and — importantly —
+    // we read back mediaRecorder.mimeType below rather than assuming, so
+    // the blob/upload always match what was truly recorded.
+    const preferredTypes = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/aac', 'audio/ogg;codecs=opus'];
+    const supportedType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t));
+    if(supportedType){
+      recorderOptions.mimeType = supportedType;
     }
     mediaRecorder = new MediaRecorder(stream, recorderOptions);
     recordingChunks = [];
@@ -1438,8 +1503,14 @@ async function toggleRecording(type, btnEl){
 
     mediaRecorder.ondataavailable = e => recordingChunks.push(e.data);
     mediaRecorder.onstop = () => {
-      const blob = new Blob(recordingChunks, { type:'audio/webm' });
+      // mediaRecorder.mimeType reflects what the browser actually used,
+      // which may differ from supportedType above if the browser adjusted
+      // it (or ignored our request entirely) — always trust this over any
+      // assumption, so the file we upload is labeled accurately.
+      const actualType = mediaRecorder.mimeType || 'audio/webm';
+      const blob = new Blob(recordingChunks, { type: actualType });
       currentAudio[type] = blob;
+      currentAudioExt[type] = mimeTypeToExtension(actualType);
       const url = URL.createObjectURL(blob);
       const audioEl = document.getElementById(type + 'AudioPlayback');
       audioEl.src = url;
@@ -1493,7 +1564,7 @@ async function scoreHebrewReading(){
   formData.append("perek", currentPerekNum || "");
   formData.append("posuk", currentPosukNum || "");
   formData.append("posukText", currentPosukText);
-  formData.append("audio", currentAudio.hebrew, "recording.webm");
+  formData.append("audio", currentAudio.hebrew, "recording." + currentAudioExt.hebrew);
 
   try{
     const res = await fetch(HEBREW_SCORE_URL, { method: 'POST', body: formData });
@@ -1554,7 +1625,7 @@ async function gradeComprehensionAttempt(){
 
   try{
     const formData = new FormData();
-    formData.append('audio', currentAudio.comprehension, 'recording.webm');
+    formData.append('audio', currentAudio.comprehension, 'recording.' + currentAudioExt.comprehension);
     formData.append('posukText', currentPosukText || '');
     formData.append('posukTranslation', currentPosukTranslation || '');
 
@@ -1629,7 +1700,7 @@ async function gradeClarificationAttempt(){
 
   try{
     const formData = new FormData();
-    formData.append('audio', currentAudio.clarify, 'recording.webm');
+    formData.append('audio', currentAudio.clarify, 'recording.' + currentAudioExt.clarify);
     formData.append('posukText', currentPosukText || '');
     formData.append('posukTranslation', currentPosukTranslation || '');
     formData.append('mode', 'clarify');
