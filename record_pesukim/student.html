@@ -541,6 +541,21 @@ const GRADE_COMPREHENSION_URL = "https://gradecomprehension-fr7n3lmy3q-uc.a.run.
    HEBREW READING SCORER — same backend Kol Emes uses
    ========================================================= */
 const HEBREW_SCORE_URL = "https://posuk-scorer.onrender.com/score";
+const SCORER_BASE_URL = "https://posuk-scorer.onrender.com";
+
+// Render's free tier spins the scorer service down when it's idle, so the
+// very first real recording can be stuck waiting 30-60s for it to wake up.
+// To avoid that, fire a harmless "wake up" ping the moment a student picks
+// a posuk (well before they're ready to record), so the service has time
+// to spin back up in the background. We don't care about the response —
+// mode:'no-cors' avoids a console error — and we only need to do this once
+// per page visit.
+let scorerWakeSent = false;
+function wakeScorer(){
+  if(scorerWakeSent) return;
+  scorerWakeSent = true;
+  fetch(SCORER_BASE_URL, { mode: 'no-cors' }).catch(() => {});
+}
 
 
 /* =========================================================
@@ -939,6 +954,7 @@ posukSelect.onchange = async () => {
   const perekNum = parseInt(perekSelect.value);
   const posukNum = parseInt(posukSelect.value);
   if(!posukNum){ resetScroll(); return; }
+  wakeScorer();
   document.getElementById('fetchMsg').textContent = 'Loading posuk…';
   try{
     const pesukim = await fetchChapter(perekNum);
