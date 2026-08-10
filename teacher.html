@@ -32,6 +32,26 @@
   .posuk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; }
   .posuk-btn { font-size: 14px; padding: 8px 0; border-radius: 6px; border: 1px solid #d9a85c; background: #f0ece0; color: #3a2417; cursor: pointer; }
   .posuk-btn.active { background: #b85042; color: white; border-color: #b85042; }
+  .editor-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(58,36,23,0.6); z-index:1000; overflow-y:auto; padding:20px 0; }
+  .editor-panel { max-width: 760px; margin: 0 auto; background:#fdf6ec; border-radius:12px; padding:20px; }
+  .editor-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px; }
+  .editor-header h2 { color:#b85042; margin:0; font-size:20px; }
+  .editor-btn { font-size:14px; padding:9px 16px; border-radius:8px; border:none; cursor:pointer; color:white; }
+  .editor-save { background:#3b6d11; }
+  .editor-cancel { background:#999; }
+  .editor-add-posuk { background:#3a6ea5; display:block; margin:16px auto 0 auto; }
+  .editor-posuk { background:white; border:1px solid #d9a85c; border-radius:10px; padding:14px; margin-bottom:14px; }
+  .editor-posuk-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .editor-posuk-head label { color:#7d5236; font-size:13px; }
+  .editor-posuk-head input { width:60px; font-size:15px; padding:4px 6px; border-radius:6px; border:1px solid #d9a85c; }
+  .editor-del-posuk { margin-left:auto; background:#b85042; font-size:12px; padding:6px 10px; }
+  .editor-question { background:#f0ece0; border-radius:8px; padding:10px; margin-bottom:8px; }
+  .editor-question label { display:block; color:#7d5236; font-size:12px; margin-bottom:2px; margin-top:6px; }
+  .editor-question input, .editor-question textarea { width:100%; box-sizing:border-box; font-size:15px; padding:6px 8px; border-radius:6px; border:1px solid #d9a85c; font-family:inherit; }
+  .editor-heb-input { direction:rtl; font-size:20px; }
+  .editor-question textarea { resize:vertical; min-height:36px; }
+  .editor-del-question { margin-top:8px; background:#999; font-size:12px; padding:5px 10px; }
+  .editor-add-question { background:#d9a85c; color:#3a2417; font-size:13px; padding:6px 12px; display:block; margin-top:4px; }
 </style>
 </head>
 <body>
@@ -44,7 +64,8 @@
 <div style="text-align:center; margin-bottom:20px;">
   <button id="enableSoundBtn" onclick="enableSound()" style="font-size:15px; padding:10px 18px; border-radius:8px; border:none; cursor:pointer; background:#3b6d11; color:white;">Click here to enable sound</button>
   <button id="resetGameBtn" onclick="resetGame()" style="font-size:15px; padding:10px 18px; border-radius:8px; border:none; cursor:pointer; background:#b85042; color:white; margin-left:8px;">Reset game (clear all names)</button>
-  <button id="syncBtn" onclick="syncQuestionsToDatabase()" style="font-size:15px; padding:10px 18px; border-radius:8px; border:none; cursor:pointer; background:#3a6ea5; color:white; margin-left:8px;">Sync questions to database</button>
+  <button id="editBtn" onclick="openEditor()" style="font-size:15px; padding:10px 18px; border-radius:8px; border:none; cursor:pointer; background:#3b6d11; color:white; margin-left:8px;">Edit questions</button>
+  <button id="syncBtn" onclick="syncQuestionsToDatabase()" style="font-size:13px; padding:8px 14px; border-radius:8px; border:none; cursor:pointer; background:#999; color:white; margin-left:8px;">Restore built-in questions</button>
   <span id="soundStatus" style="margin-left:10px; color:#7d5236;"></span>
 </div>
 
@@ -72,6 +93,20 @@
 </div>
 
 <div class="board" id="board"></div>
+
+<div class="editor-overlay" id="editorOverlay">
+  <div class="editor-panel">
+    <div class="editor-header">
+      <h2>Edit Questions</h2>
+      <div>
+        <button class="editor-btn editor-save" onclick="saveEditor()">Save changes</button>
+        <button class="editor-btn editor-cancel" onclick="closeEditor()">Cancel</button>
+      </div>
+    </div>
+    <div id="editorList"></div>
+    <button class="editor-btn editor-add-posuk" onclick="addPosukBlock()">+ Add new posuk</button>
+  </div>
+</div>
 
 <script>
 // ---- REPLACE WITH YOUR FIREBASE CONFIG ----
@@ -261,12 +296,125 @@ function buildFromPosukData(data) {
 }
 
 function syncQuestionsToDatabase() {
-  const sure = confirm("This will push the question list currently in teacher.html up to the database, replacing what's there. Player screens will update automatically. Continue?");
+  const sure = confirm("This will REPLACE your current question list with the original built-in list from when this file was created. Any edits you made in the on-page editor will be lost. Continue?");
   if (!sure) return;
   setRef.set({ title: ACTIVE_SET_TITLE, posukData: localPosukData }).then(() => {
-    document.getElementById('soundStatus').textContent = 'Questions synced to database';
+    document.getElementById('soundStatus').textContent = 'Restored built-in questions';
   }).catch(err => {
     document.getElementById('soundStatus').textContent = 'Sync error: ' + err.message;
+  });
+}
+
+// ---------- On-page question editor ----------
+
+function openEditor() {
+  renderEditor(posukData);
+  document.getElementById('editorOverlay').style.display = 'block';
+}
+
+function closeEditor() {
+  document.getElementById('editorOverlay').style.display = 'none';
+}
+
+function renderEditor(data) {
+  const list = document.getElementById('editorList');
+  list.innerHTML = '';
+  data.forEach(p => {
+    list.appendChild(createPosukBlock(p.posuk, p.questions));
+  });
+}
+
+function createPosukBlock(posukNum, questionsArr) {
+  const block = document.createElement('div');
+  block.className = 'editor-posuk';
+
+  const head = document.createElement('div');
+  head.className = 'editor-posuk-head';
+  head.innerHTML =
+    '<label>Posuk #</label>' +
+    '<input type="number" class="posuk-num-input" value="' + posukNum + '" min="1">' +
+    '<button class="editor-btn editor-del-posuk" onclick="removePosukBlock(this)">Delete this posuk</button>';
+  block.appendChild(head);
+
+  const qContainer = document.createElement('div');
+  qContainer.className = 'editor-questions-container';
+  (questionsArr || []).forEach(q => {
+    qContainer.appendChild(createQuestionBlock(q));
+  });
+  block.appendChild(qContainer);
+
+  const addQBtn = document.createElement('button');
+  addQBtn.className = 'editor-btn editor-add-question';
+  addQBtn.textContent = '+ Add question to this posuk';
+  addQBtn.onclick = () => qContainer.appendChild(createQuestionBlock({ heb: '', en: '', ans: '' }));
+  block.appendChild(addQBtn);
+
+  return block;
+}
+
+function createQuestionBlock(q) {
+  const div = document.createElement('div');
+  div.className = 'editor-question';
+  div.innerHTML =
+    '<label>Hebrew phrase</label>' +
+    '<input type="text" class="editor-heb-input q-heb" value="' + escapeAttr(q.heb || '') + '">' +
+    '<label>Question</label>' +
+    '<textarea class="q-en">' + escapeHtml(q.en || '') + '</textarea>' +
+    '<label>Answer</label>' +
+    '<textarea class="q-ans">' + escapeHtml(q.ans || '') + '</textarea>' +
+    '<button class="editor-btn editor-del-question" onclick="this.parentElement.remove()">Delete this question</button>';
+  return div;
+}
+
+function escapeAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function addPosukBlock() {
+  const list = document.getElementById('editorList');
+  // Suggest the next posuk number based on the last block's number + 1
+  const nums = [...list.querySelectorAll('.posuk-num-input')].map(i => parseInt(i.value) || 0);
+  const nextNum = nums.length ? Math.max(...nums) + 1 : 1;
+  list.appendChild(createPosukBlock(nextNum, [{ heb: '', en: '', ans: '' }]));
+}
+
+function removePosukBlock(btn) {
+  const sure = confirm("Delete this entire posuk and its questions?");
+  if (!sure) return;
+  btn.closest('.editor-posuk').remove();
+}
+
+function saveEditor() {
+  const posukBlocks = [...document.querySelectorAll('#editorList > .editor-posuk')];
+  if (posukBlocks.length === 0) {
+    alert("You need at least one posuk before saving.");
+    return;
+  }
+  const newPosukData = [];
+  for (const block of posukBlocks) {
+    const posukNum = parseInt(block.querySelector('.posuk-num-input').value) || 0;
+    const qBlocks = [...block.querySelectorAll('.editor-question')];
+    const questions = qBlocks.map(qb => ({
+      heb: qb.querySelector('.q-heb').value.trim(),
+      en: qb.querySelector('.q-en').value.trim(),
+      ans: qb.querySelector('.q-ans').value.trim()
+    })).filter(q => q.heb || q.en || q.ans); // drop fully-empty rows
+    if (questions.length > 0) {
+      newPosukData.push({ posuk: posukNum, questions });
+    }
+  }
+  if (newPosukData.length === 0) {
+    alert("There's nothing to save - add at least one question first.");
+    return;
+  }
+  setRef.set({ title: ACTIVE_SET_TITLE, posukData: newPosukData }).then(() => {
+    document.getElementById('soundStatus').textContent = 'Questions saved (' + newPosukData.length + ' pesukim)';
+    closeEditor();
+  }).catch(err => {
+    document.getElementById('soundStatus').textContent = 'Save error: ' + err.message;
   });
 }
 
