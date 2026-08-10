@@ -343,6 +343,15 @@
     box-shadow: none;
     cursor: default;
   }
+  /* .btn:active normally presses the button down with translateY(3px),
+     but these arrows are also centered with translateY(-50%) via fixed
+     positioning — the two transforms can't combine (the second overwrites
+     the first), so a click was making the arrow visibly jump instead of
+     just looking pressed. This keeps the vertical centering intact while
+     still giving a pressed feel via the box-shadow only. */
+  .nav-arrow:active{
+    transform: translateY(-50%);
+  }
 
   .history{
     margin-top: 30px;
