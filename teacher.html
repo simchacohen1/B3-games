@@ -80,9 +80,45 @@
   .tab-panel.active { display:block; }
   .setup-section { max-width:700px; margin:0 auto 20px auto; background:white; border:1px solid #d9a85c; border-radius:12px; padding:20px; }
   .setup-section h3 { color:#7d5236; margin-top:0; }
+
+  /* ---- Game-show look for the Play tab ---- */
+  body.play-mode { background: radial-gradient(ellipse at top, #3a2417 0%, #1c1108 70%); color: #fdf6ec; }
+  body.play-mode h1 { display:none; }
+  .marquee { text-align:center; padding:10px 0 6px 0; }
+  .marquee-title { display:inline-block; font-size:32px; font-weight:900; letter-spacing:2px; color:#ffd76a; text-shadow: 0 0 10px rgba(255,215,106,0.6), 0 0 2px #000; }
+  body.play-mode .tab-bar { margin-bottom:10px; }
+  body.play-mode .tab-btn { background:#5a3a24; color:#f0d9b0; }
+  body.play-mode .tab-btn.active { background:#ffd76a; color:#3a2417; }
+  body.play-mode .question-picker { background:rgba(255,255,255,0.06); border:1px solid #ffd76a; max-width:800px; padding:10px 16px; margin-bottom:14px; }
+  body.play-mode .question-picker-title { color:#ffd76a; font-size:13px; margin-bottom:6px; }
+  body.play-mode .question-btn { background:rgba(255,255,255,0.1); border:1px solid #7d5236; color:#fdf6ec; }
+  body.play-mode .question-btn.active { background:#ffd76a; color:#3a2417; border-color:#ffd76a; }
+  body.play-mode .panel { background:linear-gradient(180deg, #2b1a10, #1c1108); border:2px solid #ffd76a; box-shadow: 0 0 30px rgba(255,215,106,0.15) inset, 0 6px 20px rgba(0,0,0,0.5); max-width:850px; padding:20px 24px; margin-bottom:14px; }
+  body.play-mode .qnum { color:#d9a85c; }
+  body.play-mode .qtext { color:#fdf6ec; font-size:30px; }
+  body.play-mode .answer { color:#7ed957; }
+  body.play-mode .controls button { font-size:14px; padding:9px 16px; }
+  body.play-mode .btn-reveal { background:#ffd76a; color:#3a2417; }
+  body.play-mode .btn-clear { background:#5a3a24; color:#f0d9b0; }
+  body.play-mode .btn-next { background:#b85042; }
+  body.play-mode .buzzed { margin-bottom:12px; }
+  body.play-mode .buzzed-name { font-size:32px; background:linear-gradient(180deg,#ffe9a8,#ffd76a); color:#3a2417; padding:12px 30px; box-shadow:0 0 25px rgba(255,215,106,0.7); animation: buzzPop 0.35s ease; }
+  @keyframes buzzPop { 0% { transform:scale(0.85); } 60% { transform:scale(1.08); } 100% { transform:scale(1); } }
+  body.play-mode .score-panel { max-width:850px; }
+  body.play-mode .selected-label { color:#f0d9b0; font-size:15px; }
+  body.play-mode .selected-label b { color:#ffd76a; }
+  body.play-mode .score-btn { font-size:22px; padding:10px 28px; box-shadow:0 3px 0 rgba(0,0,0,0.3); }
+  body.play-mode .score-plus { background:#3b6d11; }
+  body.play-mode .score-minus { background:#b85042; }
+  body.play-mode .board { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap:10px; }
+  body.play-mode .team { background:rgba(255,255,255,0.07); border:2px solid #5a3a24; }
+  body.play-mode .team:hover { border-color:#ffd76a; }
+  body.play-mode .team.selected { border-color:#ffd76a; background:rgba(255,215,106,0.18); box-shadow:0 0 20px rgba(255,215,106,0.35); }
+  body.play-mode .team .name { color:#fdf6ec; font-size:16px; }
+  body.play-mode .team .score { color:#ffd76a; font-size:26px; }
 </style>
 </head>
-<body>
+<body class="play-mode">
 
 <div class="lock-overlay" id="lockOverlay">
   <div class="lock-box">
@@ -99,11 +135,13 @@
 <h1>Game Show</h1>
 
 <div class="tab-bar">
-  <button class="tab-btn active" id="tabBtnPlay" onclick="showTab(\'play\')">Play</button>
-  <button class="tab-btn" id="tabBtnSetup" onclick="showTab(\'setup\')">Setup</button>
+  <button class="tab-btn active" id="tabBtnPlay" onclick="showTab('play')">Play</button>
+  <button class="tab-btn" id="tabBtnSetup" onclick="showTab('setup')">Setup</button>
 </div>
 
 <div class="tab-panel active" id="tabPlay">
+
+<div class="marquee"><span class="marquee-title">🎬 GAME SHOW 🎬</span></div>
 
 <div class="question-picker">
   <div class="question-picker-title">Jump to any question:</div>
@@ -210,6 +248,7 @@ function showTab(name) {
   document.getElementById('tabSetup').classList.toggle('active', name === 'setup');
   document.getElementById('tabBtnPlay').classList.toggle('active', name === 'play');
   document.getElementById('tabBtnSetup').classList.toggle('active', name === 'setup');
+  document.body.classList.toggle('play-mode', name === 'play');
 }
 
 // Builds the student-facing link automatically from this page's own URL, by
