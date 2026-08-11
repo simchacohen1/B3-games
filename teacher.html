@@ -605,8 +605,16 @@ function pickRandomWinner(qIndexAtSchedule) {
     const data = snap.val() || {};
     if ((data.qIndex || 0) !== qIndexAtSchedule) return; // teacher already moved on
     if (data.buzzedBy) return; // already decided some other way
+    if (!data.revealDelayOn) return; // toggle got turned off in the meantime
+
     const names = Object.keys(data.buzzPool || {});
-    if (names.length === 0) return; // nobody buzzed in - leave it open
+    if (names.length === 0) {
+      // Nobody's buzzed in yet even though the window is technically over.
+      // Keep quietly re-checking instead of giving up - otherwise a late
+      // buzz would sit in the pool forever with nothing ever picking it.
+      revealPickTimer = setTimeout(() => pickRandomWinner(qIndexAtSchedule), 400);
+      return;
+    }
 
     const lastWinner = data.lastWinner || null;
     const lastWinnerStreak = data.lastWinnerStreak || 0;
@@ -829,6 +837,7 @@ function playAlertSound() {
 }
 
 let lastBuzzedBy = null;
+let lastPoolSize = 0;
 
 gameRef.on('value', snapshot => {
   if (!questionsReady) return; // wait until the question set has loaded from the database
@@ -847,6 +856,18 @@ gameRef.on('value', snapshot => {
     document.getElementById('revealDelaySeconds').value = data.revealDelaySeconds;
   }
   maybeScheduleRevealPick(data, qIndex);
+
+  if (data.revealDelayOn && !data.buzzedBy) {
+    const poolSize = Object.keys(data.buzzPool || {}).length;
+    if (poolSize !== lastPoolSize) {
+      document.getElementById('soundStatus').textContent = poolSize > 0
+        ? poolSize + ' student(s) buzzed in - picking a winner soon...'
+        : 'Waiting for buzzes...';
+    }
+    lastPoolSize = poolSize;
+  } else {
+    lastPoolSize = 0;
+  }
 
   if (data.buzzedBy && data.buzzedBy !== lastBuzzedBy) {
     document.getElementById('soundStatus').textContent = 'Buzz detected: ' + data.buzzedBy;
