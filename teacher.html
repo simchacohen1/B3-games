@@ -580,7 +580,16 @@ function maybeScheduleRevealPick(data, qIndex) {
     clearRevealPickTimer();
     return;
   }
-  const openAt = data.buzzOpenAt || Date.now();
+  if (!data.buzzOpenAt) {
+    // The window's start time hasn't been stamped yet (e.g. right after a
+    // reset, before any question navigation). Stamp it once here, rather
+    // than falling back to "now" on every single data change - that bug
+    // was pushing the random pick further into the future with every buzz,
+    // so it could effectively never fire.
+    gameRef.child('buzzOpenAt').set(Date.now());
+    return;
+  }
+  const openAt = data.buzzOpenAt;
   const key = qIndex + '|' + openAt;
   if (revealPickScheduledKey === key) return; // already have a timer set for this exact question
   clearRevealPickTimer();
@@ -766,7 +775,7 @@ function resetGame() {
     buzzUnlockAt: 0,
     revealDelayOn: document.getElementById('revealDelayToggle').checked,
     revealDelaySeconds: parseInt(document.getElementById('revealDelaySeconds').value) || 3,
-    buzzOpenAt: 0,
+    buzzOpenAt: Date.now(),
     buzzPool: null,
     lastWinner: null,
     lastWinnerStreak: 0
