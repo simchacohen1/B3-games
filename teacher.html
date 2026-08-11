@@ -73,6 +73,13 @@
   .lock-box button { font-size:16px; padding:10px 20px; border-radius:8px; border:none; background:#7d5236; color:white; cursor:pointer; display:block; margin:0 auto; }
   .lock-error { color:#b85042; font-size:14px; margin-top:8px; min-height:18px; }
   .hidden { display:none; }
+  .tab-bar { display:flex; justify-content:center; gap:8px; margin-bottom:16px; }
+  .tab-btn { font-size:15px; padding:10px 24px; border-radius:8px 8px 0 0; border:none; cursor:pointer; background:#e6d5b8; color:#7d5236; font-weight:bold; }
+  .tab-btn.active { background:#b85042; color:white; }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+  .setup-section { max-width:700px; margin:0 auto 20px auto; background:white; border:1px solid #d9a85c; border-radius:12px; padding:20px; }
+  .setup-section h3 { color:#7d5236; margin-top:0; }
 </style>
 </head>
 <body>
@@ -90,21 +97,13 @@
 <div id="mainContent" class="hidden">
 
 <h1>Game Show</h1>
-<div class="subtitle">Teacher control screen</div>
 
-<div class="link-box">Student link: <b id="studentLinkText">loading...</b> <button onclick="copyStudentLink()" style="margin-left:8px; font-size:12px; padding:5px 10px; border-radius:6px; border:none; background:#7d5236; color:white; cursor:pointer;">Copy link</button></div>
-
-<div class="top-controls">
-  <button id="enableSoundBtn" onclick="enableSound()" style="background:#3b6d11;">Click here to enable sound</button>
-  <button id="resetGameBtn" onclick="resetGame()" style="background:#b85042;">Reset game (clear all names)</button>
-  <button id="editBtn" onclick="openEditor()" style="background:#3b6d11;">Edit questions</button>
-  <button id="syncBtn" onclick="syncQuestionsToDatabase()" style="background:#999; font-size:13px;">Restore built-in questions</button>
-  <span class="timer-box">
-    <label><input type="checkbox" id="delayToggle" onchange="saveDelaySettings()"> Buzzer delay</label>
-    <input type="number" id="delaySeconds" value="10" min="1" max="60" onchange="saveDelaySettings()"> sec
-  </span>
-  <span id="soundStatus" style="margin-left:10px; color:#7d5236;"></span>
+<div class="tab-bar">
+  <button class="tab-btn active" id="tabBtnPlay" onclick="showTab(\'play\')">Play</button>
+  <button class="tab-btn" id="tabBtnSetup" onclick="showTab(\'setup\')">Setup</button>
 </div>
+
+<div class="tab-panel active" id="tabPlay">
 
 <div class="question-picker">
   <div class="question-picker-title">Jump to any question:</div>
@@ -135,6 +134,32 @@
     <button class="score-btn score-minus" onclick="adjustSelectedScore(-1)">-1</button>
   </div>
   <div class="board" id="board"></div>
+</div>
+
+</div>
+
+<div class="tab-panel" id="tabSetup">
+
+<div class="setup-section">
+  <h3>Student access</h3>
+  <div class="link-box">Student link: <b id="studentLinkText">loading...</b> <button onclick="copyStudentLink()" style="margin-left:8px; font-size:12px; padding:5px 10px; border-radius:6px; border:none; background:#7d5236; color:white; cursor:pointer;">Copy link</button></div>
+</div>
+
+<div class="setup-section">
+  <h3>Game controls</h3>
+  <div class="top-controls">
+    <button id="enableSoundBtn" onclick="enableSound()" style="background:#3b6d11;">Click here to enable sound</button>
+    <button id="resetGameBtn" onclick="resetGame()" style="background:#b85042;">Reset game (clear all names)</button>
+    <button id="editBtn" onclick="openEditor()" style="background:#3b6d11;">Edit questions</button>
+    <button id="syncBtn" onclick="syncQuestionsToDatabase()" style="background:#999; font-size:13px;">Restore built-in questions</button>
+    <span class="timer-box">
+      <label><input type="checkbox" id="delayToggle" onchange="saveDelaySettings()"> Buzzer delay</label>
+      <input type="number" id="delaySeconds" value="10" min="1" max="60" onchange="saveDelaySettings()"> sec
+    </span>
+    <span id="soundStatus" style="margin-left:10px; color:#7d5236;"></span>
+  </div>
+</div>
+
 </div>
 
 <div class="editor-overlay" id="editorOverlay">
@@ -178,6 +203,13 @@ function checkPassword() {
   } else {
     document.getElementById('lockError').textContent = 'Incorrect password - try again.';
   }
+}
+
+function showTab(name) {
+  document.getElementById('tabPlay').classList.toggle('active', name === 'play');
+  document.getElementById('tabSetup').classList.toggle('active', name === 'setup');
+  document.getElementById('tabBtnPlay').classList.toggle('active', name === 'play');
+  document.getElementById('tabBtnSetup').classList.toggle('active', name === 'setup');
 }
 
 // Builds the student-facing link automatically from this page's own URL, by
