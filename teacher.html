@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Tent Trail Trivia - Teacher</title>
+<title>Game Show - Teacher</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
@@ -86,10 +86,10 @@
 
 <div id="mainContent" class="hidden">
 
-<h1>Tent Trail Trivia</h1>
+<h1>Game Show</h1>
 <div class="subtitle">Teacher control screen</div>
 
-<div class="link-box">Send students this page's URL with <b>player.html</b> instead of <b>teacher.html</b> in the address.</div>
+<div class="link-box">Student link: <b id="studentLinkText">loading...</b> <button onclick="copyStudentLink()" style="margin-left:8px; font-size:12px; padding:5px 10px; border-radius:6px; border:none; background:#7d5236; color:white; cursor:pointer;">Copy link</button></div>
 
 <div class="top-controls">
   <button id="enableSoundBtn" onclick="enableSound()" style="background:#3b6d11;">Click here to enable sound</button>
@@ -177,6 +177,24 @@ function checkPassword() {
   }
 }
 
+// Builds the student-facing link automatically from this page's own URL, by
+// swapping "teacher.html" for "player.html", so it's always correct no
+// matter where this file is hosted.
+function getStudentLink() {
+  return window.location.href.replace(/teacher\.html(\?.*)?$/, 'player.html');
+}
+
+function copyStudentLink() {
+  const link = getStudentLink();
+  navigator.clipboard.writeText(link).then(() => {
+    document.getElementById('soundStatus').textContent = 'Student link copied!';
+  }).catch(() => {
+    prompt('Copy this link:', link);
+  });
+}
+
+document.getElementById('studentLinkText').textContent = getStudentLink();
+
 // Skip re-entering the password if already unlocked earlier in this browser tab.
 if (sessionStorage.getItem('teacherUnlocked') === 'yes') {
   document.getElementById('lockOverlay').style.display = 'none';
@@ -203,7 +221,7 @@ const gameRef = db.ref("tentTrailTrivia");
 // one-time fallback seed if the database is ever empty. The real "master" copy
 // lives in the database from now on - edit it using the on-page editor.
 const ACTIVE_SET_ID = "vayeira18";
-const ACTIVE_SET_TITLE = "Tent Trail Trivia";
+const ACTIVE_SET_TITLE = "Game Show";
 const setRef = db.ref("questionSets/" + ACTIVE_SET_ID);
 
 const localQuestions = [
