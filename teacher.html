@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Game Show - Teacher</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -542,7 +545,12 @@ gameRef.on('value', snapshot => {
     document.getElementById('soundStatus').textContent = 'Buzz detected: ' + data.buzzedBy;
     playAlertSound();
     // Auto-select whoever just buzzed in, so the teacher can award points immediately.
+    // Update the local variable right away too, instead of waiting for the
+    // database write above to round-trip back through this listener - that
+    // round-trip delay was letting a fast "+1" click land before the
+    // selection had actually registered.
     gameRef.child('selectedPlayer').set(data.buzzedBy);
+    data.selectedPlayer = data.buzzedBy;
   }
   lastBuzzedBy = data.buzzedBy || null;
 
