@@ -116,6 +116,24 @@
   body.play-mode .team.selected { border-color:#ffd76a; background:rgba(255,215,106,0.18); box-shadow:0 0 20px rgba(255,215,106,0.35); }
   body.play-mode .team .name { color:#fdf6ec; font-size:16px; }
   body.play-mode .team .score { color:#ffd76a; font-size:26px; }
+  /* ---- Alternate theme: cool blue quiz-board look ---- */
+  body.play-mode.theme-blue { background: radial-gradient(ellipse at top, #0b1f3a 0%, #04101f 70%); }
+  body.play-mode.theme-blue .marquee-title { color:#7ec8ff; text-shadow: 0 0 10px rgba(126,200,255,0.6), 0 0 2px #000; }
+  body.play-mode.theme-blue .tab-btn { background:#123056; color:#cfe8ff; }
+  body.play-mode.theme-blue .tab-btn.active { background:#7ec8ff; color:#04101f; }
+  body.play-mode.theme-blue .question-picker { border-color:#7ec8ff; }
+  body.play-mode.theme-blue .question-picker-title { color:#7ec8ff; }
+  body.play-mode.theme-blue .question-btn { border-color:#2a5a8c; }
+  body.play-mode.theme-blue .question-btn.active { background:#7ec8ff; color:#04101f; border-color:#7ec8ff; }
+  body.play-mode.theme-blue .panel { background:linear-gradient(180deg, #0f2a4a, #04101f); border-color:#7ec8ff; box-shadow: 0 0 30px rgba(126,200,255,0.2) inset, 0 6px 20px rgba(0,0,0,0.5); }
+  body.play-mode.theme-blue .qnum { color:#7ec8ff; }
+  body.play-mode.theme-blue .btn-reveal { background:#7ec8ff; color:#04101f; }
+  body.play-mode.theme-blue .buzzed-name { background:linear-gradient(180deg,#cfe8ff,#7ec8ff); color:#04101f; box-shadow:0 0 25px rgba(126,200,255,0.7); }
+  body.play-mode.theme-blue .selected-label b { color:#7ec8ff; }
+  body.play-mode.theme-blue .team { border-color:#123056; }
+  body.play-mode.theme-blue .team:hover { border-color:#7ec8ff; }
+  body.play-mode.theme-blue .team.selected { border-color:#7ec8ff; background:rgba(126,200,255,0.18); box-shadow:0 0 20px rgba(126,200,255,0.35); }
+  body.play-mode.theme-blue .team .score { color:#7ec8ff; }
 </style>
 </head>
 <body class="play-mode">
@@ -181,6 +199,14 @@
 <div class="setup-section">
   <h3>Student access</h3>
   <div class="link-box">Student link: <b id="studentLinkText">loading...</b> <button onclick="copyStudentLink()" style="margin-left:8px; font-size:12px; padding:5px 10px; border-radius:6px; border:none; background:#7d5236; color:white; cursor:pointer;">Copy link</button></div>
+</div>
+
+<div class="setup-section">
+  <h3>Display style</h3>
+  <div style="text-align:center;">
+    <label style="margin-right:14px;"><input type="radio" name="playTheme" value="gold" onchange="setPlayTheme('gold')" checked> Gold spotlight</label>
+    <label><input type="radio" name="playTheme" value="blue" onchange="setPlayTheme('blue')"> Blue quiz board</label>
+  </div>
 </div>
 
 <div class="setup-section">
@@ -250,6 +276,21 @@ function showTab(name) {
   document.getElementById('tabBtnSetup').classList.toggle('active', name === 'setup');
   document.body.classList.toggle('play-mode', name === 'play');
 }
+
+function setPlayTheme(theme) {
+  document.body.classList.remove('theme-blue');
+  if (theme === 'blue') document.body.classList.add('theme-blue');
+  try { localStorage.setItem('gameShowTheme', theme); } catch (e) {}
+}
+
+function loadSavedTheme() {
+  let theme = 'gold';
+  try { theme = localStorage.getItem('gameShowTheme') || 'gold'; } catch (e) {}
+  setPlayTheme(theme);
+  const radio = document.querySelector('input[name="playTheme"][value="' + theme + '"]');
+  if (radio) radio.checked = true;
+}
+loadSavedTheme();
 
 // Builds the student-facing link automatically from this page's own URL, by
 // swapping "teacher.html" for "player.html", so it's always correct no
@@ -529,6 +570,105 @@ function adjustSelectedScore(delta) {
   }
   const scoresRef = gameRef.child('scores').child(currentSelectedPlayer);
   scoresRef.transaction(current => (current || 0) + delta);
+  if (delta > 0) {
+    celebrate();
+  } else {
+    playWrongSound();
+  }
+}
+
+// ---- Celebration effects: confetti + applause chime for correct answers ----
+function celebrate() {
+  playApplauseSound();
+  launchConfetti();
+}
+
+function playApplauseSound() {
+  if (!sharedAudioCtx) return;
+  if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
+  const ctx = sharedAudioCtx;
+  // A quick, bright ascending chime - reads as a "ta-da!" of success.
+  [523, 659, 784, 1046].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.09);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.09);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.09 + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime + i * 0.09);
+    osc.stop(ctx.currentTime + i * 0.09 + 0.35);
+  });
+  // Soft applause-like noise burst underneath the chime.
+  const bufferSize = ctx.sampleRate * 0.6;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.15;
+  const noise = ctx.createBufferSource();
+  noise.buffer = buffer;
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.2, ctx.currentTime);
+  noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+  noise.connect(noiseGain);
+  noiseGain.connect(ctx.destination);
+  noise.start();
+}
+
+function playWrongSound() {
+  if (!sharedAudioCtx) return;
+  if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
+  const ctx = sharedAudioCtx;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(180, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(90, ctx.currentTime + 0.35);
+  gain.gain.setValueAtTime(0.2, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.35);
+}
+
+function launchConfetti() {
+  const colors = ['#ffd76a', '#b85042', '#7ed957', '#3a6ea5', '#fdf6ec'];
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.top = '0';
+  container.style.left = '0';
+  container.style.width = '100%';
+  container.style.height = '100%';
+  container.style.pointerEvents = 'none';
+  container.style.zIndex = '5000';
+  container.style.overflow = 'hidden';
+  document.body.appendChild(container);
+
+  const pieceCount = 60;
+  for (let i = 0; i < pieceCount; i++) {
+    const piece = document.createElement('div');
+    const size = 6 + Math.random() * 6;
+    piece.style.position = 'absolute';
+    piece.style.width = size + 'px';
+    piece.style.height = (size * 0.4) + 'px';
+    piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.left = (Math.random() * 100) + '%';
+    piece.style.top = '-20px';
+    piece.style.opacity = '0.95';
+    piece.style.transform = 'rotate(' + (Math.random() * 360) + 'deg)';
+    piece.style.borderRadius = '2px';
+    const duration = 1.6 + Math.random() * 1.2;
+    const delay = Math.random() * 0.3;
+    const drift = (Math.random() * 160 - 80);
+    piece.style.transition = 'transform ' + duration + 's cubic-bezier(0.25,0.46,0.45,0.94) ' + delay + 's, opacity ' + duration + 's linear ' + delay + 's';
+    container.appendChild(piece);
+    requestAnimationFrame(() => {
+      piece.style.transform = 'translate(' + drift + 'px, ' + (window.innerHeight + 40) + 'px) rotate(' + (Math.random() * 720) + 'deg)';
+      piece.style.opacity = '0';
+    });
+  }
+  setTimeout(() => container.remove(), 3200);
 }
 
 function sanitize(name) {
