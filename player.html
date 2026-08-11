@@ -124,8 +124,18 @@ function buzzIn() {
   // Guard against buzzing during the lockout window, even if the button
   // state hasn't refreshed yet.
   if (lockedUntil && Date.now() < lockedUntil) return;
-  playBuzzSound();
-  gameRef.child('buzzedBy').transaction(current => current || myName);
+  if (lastData && lastData.buzzedBy) return; // already decided
+  if (lastData && lastData.revealDelayOn) {
+    // Randomize-winner mode: don't reveal anything yet. Just quietly add
+    // myself to the pool of everyone who buzzed during this window - the
+    // teacher's screen picks a winner at random once the window closes.
+    if (lastData.buzzPool && lastData.buzzPool[myName]) return; // already in the pool
+    playBuzzSound();
+    gameRef.child('buzzPool').child(myName).set(true);
+  } else {
+    playBuzzSound();
+    gameRef.child('buzzedBy').transaction(current => current || myName);
+  }
 }
 
 let lockedUntil = 0;
@@ -150,8 +160,10 @@ function updateBuzzAvailability() {
       clearInterval(countdownInterval);
       countdownInterval = null;
     }
-    // Only re-enable if nobody has buzzed in yet.
-    if (!lastData || !lastData.buzzedBy) {
+    // Only re-enable if nobody has buzzed in yet, and (in randomize-winner
+    // mode) I haven't already buzzed myself this question.
+    const iAlreadyBuzzed = !!(lastData && lastData.revealDelayOn && lastData.buzzPool && lastData.buzzPool[myName]);
+    if (!lastData || (!lastData.buzzedBy && !iAlreadyBuzzed)) {
       buzzBtn.disabled = false;
     }
   }
@@ -170,9 +182,15 @@ gameRef.on('value', snapshot => {
 
   const buzzBtn = document.getElementById('buzzBtn');
   const status = document.getElementById('status');
+  const iAlreadyBuzzed = !!(data.revealDelayOn && data.buzzPool && data.buzzPool[myName]);
   if (data.buzzedBy) {
     buzzBtn.disabled = true;
     status.textContent = data.buzzedBy === myName ? "You buzzed in first!" : data.buzzedBy + " buzzed in first.";
+    document.getElementById('countdown').textContent = '';
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+  } else if (iAlreadyBuzzed) {
+    buzzBtn.disabled = true;
+    status.textContent = "You buzzed in! Waiting...";
     document.getElementById('countdown').textContent = '';
     if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
   } else {
