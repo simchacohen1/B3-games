@@ -11,72 +11,105 @@
   .subtitle { text-align: center; color: #7d5236; margin-bottom: 20px; font-style: italic; }
   .panel { max-width: 700px; margin: 0 auto 24px auto; background: white; border-radius: 12px; border: 1px solid #d9a85c; padding: 24px; text-align: center; }
   .qnum { color: #7d5236; font-size: 13px; margin-bottom: 8px; }
-  .qhebrew { font-size: 30px; font-weight: bold; margin-bottom: 10px; }
-  .qtext { font-size: 20px; margin-bottom: 16px; }
+  .qtext { font-size: 26px; font-weight: bold; margin-bottom: 16px; white-space: pre-line; }
   .answer { font-size: 18px; color: #3b6d11; font-weight: bold; min-height: 26px; margin-bottom: 16px; }
   .controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
   .controls button { font-size: 15px; padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; color: white; }
   .btn-next { background: #7d5236; }
   .btn-reveal { background: #d9a85c; color: #3a2417; }
   .btn-clear { background: #999; }
-  .buzzed { max-width: 700px; margin: 0 auto 24px auto; text-align: center; }
+  .buzzed { max-width: 700px; margin: 0 auto 20px auto; text-align: center; }
   .buzzed-name { font-size: 26px; font-weight: bold; color: #b85042; background: #e7e8d1; display: inline-block; padding: 10px 20px; border-radius: 10px; }
-  .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; max-width: 900px; margin: 0 auto; }
-  .team { background: #e7e8d1; border-radius: 10px; padding: 10px; text-align: center; }
-  .team .name { font-weight: bold; font-size: 14px; margin-bottom: 4px; }
-  .team .score { font-size: 20px; font-weight: bold; color: #b85042; }
-  .team button { font-size: 11px; margin: 2px; padding: 3px 6px; border-radius: 6px; border: 1px solid #7d5236; background: white; cursor: pointer; }
   .link-box { max-width: 700px; margin: 0 auto 20px auto; background: #f0ece0; border-radius: 8px; padding: 10px; text-align: center; font-size: 13px; word-break: break-all; }
-  .posuk-picker { max-width: 900px; margin: 0 auto 24px auto; background: white; border-radius: 12px; border: 1px solid #d9a85c; padding: 16px; }
-  .posuk-picker-title { text-align: center; color: #7d5236; font-size: 14px; margin-bottom: 10px; }
-  .posuk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; }
-  .posuk-btn { font-size: 14px; padding: 8px 0; border-radius: 6px; border: 1px solid #d9a85c; background: #f0ece0; color: #3a2417; cursor: pointer; }
-  .posuk-btn.active { background: #b85042; color: white; border-color: #b85042; }
+  .top-controls { text-align: center; margin-bottom: 20px; }
+  .top-controls button { font-size: 15px; padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; color: white; margin: 4px; }
+  .timer-box { display: inline-flex; align-items: center; gap: 6px; background: #f0ece0; border-radius: 8px; padding: 8px 14px; margin: 4px; font-size: 14px; color: #7d5236; }
+  .timer-box input[type="number"] { width: 50px; padding: 4px; border-radius: 6px; border: 1px solid #d9a85c; }
+  .question-picker { max-width: 900px; margin: 0 auto 24px auto; background: white; border-radius: 12px; border: 1px solid #d9a85c; padding: 16px; }
+  .question-picker-title { text-align: center; color: #7d5236; font-size: 14px; margin-bottom: 10px; }
+  .question-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; }
+  .question-btn { font-size: 14px; padding: 8px 0; border-radius: 6px; border: 1px solid #d9a85c; background: #f0ece0; color: #3a2417; cursor: pointer; }
+  .question-btn.active { background: #b85042; color: white; border-color: #b85042; }
+  .score-panel { max-width: 900px; margin: 0 auto 24px auto; }
+  .score-controls { text-align: center; margin-bottom: 12px; }
+  .selected-label { font-size: 16px; color: #7d5236; margin-bottom: 8px; }
+  .selected-label b { color: #b85042; }
+  .score-btn { font-size: 20px; padding: 10px 24px; border-radius: 8px; border: none; cursor: pointer; color: white; margin: 0 6px; }
+  .score-plus { background: #3b6d11; }
+  .score-minus { background: #b85042; }
+  .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; max-width: 900px; margin: 0 auto; }
+  .team { background: #e7e8d1; border-radius: 12px; padding: 16px 10px; text-align: center; cursor: pointer; border: 3px solid transparent; transition: border-color 0.15s; }
+  .team:hover { border-color: #d9a85c; }
+  .team.selected { border-color: #b85042; background: #f6e2b8; }
+  .team .name { font-weight: bold; font-size: 18px; margin-bottom: 6px; word-break: break-word; }
+  .team .score { font-size: 28px; font-weight: bold; color: #b85042; }
   .editor-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(58,36,23,0.6); z-index:1000; overflow-y:auto; padding:20px 0; }
-  .editor-panel { max-width: 760px; margin: 0 auto; background:#fdf6ec; border-radius:12px; padding:20px; }
+  .editor-panel { max-width: 780px; margin: 0 auto; background:#fdf6ec; border-radius:12px; padding:20px; }
   .editor-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px; }
   .editor-header h2 { color:#b85042; margin:0; font-size:20px; }
   .editor-btn { font-size:14px; padding:9px 16px; border-radius:8px; border:none; cursor:pointer; color:white; }
   .editor-save { background:#3b6d11; }
   .editor-cancel { background:#999; }
-  .editor-add-posuk { background:#3a6ea5; display:block; margin:16px auto 0 auto; }
-  .editor-posuk { background:white; border:1px solid #d9a85c; border-radius:10px; padding:14px; margin-bottom:14px; }
-  .editor-posuk-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
-  .editor-posuk-head label { color:#7d5236; font-size:13px; }
-  .editor-posuk-head input { width:60px; font-size:15px; padding:4px 6px; border-radius:6px; border:1px solid #d9a85c; }
-  .editor-del-posuk { margin-left:auto; background:#b85042; font-size:12px; padding:6px 10px; }
-  .editor-question { background:#f0ece0; border-radius:8px; padding:10px; margin-bottom:8px; }
-  .editor-question label { display:block; color:#7d5236; font-size:12px; margin-bottom:2px; margin-top:6px; }
-  .editor-question input, .editor-question textarea { width:100%; box-sizing:border-box; font-size:15px; padding:6px 8px; border-radius:6px; border:1px solid #d9a85c; font-family:inherit; }
-  .editor-heb-input { direction:rtl; font-size:20px; }
-  .editor-question textarea { resize:vertical; min-height:36px; }
-  .editor-del-question { margin-top:8px; background:#999; font-size:12px; padding:5px 10px; }
-  .editor-add-question { background:#d9a85c; color:#3a2417; font-size:13px; padding:6px 12px; display:block; margin-top:4px; }
+  .paste-section { background:white; border:1px solid #d9a85c; border-radius:10px; padding:14px; margin-bottom:16px; }
+  .paste-section h3 { margin:0 0 6px 0; color:#7d5236; font-size:15px; }
+  .paste-hint { font-size:13px; color:#7d5236; margin-bottom:8px; }
+  .paste-section textarea { width:100%; box-sizing:border-box; min-height:110px; font-size:14px; padding:8px; border-radius:8px; border:1px solid #d9a85c; font-family:inherit; }
+  .paste-btn-row { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
+  .paste-btn { font-size:13px; padding:8px 14px; border-radius:8px; border:none; cursor:pointer; color:white; }
+  .paste-add { background:#3a6ea5; }
+  .paste-replace { background:#b85042; }
+  .editor-add-row { background:#3a6ea5; display:block; margin:10px auto 0 auto; }
+  .editor-row { background:white; border:1px solid #d9a85c; border-radius:10px; padding:12px; margin-bottom:10px; }
+  .editor-row label { display:block; color:#7d5236; font-size:12px; margin-bottom:2px; margin-top:6px; }
+  .editor-row textarea { width:100%; box-sizing:border-box; font-size:15px; padding:6px 8px; border-radius:6px; border:1px solid #d9a85c; font-family:inherit; resize:vertical; min-height:44px; }
+  .editor-del-row { margin-top:8px; background:#999; font-size:12px; padding:5px 10px; }
+  .lock-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:#fdf6ec; z-index:2000; display:flex; align-items:center; justify-content:center; }
+  .lock-box { background:white; border:1px solid #d9a85c; border-radius:12px; padding:30px; text-align:center; max-width:340px; }
+  .lock-box h2 { color:#b85042; margin-top:0; }
+  .lock-box input { font-size:18px; padding:10px; width:80%; border-radius:8px; border:1px solid #d9a85c; margin-bottom:12px; }
+  .lock-box button { font-size:16px; padding:10px 20px; border-radius:8px; border:none; background:#7d5236; color:white; cursor:pointer; display:block; margin:0 auto; }
+  .lock-error { color:#b85042; font-size:14px; margin-top:8px; min-height:18px; }
+  .hidden { display:none; }
 </style>
 </head>
 <body>
 
+<div class="lock-overlay" id="lockOverlay">
+  <div class="lock-box">
+    <h2>Teacher Access</h2>
+    <div>Enter the password to continue</div>
+    <input type="password" id="lockPassword" placeholder="Password" onkeydown="if(event.key==='Enter')checkPassword()">
+    <button onclick="checkPassword()">Unlock</button>
+    <div class="lock-error" id="lockError"></div>
+  </div>
+</div>
+
+<div id="mainContent" class="hidden">
+
 <h1>Tent Trail Trivia</h1>
-<div class="subtitle">Teacher control screen - Vayeira, Perek 18</div>
+<div class="subtitle">Teacher control screen</div>
 
 <div class="link-box">Send students this page's URL with <b>player.html</b> instead of <b>teacher.html</b> in the address.</div>
 
-<div style="text-align:center; margin-bottom:20px;">
-  <button id="enableSoundBtn" onclick="enableSound()" style="font-size:15px; padding:10px 18px; border-radius:8px; border:none; cursor:pointer; background:#3b6d11; color:white;">Click here to enable sound</button>
-  <button id="resetGameBtn" onclick="resetGame()" style="font-size:15px; padding:10px 18px; border-radius:8px; border:none; cursor:pointer; background:#b85042; color:white; margin-left:8px;">Reset game (clear all names)</button>
-  <button id="editBtn" onclick="openEditor()" style="font-size:15px; padding:10px 18px; border-radius:8px; border:none; cursor:pointer; background:#3b6d11; color:white; margin-left:8px;">Edit questions</button>
-  <button id="syncBtn" onclick="syncQuestionsToDatabase()" style="font-size:13px; padding:8px 14px; border-radius:8px; border:none; cursor:pointer; background:#999; color:white; margin-left:8px;">Restore built-in questions</button>
+<div class="top-controls">
+  <button id="enableSoundBtn" onclick="enableSound()" style="background:#3b6d11;">Click here to enable sound</button>
+  <button id="resetGameBtn" onclick="resetGame()" style="background:#b85042;">Reset game (clear all names)</button>
+  <button id="editBtn" onclick="openEditor()" style="background:#3b6d11;">Edit questions</button>
+  <button id="syncBtn" onclick="syncQuestionsToDatabase()" style="background:#999; font-size:13px;">Restore built-in questions</button>
+  <span class="timer-box">
+    <label><input type="checkbox" id="delayToggle" onchange="saveDelaySettings()"> Buzzer delay</label>
+    <input type="number" id="delaySeconds" value="10" min="1" max="60" onchange="saveDelaySettings()"> sec
+  </span>
   <span id="soundStatus" style="margin-left:10px; color:#7d5236;"></span>
 </div>
 
-<div class="posuk-picker">
-  <div class="posuk-picker-title">Jump to any posuk (starts at its first question):</div>
-  <div class="posuk-grid" id="posukGrid"></div>
+<div class="question-picker">
+  <div class="question-picker-title">Jump to any question:</div>
+  <div class="question-grid" id="questionGrid"></div>
 </div>
 
 <div class="panel">
-  <div class="qnum" id="qnum">Posuk 1 - Question 1 of 2</div>
-  <div class="qhebrew" id="qhebrew"></div>
+  <div class="qnum" id="qnum">Question 1 of 1</div>
   <div class="qtext" id="qtext"></div>
   <div class="answer" id="answer"></div>
   <div class="controls">
@@ -92,7 +125,14 @@
   <div class="buzzed-name" id="buzzedName">Waiting...</div>
 </div>
 
-<div class="board" id="board"></div>
+<div class="score-panel">
+  <div class="score-controls">
+    <div class="selected-label" id="selectedLabel">No player selected - click a name below</div>
+    <button class="score-btn score-plus" onclick="adjustSelectedScore(1)">+1</button>
+    <button class="score-btn score-minus" onclick="adjustSelectedScore(-1)">-1</button>
+  </div>
+  <div class="board" id="board"></div>
+</div>
 
 <div class="editor-overlay" id="editorOverlay">
   <div class="editor-panel">
@@ -103,12 +143,46 @@
         <button class="editor-btn editor-cancel" onclick="closeEditor()">Cancel</button>
       </div>
     </div>
+
+    <div class="paste-section">
+      <h3>Paste questions from a spreadsheet</h3>
+      <div class="paste-hint">Copy two columns (Question, then Answer) from Google Sheets or Excel and paste below - one question per line. You can also generate questions with Claude or ChatGPT and paste the results here.</div>
+      <textarea id="pasteBox" placeholder="What does &#39;Vayeira&#39; mean?	Hashem appeared&#10;How many malachim came to Avrohom?	Three"></textarea>
+      <div class="paste-btn-row">
+        <button class="paste-btn paste-add" onclick="loadPasted(false)">Add pasted questions to list</button>
+        <button class="paste-btn paste-replace" onclick="loadPasted(true)">Replace entire list with pasted questions</button>
+      </div>
+    </div>
+
     <div id="editorList"></div>
-    <button class="editor-btn editor-add-posuk" onclick="addPosukBlock()">+ Add new posuk</button>
+    <button class="editor-btn editor-add-row" onclick="addQuestionRow()">+ Add one question manually</button>
   </div>
 </div>
 
+</div>
+
 <script>
+// ---- CHANGE THIS PASSWORD TO WHATEVER YOU WANT ----
+const TEACHER_PASSWORD = "vayeira18";
+// ------------------------------------------------------
+
+function checkPassword() {
+  const entered = document.getElementById('lockPassword').value;
+  if (entered === TEACHER_PASSWORD) {
+    document.getElementById('lockOverlay').style.display = 'none';
+    document.getElementById('mainContent').classList.remove('hidden');
+    sessionStorage.setItem('teacherUnlocked', 'yes');
+  } else {
+    document.getElementById('lockError').textContent = 'Incorrect password - try again.';
+  }
+}
+
+// Skip re-entering the password if already unlocked earlier in this browser tab.
+if (sessionStorage.getItem('teacherUnlocked') === 'yes') {
+  document.getElementById('lockOverlay').style.display = 'none';
+  document.getElementById('mainContent').classList.remove('hidden');
+}
+
 // ---- REPLACE WITH YOUR FIREBASE CONFIG ----
 const firebaseConfig = {
   apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
@@ -125,354 +199,197 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const gameRef = db.ref("tentTrailTrivia");
 
-// This is the question set teacher.html knows about locally. It is the "master"
-// copy you edit. Click "Sync questions to database" any time you change it, and
-// player.html (which reads live from the database) will pick up the changes -
-// you never need to edit player.html again.
+// This is the question set teacher.html knows about locally, used only as a
+// one-time fallback seed if the database is ever empty. The real "master" copy
+// lives in the database from now on - edit it using the on-page editor.
 const ACTIVE_SET_ID = "vayeira18";
-const ACTIVE_SET_TITLE = "Vayeira - Perek 18";
+const ACTIVE_SET_TITLE = "Tent Trail Trivia";
 const setRef = db.ref("questionSets/" + ACTIVE_SET_ID);
 
-// Grouped by posuk (1-33). Each posuk has 2 questions.
-// heb: key word/phrase from that posuk. en: the question. ans: the answer.
-const localPosukData = [
-  { posuk: 1, questions: [
-    { heb: "וַיֵּרָא אֵלָיו", en: "This phrase means...", ans: "Hashem appeared to him (Avrohom)" },
-    { heb: "כְּחֹם הַיּוֹם", en: "This phrase means... (why was Avrohom outside despite this?)", ans: "In the heat of the day - yet Avrohom still sat at the entrance of his tent hoping for guests" }
-  ]},
-  { posuk: 2, questions: [
-    { heb: "שְׁלֹשָׁה אֲנָשִׁים נִצָּבִים", en: "How many men (malachim) did Avrohom see standing near him?", ans: "Three" },
-    { heb: "וַיָּרׇץ לִקְרָאתָם", en: "This phrase means...", ans: "He ran toward them (to greet his guests)" }
-  ]},
-  { posuk: 3, questions: [
-    { heb: "אִם נָא מָצָאתִי חֵן בְּעֵינֶיךָ", en: "'Chein' in this posuk means...", ans: "Favor / good will" },
-    { heb: "אַל נָא תַעֲבֹר מֵעַל עַבְדֶּךָ", en: "This phrase means...", ans: "Please do not pass by your servant" }
-  ]},
-  { posuk: 4, questions: [
-    { heb: "יֻקַּח נָא מְעַט מַיִם", en: "What did Avrohom offer to bring first?", ans: "A little water, to wash their feet" },
-    { heb: "וְהִשָּׁעֲנוּ תַּחַת הָעֵץ", en: "This phrase means...", ans: "Rest yourselves under the tree" }
-  ]},
-  { posuk: 5, questions: [
-    { heb: "וְסַעֲדוּ לִבְּכֶם", en: "This phrase means...", ans: "Refresh/sustain yourselves" },
-    { heb: "פַת לֶחֶם", en: "Even though Avrohom said he'd bring just 'a piece of bread,' what did he actually serve?", ans: "A whole feast - meat, milk, butter, and freshly baked cakes" }
-  ]},
-  { posuk: 6, questions: [
-    { heb: "וַיְמַהֵר אַבְרָהָם הָאֹהֱלָה", en: "'Vayemaher' means...", ans: "He hurried" },
-    { heb: "שְׁלֹשׁ סְאִים קֶמַח סֹלֶת", en: "This phrase means...", ans: "Three se'ah of fine flour (a very generous amount)" }
-  ]},
-  { posuk: 7, questions: [
-    { heb: "בֶּן בָּקָר רַךְ וָטוֹב", en: "What did Avrohom run to get from the herd?", ans: "A tender, good calf" },
-    { heb: "וַיִּתֵּן אֶל הַנַּעַר", en: "This phrase means...", ans: "He gave it to the youth (his servant) to prepare" }
-  ]},
-  { posuk: 8, questions: [
-    { heb: "חֶמְאָה וְחָלָב", en: "This phrase means...", ans: "Butter and milk" },
-    { heb: "וְהוּא עֹמֵד עֲלֵיהֶם תַּחַת הָעֵץ", en: "What did Avrohom do while his guests ate?", ans: "He personally stood and served them, even though he was wealthy and elderly" }
-  ]},
-  { posuk: 9, questions: [
-    { heb: "אַיֵּה שָׂרָה אִשְׁתֶּךָ", en: "What did the malachim ask Avrohom?", ans: "'Where is Sarah your wife?'" },
-    { heb: "הִנֵּה בָאֹהֶל", en: "Avrohom's answer that Sarah was in the tent teaches us that Sarah was...", ans: "Tznius (modest, staying inside rather than mingling with guests)" }
-  ]},
-  { posuk: 10, questions: [
-    { heb: "כָּעֵת חַיָּה", en: "What did Hashem promise would happen 'at this time next year'?", ans: "Sarah would have a son" },
-    { heb: "וְשָׂרָה שֹׁמַעַת פֶּתַח הָאֹהֶל", en: "This phrase means...", ans: "Sarah was listening at the entrance of the tent" }
-  ]},
-  { posuk: 11, questions: [
-    { heb: "זְקֵנִים בָּאִים בַּיָּמִים", en: "This phrase describes Avrohom and Sarah as...", ans: "Old, advanced in years" },
-    { heb: "חָדַל לִהְיוֹת לְשָׂרָה אֹרַח כַּנָּשִׁים", en: "This phrase teaches that having a baby naturally was no longer possible for Sarah - so what would it take?", ans: "A miracle from Hashem" }
-  ]},
-  { posuk: 12, questions: [
-    { heb: "וַתִּצְחַק שָׂרָה בְּקִרְבָּהּ", en: "'Vatitzchak' means...", ans: "And she laughed" },
-    { heb: "אַחֲרֵי בְלֹתִי הָיְתָה לִּי עֶדְנָה", en: "This phrase means...", ans: "'Now that I am old, will I have this joy?'" }
-  ]},
-  { posuk: 13, questions: [
-    { heb: "לָמָּה זֶּה צָחֲקָה שָׂרָה", en: "What did Hashem ask Avrohom?", ans: "Why did Sarah laugh?" },
-    { heb: "וַאֲנִי זָקַנְתִּי", en: "Hashem left out that Sarah also said Avrohom was old when repeating her words. What lesson does this teach?", ans: "It's permitted to change small details for the sake of peace (shalom bayis)" }
-  ]},
-  { posuk: 14, questions: [
-    { heb: "הֲיִפָּלֵא מֵה' דָּבָר", en: "This phrase teaches us that...", ans: "Nothing is too wondrous/hard for Hashem" },
-    { heb: "לַמּוֹעֵד אָשׁוּב אֵלֶיךָ", en: "This phrase means...", ans: "At the appointed time I will return to you" }
-  ]},
-  { posuk: 15, questions: [
-    { heb: "וַתְּכַחֵשׁ שָׂרָה", en: "Why did Sarah deny that she laughed?", ans: "Because she was afraid" },
-    { heb: "לֹא כִּי צָחָקְתְּ", en: "This phrase means Hashem told her...", ans: "'No, you did laugh' (teaching us the value of honesty)" }
-  ]},
-  { posuk: 16, questions: [
-    { heb: "וַיַּשְׁקִפוּ עַל פְּנֵי סְדֹם", en: "This phrase means the malachim...", ans: "Looked out toward Sedom" },
-    { heb: "וְאַבְרָהָם הֹלֵךְ עִמָּם לְשַׁלְּחָם", en: "This phrase means...", ans: "Avrohom walked with them to escort/see them off" }
-  ]},
-  { posuk: 17, questions: [
-    { heb: "הַמְכַסֶּה אֲנִי מֵאַבְרָהָם", en: "What did Hashem say about Avrohom?", ans: "'Should I hide from Avrohom what I am about to do?'" },
-    { heb: "אֲשֶׁר אֲנִי עֹשֶׂה", en: "This phrase refers to Hashem's plan to...", ans: "Destroy Sedom and Amora" }
-  ]},
-  { posuk: 18, questions: [
-    { heb: "לְגוֹי גָּדוֹל וְעָצוּם", en: "This phrase means Avrohom would become...", ans: "A great and mighty nation" },
-    { heb: "וְנִבְרְכוּ בוֹ כֹּל גּוֹיֵי הָאָרֶץ", en: "This phrase means...", ans: "All the nations of the earth will be blessed through him" }
-  ]},
-  { posuk: 19, questions: [
-    { heb: "כִּי יְדַעְתִּיו", en: "Why did Hashem choose Avrohom, according to this posuk?", ans: "To teach his children to do tzedakah and mishpat" },
-    { heb: "וְשָׁמְרוּ דֶּרֶךְ ה׳", en: "This phrase means...", ans: "And they will keep the way of Hashem" }
-  ]},
-  { posuk: 20, questions: [
-    { heb: "זַעֲקַת סְדֹם וַעֲמֹרָה", en: "This phrase means...", ans: "The outcry/complaint against Sedom and Amora" },
-    { heb: "וְחַטָּאתָם כִּי כָבְדָה מְאֹד", en: "This phrase means...", ans: "Their sin is very heavy/great" }
-  ]},
-  { posuk: 21, questions: [
-    { heb: "אֵרְדָה נָּא וְאֶרְאֶה", en: "This phrase means...", ans: "I will go down and see" },
-    { heb: "וְאִם לֹא אֵדָעָה", en: "This phrase teaches an important lesson about judging others - what is it?", ans: "Investigate the facts fairly before punishing, rather than judging right away" }
-  ]},
-  { posuk: 22, questions: [
-    { heb: "וְאַבְרָהָם עוֹדֶנּוּ עֹמֵד", en: "What was Avrohom still doing before Hashem?", ans: "Standing (davening/praying)" },
-    { heb: "וַיֵּלְכוּ סְדֹמָה", en: "This phrase means...", ans: "The malachim went toward Sedom, while Avrohom stayed to daven" }
-  ]},
-  { posuk: 23, questions: [
-    { heb: "וַיִּגַּשׁ אַבְרָהָם", en: "'Vayigash' means...", ans: "He drew near / approached" },
-    { heb: "הַאַף תִּסְפֶּה צַדִּיק עִם רָשָׁע", en: "This phrase means...", ans: "'Will You also sweep away the righteous with the wicked?'" }
-  ]},
-  { posuk: 24, questions: [
-    { heb: "אוּלַי יֵשׁ חֲמִשִּׁים צַדִּיקִם", en: "How many tzadikim did Avrohom first ask Hashem about?", ans: "Fifty" },
-    { heb: "וְלֹא תִשָּׂא לַמָּקוֹם", en: "This phrase means...", ans: "And will You not forgive/spare the place" }
-  ]},
-  { posuk: 25, questions: [
-    { heb: "חָלִלָה לְּךָ", en: "This phrase means...", ans: "It would be unthinkable/a desecration for You" },
-    { heb: "הֲשֹׁפֵט כׇּל הָאָרֶץ לֹא יַעֲשֶׂה מִשְׁפָּט", en: "This phrase means...", ans: "'Shall the Judge of all the earth not act justly?'" }
-  ]},
-  { posuk: 26, questions: [
-    { heb: "אִם אֶמְצָא בִסְדֹם חֲמִשִּׁים צַדִּיקִם", en: "What did Hashem answer if 50 tzadikim were found?", ans: "He would spare the entire place" },
-    { heb: "בַּעֲבוּרָם", en: "This word teaches us how powerful even a small number of tzadikim can be - what does it mean?", ans: "'For their sake' - Hashem would spare the whole city for their merit" }
-  ]},
-  { posuk: 27, questions: [
-    { heb: "אָנֹכִי עָפָר וָאֵפֶר", en: "This phrase shows Avrohom's...", ans: "Humility - 'I am but dust and ashes'" },
-    { heb: "הוֹאַלְתִּי לְדַבֵּר אֶל אֲדֹנָי", en: "This phrase means...", ans: "'I have begun/taken it upon myself to speak to my Lord'" }
-  ]},
-  { posuk: 28, questions: [
-    { heb: "אוּלַי יַחְסְרוּן חֲמִשִּׁים הַצַּדִּיקִם חֲמִשָּׁה", en: "Avrohom asks: what if there are 5 fewer than fifty tzadikim?", ans: "Forty-five" },
-    { heb: "הֲתַשְׁחִית בַּחֲמִשָּׁה אֶת כׇּל הָעִיר", en: "This phrase means...", ans: "'Will You destroy the whole city for a shortage of five?'" }
-  ]},
-  { posuk: 29, questions: [
-    { heb: "אוּלַי יִמָּצְאוּן שָׁם אַרְבָּעִים", en: "Avrohom lowers his request to how many?", ans: "Forty" },
-    { heb: "וַיֹּסֶף עוֹד לְדַבֵּר אֵלָיו", en: "This phrase means...", ans: "And he continued further to speak to Hashem (kept davening even after being answered)" }
-  ]},
-  { posuk: 30, questions: [
-    { heb: "אוּלַי יִמָּצְאוּן שָׁם שְׁלֹשִׁים", en: "Avrohom lowers his request to how many?", ans: "Thirty" },
-    { heb: "אַל נָא יִחַר לַאדֹנָי", en: "This phrase means...", ans: "'Please let it not upset my Lord' (Avrohom's respectful, careful tone)" }
-  ]},
-  { posuk: 31, questions: [
-    { heb: "אוּלַי יִמָּצְאוּן שָׁם עֶשְׂרִים", en: "Avrohom lowers his request to how many?", ans: "Twenty" },
-    { heb: "הוֹאַלְתִּי לְדַבֵּר", en: "This phrase means...", ans: "'I have taken it upon myself to speak' (repeated humbly)" }
-  ]},
-  { posuk: 32, questions: [
-    { heb: "בַּעֲבוּר הָעֲשָׂרָה", en: "What is the final, lowest number Avrohom asks about?", ans: "Ten" },
-    { heb: "אַךְ הַפַּעַם", en: "This phrase means...", ans: "'Just this one more time' (Avrohom's final request)" }
-  ]},
-  { posuk: 33, questions: [
-    { heb: "וַיֵּלֶךְ ה' כַּאֲשֶׁר כִּלָּה", en: "This phrase means...", ans: "Hashem went, once He finished speaking" },
-    { heb: "וְאַבְרָהָם שָׁב לִמְקֹמוֹ", en: "This phrase means...", ans: "And Avrohom returned to his place" }
-  ]}
+const localQuestions = [
+  { q: "וַיֵּרָא אֵלָיו\nThis phrase means...", ans: "Hashem appeared to him (Avrohom)" },
+  { q: "כְּחֹם הַיּוֹם\nThis phrase means... (why was Avrohom outside despite this?)", ans: "In the heat of the day - yet Avrohom still sat at the entrance of his tent hoping for guests" },
+  { q: "שְׁלֹשָׁה אֲנָשִׁים נִצָּבִים\nHow many men (malachim) did Avrohom see standing near him?", ans: "Three" },
+  { q: "וַיָּרׇץ לִקְרָאתָם\nThis phrase means...", ans: "He ran toward them (to greet his guests)" },
+  { q: "אִם נָא מָצָאתִי חֵן בְּעֵינֶיךָ\n'Chein' in this posuk means...", ans: "Favor / good will" },
+  { q: "אַל נָא תַעֲבֹר מֵעַל עַבְדֶּךָ\nThis phrase means...", ans: "Please do not pass by your servant" },
+  { q: "יֻקַּח נָא מְעַט מַיִם\nWhat did Avrohom offer to bring first?", ans: "A little water, to wash their feet" },
+  { q: "וְהִשָּׁעֲנוּ תַּחַת הָעֵץ\nThis phrase means...", ans: "Rest yourselves under the tree" },
+  { q: "וְסַעֲדוּ לִבְּכֶם\nThis phrase means...", ans: "Refresh/sustain yourselves" },
+  { q: "פַת לֶחֶם\nEven though Avrohom said he'd bring just 'a piece of bread,' what did he actually serve?", ans: "A whole feast - meat, milk, butter, and freshly baked cakes" },
+  { q: "וַיְמַהֵר אַבְרָהָם הָאֹהֱלָה\n'Vayemaher' means...", ans: "He hurried" },
+  { q: "שְׁלֹשׁ סְאִים קֶמַח סֹלֶת\nThis phrase means...", ans: "Three se'ah of fine flour (a very generous amount)" },
+  { q: "בֶּן בָּקָר רַךְ וָטוֹב\nWhat did Avrohom run to get from the herd?", ans: "A tender, good calf" },
+  { q: "וַיִּתֵּן אֶל הַנַּעַר\nThis phrase means...", ans: "He gave it to the youth (his servant) to prepare" },
+  { q: "חֶמְאָה וְחָלָב\nThis phrase means...", ans: "Butter and milk" },
+  { q: "וְהוּא עֹמֵד עֲלֵיהֶם תַּחַת הָעֵץ\nWhat did Avrohom do while his guests ate?", ans: "He personally stood and served them, even though he was wealthy and elderly" },
+  { q: "אַיֵּה שָׂרָה אִשְׁתֶּךָ\nWhat did the malachim ask Avrohom?", ans: "'Where is Sarah your wife?'" },
+  { q: "הִנֵּה בָאֹהֶל\nAvrohom's answer that Sarah was in the tent teaches us that Sarah was...", ans: "Tznius (modest, staying inside rather than mingling with guests)" },
+  { q: "כָּעֵת חַיָּה\nWhat did Hashem promise would happen 'at this time next year'?", ans: "Sarah would have a son" },
+  { q: "וְשָׂרָה שֹׁמַעַת פֶּתַח הָאֹהֶל\nThis phrase means...", ans: "Sarah was listening at the entrance of the tent" },
+  { q: "זְקֵנִים בָּאִים בַּיָּמִים\nThis phrase describes Avrohom and Sarah as...", ans: "Old, advanced in years" },
+  { q: "חָדַל לִהְיוֹת לְשָׂרָה אֹרַח כַּנָּשִׁים\nThis phrase teaches that having a baby naturally was no longer possible for Sarah - so what would it take?", ans: "A miracle from Hashem" },
+  { q: "וַתִּצְחַק שָׂרָה בְּקִרְבָּהּ\n'Vatitzchak' means...", ans: "And she laughed" },
+  { q: "אַחֲרֵי בְלֹתִי הָיְתָה לִּי עֶדְנָה\nThis phrase means...", ans: "'Now that I am old, will I have this joy?'" },
+  { q: "לָמָּה זֶּה צָחֲקָה שָׂרָה\nWhat did Hashem ask Avrohom?", ans: "Why did Sarah laugh?" },
+  { q: "וַאֲנִי זָקַנְתִּי\nHashem left out that Sarah also said Avrohom was old when repeating her words. What lesson does this teach?", ans: "It's permitted to change small details for the sake of peace (shalom bayis)" },
+  { q: "הֲיִפָּלֵא מֵה' דָּבָר\nThis phrase teaches us that...", ans: "Nothing is too wondrous/hard for Hashem" },
+  { q: "לַמּוֹעֵד אָשׁוּב אֵלֶיךָ\nThis phrase means...", ans: "At the appointed time I will return to you" },
+  { q: "וַתְּכַחֵשׁ שָׂרָה\nWhy did Sarah deny that she laughed?", ans: "Because she was afraid" },
+  { q: "לֹא כִּי צָחָקְתְּ\nThis phrase means Hashem told her...", ans: "'No, you did laugh' (teaching us the value of honesty)" },
+  { q: "וַיַּשְׁקִפוּ עַל פְּנֵי סְדֹם\nThis phrase means the malachim...", ans: "Looked out toward Sedom" },
+  { q: "וְאַבְרָהָם הֹלֵךְ עִמָּם לְשַׁלְּחָם\nThis phrase means...", ans: "Avrohom walked with them to escort/see them off" },
+  { q: "הַמְכַסֶּה אֲנִי מֵאַבְרָהָם\nWhat did Hashem say about Avrohom?", ans: "'Should I hide from Avrohom what I am about to do?'" },
+  { q: "אֲשֶׁר אֲנִי עֹשֶׂה\nThis phrase refers to Hashem's plan to...", ans: "Destroy Sedom and Amora" },
+  { q: "לְגוֹי גָּדוֹל וְעָצוּם\nThis phrase means Avrohom would become...", ans: "A great and mighty nation" },
+  { q: "וְנִבְרְכוּ בוֹ כֹּל גּוֹיֵי הָאָרֶץ\nThis phrase means...", ans: "All the nations of the earth will be blessed through him" },
+  { q: "כִּי יְדַעְתִּיו\nWhy did Hashem choose Avrohom, according to this posuk?", ans: "To teach his children to do tzedakah and mishpat" },
+  { q: "וְשָׁמְרוּ דֶּרֶךְ ה׳\nThis phrase means...", ans: "And they will keep the way of Hashem" },
+  { q: "זַעֲקַת סְדֹם וַעֲמֹרָה\nThis phrase means...", ans: "The outcry/complaint against Sedom and Amora" },
+  { q: "וְחַטָּאתָם כִּי כָבְדָה מְאֹד\nThis phrase means...", ans: "Their sin is very heavy/great" },
+  { q: "אֵרְדָה נָּא וְאֶרְאֶה\nThis phrase means...", ans: "I will go down and see" },
+  { q: "וְאִם לֹא אֵדָעָה\nThis phrase teaches an important lesson about judging others - what is it?", ans: "Investigate the facts fairly before punishing, rather than judging right away" },
+  { q: "וְאַבְרָהָם עוֹדֶנּוּ עֹמֵד\nWhat was Avrohom still doing before Hashem?", ans: "Standing (davening/praying)" },
+  { q: "וַיֵּלְכוּ סְדֹמָה\nThis phrase means...", ans: "The malachim went toward Sedom, while Avrohom stayed to daven" },
+  { q: "וַיִּגַּשׁ אַבְרָהָם\n'Vayigash' means...", ans: "He drew near / approached" },
+  { q: "הַאַף תִּסְפֶּה צַדִּיק עִם רָשָׁע\nThis phrase means...", ans: "'Will You also sweep away the righteous with the wicked?'" },
+  { q: "אוּלַי יֵשׁ חֲמִשִּׁים צַדִּיקִם\nHow many tzadikim did Avrohom first ask Hashem about?", ans: "Fifty" },
+  { q: "וְלֹא תִשָּׂא לַמָּקוֹם\nThis phrase means...", ans: "And will You not forgive/spare the place" },
+  { q: "חָלִלָה לְּךָ\nThis phrase means...", ans: "It would be unthinkable/a desecration for You" },
+  { q: "הֲשֹׁפֵט כׇּל הָאָרֶץ לֹא יַעֲשֶׂה מִשְׁפָּט\nThis phrase means...", ans: "'Shall the Judge of all the earth not act justly?'" },
+  { q: "אִם אֶמְצָא בִסְדֹם חֲמִשִּׁים צַדִּיקִם\nWhat did Hashem answer if 50 tzadikim were found?", ans: "He would spare the entire place" },
+  { q: "בַּעֲבוּרָם\nThis word teaches us how powerful even a small number of tzadikim can be - what does it mean?", ans: "'For their sake' - Hashem would spare the whole city for their merit" },
+  { q: "אָנֹכִי עָפָר וָאֵפֶר\nThis phrase shows Avrohom's...", ans: "Humility - 'I am but dust and ashes'" },
+  { q: "הוֹאַלְתִּי לְדַבֵּר אֶל אֲדֹנָי\nThis phrase means...", ans: "'I have begun/taken it upon myself to speak to my Lord'" },
+  { q: "אוּלַי יַחְסְרוּן חֲמִשִּׁים הַצַּדִּיקִם חֲמִשָּׁה\nAvrohom asks: what if there are 5 fewer than fifty tzadikim?", ans: "Forty-five" },
+  { q: "הֲתַשְׁחִית בַּחֲמִשָּׁה אֶת כׇּל הָעִיר\nThis phrase means...", ans: "'Will You destroy the whole city for a shortage of five?'" },
+  { q: "אוּלַי יִמָּצְאוּן שָׁם אַרְבָּעִים\nAvrohom lowers his request to how many?", ans: "Forty" },
+  { q: "וַיֹּסֶף עוֹד לְדַבֵּר אֵלָיו\nThis phrase means...", ans: "And he continued further to speak to Hashem (kept davening even after being answered)" },
+  { q: "אוּלַי יִמָּצְאוּן שָׁם שְׁלֹשִׁים\nAvrohom lowers his request to how many?", ans: "Thirty" },
+  { q: "אַל נָא יִחַר לַאדֹנָי\nThis phrase means...", ans: "'Please let it not upset my Lord' (Avrohom's respectful, careful tone)" },
+  { q: "אוּלַי יִמָּצְאוּן שָׁם עֶשְׂרִים\nAvrohom lowers his request to how many?", ans: "Twenty" },
+  { q: "הוֹאַלְתִּי לְדַבֵּר\nThis phrase means...", ans: "'I have taken it upon myself to speak' (repeated humbly)" },
+  { q: "בַּעֲבוּר הָעֲשָׂרָה\nWhat is the final, lowest number Avrohom asks about?", ans: "Ten" },
+  { q: "אַךְ הַפַּעַם\nThis phrase means...", ans: "'Just this one more time' (Avrohom's final request)" },
+  { q: "וַיֵּלֶךְ ה' כַּאֲשֶׁר כִּלָּה\nThis phrase means...", ans: "Hashem went, once He finished speaking" },
+  { q: "וְאַבְרָהָם שָׁב לִמְקֹמוֹ\nThis phrase means...", ans: "And Avrohom returned to his place" },
 ];
 
 // These get filled in once the active question set is loaded from the database
-// (or, the first time ever, seeded into the database from localPosukData below).
-let posukData = [];
+// (or, the first time ever, seeded into the database from localQuestions below).
 let questions = [];
-let posukStartIndex = [];
 let questionsReady = false;
 
-function buildFromPosukData(data) {
-  posukData = data;
-  questions = [];
-  posukData.forEach(p => {
-    p.questions.forEach((q, i) => {
-      questions.push({ posuk: p.posuk, qOfPosuk: i + 1, totalForPosuk: p.questions.length, heb: q.heb, en: q.en, ans: q.ans });
-    });
-  });
-  posukStartIndex = [];
-  let idx = 0;
-  posukData.forEach(p => {
-    posukStartIndex.push(idx);
-    idx += p.questions.length;
-  });
-  buildPosukGrid();
+function buildFromQuestions(data) {
+  questions = data;
+  buildQuestionGrid();
   questionsReady = true;
 }
 
+// Flattens the old posuk-grouped format (heb/en/ans per posuk) into the new
+// flat question/answer format, so nothing is lost if this file is loaded
+// against a database that still has the old-style data in it.
+function flattenLegacyPosukData(posukData) {
+  const flat = [];
+  posukData.forEach(p => {
+    p.questions.forEach(q => {
+      const text = (q.heb ? q.heb + "\n" : "") + (q.en || "");
+      flat.push({ q: text, ans: q.ans || "" });
+    });
+  });
+  return flat;
+}
+
+// Requires the user to type an exact word before proceeding, so a destructive
+// action can't happen from a single accidental click through a popup.
+function confirmByTyping(word, message) {
+  const entered = prompt(message + '\n\nType ' + word + ' below to confirm:');
+  return entered !== null && entered.trim().toUpperCase() === word;
+}
+
 function syncQuestionsToDatabase() {
-  const sure = confirm("This will REPLACE your current question list with the original built-in list from when this file was created. Any edits you made in the on-page editor will be lost. Continue?");
+  const sure = confirmByTyping('RESTORE', "This will REPLACE your current question list with the original built-in Vayeira Perek 18 list this file shipped with. Any edits you made will be lost.");
   if (!sure) return;
-  setRef.set({ title: ACTIVE_SET_TITLE, posukData: localPosukData }).then(() => {
+  setRef.set({ title: ACTIVE_SET_TITLE, questions: localQuestions }).then(() => {
     document.getElementById('soundStatus').textContent = 'Restored built-in questions';
   }).catch(err => {
     document.getElementById('soundStatus').textContent = 'Sync error: ' + err.message;
   });
 }
 
-// ---------- On-page question editor ----------
-
-function openEditor() {
-  renderEditor(posukData);
-  document.getElementById('editorOverlay').style.display = 'block';
-}
-
-function closeEditor() {
-  document.getElementById('editorOverlay').style.display = 'none';
-}
-
-function renderEditor(data) {
-  const list = document.getElementById('editorList');
-  list.innerHTML = '';
-  data.forEach(p => {
-    list.appendChild(createPosukBlock(p.posuk, p.questions));
-  });
-}
-
-function createPosukBlock(posukNum, questionsArr) {
-  const block = document.createElement('div');
-  block.className = 'editor-posuk';
-
-  const head = document.createElement('div');
-  head.className = 'editor-posuk-head';
-  head.innerHTML =
-    '<label>Posuk #</label>' +
-    '<input type="number" class="posuk-num-input" value="' + posukNum + '" min="1">' +
-    '<button class="editor-btn editor-del-posuk" onclick="removePosukBlock(this)">Delete this posuk</button>';
-  block.appendChild(head);
-
-  const qContainer = document.createElement('div');
-  qContainer.className = 'editor-questions-container';
-  (questionsArr || []).forEach(q => {
-    qContainer.appendChild(createQuestionBlock(q));
-  });
-  block.appendChild(qContainer);
-
-  const addQBtn = document.createElement('button');
-  addQBtn.className = 'editor-btn editor-add-question';
-  addQBtn.textContent = '+ Add question to this posuk';
-  addQBtn.onclick = () => qContainer.appendChild(createQuestionBlock({ heb: '', en: '', ans: '' }));
-  block.appendChild(addQBtn);
-
-  return block;
-}
-
-function createQuestionBlock(q) {
-  const div = document.createElement('div');
-  div.className = 'editor-question';
-  div.innerHTML =
-    '<label>Hebrew phrase</label>' +
-    '<input type="text" class="editor-heb-input q-heb" value="' + escapeAttr(q.heb || '') + '">' +
-    '<label>Question</label>' +
-    '<textarea class="q-en">' + escapeHtml(q.en || '') + '</textarea>' +
-    '<label>Answer</label>' +
-    '<textarea class="q-ans">' + escapeHtml(q.ans || '') + '</textarea>' +
-    '<button class="editor-btn editor-del-question" onclick="this.parentElement.remove()">Delete this question</button>';
-  return div;
-}
-
-function escapeAttr(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-}
-function escapeHtml(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function addPosukBlock() {
-  const list = document.getElementById('editorList');
-  // Suggest the next posuk number based on the last block's number + 1
-  const nums = [...list.querySelectorAll('.posuk-num-input')].map(i => parseInt(i.value) || 0);
-  const nextNum = nums.length ? Math.max(...nums) + 1 : 1;
-  list.appendChild(createPosukBlock(nextNum, [{ heb: '', en: '', ans: '' }]));
-}
-
-function removePosukBlock(btn) {
-  const sure = confirm("Delete this entire posuk and its questions?");
-  if (!sure) return;
-  btn.closest('.editor-posuk').remove();
-}
-
-function saveEditor() {
-  const posukBlocks = [...document.querySelectorAll('#editorList > .editor-posuk')];
-  if (posukBlocks.length === 0) {
-    alert("You need at least one posuk before saving.");
-    return;
-  }
-  const newPosukData = [];
-  for (const block of posukBlocks) {
-    const posukNum = parseInt(block.querySelector('.posuk-num-input').value) || 0;
-    const qBlocks = [...block.querySelectorAll('.editor-question')];
-    const questions = qBlocks.map(qb => ({
-      heb: qb.querySelector('.q-heb').value.trim(),
-      en: qb.querySelector('.q-en').value.trim(),
-      ans: qb.querySelector('.q-ans').value.trim()
-    })).filter(q => q.heb || q.en || q.ans); // drop fully-empty rows
-    if (questions.length > 0) {
-      newPosukData.push({ posuk: posukNum, questions });
-    }
-  }
-  if (newPosukData.length === 0) {
-    alert("There's nothing to save - add at least one question first.");
-    return;
-  }
-  setRef.set({ title: ACTIVE_SET_TITLE, posukData: newPosukData }).then(() => {
-    document.getElementById('soundStatus').textContent = 'Questions saved (' + newPosukData.length + ' pesukim)';
-    closeEditor();
-  }).catch(err => {
-    document.getElementById('soundStatus').textContent = 'Save error: ' + err.message;
-  });
-}
-
 // On load: read the active question set from the database. If it doesn't exist
-// yet (first time this game is ever run), seed it from localPosukData automatically.
+// yet (first time this game is ever run), seed it from localQuestions automatically.
+// If it exists in the old posuk-grouped format, flatten it automatically.
 setRef.once('value').then(snap => {
   const existing = snap.val();
-  if (existing && existing.posukData) {
-    buildFromPosukData(existing.posukData);
+  if (existing && existing.questions) {
+    buildFromQuestions(existing.questions);
+  } else if (existing && existing.posukData) {
+    const flat = flattenLegacyPosukData(existing.posukData);
+    setRef.set({ title: ACTIVE_SET_TITLE, questions: flat }).then(() => {
+      buildFromQuestions(flat);
+      document.getElementById('soundStatus').textContent = 'Converted old question format automatically';
+    });
   } else {
-    setRef.set({ title: ACTIVE_SET_TITLE, posukData: localPosukData }).then(() => {
-      buildFromPosukData(localPosukData);
+    setRef.set({ title: ACTIVE_SET_TITLE, questions: localQuestions }).then(() => {
+      buildFromQuestions(localQuestions);
       document.getElementById('soundStatus').textContent = 'Question set created in database';
     });
   }
-  // Keep this screen live-updated if the question set changes (e.g. synced from
-  // another tab, or you click "Sync" again later).
   setRef.on('value', liveSnap => {
     const liveData = liveSnap.val();
-    if (liveData && liveData.posukData) {
-      buildFromPosukData(liveData.posukData);
+    if (liveData && liveData.questions) {
+      buildFromQuestions(liveData.questions);
     }
   });
 });
 
 function loadQuestion(qIndex) {
   const q = questions[qIndex] || questions[0];
-  document.getElementById('qnum').textContent = 'Posuk ' + q.posuk + ' - Question ' + q.qOfPosuk + ' of ' + q.totalForPosuk;
-  document.getElementById('qhebrew').textContent = q.heb;
-  document.getElementById('qtext').textContent = q.en;
-  highlightActivePosuk(q.posuk);
+  document.getElementById('qnum').textContent = 'Question ' + (qIndex + 1) + ' of ' + questions.length;
+  document.getElementById('qtext').textContent = q.q;
+  highlightActiveQuestion(qIndex);
 }
 
-function buildPosukGrid() {
-  const grid = document.getElementById('posukGrid');
+function buildQuestionGrid() {
+  const grid = document.getElementById('questionGrid');
   grid.innerHTML = '';
-  posukData.forEach((p, i) => {
+  questions.forEach((q, i) => {
     const btn = document.createElement('button');
-    btn.className = 'posuk-btn';
-    btn.id = 'posukBtn' + p.posuk;
-    btn.textContent = p.posuk;
-    btn.onclick = () => goToQuestion(posukStartIndex[i]);
+    btn.className = 'question-btn';
+    btn.id = 'qBtn' + i;
+    btn.textContent = i + 1;
+    btn.onclick = () => goToQuestion(i);
     grid.appendChild(btn);
   });
 }
 
-function highlightActivePosuk(posukNum) {
-  posukData.forEach(p => {
-    const btn = document.getElementById('posukBtn' + p.posuk);
-    if (btn) btn.classList.toggle('active', p.posuk === posukNum);
+function highlightActiveQuestion(qIndex) {
+  questions.forEach((q, i) => {
+    const btn = document.getElementById('qBtn' + i);
+    if (btn) btn.classList.toggle('active', i === qIndex);
   });
+}
+
+function saveDelaySettings() {
+  const on = document.getElementById('delayToggle').checked;
+  const secs = parseInt(document.getElementById('delaySeconds').value) || 10;
+  gameRef.child('buzzerDelayOn').set(on);
+  gameRef.child('buzzerDelaySeconds').set(secs);
 }
 
 function goToQuestion(qIndex) {
   ensureAudioAwake();
-  gameRef.child('qIndex').set(qIndex);
-  gameRef.child('revealed').set(false);
-  gameRef.child('buzzedBy').set(null);
+  const delayOn = document.getElementById('delayToggle').checked;
+  const delaySecs = parseInt(document.getElementById('delaySeconds').value) || 10;
+  const updates = {
+    qIndex: qIndex,
+    revealed: false,
+    buzzedBy: null,
+    selectedPlayer: null
+  };
+  updates.buzzUnlockAt = delayOn ? (Date.now() + delaySecs * 1000) : 0;
+  gameRef.update(updates);
 }
 
 function nextQuestion() {
@@ -505,9 +422,20 @@ function clearBuzz() {
   gameRef.child('buzzedBy').set(null);
 }
 
-function adjustScore(name, delta) {
+let currentSelectedPlayer = null;
+
+function selectPlayer(name) {
   ensureAudioAwake();
-  const scoresRef = gameRef.child('scores').child(sanitize(name));
+  gameRef.child('selectedPlayer').set(name);
+}
+
+function adjustSelectedScore(delta) {
+  ensureAudioAwake();
+  if (!currentSelectedPlayer) {
+    alert("Click a player's name first to select them.");
+    return;
+  }
+  const scoresRef = gameRef.child('scores').child(currentSelectedPlayer);
   scoresRef.transaction(current => (current || 0) + delta);
 }
 
@@ -517,13 +445,17 @@ function sanitize(name) {
 
 function resetGame() {
   ensureAudioAwake();
-  const sure = confirm("This will erase ALL player names and scores for a fresh start. Continue?");
+  const sure = confirmByTyping('RESET', "This will erase ALL player names and scores for a fresh start.");
   if (!sure) return;
   gameRef.set({
     qIndex: 0,
     revealed: false,
     buzzedBy: null,
-    scores: null
+    scores: null,
+    selectedPlayer: null,
+    buzzerDelayOn: document.getElementById('delayToggle').checked,
+    buzzerDelaySeconds: parseInt(document.getElementById('delaySeconds').value) || 10,
+    buzzUnlockAt: 0
   });
   document.getElementById('soundStatus').textContent = 'Game reset - names cleared';
 }
@@ -583,26 +515,139 @@ gameRef.on('value', snapshot => {
   document.getElementById('answer').textContent = data.revealed ? questions[qIndex].ans : '';
   document.getElementById('buzzedName').textContent = data.buzzedBy || 'Waiting...';
 
+  document.getElementById('delayToggle').checked = !!data.buzzerDelayOn;
+  if (data.buzzerDelaySeconds) {
+    document.getElementById('delaySeconds').value = data.buzzerDelaySeconds;
+  }
+
   if (data.buzzedBy && data.buzzedBy !== lastBuzzedBy) {
     document.getElementById('soundStatus').textContent = 'Buzz detected: ' + data.buzzedBy;
     playAlertSound();
+    // Auto-select whoever just buzzed in, so the teacher can award points immediately.
+    gameRef.child('selectedPlayer').set(data.buzzedBy);
   }
   lastBuzzedBy = data.buzzedBy || null;
+
+  currentSelectedPlayer = data.selectedPlayer || null;
+  document.getElementById('selectedLabel').innerHTML = currentSelectedPlayer
+    ? 'Selected: <b>' + currentSelectedPlayer + '</b>'
+    : 'No player selected - click a name below';
 
   const scores = data.scores || {};
   const board = document.getElementById('board');
   board.innerHTML = '';
   Object.keys(scores).sort().forEach(name => {
     const div = document.createElement('div');
-    div.className = 'team';
+    div.className = 'team' + (name === currentSelectedPlayer ? ' selected' : '');
     div.innerHTML =
       '<div class="name">' + name + '</div>' +
-      '<div class="score">' + scores[name] + '</div>' +
-      '<button onclick="adjustScore(\'' + name + '\',1)">+1</button>' +
-      '<button onclick="adjustScore(\'' + name + '\',-1)">-1</button>';
+      '<div class="score">' + scores[name] + '</div>';
+    div.onclick = () => selectPlayer(name);
     board.appendChild(div);
   });
 });
+
+// ---------- On-page question editor ----------
+
+function openEditor() {
+  document.getElementById('pasteBox').value = '';
+  renderEditor(questions);
+  document.getElementById('editorOverlay').style.display = 'block';
+}
+
+function closeEditor() {
+  document.getElementById('editorOverlay').style.display = 'none';
+}
+
+function renderEditor(data) {
+  const list = document.getElementById('editorList');
+  list.innerHTML = '';
+  data.forEach(item => {
+    list.appendChild(createQuestionRow(item.q, item.ans));
+  });
+}
+
+function createQuestionRow(q, ans) {
+  const div = document.createElement('div');
+  div.className = 'editor-row';
+  div.innerHTML =
+    '<label>Question</label>' +
+    '<textarea class="row-q">' + escapeHtml(q || '') + '</textarea>' +
+    '<label>Answer</label>' +
+    '<textarea class="row-ans">' + escapeHtml(ans || '') + '</textarea>' +
+    '<button class="editor-btn editor-del-row" onclick="this.parentElement.remove()">Delete this question</button>';
+  return div;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function addQuestionRow() {
+  document.getElementById('editorList').appendChild(createQuestionRow('', ''));
+}
+
+// Parses pasted spreadsheet text. Each line = one question. Splits on the
+// first TAB if present (normal when pasting two columns from a spreadsheet),
+// otherwise falls back to splitting on the first comma.
+function parsePastedText(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  const rows = [];
+  lines.forEach(line => {
+    let q, ans;
+    if (line.includes('\t')) {
+      const idx = line.indexOf('\t');
+      q = line.slice(0, idx).trim();
+      ans = line.slice(idx + 1).trim();
+    } else if (line.includes(',')) {
+      const idx = line.indexOf(',');
+      q = line.slice(0, idx).trim();
+      ans = line.slice(idx + 1).trim();
+    } else {
+      q = line;
+      ans = '';
+    }
+    if (q) rows.push({ q, ans });
+  });
+  return rows;
+}
+
+function loadPasted(replace) {
+  const text = document.getElementById('pasteBox').value;
+  const rows = parsePastedText(text);
+  if (rows.length === 0) {
+    alert("Nothing to load - paste some questions first (Question, then Tab or comma, then Answer, one per line).");
+    return;
+  }
+  if (replace) {
+    const sure = confirmByTyping('REPLACE', "This will replace every question currently in the editor below with the " + rows.length + " pasted questions.");
+    if (!sure) return;
+    document.getElementById('editorList').innerHTML = '';
+  }
+  rows.forEach(r => {
+    document.getElementById('editorList').appendChild(createQuestionRow(r.q, r.ans));
+  });
+  document.getElementById('pasteBox').value = '';
+}
+
+function saveEditor() {
+  const rows = [...document.querySelectorAll('#editorList > .editor-row')];
+  const newQuestions = rows.map(row => ({
+    q: row.querySelector('.row-q').value.trim(),
+    ans: row.querySelector('.row-ans').value.trim()
+  })).filter(item => item.q || item.ans);
+
+  if (newQuestions.length === 0) {
+    alert("There's nothing to save - add at least one question first.");
+    return;
+  }
+  setRef.set({ title: ACTIVE_SET_TITLE, questions: newQuestions }).then(() => {
+    document.getElementById('soundStatus').textContent = 'Saved (' + newQuestions.length + ' questions)';
+    closeEditor();
+  }).catch(err => {
+    document.getElementById('soundStatus').textContent = 'Save error: ' + err.message;
+  });
+}
 </script>
 
 </body>
