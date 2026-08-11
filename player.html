@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Tent Trail Trivia - Play</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Game Show - Play</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
@@ -14,19 +17,19 @@
   .name-box button { font-size: 16px; padding: 10px 16px; border-radius: 8px; border: none; background: #7d5236; color: white; cursor: pointer; margin-left: 6px; }
   .panel { max-width: 500px; margin: 0 auto 24px auto; background: white; border-radius: 12px; border: 1px solid #d9a85c; padding: 24px; }
   .qnum { color: #7d5236; font-size: 13px; margin-bottom: 8px; }
-  .qhebrew { font-size: 32px; font-weight: bold; margin-bottom: 10px; }
-  .qtext { font-size: 20px; margin-bottom: 20px; }
+  .qtext { font-size: 24px; font-weight: bold; margin-bottom: 20px; white-space: pre-line; }
   .buzz-btn { font-size: 24px; padding: 24px 40px; border-radius: 50%; border: none; background: #b85042; color: white; cursor: pointer; width: 160px; height: 160px; }
   .buzz-btn:disabled { background: #ccc; cursor: not-allowed; }
   .status { margin-top: 16px; font-size: 16px; color: #7d5236; }
+  .countdown { margin-top: 16px; font-size: 20px; color: #b85042; font-weight: bold; }
   .score-display { margin-top: 20px; font-size: 18px; }
   .hidden { display: none; }
 </style>
 </head>
 <body>
 
-<h1>Tent Trail Trivia</h1>
-<div class="subtitle">Vayeira, Perek 18</div>
+<h1>Game Show</h1>
+<div class="subtitle">Get ready to play!</div>
 
 <div class="name-box" id="nameBox">
   <input type="text" id="nameInput" placeholder="Type your name" />
@@ -35,10 +38,10 @@
 
 <div id="gameArea" class="hidden">
   <div class="panel">
-    <div class="qnum" id="qnum">Posuk 1 - Question 1 of 2</div>
-    <div class="qhebrew" id="qhebrew"></div>
+    <div class="qnum" id="qnum">Question 1 of 1</div>
     <div class="qtext" id="qtext"></div>
     <button class="buzz-btn" id="buzzBtn" onclick="buzzIn()">BUZZ IN</button>
+    <div class="countdown" id="countdown"></div>
     <div class="status" id="status"></div>
   </div>
   <div class="score-display">Your score: <span id="myScore">0</span></div>
@@ -61,29 +64,20 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const gameRef = db.ref("tentTrailTrivia");
 
-// Questions now live in the database (teacher.html is the master copy and syncs
-// them here). This screen just reads them live - you never need to edit this
-// file to update questions.
+// Questions live in the database (teacher.html is the master copy). This
+// screen just reads them live - you never need to edit this file for
+// question changes.
 const ACTIVE_SET_ID = "vayeira18";
 const setRef = db.ref("questionSets/" + ACTIVE_SET_ID);
 
 let questions = [];
 let questionsReady = false;
 
-function buildFromPosukData(posukData) {
-  questions = [];
-  posukData.forEach(p => {
-    p.questions.forEach((q, i) => {
-      questions.push({ posuk: p.posuk, qOfPosuk: i + 1, totalForPosuk: p.questions.length, heb: q.heb, en: q.en });
-    });
-  });
-  questionsReady = true;
-}
-
 setRef.on('value', snap => {
   const data = snap.val();
-  if (data && data.posukData) {
-    buildFromPosukData(data.posukData);
+  if (data && data.questions) {
+    questions = data.questions;
+    questionsReady = true;
   }
 });
 
@@ -127,27 +121,63 @@ function playBuzzSound() {
 }
 
 function buzzIn() {
+  // Guard against buzzing during the lockout window, even if the button
+  // state hasn't refreshed yet.
+  if (lockedUntil && Date.now() < lockedUntil) return;
   playBuzzSound();
   gameRef.child('buzzedBy').transaction(current => current || myName);
+}
+
+let lockedUntil = 0;
+let countdownInterval = null;
+let lastData = null;
+
+function updateBuzzAvailability() {
+  const buzzBtn = document.getElementById('buzzBtn');
+  const countdownEl = document.getElementById('countdown');
+  const now = Date.now();
+
+  if (lockedUntil && now < lockedUntil) {
+    buzzBtn.disabled = true;
+    const secsLeft = Math.ceil((lockedUntil - now) / 1000);
+    countdownEl.textContent = 'Wait ' + secsLeft + '...';
+    if (!countdownInterval) {
+      countdownInterval = setInterval(updateBuzzAvailability, 250);
+    }
+  } else {
+    countdownEl.textContent = '';
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+    // Only re-enable if nobody has buzzed in yet.
+    if (!lastData || !lastData.buzzedBy) {
+      buzzBtn.disabled = false;
+    }
+  }
 }
 
 gameRef.on('value', snapshot => {
   if (!questionsReady) return; // wait until questions have loaded from the database
   const data = snapshot.val() || {};
+  lastData = data;
   const qIndex = data.qIndex || 0;
   const q = questions[qIndex] || questions[0];
-  document.getElementById('qnum').textContent = 'Posuk ' + q.posuk + ' - Question ' + q.qOfPosuk + ' of ' + q.totalForPosuk;
-  document.getElementById('qhebrew').textContent = q.heb;
-  document.getElementById('qtext').textContent = q.en;
+  document.getElementById('qnum').textContent = 'Question ' + (qIndex + 1) + ' of ' + questions.length;
+  document.getElementById('qtext').textContent = q.q;
+
+  lockedUntil = data.buzzerDelayOn ? (data.buzzUnlockAt || 0) : 0;
 
   const buzzBtn = document.getElementById('buzzBtn');
   const status = document.getElementById('status');
   if (data.buzzedBy) {
     buzzBtn.disabled = true;
     status.textContent = data.buzzedBy === myName ? "You buzzed in first!" : data.buzzedBy + " buzzed in first.";
+    document.getElementById('countdown').textContent = '';
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
   } else {
-    buzzBtn.disabled = false;
     status.textContent = "";
+    updateBuzzAvailability();
   }
 
   if (myName && data.scores && data.scores[myName] !== undefined) {
