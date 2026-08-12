@@ -117,6 +117,8 @@
     font-size:0.85rem;
   }
   .attempt-row .top-line{ display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:4px;}
+  .row{ display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:3px 0; font-size:0.9rem; }
+  .row .label{ color: var(--ink-soft); }
   .score-pill{
     background: var(--gold-light); border-radius:999px; padding:2px 10px; font-weight:700; font-size:0.75rem;
   }
@@ -1014,9 +1016,9 @@ async function renderReportResults(){
     if(showParshaCol) headerCells += '<th>Parsha</th>';
     if(showPerekCol) headerCells += '<th>Perek</th>';
     if(showPosukCol) headerCells += '<th>Posuk</th>';
-    headerCells += '<th>Date</th>';
     if(showReadingCol) headerCells += '<th>Reading %</th>';
     if(showComprehensionCol) headerCells += '<th>Comprehension</th>';
+    headerCells += '<th>Date</th>';
 
     let html = `<table class="roster-table"><thead><tr>${headerCells}</tr></thead><tbody>`;
     rows.forEach(r => {
@@ -1027,9 +1029,9 @@ async function renderReportResults(){
       if(showParshaCol) cells += `<td>${r.parshaName}</td>`;
       if(showPerekCol) cells += `<td>${r.perekNum}</td>`;
       if(showPosukCol) cells += `<td>${r.posukLabel}</td>`;
-      cells += `<td>${dateLabel}</td>`;
       if(showReadingCol) cells += `<td>${scoreLabel}</td>`;
       if(showComprehensionCol) cells += `<td>${verdictLabel(r.comprehensionVerdict)}</td>`;
+      cells += `<td>${dateLabel}</td>`;
       html += `<tr>${cells}</tr>`;
     });
     html += '</tbody></table>';
@@ -1045,14 +1047,14 @@ async function renderReportResults(){
 // because it looked redundant in the current on-screen view.
 function downloadReportCsv(){
   if(!reportRows.length) return;
-  const header = ['Student','Parsha','Perek','Posuk','Date','Reading %','Comprehension'];
+  const header = ['Student','Parsha','Perek','Posuk','Reading %','Comprehension','Date'];
   const lines = [header.join(',')];
   reportRows.forEach(r => {
     const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) : '';
     const verdictText = r.comprehensionVerdict || '';
     const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '';
     // Quote the student/parsha name in case a name ever contains a comma.
-    lines.push([`"${r.studentName}"`, `"${r.parshaName}"`, r.perekNum, r.posukLabel, dateLabel, scoreLabel, verdictText].join(','));
+    lines.push([`"${r.studentName}"`, `"${r.parshaName}"`, r.perekNum, r.posukLabel, scoreLabel, verdictText, dateLabel].join(','));
   });
   const csv = lines.join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -1079,9 +1081,9 @@ function printReport(){
       <td>${r.parshaName}</td>
       <td>${r.perekNum}</td>
       <td>${r.posukLabel}</td>
-      <td>${dateLabel}</td>
       <td>${scoreLabel}</td>
       <td>${verdictLabel(r.comprehensionVerdict)}</td>
+      <td>${dateLabel}</td>
     </tr>`;
   }).join('');
   const win = window.open('', '_blank');
@@ -1097,7 +1099,7 @@ function printReport(){
     <h1>Posuk Practice Scroll — Report</h1>
     <div class="meta">Generated ${new Date().toLocaleDateString()}</div>
     <table><thead><tr>
-      <th>Student</th><th>Parsha</th><th>Perek</th><th>Posuk</th><th>Date</th><th>Reading %</th><th>Comprehension</th>
+      <th>Student</th><th>Parsha</th><th>Perek</th><th>Posuk</th><th>Reading %</th><th>Comprehension</th><th>Date</th>
     </tr></thead><tbody>${rowsHtml}</tbody></table>
     </body></html>`);
   win.document.close();
