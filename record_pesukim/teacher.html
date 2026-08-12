@@ -340,6 +340,9 @@ function effHebrewScore(record){
 function effComprehensionVerdict(record){
   return record ? (record.comprehensionFinalVerdict || record.comprehensionVerdict) : null;
 }
+function effComprehensionScore(record){
+  return (record && typeof record.comprehensionScore === 'number') ? record.comprehensionScore : null;
+}
 function hasPendingDispute(record){
   return !!record && (record.hebrewDisputeStatus === 'pending' || record.comprehensionDisputeStatus === 'pending');
 }
@@ -712,6 +715,14 @@ function verdictLabel(v){
   return '—';
 }
 
+// Same as verdictLabel but appends the supplementary 0-100 score, e.g.
+// "🌟 Excellent (94%)" — used wherever a report row displays comprehension.
+function verdictLabelWithScore(v, score){
+  const label = verdictLabel(v);
+  if(label === '—' || typeof score !== 'number') return label;
+  return label + ' (' + score + '%)';
+}
+
 // Builds one row per posuk (or posuk-range) per student from the raw
 // attempts tree, resolving each posukKey into a parsha name / perek /
 // posuk number so it can be filtered and displayed like the rest of the
@@ -752,7 +763,8 @@ function buildReportRows(allAttempts){
         posukLabel: isRange ? `${rangeStart}–${rangeEnd}` : String(posukNum),
         timestamp: latest ? latest.timestamp : null,
         hebrewScore: isRange ? null : effHebrewScore(latest), // range attempts are comprehension-only
-        comprehensionVerdict: effComprehensionVerdict(latest)
+        comprehensionVerdict: effComprehensionVerdict(latest),
+        comprehensionScore: effComprehensionScore(latest)
       });
     });
   });
@@ -935,20 +947,22 @@ function getSelectedStudentIds(){
   return [...document.querySelectorAll('.report-student-cb')].filter(cb => cb.checked).map(cb => cb.value);
 }
 
-async // Shared summary-stats calculation used by the on-screen report, the CSV
+// Shared summary-stats calculation used by the on-screen report, the CSV
 // export, and the printable PDF, so all three always agree with each other.
 function computeReportSummary(rows, scoreType){
   const distinctStudents = new Set(rows.map(r => r.studentId)).size;
   const readingScores = rows.map(r => r.hebrewScore).filter(s => typeof s === 'number');
   const avgReading = readingScores.length ? Math.round(readingScores.reduce((a,b)=>a+b,0) / readingScores.length) : null;
+  const comprehensionScores = rows.map(r => r.comprehensionScore).filter(s => typeof s === 'number');
+  const avgComprehension = comprehensionScores.length ? Math.round(comprehensionScores.reduce((a,b)=>a+b,0) / comprehensionScores.length) : null;
   const verdictCounts = { excellent: 0, correct: 0, partial: 0, incorrect: 0 };
   rows.forEach(r => { if(r.comprehensionVerdict && verdictCounts.hasOwnProperty(r.comprehensionVerdict)) verdictCounts[r.comprehensionVerdict]++; });
-  return { distinctStudents, avgReading, verdictCounts };
+  return { distinctStudents, avgReading, avgComprehension, verdictCounts };
 }
 
 // Renders the summary as an HTML block (used on-screen and in the print view).
 function reportSummaryHtml(rows, scoreType){
-  const { distinctStudents, avgReading, verdictCounts } = computeReportSummary(rows, scoreType);
+  const { distinctStudents, avgReading, avgComprehension, verdictCounts } = computeReportSummary(rows, scoreType);
   let summaryHtml = `<div class="attempt" style="margin-bottom:14px;">
       <div class="row"><span class="label">Pesukim in this report</span><span>${rows.length}</span></div>
       <div class="row"><span class="label">Students represented</span><span>${distinctStudents}</span></div>`;
@@ -956,6 +970,7 @@ function reportSummaryHtml(rows, scoreType){
     summaryHtml += `<div class="row"><span class="label">Average reading score</span><span>${avgReading === null ? '—' : avgReading + '%'}</span></div>`;
   }
   if(scoreType !== 'reading'){
+    summaryHtml += `<div class="row"><span class="label">Average comprehension score</span><span>${avgComprehension === null ? '—' : avgComprehension + '%'}</span></div>`;
     summaryHtml += `<div class="row"><span class="label">Comprehension breakdown</span><span>🌟${verdictCounts.excellent} ✅${verdictCounts.correct} 🤔${verdictCounts.partial} 💡${verdictCounts.incorrect}</span></div>`;
   }
   summaryHtml += `</div>`;
@@ -1041,7 +1056,7 @@ async function renderReportResults(){
       if(showPerekCol) cells += `<td>${r.perekNum}</td>`;
       if(showPosukCol) cells += `<td>${r.posukLabel}</td>`;
       if(showReadingCol) cells += `<td>${scoreLabel}</td>`;
-      if(showComprehensionCol) cells += `<td>${verdictLabel(r.comprehensionVerdict)}</td>`;
+      if(showComprehensionCol) cells += `<td>${verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore)}</td>`;
       cells += `<td>${dateLabel}</td>`;
       html += `<tr>${cells}</tr>`;
     });
@@ -1059,7 +1074,7 @@ async function renderReportResults(){
 function downloadReportCsv(){
   if(!reportRows.length) return;
   const scoreType = document.getElementById('reportScoreTypeFilter').value;
-  const { distinctStudents, avgReading, verdictCounts } = computeReportSummary(reportRows, scoreType);
+  const { distinctStudents, avgReading, avgComprehension, verdictCounts } = computeReportSummary(reportRows, scoreType);
 
   // Summary block first, then a blank line, then the full data table —
   // so the totals are right there without having to scroll or recompute.
@@ -1070,20 +1085,22 @@ function downloadReportCsv(){
     summaryLines.push(['Average reading score', avgReading === null ? '' : avgReading + '%'].join(','));
   }
   if(scoreType !== 'reading'){
+    summaryLines.push(['Average comprehension score', avgComprehension === null ? '' : avgComprehension + '%'].join(','));
     summaryLines.push(['Excellent', verdictCounts.excellent].join(','));
     summaryLines.push(['Correct', verdictCounts.correct].join(','));
     summaryLines.push(['Partial', verdictCounts.partial].join(','));
     summaryLines.push(['Incorrect', verdictCounts.incorrect].join(','));
   }
 
-  const header = ['Student','Parsha','Perek','Posuk','Reading %','Comprehension','Date'];
+  const header = ['Student','Parsha','Perek','Posuk','Reading %','Comprehension','Comprehension Score','Date'];
   const lines = [...summaryLines, '', header.join(',')];
   reportRows.forEach(r => {
     const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) : '';
     const verdictText = r.comprehensionVerdict || '';
+    const compScoreLabel = typeof r.comprehensionScore === 'number' ? r.comprehensionScore : '';
     const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '';
     // Quote the student/parsha name in case a name ever contains a comma.
-    lines.push([`"${r.studentName}"`, `"${r.parshaName}"`, r.perekNum, r.posukLabel, scoreLabel, verdictText, dateLabel].join(','));
+    lines.push([`"${r.studentName}"`, `"${r.parshaName}"`, r.perekNum, r.posukLabel, scoreLabel, verdictText, compScoreLabel, dateLabel].join(','));
   });
   const csv = lines.join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -1103,7 +1120,7 @@ function downloadReportCsv(){
 function printReport(){
   if(!reportRows.length) return;
   const scoreType = document.getElementById('reportScoreTypeFilter').value;
-  const { distinctStudents, avgReading, verdictCounts } = computeReportSummary(reportRows, scoreType);
+  const { distinctStudents, avgReading, avgComprehension, verdictCounts } = computeReportSummary(reportRows, scoreType);
 
   // Summary block, styled to match the print page rather than the app's
   // own stylesheet (this opens in a bare new tab with no app CSS loaded).
@@ -1113,6 +1130,7 @@ function printReport(){
     summaryRowsHtml += `<tr><td>Average reading score</td><td>${avgReading === null ? '—' : avgReading + '%'}</td></tr>`;
   }
   if(scoreType !== 'reading'){
+    summaryRowsHtml += `<tr><td>Average comprehension score</td><td>${avgComprehension === null ? '—' : avgComprehension + '%'}</td></tr>`;
     summaryRowsHtml += `<tr><td>Comprehension breakdown</td><td>🌟${verdictCounts.excellent} ✅${verdictCounts.correct} 🤔${verdictCounts.partial} 💡${verdictCounts.incorrect}</td></tr>`;
   }
 
@@ -1125,7 +1143,7 @@ function printReport(){
       <td>${r.perekNum}</td>
       <td>${r.posukLabel}</td>
       <td>${scoreLabel}</td>
-      <td>${verdictLabel(r.comprehensionVerdict)}</td>
+      <td>${verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore)}</td>
       <td>${dateLabel}</td>
     </tr>`;
   }).join('');

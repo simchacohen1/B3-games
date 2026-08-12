@@ -653,6 +653,7 @@ let hebrewScore = null;            // percentage from the Kol Emes scorer, 0-100
 let hebrewTranscript = "";         // what the scorer heard, for the history view
 let comprehensionTranscript = "";
 let comprehensionVerdict = null;   // 'excellent' | 'correct' | 'partial' | 'incorrect'
+let comprehensionScore = null;     // 0-100, supplementary to the verdict tier above
 let comprehensionFeedback = "";
 
 /* ---------- Tabs (one task visible at a time) ---------- */
@@ -1336,6 +1337,7 @@ function hideNudge(){
 function resetComprehensionResult(){
   comprehensionTranscript = "";
   comprehensionVerdict = null;
+  comprehensionScore = null;
   comprehensionFeedback = "";
   document.getElementById('comprehensionGradingMsg').textContent = '';
   const resultEl = document.getElementById('comprehensionResult');
@@ -1497,6 +1499,7 @@ async function autosaveComprehension(){
       comprehensionAudioURL: url,
       comprehensionTranscript: comprehensionTranscript,
       comprehensionVerdict: comprehensionVerdict,
+      comprehensionScore: comprehensionScore,
       comprehensionFeedback: comprehensionFeedback
     });
     markTaskSaved('comprehension');
@@ -1725,6 +1728,7 @@ async function gradeComprehensionAttempt(){
   const resultEl = document.getElementById('comprehensionResult');
   resultEl.classList.add('hidden');
   comprehensionVerdict = null;
+  comprehensionScore = null;
   comprehensionFeedback = "";
 
   if(!currentAudio.comprehension) return;
@@ -1755,7 +1759,7 @@ async function gradeComprehensionAttempt(){
 
     comprehensionTranscript = data.transcript || "";
 
-    showComprehensionResult(data.verdict, data.feedback || '');
+    showComprehensionResult(data.verdict, typeof data.score === 'number' ? data.score : null, data.feedback || '');
   }catch(err){
     console.error(err);
     gradingMsg.textContent = 'Could not check your answer — check your internet and try again.';
@@ -1766,16 +1770,18 @@ async function gradeComprehensionAttempt(){
 /* Renders the final correct/partial/incorrect result from the single
    grading pass. Audio is opt-in only — tap the speaker button to hear
    it read aloud. */
-async function showComprehensionResult(verdict, feedback){
+async function showComprehensionResult(verdict, score, feedback){
   const gradingMsg = document.getElementById('comprehensionGradingMsg');
   const resultEl = document.getElementById('comprehensionResult');
   comprehensionVerdict = verdict;
+  comprehensionScore = score;
   comprehensionFeedback = feedback;
 
   const badgeText = { excellent: '🌟 Excellent!', correct: '✅ Got it!', partial: '🤔 Almost', incorrect: '💡 Try again' }[verdict] || '';
+  const scoreText = (typeof comprehensionScore === 'number') ? ' (' + comprehensionScore + '%)' : '';
   resultEl.className = 'comp-result ' + verdict;
   resultEl.innerHTML =
-    '<span class="comp-badge">' + badgeText + '</span>' +
+    '<span class="comp-badge">' + badgeText + scoreText + '</span>' +
     '<span>' + comprehensionFeedback + '</span>' +
     '<button class="speak-btn" id="compReplayBtn" title="Hear this read aloud">🔊</button>' +
     '<div class="dispute-row" id="comprehensionDisputeRow"><button class="btn small ghost-delete" id="comprehensionDisputeBtn">⚠️ Dispute this grade</button></div>';
@@ -1873,8 +1879,9 @@ async function loadHistory(){
       }
       if(a.comprehensionAudioURL){
         const verdictLabel = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[a.comprehensionVerdict] || a.comprehensionVerdict || '';
+        const scoreSuffix = (typeof a.comprehensionScore === 'number') ? ' (' + a.comprehensionScore + '%)' : '';
         rowsHtml += `
-        <div class="row"><span class="label">🧠 Comprehension</span><span class="score-pill">${verdictLabel}</span></div>
+        <div class="row"><span class="label">🧠 Comprehension</span><span class="score-pill">${verdictLabel}${scoreSuffix}</span></div>
         <div class="row"><audio controls src="${a.comprehensionAudioURL}"></audio></div>`;
         if(a.comprehensionTranscript){
           rowsHtml += `<div class="row" style="font-style:italic;color:var(--ink-soft);">"${a.comprehensionTranscript}"</div>`;
