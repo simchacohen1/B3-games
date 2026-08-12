@@ -288,6 +288,7 @@
           <button class="tab-btn active" id="studentTabBtn">👤 By Student</button>
           <button class="tab-btn" id="rosterTabBtn">📋 Class Roster</button>
           <button class="tab-btn" id="summaryTabBtn">📊 Class Stats</button>
+          <button class="tab-btn" id="reportsTabBtn">🧾 Reports</button>
           <button class="tab-btn" id="accessTabBtn">🔑 Manage Access</button>
         </div>
         <div id="mainContent" class="empty-msg">Select a student to view their practice history.</div>
@@ -500,12 +501,14 @@ function getAudioDuration(url){
 document.getElementById('studentTabBtn').onclick = () => setTab('student');
 document.getElementById('rosterTabBtn').onclick = () => setTab('roster');
 document.getElementById('summaryTabBtn').onclick = () => setTab('summary');
+document.getElementById('reportsTabBtn').onclick = () => setTab('reports');
 document.getElementById('accessTabBtn').onclick = () => setTab('access');
 
 function setTab(tab){
   document.getElementById('studentTabBtn').classList.toggle('active', tab === 'student');
   document.getElementById('rosterTabBtn').classList.toggle('active', tab === 'roster');
   document.getElementById('summaryTabBtn').classList.toggle('active', tab === 'summary');
+  document.getElementById('reportsTabBtn').classList.toggle('active', tab === 'reports');
   document.getElementById('accessTabBtn').classList.toggle('active', tab === 'access');
   if(tab === 'summary'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
@@ -513,6 +516,9 @@ function setTab(tab){
   }else if(tab === 'roster'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
     loadRoster();
+  }else if(tab === 'reports'){
+    [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
+    loadReportsTab();
   }else if(tab === 'access'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
     loadAccessTab();
@@ -682,6 +688,201 @@ async function loadRoster(){
     mainEl.innerHTML = '<div class="empty-msg">Could not build the class roster.</div>';
     console.error(err);
   }
+}
+
+/* ---------- Reports tab ----------
+   Flat, filterable list of every posuk attempt across the class: who,
+   which parsha/perek/posuk, their reading %, and their comprehension
+   verdict. A teacher can narrow it to one student, one parsha, or both,
+   then either read it on screen, download it as a CSV, or open a
+   print-friendly view (which any browser can "Print to PDF" from). */
+let reportRows = []; // cached rows for the current filter selection, used by CSV/print export
+
+function verdictLabel(v){
+  if(v === 'excellent') return '🌟 Excellent';
+  if(v === 'correct') return '✅ Got it';
+  if(v === 'partial') return '🤔 Almost';
+  if(v === 'incorrect') return '💡 Try again';
+  return '—';
+}
+
+// Builds one row per posuk per student from the raw attempts tree,
+// resolving each posukKey into a parsha name / perek / posuk number so
+// it can be filtered and displayed like the rest of the dashboard.
+function buildReportRows(allAttempts){
+  const rows = [];
+  Object.entries(studentsMap).forEach(([id, name]) => {
+    const posukMap = allAttempts[id];
+    if(!posukMap) return;
+    Object.entries(posukMap).forEach(([posukKey, attemptMap]) => {
+      const parts = posukKey.split('_');
+      if(parts.length < 3) return;
+      const posukNum = parseInt(parts[parts.length - 1]);
+      const perekNum = parseInt(parts[parts.length - 2]);
+      const parshaSlug = parts.slice(0, parts.length - 2).join('_');
+      if(!perekNum || !posukNum) return;
+      const parshaName = Object.keys(PARSHA_CONFIG).find(n => n.replace(/\s+/g,'') === parshaSlug) || parshaSlug;
+      const attempts = Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp);
+      const latest = attempts[0];
+      rows.push({
+        studentId: id,
+        studentName: name,
+        parshaName,
+        perekNum,
+        posukNum,
+        hebrewScore: effHebrewScore(latest),
+        comprehensionVerdict: effComprehensionVerdict(latest)
+      });
+    });
+  });
+  return rows;
+}
+
+async function loadReportsTab(){
+  const mainEl = document.getElementById('mainContent');
+  mainEl.innerHTML = '<div class="loading">Loading report options…</div>';
+  try{
+    await loadAllAttempts(); // warms allAttemptsCache
+
+    const studentOptions = Object.entries(studentsMap)
+      .sort((a,b) => a[1].localeCompare(b[1]))
+      .map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
+    const parshaOptions = Object.keys(PARSHA_CONFIG)
+      .map(n => `<option value="${n}">${n}</option>`).join('');
+
+    mainEl.innerHTML = `
+      <h2>🧾 Reports</h2>
+      <div class="report-filters" style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:14px;">
+        <div>
+          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Student</label>
+          <select id="reportStudentFilter"><option value="all">All Students</option>${studentOptions}</select>
+        </div>
+        <div>
+          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Parsha</label>
+          <select id="reportParshaFilter"><option value="all">All Parshas</option>${parshaOptions}</select>
+        </div>
+        <button class="btn small" id="reportGenerateBtn">📊 Generate Report</button>
+        <button class="btn small hidden" id="reportCsvBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">⬇️ Download CSV</button>
+        <button class="btn small hidden" id="reportPrintBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">🖨️ Print / Save PDF</button>
+      </div>
+      <div id="reportResults"></div>`;
+
+    document.getElementById('reportGenerateBtn').onclick = renderReportResults;
+    document.getElementById('reportCsvBtn').onclick = downloadReportCsv;
+    document.getElementById('reportPrintBtn').onclick = printReport;
+  }catch(err){
+    mainEl.innerHTML = '<div class="empty-msg">Could not load reports.</div>';
+    console.error(err);
+  }
+}
+
+async function renderReportResults(){
+  const resultsEl = document.getElementById('reportResults');
+  resultsEl.innerHTML = '<div class="loading">Building report…</div>';
+  try{
+    const studentFilter = document.getElementById('reportStudentFilter').value;
+    const parshaFilter = document.getElementById('reportParshaFilter').value;
+    const allAttempts = await loadAllAttempts();
+    let rows = buildReportRows(allAttempts);
+
+    if(studentFilter !== 'all') rows = rows.filter(r => r.studentId === studentFilter);
+    if(parshaFilter !== 'all') rows = rows.filter(r => r.parshaName === parshaFilter);
+
+    rows.sort((a,b) => {
+      const n = a.studentName.localeCompare(b.studentName);
+      if(n !== 0) return n;
+      if(a.perekNum !== b.perekNum) return a.perekNum - b.perekNum;
+      return a.posukNum - b.posukNum;
+    });
+
+    reportRows = rows;
+    document.getElementById('reportCsvBtn').classList.toggle('hidden', rows.length === 0);
+    document.getElementById('reportPrintBtn').classList.toggle('hidden', rows.length === 0);
+
+    if(rows.length === 0){
+      resultsEl.innerHTML = '<div class="empty-msg">No recordings match these filters yet.</div>';
+      return;
+    }
+
+    let html = `<table class="roster-table"><thead><tr>
+      <th>Student</th><th>Parsha</th><th>Perek</th><th>Posuk</th><th>Reading %</th><th>Comprehension</th>
+    </tr></thead><tbody>`;
+    rows.forEach(r => {
+      const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
+      html += `<tr>
+        <td>${r.studentName}</td>
+        <td>${r.parshaName}</td>
+        <td>${r.perekNum}</td>
+        <td>${r.posukNum}</td>
+        <td>${scoreLabel}</td>
+        <td>${verdictLabel(r.comprehensionVerdict)}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    resultsEl.innerHTML = html;
+  }catch(err){
+    resultsEl.innerHTML = '<div class="empty-msg">Could not build the report.</div>';
+    console.error(err);
+  }
+}
+
+function downloadReportCsv(){
+  if(!reportRows.length) return;
+  const header = ['Student','Parsha','Perek','Posuk','Reading %','Comprehension'];
+  const lines = [header.join(',')];
+  reportRows.forEach(r => {
+    const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) : '';
+    const verdictText = r.comprehensionVerdict || '';
+    // Quote the student/parsha name in case a name ever contains a comma.
+    lines.push([`"${r.studentName}"`, `"${r.parshaName}"`, r.perekNum, r.posukNum, scoreLabel, verdictText].join(','));
+  });
+  const csv = lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'posuk_practice_report.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// Opens a clean, print-only version of the current report in a new tab.
+// Using the browser's own print dialog means "Save as PDF" works on any
+// device without needing a PDF-generation library.
+function printReport(){
+  if(!reportRows.length) return;
+  const rowsHtml = reportRows.map(r => {
+    const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
+    return `<tr>
+      <td>${r.studentName}</td>
+      <td>${r.parshaName}</td>
+      <td>${r.perekNum}</td>
+      <td>${r.posukNum}</td>
+      <td>${scoreLabel}</td>
+      <td>${verdictLabel(r.comprehensionVerdict)}</td>
+    </tr>`;
+  }).join('');
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Posuk Practice Report</title>
+    <style>
+      body{ font-family: Arial, sans-serif; padding: 24px; color:#222; }
+      h1{ font-size:1.3rem; margin-bottom:4px; }
+      .meta{ color:#666; font-size:0.85rem; margin-bottom:16px; }
+      table{ width:100%; border-collapse: collapse; font-size:0.9rem; }
+      th, td{ border:1px solid #ccc; padding:6px 8px; text-align:left; }
+      th{ background:#f2f2f2; }
+    </style></head><body>
+    <h1>Posuk Practice Scroll — Report</h1>
+    <div class="meta">Generated ${new Date().toLocaleDateString()}</div>
+    <table><thead><tr>
+      <th>Student</th><th>Parsha</th><th>Perek</th><th>Posuk</th><th>Reading %</th><th>Comprehension</th>
+    </tr></thead><tbody>${rowsHtml}</tbody></table>
+    </body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 300);
 }
 
 // Must match student.html's slugify exactly - this is the key used both to
