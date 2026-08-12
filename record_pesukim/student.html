@@ -294,20 +294,6 @@
     border-top: 1px dashed rgba(59,42,30,0.2);
   }
 
-  .clarify-box{
-    margin-top: 12px;
-    background: #FBF0D9;
-    border: 2px solid var(--gold);
-    border-radius: 12px;
-    padding: 14px 16px;
-  }
-  .clarify-question-row{
-    display:flex; align-items:flex-start; gap:8px;
-    font-weight:600; color: var(--ink);
-    margin-bottom: 10px;
-  }
-  .clarify-question-row .q-icon{ font-size:1.1rem; }
-
   .save-row{ text-align:center; margin: 20px 0; }
   /* Arrows are pulled out of normal flow (see .nav-arrow), so this row
      no longer needs to reserve space for them. */
@@ -478,23 +464,6 @@
         </div>
         <div class="comp-status" id="comprehensionGradingMsg"></div>
         <div class="comp-result hidden" id="comprehensionResult"></div>
-
-        <!-- Clarify follow-up: shown only when the AI grader is unsure and
-             needs one more spoken answer from the student before it can
-             give a final verdict. -->
-        <div class="clarify-box hidden" id="clarifyBox">
-          <div class="clarify-question-row">
-            <span class="q-icon">🤔</span>
-            <span id="clarifyQuestionText"></span>
-            <button class="speak-btn" id="clarifyReplayBtn" title="Hear this question again">🔊</button>
-          </div>
-          <div class="record-row">
-            <button class="seal-btn" id="clarifyRecordBtn" title="Record your answer">🎙️</button>
-            <audio id="clarifyAudioPlayback" controls class="hidden"></audio>
-            <button class="btn ghost-delete hidden" id="clarifyDeleteBtn" title="Delete this recording">🗑️ Delete</button>
-            <span class="status-tag" id="clarifyStatus">Not recorded yet</span>
-          </div>
-        </div>
       </div>
 
       <div class="save-row posuk-nav-row">
@@ -656,19 +625,17 @@ function hebrewNumeral(num){
 
 let studentId = null;
 let studentName = null;
-let currentAudio = { hebrew: null, comprehension: null, clarify: null };
+let currentAudio = { hebrew: null, comprehension: null };
 // The MIME type the browser actually recorded in for each type (e.g. iPhones
 // typically can't record webm and silently use something else instead) —
 // tracked so uploads can send an accurate filename/extension instead of
 // always claiming ".webm" regardless of what was really recorded.
-let currentAudioExt = { hebrew: 'webm', comprehension: 'webm', clarify: 'webm' };
+let currentAudioExt = { hebrew: 'webm', comprehension: 'webm' };
 let hebrewScore = null;            // percentage from the Kol Emes scorer, 0-100
 let hebrewTranscript = "";         // what the scorer heard, for the history view
 let comprehensionTranscript = "";
 let comprehensionVerdict = null;   // 'excellent' | 'correct' | 'partial' | 'incorrect'
 let comprehensionFeedback = "";
-let clarifyQuestion = "";          // set when the grader comes back "unsure"
-let clarifyTranscript = "";        // student's spoken answer to clarifyQuestion
 
 /* ---------- Tabs (one task visible at a time) ---------- */
 let activeTab = 'reading'; // 'reading' | 'comprehension'
@@ -684,7 +651,6 @@ let currentAttemptId = null;
 let attemptSaved = { hebrew: false, comprehension: false };
 let hebrewSavedStoragePath = null;
 let comprehensionSavedStoragePath = null;
-let clarifySavedStoragePath = null;
 let currentPosukKey = null; // "Parsha_perek_posuk"
 let currentPosukNum = null; // plain verse number (e.g. 1, 2, 3…), what the scorer expects
 let currentPerekNum = null; // perek number — needed alongside posuk since posuk numbers repeat across perakim
@@ -692,7 +658,7 @@ let currentPosukText = "";
 let currentPosukTranslation = ""; // accepted English translation, used as the grading "answer key"
 let mediaRecorder = null;
 let recordingChunks = [];
-let activeRecordingType = null; // 'hebrew' | 'translate' | 'comprehension' | 'clarify'
+let activeRecordingType = null; // 'hebrew' | 'translate' | 'comprehension'
 let chapterCache = {}; // cache fetched Sefaria Hebrew chapters this session
 let translationCache = {}; // cache fetched Sefaria English chapters this session
 
@@ -1312,21 +1278,6 @@ function resetComprehensionResult(){
   resultEl.classList.add('hidden');
   resultEl.innerHTML = '';
   if(window.speechSynthesis) window.speechSynthesis.cancel();
-  resetClarify();
-}
-
-function resetClarify(){
-  clarifyQuestion = "";
-  clarifyTranscript = "";
-  currentAudio.clarify = null;
-  const box = document.getElementById('clarifyBox');
-  box.classList.add('hidden');
-  document.getElementById('clarifyQuestionText').textContent = '';
-  const audioEl = document.getElementById('clarifyAudioPlayback');
-  audioEl.removeAttribute('src');
-  audioEl.classList.add('hidden');
-  document.getElementById('clarifyDeleteBtn').classList.add('hidden');
-  document.getElementById('clarifyStatus').textContent = 'Not recorded yet';
 }
 
 function resetHebrewResult(){
@@ -1357,7 +1308,6 @@ function resetRecordingUI(){
   attemptSaved = { hebrew: false, comprehension: false };
   hebrewSavedStoragePath = null;
   comprehensionSavedStoragePath = null;
-  clarifySavedStoragePath = null;
   document.getElementById('readingCheck').classList.add('hidden');
   document.getElementById('comprehensionCheck').classList.add('hidden');
   hideNudge();
@@ -1381,15 +1331,10 @@ function deleteRecording(type){
   } else if(type === 'comprehension'){
     resetComprehensionResult();
     if(attemptSaved.comprehension) removeSavedTask('comprehension');
-  } else if(type === 'clarify'){
-    // Let the student redo just their clarifying answer — keep the
-    // question on screen rather than resetting the whole comprehension task.
-    clarifyTranscript = "";
   }
 }
 document.getElementById('hebrewDeleteBtn').onclick = () => deleteRecording('hebrew');
 document.getElementById('comprehensionDeleteBtn').onclick = () => deleteRecording('comprehension');
-document.getElementById('clarifyDeleteBtn').onclick = () => deleteRecording('clarify');
 
 /* If a student is embarrassed by an already-autosaved recording and
    deletes it, this removes it from Firebase too (both the audio file in
@@ -1404,20 +1349,13 @@ async function removeSavedTask(task){
     const fields = (task === 'hebrew')
       ? { hebrewAudioURL: null, hebrewScore: null, hebrewTranscript: null }
       : { comprehensionAudioURL: null, comprehensionTranscript: null, comprehensionVerdict: null,
-          comprehensionFeedback: null, comprehensionClarifyQuestion: null,
-          comprehensionClarifyAudioURL: null, comprehensionClarifyTranscript: null };
+          comprehensionFeedback: null };
     await currentAttemptRef.update(fields);
 
     const storagePath = task === 'hebrew' ? hebrewSavedStoragePath : comprehensionSavedStoragePath;
     if(storagePath) storage.ref(storagePath).delete().catch(() => {});
     if(task === 'hebrew') hebrewSavedStoragePath = null;
-    else {
-      comprehensionSavedStoragePath = null;
-      if(clarifySavedStoragePath){
-        storage.ref(clarifySavedStoragePath).delete().catch(() => {});
-        clarifySavedStoragePath = null;
-      }
-    }
+    else comprehensionSavedStoragePath = null;
 
     if(!attemptSaved.hebrew && !attemptSaved.comprehension){
       await currentAttemptRef.remove();
@@ -1496,15 +1434,6 @@ async function autosaveComprehension(){
       comprehensionVerdict: comprehensionVerdict,
       comprehensionFeedback: comprehensionFeedback
     };
-
-    if(currentAudio.clarify){
-      const clarifyPath = 'posukPractice/' + studentId + '/' + currentPosukKey + '_clarify_' + currentAttemptId + '.webm';
-      await storage.ref(clarifyPath).put(currentAudio.clarify);
-      update.comprehensionClarifyQuestion = clarifyQuestion;
-      update.comprehensionClarifyAudioURL = await storage.ref(clarifyPath).getDownloadURL();
-      update.comprehensionClarifyTranscript = clarifyTranscript;
-      clarifySavedStoragePath = clarifyPath;
-    }
 
     await currentAttemptRef.update(update);
     markTaskSaved('comprehension');
@@ -1585,9 +1514,6 @@ async function toggleRecording(type, btnEl){
       if(type === 'comprehension'){
         document.getElementById(type + 'Status').textContent = 'Recorded — listening…';
         gradeComprehensionAttempt();
-      } else if(type === 'clarify'){
-        document.getElementById(type + 'Status').textContent = 'Recorded — listening…';
-        gradeClarificationAttempt();
       } else if(type === 'hebrew'){
         document.getElementById(type + 'Status').textContent = 'Recorded — scoring…';
         scoreHebrewReading();
@@ -1612,8 +1538,6 @@ async function toggleRecording(type, btnEl){
 
 document.getElementById('hebrewRecordBtn').onclick = function(){ toggleRecording('hebrew', this); };
 document.getElementById('comprehensionRecordBtn').onclick = function(){ toggleRecording('comprehension', this); };
-document.getElementById('clarifyRecordBtn').onclick = function(){ toggleRecording('clarify', this); };
-document.getElementById('clarifyReplayBtn').onclick = () => speakText(clarifyQuestion);
 
 /* ---------- Hebrew reading auto-grading (same backend as Kol Emes) ----------
    Sends the recording + the posuk's exact text to the scorer, which
@@ -1666,13 +1590,17 @@ function showHebrewResult(data){
   }
 
   resultEl.className = 'comp-result ' + tier;
+  // A perfect score has nothing to dispute, so skip the dispute row entirely.
+  const disputeRowHtml = data.score >= 100 ? '' :
+    '<div class="dispute-row" id="hebrewDisputeRow"><button class="btn small ghost-delete" id="hebrewDisputeBtn">⚠️ Dispute this score</button></div>';
   resultEl.innerHTML =
     '<span class="comp-badge">' + data.score + '%</span>' +
     wordsHtml +
-    '<div class="dispute-row" id="hebrewDisputeRow"><button class="btn small ghost-delete" id="hebrewDisputeBtn">⚠️ Dispute this score</button></div>';
+    disputeRowHtml;
   resultEl.classList.remove('hidden');
   gradingMsg.textContent = '';
-  document.getElementById('hebrewDisputeBtn').onclick = openHebrewDisputeForm;
+  const disputeBtn = document.getElementById('hebrewDisputeBtn');
+  if(disputeBtn) disputeBtn.onclick = openHebrewDisputeForm;
 }
 
 /* ---------- Dispute flow (Hebrew reading) ----------
@@ -1762,18 +1690,6 @@ async function gradeComprehensionAttempt(){
 
     comprehensionTranscript = data.transcript || "";
 
-    if(data.verdict === 'unsure'){
-      // AI couldn't tell yet — show its follow-up question and let the
-      // student record a spoken answer. comprehensionVerdict stays null,
-      // so nothing autosaves until gradeClarificationAttempt() settles it.
-      clarifyQuestion = data.clarifyQuestion || '';
-      document.getElementById('clarifyQuestionText').textContent = clarifyQuestion;
-      document.getElementById('clarifyBox').classList.remove('hidden');
-      gradingMsg.textContent = '';
-      document.getElementById('comprehensionStatus').textContent = 'Recorded — one more question below';
-      return;
-    }
-
     showComprehensionResult(data.verdict, data.feedback || '');
   }catch(err){
     console.error(err);
@@ -1782,9 +1698,9 @@ async function gradeComprehensionAttempt(){
   }
 }
 
-/* Renders the final correct/partial/incorrect result (whether it came
-   straight from the first grading pass or after a clarify follow-up).
-   Audio is opt-in only — tap the speaker button to hear it read aloud. */
+/* Renders the final correct/partial/incorrect result from the single
+   grading pass. Audio is opt-in only — tap the speaker button to hear
+   it read aloud. */
 async function showComprehensionResult(verdict, feedback){
   const gradingMsg = document.getElementById('comprehensionGradingMsg');
   const resultEl = document.getElementById('comprehensionResult');
@@ -1803,9 +1719,6 @@ async function showComprehensionResult(verdict, feedback){
   document.getElementById('comprehensionDisputeBtn').onclick = openComprehensionDisputeForm;
   gradingMsg.textContent = '';
   document.getElementById('comprehensionStatus').textContent = 'Recorded — listen above';
-  // Once a final verdict is shown (including after a clarify follow-up
-  // resolves), the clarify question box should no longer stay visible.
-  document.getElementById('clarifyBox').classList.add('hidden');
   await autosaveComprehension();
 }
 
@@ -1847,45 +1760,6 @@ async function submitComprehensionDispute(tier){
   }catch(err){
     console.error(err);
     row.innerHTML = '<span style="font-size:0.85rem;color:var(--rimon);">Could not save your dispute — check your internet and try again.</span>';
-  }
-}
-
-/* ---------- Clarify follow-up grading (second pass) ----------
-   Uploads the clarify recording along with the original transcript (from
-   the first pass) and the clarifying question; the Cloud Function
-   transcribes the new audio and must commit to a final
-   correct/partial/incorrect verdict this time. */
-async function gradeClarificationAttempt(){
-  const clarifyStatus = document.getElementById('clarifyStatus');
-
-  if(!currentAudio.clarify) return;
-
-  clarifyStatus.textContent = 'Listening to your answer…';
-
-  try{
-    const formData = new FormData();
-    formData.append('audio', currentAudio.clarify, 'recording.' + currentAudioExt.clarify);
-    formData.append('posukText', currentPosukText || '');
-    formData.append('posukTranslation', currentPosukTranslation || '');
-    formData.append('mode', 'clarify');
-    formData.append('originalTranscript', comprehensionTranscript || '');
-    formData.append('clarifyQuestion', clarifyQuestion || '');
-
-    const res = await fetch(GRADE_COMPREHENSION_URL, { method: 'POST', body: formData });
-    if(!res.ok) throw new Error('Grading request failed');
-    const data = await res.json();
-
-    if(data.verdict === 'no_speech'){
-      clarifyStatus.textContent = "Didn't catch that — try recording again, a little closer to the mic.";
-      return;
-    }
-
-    clarifyTranscript = data.transcript || "";
-    clarifyStatus.textContent = 'Recorded';
-    await showComprehensionResult(data.verdict, data.feedback || '');
-  }catch(err){
-    console.error(err);
-    clarifyStatus.textContent = 'Could not check your answer — check your internet and try again.';
   }
 }
 
