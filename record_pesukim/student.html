@@ -383,6 +383,22 @@
     font-size:0.8rem;
   }
   .msg{ text-align:center; color: var(--ink-soft); font-size:0.85rem; margin-top:8px; min-height:1.2em; }
+  .mic-meter{
+    flex: 1 1 60px;
+    max-width: 90px;
+    height: 14px;
+    background: rgba(59,42,30,0.12);
+    border-radius: 999px;
+    overflow: hidden;
+    align-self: center;
+  }
+  .mic-meter-bar{
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #6fbf73, #f2b134);
+    border-radius: 999px;
+    transition: width 60ms linear;
+  }
   .hidden{ display:none !important; }
   footer.who{
     text-align:center; margin-top:26px; font-size:0.8rem; color: var(--ink-soft);
@@ -444,6 +460,7 @@
         <h3>1️⃣ Read the Hebrew Words</h3>
         <div class="record-row">
           <button class="seal-btn" id="hebrewRecordBtn" title="Record">🎙️</button>
+          <div class="mic-meter hidden" id="hebrewMicMeter"><div class="mic-meter-bar" id="hebrewMicMeterBar"></div></div>
           <audio id="hebrewAudioPlayback" controls class="hidden"></audio>
           <button class="btn ghost-delete hidden" id="hebrewDeleteBtn" title="Delete this recording">🗑️ Delete</button>
           <span class="status-tag" id="hebrewStatus">Not recorded yet</span>
@@ -467,6 +484,7 @@
         </div>
         <div class="record-row">
           <button class="seal-btn" id="comprehensionRecordBtn" title="Record">🎙️</button>
+          <div class="mic-meter hidden" id="comprehensionMicMeter"><div class="mic-meter-bar" id="comprehensionMicMeterBar"></div></div>
           <audio id="comprehensionAudioPlayback" controls class="hidden"></audio>
           <button class="btn ghost-delete hidden" id="comprehensionDeleteBtn" title="Delete this recording">🗑️ Delete</button>
           <span class="status-tag" id="comprehensionStatus">Not recorded yet</span>
@@ -686,6 +704,51 @@ let comprehensionRangeSavedStoragePath = null;
 let mediaRecorder = null;
 let recordingChunks = [];
 let activeRecordingType = null; // 'hebrew' | 'translate' | 'comprehension'
+
+// Live mic level meter — shows the student a bouncing bar while recording
+// so they can see their voice is actually being picked up.
+let micAudioCtx = null;
+let micAnalyser = null;
+let micMeterRAF = null;
+
+function startMicMeter(stream, type){
+  try{
+    micAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = micAudioCtx.createMediaStreamSource(stream);
+    micAnalyser = micAudioCtx.createAnalyser();
+    micAnalyser.fftSize = 256;
+    source.connect(micAnalyser);
+    const data = new Uint8Array(micAnalyser.frequencyBinCount);
+    const meterEl = document.getElementById(type + 'MicMeter');
+    const barEl = document.getElementById(type + 'MicMeterBar');
+    if(meterEl) meterEl.classList.remove('hidden');
+    function tick(){
+      micAnalyser.getByteFrequencyData(data);
+      let sum = 0;
+      for(let i=0;i<data.length;i++) sum += data[i];
+      const avg = sum / data.length; // 0-255
+      // Scale up a bit so normal speech visibly moves the bar, and cap at 100%.
+      const pct = Math.min(100, Math.round((avg / 90) * 100));
+      if(barEl) barEl.style.width = pct + '%';
+      micMeterRAF = requestAnimationFrame(tick);
+    }
+    tick();
+  }catch(err){
+    // Mic meter is a nice-to-have; if AudioContext isn't available for some
+    // reason, just skip it silently — recording itself still works fine.
+    console.error('Mic meter unavailable:', err);
+  }
+}
+
+function stopMicMeter(type){
+  if(micMeterRAF){ cancelAnimationFrame(micMeterRAF); micMeterRAF = null; }
+  if(micAudioCtx){ micAudioCtx.close().catch(()=>{}); micAudioCtx = null; }
+  micAnalyser = null;
+  const meterEl = document.getElementById(type + 'MicMeter');
+  const barEl = document.getElementById(type + 'MicMeterBar');
+  if(barEl) barEl.style.width = '0%';
+  if(meterEl) meterEl.classList.add('hidden');
+}
 let chapterCache = {}; // cache fetched Sefaria Hebrew chapters this session
 let translationCache = {}; // cache fetched Sefaria English chapters this session
 
@@ -1696,6 +1759,7 @@ async function toggleRecording(type, btnEl){
       btnEl.textContent = '🎙️';
       activeRecordingType = null;
       stream.getTracks().forEach(t => t.stop());
+      stopMicMeter(type);
 
       if(type === 'comprehension'){
         document.getElementById(type + 'Status').textContent = 'Recorded — listening…';
@@ -1715,6 +1779,7 @@ async function toggleRecording(type, btnEl){
     setTimeout(() => {
       mediaRecorder.start();
       document.getElementById(type + 'Status').textContent = 'Recording…';
+      startMicMeter(stream, type);
     }, 300);
   }catch(err){
     alert('Could not access the microphone. Please allow microphone permission.');
