@@ -710,10 +710,13 @@ function verdictLabel(v){
   return '—';
 }
 
-// Builds one row per posuk per student from the raw attempts tree,
-// resolving each posukKey into a parsha name / perek / posuk number so
-// it can be filtered and displayed like the rest of the dashboard.
-// Includes the latest attempt's timestamp so rows can be filtered by date.
+// Builds one row per posuk (or posuk-range) per student from the raw
+// attempts tree, resolving each posukKey into a parsha name / perek /
+// posuk number so it can be filtered and displayed like the rest of the
+// dashboard. A comprehension range attempt (key ends in "from-to" instead
+// of a plain posuk number) becomes a row with isRange true and no reading
+// score, since range attempts are comprehension-only.
+// Includes the latest attempt's timestamp so rows can be filtered/shown by date.
 function buildReportRows(allAttempts){
   const rows = [];
   Object.entries(studentsMap).forEach(([id, name]) => {
@@ -722,10 +725,16 @@ function buildReportRows(allAttempts){
     Object.entries(posukMap).forEach(([posukKey, attemptMap]) => {
       const parts = posukKey.split('_');
       if(parts.length < 3) return;
-      const posukNum = parseInt(parts[parts.length - 1]);
+      const posukPart = parts[parts.length - 1];
       const perekNum = parseInt(parts[parts.length - 2]);
       const parshaSlug = parts.slice(0, parts.length - 2).join('_');
-      if(!perekNum || !posukNum) return;
+      if(!perekNum) return;
+      const rangeMatch = /^(\d+)-(\d+)$/.exec(posukPart);
+      const isRange = !!rangeMatch;
+      const posukNum = isRange ? parseInt(rangeMatch[1]) : parseInt(posukPart);
+      if(!posukNum) return;
+      const rangeStart = isRange ? parseInt(rangeMatch[1]) : null;
+      const rangeEnd = isRange ? parseInt(rangeMatch[2]) : null;
       const parshaName = Object.keys(PARSHA_CONFIG).find(n => n.replace(/\s+/g,'') === parshaSlug) || parshaSlug;
       const attempts = Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp);
       const latest = attempts[0];
@@ -735,8 +744,12 @@ function buildReportRows(allAttempts){
         parshaName,
         perekNum,
         posukNum,
+        isRange,
+        rangeStart,
+        rangeEnd,
+        posukLabel: isRange ? `${rangeStart}–${rangeEnd}` : String(posukNum),
         timestamp: latest ? latest.timestamp : null,
-        hebrewScore: effHebrewScore(latest),
+        hebrewScore: isRange ? null : effHebrewScore(latest), // range attempts are comprehension-only
         comprehensionVerdict: effComprehensionVerdict(latest)
       });
     });
@@ -942,7 +955,11 @@ async function renderReportResults(){
     if(studentIds) rows = rows.filter(r => studentIds.includes(r.studentId));
     if(parshaFilter !== 'all') rows = rows.filter(r => r.parshaName === parshaFilter);
     if(perekFilter !== 'all') rows = rows.filter(r => r.perekNum === parseInt(perekFilter));
-    if(posukNums) rows = rows.filter(r => posukNums.includes(r.posukNum));
+    // A range attempt (e.g. pesukim 3-5) matches a specific-posuk filter if
+    // any of the selected posukim fall anywhere inside that range.
+    if(posukNums) rows = rows.filter(r => r.isRange
+      ? posukNums.some(p => p >= r.rangeStart && p <= r.rangeEnd)
+      : posukNums.includes(r.posukNum));
     if(dateFrom !== null) rows = rows.filter(r => typeof r.timestamp === 'number' && r.timestamp >= dateFrom);
     if(dateTo !== null) rows = rows.filter(r => typeof r.timestamp === 'number' && r.timestamp <= dateTo);
 
@@ -997,17 +1014,20 @@ async function renderReportResults(){
     if(showParshaCol) headerCells += '<th>Parsha</th>';
     if(showPerekCol) headerCells += '<th>Perek</th>';
     if(showPosukCol) headerCells += '<th>Posuk</th>';
+    headerCells += '<th>Date</th>';
     if(showReadingCol) headerCells += '<th>Reading %</th>';
     if(showComprehensionCol) headerCells += '<th>Comprehension</th>';
 
     let html = `<table class="roster-table"><thead><tr>${headerCells}</tr></thead><tbody>`;
     rows.forEach(r => {
       const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
+      const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
       let cells = '';
       if(showStudentCol) cells += `<td>${r.studentName}</td>`;
       if(showParshaCol) cells += `<td>${r.parshaName}</td>`;
       if(showPerekCol) cells += `<td>${r.perekNum}</td>`;
-      if(showPosukCol) cells += `<td>${r.posukNum}</td>`;
+      if(showPosukCol) cells += `<td>${r.posukLabel}</td>`;
+      cells += `<td>${dateLabel}</td>`;
       if(showReadingCol) cells += `<td>${scoreLabel}</td>`;
       if(showComprehensionCol) cells += `<td>${verdictLabel(r.comprehensionVerdict)}</td>`;
       html += `<tr>${cells}</tr>`;
@@ -1025,13 +1045,14 @@ async function renderReportResults(){
 // because it looked redundant in the current on-screen view.
 function downloadReportCsv(){
   if(!reportRows.length) return;
-  const header = ['Student','Parsha','Perek','Posuk','Reading %','Comprehension'];
+  const header = ['Student','Parsha','Perek','Posuk','Date','Reading %','Comprehension'];
   const lines = [header.join(',')];
   reportRows.forEach(r => {
     const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) : '';
     const verdictText = r.comprehensionVerdict || '';
+    const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '';
     // Quote the student/parsha name in case a name ever contains a comma.
-    lines.push([`"${r.studentName}"`, `"${r.parshaName}"`, r.perekNum, r.posukNum, scoreLabel, verdictText].join(','));
+    lines.push([`"${r.studentName}"`, `"${r.parshaName}"`, r.perekNum, r.posukLabel, dateLabel, scoreLabel, verdictText].join(','));
   });
   const csv = lines.join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -1052,11 +1073,13 @@ function printReport(){
   if(!reportRows.length) return;
   const rowsHtml = reportRows.map(r => {
     const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
+    const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
     return `<tr>
       <td>${r.studentName}</td>
       <td>${r.parshaName}</td>
       <td>${r.perekNum}</td>
-      <td>${r.posukNum}</td>
+      <td>${r.posukLabel}</td>
+      <td>${dateLabel}</td>
       <td>${scoreLabel}</td>
       <td>${verdictLabel(r.comprehensionVerdict)}</td>
     </tr>`;
@@ -1074,7 +1097,7 @@ function printReport(){
     <h1>Posuk Practice Scroll — Report</h1>
     <div class="meta">Generated ${new Date().toLocaleDateString()}</div>
     <table><thead><tr>
-      <th>Student</th><th>Parsha</th><th>Perek</th><th>Posuk</th><th>Reading %</th><th>Comprehension</th>
+      <th>Student</th><th>Parsha</th><th>Perek</th><th>Posuk</th><th>Date</th><th>Reading %</th><th>Comprehension</th>
     </tr></thead><tbody>${rowsHtml}</tbody></table>
     </body></html>`);
   win.document.close();
@@ -1202,6 +1225,7 @@ async function loadAccessTab(){
 let studentActiveTab = 'comprehension'; // 'comprehension' | 'reading', for the currently-viewed student
 let studentPosukData = {}; // posukKey -> { attempts, latest } for the currently-viewed student
 let studentPerekData = {}; // perekNum -> posukNum -> posukKey, for the currently-viewed student
+let studentRangeData = []; // comprehension-range attempts (posuk grid can't show these as single tiles)
 let selectedPosukKey = null;
 
 async function selectStudent(id, name, el){
@@ -1232,21 +1256,28 @@ async function selectStudent(id, name, el){
 
     // Reshape into perek -> posuk -> posukKey, and cache each posukKey's
     // attempts so tapping a tile can show detail without re-fetching.
+    // Comprehension-range attempts (key ends "from-to" instead of a plain
+    // posuk number) don't fit a single tile, so they're collected
+    // separately into studentRangeData and shown as their own list.
     studentPosukData = {};
     studentPerekData = {};
+    studentRangeData = [];
     Object.entries(val).forEach(([posukKey, attemptMap]) => {
       const attempts = Object.entries(attemptMap)
         .map(([attemptId, a]) => ({ attemptId, ...a }))
         .sort((a,b) => b.timestamp - a.timestamp);
       studentPosukData[posukKey] = { attempts, latest: attempts[0] };
-      const parts = posukKey.split('_');
-      if(parts.length < 3) return;
-      const posukNum = parseInt(parts[parts.length - 1]);
-      const perekNum = parseInt(parts[parts.length - 2]);
-      if(!perekNum || !posukNum) return;
-      if(!studentPerekData[perekNum]) studentPerekData[perekNum] = {};
-      studentPerekData[perekNum][posukNum] = posukKey;
+      const parsed = parsePosukKey(posukKey);
+      if(!parsed.perek) return;
+      if(parsed.isRange){
+        studentRangeData.push({ posukKey, perekNum: parsed.perek, rangeStart: parsed.rangeStart, rangeEnd: parsed.rangeEnd, latest: attempts[0] });
+        return;
+      }
+      if(!parsed.posuk) return;
+      if(!studentPerekData[parsed.perek]) studentPerekData[parsed.perek] = {};
+      studentPerekData[parsed.perek][parsed.posuk] = posukKey;
     });
+    studentRangeData.sort((a,b) => (b.latest ? b.latest.timestamp : 0) - (a.latest ? a.latest.timestamp : 0));
 
     mainEl.innerHTML = `
       <div class="student-head">
@@ -1328,8 +1359,9 @@ async function renderStudentGrid(){
   const wrap = document.getElementById('studentGridWrap');
   wrap.innerHTML = '';
   const perekNums = Object.keys(studentPerekData).map(Number).sort((a,b) => a - b);
+  const showRanges = studentActiveTab === 'comprehension' && studentRangeData.length > 0;
 
-  if(perekNums.length === 0){
+  if(perekNums.length === 0 && !showRanges){
     wrap.innerHTML = '<div class="empty-msg">No recordings yet.</div>';
     return;
   }
@@ -1392,6 +1424,38 @@ async function renderStudentGrid(){
     label.querySelector('#teacherPerekSummary' + perekNum).textContent = `${doneCount}/${range.max - range.min + 1} pesukim done`;
     wrap.appendChild(label);
     wrap.appendChild(grid);
+  }
+
+  if(showRanges){
+    const label = document.createElement('div');
+    label.className = 'perek-label';
+    label.innerHTML = `<span>🧠 Multi-posuk comprehension checks</span>`;
+    wrap.appendChild(label);
+
+    const list = document.createElement('div');
+    list.style.display = 'flex';
+    list.style.flexWrap = 'wrap';
+    list.style.gap = '8px';
+    studentRangeData.forEach(r => {
+      const verdict = r.latest ? effComprehensionVerdict(r.latest) : null;
+      const vi = (verdict && VERDICT_INFO[verdict]) ? VERDICT_INFO[verdict] : { label: '—', tier: null };
+      const pending = r.latest && hasPendingDispute(r.latest);
+      const tile = document.createElement('div');
+      tile.className = 'posuk-tile ' + (vi.tier ? 'tile-' + vi.tier : 'tile-none') + (r.posukKey === selectedPosukKey ? ' selected' : '') + (pending ? ' tile-disputed' : '');
+      tile.style.width = 'auto';
+      tile.style.padding = '6px 10px';
+      tile.innerHTML = `<span class="tile-num">פרק ${hebrewNumeral(r.perekNum)} · ${r.rangeStart}–${r.rangeEnd}</span><span class="tile-score">${vi.label}</span>` + (pending ? '<span class="tile-dispute-flag">⚠️</span>' : '');
+      tile.id = 'tile_' + r.posukKey;
+      tile.onclick = async () => {
+        selectedPosukKey = r.posukKey;
+        await renderStudentGrid();
+        renderPosukDetail(r.posukKey);
+        const detailEl = document.getElementById('posukDetail');
+        if(detailEl) detailEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+      list.appendChild(tile);
+    });
+    wrap.appendChild(list);
   }
 }
 
@@ -1574,17 +1638,26 @@ function wireFinalizeComprehension(a, posukKey){
 /* ---------- Shared helpers ---------- */
 function parsePosukKey(posukKey){
   // format: ParshaSlug_perek_posuk  e.g. "ChayeiSarah_24_10"
+  // A comprehension range attempt uses ParshaSlug_perek_from-to instead
+  // (e.g. "ChayeiSarah_24_3-5") since it covers several pesukim at once
+  // rather than one — isRange/rangeStart/rangeEnd expose that here so
+  // every place that reads a posukKey can handle both shapes.
   const parts = posukKey.split('_');
-  const posuk = parseInt(parts.pop());
+  const posukPart = parts.pop();
   const perek = parseInt(parts.pop());
   const parshaSlug = parts.join('');
-  return { parshaSlug, perek, posuk };
+  const rangeMatch = /^(\d+)-(\d+)$/.exec(posukPart);
+  if(rangeMatch){
+    return { parshaSlug, perek, posuk: parseInt(rangeMatch[1]), isRange: true, rangeStart: parseInt(rangeMatch[1]), rangeEnd: parseInt(rangeMatch[2]) };
+  }
+  return { parshaSlug, perek, posuk: parseInt(posukPart), isRange: false, rangeStart: null, rangeEnd: null };
 }
 
 function formatRefLabel(posukKey){
-  const { parshaSlug, perek, posuk } = parsePosukKey(posukKey);
+  const { parshaSlug, perek, posuk, isRange, rangeStart, rangeEnd } = parsePosukKey(posukKey);
   const parshaName = parshaSlug === 'ChayeiSarah' ? 'Chayei Sarah' : parshaSlug;
-  return `${parshaName} · Perek ${perek} · Posuk ${posuk}`;
+  const posukLabel = isRange ? `${rangeStart}–${rangeEnd}` : posuk;
+  return `${parshaName} · Perek ${perek} · Posuk ${posukLabel}`;
 }
 
 function sortPosukKeys(keys){
