@@ -935,6 +935,33 @@ function getSelectedStudentIds(){
   return [...document.querySelectorAll('.report-student-cb')].filter(cb => cb.checked).map(cb => cb.value);
 }
 
+async // Shared summary-stats calculation used by the on-screen report, the CSV
+// export, and the printable PDF, so all three always agree with each other.
+function computeReportSummary(rows, scoreType){
+  const distinctStudents = new Set(rows.map(r => r.studentId)).size;
+  const readingScores = rows.map(r => r.hebrewScore).filter(s => typeof s === 'number');
+  const avgReading = readingScores.length ? Math.round(readingScores.reduce((a,b)=>a+b,0) / readingScores.length) : null;
+  const verdictCounts = { excellent: 0, correct: 0, partial: 0, incorrect: 0 };
+  rows.forEach(r => { if(r.comprehensionVerdict && verdictCounts.hasOwnProperty(r.comprehensionVerdict)) verdictCounts[r.comprehensionVerdict]++; });
+  return { distinctStudents, avgReading, verdictCounts };
+}
+
+// Renders the summary as an HTML block (used on-screen and in the print view).
+function reportSummaryHtml(rows, scoreType){
+  const { distinctStudents, avgReading, verdictCounts } = computeReportSummary(rows, scoreType);
+  let summaryHtml = `<div class="attempt" style="margin-bottom:14px;">
+      <div class="row"><span class="label">Pesukim in this report</span><span>${rows.length}</span></div>
+      <div class="row"><span class="label">Students represented</span><span>${distinctStudents}</span></div>`;
+  if(scoreType !== 'comprehension'){
+    summaryHtml += `<div class="row"><span class="label">Average reading score</span><span>${avgReading === null ? '—' : avgReading + '%'}</span></div>`;
+  }
+  if(scoreType !== 'reading'){
+    summaryHtml += `<div class="row"><span class="label">Comprehension breakdown</span><span>🌟${verdictCounts.excellent} ✅${verdictCounts.correct} 🤔${verdictCounts.partial} 💡${verdictCounts.incorrect}</span></div>`;
+  }
+  summaryHtml += `</div>`;
+  return summaryHtml;
+}
+
 async function renderReportResults(){
   const resultsEl = document.getElementById('reportResults');
   const summaryEl = document.getElementById('reportSummary');
@@ -983,23 +1010,7 @@ async function renderReportResults(){
     }
 
     // Summary stats give the big picture before scrolling through every row.
-    const distinctStudents = new Set(rows.map(r => r.studentId)).size;
-    const readingScores = rows.map(r => r.hebrewScore).filter(s => typeof s === 'number');
-    const avgReading = readingScores.length ? Math.round(readingScores.reduce((a,b)=>a+b,0) / readingScores.length) : null;
-    const verdictCounts = { excellent: 0, correct: 0, partial: 0, incorrect: 0 };
-    rows.forEach(r => { if(r.comprehensionVerdict && verdictCounts.hasOwnProperty(r.comprehensionVerdict)) verdictCounts[r.comprehensionVerdict]++; });
-
-    let summaryHtml = `<div class="attempt" style="margin-bottom:14px;">
-      <div class="row"><span class="label">Pesukim in this report</span><span>${rows.length}</span></div>
-      <div class="row"><span class="label">Students represented</span><span>${distinctStudents}</span></div>`;
-    if(scoreType !== 'comprehension'){
-      summaryHtml += `<div class="row"><span class="label">Average reading score</span><span>${avgReading === null ? '—' : avgReading + '%'}</span></div>`;
-    }
-    if(scoreType !== 'reading'){
-      summaryHtml += `<div class="row"><span class="label">Comprehension breakdown</span><span>🌟${verdictCounts.excellent} ✅${verdictCounts.correct} 🤔${verdictCounts.partial} 💡${verdictCounts.incorrect}</span></div>`;
-    }
-    summaryHtml += `</div>`;
-    summaryEl.innerHTML = summaryHtml;
+    summaryEl.innerHTML = reportSummaryHtml(rows, scoreType);
 
     // Columns that are redundant given the current filter (e.g. every row
     // is the same student, or the same perek) are dropped from the on-screen
@@ -1047,8 +1058,26 @@ async function renderReportResults(){
 // because it looked redundant in the current on-screen view.
 function downloadReportCsv(){
   if(!reportRows.length) return;
+  const scoreType = document.getElementById('reportScoreTypeFilter').value;
+  const { distinctStudents, avgReading, verdictCounts } = computeReportSummary(reportRows, scoreType);
+
+  // Summary block first, then a blank line, then the full data table —
+  // so the totals are right there without having to scroll or recompute.
+  const summaryLines = [];
+  summaryLines.push(['Pesukim in this report', reportRows.length].join(','));
+  summaryLines.push(['Students represented', distinctStudents].join(','));
+  if(scoreType !== 'comprehension'){
+    summaryLines.push(['Average reading score', avgReading === null ? '' : avgReading + '%'].join(','));
+  }
+  if(scoreType !== 'reading'){
+    summaryLines.push(['Excellent', verdictCounts.excellent].join(','));
+    summaryLines.push(['Correct', verdictCounts.correct].join(','));
+    summaryLines.push(['Partial', verdictCounts.partial].join(','));
+    summaryLines.push(['Incorrect', verdictCounts.incorrect].join(','));
+  }
+
   const header = ['Student','Parsha','Perek','Posuk','Reading %','Comprehension','Date'];
-  const lines = [header.join(',')];
+  const lines = [...summaryLines, '', header.join(',')];
   reportRows.forEach(r => {
     const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) : '';
     const verdictText = r.comprehensionVerdict || '';
@@ -1073,6 +1102,20 @@ function downloadReportCsv(){
 // device without needing a PDF-generation library.
 function printReport(){
   if(!reportRows.length) return;
+  const scoreType = document.getElementById('reportScoreTypeFilter').value;
+  const { distinctStudents, avgReading, verdictCounts } = computeReportSummary(reportRows, scoreType);
+
+  // Summary block, styled to match the print page rather than the app's
+  // own stylesheet (this opens in a bare new tab with no app CSS loaded).
+  let summaryRowsHtml = `<tr><td>Pesukim in this report</td><td>${reportRows.length}</td></tr>
+    <tr><td>Students represented</td><td>${distinctStudents}</td></tr>`;
+  if(scoreType !== 'comprehension'){
+    summaryRowsHtml += `<tr><td>Average reading score</td><td>${avgReading === null ? '—' : avgReading + '%'}</td></tr>`;
+  }
+  if(scoreType !== 'reading'){
+    summaryRowsHtml += `<tr><td>Comprehension breakdown</td><td>🌟${verdictCounts.excellent} ✅${verdictCounts.correct} 🤔${verdictCounts.partial} 💡${verdictCounts.incorrect}</td></tr>`;
+  }
+
   const rowsHtml = reportRows.map(r => {
     const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
     const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
@@ -1091,13 +1134,17 @@ function printReport(){
     <style>
       body{ font-family: Arial, sans-serif; padding: 24px; color:#222; }
       h1{ font-size:1.3rem; margin-bottom:4px; }
+      h2{ font-size:1.05rem; margin:20px 0 6px; }
       .meta{ color:#666; font-size:0.85rem; margin-bottom:16px; }
       table{ width:100%; border-collapse: collapse; font-size:0.9rem; }
       th, td{ border:1px solid #ccc; padding:6px 8px; text-align:left; }
       th{ background:#f2f2f2; }
+      .summary-table td:first-child{ color:#555; }
+      .summary-table{ margin-bottom:20px; max-width:420px; }
     </style></head><body>
     <h1>Posuk Practice Scroll — Report</h1>
     <div class="meta">Generated ${new Date().toLocaleDateString()}</div>
+    <table class="summary-table"><tbody>${summaryRowsHtml}</tbody></table>
     <table><thead><tr>
       <th>Student</th><th>Parsha</th><th>Perek</th><th>Posuk</th><th>Reading %</th><th>Comprehension</th><th>Date</th>
     </tr></thead><tbody>${rowsHtml}</tbody></table>
