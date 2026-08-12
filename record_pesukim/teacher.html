@@ -693,9 +693,13 @@ async function loadRoster(){
 /* ---------- Reports tab ----------
    Flat, filterable list of every posuk attempt across the class: who,
    which parsha/perek/posuk, their reading %, and their comprehension
-   verdict. A teacher can narrow it to one student, one parsha, or both,
-   then either read it on screen, download it as a CSV, or open a
-   print-friendly view (which any browser can "Print to PDF" from). */
+   verdict. Filters can be combined freely — one/several/all students,
+   one parsha, one perek within it, one posuk within that perek, a date
+   range, and which score type(s) to show — so a teacher can go as broad
+   as "the whole class, whole parsha" or as narrow as "how did everyone
+   do on this one posuk". Results can be read on screen, downloaded as a
+   CSV, or opened in a print-friendly view (which any browser can
+   "Print to PDF" from). */
 let reportRows = []; // cached rows for the current filter selection, used by CSV/print export
 
 function verdictLabel(v){
@@ -709,6 +713,7 @@ function verdictLabel(v){
 // Builds one row per posuk per student from the raw attempts tree,
 // resolving each posukKey into a parsha name / perek / posuk number so
 // it can be filtered and displayed like the rest of the dashboard.
+// Includes the latest attempt's timestamp so rows can be filtered by date.
 function buildReportRows(allAttempts){
   const rows = [];
   Object.entries(studentsMap).forEach(([id, name]) => {
@@ -730,6 +735,7 @@ function buildReportRows(allAttempts){
         parshaName,
         perekNum,
         posukNum,
+        timestamp: latest ? latest.timestamp : null,
         hebrewScore: effHebrewScore(latest),
         comprehensionVerdict: effComprehensionVerdict(latest)
       });
@@ -744,28 +750,80 @@ async function loadReportsTab(){
   try{
     await loadAllAttempts(); // warms allAttemptsCache
 
-    const studentOptions = Object.entries(studentsMap)
+    const studentCheckboxes = Object.entries(studentsMap)
       .sort((a,b) => a[1].localeCompare(b[1]))
-      .map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
+      .map(([id, name]) => `<label style="display:block;font-size:0.85rem;font-weight:400;margin:2px 0;">
+        <input type="checkbox" class="report-student-cb" value="${id}"> ${name}</label>`).join('');
     const parshaOptions = Object.keys(PARSHA_CONFIG)
       .map(n => `<option value="${n}">${n}</option>`).join('');
 
     mainEl.innerHTML = `
       <h2>🧾 Reports</h2>
-      <div class="report-filters" style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:14px;">
+      <div class="report-filters" style="display:flex;flex-wrap:wrap;gap:14px;align-items:start;margin-bottom:14px;">
         <div>
-          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Student</label>
-          <select id="reportStudentFilter"><option value="all">All Students</option>${studentOptions}</select>
+          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Student(s)</label>
+          <div id="reportStudentBox" style="border:1px solid #d8c9a0;border-radius:10px;padding:8px 10px;max-height:130px;overflow-y:auto;min-width:170px;background:#fffbf2;">
+            <label style="display:block;font-size:0.85rem;font-weight:600;margin:0 0 4px;">
+              <input type="checkbox" id="reportStudentAll" checked> All Students</label>
+            ${studentCheckboxes}
+          </div>
         </div>
         <div>
           <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Parsha</label>
           <select id="reportParshaFilter"><option value="all">All Parshas</option>${parshaOptions}</select>
         </div>
+        <div>
+          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Perek</label>
+          <select id="reportPerekFilter"><option value="all">All Perakim</option></select>
+        </div>
+        <div>
+          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Posuk</label>
+          <select id="reportPosukFilter" disabled><option value="all">All Pesukim</option></select>
+        </div>
+        <div>
+          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Show</label>
+          <select id="reportScoreTypeFilter">
+            <option value="both">Reading + Comprehension</option>
+            <option value="reading">Reading Only</option>
+            <option value="comprehension">Comprehension Only</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">From</label>
+          <input type="date" id="reportDateFrom">
+        </div>
+        <div>
+          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">To</label>
+          <input type="date" id="reportDateTo">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:14px;">
         <button class="btn small" id="reportGenerateBtn">📊 Generate Report</button>
         <button class="btn small hidden" id="reportCsvBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">⬇️ Download CSV</button>
         <button class="btn small hidden" id="reportPrintBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">🖨️ Print / Save PDF</button>
       </div>
+      <div id="reportSummary"></div>
       <div id="reportResults"></div>`;
+
+    // "All Students" and the individual checkboxes are mutually exclusive:
+    // checking "All" clears the individual picks, and picking any individual
+    // student clears "All" so the filter reflects only what's actually checked.
+    const allBox = document.getElementById('reportStudentAll');
+    const studentCbs = () => [...document.querySelectorAll('.report-student-cb')];
+    allBox.onchange = () => {
+      if(allBox.checked) studentCbs().forEach(cb => cb.checked = false);
+    };
+    studentCbs().forEach(cb => {
+      cb.onchange = () => {
+        if(cb.checked) allBox.checked = false;
+        // If nothing ends up checked, fall back to "All" so the filter never goes empty.
+        if(!studentCbs().some(c => c.checked)) allBox.checked = true;
+      };
+    });
+
+    populatePerekFilter('all');
+    document.getElementById('reportParshaFilter').onchange = (e) => populatePerekFilter(e.target.value);
+    document.getElementById('reportPerekFilter').onchange = (e) => populatePosukFilter(e.target.value);
 
     document.getElementById('reportGenerateBtn').onclick = renderReportResults;
     document.getElementById('reportCsvBtn').onclick = downloadReportCsv;
@@ -776,17 +834,74 @@ async function loadReportsTab(){
   }
 }
 
+// Repopulates the Perek dropdown to match the chosen parsha (or every
+// perek across all parshas, if "All Parshas" is selected), and resets
+// the Posuk dropdown since it depends on which perek ends up chosen.
+function populatePerekFilter(parshaFilter){
+  const perekSelect = document.getElementById('reportPerekFilter');
+  const perekNums = parshaFilter === 'all'
+    ? getAllPerekNums()
+    : (PARSHA_CONFIG[parshaFilter] || []).map(ch => ch.num);
+  perekSelect.innerHTML = '<option value="all">All Perakim</option>' +
+    perekNums.map(n => `<option value="${n}">${n}</option>`).join('');
+  populatePosukFilter('all');
+}
+
+// Repopulates the Posuk dropdown to the actual posuk range of the chosen
+// perek. Disabled (and reset to "all") when no single perek is chosen,
+// since "posuk 5" doesn't mean anything across several different perakim.
+async function populatePosukFilter(perekFilter){
+  const posukSelect = document.getElementById('reportPosukFilter');
+  if(perekFilter === 'all'){
+    posukSelect.innerHTML = '<option value="all">All Pesukim</option>';
+    posukSelect.disabled = true;
+    return;
+  }
+  posukSelect.disabled = false;
+  posukSelect.innerHTML = '<option value="all">All Pesukim</option>';
+  try{
+    const { min, max } = await getPerekRange(parseInt(perekFilter));
+    if(isFinite(min) && isFinite(max)){
+      let opts = '<option value="all">All Pesukim</option>';
+      for(let p = min; p <= max; p++) opts += `<option value="${p}">${p}</option>`;
+      posukSelect.innerHTML = opts;
+    }
+  }catch(err){
+    console.error('Could not load posuk range for perek', perekFilter, err);
+  }
+}
+
+function getSelectedStudentIds(){
+  const allBox = document.getElementById('reportStudentAll');
+  if(allBox.checked) return null; // null = no student filter, show everyone
+  return [...document.querySelectorAll('.report-student-cb')].filter(cb => cb.checked).map(cb => cb.value);
+}
+
 async function renderReportResults(){
   const resultsEl = document.getElementById('reportResults');
+  const summaryEl = document.getElementById('reportSummary');
   resultsEl.innerHTML = '<div class="loading">Building report…</div>';
+  summaryEl.innerHTML = '';
   try{
-    const studentFilter = document.getElementById('reportStudentFilter').value;
+    const studentIds = getSelectedStudentIds(); // null = all
     const parshaFilter = document.getElementById('reportParshaFilter').value;
+    const perekFilter = document.getElementById('reportPerekFilter').value;
+    const posukFilter = document.getElementById('reportPosukFilter').value;
+    const scoreType = document.getElementById('reportScoreTypeFilter').value;
+    const dateFromVal = document.getElementById('reportDateFrom').value;
+    const dateToVal = document.getElementById('reportDateTo').value;
+    const dateFrom = dateFromVal ? new Date(dateFromVal + 'T00:00:00').getTime() : null;
+    const dateTo = dateToVal ? new Date(dateToVal + 'T23:59:59').getTime() : null;
+
     const allAttempts = await loadAllAttempts();
     let rows = buildReportRows(allAttempts);
 
-    if(studentFilter !== 'all') rows = rows.filter(r => r.studentId === studentFilter);
+    if(studentIds) rows = rows.filter(r => studentIds.includes(r.studentId));
     if(parshaFilter !== 'all') rows = rows.filter(r => r.parshaName === parshaFilter);
+    if(perekFilter !== 'all') rows = rows.filter(r => r.perekNum === parseInt(perekFilter));
+    if(posukFilter !== 'all') rows = rows.filter(r => r.posukNum === parseInt(posukFilter));
+    if(dateFrom !== null) rows = rows.filter(r => typeof r.timestamp === 'number' && r.timestamp >= dateFrom);
+    if(dateTo !== null) rows = rows.filter(r => typeof r.timestamp === 'number' && r.timestamp <= dateTo);
 
     rows.sort((a,b) => {
       const n = a.studentName.localeCompare(b.studentName);
@@ -800,23 +915,59 @@ async function renderReportResults(){
     document.getElementById('reportPrintBtn').classList.toggle('hidden', rows.length === 0);
 
     if(rows.length === 0){
+      summaryEl.innerHTML = '';
       resultsEl.innerHTML = '<div class="empty-msg">No recordings match these filters yet.</div>';
       return;
     }
 
-    let html = `<table class="roster-table"><thead><tr>
-      <th>Student</th><th>Parsha</th><th>Perek</th><th>Posuk</th><th>Reading %</th><th>Comprehension</th>
-    </tr></thead><tbody>`;
+    // Summary stats give the big picture before scrolling through every row.
+    const distinctStudents = new Set(rows.map(r => r.studentId)).size;
+    const readingScores = rows.map(r => r.hebrewScore).filter(s => typeof s === 'number');
+    const avgReading = readingScores.length ? Math.round(readingScores.reduce((a,b)=>a+b,0) / readingScores.length) : null;
+    const verdictCounts = { excellent: 0, correct: 0, partial: 0, incorrect: 0 };
+    rows.forEach(r => { if(r.comprehensionVerdict && verdictCounts.hasOwnProperty(r.comprehensionVerdict)) verdictCounts[r.comprehensionVerdict]++; });
+
+    let summaryHtml = `<div class="attempt" style="margin-bottom:14px;">
+      <div class="row"><span class="label">Pesukim in this report</span><span>${rows.length}</span></div>
+      <div class="row"><span class="label">Students represented</span><span>${distinctStudents}</span></div>`;
+    if(scoreType !== 'comprehension'){
+      summaryHtml += `<div class="row"><span class="label">Average reading score</span><span>${avgReading === null ? '—' : avgReading + '%'}</span></div>`;
+    }
+    if(scoreType !== 'reading'){
+      summaryHtml += `<div class="row"><span class="label">Comprehension breakdown</span><span>🌟${verdictCounts.excellent} ✅${verdictCounts.correct} 🤔${verdictCounts.partial} 💡${verdictCounts.incorrect}</span></div>`;
+    }
+    summaryHtml += `</div>`;
+    summaryEl.innerHTML = summaryHtml;
+
+    // Columns that are redundant given the current filter (e.g. every row
+    // is the same student, or the same perek) are dropped from the on-screen
+    // table so the teacher isn't scanning a column that never changes.
+    const showStudentCol = studentIds === null || studentIds.length !== 1;
+    const showParshaCol = parshaFilter === 'all';
+    const showPerekCol = perekFilter === 'all';
+    const showPosukCol = posukFilter === 'all';
+    const showReadingCol = scoreType !== 'comprehension';
+    const showComprehensionCol = scoreType !== 'reading';
+
+    let headerCells = '';
+    if(showStudentCol) headerCells += '<th>Student</th>';
+    if(showParshaCol) headerCells += '<th>Parsha</th>';
+    if(showPerekCol) headerCells += '<th>Perek</th>';
+    if(showPosukCol) headerCells += '<th>Posuk</th>';
+    if(showReadingCol) headerCells += '<th>Reading %</th>';
+    if(showComprehensionCol) headerCells += '<th>Comprehension</th>';
+
+    let html = `<table class="roster-table"><thead><tr>${headerCells}</tr></thead><tbody>`;
     rows.forEach(r => {
       const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
-      html += `<tr>
-        <td>${r.studentName}</td>
-        <td>${r.parshaName}</td>
-        <td>${r.perekNum}</td>
-        <td>${r.posukNum}</td>
-        <td>${scoreLabel}</td>
-        <td>${verdictLabel(r.comprehensionVerdict)}</td>
-      </tr>`;
+      let cells = '';
+      if(showStudentCol) cells += `<td>${r.studentName}</td>`;
+      if(showParshaCol) cells += `<td>${r.parshaName}</td>`;
+      if(showPerekCol) cells += `<td>${r.perekNum}</td>`;
+      if(showPosukCol) cells += `<td>${r.posukNum}</td>`;
+      if(showReadingCol) cells += `<td>${scoreLabel}</td>`;
+      if(showComprehensionCol) cells += `<td>${verdictLabel(r.comprehensionVerdict)}</td>`;
+      html += `<tr>${cells}</tr>`;
     });
     html += '</tbody></table>';
     resultsEl.innerHTML = html;
@@ -826,6 +977,9 @@ async function renderReportResults(){
   }
 }
 
+// CSV/print exports always include every column regardless of what's
+// hidden on screen — a downloaded file shouldn't silently drop data just
+// because it looked redundant in the current on-screen view.
 function downloadReportCsv(){
   if(!reportRows.length) return;
   const header = ['Student','Parsha','Perek','Posuk','Reading %','Comprehension'];
