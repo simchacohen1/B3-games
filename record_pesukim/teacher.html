@@ -975,7 +975,18 @@ async function renderStudentGrid(){
       tile.className = 'posuk-tile ' + (tier ? 'tile-' + tier : 'tile-none') + (posukKey === selectedPosukKey ? ' selected' : '') + (pending ? ' tile-disputed' : '');
       tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${tileLabel}</span>` + (pending ? '<span class="tile-dispute-flag">⚠️</span>' : '');
       if(posukKey){
-        tile.onclick = () => { selectedPosukKey = posukKey; renderStudentGrid(); renderPosukDetail(posukKey); };
+        // Give the tile a stable id so the detail panel's "back" button
+        // can scroll the teacher precisely back to the tile they came from.
+        tile.id = 'tile_' + posukKey;
+        tile.onclick = async () => {
+          selectedPosukKey = posukKey;
+          await renderStudentGrid();
+          renderPosukDetail(posukKey);
+          // Jump the teacher's eye straight to the detail panel instead of
+          // leaving them hunting for it below a long grid of pesukim.
+          const detailEl = document.getElementById('posukDetail');
+          if(detailEl) detailEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
       }
       grid.appendChild(tile);
     }
@@ -992,6 +1003,7 @@ function renderPosukDetail(posukKey){
   const { attempts, latest } = studentPosukData[posukKey];
   const refLabel = formatRefLabel(posukKey);
   let html = `<div class="posuk-group">
+    <button class="btn small" id="backToTileBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;margin-bottom:10px;">⬆️ Back to grid</button>
     <h3>${refLabel}</h3>
     <div class="posuk-hebrew">${latest.posukText || ''}</div>`;
   attempts.forEach(a => {
@@ -1021,6 +1033,20 @@ function renderPosukDetail(posukKey){
   });
   html += `</div>`;
   detailEl.innerHTML = html;
+
+  // Scroll back to the exact tile that was clicked, rather than just
+  // the top of the grid, so the teacher lands right where they left off.
+  const backBtn = document.getElementById('backToTileBtn');
+  if(backBtn){
+    backBtn.onclick = () => {
+      const tileEl = document.getElementById('tile_' + posukKey);
+      if(tileEl){
+        tileEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }else{
+        detailEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+  }
 
   // Wire up finalize controls now that the HTML is in the DOM.
   attempts.forEach(a => {
