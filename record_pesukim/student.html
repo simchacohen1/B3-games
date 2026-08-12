@@ -383,22 +383,6 @@
     font-size:0.8rem;
   }
   .msg{ text-align:center; color: var(--ink-soft); font-size:0.85rem; margin-top:8px; min-height:1.2em; }
-  .mic-meter{
-    flex: 1 1 60px;
-    max-width: 90px;
-    height: 14px;
-    background: rgba(59,42,30,0.12);
-    border-radius: 999px;
-    overflow: hidden;
-    align-self: center;
-  }
-  .mic-meter-bar{
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #6fbf73, #f2b134);
-    border-radius: 999px;
-    transition: width 60ms linear;
-  }
   .hidden{ display:none !important; }
   footer.who{
     text-align:center; margin-top:26px; font-size:0.8rem; color: var(--ink-soft);
@@ -460,7 +444,6 @@
         <h3>1️⃣ Read the Hebrew Words</h3>
         <div class="record-row">
           <button class="seal-btn" id="hebrewRecordBtn" title="Record">🎙️</button>
-          <div class="mic-meter hidden" id="hebrewMicMeter"><div class="mic-meter-bar" id="hebrewMicMeterBar"></div></div>
           <audio id="hebrewAudioPlayback" controls class="hidden"></audio>
           <button class="btn ghost-delete hidden" id="hebrewDeleteBtn" title="Delete this recording">🗑️ Delete</button>
           <span class="status-tag" id="hebrewStatus">Not recorded yet</span>
@@ -473,9 +456,17 @@
       <div class="task-card comprehension hidden" id="comprehensionPanel">
         <h3>🧠 Show You Understand</h3>
         <p style="margin:0 0 10px;color:var(--ink-soft);font-size:0.9rem;">In your own words, say what is happening in this posuk. Don't worry about exact words — just explain it like you'd tell a friend!</p>
+        <div class="comp-range-picker" id="comprehensionRangePicker" style="margin-bottom:12px;font-size:0.9rem;">
+          <label style="display:block;color:var(--ink-soft);margin-bottom:4px;">Answer about posuk(s):</label>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <select id="comprehensionFromPosuk"></select>
+            <span>to</span>
+            <select id="comprehensionToPosuk"></select>
+          </div>
+          <div class="comp-range-text hidden" id="comprehensionRangeTextDisplay" style="margin-top:8px;font-size:1.1rem;"></div>
+        </div>
         <div class="record-row">
           <button class="seal-btn" id="comprehensionRecordBtn" title="Record">🎙️</button>
-          <div class="mic-meter hidden" id="comprehensionMicMeter"><div class="mic-meter-bar" id="comprehensionMicMeterBar"></div></div>
           <audio id="comprehensionAudioPlayback" controls class="hidden"></audio>
           <button class="btn ghost-delete hidden" id="comprehensionDeleteBtn" title="Delete this recording">🗑️ Delete</button>
           <span class="status-tag" id="comprehensionStatus">Not recorded yet</span>
@@ -674,54 +665,27 @@ let currentPosukNum = null; // plain verse number (e.g. 1, 2, 3…), what the sc
 let currentPerekNum = null; // perek number — needed alongside posuk since posuk numbers repeat across perakim
 let currentPosukText = "";
 let currentPosukTranslation = ""; // accepted English translation, used as the grading "answer key"
+
+/* ---------- Comprehension posuk-range picker ----------
+   Reading is always exactly one posuk, unchanged. Comprehension can
+   optionally cover a range of pesukim within the current perek (e.g.
+   "explain pesukim 3 through 5 together") — one recording, one verdict,
+   covering the whole range. When the range is just the current posuk
+   (the default), this behaves identically to before and shares the
+   same attempt record as the reading task; a wider range is saved as
+   its own attempt record under a range key instead, since it no longer
+   corresponds to a single posuk. */
+let comprehensionRangeFrom = null;
+let comprehensionRangeTo = null;
+let comprehensionRangeText = "";         // combined Hebrew across the range — the grading "answer key" source
+let comprehensionRangeTranslation = "";  // combined English across the range
+let comprehensionRangeAttemptRef = null; // separate Firebase ref, used only when the range spans >1 posuk
+let comprehensionRangeAttemptId = null;
+let comprehensionRangeSavedStoragePath = null;
+
 let mediaRecorder = null;
 let recordingChunks = [];
 let activeRecordingType = null; // 'hebrew' | 'translate' | 'comprehension'
-
-// Live mic level meter — shows the student a bouncing bar while recording
-// so they can see their voice is actually being picked up.
-let micAudioCtx = null;
-let micAnalyser = null;
-let micMeterRAF = null;
-
-function startMicMeter(stream, type){
-  try{
-    micAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const source = micAudioCtx.createMediaStreamSource(stream);
-    micAnalyser = micAudioCtx.createAnalyser();
-    micAnalyser.fftSize = 256;
-    source.connect(micAnalyser);
-    const data = new Uint8Array(micAnalyser.frequencyBinCount);
-    const meterEl = document.getElementById(type + 'MicMeter');
-    const barEl = document.getElementById(type + 'MicMeterBar');
-    if(meterEl) meterEl.classList.remove('hidden');
-    function tick(){
-      micAnalyser.getByteFrequencyData(data);
-      let sum = 0;
-      for(let i=0;i<data.length;i++) sum += data[i];
-      const avg = sum / data.length; // 0-255
-      // Scale up a bit so normal speech visibly moves the bar, and cap at 100%.
-      const pct = Math.min(100, Math.round((avg / 90) * 100));
-      if(barEl) barEl.style.width = pct + '%';
-      micMeterRAF = requestAnimationFrame(tick);
-    }
-    tick();
-  }catch(err){
-    // Mic meter is a nice-to-have; if AudioContext isn't available for some
-    // reason, just skip it silently — recording itself still works fine.
-    console.error('Mic meter unavailable:', err);
-  }
-}
-
-function stopMicMeter(type){
-  if(micMeterRAF){ cancelAnimationFrame(micMeterRAF); micMeterRAF = null; }
-  if(micAudioCtx){ micAudioCtx.close().catch(()=>{}); micAudioCtx = null; }
-  micAnalyser = null;
-  const meterEl = document.getElementById(type + 'MicMeter');
-  const barEl = document.getElementById(type + 'MicMeterBar');
-  if(barEl) barEl.style.width = '0%';
-  if(meterEl) meterEl.classList.add('hidden');
-}
 let chapterCache = {}; // cache fetched Sefaria Hebrew chapters this session
 let translationCache = {}; // cache fetched Sefaria English chapters this session
 
@@ -1300,8 +1264,95 @@ function showPosuk(parsha, perekNum, posukNum, text, translation){
   document.getElementById('recordingArea').classList.remove('hidden');
   updateNavArrows(); // arrows stay visible always; this just disables at the true start/end
   resetRecordingUI();
+  populateComprehensionRangeSelects();
   loadHistory();
 }
+
+/* ---------- Comprehension posuk-range picker ----------
+   Populates the From/To selects with every posuk in the current perek
+   (same range Sefaria gives for the perek itself), defaulting both to
+   the posuk just loaded for reading. */
+async function populateComprehensionRangeSelects(){
+  const fromSel = document.getElementById('comprehensionFromPosuk');
+  const toSel = document.getElementById('comprehensionToPosuk');
+  fromSel.innerHTML = '';
+  toSel.innerHTML = '';
+  try{
+    const pesukim = await fetchChapter(currentPerekNum);
+    // Same cross-parsha-split handling as the main perek/posuk pickers above.
+    let min = Infinity, max = -Infinity;
+    Object.values(PARSHA_CONFIG).forEach(chapters => {
+      const ch = chapters.find(c => c.num === currentPerekNum);
+      if(ch){
+        min = Math.min(min, ch.minPosuk || 1);
+        max = Math.max(max, ch.maxPosuk || pesukim.length);
+      }
+    });
+    for(let i = min; i <= max; i++){
+      const optFrom = document.createElement('option');
+      optFrom.value = i;
+      optFrom.textContent = 'פסוק ' + hebrewNumeral(i);
+      fromSel.appendChild(optFrom);
+      const optTo = document.createElement('option');
+      optTo.value = i;
+      optTo.textContent = 'פסוק ' + hebrewNumeral(i);
+      toSel.appendChild(optTo);
+    }
+    fromSel.value = currentPosukNum;
+    toSel.value = currentPosukNum;
+  }catch(err){
+    console.error('Could not populate comprehension range selects', err);
+  }
+  await updateComprehensionRange();
+}
+
+// Recomputes the combined Hebrew/English text for whatever range is
+// currently selected — this combined text becomes the "answer key" the
+// AI grades the recording against, same idea as a single posuk's text
+// and translation today, just concatenated across the range.
+async function updateComprehensionRange(){
+  const fromSel = document.getElementById('comprehensionFromPosuk');
+  const toSel = document.getElementById('comprehensionToPosuk');
+  let from = parseInt(fromSel.value);
+  let to = parseInt(toSel.value);
+  if(!from || !to) return;
+  if(to < from){ to = from; toSel.value = to; } // "to" can never be before "from"
+  comprehensionRangeFrom = from;
+  comprehensionRangeTo = to;
+
+  try{
+    const pesukim = await fetchChapter(currentPerekNum);
+    let translations = [];
+    try{ translations = await fetchChapterTranslation(currentPerekNum); }
+    catch(err){ console.error('Could not load translations for comprehension range', err); }
+
+    const parts = [];
+    for(let i = from; i <= to; i++){
+      parts.push({ num: i, text: stripMeteg(pesukim[i - 1] || ''), translation: translations[i - 1] || '' });
+    }
+    comprehensionRangeText = parts.map(p => p.text).join(' ');
+    comprehensionRangeTranslation = parts.map(p => p.translation).filter(Boolean).join(' ');
+
+    // Only the current (single, already-visible-above) posuk needs no
+    // extra display — a wider range needs its own text shown here so
+    // the student has everything to answer about in view at once.
+    const displayEl = document.getElementById('comprehensionRangeTextDisplay');
+    if(from === to){
+      displayEl.classList.add('hidden');
+      displayEl.innerHTML = '';
+    }else{
+      displayEl.innerHTML = parts.map(p =>
+        '<div style="margin-bottom:6px;"><span style="color:var(--ink-soft);font-size:0.8rem;">פסוק ' + hebrewNumeral(p.num) + '</span><br>' +
+        p.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>'
+      ).join('');
+      displayEl.classList.remove('hidden');
+    }
+  }catch(err){
+    console.error('Could not load posuk range text for comprehension', err);
+  }
+}
+document.getElementById('comprehensionFromPosuk').onchange = updateComprehensionRange;
+document.getElementById('comprehensionToPosuk').onchange = updateComprehensionRange;
 
 /* ---------- Tab switching ----------
    Only one task is visible at a time so the page doesn't feel cluttered.
@@ -1371,6 +1422,11 @@ function resetRecordingUI(){
   attemptSaved = { hebrew: false, comprehension: false };
   hebrewSavedStoragePath = null;
   comprehensionSavedStoragePath = null;
+  comprehensionRangeAttemptRef = null;
+  comprehensionRangeAttemptId = null;
+  comprehensionRangeSavedStoragePath = null;
+  document.getElementById('comprehensionFromPosuk').disabled = false;
+  document.getElementById('comprehensionToPosuk').disabled = false;
   document.getElementById('readingCheck').classList.add('hidden');
   document.getElementById('comprehensionCheck').classList.add('hidden');
   hideNudge();
@@ -1394,6 +1450,8 @@ function deleteRecording(type){
   } else if(type === 'comprehension'){
     resetComprehensionResult();
     if(attemptSaved.comprehension) removeSavedTask('comprehension');
+    document.getElementById('comprehensionFromPosuk').disabled = false;
+    document.getElementById('comprehensionToPosuk').disabled = false;
   }
 }
 document.getElementById('hebrewDeleteBtn').onclick = () => deleteRecording('hebrew');
@@ -1407,6 +1465,24 @@ document.getElementById('comprehensionDeleteBtn').onclick = () => deleteRecordin
 async function removeSavedTask(task){
   attemptSaved[task] = false;
   document.getElementById(task === 'hebrew' ? 'readingCheck' : 'comprehensionCheck').classList.add('hidden');
+
+  // A comprehension range attempt lives entirely on its own (it never
+  // shares a record with a reading attempt), so removing it just deletes
+  // that whole record and its audio outright — nothing else to preserve.
+  if(task === 'comprehension' && comprehensionRangeAttemptRef){
+    try{
+      if(comprehensionRangeSavedStoragePath) storage.ref(comprehensionRangeSavedStoragePath).delete().catch(() => {});
+      await comprehensionRangeAttemptRef.remove();
+    }catch(err){
+      console.error('Could not remove saved comprehension range attempt', err);
+    }
+    comprehensionRangeAttemptRef = null;
+    comprehensionRangeAttemptId = null;
+    comprehensionRangeSavedStoragePath = null;
+    loadHistory();
+    return;
+  }
+
   if(!currentAttemptRef) return;
   try{
     const fields = (task === 'hebrew')
@@ -1477,31 +1553,72 @@ async function autosaveHebrew(){
 }
 
 async function autosaveComprehension(){
-  if(!currentAudio.comprehension || !comprehensionVerdict || !currentPosukKey) return;
-  try{
-    if(!currentAttemptRef){
-      currentAttemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
-      currentAttemptId = currentAttemptRef.key;
+  if(!currentAudio.comprehension || !comprehensionVerdict) return;
+  const isRange = comprehensionRangeFrom !== null && comprehensionRangeTo !== null && comprehensionRangeFrom !== comprehensionRangeTo;
+
+  if(!isRange){
+    // Single posuk — identical to before, sharing the reading task's attempt record.
+    if(!currentPosukKey) return;
+    try{
+      if(!currentAttemptRef){
+        currentAttemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
+        currentAttemptId = currentAttemptRef.key;
+      }
+      const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_comprehension_' + currentAttemptId + '.webm';
+      await storage.ref(path).put(currentAudio.comprehension);
+      const url = await storage.ref(path).getDownloadURL();
+      comprehensionSavedStoragePath = path;
+
+      await currentAttemptRef.update({
+        timestamp: Date.now(),
+        posukText: currentPosukText,
+        posukTranslation: currentPosukTranslation,
+        comprehensionAudioURL: url,
+        comprehensionTranscript: comprehensionTranscript,
+        comprehensionVerdict: comprehensionVerdict,
+        comprehensionFeedback: comprehensionFeedback
+      });
+      markTaskSaved('comprehension');
+    }catch(err){
+      console.error('Autosave (comprehension) failed', err);
+      const gradingMsg = document.getElementById('comprehensionGradingMsg');
+      gradingMsg.textContent = (gradingMsg.textContent ? gradingMsg.textContent + ' ' : '') +
+        "Couldn't save automatically — check your internet connection.";
     }
-    const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_comprehension_' + currentAttemptId + '.webm';
+    return;
+  }
+
+  // Multi-posuk range — this doesn't correspond to any single posukKey,
+  // so it gets its own standalone attempt record (comprehension fields
+  // only) keyed by the range instead of sharing the reading task's record.
+  try{
+    const rangeParsha = resolveParsha(currentPerekNum, comprehensionRangeFrom);
+    const rangeKey = rangeParsha.replace(/\s+/g,'') + '_' + currentPerekNum + '_' + comprehensionRangeFrom + '-' + comprehensionRangeTo;
+    if(!comprehensionRangeAttemptRef){
+      comprehensionRangeAttemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + rangeKey).push();
+      comprehensionRangeAttemptId = comprehensionRangeAttemptRef.key;
+    }
+    const path = 'posukPractice/' + studentId + '/' + rangeKey + '_comprehension_' + comprehensionRangeAttemptId + '.webm';
     await storage.ref(path).put(currentAudio.comprehension);
     const url = await storage.ref(path).getDownloadURL();
-    comprehensionSavedStoragePath = path;
+    comprehensionRangeSavedStoragePath = path;
 
-    const update = {
+    await comprehensionRangeAttemptRef.update({
       timestamp: Date.now(),
-      posukText: currentPosukText,
-      posukTranslation: currentPosukTranslation,
+      perekNum: currentPerekNum,
+      parshaName: rangeParsha,
+      rangeStart: comprehensionRangeFrom,
+      rangeEnd: comprehensionRangeTo,
+      posukText: comprehensionRangeText,
+      posukTranslation: comprehensionRangeTranslation,
       comprehensionAudioURL: url,
       comprehensionTranscript: comprehensionTranscript,
       comprehensionVerdict: comprehensionVerdict,
       comprehensionFeedback: comprehensionFeedback
-    };
-
-    await currentAttemptRef.update(update);
+    });
     markTaskSaved('comprehension');
   }catch(err){
-    console.error('Autosave (comprehension) failed', err);
+    console.error('Autosave (comprehension range) failed', err);
     const gradingMsg = document.getElementById('comprehensionGradingMsg');
     gradingMsg.textContent = (gradingMsg.textContent ? gradingMsg.textContent + ' ' : '') +
       "Couldn't save automatically — check your internet connection.";
@@ -1553,7 +1670,12 @@ async function toggleRecording(type, btnEl){
     btnEl.classList.add('recording');
     btnEl.textContent = '⏹️';
     document.getElementById(type + 'Status').textContent = 'Get ready…';
-    startMicMeter(stream, type);
+    if(type === 'comprehension'){
+      // Lock the range in for this recording — changing it mid-answer would
+      // make the transcript and the "answer key" text mismatch.
+      document.getElementById('comprehensionFromPosuk').disabled = true;
+      document.getElementById('comprehensionToPosuk').disabled = true;
+    }
 
     mediaRecorder.ondataavailable = e => recordingChunks.push(e.data);
     mediaRecorder.onstop = () => {
@@ -1574,7 +1696,6 @@ async function toggleRecording(type, btnEl){
       btnEl.textContent = '🎙️';
       activeRecordingType = null;
       stream.getTracks().forEach(t => t.stop());
-      stopMicMeter(type);
 
       if(type === 'comprehension'){
         document.getElementById(type + 'Status').textContent = 'Recorded — listening…';
@@ -1740,8 +1861,11 @@ async function gradeComprehensionAttempt(){
   try{
     const formData = new FormData();
     formData.append('audio', currentAudio.comprehension, 'recording.' + currentAudioExt.comprehension);
-    formData.append('posukText', currentPosukText || '');
-    formData.append('posukTranslation', currentPosukTranslation || '');
+    // Falls back to the single current posuk's text if the range text
+    // somehow never loaded (e.g. a network hiccup) — in the common case
+    // (range = just this posuk) the two are identical anyway.
+    formData.append('posukText', comprehensionRangeText || currentPosukText || '');
+    formData.append('posukTranslation', comprehensionRangeTranslation || currentPosukTranslation || '');
 
     const res = await fetch(GRADE_COMPREHENSION_URL, { method: 'POST', body: formData });
     if(!res.ok) throw new Error('Grading request failed');
