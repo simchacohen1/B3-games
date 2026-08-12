@@ -819,6 +819,15 @@ async function loadReportsTab(){
           </select>
         </div>
         <div>
+          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Range</label>
+          <select id="reportQuickRange">
+            <option value="custom">Custom dates</option>
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+          </select>
+        </div>
+        <div>
           <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">From</label>
           <input type="date" id="reportDateFrom">
         </div>
@@ -854,6 +863,41 @@ async function loadReportsTab(){
     populatePerekFilter('all');
     document.getElementById('reportParshaFilter').onchange = (e) => populatePerekFilter(e.target.value);
     document.getElementById('reportPerekFilter').onchange = (e) => populatePosukFilter(e.target.value);
+
+    // Quick Range dropdown: fills in the From/To date inputs for common
+    // presets (Today / This Week / This Month) instead of making the
+    // teacher pick exact dates every time. "This Week" and "This Month"
+    // run from the start of that period through today (not through the
+    // end of the period), since future days have no attempts yet anyway.
+    // Picking a preset locks the From/To inputs (greyed out, read-only)
+    // so they can't be hand-edited out of sync with the preset; switching
+    // back to "Custom dates" unlocks them again.
+    const quickRangeSel = document.getElementById('reportQuickRange');
+    const dateFromInput = document.getElementById('reportDateFrom');
+    const dateToInput = document.getElementById('reportDateTo');
+    const toYmd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    quickRangeSel.onchange = () => {
+      const kind = quickRangeSel.value;
+      if (kind === 'custom') {
+        dateFromInput.disabled = false;
+        dateToInput.disabled = false;
+        return;
+      }
+      const now = new Date();
+      const todayStr = toYmd(now);
+      let fromStr = todayStr;
+      if (kind === 'week') {
+        const start = new Date(now);
+        start.setDate(now.getDate() - now.getDay()); // most recent Sunday
+        fromStr = toYmd(start);
+      } else if (kind === 'month') {
+        fromStr = toYmd(new Date(now.getFullYear(), now.getMonth(), 1));
+      }
+      dateFromInput.value = fromStr;
+      dateToInput.value = todayStr;
+      dateFromInput.disabled = true;
+      dateToInput.disabled = true;
+    };
 
     document.getElementById('reportGenerateBtn').onclick = renderReportResults;
     document.getElementById('reportCsvBtn').onclick = downloadReportCsv;
