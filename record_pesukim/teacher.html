@@ -180,6 +180,31 @@
   .posuk-tile.tile-high{ background: #C9E4A6; color: #33511E; }
   .posuk-tile.tile-mid{ background: var(--gold-light); color: var(--ink); }
   .posuk-tile.tile-low{ background: #EFC1C1; color: #7A2626; }
+  .posuk-tile{ position:relative; }
+  .posuk-tile.tile-disputed{ outline: 2px solid var(--rimon); outline-offset: 1px; }
+  .tile-dispute-flag{
+    position:absolute; top:2px; right:2px; font-size:0.7rem; line-height:1;
+  }
+  .dispute-banner{
+    background:#F6E1E1; border:2px solid var(--rimon); border-radius:10px;
+    padding:8px 12px; margin-bottom:8px; font-size:0.85rem; color:#7A2626; font-weight:700;
+  }
+  .finalize-row{
+    background:#FBF0D9; border:2px solid var(--gold); border-radius:10px;
+    padding:8px 12px; margin-top:6px; font-size:0.85rem; display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  }
+  .finalize-row input[type="number"]{
+    width:70px; padding:6px; border-radius:8px; border:2px solid var(--ink-soft); font-family:'Quicksand', sans-serif; text-align:center;
+  }
+  .finalize-row select{
+    padding:6px; border-radius:8px; border:2px solid var(--ink-soft); font-family:'Quicksand', sans-serif;
+  }
+  .finalize-row .btn{ padding: 6px 14px; font-size:0.8rem; }
+  .student-item .dispute-badge{
+    background: var(--rimon); color:#fff; border-radius:999px; font-size:0.65rem; font-weight:700;
+    padding: 1px 6px; margin-left:6px;
+  }
+  .hidden{ display:none !important; }
   #posukDetail{ margin-top:18px; }
   #posukDetail:empty{ margin-top:0; }
 
@@ -300,6 +325,21 @@ const VERDICT_INFO = {
   partial:   { label: '🤔 Almost',    tier: 'mid'  },
   incorrect: { label: '💡 Try again', tier: 'low'  }
 };
+
+/* ---------- Dispute-aware score/verdict readers ----------
+   If a teacher has finalized a disputed attempt, that final value
+   should be what's used everywhere a score/verdict is displayed or
+   averaged — not the original auto-graded one. Everything below reads
+   through these two helpers rather than the raw fields directly. */
+function effHebrewScore(record){
+  return (record && typeof record.hebrewFinalScore === 'number') ? record.hebrewFinalScore : (record ? record.hebrewScore : null);
+}
+function effComprehensionVerdict(record){
+  return record ? (record.comprehensionFinalVerdict || record.comprehensionVerdict) : null;
+}
+function hasPendingDispute(record){
+  return !!record && (record.hebrewDisputeStatus === 'pending' || record.comprehensionDisputeStatus === 'pending');
+}
 
 document.getElementById('enterBtn').onclick = () => {
   const val = document.getElementById('passcodeInput').value;
@@ -503,13 +543,44 @@ async function loadStudents(){
         div.className = 'student-item';
         div.dataset.id = id;
         const lastActive = info.lastActive ? new Date(info.lastActive).toLocaleDateString() : '';
-        div.innerHTML = `<span>${info.name}</span><span class="last-active">${lastActive}</span>`;
+        div.innerHTML = `<span>${info.name}<span class="dispute-badge hidden" id="disputeBadge_${id}"></span></span><span class="last-active">${lastActive}</span>`;
         div.onclick = () => { setTab('student'); selectStudent(id, info.name, div); };
         listEl.appendChild(div);
       });
+    markStudentsWithPendingDisputes();
   }catch(err){
     listEl.innerHTML = '<div class="empty-msg">Could not load students.</div>';
     console.error(err);
+  }
+}
+
+/* Scans every attempt once (reusing the shared cache) so the sidebar can
+   flag students with a pending dispute — the teacher shouldn't have to
+   click into each student just to find out one is waiting on them. */
+async function markStudentsWithPendingDisputes(){
+  try{
+    const allAttempts = await loadAllAttempts();
+    Object.keys(studentsMap).forEach(id => {
+      const posukMap = allAttempts[id];
+      const badge = document.getElementById('disputeBadge_' + id);
+      if(!badge || !posukMap) return;
+      let count = 0;
+      Object.values(posukMap).forEach(attemptMap => {
+        Object.values(attemptMap).forEach(a => {
+          if(a.hebrewDisputeStatus === 'pending') count++;
+          if(a.comprehensionDisputeStatus === 'pending') count++;
+        });
+      });
+      if(count > 0){
+        badge.textContent = '⚠️ ' + count;
+        badge.classList.remove('hidden');
+      }else{
+        badge.textContent = '';
+        badge.classList.add('hidden');
+      }
+    });
+  }catch(err){
+    console.error('Could not check for pending disputes', err);
   }
 }
 
@@ -534,9 +605,11 @@ function computeStudentStats(posukMap){
     const attempts = Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp);
     const latest = attempts[0];
     posukCount++;
-    if(typeof latest.hebrewScore === 'number') hebrewScores.push(latest.hebrewScore);
-    if(latest.comprehensionVerdict && verdictCounts.hasOwnProperty(latest.comprehensionVerdict)){
-      verdictCounts[latest.comprehensionVerdict]++;
+    const hScore = effHebrewScore(latest);
+    if(typeof hScore === 'number') hebrewScores.push(hScore);
+    const cVerdict = effComprehensionVerdict(latest);
+    if(cVerdict && verdictCounts.hasOwnProperty(cVerdict)){
+      verdictCounts[cVerdict]++;
     }
   });
   const avg = hebrewScores.length ? hebrewScores.reduce((a,b) => a+b, 0) / hebrewScores.length : null;
@@ -764,7 +837,9 @@ async function selectStudent(id, name, el){
     studentPosukData = {};
     studentPerekData = {};
     Object.entries(val).forEach(([posukKey, attemptMap]) => {
-      const attempts = Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp);
+      const attempts = Object.entries(attemptMap)
+        .map(([attemptId, a]) => ({ attemptId, ...a }))
+        .sort((a,b) => b.timestamp - a.timestamp);
       studentPosukData[posukKey] = { attempts, latest: attempts[0] };
       const parts = posukKey.split('_');
       if(parts.length < 3) return;
@@ -880,14 +955,14 @@ async function renderStudentGrid(){
       let tier = null;
       let tileLabel = '—';
       if(studentActiveTab === 'reading'){
-        const score = record ? record.hebrewScore : null;
+        const score = record ? effHebrewScore(record) : null;
         if(typeof score === 'number'){
           tier = pctTier(score);
           tileLabel = score + '%';
           doneCount++;
         }
       }else{
-        const verdict = record ? record.comprehensionVerdict : null;
+        const verdict = record ? effComprehensionVerdict(record) : null;
         if(verdict && VERDICT_INFO[verdict]){
           tier = VERDICT_INFO[verdict].tier;
           tileLabel = VERDICT_INFO[verdict].label;
@@ -895,9 +970,10 @@ async function renderStudentGrid(){
         }
       }
 
+      const pending = record && hasPendingDispute(record);
       const tile = document.createElement('div');
-      tile.className = 'posuk-tile ' + (tier ? 'tile-' + tier : 'tile-none') + (posukKey === selectedPosukKey ? ' selected' : '');
-      tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${tileLabel}</span>`;
+      tile.className = 'posuk-tile ' + (tier ? 'tile-' + tier : 'tile-none') + (posukKey === selectedPosukKey ? ' selected' : '') + (pending ? ' tile-disputed' : '');
+      tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${tileLabel}</span>` + (pending ? '<span class="tile-dispute-flag">⚠️</span>' : '');
       if(posukKey){
         tile.onclick = () => { selectedPosukKey = posukKey; renderStudentGrid(); renderPosukDetail(posukKey); };
       }
@@ -922,13 +998,16 @@ function renderPosukDetail(posukKey){
     const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
     let lines = `<div class="top-line"><strong>${dateStr}</strong></div>`;
     if(a.hebrewAudioURL){
+      const hScore = effHebrewScore(a);
       lines += `<div class="top-line">
-        <span>🎙️ Hebrew reading — <span class="score-pill">${a.hebrewScore}%</span></span>
+        <span>🎙️ Hebrew reading — <span class="score-pill">${hScore}%</span></span>
         <audio controls src="${a.hebrewAudioURL}"></audio>
       </div>`;
+      lines += renderDisputeSection(a, posukKey, 'hebrew');
     }
     if(a.comprehensionAudioURL){
-      const vi = VERDICT_INFO[a.comprehensionVerdict] || { label: a.comprehensionVerdict || '' };
+      const cVerdict = effComprehensionVerdict(a);
+      const vi = VERDICT_INFO[cVerdict] || { label: cVerdict || '' };
       lines += `<div class="top-line">
         <span>🧠 Comprehension — <span class="score-pill">${vi.label}</span></span>
         <audio controls src="${a.comprehensionAudioURL}"></audio>
@@ -936,11 +1015,136 @@ function renderPosukDetail(posukKey){
       if(a.comprehensionFeedback){
         lines += `<div class="summary-meta" style="margin-top:2px;">${a.comprehensionFeedback}</div>`;
       }
+      lines += renderDisputeSection(a, posukKey, 'comprehension');
     }
     html += `<div class="attempt-row">${lines}</div>`;
   });
   html += `</div>`;
   detailEl.innerHTML = html;
+
+  // Wire up finalize controls now that the HTML is in the DOM.
+  attempts.forEach(a => {
+    if(a.hebrewDisputeStatus === 'pending'){
+      wireFinalizeHebrew(a, posukKey);
+    }
+    if(a.comprehensionDisputeStatus === 'pending'){
+      wireFinalizeComprehension(a, posukKey);
+    }
+  });
+}
+
+/* Builds the little banner/finalize block for one skill on one attempt.
+   Pending disputes get a red flag + an inline override control; already-
+   resolved ones get a quiet confirmation note; no dispute means nothing. */
+function renderDisputeSection(a, posukKey, skill){
+  if(skill === 'hebrew'){
+    if(a.hebrewDisputeStatus === 'pending'){
+      return `<div class="dispute-banner">⚠️ Student disputes this score — asked for ${a.hebrewDisputeRequested}%</div>
+        <div class="finalize-row" id="finalizeHebrew_${a.attemptId}">
+          <span>Final score:</span>
+          <input type="number" min="0" max="100" id="finalizeHebrewInput_${a.attemptId}" value="${a.hebrewDisputeRequested}">
+          <span>%</span>
+          <button class="btn" id="finalizeHebrewAcceptBtn_${a.attemptId}">Accept student's number</button>
+          <button class="btn gold" id="finalizeHebrewSaveBtn_${a.attemptId}">Save final score</button>
+          <button class="btn small" style="background:var(--ink-soft);box-shadow:none;" id="finalizeHebrewKeepBtn_${a.attemptId}">Keep original (${a.hebrewScore}%)</button>
+        </div>`;
+    }
+    if(a.hebrewDisputeStatus === 'resolved' && typeof a.hebrewFinalScore === 'number'){
+      return `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final score set to ${a.hebrewFinalScore}%</div>`;
+    }
+    return '';
+  }
+  // comprehension
+  const labelMap = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' };
+  if(a.comprehensionDisputeStatus === 'pending'){
+    const options = Object.entries(labelMap).map(([key,label]) =>
+      `<option value="${key}" ${key === a.comprehensionDisputeRequested ? 'selected' : ''}>${label}</option>`).join('');
+    return `<div class="dispute-banner">⚠️ Student disputes this grade — asked for ${labelMap[a.comprehensionDisputeRequested] || a.comprehensionDisputeRequested}</div>
+      <div class="finalize-row" id="finalizeComp_${a.attemptId}">
+        <span>Final grade:</span>
+        <select id="finalizeCompSelect_${a.attemptId}">${options}</select>
+        <button class="btn" id="finalizeCompAcceptBtn_${a.attemptId}">Accept student's request</button>
+        <button class="btn gold" id="finalizeCompSaveBtn_${a.attemptId}">Save final grade</button>
+        <button class="btn small" style="background:var(--ink-soft);box-shadow:none;" id="finalizeCompKeepBtn_${a.attemptId}">Keep original (${labelMap[a.comprehensionVerdict] || a.comprehensionVerdict})</button>
+      </div>`;
+  }
+  if(a.comprehensionDisputeStatus === 'resolved' && a.comprehensionFinalVerdict){
+    return `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final grade set to ${labelMap[a.comprehensionFinalVerdict] || a.comprehensionFinalVerdict}</div>`;
+  }
+  return '';
+}
+
+function attemptRef(posukKey, attemptId){
+  return db.ref('posukPractice/attempts/' + activeStudentId + '/' + posukKey + '/' + attemptId);
+}
+
+function wireFinalizeHebrew(a, posukKey){
+  const input = document.getElementById('finalizeHebrewInput_' + a.attemptId);
+  const acceptBtn = document.getElementById('finalizeHebrewAcceptBtn_' + a.attemptId);
+  const saveBtn = document.getElementById('finalizeHebrewSaveBtn_' + a.attemptId);
+  const keepBtn = document.getElementById('finalizeHebrewKeepBtn_' + a.attemptId);
+  if(!input || !saveBtn) return;
+
+  const finalize = async (finalScore) => {
+    if(isNaN(finalScore) || finalScore < 0 || finalScore > 100){
+      alert('Please enter a number between 0 and 100.');
+      return;
+    }
+    try{
+      await attemptRef(posukKey, a.attemptId).update({
+        hebrewFinalScore: finalScore,
+        hebrewDisputeStatus: 'resolved',
+        hebrewDisputeResolvedAt: Date.now()
+      });
+      allAttemptsCache = null; // stats need to be recomputed with the override
+      await selectStudent(activeStudentId, studentsMap[activeStudentId],
+        [...document.querySelectorAll('.student-item')].find(e => e.dataset.id === activeStudentId));
+      selectedPosukKey = posukKey;
+      await renderStudentGrid();
+      renderPosukDetail(posukKey);
+      markStudentsWithPendingDisputes();
+    }catch(err){
+      console.error(err);
+      alert('Could not save the final score — check your internet and try again.');
+    }
+  };
+
+  acceptBtn.onclick = () => finalize(a.hebrewDisputeRequested);
+  saveBtn.onclick = () => finalize(parseInt(input.value, 10));
+  keepBtn.onclick = () => finalize(a.hebrewScore);
+}
+
+function wireFinalizeComprehension(a, posukKey){
+  const select = document.getElementById('finalizeCompSelect_' + a.attemptId);
+  const acceptBtn = document.getElementById('finalizeCompAcceptBtn_' + a.attemptId);
+  const saveBtn = document.getElementById('finalizeCompSaveBtn_' + a.attemptId);
+  const keepBtn = document.getElementById('finalizeCompKeepBtn_' + a.attemptId);
+  if(!select || !saveBtn) return;
+
+  const finalize = async (finalVerdict) => {
+    if(!VERDICT_INFO[finalVerdict]) return;
+    try{
+      await attemptRef(posukKey, a.attemptId).update({
+        comprehensionFinalVerdict: finalVerdict,
+        comprehensionDisputeStatus: 'resolved',
+        comprehensionDisputeResolvedAt: Date.now()
+      });
+      allAttemptsCache = null;
+      await selectStudent(activeStudentId, studentsMap[activeStudentId],
+        [...document.querySelectorAll('.student-item')].find(e => e.dataset.id === activeStudentId));
+      selectedPosukKey = posukKey;
+      await renderStudentGrid();
+      renderPosukDetail(posukKey);
+      markStudentsWithPendingDisputes();
+    }catch(err){
+      console.error(err);
+      alert('Could not save the final grade — check your internet and try again.');
+    }
+  };
+
+  acceptBtn.onclick = () => finalize(a.comprehensionDisputeRequested);
+  saveBtn.onclick = () => finalize(select.value);
+  keepBtn.onclick = () => finalize(a.comprehensionVerdict);
 }
 
 /* ---------- Shared helpers ---------- */
@@ -1015,9 +1219,10 @@ function skillInfo(record, skill){
   if(!record) return null;
   if(skill === 'reading'){
     if(typeof record.hebrewScore !== 'number') return null;
-    return { tier: pctTier(record.hebrewScore), label: record.hebrewScore + '%' };
+    const score = effHebrewScore(record);
+    return { tier: pctTier(score), label: score + '%' };
   }
-  const v = record.comprehensionVerdict;
+  const v = effComprehensionVerdict(record);
   if(!v || !VERDICT_INFO[v]) return null;
   return { tier: VERDICT_INFO[v].tier, label: VERDICT_INFO[v].label };
 }

@@ -287,6 +287,12 @@
   }
   .speak-btn:hover{ opacity:1; }
   .speak-btn:active{ transform: scale(0.9); }
+  .dispute-row{
+    width:100%;
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px dashed rgba(59,42,30,0.2);
+  }
 
   .clarify-box{
     margin-top: 12px;
@@ -1662,9 +1668,59 @@ function showHebrewResult(data){
   resultEl.className = 'comp-result ' + tier;
   resultEl.innerHTML =
     '<span class="comp-badge">' + data.score + '%</span>' +
-    wordsHtml;
+    wordsHtml +
+    '<div class="dispute-row" id="hebrewDisputeRow"><button class="btn small ghost-delete" id="hebrewDisputeBtn">⚠️ Dispute this score</button></div>';
   resultEl.classList.remove('hidden');
   gradingMsg.textContent = '';
+  document.getElementById('hebrewDisputeBtn').onclick = openHebrewDisputeForm;
+}
+
+/* ---------- Dispute flow (Hebrew reading) ----------
+   Lets a student flag that they think the auto-scorer got it wrong.
+   Keeps the system's own score and recording untouched — just adds a
+   pending-review request the teacher sees and can act on later. */
+function openHebrewDisputeForm(){
+  const row = document.getElementById('hebrewDisputeRow');
+  row.innerHTML =
+    '<span style="font-size:0.85rem;">I should get: </span>' +
+    '<input type="number" id="hebrewDisputeInput" min="0" max="100" placeholder="0-100" ' +
+    'style="width:70px;padding:6px;border-radius:8px;border:2px solid var(--ink-soft);font-family:\'Quicksand\',sans-serif;text-align:center;"> ' +
+    '<span style="font-size:0.85rem;">%</span> ' +
+    '<button class="btn small" id="hebrewDisputeSubmitBtn">Submit</button>';
+  document.getElementById('hebrewDisputeSubmitBtn').onclick = submitHebrewDispute;
+}
+
+async function submitHebrewDispute(){
+  const input = document.getElementById('hebrewDisputeInput');
+  const val = parseInt(input.value, 10);
+  if(isNaN(val) || val < 0 || val > 100){
+    alert('Please enter a number between 0 and 100.');
+    return;
+  }
+  const row = document.getElementById('hebrewDisputeRow');
+  row.innerHTML = '<span style="font-size:0.85rem;color:var(--ink-soft);">Saving…</span>';
+  // The recording may still be autosaving (currentAttemptRef is created
+  // there), so give it a moment to finish before we try to attach to it.
+  let tries = 0;
+  while(!currentAttemptRef && tries < 20){
+    await new Promise(r => setTimeout(r, 250));
+    tries++;
+  }
+  if(!currentAttemptRef){
+    row.innerHTML = '<span style="font-size:0.85rem;color:var(--rimon);">Could not save — please try again in a moment.</span>';
+    return;
+  }
+  try{
+    await currentAttemptRef.update({
+      hebrewDisputeRequested: val,
+      hebrewDisputeStatus: 'pending',
+      hebrewDisputeAt: Date.now()
+    });
+    row.innerHTML = '<span style="font-size:0.85rem;color:var(--ink-soft);">⚠️ Dispute sent — you asked for ' + val + '%. Your teacher will review it.</span>';
+  }catch(err){
+    console.error(err);
+    row.innerHTML = '<span style="font-size:0.85rem;color:var(--rimon);">Could not save your dispute — check your internet and try again.</span>';
+  }
 }
 
 /* ---------- Comprehension grading (computer-graded, no self-rating) ----------
@@ -1740,15 +1796,58 @@ async function showComprehensionResult(verdict, feedback){
   resultEl.innerHTML =
     '<span class="comp-badge">' + badgeText + '</span>' +
     '<span>' + comprehensionFeedback + '</span>' +
-    '<button class="speak-btn" id="compReplayBtn" title="Hear this read aloud">🔊</button>';
+    '<button class="speak-btn" id="compReplayBtn" title="Hear this read aloud">🔊</button>' +
+    '<div class="dispute-row" id="comprehensionDisputeRow"><button class="btn small ghost-delete" id="comprehensionDisputeBtn">⚠️ Dispute this grade</button></div>';
   resultEl.classList.remove('hidden');
   document.getElementById('compReplayBtn').onclick = () => speakText(comprehensionFeedback);
+  document.getElementById('comprehensionDisputeBtn').onclick = openComprehensionDisputeForm;
   gradingMsg.textContent = '';
   document.getElementById('comprehensionStatus').textContent = 'Recorded — listen above';
   // Once a final verdict is shown (including after a clarify follow-up
   // resolves), the clarify question box should no longer stay visible.
   document.getElementById('clarifyBox').classList.add('hidden');
   await autosaveComprehension();
+}
+
+/* ---------- Dispute flow (Comprehension) ----------
+   Tier-based rather than a typed number, since comprehension is graded
+   in verdict tiers (excellent/correct/partial/incorrect) rather than a
+   0-100 score — tapping a tier keeps this just as writing-free. */
+function openComprehensionDisputeForm(){
+  const row = document.getElementById('comprehensionDisputeRow');
+  const tiers = [['excellent','🌟 Excellent'],['correct','✅ Got it'],['partial','🤔 Almost'],['incorrect','💡 Try again']];
+  row.innerHTML =
+    '<span style="font-size:0.85rem;display:block;margin-bottom:6px;">I think I deserve:</span>' +
+    tiers.map(([key,label]) => '<button class="btn small gold" data-tier="' + key + '" style="margin:2px;">' + label + '</button>').join('');
+  row.querySelectorAll('button[data-tier]').forEach(btn => {
+    btn.onclick = () => submitComprehensionDispute(btn.dataset.tier);
+  });
+}
+
+async function submitComprehensionDispute(tier){
+  const row = document.getElementById('comprehensionDisputeRow');
+  row.innerHTML = '<span style="font-size:0.85rem;color:var(--ink-soft);">Saving…</span>';
+  let tries = 0;
+  while(!currentAttemptRef && tries < 20){
+    await new Promise(r => setTimeout(r, 250));
+    tries++;
+  }
+  if(!currentAttemptRef){
+    row.innerHTML = '<span style="font-size:0.85rem;color:var(--rimon);">Could not save — please try again in a moment.</span>';
+    return;
+  }
+  const labelMap = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' };
+  try{
+    await currentAttemptRef.update({
+      comprehensionDisputeRequested: tier,
+      comprehensionDisputeStatus: 'pending',
+      comprehensionDisputeAt: Date.now()
+    });
+    row.innerHTML = '<span style="font-size:0.85rem;color:var(--ink-soft);">⚠️ Dispute sent — you asked for ' + labelMap[tier] + '. Your teacher will review it.</span>';
+  }catch(err){
+    console.error(err);
+    row.innerHTML = '<span style="font-size:0.85rem;color:var(--rimon);">Could not save your dispute — check your internet and try again.</span>';
+  }
 }
 
 /* ---------- Clarify follow-up grading (second pass) ----------
@@ -1822,6 +1921,11 @@ async function loadHistory(){
         rowsHtml += `
         <div class="row"><span class="label">🎙️ Hebrew reading</span><span class="score-pill">${hebrewScorePill}</span></div>
         <div class="row"><audio controls src="${a.hebrewAudioURL}"></audio></div>`;
+        if(a.hebrewDisputeStatus === 'pending'){
+          rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">⚠️ Dispute pending — you asked for ${a.hebrewDisputeRequested}%</div>`;
+        }else if(a.hebrewDisputeStatus === 'resolved' && typeof a.hebrewFinalScore === 'number'){
+          rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">✔️ Teacher reviewed — final score: ${a.hebrewFinalScore}%</div>`;
+        }
       }
       if(a.translationAudioURL){
         rowsHtml += `
@@ -1835,6 +1939,13 @@ async function loadHistory(){
         <div class="row"><audio controls src="${a.comprehensionAudioURL}"></audio></div>`;
         if(a.comprehensionTranscript){
           rowsHtml += `<div class="row" style="font-style:italic;color:var(--ink-soft);">"${a.comprehensionTranscript}"</div>`;
+        }
+        if(a.comprehensionDisputeStatus === 'pending'){
+          const reqLabel = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[a.comprehensionDisputeRequested] || a.comprehensionDisputeRequested;
+          rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">⚠️ Dispute pending — you asked for ${reqLabel}</div>`;
+        }else if(a.comprehensionDisputeStatus === 'resolved' && a.comprehensionFinalVerdict){
+          const finalLabel = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[a.comprehensionFinalVerdict] || a.comprehensionFinalVerdict;
+          rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">✔️ Teacher reviewed — final grade: ${finalLabel}</div>`;
         }
         if(a.comprehensionClarifyQuestion){
           rowsHtml += `

@@ -437,11 +437,19 @@ async function renderPerekList(){
   }
 }
 
-/* hebrewScore is a 0-100 percentage from the automatic reading scorer. */
+/* hebrewScore is a 0-100 percentage from the automatic reading scorer.
+   If a teacher has since finalized a disputed score/grade, that final
+   value is what should show here — not the original auto-graded one. */
 function pctTier(score){
   if(score >= 80) return 'high';
   if(score >= 50) return 'mid';
   return 'low';
+}
+function effHebrewScore(record){
+  return (record && typeof record.hebrewFinalScore === 'number') ? record.hebrewFinalScore : (record ? record.hebrewScore : null);
+}
+function effComprehensionVerdict(record){
+  return record ? (record.comprehensionFinalVerdict || record.comprehensionVerdict) : null;
 }
 
 function buildPerekSection(perekNum, range){
@@ -473,14 +481,14 @@ function buildPerekSection(perekNum, range){
     let tier = null;
     let label = '—';
     if(activeTab === 'reading'){
-      const score = record ? record.hebrewScore : null;
+      const score = effHebrewScore(record);
       if(typeof score === 'number'){
         tier = pctTier(score);
         label = score + '%';
         doneCount++;
       }
     }else{
-      const verdict = record ? record.comprehensionVerdict : null;
+      const verdict = effComprehensionVerdict(record);
       if(verdict && VERDICT_INFO[verdict]){
         tier = VERDICT_INFO[verdict].tier;
         label = VERDICT_INFO[verdict].label;
