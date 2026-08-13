@@ -466,6 +466,7 @@
           <span class="status-tag" id="hebrewStatus">Not recorded yet</span>
         </div>
         <div class="comp-status" id="hebrewGradingMsg"></div>
+        <button class="btn small hidden" id="hebrewRetryBtn" style="margin-top:6px;">🔁 Try checking again</button>
         <div class="comp-result hidden" id="hebrewResult"></div>
       </div>
 
@@ -481,6 +482,7 @@
           <span class="status-tag" id="comprehensionStatus">Not recorded yet</span>
         </div>
         <div class="comp-status" id="comprehensionGradingMsg"></div>
+        <button class="btn small hidden" id="comprehensionRetryBtn" style="margin-top:6px;">🔁 Try checking again</button>
         <div class="comp-result hidden" id="comprehensionResult"></div>
       </div>
 
@@ -1341,6 +1343,7 @@ function resetComprehensionResult(){
   comprehensionScore = null;
   comprehensionFeedback = "";
   document.getElementById('comprehensionGradingMsg').textContent = '';
+  document.getElementById('comprehensionRetryBtn').classList.add('hidden');
   const resultEl = document.getElementById('comprehensionResult');
   resultEl.classList.add('hidden');
   resultEl.innerHTML = '';
@@ -1352,6 +1355,7 @@ function resetHebrewResult(){
   hebrewTranscript = "";
   hebrewWords = null;
   document.getElementById('hebrewGradingMsg').textContent = '';
+  document.getElementById('hebrewRetryBtn').classList.add('hidden');
   const resultEl = document.getElementById('hebrewResult');
   resultEl.classList.add('hidden');
   resultEl.innerHTML = '';
@@ -1609,6 +1613,8 @@ async function toggleRecording(type, btnEl){
 
 document.getElementById('hebrewRecordBtn').onclick = function(){ toggleRecording('hebrew', this); };
 document.getElementById('comprehensionRecordBtn').onclick = function(){ toggleRecording('comprehension', this); };
+document.getElementById('hebrewRetryBtn').onclick = () => scoreHebrewReading();
+document.getElementById('comprehensionRetryBtn').onclick = () => gradeComprehensionAttempt();
 
 /* ---------- Hebrew reading auto-grading (same backend as Kol Emes) ----------
    Sends the recording + the posuk's exact text to the scorer, which
@@ -1617,7 +1623,9 @@ document.getElementById('comprehensionRecordBtn').onclick = function(){ toggleRe
 async function scoreHebrewReading(){
   const gradingMsg = document.getElementById('hebrewGradingMsg');
   const resultEl = document.getElementById('hebrewResult');
+  const retryBtn = document.getElementById('hebrewRetryBtn');
   resultEl.classList.add('hidden');
+  retryBtn.classList.add('hidden');
   hebrewScore = null;
   hebrewTranscript = "";
   hebrewWords = null;
@@ -1647,6 +1655,7 @@ async function scoreHebrewReading(){
     console.error(err);
     gradingMsg.textContent = 'Could not check your reading — check your internet and try again.';
     document.getElementById('hebrewStatus').textContent = 'Recorded';
+    retryBtn.classList.remove('hidden');
   }
 }
 
@@ -1731,7 +1740,9 @@ async function submitHebrewDispute(){
 async function gradeComprehensionAttempt(){
   const gradingMsg = document.getElementById('comprehensionGradingMsg');
   const resultEl = document.getElementById('comprehensionResult');
+  const retryBtn = document.getElementById('comprehensionRetryBtn');
   resultEl.classList.add('hidden');
+  retryBtn.classList.add('hidden');
   comprehensionVerdict = null;
   comprehensionScore = null;
   comprehensionFeedback = "";
@@ -1769,6 +1780,7 @@ async function gradeComprehensionAttempt(){
     console.error(err);
     gradingMsg.textContent = 'Could not check your answer — check your internet and try again.';
     document.getElementById('comprehensionStatus').textContent = 'Recorded';
+    retryBtn.classList.remove('hidden');
   }
 }
 
