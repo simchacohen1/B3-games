@@ -1868,17 +1868,21 @@ async function loadHistory(){
         const hebrewScorePill = (typeof a.hebrewScore === 'number' && a.hebrewScore > 10)
           ? a.hebrewScore + '%'
           : a.hebrewScore + '/10 · ' + RATING_LABELS[a.hebrewScore - 1];
-        rowsHtml += `
-        <div class="row"><span class="label">🎙️ Hebrew reading</span><span class="score-pill">${hebrewScorePill}</span></div>
-        <div class="row"><audio controls src="${a.hebrewAudioURL}"></audio></div>`;
+        rowsHtml += `<div class="row"><span class="label">🎙️ Hebrew reading</span></div>`;
+        const hTier = (typeof a.hebrewScore === 'number' && a.hebrewScore > 10)
+          ? (a.hebrewScore >= 80 ? 'correct' : (a.hebrewScore >= 50 ? 'partial' : 'incorrect'))
+          : 'correct';
+        let hebrewCardHtml = '<span class="comp-badge">' + hebrewScorePill + '</span>';
         if(Array.isArray(a.hebrewWords) && a.hebrewWords.length){
-          rowsHtml += `<div class="row hebrew-word-breakdown">` +
+          hebrewCardHtml += '<div class="hebrew-word-breakdown">' +
             a.hebrewWords.map(w => '<span class="' + (w.match ? 'word-ok' : 'word-miss') + '">' + w.word + '</span>').join(' ') +
-            `</div>`;
+            '</div>';
         }
+        hebrewCardHtml += '<audio controls src="' + a.hebrewAudioURL + '"></audio>';
         if(a.hebrewTranscript){
-          rowsHtml += `<div class="row" style="font-style:italic;color:var(--ink-soft);">"${a.hebrewTranscript}"</div>`;
+          hebrewCardHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + a.hebrewTranscript + '"</span>';
         }
+        rowsHtml += `<div class="comp-result ${hTier}" style="margin-top:2px;">${hebrewCardHtml}</div>`;
         if(a.hebrewDisputeStatus === 'pending'){
           rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">⚠️ Dispute pending — you asked for ${a.hebrewDisputeRequested}%</div>`;
         }else if(a.hebrewDisputeStatus === 'resolved' && typeof a.hebrewFinalScore === 'number'){
@@ -1893,12 +1897,16 @@ async function loadHistory(){
       if(a.comprehensionAudioURL){
         const verdictLabel = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[a.comprehensionVerdict] || a.comprehensionVerdict || '';
         const scoreSuffix = (typeof a.comprehensionScore === 'number') ? ' (' + a.comprehensionScore + '%)' : '';
-        rowsHtml += `
-        <div class="row"><span class="label">🧠 Comprehension</span><span class="score-pill">${verdictLabel}${scoreSuffix}</span></div>
-        <div class="row"><audio controls src="${a.comprehensionAudioURL}"></audio></div>`;
-        if(a.comprehensionTranscript){
-          rowsHtml += `<div class="row" style="font-style:italic;color:var(--ink-soft);">"${a.comprehensionTranscript}"</div>`;
+        rowsHtml += `<div class="row"><span class="label">🧠 Comprehension</span></div>`;
+        let compCardHtml = '<span class="comp-badge">' + verdictLabel + scoreSuffix + '</span>';
+        if(a.comprehensionFeedback){
+          compCardHtml += '<span>' + a.comprehensionFeedback + '</span>';
         }
+        compCardHtml += '<audio controls src="' + a.comprehensionAudioURL + '"></audio>';
+        if(a.comprehensionTranscript){
+          compCardHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + a.comprehensionTranscript + '"</span>';
+        }
+        rowsHtml += `<div class="comp-result ${a.comprehensionVerdict || ''}" style="margin-top:2px;">${compCardHtml}</div>`;
         if(a.comprehensionDisputeStatus === 'pending'){
           const reqLabel = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[a.comprehensionDisputeRequested] || a.comprehensionDisputeRequested;
           rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">⚠️ Dispute pending — you asked for ${reqLabel}</div>`;
