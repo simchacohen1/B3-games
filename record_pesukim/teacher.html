@@ -123,6 +123,32 @@
     background: var(--gold-light); border-radius:999px; padding:2px 10px; font-weight:700; font-size:0.75rem;
   }
   audio{ height:32px; max-width: 240px; }
+  .comp-result{
+    margin-top: 6px;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    display:flex;
+    flex-wrap: wrap;
+    align-items:center;
+    gap:8px;
+  }
+  .comp-result.excellent{ background:#E4EAF4; border:2px solid var(--tent-navy, var(--ink)); }
+  .comp-result.correct{ background:#E4F4E4; border:2px solid #4C9A4C; }
+  .comp-result.partial{ background:#FBF0D9; border:2px solid var(--gold); }
+  .comp-result.incorrect{ background:#F6E1E1; border:2px solid var(--rimon); }
+  .comp-badge{
+    font-weight:700;
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size:0.75rem;
+    white-space:nowrap;
+    color:#fff;
+  }
+  .comp-result.excellent .comp-badge{ background: var(--tent-navy, var(--ink)); }
+  .comp-result.correct .comp-badge{ background:#4C9A4C; }
+  .comp-result.partial .comp-badge{ background: var(--gold); color: var(--ink); }
+  .comp-result.incorrect .comp-badge{ background: var(--rimon); }
   .hebrew-word-breakdown{
     width:100%; font-family:'Frank Ruhl Libre', serif; font-size:1.15rem;
     direction:rtl; line-height:1.6; margin:4px 0;
@@ -1594,33 +1620,34 @@ function renderPosukDetail(posukKey){
     let lines = `<div class="top-line"><strong>${dateStr}</strong></div>`;
     if(a.hebrewAudioURL){
       const hScore = effHebrewScore(a);
-      lines += `<div class="top-line">
-        <span>🎙️ Hebrew reading — <span class="score-pill">${hScore}%</span></span>
-        <audio controls src="${a.hebrewAudioURL}"></audio>
-      </div>`;
+      const hTier = (typeof hScore === 'number') ? (hScore >= 80 ? 'correct' : (hScore >= 50 ? 'partial' : 'incorrect')) : 'correct';
+      lines += `<div class="top-line"><span>🎙️ Hebrew reading</span></div>`;
+      let hebrewCardHtml = '<span class="comp-badge">' + (typeof hScore === 'number' ? hScore + '%' : '—') + '</span>';
       if(Array.isArray(a.hebrewWords) && a.hebrewWords.length){
-        lines += `<div class="hebrew-word-breakdown">` +
+        hebrewCardHtml += '<div class="hebrew-word-breakdown">' +
           a.hebrewWords.map(w => '<span class="' + (w.match ? 'word-ok' : 'word-miss') + '">' + w.word + '</span>').join(' ') +
-          `</div>`;
+          '</div>';
       }
+      hebrewCardHtml += '<audio controls src="' + a.hebrewAudioURL + '"></audio>';
       if(a.hebrewTranscript){
-        lines += `<div class="transcript-line">"${a.hebrewTranscript}"</div>`;
+        hebrewCardHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + a.hebrewTranscript + '"</span>';
       }
+      lines += `<div class="comp-result ${hTier}">${hebrewCardHtml}</div>`;
       lines += renderDisputeSection(a, posukKey, 'hebrew');
     }
     if(a.comprehensionAudioURL){
       const cVerdict = effComprehensionVerdict(a);
       const vi = VERDICT_INFO[cVerdict] || { label: cVerdict || '' };
-      lines += `<div class="top-line">
-        <span>🧠 Comprehension — <span class="score-pill">${vi.label}</span></span>
-        <audio controls src="${a.comprehensionAudioURL}"></audio>
-      </div>`;
-      if(a.comprehensionTranscript){
-        lines += `<div class="transcript-line">"${a.comprehensionTranscript}"</div>`;
-      }
+      lines += `<div class="top-line"><span>🧠 Comprehension</span></div>`;
+      let compCardHtml = '<span class="comp-badge">' + vi.label + '</span>';
       if(a.comprehensionFeedback){
-        lines += `<div class="summary-meta" style="margin-top:2px;">${a.comprehensionFeedback}</div>`;
+        compCardHtml += '<span>' + a.comprehensionFeedback + '</span>';
       }
+      compCardHtml += '<audio controls src="' + a.comprehensionAudioURL + '"></audio>';
+      if(a.comprehensionTranscript){
+        compCardHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + a.comprehensionTranscript + '"</span>';
+      }
+      lines += `<div class="comp-result ${cVerdict || ''}">${compCardHtml}</div>`;
       lines += renderDisputeSection(a, posukKey, 'comprehension');
     }
     html += `<div class="attempt-row">${lines}</div>`;
