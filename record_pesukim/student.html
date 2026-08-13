@@ -651,6 +651,7 @@ let currentAudio = { hebrew: null, comprehension: null };
 let currentAudioExt = { hebrew: 'webm', comprehension: 'webm' };
 let hebrewScore = null;            // percentage from the Kol Emes scorer, 0-100
 let hebrewTranscript = "";         // what the scorer heard, for the history view
+let hebrewWords = null;            // per-word match/miss breakdown from the scorer, for the history view
 let comprehensionTranscript = "";
 let comprehensionVerdict = null;   // 'excellent' | 'correct' | 'partial' | 'incorrect'
 let comprehensionScore = null;     // 0-100, supplementary to the verdict tier above
@@ -1349,6 +1350,7 @@ function resetComprehensionResult(){
 function resetHebrewResult(){
   hebrewScore = null;
   hebrewTranscript = "";
+  hebrewWords = null;
   document.getElementById('hebrewGradingMsg').textContent = '';
   const resultEl = document.getElementById('hebrewResult');
   resultEl.classList.add('hidden');
@@ -1468,7 +1470,8 @@ async function autosaveHebrew(){
       posukTranslation: currentPosukTranslation,
       hebrewAudioURL: url,
       hebrewScore: hebrewScore,
-      hebrewTranscript: hebrewTranscript
+      hebrewTranscript: hebrewTranscript,
+      hebrewWords: hebrewWords
     });
     hebrewSavedStoragePath = path;
     markTaskSaved('hebrew');
@@ -1617,6 +1620,7 @@ async function scoreHebrewReading(){
   resultEl.classList.add('hidden');
   hebrewScore = null;
   hebrewTranscript = "";
+  hebrewWords = null;
 
   if(!currentAudio.hebrew){ return; }
 
@@ -1635,6 +1639,7 @@ async function scoreHebrewReading(){
     const data = await res.json();
     hebrewScore = data.score;
     hebrewTranscript = data.transcription || "";
+    hebrewWords = Array.isArray(data.words) ? data.words : null;
     showHebrewResult(data);
     document.getElementById('hebrewStatus').textContent = 'Recorded — see your score above';
     await autosaveHebrew();
@@ -1866,6 +1871,14 @@ async function loadHistory(){
         rowsHtml += `
         <div class="row"><span class="label">🎙️ Hebrew reading</span><span class="score-pill">${hebrewScorePill}</span></div>
         <div class="row"><audio controls src="${a.hebrewAudioURL}"></audio></div>`;
+        if(Array.isArray(a.hebrewWords) && a.hebrewWords.length){
+          rowsHtml += `<div class="row hebrew-word-breakdown">` +
+            a.hebrewWords.map(w => '<span class="' + (w.match ? 'word-ok' : 'word-miss') + '">' + w.word + '</span>').join(' ') +
+            `</div>`;
+        }
+        if(a.hebrewTranscript){
+          rowsHtml += `<div class="row" style="font-style:italic;color:var(--ink-soft);">"${a.hebrewTranscript}"</div>`;
+        }
         if(a.hebrewDisputeStatus === 'pending'){
           rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">⚠️ Dispute pending — you asked for ${a.hebrewDisputeRequested}%</div>`;
         }else if(a.hebrewDisputeStatus === 'resolved' && typeof a.hebrewFinalScore === 'number'){
