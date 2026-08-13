@@ -123,6 +123,16 @@
     background: var(--gold-light); border-radius:999px; padding:2px 10px; font-weight:700; font-size:0.75rem;
   }
   audio{ height:32px; max-width: 240px; }
+  .hebrew-word-breakdown{
+    width:100%; font-family:'Frank Ruhl Libre', serif; font-size:1.15rem;
+    direction:rtl; line-height:1.6; margin:4px 0;
+  }
+  .hebrew-word-breakdown .word-ok{ color:#3D7A3D; }
+  .hebrew-word-breakdown .word-miss{
+    color: var(--rimon-dark, var(--rimon)); text-decoration: underline;
+    text-decoration-style: wavy; text-underline-offset: 3px;
+  }
+  .transcript-line{ font-style:italic; color: var(--ink-soft); font-size:0.85rem; margin:2px 0; }
   .empty-msg{ color: var(--ink-soft); text-align:center; padding: 40px 0; }
   .loading{ color: var(--ink-soft); text-align:center; padding:20px 0; }
 
@@ -1588,6 +1598,14 @@ function renderPosukDetail(posukKey){
         <span>🎙️ Hebrew reading — <span class="score-pill">${hScore}%</span></span>
         <audio controls src="${a.hebrewAudioURL}"></audio>
       </div>`;
+      if(Array.isArray(a.hebrewWords) && a.hebrewWords.length){
+        lines += `<div class="hebrew-word-breakdown">` +
+          a.hebrewWords.map(w => '<span class="' + (w.match ? 'word-ok' : 'word-miss') + '">' + w.word + '</span>').join(' ') +
+          `</div>`;
+      }
+      if(a.hebrewTranscript){
+        lines += `<div class="transcript-line">"${a.hebrewTranscript}"</div>`;
+      }
       lines += renderDisputeSection(a, posukKey, 'hebrew');
     }
     if(a.comprehensionAudioURL){
@@ -1597,6 +1615,9 @@ function renderPosukDetail(posukKey){
         <span>🧠 Comprehension — <span class="score-pill">${vi.label}</span></span>
         <audio controls src="${a.comprehensionAudioURL}"></audio>
       </div>`;
+      if(a.comprehensionTranscript){
+        lines += `<div class="transcript-line">"${a.comprehensionTranscript}"</div>`;
+      }
       if(a.comprehensionFeedback){
         lines += `<div class="summary-meta" style="margin-top:2px;">${a.comprehensionFeedback}</div>`;
       }
