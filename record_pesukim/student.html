@@ -3003,7 +3003,13 @@ async function loadHistory(){
         }
       }
       if(activeTab === 'translate' && Array.isArray(a.translationChunkResults) && a.translationChunkResults.length){
-        rowsHtml += `<div class="row"><span class="label">🌐 Translation</span><span class="score-pill">${a.translationScore || ''}</span></div>`;
+        // Once a teacher finalizes a disputed chunk, that decision counts
+        // toward the score too — recompute from effective verdicts rather
+        // than trusting the score string saved at record time, which goes
+        // stale the moment a dispute is resolved.
+        const effCorrectCount = a.translationChunkResults.filter(c => (c.finalVerdict || c.verdict) === 'correct').length;
+        const effScoreLabel = effCorrectCount + '/' + a.translationChunkResults.length;
+        rowsHtml += `<div class="row"><span class="label">🌐 Translation</span><span class="score-pill">${effScoreLabel}</span></div>`;
         a.translationChunkResults.forEach(c => {
           // Same as Hebrew/comprehension: once a teacher finalizes a
           // disputed chunk, that decision is the official verdict.

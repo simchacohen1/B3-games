@@ -394,7 +394,9 @@ function effComprehensionScore(record){
 function effTranslationScore(record){
   if(!record || !Array.isArray(record.translationChunkResults) || !record.translationChunkResults.length) return null;
   const total = record.translationChunkResults.length;
-  const correct = record.translationChunkResults.filter(c => c.verdict === 'correct').length;
+  // Once a teacher finalizes a disputed chunk, that decision is the
+  // official verdict for scoring purposes too — not just the badge.
+  const correct = record.translationChunkResults.filter(c => (c.finalVerdict || c.verdict) === 'correct').length;
   return Math.round((correct / total) * 100);
 }
 function hasPendingDispute(record){
