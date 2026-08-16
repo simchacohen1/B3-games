@@ -1626,7 +1626,11 @@ async function renderStudentGrid(){
         }
       }
 
-      const pending = record && hasPendingDispute(record);
+      // Check every attempt for this posuk, not just the latest \u2014 a
+      // student may have re-recorded (e.g. via "Redo this piece") after
+      // disputing an earlier attempt, leaving the dispute pending on an
+      // attempt that's no longer .latest.
+      const pending = posukKey && studentPosukData[posukKey].attempts.some(hasPendingDispute);
       const tile = document.createElement('div');
       tile.className = 'posuk-tile ' + (tier ? 'tile-' + tier : 'tile-none') + (posukKey === selectedPosukKey ? ' selected' : '') + (pending ? ' tile-disputed' : '');
       tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${tileLabel}</span>` + (pending ? '<span class="tile-dispute-flag">⚠️</span>' : '');
@@ -1665,7 +1669,7 @@ async function renderStudentGrid(){
     studentRangeData.forEach(r => {
       const verdict = r.latest ? effComprehensionVerdict(r.latest) : null;
       const vi = (verdict && VERDICT_INFO[verdict]) ? VERDICT_INFO[verdict] : { label: '—', tier: null };
-      const pending = r.latest && hasPendingDispute(r.latest);
+      const pending = studentPosukData[r.posukKey].attempts.some(hasPendingDispute);
       const tile = document.createElement('div');
       tile.className = 'posuk-tile ' + (vi.tier ? 'tile-' + vi.tier : 'tile-none') + (r.posukKey === selectedPosukKey ? ' selected' : '') + (pending ? ' tile-disputed' : '');
       tile.style.width = 'auto';
