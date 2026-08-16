@@ -2230,6 +2230,43 @@ async function showComprehensionResult(verdict, score, feedback, transcript){
    posuk reuses it instead of re-generating it. This function is safe to
    call every time a posuk loads (see resetRecordingUI) — it does nothing
    expensive if a cached breakdown is already there. */
+// Remembers how "small" a student likes their translation pieces, as a
+// distance-from-the-top count (0 = whole posuk, 1 = one step smaller, etc.)
+// rather than a raw array index — different pesukim have different numbers
+// of levels, so "2 steps smaller than whole" is comparable across pesukim
+// in a way that "index 2" is not. Persisted per-student in localStorage so
+// it carries across posukim and across visits, matching the existing
+// posukPractice_* localStorage pattern used for student identity/caching.
+function translationLevelPrefKey(){
+  return 'posukPractice_translationLevelPref_' + (studentId || 'anon');
+}
+function getSavedTranslationTopDistance(){
+  const raw = localStorage.getItem(translationLevelPrefKey());
+  const n = raw === null ? NaN : parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+function saveTranslationTopDistance(topDistance){
+  try{
+    localStorage.setItem(translationLevelPrefKey(), String(topDistance));
+  }catch(err){
+    console.error('Could not save translation level preference', err);
+  }
+}
+// Turns a saved topDistance into a valid index into `levels`, clamped so a
+// preference learned on a posuk with many levels doesn't overshoot a posuk
+// with fewer.
+function levelIndexFromTopDistance(levels, topDistance){
+  const idx = (levels.length - 1) - topDistance;
+  return Math.max(0, Math.min(levels.length - 1, idx));
+}
+function defaultTranslationLevelIndex(levels){
+  const savedTopDistance = getSavedTranslationTopDistance();
+  if(savedTopDistance !== null) return levelIndexFromTopDistance(levels, savedTopDistance);
+  // No preference saved yet — start one level below the top (whole posuk)
+  // if there is one, otherwise the top level itself.
+  return levels.length >= 2 ? levels.length - 2 : 0;
+}
+
 async function loadOrGenerateTranslationChunks(){
   const myToken = ++translationLoadToken;
   translationLevels = null;
@@ -2246,12 +2283,7 @@ async function loadOrGenerateTranslationChunks(){
     if(myToken !== translationLoadToken) return; // student already moved on to a different posuk
     if(snap.exists() && snap.val() && Array.isArray(snap.val().levels) && snap.val().levels.length){
       translationLevels = snap.val().levels;
-      // Start at the coarsest level whose chunk count is still small enough
-      // to be a gentle default — roughly the middle of the ladder — rather
-      // than always dropping a student into the very finest (most tedious)
-      // breakdown. Simple default: start one level below the top (whole
-      // posuk) if there is one, otherwise the top level itself.
-      translationLevelIndex = translationLevels.length >= 2 ? translationLevels.length - 2 : 0;
+      translationLevelIndex = defaultTranslationLevelIndex(translationLevels);
       translationChunkIndex = 0;
       renderCurrentChunk();
       return;
@@ -2277,7 +2309,7 @@ async function loadOrGenerateTranslationChunks(){
     if(!data.levels || !Array.isArray(data.levels) || !data.levels.length) throw new Error('No levels returned');
 
     translationLevels = data.levels;
-    translationLevelIndex = translationLevels.length >= 2 ? translationLevels.length - 2 : 0;
+    translationLevelIndex = defaultTranslationLevelIndex(translationLevels);
     translationChunkIndex = 0;
     renderCurrentChunk();
 
@@ -2390,6 +2422,9 @@ function changeChunkLevel(delta){
   translationGradedResults = {};
   resetTranslationResult();
   renderCurrentChunk();
+  // Remember this granularity (as distance from the "whole posuk" top level)
+  // so the next posuk this student opens starts at the same piece size.
+  saveTranslationTopDistance((translationLevels.length - 1) - translationLevelIndex);
 }
 document.getElementById('chunkSmallerBtn').onclick = () => changeChunkLevel(-1);
 document.getElementById('chunkBiggerBtn').onclick = () => changeChunkLevel(1);
@@ -2623,10 +2658,11 @@ function showTranslationSummary(level){
     }
     const said = r.transcript ? r.transcript : '(nothing heard)';
     const pillClass = 'chunk-token ' + (isCorrect ? 'correct' : 'incorrect');
-    const pillTitle = isCorrect ? '' : ' title="Tap to redo this piece"';
+    const pillTitle = isCorrect ? ' title="Tap to re-record this piece"' : ' title="Tap to redo this piece"';
     return '<div>' +
-      '<span class="' + pillClass + ' chunk-fix-pill" data-chunk-index="' + i + '"' + pillTitle + ' style="cursor:pointer;display:inline-block;">' +
-        chunk.hebrew + ' — <span style="font-style:italic;">' + said + '</span>' +
+      '<span class="' + pillClass + ' chunk-fix-pill" data-chunk-index="' + i + '"' + pillTitle + ' style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;">' +
+        '<span>' + chunk.hebrew + ' — <span style="font-style:italic;">' + said + '</span></span>' +
+        '<span class="chunk-fix-status" data-status-index="' + i + '" style="font-size:0.85em;opacity:0.75;">🔁</span>' +
       '</span>' +
       (audioHtml ? '<div style="margin-top:2px;">' + audioHtml + '</div>' : '') +
     '</div>';
@@ -2646,6 +2682,7 @@ function showTranslationSummary(level){
    chunk, re-grade only that chunk, then patch the existing summary/pill
    display and saved record in place — everything else stays untouched. */
 async function recordChunkFix(index, btnEl){
+  const statusEl = btnEl.querySelector('.chunk-fix-status') || btnEl;
   if(chunkFixActiveIndex === index){
     chunkFixRecorder.stop();
     return;
@@ -2665,7 +2702,7 @@ async function recordChunkFix(index, btnEl){
     chunkFixChunks = [];
     chunkFixActiveIndex = index;
     let startedAt = null;
-    btnEl.textContent = '⏺️';
+    statusEl.textContent = '⏺️';
     btnEl.title = 'Recording… tap to stop';
 
     chunkFixRecorder.ondataavailable = e => chunkFixChunks.push(e.data);
@@ -2676,15 +2713,15 @@ async function recordChunkFix(index, btnEl){
       const actualType = chunkFixRecorder.mimeType || 'audio/webm';
 
       if(elapsedMs < 500){
-        btnEl.textContent = '🔁';
+        statusEl.textContent = '🔁';
         btnEl.title = 'Too short — tap to try again';
         return;
       }
 
       const blob = new Blob(chunkFixChunks, { type: actualType });
       const ext = mimeTypeToExtension(actualType);
-      btnEl.disabled = true;
-      btnEl.textContent = '⏳';
+      btnEl.style.pointerEvents = 'none';
+      statusEl.textContent = '⏳';
       btnEl.title = 'Checking…';
 
       try{
@@ -2699,8 +2736,8 @@ async function recordChunkFix(index, btnEl){
         const data = await res.json();
 
         if(data.verdict === 'no_speech'){
-          btnEl.disabled = false;
-          btnEl.textContent = '🔁';
+          btnEl.style.pointerEvents = '';
+          statusEl.textContent = '🔁';
           btnEl.title = "Didn't catch that — tap to try again";
           return;
         }
@@ -2712,8 +2749,8 @@ async function recordChunkFix(index, btnEl){
         await autosaveTranslation(level);
       }catch(err){
         console.error(err);
-        btnEl.disabled = false;
-        btnEl.textContent = '🔁';
+        btnEl.style.pointerEvents = '';
+        statusEl.textContent = '🔁';
         btnEl.title = 'Could not check — check your internet and try again';
       }
     };
@@ -2835,10 +2872,11 @@ async function loadHistory(){
     // Only attempts with data matching the currently active tab are shown
     // at all - one with only e.g. comprehensionAudioURL shouldn't leave a
     // bare, content-less date/delete card sitting on the reading tab.
-    const visibleAttempts = attempts.filter(a =>
-      activeTab === 'reading' ? (a.hebrewAudioURL || (Array.isArray(a.translationChunkResults) && a.translationChunkResults.length))
-                               : a.comprehensionAudioURL
-    );
+    const visibleAttempts = attempts.filter(a => {
+      if(activeTab === 'reading') return !!a.hebrewAudioURL;
+      if(activeTab === 'translate') return Array.isArray(a.translationChunkResults) && a.translationChunkResults.length;
+      return !!a.comprehensionAudioURL;
+    });
     if(!visibleAttempts.length){
       listEl.innerHTML = '<div class="msg">No attempts yet — record above and save!</div>';
       return;
@@ -2890,7 +2928,7 @@ async function loadHistory(){
           rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">✔️ Teacher reviewed — final score: ${a.hebrewFinalScore}%</div>`;
         }
       }
-      if(activeTab === 'reading' && Array.isArray(a.translationChunkResults) && a.translationChunkResults.length){
+      if(activeTab === 'translate' && Array.isArray(a.translationChunkResults) && a.translationChunkResults.length){
         rowsHtml += `<div class="row"><span class="label">🌐 Translation</span><span class="score-pill">${a.translationScore || ''}</span></div>`;
         a.translationChunkResults.forEach(c => {
           let chunkHtml = '<span class="comp-badge">' + (c.verdict === 'correct' ? '✅' : '💡') + '</span>' +
