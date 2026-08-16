@@ -1785,7 +1785,7 @@ async function gradeComprehensionAttempt(){
 
     comprehensionTranscript = data.transcript || "";
 
-    showComprehensionResult(data.verdict, typeof data.score === 'number' ? data.score : null, data.feedback || '');
+    showComprehensionResult(data.verdict, typeof data.score === 'number' ? data.score : null, data.feedback || '', comprehensionTranscript);
   }catch(err){
     console.error(err);
     gradingMsg.textContent = 'Could not check your answer — check your internet and try again.';
@@ -1797,7 +1797,7 @@ async function gradeComprehensionAttempt(){
 /* Renders the final correct/partial/incorrect result from the single
    grading pass. Audio is opt-in only — tap the speaker button to hear
    it read aloud. */
-async function showComprehensionResult(verdict, score, feedback){
+async function showComprehensionResult(verdict, score, feedback, transcript){
   const gradingMsg = document.getElementById('comprehensionGradingMsg');
   const resultEl = document.getElementById('comprehensionResult');
   comprehensionVerdict = verdict;
@@ -1806,10 +1806,18 @@ async function showComprehensionResult(verdict, score, feedback){
 
   const badgeText = { excellent: '🌟 Excellent!', correct: '✅ Got it!', partial: '🤔 Almost', incorrect: '💡 Try again' }[verdict] || '';
   const scoreText = (typeof comprehensionScore === 'number') ? ' (' + comprehensionScore + '%)' : '';
+  // Show what the scorer actually heard, same as the history view already
+  // does via a.comprehensionTranscript - previously only visible after
+  // saving and reloading, same gap as the Hebrew reading result had.
+  let transcriptHtml = "";
+  if(transcript){
+    transcriptHtml = '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + transcript + '"</span>';
+  }
   resultEl.className = 'comp-result ' + verdict;
   resultEl.innerHTML =
     '<span class="comp-badge">' + badgeText + scoreText + '</span>' +
     '<span>' + comprehensionFeedback + '</span>' +
+    transcriptHtml +
     '<button class="speak-btn" id="compReplayBtn" title="Hear this read aloud">🔊</button>' +
     '<div class="dispute-row" id="comprehensionDisputeRow"><button class="btn small ghost-delete" id="comprehensionDisputeBtn">⚠️ Dispute this grade</button></div>';
   resultEl.classList.remove('hidden');
