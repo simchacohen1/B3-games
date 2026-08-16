@@ -2665,9 +2665,9 @@ function showTranslationSummary(level){
     // Only an incorrect piece gets a redo button — a correct piece is
     // done and shouldn't invite a re-record.
     const redoHtml = isCorrect ? '' :
-      '<div style="margin-top:4px;">' +
-        '<button type="button" class="btn small chunk-fix-pill" data-chunk-index="' + i + '" ' +
-          'style="padding:6px 14px;font-size:0.8rem;background:var(--gold);box-shadow:0 3px 0 #97781a;color:var(--ink);">' +
+      '<div style="margin-top:6px;">' +
+        '<button type="button" class="btn gold chunk-fix-pill" data-chunk-index="' + i + '" ' +
+          'style="width:100%;font-size:1rem;">' +
           '<span class="chunk-fix-status" data-status-index="' + i + '">🔁 Redo this piece</span>' +
         '</button>' +
       '</div>';
