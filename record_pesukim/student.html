@@ -2658,13 +2658,25 @@ function showTranslationSummary(level){
     }
     const said = r.transcript ? r.transcript : '(nothing heard)';
     const pillClass = 'chunk-token ' + (isCorrect ? 'correct' : 'incorrect');
-    const pillTitle = isCorrect ? ' title="Tap to re-record this piece"' : ' title="Tap to redo this piece"';
+    // The pill itself is no longer the (easy-to-miss) click target for
+    // redoing a piece — there's now an explicit, labeled "Redo this piece"
+    // button below the audio player, sized like a normal button so it's
+    // obviously tappable rather than a tiny icon riding along the pill.
+    // Only an incorrect piece gets a redo button — a correct piece is
+    // done and shouldn't invite a re-record.
+    const redoHtml = isCorrect ? '' :
+      '<div style="margin-top:4px;">' +
+        '<button type="button" class="btn small chunk-fix-pill" data-chunk-index="' + i + '" ' +
+          'style="padding:6px 14px;font-size:0.8rem;background:var(--gold);box-shadow:0 3px 0 #97781a;color:var(--ink);">' +
+          '<span class="chunk-fix-status" data-status-index="' + i + '">🔁 Redo this piece</span>' +
+        '</button>' +
+      '</div>';
     return '<div>' +
-      '<span class="' + pillClass + ' chunk-fix-pill" data-chunk-index="' + i + '"' + pillTitle + ' style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;">' +
-        '<span>' + chunk.hebrew + ' — <span style="font-style:italic;">' + said + '</span></span>' +
-        '<span class="chunk-fix-status" data-status-index="' + i + '" style="font-size:0.85em;opacity:0.75;">🔁</span>' +
+      '<span class="' + pillClass + '" data-chunk-index="' + i + '" style="display:inline-block;">' +
+        chunk.hebrew + ' — <span style="font-style:italic;">' + said + '</span>' +
       '</span>' +
       (audioHtml ? '<div style="margin-top:2px;">' + audioHtml + '</div>' : '') +
+      redoHtml +
     '</div>';
   }).join('') + '</div>';
 
