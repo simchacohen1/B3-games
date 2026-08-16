@@ -1576,7 +1576,9 @@ function resetRecordingUI(){
   translationRecBtn.textContent = '🎙️';
   translationRecBtn.disabled = false;
 
-  // Fresh posuk visit — nothing saved yet, back to the reading tab.
+  // Fresh posuk visit — nothing saved yet. Keep whichever tab the student
+  // was already on (reading/translate/comprehension) instead of forcing
+  // them back to the reading tab every time they move to a new posuk.
   currentAttemptRef = null;
   currentAttemptId = null;
   attemptSaved = { hebrew: false, translation: false, comprehension: false };
@@ -1587,7 +1589,7 @@ function resetRecordingUI(){
   document.getElementById('translateCheck').classList.add('hidden');
   document.getElementById('comprehensionCheck').classList.add('hidden');
   hideNudge();
-  setActiveTab('reading');
+  setActiveTab(activeTab);
 
   // Kick off (or reload from cache) the chunk breakdown for this posuk in
   // the background, so it's likely ready by the time the student taps
