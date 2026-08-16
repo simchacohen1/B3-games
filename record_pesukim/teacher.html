@@ -379,6 +379,17 @@ function effComprehensionVerdict(record){
 function effComprehensionScore(record){
   return (record && typeof record.comprehensionScore === 'number') ? record.comprehensionScore : null;
 }
+// Translation isn't stored as a single percentage (each chunk piece is
+// graded correct/incorrect separately), so its percentage is derived here
+// from the saved per-chunk results — same math as the "X% correct" badge
+// shown on the Translate tab itself in student.html. No dispute mechanism
+// exists for translation (only Hebrew reading and comprehension have one).
+function effTranslationScore(record){
+  if(!record || !Array.isArray(record.translationChunkResults) || !record.translationChunkResults.length) return null;
+  const total = record.translationChunkResults.length;
+  const correct = record.translationChunkResults.filter(c => c.verdict === 'correct').length;
+  return Math.round((correct / total) * 100);
+}
 function hasPendingDispute(record){
   return !!record && (record.hebrewDisputeStatus === 'pending' || record.comprehensionDisputeStatus === 'pending');
 }
@@ -646,6 +657,7 @@ async function loadAllAttempts(forceRefresh){
    down to simple stats used by the Roster and Class Stats tabs. */
 function computeStudentStats(posukMap){
   let hebrewScores = [];
+  let translationScores = [];
   let verdictCounts = { excellent: 0, correct: 0, partial: 0, incorrect: 0 };
   let posukCount = 0;
   Object.values(posukMap || {}).forEach(attemptMap => {
@@ -654,13 +666,16 @@ function computeStudentStats(posukMap){
     posukCount++;
     const hScore = effHebrewScore(latest);
     if(typeof hScore === 'number') hebrewScores.push(hScore);
+    const tScore = effTranslationScore(latest);
+    if(typeof tScore === 'number') translationScores.push(tScore);
     const cVerdict = effComprehensionVerdict(latest);
     if(cVerdict && verdictCounts.hasOwnProperty(cVerdict)){
       verdictCounts[cVerdict]++;
     }
   });
   const avg = hebrewScores.length ? hebrewScores.reduce((a,b) => a+b, 0) / hebrewScores.length : null;
-  return { posukCount, avg, verdictCounts };
+  const avgTranslation = translationScores.length ? translationScores.reduce((a,b) => a+b, 0) / translationScores.length : null;
+  return { posukCount, avg, avgTranslation, verdictCounts };
 }
 
 /* ---------- Class Roster ---------- */
@@ -693,12 +708,13 @@ async function loadRoster(){
     let html = `<h2>Class Roster</h2>
       <table class="roster-table">
         <thead><tr>
-          <th>Student</th><th>Pesukim Recorded</th><th>Avg Reading %</th><th>Comprehension</th><th>Last Active</th>
+          <th>Student</th><th>Pesukim Recorded</th><th>Avg Reading %</th><th>Avg Translation %</th><th>Comprehension</th><th>Last Active</th>
         </tr></thead><tbody>`;
     rows.forEach(r => {
       const tier = r.avg === null ? 'none' : pctTier(r.avg);
       const tierLabel = tier === 'high' ? 'Doing Well' : tier === 'mid' ? 'Making Progress' : tier === 'low' ? 'Needs Support' : 'Not Started';
       const avgLabel = r.avg === null ? '—' : Math.round(r.avg) + '%';
+      const avgTranslationLabel = r.avgTranslation === null ? '—' : Math.round(r.avgTranslation) + '%';
       const vc = r.verdictCounts;
       const compParts = [];
       if(vc.excellent) compParts.push('🌟' + vc.excellent);
@@ -710,6 +726,7 @@ async function loadRoster(){
         <td class="rname">${r.name}</td>
         <td>${r.posukCount}</td>
         <td>${avgLabel}</td>
+        <td>${avgTranslationLabel}</td>
         <td><span class="status-pill ${tier}">${tierLabel}</span> <span style="margin-left:6px;">${compLabel}</span></td>
         <td>${r.lastActive}</td>
       </tr>`;
@@ -799,6 +816,7 @@ function buildReportRows(allAttempts){
         posukLabel: isRange ? `${rangeStart}–${rangeEnd}` : String(posukNum),
         timestamp: latest ? latest.timestamp : null,
         hebrewScore: isRange ? null : effHebrewScore(latest), // range attempts are comprehension-only
+        translationScore: isRange ? null : effTranslationScore(latest), // range attempts are comprehension-only
         comprehensionVerdict: effComprehensionVerdict(latest),
         comprehensionScore: effComprehensionScore(latest)
       });
@@ -849,8 +867,9 @@ async function loadReportsTab(){
         <div>
           <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Show</label>
           <select id="reportScoreTypeFilter">
-            <option value="both">Reading + Comprehension</option>
+            <option value="all">Reading + Translation + Comprehension</option>
             <option value="reading">Reading Only</option>
+            <option value="translation">Translation Only</option>
             <option value="comprehension">Comprehension Only</option>
           </select>
         </div>
@@ -1033,23 +1052,28 @@ function computeReportSummary(rows, scoreType){
   const distinctStudents = new Set(rows.map(r => r.studentId)).size;
   const readingScores = rows.map(r => r.hebrewScore).filter(s => typeof s === 'number');
   const avgReading = readingScores.length ? Math.round(readingScores.reduce((a,b)=>a+b,0) / readingScores.length) : null;
+  const translationScores = rows.map(r => r.translationScore).filter(s => typeof s === 'number');
+  const avgTranslation = translationScores.length ? Math.round(translationScores.reduce((a,b)=>a+b,0) / translationScores.length) : null;
   const comprehensionScores = rows.map(r => r.comprehensionScore).filter(s => typeof s === 'number');
   const avgComprehension = comprehensionScores.length ? Math.round(comprehensionScores.reduce((a,b)=>a+b,0) / comprehensionScores.length) : null;
   const verdictCounts = { excellent: 0, correct: 0, partial: 0, incorrect: 0 };
   rows.forEach(r => { if(r.comprehensionVerdict && verdictCounts.hasOwnProperty(r.comprehensionVerdict)) verdictCounts[r.comprehensionVerdict]++; });
-  return { distinctStudents, avgReading, avgComprehension, verdictCounts };
+  return { distinctStudents, avgReading, avgTranslation, avgComprehension, verdictCounts };
 }
 
 // Renders the summary as an HTML block (used on-screen and in the print view).
 function reportSummaryHtml(rows, scoreType){
-  const { distinctStudents, avgReading, avgComprehension, verdictCounts } = computeReportSummary(rows, scoreType);
+  const { distinctStudents, avgReading, avgTranslation, avgComprehension, verdictCounts } = computeReportSummary(rows, scoreType);
   let summaryHtml = `<div class="attempt" style="margin-bottom:14px;">
       <div class="row"><span class="label">Pesukim in this report</span><span>${rows.length}</span></div>
       <div class="row"><span class="label">Students represented</span><span>${distinctStudents}</span></div>`;
-  if(scoreType !== 'comprehension'){
+  if(scoreType === 'all' || scoreType === 'reading'){
     summaryHtml += `<div class="row"><span class="label">Average reading score</span><span>${avgReading === null ? '—' : avgReading + '%'}</span></div>`;
   }
-  if(scoreType !== 'reading'){
+  if(scoreType === 'all' || scoreType === 'translation'){
+    summaryHtml += `<div class="row"><span class="label">Average translation score</span><span>${avgTranslation === null ? '—' : avgTranslation + '%'}</span></div>`;
+  }
+  if(scoreType === 'all' || scoreType === 'comprehension'){
     summaryHtml += `<div class="row"><span class="label">Average comprehension score</span><span>${avgComprehension === null ? '—' : avgComprehension + '%'}</span></div>`;
     summaryHtml += `<div class="row"><span class="label">Comprehension breakdown</span><span>🌟${verdictCounts.excellent} ✅${verdictCounts.correct} 🤔${verdictCounts.partial} 💡${verdictCounts.incorrect}</span></div>`;
   }
@@ -1114,8 +1138,9 @@ async function renderReportResults(){
     const showParshaCol = parshaFilter === 'all';
     const showPerekCol = perekFilter === 'all';
     const showPosukCol = posukNums === null || posukNums.length !== 1;
-    const showReadingCol = scoreType !== 'comprehension';
-    const showComprehensionCol = scoreType !== 'reading';
+    const showReadingCol = scoreType === 'all' || scoreType === 'reading';
+    const showTranslationCol = scoreType === 'all' || scoreType === 'translation';
+    const showComprehensionCol = scoreType === 'all' || scoreType === 'comprehension';
 
     let headerCells = '';
     if(showStudentCol) headerCells += '<th>Student</th>';
@@ -1123,12 +1148,14 @@ async function renderReportResults(){
     if(showPerekCol) headerCells += '<th>Perek</th>';
     if(showPosukCol) headerCells += '<th>Posuk</th>';
     if(showReadingCol) headerCells += '<th>Reading %</th>';
+    if(showTranslationCol) headerCells += '<th>Translation %</th>';
     if(showComprehensionCol) headerCells += '<th>Comprehension</th>';
     headerCells += '<th>Date</th>';
 
     let html = `<table class="roster-table"><thead><tr>${headerCells}</tr></thead><tbody>`;
     rows.forEach(r => {
       const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
+      const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' : '—';
       const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
       let cells = '';
       if(showStudentCol) cells += `<td>${r.studentName}</td>`;
@@ -1136,6 +1163,7 @@ async function renderReportResults(){
       if(showPerekCol) cells += `<td>${r.perekNum}</td>`;
       if(showPosukCol) cells += `<td>${r.posukLabel}</td>`;
       if(showReadingCol) cells += `<td>${scoreLabel}</td>`;
+      if(showTranslationCol) cells += `<td>${translationLabel}</td>`;
       if(showComprehensionCol) cells += `<td>${verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore)}</td>`;
       cells += `<td>${dateLabel}</td>`;
       html += `<tr>${cells}</tr>`;
@@ -1154,17 +1182,20 @@ async function renderReportResults(){
 function downloadReportCsv(){
   if(!reportRows.length) return;
   const scoreType = document.getElementById('reportScoreTypeFilter').value;
-  const { distinctStudents, avgReading, avgComprehension, verdictCounts } = computeReportSummary(reportRows, scoreType);
+  const { distinctStudents, avgReading, avgTranslation, avgComprehension, verdictCounts } = computeReportSummary(reportRows, scoreType);
 
   // Summary block first, then a blank line, then the full data table —
   // so the totals are right there without having to scroll or recompute.
   const summaryLines = [];
   summaryLines.push(['Pesukim in this report', reportRows.length].join(','));
   summaryLines.push(['Students represented', distinctStudents].join(','));
-  if(scoreType !== 'comprehension'){
+  if(scoreType === 'all' || scoreType === 'reading'){
     summaryLines.push(['Average reading score', avgReading === null ? '' : avgReading + '%'].join(','));
   }
-  if(scoreType !== 'reading'){
+  if(scoreType === 'all' || scoreType === 'translation'){
+    summaryLines.push(['Average translation score', avgTranslation === null ? '' : avgTranslation + '%'].join(','));
+  }
+  if(scoreType === 'all' || scoreType === 'comprehension'){
     summaryLines.push(['Average comprehension score', avgComprehension === null ? '' : avgComprehension + '%'].join(','));
     summaryLines.push(['Excellent', verdictCounts.excellent].join(','));
     summaryLines.push(['Correct', verdictCounts.correct].join(','));
@@ -1172,15 +1203,16 @@ function downloadReportCsv(){
     summaryLines.push(['Incorrect', verdictCounts.incorrect].join(','));
   }
 
-  const header = ['Student','Parsha','Perek','Posuk','Reading %','Comprehension','Comprehension Score','Date'];
+  const header = ['Student','Parsha','Perek','Posuk','Reading %','Translation %','Comprehension','Comprehension Score','Date'];
   const lines = [...summaryLines, '', header.join(',')];
   reportRows.forEach(r => {
     const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) : '';
+    const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) : '';
     const verdictText = r.comprehensionVerdict || '';
     const compScoreLabel = typeof r.comprehensionScore === 'number' ? r.comprehensionScore : '';
     const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '';
     // Quote the student/parsha name in case a name ever contains a comma.
-    lines.push([`"${r.studentName}"`, `"${r.parshaName}"`, r.perekNum, r.posukLabel, scoreLabel, verdictText, compScoreLabel, dateLabel].join(','));
+    lines.push([`"${r.studentName}"`, `"${r.parshaName}"`, r.perekNum, r.posukLabel, scoreLabel, translationLabel, verdictText, compScoreLabel, dateLabel].join(','));
   });
   const csv = lines.join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -1200,22 +1232,26 @@ function downloadReportCsv(){
 function printReport(){
   if(!reportRows.length) return;
   const scoreType = document.getElementById('reportScoreTypeFilter').value;
-  const { distinctStudents, avgReading, avgComprehension, verdictCounts } = computeReportSummary(reportRows, scoreType);
+  const { distinctStudents, avgReading, avgTranslation, avgComprehension, verdictCounts } = computeReportSummary(reportRows, scoreType);
 
   // Summary block, styled to match the print page rather than the app's
   // own stylesheet (this opens in a bare new tab with no app CSS loaded).
   let summaryRowsHtml = `<tr><td>Pesukim in this report</td><td>${reportRows.length}</td></tr>
     <tr><td>Students represented</td><td>${distinctStudents}</td></tr>`;
-  if(scoreType !== 'comprehension'){
+  if(scoreType === 'all' || scoreType === 'reading'){
     summaryRowsHtml += `<tr><td>Average reading score</td><td>${avgReading === null ? '—' : avgReading + '%'}</td></tr>`;
   }
-  if(scoreType !== 'reading'){
+  if(scoreType === 'all' || scoreType === 'translation'){
+    summaryRowsHtml += `<tr><td>Average translation score</td><td>${avgTranslation === null ? '—' : avgTranslation + '%'}</td></tr>`;
+  }
+  if(scoreType === 'all' || scoreType === 'comprehension'){
     summaryRowsHtml += `<tr><td>Average comprehension score</td><td>${avgComprehension === null ? '—' : avgComprehension + '%'}</td></tr>`;
     summaryRowsHtml += `<tr><td>Comprehension breakdown</td><td>🌟${verdictCounts.excellent} ✅${verdictCounts.correct} 🤔${verdictCounts.partial} 💡${verdictCounts.incorrect}</td></tr>`;
   }
 
   const rowsHtml = reportRows.map(r => {
     const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
+    const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' : '—';
     const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
     return `<tr>
       <td>${r.studentName}</td>
@@ -1223,6 +1259,7 @@ function printReport(){
       <td>${r.perekNum}</td>
       <td>${r.posukLabel}</td>
       <td>${scoreLabel}</td>
+      <td>${translationLabel}</td>
       <td>${verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore)}</td>
       <td>${dateLabel}</td>
     </tr>`;
@@ -1244,7 +1281,7 @@ function printReport(){
     <div class="meta">Generated ${new Date().toLocaleDateString()}</div>
     <table class="summary-table"><tbody>${summaryRowsHtml}</tbody></table>
     <table><thead><tr>
-      <th>Student</th><th>Parsha</th><th>Perek</th><th>Posuk</th><th>Reading %</th><th>Comprehension</th><th>Date</th>
+      <th>Student</th><th>Parsha</th><th>Perek</th><th>Posuk</th><th>Reading %</th><th>Translation %</th><th>Comprehension</th><th>Date</th>
     </tr></thead><tbody>${rowsHtml}</tbody></table>
     </body></html>`);
   win.document.close();
@@ -1369,7 +1406,7 @@ async function loadAccessTab(){
   }
 }
 
-let studentActiveTab = 'comprehension'; // 'comprehension' | 'reading', for the currently-viewed student
+let studentActiveTab = 'comprehension'; // 'comprehension' | 'reading' | 'translate', for the currently-viewed student
 let studentPosukData = {}; // posukKey -> { attempts, latest } for the currently-viewed student
 let studentPerekData = {}; // perekNum -> posukNum -> posukKey, for the currently-viewed student
 let studentRangeData = []; // comprehension-range attempts (posuk grid can't show these as single tiles)
@@ -1432,6 +1469,7 @@ async function selectStudent(id, name, el){
         <div class="mini-tabs">
           <button class="mini-tab-btn ${studentActiveTab==='comprehension'?'active':''}" id="studentComprehensionBtn">🧠 Comprehension</button>
           <button class="mini-tab-btn ${studentActiveTab==='reading'?'active':''}" id="studentReadingBtn">🎙️ Reading</button>
+          <button class="mini-tab-btn ${studentActiveTab==='translate'?'active':''}" id="studentTranslateBtn">🌐 Translate</button>
           <button class="btn small" id="resetStudentBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">↩️ Reset Progress</button>
           <button class="btn small" id="removeStudentBtn" style="background:#8a3a3a;box-shadow:0 4px 0 #5c2626;">🗑️ Remove Student</button>
         </div>
@@ -1440,6 +1478,7 @@ async function selectStudent(id, name, el){
       <div id="posukDetail"></div>`;
     document.getElementById('studentComprehensionBtn').onclick = () => { studentActiveTab = 'comprehension'; renderStudentGrid(); };
     document.getElementById('studentReadingBtn').onclick = () => { studentActiveTab = 'reading'; renderStudentGrid(); };
+    document.getElementById('studentTranslateBtn').onclick = () => { studentActiveTab = 'translate'; renderStudentGrid(); };
     wireStudentAdminButtons(id, name);
 
     await renderStudentGrid();
@@ -1500,7 +1539,8 @@ async function removeStudentEntirely(id, name){
 
 async function renderStudentGrid(){
   document.querySelectorAll('.mini-tab-btn').forEach(b => b.classList.remove('active'));
-  const btn = document.getElementById(studentActiveTab === 'comprehension' ? 'studentComprehensionBtn' : 'studentReadingBtn');
+  const btnId = studentActiveTab === 'comprehension' ? 'studentComprehensionBtn' : (studentActiveTab === 'reading' ? 'studentReadingBtn' : 'studentTranslateBtn');
+  const btn = document.getElementById(btnId);
   if(btn) btn.classList.add('active');
 
   const wrap = document.getElementById('studentGridWrap');
@@ -1533,6 +1573,13 @@ async function renderStudentGrid(){
       let tileLabel = '—';
       if(studentActiveTab === 'reading'){
         const score = record ? effHebrewScore(record) : null;
+        if(typeof score === 'number'){
+          tier = pctTier(score);
+          tileLabel = score + '%';
+          doneCount++;
+        }
+      }else if(studentActiveTab === 'translate'){
+        const score = record ? effTranslationScore(record) : null;
         if(typeof score === 'number'){
           tier = pctTier(score);
           tileLabel = score + '%';
@@ -1634,6 +1681,17 @@ function renderPosukDetail(posukKey){
       }
       lines += `<div class="comp-result ${hTier}">${hebrewCardHtml}</div>`;
       lines += renderDisputeSection(a, posukKey, 'hebrew');
+    }
+    if(Array.isArray(a.translationChunkResults) && a.translationChunkResults.length){
+      const tScore = effTranslationScore(a);
+      lines += `<div class="top-line"><span>🌐 Translation</span><span class="score-pill">${tScore === null ? '' : tScore + '%'}</span></div>`;
+      a.translationChunkResults.forEach(c => {
+        let chunkHtml = '<span class="comp-badge">' + (c.verdict === 'correct' ? '✅' : '💡') + '</span>' +
+          '<span dir="rtl" style="font-family:\'Noto Serif Hebrew\',serif;">' + c.chunkHebrew + '</span>';
+        if(c.audioURL) chunkHtml += '<audio controls src="' + c.audioURL + '"></audio>';
+        if(c.transcript) chunkHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + c.transcript + '"</span>';
+        lines += `<div class="comp-result ${c.verdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:4px;">${chunkHtml}</div>`;
+      });
     }
     if(a.comprehensionAudioURL){
       const cVerdict = effComprehensionVerdict(a);
@@ -1831,7 +1889,7 @@ function sortPosukKeys(keys){
 }
 
 /* ---------- Class Summary ---------- */
-let classActiveSkill = 'comprehension'; // 'comprehension' | 'reading' -- one global toggle for the whole tab
+let classActiveSkill = 'comprehension'; // 'comprehension' | 'reading' | 'translate' -- one global toggle for the whole tab
 let expandedPerekNum = null; // only one perek open (accordion) at a time; null = all collapsed
 let lastAttemptsVal = null; // cached attempts tree so toggling skill/expand doesn't need a re-fetch
 
@@ -1850,12 +1908,14 @@ async function loadClassSummary(){
     html += `<div class="mini-tabs" style="margin-bottom:6px;">
       <button class="mini-tab-btn ${classActiveSkill==='comprehension'?'active':''}" id="classComprehensionBtn">🧠 Comprehension</button>
       <button class="mini-tab-btn ${classActiveSkill==='reading'?'active':''}" id="classReadingBtn">🎙️ Reading</button>
+      <button class="mini-tab-btn ${classActiveSkill==='translate'?'active':''}" id="classTranslateBtn">🌐 Translate</button>
     </div>`;
     html += `<div id="classPosukGridWrap"></div>`;
     mainEl.innerHTML = html;
 
     document.getElementById('classComprehensionBtn').onclick = () => { classActiveSkill = 'comprehension'; renderClassPosukGrid(lastAttemptsVal); };
     document.getElementById('classReadingBtn').onclick = () => { classActiveSkill = 'reading'; renderClassPosukGrid(lastAttemptsVal); };
+    document.getElementById('classTranslateBtn').onclick = () => { classActiveSkill = 'translate'; renderClassPosukGrid(lastAttemptsVal); };
 
     await renderClassPosukGrid(val);
   }catch(err){
@@ -1876,6 +1936,11 @@ function skillInfo(record, skill){
   if(skill === 'reading'){
     if(typeof record.hebrewScore !== 'number') return null;
     const score = effHebrewScore(record);
+    return { tier: pctTier(score), label: score + '%' };
+  }
+  if(skill === 'translate'){
+    const score = effTranslationScore(record);
+    if(typeof score !== 'number') return null;
     return { tier: pctTier(score), label: score + '%' };
   }
   const v = effComprehensionVerdict(record);
@@ -2013,7 +2078,11 @@ function renderClassPosukDetail(posukKey, bodyEl){
   const doneCount = data.doneList.length;
   const notDoneCount = total - doneCount;
   const refLabel = formatRefLabel(posukKey);
-  const skillLabel = classActiveSkill === 'reading' ? '🎙️ Reading' : '🧠 Comprehension';
+  const isTranslate = classActiveSkill === 'translate';
+  const skillLabel = classActiveSkill === 'reading' ? '🎙️ Reading' : (isTranslate ? '🌐 Translate' : '🧠 Comprehension');
+  // Translation doesn't have one single audio clip per attempt (it's one
+  // clip per chunk piece), so it needs its own rendering branch below
+  // rather than the single-audioField pattern reading/comprehension share.
   const audioField = classActiveSkill === 'reading' ? 'hebrewAudioURL' : 'comprehensionAudioURL';
   const durKey = classActiveSkill === 'reading' ? 'heb' : 'comp';
 
@@ -2024,6 +2093,22 @@ function renderClassPosukDetail(posukKey, bodyEl){
 
   if(doneCount === 0){
     html += `<div class="empty-msg">No one has recorded this posuk yet.</div>`;
+  }else if(isTranslate){
+    [...data.doneList].sort((a,b) => a.name.localeCompare(b.name)).forEach(entry => {
+      const a = entry.latest;
+      const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      const info = skillInfo(a, 'translate');
+      let lines = `<div class="top-line"><strong>${entry.name}</strong><span class="summary-meta">${dateStr}</span></div>`;
+      lines += `<div class="top-line"><span>${skillLabel} — <span class="score-pill">${info ? info.label : '—'}</span></span></div>`;
+      (a.translationChunkResults || []).forEach(c => {
+        let chunkHtml = '<span class="comp-badge">' + (c.verdict === 'correct' ? '✅' : '💡') + '</span>' +
+          '<span dir="rtl" style="font-family:\'Noto Serif Hebrew\',serif;">' + c.chunkHebrew + '</span>';
+        if(c.audioURL) chunkHtml += '<audio controls src="' + c.audioURL + '"></audio>';
+        if(c.transcript) chunkHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + c.transcript + '"</span>';
+        lines += `<div class="comp-result ${c.verdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:4px;">${chunkHtml}</div>`;
+      });
+      html += `<div class="attempt-row">${lines}</div>`;
+    });
   }else{
     [...data.doneList].sort((a,b) => a.name.localeCompare(b.name)).forEach(entry => {
       const a = entry.latest;
@@ -2051,16 +2136,20 @@ function renderClassPosukDetail(posukKey, bodyEl){
   detailEl.innerHTML = html;
 
   // Recording lengths aren't stored — fetch them lazily from the audio
-  // files themselves only for the posuk currently being viewed.
-  data.doneList.forEach(entry => {
-    const a = entry.latest;
-    if(a[audioField]){
-      getAudioDuration(a[audioField]).then(d => {
-        const el = document.getElementById(`dur_${entry.studentId}_${durKey}`);
-        if(el) el.textContent = d ? '⏱ ' + formatDuration(d) : '';
-      });
-    }
-  });
+  // files themselves only for the posuk currently being viewed. Translation
+  // has no single audioField (each chunk piece has its own clip already
+  // playable via its own <audio> tag), so this lookup doesn't apply there.
+  if(!isTranslate){
+    data.doneList.forEach(entry => {
+      const a = entry.latest;
+      if(a[audioField]){
+        getAudioDuration(a[audioField]).then(d => {
+          const el = document.getElementById(`dur_${entry.studentId}_${durKey}`);
+          if(el) el.textContent = d ? '⏱ ' + formatDuration(d) : '';
+        });
+      }
+    });
+  }
 }
 </script>
 </body>

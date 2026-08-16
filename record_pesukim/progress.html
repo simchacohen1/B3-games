@@ -219,6 +219,7 @@
     <div class="tabs">
       <button class="tab-btn active" id="comprehensionTabBtn">🧠 Comprehension</button>
       <button class="tab-btn" id="readingTabBtn">🎙️ Reading</button>
+      <button class="tab-btn" id="translateTabBtn">🌐 Translate</button>
     </div>
 
     <div id="perekList"></div>
@@ -356,7 +357,7 @@ async function getPerekRange(perekNum){
 let studentId = localStorage.getItem('posukPractice_studentId');
 let studentName = localStorage.getItem('posukPractice_studentName');
 
-let activeTab = 'comprehension'; // 'comprehension' | 'reading'
+let activeTab = 'comprehension'; // 'comprehension' | 'reading' | 'translate'
 let perekData = {}; // perekNum -> { posukNum -> latestAttemptRecord }
 let expandedState = {}; // perekNum -> bool
 
@@ -372,11 +373,13 @@ window.addEventListener('load', () => {
 
 document.getElementById('comprehensionTabBtn').onclick = () => switchTab('comprehension');
 document.getElementById('readingTabBtn').onclick = () => switchTab('reading');
+document.getElementById('translateTabBtn').onclick = () => switchTab('translate');
 
 function switchTab(tab){
   activeTab = tab;
   document.getElementById('comprehensionTabBtn').classList.toggle('active', tab === 'comprehension');
   document.getElementById('readingTabBtn').classList.toggle('active', tab === 'reading');
+  document.getElementById('translateTabBtn').classList.toggle('active', tab === 'translate');
   renderPerekList();
 }
 
@@ -451,6 +454,16 @@ function effHebrewScore(record){
 function effComprehensionVerdict(record){
   return record ? (record.comprehensionFinalVerdict || record.comprehensionVerdict) : null;
 }
+// Translation isn't stored as a single percentage (each chunk is graded
+// separately as correct/incorrect), so the percentage is derived here from
+// the saved per-chunk results — same math as the "X% correct" badge shown
+// on the Translate tab itself in student.html.
+function effTranslationScore(record){
+  if(!record || !Array.isArray(record.translationChunkResults) || !record.translationChunkResults.length) return null;
+  const total = record.translationChunkResults.length;
+  const correct = record.translationChunkResults.filter(c => c.verdict === 'correct').length;
+  return Math.round((correct / total) * 100);
+}
 
 function buildPerekSection(perekNum, range){
   const posukScores = perekData[perekNum] || {};
@@ -482,6 +495,13 @@ function buildPerekSection(perekNum, range){
     let label = '—';
     if(activeTab === 'reading'){
       const score = effHebrewScore(record);
+      if(typeof score === 'number'){
+        tier = pctTier(score);
+        label = score + '%';
+        doneCount++;
+      }
+    }else if(activeTab === 'translate'){
+      const score = effTranslationScore(record);
       if(typeof score === 'number'){
         tier = pctTier(score);
         label = score + '%';
