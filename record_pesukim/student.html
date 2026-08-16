@@ -682,6 +682,7 @@ let currentPosukTranslation = ""; // accepted English translation, used as the g
 let mediaRecorder = null;
 let recordingChunks = [];
 let activeRecordingType = null; // 'hebrew' | 'translate' | 'comprehension'
+let recordingStartedAt = null; // timestamp from when the recorder truly started, for a minimum-duration check on stop
 
 // Live mic level meter — shows the student a bouncing bar while recording
 // so they can see their voice is actually being picked up.
@@ -1319,6 +1320,7 @@ function setActiveTab(tab){
   document.getElementById('tabReadingBtn').classList.toggle('active', tab === 'reading');
   document.getElementById('tabComprehensionBtn').classList.toggle('active', tab === 'comprehension');
   hideNudge();
+  loadHistory();
 }
 document.getElementById('tabReadingBtn').onclick = () => setActiveTab('reading');
 document.getElementById('tabComprehensionBtn').onclick = () => setActiveTab('comprehension');
@@ -1474,6 +1476,7 @@ async function autosaveHebrew(){
       posukTranslation: currentPosukTranslation,
       hebrewAudioURL: url,
       hebrewScore: hebrewScore,
+      hebrewScoreIsPercent: true,
       hebrewTranscript: hebrewTranscript,
       hebrewWords: hebrewWords
     });
@@ -1572,6 +1575,27 @@ async function toggleRecording(type, btnEl){
       // assumption, so the file we upload is labeled accurately.
       const actualType = mediaRecorder.mimeType || 'audio/webm';
       const blob = new Blob(recordingChunks, { type: actualType });
+      const elapsedMs = recordingStartedAt ? (Date.now() - recordingStartedAt) : null;
+      btnEl.classList.remove('recording');
+      btnEl.textContent = '🎙️';
+      activeRecordingType = null;
+      stream.getTracks().forEach(t => t.stop());
+      stopMicMeter(type);
+
+      // A press-and-release that barely lasted any real time isn't a
+      // genuine reading/answer attempt - it's an accidental tap. Sending it
+      // on anyway used to reach Whisper as a near-silent clip, which can
+      // hallucinate a plausible-looking transcript from little/no real
+      // signal (especially since we prompt it with the expected posuk
+      // text), producing a misleading score instead of an honest "too
+      // short" message. Catch it here, before it's ever uploaded or saved.
+      if(elapsedMs !== null && elapsedMs < 800){
+        document.getElementById(type + 'Status').textContent = 'Recording was too short — please try again.';
+        recordingStartedAt = null;
+        return;
+      }
+      recordingStartedAt = null;
+
       currentAudio[type] = blob;
       currentAudioExt[type] = mimeTypeToExtension(actualType);
       const url = URL.createObjectURL(blob);
@@ -1579,11 +1603,6 @@ async function toggleRecording(type, btnEl){
       audioEl.src = url;
       audioEl.classList.remove('hidden');
       document.getElementById(type + 'DeleteBtn').classList.remove('hidden');
-      btnEl.classList.remove('recording');
-      btnEl.textContent = '🎙️';
-      activeRecordingType = null;
-      stream.getTracks().forEach(t => t.stop());
-      stopMicMeter(type);
 
       if(type === 'comprehension'){
         document.getElementById(type + 'Status').textContent = 'Recorded — listening…';
@@ -1602,6 +1621,7 @@ async function toggleRecording(type, btnEl){
     // what they say lines up with what's actually being captured.
     setTimeout(() => {
       mediaRecorder.start();
+      recordingStartedAt = Date.now();
       document.getElementById(type + 'Status').textContent = 'Recording…';
       startMicMeter(stream, type);
     }, 300);
@@ -1885,21 +1905,45 @@ async function loadHistory(){
     const attempts = Object.entries(val)
       .map(([id, a]) => ({ id, ...a }))
       .sort((a,b) => b.timestamp - a.timestamp);
+    // Only attempts with data matching the currently active tab are shown
+    // at all - one with only e.g. comprehensionAudioURL shouldn't leave a
+    // bare, content-less date/delete card sitting on the reading tab.
+    const visibleAttempts = attempts.filter(a =>
+      activeTab === 'reading' ? (a.hebrewAudioURL || a.translationAudioURL)
+                               : a.comprehensionAudioURL
+    );
+    if(!visibleAttempts.length){
+      listEl.innerHTML = '<div class="msg">No attempts yet — record above and save!</div>';
+      return;
+    }
     listEl.innerHTML = '';
-    attempts.forEach(a => {
+    visibleAttempts.forEach(a => {
       const div = document.createElement('div');
       div.className = 'attempt';
       const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
       let rowsHtml = `<div class="row"><span>${dateStr}</span><button class="btn ghost-delete attempt-delete-btn">🗑️ Delete</button></div>`;
-      if(a.hebrewAudioURL){
+      // Each tab should only show its own category of past attempts - a
+      // saved attempt record can hold both a hebrewAudioURL and a
+      // comprehensionAudioURL (since both tasks for the same posuk share
+      // one record), but rendering both regardless of which tab is open
+      // meant the "Show You Understand" tab was also displaying Hebrew
+      // reading cards and vice versa. Gate each block on activeTab so only
+      // the matching category renders.
+      if(activeTab === 'reading' && a.hebrewAudioURL){
         // Older saved attempts used the 1-10 self-rating slider; newer ones
-        // use the automatic scorer's 0-100 percentage. Tell them apart by
-        // range so old history entries still display correctly.
-        const hebrewScorePill = (typeof a.hebrewScore === 'number' && a.hebrewScore > 10)
+        // use the automatic scorer's 0-100 percentage. Attempts saved going
+        // forward carry an explicit hebrewScoreIsPercent flag, so a
+        // genuinely low percent score (e.g. 9%, from a near-empty/garbled
+        // recording) can't be mistaken for a legacy "9/10" rating just
+        // because its value happens to be <=10. Only attempts saved before
+        // this flag existed fall back to the old magnitude-based guess.
+        const isPercentScore = a.hebrewScoreIsPercent === true ||
+          (typeof a.hebrewScore === 'number' && a.hebrewScore > 10);
+        const hebrewScorePill = isPercentScore
           ? a.hebrewScore + '%'
           : a.hebrewScore + '/10 · ' + RATING_LABELS[a.hebrewScore - 1];
         rowsHtml += `<div class="row"><span class="label">🎙️ Hebrew reading</span></div>`;
-        const hTier = (typeof a.hebrewScore === 'number' && a.hebrewScore > 10)
+        const hTier = isPercentScore
           ? (a.hebrewScore >= 80 ? 'correct' : (a.hebrewScore >= 50 ? 'partial' : 'incorrect'))
           : 'correct';
         let hebrewCardHtml = '<span class="comp-badge">' + hebrewScorePill + '</span>';
@@ -1919,12 +1963,12 @@ async function loadHistory(){
           rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">✔️ Teacher reviewed — final score: ${a.hebrewFinalScore}%</div>`;
         }
       }
-      if(a.translationAudioURL){
+      if(activeTab === 'reading' && a.translationAudioURL){
         rowsHtml += `
         <div class="row"><span class="label">🌐 Translation</span><span class="score-pill">${a.translationScore}/10 · ${RATING_LABELS[a.translationScore-1]}</span></div>
         <div class="row"><audio controls src="${a.translationAudioURL}"></audio></div>`;
       }
-      if(a.comprehensionAudioURL){
+      if(activeTab === 'comprehension' && a.comprehensionAudioURL){
         const verdictLabel = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[a.comprehensionVerdict] || a.comprehensionVerdict || '';
         const scoreSuffix = (typeof a.comprehensionScore === 'number') ? ' (' + a.comprehensionScore + '%)' : '';
         rowsHtml += `<div class="row"><span class="label">🧠 Comprehension</span></div>`;
