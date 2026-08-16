@@ -841,6 +841,9 @@ let translationSegmentStartedAt = null;
 let chunkFixRecorder = null;
 let chunkFixChunks = [];
 let chunkFixActiveIndex = null;
+// Tracks blob: URLs created for the per-piece playback players in
+// showTranslationSummary, so they can be revoked before re-rendering.
+let translationAudioUrls = {};
 
 let mediaRecorder = null;
 let recordingChunks = [];
@@ -2587,29 +2590,51 @@ function showTranslationSummary(level){
   const correctCount = idxs.filter(i => translationGradedResults[i].verdict === 'correct').length;
   const attempted = idxs.length;
   const total = level.chunks.length;
+  const pct = total ? Math.round((correctCount / total) * 100) : 0;
 
   const overallOk = attempted === total && correctCount === total;
-  let html = '<span class="comp-badge">' + (overallOk ? '✅ ' + correctCount + '/' + total + ' correct!' : correctCount + '/' + total + ' correct') + '</span>';
+  let html = '<span class="comp-badge">' + (overallOk ? '\u2705 ' + pct + '% correct!' : pct + '% correct') + '</span>';
   if(attempted < total){
     html += '<span>' + (total - attempted) + ' piece(s) weren\'t recorded.</span>';
   }
-  // Every graded piece shows what the system actually heard (same as the
-  // transcript shown on Show-You-Understand), plus a small redo button so
-  // a student who got one piece wrong can just fix that piece instead of
-  // recording the whole posuk again.
-  html += '<div style="width:100%;margin-top:6px;" id="translationChunkBreakdown">' + idxs.map(i => {
+  // Free up any object URLs from a previous render before making new ones,
+  // so repeated redos/re-renders don't leak memory.
+  Object.values(translationAudioUrls).forEach(u => URL.revokeObjectURL(u));
+  translationAudioUrls = {};
+  // Simple pill-based breakdown, matching the look of the Hebrew-reading
+  // results: green pill = correct, red pill = wrong. Each pill shows the
+  // Hebrew piece together with what the student actually said (their
+  // spoken translation) — no long feedback paragraph here, that's kept
+  // for the comprehension tab only. Tapping a pill re-records that piece
+  // (recordChunkFix). An audio player (so a teacher can listen back to
+  // the actual recording) sits underneath each pill.
+  html += '<div style="width:100%;margin-top:8px;display:flex;flex-direction:column;gap:6px;" id="translationChunkBreakdown">' + idxs.map(i => {
     const r = translationGradedResults[i];
+    const chunk = level.chunks[i];
     const isCorrect = r.verdict === 'correct';
-    const transcriptHtml = r.transcript ? '<span style="font-style:italic;color:var(--ink-soft);"> — "' + r.transcript + '"</span>' : '';
-    return '<div style="margin-bottom:4px;">' + (isCorrect ? '✅' : '💡') + ' Piece ' + (i + 1) + ': ' + r.feedback + transcriptHtml +
-      ' <button class="word-fix-btn chunk-fix-btn" data-chunk-index="' + i + '" title="Redo just this piece">🔁</button></div>';
+    let audioHtml = '';
+    const seg = translationSegments[i];
+    if(seg && seg.blob){
+      const url = URL.createObjectURL(seg.blob);
+      translationAudioUrls[i] = url;
+      audioHtml = '<audio controls src="' + url + '" style="height:28px;vertical-align:middle;margin-left:6px;"></audio>';
+    }
+    const said = r.transcript ? r.transcript : '(nothing heard)';
+    const pillClass = 'chunk-token ' + (isCorrect ? 'correct' : 'incorrect');
+    const pillTitle = isCorrect ? '' : ' title="Tap to redo this piece"';
+    return '<div>' +
+      '<span class="' + pillClass + ' chunk-fix-pill" data-chunk-index="' + i + '"' + pillTitle + ' style="cursor:pointer;display:inline-block;">' +
+        chunk.hebrew + ' — <span style="font-style:italic;">' + said + '</span>' +
+      '</span>' +
+      (audioHtml ? '<div style="margin-top:2px;">' + audioHtml + '</div>' : '') +
+    '</div>';
   }).join('') + '</div>';
 
   resultEl.className = 'comp-result ' + (overallOk ? 'correct' : 'incorrect');
   resultEl.innerHTML = html;
   resultEl.classList.remove('hidden');
   retryBtn.classList.remove('hidden');
-  resultEl.querySelectorAll('.chunk-fix-btn').forEach(btn => {
+  resultEl.querySelectorAll('.chunk-fix-pill').forEach(btn => {
     btn.onclick = () => recordChunkFix(parseInt(btn.getAttribute('data-chunk-index'), 10), btn);
   });
 }
