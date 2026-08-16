@@ -280,6 +280,13 @@
     color: var(--rimon-dark); text-decoration: underline;
     text-decoration-style: wavy; text-underline-offset: 3px;
   }
+  .word-fix-btn{
+    border:none; background:transparent; cursor:pointer;
+    font-size:0.85rem; line-height:1; padding:0 2px; opacity:0.7;
+    vertical-align:middle;
+  }
+  .word-fix-btn:hover{ opacity:1; }
+  .word-fix-btn:disabled{ opacity:0.4; cursor:default; }
   .speak-btn{
     border:none; background:transparent; cursor:pointer;
     font-size:1.1rem; line-height:1; padding:2px 4px; flex-shrink:0;
@@ -1686,8 +1693,17 @@ function showHebrewResult(data){
 
   let wordsHtml = "";
   if(Array.isArray(data.words) && data.words.length){
-    wordsHtml = '<div class="hebrew-word-breakdown">' +
-      data.words.map(w => '<span class="' + (w.match ? 'word-ok' : 'word-miss') + '">' + w.word + '</span>').join(' ') +
+    // Each wrong word gets its own small redo button, so a student who
+    // misread (or was misheard on) just a word or two doesn't have to
+    // re-record the whole posuk - see recordWordFix() below.
+    wordsHtml = '<div class="hebrew-word-breakdown" id="hebrewWordBreakdown">' +
+      data.words.map((w, i) => {
+        let span = '<span class="' + (w.match ? 'word-ok' : 'word-miss') + '">' + w.word + '</span>';
+        if(!w.match){
+          span += '<button class="word-fix-btn" data-word-index="' + i + '" title="Redo just this word">🔁</button>';
+        }
+        return span;
+      }).join(' ') +
       '</div>';
   }
 
@@ -1713,6 +1729,120 @@ function showHebrewResult(data){
   gradingMsg.textContent = '';
   const disputeBtn = document.getElementById('hebrewDisputeBtn');
   if(disputeBtn) disputeBtn.onclick = openHebrewDisputeForm;
+  resultEl.querySelectorAll('.word-fix-btn').forEach(btn => {
+    btn.onclick = () => recordWordFix(parseInt(btn.getAttribute('data-word-index'), 10), btn);
+  });
+}
+
+/* ---------- Per-word redo (Hebrew reading) ----------
+   Lets a student re-record just a word or two that got flagged wrong,
+   instead of re-doing the whole posuk. The original full recording and
+   transcript are left exactly as they were - only the flagged word's
+   match status (and the overall score derived from it) gets updated. */
+let wordFixRecorder = null;
+let wordFixChunks = [];
+let wordFixActiveIndex = null;
+
+async function recordWordFix(index, btnEl){
+  if(wordFixActiveIndex === index){
+    wordFixRecorder.stop();
+    return;
+  }
+  if(wordFixActiveIndex !== null || !hebrewWords || !hebrewWords[index]){ return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined'){
+    alert("This browser can't record audio. Please try a newer version of Chrome or Safari.");
+    return;
+  }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    let recorderOptions = { audioBitsPerSecond: 32000 };
+    const preferredTypes = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/aac', 'audio/ogg;codecs=opus'];
+    const supportedType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t));
+    if(supportedType) recorderOptions.mimeType = supportedType;
+    wordFixRecorder = new MediaRecorder(stream, recorderOptions);
+    wordFixChunks = [];
+    wordFixActiveIndex = index;
+    let startedAt = null;
+    const originalTitle = btnEl.title;
+    btnEl.textContent = '⏺️';
+    btnEl.title = 'Recording… tap to stop';
+
+    wordFixRecorder.ondataavailable = e => wordFixChunks.push(e.data);
+    wordFixRecorder.onstop = async () => {
+      const elapsedMs = startedAt ? (Date.now() - startedAt) : 0;
+      stream.getTracks().forEach(t => t.stop());
+      wordFixActiveIndex = null;
+      const actualType = wordFixRecorder.mimeType || 'audio/webm';
+
+      // Same too-short guard as the main recording flow - a barely-there
+      // clip isn't worth sending to the scorer at all.
+      if(elapsedMs < 500){
+        btnEl.textContent = '🔁';
+        btnEl.title = 'Too short — tap to try again';
+        return;
+      }
+
+      const blob = new Blob(wordFixChunks, { type: actualType });
+      btnEl.disabled = true;
+      btnEl.textContent = '⏳';
+      btnEl.title = 'Checking…';
+      try{
+        const formData = new FormData();
+        formData.append('word', hebrewWords[index].word);
+        formData.append('audio', blob, 'wordfix.' + mimeTypeToExtension(actualType));
+        const res = await fetch(SCORER_BASE_URL + '/score_word', { method: 'POST', body: formData });
+        if(!res.ok) throw new Error('Word check request failed');
+        const result = await res.json();
+        if(result.match){
+          hebrewWords[index].match = true;
+          await applyHebrewWordFix();
+        }else{
+          btnEl.disabled = false;
+          btnEl.textContent = '🔁';
+          btnEl.title = 'Still not matching — tap to try again';
+        }
+      }catch(err){
+        console.error(err);
+        btnEl.disabled = false;
+        btnEl.textContent = '🔁';
+        btnEl.title = 'Could not check — check your internet and try again';
+      }
+    };
+    // Same brief warm-up as the main recording flow, so the mic is truly
+    // live before we start capturing (and before we start the elapsed-time
+    // clock used for the too-short check above).
+    setTimeout(() => {
+      wordFixRecorder.start();
+      startedAt = Date.now();
+    }, 300);
+  }catch(err){
+    alert('Could not access the microphone. Please allow microphone permission.');
+    console.error(err);
+  }
+}
+
+async function applyHebrewWordFix(){
+  const total = hebrewWords.length;
+  const matched = hebrewWords.filter(w => w.match).length;
+  hebrewScore = total ? Math.round((matched / total) * 100) : hebrewScore;
+  // Re-render the whole result panel so the badge, word colors, and
+  // dispute row (hidden once score hits 100) all reflect the update -
+  // the transcript itself is untouched since the original recording didn't
+  // change, just which words are now counted as correct.
+  showHebrewResult({ score: hebrewScore, words: hebrewWords, transcription: hebrewTranscript });
+  // If this attempt was already autosaved, keep the saved record in sync
+  // too, so history shows the corrected score rather than the stale one.
+  if(currentAttemptRef){
+    try{
+      await currentAttemptRef.update({
+        hebrewScore: hebrewScore,
+        hebrewScoreIsPercent: true,
+        hebrewWords: hebrewWords
+      });
+    }catch(err){
+      console.error('Could not save updated score after word fix', err);
+    }
+  }
 }
 
 /* ---------- Dispute flow (Hebrew reading) ----------
