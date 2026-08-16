@@ -55,6 +55,7 @@
   .students-panel{
     flex: 0 0 240px;
     background:#26374A;
+    border: 2px solid #3A5068;
     border-radius: 14px;
     padding: 14px;
     max-height: 75vh;
@@ -62,16 +63,21 @@
   }
   .students-panel h2{ font-size:1rem; color: var(--gold-light); margin:0 0 10px; }
   .student-item{
-    padding: 10px 12px;
+    padding: 12px 14px;
     border-radius: 10px;
     cursor:pointer;
-    margin-bottom: 6px;
-    font-weight:600;
-    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom: 8px;
+    font-weight:700;
+    color: #FFFFFF;
+    display:flex; flex-direction:column; align-items:flex-start; gap:4px;
+    border: 2px solid transparent;
+    transition: background .1s ease, border-color .1s ease;
   }
-  .student-item:hover{ background: #32475e; }
+  .student-item:hover{ background: #32475e; border-color:#4A6580; }
   .student-item.active{ background: var(--gold); color: var(--ink); }
-  .student-item .last-active{ font-size:0.7rem; opacity:0.7; font-weight:500; }
+  .student-item .name-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .student-item .last-active{ font-size:0.75rem; opacity:0.75; font-weight:600; color:#C7D3E0; }
+  .student-item.active .last-active{ color:#5A4A18; opacity:1; }
 
   .main-panel{
     flex: 1 1 500px;
@@ -239,8 +245,8 @@
   }
   .finalize-row .btn{ padding: 6px 14px; font-size:0.8rem; }
   .student-item .dispute-badge{
-    background: var(--rimon); color:#fff; border-radius:999px; font-size:0.65rem; font-weight:700;
-    padding: 1px 6px; margin-left:6px;
+    background: var(--rimon); color:#fff; border-radius:999px; font-size:0.72rem; font-weight:700;
+    padding: 3px 10px; white-space:nowrap; box-shadow: 0 2px 0 #6e1f28;
   }
   .hidden{ display:none !important; }
   #posukDetail{ margin-top:18px; }
@@ -601,7 +607,7 @@ async function loadStudents(){
         div.className = 'student-item';
         div.dataset.id = id;
         const lastActive = info.lastActive ? new Date(info.lastActive).toLocaleDateString() : '';
-        div.innerHTML = `<span>${info.name}<span class="dispute-badge hidden" id="disputeBadge_${id}"></span></span><span class="last-active">${lastActive}</span>`;
+        div.innerHTML = `<span class="name-row"><span>${info.name}</span><span class="dispute-badge hidden" id="disputeBadge_${id}"></span></span><span class="last-active">${lastActive}</span>`;
         div.onclick = () => { setTab('student'); selectStudent(id, info.name, div); };
         listEl.appendChild(div);
       });
@@ -630,7 +636,7 @@ async function markStudentsWithPendingDisputes(){
         });
       });
       if(count > 0){
-        badge.textContent = '⚠️ ' + count;
+        badge.textContent = '⚠️ ' + count + (count === 1 ? ' dispute' : ' disputes');
         badge.classList.remove('hidden');
       }else{
         badge.textContent = '';
