@@ -244,6 +244,7 @@
     padding:6px; border-radius:8px; border:2px solid var(--ink-soft); font-family:'Quicksand', sans-serif;
   }
   .finalize-row .btn{ padding: 6px 14px; font-size:0.8rem; }
+  .student-item .dispute-badge{ cursor:pointer; }
   .student-item .dispute-badge{
     background: var(--rimon); color:#fff; border-radius:999px; font-size:0.72rem; font-weight:700;
     padding: 3px 10px; white-space:nowrap; box-shadow: 0 2px 0 #6e1f28;
@@ -620,7 +621,11 @@ async function loadStudents(){
 
 /* Scans every attempt once (reusing the shared cache) so the sidebar can
    flag students with a pending dispute — the teacher shouldn't have to
-   click into each student just to find out one is waiting on them. */
+   click into each student just to find out one is waiting on them.
+   Also remembers WHERE the first pending dispute is (posukKey + which
+   skill tab) so clicking the badge can jump straight to it instead of
+   just opening the student's default grid. */
+let pendingDisputeTargets = {}; // studentId -> { posukKey, tab }
 async function markStudentsWithPendingDisputes(){
   try{
     const allAttempts = await loadAllAttempts();
@@ -629,18 +634,39 @@ async function markStudentsWithPendingDisputes(){
       const badge = document.getElementById('disputeBadge_' + id);
       if(!badge || !posukMap) return;
       let count = 0;
-      Object.values(posukMap).forEach(attemptMap => {
+      let firstTarget = null;
+      Object.entries(posukMap).forEach(([posukKey, attemptMap]) => {
         Object.values(attemptMap).forEach(a => {
-          if(a.hebrewDisputeStatus === 'pending') count++;
-          if(a.comprehensionDisputeStatus === 'pending') count++;
+          if(a.hebrewDisputeStatus === 'pending'){
+            count++;
+            if(!firstTarget) firstTarget = { posukKey, tab: 'reading' };
+          }
+          if(a.comprehensionDisputeStatus === 'pending'){
+            count++;
+            if(!firstTarget) firstTarget = { posukKey, tab: 'comprehension' };
+          }
         });
       });
       if(count > 0){
         badge.textContent = '⚠️ ' + count + (count === 1 ? ' dispute' : ' disputes');
         badge.classList.remove('hidden');
+        pendingDisputeTargets[id] = firstTarget;
+        badge.onclick = (ev) => {
+          ev.stopPropagation(); // don't also trigger the row's own click
+          const target = pendingDisputeTargets[id];
+          const rowEl = document.querySelector(`.student-item[data-id="${id}"]`);
+          const name = studentsMap[id];
+          if(target){
+            studentActiveTab = target.tab;
+            selectedPosukKey = target.posukKey;
+          }
+          selectStudent(id, name, rowEl || document.createElement('div'));
+        };
       }else{
         badge.textContent = '';
         badge.classList.add('hidden');
+        badge.onclick = null;
+        delete pendingDisputeTargets[id];
       }
     });
   }catch(err){
@@ -899,8 +925,8 @@ async function loadReportsTab(){
       </div>
       <div style="display:flex;gap:10px;margin-bottom:14px;">
         <button class="btn small" id="reportGenerateBtn">📊 Generate Report</button>
-        <button class="btn small hidden" id="reportCsvBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">⬇️ Download CSV</button>
-        <button class="btn small hidden" id="reportPrintBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">🖨️ Print / Save PDF</button>
+        <button class="btn small hidden" id="reportCsvBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;">⬇️ Download CSV</button>
+        <button class="btn small hidden" id="reportPrintBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;">🖨️ Print / Save PDF</button>
       </div>
       <div id="reportSummary"></div>
       <div id="reportResults"></div>`;
@@ -1435,7 +1461,7 @@ async function selectStudent(id, name, el){
         <div class="student-head">
           <h2>${name}</h2>
           <div class="mini-tabs">
-            <button class="btn small" id="resetStudentBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">↩️ Reset Progress</button>
+            <button class="btn small" id="resetStudentBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;">↩️ Reset Progress</button>
             <button class="btn small" id="removeStudentBtn" style="background:#8a3a3a;box-shadow:0 4px 0 #5c2626;">🗑️ Remove Student</button>
           </div>
         </div>
@@ -1476,7 +1502,7 @@ async function selectStudent(id, name, el){
           <button class="mini-tab-btn ${studentActiveTab==='comprehension'?'active':''}" id="studentComprehensionBtn">🧠 Comprehension</button>
           <button class="mini-tab-btn ${studentActiveTab==='reading'?'active':''}" id="studentReadingBtn">🎙️ Reading</button>
           <button class="mini-tab-btn ${studentActiveTab==='translate'?'active':''}" id="studentTranslateBtn">🌐 Translate</button>
-          <button class="btn small" id="resetStudentBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;">↩️ Reset Progress</button>
+          <button class="btn small" id="resetStudentBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;">↩️ Reset Progress</button>
           <button class="btn small" id="removeStudentBtn" style="background:#8a3a3a;box-shadow:0 4px 0 #5c2626;">🗑️ Remove Student</button>
         </div>
       </div>
@@ -1665,7 +1691,7 @@ function renderPosukDetail(posukKey){
   const { attempts, latest } = studentPosukData[posukKey];
   const refLabel = formatRefLabel(posukKey);
   let html = `<div class="posuk-group">
-    <button class="btn small" id="backToTileBtn" style="background:var(--tent-navy);box-shadow:0 4px 0 #16202e;margin-bottom:10px;">⬆️ Back to grid</button>
+    <button class="btn small" id="backToTileBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;margin-bottom:10px;">⬆️ Back to grid</button>
     <h3>${refLabel}</h3>
     <div class="posuk-hebrew">${latest.posukText || ''}</div>`;
   attempts.forEach(a => {
