@@ -835,6 +835,13 @@ let translationSegments = {};      // chunkIdx -> { blob, ext }
 let translationGradedResults = {}; // chunkIdx -> { verdict, feedback, transcript }
 let translationSegmentStartedAt = null;
 
+// Per-chunk redo (mirrors recordWordFix for Hebrew reading): lets a
+// student re-record just ONE chunk after grading, instead of redoing the
+// whole posuk.
+let chunkFixRecorder = null;
+let chunkFixChunks = [];
+let chunkFixActiveIndex = null;
+
 let mediaRecorder = null;
 let recordingChunks = [];
 let activeRecordingType = null; // 'hebrew' | 'translate' | 'comprehension'
@@ -2586,19 +2593,111 @@ function showTranslationSummary(level){
   if(attempted < total){
     html += '<span>' + (total - attempted) + ' piece(s) weren\'t recorded.</span>';
   }
-  const missed = idxs.filter(i => translationGradedResults[i].verdict !== 'correct');
-  if(missed.length){
-    html += '<div style="width:100%;margin-top:6px;">' + missed.map(i => {
-      const r = translationGradedResults[i];
-      const transcriptHtml = r.transcript ? '<span style="font-style:italic;color:var(--ink-soft);"> — "' + r.transcript + '"</span>' : '';
-      return '<div style="margin-bottom:4px;">💡 Piece ' + (i + 1) + ': ' + r.feedback + transcriptHtml + '</div>';
-    }).join('') + '</div>';
-  }
+  // Every graded piece shows what the system actually heard (same as the
+  // transcript shown on Show-You-Understand), plus a small redo button so
+  // a student who got one piece wrong can just fix that piece instead of
+  // recording the whole posuk again.
+  html += '<div style="width:100%;margin-top:6px;" id="translationChunkBreakdown">' + idxs.map(i => {
+    const r = translationGradedResults[i];
+    const isCorrect = r.verdict === 'correct';
+    const transcriptHtml = r.transcript ? '<span style="font-style:italic;color:var(--ink-soft);"> — "' + r.transcript + '"</span>' : '';
+    return '<div style="margin-bottom:4px;">' + (isCorrect ? '✅' : '💡') + ' Piece ' + (i + 1) + ': ' + r.feedback + transcriptHtml +
+      ' <button class="word-fix-btn chunk-fix-btn" data-chunk-index="' + i + '" title="Redo just this piece">🔁</button></div>';
+  }).join('') + '</div>';
 
   resultEl.className = 'comp-result ' + (overallOk ? 'correct' : 'incorrect');
   resultEl.innerHTML = html;
   resultEl.classList.remove('hidden');
   retryBtn.classList.remove('hidden');
+  resultEl.querySelectorAll('.chunk-fix-btn').forEach(btn => {
+    btn.onclick = () => recordChunkFix(parseInt(btn.getAttribute('data-chunk-index'), 10), btn);
+  });
+}
+
+/* ---------- Per-chunk redo (Translation) ----------
+   Same idea as recordWordFix for Hebrew reading: re-record just ONE
+   chunk, re-grade only that chunk, then patch the existing summary/pill
+   display and saved record in place — everything else stays untouched. */
+async function recordChunkFix(index, btnEl){
+  if(chunkFixActiveIndex === index){
+    chunkFixRecorder.stop();
+    return;
+  }
+  if(chunkFixActiveIndex !== null || !translationLevels) return;
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined'){
+    alert("This browser can't record audio. Please try a newer version of Chrome or Safari.");
+    return;
+  }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    let recorderOptions = { audioBitsPerSecond: 32000 };
+    const preferredTypes = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/aac', 'audio/ogg;codecs=opus'];
+    const supportedType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t));
+    if(supportedType) recorderOptions.mimeType = supportedType;
+    chunkFixRecorder = new MediaRecorder(stream, recorderOptions);
+    chunkFixChunks = [];
+    chunkFixActiveIndex = index;
+    let startedAt = null;
+    btnEl.textContent = '⏺️';
+    btnEl.title = 'Recording… tap to stop';
+
+    chunkFixRecorder.ondataavailable = e => chunkFixChunks.push(e.data);
+    chunkFixRecorder.onstop = async () => {
+      const elapsedMs = startedAt ? (Date.now() - startedAt) : 0;
+      stream.getTracks().forEach(t => t.stop());
+      chunkFixActiveIndex = null;
+      const actualType = chunkFixRecorder.mimeType || 'audio/webm';
+
+      if(elapsedMs < 500){
+        btnEl.textContent = '🔁';
+        btnEl.title = 'Too short — tap to try again';
+        return;
+      }
+
+      const blob = new Blob(chunkFixChunks, { type: actualType });
+      const ext = mimeTypeToExtension(actualType);
+      btnEl.disabled = true;
+      btnEl.textContent = '⏳';
+      btnEl.title = 'Checking…';
+
+      try{
+        const level = translationLevels[translationLevelIndex];
+        const chunk = level.chunks[index];
+        const formData = new FormData();
+        formData.append('audio', blob, 'recording.' + ext);
+        formData.append('chunkHebrew', chunk.hebrew);
+        formData.append('acceptedTranslations', JSON.stringify(chunk.english || []));
+        const res = await fetch(GRADE_TRANSLATION_CHUNK_URL, { method: 'POST', body: formData });
+        if(!res.ok) throw new Error('Grading request failed');
+        const data = await res.json();
+
+        if(data.verdict === 'no_speech'){
+          btnEl.disabled = false;
+          btnEl.textContent = '🔁';
+          btnEl.title = "Didn't catch that — tap to try again";
+          return;
+        }
+
+        translationSegments[index] = { blob, ext };
+        translationGradedResults[index] = { verdict: data.verdict, feedback: data.feedback || '', transcript: data.transcript || '' };
+        showTranslationSummary(level);
+        renderCurrentChunk();
+        await autosaveTranslation(level);
+      }catch(err){
+        console.error(err);
+        btnEl.disabled = false;
+        btnEl.textContent = '🔁';
+        btnEl.title = 'Could not check — check your internet and try again';
+      }
+    };
+    setTimeout(() => {
+      chunkFixRecorder.start();
+      startedAt = Date.now();
+    }, 300);
+  }catch(err){
+    alert('Could not access the microphone. Please allow microphone permission.');
+    console.error(err);
+  }
 }
 
 // Same one-attempt-per-posuk-visit pattern as autosaveHebrew/
