@@ -2951,8 +2951,12 @@ async function loadHistory(){
         });
       }
       if(activeTab === 'comprehension' && a.comprehensionAudioURL){
-        const verdictLabel = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[a.comprehensionVerdict] || a.comprehensionVerdict || '';
-        const scoreSuffix = (typeof a.comprehensionScore === 'number') ? ' (' + a.comprehensionScore + '%)' : '';
+        // Once a teacher finalizes a disputed grade, that decision IS the
+        // official grade \u2014 the badge itself (color + label) should show
+        // it, not just a footnote below the original auto-graded verdict.
+        const effectiveVerdict = a.comprehensionFinalVerdict || a.comprehensionVerdict;
+        const verdictLabel = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[effectiveVerdict] || effectiveVerdict || '';
+        const scoreSuffix = (!a.comprehensionFinalVerdict && typeof a.comprehensionScore === 'number') ? ' (' + a.comprehensionScore + '%)' : '';
         rowsHtml += `<div class="row"><span class="label">🧠 Comprehension</span></div>`;
         let compCardHtml = '<span class="comp-badge">' + verdictLabel + scoreSuffix + '</span>';
         if(a.comprehensionFeedback){
@@ -2962,7 +2966,7 @@ async function loadHistory(){
         if(a.comprehensionTranscript){
           compCardHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + a.comprehensionTranscript + '"</span>';
         }
-        rowsHtml += `<div class="comp-result ${a.comprehensionVerdict || ''}" style="margin-top:2px;">${compCardHtml}</div>`;
+        rowsHtml += `<div class="comp-result ${effectiveVerdict || ''}" style="margin-top:2px;">${compCardHtml}</div>`;
         if(a.comprehensionDisputeStatus === 'pending'){
           const reqLabel = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[a.comprehensionDisputeRequested] || a.comprehensionDisputeRequested;
           rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">⚠️ Dispute pending — you asked for ${reqLabel}</div>`;
