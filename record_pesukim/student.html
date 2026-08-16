@@ -2671,12 +2671,30 @@ function showTranslationSummary(level){
           '<span class="chunk-fix-status" data-status-index="' + i + '">🔁 Redo this piece</span>' +
         '</button>' +
       '</div>';
+    // A student who's confident their translation was actually right (and
+    // would rather flag it for the teacher than re-record) can dispute an
+    // incorrect chunk, same idea as the Hebrew/comprehension dispute flows.
+    // Once pending or resolved, that state is shown instead of the button.
+    let disputeHtml = '';
+    if(!isCorrect){
+      const dStatus = r.disputeStatus;
+      if(dStatus === 'pending'){
+        disputeHtml = '<div class="dispute-row" style="margin-top:4px;font-size:0.8rem;color:var(--ink-soft);">⚠️ Dispute sent — your teacher will review it.</div>';
+      }else if(dStatus === 'resolved'){
+        disputeHtml = '<div class="dispute-row" style="margin-top:4px;font-size:0.8rem;color:var(--ink-soft);">✔️ Teacher reviewed — final: ' + (r.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</div>';
+      }else{
+        disputeHtml = '<div class="dispute-row" style="margin-top:4px;">' +
+          '<button type="button" class="btn small ghost-delete chunk-dispute-btn" data-chunk-index="' + i + '">⚠️ Dispute this piece</button>' +
+        '</div>';
+      }
+    }
     return '<div>' +
       '<span class="' + pillClass + '" data-chunk-index="' + i + '" style="display:inline-block;">' +
         chunk.hebrew + ' — <span style="font-style:italic;">' + said + '</span>' +
       '</span>' +
       (audioHtml ? '<div style="margin-top:2px;">' + audioHtml + '</div>' : '') +
       redoHtml +
+      disputeHtml +
     '</div>';
   }).join('') + '</div>';
 
@@ -2686,6 +2704,9 @@ function showTranslationSummary(level){
   retryBtn.classList.remove('hidden');
   resultEl.querySelectorAll('.chunk-fix-pill').forEach(btn => {
     btn.onclick = () => recordChunkFix(parseInt(btn.getAttribute('data-chunk-index'), 10), btn);
+  });
+  resultEl.querySelectorAll('.chunk-dispute-btn').forEach(btn => {
+    btn.onclick = () => submitChunkDispute(parseInt(btn.getAttribute('data-chunk-index'), 10), level, btn);
   });
 }
 
@@ -2804,7 +2825,9 @@ async function autosaveTranslation(level){
         verdict: translationGradedResults[i].verdict,
         feedback: translationGradedResults[i].feedback,
         transcript: translationGradedResults[i].transcript,
-        audioURL: url
+        audioURL: url,
+        disputeStatus: translationGradedResults[i].disputeStatus || null,
+        finalVerdict: translationGradedResults[i].finalVerdict || null
       };
     }));
 
@@ -2821,6 +2844,40 @@ async function autosaveTranslation(level){
     const gradingMsg = document.getElementById('translationGradingMsg');
     gradingMsg.textContent = (gradingMsg.textContent ? gradingMsg.textContent + ' ' : '') +
       "Couldn't save automatically — check your internet connection.";
+  }
+}
+
+/* ---------- Dispute flow (Translation, per-piece) ----------
+   Same idea as the Hebrew/comprehension dispute flows, but scoped to a
+   single chunk rather than the whole attempt \u2014 a student who thinks one
+   piece was actually right can flag just that piece instead of the whole
+   posuk. Marks disputeStatus on that chunk in local state, re-renders the
+   summary immediately, then patches just that chunk's fields in Firebase
+   (not a full autosave, so we don't re-upload every chunk's audio again). */
+async function submitChunkDispute(index, level, btnEl){
+  translationGradedResults[index].disputeStatus = 'pending';
+  showTranslationSummary(level);
+  let tries = 0;
+  while(!currentAttemptRef && tries < 20){
+    await new Promise(r => setTimeout(r, 250));
+    tries++;
+  }
+  if(!currentAttemptRef){
+    translationGradedResults[index].disputeStatus = null;
+    showTranslationSummary(level);
+    alert('Could not save — please try again in a moment.');
+    return;
+  }
+  try{
+    await currentAttemptRef.child('translationChunkResults').child(String(index)).update({
+      disputeStatus: 'pending',
+      disputeAt: Date.now()
+    });
+  }catch(err){
+    console.error('Could not save chunk dispute', err);
+    translationGradedResults[index].disputeStatus = null;
+    showTranslationSummary(level);
+    alert('Could not save your dispute — check your internet and try again.');
   }
 }
 
@@ -2916,12 +2973,17 @@ async function loadHistory(){
         // this flag existed fall back to the old magnitude-based guess.
         const isPercentScore = a.hebrewScoreIsPercent === true ||
           (typeof a.hebrewScore === 'number' && a.hebrewScore > 10);
-        const hebrewScorePill = isPercentScore
-          ? a.hebrewScore + '%'
+        // Once a teacher finalizes a disputed score, that decision IS the
+        // official grade — the badge itself should show it, not just a
+        // footnote below the original auto-graded score.
+        const hasFinal = typeof a.hebrewFinalScore === 'number';
+        const effScore = hasFinal ? a.hebrewFinalScore : a.hebrewScore;
+        const hebrewScorePill = (isPercentScore || hasFinal)
+          ? effScore + '%'
           : a.hebrewScore + '/10 · ' + RATING_LABELS[a.hebrewScore - 1];
         rowsHtml += `<div class="row"><span class="label">🎙️ Hebrew reading</span></div>`;
-        const hTier = isPercentScore
-          ? (a.hebrewScore >= 80 ? 'correct' : (a.hebrewScore >= 50 ? 'partial' : 'incorrect'))
+        const hTier = (isPercentScore || hasFinal)
+          ? (effScore >= 80 ? 'correct' : (effScore >= 50 ? 'partial' : 'incorrect'))
           : 'correct';
         let hebrewCardHtml = '<span class="comp-badge">' + hebrewScorePill + '</span>';
         if(Array.isArray(a.hebrewWords) && a.hebrewWords.length){
@@ -2936,18 +2998,26 @@ async function loadHistory(){
         rowsHtml += `<div class="comp-result ${hTier}" style="margin-top:2px;">${hebrewCardHtml}</div>`;
         if(a.hebrewDisputeStatus === 'pending'){
           rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">⚠️ Dispute pending — you asked for ${a.hebrewDisputeRequested}%</div>`;
-        }else if(a.hebrewDisputeStatus === 'resolved' && typeof a.hebrewFinalScore === 'number'){
+        }else if(a.hebrewDisputeStatus === 'resolved' && hasFinal){
           rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">✔️ Teacher reviewed — final score: ${a.hebrewFinalScore}%</div>`;
         }
       }
       if(activeTab === 'translate' && Array.isArray(a.translationChunkResults) && a.translationChunkResults.length){
         rowsHtml += `<div class="row"><span class="label">🌐 Translation</span><span class="score-pill">${a.translationScore || ''}</span></div>`;
         a.translationChunkResults.forEach(c => {
-          let chunkHtml = '<span class="comp-badge">' + (c.verdict === 'correct' ? '✅' : '💡') + '</span>' +
+          // Same as Hebrew/comprehension: once a teacher finalizes a
+          // disputed chunk, that decision is the official verdict.
+          const effVerdict = c.finalVerdict || c.verdict;
+          let chunkHtml = '<span class="comp-badge">' + (effVerdict === 'correct' ? '✅' : '💡') + '</span>' +
             '<span dir="rtl" style="font-family:\'Noto Serif Hebrew\',serif;">' + c.chunkHebrew + '</span>';
           if(c.audioURL) chunkHtml += '<audio controls src="' + c.audioURL + '"></audio>';
           if(c.transcript) chunkHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + c.transcript + '"</span>';
-          rowsHtml += `<div class="comp-result ${c.verdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:2px;">${chunkHtml}</div>`;
+          rowsHtml += `<div class="comp-result ${effVerdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:2px;">${chunkHtml}</div>`;
+          if(c.disputeStatus === 'pending'){
+            rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">⚠️ Dispute pending — your teacher will review it.</div>`;
+          }else if(c.disputeStatus === 'resolved' && c.finalVerdict){
+            rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">✔️ Teacher reviewed — final: ${c.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again'}</div>`;
+          }
         });
       }
       if(activeTab === 'comprehension' && a.comprehensionAudioURL){

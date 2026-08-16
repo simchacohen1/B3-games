@@ -398,7 +398,12 @@ function effTranslationScore(record){
   return Math.round((correct / total) * 100);
 }
 function hasPendingDispute(record){
-  return !!record && (record.hebrewDisputeStatus === 'pending' || record.comprehensionDisputeStatus === 'pending');
+  if(!record) return false;
+  if(record.hebrewDisputeStatus === 'pending' || record.comprehensionDisputeStatus === 'pending') return true;
+  if(Array.isArray(record.translationChunkResults)){
+    return record.translationChunkResults.some(c => c.disputeStatus === 'pending');
+  }
+  return false;
 }
 
 document.getElementById('enterBtn').onclick = () => {
@@ -644,6 +649,14 @@ async function markStudentsWithPendingDisputes(){
           if(a.comprehensionDisputeStatus === 'pending'){
             count++;
             if(!firstTarget) firstTarget = { posukKey, tab: 'comprehension' };
+          }
+          if(Array.isArray(a.translationChunkResults)){
+            a.translationChunkResults.forEach(c => {
+              if(c.disputeStatus === 'pending'){
+                count++;
+                if(!firstTarget) firstTarget = { posukKey, tab: 'translate' };
+              }
+            });
           }
         });
       });
@@ -1721,12 +1734,14 @@ function renderPosukDetail(posukKey){
     if(Array.isArray(a.translationChunkResults) && a.translationChunkResults.length){
       const tScore = effTranslationScore(a);
       lines += `<div class="top-line"><span>🌐 Translation</span><span class="score-pill">${tScore === null ? '' : tScore + '%'}</span></div>`;
-      a.translationChunkResults.forEach(c => {
-        let chunkHtml = '<span class="comp-badge">' + (c.verdict === 'correct' ? '✅' : '💡') + '</span>' +
+      a.translationChunkResults.forEach((c, chunkIdx) => {
+        const effVerdict = c.finalVerdict || c.verdict;
+        let chunkHtml = '<span class="comp-badge">' + (effVerdict === 'correct' ? '✅' : '💡') + '</span>' +
           '<span dir="rtl" style="font-family:\'Noto Serif Hebrew\',serif;">' + c.chunkHebrew + '</span>';
         if(c.audioURL) chunkHtml += '<audio controls src="' + c.audioURL + '"></audio>';
         if(c.transcript) chunkHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + c.transcript + '"</span>';
-        lines += `<div class="comp-result ${c.verdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:4px;">${chunkHtml}</div>`;
+        lines += `<div class="comp-result ${effVerdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:4px;">${chunkHtml}</div>`;
+        lines += renderTranslationChunkDisputeSection(a, posukKey, chunkIdx, c);
       });
     }
     if(a.comprehensionAudioURL){
@@ -1771,6 +1786,13 @@ function renderPosukDetail(posukKey){
     if(a.comprehensionDisputeStatus === 'pending'){
       wireFinalizeComprehension(a, posukKey);
     }
+    if(Array.isArray(a.translationChunkResults)){
+      a.translationChunkResults.forEach((c, chunkIdx) => {
+        if(c.disputeStatus === 'pending'){
+          wireFinalizeTranslationChunk(a, posukKey, chunkIdx, c);
+        }
+      });
+    }
   });
 }
 
@@ -1811,6 +1833,25 @@ function renderDisputeSection(a, posukKey, skill){
   }
   if(a.comprehensionDisputeStatus === 'resolved' && a.comprehensionFinalVerdict){
     return `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final grade set to ${labelMap[a.comprehensionFinalVerdict] || a.comprehensionFinalVerdict}</div>`;
+  }
+  return '';
+}
+
+// Same idea as renderDisputeSection, but scoped to one chunk within a
+// translation attempt's translationChunkResults array \u2014 a student can
+// dispute a single piece rather than the whole posuk (translation has no
+// single overall score to dispute).
+function renderTranslationChunkDisputeSection(a, posukKey, chunkIdx, c){
+  if(c.disputeStatus === 'pending'){
+    return `<div class="dispute-banner">⚠️ Student disputes this piece</div>
+      <div class="finalize-row" id="finalizeChunk_${a.attemptId}_${chunkIdx}">
+        <span>Final:</span>
+        <button class="btn" id="finalizeChunkCorrectBtn_${a.attemptId}_${chunkIdx}">Mark correct</button>
+        <button class="btn small" style="background:var(--ink-soft);box-shadow:none;" id="finalizeChunkKeepBtn_${a.attemptId}_${chunkIdx}">Keep original (${c.verdict === 'correct' ? '✅ Correct' : '💡 Try again'})</button>
+      </div>`;
+  }
+  if(c.disputeStatus === 'resolved' && c.finalVerdict){
+    return `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final: ${c.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again'}</div>`;
   }
   return '';
 }
@@ -1886,6 +1927,35 @@ function wireFinalizeComprehension(a, posukKey){
   acceptBtn.onclick = () => finalize(a.comprehensionDisputeRequested);
   saveBtn.onclick = () => finalize(select.value);
   keepBtn.onclick = () => finalize(a.comprehensionVerdict);
+}
+
+function wireFinalizeTranslationChunk(a, posukKey, chunkIdx, c){
+  const correctBtn = document.getElementById('finalizeChunkCorrectBtn_' + a.attemptId + '_' + chunkIdx);
+  const keepBtn = document.getElementById('finalizeChunkKeepBtn_' + a.attemptId + '_' + chunkIdx);
+  if(!correctBtn || !keepBtn) return;
+
+  const finalize = async (finalVerdict) => {
+    try{
+      await attemptRef(posukKey, a.attemptId).child('translationChunkResults').child(String(chunkIdx)).update({
+        finalVerdict: finalVerdict,
+        disputeStatus: 'resolved',
+        disputeResolvedAt: Date.now()
+      });
+      allAttemptsCache = null;
+      await selectStudent(activeStudentId, studentsMap[activeStudentId],
+        [...document.querySelectorAll('.student-item')].find(e => e.dataset.id === activeStudentId));
+      selectedPosukKey = posukKey;
+      await renderStudentGrid();
+      renderPosukDetail(posukKey);
+      markStudentsWithPendingDisputes();
+    }catch(err){
+      console.error(err);
+      alert('Could not save the final verdict — check your internet and try again.');
+    }
+  };
+
+  correctBtn.onclick = () => finalize('correct');
+  keepBtn.onclick = () => finalize(c.verdict);
 }
 
 /* ---------- Shared helpers ---------- */
