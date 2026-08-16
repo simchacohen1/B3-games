@@ -1671,6 +1671,15 @@ function showHebrewResult(data){
       '</div>';
   }
 
+  // Show what the scorer actually heard, same as the history view already
+  // does below via a.hebrewTranscript - previously this only appeared once
+  // an attempt was saved and reloaded from history, so a student had no way
+  // to see it right after recording, on the fresh result.
+  let transcriptHtml = "";
+  if(data.transcription){
+    transcriptHtml = '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + data.transcription + '"</span>';
+  }
+
   resultEl.className = 'comp-result ' + tier;
   // A perfect score has nothing to dispute, so skip the dispute row entirely.
   const disputeRowHtml = data.score >= 100 ? '' :
@@ -1678,6 +1687,7 @@ function showHebrewResult(data){
   resultEl.innerHTML =
     '<span class="comp-badge">' + data.score + '%</span>' +
     wordsHtml +
+    transcriptHtml +
     disputeRowHtml;
   resultEl.classList.remove('hidden');
   gradingMsg.textContent = '';
