@@ -287,6 +287,10 @@
   }
   .word-fix-btn:hover{ opacity:1; }
   .word-fix-btn:disabled{ opacity:0.4; cursor:default; }
+  .word-fix-heard{
+    font-size:0.75rem; font-style:italic; color:var(--ink-soft);
+    font-family:'Quicksand',sans-serif;
+  }
   .speak-btn{
     border:none; background:transparent; cursor:pointer;
     font-size:1.1rem; line-height:1; padding:2px 4px; flex-shrink:0;
@@ -1743,6 +1747,22 @@ let wordFixRecorder = null;
 let wordFixChunks = [];
 let wordFixActiveIndex = null;
 
+// Shows (or clears) a small note next to a word-fix button with what the
+// scorer actually heard on a failed attempt, so it's possible to tell a
+// genuine mispronunciation apart from the scorer just mishearing a short
+// word. Removes any previous note before adding a new one so repeated
+// attempts don't stack up.
+function setWordFixHeard(btnEl, text){
+  const existing = btnEl.nextElementSibling;
+  if(existing && existing.classList.contains('word-fix-heard')) existing.remove();
+  if(text){
+    const span = document.createElement('span');
+    span.className = 'word-fix-heard';
+    span.textContent = ' heard: "' + text + '"';
+    btnEl.insertAdjacentElement('afterend', span);
+  }
+}
+
 async function recordWordFix(index, btnEl){
   if(wordFixActiveIndex === index){
     wordFixRecorder.stop();
@@ -1787,19 +1807,35 @@ async function recordWordFix(index, btnEl){
       btnEl.textContent = '⏳';
       btnEl.title = 'Checking…';
       try{
+        // A bare 1-2 letter word (like "נא") gives Whisper almost nothing
+        // to work with on its own - full-posuk scoring works well because
+        // the whole sentence gives it real context, but a single isolated
+        // short word is easy to mishear or hallucinate over. Sending a
+        // small window of the surrounding words as context (without
+        // changing what's being *graded* - still just this one word)
+        // gives it the same kind of grounding.
+        const contextStart = Math.max(0, index - 2);
+        const contextEnd = Math.min(hebrewWords.length, index + 3);
+        const context = hebrewWords.slice(contextStart, contextEnd).map(w => w.word).join(' ');
+
         const formData = new FormData();
         formData.append('word', hebrewWords[index].word);
+        formData.append('context', context);
         formData.append('audio', blob, 'wordfix.' + mimeTypeToExtension(actualType));
         const res = await fetch(SCORER_BASE_URL + '/score_word', { method: 'POST', body: formData });
         if(!res.ok) throw new Error('Word check request failed');
         const result = await res.json();
         if(result.match){
+          setWordFixHeard(btnEl, null);
           hebrewWords[index].match = true;
           await applyHebrewWordFix();
         }else{
           btnEl.disabled = false;
           btnEl.textContent = '🔁';
           btnEl.title = 'Still not matching — tap to try again';
+          // Show what was actually heard, so it's possible to tell a real
+          // mispronunciation apart from the scorer just mishearing it.
+          setWordFixHeard(btnEl, result.transcription);
         }
       }catch(err){
         console.error(err);
