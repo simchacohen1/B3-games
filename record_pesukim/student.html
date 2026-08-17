@@ -2836,7 +2836,7 @@ async function autosaveTranslation(level){
       posukText: currentPosukText,
       posukTranslation: currentPosukTranslation,
       translationChunkResults: chunkResults,
-      translationScore: correctCount + '/' + level.chunks.length
+      translationScore: Math.round((correctCount / level.chunks.length) * 100) + '%'
     });
     markTaskSaved('translation');
   }catch(err){
@@ -3006,9 +3006,10 @@ async function loadHistory(){
         // Once a teacher finalizes a disputed chunk, that decision counts
         // toward the score too — recompute from effective verdicts rather
         // than trusting the score string saved at record time, which goes
-        // stale the moment a dispute is resolved.
+        // stale the moment a dispute is resolved. Shown as a percentage to
+        // match Hebrew reading and comprehension.
         const effCorrectCount = a.translationChunkResults.filter(c => (c.finalVerdict || c.verdict) === 'correct').length;
-        const effScoreLabel = effCorrectCount + '/' + a.translationChunkResults.length;
+        const effScoreLabel = Math.round((effCorrectCount / a.translationChunkResults.length) * 100) + '%';
         rowsHtml += `<div class="row"><span class="label">🌐 Translation</span><span class="score-pill">${effScoreLabel}</span></div>`;
         a.translationChunkResults.forEach(c => {
           // Same as Hebrew/comprehension: once a teacher finalizes a
