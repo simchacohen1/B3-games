@@ -495,6 +495,7 @@
   }
   .chunk-token{
     display:inline-block;
+    position:relative;
     padding:4px 10px;
     margin:3px 4px;
     border-radius:999px;
@@ -510,7 +511,27 @@
     transform: scale(1.08);
     box-shadow: 0 2px 8px rgba(201,162,39,0.4);
   }
-  .chunk-token.recorded{ border-style:dashed; border-color:var(--tent-navy); }
+  .chunk-token.recorded{
+    background:#FBF0D9;
+    border-color:var(--gold);
+    border-style:solid;
+  }
+  .chunk-token.recorded::after{
+    content:'✓';
+    position:absolute;
+    top:-7px;
+    left:-7px;
+    width:17px;
+    height:17px;
+    border-radius:50%;
+    background:var(--gold);
+    color:#fff;
+    font-size:11px;
+    font-weight:700;
+    line-height:17px;
+    text-align:center;
+    box-shadow:0 1px 3px rgba(59,42,30,0.35);
+  }
   .chunk-token.correct{ background:#E4F4E4; border-color:#4C9A4C; border-style:solid; }
   .chunk-token.incorrect{ background:#F6E1E1; border-color:var(--rimon); border-style:solid; }
   .chunk-token .sof-pasuk{ font-family:'Times New Roman', 'Liberation Serif', serif; }
