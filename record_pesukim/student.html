@@ -942,9 +942,9 @@
     box-shadow:0 4px 12px rgba(201,162,39,.35);
   }
   .chunk-token.tap-recording{
-    background:#F9E3E3;
-    border-color:var(--rimon);
-    box-shadow:0 0 0 4px rgba(156,47,58,.12), 0 5px 14px rgba(59,42,30,.14);
+    background:#FDECC8;
+    border-color:#E8963C;
+    box-shadow:0 0 0 4px rgba(232,150,60,.18), 0 5px 14px rgba(59,42,30,.14);
     transform:translateY(-1px);
     opacity:1;
     filter:none;
@@ -961,7 +961,7 @@
   /* Released (tapped a 2nd time), but the recorder is kept open a little
      longer so a trailing word doesn't get clipped off the end. */
   .chunk-token.tap-finishing{
-    background:#F9E3E3;
+    background:#FDECC8;
     border-color:var(--gold);
     box-shadow:0 0 0 3px rgba(201,162,39,.18);
     opacity:1;
@@ -1589,6 +1589,14 @@ let translationSegmentStartedAt = null;
 let translationPillPhase = 'idle';
 let translationHoldTargetIndex = null;
 let translationHoldStartTimer = null;
+// If the child taps a DIFFERENT pill while one is still armed/recording/
+// finishing, we don't arm the new one immediately — we queue it here and
+// arm it automatically once the current piece finishes wrapping up.
+let translationPendingArmIdx = null;
+// Each piece is graded the moment ITS recording finishes, independently of
+// the others, instead of waiting for every piece to be recorded first.
+// chunkIdx -> in-flight grading Promise, so we can await "all done" later.
+let translationGradingPromises = {};
 // How long the pill stays faded/blurry after the first tap before the mic
 // actually opens and recording starts (it turns clear again right then).
 // Gives the child a beat to see the cue and start talking right as it goes
@@ -2551,6 +2559,8 @@ function resetRecordingUI(){
   if(translationHoldStartTimer){ clearTimeout(translationHoldStartTimer); translationHoldStartTimer = null; }
   translationSegments = {};
   translationGradedResults = {};
+  translationGradingPromises = {};
+  translationPendingArmIdx = null;
   const translationRecBtn = document.getElementById('translationRecordBtn');
   translationRecBtn.classList.remove('recording');
   translationRecBtn.textContent = '🎙️';
@@ -3481,6 +3491,8 @@ function changeChunkLevel(delta){
   translationChunkIndex = findContainingChunkIndex(newLevelIdx, approxOffset);
   translationSegments = {};
   translationGradedResults = {};
+  translationGradingPromises = {};
+  translationPendingArmIdx = null;
   resetTranslationResult();
   document.getElementById('translationStatus').textContent = 'Ready';
   renderCurrentChunk();
@@ -3542,13 +3554,42 @@ function handleTranslationPillTap(e, idx){
     return;
   }
 
-  if(translationHoldTargetIndex !== idx) return;
-
-  if(translationPillPhase === 'recording'){
-    scheduleFinishTranslationHold(idx);
+  if(translationHoldTargetIndex === idx){
+    if(translationPillPhase === 'recording'){
+      scheduleFinishTranslationHold(idx);
+    }
+    // 'arming' or 'finishing': a repeat tap on the same pill is a no-op —
+    // let the timer that's already running play out.
+    return;
   }
-  // 'arming' or 'finishing': a repeat tap on the same pill is a no-op —
-  // let the timer that's already running play out.
+
+  // A DIFFERENT pill was tapped while one is still armed/recording/
+  // finishing. Rather than ignoring it, wrap up the current piece first,
+  // then automatically arm the newly-tapped piece once that's done.
+  if(translationPillPhase === 'recording'){
+    translationPendingArmIdx = idx;
+    scheduleFinishTranslationHold(translationHoldTargetIndex);
+  }else if(translationPillPhase === 'arming'){
+    // The mic hasn't opened yet — just cancel that arm timer and arm the
+    // newly-tapped pill right away instead.
+    if(translationHoldStartTimer){ clearTimeout(translationHoldStartTimer); translationHoldStartTimer = null; }
+    translationPillPhase = 'idle';
+    translationHoldTargetIndex = null;
+    armTranslationPill(idx);
+  }else if(translationPillPhase === 'finishing'){
+    // Already wrapping up — queue the new pill to arm the moment that finishes.
+    translationPendingArmIdx = idx;
+  }
+}
+
+// After a piece finishes recording (or is skipped because it was too
+// short), arm whatever pill the child had already tapped in the meantime.
+function maybeArmPendingPill(){
+  if(translationPendingArmIdx !== null){
+    const nextIdx = translationPendingArmIdx;
+    translationPendingArmIdx = null;
+    armTranslationPill(nextIdx);
+  }
 }
 
 // Tap #1: select the piece and start the fade-out. It stays faded/blurry
@@ -3642,6 +3683,7 @@ async function finishTranslationPillRecording(idx){
   if(elapsedMs < 500 || !translationRecChunks.length){
     document.getElementById('translationStatus').textContent = 'Too quick — tap the piece again and wait a little longer before stopping.';
     renderCurrentChunk();
+    maybeArmPendingPill();
     return;
   }
 
@@ -3654,15 +3696,60 @@ async function finishTranslationPillRecording(idx){
   const level = translationLevels[translationLevelIndex];
   const total = level.chunks.length;
   const recordedCount = Object.keys(translationSegments).filter(k => Number(k) < total).length;
-  document.getElementById('translationStatus').textContent = 'Saved piece ' + (idx + 1) + ' ✓';
+  document.getElementById('translationStatus').textContent = 'Saved piece ' + (idx + 1) + ' ✓ — checking it now…';
   renderCurrentChunk();
 
+  // Kick this piece's grading off right away instead of waiting for every
+  // piece to be recorded first — grading happens in the background while
+  // the child moves on to the next piece.
+  gradeSingleTranslationSegment(idx, level);
+
   // Keep the microphone completely off between pieces. Once every piece has
-  // its own saved recording, use the SAME existing grader and autosave flow.
+  // been recorded, wait for whichever grading calls are still in flight,
+  // then show the combined summary and autosave.
   if(recordedCount === total){
-    document.getElementById('translationStatus').textContent = 'All pieces saved — checking…';
-    await gradeAllTranslationSegments();
+    document.getElementById('translationStatus').textContent = 'Finishing up the last check…';
+    await Promise.all(Object.values(translationGradingPromises));
+    document.getElementById('translationStatus').textContent = 'Graded — see below';
+    showTranslationSummary(level);
+    renderCurrentChunk();
+    autosaveTranslation(level);
   }
+
+  maybeArmPendingPill();
+}
+
+// Grades ONE piece as soon as its recording is done, independently of the
+// others. Updates translationGradedResults (and re-renders the pill so its
+// gold/green/red state shows up) the moment its own grade comes back.
+function gradeSingleTranslationSegment(idx, level){
+  const chunk = level.chunks[idx];
+  const seg = translationSegments[idx];
+  const promise = (async () => {
+    if(!GRADE_TRANSLATION_CHUNK_URL || GRADE_TRANSLATION_CHUNK_URL.indexOf('PASTE') === 0){
+      return;
+    }
+    try{
+      const formData = new FormData();
+      formData.append('audio', seg.blob, 'recording.' + seg.ext);
+      formData.append('chunkHebrew', chunk.hebrew);
+      formData.append('acceptedTranslations', JSON.stringify(chunk.english || []));
+      const res = await fetch(GRADE_TRANSLATION_CHUNK_URL, { method:'POST', body: formData });
+      if(!res.ok) throw new Error('Grading request failed');
+      const data = await res.json();
+      if(data.verdict === 'no_speech'){
+        translationGradedResults[idx] = { verdict:'incorrect', feedback:"Didn't catch that piece — try recording again.", transcript:'' };
+      } else {
+        translationGradedResults[idx] = { verdict: data.verdict, feedback: data.feedback || '', transcript: data.transcript || '' };
+      }
+    }catch(err){
+      console.error('gradeTranslationChunk error', err);
+      translationGradedResults[idx] = { verdict:'incorrect', feedback:'Could not check this piece — check your internet.', transcript:'' };
+    }
+    renderCurrentChunk();
+  })();
+  translationGradingPromises[idx] = promise;
+  return promise;
 }
 
 function jumpToChunk(newIdx){
@@ -3679,60 +3766,13 @@ document.getElementById('translationRecordBtn').onclick = () => {};
 document.getElementById('translationRetryBtn').onclick = () => {
   translationSegments = {};
   translationGradedResults = {};
+  translationGradingPromises = {};
+  translationPendingArmIdx = null;
   translationChunkIndex = 0;
   resetTranslationResult();
   document.getElementById('translationStatus').textContent = 'Ready';
   renderCurrentChunk();
 };
-
-// Grades every captured segment together (in parallel), then shows one
-// combined result — a per-piece breakdown plus an overall score — rather
-// than interrupting the student after each individual piece.
-async function gradeAllTranslationSegments(){
-  const gradingMsg = document.getElementById('translationGradingMsg');
-  const level = translationLevels[translationLevelIndex];
-  const idxs = Object.keys(translationSegments).map(Number);
-
-  if(!idxs.length){
-    document.getElementById('translationStatus').textContent = 'Not recorded yet';
-    return;
-  }
-  if(!GRADE_TRANSLATION_CHUNK_URL || GRADE_TRANSLATION_CHUNK_URL.indexOf('PASTE') === 0){
-    gradingMsg.textContent = "Grading isn't set up yet (Cloud Function URL missing).";
-    return;
-  }
-
-  gradingMsg.textContent = 'Listening to your answers…';
-  document.getElementById('translationStatus').textContent = 'Grading…';
-
-  await Promise.all(idxs.map(async i => {
-    const chunk = level.chunks[i];
-    const seg = translationSegments[i];
-    try{
-      const formData = new FormData();
-      formData.append('audio', seg.blob, 'recording.' + seg.ext);
-      formData.append('chunkHebrew', chunk.hebrew);
-      formData.append('acceptedTranslations', JSON.stringify(chunk.english || []));
-      const res = await fetch(GRADE_TRANSLATION_CHUNK_URL, { method:'POST', body: formData });
-      if(!res.ok) throw new Error('Grading request failed');
-      const data = await res.json();
-      if(data.verdict === 'no_speech'){
-        translationGradedResults[i] = { verdict:'incorrect', feedback:"Didn't catch that piece — try recording again.", transcript:'' };
-      } else {
-        translationGradedResults[i] = { verdict: data.verdict, feedback: data.feedback || '', transcript: data.transcript || '' };
-      }
-    }catch(err){
-      console.error('gradeTranslationChunk error', err);
-      translationGradedResults[i] = { verdict:'incorrect', feedback:'Could not check this piece — check your internet.', transcript:'' };
-    }
-  }));
-
-  gradingMsg.textContent = '';
-  document.getElementById('translationStatus').textContent = 'Graded — see below';
-  showTranslationSummary(level);
-  renderCurrentChunk();
-  autosaveTranslation(level);
-}
 
 function showTranslationSummary(level){
   const resultEl = document.getElementById('translationResult');
