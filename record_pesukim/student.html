@@ -941,30 +941,31 @@
     transform:none;
     box-shadow:0 4px 12px rgba(201,162,39,.35);
   }
-  .chunk-token.hold-recording{
+  .chunk-token.tap-recording{
     background:#F9E3E3;
     border-color:var(--rimon);
     box-shadow:0 0 0 4px rgba(156,47,58,.12), 0 5px 14px rgba(59,42,30,.14);
     transform:translateY(-1px);
+    opacity:1;
+    filter:none;
   }
-  /* Pressed but not yet recording — the "red light, wait" phase before the
-     mic actually opens. Pulses so it reads as "not yet" rather than "done". */
-  .chunk-token.hold-arming{
-    background:#FDECEC;
-    border-color:var(--rimon);
-    box-shadow:0 0 0 3px rgba(156,47,58,.16);
-    animation:translationArmPulse .7s ease-in-out infinite;
+  /* Tapped, but not yet recording — faded/blurry "not ready" look. It fades
+     back in to full clarity right as the mic opens, so the moment it becomes
+     sharp again IS the "go" signal — much easier for a child to notice than
+     a color change alone. */
+  .chunk-token.tap-arming{
+    opacity:.35;
+    filter:blur(1.5px);
+    transition:opacity .25s ease, filter .25s ease;
   }
-  @keyframes translationArmPulse{
-    0%,100%{ opacity:1; }
-    50%{ opacity:.55; }
-  }
-  /* Released, but the recorder is kept open a little longer so a trailing
-     word doesn't get clipped off the end of the recording. */
-  .chunk-token.hold-finishing{
+  /* Released (tapped a 2nd time), but the recorder is kept open a little
+     longer so a trailing word doesn't get clipped off the end. */
+  .chunk-token.tap-finishing{
     background:#F9E3E3;
     border-color:var(--gold);
     box-shadow:0 0 0 3px rgba(201,162,39,.18);
+    opacity:1;
+    filter:none;
   }
   .translation-hold-hint{
     text-align:center;
@@ -1249,8 +1250,8 @@
         </div>
         <div class="instruction-card">
           <div class="instruction-copy">
-            <strong>Press and hold a Hebrew piece while you say its English meaning.</strong>
-            <span>Let go when you finish that piece. You can stop and take a break between pieces.</span>
+            <strong>Tap a Hebrew piece, wait for it to turn clear, then say its English meaning.</strong>
+            <span>Tap it again when you finish. You can stop and take a break between pieces.</span>
           </div>
           <button class="listen-btn" id="translationInstructionBtn" type="button">🔊 Listen</button>
         </div>
@@ -1261,9 +1262,9 @@
           <button class="btn small gold" id="chunkBiggerBtn">➕ Bigger</button>
         </div>
 
-        <div class="chunk-progress" id="chunkProgress">Press and hold a Hebrew piece to record its translation.</div>
+        <div class="chunk-progress" id="chunkProgress">Tap a Hebrew piece to record its translation.</div>
         <div class="chunk-pill-display" id="chunkPillDisplay" dir="rtl"></div>
-        <div class="translation-hold-hint">👆 Hold a piece to talk • let go to save</div>
+        <div class="translation-hold-hint">👆 Tap to start, wait for it to turn clear, then talk • tap again to save</div>
         <div style="text-align:center;margin-top:8px;"><span class="status-tag" id="translationStatus">Ready</span></div>
 
         <audio id="translationAudioPlayback" controls class="hidden"></audio>
@@ -1582,17 +1583,19 @@ let translationRecChunks = [];
 let translationSegments = {};      // chunkIdx -> { blob, ext }
 let translationGradedResults = {}; // chunkIdx -> { verdict, feedback, transcript }
 let translationSegmentStartedAt = null;
-let translationHoldPointerDown = false;
-let translationHoldPointerId = null;
+// Tap-to-record model: tap once to arm a piece (it fades out while it
+// waits), it becomes clear on its own once the mic is actually live, then a
+// second tap stops it. 'idle' -> 'arming' -> 'recording' -> 'finishing' -> 'idle'.
+let translationPillPhase = 'idle';
 let translationHoldTargetIndex = null;
 let translationHoldStartTimer = null;
-// How long the pill shows a "get ready" (red) state after being pressed
-// before the mic actually opens and recording starts (goes "green"). Gives
-// the child a beat to see the cue and start talking right as it goes live,
-// instead of the recording starting mid-word.
+// How long the pill stays faded/blurry after the first tap before the mic
+// actually opens and recording starts (it turns clear again right then).
+// Gives the child a beat to see the cue and start talking right as it goes
+// live, instead of the recording starting mid-word.
 const TRANSLATION_ARM_DELAY_MS = 700;
-// How much longer the recorder is kept open after the child releases the
-// pill, so a trailing word or soft ending doesn't get cut off.
+// How much longer the recorder is kept open after the second tap, so a
+// trailing word or soft ending doesn't get cut off.
 const TRANSLATION_TRAIL_BUFFER_MS = 500;
 
 // Per-chunk redo (mirrors recordWordFix for Hebrew reading): lets a
@@ -1754,8 +1757,8 @@ function studentDirection(task){
     ? 'Read all of the selected pesukim out loud. Tap the microphone when you are ready. When you are finished, tap it again.'
     : 'Read the selected posuk out loud. Tap the microphone when you are ready. When you are finished, tap it again.';
   if(task === 'translation') return many
-    ? 'Press and hold one Hebrew piece while you say its English meaning. Let go when you finish that piece. Then move to the next piece. The pieces stay separated by posuk, and you can take a break between recordings.'
-    : 'Press and hold one Hebrew piece while you say its English meaning. Let go when you finish that piece, and the recording will save. Then hold the next piece when you are ready. You can stop and take a break between pieces, and you can choose smaller or bigger pieces before you start.';
+    ? 'Tap one Hebrew piece. Wait for it to turn clear, then say its English meaning. Tap it again when you finish that piece. Then move to the next piece. The pieces stay separated by posuk, and you can take a break between recordings.'
+    : 'Tap one Hebrew piece. Wait for it to turn clear, then say its English meaning. Tap it again when you finish that piece, and the recording will save. Then tap the next piece when you are ready. You can stop and take a break between pieces, and you can choose smaller or bigger pieces before you start.';
   return many
     ? 'Tell what is happening in all of the selected pesukim in your own words. Explain the whole section the way you would tell a friend. Tap the microphone when you are ready.'
     : 'Tell what is happening in the selected posuk in your own words. Explain it the way you would tell a friend. Tap the microphone when you are ready.';
@@ -2543,8 +2546,7 @@ function resetRecordingUI(){
     stopMicMeter('translation');
   }
   translationSessionActive = false;
-  translationHoldPointerDown = false;
-  translationHoldPointerId = null;
+  translationPillPhase = 'idle';
   translationHoldTargetIndex = null;
   if(translationHoldStartTimer){ clearTimeout(translationHoldStartTimer); translationHoldStartTimer = null; }
   translationSegments = {};
@@ -3392,7 +3394,11 @@ function renderCurrentChunk(){
     }
     const classes = ['chunk-token'];
     if(i === translationChunkIndex) classes.push('active');
-    if(translationSessionActive && i === translationHoldTargetIndex) classes.push('hold-recording');
+    if(i === translationHoldTargetIndex){
+      if(translationPillPhase === 'arming') classes.push('tap-arming');
+      else if(translationPillPhase === 'recording') classes.push('tap-recording');
+      else if(translationPillPhase === 'finishing') classes.push('tap-finishing');
+    }
     if(translationGradedResults[i]) classes.push(translationGradedResults[i].verdict === 'correct' ? 'correct' : 'incorrect');
     else if(translationSegments[i]) classes.push('recorded');
     const safeHtml = chunk.hebrew
@@ -3401,26 +3407,24 @@ function renderCurrentChunk(){
         ? '<span class="sof-pasuk">\u05C3</span>'
         : part.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'))
       .join('');
-    pillHtml += '<span class="' + classes.join(' ') + '" data-idx="' + i + '" role="button" tabindex="0" aria-label="Hold to record translation for piece ' + (i + 1) + '">' + safeHtml + '</span>';
+    pillHtml += '<span class="' + classes.join(' ') + '" data-idx="' + i + '" role="button" tabindex="0" aria-label="Tap to record translation for piece ' + (i + 1) + '">' + safeHtml + '</span>';
   });
   stripEl.innerHTML = pillHtml;
 
-  // A quick tap simply selects/highlights a piece. Holding for a moment
-  // starts that ONE piece's recorder; releasing stops the mic and saves
-  // the blob. Pointer Events make the same code work for mouse, touch,
-  // stylus, Chromebook touchscreens, iPad, etc.
+  // Tap once to arm a piece (it fades while it waits), it turns clear on
+  // its own once the mic is actually live, then tap it again to stop and
+  // save. Pointer Events make this work for mouse, touch, stylus,
+  // Chromebook touchscreens, iPad, etc. without the ~300ms click delay.
   stripEl.querySelectorAll('.chunk-token').forEach(el => {
     const idx = parseInt(el.dataset.idx, 10);
     el.oncontextmenu = e => e.preventDefault();
-    el.onpointerdown = e => beginTranslationPillHold(e, idx, el);
-    el.onpointerup = e => endTranslationPillHold(e, idx);
-    el.onpointercancel = e => cancelTranslationPillHold(e, idx);
+    el.onpointerdown = e => e.preventDefault();
+    el.onpointerup = e => handleTranslationPillTap(e, idx);
     el.onclick = e => e.preventDefault();
     el.onkeydown = e => {
       if(e.key === 'Enter' || e.key === ' '){
         e.preventDefault();
-        translationChunkIndex = idx;
-        renderCurrentChunk();
+        handleTranslationPillTap(e, idx);
       }
     };
   });
@@ -3431,19 +3435,24 @@ function renderCurrentChunk(){
         : 'Level ' + (translationLevelIndex + 1) + ' of ' + translationLevels.length)
     : '';
 
-  smallerBtn.disabled = (translationLevelIndex === 0) || translationSessionActive;
-  biggerBtn.disabled = (translationLevelIndex === translationLevels.length - 1) || translationSessionActive;
-  prevBtn.disabled = translationSessionActive || (translationChunkIndex === 0);
-  nextBtn.disabled = translationSessionActive || (translationChunkIndex === total - 1);
+  const translationBusy = translationPillPhase !== 'idle';
+  smallerBtn.disabled = (translationLevelIndex === 0) || translationBusy;
+  biggerBtn.disabled = (translationLevelIndex === translationLevels.length - 1) || translationBusy;
+  prevBtn.disabled = translationBusy || (translationChunkIndex === 0);
+  nextBtn.disabled = translationBusy || (translationChunkIndex === total - 1);
 
-  if(translationSessionActive){
-    progressEl.textContent = 'Recording piece ' + (translationHoldTargetIndex + 1) + ' of ' + total + ' — let go to save it.';
+  if(translationPillPhase === 'arming'){
+    progressEl.textContent = 'Piece ' + (translationHoldTargetIndex + 1) + ' of ' + total + ' — get ready…';
+  }else if(translationPillPhase === 'recording'){
+    progressEl.textContent = 'Recording piece ' + (translationHoldTargetIndex + 1) + ' of ' + total + ' — tap it again to save.';
+  }else if(translationPillPhase === 'finishing'){
+    progressEl.textContent = 'Finishing up piece ' + (translationHoldTargetIndex + 1) + ' of ' + total + '…';
   }else if(Object.keys(translationGradedResults).length){
-    progressEl.textContent = 'Checked! Hold any piece again if you want to replace that recording.';
+    progressEl.textContent = 'Checked! Tap any piece again if you want to replace that recording.';
   }else if(recordedCount){
-    progressEl.textContent = recordedCount + ' of ' + total + ' pieces saved — hold another piece when you are ready.';
+    progressEl.textContent = recordedCount + ' of ' + total + ' pieces saved — tap another piece when you are ready.';
   }else{
-    progressEl.textContent = 'Piece ' + (translationChunkIndex + 1) + ' of ' + total + ' — press and hold a Hebrew piece while you translate it.';
+    progressEl.textContent = 'Piece ' + (translationChunkIndex + 1) + ' of ' + total + ' — tap a Hebrew piece to record its translation.';
   }
 }
 
@@ -3464,7 +3473,7 @@ function charOffsetOfCurrentChunk(){
   return offset;
 }
 function changeChunkLevel(delta){
-  if(!translationLevels || translationSessionActive) return;
+  if(!translationLevels || translationPillPhase !== 'idle') return;
   const newLevelIdx = translationLevelIndex + delta;
   if(newLevelIdx < 0 || newLevelIdx >= translationLevels.length) return;
   const approxOffset = charOffsetOfCurrentChunk();
@@ -3480,10 +3489,10 @@ function changeChunkLevel(delta){
 document.getElementById('chunkSmallerBtn').onclick = () => changeChunkLevel(-1);
 document.getElementById('chunkBiggerBtn').onclick = () => changeChunkLevel(1);
 document.getElementById('chunkPrevBtn').onclick = () => {
-  if(!translationSessionActive && translationChunkIndex > 0) jumpToChunk(translationChunkIndex - 1);
+  if(translationPillPhase === 'idle' && translationChunkIndex > 0) jumpToChunk(translationChunkIndex - 1);
 };
 document.getElementById('chunkNextBtn').onclick = () => {
-  if(!translationLevels || translationSessionActive) return;
+  if(!translationLevels || translationPillPhase !== 'idle') return;
   const level = translationLevels[translationLevelIndex];
   if(translationChunkIndex < level.chunks.length - 1) jumpToChunk(translationChunkIndex + 1);
 };
@@ -3514,28 +3523,45 @@ function selectTranslationChunkWithoutRender(idx){
     el.classList.toggle('active', parseInt(el.dataset.idx, 10) === idx);
   });
   const level = translationLevels && translationLevels[translationLevelIndex];
-  if(level && !translationSessionActive){
-    document.getElementById('chunkProgress').textContent = 'Piece ' + (idx + 1) + ' of ' + level.chunks.length + ' — keep holding to record, or let go now just to select it.';
+  if(level){
+    document.getElementById('chunkProgress').textContent = 'Piece ' + (idx + 1) + ' of ' + level.chunks.length + ' — get ready…';
   }
 }
 
-function beginTranslationPillHold(e, idx, el){
-  if(!translationLevels || translationSessionActive) return;
-  if(e.button !== undefined && e.button !== 0 && e.pointerType !== 'touch') return;
-  e.preventDefault();
-  translationHoldPointerDown = true;
-  translationHoldPointerId = e.pointerId;
+// Single entry point for every tap/click/Enter on a translation pill.
+// Tap #1 on an idle pill arms it. A second tap on the SAME pill while it's
+// actually recording stops it. Taps on any OTHER pill, or a repeat tap
+// during the brief arming/finishing windows, are ignored so a fumbled
+// double-tap can't leave two segments half-started.
+function handleTranslationPillTap(e, idx){
+  if(!translationLevels) return;
+  if(e && e.preventDefault) e.preventDefault();
+
+  if(translationPillPhase === 'idle'){
+    armTranslationPill(idx);
+    return;
+  }
+
+  if(translationHoldTargetIndex !== idx) return;
+
+  if(translationPillPhase === 'recording'){
+    scheduleFinishTranslationHold(idx);
+  }
+  // 'arming' or 'finishing': a repeat tap on the same pill is a no-op —
+  // let the timer that's already running play out.
+}
+
+// Tap #1: select the piece and start the fade-out. It stays faded/blurry
+// for TRANSLATION_ARM_DELAY_MS, then the mic opens and it fades back to
+// clear on its own — THAT moment is the "go" signal.
+function armTranslationPill(idx){
+  translationPillPhase = 'arming';
   translationHoldTargetIndex = idx;
   selectTranslationChunkWithoutRender(idx);
-  try{ el.setPointerCapture(e.pointerId); }catch(_){ }
-
-  // Red light: pressed, but not recording yet. Keep holding until it turns green.
-  el.classList.add('hold-arming');
-  document.getElementById('translationStatus').textContent = '🔴 Get ready… keep holding';
+  renderCurrentChunk();
+  document.getElementById('translationStatus').textContent = 'Get ready… starting in a moment';
 
   if(translationHoldStartTimer) clearTimeout(translationHoldStartTimer);
-  // A short tap is just selection. Only a real hold — past the arming delay —
-  // opens the microphone and starts recording (the "green light").
   translationHoldStartTimer = setTimeout(() => {
     translationHoldStartTimer = null;
     startTranslationPillRecording(idx);
@@ -3543,21 +3569,20 @@ function beginTranslationPillHold(e, idx, el){
 }
 
 async function startTranslationPillRecording(idx){
-  if(!translationHoldPointerDown || translationHoldTargetIndex !== idx || translationSessionActive) return;
+  if(translationPillPhase !== 'arming' || translationHoldTargetIndex !== idx) return;
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined'){
     alert("This browser can't record audio. Please try a newer version of Chrome or Safari.");
+    translationPillPhase = 'idle';
+    translationHoldTargetIndex = null;
+    renderCurrentChunk();
     return;
   }
 
   try{
     const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
-    // The child may have let go while the browser's permission box was open.
-    // In that case, close the mic immediately and wait for the next hold.
-    if(!translationHoldPointerDown || translationHoldTargetIndex !== idx){
+    // Guard against a stale timer firing after the piece changed underneath it.
+    if(translationPillPhase !== 'arming' || translationHoldTargetIndex !== idx){
       stream.getTracks().forEach(t => t.stop());
-      const releasedPill = document.querySelector('.chunk-token[data-idx="' + idx + '"]');
-      if(releasedPill) releasedPill.classList.remove('hold-arming');
-      document.getElementById('translationStatus').textContent = 'Ready — hold the piece again to record.';
       return;
     }
 
@@ -3572,68 +3597,29 @@ async function startTranslationPillRecording(idx){
     translationRecorder.ondataavailable = ev => { if(ev.data && ev.data.size) translationRecChunks.push(ev.data); };
     translationSegmentStartedAt = Date.now();
     translationSessionActive = true;
+    translationPillPhase = 'recording';
     translationRecorder.start();
 
-    // Green light: recording is actually live now — go ahead and talk.
-    document.getElementById('translationStatus').textContent = '🟢 Recording piece ' + (idx + 1) + ' — let go to save';
-    const pill = document.querySelector('.chunk-token[data-idx="' + idx + '"]');
-    if(pill){ pill.classList.remove('hold-arming'); pill.classList.add('hold-recording'); }
-    const level = translationLevels[translationLevelIndex];
-    document.getElementById('chunkProgress').textContent = 'Recording piece ' + (idx + 1) + ' of ' + level.chunks.length + ' — let go when you finish.';
+    // Clear again = live. This is the "go" cue: go ahead and talk.
+    document.getElementById('translationStatus').textContent = '🎙️ Recording piece ' + (idx + 1) + ' — tap it again when you finish';
+    renderCurrentChunk();
   }catch(err){
     console.error(err);
-    translationHoldPointerDown = false;
+    translationPillPhase = 'idle';
     translationHoldTargetIndex = null;
-    const failedPill = document.querySelector('.chunk-token[data-idx="' + idx + '"]');
-    if(failedPill) failedPill.classList.remove('hold-arming');
     alert('Could not access the microphone. Please allow microphone permission.');
     document.getElementById('translationStatus').textContent = 'Microphone permission needed';
-  }
-}
-
-async function endTranslationPillHold(e, idx){
-  if(translationHoldPointerId !== null && e.pointerId !== translationHoldPointerId) return;
-  e.preventDefault();
-  translationHoldPointerDown = false;
-  translationHoldPointerId = null;
-
-  if(translationHoldStartTimer){
-    clearTimeout(translationHoldStartTimer);
-    translationHoldStartTimer = null;
-    // It was a quick tap, not a hold: selection only.
-    translationHoldTargetIndex = null;
-    document.getElementById('translationStatus').textContent = 'Ready — hold the selected piece to record.';
-    renderCurrentChunk();
-    return;
-  }
-
-  if(translationSessionActive && translationHoldTargetIndex === idx){
-    scheduleFinishTranslationHold(idx);
-  }else{
-    translationHoldTargetIndex = null;
     renderCurrentChunk();
   }
 }
 
-async function cancelTranslationPillHold(e, idx){
-  translationHoldPointerDown = false;
-  translationHoldPointerId = null;
-  if(translationHoldStartTimer){ clearTimeout(translationHoldStartTimer); translationHoldStartTimer = null; }
-  if(translationSessionActive && translationHoldTargetIndex === idx){
-    scheduleFinishTranslationHold(idx);
-  }else{
-    translationHoldTargetIndex = null;
-    renderCurrentChunk();
-  }
-}
-
-// Called the instant the child releases the pill. Rather than cutting the
+// Called the instant the child taps a 2nd time. Rather than cutting the
 // recording off immediately, keep the mic running a bit longer so a soft or
 // trailing word right at the end doesn't get clipped — then actually stop.
 function scheduleFinishTranslationHold(idx){
+  translationPillPhase = 'finishing';
   document.getElementById('translationStatus').textContent = '✋ Got it — finishing up…';
-  const pill = document.querySelector('.chunk-token[data-idx="' + idx + '"]');
-  if(pill){ pill.classList.remove('hold-recording'); pill.classList.add('hold-finishing'); }
+  renderCurrentChunk();
   setTimeout(() => {
     finishTranslationPillRecording(idx);
   }, TRANSLATION_TRAIL_BUFFER_MS);
@@ -3648,12 +3634,13 @@ async function finishTranslationPillRecording(idx){
   await stopRecorderAsync(recorder);
   if(stream) stream.getTracks().forEach(t => t.stop());
   translationSessionActive = false;
+  translationPillPhase = 'idle';
   translationStream = null;
   translationRecorder = null;
   translationHoldTargetIndex = null;
 
   if(elapsedMs < 500 || !translationRecChunks.length){
-    document.getElementById('translationStatus').textContent = 'Too quick — hold the piece a little longer.';
+    document.getElementById('translationStatus').textContent = 'Too quick — tap the piece again and wait a little longer before stopping.';
     renderCurrentChunk();
     return;
   }
