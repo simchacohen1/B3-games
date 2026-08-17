@@ -647,6 +647,8 @@
     border-radius: 999px;
     transition: width 60ms linear;
   }
+  .recording-ready-blur{filter:blur(5px);opacity:.28;pointer-events:none;transition:filter .18s ease,opacity .18s ease;user-select:none;}
+  .recording-ready-clear{filter:none;opacity:1;transition:filter .18s ease,opacity .18s ease;}
   .hidden{ display:none !important; }
   footer.who{
     text-align:center; margin-top:26px; font-size:0.8rem; color: var(--ink-soft);
@@ -1232,7 +1234,7 @@
         <div class="instruction-card">
           <div class="instruction-copy">
             <strong>Read the selected Hebrew out loud.</strong>
-            <span>Tap the microphone when you are ready.</span>
+            <span>Tap the microphone, wait for the Hebrew to become clear, then read. Stay quiet when you finish.</span>
           </div>
           <button class="listen-btn" id="readingInstructionBtn" type="button">🔊 Listen</button>
         </div>
@@ -1243,7 +1245,7 @@
             <audio id="hebrewAudioPlayback" controls class="hidden"></audio>
             <button class="btn ghost-delete hidden" id="hebrewDeleteBtn" title="Delete this recording">🗑️ Delete</button>
           </div>
-          <div class="record-caption">🎙️ Tap to start reading</div>
+          <div class="record-caption">🎙️ Tap • wait for clear Hebrew • read • stay quiet to finish</div>
           <span class="status-tag" id="hebrewStatus">Not recorded yet</span>
         </div>
         <div class="comp-status" id="hebrewGradingMsg"></div>
@@ -1260,7 +1262,7 @@
         <div class="instruction-card">
           <div class="instruction-copy">
             <strong>Tap a Hebrew piece, wait for it to turn clear, then say its English meaning.</strong>
-            <span>Tap it again when you finish. You can stop and take a break between pieces.</span>
+            <span>When you finish speaking, stay quiet for a moment. It will stop and save by itself.</span>
           </div>
           <button class="listen-btn" id="translationInstructionBtn" type="button">🔊 Listen</button>
         </div>
@@ -1273,7 +1275,7 @@
 
         <div class="chunk-progress" id="chunkProgress">Tap a Hebrew piece to record its translation.</div>
         <div class="chunk-pill-display" id="chunkPillDisplay" dir="rtl"></div>
-        <div class="translation-hold-hint">👆 Tap to start, wait for it to turn clear, then talk • tap again to save</div>
+        <div class="translation-hold-hint">👆 Tap to start • wait for it to turn clear • speak • then stay quiet for the ✓</div>
         <div style="text-align:center;margin-top:8px;"><span class="status-tag" id="translationStatus">Ready</span></div>
         <div style="text-align:center;margin-top:8px;"><button class="btn small gold hidden" id="translationDoneBtn" type="button">✅ Done — save this piece</button></div>
 
@@ -1339,7 +1341,7 @@
             <audio id="comprehensionAudioPlayback" controls class="hidden"></audio>
             <button class="btn ghost-delete hidden" id="comprehensionDeleteBtn" title="Delete this recording">🗑️ Delete</button>
           </div>
-          <div class="record-caption" id="comprehensionRecordCaption">🎙️ Tap and answer the question</div>
+          <div class="record-caption" id="comprehensionRecordCaption">🎙️ Tap • wait for clear question • answer • stay quiet to finish</div>
           <span class="status-tag" id="comprehensionStatus">Not recorded yet</span>
         </div>
         <div class="comp-status" id="comprehensionGradingMsg"></div>
@@ -1887,7 +1889,7 @@ let translationGradingPromises = {};
 // actually opens and recording starts (it turns clear again right then).
 // Gives the child a beat to see the cue and start talking right as it goes
 // live, instead of the recording starting mid-word.
-const TRANSLATION_ARM_DELAY_MS = 700;
+const TRANSLATION_READY_WARMUP_MS = 550;
 // How much longer the recorder is kept open after the second tap, so a
 // trailing word or soft ending doesn't get cut off.
 const TRANSLATION_TRAIL_BUFFER_MS = 500;
@@ -1918,6 +1920,68 @@ let mediaRecorder = null;
 let recordingChunks = [];
 let activeRecordingType = null; // 'hebrew' | 'translate' | 'comprehension'
 let recordingStartedAt = null; // timestamp from when the recorder truly started, for a minimum-duration check on stop
+
+const RECORDING_READY_WARMUP_MS = 550;
+const RECORDING_SILENCE_TO_FINISH_MS = 1100;
+const RECORDING_MIN_SPEECH_MS = 220;
+let genericVadAudioCtx=null, genericVadAnalyser=null, genericVadRAF=null;
+let genericVadSpeechSeen=false, genericVadSpeechStartedAt=null, genericVadLastVoiceAt=null, genericVadNoiseFloor=.008;
+let genericRecordingReadyTimer=null, genericRecordingReady=false;
+
+function recordingCueTarget(type){
+  if(type==='hebrew') return document.getElementById('scrollBox');
+  if(type==='comprehension') return comprehensionMode==='questions'
+    ? document.getElementById('questionModeBlock')
+    : document.getElementById('bonusModeBlock');
+  return null;
+}
+function setRecordingCueBlur(type, blurred){
+  const el=recordingCueTarget(type); if(!el) return;
+  el.classList.toggle('recording-ready-blur',!!blurred);
+  el.classList.toggle('recording-ready-clear',!blurred);
+}
+function clearGenericRecordingReadyTimer(){
+  if(genericRecordingReadyTimer){clearTimeout(genericRecordingReadyTimer);genericRecordingReadyTimer=null;}
+}
+function stopGenericSilenceDetector(){
+  if(genericVadRAF){cancelAnimationFrame(genericVadRAF);genericVadRAF=null;}
+  if(genericVadAudioCtx){try{genericVadAudioCtx.close();}catch(e){}}
+  genericVadAudioCtx=null;genericVadAnalyser=null;genericVadSpeechSeen=false;genericVadSpeechStartedAt=null;genericVadLastVoiceAt=null;
+}
+function startGenericSilenceDetector(stream,type){
+  stopGenericSilenceDetector();
+  try{
+    const Ctx=window.AudioContext||window.webkitAudioContext; if(!Ctx) return;
+    genericVadAudioCtx=new Ctx();
+    const source=genericVadAudioCtx.createMediaStreamSource(stream);
+    genericVadAnalyser=genericVadAudioCtx.createAnalyser();
+    genericVadAnalyser.fftSize=1024;genericVadAnalyser.smoothingTimeConstant=.35;source.connect(genericVadAnalyser);
+    const samples=new Uint8Array(genericVadAnalyser.fftSize), calibrationUntil=performance.now()+250;
+    const tick=()=>{
+      if(activeRecordingType!==type||!mediaRecorder||mediaRecorder.state!=='recording'||!genericVadAnalyser) return;
+      genericVadAnalyser.getByteTimeDomainData(samples);
+      let sum=0; for(let i=0;i<samples.length;i++){const v=(samples[i]-128)/128;sum+=v*v;}
+      const rms=Math.sqrt(sum/samples.length), now=performance.now();
+      if(now<calibrationUntil&&!genericVadSpeechSeen) genericVadNoiseFloor=Math.max(.004,genericVadNoiseFloor*.85+rms*.15);
+      const threshold=Math.max(.018,genericVadNoiseFloor*2.8);
+      if(genericRecordingReady){
+        if(rms>=threshold){
+          if(!genericVadSpeechSeen){genericVadSpeechSeen=true;genericVadSpeechStartedAt=now;}
+          genericVadLastVoiceAt=now;
+        }else if(genericVadSpeechSeen&&genericVadLastVoiceAt){
+          const enough=(genericVadLastVoiceAt-genericVadSpeechStartedAt)>=RECORDING_MIN_SPEECH_MS;
+          if(enough&&(now-genericVadLastVoiceAt)>=RECORDING_SILENCE_TO_FINISH_MS){
+            document.getElementById(type+'Status').textContent='✓ Voice captured — finishing…';
+            try{mediaRecorder.stop();}catch(e){}
+            return;
+          }
+        }
+      }
+      genericVadRAF=requestAnimationFrame(tick);
+    };
+    genericVadRAF=requestAnimationFrame(tick);
+  }catch(e){console.warn('Automatic silence detection unavailable; tap the mic to stop manually.',e);stopGenericSilenceDetector();}
+}
 
 // Live mic level meter — shows the student a bouncing bar while recording
 // so they can see their voice is actually being picked up.
@@ -2061,11 +2125,11 @@ function speakTextBrowserFallback(text){
 function studentDirection(task){
   const many = currentIsRange && currentPosukEndNum > currentPosukNum;
   if(task === 'reading') return many
-    ? 'Read all of the selected pesukim out loud. Tap the microphone when you are ready. When you are finished, tap it again.'
-    : 'Read the selected posuk out loud. Tap the microphone when you are ready. When you are finished, tap it again.';
+    ? 'Read all of the selected pesukim out loud. Tap the microphone when you are ready. When you are finished, stay quiet and it will stop by itself.'
+    : 'Read the selected posuk out loud. Tap the microphone when you are ready. When you are finished, stay quiet and it will stop by itself.';
   if(task === 'translation') return many
-    ? 'Tap one Hebrew piece. Wait for it to turn clear, then say its English meaning. Tap it again when you finish that piece. Then move to the next piece. The pieces stay separated by posuk, and you can take a break between recordings.'
-    : 'Tap one Hebrew piece. Wait for it to turn clear, then say its English meaning. Tap it again when you finish that piece, and the recording will save. Then tap the next piece when you are ready. You can stop and take a break between pieces, and you can choose smaller or bigger pieces before you start.';
+    ? 'Tap one Hebrew piece. Wait for it to turn clear, then say its English meaning. When you finish that piece, stay quiet for a moment and it will save by itself. Then move to the next piece. The pieces stay separated by posuk, and you can take a break between recordings.'
+    : 'Tap one Hebrew piece. Wait for it to turn clear, then say its English meaning. When you finish that piece, stay quiet for a moment and the recording will save by itself. Then tap the next piece when you are ready. You can stop and take a break between pieces, and you can choose smaller or bigger pieces before you start.';
   return many
     ? 'Tell what is happening in all of the selected pesukim in your own words. Explain the whole section the way you would tell a friend. Tap the microphone when you are ready.'
     : 'Tell what is happening in the selected posuk in your own words. Explain it the way you would tell a friend. Tap the microphone when you are ready.';
@@ -3104,7 +3168,7 @@ function renderComprehensionQuestionUI(){
     doneBlock.classList.add('hidden');
     bonusBlock.classList.remove('hidden');
     backBtn.classList.add('hidden');
-    caption.textContent = '🎙️ Tap and tell me what happened';
+    caption.textContent = '🎙️ Tap • wait for clear prompt • answer • stay quiet to finish';
     return;
   }
 
@@ -3114,7 +3178,7 @@ function renderComprehensionQuestionUI(){
     doneBlock.classList.add('hidden');
     bonusBlock.classList.remove('hidden');
     backBtn.classList.remove('hidden');
-    caption.textContent = '🎙️ Tap and tell me what happened';
+    caption.textContent = '🎙️ Tap • wait for clear prompt • answer • stay quiet to finish';
     return;
   }
 
@@ -3126,7 +3190,7 @@ function renderComprehensionQuestionUI(){
   document.getElementById('questionProgress').textContent =
     'Question ' + (comprehensionQIndex + 1) + ' of ' + total + '  ' + questionProgressDots();
   document.getElementById('questionText').textContent = current ? current.question : '';
-  caption.textContent = '🎙️ Tap and answer the question';
+  caption.textContent = '🎙️ Tap • wait for clear question • answer • stay quiet to finish';
 
   navRow.classList.toggle('hidden', total <= 1 && !allAnswered);
   document.getElementById('questionPrevBtn').disabled = (comprehensionQIndex === 0);
@@ -3175,6 +3239,8 @@ function renderComprehensionQuestionUI(){
 }
 
 function resetRecordingUI(){
+  clearGenericRecordingReadyTimer(); stopGenericSilenceDetector(); genericRecordingReady=false;
+  setRecordingCueBlur('hebrew',false); setRecordingCueBlur('comprehension',false);
   currentAudio.hebrew = null;
   document.getElementById('hebrewAudioPlayback').classList.add('hidden');
   document.getElementById('hebrewDeleteBtn').classList.add('hidden');
@@ -3202,6 +3268,7 @@ function resetRecordingUI(){
   translationSessionActive = false;
   translationPillPhase = 'idle';
   translationHoldTargetIndex = null;
+  stopTranslationSilenceDetector();
   if(translationHoldStartTimer){ clearTimeout(translationHoldStartTimer); translationHoldStartTimer = null; }
   translationSegments = {};
   translationGradedResults = {};
@@ -3402,106 +3469,58 @@ function mimeTypeToExtension(mimeType){
 }
 
 async function toggleRecording(type, btnEl){
-  if(activeRecordingType === type){
-    // stop
-    mediaRecorder.stop();
+  if(activeRecordingType===type){
+    if(mediaRecorder&&mediaRecorder.state==='recording'){try{mediaRecorder.stop();}catch(e){}}
     return;
   }
-  if(activeRecordingType){ return; } // another recording in progress
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined'){
-    alert("This browser can't record audio. Please try a newer version of Chrome or Safari.");
-    return;
+  if(activeRecordingType) return;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined'){
+    alert("This browser can't record audio. Please try a newer version of Chrome or Safari."); return;
   }
+  genericRecordingReady=false; clearGenericRecordingReadyTimer(); stopGenericSilenceDetector();
+  setRecordingCueBlur(type,true); btnEl.disabled=true;
+  document.getElementById(type+'Status').textContent='Get ready…';
   try{
-    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
-    // Low bitrate is plenty for a few seconds of spoken Hebrew/translation —
-    // keeps the recording small so it uploads (and saves) much faster,
-    // which matters a lot on shared classroom WiFi.
-    let recorderOptions = { audioBitsPerSecond: 32000 };
-    // iPhones/iPads (Safari) generally can't record webm at all, so trying
-    // only "audio/webm;codecs=opus" would leave Safari to silently fall
-    // back to some other type on its own. Trying types in this order finds
-    // whatever the current browser actually supports, and — importantly —
-    // we read back mediaRecorder.mimeType below rather than assuming, so
-    // the blob/upload always match what was truly recorded.
-    const preferredTypes = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/aac', 'audio/ogg;codecs=opus'];
-    const supportedType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t));
-    if(supportedType){
-      recorderOptions.mimeType = supportedType;
-    }
-    mediaRecorder = new MediaRecorder(stream, recorderOptions);
-    recordingChunks = [];
-    activeRecordingType = type;
-    btnEl.classList.add('recording');
-    btnEl.textContent = '⏹️';
-    document.getElementById(type + 'Status').textContent = 'Get ready…';
-
-    mediaRecorder.ondataavailable = e => recordingChunks.push(e.data);
-    mediaRecorder.onstop = () => {
-      // mediaRecorder.mimeType reflects what the browser actually used,
-      // which may differ from supportedType above if the browser adjusted
-      // it (or ignored our request entirely) — always trust this over any
-      // assumption, so the file we upload is labeled accurately.
-      const actualType = mediaRecorder.mimeType || 'audio/webm';
-      const blob = new Blob(recordingChunks, { type: actualType });
-      const elapsedMs = recordingStartedAt ? (Date.now() - recordingStartedAt) : null;
-      btnEl.classList.remove('recording');
-      btnEl.textContent = '🎙️';
-      activeRecordingType = null;
-      stream.getTracks().forEach(t => t.stop());
-      stopMicMeter(type);
-
-      // A press-and-release that barely lasted any real time isn't a
-      // genuine reading/answer attempt - it's an accidental tap. Sending it
-      // on anyway used to reach Whisper as a near-silent clip, which can
-      // hallucinate a plausible-looking transcript from little/no real
-      // signal (especially since we prompt it with the expected posuk
-      // text), producing a misleading score instead of an honest "too
-      // short" message. Catch it here, before it's ever uploaded or saved.
-      if(elapsedMs !== null && elapsedMs < 800){
-        document.getElementById(type + 'Status').textContent = 'Recording was too short — please try again.';
-        recordingStartedAt = null;
-        return;
-      }
-      recordingStartedAt = null;
-
-      currentAudio[type] = blob;
-      currentAudioExt[type] = mimeTypeToExtension(actualType);
-      const url = URL.createObjectURL(blob);
-      const audioEl = document.getElementById(type + 'AudioPlayback');
-      audioEl.src = url;
-      audioEl.classList.remove('hidden');
-      document.getElementById(type + 'DeleteBtn').classList.remove('hidden');
-
-      if(type === 'comprehension'){
-        if(comprehensionMode === 'questions'){
-          document.getElementById(type + 'Status').textContent = 'Recorded — listening…';
-          gradeCurrentQuestionAnswer();
-        }else{
-          document.getElementById(type + 'Status').textContent = 'Recorded — listening…';
-          gradeComprehensionAttempt();
-        }
-      } else if(type === 'hebrew'){
-        document.getElementById(type + 'Status').textContent = 'Recorded — scoring…';
-        scoreHebrewReading();
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    let opts={audioBitsPerSecond:32000};
+    const types=['audio/webm;codecs=opus','audio/mp4','audio/aac','audio/ogg;codecs=opus'];
+    const supported=types.find(t=>MediaRecorder.isTypeSupported(t)); if(supported) opts.mimeType=supported;
+    mediaRecorder=new MediaRecorder(stream,opts); recordingChunks=[]; activeRecordingType=type;
+    btnEl.classList.add('recording'); btnEl.textContent='⏹️';
+    mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size) recordingChunks.push(e.data);};
+    mediaRecorder.onstart=()=>{
+      recordingStartedAt=Date.now(); startMicMeter(stream,type); startGenericSilenceDetector(stream,type);
+      genericRecordingReadyTimer=setTimeout(()=>{
+        genericRecordingReadyTimer=null;
+        if(activeRecordingType!==type||!mediaRecorder||mediaRecorder.state!=='recording') return;
+        genericRecordingReady=true; setRecordingCueBlur(type,false); btnEl.disabled=false;
+        document.getElementById(type+'Status').textContent='🎙️ Recording… speak, then stay quiet';
+      },RECORDING_READY_WARMUP_MS);
+    };
+    mediaRecorder.onstop=()=>{
+      const actual=mediaRecorder.mimeType||'audio/webm';
+      const blob=new Blob(recordingChunks,{type:actual});
+      const elapsed=recordingStartedAt?(Date.now()-recordingStartedAt):null;
+      clearGenericRecordingReadyTimer(); stopGenericSilenceDetector(); genericRecordingReady=false; setRecordingCueBlur(type,false);
+      btnEl.disabled=false;btnEl.classList.remove('recording');btnEl.textContent='🎙️';activeRecordingType=null;
+      stream.getTracks().forEach(t=>t.stop());stopMicMeter(type);
+      if(elapsed!==null&&elapsed<800){document.getElementById(type+'Status').textContent='Recording was too short — please try again.';recordingStartedAt=null;return;}
+      recordingStartedAt=null;
+      currentAudio[type]=blob;currentAudioExt[type]=mimeTypeToExtension(actual);
+      const url=URL.createObjectURL(blob),audioEl=document.getElementById(type+'AudioPlayback');
+      audioEl.src=url;audioEl.classList.remove('hidden');document.getElementById(type+'DeleteBtn').classList.remove('hidden');
+      if(type==='comprehension'){
+        document.getElementById(type+'Status').textContent='✓ Captured — listening…';
+        if(comprehensionMode==='questions') gradeCurrentQuestionAnswer(); else gradeComprehensionAttempt();
+      }else if(type==='hebrew'){
+        document.getElementById(type+'Status').textContent='✓ Captured — scoring…';scoreHebrewReading();
       }
     };
-    // The microphone stream can take a brief moment to actually start
-    // capturing clean audio right after permission is granted/the track
-    // is created — starting the recorder instantly risks clipping the
-    // student's first syllable or word before the mic is truly live.
-    // A short warm-up delay before mediaRecorder.start() gives the stream
-    // a beat to settle, and only then do we tell the student to go, so
-    // what they say lines up with what's actually being captured.
-    setTimeout(() => {
-      mediaRecorder.start();
-      recordingStartedAt = Date.now();
-      document.getElementById(type + 'Status').textContent = 'Recording…';
-      startMicMeter(stream, type);
-    }, 300);
+    mediaRecorder.start();
   }catch(err){
-    alert('Could not access the microphone. Please allow microphone permission.');
-    console.error(err);
+    clearGenericRecordingReadyTimer();stopGenericSilenceDetector();genericRecordingReady=false;setRecordingCueBlur(type,false);
+    btnEl.disabled=false;activeRecordingType=null;
+    alert('Could not access the microphone. Please allow microphone permission.');console.error(err);
   }
 }
 
@@ -4447,17 +4466,13 @@ function maybeArmPendingPill(){
 // for TRANSLATION_ARM_DELAY_MS, then the mic opens and it fades back to
 // clear on its own — THAT moment is the "go" signal.
 function armTranslationPill(idx){
-  translationPillPhase = 'arming';
-  translationHoldTargetIndex = idx;
+  translationPillPhase='arming';
+  translationHoldTargetIndex=idx;
   selectTranslationChunkWithoutRender(idx);
   renderCurrentChunk();
-  document.getElementById('translationStatus').textContent = 'Get ready… starting in a moment';
-
-  if(translationHoldStartTimer) clearTimeout(translationHoldStartTimer);
-  translationHoldStartTimer = setTimeout(() => {
-    translationHoldStartTimer = null;
-    startTranslationPillRecording(idx);
-  }, TRANSLATION_ARM_DELAY_MS);
+  document.getElementById('translationStatus').textContent='Get ready…';
+  if(translationHoldStartTimer){clearTimeout(translationHoldStartTimer);translationHoldStartTimer=null;}
+  startTranslationPillRecording(idx);
 }
 
 function stopTranslationSilenceDetector(){
@@ -4530,48 +4545,35 @@ function startTranslationSilenceDetector(stream, idx){
 }
 
 async function startTranslationPillRecording(idx){
-  if(translationPillPhase !== 'arming' || translationHoldTargetIndex !== idx) return;
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined'){
+  if(translationPillPhase!=='arming'||translationHoldTargetIndex!==idx) return;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined'){
     alert("This browser can't record audio. Please try a newer version of Chrome or Safari.");
-    translationPillPhase = 'idle';
-    translationHoldTargetIndex = null;
-    renderCurrentChunk();
-    return;
+    translationPillPhase='idle';translationHoldTargetIndex=null;renderCurrentChunk();return;
   }
-
   try{
-    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
-    // Guard against a stale timer firing after the piece changed underneath it.
-    if(translationPillPhase !== 'arming' || translationHoldTargetIndex !== idx){
-      stream.getTracks().forEach(t => t.stop());
-      return;
-    }
-
-    let recorderOptions = { audioBitsPerSecond: 32000 };
-    const preferredTypes = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/aac', 'audio/ogg;codecs=opus'];
-    const supportedType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t));
-    if(supportedType) recorderOptions.mimeType = supportedType;
-
-    translationStream = stream;
-    translationRecorder = new MediaRecorder(stream, recorderOptions);
-    translationRecChunks = [];
-    translationRecorder.ondataavailable = ev => { if(ev.data && ev.data.size) translationRecChunks.push(ev.data); };
-    translationSegmentStartedAt = Date.now();
-    translationSessionActive = true;
-    translationPillPhase = 'recording';
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    if(translationPillPhase!=='arming'||translationHoldTargetIndex!==idx){stream.getTracks().forEach(t=>t.stop());return;}
+    let opts={audioBitsPerSecond:32000};
+    const types=['audio/webm;codecs=opus','audio/mp4','audio/aac','audio/ogg;codecs=opus'];
+    const supported=types.find(t=>MediaRecorder.isTypeSupported(t));if(supported)opts.mimeType=supported;
+    translationStream=stream;translationRecorder=new MediaRecorder(stream,opts);translationRecChunks=[];
+    translationRecorder.ondataavailable=ev=>{if(ev.data&&ev.data.size)translationRecChunks.push(ev.data);};
+    translationRecorder.onstart=()=>{
+      translationSegmentStartedAt=Date.now();translationSessionActive=true;
+      translationHoldStartTimer=setTimeout(()=>{
+        translationHoldStartTimer=null;
+        if(translationPillPhase!=='arming'||translationHoldTargetIndex!==idx)return;
+        translationPillPhase='recording';
+        startTranslationSilenceDetector(stream,idx);
+        document.getElementById('translationStatus').textContent='🎙️ Recording piece '+(idx+1)+' — speak, then stay quiet for the ✓';
+        renderCurrentChunk();
+      },TRANSLATION_READY_WARMUP_MS);
+    };
     translationRecorder.start();
-    startTranslationSilenceDetector(stream, idx);
-
-    // Clear again = live. The child speaks, then waits for the automatic check.
-    document.getElementById('translationStatus').textContent = '🎙️ Recording piece ' + (idx + 1) + ' — speak, then wait for the ✓';
-    renderCurrentChunk();
   }catch(err){
-    console.error(err);
-    translationPillPhase = 'idle';
-    translationHoldTargetIndex = null;
+    console.error(err);translationPillPhase='idle';translationHoldTargetIndex=null;
     alert('Could not access the microphone. Please allow microphone permission.');
-    document.getElementById('translationStatus').textContent = 'Microphone permission needed';
-    renderCurrentChunk();
+    document.getElementById('translationStatus').textContent='Microphone permission needed';renderCurrentChunk();
   }
 }
 
