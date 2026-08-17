@@ -229,8 +229,8 @@
   <footer class="who">Nigri Shluchim Online School · Posuk Practice Scroll</footer>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
@@ -249,9 +249,18 @@ const db = firebase.database();
    so posuk ranges line up exactly with what students can record.
    ========================================================= */
 const PARSHA_CONFIG = {
-  "Vayeira":      [ {num:18}, {num:19}, {num:20}, {num:21}, {num:22} ],
+  "Bereishis": [ {num:1}, {num:2}, {num:3}, {num:4}, {num:5}, {num:6, maxPosuk:8} ],
+  "Noach": [ {num:6, minPosuk:9}, {num:7}, {num:8}, {num:9}, {num:10}, {num:11} ],
+  "Lech Lecha": [ {num:12}, {num:13}, {num:14}, {num:15}, {num:16}, {num:17} ],
+  "Vayeira": [ {num:18}, {num:19}, {num:20}, {num:21}, {num:22} ],
   "Chayei Sarah": [ {num:23}, {num:24}, {num:25, maxPosuk:18} ],
-  "Toldos":       [ {num:25, minPosuk:19}, {num:26}, {num:27}, {num:28, maxPosuk:9} ]
+  "Toldos": [ {num:25, minPosuk:19}, {num:26}, {num:27}, {num:28, maxPosuk:9} ],
+  "Vayeitzei": [ {num:28, minPosuk:10}, {num:29}, {num:30}, {num:31}, {num:32, maxPosuk:3} ],
+  "Vayishlach": [ {num:32, minPosuk:4}, {num:33}, {num:34}, {num:35}, {num:36} ],
+  "Vayeishev": [ {num:37}, {num:38}, {num:39}, {num:40} ],
+  "Mikeitz": [ {num:41}, {num:42}, {num:43}, {num:44, maxPosuk:17} ],
+  "Vayigash": [ {num:44, minPosuk:18}, {num:45}, {num:46}, {num:47, maxPosuk:27} ],
+  "Vayechi": [ {num:47, minPosuk:28}, {num:48}, {num:49}, {num:50} ]
 };
 
 /* Comprehension is graded as a category, not a 1-10 rating, so it gets
@@ -359,6 +368,7 @@ let studentName = localStorage.getItem('posukPractice_studentName');
 
 let activeTab = 'comprehension'; // 'comprehension' | 'reading' | 'translate'
 let perekData = {}; // perekNum -> { posukNum -> latestAttemptRecord }
+let rangeData = {}; // perekNum -> [{start,end,key,latest}] for multi-posuk practice
 let expandedState = {}; // perekNum -> bool
 
 window.addEventListener('load', () => {
@@ -395,24 +405,36 @@ async function loadProgress(){
     }
 
     perekData = {};
+    rangeData = {};
     Object.entries(val).forEach(([posukKey, attemptsObj]) => {
-      // posukKey looks like "Vayeira_18_2" — parsha has no spaces/underscores
-      // of its own, so the last two pieces are always perek and posuk.
       const parts = posukKey.split('_');
       if(parts.length < 3) return;
-      const posukNum = parseInt(parts[parts.length - 1]);
+      const posukPart = parts[parts.length - 1];
       const perekNum = parseInt(parts[parts.length - 2]);
-      if(!perekNum || !posukNum) return;
+      if(!perekNum) return;
+      const rangeMatch = /^(\d+)-(\d+)$/.exec(posukPart);
 
       const attempts = Object.values(attemptsObj);
       const latest = attempts.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
 
-      if(!perekData[perekNum]) perekData[perekNum] = {};
-      perekData[perekNum][posukNum] = latest;
+      if(rangeMatch){
+        if(!rangeData[perekNum]) rangeData[perekNum] = [];
+        rangeData[perekNum].push({
+          start: parseInt(rangeMatch[1]),
+          end: parseInt(rangeMatch[2]),
+          key: posukKey,
+          latest
+        });
+      }else{
+        const posukNum = parseInt(posukPart);
+        if(!posukNum) return;
+        if(!perekData[perekNum]) perekData[perekNum] = {};
+        perekData[perekNum][posukNum] = latest;
+      }
 
-      // Perakim the student has already started should be expanded by default.
       if(!(perekNum in expandedState)) expandedState[perekNum] = true;
     });
+    Object.values(rangeData).forEach(list => list.sort((a,b) => (b.latest.timestamp || 0) - (a.latest.timestamp || 0)));
 
     statusMsg.textContent = '';
     await renderPerekList();
@@ -425,7 +447,7 @@ async function loadProgress(){
 /* ---------- Render ---------- */
 async function renderPerekList(){
   const listEl = document.getElementById('perekList');
-  const perekNums = Object.keys(perekData).map(Number).sort((a,b) => a - b);
+  const perekNums = [...new Set([...Object.keys(perekData), ...Object.keys(rangeData)].map(Number))].sort((a,b) => a - b);
 
   if(perekNums.length === 0){
     listEl.innerHTML = '';
@@ -461,7 +483,7 @@ function effComprehensionVerdict(record){
 function effTranslationScore(record){
   if(!record || !Array.isArray(record.translationChunkResults) || !record.translationChunkResults.length) return null;
   const total = record.translationChunkResults.length;
-  const correct = record.translationChunkResults.filter(c => c.verdict === 'correct').length;
+  const correct = record.translationChunkResults.filter(c => (c.finalVerdict || c.verdict) === 'correct').length;
   return Math.round((correct / total) * 100);
 }
 
@@ -529,6 +551,37 @@ function buildPerekSection(perekNum, range){
   header.querySelector('#perekSummary' + perekNum).textContent = `${doneCount}/${total} pesukim done`;
 
   body.appendChild(grid);
+
+  const ranges = rangeData[perekNum] || [];
+  if(ranges.length){
+    const rangeWrap = document.createElement('div');
+    rangeWrap.style.marginTop = '14px';
+    rangeWrap.innerHTML = '<div style="font-weight:800;color:var(--ink-soft);margin-bottom:8px;">Several פסוקים together</div>';
+    ranges.forEach(r => {
+      const record = r.latest;
+      let tier = null, label = '—';
+      if(activeTab === 'reading'){
+        const score = effHebrewScore(record);
+        if(typeof score === 'number'){ tier = pctTier(score); label = score + '%'; }
+      }else if(activeTab === 'translate'){
+        const score = effTranslationScore(record);
+        if(typeof score === 'number'){ tier = pctTier(score); label = score + '%'; }
+      }else{
+        const verdict = effComprehensionVerdict(record);
+        if(verdict && VERDICT_INFO[verdict]){ tier = VERDICT_INFO[verdict].tier; label = VERDICT_INFO[verdict].label; }
+      }
+      const a = document.createElement('a');
+      a.href = `student.html?perek=${perekNum}&posuk=${r.start}&endPosuk=${r.end}`;
+      a.className = 'posuk-tile ' + (tier ? 'tile-' + tier : 'tile-none');
+      a.style.display = 'inline-flex';
+      a.style.width = 'auto';
+      a.style.minWidth = '118px';
+      a.style.margin = '0 8px 8px 0';
+      a.innerHTML = `<span class="tile-num">${hebrewNumeral(r.start)}–${hebrewNumeral(r.end)}</span><span class="tile-score">${label}</span>`;
+      rangeWrap.appendChild(a);
+    });
+    body.appendChild(rangeWrap);
+  }
   section.appendChild(header);
   section.appendChild(body);
   return section;
