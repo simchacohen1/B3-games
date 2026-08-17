@@ -1539,6 +1539,45 @@ function getQuestionsForPosuk(perekNum, posukNum){
    QUESTION_BANK above always wins when an entry exists. */
 let generatedQuestionLoadToken = 0;
 
+// Two-level client cache: Firebase remains the shared permanent master copy
+// for every student, while this browser keeps question sets in memory and
+// localStorage so revisiting a posuk can render instantly without another
+// network read.
+const generatedQuestionMemoryCache = new Map();
+const generatedQuestionPromiseCache = new Map();
+const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_v1_';
+
+function generatedQuestionCacheKey(part){
+  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_');
+}
+function normalizeGeneratedItems(items, posukNum){
+  return (Array.isArray(items) ? items : []).map(item => ({
+    question: normalizeDivineNames(item.question || ''),
+    expectedAnswer: normalizeDivineNames(item.expectedAnswer || ''),
+    sourceFact: normalizeDivineNames(item.sourceFact || ''),
+    posukNum,
+    generated: true
+  })).filter(item => item.question);
+}
+function readLocalGeneratedQuestions(cacheKey, posukNum){
+  try{
+    const raw = localStorage.getItem(GENERATED_QUESTION_LOCAL_PREFIX + cacheKey);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    const items = normalizeGeneratedItems(parsed.items, posukNum);
+    return items.length ? items : null;
+  }catch(err){
+    return null;
+  }
+}
+function saveLocalGeneratedQuestions(cacheKey, items){
+  try{
+    localStorage.setItem(GENERATED_QUESTION_LOCAL_PREFIX + cacheKey, JSON.stringify({ items }));
+  }catch(err){
+    // localStorage can be unavailable/full; Firebase still remains the source of truth.
+  }
+}
+
 // Student-facing classroom convention: every Divine name is displayed as
 // "Hashem" in comprehension questions and their hidden expected-answer
 // metadata, even if an older Firebase cache was generated with "Elohim",
@@ -1558,62 +1597,87 @@ async function getGeneratedQuestionsForPart(part){
   }
 
   if(!part || !part.translation || !part.translation.trim()) return [];
-  const cacheKey = (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]/]/g, '_');
-  const ref = db.ref('posukPractice/generatedQuestions/' + cacheKey);
+  const cacheKey = generatedQuestionCacheKey(part);
 
-  try{
-    const snap = await ref.once('value');
-    const cached = snap.val();
-    if(cached && Array.isArray(cached.items) && cached.items.length){
-      return cached.items.map(item => ({
-        question: normalizeDivineNames(item.question || ''),
-        expectedAnswer: normalizeDivineNames(item.expectedAnswer || ''),
-        sourceFact: normalizeDivineNames(item.sourceFact || ''),
-        posukNum: part.posukNum,
-        generated: true
-      })).filter(item => item.question);
+  // Fastest path: this page session already loaded the shared set.
+  if(generatedQuestionMemoryCache.has(cacheKey)){
+    return generatedQuestionMemoryCache.get(cacheKey);
+  }
+
+  // Next-fastest path: this browser has seen the posuk before.
+  const localItems = readLocalGeneratedQuestions(cacheKey, part.posukNum);
+  if(localItems){
+    generatedQuestionMemoryCache.set(cacheKey, localItems);
+    return localItems;
+  }
+
+  // If two UI paths ask for the same posuk while it is still loading, share
+  // one promise instead of doing duplicate Firebase reads / AI generation.
+  if(generatedQuestionPromiseCache.has(cacheKey)){
+    return generatedQuestionPromiseCache.get(cacheKey);
+  }
+
+  const loadPromise = (async () => {
+    const ref = db.ref('posukPractice/generatedQuestions/' + cacheKey);
+
+    try{
+      const snap = await ref.once('value');
+      const cached = snap.val();
+      if(cached && Array.isArray(cached.items) && cached.items.length){
+        const items = normalizeGeneratedItems(cached.items, part.posukNum);
+        if(items.length){
+          generatedQuestionMemoryCache.set(cacheKey, items);
+          saveLocalGeneratedQuestions(cacheKey, cached.items);
+          return items;
+        }
+      }
+    }catch(err){
+      console.warn('Could not read generated-question cache', err);
     }
-  }catch(err){
-    console.warn('Could not read generated-question cache', err);
-  }
 
-  if(!GENERATE_COMPREHENSION_QUESTIONS_URL || GENERATE_COMPREHENSION_QUESTIONS_URL.indexOf('PASTE') === 0) return [];
+    if(!GENERATE_COMPREHENSION_QUESTIONS_URL || GENERATE_COMPREHENSION_QUESTIONS_URL.indexOf('PASTE') === 0) return [];
 
-  const res = await fetch(GENERATE_COMPREHENSION_QUESTIONS_URL, {
-    method:'POST',
-    headers:{ 'Content-Type':'application/json' },
-    body:JSON.stringify({
-      posukText: part.text || '',
-      posukTranslation: part.translation || '',
-      perekNum: currentPerekNum,
-      posukNum: part.posukNum
-    })
-  });
-  if(!res.ok) throw new Error('Question generation request failed');
-  const data = await res.json();
-  const items = Array.isArray(data.items) ? data.items.filter(x => x && x.question) : [];
-  if(!items.length) return [];
-
-  try{
-    await ref.set({
-      perekNum: currentPerekNum,
-      posukNum: part.posukNum,
-      generatedAt: firebase.database.ServerValue.TIMESTAMP,
-      items
+    const res = await fetch(GENERATE_COMPREHENSION_QUESTIONS_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({
+        posukText: part.text || '',
+        posukTranslation: part.translation || '',
+        perekNum: currentPerekNum,
+        posukNum: part.posukNum
+      })
     });
-  }catch(err){
-    console.warn('Could not save generated-question cache', err);
+    if(!res.ok) throw new Error('Question generation request failed');
+    const data = await res.json();
+    const rawItems = Array.isArray(data.items) ? data.items.filter(x => x && x.question) : [];
+    if(!rawItems.length) return [];
+
+    // Shared path has no student ID: the first successful generation becomes
+    // the permanent question set used by every student for this posuk.
+    try{
+      await ref.set({
+        perekNum: currentPerekNum,
+        posukNum: part.posukNum,
+        generatedAt: firebase.database.ServerValue.TIMESTAMP,
+        items: rawItems
+      });
+    }catch(err){
+      console.warn('Could not save generated-question cache', err);
+    }
+
+    const items = normalizeGeneratedItems(rawItems, part.posukNum);
+    generatedQuestionMemoryCache.set(cacheKey, items);
+    saveLocalGeneratedQuestions(cacheKey, rawItems);
+    return items;
+  })();
+
+  generatedQuestionPromiseCache.set(cacheKey, loadPromise);
+  try{
+    return await loadPromise;
+  }finally{
+    generatedQuestionPromiseCache.delete(cacheKey);
   }
-
-  return items.map(item => ({
-    question:normalizeDivineNames(item.question),
-    expectedAnswer:normalizeDivineNames(item.expectedAnswer || ''),
-    sourceFact:normalizeDivineNames(item.sourceFact || ''),
-    posukNum:part.posukNum,
-    generated:true
-  }));
 }
-
 
 
 /* =========================================================
