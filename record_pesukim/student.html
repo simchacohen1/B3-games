@@ -1539,6 +1539,18 @@ function getQuestionsForPosuk(perekNum, posukNum){
    QUESTION_BANK above always wins when an entry exists. */
 let generatedQuestionLoadToken = 0;
 
+// Student-facing classroom convention: every Divine name is displayed as
+// "Hashem" in comprehension questions and their hidden expected-answer
+// metadata, even if an older Firebase cache was generated with "Elohim",
+// "God", "the Lord", etc. This also fixes already-cached question sets.
+function normalizeDivineNames(text){
+  return String(text || "")
+    .replace(/\b(?:Elohim|Elokim|Adonai|Adonoy)\b/gi, 'Hashem')
+    .replace(/\bthe\s+LORD\b/gi, 'Hashem')
+    .replace(/\bthe\s+Lord\b/gi, 'Hashem')
+    .replace(/\bGod\b/gi, 'Hashem');
+}
+
 async function getGeneratedQuestionsForPart(part){
   const staticQs = getQuestionsForPosuk(currentPerekNum, part.posukNum);
   if(staticQs){
@@ -1554,9 +1566,9 @@ async function getGeneratedQuestionsForPart(part){
     const cached = snap.val();
     if(cached && Array.isArray(cached.items) && cached.items.length){
       return cached.items.map(item => ({
-        question: item.question || '',
-        expectedAnswer: item.expectedAnswer || '',
-        sourceFact: item.sourceFact || '',
+        question: normalizeDivineNames(item.question || ''),
+        expectedAnswer: normalizeDivineNames(item.expectedAnswer || ''),
+        sourceFact: normalizeDivineNames(item.sourceFact || ''),
         posukNum: part.posukNum,
         generated: true
       })).filter(item => item.question);
@@ -1594,9 +1606,9 @@ async function getGeneratedQuestionsForPart(part){
   }
 
   return items.map(item => ({
-    question:item.question,
-    expectedAnswer:item.expectedAnswer || '',
-    sourceFact:item.sourceFact || '',
+    question:normalizeDivineNames(item.question),
+    expectedAnswer:normalizeDivineNames(item.expectedAnswer || ''),
+    sourceFact:normalizeDivineNames(item.sourceFact || ''),
     posukNum:part.posukNum,
     generated:true
   }));
