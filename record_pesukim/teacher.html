@@ -1421,12 +1421,14 @@ async function loadAccessTab(){
   const mainEl = document.getElementById('mainContent');
   mainEl.innerHTML = '<div class="loading">Loading access settings…</div>';
   try{
-    const [pinSnap, allowedSnap] = await Promise.all([
+    const [pinSnap, allowedSnap, practiceLimitSnap] = await Promise.all([
       db.ref('posukPractice/settings/classPin').once('value'),
-      db.ref('posukPractice/allowedStudents').once('value')
+      db.ref('posukPractice/allowedStudents').once('value'),
+      db.ref('posukPractice/settings/practiceLimit').once('value')
     ]);
     const currentPin = pinSnap.val() || '';
     const allowedVal = allowedSnap.val() || {};
+    const practiceLimit = practiceLimitSnap.val() || null;
     const approvedNames = Object.entries(allowedVal)
       .map(([slug, info]) => ({ slug, name: (info && info.name) || slug }))
       .sort((a,b) => a.name.localeCompare(b.name));
@@ -1443,6 +1445,34 @@ async function loadAccessTab(){
         <button class="btn small gold" id="savePinBtn" style="margin-left:8px;">Save PIN</button>
         <span id="pinSaveMsg" style="margin-left:10px;font-size:0.85rem;"></span>
       </div>
+
+      <div style="margin-bottom:26px;padding:16px;border-radius:12px;background:#fff;border:2px solid var(--gold);">
+        <div style="font-weight:700;margin-bottom:4px;">📖 Student Practice Limit</div>
+        <div style="font-size:0.84rem;color:var(--ink-soft);margin-bottom:10px;">
+          Choose the furthest פסוק students may practice. Anything after it is hidden from the student app.
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <select id="practiceLimitPerek"
+            style="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;">
+            <option value="">Choose Perek</option>
+          </select>
+          <select id="practiceLimitPosuk" disabled
+            style="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;">
+            <option value="">Choose Posuk</option>
+          </select>
+          <button class="btn small gold" id="savePracticeLimitBtn">Save Limit</button>
+          <button class="btn small" id="clearPracticeLimitBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;">Allow All</button>
+        </div>
+        <div id="practiceLimitMsg" style="font-size:0.85rem;margin-top:8px;"></div>
+        <div style="font-size:0.8rem;color:var(--ink-soft);margin-top:6px;">
+          Current: <strong id="practiceLimitCurrent">${
+            practiceLimit && practiceLimit.perek && practiceLimit.posuk
+              ? `Through Perek ${practiceLimit.perek}, Posuk ${practiceLimit.posuk}`
+              : 'All pesukim available'
+          }</strong>
+        </div>
+      </div>
+
       <div>
         <div style="font-weight:700;margin-bottom:6px;">Approved Students (${approvedNames.length})</div>
         <input id="newApprovedName" type="text" placeholder="Student's name" maxlength="30"
@@ -1474,6 +1504,86 @@ async function loadAccessTab(){
         msgEl.style.color = '#ffb3b3';
         msgEl.textContent = 'Could not save.';
         console.error(e);
+      }
+    };
+
+    // Practice-limit controls: one simple class-wide boundary.
+    const practiceLimitPerek = document.getElementById('practiceLimitPerek');
+    const practiceLimitPosuk = document.getElementById('practiceLimitPosuk');
+    const practiceLimitMsg = document.getElementById('practiceLimitMsg');
+
+    getAllPerekNums().forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n;
+      opt.textContent = 'Perek ' + n;
+      practiceLimitPerek.appendChild(opt);
+    });
+
+    async function populatePracticeLimitPosuk(perekNum, selectedPosuk){
+      practiceLimitPosuk.innerHTML = '<option value="">Choose Posuk</option>';
+      practiceLimitPosuk.disabled = true;
+      if(!perekNum) return;
+      try{
+        const range = await getPerekRange(parseInt(perekNum));
+        for(let p = range.min; p <= range.max; p++){
+          const opt = document.createElement('option');
+          opt.value = p;
+          opt.textContent = 'Posuk ' + p;
+          practiceLimitPosuk.appendChild(opt);
+        }
+        practiceLimitPosuk.disabled = false;
+        if(selectedPosuk) practiceLimitPosuk.value = String(selectedPosuk);
+      }catch(err){
+        console.error('Could not load practice-limit posuk range', err);
+      }
+    }
+
+    practiceLimitPerek.onchange = () => {
+      populatePracticeLimitPosuk(practiceLimitPerek.value, null);
+    };
+
+    if(practiceLimit && practiceLimit.perek){
+      practiceLimitPerek.value = String(practiceLimit.perek);
+      await populatePracticeLimitPosuk(practiceLimit.perek, practiceLimit.posuk);
+    }
+
+    document.getElementById('savePracticeLimitBtn').onclick = async () => {
+      const perek = parseInt(practiceLimitPerek.value);
+      const posuk = parseInt(practiceLimitPosuk.value);
+      if(!perek || !posuk){
+        practiceLimitMsg.style.color = '#8a3a3a';
+        practiceLimitMsg.textContent = 'Choose both a perek and a posuk.';
+        return;
+      }
+      try{
+        await db.ref('posukPractice/settings/practiceLimit').set({
+          perek,
+          posuk,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP
+        });
+        practiceLimitMsg.style.color = '#397839';
+        practiceLimitMsg.textContent = 'Saved — student menus update automatically.';
+        document.getElementById('practiceLimitCurrent').textContent = `Through Perek ${perek}, Posuk ${posuk}`;
+      }catch(err){
+        practiceLimitMsg.style.color = '#8a3a3a';
+        practiceLimitMsg.textContent = 'Could not save the practice limit.';
+        console.error(err);
+      }
+    };
+
+    document.getElementById('clearPracticeLimitBtn').onclick = async () => {
+      try{
+        await db.ref('posukPractice/settings/practiceLimit').remove();
+        practiceLimitPerek.value = '';
+        practiceLimitPosuk.innerHTML = '<option value="">Choose Posuk</option>';
+        practiceLimitPosuk.disabled = true;
+        practiceLimitMsg.style.color = '#397839';
+        practiceLimitMsg.textContent = 'Restriction removed — all pesukim are available.';
+        document.getElementById('practiceLimitCurrent').textContent = 'All pesukim available';
+      }catch(err){
+        practiceLimitMsg.style.color = '#8a3a3a';
+        practiceLimitMsg.textContent = 'Could not remove the practice limit.';
+        console.error(err);
       }
     };
 
