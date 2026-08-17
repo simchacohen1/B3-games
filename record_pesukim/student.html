@@ -1652,6 +1652,7 @@ async function getGeneratedQuestionsForPart(part){
       body:JSON.stringify({
         posukText: part.text || '',
         posukTranslation: part.translation || '',
+        classroomReferenceTranslation: await getClassroomReferenceForPart(part),
         perekNum: currentPerekNum,
         posukNum: part.posukNum
       })
@@ -1961,7 +1962,8 @@ function stopMicMeter(type){
   if(meterEl) meterEl.classList.add('hidden');
 }
 let chapterCache = {}; // cache fetched Sefaria Hebrew chapters this session
-let translationCache = {}; // cache fetched Sefaria English chapters this session
+let translationCache = {};
+let classroomReferenceCache = {}; // Ba'er Hetev classroom wording from Firebase // cache fetched Sefaria English chapters this session
 
 /* ---------- Text-to-speech (reads comprehension feedback + clarifying
    questions aloud) ----------
@@ -2337,6 +2339,7 @@ perekSelect.onchange = async () => {
   warmTranslationServices();
   warmQuestionGradingService();
   fetchChapterTranslation(perekNum).catch(err => console.error('Translation prefetch failed', err));
+  fetchClassroomReferenceChapter(perekNum).catch(err => console.error('Classroom reference prefetch failed', err));
   document.getElementById('fetchMsg').textContent = 'Loading pesukim…';
   try{
     const pesukim = await fetchChapter(perekNum);
@@ -2596,6 +2599,39 @@ async function fetchChapter(perekNum){
    translation (the standard traditional English Chumash); falls back to
    Sefaria's default English version if Metsudah isn't digitized for
    that sefer/perek, so grading never breaks entirely. */
+/* Fetches the optional Ba'er Hetev classroom-reference translation.
+   This is NOT the only accepted meaning. It is a second, child-friendly
+   reference layer stored centrally in Firebase at:
+     posukPractice/classroomTranslations/<perek>/<posuk>
+   Each value can be either a plain string or {translation:"..."}.
+   Missing entries simply fall back to the existing Metsudah/Sefaria flow. */
+async function fetchClassroomReferenceChapter(perekNum){
+  if(classroomReferenceCache[perekNum]) return classroomReferenceCache[perekNum];
+  try{
+    const snap = await db.ref('posukPractice/classroomTranslations/' + perekNum).once('value');
+    const raw = snap.val() || {};
+    const arr = [];
+    Object.entries(raw).forEach(([posuk, value]) => {
+      const n = parseInt(posuk, 10);
+      if(!n) return;
+      const text = typeof value === 'string' ? value : (value && value.translation) || '';
+      arr[n - 1] = String(text || '').trim();
+    });
+    classroomReferenceCache[perekNum] = arr;
+    return arr;
+  }catch(err){
+    console.warn('Could not load Baer Hetev classroom references', err);
+    classroomReferenceCache[perekNum] = [];
+    return [];
+  }
+}
+
+async function getClassroomReferenceForPart(part){
+  if(!part || !part.posukNum) return '';
+  const refs = await fetchClassroomReferenceChapter(currentPerekNum);
+  return refs[part.posukNum - 1] || '';
+}
+
 async function fetchChapterTranslation(perekNum){
   if(translationCache[perekNum]) return translationCache[perekNum];
 
@@ -3634,6 +3670,8 @@ async function gradeComprehensionAttempt(){
     formData.append('audio', currentAudio.comprehension, 'recording.' + currentAudioExt.comprehension);
     formData.append('posukText', currentPosukText || '');
     formData.append('posukTranslation', currentPosukTranslation || '');
+    const classroomRefs = await fetchClassroomReferenceChapter(currentPerekNum);
+    formData.append('classroomReferenceTranslation', classroomRefs[currentPosukNum - 1] || '');
 
     const res = await fetch(GRADE_COMPREHENSION_URL, { method: 'POST', body: formData });
     if(!res.ok) throw new Error('Grading request failed');
@@ -3722,6 +3760,8 @@ async function gradeCurrentQuestionAnswer(){
     if(current.expectedAnswer) formData.append('expectedAnswer', current.expectedAnswer);
     formData.append('posukTranslation', currentPosukTranslation || '');
     formData.append('posukText', currentPosukText || '');
+    const classroomRefs = await fetchClassroomReferenceChapter(currentPerekNum);
+    formData.append('classroomReferenceTranslation', classroomRefs[currentPosukNum - 1] || '');
 
     const res = await fetch(GRADE_QUESTION_ANSWER_URL, { method: 'POST', body: formData });
     if(!res.ok) throw new Error('Grading request failed');
@@ -3930,10 +3970,15 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
 
   if(!GENERATE_TRANSLATION_CHUNKS_URL || GENERATE_TRANSLATION_CHUNKS_URL.indexOf('PASTE') === 0) return null;
   try{
+    const classroomReferenceTranslation = await getClassroomReferenceForPart(part);
     const res = await fetch(GENERATE_TRANSLATION_CHUNKS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ posukText: part.text, posukTranslation: part.translation || '' }),
+      body: JSON.stringify({
+        posukText: part.text,
+        posukTranslation: part.translation || '',
+        classroomReferenceTranslation
+      }),
     });
     if(myToken !== translationLoadToken) return null;
     if(!res.ok) throw new Error('Chunk generation request failed');
