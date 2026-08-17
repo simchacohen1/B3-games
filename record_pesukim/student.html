@@ -1346,6 +1346,8 @@
         <button class="btn small hidden" id="comprehensionRetryBtn" style="margin-top:6px;">🔁 Try checking again</button>
         <div class="comp-result hidden" id="comprehensionResult"></div>
 
+        <div id="questionAnsweredHistory" style="margin:12px 0;"></div>
+        <div id="questionFinalScore" class="hidden" style="margin:14px 0;padding:16px;border-radius:16px;background:#fff7dc;border:2px solid var(--gold);text-align:center;font-weight:800;font-size:1.05rem;"></div>
         <div class="chunk-nav-row hidden" id="questionNavRow">
           <button class="btn small ghost-delete" id="questionPrevBtn">◀️ Previous</button>
           <button class="btn small gold" id="questionNextBtn">Next ▶️</button>
@@ -2999,7 +3001,55 @@ async function completeGeneratedComprehensionQuestions(loadToken){
     comprehensionQResults = {};
     comprehensionMode = 'questions';
     renderComprehensionQuestionUI();
+    await restoreSavedQuestionResults();
   }
+}
+
+function renderAnsweredQuestionHistory(){
+  const host=document.getElementById('questionAnsweredHistory');
+  if(!host) return;
+  const answered=Object.keys(comprehensionQResults).map(Number).sort((a,b)=>a-b);
+  if(!answered.length){ host.innerHTML=''; return; }
+  host.innerHTML='<div style="font-weight:800;margin-bottom:7px;color:var(--ink-soft);">Your answers so far</div>' +
+    answered.map(i=>{
+      const r=comprehensionQResults[i], q=comprehensionQuestions[i], ok=r&&r.verdict==='correct';
+      return `<div style="padding:9px 11px;margin:5px 0;border-radius:12px;background:${ok?'#E4F4E4':'#F6E1E1'};border:1px solid ${ok?'#4C9A4C':'var(--rimon)'};">
+        <strong>${ok?'✅':'❌'} ${i+1}. ${q?q.question:''}</strong>
+        ${r&&r.transcript?`<div style="font-size:.8rem;font-style:italic;margin-top:3px;">You said: “${r.transcript}”</div>`:''}
+        ${r&&r.feedback?`<div style="font-size:.8rem;margin-top:2px;">${r.feedback}</div>`:''}
+      </div>`;
+    }).join('');
+}
+function renderQuestionFinalScore(){
+  const el=document.getElementById('questionFinalScore');
+  if(!el) return;
+  const total=comprehensionQuestions.length, answered=Object.keys(comprehensionQResults).length;
+  if(!total||answered<total){ el.classList.add('hidden'); el.innerHTML=''; return; }
+  const correct=comprehensionQuestions.filter((_,i)=>comprehensionQResults[i]&&comprehensionQResults[i].verdict==='correct').length;
+  const pct=Math.round(correct/total*100);
+  el.innerHTML=`🎉 You finished! <span style="font-size:1.35rem;">${pct}%</span><br><span style="font-size:.86rem;font-weight:700;color:var(--ink-soft);">${correct} out of ${total} correct</span>`;
+  el.classList.remove('hidden');
+}
+async function restoreSavedQuestionResults(){
+  if(!studentId||!currentPosukKey||!comprehensionQuestions.length) return false;
+  try{
+    const snap=await db.ref('posukPractice/attempts/'+studentId+'/'+currentPosukKey).once('value'), val=snap.val();
+    if(!val) return false;
+    const saved=Object.values(val).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0)).find(a=>Array.isArray(a.questionResults)&&a.questionResults.length);
+    if(!saved) return false;
+    const restored={};
+    saved.questionResults.forEach((r,i)=>{
+      let idx=comprehensionQuestions.findIndex(q=>q.question===r.question);
+      if(idx<0&&i<comprehensionQuestions.length) idx=i;
+      if(idx>=0) restored[idx]={verdict:r.finalVerdict||r.verdict,feedback:r.feedback||'',transcript:r.transcript||'',blob:null,ext:'webm',audioURL:r.audioURL||null};
+    });
+    if(!Object.keys(restored).length) return false;
+    comprehensionQResults=restored;
+    const first=comprehensionQuestions.findIndex((_,i)=>!comprehensionQResults[i]);
+    comprehensionQIndex=first>=0?first:Math.max(0,comprehensionQuestions.length-1);
+    renderComprehensionQuestionUI();
+    return true;
+  }catch(err){ console.warn('Could not restore saved comprehension answers',err); return false; }
 }
 
 // Clears everything about the question flow for a fresh posuk visit. Hand-
@@ -3013,6 +3063,7 @@ function resetComprehensionQuestionState(){
   comprehensionQResults = {};
   comprehensionMode = comprehensionQuestions.length ? 'questions' : 'freehand-only';
   renderComprehensionQuestionUI();
+  if(comprehensionQuestions.length) restoreSavedQuestionResults();
 
   const hasMissing = (currentSelectionParts || []).some(part => !getQuestionsForPosuk(currentPerekNum, part.posukNum));
   if(hasMissing){
@@ -3082,6 +3133,8 @@ function renderComprehensionQuestionUI(){
   document.getElementById('questionNextBtn').disabled = (comprehensionQIndex === total - 1);
 
   doneBlock.classList.toggle('hidden', !allAnswered);
+  renderAnsweredQuestionHistory();
+  renderQuestionFinalScore();
 
   // Restore whatever this question's own recording/result already looked
   // like (if the student already answered it and is navigating back to
@@ -3099,6 +3152,10 @@ function renderComprehensionQuestionUI(){
       audioEl.src = URL.createObjectURL(existing.blob);
       audioEl.classList.remove('hidden');
       deleteBtn.classList.remove('hidden');
+    }else if(existing.audioURL){
+      audioEl.src = existing.audioURL;
+      audioEl.classList.remove('hidden');
+      deleteBtn.classList.add('hidden');
     }
     statusEl.textContent = 'Recorded — listen above';
     retryBtn.classList.add('hidden');
@@ -3895,7 +3952,18 @@ async function gradeCurrentQuestionAnswer(){
       'Question ' + (idx + 1) + ' of ' + comprehensionQuestions.length + '  ' + questionProgressDots();
     const allAnswered = comprehensionQuestions.every((_, i) => !!comprehensionQResults[i]);
     document.getElementById('questionsDoneBlock').classList.toggle('hidden', !allAnswered);
-    if(allAnswered) await autosaveComprehensionQuestions();
+    renderAnsweredQuestionHistory();
+    renderQuestionFinalScore();
+    if(allAnswered){
+      await autosaveComprehensionQuestions();
+      renderQuestionFinalScore();
+    }else{
+      setTimeout(()=>{
+        if(comprehensionMode!=='questions') return;
+        const next=comprehensionQuestions.findIndex((_,i)=>i>idx&&!comprehensionQResults[i]);
+        if(next>=0){ comprehensionQIndex=next; renderComprehensionQuestionUI(); }
+      },1300);
+    }
   }catch(err){
     console.error(err);
     gradingMsg.textContent = 'Could not check your answer — check your internet and try again.';
@@ -3942,11 +4010,13 @@ async function autosaveComprehensionQuestions(){
     const questionResultsData = await Promise.all(idxs.map(async i => {
       const r = comprehensionQResults[i];
       const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_question_' + currentAttemptId + '_q' + i + '.' + r.ext;
-      let url = null;
-      try{
-        await storage.ref(path).put(r.blob);
-        url = await storage.ref(path).getDownloadURL();
-      }catch(err){ console.error('Could not upload question answer audio', i, err); }
+      let url = r.audioURL || null;
+      if(r.blob){
+        try{
+          await storage.ref(path).put(r.blob);
+          url = await storage.ref(path).getDownloadURL();
+        }catch(err){ console.error('Could not upload question answer audio', i, err); }
+      }
       return {
         question: comprehensionQuestions[i].question,
         posukNum: comprehensionQuestions[i].posukNum,
