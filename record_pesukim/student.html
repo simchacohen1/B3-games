@@ -1293,13 +1293,36 @@
           <h3>🧠 Show You Understand</h3>
           <span class="step-chip">STEP 3</span>
         </div>
-        <div class="instruction-card">
-          <div class="instruction-copy">
-            <strong>Tell what is happening in the selected פסוק or פסוקים in your own words.</strong>
-            <span>Explain it the way you would tell a friend.</span>
+
+        <!-- Question-by-question mode (primary way comprehension is graded
+             when this posuk/range has a question set authored for it — see
+             QUESTION_BANK). -->
+        <div id="questionModeBlock">
+          <div class="chunk-progress" id="questionProgress">Question 1 of 1</div>
+          <div class="instruction-card">
+            <div class="instruction-copy">
+              <strong id="questionText">Loading question…</strong>
+            </div>
+            <button class="listen-btn" id="questionListenBtn" type="button">🔊 Listen</button>
           </div>
-          <button class="listen-btn" id="comprehensionInstructionBtn" type="button">🔊 Listen</button>
         </div>
+
+        <!-- Bonus freehand-explanation mode. Hidden until every question
+             above has been answered, and hidden again automatically for
+             any posuk/range that has no question set (in which case this
+             becomes the only, primary comprehension task, unchanged from
+             how the app always worked). -->
+        <div class="hidden" id="bonusModeBlock">
+          <div class="instruction-card">
+            <div class="instruction-copy">
+              <strong>🌟 Bonus: Tell what is happening in the selected פסוק or פסוקים in your own words.</strong>
+              <span>Explain it the way you would tell a friend.</span>
+            </div>
+            <button class="listen-btn" id="comprehensionInstructionBtn" type="button">🔊 Listen</button>
+          </div>
+          <button class="btn small ghost-delete hidden" id="backToQuestionsBtn" type="button" style="margin-bottom:8px;">⬅️ Back to questions</button>
+        </div>
+
         <div class="record-stage">
           <div class="record-row">
             <button class="seal-btn" id="comprehensionRecordBtn" title="Tell what is happening" aria-label="Start or stop comprehension recording">🎙️</button>
@@ -1307,12 +1330,22 @@
             <audio id="comprehensionAudioPlayback" controls class="hidden"></audio>
             <button class="btn ghost-delete hidden" id="comprehensionDeleteBtn" title="Delete this recording">🗑️ Delete</button>
           </div>
-          <div class="record-caption">🎙️ Tap and tell me what happened</div>
+          <div class="record-caption" id="comprehensionRecordCaption">🎙️ Tap and answer the question</div>
           <span class="status-tag" id="comprehensionStatus">Not recorded yet</span>
         </div>
         <div class="comp-status" id="comprehensionGradingMsg"></div>
         <button class="btn small hidden" id="comprehensionRetryBtn" style="margin-top:6px;">🔁 Try checking again</button>
         <div class="comp-result hidden" id="comprehensionResult"></div>
+
+        <div class="chunk-nav-row hidden" id="questionNavRow">
+          <button class="btn small ghost-delete" id="questionPrevBtn">◀️ Previous</button>
+          <button class="btn small gold" id="questionNextBtn">Next ▶️</button>
+        </div>
+
+        <div class="hidden" id="questionsDoneBlock" style="text-align:center;margin-top:10px;">
+          <div class="comp-status">🎉 All questions done for this posuk!</div>
+          <button class="btn small gold" id="bonusExplainBtn" type="button">🌟 Bonus: Explain it all yourself</button>
+        </div>
       </div>
 
       <div class="save-row posuk-nav-row">
@@ -1420,6 +1453,83 @@ function warmTranslationServices(){
     }
   });
 }
+
+
+/* =========================================================
+   COMPREHENSION QUESTIONS — the primary way comprehension is now
+   graded. Each posuk that has an entry below gets asked its own short
+   list of explicit-detail questions (one at a time, computer-graded)
+   instead of/before the old "explain it in your own words" recording.
+   The old freehand explanation still exists — it now shows up as an
+   optional "🌟 Bonus" step after every question for the posuk/range has
+   been answered, rather than as the primary/only comprehension task.
+
+   Structure: QUESTION_BANK[perekNum][posukNum] = ["question 1", ...]
+   Perakim/posukim with no entry here simply fall back to the old
+   freehand-only comprehension flow (so nothing breaks for parts of the
+   text that don't have a question set authored yet).
+
+     firebase deploy --only functions:gradeQuestionAnswer
+   ========================================================= */
+const GRADE_QUESTION_ANSWER_URL = "https://us-central1-b3-games.cloudfunctions.net/gradeQuestionAnswer";
+
+const QUESTION_BANK = {
+  "18": {
+    "1": ["To whom did Hashem appear?", "Where did Hashem appear to Avraham?", "Where was Avraham sitting when Hashem appeared to him?", "At what part of the day did Hashem appear to Avraham?"],
+    "2": ["What did Avraham do with his eyes?", "How many men did Avraham see?", "What did Avraham do when he saw the men?", "From where did Avraham run to greet them?", "What did Avraham do once he reached the men?"],
+    "3": ["What did Avraham ask his guest not to do?", "How did Avraham refer to himself when he spoke to his guest?"],
+    "4": ["What did Avraham offer to have brought for his guests?", "What did Avraham ask his guests to wash?", "Where did Avraham invite his guests to rest?"],
+    "5": ["What did Avraham say he would bring for his guests to eat?", "What did Avraham say the guests should do after eating?", "How did the guests respond to Avraham's offer?"],
+    "6": ["Where did Avraham hurry to?", "To whom did Avraham speak in the tent?", "How many se'ah of flour did Avraham tell Sarah to prepare?", "What did Avraham tell Sarah to do with the flour?", "What did Avraham tell Sarah to make?"],
+    "7": ["Where did Avraham run to after speaking with Sarah?", "What did Avraham take from the cattle?", "How is the calf that Avraham took described?", "To whom did Avraham give the calf?", "What did the young man do with the calf?"],
+    "8": ["What two foods did Avraham take along with the prepared calf?", "Where did Avraham set the food?", "What did Avraham do while his guests ate?", "Where did the guests eat?", "What did the guests do with the food?"],
+    "9": ["What did the guests ask Avraham?", "How did Avraham answer them about where Sarah was?"],
+    "10": ["When did the guest say he would return to Avraham?", "What did the guest say Sarah would have?", "Where was Sarah while this was being said?", "Where was the entrance of the tent in relation to the guest speaking?"],
+    "11": ["How are Avraham and Sarah described in this posuk?", "What does the posuk say had stopped happening for Sarah?"],
+    "12": ["What did Sarah do to herself upon hearing the news?", "Why did Sarah laugh at the news that she would have a child?", "How did Sarah refer to Avraham in her thoughts?"],
+    "13": ["Who spoke to Avraham about Sarah's laughter?", "What did Hashem ask Avraham about Sarah?", "What did Hashem quote Sarah as saying about her age?"],
+    "14": ["What question did Hashem ask about His own power?", "When did Hashem say He would return to Avraham?", "What did Hashem again say Sarah would have?"],
+    "15": ["What did Sarah say about her laughter?", "Why did Sarah deny that she had laughed?", "How did Hashem respond to Sarah's denial?"],
+    "16": ["What did the men look out toward after they got up?", "What did Avraham do as the men left?"],
+    "17": ["What did Hashem ask Himself about Avraham?"],
+    "18": ["What did Hashem say Avraham would become?", "What did Hashem say would happen to all the nations of the earth through Avraham?"],
+    "19": ["Whom did Hashem say Avraham would command after him?", "What did Hashem say Avraham's children and household would keep?", "What two things did Hashem say they would do?", "Why did Hashem decide to reveal His plan to Avraham?"],
+    "20": ["Which two cities did Hashem mention?", "What did Hashem say about the outcry against these cities?", "What did Hashem say about the sin of these cities?"],
+    "21": ["What did Hashem say He would do regarding Sedom?", "What did Hashem say He wanted to find out?"],
+    "22": ["Where did the men go from there?", "What was Avraham still doing?"],
+    "23": ["What did Avraham do before he spoke to Hashem?", "What did Avraham ask Hashem?"],
+    "24": ["How many righteous people did Avraham suggest might be in the city?", "What did Avraham ask Hashem to do for the sake of the fifty righteous people?"],
+    "25": ["What did Avraham say would be forbidden for Hashem to do?", "What title did Avraham use for Hashem in this posuk?", "What did Avraham ask about the Judge of all the earth?"],
+    "26": ["How many righteous people did Hashem say He needed to find in Sedom?", "What did Hashem promise to do if He found them?"],
+    "27": ["How did Avraham describe himself when speaking to Hashem?"],
+    "28": ["What number did Avraham suggest might be missing from the fifty righteous people?", "What did Hashem answer about forty-five righteous people?"],
+    "29": ["What number did Avraham ask about next?", "What did Hashem answer about forty righteous people?"],
+    "30": ["What did Avraham ask Hashem before he continued speaking?", "What number did Avraham ask about in this posuk?", "What did Hashem answer about thirty righteous people?"],
+    "31": ["What number did Avraham ask about next?", "What did Hashem answer about twenty righteous people?"],
+    "32": ["How many more times did Avraham say he would speak in this posuk?", "What number did Avraham ask about last?", "What did Hashem answer about ten righteous people?"],
+    "33": ["What did Hashem do when He finished speaking to Avraham?", "What did Avraham do after Hashem left?"]
+  }
+};
+
+// Warm the question-grading Cloud Function the same way the translation
+// ones are warmed, so the first question of the session doesn't eat a
+// cold-start delay.
+let questionGradingWarmSent = false;
+function warmQuestionGradingService(){
+  if(questionGradingWarmSent) return;
+  questionGradingWarmSent = true;
+  if(GRADE_QUESTION_ANSWER_URL && GRADE_QUESTION_ANSWER_URL.indexOf('PASTE') !== 0){
+    fetch(GRADE_QUESTION_ANSWER_URL, { method:'OPTIONS' }).catch(() => {});
+  }
+}
+
+function getQuestionsForPosuk(perekNum, posukNum){
+  const perekBank = QUESTION_BANK[String(perekNum)];
+  if(!perekBank) return null;
+  const qs = perekBank[String(posukNum)];
+  return (qs && qs.length) ? qs : null;
+}
+
 
 
 /* =========================================================
@@ -1552,6 +1662,21 @@ let currentPosukTranslation = ""; // accepted English translation, used as the g
 let currentIsRange = false;
 let currentParshaName = null;
 let currentSelectionParts = []; // [{posukNum, text, translation, key}] for translation chunking and display
+
+/* ---------- Comprehension questions (primary comprehension mode) ----------
+   comprehensionQuestions: [{question, posukNum}] built fresh for whichever
+   posuk/range is currently loaded, from QUESTION_BANK (empty array = no
+   question set authored for this posuk/range yet, so the old freehand
+   explanation becomes the only/primary comprehension task, unchanged).
+   comprehensionQResults: idx -> {verdict, feedback, transcript, blob, ext}
+   comprehensionMode: 'questions' (answering the current question),
+   'bonus' (freehand explanation, optional extra credit once all questions
+   are answered), or 'freehand-only' (no question set exists here). */
+let comprehensionQuestions = [];
+let comprehensionQIndex = 0;
+let comprehensionQResults = {};
+let comprehensionMode = 'freehand-only';
+
 
 /* ---------- Translation chunk state ----------
    translationLevels: the nested chunk breakdown for the CURRENT posuk, as
@@ -2041,6 +2166,7 @@ perekSelect.onchange = async () => {
   const perekNum = parseInt(perekSelect.value);
   if(!perekNum){ posukSelect.disabled = true; return; }
   warmTranslationServices();
+  warmQuestionGradingService();
   fetchChapterTranslation(perekNum).catch(err => console.error('Translation prefetch failed', err));
   document.getElementById('fetchMsg').textContent = 'Loading pesukim…';
   try{
@@ -2090,6 +2216,7 @@ async function loadSelectedPesukim(){
 
   wakeScorer();
   warmTranslationServices();
+  warmQuestionGradingService();
   document.getElementById('fetchMsg').textContent = rangeModeOn() ? 'Loading pesukim…' : 'Loading posuk…';
   try{
     const [pesukim, translations] = await Promise.all([
@@ -2530,6 +2657,124 @@ function resetHebrewResult(){
   resultEl.innerHTML = '';
 }
 
+/* Builds comprehensionQuestions fresh for whatever posuk/range is
+   currently loaded, by looking up each part of currentSelectionParts in
+   QUESTION_BANK and concatenating in posuk order (mirrors how translation
+   chunks are combined across a range). Any part with no entry simply
+   contributes no questions — a range that mixes an authored posuk with an
+   unauthored one just asks about the authored one(s). */
+function buildComprehensionQuestions(){
+  comprehensionQuestions = [];
+  (currentSelectionParts || []).forEach(part => {
+    const qs = getQuestionsForPosuk(currentPerekNum, part.posukNum);
+    if(qs) qs.forEach(q => comprehensionQuestions.push({ question: q, posukNum: part.posukNum }));
+  });
+}
+
+// Clears everything about the question flow for a fresh posuk visit —
+// separate from resetComprehensionResult, which only clears the *display*
+// of whichever grading result is currently on screen (question or bonus).
+function resetComprehensionQuestionState(){
+  buildComprehensionQuestions();
+  comprehensionQIndex = 0;
+  comprehensionQResults = {};
+  comprehensionMode = comprehensionQuestions.length ? 'questions' : 'freehand-only';
+  renderComprehensionQuestionUI();
+}
+
+// Small inline progress indicator, e.g. "Question 2 of 4  ✅✅⬜⬜" — cheap
+// way to show at a glance which questions are already answered without a
+// whole separate pill strip like the translation screen has.
+function questionProgressDots(){
+  return comprehensionQuestions.map((_, i) => {
+    if(i === comprehensionQIndex) return '🔵';
+    return comprehensionQResults[i] ? '✅' : '⬜';
+  }).join('');
+}
+
+// Switches the panel between the three states: answering questions one at
+// a time, doing the optional bonus freehand explanation, or (for posukim
+// without an authored question set) the old freehand-only behavior.
+function renderComprehensionQuestionUI(){
+  const questionBlock = document.getElementById('questionModeBlock');
+  const bonusBlock = document.getElementById('bonusModeBlock');
+  const navRow = document.getElementById('questionNavRow');
+  const doneBlock = document.getElementById('questionsDoneBlock');
+  const backBtn = document.getElementById('backToQuestionsBtn');
+  const caption = document.getElementById('comprehensionRecordCaption');
+  const allAnswered = comprehensionQuestions.length > 0 &&
+    comprehensionQuestions.every((_, i) => !!comprehensionQResults[i]);
+
+  if(comprehensionMode === 'freehand-only'){
+    questionBlock.classList.add('hidden');
+    navRow.classList.add('hidden');
+    doneBlock.classList.add('hidden');
+    bonusBlock.classList.remove('hidden');
+    backBtn.classList.add('hidden');
+    caption.textContent = '🎙️ Tap and tell me what happened';
+    return;
+  }
+
+  if(comprehensionMode === 'bonus'){
+    questionBlock.classList.add('hidden');
+    navRow.classList.add('hidden');
+    doneBlock.classList.add('hidden');
+    bonusBlock.classList.remove('hidden');
+    backBtn.classList.remove('hidden');
+    caption.textContent = '🎙️ Tap and tell me what happened';
+    return;
+  }
+
+  // comprehensionMode === 'questions'
+  bonusBlock.classList.add('hidden');
+  questionBlock.classList.remove('hidden');
+  const total = comprehensionQuestions.length;
+  const current = comprehensionQuestions[comprehensionQIndex];
+  document.getElementById('questionProgress').textContent =
+    'Question ' + (comprehensionQIndex + 1) + ' of ' + total + '  ' + questionProgressDots();
+  document.getElementById('questionText').textContent = current ? current.question : '';
+  caption.textContent = '🎙️ Tap and answer the question';
+
+  navRow.classList.toggle('hidden', total <= 1 && !allAnswered);
+  document.getElementById('questionPrevBtn').disabled = (comprehensionQIndex === 0);
+  document.getElementById('questionNextBtn').disabled = (comprehensionQIndex === total - 1);
+
+  doneBlock.classList.toggle('hidden', !allAnswered);
+
+  // Restore whatever this question's own recording/result already looked
+  // like (if the student already answered it and is navigating back to
+  // look at it again), rather than always showing a blank slate.
+  const existing = comprehensionQResults[comprehensionQIndex];
+  const audioEl = document.getElementById('comprehensionAudioPlayback');
+  const deleteBtn = document.getElementById('comprehensionDeleteBtn');
+  const statusEl = document.getElementById('comprehensionStatus');
+  const retryBtn = document.getElementById('comprehensionRetryBtn');
+  const resultEl = document.getElementById('comprehensionResult');
+  if(existing){
+    currentAudio.comprehension = existing.blob || null;
+    currentAudioExt.comprehension = existing.ext || 'webm';
+    if(existing.blob){
+      audioEl.src = URL.createObjectURL(existing.blob);
+      audioEl.classList.remove('hidden');
+      deleteBtn.classList.remove('hidden');
+    }
+    statusEl.textContent = 'Recorded — listen above';
+    retryBtn.classList.add('hidden');
+    renderQuestionResult(existing.verdict, existing.feedback, existing.transcript);
+  }else{
+    currentAudio.comprehension = null;
+    currentAudioExt.comprehension = 'webm';
+    audioEl.removeAttribute('src');
+    audioEl.classList.add('hidden');
+    deleteBtn.classList.add('hidden');
+    statusEl.textContent = 'Not recorded yet';
+    retryBtn.classList.add('hidden');
+    resultEl.classList.add('hidden');
+    resultEl.innerHTML = '';
+  }
+  document.getElementById('comprehensionGradingMsg').textContent = '';
+}
+
 function resetRecordingUI(){
   currentAudio.hebrew = null;
   document.getElementById('hebrewAudioPlayback').classList.add('hidden');
@@ -2542,6 +2787,7 @@ function resetRecordingUI(){
   document.getElementById('comprehensionDeleteBtn').classList.add('hidden');
   document.getElementById('comprehensionStatus').textContent = 'Not recorded yet';
   resetComprehensionResult();
+  resetComprehensionQuestionState();
 
   currentAudio.translation = null;
   document.getElementById('translationAudioPlayback').classList.add('hidden');
@@ -2605,6 +2851,10 @@ function deleteRecording(type){
     if(attemptSaved.hebrew) removeSavedTask('hebrew');
   } else if(type === 'comprehension'){
     resetComprehensionResult();
+    if(comprehensionMode === 'questions'){
+      delete comprehensionQResults[comprehensionQIndex];
+      renderComprehensionQuestionUI();
+    }
     if(attemptSaved.comprehension) removeSavedTask('comprehension');
   } else if(type === 'translation'){
     resetTranslationResult();
@@ -2825,8 +3075,13 @@ async function toggleRecording(type, btnEl){
       document.getElementById(type + 'DeleteBtn').classList.remove('hidden');
 
       if(type === 'comprehension'){
-        document.getElementById(type + 'Status').textContent = 'Recorded — listening…';
-        gradeComprehensionAttempt();
+        if(comprehensionMode === 'questions'){
+          document.getElementById(type + 'Status').textContent = 'Recorded — listening…';
+          gradeCurrentQuestionAnswer();
+        }else{
+          document.getElementById(type + 'Status').textContent = 'Recorded — listening…';
+          gradeComprehensionAttempt();
+        }
       } else if(type === 'hebrew'){
         document.getElementById(type + 'Status').textContent = 'Recorded — scoring…';
         scoreHebrewReading();
@@ -2854,7 +3109,10 @@ async function toggleRecording(type, btnEl){
 document.getElementById('hebrewRecordBtn').onclick = function(){ toggleRecording('hebrew', this); };
 document.getElementById('comprehensionRecordBtn').onclick = function(){ toggleRecording('comprehension', this); };
 document.getElementById('hebrewRetryBtn').onclick = () => scoreHebrewReading();
-document.getElementById('comprehensionRetryBtn').onclick = () => gradeComprehensionAttempt();
+document.getElementById('comprehensionRetryBtn').onclick = () => {
+  if(comprehensionMode === 'questions') gradeCurrentQuestionAnswer();
+  else gradeComprehensionAttempt();
+};
 
 /* ---------- Hebrew reading auto-grading (same backend as Kol Emes) ----------
    Sends the recording + the posuk's exact text to the scorer, which
@@ -3230,6 +3488,186 @@ async function showComprehensionResult(verdict, score, feedback, transcript){
   document.getElementById('comprehensionStatus').textContent = 'Recorded — listen above';
   await autosaveComprehension();
 }
+
+/* ---------- Comprehension QUESTIONS (primary comprehension mode) ----------
+   One question at a time, computer-graded the same way translation chunks
+   are: the question + the posuk's accepted translation (as the "answer
+   key" — see gradeQuestionAnswer on the backend) go along with the
+   recording. Two-tier verdict (correct/incorrect), matching how a single
+   factual question naturally grades. */
+async function gradeCurrentQuestionAnswer(){
+  const idx = comprehensionQIndex;
+  const current = comprehensionQuestions[idx];
+  const gradingMsg = document.getElementById('comprehensionGradingMsg');
+  const retryBtn = document.getElementById('comprehensionRetryBtn');
+  const resultEl = document.getElementById('comprehensionResult');
+  resultEl.classList.add('hidden');
+  retryBtn.classList.add('hidden');
+
+  if(!currentAudio.comprehension || !current) return;
+
+  if(!GRADE_QUESTION_ANSWER_URL || GRADE_QUESTION_ANSWER_URL.indexOf('PASTE') === 0){
+    gradingMsg.textContent = "Grading isn't set up yet (Cloud Function URL missing).";
+    return;
+  }
+
+  gradingMsg.textContent = 'Listening to your answer…';
+  document.getElementById('comprehensionStatus').textContent = 'Recorded — grading…';
+
+  try{
+    const formData = new FormData();
+    formData.append('audio', currentAudio.comprehension, 'recording.' + currentAudioExt.comprehension);
+    formData.append('question', current.question);
+    formData.append('posukTranslation', currentPosukTranslation || '');
+    formData.append('posukText', currentPosukText || '');
+
+    const res = await fetch(GRADE_QUESTION_ANSWER_URL, { method: 'POST', body: formData });
+    if(!res.ok) throw new Error('Grading request failed');
+    const data = await res.json();
+
+    if(data.verdict === 'no_speech'){
+      gradingMsg.textContent = "Didn't catch that — try recording again, a little closer to the mic.";
+      document.getElementById('comprehensionStatus').textContent = 'Recorded';
+      return;
+    }
+
+    comprehensionQResults[idx] = {
+      verdict: data.verdict,
+      feedback: data.feedback || '',
+      transcript: data.transcript || '',
+      blob: currentAudio.comprehension,
+      ext: currentAudioExt.comprehension
+    };
+    renderQuestionResult(data.verdict, data.feedback || '', data.transcript || '');
+    gradingMsg.textContent = '';
+    document.getElementById('comprehensionStatus').textContent = 'Recorded — listen above';
+
+    // Update the progress dots / Previous-Next / done-block state now that
+    // this question has a result, without disturbing what's on screen.
+    document.getElementById('questionProgress').textContent =
+      'Question ' + (idx + 1) + ' of ' + comprehensionQuestions.length + '  ' + questionProgressDots();
+    const allAnswered = comprehensionQuestions.every((_, i) => !!comprehensionQResults[i]);
+    document.getElementById('questionsDoneBlock').classList.toggle('hidden', !allAnswered);
+    if(allAnswered) await autosaveComprehensionQuestions();
+  }catch(err){
+    console.error(err);
+    gradingMsg.textContent = 'Could not check your answer — check your internet and try again.';
+    document.getElementById('comprehensionStatus').textContent = 'Recorded';
+    retryBtn.classList.remove('hidden');
+  }
+}
+
+// Renders one question's correct/incorrect result — deliberately simpler
+// than showComprehensionResult (no score %, no dispute button) since a
+// single factual question is just right or not, and disputing individual
+// questions would add a lot of UI for little benefit at this scale.
+function renderQuestionResult(verdict, feedback, transcript){
+  const resultEl = document.getElementById('comprehensionResult');
+  const badgeText = { correct: '✅ Got it!', incorrect: '💡 Try again' }[verdict] || '';
+  let transcriptHtml = "";
+  if(transcript){
+    transcriptHtml = '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + transcript + '"</span>';
+  }
+  resultEl.className = 'comp-result ' + (verdict === 'correct' ? 'correct' : 'incorrect');
+  resultEl.innerHTML =
+    '<span class="comp-badge">' + badgeText + '</span>' +
+    '<span>' + feedback + '</span>' +
+    transcriptHtml +
+    '<button class="speak-btn" id="questionReplayBtn" title="Hear this read aloud">🔊 Hear feedback</button>';
+  resultEl.classList.remove('hidden');
+  document.getElementById('questionReplayBtn').onclick = () => speakText(feedback);
+}
+
+// Uploads every answered question's audio + result once ALL questions for
+// this posuk/range have been graded (same "save once complete" pattern
+// autosaveTranslation already uses for its per-chunk recordings), then
+// marks the comprehension task done.
+async function autosaveComprehensionQuestions(){
+  const idxs = Object.keys(comprehensionQResults).map(Number);
+  if(!idxs.length || !currentPosukKey) return;
+  try{
+    if(!currentAttemptRef){
+      currentAttemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
+      currentAttemptId = currentAttemptRef.key;
+    }
+    const correctCount = idxs.filter(i => comprehensionQResults[i].verdict === 'correct').length;
+
+    const questionResultsData = await Promise.all(idxs.map(async i => {
+      const r = comprehensionQResults[i];
+      const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_question_' + currentAttemptId + '_q' + i + '.' + r.ext;
+      let url = null;
+      try{
+        await storage.ref(path).put(r.blob);
+        url = await storage.ref(path).getDownloadURL();
+      }catch(err){ console.error('Could not upload question answer audio', i, err); }
+      return {
+        question: comprehensionQuestions[i].question,
+        posukNum: comprehensionQuestions[i].posukNum,
+        verdict: r.verdict,
+        feedback: r.feedback,
+        transcript: r.transcript,
+        audioURL: url
+      };
+    }));
+
+    await currentAttemptRef.update({
+      timestamp: Date.now(),
+      parsha: currentParshaName || null,
+      perek: currentPerekNum,
+      posukStart: currentPosukNum,
+      posukEnd: currentPosukEndNum || currentPosukNum,
+      isRange: currentIsRange,
+      posukText: currentPosukText,
+      posukTranslation: currentPosukTranslation,
+      questionResults: questionResultsData,
+      questionScore: Math.round((correctCount / comprehensionQuestions.length) * 100) + '%'
+    });
+    markTaskSaved('comprehension');
+  }catch(err){
+    console.error('Autosave (comprehension questions) failed', err);
+    const gradingMsg = document.getElementById('comprehensionGradingMsg');
+    gradingMsg.textContent = (gradingMsg.textContent ? gradingMsg.textContent + ' ' : '') +
+      "Couldn't save automatically — check your internet connection.";
+  }
+}
+
+// Switches into/out of the optional bonus freehand explanation. Clears
+// whatever recording/result is currently showing first, since the bonus
+// recording is a completely separate thing from any question's answer.
+function switchToBonusMode(){
+  comprehensionMode = 'bonus';
+  resetComprehensionResult();
+  currentAudio.comprehension = null;
+  const audioEl = document.getElementById('comprehensionAudioPlayback');
+  audioEl.removeAttribute('src');
+  audioEl.classList.add('hidden');
+  document.getElementById('comprehensionDeleteBtn').classList.add('hidden');
+  document.getElementById('comprehensionStatus').textContent = 'Not recorded yet';
+  renderComprehensionQuestionUI();
+}
+function switchBackToQuestions(){
+  comprehensionMode = 'questions';
+  resetComprehensionResult();
+  currentAudio.comprehension = null;
+  const audioEl = document.getElementById('comprehensionAudioPlayback');
+  audioEl.removeAttribute('src');
+  audioEl.classList.add('hidden');
+  document.getElementById('comprehensionDeleteBtn').classList.add('hidden');
+  renderComprehensionQuestionUI();
+}
+
+document.getElementById('questionListenBtn').onclick = () => {
+  const current = comprehensionQuestions[comprehensionQIndex];
+  if(current) speakText(current.question);
+};
+document.getElementById('questionPrevBtn').onclick = () => {
+  if(comprehensionQIndex > 0){ comprehensionQIndex--; renderComprehensionQuestionUI(); }
+};
+document.getElementById('questionNextBtn').onclick = () => {
+  if(comprehensionQIndex < comprehensionQuestions.length - 1){ comprehensionQIndex++; renderComprehensionQuestionUI(); }
+};
+document.getElementById('bonusExplainBtn').onclick = switchToBonusMode;
+document.getElementById('backToQuestionsBtn').onclick = switchBackToQuestions;
 
 /* ---------- Translation chunks ----------
    Loads the cached chunk breakdown for the current posuk from Firebase
@@ -4226,6 +4664,17 @@ async function loadHistory(){
           }
         });
       }
+      if(activeTab === 'comprehension' && Array.isArray(a.questionResults) && a.questionResults.length){
+        rowsHtml += `<div class="row"><span class="label">🧠 Comprehension — Questions</span><span class="score-pill">${a.questionScore || ''}</span></div>`;
+        a.questionResults.forEach(q => {
+          let qHtml = '<span class="comp-badge">' + (q.verdict === 'correct' ? '✅ Got it' : '💡 Try again') + '</span>' +
+            '<span style="width:100%;">' + q.question + '</span>';
+          if(q.feedback) qHtml += '<span>' + q.feedback + '</span>';
+          if(q.audioURL) qHtml += '<audio controls src="' + q.audioURL + '"></audio>';
+          if(q.transcript) qHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + q.transcript + '"</span>';
+          rowsHtml += `<div class="comp-result ${q.verdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:2px;">${qHtml}</div>`;
+        });
+      }
       if(activeTab === 'comprehension' && a.comprehensionAudioURL){
         // Once a teacher finalizes a disputed grade, that decision IS the
         // official grade \u2014 the badge itself (color + label) should show
@@ -4233,7 +4682,11 @@ async function loadHistory(){
         const effectiveVerdict = a.comprehensionFinalVerdict || a.comprehensionVerdict;
         const verdictLabel = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[effectiveVerdict] || effectiveVerdict || '';
         const scoreSuffix = (!a.comprehensionFinalVerdict && typeof a.comprehensionScore === 'number') ? ' (' + a.comprehensionScore + '%)' : '';
-        rowsHtml += `<div class="row"><span class="label">🧠 Comprehension</span></div>`;
+        // If question results also exist for this attempt, this freehand
+        // explanation was the optional bonus step, not the primary grade —
+        // label it as such so it doesn't read as a second, competing score.
+        const hasQuestions = Array.isArray(a.questionResults) && a.questionResults.length;
+        rowsHtml += `<div class="row"><span class="label">${hasQuestions ? '🌟 Bonus — Explain it yourself' : '🧠 Comprehension'}</span></div>`;
         let compCardHtml = '<span class="comp-badge">' + verdictLabel + scoreSuffix + '</span>';
         if(a.comprehensionFeedback){
           compCardHtml += '<span>' + a.comprehensionFeedback + '</span>';
