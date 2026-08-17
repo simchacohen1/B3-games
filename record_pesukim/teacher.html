@@ -381,10 +381,52 @@ function effHebrewScore(record){
   return (record && typeof record.hebrewFinalScore === 'number') ? record.hebrewFinalScore : (record ? record.hebrewScore : null);
 }
 function effComprehensionVerdict(record){
+  // The freehand/bonus explanation keeps its own four-tier verdict.
   return record ? (record.comprehensionFinalVerdict || record.comprehensionVerdict) : null;
 }
+function effQuestionScore(record){
+  if(!record || !Array.isArray(record.questionResults) || !record.questionResults.length) return null;
+
+  // Newer/older records may store "80%" or 80. Accept either.
+  if(typeof record.questionScore === 'number' && Number.isFinite(record.questionScore)){
+    return Math.max(0, Math.min(100, Math.round(record.questionScore)));
+  }
+  if(typeof record.questionScore === 'string'){
+    const n = parseFloat(record.questionScore.replace('%','').trim());
+    if(Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(n)));
+  }
+
+  // Backstop: derive the score directly from the saved per-question verdicts.
+  const total = record.questionResults.length;
+  const correct = record.questionResults.filter(q => q && (q.finalVerdict || q.verdict) === 'correct').length;
+  return total ? Math.round((correct / total) * 100) : null;
+}
+function hasQuestionComprehension(record){
+  return effQuestionScore(record) !== null;
+}
 function effComprehensionScore(record){
+  // Question mode is the primary comprehension grade whenever it exists.
+  const qScore = effQuestionScore(record);
+  if(typeof qScore === 'number') return qScore;
+
+  // Otherwise fall back to the optional freehand/bonus score.
   return (record && typeof record.comprehensionScore === 'number') ? record.comprehensionScore : null;
+}
+function comprehensionSkillInfo(record){
+  if(!record) return null;
+
+  // Primary question-based comprehension is shown as an actual percentage.
+  const qScore = effQuestionScore(record);
+  if(typeof qScore === 'number'){
+    return { tier: pctTier(qScore), label: qScore + '%', score: qScore, mode: 'questions' };
+  }
+
+  // Older/freehand-only records retain the original four-tier display.
+  const verdict = effComprehensionVerdict(record);
+  if(verdict && VERDICT_INFO[verdict]){
+    return { tier: VERDICT_INFO[verdict].tier, label: VERDICT_INFO[verdict].label, verdict, mode: 'freehand' };
+  }
+  return null;
 }
 // Translation isn't stored as a single percentage (each chunk piece is
 // graded correct/incorrect separately), so its percentage is derived here
@@ -718,6 +760,7 @@ async function loadAllAttempts(forceRefresh){
 function computeStudentStats(posukMap){
   let hebrewScores = [];
   let translationScores = [];
+  let comprehensionScores = [];
   let verdictCounts = { excellent: 0, correct: 0, partial: 0, incorrect: 0 };
   let posukCount = 0;
   Object.values(posukMap || {}).forEach(attemptMap => {
@@ -728,6 +771,11 @@ function computeStudentStats(posukMap){
     if(typeof hScore === 'number') hebrewScores.push(hScore);
     const tScore = effTranslationScore(latest);
     if(typeof tScore === 'number') translationScores.push(tScore);
+    const cScore = effComprehensionScore(latest);
+    if(typeof cScore === 'number') comprehensionScores.push(cScore);
+
+    // Keep counting old freehand verdicts separately for historical context,
+    // but question-mode percentages are now the primary comprehension grade.
     const cVerdict = effComprehensionVerdict(latest);
     if(cVerdict && verdictCounts.hasOwnProperty(cVerdict)){
       verdictCounts[cVerdict]++;
@@ -735,7 +783,8 @@ function computeStudentStats(posukMap){
   });
   const avg = hebrewScores.length ? hebrewScores.reduce((a,b) => a+b, 0) / hebrewScores.length : null;
   const avgTranslation = translationScores.length ? translationScores.reduce((a,b) => a+b, 0) / translationScores.length : null;
-  return { posukCount, avg, avgTranslation, verdictCounts };
+  const avgComprehension = comprehensionScores.length ? comprehensionScores.reduce((a,b) => a+b, 0) / comprehensionScores.length : null;
+  return { posukCount, avg, avgTranslation, avgComprehension, verdictCounts };
 }
 
 /* ---------- Class Roster ---------- */
@@ -776,12 +825,15 @@ async function loadRoster(){
       const avgLabel = r.avg === null ? '—' : Math.round(r.avg) + '%';
       const avgTranslationLabel = r.avgTranslation === null ? '—' : Math.round(r.avgTranslation) + '%';
       const vc = r.verdictCounts;
-      const compParts = [];
-      if(vc.excellent) compParts.push('🌟' + vc.excellent);
-      if(vc.correct) compParts.push('✅' + vc.correct);
-      if(vc.partial) compParts.push('🤔' + vc.partial);
-      if(vc.incorrect) compParts.push('💡' + vc.incorrect);
-      const compLabel = compParts.length ? compParts.join(' ') : '—';
+      const historicalParts = [];
+      if(vc.excellent) historicalParts.push('🌟' + vc.excellent);
+      if(vc.correct) historicalParts.push('✅' + vc.correct);
+      if(vc.partial) historicalParts.push('🤔' + vc.partial);
+      if(vc.incorrect) historicalParts.push('💡' + vc.incorrect);
+      const avgCompLabel = r.avgComprehension === null ? '—' : Math.round(r.avgComprehension) + '%';
+      const compLabel = historicalParts.length
+        ? avgCompLabel + ' · bonus ' + historicalParts.join(' ')
+        : avgCompLabel;
       html += `<tr class="roster-row" data-id="${r.id}">
         <td class="rname">${r.name}</td>
         <td>${r.posukCount}</td>
@@ -832,8 +884,13 @@ function verdictLabel(v){
 // "🌟 Excellent (94%)" — used wherever a report row displays comprehension.
 function verdictLabelWithScore(v, score){
   const label = verdictLabel(v);
-  if(label === '—' || typeof score !== 'number') return label;
-  return label + ' (' + score + '%)';
+  if(typeof score === 'number'){
+    // Question-mode comprehension intentionally uses a percentage as its
+    // primary result rather than forcing it into a freehand verdict tier.
+    if(label === '—') return score + '%';
+    return label + ' (' + score + '%)';
+  }
+  return label;
 }
 
 // Builds one row per posuk (or posuk-range) per student from the raw
@@ -1135,7 +1192,7 @@ function reportSummaryHtml(rows, scoreType){
   }
   if(scoreType === 'all' || scoreType === 'comprehension'){
     summaryHtml += `<div class="row"><span class="label">Average comprehension score</span><span>${avgComprehension === null ? '—' : avgComprehension + '%'}</span></div>`;
-    summaryHtml += `<div class="row"><span class="label">Comprehension breakdown</span><span>🌟${verdictCounts.excellent} ✅${verdictCounts.correct} 🤔${verdictCounts.partial} 💡${verdictCounts.incorrect}</span></div>`;
+    summaryHtml += `<div class="row"><span class="label">Bonus/freehand breakdown</span><span>🌟${verdictCounts.excellent} ✅${verdictCounts.correct} 🤔${verdictCounts.partial} 💡${verdictCounts.incorrect}</span></div>`;
   }
   summaryHtml += `</div>`;
   return summaryHtml;
@@ -1257,10 +1314,10 @@ function downloadReportCsv(){
   }
   if(scoreType === 'all' || scoreType === 'comprehension'){
     summaryLines.push(['Average comprehension score', avgComprehension === null ? '' : avgComprehension + '%'].join(','));
-    summaryLines.push(['Excellent', verdictCounts.excellent].join(','));
-    summaryLines.push(['Correct', verdictCounts.correct].join(','));
-    summaryLines.push(['Partial', verdictCounts.partial].join(','));
-    summaryLines.push(['Incorrect', verdictCounts.incorrect].join(','));
+    summaryLines.push(['Bonus/freehand Excellent', verdictCounts.excellent].join(','));
+    summaryLines.push(['Bonus/freehand Correct', verdictCounts.correct].join(','));
+    summaryLines.push(['Bonus/freehand Partial', verdictCounts.partial].join(','));
+    summaryLines.push(['Bonus/freehand Incorrect', verdictCounts.incorrect].join(','));
   }
 
   const header = ['Student','Parsha','Perek','Posuk','Reading %','Translation %','Comprehension','Comprehension Score','Date'];
@@ -1306,7 +1363,7 @@ function printReport(){
   }
   if(scoreType === 'all' || scoreType === 'comprehension'){
     summaryRowsHtml += `<tr><td>Average comprehension score</td><td>${avgComprehension === null ? '—' : avgComprehension + '%'}</td></tr>`;
-    summaryRowsHtml += `<tr><td>Comprehension breakdown</td><td>🌟${verdictCounts.excellent} ✅${verdictCounts.correct} 🤔${verdictCounts.partial} 💡${verdictCounts.incorrect}</td></tr>`;
+    summaryRowsHtml += `<tr><td>Bonus/freehand breakdown</td><td>🌟${verdictCounts.excellent} ✅${verdictCounts.correct} 🤔${verdictCounts.partial} 💡${verdictCounts.incorrect}</td></tr>`;
   }
 
   const rowsHtml = reportRows.map(r => {
@@ -1646,10 +1703,10 @@ async function renderStudentGrid(){
           doneCount++;
         }
       }else{
-        const verdict = record ? effComprehensionVerdict(record) : null;
-        if(verdict && VERDICT_INFO[verdict]){
-          tier = VERDICT_INFO[verdict].tier;
-          tileLabel = VERDICT_INFO[verdict].label;
+        const info = record ? comprehensionSkillInfo(record) : null;
+        if(info){
+          tier = info.tier;
+          tileLabel = info.label;
           doneCount++;
         }
       }
@@ -1704,8 +1761,8 @@ async function renderStudentGrid(){
         const score = r.latest ? effTranslationScore(r.latest) : null;
         if(typeof score === 'number'){ rangeTier = pctTier(score); rangeLabel = score + '%'; }
       }else{
-        const verdict = r.latest ? effComprehensionVerdict(r.latest) : null;
-        if(verdict && VERDICT_INFO[verdict]){ rangeTier = VERDICT_INFO[verdict].tier; rangeLabel = VERDICT_INFO[verdict].label; }
+        const info = r.latest ? comprehensionSkillInfo(r.latest) : null;
+        if(info){ rangeTier = info.tier; rangeLabel = info.label; }
       }
       const pending = studentPosukData[r.posukKey].attempts.some(hasPendingDispute);
       const tile = document.createElement('div');
@@ -1767,6 +1824,19 @@ function renderPosukDetail(posukKey){
         if(c.transcript) chunkHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + c.transcript + '"</span>';
         lines += `<div class="comp-result ${effVerdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:4px;">${chunkHtml}</div>`;
         lines += renderTranslationChunkDisputeSection(a, posukKey, chunkIdx, c);
+      });
+    }
+    if(Array.isArray(a.questionResults) && a.questionResults.length){
+      const qScore = effQuestionScore(a);
+      lines += `<div class="top-line"><span>🧠 Comprehension questions</span><span class="score-pill">${typeof qScore === 'number' ? qScore + '%' : '—'}</span></div>`;
+      a.questionResults.forEach((q, qIdx) => {
+        const qVerdict = q.finalVerdict || q.verdict;
+        let qHtml = '<span class="comp-badge">' + (qVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</span>';
+        if(q.question) qHtml += '<span style="font-weight:700;">' + q.question + '</span>';
+        if(q.audioURL) qHtml += '<audio controls src="' + q.audioURL + '"></audio>';
+        if(q.transcript) qHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + q.transcript + '"</span>';
+        if(q.feedback) qHtml += '<span style="width:100%;font-size:0.82rem;">' + q.feedback + '</span>';
+        lines += `<div class="comp-result ${qVerdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:4px;">${qHtml}</div>`;
       });
     }
     if(a.comprehensionAudioURL){
@@ -2074,9 +2144,7 @@ function skillInfo(record, skill){
     if(typeof score !== 'number') return null;
     return { tier: pctTier(score), label: score + '%' };
   }
-  const v = effComprehensionVerdict(record);
-  if(!v || !VERDICT_INFO[v]) return null;
-  return { tier: VERDICT_INFO[v].tier, label: VERDICT_INFO[v].label };
+  return comprehensionSkillInfo(record);
 }
 
 /* For a class-wide tile, there's no single "average" verdict, so we color

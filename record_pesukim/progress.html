@@ -476,6 +476,30 @@ function effHebrewScore(record){
 function effComprehensionVerdict(record){
   return record ? (record.comprehensionFinalVerdict || record.comprehensionVerdict) : null;
 }
+function effQuestionScore(record){
+  if(!record || !Array.isArray(record.questionResults) || !record.questionResults.length) return null;
+  if(typeof record.questionScore === 'number' && Number.isFinite(record.questionScore)){
+    return Math.max(0, Math.min(100, Math.round(record.questionScore)));
+  }
+  if(typeof record.questionScore === 'string'){
+    const n = parseFloat(record.questionScore.replace('%','').trim());
+    if(Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(n)));
+  }
+  const total = record.questionResults.length;
+  const correct = record.questionResults.filter(q => q && (q.finalVerdict || q.verdict) === 'correct').length;
+  return total ? Math.round((correct / total) * 100) : null;
+}
+function comprehensionDisplay(record){
+  const qScore = effQuestionScore(record);
+  if(typeof qScore === 'number'){
+    return { tier: pctTier(qScore), label: qScore + '%' };
+  }
+  const verdict = effComprehensionVerdict(record);
+  if(verdict && VERDICT_INFO[verdict]){
+    return { tier: VERDICT_INFO[verdict].tier, label: VERDICT_INFO[verdict].label };
+  }
+  return null;
+}
 // Translation isn't stored as a single percentage (each chunk is graded
 // separately as correct/incorrect), so the percentage is derived here from
 // the saved per-chunk results — same math as the "X% correct" badge shown
@@ -530,10 +554,10 @@ function buildPerekSection(perekNum, range){
         doneCount++;
       }
     }else{
-      const verdict = effComprehensionVerdict(record);
-      if(verdict && VERDICT_INFO[verdict]){
-        tier = VERDICT_INFO[verdict].tier;
-        label = VERDICT_INFO[verdict].label;
+      const info = comprehensionDisplay(record);
+      if(info){
+        tier = info.tier;
+        label = info.label;
         doneCount++;
       }
     }
@@ -567,8 +591,8 @@ function buildPerekSection(perekNum, range){
         const score = effTranslationScore(record);
         if(typeof score === 'number'){ tier = pctTier(score); label = score + '%'; }
       }else{
-        const verdict = effComprehensionVerdict(record);
-        if(verdict && VERDICT_INFO[verdict]){ tier = VERDICT_INFO[verdict].tier; label = VERDICT_INFO[verdict].label; }
+        const info = comprehensionDisplay(record);
+        if(info){ tier = info.tier; label = info.label; }
       }
       const a = document.createElement('a');
       a.href = `student.html?perek=${perekNum}&posuk=${r.start}&endPosuk=${r.end}`;
