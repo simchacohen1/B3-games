@@ -947,6 +947,25 @@
     box-shadow:0 0 0 4px rgba(156,47,58,.12), 0 5px 14px rgba(59,42,30,.14);
     transform:translateY(-1px);
   }
+  /* Pressed but not yet recording — the "red light, wait" phase before the
+     mic actually opens. Pulses so it reads as "not yet" rather than "done". */
+  .chunk-token.hold-arming{
+    background:#FDECEC;
+    border-color:var(--rimon);
+    box-shadow:0 0 0 3px rgba(156,47,58,.16);
+    animation:translationArmPulse .7s ease-in-out infinite;
+  }
+  @keyframes translationArmPulse{
+    0%,100%{ opacity:1; }
+    50%{ opacity:.55; }
+  }
+  /* Released, but the recorder is kept open a little longer so a trailing
+     word doesn't get clipped off the end of the recording. */
+  .chunk-token.hold-finishing{
+    background:#F9E3E3;
+    border-color:var(--gold);
+    box-shadow:0 0 0 3px rgba(201,162,39,.18);
+  }
   .translation-hold-hint{
     text-align:center;
     font-size:.84rem;
@@ -1567,6 +1586,14 @@ let translationHoldPointerDown = false;
 let translationHoldPointerId = null;
 let translationHoldTargetIndex = null;
 let translationHoldStartTimer = null;
+// How long the pill shows a "get ready" (red) state after being pressed
+// before the mic actually opens and recording starts (goes "green"). Gives
+// the child a beat to see the cue and start talking right as it goes live,
+// instead of the recording starting mid-word.
+const TRANSLATION_ARM_DELAY_MS = 700;
+// How much longer the recorder is kept open after the child releases the
+// pill, so a trailing word or soft ending doesn't get cut off.
+const TRANSLATION_TRAIL_BUFFER_MS = 500;
 
 // Per-chunk redo (mirrors recordWordFix for Hebrew reading): lets a
 // student re-record just ONE chunk after grading, instead of redoing the
@@ -3502,12 +3529,17 @@ function beginTranslationPillHold(e, idx, el){
   selectTranslationChunkWithoutRender(idx);
   try{ el.setPointerCapture(e.pointerId); }catch(_){ }
 
+  // Red light: pressed, but not recording yet. Keep holding until it turns green.
+  el.classList.add('hold-arming');
+  document.getElementById('translationStatus').textContent = '🔴 Get ready… keep holding';
+
   if(translationHoldStartTimer) clearTimeout(translationHoldStartTimer);
-  // A short tap is just selection. Only a real hold opens the microphone.
+  // A short tap is just selection. Only a real hold — past the arming delay —
+  // opens the microphone and starts recording (the "green light").
   translationHoldStartTimer = setTimeout(() => {
     translationHoldStartTimer = null;
     startTranslationPillRecording(idx);
-  }, 280);
+  }, TRANSLATION_ARM_DELAY_MS);
 }
 
 async function startTranslationPillRecording(idx){
@@ -3523,6 +3555,8 @@ async function startTranslationPillRecording(idx){
     // In that case, close the mic immediately and wait for the next hold.
     if(!translationHoldPointerDown || translationHoldTargetIndex !== idx){
       stream.getTracks().forEach(t => t.stop());
+      const releasedPill = document.querySelector('.chunk-token[data-idx="' + idx + '"]');
+      if(releasedPill) releasedPill.classList.remove('hold-arming');
       document.getElementById('translationStatus').textContent = 'Ready — hold the piece again to record.';
       return;
     }
@@ -3540,15 +3574,18 @@ async function startTranslationPillRecording(idx){
     translationSessionActive = true;
     translationRecorder.start();
 
-    document.getElementById('translationStatus').textContent = '🎙️ Recording piece ' + (idx + 1) + ' — let go to save';
+    // Green light: recording is actually live now — go ahead and talk.
+    document.getElementById('translationStatus').textContent = '🟢 Recording piece ' + (idx + 1) + ' — let go to save';
     const pill = document.querySelector('.chunk-token[data-idx="' + idx + '"]');
-    if(pill) pill.classList.add('hold-recording');
+    if(pill){ pill.classList.remove('hold-arming'); pill.classList.add('hold-recording'); }
     const level = translationLevels[translationLevelIndex];
     document.getElementById('chunkProgress').textContent = 'Recording piece ' + (idx + 1) + ' of ' + level.chunks.length + ' — let go when you finish.';
   }catch(err){
     console.error(err);
     translationHoldPointerDown = false;
     translationHoldTargetIndex = null;
+    const failedPill = document.querySelector('.chunk-token[data-idx="' + idx + '"]');
+    if(failedPill) failedPill.classList.remove('hold-arming');
     alert('Could not access the microphone. Please allow microphone permission.');
     document.getElementById('translationStatus').textContent = 'Microphone permission needed';
   }
@@ -3571,7 +3608,7 @@ async function endTranslationPillHold(e, idx){
   }
 
   if(translationSessionActive && translationHoldTargetIndex === idx){
-    await finishTranslationPillRecording(idx);
+    scheduleFinishTranslationHold(idx);
   }else{
     translationHoldTargetIndex = null;
     renderCurrentChunk();
@@ -3583,11 +3620,23 @@ async function cancelTranslationPillHold(e, idx){
   translationHoldPointerId = null;
   if(translationHoldStartTimer){ clearTimeout(translationHoldStartTimer); translationHoldStartTimer = null; }
   if(translationSessionActive && translationHoldTargetIndex === idx){
-    await finishTranslationPillRecording(idx);
+    scheduleFinishTranslationHold(idx);
   }else{
     translationHoldTargetIndex = null;
     renderCurrentChunk();
   }
+}
+
+// Called the instant the child releases the pill. Rather than cutting the
+// recording off immediately, keep the mic running a bit longer so a soft or
+// trailing word right at the end doesn't get clipped — then actually stop.
+function scheduleFinishTranslationHold(idx){
+  document.getElementById('translationStatus').textContent = '✋ Got it — finishing up…';
+  const pill = document.querySelector('.chunk-token[data-idx="' + idx + '"]');
+  if(pill){ pill.classList.remove('hold-recording'); pill.classList.add('hold-finishing'); }
+  setTimeout(() => {
+    finishTranslationPillRecording(idx);
+  }, TRANSLATION_TRAIL_BUFFER_MS);
 }
 
 async function finishTranslationPillRecording(idx){
