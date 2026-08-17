@@ -1266,6 +1266,7 @@
         <div class="chunk-pill-display" id="chunkPillDisplay" dir="rtl"></div>
         <div class="translation-hold-hint">👆 Tap to start, wait for it to turn clear, then talk • tap again to save</div>
         <div style="text-align:center;margin-top:8px;"><span class="status-tag" id="translationStatus">Ready</span></div>
+        <div style="text-align:center;margin-top:8px;"><button class="btn small gold hidden" id="translationDoneBtn" type="button">✅ Done — save this piece</button></div>
 
         <audio id="translationAudioPlayback" controls class="hidden"></audio>
         <button class="hidden" id="translationDeleteBtn"></button>
@@ -3451,6 +3452,12 @@ function renderCurrentChunk(){
   prevBtn.disabled = translationBusy || (translationChunkIndex === 0);
   nextBtn.disabled = translationBusy || (translationChunkIndex === total - 1);
 
+  // The last piece has no "next pill" to tap to trigger its finish, so give
+  // it an explicit Done button instead — only while it's actually recording.
+  const doneBtn = document.getElementById('translationDoneBtn');
+  const isLastPieceRecording = translationPillPhase === 'recording' && translationHoldTargetIndex === total - 1;
+  doneBtn.classList.toggle('hidden', !isLastPieceRecording);
+
   if(translationPillPhase === 'arming'){
     progressEl.textContent = 'Piece ' + (translationHoldTargetIndex + 1) + ' of ' + total + ' — get ready…';
   }else if(translationPillPhase === 'recording'){
@@ -3763,6 +3770,11 @@ function jumpToChunk(newIdx){
 // The old stand-alone translation microphone is intentionally hidden now;
 // recording starts from a long-press on a Hebrew pill instead.
 document.getElementById('translationRecordBtn').onclick = () => {};
+document.getElementById('translationDoneBtn').onclick = () => {
+  if(translationPillPhase === 'recording' && translationHoldTargetIndex !== null){
+    scheduleFinishTranslationHold(translationHoldTargetIndex);
+  }
+};
 document.getElementById('translationRetryBtn').onclick = () => {
   translationSegments = {};
   translationGradedResults = {};
