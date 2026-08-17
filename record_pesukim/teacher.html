@@ -423,16 +423,29 @@ let activeStudentId = null;
 let studentsMap = {}; // id -> name
 let studentsInfo = {}; // id -> { name, lastActive }
 
-const PARSHA_ORDER = { "Vayeira": 0, "ChayeiSarah": 1, "Toldos": 2 };
+const PARSHA_ORDER = {
+  "Bereishis":0, "Noach":1, "LechLecha":2, "Vayeira":3,
+  "ChayeiSarah":4, "Toldos":5, "Vayeitzei":6, "Vayishlach":7,
+  "Vayeishev":8, "Mikeitz":9, "Vayigash":10, "Vayechi":11
+};
 
 /* =========================================================
    PARSHA / PEREK / POSUK MAP + Hebrew numerals — kept identical
    to student.html / progress.html so ranges & labels line up.
    ========================================================= */
 const PARSHA_CONFIG = {
-  "Vayeira":      [ {num:18}, {num:19}, {num:20}, {num:21}, {num:22} ],
+  "Bereishis": [ {num:1}, {num:2}, {num:3}, {num:4}, {num:5}, {num:6, maxPosuk:8} ],
+  "Noach": [ {num:6, minPosuk:9}, {num:7}, {num:8}, {num:9}, {num:10}, {num:11} ],
+  "Lech Lecha": [ {num:12}, {num:13}, {num:14}, {num:15}, {num:16}, {num:17} ],
+  "Vayeira": [ {num:18}, {num:19}, {num:20}, {num:21}, {num:22} ],
   "Chayei Sarah": [ {num:23}, {num:24}, {num:25, maxPosuk:18} ],
-  "Toldos":       [ {num:25, minPosuk:19}, {num:26}, {num:27}, {num:28, maxPosuk:9} ]
+  "Toldos": [ {num:25, minPosuk:19}, {num:26}, {num:27}, {num:28, maxPosuk:9} ],
+  "Vayeitzei": [ {num:28, minPosuk:10}, {num:29}, {num:30}, {num:31}, {num:32, maxPosuk:3} ],
+  "Vayishlach": [ {num:32, minPosuk:4}, {num:33}, {num:34}, {num:35}, {num:36} ],
+  "Vayeishev": [ {num:37}, {num:38}, {num:39}, {num:40} ],
+  "Mikeitz": [ {num:41}, {num:42}, {num:43}, {num:44, maxPosuk:17} ],
+  "Vayigash": [ {num:44, minPosuk:18}, {num:45}, {num:46}, {num:47, maxPosuk:27} ],
+  "Vayechi": [ {num:47, minPosuk:28}, {num:48}, {num:49}, {num:50} ]
 };
 
 const HEB_HUNDREDS = ['','ק','ר','ש','ת'];
@@ -828,7 +841,7 @@ function verdictLabelWithScore(v, score){
 // posuk number so it can be filtered and displayed like the rest of the
 // dashboard. A comprehension range attempt (key ends in "from-to" instead
 // of a plain posuk number) becomes a row with isRange true and no reading
-// score, since range attempts are comprehension-only.
+// scores. Range attempts can now contain reading, translation, and comprehension.
 // Includes the latest attempt's timestamp so rows can be filtered/shown by date.
 function buildReportRows(allAttempts){
   const rows = [];
@@ -862,8 +875,8 @@ function buildReportRows(allAttempts){
         rangeEnd,
         posukLabel: isRange ? `${rangeStart}–${rangeEnd}` : String(posukNum),
         timestamp: latest ? latest.timestamp : null,
-        hebrewScore: isRange ? null : effHebrewScore(latest), // range attempts are comprehension-only
-        translationScore: isRange ? null : effTranslationScore(latest), // range attempts are comprehension-only
+        hebrewScore: effHebrewScore(latest),
+        translationScore: effTranslationScore(latest),
         comprehensionVerdict: effComprehensionVerdict(latest),
         comprehensionScore: effComprehensionScore(latest)
       });
@@ -1593,7 +1606,7 @@ async function renderStudentGrid(){
   const wrap = document.getElementById('studentGridWrap');
   wrap.innerHTML = '';
   const perekNums = Object.keys(studentPerekData).map(Number).sort((a,b) => a - b);
-  const showRanges = studentActiveTab === 'comprehension' && studentRangeData.length > 0;
+  const showRanges = studentRangeData.length > 0;
 
   if(perekNums.length === 0 && !showRanges){
     wrap.innerHTML = '<div class="empty-msg">No recordings yet.</div>';
@@ -1674,7 +1687,7 @@ async function renderStudentGrid(){
   if(showRanges){
     const label = document.createElement('div');
     label.className = 'perek-label';
-    label.innerHTML = `<span>🧠 Multi-posuk comprehension checks</span>`;
+    label.innerHTML = `<span>📚 Several פסוקים together</span>`;
     wrap.appendChild(label);
 
     const list = document.createElement('div');
@@ -1682,14 +1695,24 @@ async function renderStudentGrid(){
     list.style.flexWrap = 'wrap';
     list.style.gap = '8px';
     studentRangeData.forEach(r => {
-      const verdict = r.latest ? effComprehensionVerdict(r.latest) : null;
-      const vi = (verdict && VERDICT_INFO[verdict]) ? VERDICT_INFO[verdict] : { label: '—', tier: null };
+      let rangeTier = null;
+      let rangeLabel = '—';
+      if(studentActiveTab === 'reading'){
+        const score = r.latest ? effHebrewScore(r.latest) : null;
+        if(typeof score === 'number'){ rangeTier = pctTier(score); rangeLabel = score + '%'; }
+      }else if(studentActiveTab === 'translate'){
+        const score = r.latest ? effTranslationScore(r.latest) : null;
+        if(typeof score === 'number'){ rangeTier = pctTier(score); rangeLabel = score + '%'; }
+      }else{
+        const verdict = r.latest ? effComprehensionVerdict(r.latest) : null;
+        if(verdict && VERDICT_INFO[verdict]){ rangeTier = VERDICT_INFO[verdict].tier; rangeLabel = VERDICT_INFO[verdict].label; }
+      }
       const pending = studentPosukData[r.posukKey].attempts.some(hasPendingDispute);
       const tile = document.createElement('div');
-      tile.className = 'posuk-tile ' + (vi.tier ? 'tile-' + vi.tier : 'tile-none') + (r.posukKey === selectedPosukKey ? ' selected' : '') + (pending ? ' tile-disputed' : '');
+      tile.className = 'posuk-tile ' + (rangeTier ? 'tile-' + rangeTier : 'tile-none') + (r.posukKey === selectedPosukKey ? ' selected' : '') + (pending ? ' tile-disputed' : '');
       tile.style.width = 'auto';
       tile.style.padding = '6px 10px';
-      tile.innerHTML = `<span class="tile-num">פרק ${hebrewNumeral(r.perekNum)} · ${r.rangeStart}–${r.rangeEnd}</span><span class="tile-score">${vi.label}</span>` + (pending ? '<span class="tile-dispute-flag">⚠️</span>' : '');
+      tile.innerHTML = `<span class="tile-num">פרק ${hebrewNumeral(r.perekNum)} · ${r.rangeStart}–${r.rangeEnd}</span><span class="tile-score">${rangeLabel}</span>` + (pending ? '<span class="tile-dispute-flag">⚠️</span>' : '');
       tile.id = 'tile_' + r.posukKey;
       tile.onclick = async () => {
         selectedPosukKey = r.posukKey;
@@ -1980,7 +2003,7 @@ function parsePosukKey(posukKey){
 
 function formatRefLabel(posukKey){
   const { parshaSlug, perek, posuk, isRange, rangeStart, rangeEnd } = parsePosukKey(posukKey);
-  const parshaName = parshaSlug === 'ChayeiSarah' ? 'Chayei Sarah' : parshaSlug;
+  const parshaName = Object.keys(PARSHA_CONFIG).find(n => n.replace(/\s+/g,'') === parshaSlug) || parshaSlug;
   const posukLabel = isRange ? `${rangeStart}–${rangeEnd}` : posuk;
   return `${parshaName} · Perek ${perek} · Posuk ${posukLabel}`;
 }

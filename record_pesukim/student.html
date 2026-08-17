@@ -86,12 +86,75 @@
   .btn:disabled{ opacity:0.45; cursor:not-allowed; box-shadow:none; }
   .btn.small{ padding:8px 16px; font-size:0.85rem; }
 
+  .selection-shell{
+    margin:18px 0 12px;
+    display:grid;
+    gap:12px;
+  }
+  .mode-card, .content-picker{
+    background:rgba(255,255,255,0.82);
+    border:1px solid rgba(59,42,30,0.14);
+    border-radius:16px;
+    padding:12px 14px;
+    box-shadow:0 3px 10px rgba(59,42,30,0.07);
+  }
+  .mode-card{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .mode-label{
+    font-size:.82rem;
+    font-weight:800;
+    color:var(--ink-soft);
+    white-space:nowrap;
+  }
+  .mode-toggle{
+    display:inline-grid;
+    grid-template-columns:1fr 1fr;
+    gap:5px;
+    padding:4px;
+    border-radius:999px;
+    background:rgba(31,46,61,.08);
+  }
+  .mode-choice{
+    appearance:none;
+    border:0;
+    border-radius:999px;
+    padding:9px 16px;
+    background:transparent;
+    color:var(--ink-soft);
+    font-family:'Quicksand',sans-serif;
+    font-weight:800;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .mode-choice.active{
+    background:var(--tent-navy);
+    color:#fff;
+    box-shadow:0 2px 6px rgba(31,46,61,.2);
+  }
+  .content-picker-title{
+    text-align:center;
+    font-size:.78rem;
+    font-weight:800;
+    color:var(--ink-soft);
+    margin-bottom:8px;
+  }
   .selectors{
-    display:flex; justify-content:center; gap:10px; flex-wrap:wrap;
-    margin: 18px 0;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin:0;
   }
   select{
-    flex: 0 1 200px; min-width: 140px;
+    flex: 1 1 170px;
+    max-width:220px;
+    min-width:140px;
     font-family:'Quicksand', sans-serif;
     font-size: 1rem;
     padding: 10px 12px;
@@ -101,6 +164,76 @@
     direction: rtl;
     text-align: center;
     text-align-last: center;
+  }
+  #selectionModeSelect{ display:none !important; }
+  .selection-summary{
+    margin:14px 0 10px;
+    padding:10px 14px;
+    border-radius:14px;
+    background:rgba(255,255,255,.88);
+    border:1px solid rgba(59,42,30,.14);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    box-shadow:0 3px 10px rgba(59,42,30,.07);
+  }
+  .selection-summary-text{
+    font-weight:800;
+    color:var(--tent-navy);
+    direction:rtl;
+  }
+  .change-selection-btn{
+    border:0;
+    border-radius:999px;
+    padding:7px 12px;
+    background:rgba(140,47,57,.10);
+    color:var(--rimon-dark);
+    font-family:'Quicksand',sans-serif;
+    font-weight:800;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .range-posuk{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    padding:8px 0;
+    border-bottom:1px dashed rgba(59,42,30,0.18);
+  }
+  .range-posuk:last-child{ border-bottom:none; }
+  .range-posuk-num{
+    flex:0 0 auto;
+    min-width:34px;
+    height:34px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:999px;
+    background:var(--gold);
+    color:var(--ink);
+    font-family:'Quicksand',sans-serif;
+    font-size:0.78rem;
+    font-weight:800;
+    direction:rtl;
+    margin-top:4px;
+  }
+  .range-posuk-text{ flex:1; }
+  .range-boundary-label{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    align-self:center;
+    padding:5px 9px;
+    border-radius:999px;
+    background:rgba(201,162,39,0.18);
+    color:var(--ink-soft);
+    font-family:'Quicksand',sans-serif;
+    font-size:0.72rem;
+    font-weight:800;
+    white-space:nowrap;
+    direction:rtl;
+    user-select:none;
   }
 
   .scroll{
@@ -130,6 +263,24 @@
   }
   .posuk-text .sof-pasuk{
     font-family: 'Times New Roman', 'Liberation Serif', serif;
+  }
+  /* A multi-posuk selection stays readable without pushing the record
+     controls below the fold. The text scrolls inside the parchment box. */
+  .scroll.range-selection{
+    max-height:300px;
+    min-height:170px;
+    overflow-y:auto;
+    align-items:flex-start;
+    justify-content:stretch;
+    scroll-behavior:smooth;
+  }
+  .scroll.range-selection .posuk-text{
+    width:100%;
+    font-size:clamp(1.45rem,3.2vw,1.85rem);
+    line-height:1.55;
+  }
+  .scroll.range-selection .range-posuk{
+    padding:5px 0 9px;
   }
   .btn.ghost-delete{
     background: transparent;
@@ -479,6 +630,310 @@
   footer.who{
     text-align:center; margin-top:26px; font-size:0.8rem; color: var(--ink-soft);
   }
+
+
+  /* =========================================================
+     2026 STUDENT EXPERIENCE REFRESH
+     Visual-only layer: keeps the existing Firebase/recording/grading
+     logic, but makes each tab feel like one simple child-friendly task.
+     ========================================================= */
+  .task-tabs{
+    gap:8px;
+    margin: 6px 0 12px;
+    padding:6px;
+    background:rgba(255,255,255,0.45);
+    border:1px solid rgba(59,42,30,0.10);
+    border-radius:18px;
+  }
+  .tab-btn,
+  .tab-btn:first-child,
+  .tab-btn:last-child{
+    border-radius:13px;
+    border:2px solid transparent;
+    border-bottom:2px solid transparent;
+    min-height:54px;
+    padding:10px 8px;
+    line-height:1.15;
+  }
+  .tab-btn.active{
+    border-color:var(--gold);
+    box-shadow:0 4px 12px rgba(59,42,30,0.10);
+  }
+  .task-card,
+  .task-card.translate,
+  .task-card.comprehension{
+    border-radius:20px;
+    border-top:0;
+    border-left:0;
+    padding:24px;
+    margin-top:0;
+    box-shadow:0 7px 22px rgba(59,42,30,0.12);
+    overflow:hidden;
+  }
+  .task-card::before{
+    content:"";
+    position:absolute;
+    left:0; right:0; top:0;
+    height:6px;
+    background:var(--tent-navy);
+  }
+  .task-card.translate::before{ background:var(--rimon); }
+  .task-card.comprehension::before{ background:var(--gold); }
+  .task-title-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:14px;
+  }
+  .task-title-row h3{
+    margin:0;
+    font-size:1.45rem;
+  }
+  .step-chip{
+    flex:0 0 auto;
+    border-radius:999px;
+    background:var(--parchment);
+    color:var(--ink-soft);
+    border:1px solid rgba(59,42,30,0.12);
+    font-size:0.72rem;
+    font-weight:700;
+    padding:5px 10px;
+    letter-spacing:.2px;
+  }
+  .instruction-card{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    padding:15px 16px;
+    margin-bottom:18px;
+    border-radius:16px;
+    background:linear-gradient(135deg, #fffaf0 0%, var(--parchment) 100%);
+    border:1px solid rgba(201,162,39,0.45);
+  }
+  .instruction-copy{
+    min-width:0;
+  }
+  .instruction-copy strong{
+    display:block;
+    font-size:1.02rem;
+    line-height:1.35;
+    color:var(--ink);
+  }
+  .instruction-copy span{
+    display:block;
+    margin-top:3px;
+    font-size:.82rem;
+    line-height:1.35;
+    color:var(--ink-soft);
+  }
+  .listen-btn{
+    flex:0 0 auto;
+    border:2px solid var(--gold);
+    background:#fff;
+    color:var(--ink);
+    border-radius:999px;
+    min-height:42px;
+    padding:9px 13px;
+    font-family:'Quicksand',sans-serif;
+    font-weight:700;
+    cursor:pointer;
+    box-shadow:0 2px 0 rgba(151,120,26,.35);
+  }
+  .listen-btn:active{ transform:translateY(2px); box-shadow:none; }
+  .record-stage{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+    padding:8px 0 2px;
+    text-align:center;
+  }
+  .record-stage .record-row{
+    width:100%;
+    justify-content:center;
+  }
+  .seal-btn{
+    width:82px;
+    height:82px;
+    font-size:1.9rem;
+  }
+  .record-caption{
+    font-size:.88rem;
+    font-weight:700;
+    color:var(--ink-soft);
+  }
+  .record-stage .status-tag{
+    min-height:1.2em;
+    font-size:.82rem;
+  }
+  .record-stage audio{
+    flex:0 1 420px;
+    max-width:100%;
+  }
+  .comp-status{
+    font-weight:600;
+  }
+  .comp-result{
+    padding:16px 18px;
+    border-radius:16px;
+    font-size:.95rem;
+    line-height:1.45;
+  }
+  .comp-badge{
+    font-size:.86rem;
+    padding:6px 12px;
+  }
+  .speak-btn,
+  .feedback-listen-btn{
+    border:2px solid rgba(59,42,30,.18);
+    background:#fff;
+    color:var(--ink);
+    cursor:pointer;
+    border-radius:999px;
+    font-family:'Quicksand',sans-serif;
+    font-weight:700;
+    font-size:.83rem;
+    line-height:1;
+    padding:8px 11px;
+    opacity:1;
+  }
+  .speak-btn:active,
+  .feedback-listen-btn:active{ transform:scale(.97); }
+  .chunk-level-row{
+    background:rgba(241,231,206,.58);
+    border-radius:14px;
+    padding:10px;
+    margin-bottom:13px;
+  }
+  .chunk-level-row .btn{
+    padding:8px 12px;
+  }
+  .chunk-progress{
+    font-size:.92rem;
+    font-weight:700;
+    color:var(--rimon-dark);
+    margin:4px 0 10px;
+  }
+  .chunk-pill-display{
+    background:#fffaf0;
+    border:2px solid rgba(201,162,39,.40);
+    padding:18px 16px;
+    margin-bottom:14px;
+    font-size:1.55rem;
+  }
+  .chunk-token{
+    padding:6px 11px;
+  }
+  .chunk-token.active{
+    transform:scale(1.10);
+    box-shadow:0 4px 12px rgba(201,162,39,.35);
+  }
+  .chunk-nav-row{
+    justify-content:space-between;
+    align-items:center;
+    margin-top:16px;
+  }
+  .chunk-nav-row .btn{ min-width:150px; }
+  .history{
+    margin-top:24px;
+  }
+  .history-toggle{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    background:rgba(255,255,255,.72);
+    border:2px solid rgba(201,162,39,.55);
+    color:var(--tent-navy);
+    border-radius:16px;
+    padding:13px 16px;
+    font-family:'Quicksand',sans-serif;
+    font-weight:700;
+    font-size:1rem;
+    cursor:pointer;
+  }
+  .history-toggle .chevron{ transition:transform .18s ease; }
+  .history-toggle[aria-expanded="true"] .chevron{ transform:rotate(180deg); }
+  .history-body{
+    padding-top:10px;
+  }
+  .history h2{ display:none; }
+  .feedback-audio-row{
+    width:100%;
+    display:flex;
+    justify-content:flex-start;
+    margin-top:3px;
+  }
+  @media (max-width:620px){
+    .mode-card{ padding:10px; gap:8px; }
+    .mode-label{ width:100%; text-align:center; }
+    .mode-toggle{ width:100%; }
+    .mode-choice{ padding:9px 8px; font-size:.88rem; }
+    .content-picker{ padding:10px; }
+    .selectors{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .selectors select{ width:100%; max-width:none; min-width:0; }
+    .selectors.range-active{ grid-template-columns:1fr 1fr; }
+    .selectors.range-active #perekSelect{ grid-column:1 / -1; }
+    .selection-summary{ margin-top:10px; }
+    .scroll.range-selection{ max-height:235px; min-height:145px; }
+    .wrap{ padding-left:12px; padding-right:12px; }
+    .scroll{ padding:18px 14px; }
+    .posuk-text{ font-size:1.7rem; }
+    .tab-btn{ font-size:.78rem; }
+    .task-card,
+    .task-card.translate,
+    .task-card.comprehension{ padding:19px 15px; }
+    .task-title-row h3{ font-size:1.25rem; }
+    .instruction-card{ align-items:flex-start; }
+    .listen-btn{ padding:8px 10px; font-size:.82rem; }
+    .chunk-nav-row{ gap:7px; }
+    .chunk-nav-row .btn{ min-width:0; flex:1; padding:9px 7px; }
+  }
+
+
+  /* Translate v2: each Hebrew pill is also its own press-and-hold recorder.
+     Flex gap (instead of inline margins + a scaled active pill) guarantees
+     neighboring pills never visually overlap, even on narrow screens. */
+  .chunk-pill-display{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    align-items:center;
+    gap:12px 14px;
+    line-height:1.55;
+  }
+  .chunk-token{
+    margin:0;
+    max-width:100%;
+    line-height:1.55;
+    white-space:normal;
+    touch-action:none;
+    user-select:none;
+    -webkit-user-select:none;
+    -webkit-touch-callout:none;
+  }
+  .chunk-token.active{
+    transform:none;
+    box-shadow:0 4px 12px rgba(201,162,39,.35);
+  }
+  .chunk-token.hold-recording{
+    background:#F9E3E3;
+    border-color:var(--rimon);
+    box-shadow:0 0 0 4px rgba(156,47,58,.12), 0 5px 14px rgba(59,42,30,.14);
+    transform:translateY(-1px);
+  }
+  .translation-hold-hint{
+    text-align:center;
+    font-size:.84rem;
+    font-weight:700;
+    color:var(--ink-soft);
+    margin-top:-3px;
+  }
+
 </style>
 </head>
 <body>
@@ -509,13 +964,35 @@
       </div>
     </div>
 
-    <div class="selectors">
-      <select id="posukSelect" disabled><option value="">פסוק</option></select>
-      <select id="perekSelect"><option value="">פרק</option></select>
+    <div class="selection-shell" id="selectionShell">
+      <div class="mode-card">
+        <div class="mode-label">How much do you want to practice?</div>
+        <div class="mode-toggle" role="group" aria-label="Choose one posuk or several pesukim">
+          <button type="button" class="mode-choice active" id="modeSingleBtn" data-mode="single">① One פסוק</button>
+          <button type="button" class="mode-choice" id="modeRangeBtn" data-mode="range">①–③ Several פסוקים</button>
+        </div>
+        <select id="selectionModeSelect" aria-hidden="true" tabindex="-1">
+          <option value="single">One פסוק</option>
+          <option value="range">Several פסוקים</option>
+        </select>
+      </div>
+      <div class="content-picker">
+        <div class="content-picker-title" id="contentPickerTitle">Choose what to practice</div>
+        <div class="selectors" id="selectorsRow">
+          <select id="posukSelect" disabled><option value="">פסוק</option></select>
+          <select id="endPosukSelect" class="hidden" disabled><option value="">עד פסוק</option></select>
+          <select id="perekSelect"><option value="">פרק</option></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="selection-summary hidden" id="selectionSummary">
+      <div class="selection-summary-text" id="selectionSummaryText"></div>
+      <button type="button" class="change-selection-btn" id="changeSelectionBtn">✏️ Change</button>
     </div>
 
     <div class="scroll" id="scrollBox">
-      <div class="placeholder" id="scrollPlaceholder">Pick a פרק and Posuk above to begin 📖</div>
+      <div class="placeholder" id="scrollPlaceholder">Choose a פרק and פסוק to begin 📖</div>
       <div class="posuk-text hidden" id="posukText"></div>
     </div>
     <div class="msg" id="fetchMsg"></div>
@@ -527,19 +1004,32 @@
            step. A checkmark appears on a tab once that task has been
            completed and saved for this posuk. -->
       <div class="task-tabs">
-        <button class="tab-btn active" id="tabReadingBtn">1️⃣ Read the Hebrew <span class="tab-check hidden" id="readingCheck">✅</span></button>
+        <button class="tab-btn active" id="tabReadingBtn">📖 Read Hebrew <span class="tab-check hidden" id="readingCheck">✅</span></button>
         <button class="tab-btn" id="tabTranslateBtn">🔤 Translate <span class="tab-check hidden" id="translateCheck">✅</span></button>
-        <button class="tab-btn" id="tabComprehensionBtn">🧠 Show You Understand <span class="tab-check hidden" id="comprehensionCheck">✅</span></button>
+        <button class="tab-btn" id="tabComprehensionBtn">🧠 Understand <span class="tab-check hidden" id="comprehensionCheck">✅</span></button>
       </div>
 
       <!-- Hebrew reading task (computer-graded, same scorer as Kol Emes) -->
       <div class="task-card" id="readingPanel">
-        <h3>1️⃣ Read the Hebrew Words</h3>
-        <div class="record-row">
-          <button class="seal-btn" id="hebrewRecordBtn" title="Record">🎙️</button>
-          <div class="mic-meter hidden" id="hebrewMicMeter"><div class="mic-meter-bar" id="hebrewMicMeterBar"></div></div>
-          <audio id="hebrewAudioPlayback" controls class="hidden"></audio>
-          <button class="btn ghost-delete hidden" id="hebrewDeleteBtn" title="Delete this recording">🗑️ Delete</button>
+        <div class="task-title-row">
+          <h3>📖 Read the Hebrew</h3>
+          <span class="step-chip">STEP 1</span>
+        </div>
+        <div class="instruction-card">
+          <div class="instruction-copy">
+            <strong>Read the selected Hebrew out loud.</strong>
+            <span>Tap the microphone when you are ready.</span>
+          </div>
+          <button class="listen-btn" id="readingInstructionBtn" type="button">🔊 Listen</button>
+        </div>
+        <div class="record-stage">
+          <div class="record-row">
+            <button class="seal-btn" id="hebrewRecordBtn" title="Start reading" aria-label="Start or stop reading">🎙️</button>
+            <div class="mic-meter hidden" id="hebrewMicMeter"><div class="mic-meter-bar" id="hebrewMicMeterBar"></div></div>
+            <audio id="hebrewAudioPlayback" controls class="hidden"></audio>
+            <button class="btn ghost-delete hidden" id="hebrewDeleteBtn" title="Delete this recording">🗑️ Delete</button>
+          </div>
+          <div class="record-caption">🎙️ Tap to start reading</div>
           <span class="status-tag" id="hebrewStatus">Not recorded yet</span>
         </div>
         <div class="comp-status" id="hebrewGradingMsg"></div>
@@ -549,48 +1039,69 @@
 
       <!-- Translation task (computer-graded, per Hebrew phrase chunk) -->
       <div class="task-card translate hidden" id="translationPanel">
-        <h3>🔤 Translate the Posuk</h3>
-        <p style="margin:0 0 10px;color:var(--ink-soft);font-size:0.9rem;">Say the English translation of each piece, out loud. Ask for bigger or smaller pieces any time!</p>
-
-        <div class="chunk-level-row">
-          <button class="btn small gold" id="chunkSmallerBtn">🔍 Smaller pieces</button>
-          <span class="chunk-level-label" id="chunkLevelLabel"></span>
-          <button class="btn small gold" id="chunkBiggerBtn">🔎 Bigger pieces</button>
+        <div class="task-title-row">
+          <h3>🔤 Translate</h3>
+          <span class="step-chip">STEP 2</span>
+        </div>
+        <div class="instruction-card">
+          <div class="instruction-copy">
+            <strong>Press and hold a Hebrew piece while you say its English meaning.</strong>
+            <span>Let go when you finish that piece. You can stop and take a break between pieces.</span>
+          </div>
+          <button class="listen-btn" id="translationInstructionBtn" type="button">🔊 Listen</button>
         </div>
 
-        <div class="chunk-progress" id="chunkProgress">Tap the microphone, then read the highlighted piece aloud.</div>
-        <div class="chunk-pill-display" id="chunkPillDisplay" dir="rtl"></div>
+        <div class="chunk-level-row">
+          <button class="btn small gold" id="chunkSmallerBtn">➖ Smaller</button>
+          <span class="chunk-level-label" id="chunkLevelLabel"></span>
+          <button class="btn small gold" id="chunkBiggerBtn">➕ Bigger</button>
+        </div>
 
-        <!-- Hidden legacy elements some shared helper functions (deleteRecording,
-             markTaskSaved, etc.) still look up by id — they stay unused/empty
-             in the new continuous-recording flow but must exist in the DOM. -->
+        <div class="chunk-progress" id="chunkProgress">Press and hold a Hebrew piece to record its translation.</div>
+        <div class="chunk-pill-display" id="chunkPillDisplay" dir="rtl"></div>
+        <div class="translation-hold-hint">👆 Hold a piece to talk • let go to save</div>
+        <div style="text-align:center;margin-top:8px;"><span class="status-tag" id="translationStatus">Ready</span></div>
+
         <audio id="translationAudioPlayback" controls class="hidden"></audio>
         <button class="hidden" id="translationDeleteBtn"></button>
 
-        <div class="record-row">
-          <button class="seal-btn" id="translationRecordBtn" title="Start recording">🎙️</button>
-          <div class="mic-meter hidden" id="translationMicMeter"><div class="mic-meter-bar" id="translationMicMeterBar"></div></div>
-          <span class="status-tag" id="translationStatus">Not recorded yet</span>
+        <!-- Kept in the page for compatibility with the existing reset/meter code,
+             but the child now records directly by holding a Hebrew pill. -->
+        <div class="hidden" aria-hidden="true">
+          <button id="translationRecordBtn" type="button">🎙️</button>
+          <div id="translationMicMeter"><div id="translationMicMeterBar"></div></div>
         </div>
         <div class="comp-status" id="translationGradingMsg"></div>
         <button class="btn small hidden" id="translationRetryBtn" style="margin-top:6px;">🔁 Start over</button>
         <div class="comp-result hidden" id="translationResult"></div>
 
         <div class="chunk-nav-row">
-          <button class="btn small ghost-delete" id="chunkPrevBtn">◀️ Previous piece</button>
-          <button class="btn small gold" id="chunkNextBtn">Next piece ▶️</button>
+          <button class="btn small ghost-delete" id="chunkPrevBtn">◀️ Previous</button>
+          <button class="btn small gold" id="chunkNextBtn">Next ▶️</button>
         </div>
       </div>
 
       <!-- Comprehension check (computer-graded) -->
       <div class="task-card comprehension hidden" id="comprehensionPanel">
-        <h3>🧠 Show You Understand</h3>
-        <p style="margin:0 0 10px;color:var(--ink-soft);font-size:0.9rem;">In your own words, say what is happening in this posuk. Don't worry about exact words — just explain it like you'd tell a friend!</p>
-        <div class="record-row">
-          <button class="seal-btn" id="comprehensionRecordBtn" title="Record">🎙️</button>
-          <div class="mic-meter hidden" id="comprehensionMicMeter"><div class="mic-meter-bar" id="comprehensionMicMeterBar"></div></div>
-          <audio id="comprehensionAudioPlayback" controls class="hidden"></audio>
-          <button class="btn ghost-delete hidden" id="comprehensionDeleteBtn" title="Delete this recording">🗑️ Delete</button>
+        <div class="task-title-row">
+          <h3>🧠 Show You Understand</h3>
+          <span class="step-chip">STEP 3</span>
+        </div>
+        <div class="instruction-card">
+          <div class="instruction-copy">
+            <strong>Tell what is happening in the selected פסוק or פסוקים in your own words.</strong>
+            <span>Explain it the way you would tell a friend.</span>
+          </div>
+          <button class="listen-btn" id="comprehensionInstructionBtn" type="button">🔊 Listen</button>
+        </div>
+        <div class="record-stage">
+          <div class="record-row">
+            <button class="seal-btn" id="comprehensionRecordBtn" title="Tell what is happening" aria-label="Start or stop comprehension recording">🎙️</button>
+            <div class="mic-meter hidden" id="comprehensionMicMeter"><div class="mic-meter-bar" id="comprehensionMicMeterBar"></div></div>
+            <audio id="comprehensionAudioPlayback" controls class="hidden"></audio>
+            <button class="btn ghost-delete hidden" id="comprehensionDeleteBtn" title="Delete this recording">🗑️ Delete</button>
+          </div>
+          <div class="record-caption">🎙️ Tap and tell me what happened</div>
           <span class="status-tag" id="comprehensionStatus">Not recorded yet</span>
         </div>
         <div class="comp-status" id="comprehensionGradingMsg"></div>
@@ -604,8 +1115,13 @@
       </div>
 
       <div class="history">
-        <h2>📈 My Past Attempts on This Posuk</h2>
-        <div id="historyList"><div class="msg">No attempts yet — record above and save!</div></div>
+        <button class="history-toggle" id="historyToggleBtn" type="button" aria-expanded="false" aria-controls="historyBody">
+          <span>📈 See my past tries</span><span class="chevron">⌄</span>
+        </button>
+        <div class="history-body hidden" id="historyBody">
+          <h2>📈 My Past Attempts on This Posuk</h2>
+          <div id="historyList"><div class="msg">No attempts yet — record above and save!</div></div>
+        </div>
       </div>
     </div>
   </div>
@@ -685,13 +1201,37 @@ const SYNTHESIZE_SPEECH_URL = "https://us-central1-b3-games.cloudfunctions.net/s
 const GENERATE_TRANSLATION_CHUNKS_URL = "https://us-central1-b3-games.cloudfunctions.net/generateTranslationChunks";
 const GRADE_TRANSLATION_CHUNK_URL = "https://us-central1-b3-games.cloudfunctions.net/gradeTranslationChunk";
 
+// Warm the translation Cloud Functions before the student opens Translate.
+// OPTIONS reaches the function without generating/grading anything, so this
+// can wake a cold function while the child is still reading the Hebrew.
+let translationWarmSent = false;
+function warmTranslationServices(){
+  if(translationWarmSent) return;
+  translationWarmSent = true;
+  [GENERATE_TRANSLATION_CHUNKS_URL, GRADE_TRANSLATION_CHUNK_URL].forEach(url => {
+    if(url && url.indexOf('PASTE') !== 0){
+      fetch(url, { method:'OPTIONS' }).catch(() => {});
+    }
+  });
+}
+
+
 /* =========================================================
    PARSHA / PEREK / POSUK MAP (Sefaria "Genesis" chapters)
    ========================================================= */
 const PARSHA_CONFIG = {
-  "Vayeira":      [ {num:18}, {num:19}, {num:20}, {num:21}, {num:22} ],
+  "Bereishis": [ {num:1}, {num:2}, {num:3}, {num:4}, {num:5}, {num:6, maxPosuk:8} ],
+  "Noach": [ {num:6, minPosuk:9}, {num:7}, {num:8}, {num:9}, {num:10}, {num:11} ],
+  "Lech Lecha": [ {num:12}, {num:13}, {num:14}, {num:15}, {num:16}, {num:17} ],
+  "Vayeira": [ {num:18}, {num:19}, {num:20}, {num:21}, {num:22} ],
   "Chayei Sarah": [ {num:23}, {num:24}, {num:25, maxPosuk:18} ],
-  "Toldos":       [ {num:25, minPosuk:19}, {num:26}, {num:27}, {num:28, maxPosuk:9} ]
+  "Toldos": [ {num:25, minPosuk:19}, {num:26}, {num:27}, {num:28, maxPosuk:9} ],
+  "Vayeitzei": [ {num:28, minPosuk:10}, {num:29}, {num:30}, {num:31}, {num:32, maxPosuk:3} ],
+  "Vayishlach": [ {num:32, minPosuk:4}, {num:33}, {num:34}, {num:35}, {num:36} ],
+  "Vayeishev": [ {num:37}, {num:38}, {num:39}, {num:40} ],
+  "Mikeitz": [ {num:41}, {num:42}, {num:43}, {num:44, maxPosuk:17} ],
+  "Vayigash": [ {num:44, minPosuk:18}, {num:45}, {num:46}, {num:47, maxPosuk:27} ],
+  "Vayechi": [ {num:47, minPosuk:28}, {num:48}, {num:49}, {num:50} ]
 };
 
 /* Flattened, ordered list of every perek across all three parshas, with
@@ -797,11 +1337,15 @@ let attemptSaved = { hebrew: false, comprehension: false };
 let hebrewSavedStoragePath = null;
 let comprehensionSavedStoragePath = null;
 let translationSavedStoragePath = null;
-let currentPosukKey = null; // "Parsha_perek_posuk"
-let currentPosukNum = null; // plain verse number (e.g. 1, 2, 3…), what the scorer expects
+let currentPosukKey = null; // "Parsha_perek_posuk" or "Parsha_perek_from-to"
+let currentPosukNum = null; // first verse number; the reading scorer still receives exact expected text separately
+let currentPosukEndNum = null;
 let currentPerekNum = null; // perek number — needed alongside posuk since posuk numbers repeat across perakim
 let currentPosukText = "";
 let currentPosukTranslation = ""; // accepted English translation, used as the grading "answer key"
+let currentIsRange = false;
+let currentParshaName = null;
+let currentSelectionParts = []; // [{posukNum, text, translation, key}] for translation chunking and display
 
 /* ---------- Translation chunk state ----------
    translationLevels: the nested chunk breakdown for the CURRENT posuk, as
@@ -834,6 +1378,10 @@ let translationRecChunks = [];
 let translationSegments = {};      // chunkIdx -> { blob, ext }
 let translationGradedResults = {}; // chunkIdx -> { verdict, feedback, transcript }
 let translationSegmentStartedAt = null;
+let translationHoldPointerDown = false;
+let translationHoldPointerId = null;
+let translationHoldTargetIndex = null;
+let translationHoldStartTimer = null;
 
 // Per-chunk redo (mirrors recordWordFix for Hebrew reading): lets a
 // student re-record just ONE chunk after grading, instead of redoing the
@@ -986,6 +1534,34 @@ function speakTextBrowserFallback(text){
   }catch(e){ console.error('Speech synthesis error:', e); }
 }
 
+
+/* ---------- Student-friendly spoken directions ---------- */
+function studentDirection(task){
+  const many = currentIsRange && currentPosukEndNum > currentPosukNum;
+  if(task === 'reading') return many
+    ? 'Read all of the selected pesukim out loud. Tap the microphone when you are ready. When you are finished, tap it again.'
+    : 'Read the selected posuk out loud. Tap the microphone when you are ready. When you are finished, tap it again.';
+  if(task === 'translation') return many
+    ? 'Press and hold one Hebrew piece while you say its English meaning. Let go when you finish that piece. Then move to the next piece. The pieces stay separated by posuk, and you can take a break between recordings.'
+    : 'Press and hold one Hebrew piece while you say its English meaning. Let go when you finish that piece, and the recording will save. Then hold the next piece when you are ready. You can stop and take a break between pieces, and you can choose smaller or bigger pieces before you start.';
+  return many
+    ? 'Tell what is happening in all of the selected pesukim in your own words. Explain the whole section the way you would tell a friend. Tap the microphone when you are ready.'
+    : 'Tell what is happening in the selected posuk in your own words. Explain it the way you would tell a friend. Tap the microphone when you are ready.';
+}
+
+document.getElementById('readingInstructionBtn').onclick = () => speakText(studentDirection('reading'));
+document.getElementById('translationInstructionBtn').onclick = () => speakText(studentDirection('translation'));
+document.getElementById('comprehensionInstructionBtn').onclick = () => speakText(studentDirection('comprehension'));
+
+const historyToggleBtn = document.getElementById('historyToggleBtn');
+const historyBody = document.getElementById('historyBody');
+historyToggleBtn.onclick = () => {
+  const willOpen = historyBody.classList.contains('hidden');
+  historyBody.classList.toggle('hidden', !willOpen);
+  historyToggleBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  historyToggleBtn.querySelector('span:first-child').textContent = willOpen ? '📈 Hide my past tries' : '📈 See my past tries';
+};
+
 /* ---------- Name gate ---------- */
 function slugify(name){
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
@@ -1073,12 +1649,21 @@ function applyDeepLinkFromURL(){
   const params = new URLSearchParams(window.location.search);
   const perekParam = parseInt(params.get('perek'));
   const posukParam = parseInt(params.get('posuk'));
+  const endPosukParam = parseInt(params.get('endPosuk'));
   if(!perekParam || !ALL_PERAKIM.includes(perekParam)) return;
   perekSelect.value = perekParam;
-  Promise.resolve(perekSelect.onchange()).then(() => {
+  Promise.resolve(perekSelect.onchange()).then(async () => {
     if(posukParam){
       posukSelect.value = posukParam;
-      posukSelect.onchange();
+      if(endPosukParam && endPosukParam >= posukParam){
+        selectionModeSelect.value = 'range';
+        endPosukSelect.classList.remove('hidden');
+        populateEndPosukOptions();
+        endPosukSelect.value = endPosukParam;
+        await loadSelectedPesukim();
+      }else{
+        await posukSelect.onchange();
+      }
     }
   });
 }
@@ -1116,6 +1701,59 @@ window.addEventListener('load', async () => {
    is picked, not just the perek number). */
 const perekSelect = document.getElementById('perekSelect');
 const posukSelect = document.getElementById('posukSelect');
+const endPosukSelect = document.getElementById('endPosukSelect');
+const selectionModeSelect = document.getElementById('selectionModeSelect');
+const selectionShell = document.getElementById('selectionShell');
+const selectionSummary = document.getElementById('selectionSummary');
+const selectionSummaryText = document.getElementById('selectionSummaryText');
+const changeSelectionBtn = document.getElementById('changeSelectionBtn');
+const selectorsRow = document.getElementById('selectorsRow');
+const modeSingleBtn = document.getElementById('modeSingleBtn');
+const modeRangeBtn = document.getElementById('modeRangeBtn');
+
+function syncModeButtons(){
+  const range = selectionModeSelect.value === 'range';
+  modeSingleBtn.classList.toggle('active', !range);
+  modeRangeBtn.classList.toggle('active', range);
+  selectorsRow.classList.toggle('range-active', range);
+  document.getElementById('contentPickerTitle').textContent = range
+    ? 'Choose a פרק, first פסוק, and last פסוק'
+    : 'Choose a פרק and פסוק';
+  document.getElementById('scrollPlaceholder').textContent = range
+    ? 'Choose a פרק and פסוק range to begin 📖'
+    : 'Choose a פרק and פסוק to begin 📖';
+}
+
+function expandSelectionPicker(){
+  selectionShell.classList.remove('hidden');
+  selectionSummary.classList.add('hidden');
+}
+
+function collapseSelectionPicker(){
+  if(!currentPerekNum || !currentPosukNum) return;
+  const rangeText = currentIsRange
+    ? ('פסוקים ' + hebrewNumeral(currentPosukNum) + '–' + hebrewNumeral(currentPosukEndNum))
+    : ('פסוק ' + hebrewNumeral(currentPosukNum));
+  selectionSummaryText.textContent = 'פרק ' + hebrewNumeral(currentPerekNum) + ' • ' + rangeText;
+  selectionShell.classList.add('hidden');
+  selectionSummary.classList.remove('hidden');
+}
+
+changeSelectionBtn.onclick = () => {
+  expandSelectionPicker();
+  selectionShell.scrollIntoView({ behavior:'smooth', block:'start' });
+};
+
+modeSingleBtn.onclick = () => {
+  if(selectionModeSelect.value === 'single') return;
+  selectionModeSelect.value = 'single';
+  selectionModeSelect.dispatchEvent(new Event('change'));
+};
+modeRangeBtn.onclick = () => {
+  if(selectionModeSelect.value === 'range') return;
+  selectionModeSelect.value = 'range';
+  selectionModeSelect.dispatchEvent(new Event('change'));
+};
 
 ALL_PERAKIM.forEach(num => {
   const opt = document.createElement('option');
@@ -1124,17 +1762,65 @@ ALL_PERAKIM.forEach(num => {
   perekSelect.appendChild(opt);
 });
 
+function rangeModeOn(){
+  return selectionModeSelect.value === 'range';
+}
+
+function allowedEndForStart(perekNum, startPosuk){
+  const startParsha = resolveParsha(perekNum, startPosuk);
+  const opts = Array.from(posukSelect.options).filter(o => o.value !== '');
+  return opts.map(o => parseInt(o.value)).filter(n => n >= startPosuk && resolveParsha(perekNum, n) === startParsha);
+}
+
+function populateEndPosukOptions(){
+  endPosukSelect.innerHTML = '<option value="">עד פסוק</option>';
+  const perekNum = parseInt(perekSelect.value);
+  const startPosuk = parseInt(posukSelect.value);
+  if(!rangeModeOn() || !perekNum || !startPosuk){
+    endPosukSelect.disabled = true;
+    return;
+  }
+  const allowed = allowedEndForStart(perekNum, startPosuk);
+  allowed.forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n;
+    opt.textContent = 'עד פסוק ' + hebrewNumeral(n);
+    endPosukSelect.appendChild(opt);
+  });
+  endPosukSelect.disabled = false;
+}
+
+selectionModeSelect.onchange = async () => {
+  const range = rangeModeOn();
+  syncModeButtons();
+  endPosukSelect.classList.toggle('hidden', !range);
+  if(range){
+    populateEndPosukOptions();
+    // If a single posuk is already open, begin the range at that same posuk
+    // but wait for the student to choose the ending posuk explicitly.
+    resetScroll();
+    document.getElementById('fetchMsg').textContent = posukSelect.value ? 'Choose the last פסוק in the range.' : '';
+  }else{
+    endPosukSelect.value = '';
+    if(posukSelect.value) await loadSelectedPesukim();
+  }
+};
+
+syncModeButtons();
+
 perekSelect.onchange = async () => {
+  expandSelectionPicker();
   posukSelect.innerHTML = '<option value="">פסוק</option>';
+  endPosukSelect.innerHTML = '<option value="">עד פסוק</option>';
+  endPosukSelect.disabled = true;
   resetScroll();
   const perekNum = parseInt(perekSelect.value);
   if(!perekNum){ posukSelect.disabled = true; return; }
+  warmTranslationServices();
+  fetchChapterTranslation(perekNum).catch(err => console.error('Translation prefetch failed', err));
   document.getElementById('fetchMsg').textContent = 'Loading pesukim…';
   try{
     const pesukim = await fetchChapter(perekNum);
-    // A perek can span two parshas (perek 25 splits between Chayei Sarah
-    // and Toldos), so combine the posuk range across every chapter-entry
-    // that matches this perek number.
     let min = Infinity, max = -Infinity;
     Object.values(PARSHA_CONFIG).forEach(chapters => {
       const ch = chapters.find(c => c.num === perekNum);
@@ -1157,33 +1843,73 @@ perekSelect.onchange = async () => {
   }
 };
 
-posukSelect.onchange = async () => {
+async function loadSelectedPesukim(){
   const perekNum = parseInt(perekSelect.value);
-  const posukNum = parseInt(posukSelect.value);
-  if(!posukNum){ resetScroll(); return; }
+  const startPosuk = parseInt(posukSelect.value);
+  if(!startPosuk){ resetScroll(); return; }
+  const endPosuk = rangeModeOn() ? parseInt(endPosukSelect.value) : startPosuk;
+  if(rangeModeOn() && !endPosuk){
+    resetScroll();
+    document.getElementById('fetchMsg').textContent = 'Choose the last פסוק in the range.';
+    return;
+  }
+  if(endPosuk < startPosuk){
+    document.getElementById('fetchMsg').textContent = 'The last פסוק must come after the first one.';
+    return;
+  }
+  const startParsha = resolveParsha(perekNum, startPosuk);
+  const endParsha = resolveParsha(perekNum, endPosuk);
+  if(startParsha !== endParsha){
+    document.getElementById('fetchMsg').textContent = 'Choose pesukim from the same parsha.';
+    return;
+  }
+
   wakeScorer();
-  document.getElementById('fetchMsg').textContent = 'Loading posuk…';
+  warmTranslationServices();
+  document.getElementById('fetchMsg').textContent = rangeModeOn() ? 'Loading pesukim…' : 'Loading posuk…';
   try{
-    const pesukim = await fetchChapter(perekNum);
-    const text = pesukim[posukNum - 1];
-    // Fetch the English translation too — this becomes the "answer key"
-    // the AI grades comprehension against instead of interpreting the
-    // Hebrew itself. If this fails, comprehension grading will still
-    // fall back to Claude's own reading (see gradeComprehensionAttempt).
-    let translation = '';
-    try{
-      const translations = await fetchChapterTranslation(perekNum);
-      translation = translations[posukNum - 1] || '';
-    }catch(err){
-      console.error('Could not load translation for grading', err);
+    const [pesukim, translations] = await Promise.all([
+      fetchChapter(perekNum),
+      fetchChapterTranslation(perekNum).catch(err => {
+        console.error('Could not load translation for grading', err);
+        return [];
+      })
+    ]);
+    const parts = [];
+    for(let n = startPosuk; n <= endPosuk; n++){
+      const partText = pesukim[n - 1];
+      if(!partText) continue;
+      const parsha = resolveParsha(perekNum, n);
+      parts.push({
+        posukNum: n,
+        text: partText,
+        translation: translations[n - 1] || '',
+        key: parsha.replace(/\s+/g,'') + '_' + perekNum + '_' + n
+      });
     }
-    const parsha = resolveParsha(perekNum, posukNum);
-    showPosuk(parsha, perekNum, posukNum, text, translation);
+    if(!parts.length) throw new Error('No pesukim found for selection');
+    const combinedText = parts.map(p => p.text).join(' ');
+    const combinedTranslation = parts.map(p => p.translation).filter(Boolean).join(' ');
+    showPosuk(startParsha, perekNum, startPosuk, combinedText, combinedTranslation, endPosuk, parts);
     document.getElementById('fetchMsg').textContent = '';
   }catch(err){
-    document.getElementById('fetchMsg').textContent = 'Could not load this posuk.';
+    document.getElementById('fetchMsg').textContent = 'Could not load this selection.';
     console.error(err);
   }
+}
+
+posukSelect.onchange = async () => {
+  if(rangeModeOn()){
+    populateEndPosukOptions();
+    resetScroll();
+    document.getElementById('fetchMsg').textContent = posukSelect.value ? 'Choose the last פסוק in the range.' : '';
+    return;
+  }
+  await loadSelectedPesukim();
+};
+
+endPosukSelect.onchange = async () => {
+  if(rangeModeOn()) await loadSelectedPesukim();
 };
 
 /* ---------- Posuk navigation arrows ----------
@@ -1192,6 +1918,7 @@ posukSelect.onchange = async () => {
    Each handles rolling into the adjacent perek once the current one's
    pesukim run out in that direction. */
 async function goToPosuk(direction){
+  if(currentIsRange) return;
   const btn = document.getElementById(direction === 1 ? 'nextPosukBtn' : 'prevPosukBtn');
   btn.disabled = true;
   try{
@@ -1246,6 +1973,15 @@ document.getElementById('prevPosukBtn').onclick = () => goToPosuk(-1);
 function updateNavArrows(){
   const prevBtn = document.getElementById('prevPosukBtn');
   const nextBtn = document.getElementById('nextPosukBtn');
+  if(currentIsRange){
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
+    prevBtn.title = 'Choose a new range above';
+    nextBtn.title = 'Choose a new range above';
+    return;
+  }
+  prevBtn.title = 'Previous posuk';
+  nextBtn.title = 'Next posuk';
   const perekNum = parseInt(perekSelect.value);
   const posukOpts = Array.from(posukSelect.options).filter(o => o.value !== '');
   const curPosukIdx = posukOpts.findIndex(o => parseInt(o.value) === parseInt(posukSelect.value));
@@ -1449,28 +2185,54 @@ function resetScroll(){
   document.getElementById('scrollPlaceholder').classList.remove('hidden');
   document.getElementById('posukText').classList.add('hidden');
   document.getElementById('recordingArea').classList.add('hidden');
+  document.getElementById('scrollBox').classList.remove('range-selection');
+  expandSelectionPicker();
   currentPosukKey = null;
   currentPosukTranslation = "";
+  currentSelectionParts = [];
+  currentIsRange = false;
+  currentPosukEndNum = null;
 }
 
-function showPosuk(parsha, perekNum, posukNum, text, translation){
-  text = stripMeteg(text); // remove before storing/displaying so it can't visually fuse with an adjacent vowel
-  currentPosukKey = parsha.replace(/\s+/g,'') + '_' + perekNum + '_' + posukNum;
-  currentPosukNum = posukNum;
-  currentPerekNum = perekNum;
-  currentPosukText = text;
-  currentPosukTranslation = translation || "";
-  document.getElementById('scrollPlaceholder').classList.add('hidden');
-  const textEl = document.getElementById('posukText');
-  textEl.innerHTML = text
+function safeHebrewHtml(text){
+  return stripMeteg(text || '')
     .split(/(\u05C3)/)
     .map(part => part === '\u05C3'
       ? '<span class="sof-pasuk">\u05C3</span>'
       : part.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'))
     .join('');
+}
+
+function showPosuk(parsha, perekNum, posukNum, text, translation, endPosukNum = posukNum, selectionParts = null){
+  text = stripMeteg(text);
+  const isRange = Number(endPosukNum) > Number(posukNum);
+  const posukPart = isRange ? (posukNum + '-' + endPosukNum) : String(posukNum);
+  currentPosukKey = parsha.replace(/\s+/g,'') + '_' + perekNum + '_' + posukPart;
+  currentPosukNum = posukNum;
+  currentPosukEndNum = endPosukNum;
+  currentPerekNum = perekNum;
+  currentPosukText = text;
+  currentPosukTranslation = translation || "";
+  currentIsRange = isRange;
+  currentParshaName = parsha;
+  currentSelectionParts = Array.isArray(selectionParts) && selectionParts.length
+    ? selectionParts.map(p => ({ ...p, text: stripMeteg(p.text || '') }))
+    : [{ posukNum, text, translation: translation || '', key: parsha.replace(/\s+/g,'') + '_' + perekNum + '_' + posukNum }];
+
+  document.getElementById('scrollPlaceholder').classList.add('hidden');
+  const textEl = document.getElementById('posukText');
+  if(isRange){
+    textEl.innerHTML = currentSelectionParts.map(p =>
+      '<div class="range-posuk"><span class="range-posuk-num">' + hebrewNumeral(p.posukNum) + '</span><span class="range-posuk-text">' + safeHebrewHtml(p.text) + '</span></div>'
+    ).join('');
+  }else{
+    textEl.innerHTML = safeHebrewHtml(text);
+  }
   textEl.classList.remove('hidden');
+  document.getElementById('scrollBox').classList.toggle('range-selection', isRange);
   document.getElementById('recordingArea').classList.remove('hidden');
-  updateNavArrows(); // arrows stay visible always; this just disables at the true start/end
+  collapseSelectionPicker();
+  updateNavArrows();
   resetRecordingUI();
   loadHistory();
 }
@@ -1569,6 +2331,10 @@ function resetRecordingUI(){
     stopMicMeter('translation');
   }
   translationSessionActive = false;
+  translationHoldPointerDown = false;
+  translationHoldPointerId = null;
+  translationHoldTargetIndex = null;
+  if(translationHoldStartTimer){ clearTimeout(translationHoldStartTimer); translationHoldStartTimer = null; }
   translationSegments = {};
   translationGradedResults = {};
   const translationRecBtn = document.getElementById('translationRecordBtn');
@@ -1691,6 +2457,11 @@ async function autosaveHebrew(){
     const url = await storage.ref(path).getDownloadURL();
     await currentAttemptRef.update({
       timestamp: Date.now(),
+      parsha: currentParshaName || null,
+      perek: currentPerekNum,
+      posukStart: currentPosukNum,
+      posukEnd: currentPosukEndNum || currentPosukNum,
+      isRange: currentIsRange,
       posukText: currentPosukText,
       posukTranslation: currentPosukTranslation,
       hebrewAudioURL: url,
@@ -1723,6 +2494,11 @@ async function autosaveComprehension(){
 
     await currentAttemptRef.update({
       timestamp: Date.now(),
+      parsha: currentParshaName || null,
+      perek: currentPerekNum,
+      posukStart: currentPosukNum,
+      posukEnd: currentPosukEndNum || currentPosukNum,
+      isRange: currentIsRange,
       posukText: currentPosukText,
       posukTranslation: currentPosukTranslation,
       comprehensionAudioURL: url,
@@ -1932,13 +2708,21 @@ function showHebrewResult(data){
   // A perfect score has nothing to dispute, so skip the dispute row entirely.
   const disputeRowHtml = data.score >= 100 ? '' :
     '<div class="dispute-row" id="hebrewDisputeRow"><button class="btn small ghost-delete" id="hebrewDisputeBtn">⚠️ Dispute this score</button></div>';
+  const missedWords = Array.isArray(data.words) ? data.words.filter(w => !w.match).length : 0;
+  const hebrewFeedbackText = data.score >= 100
+    ? 'Excellent reading. You got one hundred percent.'
+    : (missedWords
+      ? 'You got ' + data.score + ' percent. The underlined words need another try. You can redo just those words.'
+      : 'You got ' + data.score + ' percent. Nice work.');
   resultEl.innerHTML =
     '<span class="comp-badge">' + data.score + '%</span>' +
+    '<button class="feedback-listen-btn" id="hebrewFeedbackListenBtn" type="button">🔊 Hear feedback</button>' +
     wordsHtml +
     transcriptHtml +
     disputeRowHtml;
   resultEl.classList.remove('hidden');
   gradingMsg.textContent = '';
+  document.getElementById('hebrewFeedbackListenBtn').onclick = () => speakText(hebrewFeedbackText);
   const disputeBtn = document.getElementById('hebrewDisputeBtn');
   if(disputeBtn) disputeBtn.onclick = openHebrewDisputeForm;
   resultEl.querySelectorAll('.word-fix-btn').forEach(btn => {
@@ -2212,7 +2996,7 @@ async function showComprehensionResult(verdict, score, feedback, transcript){
     '<span class="comp-badge">' + badgeText + scoreText + '</span>' +
     '<span>' + comprehensionFeedback + '</span>' +
     transcriptHtml +
-    '<button class="speak-btn" id="compReplayBtn" title="Hear this read aloud">🔊</button>' +
+    '<button class="speak-btn" id="compReplayBtn" title="Hear this read aloud">🔊 Hear feedback</button>' +
     '<div class="dispute-row" id="comprehensionDisputeRow"><button class="btn small ghost-delete" id="comprehensionDisputeBtn">⚠️ Dispute this grade</button></div>';
   resultEl.classList.remove('hidden');
   document.getElementById('compReplayBtn').onclick = () => speakText(comprehensionFeedback);
@@ -2267,61 +3051,93 @@ function defaultTranslationLevelIndex(levels){
   return levels.length >= 2 ? levels.length - 2 : 0;
 }
 
+async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
+  const chunkRef = db.ref('posukPractice/translationChunks/' + part.key);
+  try{
+    const snap = await chunkRef.once('value');
+    if(myToken !== translationLoadToken) return null;
+    if(snap.exists() && snap.val() && Array.isArray(snap.val().levels) && snap.val().levels.length){
+      return snap.val().levels;
+    }
+  }catch(err){
+    console.error('Could not read cached translation chunks', part.key, err);
+  }
+
+  if(!GENERATE_TRANSLATION_CHUNKS_URL || GENERATE_TRANSLATION_CHUNKS_URL.indexOf('PASTE') === 0) return null;
+  try{
+    const res = await fetch(GENERATE_TRANSLATION_CHUNKS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ posukText: part.text, posukTranslation: part.translation || '' }),
+    });
+    if(myToken !== translationLoadToken) return null;
+    if(!res.ok) throw new Error('Chunk generation request failed');
+    const data = await res.json();
+    if(!data.levels || !Array.isArray(data.levels) || !data.levels.length) throw new Error('No levels returned');
+    chunkRef.set({ levels: data.levels, generatedAt: Date.now() }).catch(err => {
+      console.error('Could not cache translation chunks', part.key, err);
+    });
+    return data.levels;
+  }catch(err){
+    console.error('generateTranslationChunks error for', part.key, err);
+    return null;
+  }
+}
+
+function combineTranslationLevelsForRange(partLevels){
+  const usable = partLevels.filter(x => x && Array.isArray(x.levels) && x.levels.length);
+  if(!usable.length || usable.length !== partLevels.length) return null;
+  const maxTopDistance = Math.max(...usable.map(x => x.levels.length - 1));
+  const combined = [];
+  let lastSignature = null;
+  for(let topDistance = maxTopDistance; topDistance >= 0; topDistance--){
+    const chunks = [];
+    usable.forEach(({ part, levels }) => {
+      const idx = Math.max(0, levels.length - 1 - topDistance);
+      const level = levels[idx];
+      (level.chunks || []).forEach(c => chunks.push({ ...c, posukNum: part.posukNum }));
+    });
+    const signature = chunks.map(c => c.posukNum + ':' + c.hebrew).join('|');
+    if(chunks.length && signature !== lastSignature){
+      combined.push({ chunks });
+      lastSignature = signature;
+    }
+  }
+  return combined.length ? combined : null;
+}
+
 async function loadOrGenerateTranslationChunks(){
   const myToken = ++translationLoadToken;
   translationLevels = null;
   translationLevelIndex = 0;
   translationChunkIndex = 0;
   if(document.getElementById('translationPanel').classList.contains('hidden') === false){
-    renderCurrentChunk(); // shows a "loading" state immediately if the tab is already open
+    renderCurrentChunk();
   }
   if(!currentPosukKey || !currentPosukText) return;
 
-  const chunkRef = db.ref('posukPractice/translationChunks/' + currentPosukKey);
-  try{
-    const snap = await chunkRef.once('value');
-    if(myToken !== translationLoadToken) return; // student already moved on to a different posuk
-    if(snap.exists() && snap.val() && Array.isArray(snap.val().levels) && snap.val().levels.length){
-      translationLevels = snap.val().levels;
-      translationLevelIndex = defaultTranslationLevelIndex(translationLevels);
-      translationChunkIndex = 0;
-      renderCurrentChunk();
-      return;
-    }
-  }catch(err){
-    console.error('Could not read cached translation chunks', err);
-  }
+  const parts = currentSelectionParts.length ? currentSelectionParts : [{
+    posukNum: currentPosukNum,
+    text: currentPosukText,
+    translation: currentPosukTranslation,
+    key: currentPosukKey
+  }];
 
-  if(!GENERATE_TRANSLATION_CHUNKS_URL || GENERATE_TRANSLATION_CHUNKS_URL.indexOf('PASTE') === 0){
-    if(myToken === translationLoadToken) renderCurrentChunk();
-    return;
-  }
+  const loaded = await Promise.all(parts.map(async part => ({
+    part,
+    levels: await fetchOrGenerateTranslationLevelsForPart(part, myToken)
+  })));
+  if(myToken !== translationLoadToken) return;
 
-  try{
-    const res = await fetch(GENERATE_TRANSLATION_CHUNKS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ posukText: currentPosukText, posukTranslation: currentPosukTranslation || '' }),
-    });
-    if(myToken !== translationLoadToken) return;
-    if(!res.ok) throw new Error('Chunk generation request failed');
-    const data = await res.json();
-    if(!data.levels || !Array.isArray(data.levels) || !data.levels.length) throw new Error('No levels returned');
+  translationLevels = currentIsRange
+    ? combineTranslationLevelsForRange(loaded)
+    : (loaded[0] ? loaded[0].levels : null);
 
-    translationLevels = data.levels;
+  if(translationLevels && translationLevels.length){
     translationLevelIndex = defaultTranslationLevelIndex(translationLevels);
     translationChunkIndex = 0;
-    renderCurrentChunk();
-
-    // Cache for every future student on this posuk — fire-and-forget, a
-    // failure here just means the next student re-generates it once more.
-    chunkRef.set({ levels: translationLevels, generatedAt: Date.now() }).catch(err => {
-      console.error('Could not cache translation chunks', err);
-    });
-  }catch(err){
-    console.error('generateTranslationChunks error', err);
-    if(myToken === translationLoadToken) renderCurrentChunk();
   }
+  renderCurrentChunk();
 }
 
 // Renders whatever chunk is currently selected (translationLevels /
@@ -2345,17 +3161,26 @@ function renderCurrentChunk(){
 
   if(!translationLevels){
     stripEl.textContent = 'Loading…';
-    progressEl.textContent = '';
+    progressEl.textContent = 'Getting the translation pieces ready…';
     levelLabelEl.textContent = '';
     [smallerBtn, biggerBtn, prevBtn, nextBtn].forEach(b => b.disabled = true);
     return;
   }
 
   const level = translationLevels[translationLevelIndex];
+  const total = level.chunks.length;
+  const recordedCount = Object.keys(translationSegments).filter(k => Number(k) < total).length;
 
-  stripEl.innerHTML = level.chunks.map((chunk, i) => {
+  let pillHtml = '';
+  let lastPosukLabel = null;
+  level.chunks.forEach((chunk, i) => {
+    if(currentIsRange && chunk.posukNum && chunk.posukNum !== lastPosukLabel){
+      pillHtml += '<span class="range-boundary-label">פסוק ' + hebrewNumeral(chunk.posukNum) + '</span>';
+      lastPosukLabel = chunk.posukNum;
+    }
     const classes = ['chunk-token'];
     if(i === translationChunkIndex) classes.push('active');
+    if(translationSessionActive && i === translationHoldTargetIndex) classes.push('hold-recording');
     if(translationGradedResults[i]) classes.push(translationGradedResults[i].verdict === 'correct' ? 'correct' : 'incorrect');
     else if(translationSegments[i]) classes.push('recorded');
     const safeHtml = chunk.hebrew
@@ -2364,44 +3189,59 @@ function renderCurrentChunk(){
         ? '<span class="sof-pasuk">\u05C3</span>'
         : part.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'))
       .join('');
-    return '<span class="' + classes.join(' ') + '" data-idx="' + i + '">' + safeHtml + '</span>';
-  }).join('');
+    pillHtml += '<span class="' + classes.join(' ') + '" data-idx="' + i + '" role="button" tabindex="0" aria-label="Hold to record translation for piece ' + (i + 1) + '">' + safeHtml + '</span>';
+  });
+  stripEl.innerHTML = pillHtml;
+
+  // A quick tap simply selects/highlights a piece. Holding for a moment
+  // starts that ONE piece's recorder; releasing stops the mic and saves
+  // the blob. Pointer Events make the same code work for mouse, touch,
+  // stylus, Chromebook touchscreens, iPad, etc.
   stripEl.querySelectorAll('.chunk-token').forEach(el => {
-    el.onclick = () => jumpToChunk(parseInt(el.dataset.idx, 10));
+    const idx = parseInt(el.dataset.idx, 10);
+    el.oncontextmenu = e => e.preventDefault();
+    el.onpointerdown = e => beginTranslationPillHold(e, idx, el);
+    el.onpointerup = e => endTranslationPillHold(e, idx);
+    el.onpointercancel = e => cancelTranslationPillHold(e, idx);
+    el.onclick = e => e.preventDefault();
+    el.onkeydown = e => {
+      if(e.key === 'Enter' || e.key === ' '){
+        e.preventDefault();
+        translationChunkIndex = idx;
+        renderCurrentChunk();
+      }
+    };
   });
 
   levelLabelEl.textContent = translationLevels.length > 1
-    ? (translationLevelIndex === translationLevels.length - 1 ? 'Whole posuk' : 'Level ' + (translationLevelIndex + 1) + ' of ' + translationLevels.length)
+    ? (translationLevelIndex === translationLevels.length - 1
+        ? (currentIsRange ? 'Whole pesukim' : 'Whole posuk')
+        : 'Level ' + (translationLevelIndex + 1) + ' of ' + translationLevels.length)
     : '';
 
-  // Bigger/smaller pieces change chunk boundaries entirely, so they're
-  // disabled mid-session rather than trying to remap in-progress segments.
   smallerBtn.disabled = (translationLevelIndex === 0) || translationSessionActive;
   biggerBtn.disabled = (translationLevelIndex === translationLevels.length - 1) || translationSessionActive;
-  prevBtn.disabled = (translationChunkIndex === 0);
-  nextBtn.disabled = (translationChunkIndex === level.chunks.length - 1) && translationSessionActive === false;
+  prevBtn.disabled = translationSessionActive || (translationChunkIndex === 0);
+  nextBtn.disabled = translationSessionActive || (translationChunkIndex === total - 1);
 
-  if(!translationSessionActive && !Object.keys(translationGradedResults).length){
-    progressEl.textContent = 'Tap the microphone, then read the highlighted piece aloud.';
-  } else if(translationSessionActive){
-    progressEl.textContent = 'Recording piece ' + (translationChunkIndex + 1) + ' of ' + level.chunks.length + ' — tap the next piece (or "Next piece ▶️") when you\'re done saying this one.';
+  if(translationSessionActive){
+    progressEl.textContent = 'Recording piece ' + (translationHoldTargetIndex + 1) + ' of ' + total + ' — let go to save it.';
+  }else if(Object.keys(translationGradedResults).length){
+    progressEl.textContent = 'Checked! Hold any piece again if you want to replace that recording.';
+  }else if(recordedCount){
+    progressEl.textContent = recordedCount + ' of ' + total + ' pieces saved — hold another piece when you are ready.';
+  }else{
+    progressEl.textContent = 'Piece ' + (translationChunkIndex + 1) + ' of ' + total + ' — press and hold a Hebrew piece while you translate it.';
   }
 }
 
-// "Smaller pieces" moves DOWN a level (more, shorter chunks); "bigger
-// pieces" moves UP a level (fewer, longer chunks). Each level's chunks are
-// built by merging consecutive chunks from the level below (see
-// generateTranslationChunks in index.js), so we re-anchor the chunk index
-// to whichever new chunk actually contains the START of the chunk the
-// student was just looking at — this keeps their place instead of
-// jumping to an unrelated part of the posuk.
 function findContainingChunkIndex(newLevelIdx, approxCharOffset){
   const chunks = translationLevels[newLevelIdx].chunks;
   let offset = 0;
   for(let i = 0; i < chunks.length; i++){
     const len = chunks[i].hebrew.length;
     if(approxCharOffset < offset + len) return i;
-    offset += len + 1; // +1 for the joining space
+    offset += len + 1;
   }
   return chunks.length - 1;
 }
@@ -2421,24 +3261,19 @@ function changeChunkLevel(delta){
   translationSegments = {};
   translationGradedResults = {};
   resetTranslationResult();
+  document.getElementById('translationStatus').textContent = 'Ready';
   renderCurrentChunk();
-  // Remember this granularity (as distance from the "whole posuk" top level)
-  // so the next posuk this student opens starts at the same piece size.
   saveTranslationTopDistance((translationLevels.length - 1) - translationLevelIndex);
 }
 document.getElementById('chunkSmallerBtn').onclick = () => changeChunkLevel(-1);
 document.getElementById('chunkBiggerBtn').onclick = () => changeChunkLevel(1);
 document.getElementById('chunkPrevBtn').onclick = () => {
-  if(translationChunkIndex > 0) jumpToChunk(translationChunkIndex - 1);
+  if(!translationSessionActive && translationChunkIndex > 0) jumpToChunk(translationChunkIndex - 1);
 };
 document.getElementById('chunkNextBtn').onclick = () => {
-  if(!translationLevels) return;
+  if(!translationLevels || translationSessionActive) return;
   const level = translationLevels[translationLevelIndex];
-  if(translationChunkIndex < level.chunks.length - 1){
-    jumpToChunk(translationChunkIndex + 1);
-  } else if(translationSessionActive){
-    finishTranslationSession(); // tapped "next" on the last piece — done!
-  }
+  if(translationChunkIndex < level.chunks.length - 1) jumpToChunk(translationChunkIndex + 1);
 };
 
 function resetTranslationResult(){
@@ -2452,9 +3287,6 @@ function resetTranslationResult(){
   resultEl.innerHTML = '';
 }
 
-// Wraps MediaRecorder.stop() in a Promise so callers can reliably wait for
-// the final blob to be assembled (via the 'stop' event) before moving on
-// to start the next segment or grading everything.
 function stopRecorderAsync(recorder){
   return new Promise(resolve => {
     if(!recorder || recorder.state === 'inactive'){ resolve(); return; }
@@ -2463,111 +3295,172 @@ function stopRecorderAsync(recorder){
   });
 }
 
-// Starts (or restarts) capturing audio for one chunk, reusing the SAME
-// open mic stream across the whole session — this is what makes moving
-// from piece to piece feel seamless instead of stop/start/re-permission.
-function startSegmentRecorder(idx){
-  let recorderOptions = { audioBitsPerSecond: 32000 };
-  const preferredTypes = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/aac', 'audio/ogg;codecs=opus'];
-  const supportedType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t));
-  if(supportedType) recorderOptions.mimeType = supportedType;
-
-  const recorder = new MediaRecorder(translationStream, recorderOptions);
-  const localChunks = [];
-  recorder.ondataavailable = e => localChunks.push(e.data);
-  recorder.onstop = () => {
-    const actualType = recorder.mimeType || 'audio/webm';
-    const blob = new Blob(localChunks, { type: actualType });
-    translationSegments[idx] = { blob, ext: mimeTypeToExtension(actualType) };
-  };
-  recorder.start();
-  translationRecorder = recorder;
-  translationSegmentStartedAt = Date.now();
+function selectTranslationChunkWithoutRender(idx){
+  translationChunkIndex = idx;
+  const stripEl = document.getElementById('chunkPillDisplay');
+  stripEl.querySelectorAll('.chunk-token').forEach(el => {
+    el.classList.toggle('active', parseInt(el.dataset.idx, 10) === idx);
+  });
+  const level = translationLevels && translationLevels[translationLevelIndex];
+  if(level && !translationSessionActive){
+    document.getElementById('chunkProgress').textContent = 'Piece ' + (idx + 1) + ' of ' + level.chunks.length + ' — keep holding to record, or let go now just to select it.';
+  }
 }
 
-// Starts a brand-new session: fresh mic permission, first chunk of the
-// current level, clean slate for any prior segments/results.
-async function startTranslationSession(){
+function beginTranslationPillHold(e, idx, el){
   if(!translationLevels || translationSessionActive) return;
+  if(e.button !== undefined && e.button !== 0 && e.pointerType !== 'touch') return;
+  e.preventDefault();
+  translationHoldPointerDown = true;
+  translationHoldPointerId = e.pointerId;
+  translationHoldTargetIndex = idx;
+  selectTranslationChunkWithoutRender(idx);
+  try{ el.setPointerCapture(e.pointerId); }catch(_){ }
+
+  if(translationHoldStartTimer) clearTimeout(translationHoldStartTimer);
+  // A short tap is just selection. Only a real hold opens the microphone.
+  translationHoldStartTimer = setTimeout(() => {
+    translationHoldStartTimer = null;
+    startTranslationPillRecording(idx);
+  }, 280);
+}
+
+async function startTranslationPillRecording(idx){
+  if(!translationHoldPointerDown || translationHoldTargetIndex !== idx || translationSessionActive) return;
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined'){
     alert("This browser can't record audio. Please try a newer version of Chrome or Safari.");
     return;
   }
+
   try{
-    translationStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    // The child may have let go while the browser's permission box was open.
+    // In that case, close the mic immediately and wait for the next hold.
+    if(!translationHoldPointerDown || translationHoldTargetIndex !== idx){
+      stream.getTracks().forEach(t => t.stop());
+      document.getElementById('translationStatus').textContent = 'Ready — hold the piece again to record.';
+      return;
+    }
+
+    let recorderOptions = { audioBitsPerSecond: 32000 };
+    const preferredTypes = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/aac', 'audio/ogg;codecs=opus'];
+    const supportedType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t));
+    if(supportedType) recorderOptions.mimeType = supportedType;
+
+    translationStream = stream;
+    translationRecorder = new MediaRecorder(stream, recorderOptions);
+    translationRecChunks = [];
+    translationRecorder.ondataavailable = ev => { if(ev.data && ev.data.size) translationRecChunks.push(ev.data); };
+    translationSegmentStartedAt = Date.now();
+    translationSessionActive = true;
+    translationRecorder.start();
+
+    document.getElementById('translationStatus').textContent = '🎙️ Recording piece ' + (idx + 1) + ' — let go to save';
+    const pill = document.querySelector('.chunk-token[data-idx="' + idx + '"]');
+    if(pill) pill.classList.add('hold-recording');
+    const level = translationLevels[translationLevelIndex];
+    document.getElementById('chunkProgress').textContent = 'Recording piece ' + (idx + 1) + ' of ' + level.chunks.length + ' — let go when you finish.';
   }catch(err){
-    alert('Could not access the microphone. Please allow microphone permission.');
     console.error(err);
-    return;
+    translationHoldPointerDown = false;
+    translationHoldTargetIndex = null;
+    alert('Could not access the microphone. Please allow microphone permission.');
+    document.getElementById('translationStatus').textContent = 'Microphone permission needed';
   }
-  translationSegments = {};
-  translationGradedResults = {};
-  translationChunkIndex = 0;
-  resetTranslationResult();
-  translationSessionActive = true;
-
-  const btn = document.getElementById('translationRecordBtn');
-  btn.classList.add('recording');
-  btn.textContent = '⏹️';
-  btn.title = 'Stop and grade';
-  document.getElementById('translationStatus').textContent = 'Recording…';
-  startMicMeter(translationStream, 'translation');
-
-  startSegmentRecorder(translationChunkIndex);
-  renderCurrentChunk();
 }
 
-// Used by "Next piece", "Previous piece", and tapping any pill directly.
-// If a session is active, this cuts the current segment (stop+restart on
-// the same stream) and starts recording the destination chunk; if no
-// session is active yet, it's just browsing — no recording involved.
-async function jumpToChunk(newIdx){
-  if(!translationLevels) return;
-  const level = translationLevels[translationLevelIndex];
-  if(newIdx < 0 || newIdx >= level.chunks.length || newIdx === translationChunkIndex){
-    return;
-  }
-  if(!translationSessionActive){
-    translationChunkIndex = newIdx;
+async function endTranslationPillHold(e, idx){
+  if(translationHoldPointerId !== null && e.pointerId !== translationHoldPointerId) return;
+  e.preventDefault();
+  translationHoldPointerDown = false;
+  translationHoldPointerId = null;
+
+  if(translationHoldStartTimer){
+    clearTimeout(translationHoldStartTimer);
+    translationHoldStartTimer = null;
+    // It was a quick tap, not a hold: selection only.
+    translationHoldTargetIndex = null;
+    document.getElementById('translationStatus').textContent = 'Ready — hold the selected piece to record.';
     renderCurrentChunk();
     return;
   }
-  await stopRecorderAsync(translationRecorder);
-  translationChunkIndex = newIdx;
-  startSegmentRecorder(translationChunkIndex);
-  renderCurrentChunk();
+
+  if(translationSessionActive && translationHoldTargetIndex === idx){
+    await finishTranslationPillRecording(idx);
+  }else{
+    translationHoldTargetIndex = null;
+    renderCurrentChunk();
+  }
 }
 
-// Ends the session (whether the student finished every piece or stopped
-// early), releases the microphone, and kicks off grading of everything
-// captured so far.
-async function finishTranslationSession(){
-  if(!translationSessionActive) return;
-  await stopRecorderAsync(translationRecorder);
+async function cancelTranslationPillHold(e, idx){
+  translationHoldPointerDown = false;
+  translationHoldPointerId = null;
+  if(translationHoldStartTimer){ clearTimeout(translationHoldStartTimer); translationHoldStartTimer = null; }
+  if(translationSessionActive && translationHoldTargetIndex === idx){
+    await finishTranslationPillRecording(idx);
+  }else{
+    translationHoldTargetIndex = null;
+    renderCurrentChunk();
+  }
+}
+
+async function finishTranslationPillRecording(idx){
+  if(!translationSessionActive || !translationRecorder) return;
+  const recorder = translationRecorder;
+  const stream = translationStream;
+  const elapsedMs = translationSegmentStartedAt ? (Date.now() - translationSegmentStartedAt) : 0;
+
+  await stopRecorderAsync(recorder);
+  if(stream) stream.getTracks().forEach(t => t.stop());
   translationSessionActive = false;
-  translationStream.getTracks().forEach(t => t.stop());
-  stopMicMeter('translation');
+  translationStream = null;
+  translationRecorder = null;
+  translationHoldTargetIndex = null;
 
-  const btn = document.getElementById('translationRecordBtn');
-  btn.classList.remove('recording');
-  btn.textContent = '🎙️';
-  btn.title = 'Start recording';
-  btn.disabled = true;
+  if(elapsedMs < 500 || !translationRecChunks.length){
+    document.getElementById('translationStatus').textContent = 'Too quick — hold the piece a little longer.';
+    renderCurrentChunk();
+    return;
+  }
 
+  const actualType = recorder.mimeType || 'audio/webm';
+  const blob = new Blob(translationRecChunks, { type: actualType });
+  translationSegments[idx] = { blob, ext: mimeTypeToExtension(actualType) };
+  // If this was a re-record, the old grade no longer describes the new audio.
+  delete translationGradedResults[idx];
+
+  const level = translationLevels[translationLevelIndex];
+  const total = level.chunks.length;
+  const recordedCount = Object.keys(translationSegments).filter(k => Number(k) < total).length;
+  document.getElementById('translationStatus').textContent = 'Saved piece ' + (idx + 1) + ' ✓';
   renderCurrentChunk();
-  await gradeAllTranslationSegments();
-  btn.disabled = false;
+
+  // Keep the microphone completely off between pieces. Once every piece has
+  // its own saved recording, use the SAME existing grader and autosave flow.
+  if(recordedCount === total){
+    document.getElementById('translationStatus').textContent = 'All pieces saved — checking…';
+    await gradeAllTranslationSegments();
+  }
 }
-document.getElementById('translationRecordBtn').onclick = function(){
-  if(translationSessionActive) finishTranslationSession();
-  else startTranslationSession();
-};
+
+function jumpToChunk(newIdx){
+  if(!translationLevels || translationSessionActive) return;
+  const level = translationLevels[translationLevelIndex];
+  if(newIdx < 0 || newIdx >= level.chunks.length) return;
+  translationChunkIndex = newIdx;
+  renderCurrentChunk();
+}
+
+// The old stand-alone translation microphone is intentionally hidden now;
+// recording starts from a long-press on a Hebrew pill instead.
+document.getElementById('translationRecordBtn').onclick = () => {};
 document.getElementById('translationRetryBtn').onclick = () => {
   translationSegments = {};
   translationGradedResults = {};
   translationChunkIndex = 0;
   resetTranslationResult();
-  document.getElementById('translationStatus').textContent = 'Not recorded yet';
+  document.getElementById('translationStatus').textContent = 'Ready';
   renderCurrentChunk();
 };
 
@@ -2630,7 +3523,9 @@ function showTranslationSummary(level){
   const pct = total ? Math.round((correctCount / total) * 100) : 0;
 
   const overallOk = attempted === total && correctCount === total;
-  let html = '<span class="comp-badge">' + (overallOk ? '\u2705 ' + pct + '% correct!' : pct + '% correct') + '</span>';
+  const translationSummaryText = overallOk ? 'Great job. You translated every piece correctly.' : 'You got ' + correctCount + ' out of ' + total + ' pieces correct. Listen to the feedback on any piece that needs another try.';
+  let html = '<span class="comp-badge">' + (overallOk ? '\u2705 ' + pct + '% correct!' : pct + '% correct') + '</span>' +
+    '<button class="feedback-listen-btn" id="translationSummaryListenBtn" type="button">🔊 Hear feedback</button>';
   if(attempted < total){
     html += '<span>' + (total - attempted) + ' piece(s) weren\'t recorded.</span>';
   }
@@ -2664,6 +3559,9 @@ function showTranslationSummary(level){
     // obviously tappable rather than a tiny icon riding along the pill.
     // Only an incorrect piece gets a redo button — a correct piece is
     // done and shouldn't invite a re-record.
+    const feedbackAudioHtml = r.feedback
+      ? '<div class="feedback-audio-row"><button type="button" class="feedback-listen-btn chunk-feedback-listen" data-chunk-index="' + i + '">🔊 Hear feedback</button></div>'
+      : '';
     const redoHtml = isCorrect ? '' :
       '<div style="margin-top:6px;">' +
         '<button type="button" class="btn gold chunk-fix-pill" data-chunk-index="' + i + '" ' +
@@ -2693,6 +3591,7 @@ function showTranslationSummary(level){
         chunk.hebrew + ' — <span style="font-style:italic;">' + said + '</span>' +
       '</span>' +
       (audioHtml ? '<div style="margin-top:2px;">' + audioHtml + '</div>' : '') +
+      feedbackAudioHtml +
       redoHtml +
       disputeHtml +
     '</div>';
@@ -2702,6 +3601,15 @@ function showTranslationSummary(level){
   resultEl.innerHTML = html;
   resultEl.classList.remove('hidden');
   retryBtn.classList.remove('hidden');
+  const summaryListenBtn = document.getElementById('translationSummaryListenBtn');
+  if(summaryListenBtn) summaryListenBtn.onclick = () => speakText(translationSummaryText);
+  resultEl.querySelectorAll('.chunk-feedback-listen').forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.getAttribute('data-chunk-index'), 10);
+      const r = translationGradedResults[idx];
+      if(r && r.feedback) speakText(r.feedback);
+    };
+  });
   resultEl.querySelectorAll('.chunk-fix-pill').forEach(btn => {
     btn.onclick = () => recordChunkFix(parseInt(btn.getAttribute('data-chunk-index'), 10), btn);
   });
@@ -2822,6 +3730,7 @@ async function autosaveTranslation(level){
       }catch(err){ console.error('Could not upload translation segment', i, err); }
       return {
         chunkHebrew: level.chunks[i].hebrew,
+        posukNum: level.chunks[i].posukNum || currentPosukNum,
         verdict: translationGradedResults[i].verdict,
         feedback: translationGradedResults[i].feedback,
         transcript: translationGradedResults[i].transcript,
@@ -2833,6 +3742,11 @@ async function autosaveTranslation(level){
 
     await currentAttemptRef.update({
       timestamp: Date.now(),
+      parsha: currentParshaName || null,
+      perek: currentPerekNum,
+      posukStart: currentPosukNum,
+      posukEnd: currentPosukEndNum || currentPosukNum,
+      isRange: currentIsRange,
       posukText: currentPosukText,
       posukTranslation: currentPosukTranslation,
       translationChunkResults: chunkResults,
