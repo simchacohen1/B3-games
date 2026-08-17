@@ -2165,9 +2165,7 @@ function enterApp(){
   // a race where a bookmarked future posuk could open before the limit arrives.
   db.ref('posukPractice/settings/practiceLimit').once('value').then(snap => {
     const limit = snap.val();
-    classPracticeLimit = (limit && limit.perek && limit.posuk)
-      ? { perek: parseInt(limit.perek), posuk: parseInt(limit.posuk) }
-      : null;
+    classPracticeLimit = normalizedPracticeWindow(limit);
     rebuildPerekOptionsForClassLimit();
     applyDeepLinkFromURL();
   }).catch(err => {
@@ -2243,22 +2241,35 @@ const perekSelect = document.getElementById('perekSelect');
 const posukSelect = document.getElementById('posukSelect');
 const endPosukSelect = document.getElementById('endPosukSelect');
 
-// Teacher-controlled class-wide practice boundary. Null means unrestricted.
+// Teacher-controlled class-wide practice window. Null means unrestricted.
+// Old one-sided settings still work as "from the beginning through..."
 let classPracticeLimit = null;
 let practiceLimitListenerStarted = false;
 
+function normalizedPracticeWindow(limit){
+  if(!limit) return null;
+  const endPerek=parseInt(limit.endPerek||limit.perek);
+  const endPosuk=parseInt(limit.endPosuk||limit.posuk);
+  if(!endPerek||!endPosuk) return null;
+  return {
+    startPerek:parseInt(limit.startPerek||1),
+    startPosuk:parseInt(limit.startPosuk||1),
+    endPerek,endPosuk
+  };
+}
+
 function isWithinClassPracticeLimit(perekNum, posukNum){
-  if(!classPracticeLimit || !classPracticeLimit.perek || !classPracticeLimit.posuk) return true;
-  const p = parseInt(perekNum);
-  const v = parseInt(posukNum);
-  if(p < classPracticeLimit.perek) return true;
-  if(p > classPracticeLimit.perek) return false;
-  return v <= classPracticeLimit.posuk;
+  if(!classPracticeLimit) return true;
+  const p=parseInt(perekNum), v=parseInt(posukNum);
+  const afterStart=p>classPracticeLimit.startPerek||(p===classPracticeLimit.startPerek&&v>=classPracticeLimit.startPosuk);
+  const beforeEnd=p<classPracticeLimit.endPerek||(p===classPracticeLimit.endPerek&&v<=classPracticeLimit.endPosuk);
+  return afterStart&&beforeEnd;
 }
 
 function perekAllowedByClassLimit(perekNum){
-  if(!classPracticeLimit || !classPracticeLimit.perek) return true;
-  return parseInt(perekNum) <= parseInt(classPracticeLimit.perek);
+  if(!classPracticeLimit) return true;
+  const p=parseInt(perekNum);
+  return p>=classPracticeLimit.startPerek&&p<=classPracticeLimit.endPerek;
 }
 
 function rebuildPerekOptionsForClassLimit(){
@@ -2290,9 +2301,7 @@ function startPracticeLimitListener(){
   practiceLimitListenerStarted = true;
   db.ref('posukPractice/settings/practiceLimit').on('value', async snap => {
     const nextLimit = snap.val();
-    classPracticeLimit = (nextLimit && nextLimit.perek && nextLimit.posuk)
-      ? { perek: parseInt(nextLimit.perek), posuk: parseInt(nextLimit.posuk) }
-      : null;
+    classPracticeLimit = normalizedPracticeWindow(nextLimit);
 
     const selectedPerek = parseInt(perekSelect.value);
     const selectedPosuk = parseInt(posukSelect.value);
