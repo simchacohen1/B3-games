@@ -1449,25 +1449,29 @@ async function loadAccessTab(){
       <div style="margin-bottom:26px;padding:16px;border-radius:12px;background:#fff;border:2px solid var(--gold);">
         <div style="font-weight:700;margin-bottom:4px;">📖 Student Practice Limit</div>
         <div style="font-size:0.84rem;color:var(--ink-soft);margin-bottom:10px;">
-          Choose the furthest פסוק students may practice. Anything after it is hidden from the student app.
+          Choose the exact range students may practice. Pesukim before the start and after the end are hidden from the student app.
         </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <select id="practiceLimitPerek"
-            style="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;">
-            <option value="">Choose Perek</option>
-          </select>
-          <select id="practiceLimitPosuk" disabled
-            style="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;">
-            <option value="">Choose Posuk</option>
-          </select>
-          <button class="btn small gold" id="savePracticeLimitBtn">Save Limit</button>
-          <button class="btn small" id="clearPracticeLimitBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;">Allow All</button>
+        <div style="display:grid;gap:10px;">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <strong style="min-width:58px;">From</strong>
+            <select id="practiceStartPerek" style="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;"><option value="">Choose Perek</option></select>
+            <select id="practiceStartPosuk" disabled style="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;"><option value="">Choose Posuk</option></select>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <strong style="min-width:58px;">Through</strong>
+            <select id="practiceEndPerek" style="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;"><option value="">Choose Perek</option></select>
+            <select id="practiceEndPosuk" disabled style="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;"><option value="">Choose Posuk</option></select>
+          </div>
+          <div>
+            <button class="btn small gold" id="savePracticeLimitBtn">Save Practice Window</button>
+            <button class="btn small" id="clearPracticeLimitBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;margin-left:6px;">Allow All</button>
+          </div>
         </div>
         <div id="practiceLimitMsg" style="font-size:0.85rem;margin-top:8px;"></div>
         <div style="font-size:0.8rem;color:var(--ink-soft);margin-top:6px;">
           Current: <strong id="practiceLimitCurrent">${
-            practiceLimit && practiceLimit.perek && practiceLimit.posuk
-              ? `Through Perek ${practiceLimit.perek}, Posuk ${practiceLimit.posuk}`
+            practiceLimit && (practiceLimit.endPerek || practiceLimit.perek) && (practiceLimit.endPosuk || practiceLimit.posuk)
+              ? `Perek ${practiceLimit.startPerek || 1}, Posuk ${practiceLimit.startPosuk || 1} through Perek ${practiceLimit.endPerek || practiceLimit.perek}, Posuk ${practiceLimit.endPosuk || practiceLimit.posuk}`
               : 'All pesukim available'
           }</strong>
         </div>
@@ -1507,84 +1511,69 @@ async function loadAccessTab(){
       }
     };
 
-    // Practice-limit controls: one simple class-wide boundary.
-    const practiceLimitPerek = document.getElementById('practiceLimitPerek');
-    const practiceLimitPosuk = document.getElementById('practiceLimitPosuk');
+    // Practice window: exact first and last posuk visible to the class.
+    const practiceStartPerek = document.getElementById('practiceStartPerek');
+    const practiceStartPosuk = document.getElementById('practiceStartPosuk');
+    const practiceEndPerek = document.getElementById('practiceEndPerek');
+    const practiceEndPosuk = document.getElementById('practiceEndPosuk');
     const practiceLimitMsg = document.getElementById('practiceLimitMsg');
 
-    getAllPerekNums().forEach(n => {
-      const opt = document.createElement('option');
-      opt.value = n;
-      opt.textContent = 'Perek ' + n;
-      practiceLimitPerek.appendChild(opt);
+    [practiceStartPerek, practiceEndPerek].forEach(sel => {
+      getAllPerekNums().forEach(n => {
+        const opt=document.createElement('option');
+        opt.value=n; opt.textContent='Perek '+n; sel.appendChild(opt);
+      });
     });
 
-    async function populatePracticeLimitPosuk(perekNum, selectedPosuk){
-      practiceLimitPosuk.innerHTML = '<option value="">Choose Posuk</option>';
-      practiceLimitPosuk.disabled = true;
+    async function fillPracticePosuk(perekNum, selectEl, selected){
+      selectEl.innerHTML='<option value="">Choose Posuk</option>';
+      selectEl.disabled=true;
       if(!perekNum) return;
-      try{
-        const range = await getPerekRange(parseInt(perekNum));
-        for(let p = range.min; p <= range.max; p++){
-          const opt = document.createElement('option');
-          opt.value = p;
-          opt.textContent = 'Posuk ' + p;
-          practiceLimitPosuk.appendChild(opt);
-        }
-        practiceLimitPosuk.disabled = false;
-        if(selectedPosuk) practiceLimitPosuk.value = String(selectedPosuk);
-      }catch(err){
-        console.error('Could not load practice-limit posuk range', err);
+      const range=await getPerekRange(parseInt(perekNum));
+      for(let p=range.min;p<=range.max;p++){
+        const opt=document.createElement('option');
+        opt.value=p; opt.textContent='Posuk '+p; selectEl.appendChild(opt);
+      }
+      selectEl.disabled=false;
+      if(selected) selectEl.value=String(selected);
+    }
+    practiceStartPerek.onchange=()=>fillPracticePosuk(practiceStartPerek.value,practiceStartPosuk,null);
+    practiceEndPerek.onchange=()=>fillPracticePosuk(practiceEndPerek.value,practiceEndPosuk,null);
+
+    if(practiceLimit){
+      const sp=practiceLimit.startPerek||1, sv=practiceLimit.startPosuk||1;
+      const ep=practiceLimit.endPerek||practiceLimit.perek, ev=practiceLimit.endPosuk||practiceLimit.posuk;
+      if(ep&&ev){
+        practiceStartPerek.value=String(sp); practiceEndPerek.value=String(ep);
+        await fillPracticePosuk(sp,practiceStartPosuk,sv);
+        await fillPracticePosuk(ep,practiceEndPosuk,ev);
       }
     }
 
-    practiceLimitPerek.onchange = () => {
-      populatePracticeLimitPosuk(practiceLimitPerek.value, null);
+    document.getElementById('savePracticeLimitBtn').onclick=async()=>{
+      const startPerek=parseInt(practiceStartPerek.value), startPosuk=parseInt(practiceStartPosuk.value);
+      const endPerek=parseInt(practiceEndPerek.value), endPosuk=parseInt(practiceEndPosuk.value);
+      if(!startPerek||!startPosuk||!endPerek||!endPosuk){
+        practiceLimitMsg.style.color='#8a3a3a'; practiceLimitMsg.textContent='Choose both the starting and ending posuk.'; return;
+      }
+      if(endPerek<startPerek||(endPerek===startPerek&&endPosuk<startPosuk)){
+        practiceLimitMsg.style.color='#8a3a3a'; practiceLimitMsg.textContent='The ending posuk must come after the starting posuk.'; return;
+      }
+      await db.ref('posukPractice/settings/practiceLimit').set({
+        startPerek,startPosuk,endPerek,endPosuk,updatedAt:firebase.database.ServerValue.TIMESTAMP
+      });
+      practiceLimitMsg.style.color='#397839';
+      practiceLimitMsg.textContent='Saved — student menus update automatically.';
+      document.getElementById('practiceLimitCurrent').textContent=`Perek ${startPerek}, Posuk ${startPosuk} through Perek ${endPerek}, Posuk ${endPosuk}`;
     };
 
-    if(practiceLimit && practiceLimit.perek){
-      practiceLimitPerek.value = String(practiceLimit.perek);
-      await populatePracticeLimitPosuk(practiceLimit.perek, practiceLimit.posuk);
-    }
-
-    document.getElementById('savePracticeLimitBtn').onclick = async () => {
-      const perek = parseInt(practiceLimitPerek.value);
-      const posuk = parseInt(practiceLimitPosuk.value);
-      if(!perek || !posuk){
-        practiceLimitMsg.style.color = '#8a3a3a';
-        practiceLimitMsg.textContent = 'Choose both a perek and a posuk.';
-        return;
-      }
-      try{
-        await db.ref('posukPractice/settings/practiceLimit').set({
-          perek,
-          posuk,
-          updatedAt: firebase.database.ServerValue.TIMESTAMP
-        });
-        practiceLimitMsg.style.color = '#397839';
-        practiceLimitMsg.textContent = 'Saved — student menus update automatically.';
-        document.getElementById('practiceLimitCurrent').textContent = `Through Perek ${perek}, Posuk ${posuk}`;
-      }catch(err){
-        practiceLimitMsg.style.color = '#8a3a3a';
-        practiceLimitMsg.textContent = 'Could not save the practice limit.';
-        console.error(err);
-      }
-    };
-
-    document.getElementById('clearPracticeLimitBtn').onclick = async () => {
-      try{
-        await db.ref('posukPractice/settings/practiceLimit').remove();
-        practiceLimitPerek.value = '';
-        practiceLimitPosuk.innerHTML = '<option value="">Choose Posuk</option>';
-        practiceLimitPosuk.disabled = true;
-        practiceLimitMsg.style.color = '#397839';
-        practiceLimitMsg.textContent = 'Restriction removed — all pesukim are available.';
-        document.getElementById('practiceLimitCurrent').textContent = 'All pesukim available';
-      }catch(err){
-        practiceLimitMsg.style.color = '#8a3a3a';
-        practiceLimitMsg.textContent = 'Could not remove the practice limit.';
-        console.error(err);
-      }
+    document.getElementById('clearPracticeLimitBtn').onclick=async()=>{
+      await db.ref('posukPractice/settings/practiceLimit').remove();
+      [practiceStartPerek,practiceEndPerek].forEach(s=>s.value='');
+      [practiceStartPosuk,practiceEndPosuk].forEach(s=>{s.innerHTML='<option value="">Choose Posuk</option>';s.disabled=true;});
+      practiceLimitMsg.style.color='#397839';
+      practiceLimitMsg.textContent='Restriction removed — all pesukim are available.';
+      document.getElementById('practiceLimitCurrent').textContent='All pesukim available';
     };
 
     document.getElementById('addApprovedBtn').onclick = async () => {
@@ -1639,6 +1628,13 @@ let studentPerekData = {}; // perekNum -> posukNum -> posukKey, for the currentl
 let studentRangeData = []; // comprehension-range attempts (posuk grid can't show these as single tiles)
 let selectedPosukKey = null;
 
+function formatPracticeWindow(limit){
+  if(!limit) return 'All pesukim available';
+  const sp=limit.startPerek||1, sv=limit.startPosuk||1;
+  const ep=limit.endPerek||limit.perek, ev=limit.endPosuk||limit.posuk;
+  return (ep&&ev) ? `Perek ${sp}, Posuk ${sv} → Perek ${ep}, Posuk ${ev}` : 'All pesukim available';
+}
+
 async function selectStudent(id, name, el){
   activeStudentId = id;
   selectedPosukKey = null;
@@ -1649,12 +1645,19 @@ async function selectStudent(id, name, el){
   mainEl.innerHTML = '<div class="loading">Loading ' + name + '\'s practice history…</div>';
 
   try{
-    const snap = await db.ref('posukPractice/attempts/' + id).once('value');
+    const [snap, practiceLimitSnap] = await Promise.all([
+      db.ref('posukPractice/attempts/' + id).once('value'),
+      db.ref('posukPractice/settings/practiceLimit').once('value')
+    ]);
     const val = snap.val();
+    const studentPracticeLimit = practiceLimitSnap.val() || null;
     if(!val){
       mainEl.innerHTML = `
         <div class="student-head">
           <h2>${name}</h2>
+          <div style="width:100%;padding:8px 12px;border-radius:10px;background:#fff7dc;border:1px solid var(--gold);font-size:0.84rem;">
+            📖 <strong>Practice window:</strong> ${formatPracticeWindow(studentPracticeLimit)}
+          </div>
           <div class="mini-tabs">
             <button class="btn small" id="resetStudentBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;">↩️ Reset Progress</button>
             <button class="btn small" id="removeStudentBtn" style="background:#8a3a3a;box-shadow:0 4px 0 #5c2626;">🗑️ Remove Student</button>
