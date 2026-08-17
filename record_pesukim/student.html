@@ -955,6 +955,170 @@
     margin-top:-3px;
   }
 
+
+
+  /* Translate result refresh: compact, child-friendly piece cards.
+     This changes presentation only; grading, disputes, redo logic and
+     Firebase saves still use the same data/functions underneath. */
+  .translation-result-shell{
+    width:100%;
+    display:block;
+    background:#fff !important;
+    border:2px solid rgba(201,162,39,.45) !important;
+    padding:14px !important;
+  }
+  .translation-summary-head{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    flex-wrap:wrap;
+    padding-bottom:11px;
+    margin-bottom:10px;
+    border-bottom:1px solid rgba(59,42,30,.12);
+  }
+  .translation-summary-score{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:34px;
+    padding:6px 12px;
+    border-radius:999px;
+    background:var(--rimon);
+    color:#fff;
+    font-size:.86rem;
+    font-weight:800;
+  }
+  .translation-summary-score.all-correct{ background:#4C9A4C; }
+  .translation-summary-count{
+    color:var(--ink-soft);
+    font-size:.84rem;
+    font-weight:700;
+    margin-right:auto;
+  }
+  .translation-summary-head .feedback-listen-btn{
+    padding:7px 10px;
+    font-size:.78rem;
+  }
+  .translation-piece-list{
+    display:grid;
+    gap:9px;
+  }
+  .translation-piece-card{
+    border:1.5px solid rgba(59,42,30,.14);
+    border-left:5px solid var(--rimon);
+    background:#fff;
+    border-radius:14px;
+    padding:11px 12px 10px;
+    box-shadow:0 2px 7px rgba(59,42,30,.06);
+  }
+  .translation-piece-card.correct{
+    border-left-color:#4C9A4C;
+    background:#F7FCF7;
+  }
+  .translation-piece-card.incorrect{
+    background:#FFF9F9;
+  }
+  .translation-piece-top{
+    display:flex;
+    align-items:flex-start;
+    gap:9px;
+  }
+  .translation-piece-status{
+    flex:0 0 auto;
+    border-radius:999px;
+    padding:4px 8px;
+    font-size:.72rem;
+    font-weight:800;
+    background:#F6E1E1;
+    color:var(--rimon-dark);
+    white-space:nowrap;
+  }
+  .translation-piece-card.correct .translation-piece-status{
+    background:#E4F4E4;
+    color:#397839;
+  }
+  .translation-piece-hebrew{
+    flex:1;
+    min-width:0;
+    font-family:'Noto Serif Hebrew',serif;
+    direction:rtl;
+    text-align:right;
+    font-size:1.15rem;
+    line-height:1.45;
+    color:var(--ink);
+  }
+  .translation-heard{
+    margin:5px 0 8px;
+    padding-left:0;
+    color:var(--ink-soft);
+    font-size:.82rem;
+    line-height:1.35;
+  }
+  .translation-heard strong{
+    color:var(--ink);
+    font-weight:700;
+  }
+  .translation-piece-actions{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    flex-wrap:wrap;
+  }
+  .translation-action-btn{
+    border:1.5px solid rgba(59,42,30,.20);
+    background:#fff;
+    color:var(--ink);
+    border-radius:999px;
+    padding:7px 10px;
+    min-height:34px;
+    font-family:'Quicksand',sans-serif;
+    font-size:.76rem;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow:none;
+  }
+  .translation-action-btn:hover{ border-color:var(--gold); }
+  .translation-action-btn.redo{
+    background:var(--gold);
+    border-color:var(--gold);
+    color:var(--ink);
+  }
+  .translation-action-btn:active{ transform:translateY(1px); }
+  .translation-help{
+    margin-top:7px;
+    font-size:.75rem;
+    color:var(--ink-soft);
+  }
+  .translation-help summary{
+    display:inline-block;
+    cursor:pointer;
+    user-select:none;
+    font-weight:700;
+    color:var(--ink-soft);
+    list-style:none;
+  }
+  .translation-help summary::-webkit-details-marker{ display:none; }
+  .translation-help summary::before{ content:'⋯ '; font-weight:900; }
+  .translation-help-body{ margin-top:6px; }
+  .translation-help .chunk-dispute-btn{
+    padding:5px 9px;
+    font-size:.72rem;
+  }
+  .translation-review-note{
+    margin-top:7px;
+    font-size:.75rem;
+    color:var(--ink-soft);
+  }
+  @media (max-width:620px){
+    .translation-result-shell{ padding:10px !important; }
+    .translation-summary-count{ width:100%; order:3; }
+    .translation-piece-card{ padding:10px; }
+    .translation-piece-top{ gap:7px; }
+    .translation-piece-hebrew{ font-size:1.08rem; }
+    .translation-piece-actions{ gap:6px; }
+    .translation-action-btn{ padding:7px 9px; }
+  }
+
 </style>
 </head>
 <body>
@@ -3544,86 +3708,96 @@ function showTranslationSummary(level){
   const pct = total ? Math.round((correctCount / total) * 100) : 0;
 
   const overallOk = attempted === total && correctCount === total;
-  const translationSummaryText = overallOk ? 'Great job. You translated every piece correctly.' : 'You got ' + correctCount + ' out of ' + total + ' pieces correct. Listen to the feedback on any piece that needs another try.';
-  let html = '<span class="comp-badge">' + (overallOk ? '\u2705 ' + pct + '% correct!' : pct + '% correct') + '</span>' +
-    '<button class="feedback-listen-btn" id="translationSummaryListenBtn" type="button">🔊 Hear feedback</button>';
+  const translationSummaryText = overallOk
+    ? 'Great job. You translated every piece correctly.'
+    : 'You got ' + correctCount + ' out of ' + total + ' pieces correct. Redo any piece that needs another try.';
+
+  let html =
+    '<div class="translation-summary-head">' +
+      '<span class="translation-summary-score' + (overallOk ? ' all-correct' : '') + '">' +
+        (overallOk ? '✅ ' : '') + pct + '% correct' +
+      '</span>' +
+      '<span class="translation-summary-count">' + correctCount + ' of ' + total + ' pieces correct</span>' +
+      '<button class="feedback-listen-btn" id="translationSummaryListenBtn" type="button">🔊 Hear feedback</button>' +
+    '</div>';
+
   if(attempted < total){
-    html += '<span>' + (total - attempted) + ' piece(s) weren\'t recorded.</span>';
+    html += '<div class="translation-review-note">' + (total - attempted) + ' piece(s) were not recorded.</div>';
   }
-  // Free up any object URLs from a previous render before making new ones,
-  // so repeated redos/re-renders don't leak memory.
+
+  // Free up object URLs from a previous render before making new ones.
   Object.values(translationAudioUrls).forEach(u => URL.revokeObjectURL(u));
   translationAudioUrls = {};
-  // Simple pill-based breakdown, matching the look of the Hebrew-reading
-  // results: green pill = correct, red pill = wrong. Each pill shows the
-  // Hebrew piece together with what the student actually said (their
-  // spoken translation) — no long feedback paragraph here, that's kept
-  // for the comprehension tab only. Tapping a pill re-records that piece
-  // (recordChunkFix). An audio player (so a teacher can listen back to
-  // the actual recording) sits underneath each pill.
-  html += '<div style="width:100%;margin-top:8px;display:flex;flex-direction:column;gap:6px;" id="translationChunkBreakdown">' + idxs.map(i => {
+
+  html += '<div class="translation-piece-list" id="translationChunkBreakdown">' + idxs.map(i => {
     const r = translationGradedResults[i];
     const chunk = level.chunks[i];
     const isCorrect = r.verdict === 'correct';
-    let audioHtml = '';
     const seg = translationSegments[i];
     if(seg && seg.blob){
-      const url = URL.createObjectURL(seg.blob);
-      translationAudioUrls[i] = url;
-      audioHtml = '<audio controls src="' + url + '" style="height:28px;vertical-align:middle;margin-left:6px;"></audio>';
+      translationAudioUrls[i] = URL.createObjectURL(seg.blob);
     }
     const said = r.transcript ? r.transcript : '(nothing heard)';
-    const pillClass = 'chunk-token ' + (isCorrect ? 'correct' : 'incorrect');
-    // The pill itself is no longer the (easy-to-miss) click target for
-    // redoing a piece — there's now an explicit, labeled "Redo this piece"
-    // button below the audio player, sized like a normal button so it's
-    // obviously tappable rather than a tiny icon riding along the pill.
-    // Only an incorrect piece gets a redo button — a correct piece is
-    // done and shouldn't invite a re-record.
-    const feedbackAudioHtml = r.feedback
-      ? '<div class="feedback-audio-row"><button type="button" class="feedback-listen-btn chunk-feedback-listen" data-chunk-index="' + i + '">🔊 Hear feedback</button></div>'
+
+    const recordingBtn = translationAudioUrls[i]
+      ? '<button type="button" class="translation-action-btn chunk-play-btn" data-chunk-index="' + i + '">▶️ Recording</button>'
       : '';
-    const redoHtml = isCorrect ? '' :
-      '<div style="margin-top:6px;">' +
-        '<button type="button" class="btn gold chunk-fix-pill" data-chunk-index="' + i + '" ' +
-          'style="width:100%;font-size:1rem;">' +
-          '<span class="chunk-fix-status" data-status-index="' + i + '">🔁 Redo this piece</span>' +
-        '</button>' +
-      '</div>';
-    // A student who's confident their translation was actually right (and
-    // would rather flag it for the teacher than re-record) can dispute an
-    // incorrect chunk, same idea as the Hebrew/comprehension dispute flows.
-    // Once pending or resolved, that state is shown instead of the button.
-    let disputeHtml = '';
+    const feedbackBtn = r.feedback
+      ? '<button type="button" class="translation-action-btn chunk-feedback-listen" data-chunk-index="' + i + '">🔊 Feedback</button>'
+      : '';
+    const redoBtn = isCorrect ? '' :
+      '<button type="button" class="translation-action-btn redo chunk-fix-pill" data-chunk-index="' + i + '">' +
+        '<span class="chunk-fix-status" data-status-index="' + i + '">🔁 Redo</span>' +
+      '</button>';
+
+    let helpHtml = '';
     if(!isCorrect){
       const dStatus = r.disputeStatus;
       if(dStatus === 'pending'){
-        disputeHtml = '<div class="dispute-row" style="margin-top:4px;font-size:0.8rem;color:var(--ink-soft);">⚠️ Dispute sent — your teacher will review it.</div>';
+        helpHtml = '<div class="translation-review-note">⚠️ Dispute sent — your teacher will review it.</div>';
       }else if(dStatus === 'resolved'){
-        disputeHtml = '<div class="dispute-row" style="margin-top:4px;font-size:0.8rem;color:var(--ink-soft);">✔️ Teacher reviewed — final: ' + (r.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</div>';
+        helpHtml = '<div class="translation-review-note">✔️ Teacher reviewed — final: ' +
+          (r.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</div>';
       }else{
-        disputeHtml = '<div class="dispute-row" style="margin-top:4px;">' +
-          '<button type="button" class="btn small ghost-delete chunk-dispute-btn" data-chunk-index="' + i + '">⚠️ Dispute this piece</button>' +
-        '</div>';
+        helpHtml =
+          '<details class="translation-help">' +
+            '<summary>Need help?</summary>' +
+            '<div class="translation-help-body">' +
+              '<button type="button" class="btn small ghost-delete chunk-dispute-btn" data-chunk-index="' + i + '">⚠️ Dispute this piece</button>' +
+            '</div>' +
+          '</details>';
       }
     }
-    return '<div>' +
-      '<span class="' + pillClass + '" data-chunk-index="' + i + '" style="display:inline-block;">' +
-        chunk.hebrew + ' — <span style="font-style:italic;">' + said + '</span>' +
-      '</span>' +
-      (audioHtml ? '<div style="margin-top:2px;">' + audioHtml + '</div>' : '') +
-      feedbackAudioHtml +
-      redoHtml +
-      disputeHtml +
+
+    return '<div class="translation-piece-card ' + (isCorrect ? 'correct' : 'incorrect') + '">' +
+      '<div class="translation-piece-top">' +
+        '<span class="translation-piece-status">' + (isCorrect ? '✅ Correct' : '↻ Try again') + '</span>' +
+        '<div class="translation-piece-hebrew">' + chunk.hebrew + '</div>' +
+      '</div>' +
+      '<div class="translation-heard"><strong>I heard:</strong> “' + said + '”</div>' +
+      '<div class="translation-piece-actions">' + recordingBtn + feedbackBtn + redoBtn + '</div>' +
+      helpHtml +
     '</div>';
   }).join('') + '</div>';
 
-  resultEl.className = 'comp-result ' + (overallOk ? 'correct' : 'incorrect');
+  resultEl.className = 'comp-result translation-result-shell';
   resultEl.innerHTML = html;
   resultEl.classList.remove('hidden');
   retryBtn.classList.remove('hidden');
+
   const summaryListenBtn = document.getElementById('translationSummaryListenBtn');
   if(summaryListenBtn) summaryListenBtn.onclick = () => speakText(translationSummaryText);
+
+  resultEl.querySelectorAll('.chunk-play-btn').forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.getAttribute('data-chunk-index'), 10);
+      const url = translationAudioUrls[idx];
+      if(!url) return;
+      const audio = new Audio(url);
+      audio.play().catch(err => console.error('Could not play translation recording', err));
+    };
+  });
+
   resultEl.querySelectorAll('.chunk-feedback-listen').forEach(btn => {
     btn.onclick = () => {
       const idx = parseInt(btn.getAttribute('data-chunk-index'), 10);
@@ -3631,9 +3805,11 @@ function showTranslationSummary(level){
       if(r && r.feedback) speakText(r.feedback);
     };
   });
+
   resultEl.querySelectorAll('.chunk-fix-pill').forEach(btn => {
     btn.onclick = () => recordChunkFix(parseInt(btn.getAttribute('data-chunk-index'), 10), btn);
   });
+
   resultEl.querySelectorAll('.chunk-dispute-btn').forEach(btn => {
     btn.onclick = () => submitChunkDispute(parseInt(btn.getAttribute('data-chunk-index'), 10), level, btn);
   });
