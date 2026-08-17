@@ -1593,9 +1593,21 @@ async function selectStudent(id, name, el){
       </div>
       <div id="studentGridWrap"></div>
       <div id="posukDetail"></div>`;
-    document.getElementById('studentComprehensionBtn').onclick = () => { studentActiveTab = 'comprehension'; renderStudentGrid(); };
-    document.getElementById('studentReadingBtn').onclick = () => { studentActiveTab = 'reading'; renderStudentGrid(); };
-    document.getElementById('studentTranslateBtn').onclick = () => { studentActiveTab = 'translate'; renderStudentGrid(); };
+    document.getElementById('studentComprehensionBtn').onclick = async () => {
+      studentActiveTab = 'comprehension';
+      await renderStudentGrid();
+      if(selectedPosukKey) renderPosukDetail(selectedPosukKey);
+    };
+    document.getElementById('studentReadingBtn').onclick = async () => {
+      studentActiveTab = 'reading';
+      await renderStudentGrid();
+      if(selectedPosukKey) renderPosukDetail(selectedPosukKey);
+    };
+    document.getElementById('studentTranslateBtn').onclick = async () => {
+      studentActiveTab = 'translate';
+      await renderStudentGrid();
+      if(selectedPosukKey) renderPosukDetail(selectedPosukKey);
+    };
     wireStudentAdminButtons(id, name);
 
     await renderStudentGrid();
@@ -1786,81 +1798,116 @@ async function renderStudentGrid(){
 
 function renderPosukDetail(posukKey){
   const detailEl = document.getElementById('posukDetail');
-  if(!detailEl) return;
+  if(!detailEl || !studentPosukData[posukKey]) return;
+
   const { attempts, latest } = studentPosukData[posukKey];
   const refLabel = formatRefLabel(posukKey);
+  const skillTitle = studentActiveTab === 'reading'
+    ? '🎙️ Reading'
+    : (studentActiveTab === 'translate' ? '🌐 Translation' : '🧠 Comprehension');
+
+  // Only include attempts that actually contain data for the skill the
+  // teacher selected in the pill/grid above. One database attempt can hold
+  // multiple skills, but the teacher detail view should never mix them.
+  const relevantAttempts = attempts.filter(a => {
+    if(studentActiveTab === 'reading'){
+      return !!a.hebrewAudioURL || typeof effHebrewScore(a) === 'number';
+    }
+    if(studentActiveTab === 'translate'){
+      return Array.isArray(a.translationChunkResults) && a.translationChunkResults.length > 0;
+    }
+    return (Array.isArray(a.questionResults) && a.questionResults.length > 0) || !!a.comprehensionAudioURL;
+  });
+
   let html = `<div class="posuk-group">
     <button class="btn small" id="backToTileBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;margin-bottom:10px;">⬆️ Back to grid</button>
-    <h3>${refLabel}</h3>
+    <h3>${refLabel} · ${skillTitle}</h3>
     <div class="posuk-hebrew">${latest.posukText || ''}</div>`;
-  attempts.forEach(a => {
-    const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+  if(!relevantAttempts.length){
+    html += `<div class="empty-msg" style="padding:22px 0;">No ${studentActiveTab === 'reading' ? 'reading' : studentActiveTab === 'translate' ? 'translation' : 'comprehension'} activity saved for this posuk yet.</div>`;
+  }
+
+  relevantAttempts.forEach(a => {
+    const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, {
+      month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'
+    });
     let lines = `<div class="top-line"><strong>${dateStr}</strong></div>`;
-    if(a.hebrewAudioURL){
+
+    if(studentActiveTab === 'reading'){
       const hScore = effHebrewScore(a);
-      const hTier = (typeof hScore === 'number') ? (hScore >= 80 ? 'correct' : (hScore >= 50 ? 'partial' : 'incorrect')) : 'correct';
-      lines += `<div class="top-line"><span>🎙️ Hebrew reading</span></div>`;
+      const hTier = (typeof hScore === 'number')
+        ? (hScore >= 80 ? 'correct' : (hScore >= 50 ? 'partial' : 'incorrect'))
+        : 'correct';
+
       let hebrewCardHtml = '<span class="comp-badge">' + (typeof hScore === 'number' ? hScore + '%' : '—') + '</span>';
       if(Array.isArray(a.hebrewWords) && a.hebrewWords.length){
         hebrewCardHtml += '<div class="hebrew-word-breakdown">' +
           a.hebrewWords.map(w => '<span class="' + (w.match ? 'word-ok' : 'word-miss') + '">' + w.word + '</span>').join(' ') +
           '</div>';
       }
-      hebrewCardHtml += '<audio controls src="' + a.hebrewAudioURL + '"></audio>';
+      if(a.hebrewAudioURL){
+        hebrewCardHtml += '<audio controls src="' + a.hebrewAudioURL + '"></audio>';
+      }
       if(a.hebrewTranscript){
         hebrewCardHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + a.hebrewTranscript + '"</span>';
       }
       lines += `<div class="comp-result ${hTier}">${hebrewCardHtml}</div>`;
       lines += renderDisputeSection(a, posukKey, 'hebrew');
     }
-    if(Array.isArray(a.translationChunkResults) && a.translationChunkResults.length){
+
+    if(studentActiveTab === 'translate'){
       const tScore = effTranslationScore(a);
-      lines += `<div class="top-line"><span>🌐 Translation</span><span class="score-pill">${tScore === null ? '' : tScore + '%'}</span></div>`;
+      lines += `<div class="top-line"><span>Overall translation</span><span class="score-pill">${tScore === null ? '—' : tScore + '%'}</span></div>`;
       a.translationChunkResults.forEach((c, chunkIdx) => {
         const effVerdict = c.finalVerdict || c.verdict;
         let chunkHtml = '<span class="comp-badge">' + (effVerdict === 'correct' ? '✅' : '💡') + '</span>' +
-          '<span dir="rtl" style="font-family:\'Noto Serif Hebrew\',serif;">' + c.chunkHebrew + '</span>';
+          '<span dir="rtl" style="font-family:\'Noto Serif Hebrew\',serif;">' + (c.chunkHebrew || '') + '</span>';
         if(c.audioURL) chunkHtml += '<audio controls src="' + c.audioURL + '"></audio>';
         if(c.transcript) chunkHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + c.transcript + '"</span>';
         lines += `<div class="comp-result ${effVerdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:4px;">${chunkHtml}</div>`;
         lines += renderTranslationChunkDisputeSection(a, posukKey, chunkIdx, c);
       });
     }
-    if(Array.isArray(a.questionResults) && a.questionResults.length){
-      const qScore = effQuestionScore(a);
-      lines += `<div class="top-line"><span>🧠 Comprehension questions</span><span class="score-pill">${typeof qScore === 'number' ? qScore + '%' : '—'}</span></div>`;
-      a.questionResults.forEach((q, qIdx) => {
-        const qVerdict = q.finalVerdict || q.verdict;
-        let qHtml = '<span class="comp-badge">' + (qVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</span>';
-        if(q.question) qHtml += '<span style="font-weight:700;">' + q.question + '</span>';
-        if(q.audioURL) qHtml += '<audio controls src="' + q.audioURL + '"></audio>';
-        if(q.transcript) qHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + q.transcript + '"</span>';
-        if(q.feedback) qHtml += '<span style="width:100%;font-size:0.82rem;">' + q.feedback + '</span>';
-        lines += `<div class="comp-result ${qVerdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:4px;">${qHtml}</div>`;
-      });
-    }
-    if(a.comprehensionAudioURL){
-      const cVerdict = effComprehensionVerdict(a);
-      const vi = VERDICT_INFO[cVerdict] || { label: cVerdict || '' };
-      lines += `<div class="top-line"><span>🧠 Comprehension</span></div>`;
-      let compCardHtml = '<span class="comp-badge">' + vi.label + '</span>';
-      if(a.comprehensionFeedback){
-        compCardHtml += '<span>' + a.comprehensionFeedback + '</span>';
+
+    if(studentActiveTab === 'comprehension'){
+      if(Array.isArray(a.questionResults) && a.questionResults.length){
+        const qScore = effQuestionScore(a);
+        lines += `<div class="top-line"><span>Detail questions</span><span class="score-pill">${typeof qScore === 'number' ? qScore + '%' : '—'}</span></div>`;
+        a.questionResults.forEach(q => {
+          const qVerdict = q.finalVerdict || q.verdict;
+          let qHtml = '<span class="comp-badge">' + (qVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</span>';
+          if(q.question) qHtml += '<span style="font-weight:700;">' + q.question + '</span>';
+          if(q.audioURL) qHtml += '<audio controls src="' + q.audioURL + '"></audio>';
+          if(q.transcript) qHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + q.transcript + '"</span>';
+          if(q.feedback) qHtml += '<span style="width:100%;font-size:0.82rem;">' + q.feedback + '</span>';
+          lines += `<div class="comp-result ${qVerdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:4px;">${qHtml}</div>`;
+        });
       }
-      compCardHtml += '<audio controls src="' + a.comprehensionAudioURL + '"></audio>';
-      if(a.comprehensionTranscript){
-        compCardHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + a.comprehensionTranscript + '"</span>';
+
+      // The old/freehand explanation is a bonus/legacy comprehension item,
+      // so it belongs here—but never in Reading or Translation.
+      if(a.comprehensionAudioURL){
+        const cVerdict = effComprehensionVerdict(a);
+        const vi = VERDICT_INFO[cVerdict] || { label: cVerdict || '' };
+        lines += `<div class="top-line"><span>🌟 Bonus / freehand explanation</span></div>`;
+        let compCardHtml = '<span class="comp-badge">' + vi.label + '</span>';
+        if(a.comprehensionFeedback) compCardHtml += '<span>' + a.comprehensionFeedback + '</span>';
+        compCardHtml += '<audio controls src="' + a.comprehensionAudioURL + '"></audio>';
+        if(a.comprehensionTranscript){
+          compCardHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + a.comprehensionTranscript + '"</span>';
+        }
+        lines += `<div class="comp-result ${cVerdict || ''}">${compCardHtml}</div>`;
+        lines += renderDisputeSection(a, posukKey, 'comprehension');
       }
-      lines += `<div class="comp-result ${cVerdict || ''}">${compCardHtml}</div>`;
-      lines += renderDisputeSection(a, posukKey, 'comprehension');
     }
+
     html += `<div class="attempt-row">${lines}</div>`;
   });
+
   html += `</div>`;
   detailEl.innerHTML = html;
 
-  // Scroll back to the exact tile that was clicked, rather than just
-  // the top of the grid, so the teacher lands right where they left off.
   const backBtn = document.getElementById('backToTileBtn');
   if(backBtn){
     backBtn.onclick = () => {
@@ -1873,15 +1920,15 @@ function renderPosukDetail(posukKey){
     };
   }
 
-  // Wire up finalize controls now that the HTML is in the DOM.
-  attempts.forEach(a => {
-    if(a.hebrewDisputeStatus === 'pending'){
+  // Only wire controls that are actually visible for the selected skill.
+  relevantAttempts.forEach(a => {
+    if(studentActiveTab === 'reading' && a.hebrewDisputeStatus === 'pending'){
       wireFinalizeHebrew(a, posukKey);
     }
-    if(a.comprehensionDisputeStatus === 'pending'){
+    if(studentActiveTab === 'comprehension' && a.comprehensionDisputeStatus === 'pending'){
       wireFinalizeComprehension(a, posukKey);
     }
-    if(Array.isArray(a.translationChunkResults)){
+    if(studentActiveTab === 'translate' && Array.isArray(a.translationChunkResults)){
       a.translationChunkResults.forEach((c, chunkIdx) => {
         if(c.disputeStatus === 'pending'){
           wireFinalizeTranslationChunk(a, posukKey, chunkIdx, c);
