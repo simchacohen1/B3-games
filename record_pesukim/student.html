@@ -1472,44 +1472,46 @@ function warmTranslationServices(){
      firebase deploy --only functions:gradeQuestionAnswer
    ========================================================= */
 const GRADE_QUESTION_ANSWER_URL = "https://us-central1-b3-games.cloudfunctions.net/gradeQuestionAnswer";
+const GENERATE_COMPREHENSION_QUESTIONS_URL = "https://us-central1-b3-games.cloudfunctions.net/generateComprehensionQuestions";
 
 const QUESTION_BANK = {
   "18": {
-    "1": ["To whom did Hashem appear?", "Where did Hashem appear to Avraham?", "Where was Avraham sitting when Hashem appeared to him?", "At what part of the day did Hashem appear to Avraham?"],
-    "2": ["What did Avraham do with his eyes?", "How many men did Avraham see?", "What did Avraham do when he saw the men?", "From where did Avraham run to greet them?", "What did Avraham do once he reached the men?"],
-    "3": ["What did Avraham ask his guest not to do?", "How did Avraham refer to himself when he spoke to his guest?"],
-    "4": ["What did Avraham offer to have brought for his guests?", "What did Avraham ask his guests to wash?", "Where did Avraham invite his guests to rest?"],
-    "5": ["What did Avraham say he would bring for his guests to eat?", "What did Avraham say the guests should do after eating?", "How did the guests respond to Avraham's offer?"],
-    "6": ["Where did Avraham hurry to?", "To whom did Avraham speak in the tent?", "How many se'ah of flour did Avraham tell Sarah to prepare?", "What did Avraham tell Sarah to do with the flour?", "What did Avraham tell Sarah to make?"],
-    "7": ["Where did Avraham run to after speaking with Sarah?", "What did Avraham take from the cattle?", "How is the calf that Avraham took described?", "To whom did Avraham give the calf?", "What did the young man do with the calf?"],
-    "8": ["What two foods did Avraham take along with the prepared calf?", "Where did Avraham set the food?", "What did Avraham do while his guests ate?", "Where did the guests eat?", "What did the guests do with the food?"],
-    "9": ["What did the guests ask Avraham?", "How did Avraham answer them about where Sarah was?"],
-    "10": ["When did the guest say he would return to Avraham?", "What did the guest say Sarah would have?", "Where was Sarah while this was being said?", "Where was the entrance of the tent in relation to the guest speaking?"],
-    "11": ["How are Avraham and Sarah described in this posuk?", "What does the posuk say had stopped happening for Sarah?"],
-    "12": ["What did Sarah do to herself upon hearing the news?", "Why did Sarah laugh at the news that she would have a child?", "How did Sarah refer to Avraham in her thoughts?"],
-    "13": ["Who spoke to Avraham about Sarah's laughter?", "What did Hashem ask Avraham about Sarah?", "What did Hashem quote Sarah as saying about her age?"],
-    "14": ["What question did Hashem ask about His own power?", "When did Hashem say He would return to Avraham?", "What did Hashem again say Sarah would have?"],
-    "15": ["What did Sarah say about her laughter?", "Why did Sarah deny that she had laughed?", "How did Hashem respond to Sarah's denial?"],
-    "16": ["What did the men look out toward after they got up?", "What did Avraham do as the men left?"],
-    "17": ["What did Hashem ask Himself about Avraham?"],
-    "18": ["What did Hashem say Avraham would become?", "What did Hashem say would happen to all the nations of the earth through Avraham?"],
-    "19": ["Whom did Hashem say Avraham would command after him?", "What did Hashem say Avraham's children and household would keep?", "What two things did Hashem say they would do?", "Why did Hashem decide to reveal His plan to Avraham?"],
-    "20": ["Which two cities did Hashem mention?", "What did Hashem say about the outcry against these cities?", "What did Hashem say about the sin of these cities?"],
-    "21": ["What did Hashem say He would do regarding Sedom?", "What did Hashem say He wanted to find out?"],
-    "22": ["Where did the men go from there?", "What was Avraham still doing?"],
-    "23": ["What did Avraham do before he spoke to Hashem?", "What did Avraham ask Hashem?"],
-    "24": ["How many righteous people did Avraham suggest might be in the city?", "What did Avraham ask Hashem to do for the sake of the fifty righteous people?"],
-    "25": ["What did Avraham say would be forbidden for Hashem to do?", "What title did Avraham use for Hashem in this posuk?", "What did Avraham ask about the Judge of all the earth?"],
-    "26": ["How many righteous people did Hashem say He needed to find in Sedom?", "What did Hashem promise to do if He found them?"],
-    "27": ["How did Avraham describe himself when speaking to Hashem?"],
-    "28": ["What number did Avraham suggest might be missing from the fifty righteous people?", "What did Hashem answer about forty-five righteous people?"],
-    "29": ["What number did Avraham ask about next?", "What did Hashem answer about forty righteous people?"],
-    "30": ["What did Avraham ask Hashem before he continued speaking?", "What number did Avraham ask about in this posuk?", "What did Hashem answer about thirty righteous people?"],
-    "31": ["What number did Avraham ask about next?", "What did Hashem answer about twenty righteous people?"],
-    "32": ["How many more times did Avraham say he would speak in this posuk?", "What number did Avraham ask about last?", "What did Hashem answer about ten righteous people?"],
-    "33": ["What did Hashem do when He finished speaking to Avraham?", "What did Avraham do after Hashem left?"]
+    "1": ["To whom did Hashem appear?", "Where did Hashem appear to Avraham?", "Where was Avraham sitting?", "At what part of the day was Avraham sitting at the entrance of the tent?"],
+    "2": ["What did Avraham do with his eyes?", "What did Avraham see when he lifted his eyes?", "How many men did Avraham see?", "Where were the three men standing?", "What did Avraham do when he saw them?", "From where did Avraham run to greet them?", "What did Avraham do when he reached them?", "Toward what did Avraham bow?"],
+    "3": ["How did Avraham address the guest he was speaking to?", "What did Avraham say about finding favor in his guest's eyes?", "What did Avraham ask his guest not to do?", "How did Avraham refer to himself when he spoke to his guest?"],
+    "4": ["What did Avraham offer to have brought?", "How much water did Avraham offer to have brought?", "What did Avraham ask his guests to wash?", "Where did Avraham invite his guests to rest?"],
+    "5": ["What did Avraham say he would bring for his guests to eat?", "What did Avraham say the bread would do for his guests?", "What did Avraham say the guests should do after eating?", "What reason did Avraham give for serving the guests?", "How did Avraham refer to himself in this posuk?", "How did the guests respond to Avraham's offer?", "What did the guests tell Avraham to do?"],
+    "6": ["Where did Avraham hurry to?", "To whom did Avraham hurry in the tent?", "What did Avraham tell Sarah to do first?", "How many se'ah of flour did Avraham tell Sarah to prepare?", "What kind of flour did Avraham tell Sarah to use?", "What did Avraham tell Sarah to do with the flour?", "What did Avraham tell Sarah to make?"],
+    "7": ["Where did Avraham run after speaking with Sarah?", "What did Avraham take from the cattle?", "How is the calf described?", "To whom did Avraham give the calf?", "What did the young man do after receiving the calf?", "How quickly did the young man prepare the calf?"],
+    "8": ["What did Avraham take besides the calf?", "Which two dairy foods did Avraham take?", "Which calf did Avraham serve?", "Where did Avraham place the food?", "Where did Avraham stand while the guests ate?", "What was Avraham doing while the guests ate?", "Under what did Avraham stand?", "What did the guests do with the food?"],
+    "9": ["Who asked Avraham a question?", "Whom did the guests ask about?", "How did the guests describe Sarah when asking about her?", "What did the guests ask Avraham?", "Where did Avraham say Sarah was?"],
+    "10": ["Who said he would return to Avraham?", "What did the guest say he would do?", "When did the guest say he would return?", "What did the guest say Sarah would have when he returned?", "How did the guest describe Sarah in relation to Avraham?", "What was Sarah doing while the guest spoke?", "Where was Sarah while she listened?", "Where was the tent entrance in relation to the guest who was speaking?"],
+    "11": ["How are Avraham and Sarah described in age?", "What does the posuk say about how advanced in years Avraham and Sarah were?", "What normal condition had stopped happening for Sarah?"],
+    "12": ["Who laughed in this posuk?", "Where did Sarah laugh?", "What did Sarah say about herself in her thoughts?", "What did Sarah wonder whether she would have after becoming old?", "How did Sarah describe Avraham?"],
+    "13": ["Who spoke to Avraham about Sarah's laughter?", "To whom did Hashem speak?", "What did Hashem ask about Sarah's laughter?", "What did Hashem quote Sarah as wondering whether she could do?", "How did Hashem quote Sarah describing herself?"],
+    "14": ["What question did Hashem ask about whether anything is too difficult for Him?", "When did Hashem say He would return to Avraham?", "What did Hashem say Sarah would have at that time?"],
+    "15": ["What did Sarah deny doing?", "Why did Sarah deny that she had laughed?", "What did Hashem say in response to Sarah's denial?", "What did Hashem say Sarah had in fact done?"],
+    "16": ["What did the men do first in this posuk?", "From where did the men get up?", "Toward what place did the men look?", "Who went with the men?", "What did Avraham do as the men left?"],
+    "17": ["Who spoke to Himself in this posuk?", "Whom did Hashem mention?", "What did Hashem ask whether He should hide from Avraham?", "What was Hashem planning to do?"],
+    "18": ["Who did Hashem say would surely become something great?", "What kind of nation did Hashem say Avraham would become?", "How is that nation described?", "Who did Hashem say would be blessed through Avraham?"],
+    "19": ["Whom did Hashem say He had known or chosen?", "Whom did Hashem say Avraham would command after him?", "What did Hashem say Avraham's children and household would keep?", "Whose way would they keep?", "What two things did Hashem say they would do?", "What did Hashem say He would bring upon Avraham?", "What had Hashem spoken about Avraham?"],
+    "20": ["Who spoke in this posuk?", "Which two cities did Hashem mention?", "What did Hashem say about the outcry of Sedom and Amorah?", "What did Hashem say about their sin?", "How serious did Hashem say their sin was?"],
+    "21": ["What did Hashem say He would do first?", "What did Hashem say He would see?", "What outcry did Hashem say had come to Him?", "What did Hashem say He wanted to find out about what the people had done?", "What did Hashem say He would know if they had not acted according to the outcry?"],
+    "22": ["What did the men do from there?", "Where did the men go?", "Who remained behind?", "Before whom was Avraham still standing?"],
+    "23": ["What did Avraham do before speaking?", "Who spoke in this posuk?", "Whom did Avraham ask about destroying?", "Whom did Avraham ask whether Hashem would destroy together?"],
+    "24": ["How many righteous people did Avraham suggest might be inside the city?", "Where did Avraham say the fifty righteous people might be?", "What did Avraham ask whether Hashem would do to the city?", "What did Avraham ask Hashem to do for the place for the sake of the fifty righteous people?"],
+    "25": ["What did Avraham say would be far from Hashem to do?", "Whom did Avraham say should not be killed together?", "What did Avraham say should not happen to the righteous person?", "What did Avraham say should not happen to the wicked person?", "How did Avraham refer to Hashem in his question?", "What did Avraham ask the Judge of all the earth to do?"],
+    "26": ["Who answered Avraham?", "How many righteous people did Hashem say He would need to find in Sedom?", "Where in Sedom did Hashem say He would find them?", "What did Hashem promise to do for the entire place if He found fifty righteous people?", "For whose sake did Hashem say He would spare the place?"],
+    "27": ["Who answered and continued speaking?", "To whom did Avraham say he had begun to speak?", "How did Avraham describe himself?", "What two things did Avraham compare himself to?"],
+    "28": ["How many might be missing from the fifty righteous people according to Avraham?", "How many righteous people would that leave?", "What did Avraham ask whether Hashem would do to the whole city because five were missing?", "What did Hashem answer about forty-five righteous people?", "Where did Hashem say He would need to find the forty-five?"],
+    "29": ["What did Avraham do again in this posuk?", "How many righteous people did Avraham ask about next?", "What did Hashem say He would not do for the sake of forty righteous people?"],
+    "30": ["What did Avraham ask Hashem not to do before he continued speaking?", "What did Avraham say he wanted to do after asking Hashem not to be angry?", "How many righteous people did Avraham ask about in this posuk?", "What did Hashem say He would not do if He found thirty righteous people?", "Where did Hashem say He would need to find the thirty?"],
+    "31": ["What did Avraham say about having begun to speak to Hashem?", "How many righteous people did Avraham ask about next?", "What did Hashem say He would not do for the sake of twenty righteous people?"],
+    "32": ["What did Avraham ask Hashem not to do?", "How many more times did Avraham say he would speak?", "How many righteous people did Avraham ask about last?", "What did Hashem say He would not do for the sake of ten righteous people?"],
+    "33": ["Who left after the conversation was finished?", "When did Hashem leave?", "With whom had Hashem been speaking?", "What did Avraham do after Hashem left?", "Where did Avraham return?" ]
   }
 };
+
 
 // Warm the question-grading Cloud Function the same way the translation
 // ones are warmed, so the first question of the session doesn't eat a
@@ -1518,9 +1520,9 @@ let questionGradingWarmSent = false;
 function warmQuestionGradingService(){
   if(questionGradingWarmSent) return;
   questionGradingWarmSent = true;
-  if(GRADE_QUESTION_ANSWER_URL && GRADE_QUESTION_ANSWER_URL.indexOf('PASTE') !== 0){
-    fetch(GRADE_QUESTION_ANSWER_URL, { method:'OPTIONS' }).catch(() => {});
-  }
+  [GRADE_QUESTION_ANSWER_URL, GENERATE_COMPREHENSION_QUESTIONS_URL].forEach(url => {
+    if(url && url.indexOf('PASTE') !== 0) fetch(url, { method:'OPTIONS' }).catch(() => {});
+  });
 }
 
 function getQuestionsForPosuk(perekNum, posukNum){
@@ -1528,6 +1530,76 @@ function getQuestionsForPosuk(perekNum, posukNum){
   if(!perekBank) return null;
   const qs = perekBank[String(posukNum)];
   return (qs && qs.length) ? qs : null;
+}
+
+/* Automatically generated question sets are cached in Firebase after the
+   first successful generation. Each item keeps its source fact + expected
+   answer beside the child-facing question so a teacher/developer can audit
+   exactly what detail the generator intended to test. The hand-authored
+   QUESTION_BANK above always wins when an entry exists. */
+let generatedQuestionLoadToken = 0;
+
+async function getGeneratedQuestionsForPart(part){
+  const staticQs = getQuestionsForPosuk(currentPerekNum, part.posukNum);
+  if(staticQs){
+    return staticQs.map(q => ({ question:q, posukNum:part.posukNum, expectedAnswer:'', sourceFact:'', generated:false }));
+  }
+
+  if(!part || !part.translation || !part.translation.trim()) return [];
+  const cacheKey = (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]/]/g, '_');
+  const ref = db.ref('posukPractice/generatedQuestions/' + cacheKey);
+
+  try{
+    const snap = await ref.once('value');
+    const cached = snap.val();
+    if(cached && Array.isArray(cached.items) && cached.items.length){
+      return cached.items.map(item => ({
+        question: item.question || '',
+        expectedAnswer: item.expectedAnswer || '',
+        sourceFact: item.sourceFact || '',
+        posukNum: part.posukNum,
+        generated: true
+      })).filter(item => item.question);
+    }
+  }catch(err){
+    console.warn('Could not read generated-question cache', err);
+  }
+
+  if(!GENERATE_COMPREHENSION_QUESTIONS_URL || GENERATE_COMPREHENSION_QUESTIONS_URL.indexOf('PASTE') === 0) return [];
+
+  const res = await fetch(GENERATE_COMPREHENSION_QUESTIONS_URL, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    body:JSON.stringify({
+      posukText: part.text || '',
+      posukTranslation: part.translation || '',
+      perekNum: currentPerekNum,
+      posukNum: part.posukNum
+    })
+  });
+  if(!res.ok) throw new Error('Question generation request failed');
+  const data = await res.json();
+  const items = Array.isArray(data.items) ? data.items.filter(x => x && x.question) : [];
+  if(!items.length) return [];
+
+  try{
+    await ref.set({
+      perekNum: currentPerekNum,
+      posukNum: part.posukNum,
+      generatedAt: firebase.database.ServerValue.TIMESTAMP,
+      items
+    });
+  }catch(err){
+    console.warn('Could not save generated-question cache', err);
+  }
+
+  return items.map(item => ({
+    question:item.question,
+    expectedAnswer:item.expectedAnswer || '',
+    sourceFact:item.sourceFact || '',
+    posukNum:part.posukNum,
+    generated:true
+  }));
 }
 
 
@@ -2667,19 +2739,51 @@ function buildComprehensionQuestions(){
   comprehensionQuestions = [];
   (currentSelectionParts || []).forEach(part => {
     const qs = getQuestionsForPosuk(currentPerekNum, part.posukNum);
-    if(qs) qs.forEach(q => comprehensionQuestions.push({ question: q, posukNum: part.posukNum }));
+    if(qs) qs.forEach(q => comprehensionQuestions.push({ question:q, posukNum:part.posukNum, expectedAnswer:'', sourceFact:'', generated:false }));
   });
 }
 
-// Clears everything about the question flow for a fresh posuk visit —
-// separate from resetComprehensionResult, which only clears the *display*
-// of whichever grading result is currently on screen (question or bonus).
+async function completeGeneratedComprehensionQuestions(loadToken){
+  const combined = [];
+  for(const part of (currentSelectionParts || [])){
+    if(loadToken !== generatedQuestionLoadToken) return;
+    try{
+      const items = await getGeneratedQuestionsForPart(part);
+      items.forEach(item => combined.push(item));
+    }catch(err){
+      console.error('Could not generate comprehension questions for posuk', part.posukNum, err);
+    }
+  }
+  if(loadToken !== generatedQuestionLoadToken) return;
+  if(combined.length){
+    comprehensionQuestions = combined;
+    comprehensionQIndex = 0;
+    comprehensionQResults = {};
+    comprehensionMode = 'questions';
+    renderComprehensionQuestionUI();
+  }
+}
+
+// Clears everything about the question flow for a fresh posuk visit. Hand-
+// authored questions appear immediately. If any selected posuk has no hand-
+// authored set, its exhaustive fact questions are generated/cached in the
+// background and then swapped into this same UI when ready.
 function resetComprehensionQuestionState(){
+  const loadToken = ++generatedQuestionLoadToken;
   buildComprehensionQuestions();
   comprehensionQIndex = 0;
   comprehensionQResults = {};
   comprehensionMode = comprehensionQuestions.length ? 'questions' : 'freehand-only';
   renderComprehensionQuestionUI();
+
+  const hasMissing = (currentSelectionParts || []).some(part => !getQuestionsForPosuk(currentPerekNum, part.posukNum));
+  if(hasMissing){
+    const msg = document.getElementById('comprehensionGradingMsg');
+    if(msg && !comprehensionQuestions.length) msg.textContent = 'Preparing detail questions…';
+    completeGeneratedComprehensionQuestions(loadToken).finally(() => {
+      if(loadToken === generatedQuestionLoadToken && msg && msg.textContent === 'Preparing detail questions…') msg.textContent = '';
+    });
+  }
 }
 
 // Small inline progress indicator, e.g. "Question 2 of 4  ✅✅⬜⬜" — cheap
@@ -3518,6 +3622,7 @@ async function gradeCurrentQuestionAnswer(){
     const formData = new FormData();
     formData.append('audio', currentAudio.comprehension, 'recording.' + currentAudioExt.comprehension);
     formData.append('question', current.question);
+    if(current.expectedAnswer) formData.append('expectedAnswer', current.expectedAnswer);
     formData.append('posukTranslation', currentPosukTranslation || '');
     formData.append('posukText', currentPosukText || '');
 
