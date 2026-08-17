@@ -967,6 +967,15 @@
     opacity:1;
     filter:none;
   }
+  /* While one piece is being captured, every other piece is visibly locked.
+     This prevents a child from moving ahead before the current audio has
+     safely finalized and received its captured check. */
+  .chunk-token.capture-locked{
+    opacity:.24;
+    filter:blur(1.7px);
+    pointer-events:none;
+    cursor:default;
+  }
   .translation-hold-hint{
     text-align:center;
     font-size:.84rem;
@@ -1879,6 +1888,18 @@ const TRANSLATION_ARM_DELAY_MS = 700;
 // How much longer the recorder is kept open after the second tap, so a
 // trailing word or soft ending doesn't get cut off.
 const TRANSLATION_TRAIL_BUFFER_MS = 500;
+// Automatic end-of-speech detection. We do NOT start the silence clock until
+// real speech has been detected, so a child can take a moment before talking.
+// Once speech has begun, sustained quiet finalizes the piece automatically.
+const TRANSLATION_SILENCE_TO_FINISH_MS = 950;
+const TRANSLATION_MIN_SPEECH_MS = 180;
+let translationVadAudioCtx = null;
+let translationVadAnalyser = null;
+let translationVadRAF = null;
+let translationVadSpeechSeen = false;
+let translationVadSpeechStartedAt = null;
+let translationVadLastVoiceAt = null;
+let translationVadNoiseFloor = 0.008;
 
 // Per-chunk redo (mirrors recordWordFix for Hebrew reading): lets a
 // student re-record just ONE chunk after grading, instead of redoing the
@@ -4024,6 +4045,7 @@ function renderCurrentChunk(){
     }
     const classes = ['chunk-token'];
     if(i === translationChunkIndex) classes.push('active');
+    if(translationPillPhase !== 'idle' && i !== translationHoldTargetIndex) classes.push('capture-locked');
     if(i === translationHoldTargetIndex){
       if(translationPillPhase === 'arming') classes.push('tap-arming');
       else if(translationPillPhase === 'recording') classes.push('tap-recording');
@@ -4080,7 +4102,7 @@ function renderCurrentChunk(){
   if(translationPillPhase === 'arming'){
     progressEl.textContent = 'Piece ' + (translationHoldTargetIndex + 1) + ' of ' + total + ' — get ready…';
   }else if(translationPillPhase === 'recording'){
-    progressEl.textContent = 'Recording piece ' + (translationHoldTargetIndex + 1) + ' of ' + total + ' — tap it again to save.';
+    progressEl.textContent = 'Recording piece ' + (translationHoldTargetIndex + 1) + ' of ' + total + ' — speak, then wait for the ✓.';
   }else if(translationPillPhase === 'finishing'){
     progressEl.textContent = 'Finishing up piece ' + (translationHoldTargetIndex + 1) + ' of ' + total + '…';
   }else if(Object.keys(translationGradedResults).length){
@@ -4180,33 +4202,16 @@ function handleTranslationPillTap(e, idx){
     return;
   }
 
-  if(translationHoldTargetIndex === idx){
-    if(translationPillPhase === 'recording'){
-      scheduleFinishTranslationHold(idx);
-    }
-    // 'arming' or 'finishing': a repeat tap on the same pill is a no-op —
-    // let the timer that's already running play out.
-    return;
-  }
+  // While a piece is being captured, all other pieces are intentionally
+  // locked/blurred. The current piece may still be tapped as a manual
+  // fallback, but normally silence detection will finish it automatically.
+  if(translationHoldTargetIndex !== idx) return;
 
-  // A DIFFERENT pill was tapped while one is still armed/recording/
-  // finishing. Rather than ignoring it, wrap up the current piece first,
-  // then automatically arm the newly-tapped piece once that's done.
   if(translationPillPhase === 'recording'){
-    translationPendingArmIdx = idx;
-    scheduleFinishTranslationHold(translationHoldTargetIndex);
-  }else if(translationPillPhase === 'arming'){
-    // The mic hasn't opened yet — just cancel that arm timer and arm the
-    // newly-tapped pill right away instead.
-    if(translationHoldStartTimer){ clearTimeout(translationHoldStartTimer); translationHoldStartTimer = null; }
-    translationPillPhase = 'idle';
-    translationHoldTargetIndex = null;
-    armTranslationPill(idx);
-  }else if(translationPillPhase === 'finishing'){
-    // Already wrapping up — queue the new pill to arm the moment that finishes.
-    translationPendingArmIdx = idx;
+    scheduleFinishTranslationHold(idx);
   }
 }
+
 
 // After a piece finishes recording (or is skipped because it was too
 // short), arm whatever pill the child had already tapped in the meantime.
@@ -4233,6 +4238,75 @@ function armTranslationPill(idx){
     translationHoldStartTimer = null;
     startTranslationPillRecording(idx);
   }, TRANSLATION_ARM_DELAY_MS);
+}
+
+function stopTranslationSilenceDetector(){
+  if(translationVadRAF){ cancelAnimationFrame(translationVadRAF); translationVadRAF = null; }
+  if(translationVadAudioCtx){
+    try{ translationVadAudioCtx.close(); }catch(err){}
+  }
+  translationVadAudioCtx = null;
+  translationVadAnalyser = null;
+  translationVadSpeechSeen = false;
+  translationVadSpeechStartedAt = null;
+  translationVadLastVoiceAt = null;
+}
+
+function startTranslationSilenceDetector(stream, idx){
+  stopTranslationSilenceDetector();
+  try{
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if(!AudioCtx) return;
+    translationVadAudioCtx = new AudioCtx();
+    const source = translationVadAudioCtx.createMediaStreamSource(stream);
+    translationVadAnalyser = translationVadAudioCtx.createAnalyser();
+    translationVadAnalyser.fftSize = 1024;
+    translationVadAnalyser.smoothingTimeConstant = 0.35;
+    source.connect(translationVadAnalyser);
+    const samples = new Uint8Array(translationVadAnalyser.fftSize);
+    const calibrationUntil = performance.now() + 250;
+
+    const tick = () => {
+      if(translationPillPhase !== 'recording' || translationHoldTargetIndex !== idx || !translationVadAnalyser) return;
+      translationVadAnalyser.getByteTimeDomainData(samples);
+      let sum = 0;
+      for(let i=0;i<samples.length;i++){
+        const v = (samples[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / samples.length);
+      const now = performance.now();
+
+      // Briefly learn the room's baseline before deciding what counts as voice.
+      if(now < calibrationUntil && !translationVadSpeechSeen){
+        translationVadNoiseFloor = Math.max(0.004, translationVadNoiseFloor * 0.85 + rms * 0.15);
+      }
+      const voiceThreshold = Math.max(0.018, translationVadNoiseFloor * 2.8);
+
+      if(rms >= voiceThreshold){
+        if(!translationVadSpeechSeen){
+          translationVadSpeechSeen = true;
+          translationVadSpeechStartedAt = now;
+        }
+        translationVadLastVoiceAt = now;
+      }else if(translationVadSpeechSeen && translationVadLastVoiceAt){
+        const spokeLongEnough = (translationVadLastVoiceAt - translationVadSpeechStartedAt) >= TRANSLATION_MIN_SPEECH_MS;
+        if(spokeLongEnough && (now - translationVadLastVoiceAt) >= TRANSLATION_SILENCE_TO_FINISH_MS){
+          // Silence itself already supplies a generous tail, so finalize now.
+          translationPillPhase = 'finishing';
+          document.getElementById('translationStatus').textContent = '✓ Voice captured — saving…';
+          renderCurrentChunk();
+          finishTranslationPillRecording(idx);
+          return;
+        }
+      }
+      translationVadRAF = requestAnimationFrame(tick);
+    };
+    translationVadRAF = requestAnimationFrame(tick);
+  }catch(err){
+    console.warn('Automatic silence detection unavailable; manual tap-to-stop still works.', err);
+    stopTranslationSilenceDetector();
+  }
 }
 
 async function startTranslationPillRecording(idx){
@@ -4266,9 +4340,10 @@ async function startTranslationPillRecording(idx){
     translationSessionActive = true;
     translationPillPhase = 'recording';
     translationRecorder.start();
+    startTranslationSilenceDetector(stream, idx);
 
-    // Clear again = live. This is the "go" cue: go ahead and talk.
-    document.getElementById('translationStatus').textContent = '🎙️ Recording piece ' + (idx + 1) + ' — tap it again when you finish';
+    // Clear again = live. The child speaks, then waits for the automatic check.
+    document.getElementById('translationStatus').textContent = '🎙️ Recording piece ' + (idx + 1) + ' — speak, then wait for the ✓';
     renderCurrentChunk();
   }catch(err){
     console.error(err);
@@ -4298,6 +4373,7 @@ async function finishTranslationPillRecording(idx){
   const stream = translationStream;
   const elapsedMs = translationSegmentStartedAt ? (Date.now() - translationSegmentStartedAt) : 0;
 
+  stopTranslationSilenceDetector();
   await stopRecorderAsync(recorder);
   if(stream) stream.getTracks().forEach(t => t.stop());
   translationSessionActive = false;
@@ -4305,6 +4381,7 @@ async function finishTranslationPillRecording(idx){
   translationStream = null;
   translationRecorder = null;
   translationHoldTargetIndex = null;
+  translationPendingArmIdx = null;
 
   if(elapsedMs < 500 || !translationRecChunks.length){
     document.getElementById('translationStatus').textContent = 'Too quick — tap the piece again and wait a little longer before stopping.';
