@@ -2159,7 +2159,21 @@ function enterApp(){
     name: studentName,
     lastActive: firebase.database.ServerValue.TIMESTAMP
   });
-  applyDeepLinkFromURL();
+  startPracticeLimitListener();
+  // Load the boundary explicitly before honoring a deep link. The live
+  // listener above keeps it updated afterward, but this one-time read avoids
+  // a race where a bookmarked future posuk could open before the limit arrives.
+  db.ref('posukPractice/settings/practiceLimit').once('value').then(snap => {
+    const limit = snap.val();
+    classPracticeLimit = (limit && limit.perek && limit.posuk)
+      ? { perek: parseInt(limit.perek), posuk: parseInt(limit.posuk) }
+      : null;
+    rebuildPerekOptionsForClassLimit();
+    applyDeepLinkFromURL();
+  }).catch(err => {
+    console.error('Could not load practice limit before deep link', err);
+    applyDeepLinkFromURL();
+  });
 }
 
 /* ---------- Deep link from My Progress ----------
@@ -2171,6 +2185,12 @@ function applyDeepLinkFromURL(){
   const posukParam = parseInt(params.get('posuk'));
   const endPosukParam = parseInt(params.get('endPosuk'));
   if(!perekParam || !ALL_PERAKIM.includes(perekParam)) return;
+  if(!perekAllowedByClassLimit(perekParam) ||
+     (posukParam && !isWithinClassPracticeLimit(perekParam, posukParam)) ||
+     (endPosukParam && !isWithinClassPracticeLimit(perekParam, endPosukParam))){
+    document.getElementById('fetchMsg').textContent = '🔒 Your teacher has not opened that posuk yet.';
+    return;
+  }
   perekSelect.value = perekParam;
   Promise.resolve(perekSelect.onchange()).then(async () => {
     if(posukParam){
@@ -2222,6 +2242,76 @@ window.addEventListener('load', async () => {
 const perekSelect = document.getElementById('perekSelect');
 const posukSelect = document.getElementById('posukSelect');
 const endPosukSelect = document.getElementById('endPosukSelect');
+
+// Teacher-controlled class-wide practice boundary. Null means unrestricted.
+let classPracticeLimit = null;
+let practiceLimitListenerStarted = false;
+
+function isWithinClassPracticeLimit(perekNum, posukNum){
+  if(!classPracticeLimit || !classPracticeLimit.perek || !classPracticeLimit.posuk) return true;
+  const p = parseInt(perekNum);
+  const v = parseInt(posukNum);
+  if(p < classPracticeLimit.perek) return true;
+  if(p > classPracticeLimit.perek) return false;
+  return v <= classPracticeLimit.posuk;
+}
+
+function perekAllowedByClassLimit(perekNum){
+  if(!classPracticeLimit || !classPracticeLimit.perek) return true;
+  return parseInt(perekNum) <= parseInt(classPracticeLimit.perek);
+}
+
+function rebuildPerekOptionsForClassLimit(){
+  const current = parseInt(perekSelect.value);
+  perekSelect.innerHTML = '<option value="">פרק</option>';
+  ALL_PERAKIM.filter(perekAllowedByClassLimit).forEach(num => {
+    const opt = document.createElement('option');
+    opt.value = num;
+    opt.textContent = 'פרק ' + hebrewNumeral(num);
+    perekSelect.appendChild(opt);
+  });
+
+  if(current && perekAllowedByClassLimit(current)){
+    perekSelect.value = String(current);
+  }else if(current){
+    // The teacher tightened the limit while this page was open.
+    perekSelect.value = '';
+    posukSelect.innerHTML = '<option value="">פסוק</option>';
+    posukSelect.disabled = true;
+    endPosukSelect.innerHTML = '<option value="">עד פסוק</option>';
+    endPosukSelect.disabled = true;
+    resetScroll();
+    document.getElementById('fetchMsg').textContent = '🔒 Your teacher has not opened that section yet.';
+  }
+}
+
+function startPracticeLimitListener(){
+  if(practiceLimitListenerStarted) return;
+  practiceLimitListenerStarted = true;
+  db.ref('posukPractice/settings/practiceLimit').on('value', async snap => {
+    const nextLimit = snap.val();
+    classPracticeLimit = (nextLimit && nextLimit.perek && nextLimit.posuk)
+      ? { perek: parseInt(nextLimit.perek), posuk: parseInt(nextLimit.posuk) }
+      : null;
+
+    const selectedPerek = parseInt(perekSelect.value);
+    const selectedPosuk = parseInt(posukSelect.value);
+
+    rebuildPerekOptionsForClassLimit();
+
+    // If the current perek is still allowed, rebuild its posuk list so a
+    // newly opened/closed boundary is reflected immediately.
+    if(selectedPerek && perekAllowedByClassLimit(selectedPerek)){
+      const previousPosuk = selectedPosuk;
+      await perekSelect.onchange();
+      if(previousPosuk && isWithinClassPracticeLimit(selectedPerek, previousPosuk)){
+        posukSelect.value = String(previousPosuk);
+        if(posukSelect.value) await posukSelect.onchange();
+      }
+    }
+    updateNavArrows();
+  });
+}
 const selectionModeSelect = document.getElementById('selectionModeSelect');
 const selectionShell = document.getElementById('selectionShell');
 const selectionSummary = document.getElementById('selectionSummary');
@@ -2275,12 +2365,7 @@ modeRangeBtn.onclick = () => {
   selectionModeSelect.dispatchEvent(new Event('change'));
 };
 
-ALL_PERAKIM.forEach(num => {
-  const opt = document.createElement('option');
-  opt.value = num;
-  opt.textContent = 'פרק ' + hebrewNumeral(num);
-  perekSelect.appendChild(opt);
-});
+rebuildPerekOptionsForClassLimit();
 
 function rangeModeOn(){
   return selectionModeSelect.value === 'range';
@@ -2352,6 +2437,7 @@ perekSelect.onchange = async () => {
       }
     });
     for(let i = min; i <= max; i++){
+      if(!isWithinClassPracticeLimit(perekNum, i)) continue;
       const opt = document.createElement('option');
       opt.value = i;
       opt.textContent = 'פסוק ' + hebrewNumeral(i);
@@ -2370,6 +2456,11 @@ async function loadSelectedPesukim(){
   const startPosuk = parseInt(posukSelect.value);
   if(!startPosuk){ resetScroll(); return; }
   const endPosuk = rangeModeOn() ? parseInt(endPosukSelect.value) : startPosuk;
+  if(!isWithinClassPracticeLimit(perekNum, startPosuk) || (endPosuk && !isWithinClassPracticeLimit(perekNum, endPosuk))){
+    resetScroll();
+    document.getElementById('fetchMsg').textContent = '🔒 Your teacher has not opened that posuk yet.';
+    return;
+  }
   if(rangeModeOn() && !endPosuk){
     resetScroll();
     document.getElementById('fetchMsg').textContent = 'Choose the last פסוק in the range.';
@@ -2461,10 +2552,11 @@ async function goToPosuk(direction){
 
     // 2) Out of pesukim in this direction within this perek — move to the
     //    adjacent perek and land on its first (or last) posuk.
-    const perekIdx = ALL_PERAKIM.indexOf(perekNum);
+    const allowedPerakim = ALL_PERAKIM.filter(perekAllowedByClassLimit);
+    const perekIdx = allowedPerakim.indexOf(perekNum);
     const targetPerekIdx = perekIdx + direction;
-    if(perekIdx > -1 && targetPerekIdx >= 0 && targetPerekIdx < ALL_PERAKIM.length){
-      perekSelect.value = ALL_PERAKIM[targetPerekIdx];
+    if(perekIdx > -1 && targetPerekIdx >= 0 && targetPerekIdx < allowedPerakim.length){
+      perekSelect.value = allowedPerakim[targetPerekIdx];
       await perekSelect.onchange();
       const opts = Array.from(posukSelect.options).filter(o => o.value !== '');
       const edgeOpt = direction === 1 ? opts[0] : opts[opts.length - 1];
@@ -2508,9 +2600,13 @@ function updateNavArrows(){
   const perekNum = parseInt(perekSelect.value);
   const posukOpts = Array.from(posukSelect.options).filter(o => o.value !== '');
   const curPosukIdx = posukOpts.findIndex(o => parseInt(o.value) === parseInt(posukSelect.value));
-  const perekIdx = ALL_PERAKIM.indexOf(perekNum);
+  const allowedPerakim = ALL_PERAKIM.filter(perekAllowedByClassLimit);
+  const perekIdx = allowedPerakim.indexOf(perekNum);
   prevBtn.disabled = (perekIdx === 0 && curPosukIdx === 0);
-  nextBtn.disabled = (perekIdx === ALL_PERAKIM.length - 1 && curPosukIdx === posukOpts.length - 1);
+  nextBtn.disabled = (perekIdx === allowedPerakim.length - 1 && curPosukIdx === posukOpts.length - 1);
+  if(nextBtn.disabled && classPracticeLimit){
+    nextBtn.title = 'Your teacher has not opened the next posuk yet';
+  }
 }
 
 /* ---------- Locally-verified chapter text ----------
