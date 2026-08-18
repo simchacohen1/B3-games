@@ -1275,7 +1275,7 @@
 
         <div class="chunk-progress" id="chunkProgress">Tap a Hebrew piece to record its translation.</div>
         <div class="chunk-pill-display" id="chunkPillDisplay" dir="rtl"></div>
-        <div class="translation-hold-hint">👆 Tap to start • wait for it to turn clear • speak • then stay quiet for the ✓</div>
+        <div class="translation-hold-hint">👆 Tap to start • wait for it to turn clear • speak • then stay quiet for a moment for the ✓</div>
         <div style="text-align:center;margin-top:8px;"><span class="status-tag" id="translationStatus">Ready</span></div>
         <div style="text-align:center;margin-top:8px;"><button class="btn small gold hidden" id="translationDoneBtn" type="button">✅ Done — save this piece</button></div>
 
@@ -1896,13 +1896,14 @@ const TRANSLATION_TRAIL_BUFFER_MS = 500;
 // Automatic end-of-speech detection. We do NOT start the silence clock until
 // real speech has been detected, so a child can take a moment before talking.
 // Once speech has begun, sustained quiet finalizes the piece automatically.
-const TRANSLATION_SILENCE_TO_FINISH_MS = 950;
-const TRANSLATION_MIN_SPEECH_MS = 180;
+const TRANSLATION_SILENCE_TO_FINISH_MS = 1650;
+const TRANSLATION_VOICE_CONFIRM_MS = 120;
+const TRANSLATION_MIN_BLOB_BYTES = 1400;
 let translationVadAudioCtx = null;
 let translationVadAnalyser = null;
 let translationVadRAF = null;
 let translationVadSpeechSeen = false;
-let translationVadSpeechStartedAt = null;
+let translationVadVoiceCandidateAt = null;
 let translationVadLastVoiceAt = null;
 let translationVadNoiseFloor = 0.008;
 
@@ -1922,10 +1923,11 @@ let activeRecordingType = null; // 'hebrew' | 'translate' | 'comprehension'
 let recordingStartedAt = null; // timestamp from when the recorder truly started, for a minimum-duration check on stop
 
 const RECORDING_READY_WARMUP_MS = 550;
-const RECORDING_SILENCE_TO_FINISH_MS = 1100;
-const RECORDING_MIN_SPEECH_MS = 220;
+const RECORDING_SILENCE_TO_FINISH_MS = 1650;
+const RECORDING_VOICE_CONFIRM_MS = 140;
+const RECORDING_MIN_BLOB_BYTES = 2200;
 let genericVadAudioCtx=null, genericVadAnalyser=null, genericVadRAF=null;
-let genericVadSpeechSeen=false, genericVadSpeechStartedAt=null, genericVadLastVoiceAt=null, genericVadNoiseFloor=.008;
+let genericVadSpeechSeen=false, genericVadVoiceCandidateAt=null, genericVadLastVoiceAt=null, genericVadNoiseFloor=.008;
 let genericRecordingReadyTimer=null, genericRecordingReady=false;
 
 function recordingCueTarget(type){
@@ -1946,7 +1948,7 @@ function clearGenericRecordingReadyTimer(){
 function stopGenericSilenceDetector(){
   if(genericVadRAF){cancelAnimationFrame(genericVadRAF);genericVadRAF=null;}
   if(genericVadAudioCtx){try{genericVadAudioCtx.close();}catch(e){}}
-  genericVadAudioCtx=null;genericVadAnalyser=null;genericVadSpeechSeen=false;genericVadSpeechStartedAt=null;genericVadLastVoiceAt=null;
+  genericVadAudioCtx=null;genericVadAnalyser=null;genericVadSpeechSeen=false;genericVadVoiceCandidateAt=null;genericVadLastVoiceAt=null;
 }
 function startGenericSilenceDetector(stream,type){
   stopGenericSilenceDetector();
@@ -1963,14 +1965,25 @@ function startGenericSilenceDetector(stream,type){
       let sum=0; for(let i=0;i<samples.length;i++){const v=(samples[i]-128)/128;sum+=v*v;}
       const rms=Math.sqrt(sum/samples.length), now=performance.now();
       if(now<calibrationUntil&&!genericVadSpeechSeen) genericVadNoiseFloor=Math.max(.004,genericVadNoiseFloor*.85+rms*.15);
-      const threshold=Math.max(.018,genericVadNoiseFloor*2.8);
+      // Softer than before so a quiet child is still detected, but a single
+      // bump/click is NOT enough to arm auto-stop. Voice must stay above the
+      // threshold continuously for a short confirmation window first.
+      const threshold=Math.max(.012,genericVadNoiseFloor*2.15);
       if(genericRecordingReady){
         if(rms>=threshold){
-          if(!genericVadSpeechSeen){genericVadSpeechSeen=true;genericVadSpeechStartedAt=now;}
-          genericVadLastVoiceAt=now;
-        }else if(genericVadSpeechSeen&&genericVadLastVoiceAt){
-          const enough=(genericVadLastVoiceAt-genericVadSpeechStartedAt)>=RECORDING_MIN_SPEECH_MS;
-          if(enough&&(now-genericVadLastVoiceAt)>=RECORDING_SILENCE_TO_FINISH_MS){
+          if(!genericVadSpeechSeen){
+            if(genericVadVoiceCandidateAt===null) genericVadVoiceCandidateAt=now;
+            if((now-genericVadVoiceCandidateAt)>=RECORDING_VOICE_CONFIRM_MS){
+              genericVadSpeechSeen=true;
+              genericVadLastVoiceAt=now;
+            }
+          }else{
+            genericVadLastVoiceAt=now;
+          }
+        }else{
+          if(!genericVadSpeechSeen) genericVadVoiceCandidateAt=null;
+          if(genericVadSpeechSeen&&genericVadLastVoiceAt &&
+             (now-genericVadLastVoiceAt)>=RECORDING_SILENCE_TO_FINISH_MS){
             document.getElementById(type+'Status').textContent='✓ Voice captured — finishing…';
             try{mediaRecorder.stop();}catch(e){}
             return;
@@ -3501,10 +3514,20 @@ async function toggleRecording(type, btnEl){
       const actual=mediaRecorder.mimeType||'audio/webm';
       const blob=new Blob(recordingChunks,{type:actual});
       const elapsed=recordingStartedAt?(Date.now()-recordingStartedAt):null;
+      const capturedConfirmedSpeech = genericVadSpeechSeen;
       clearGenericRecordingReadyTimer(); stopGenericSilenceDetector(); genericRecordingReady=false; setRecordingCueBlur(type,false);
       btnEl.disabled=false;btnEl.classList.remove('recording');btnEl.textContent='🎙️';activeRecordingType=null;
       stream.getTracks().forEach(t=>t.stop());stopMicMeter(type);
-      if(elapsed!==null&&elapsed<800){document.getElementById(type+'Status').textContent='Recording was too short — please try again.';recordingStartedAt=null;return;}
+      if(elapsed!==null&&elapsed<800){
+        document.getElementById(type+'Status').textContent='Recording was too short — please try again.';
+        recordingStartedAt=null;return;
+      }
+      // Do not send an almost-empty/silent container to transcription. This
+      // is the exact failure mode that can come back as “nothing heard.”
+      if(!capturedConfirmedSpeech || blob.size < RECORDING_MIN_BLOB_BYTES){
+        document.getElementById(type+'Status').textContent='I did not capture your voice clearly — please try again.';
+        recordingStartedAt=null;return;
+      }
       recordingStartedAt=null;
       currentAudio[type]=blob;currentAudioExt[type]=mimeTypeToExtension(actual);
       const url=URL.createObjectURL(blob),audioEl=document.getElementById(type+'AudioPlayback');
@@ -4483,7 +4506,7 @@ function stopTranslationSilenceDetector(){
   translationVadAudioCtx = null;
   translationVadAnalyser = null;
   translationVadSpeechSeen = false;
-  translationVadSpeechStartedAt = null;
+  translationVadVoiceCandidateAt = null;
   translationVadLastVoiceAt = null;
 }
 
@@ -4516,18 +4539,22 @@ function startTranslationSilenceDetector(stream, idx){
       if(now < calibrationUntil && !translationVadSpeechSeen){
         translationVadNoiseFloor = Math.max(0.004, translationVadNoiseFloor * 0.85 + rms * 0.15);
       }
-      const voiceThreshold = Math.max(0.018, translationVadNoiseFloor * 2.8);
+      const voiceThreshold = Math.max(0.012, translationVadNoiseFloor * 2.15);
 
       if(rms >= voiceThreshold){
         if(!translationVadSpeechSeen){
-          translationVadSpeechSeen = true;
-          translationVadSpeechStartedAt = now;
+          if(translationVadVoiceCandidateAt === null) translationVadVoiceCandidateAt = now;
+          if((now - translationVadVoiceCandidateAt) >= TRANSLATION_VOICE_CONFIRM_MS){
+            translationVadSpeechSeen = true;
+            translationVadLastVoiceAt = now;
+          }
+        }else{
+          translationVadLastVoiceAt = now;
         }
-        translationVadLastVoiceAt = now;
-      }else if(translationVadSpeechSeen && translationVadLastVoiceAt){
-        const spokeLongEnough = (translationVadLastVoiceAt - translationVadSpeechStartedAt) >= TRANSLATION_MIN_SPEECH_MS;
-        if(spokeLongEnough && (now - translationVadLastVoiceAt) >= TRANSLATION_SILENCE_TO_FINISH_MS){
-          // Silence itself already supplies a generous tail, so finalize now.
+      }else{
+        if(!translationVadSpeechSeen) translationVadVoiceCandidateAt = null;
+        if(translationVadSpeechSeen && translationVadLastVoiceAt &&
+           (now - translationVadLastVoiceAt) >= TRANSLATION_SILENCE_TO_FINISH_MS){
           translationPillPhase = 'finishing';
           document.getElementById('translationStatus').textContent = '✓ Voice captured — saving…';
           renderCurrentChunk();
@@ -4565,7 +4592,7 @@ async function startTranslationPillRecording(idx){
         if(translationPillPhase!=='arming'||translationHoldTargetIndex!==idx)return;
         translationPillPhase='recording';
         startTranslationSilenceDetector(stream,idx);
-        document.getElementById('translationStatus').textContent='🎙️ Recording piece '+(idx+1)+' — speak, then stay quiet for the ✓';
+        document.getElementById('translationStatus').textContent='🎙️ Recording piece '+(idx+1)+' — speak, then stay quiet for a moment for the ✓';
         renderCurrentChunk();
       },TRANSLATION_READY_WARMUP_MS);
     };
@@ -4594,6 +4621,7 @@ async function finishTranslationPillRecording(idx){
   const recorder = translationRecorder;
   const stream = translationStream;
   const elapsedMs = translationSegmentStartedAt ? (Date.now() - translationSegmentStartedAt) : 0;
+  const capturedConfirmedSpeech = translationVadSpeechSeen;
 
   stopTranslationSilenceDetector();
   await stopRecorderAsync(recorder);
@@ -4606,7 +4634,7 @@ async function finishTranslationPillRecording(idx){
   translationPendingArmIdx = null;
 
   if(elapsedMs < 500 || !translationRecChunks.length){
-    document.getElementById('translationStatus').textContent = 'Too quick — tap the piece again and wait a little longer before stopping.';
+    document.getElementById('translationStatus').textContent = 'Too quick — tap the piece again and speak after it turns clear.';
     renderCurrentChunk();
     maybeArmPendingPill();
     return;
@@ -4614,6 +4642,12 @@ async function finishTranslationPillRecording(idx){
 
   const actualType = recorder.mimeType || 'audio/webm';
   const blob = new Blob(translationRecChunks, { type: actualType });
+  if(!capturedConfirmedSpeech || blob.size < TRANSLATION_MIN_BLOB_BYTES){
+    document.getElementById('translationStatus').textContent = 'I did not capture your voice clearly — please try this piece again.';
+    renderCurrentChunk();
+    maybeArmPendingPill();
+    return;
+  }
   translationSegments[idx] = { blob, ext: mimeTypeToExtension(actualType) };
   // If this was a re-record, the old grade no longer describes the new audio.
   delete translationGradedResults[idx];
