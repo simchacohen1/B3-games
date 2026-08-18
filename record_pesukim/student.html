@@ -1454,15 +1454,16 @@ const GENERATE_TRANSLATION_CHUNKS_URL = "https://us-central1-b3-games.cloudfunct
 const GRADE_TRANSLATION_CHUNK_URL = "https://us-central1-b3-games.cloudfunctions.net/gradeTranslationChunk";
 
 // Warm the translation Cloud Functions before the student opens Translate.
-// OPTIONS reaches the function without generating/grading anything, so this
-// can wake a cold function while the child is still reading the Hebrew.
+// A simple no-cors GET wakes the runtime without generating/grading anything.
+ // Do not use an explicit cross-origin OPTIONS request here; that can itself
+ // create a failed CORS preflight in the browser.
 let translationWarmSent = false;
 function warmTranslationServices(){
   if(translationWarmSent) return;
   translationWarmSent = true;
   [GENERATE_TRANSLATION_CHUNKS_URL, GRADE_TRANSLATION_CHUNK_URL].forEach(url => {
     if(url && url.indexOf('PASTE') !== 0){
-      fetch(url, { method:'OPTIONS' }).catch(() => {});
+      fetch(url, { method:'GET', mode:'no-cors', cache:'no-store' }).catch(() => {});
     }
   });
 }
@@ -1534,7 +1535,7 @@ function warmQuestionGradingService(){
   if(questionGradingWarmSent) return;
   questionGradingWarmSent = true;
   [GRADE_QUESTION_ANSWER_URL, GENERATE_COMPREHENSION_QUESTIONS_URL].forEach(url => {
-    if(url && url.indexOf('PASTE') !== 0) fetch(url, { method:'OPTIONS' }).catch(() => {});
+    if(url && url.indexOf('PASTE') !== 0) fetch(url, { method:'GET', mode:'no-cors', cache:'no-store' }).catch(() => {});
   });
 }
 
@@ -1907,6 +1908,8 @@ let translationVadSpeechSeen = false;
 let translationVadVoiceCandidateAt = null;
 let translationVadLastVoiceAt = null;
 let translationVadNoiseFloor = 0.008;
+let translationMaxTimer = null;
+const TRANSLATION_MAX_DURATION_MS = 30000;
 
 // Per-chunk redo (mirrors recordWordFix for Hebrew reading): lets a
 // student re-record just ONE chunk after grading, instead of redoing the
@@ -1930,6 +1933,8 @@ const RECORDING_MIN_BLOB_BYTES = 2200;
 let genericVadAudioCtx=null, genericVadAnalyser=null, genericVadRAF=null;
 let genericVadSpeechSeen=false, genericVadVoiceCandidateAt=null, genericVadLastVoiceAt=null, genericVadNoiseFloor=.008;
 let genericRecordingReadyTimer=null, genericRecordingReady=false;
+let genericRecordingMaxTimer=null;
+const RECORDING_MAX_DURATION_MS = 45000;
 
 function recordingCueTarget(type){
   if(type==='hebrew') return document.getElementById('scrollBox');
@@ -1945,6 +1950,7 @@ function setRecordingCueBlur(type, blurred){
 }
 function clearGenericRecordingReadyTimer(){
   if(genericRecordingReadyTimer){clearTimeout(genericRecordingReadyTimer);genericRecordingReadyTimer=null;}
+  if(genericRecordingMaxTimer){clearTimeout(genericRecordingMaxTimer);genericRecordingMaxTimer=null;}
 }
 function stopGenericSilenceDetector(){
   if(genericVadRAF){cancelAnimationFrame(genericVadRAF);genericVadRAF=null;}
@@ -3516,6 +3522,12 @@ async function toggleRecording(type, btnEl){
     mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size) recordingChunks.push(e.data);};
     mediaRecorder.onstart=()=>{
       recordingStartedAt=Date.now(); startMicMeter(stream,type); startGenericSilenceDetector(stream,type);
+      genericRecordingMaxTimer=setTimeout(()=>{
+        if(activeRecordingType===type && mediaRecorder && mediaRecorder.state==='recording'){
+          document.getElementById(type+'Status').textContent='Finishing this recording…';
+          try{mediaRecorder.stop();}catch(e){}
+        }
+      }, RECORDING_MAX_DURATION_MS);
       genericRecordingReadyTimer=setTimeout(()=>{
         genericRecordingReadyTimer=null;
         if(activeRecordingType!==type||!mediaRecorder||mediaRecorder.state!=='recording') return;
@@ -4550,6 +4562,7 @@ function armTranslationPill(idx){
 }
 
 function stopTranslationSilenceDetector(){
+  if(translationMaxTimer){ clearTimeout(translationMaxTimer); translationMaxTimer = null; }
   if(translationVadRAF){ cancelAnimationFrame(translationVadRAF); translationVadRAF = null; }
   if(translationVadAudioCtx){
     try{ translationVadAudioCtx.close(); }catch(err){}
@@ -4643,6 +4656,14 @@ async function startTranslationPillRecording(idx){
         if(translationPillPhase!=='arming'||translationHoldTargetIndex!==idx)return;
         translationPillPhase='recording';
         startTranslationSilenceDetector(stream,idx);
+        translationMaxTimer=setTimeout(()=>{
+          if(translationPillPhase==='recording' && translationHoldTargetIndex===idx){
+            translationPillPhase='finishing';
+            document.getElementById('translationStatus').textContent='Finishing this piece…';
+            renderCurrentChunk();
+            finishTranslationPillRecording(idx);
+          }
+        }, TRANSLATION_MAX_DURATION_MS);
         document.getElementById('translationStatus').textContent='🎙️ Recording piece '+(idx+1)+' — speak, then stay quiet for a moment for the ✓';
         renderCurrentChunk();
       },TRANSLATION_READY_WARMUP_MS);
