@@ -1551,6 +1551,7 @@ function getQuestionsForPosuk(perekNum, posukNum){
    exactly what detail the generator intended to test. The hand-authored
    QUESTION_BANK above always wins when an entry exists. */
 let generatedQuestionLoadToken = 0;
+let comprehensionQuestionLoadFailed = false;
 
 // Two-level client cache: Firebase remains the shared permanent master copy
 // for every student, while this browser keeps question sets in memory and
@@ -3062,23 +3063,34 @@ function buildComprehensionQuestions(){
 
 async function completeGeneratedComprehensionQuestions(loadToken){
   const combined = [];
+  let hadFailure = false;
   for(const part of (currentSelectionParts || [])){
     if(loadToken !== generatedQuestionLoadToken) return;
     try{
       const items = await getGeneratedQuestionsForPart(part);
-      items.forEach(item => combined.push(item));
+      if(items && items.length) items.forEach(item => combined.push(item));
+      else hadFailure = true;
     }catch(err){
+      hadFailure = true;
       console.error('Could not generate comprehension questions for posuk', part.posukNum, err);
     }
   }
   if(loadToken !== generatedQuestionLoadToken) return;
   if(combined.length){
+    comprehensionQuestionLoadFailed = false;
     comprehensionQuestions = combined;
     comprehensionQIndex = 0;
     comprehensionQResults = {};
     comprehensionMode = 'questions';
     renderComprehensionQuestionUI();
     await restoreSavedQuestionResults();
+  }else if(hadFailure){
+    comprehensionQuestionLoadFailed = true;
+    const msg = document.getElementById('comprehensionGradingMsg');
+    msg.textContent = 'Could not prepare the detail questions. Tap retry.';
+    const retry = document.getElementById('comprehensionRetryBtn');
+    retry.textContent = '🔁 Retry questions';
+    retry.classList.remove('hidden');
   }
 }
 
@@ -3134,6 +3146,7 @@ async function restoreSavedQuestionResults(){
 // authored set, its exhaustive fact questions are generated/cached in the
 // background and then swapped into this same UI when ready.
 function resetComprehensionQuestionState(){
+  comprehensionQuestionLoadFailed = false;
   const loadToken = ++generatedQuestionLoadToken;
   buildComprehensionQuestions();
   comprehensionQIndex = 0;
@@ -3551,6 +3564,15 @@ document.getElementById('hebrewRecordBtn').onclick = function(){ toggleRecording
 document.getElementById('comprehensionRecordBtn').onclick = function(){ toggleRecording('comprehension', this); };
 document.getElementById('hebrewRetryBtn').onclick = () => scoreHebrewReading();
 document.getElementById('comprehensionRetryBtn').onclick = () => {
+  if(comprehensionQuestionLoadFailed){
+    comprehensionQuestionLoadFailed = false;
+    const btn = document.getElementById('comprehensionRetryBtn');
+    btn.classList.add('hidden');
+    btn.textContent = '🔁 Try checking again';
+    document.getElementById('comprehensionGradingMsg').textContent = 'Preparing detail questions…';
+    completeGeneratedComprehensionQuestions(++generatedQuestionLoadToken);
+    return;
+  }
   if(comprehensionMode === 'questions') gradeCurrentQuestionAnswer();
   else gradeComprehensionAttempt();
 };
@@ -4188,17 +4210,33 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
   if(!GENERATE_TRANSLATION_CHUNKS_URL || GENERATE_TRANSLATION_CHUNKS_URL.indexOf('PASTE') === 0) return null;
   try{
     const classroomReferenceTranslation = await getClassroomReferenceForPart(part);
-    const res = await fetch(GENERATE_TRANSLATION_CHUNKS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        posukText: part.text,
-        posukTranslation: part.translation || '',
-        classroomReferenceTranslation
-      }),
-    });
+    let res = null;
+    let lastErr = null;
+    for(let attempt = 0; attempt < 2; attempt++){
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 35000);
+      try{
+        res = await fetch(GENERATE_TRANSLATION_CHUNKS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            posukText: part.text,
+            posukTranslation: part.translation || '',
+            classroomReferenceTranslation
+          }),
+        });
+        clearTimeout(timeout);
+        if(res.ok) break;
+        lastErr = new Error('Chunk generation request failed: ' + res.status);
+      }catch(err){
+        clearTimeout(timeout);
+        lastErr = err;
+      }
+      if(attempt === 0) await new Promise(r => setTimeout(r, 900));
+    }
     if(myToken !== translationLoadToken) return null;
-    if(!res.ok) throw new Error('Chunk generation request failed');
+    if(!res || !res.ok) throw (lastErr || new Error('Chunk generation request failed'));
     const data = await res.json();
     if(!data.levels || !Array.isArray(data.levels) || !data.levels.length) throw new Error('No levels returned');
     chunkRef.set({ levels: data.levels, generatedAt: Date.now() }).catch(err => {
@@ -4263,6 +4301,9 @@ async function loadOrGenerateTranslationChunks(){
   if(translationLevels && translationLevels.length){
     translationLevelIndex = defaultTranslationLevelIndex(translationLevels);
     translationChunkIndex = 0;
+  }else{
+    // [] means generation definitively failed; null means still loading.
+    translationLevels = [];
   }
   renderCurrentChunk();
 }
@@ -4291,6 +4332,16 @@ function renderCurrentChunk(){
     progressEl.textContent = 'Getting the translation pieces ready…';
     levelLabelEl.textContent = '';
     [smallerBtn, biggerBtn, prevBtn, nextBtn].forEach(b => b.disabled = true);
+    return;
+  }
+  if(Array.isArray(translationLevels) && translationLevels.length === 0){
+    stripEl.textContent = 'Could not prepare the translation pieces.';
+    progressEl.textContent = 'Tap “Retry loading” below.';
+    levelLabelEl.textContent = '';
+    [smallerBtn, biggerBtn, prevBtn, nextBtn].forEach(b => b.disabled = true);
+    const retryBtn = document.getElementById('translationRetryBtn');
+    retryBtn.textContent = '🔁 Retry loading';
+    retryBtn.classList.remove('hidden');
     return;
   }
 
@@ -4728,6 +4779,14 @@ document.getElementById('translationDoneBtn').onclick = () => {
   }
 };
 document.getElementById('translationRetryBtn').onclick = () => {
+  if(Array.isArray(translationLevels) && translationLevels.length === 0){
+    const btn = document.getElementById('translationRetryBtn');
+    btn.classList.add('hidden');
+    btn.textContent = '🔁 Start over';
+    document.getElementById('translationStatus').textContent = 'Preparing…';
+    loadOrGenerateTranslationChunks();
+    return;
+  }
   translationSegments = {};
   translationGradedResults = {};
   translationGradingPromises = {};
