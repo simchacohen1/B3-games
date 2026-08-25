@@ -2268,6 +2268,11 @@ function applyDeepLinkFromURL(){
   const perekParam = parseInt(params.get('perek'));
   const posukParam = parseInt(params.get('posuk'));
   const endPosukParam = parseInt(params.get('endPosuk'));
+  // A tile on progress.html represents one specific tab (reading /
+  // translate / comprehension) — land there directly instead of always
+  // defaulting back to Read Hebrew.
+  const tabParam = params.get('tab');
+  const VALID_DEEP_LINK_TABS = ['reading', 'translate', 'comprehension'];
   if(!perekParam || !ALL_PERAKIM.includes(perekParam)) return;
   if(!perekAllowedByClassLimit(perekParam) ||
      (posukParam && !isWithinClassPracticeLimit(perekParam, posukParam)) ||
@@ -2288,6 +2293,9 @@ function applyDeepLinkFromURL(){
       }else{
         await posukSelect.onchange();
       }
+    }
+    if(tabParam && VALID_DEEP_LINK_TABS.includes(tabParam)){
+      setActiveTab(tabParam);
     }
   });
 }
@@ -5354,3 +5362,4 @@ async function deleteAttempt(attempt, btnEl){
 </script>
 </body>
 </html>
+
