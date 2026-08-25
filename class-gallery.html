@@ -485,8 +485,17 @@
     <button class="close-x" id="closeModalBtn">&times;</button>
     <h2>Pin Your Work</h2>
     <form id="projectForm">
+      <label for="classSelect">Your Class</label>
+      <select id="classSelect">
+        <option value="">Choose your class...</option>
+        <option value="B3 WT">B3 WT</option>
+        <option value="B3 ET">B3 ET</option>
+      </select>
+
       <label for="studentName">Your Name</label>
-      <input type="text" id="studentName" required maxlength="40" placeholder="e.g. Mendel">
+      <select id="studentName" required>
+        <option value="">Choose your class first...</option>
+      </select>
 
       <label for="title">Project Title</label>
       <input type="text" id="title" required maxlength="60" placeholder="e.g. Avraham's Tent">
@@ -579,6 +588,40 @@
 </div>
 
 <script>
+const ROSTERS = {
+  'B3 WT': [
+    'Ari Greenberg',
+    'Zev Rosenfeld',
+    'Levi Schtroks',
+    'Yisroel Aryeh Simmonds',
+    'Leibel Vogel',
+    'Yisroel Arye Leib Wolf'
+  ],
+  'B3 ET': [
+    'Mayer Chaim Chaikin',
+    'Yossi Gourarie',
+    'Sholom DovBer Huebner',
+    'Moshe Lapine',
+    'Kehos Notik',
+    'Yisroel Oirechman',
+    'Moshe Tuvia Raichman',
+    'Avrohom Rosenfeld',
+    'Levi Rozmarin',
+    'Arik Traxler'
+  ]
+};
+
+document.getElementById('classSelect').addEventListener('change', (e) => {
+  const nameSelect = document.getElementById('studentName');
+  const roster = ROSTERS[e.target.value];
+  if(!roster){
+    nameSelect.innerHTML = '<option value="">Choose your class first...</option>';
+    return;
+  }
+  nameSelect.innerHTML = '<option value="">Choose your name...</option>' +
+    roster.map(name => `<option value="${name}">${name}</option>`).join('');
+});
+
 const dbRef = firebase.database().ref('classGallery/posts');
 // Teacher passcode — change this to whatever you like before sharing the link with your class.
 const TEACHER_PASSCODE = 'class123';
@@ -672,7 +715,7 @@ function render(){
       <span class="card-category">${escapeHtml(post.category)}</span>
       <h3>${escapeHtml(post.title)}</h3>
       <div class="desc">${escapeHtml(post.description)}</div>
-      <div class="by">${escapeHtml(post.studentName)}</div>
+      <div class="by">${escapeHtml(post.studentName)}${post.className ? ` &middot; ${escapeHtml(post.className)}` : ''}</div>
       ${mediaBadges ? `<div class="media-badges">${mediaBadges}</div>` : ''}
       ${stickerHtml}
     `;
@@ -717,7 +760,7 @@ function openLightbox(post){
     <h2>${escapeHtml(post.title)} ${post.sticker || ''}</h2>
     <div class="desc-full">${escapeHtml(post.description)}</div>
     ${linkHtml}
-    <div class="by">${escapeHtml(post.studentName)}</div>
+    <div class="by">${escapeHtml(post.studentName)}${post.className ? ` &middot; ${escapeHtml(post.className)}` : ''}</div>
   `;
   lightbox.classList.add('show');
 }
@@ -880,6 +923,7 @@ document.getElementById('projectForm').addEventListener('submit', async (e) => {
   statusMsg.textContent = 'Pinning...';
   statusMsg.style.color = '#5b4632';
 
+  const className = document.getElementById('classSelect').value;
   const studentName = document.getElementById('studentName').value.trim();
   const title = document.getElementById('title').value.trim();
   const category = document.getElementById('category').value;
@@ -918,7 +962,7 @@ document.getElementById('projectForm').addEventListener('submit', async (e) => {
     }
 
     const post = {
-      studentName, title, category, description, link, image, color, sticker,
+      studentName, className, title, category, description, link, image, color, sticker,
       audioUrl, videoUrl,
       status: 'pending',
       createdAt: new Date().toISOString()
@@ -931,6 +975,7 @@ document.getElementById('projectForm').addEventListener('submit', async (e) => {
 
     setTimeout(() => {
       document.getElementById('projectForm').reset();
+      document.getElementById('studentName').innerHTML = '<option value="">Choose your class first...</option>';
       document.querySelectorAll('.swatch').forEach(s => s.classList.remove('selected'));
       document.getElementById('chosenColor').value = '';
       statusMsg.textContent = '';
