@@ -566,7 +566,7 @@ function buildPerekSection(perekNum, range){
     // recording page itself, as if they'd picked it from the dropdowns —
     // their existing recording/history is right there ready to review.
     const tile = document.createElement('a');
-    tile.href = `student.html?perek=${perekNum}&posuk=${posukNum}`;
+    tile.href = `student.html?perek=${perekNum}&posuk=${posukNum}&tab=${activeTab}`;
     tile.className = 'posuk-tile ' + (tier ? 'tile-' + tier : 'tile-none');
     tile.innerHTML = `<span class="tile-num">${hebrewNumeral(posukNum)}</span><span class="tile-score">${label}</span>`;
     grid.appendChild(tile);
@@ -595,7 +595,7 @@ function buildPerekSection(perekNum, range){
         if(info){ tier = info.tier; label = info.label; }
       }
       const a = document.createElement('a');
-      a.href = `student.html?perek=${perekNum}&posuk=${r.start}&endPosuk=${r.end}`;
+      a.href = `student.html?perek=${perekNum}&posuk=${r.start}&endPosuk=${r.end}&tab=${activeTab}`;
       a.className = 'posuk-tile ' + (tier ? 'tile-' + tier : 'tile-none');
       a.style.display = 'inline-flex';
       a.style.width = 'auto';
@@ -613,3 +613,5 @@ function buildPerekSection(perekNum, range){
 </script>
 </body>
 </html>
+
+
