@@ -6,6 +6,13 @@
 <title>Our Wall of Learning</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  // Reuses the same Firebase project as B3-games, under its own data path.
+  firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+</script>
 <style>
   :root{
     --cork-1:#c69463;
@@ -550,7 +557,7 @@
 </div>
 
 <script>
-const STORAGE_KEY = 'gallery-posts';
+const dbRef = firebase.database().ref('classGallery/posts');
 // Teacher passcode — change this to whatever you like before sharing the link with your class.
 const TEACHER_PASSCODE = 'class123';
 let isTeacher = false;
@@ -575,19 +582,17 @@ function rotationFor(id){
   return deg;
 }
 
-async function loadPosts(){
-  try{
-    const result = await window.storage.get(STORAGE_KEY, true);
-    posts = result && result.value ? JSON.parse(result.value) : [];
-  }catch(e){
-    posts = [];
-  }
+// Live sync: any change anywhere (a new submission, an approval) updates everyone's view instantly.
+dbRef.on('value', (snapshot) => {
+  const data = snapshot.val() || {};
+  posts = Object.keys(data).map(id => ({ id, ...data[id] }));
   render();
-}
-
-async function savePosts(){
-  await window.storage.set(STORAGE_KEY, JSON.stringify(posts), true);
-}
+  if(isTeacher && document.getElementById('reviewListArea').style.display !== 'none'){
+    renderReviewList();
+  }
+}, (err) => {
+  console.error('Firebase read failed:', err);
+});
 
 function escapeHtml(str){
   const div = document.createElement('div');
@@ -747,18 +752,21 @@ function renderReviewList(){
   `).join('');
 
   listEl.querySelectorAll('button[data-action]').forEach(btn => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async (e) => {
+      e.target.disabled = true;
       const id = btn.dataset.id;
       const action = btn.dataset.action;
-      if(action === 'approve'){
-        const p = posts.find(p => p.id === id);
-        if(p) p.status = 'approved';
-      }else{
-        posts = posts.filter(p => p.id !== id);
+      try{
+        if(action === 'approve'){
+          await dbRef.child(id).update({ status: 'approved' });
+        }else{
+          await dbRef.child(id).remove();
+        }
+        // The live listener (dbRef.on('value', ...)) will re-render automatically.
+      }catch(err){
+        alert('Could not update that project. Check your connection and try again.');
+        e.target.disabled = false;
       }
-      await savePosts();
-      renderReviewList();
-      render();
     });
   });
 }
@@ -818,14 +826,12 @@ document.getElementById('projectForm').addEventListener('submit', async (e) => {
     }
 
     const post = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2,8),
       studentName, title, category, description, link, image, color, sticker,
       status: 'pending',
       createdAt: new Date().toISOString()
     };
 
-    posts.push(post);
-    await savePosts();
+    await dbRef.push(post);
 
     statusMsg.textContent = 'Sent to your teacher for approval!';
     statusMsg.style.color = '#4d7440';
@@ -837,7 +843,7 @@ document.getElementById('projectForm').addEventListener('submit', async (e) => {
       statusMsg.textContent = '';
       overlay.classList.remove('show');
       submitBtn.disabled = false;
-      render();
+      // No manual render() call needed — the live listener updates the board.
     }, 500);
 
   }catch(err){
@@ -847,7 +853,6 @@ document.getElementById('projectForm').addEventListener('submit', async (e) => {
   }
 });
 
-loadPosts();
 </script>
 
 </body>
