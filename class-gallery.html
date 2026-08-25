@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script>
   // Reuses the same Firebase project as B3-games, under its own data path.
@@ -245,6 +246,16 @@
     color:#7a5a36;
   }
   .card .by::before{content:"— ";}
+
+  .media-badges{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;}
+  .media-badge{
+    font-size:0.68rem;
+    font-weight:700;
+    background:rgba(0,0,0,0.06);
+    color:#5b4632;
+    padding:2px 8px;
+    border-radius:10px;
+  }
 
   .delete-x{
     position:absolute;
@@ -500,6 +511,17 @@
       </div>
       <div class="hint">Photos are automatically resized to keep the board fast for everyone.</div>
 
+      <label for="audio">Audio recording (optional)</label>
+      <div class="file-row">
+        <input type="file" id="audio" accept="audio/*">
+      </div>
+
+      <label for="video">Video (optional)</label>
+      <div class="file-row">
+        <input type="file" id="video" accept="video/*">
+      </div>
+      <div class="hint">Keep audio/video short — long files take longer to upload and share.</div>
+
       <label>Pick your pin color</label>
       <div class="swatch-row" id="colorSwatches">
         <button type="button" class="swatch blue" data-color="blue" title="Blue"></button>
@@ -637,18 +659,41 @@ function render(){
     }
 
     const stickerHtml = post.sticker ? `<div class="card-sticker">${post.sticker}</div>` : '';
+    const teacherDeleteHtml = isTeacher ? `<button class="delete-x show" title="Remove from board" data-id="${post.id}">&times;</button>` : '';
+
+    let mediaBadges = '';
+    if(post.audioUrl) mediaBadges += `<span class="media-badge">🎧 Audio</span>`;
+    if(post.videoUrl) mediaBadges += `<span class="media-badge">🎬 Video</span>`;
 
     card.innerHTML = `
       <div class="pin"></div>
+      ${teacherDeleteHtml}
       ${imgHtml}
       <span class="card-category">${escapeHtml(post.category)}</span>
       <h3>${escapeHtml(post.title)}</h3>
       <div class="desc">${escapeHtml(post.description)}</div>
       <div class="by">${escapeHtml(post.studentName)}</div>
+      ${mediaBadges ? `<div class="media-badges">${mediaBadges}</div>` : ''}
       ${stickerHtml}
     `;
 
-    card.addEventListener('click', () => openLightbox(post));
+    card.addEventListener('click', (e) => {
+      if(e.target.classList.contains('delete-x')) return;
+      openLightbox(post);
+    });
+
+    if(isTeacher){
+      card.querySelector('.delete-x').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if(confirm(`Remove "${post.title}" by ${post.studentName} from the board?`)){
+          try{
+            await dbRef.child(post.id).remove();
+          }catch(err){
+            alert('Could not remove that project. Check your connection and try again.');
+          }
+        }
+      });
+    }
 
     board.appendChild(card);
   });
@@ -661,9 +706,13 @@ function openLightbox(post){
   const lightbox = document.getElementById('lightbox');
   const content = document.getElementById('lightboxContent');
   let imgHtml = post.image ? `<img src="${post.image}" alt="${escapeHtml(post.title)}">` : '';
+  let videoHtml = post.videoUrl ? `<video controls style="width:100%;border-radius:6px;margin-bottom:12px;" src="${escapeHtml(post.videoUrl)}"></video>` : '';
+  let audioHtml = post.audioUrl ? `<audio controls style="width:100%;margin-bottom:12px;" src="${escapeHtml(post.audioUrl)}"></audio>` : '';
   let linkHtml = post.link ? `<a class="link-out" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">View link &rarr;</a>` : '';
   content.innerHTML = `
     ${imgHtml}
+    ${videoHtml}
+    ${audioHtml}
     <span class="card-category">${escapeHtml(post.category)}</span>
     <h2>${escapeHtml(post.title)} ${post.sticker || ''}</h2>
     <div class="desc-full">${escapeHtml(post.description)}</div>
@@ -715,6 +764,7 @@ document.getElementById('loginSubmitBtn').addEventListener('click', () => {
     document.getElementById('teacherPasscode').value = '';
     loginStatus.textContent = '';
     showReviewList();
+    render();
   }else{
     loginStatus.textContent = 'Incorrect passcode.';
     loginStatus.style.color = '#b6302f';
@@ -742,7 +792,9 @@ function renderReviewList(){
       <div class="info">
         <h4>${escapeHtml(post.title)}</h4>
         <p>${escapeHtml(post.description).slice(0,80)}</p>
-        <div class="meta">${escapeHtml(post.studentName)} &middot; ${escapeHtml(post.category)}</div>
+        <div class="meta">${escapeHtml(post.studentName)} &middot; ${escapeHtml(post.category)}
+          ${post.audioUrl ? ' &middot; 🎧' : ''}${post.videoUrl ? ' &middot; 🎬' : ''}
+        </div>
       </div>
       <div class="review-actions">
         <button class="btn-approve" data-action="approve" data-id="${post.id}">Approve</button>
@@ -802,6 +854,24 @@ function resizeImage(file, maxWidth){
   });
 }
 
+function uploadToStorage(file, path, onProgress){
+  return new Promise((resolve, reject) => {
+    const ref = firebase.storage().ref(path);
+    const task = ref.put(file);
+    task.on('state_changed',
+      (snapshot) => {
+        const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+        if(onProgress) onProgress(pct);
+      },
+      (err) => reject(err),
+      async () => {
+        const url = await task.snapshot.ref.getDownloadURL();
+        resolve(url);
+      }
+    );
+  });
+}
+
 document.getElementById('projectForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const submitBtn = document.getElementById('submitBtn');
@@ -816,6 +886,8 @@ document.getElementById('projectForm').addEventListener('submit', async (e) => {
   const description = document.getElementById('description').value.trim();
   const link = document.getElementById('link').value.trim();
   const photoFile = document.getElementById('photo').files[0];
+  const audioFile = document.getElementById('audio').files[0];
+  const videoFile = document.getElementById('video').files[0];
   const color = document.getElementById('chosenColor').value;
   const sticker = document.getElementById('sticker').value;
 
@@ -825,13 +897,34 @@ document.getElementById('projectForm').addEventListener('submit', async (e) => {
       image = await resizeImage(photoFile, 700);
     }
 
+    // Reserve a database key up front so uploaded files can be stored under a matching Storage path.
+    const newRef = dbRef.push();
+    const postId = newRef.key;
+
+    let audioUrl = null;
+    if(audioFile){
+      statusMsg.textContent = 'Uploading audio... 0%';
+      audioUrl = await uploadToStorage(audioFile, `classGallery/${postId}/audio-${audioFile.name}`, (pct) => {
+        statusMsg.textContent = `Uploading audio... ${pct}%`;
+      });
+    }
+
+    let videoUrl = null;
+    if(videoFile){
+      statusMsg.textContent = 'Uploading video... 0%';
+      videoUrl = await uploadToStorage(videoFile, `classGallery/${postId}/video-${videoFile.name}`, (pct) => {
+        statusMsg.textContent = `Uploading video... ${pct}%`;
+      });
+    }
+
     const post = {
       studentName, title, category, description, link, image, color, sticker,
+      audioUrl, videoUrl,
       status: 'pending',
       createdAt: new Date().toISOString()
     };
 
-    await dbRef.push(post);
+    await newRef.set(post);
 
     statusMsg.textContent = 'Sent to your teacher for approval!';
     statusMsg.style.color = '#4d7440';
@@ -847,7 +940,8 @@ document.getElementById('projectForm').addEventListener('submit', async (e) => {
     }, 500);
 
   }catch(err){
-    statusMsg.textContent = 'Something went wrong saving that. Try a smaller photo?';
+    console.error('Save failed:', err);
+    statusMsg.textContent = 'Save failed: ' + (err && err.message ? err.message : 'unknown error');
     statusMsg.style.color = '#b6302f';
     submitBtn.disabled = false;
   }
