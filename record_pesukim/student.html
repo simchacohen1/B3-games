@@ -3113,15 +3113,52 @@ function renderAnsweredQuestionHistory(){
   if(!host) return;
   const answered=Object.keys(comprehensionQResults).map(Number).sort((a,b)=>a-b);
   if(!answered.length){ host.innerHTML=''; return; }
-  host.innerHTML='<div style="font-weight:800;margin-bottom:7px;color:var(--ink-soft);">Your answers so far</div>' +
-    answered.map(i=>{
-      const r=comprehensionQResults[i], q=comprehensionQuestions[i], ok=r&&r.verdict==='correct';
-      return `<div style="padding:9px 11px;margin:5px 0;border-radius:12px;background:${ok?'#E4F4E4':'#F6E1E1'};border:1px solid ${ok?'#4C9A4C':'var(--rimon)'};">
-        <strong>${ok?'✅':'❌'} ${i+1}. ${q?q.question:''}</strong>
-        ${r&&r.transcript?`<div style="font-size:.8rem;font-style:italic;margin-top:3px;">You said: “${r.transcript}”</div>`:''}
-        ${r&&r.feedback?`<div style="font-size:.8rem;margin-top:2px;">${r.feedback}</div>`:''}
-      </div>`;
-    }).join('');
+  // Built via DOM APIs (not a single innerHTML template) so feedback/
+  // transcript text — which can contain quotes, apostrophes, or Hebrew —
+  // is set safely via textContent rather than interpolated into HTML.
+  host.innerHTML='';
+  const heading=document.createElement('div');
+  heading.style.cssText='font-weight:800;margin-bottom:7px;color:var(--ink-soft);';
+  heading.textContent='Your answers so far';
+  host.appendChild(heading);
+  answered.forEach(i=>{
+    const r=comprehensionQResults[i], q=comprehensionQuestions[i], ok=r&&r.verdict==='correct';
+    const card=document.createElement('div');
+    card.style.cssText=`padding:9px 11px;margin:5px 0;border-radius:12px;background:${ok?'#E4F4E4':'#F6E1E1'};border:1px solid ${ok?'#4C9A4C':'var(--rimon)'};`;
+
+    const titleRow=document.createElement('div');
+    titleRow.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;';
+    const strong=document.createElement('strong');
+    strong.textContent=(ok?'✅':'❌')+' '+(i+1)+'. '+(q?q.question:'');
+    titleRow.appendChild(strong);
+    // Lets a student replay this question's feedback even after it has
+    // scrolled into history — previously the only "🔊 Hear feedback"
+    // button lived on the live result, which auto-advances after ~1.3s.
+    if(r&&r.feedback){
+      const replayBtn=document.createElement('button');
+      replayBtn.className='speak-btn';
+      replayBtn.title='Hear this read aloud';
+      replayBtn.textContent='🔊';
+      replayBtn.style.flexShrink='0';
+      replayBtn.onclick=()=>speakText(r.feedback);
+      titleRow.appendChild(replayBtn);
+    }
+    card.appendChild(titleRow);
+
+    if(r&&r.transcript){
+      const transcriptEl=document.createElement('div');
+      transcriptEl.style.cssText='font-size:.8rem;font-style:italic;margin-top:3px;';
+      transcriptEl.textContent='You said: "'+r.transcript+'"';
+      card.appendChild(transcriptEl);
+    }
+    if(r&&r.feedback){
+      const feedbackEl=document.createElement('div');
+      feedbackEl.style.cssText='font-size:.8rem;margin-top:2px;';
+      feedbackEl.textContent=r.feedback;
+      card.appendChild(feedbackEl);
+    }
+    host.appendChild(card);
+  });
 }
 function renderQuestionFinalScore(){
   const el=document.getElementById('questionFinalScore');
@@ -5362,4 +5399,3 @@ async function deleteAttempt(attempt, btnEl){
 </script>
 </body>
 </html>
-
