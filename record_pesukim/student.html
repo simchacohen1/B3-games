@@ -4075,8 +4075,11 @@ async function gradeCurrentQuestionAnswer(){
     document.getElementById('questionsDoneBlock').classList.toggle('hidden', !allAnswered);
     renderAnsweredQuestionHistory();
     renderQuestionFinalScore();
+    // Save after every answer (not only once the whole set is done) so an
+    // interrupted session — tab closed, connection dropped, class ending —
+    // never loses progress the student already made.
+    await autosaveComprehensionQuestions();
     if(allAnswered){
-      await autosaveComprehensionQuestions();
       renderQuestionFinalScore();
     }else{
       setTimeout(()=>{
@@ -4114,10 +4117,10 @@ function renderQuestionResult(verdict, feedback, transcript){
   document.getElementById('questionReplayBtn').onclick = () => speakText(feedback);
 }
 
-// Uploads every answered question's audio + result once ALL questions for
-// this posuk/range have been graded (same "save once complete" pattern
-// autosaveTranslation already uses for its per-chunk recordings), then
-// marks the comprehension task done.
+// Uploads each answered question's audio + result and writes the attempt
+// record. Runs after every graded question (not just once the whole set
+// is done) so an interrupted session never loses progress already made —
+// matching how autosaveTranslation already saves after each chunk.
 async function autosaveComprehensionQuestions(){
   const idxs = Object.keys(comprehensionQResults).map(Number);
   if(!idxs.length || !currentPosukKey) return;
@@ -4130,12 +4133,16 @@ async function autosaveComprehensionQuestions(){
 
     const questionResultsData = await Promise.all(idxs.map(async i => {
       const r = comprehensionQResults[i];
-      const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_question_' + currentAttemptId + '_q' + i + '.' + r.ext;
       let url = r.audioURL || null;
-      if(r.blob){
+      // Only upload once per answer — autosave now runs after every
+      // question (not just the last), so a blob already uploaded on an
+      // earlier call is skipped here rather than re-uploaded each time.
+      if(r.blob && !url){
+        const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_question_' + currentAttemptId + '_q' + i + '.' + r.ext;
         try{
           await storage.ref(path).put(r.blob);
           url = await storage.ref(path).getDownloadURL();
+          r.audioURL = url;
         }catch(err){ console.error('Could not upload question answer audio', i, err); }
       }
       return {
