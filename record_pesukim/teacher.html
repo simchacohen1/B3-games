@@ -62,6 +62,13 @@
     overflow-y:auto;
   }
   .students-panel h2{ font-size:1rem; color: var(--gold-light); margin:0 0 8px; padding-left:4px; }
+  .section-filter-select{
+    width:100%; margin-bottom:12px; padding:8px 10px; border-radius:8px;
+    border:2px solid #3A5068; background:#1B2732; color:#E9E4D4;
+    font-family:'Quicksand', sans-serif; font-weight:600; font-size:0.82rem;
+    cursor:pointer;
+  }
+  .section-filter-select:focus{ outline:none; border-color: var(--gold); }
   .section-header{
     font-family:'Quicksand', sans-serif; font-weight:700; font-size:0.7rem;
     text-transform:uppercase; letter-spacing:0.06em;
@@ -376,6 +383,9 @@
     <div class="layout">
       <div class="students-panel">
         <h2>Students</h2>
+        <select id="sectionFilterSelect" class="section-filter-select">
+          <option value="all">All Sections</option>
+        </select>
         <div id="studentList" class="loading">Loading students…</div>
       </div>
 
@@ -705,6 +715,7 @@ function setTab(tab){
 
 const UNASSIGNED_SECTION = 'Unassigned';
 let pendingDisputeTargets = {}; // studentId -> { posukKey, tab }
+let sectionFilter = 'all'; // 'all' or a specific section name
 
 async function loadStudents(){
   const listEl = document.getElementById('studentList');
@@ -752,15 +763,27 @@ async function loadStudents(){
       });
     });
 
-    const sectionNames = Object.keys(groups)
+    const allSectionNames = Object.keys(groups)
       .filter(s => s !== UNASSIGNED_SECTION)
       .sort((a,b) => a.localeCompare(b));
-    if(groups[UNASSIGNED_SECTION]) sectionNames.push(UNASSIGNED_SECTION);
+    if(groups[UNASSIGNED_SECTION]) allSectionNames.push(UNASSIGNED_SECTION);
+
+    // The filter dropdown always lists every section that actually exists
+    // right now, regardless of the current filter, so switching back to
+    // "All Sections" or another section is always one click away.
+    populateSectionFilter(allSectionNames);
+    if(sectionFilter !== 'all' && !allSectionNames.includes(sectionFilter)){
+      sectionFilter = 'all';
+    }
+    const sectionNames = sectionFilter === 'all'
+      ? allSectionNames
+      : allSectionNames.filter(s => s === sectionFilter);
 
     // Every student with a pending dispute is pinned into its own group at
-    // the very top of the whole sidebar, above all sections, so the
-    // teacher never has to hunt through sections to find who's waiting on
-    // a review. They still also appear in their normal section below.
+    // the very top of the sidebar, above all sections (still respecting
+    // the current section filter), so the teacher never has to hunt
+    // through sections to find who's waiting on a review. They still also
+    // appear in their normal section below.
     const disputedEntries = [];
     sectionNames.forEach(section => {
       groups[section].forEach(entry => {
@@ -777,6 +800,12 @@ async function loadStudents(){
       disputedEntries.forEach(({ id, info }) => renderStudentRow(listEl, id, info, disputeInfo));
     }
 
+    if(sectionNames.length === 0){
+      listEl.appendChild(Object.assign(document.createElement('div'), {
+        className: 'empty-msg', textContent: 'No students in this section.'
+      }));
+    }
+
     sectionNames.forEach(section => {
       const header = document.createElement('div');
       header.className = 'section-header';
@@ -788,6 +817,25 @@ async function loadStudents(){
     listEl.innerHTML = '<div class="empty-msg">Could not load students.</div>';
     console.error(err);
   }
+}
+
+function populateSectionFilter(allSectionNames){
+  const sel = document.getElementById('sectionFilterSelect');
+  if(!sel) return;
+  const desired = ['all', ...allSectionNames];
+  const current = [...sel.options].map(o => o.value);
+  // Only rebuild the options if the section list actually changed, so we
+  // don't fight the user's open dropdown or reset scroll position on
+  // every reload.
+  if(desired.length !== current.length || desired.some((v,i) => v !== current[i])){
+    sel.innerHTML = '<option value="all">All Sections</option>' +
+      allSectionNames.map(s => `<option value="${s}">${s}</option>`).join('');
+  }
+  sel.value = sectionFilter;
+  sel.onchange = () => {
+    sectionFilter = sel.value;
+    loadStudents();
+  };
 }
 
 function renderStudentRow(listEl, id, info, disputeInfo){
