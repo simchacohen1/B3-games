@@ -5404,5 +5404,73 @@ async function deleteAttempt(attempt, btnEl){
   }
 }
 </script>
+
+
+<!-- POSUK_STUDENT_APP_LOCK_V1 -->
+<style id="posukStudentAppLockStyle">
+  #studentAppClosedScreen { display: none; }
+  body.student-app-closed { margin: 0 !important; background: #f7f3e8 !important; }
+  body.student-app-closed > *:not(#studentAppClosedScreen):not(script):not(style) { display: none !important; }
+  body.student-app-closed #studentAppClosedScreen {
+    display: flex !important;
+    min-height: 100vh;
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+    box-sizing: border-box;
+    text-align: center;
+    font-family: Arial, sans-serif;
+  }
+  #studentAppClosedCard { max-width: 560px; }
+  #studentAppClosedIcon { font-size: 4rem; line-height: 1; margin-bottom: 18px; }
+  #studentAppClosedTitle {
+    font-size: clamp(2rem, 6vw, 3rem);
+    font-weight: 800;
+    margin: 0 0 12px;
+    color: #312a1e;
+  }
+  #studentAppClosedText { font-size: 1.15rem; color: #6a5d49; margin: 0; }
+</style>
+
+<div id="studentAppClosedScreen" aria-live="polite">
+  <div id="studentAppClosedCard">
+    <div id="studentAppClosedIcon">🔒</div>
+    <h1 id="studentAppClosedTitle">Currently Closed</h1>
+    <p id="studentAppClosedText">This practice page is currently closed.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  try {
+    if (!window.firebase || !firebase.database) return;
+
+    const appOpenRef = firebase.database().ref('posukPractice/settings/studentAppOpen');
+    let previousState = null;
+
+    function applyState(isOpen) {
+      document.body.classList.toggle('student-app-closed', !isOpen);
+    }
+
+    appOpenRef.on('value', function (snap) {
+      const isOpen = snap.val() !== false;
+
+      if (previousState !== null && previousState !== isOpen) {
+        window.location.reload();
+        return;
+      }
+
+      previousState = isOpen;
+      applyState(isOpen);
+    }, function (err) {
+      console.error('Could not read student app open/closed setting:', err);
+      applyState(true);
+    });
+  } catch (err) {
+    console.error('Student app lock failed to initialize:', err);
+  }
+})();
+</script>
+
 </body>
 </html>
