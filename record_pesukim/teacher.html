@@ -53,30 +53,41 @@
 
   .layout{ display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
   .students-panel{
-    flex: 0 0 240px;
+    flex: 0 0 270px;
     background:#26374A;
     border: 2px solid #3A5068;
     border-radius: 14px;
-    padding: 14px;
-    max-height: 75vh;
+    padding: 14px 10px 14px 14px;
+    max-height: 78vh;
     overflow-y:auto;
   }
-  .students-panel h2{ font-size:1rem; color: var(--gold-light); margin:0 0 10px; }
+  .students-panel h2{ font-size:1rem; color: var(--gold-light); margin:0 0 8px; padding-left:4px; }
+  .section-header{
+    font-family:'Quicksand', sans-serif; font-weight:700; font-size:0.7rem;
+    text-transform:uppercase; letter-spacing:0.06em;
+    color: var(--gold-light); opacity:0.9;
+    padding: 10px 6px 5px; margin-top:2px;
+    position: sticky; top:-14px; background:#26374A; z-index:1;
+  }
+  .section-header:first-child{ margin-top:0; padding-top:0; }
   .student-item{
-    padding: 12px 14px;
-    border-radius: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
     cursor:pointer;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     font-weight:700;
     color: #FFFFFF;
-    display:flex; flex-direction:column; align-items:flex-start; gap:4px;
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
     border: 2px solid transparent;
     transition: background .1s ease, border-color .1s ease;
   }
   .student-item:hover{ background: #32475e; border-color:#4A6580; }
   .student-item.active{ background: var(--gold); color: var(--ink); }
-  .student-item .name-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .student-item .last-active{ font-size:0.75rem; opacity:0.75; font-weight:600; color:#C7D3E0; }
+  .student-item .s-name{
+    font-size:0.87rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+  }
+  .student-item .meta{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .student-item .last-active{ font-size:0.68rem; font-weight:600; color:#C7D3E0; white-space:nowrap; }
   .student-item.active .last-active{ color:#5A4A18; opacity:1; }
 
   .main-panel{
@@ -503,6 +514,7 @@ document.getElementById('enterBtn').onclick = () => {
 let activeStudentId = null;
 let studentsMap = {}; // id -> name
 let studentsInfo = {}; // id -> { name, lastActive }
+let studentsSections = {}; // id -> section label (from allowedStudents), '' if unset
 
 const PARSHA_ORDER = {
   "Bereishis":0, "Noach":1, "LechLecha":2, "Vayeira":3,
@@ -690,29 +702,64 @@ function setTab(tab){
   }
 }
 
+const UNASSIGNED_SECTION = 'Unassigned';
+
 async function loadStudents(){
   const listEl = document.getElementById('studentList');
   try{
-    const snap = await db.ref('posukPractice/students').once('value');
+    const [snap, allowedSnap] = await Promise.all([
+      db.ref('posukPractice/students').once('value'),
+      db.ref('posukPractice/allowedStudents').once('value')
+    ]);
     const val = snap.val();
+    const allowedVal = allowedSnap.val() || {};
     if(!val){
       listEl.innerHTML = '<div class="empty-msg">No students yet.</div>';
       return;
     }
     listEl.innerHTML = '';
+
+    // Group by section (as set in Manage Access) so the teacher can scan
+    // "who is who" without scrolling past the whole roster. Students with
+    // no section saved fall into Unassigned, always shown last.
+    const groups = {}; // section -> [{id, info}]
     Object.entries(val)
       .sort((a,b) => a[1].name.localeCompare(b[1].name))
       .forEach(([id, info]) => {
         studentsMap[id] = info.name;
         studentsInfo[id] = info;
+        const section = (allowedVal[id] && allowedVal[id].section) ? allowedVal[id].section.trim() : '';
+        studentsSections[id] = section;
+        const key = section || UNASSIGNED_SECTION;
+        if(!groups[key]) groups[key] = [];
+        groups[key].push({ id, info });
+      });
+
+    const sectionNames = Object.keys(groups)
+      .filter(s => s !== UNASSIGNED_SECTION)
+      .sort((a,b) => a.localeCompare(b));
+    if(groups[UNASSIGNED_SECTION]) sectionNames.push(UNASSIGNED_SECTION);
+
+    sectionNames.forEach(section => {
+      const header = document.createElement('div');
+      header.className = 'section-header';
+      header.textContent = `${section} (${groups[section].length})`;
+      listEl.appendChild(header);
+
+      groups[section].forEach(({ id, info }) => {
         const div = document.createElement('div');
         div.className = 'student-item';
         div.dataset.id = id;
         const lastActive = info.lastActive ? new Date(info.lastActive).toLocaleDateString() : '';
-        div.innerHTML = `<span class="name-row"><span>${info.name}</span><span class="dispute-badge hidden" id="disputeBadge_${id}"></span></span><span class="last-active">${lastActive}</span>`;
+        div.innerHTML = `<span class="s-name">${info.name}</span>
+          <span class="meta">
+            <span class="dispute-badge hidden" id="disputeBadge_${id}"></span>
+            <span class="last-active">${lastActive}</span>
+          </span>`;
         div.onclick = () => { setTab('student'); selectStudent(id, info.name, div); };
         listEl.appendChild(div);
       });
+    });
     markStudentsWithPendingDisputes();
   }catch(err){
     listEl.innerHTML = '<div class="empty-msg">Could not load students.</div>';
@@ -1469,7 +1516,7 @@ async function loadAccessTab(){
     const allowedVal = allowedSnap.val() || {};
     const practiceLimit = practiceLimitSnap.val() || null;
     const approvedNames = Object.entries(allowedVal)
-      .map(([slug, info]) => ({ slug, name: (info && info.name) || slug }))
+      .map(([slug, info]) => ({ slug, name: (info && info.name) || slug, section: (info && info.section) || '' }))
       .sort((a,b) => a.name.localeCompare(b.name));
 
     let html = `<h2>🔑 Manage Access</h2>
@@ -1518,17 +1565,25 @@ async function loadAccessTab(){
 
       <div>
         <div style="font-weight:700;margin-bottom:6px;">Approved Students (${approvedNames.length})</div>
-        <input id="newApprovedName" type="text" placeholder="Student's name" maxlength="30"
-          style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:220px;">
-        <button class="btn small gold" id="addApprovedBtn">Add Student</button>
-        <span id="addApprovedMsg" style="margin-left:10px;font-size:0.85rem;"></span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <input id="newApprovedName" type="text" placeholder="Student's name" maxlength="30"
+            style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:200px;">
+          <input id="newApprovedSection" type="text" placeholder="Section (e.g. B3 WT)" maxlength="30"
+            style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:170px;">
+          <button class="btn small gold" id="addApprovedBtn">Add Student</button>
+        </div>
+        <span id="addApprovedMsg" style="margin-left:2px;font-size:0.85rem;"></span>
         <table class="roster-table" style="margin-top:14px;">
-          <thead><tr><th>Name</th><th style="width:90px;"></th></tr></thead>
+          <thead><tr><th>Name</th><th>Section</th><th style="width:90px;"></th></tr></thead>
           <tbody id="approvedList">
             ${approvedNames.length === 0
-              ? '<tr><td colspan="2" class="empty-msg">No approved students yet.</td></tr>'
+              ? '<tr><td colspan="3" class="empty-msg">No approved students yet.</td></tr>'
               : approvedNames.map(a => `<tr data-slug="${a.slug}">
                   <td>${a.name}</td>
+                  <td>
+                    <input type="text" class="section-edit-input" value="${a.section || ''}" placeholder="Unassigned" maxlength="30"
+                      style="padding:5px 8px;border-radius:6px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;font-size:0.82rem;width:130px;">
+                  </td>
                   <td><button class="btn small remove-approved-btn" style="background:#8a3a3a;box-shadow:0 4px 0 #5c2626;">Remove</button></td>
                 </tr>`).join('')}
           </tbody>
@@ -1617,6 +1672,7 @@ async function loadAccessTab(){
 
     document.getElementById('addApprovedBtn').onclick = async () => {
       const nameVal = document.getElementById('newApprovedName').value.trim();
+      const sectionVal = document.getElementById('newApprovedSection').value.trim();
       const msgEl = document.getElementById('addApprovedMsg');
       if(!nameVal){ return; }
       const slug = slugify(nameVal);
@@ -1628,9 +1684,11 @@ async function loadAccessTab(){
       try{
         await db.ref('posukPractice/allowedStudents/' + slug).set({
           name: nameVal,
+          section: sectionVal,
           addedAt: firebase.database.ServerValue.TIMESTAMP
         });
         document.getElementById('newApprovedName').value = '';
+        document.getElementById('newApprovedSection').value = '';
         msgEl.style.color = '#8fd694';
         msgEl.textContent = 'Added!';
         loadAccessTab();
@@ -1640,6 +1698,26 @@ async function loadAccessTab(){
         console.error(e);
       }
     };
+
+    // Section is edited inline right in the approved-students table; saved
+    // on blur (or Enter) rather than needing a separate save button per row.
+    mainEl.querySelectorAll('.section-edit-input').forEach(input => {
+      const commit = async () => {
+        const row = input.closest('tr');
+        const slug = row.dataset.slug;
+        const newSection = input.value.trim();
+        try{
+          await db.ref('posukPractice/allowedStudents/' + slug + '/section').set(newSection);
+          loadStudents();
+        }catch(e){
+          console.error('Could not save section', e);
+        }
+      };
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', (ev) => {
+        if(ev.key === 'Enter'){ input.blur(); }
+      });
+    });
 
     mainEl.querySelectorAll('.remove-approved-btn').forEach(btn => {
       btn.onclick = async () => {
