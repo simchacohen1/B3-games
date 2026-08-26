@@ -70,6 +70,7 @@
     position: sticky; top:-14px; background:#26374A; z-index:1;
   }
   .section-header:first-child{ margin-top:0; padding-top:0; }
+  .section-header.dispute-section-header{ color: #FF9E9E; }
   .student-item{
     padding: 8px 10px;
     border-radius: 8px;
@@ -703,6 +704,7 @@ function setTab(tab){
 }
 
 const UNASSIGNED_SECTION = 'Unassigned';
+let pendingDisputeTargets = {}; // studentId -> { posukKey, tab }
 
 async function loadStudents(){
   const listEl = document.getElementById('studentList');
@@ -735,52 +737,99 @@ async function loadStudents(){
         groups[key].push({ id, info });
       });
 
+    // Figure out who has a pending dispute BEFORE building rows, so those
+    // students can be pinned to the top rather than just badged afterward.
+    const disputeInfo = await computeDisputeInfo(Object.keys(val));
+
+    // Within each section, dispute-pending students float to the top
+    // (alphabetical among themselves); everyone else stays alphabetical.
+    Object.values(groups).forEach(list => {
+      list.sort((a,b) => {
+        const da = disputeInfo.counts[a.id] ? 1 : 0;
+        const db_ = disputeInfo.counts[b.id] ? 1 : 0;
+        if(da !== db_) return db_ - da;
+        return a.info.name.localeCompare(b.info.name);
+      });
+    });
+
     const sectionNames = Object.keys(groups)
       .filter(s => s !== UNASSIGNED_SECTION)
       .sort((a,b) => a.localeCompare(b));
     if(groups[UNASSIGNED_SECTION]) sectionNames.push(UNASSIGNED_SECTION);
+
+    // Every student with a pending dispute is pinned into its own group at
+    // the very top of the whole sidebar, above all sections, so the
+    // teacher never has to hunt through sections to find who's waiting on
+    // a review. They still also appear in their normal section below.
+    const disputedEntries = [];
+    sectionNames.forEach(section => {
+      groups[section].forEach(entry => {
+        if(disputeInfo.counts[entry.id]) disputedEntries.push(entry);
+      });
+    });
+    disputedEntries.sort((a,b) => a.info.name.localeCompare(b.info.name));
+
+    if(disputedEntries.length){
+      const header = document.createElement('div');
+      header.className = 'section-header dispute-section-header';
+      header.textContent = `⚠️ Needs Review (${disputedEntries.length})`;
+      listEl.appendChild(header);
+      disputedEntries.forEach(({ id, info }) => renderStudentRow(listEl, id, info, disputeInfo));
+    }
 
     sectionNames.forEach(section => {
       const header = document.createElement('div');
       header.className = 'section-header';
       header.textContent = `${section} (${groups[section].length})`;
       listEl.appendChild(header);
-
-      groups[section].forEach(({ id, info }) => {
-        const div = document.createElement('div');
-        div.className = 'student-item';
-        div.dataset.id = id;
-        const lastActive = info.lastActive ? new Date(info.lastActive).toLocaleDateString() : '';
-        div.innerHTML = `<span class="s-name">${info.name}</span>
-          <span class="meta">
-            <span class="dispute-badge hidden" id="disputeBadge_${id}"></span>
-            <span class="last-active">${lastActive}</span>
-          </span>`;
-        div.onclick = () => { setTab('student'); selectStudent(id, info.name, div); };
-        listEl.appendChild(div);
-      });
+      groups[section].forEach(({ id, info }) => renderStudentRow(listEl, id, info, disputeInfo));
     });
-    markStudentsWithPendingDisputes();
   }catch(err){
     listEl.innerHTML = '<div class="empty-msg">Could not load students.</div>';
     console.error(err);
   }
 }
 
-/* Scans every attempt once (reusing the shared cache) so the sidebar can
-   flag students with a pending dispute — the teacher shouldn't have to
-   click into each student just to find out one is waiting on them.
-   Also remembers WHERE the first pending dispute is (posukKey + which
-   skill tab) so clicking the badge can jump straight to it instead of
-   just opening the student's default grid. */
-let pendingDisputeTargets = {}; // studentId -> { posukKey, tab }
-async function markStudentsWithPendingDisputes(){
+function renderStudentRow(listEl, id, info, disputeInfo){
+  const div = document.createElement('div');
+  div.className = 'student-item' + (id === activeStudentId ? ' active' : '');
+  div.dataset.id = id;
+  const lastActive = info.lastActive ? new Date(info.lastActive).toLocaleDateString() : '';
+  const dCount = disputeInfo.counts[id] || 0;
+  div.innerHTML = `<span class="s-name">${info.name}</span>
+    <span class="meta">
+      <span class="dispute-badge${dCount ? '' : ' hidden'}" id="disputeBadge_${id}">${dCount ? '⚠️ ' + dCount + (dCount === 1 ? ' dispute' : ' disputes') : ''}</span>
+      <span class="last-active">${lastActive}</span>
+    </span>`;
+  div.onclick = () => { setTab('student'); selectStudent(id, info.name, div); };
+  if(dCount){
+    pendingDisputeTargets[id] = disputeInfo.targets[id];
+    div.querySelector('.dispute-badge').onclick = (ev) => {
+      ev.stopPropagation(); // don't also trigger the row's own click
+      const target = pendingDisputeTargets[id];
+      if(target){
+        studentActiveTab = target.tab;
+        selectedPosukKey = target.posukKey;
+      }
+      selectStudent(id, info.name, div);
+    };
+  }
+  listEl.appendChild(div);
+}
+
+/* Scans every attempt once (reusing the shared cache) to find who has a
+   pending dispute, and where the first one is (posukKey + which skill tab)
+   so clicking a badge can jump straight to it. Called up front by
+   loadStudents so disputed students can be pinned to the top, not just
+   badged after the fact. */
+async function computeDisputeInfo(studentIds){
+  const counts = {};
+  const targets = {};
   try{
     const allAttempts = await loadAllAttempts();
-    Object.keys(studentsMap).forEach(id => {
+    studentIds.forEach(id => {
       const posukMap = allAttempts[id];
-      const badge = document.getElementById('disputeBadge_' + id);
-      if(!badge || !posukMap) return;
+      if(!posukMap) return;
       let count = 0;
       let firstTarget = null;
       Object.entries(posukMap).forEach(([posukKey, attemptMap]) => {
@@ -804,30 +853,22 @@ async function markStudentsWithPendingDisputes(){
         });
       });
       if(count > 0){
-        badge.textContent = '⚠️ ' + count + (count === 1 ? ' dispute' : ' disputes');
-        badge.classList.remove('hidden');
-        pendingDisputeTargets[id] = firstTarget;
-        badge.onclick = (ev) => {
-          ev.stopPropagation(); // don't also trigger the row's own click
-          const target = pendingDisputeTargets[id];
-          const rowEl = document.querySelector(`.student-item[data-id="${id}"]`);
-          const name = studentsMap[id];
-          if(target){
-            studentActiveTab = target.tab;
-            selectedPosukKey = target.posukKey;
-          }
-          selectStudent(id, name, rowEl || document.createElement('div'));
-        };
-      }else{
-        badge.textContent = '';
-        badge.classList.add('hidden');
-        badge.onclick = null;
-        delete pendingDisputeTargets[id];
+        counts[id] = count;
+        targets[id] = firstTarget;
       }
     });
   }catch(err){
     console.error('Could not check for pending disputes', err);
   }
+  return { counts, targets };
+}
+
+/* Kept as the refresh entry point other code already calls after a
+   dispute is resolved — a full sidebar rebuild is what's needed now since
+   resolving a dispute must also move the student out of "Needs Review"
+   and back into normal alphabetical position, not just clear a badge. */
+async function markStudentsWithPendingDisputes(){
+  await loadStudents();
 }
 
 /* ---------- Shared cache of every attempt, every student ----------
