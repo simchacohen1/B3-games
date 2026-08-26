@@ -106,58 +106,84 @@
   }
   .posuk-group h3{
     font-family:'Frank Ruhl Libre', serif;
-    margin:0 0 4px;
+    margin:0 0 10px;
     color: var(--ink);
-    font-size:1rem;
+    font-size:1.1rem;
+    padding-bottom:10px;
+    border-bottom: 2px solid var(--gold-light);
   }
   .posuk-hebrew{
     font-family:'Noto Serif Hebrew', serif;
     direction:rtl;
-    font-size:1.3rem;
+    font-size:1.5rem;
     color:#3B2A1E;
-    margin: 4px 0 10px;
+    margin: 4px 0 14px;
+    background: linear-gradient(135deg, #FBF6E8, #F3E8C9);
+    border: 1px solid #E4D9BB;
+    border-radius: 10px;
+    padding: 12px 18px;
+    line-height:1.5;
   }
   .attempt-row{
-    border-top: 1px dashed #ccc;
-    padding: 8px 0;
+    background: #fff;
+    border: 1px solid #E7DEC4;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
     font-size:0.85rem;
+    box-shadow: 0 1px 4px rgba(36,52,74,0.06);
+    transition: box-shadow .15s ease, border-color .15s ease;
   }
-  .attempt-row .top-line{ display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:4px;}
+  .attempt-row:hover{ box-shadow: 0 4px 14px rgba(36,52,74,0.12); border-color:#D8C79A; }
+  .attempt-row .top-line{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  .attempt-row .top-line strong{
+    font-family:'Frank Ruhl Libre', serif; font-size:1rem; color: var(--rimon);
+    display:flex; align-items:center; gap:6px;
+  }
+  .attempt-row .top-line strong::before{ content:'🗓️'; font-size:0.85em; }
+  .attempt-row + .attempt-row{ margin-top:0; }
   .row{ display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:3px 0; font-size:0.9rem; }
   .row .label{ color: var(--ink-soft); }
   .score-pill{
-    background: var(--gold-light); border-radius:999px; padding:2px 10px; font-weight:700; font-size:0.75rem;
+    background: var(--gold-light); border-radius:999px; padding:4px 14px; font-weight:700; font-size:0.78rem;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
   }
-  audio{ height:32px; max-width: 240px; }
+  audio{ height:34px; width:100%; max-width: 260px; border-radius:8px; display:block; }
   .comp-result{
-    margin-top: 6px;
-    border-radius: 12px;
-    padding: 10px 14px;
+    margin-top: 8px;
+    border-radius: 10px;
+    padding: 12px 14px;
     font-size: 0.85rem;
     display:flex;
-    flex-wrap: wrap;
-    align-items:center;
+    flex-direction: column;
+    align-items:flex-start;
     gap:8px;
+    border: 1px solid transparent;
+    border-inline-start-width: 4px;
   }
-  .comp-result.excellent{ background:#E4EAF4; border:2px solid var(--tent-navy, var(--ink)); }
-  .comp-result.correct{ background:#E4F4E4; border:2px solid #4C9A4C; }
-  .comp-result.partial{ background:#FBF0D9; border:2px solid var(--gold); }
-  .comp-result.incorrect{ background:#F6E1E1; border:2px solid var(--rimon); }
+  .comp-result.excellent{ background:#E9EEF6; border-color:#C7D3E4; border-inline-start-color: var(--tent-navy, var(--ink)); }
+  .comp-result.correct{ background:#EBF6EB; border-color:#C7E4C7; border-inline-start-color:#4C9A4C; }
+  .comp-result.partial{ background:#FCF3DC; border-color:#EEDBA0; border-inline-start-color:var(--gold); }
+  .comp-result.incorrect{ background:#FAEAEA; border-color:#EFC9C9; border-inline-start-color:var(--rimon); }
   .comp-badge{
     font-weight:700;
     border-radius: 999px;
-    padding: 4px 12px;
-    font-size:0.75rem;
+    padding: 5px 14px;
+    font-size:0.76rem;
     white-space:nowrap;
     color:#fff;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.15);
   }
   .comp-result.excellent .comp-badge{ background: var(--tent-navy, var(--ink)); }
   .comp-result.correct .comp-badge{ background:#4C9A4C; }
-  .comp-result.partial .comp-badge{ background: var(--gold); color: var(--ink); }
-  .comp-result.incorrect .comp-badge{ background: var(--rimon); }
+  .comp-result.partial .comp-badge{ background: var(--gold); color: var(--ink); box-shadow: 0 2px 0 #97781a; }
+  .comp-result.incorrect .comp-badge{ background: var(--rimon); box-shadow: 0 2px 0 #6e1f28; }
   .hebrew-word-breakdown{
-    width:100%; font-family:'Frank Ruhl Libre', serif; font-size:1.15rem;
-    direction:rtl; line-height:1.6; margin:4px 0;
+    width:100%; font-family:'Frank Ruhl Libre', serif; font-size:1.2rem;
+    direction:rtl; line-height:1.8; margin:2px 0;
+    background: rgba(255,255,255,0.55);
+    border-radius: 8px;
+    padding: 10px 14px;
   }
   .hebrew-word-breakdown .word-ok{ color:#3D7A3D; }
   .hebrew-word-breakdown .word-miss{
@@ -165,6 +191,11 @@
     text-decoration-style: wavy; text-underline-offset: 3px;
   }
   .transcript-line{ font-style:italic; color: var(--ink-soft); font-size:0.85rem; margin:2px 0; }
+  .comp-result span[style*="italic"]{
+    display:block; width:100%; background: rgba(255,255,255,0.65);
+    border-inline-start: 3px solid rgba(0,0,0,0.15);
+    padding: 7px 12px; border-radius: 6px; box-sizing:border-box;
+  }
   .empty-msg{ color: var(--ink-soft); text-align:center; padding: 40px 0; }
   .loading{ color: var(--ink-soft); text-align:center; padding:20px 0; }
 
@@ -292,7 +323,11 @@
   .activity-col{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
   .activity-bar{ width:100%; background: var(--navy); border-radius:4px 4px 0 0; min-height:2px; }
   .activity-col .activity-lbl{ font-size:0.62rem; color: var(--ink-soft); margin-top:5px; }
-  .dur{ font-size:0.72rem; opacity:0.75; font-weight:600; }
+  .dur{
+    font-size:0.72rem; font-weight:700; color: var(--ink-soft);
+    background: rgba(36,52,74,0.07); border-radius:999px; padding:2px 9px;
+    display:inline-block;
+  }
 
   /* ---------- Class Stats: collapsible perek accordion ---------- */
   .perek-section{ border-bottom: 1px dashed #d8c9a0; margin-bottom: 4px; }
@@ -303,7 +338,11 @@
   .perek-section.expanded .perek-body{ display:block; }
   .class-posuk-detail-inline{ margin-top:14px; }
   .class-posuk-detail-inline:empty{ margin-top:0; }
-  .not-done-list{ font-size:0.85rem; color: var(--ink-soft); line-height:1.5; }
+  .not-done-list{
+    font-size:0.85rem; color: var(--ink-soft); line-height:1.6;
+    background:#F5F1E4; border:1px dashed #D8C79A; border-radius:10px;
+    padding:10px 14px;
+  }
 </style>
 </head>
 <body>
