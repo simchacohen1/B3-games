@@ -1596,14 +1596,16 @@ async function loadAccessTab(){
   const mainEl = document.getElementById('mainContent');
   mainEl.innerHTML = '<div class="loading">Loading access settings…</div>';
   try{
-    const [pinSnap, allowedSnap, practiceLimitSnap] = await Promise.all([
+    const [pinSnap, allowedSnap, practiceLimitSnap, appEnabledSnap] = await Promise.all([
       db.ref('posukPractice/settings/classPin').once('value'),
       db.ref('posukPractice/allowedStudents').once('value'),
-      db.ref('posukPractice/settings/practiceLimit').once('value')
+      db.ref('posukPractice/settings/practiceLimit').once('value'),
+      db.ref('posukPractice/settings/appEnabled').once('value')
     ]);
     const currentPin = pinSnap.val() || '';
     const allowedVal = allowedSnap.val() || {};
     const practiceLimit = practiceLimitSnap.val() || null;
+    const appEnabled = appEnabledSnap.val() !== false; // missing/true = open
     const approvedNames = Object.entries(allowedVal)
       .map(([slug, info]) => ({ slug, name: (info && info.name) || slug, section: (info && info.section) || '' }))
       .sort((a,b) => a.name.localeCompare(b.name));
@@ -1613,6 +1615,22 @@ async function loadAccessTab(){
         Students need BOTH the class PIN and an approved name to get into the app.
         Add a name here before sharing the link with a new student.
       </div>
+
+      <div style="margin-bottom:24px;padding:16px;border-radius:12px;border:2px solid ${appEnabled ? '#4C9A4C' : 'var(--rimon)'};background:${appEnabled ? '#EBF6EB' : '#FAEAEA'};display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div>
+          <div style="font-weight:700;">${appEnabled ? '🟢 Student App Is Open' : '🔴 Student App Is Closed'}</div>
+          <div style="font-size:0.84rem;color:var(--ink-soft);margin-top:2px;">
+            ${appEnabled
+              ? 'Students can open the link, log in, and practice right now.'
+              : 'The student link shows a "closed" message. Anyone already in the app is bumped to it too.'}
+          </div>
+        </div>
+        <button class="btn small" id="toggleAppEnabledBtn"
+          style="background:${appEnabled ? '#8a3a3a' : '#4C9A4C'};box-shadow:0 4px 0 ${appEnabled ? '#5c2626' : '#397839'};white-space:nowrap;">
+          ${appEnabled ? 'Turn Off' : 'Turn On'}
+        </button>
+      </div>
+
       <div style="margin-bottom:24px;">
         <div style="font-weight:700;margin-bottom:6px;">Class PIN</div>
         <input id="pinInput" type="text" value="${currentPin}" placeholder="e.g. 1234"
@@ -1679,6 +1697,20 @@ async function loadAccessTab(){
         </table>
       </div>`;
     mainEl.innerHTML = html;
+
+    document.getElementById('toggleAppEnabledBtn').onclick = async () => {
+      const turningOff = appEnabled;
+      if(turningOff && !confirm('Turn OFF the student app? Every student — including anyone mid-session right now — will immediately see a "closed" message instead of the app.')){
+        return;
+      }
+      try{
+        await db.ref('posukPractice/settings/appEnabled').set(!turningOff);
+        loadAccessTab();
+      }catch(e){
+        console.error('Could not toggle app access', e);
+        alert('Could not save — check your internet and try again.');
+      }
+    };
 
     document.getElementById('savePinBtn').onclick = async () => {
       const val = document.getElementById('pinInput').value.trim();
