@@ -1160,6 +1160,13 @@
     <p>Read the posuk. Explain what it means. See how you did!</p>
   </header>
 
+  <!-- Shown instead of everything else when the teacher toggles the app off -->
+  <div id="closedScreen" class="name-gate hidden">
+    <div style="font-size:2.6rem;">📚</div>
+    <div style="font-weight:700;font-size:1.15rem;margin-top:8px;color:var(--rimon-dark);">Posuk Practice is closed right now</div>
+    <div style="color:var(--ink-soft);margin-top:8px;">Ask your teacher when it will be open again.</div>
+  </div>
+
   <!-- STEP 0: Name entry (gated by class PIN + teacher-approved name list) -->
   <div id="nameGate" class="name-gate">
     <div>Class PIN</div>
@@ -1403,6 +1410,40 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const storage = firebase.storage();
+
+/* ---------- Teacher on/off switch for the whole app ----------
+   posukPractice/settings/appEnabled — missing or true means open (default
+   open, so existing deployments aren't accidentally locked out). Listened
+   to live (not just checked once) so that if the teacher flips it off
+   while a student is mid-session, the closed screen covers the app
+   immediately instead of waiting for a page reload. */
+let appAccessEnabled = true;
+let preClosedScreen = 'nameGate'; // which screen to restore once reopened
+function applyAppEnabledState(enabled){
+  const closedEl = document.getElementById('closedScreen');
+  const nameGateEl = document.getElementById('nameGate');
+  const appEl = document.getElementById('app');
+  if(!closedEl || !nameGateEl || !appEl) return; // not parsed yet
+  if(!enabled){
+    if(!closedEl.classList.contains('hidden')) return;
+    preClosedScreen = appEl.classList.contains('hidden') ? 'nameGate' : 'app';
+    nameGateEl.classList.add('hidden');
+    appEl.classList.add('hidden');
+    closedEl.classList.remove('hidden');
+  }else{
+    if(closedEl.classList.contains('hidden')) return;
+    closedEl.classList.add('hidden');
+    if(preClosedScreen === 'app'){
+      appEl.classList.remove('hidden');
+    }else{
+      nameGateEl.classList.remove('hidden');
+    }
+  }
+}
+db.ref('posukPractice/settings/appEnabled').on('value', snap => {
+  appAccessEnabled = snap.val() !== false;
+  applyAppEnabledState(appAccessEnabled);
+});
 
 /* =========================================================
    COMPREHENSION GRADING — Cloud Function URL
@@ -2268,11 +2309,6 @@ function applyDeepLinkFromURL(){
   const perekParam = parseInt(params.get('perek'));
   const posukParam = parseInt(params.get('posuk'));
   const endPosukParam = parseInt(params.get('endPosuk'));
-  // A tile on progress.html represents one specific tab (reading /
-  // translate / comprehension) — land there directly instead of always
-  // defaulting back to Read Hebrew.
-  const tabParam = params.get('tab');
-  const VALID_DEEP_LINK_TABS = ['reading', 'translate', 'comprehension'];
   if(!perekParam || !ALL_PERAKIM.includes(perekParam)) return;
   if(!perekAllowedByClassLimit(perekParam) ||
      (posukParam && !isWithinClassPracticeLimit(perekParam, posukParam)) ||
@@ -2294,13 +2330,20 @@ function applyDeepLinkFromURL(){
         await posukSelect.onchange();
       }
     }
-    if(tabParam && VALID_DEEP_LINK_TABS.includes(tabParam)){
-      setActiveTab(tabParam);
-    }
   });
 }
 
 window.addEventListener('load', async () => {
+  try{
+    const enabledSnap = await db.ref('posukPractice/settings/appEnabled').once('value');
+    if(enabledSnap.val() === false){
+      applyAppEnabledState(false);
+      return; // don't auto-log a returning student in while access is closed
+    }
+  }catch(e){
+    console.error('Could not check app access state:', e);
+    // fail open - don't lock out students over a network hiccup
+  }
   const savedId = localStorage.getItem('posukPractice_studentId');
   const savedName = localStorage.getItem('posukPractice_studentName');
   if(savedId && savedName){
@@ -3113,52 +3156,15 @@ function renderAnsweredQuestionHistory(){
   if(!host) return;
   const answered=Object.keys(comprehensionQResults).map(Number).sort((a,b)=>a-b);
   if(!answered.length){ host.innerHTML=''; return; }
-  // Built via DOM APIs (not a single innerHTML template) so feedback/
-  // transcript text — which can contain quotes, apostrophes, or Hebrew —
-  // is set safely via textContent rather than interpolated into HTML.
-  host.innerHTML='';
-  const heading=document.createElement('div');
-  heading.style.cssText='font-weight:800;margin-bottom:7px;color:var(--ink-soft);';
-  heading.textContent='Your answers so far';
-  host.appendChild(heading);
-  answered.forEach(i=>{
-    const r=comprehensionQResults[i], q=comprehensionQuestions[i], ok=r&&r.verdict==='correct';
-    const card=document.createElement('div');
-    card.style.cssText=`padding:9px 11px;margin:5px 0;border-radius:12px;background:${ok?'#E4F4E4':'#F6E1E1'};border:1px solid ${ok?'#4C9A4C':'var(--rimon)'};`;
-
-    const titleRow=document.createElement('div');
-    titleRow.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;';
-    const strong=document.createElement('strong');
-    strong.textContent=(ok?'✅':'❌')+' '+(i+1)+'. '+(q?q.question:'');
-    titleRow.appendChild(strong);
-    // Lets a student replay this question's feedback even after it has
-    // scrolled into history — previously the only "🔊 Hear feedback"
-    // button lived on the live result, which auto-advances after ~1.3s.
-    if(r&&r.feedback){
-      const replayBtn=document.createElement('button');
-      replayBtn.className='speak-btn';
-      replayBtn.title='Hear this read aloud';
-      replayBtn.textContent='🔊';
-      replayBtn.style.flexShrink='0';
-      replayBtn.onclick=()=>speakText(r.feedback);
-      titleRow.appendChild(replayBtn);
-    }
-    card.appendChild(titleRow);
-
-    if(r&&r.transcript){
-      const transcriptEl=document.createElement('div');
-      transcriptEl.style.cssText='font-size:.8rem;font-style:italic;margin-top:3px;';
-      transcriptEl.textContent='You said: "'+r.transcript+'"';
-      card.appendChild(transcriptEl);
-    }
-    if(r&&r.feedback){
-      const feedbackEl=document.createElement('div');
-      feedbackEl.style.cssText='font-size:.8rem;margin-top:2px;';
-      feedbackEl.textContent=r.feedback;
-      card.appendChild(feedbackEl);
-    }
-    host.appendChild(card);
-  });
+  host.innerHTML='<div style="font-weight:800;margin-bottom:7px;color:var(--ink-soft);">Your answers so far</div>' +
+    answered.map(i=>{
+      const r=comprehensionQResults[i], q=comprehensionQuestions[i], ok=r&&r.verdict==='correct';
+      return `<div style="padding:9px 11px;margin:5px 0;border-radius:12px;background:${ok?'#E4F4E4':'#F6E1E1'};border:1px solid ${ok?'#4C9A4C':'var(--rimon)'};">
+        <strong>${ok?'✅':'❌'} ${i+1}. ${q?q.question:''}</strong>
+        ${r&&r.transcript?`<div style="font-size:.8rem;font-style:italic;margin-top:3px;">You said: “${r.transcript}”</div>`:''}
+        ${r&&r.feedback?`<div style="font-size:.8rem;margin-top:2px;">${r.feedback}</div>`:''}
+      </div>`;
+    }).join('');
 }
 function renderQuestionFinalScore(){
   const el=document.getElementById('questionFinalScore');
@@ -4075,11 +4081,8 @@ async function gradeCurrentQuestionAnswer(){
     document.getElementById('questionsDoneBlock').classList.toggle('hidden', !allAnswered);
     renderAnsweredQuestionHistory();
     renderQuestionFinalScore();
-    // Save after every answer (not only once the whole set is done) so an
-    // interrupted session — tab closed, connection dropped, class ending —
-    // never loses progress the student already made.
-    await autosaveComprehensionQuestions();
     if(allAnswered){
+      await autosaveComprehensionQuestions();
       renderQuestionFinalScore();
     }else{
       setTimeout(()=>{
@@ -4117,10 +4120,10 @@ function renderQuestionResult(verdict, feedback, transcript){
   document.getElementById('questionReplayBtn').onclick = () => speakText(feedback);
 }
 
-// Uploads each answered question's audio + result and writes the attempt
-// record. Runs after every graded question (not just once the whole set
-// is done) so an interrupted session never loses progress already made —
-// matching how autosaveTranslation already saves after each chunk.
+// Uploads every answered question's audio + result once ALL questions for
+// this posuk/range have been graded (same "save once complete" pattern
+// autosaveTranslation already uses for its per-chunk recordings), then
+// marks the comprehension task done.
 async function autosaveComprehensionQuestions(){
   const idxs = Object.keys(comprehensionQResults).map(Number);
   if(!idxs.length || !currentPosukKey) return;
@@ -4133,16 +4136,12 @@ async function autosaveComprehensionQuestions(){
 
     const questionResultsData = await Promise.all(idxs.map(async i => {
       const r = comprehensionQResults[i];
+      const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_question_' + currentAttemptId + '_q' + i + '.' + r.ext;
       let url = r.audioURL || null;
-      // Only upload once per answer — autosave now runs after every
-      // question (not just the last), so a blob already uploaded on an
-      // earlier call is skipped here rather than re-uploaded each time.
-      if(r.blob && !url){
-        const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_question_' + currentAttemptId + '_q' + i + '.' + r.ext;
+      if(r.blob){
         try{
           await storage.ref(path).put(r.blob);
           url = await storage.ref(path).getDownloadURL();
-          r.audioURL = url;
         }catch(err){ console.error('Could not upload question answer audio', i, err); }
       }
       return {
