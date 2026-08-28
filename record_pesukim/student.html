@@ -1114,6 +1114,12 @@
     border-color:var(--gold);
     color:var(--ink);
   }
+  .translation-action-btn.delete{
+    background:#fff;
+    border-color:var(--rimon);
+    color:var(--rimon);
+  }
+  .translation-action-btn.delete:hover{ background:var(--rimon); color:#fff; }
   .translation-action-btn:active{ transform:translateY(1px); }
   .translation-help{
     margin-top:7px;
@@ -3120,11 +3126,16 @@ function renderAnsweredQuestionHistory(){
       const feedbackBtn = (r && r.feedback)
         ? `<button type="button" class="speak-btn history-feedback-listen" data-hist-index="${i}" style="margin-top:5px;">🔊 Hear feedback</button>`
         : '';
+      // Every answered question also gets a Delete option, matching
+      // Translate's per-piece delete — previously an answered question
+      // could only be redone (by navigating back to it), never removed
+      // outright once it was recorded (see Simcha's feedback).
+      const deleteBtn = `<button type="button" class="translation-action-btn delete history-delete-btn" data-hist-index="${i}" style="margin-top:5px;">🗑️ Delete</button>`;
       return `<div style="padding:9px 11px;margin:5px 0;border-radius:12px;background:${ok?'#E4F4E4':'#F6E1E1'};border:1px solid ${ok?'#4C9A4C':'var(--rimon)'};">
         <strong>${ok?'✅':'❌'} ${i+1}. ${q?q.question:''}</strong>
         ${r&&r.transcript?`<div style="font-size:.8rem;font-style:italic;margin-top:3px;">You said: “${r.transcript}”</div>`:''}
         ${r&&r.feedback?`<div style="font-size:.8rem;margin-top:2px;">${r.feedback}</div>`:''}
-        ${feedbackBtn}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">${feedbackBtn}${deleteBtn}</div>
       </div>`;
     }).join('');
   host.querySelectorAll('.history-feedback-listen').forEach(btn=>{
@@ -3133,6 +3144,9 @@ function renderAnsweredQuestionHistory(){
       const r = comprehensionQResults[idx];
       if(r && r.feedback) speakText(r.feedback);
     };
+  });
+  host.querySelectorAll('.history-delete-btn').forEach(btn=>{
+    btn.onclick = () => deleteComprehensionAnswer(Number(btn.dataset.histIndex));
   });
 }
 function renderQuestionFinalScore(){
@@ -4089,13 +4103,57 @@ function renderQuestionResult(verdict, feedback, transcript){
   document.getElementById('questionReplayBtn').onclick = () => speakText(feedback);
 }
 
+// Removes one already-answered question so the student can answer it
+// again later, matching the delete option Translate has for each
+// recorded piece. Looks up the saved entry by question text rather than
+// array position, since Firebase's questionResults array is compacted —
+// it only contains answered questions, so index there won't line up with
+// this question's index once other answers have been added/removed.
+async function deleteComprehensionAnswer(index){
+  if(!confirm('Delete this answer? You can answer it again after.')) return;
+  const q = comprehensionQuestions[index];
+
+  if(currentAttemptRef && q){
+    try{
+      const snap = await currentAttemptRef.once('value');
+      const val = snap.val();
+      const match = val && Array.isArray(val.questionResults)
+        ? val.questionResults.find(r => r.question === q.question)
+        : null;
+      if(match && match.audioURL){
+        try{ await storage.refFromURL(match.audioURL).delete(); }
+        catch(err){ console.warn('Could not delete stored answer audio', err); }
+      }
+    }catch(err){ console.warn('Could not look up saved comprehension answer', err); }
+  }
+
+  delete comprehensionQResults[index];
+  comprehensionQIndex = index;
+  renderComprehensionQuestionUI();
+  await autosaveComprehensionQuestions();
+}
+
 // Uploads every answered question's audio + result once ALL questions for
 // this posuk/range have been graded (same "save once complete" pattern
 // autosaveTranslation already uses for its per-chunk recordings), then
 // marks the comprehension task done.
 async function autosaveComprehensionQuestions(){
   const idxs = Object.keys(comprehensionQResults).map(Number);
-  if(!idxs.length || !currentPosukKey) return;
+  if(!currentPosukKey) return;
+  if(!idxs.length){
+    // Every answered question has since been deleted — clear the saved
+    // record instead of leaving stale results behind, mirroring how
+    // autosaveTranslation handles a translate tab with nothing left in it.
+    if(currentAttemptRef){
+      try{ await currentAttemptRef.update({ questionResults: null, questionScore: null }); }
+      catch(err){ console.error('Could not clear saved comprehension answers', err); }
+    }
+    if(attemptSaved.comprehension){
+      attemptSaved.comprehension = false;
+      document.getElementById('comprehensionCheck').classList.add('hidden');
+    }
+    return;
+  }
   try{
     if(!currentAttemptRef){
       currentAttemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
@@ -4135,7 +4193,18 @@ async function autosaveComprehensionQuestions(){
       questionResults: questionResultsData,
       questionScore: Math.round((correctCount / comprehensionQuestions.length) * 100) + '%'
     });
-    markTaskSaved('comprehension');
+
+    // Only a fully-answered set counts as "done" for the tab checkmark —
+    // a partial re-save (e.g. right after deleting one answer, with
+    // others still unanswered) should not show it.
+    const allAnswered = comprehensionQuestions.length > 0 &&
+      comprehensionQuestions.every((_, i) => !!comprehensionQResults[i]);
+    if(allAnswered){
+      markTaskSaved('comprehension');
+    }else if(attemptSaved.comprehension){
+      attemptSaved.comprehension = false;
+      document.getElementById('comprehensionCheck').classList.add('hidden');
+    }
   }catch(err){
     console.error('Autosave (comprehension questions) failed', err);
     const gradingMsg = document.getElementById('comprehensionGradingMsg');
@@ -4885,10 +4954,18 @@ function showTranslationSummary(level){
     const feedbackBtn = r.feedback
       ? '<button type="button" class="translation-action-btn chunk-feedback-listen" data-chunk-index="' + i + '">🔊 Feedback</button>'
       : '';
-    const redoBtn = isCorrect ? '' :
+    // Redo is now offered for EVERY piece, correct or not — a student may
+    // want to try again even after getting it right (previously the button
+    // only appeared for incorrect pieces, per Simcha's feedback).
+    const redoBtn =
       '<button type="button" class="translation-action-btn redo chunk-fix-pill" data-chunk-index="' + i + '">' +
         '<span class="chunk-fix-status" data-status-index="' + i + '">🔁 Redo</span>' +
       '</button>';
+    // Delete removes this piece's saved recording entirely (no immediate
+    // re-record forced) — the student can leave it blank or come back to
+    // it later, same idea as the delete buttons on Reading/Comprehension.
+    const deleteBtn =
+      '<button type="button" class="translation-action-btn delete chunk-delete-pill" data-chunk-index="' + i + '">🗑️ Delete</button>';
 
     let helpHtml = '';
     if(!isCorrect){
@@ -4915,7 +4992,7 @@ function showTranslationSummary(level){
         '<div class="translation-piece-hebrew">' + chunk.hebrew + '</div>' +
       '</div>' +
       '<div class="translation-heard"><strong>I heard:</strong> “' + said + '”</div>' +
-      '<div class="translation-piece-actions">' + recordingBtn + feedbackBtn + redoBtn + '</div>' +
+      '<div class="translation-piece-actions">' + recordingBtn + feedbackBtn + redoBtn + deleteBtn + '</div>' +
       helpHtml +
     '</div>';
   }).join('') + '</div>';
@@ -4948,6 +5025,10 @@ function showTranslationSummary(level){
 
   resultEl.querySelectorAll('.chunk-fix-pill').forEach(btn => {
     btn.onclick = () => recordChunkFix(parseInt(btn.getAttribute('data-chunk-index'), 10), btn);
+  });
+
+  resultEl.querySelectorAll('.chunk-delete-pill').forEach(btn => {
+    btn.onclick = () => deleteTranslationChunk(parseInt(btn.getAttribute('data-chunk-index'), 10), level);
   });
 
   resultEl.querySelectorAll('.chunk-dispute-btn').forEach(btn => {
@@ -5042,12 +5123,66 @@ async function recordChunkFix(index, btnEl){
   }
 }
 
+// Removes one piece's recording entirely (local state + the uploaded
+// audio file + the saved record), without forcing an immediate re-record —
+// same idea as the Delete button on Reading/Comprehension, just scoped to
+// a single translation piece instead of the whole attempt.
+//
+// Note: translationChunkResults is saved as a COMPACTED array (only pieces
+// that have a result, in chunk-index order) — its array position is NOT
+// the same as the chunk's own index once earlier pieces are missing/deleted.
+// So the saved audio URL to clean up is looked up by matching chunkHebrew
+// text rather than assuming array position === chunk index.
+async function deleteTranslationChunk(index, level){
+  if(!confirm('Delete this piece\'s recording? You can record it again anytime.')) return;
+
+  // If this piece was already autosaved, remove its uploaded audio file
+  // from Storage too, not just the local state.
+  if(currentAttemptRef){
+    try{
+      const snap = await currentAttemptRef.child('translationChunkResults').once('value');
+      const saved = snap.val();
+      const chunkHebrew = level.chunks[index] && level.chunks[index].hebrew;
+      if(Array.isArray(saved) && chunkHebrew){
+        const match = saved.find(c => c && c.chunkHebrew === chunkHebrew);
+        if(match && match.audioURL){
+          storage.refFromURL(match.audioURL).delete().catch(() => {});
+        }
+      }
+    }catch(err){
+      console.error('Could not check saved chunk before delete', err);
+    }
+  }
+
+  delete translationSegments[index];
+  delete translationGradedResults[index];
+
+  showTranslationSummary(level);
+  renderCurrentChunk();
+  await autosaveTranslation(level);
+}
+
 // Same one-attempt-per-posuk-visit pattern as autosaveHebrew/
 // autosaveComprehension, but stores the whole set of graded chunks (not
 // just one), since a full session covers the entire posuk at once.
 async function autosaveTranslation(level){
   const idxs = Object.keys(translationGradedResults).map(Number);
-  if(!idxs.length || !currentPosukKey) return;
+  if(!currentPosukKey) return;
+  // If every piece has been deleted, clear the saved translation fields
+  // entirely instead of just silently doing nothing — otherwise a stale
+  // translationChunkResults from before the last delete would keep showing
+  // up in the teacher dashboard and student history.
+  if(!idxs.length){
+    if(currentAttemptRef){
+      try{
+        await currentAttemptRef.update({ translationChunkResults: null, translationScore: null });
+      }catch(err){ console.error('Could not clear translation after deleting all pieces', err); }
+    }
+    document.getElementById('translationStatus').textContent = 'Ready';
+    attemptSaved.translation = false;
+    document.getElementById('translateCheck').classList.add('hidden');
+    return;
+  }
   try{
     if(!currentAttemptRef){
       currentAttemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
