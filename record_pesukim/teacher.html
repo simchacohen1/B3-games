@@ -78,6 +78,14 @@
   .student-search-input::placeholder{ color:#8494a6; }
   .student-search-input:focus{ outline:none; border-color:var(--gold); }
   .student-count{ font-size:0.72rem; color:#9fb0c2; font-weight:600; margin: -4px 0 10px; }
+  /* Small section labels above each group of students in the sidebar
+     (e.g. "B3 WT" / "B3 ET" / "Ungrouped") so a teacher with multiple
+     classes/cohorts can tell at a glance who's in which one. */
+  .student-group-header{
+    font-size:0.68rem; font-weight:700; color:#8fa2b8; text-transform:uppercase;
+    letter-spacing:0.05em; margin: 14px 0 6px; padding-top:8px; border-top:1px solid #33475d;
+  }
+  .student-group-header:first-of-type{ margin-top:0; padding-top:0; border-top:none; }
   .student-item{
     padding: 12px 14px;
     border-radius: 10px;
@@ -826,28 +834,66 @@ async function loadStudents(){
   const listEl = document.getElementById('studentList');
   const countEl = document.getElementById('studentCount');
   try{
-    const snap = await db.ref('posukPractice/students').once('value');
-    const val = snap.val();
-    if(!val){
+    // Merge two sources: allowedStudents (the teacher's full roster —
+    // approved usernames, whether or not they've ever logged in) and
+    // posukPractice/students (activity data — only exists once someone
+    // has actually opened the app). Every approved name shows up in the
+    // sidebar even with zero recordings; the roster entry's name/group
+    // wins if both exist, since that's what the teacher intentionally set.
+    const [recordedSnap, allowedSnap] = await Promise.all([
+      db.ref('posukPractice/students').once('value'),
+      db.ref('posukPractice/allowedStudents').once('value')
+    ]);
+    const recordedVal = recordedSnap.val() || {};
+    const allowedVal = allowedSnap.val() || {};
+    const allIds = new Set([...Object.keys(recordedVal), ...Object.keys(allowedVal)]);
+    if(allIds.size === 0){
       listEl.innerHTML = '<div class="empty-msg">No students yet.</div>';
       if(countEl) countEl.textContent = '';
       return;
     }
     listEl.innerHTML = '';
-    const entries = Object.entries(val).sort((a,b) => a[1].name.localeCompare(b[1].name));
-    if(countEl) countEl.textContent = entries.length + (entries.length === 1 ? ' student' : ' students');
-    entries.forEach(([id, info]) => {
-        studentsMap[id] = info.name;
-        studentsInfo[id] = info;
+    const merged = [...allIds].map(id => {
+      const recorded = recordedVal[id];
+      const allowed = allowedVal[id];
+      const name = (allowed && allowed.name) || (recorded && recorded.name) || id;
+      const group = (allowed && allowed.group) || '';
+      const lastActive = recorded && recorded.lastActive ? recorded.lastActive : null;
+      return { id, name, group, lastActive };
+    });
+    merged.sort((a,b) => (a.group || '').localeCompare(b.group || '') || a.name.localeCompare(b.name));
+
+    // Group into labeled sections (e.g. "B3 WT" / "B3 ET") instead of one
+    // flat list, so a teacher juggling multiple classes/cohorts can see
+    // who's in which at a glance. No-group students land in a shared
+    // "Ungrouped" section, sorted after any named groups.
+    const byGroup = {};
+    merged.forEach(s => {
+      const key = s.group || '\uFFFFUngrouped';
+      (byGroup[key] = byGroup[key] || []).push(s);
+    });
+    const groupKeysSorted = Object.keys(byGroup).sort((a,b) => a.localeCompare(b));
+
+    if(countEl) countEl.textContent = merged.length + (merged.length === 1 ? ' student' : ' students');
+
+    groupKeysSorted.forEach(gkey => {
+      const header = document.createElement('div');
+      header.className = 'student-group-header';
+      header.textContent = gkey === '\uFFFFUngrouped' ? 'Ungrouped' : gkey;
+      listEl.appendChild(header);
+
+      byGroup[gkey].forEach(({ id, name, lastActive }) => {
+        studentsMap[id] = name;
+        studentsInfo[id] = { name, lastActive };
         const div = document.createElement('div');
         div.className = 'student-item';
         div.dataset.id = id;
-        div.dataset.searchName = info.name.toLowerCase();
-        const lastActive = info.lastActive ? new Date(info.lastActive).toLocaleDateString() : '';
-        div.innerHTML = `<span class="name-row"><span>${displayName(info.name)}</span><span class="dispute-badge hidden" id="disputeBadge_${id}"></span></span><span class="last-active">${lastActive ? 'Last activity: ' + lastActive : ''}</span>`;
+        div.dataset.searchName = name.toLowerCase();
+        const lastActiveLabel = lastActive ? 'Last activity: ' + new Date(lastActive).toLocaleDateString() : 'Never recorded';
+        div.innerHTML = `<span class="name-row"><span>${displayName(name)}</span><span class="dispute-badge hidden" id="disputeBadge_${id}"></span></span><span class="last-active">${lastActiveLabel}</span>`;
         div.onclick = () => {
           setTab('student');
-          selectStudent(id, info.name, div);
+          selectStudent(id, name, div);
           // On mobile the sidebar is a drawer — picking a student should
           // close it back up rather than leaving it covering the report.
           const panel = document.getElementById('studentsPanel');
@@ -855,6 +901,7 @@ async function loadStudents(){
         };
         listEl.appendChild(div);
       });
+    });
     markStudentsWithPendingDisputes();
   }catch(err){
     listEl.innerHTML = '<div class="empty-msg">Could not load students.</div>';
@@ -863,13 +910,26 @@ async function loadStudents(){
 }
 
 // Filters the sidebar list as the teacher types, matching against the raw
-// stored name (case-insensitive) rather than the display-cased version.
+// stored name (case-insensitive). Also hides a group header if every
+// student under it got filtered out, so searching doesn't leave empty
+// "B3 WT" labels dangling with nothing underneath.
 document.getElementById('studentSearchInput').addEventListener('input', (e) => {
   const q = e.target.value.trim().toLowerCase();
-  document.querySelectorAll('#studentList .student-item').forEach(el => {
-    const match = !q || (el.dataset.searchName || '').includes(q);
-    el.style.display = match ? '' : 'none';
+  const listEl = document.getElementById('studentList');
+  let currentHeader = null;
+  let currentHeaderHasMatch = false;
+  [...listEl.children].forEach(el => {
+    if(el.classList.contains('student-group-header')){
+      if(currentHeader) currentHeader.style.display = currentHeaderHasMatch ? '' : 'none';
+      currentHeader = el;
+      currentHeaderHasMatch = false;
+    }else if(el.classList.contains('student-item')){
+      const match = !q || (el.dataset.searchName || '').includes(q);
+      el.style.display = match ? '' : 'none';
+      if(match) currentHeaderHasMatch = true;
+    }
   });
+  if(currentHeader) currentHeader.style.display = currentHeaderHasMatch ? '' : 'none';
 });
 
 document.getElementById('studentsToggleBtn').onclick = () => {
@@ -1780,8 +1840,14 @@ async function loadAccessTab(){
     const allowedVal = allowedSnap.val() || {};
     const practiceLimit = practiceLimitSnap.val() || null;
     const approvedNames = Object.entries(allowedVal)
-      .map(([slug, info]) => ({ slug, name: (info && info.name) || slug }))
-      .sort((a,b) => a.name.localeCompare(b.name));
+      .map(([slug, info]) => ({ slug, name: (info && info.name) || slug, group: (info && info.group) || '' }))
+      .sort((a,b) => (a.group||'').localeCompare(b.group||'') || a.name.localeCompare(b.name));
+    // Distinct existing group names (e.g. "B3 WT", "B3 ET"), offered as
+    // suggestions via a datalist so the teacher can reuse the same group
+    // spelling instead of retyping it and accidentally creating a near-
+    // duplicate group.
+    const distinctGroups = [...new Set(approvedNames.map(a => a.group).filter(Boolean))].sort();
+    const groupDatalist = `<datalist id="groupOptionsList">${distinctGroups.map(g => `<option value="${g}">`).join('')}</datalist>`;
 
     let html = `<h2>🔑 Manage Access</h2>
       <div class="empty-msg" style="text-align:left;margin-bottom:18px;">
@@ -1829,17 +1895,22 @@ async function loadAccessTab(){
 
       <div>
         <div style="font-weight:700;margin-bottom:6px;">Approved Students (${approvedNames.length})</div>
+        ${groupDatalist}
         <input id="newApprovedName" type="text" placeholder="Student's name" maxlength="30"
-          style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:220px;">
+          style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:200px;">
+        <input id="newApprovedGroup" type="text" list="groupOptionsList" placeholder="Group (optional)" maxlength="30"
+          style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:160px;">
         <button class="btn small gold" id="addApprovedBtn">Add Student</button>
         <span id="addApprovedMsg" style="margin-left:10px;font-size:0.85rem;"></span>
         <table class="roster-table" style="margin-top:14px;">
-          <thead><tr><th>Name</th><th style="width:90px;"></th></tr></thead>
+          <thead><tr><th>Name</th><th>Group</th><th style="width:90px;"></th></tr></thead>
           <tbody id="approvedList">
             ${approvedNames.length === 0
-              ? '<tr><td colspan="2" class="empty-msg">No approved students yet.</td></tr>'
+              ? '<tr><td colspan="3" class="empty-msg">No approved students yet.</td></tr>'
               : approvedNames.map(a => `<tr data-slug="${a.slug}">
                   <td>${a.name}</td>
+                  <td><input type="text" class="group-edit-input" list="groupOptionsList" value="${a.group}" placeholder="—"
+                    style="padding:5px 8px;border-radius:7px;border:2px solid #d8c9a0;font-family:'Quicksand',sans-serif;font-size:0.85rem;width:130px;"></td>
                   <td><button class="btn small remove-approved-btn" style="background:#8a3a3a;box-shadow:0 4px 0 #5c2626;">Remove</button></td>
                 </tr>`).join('')}
           </tbody>
@@ -1928,6 +1999,7 @@ async function loadAccessTab(){
 
     document.getElementById('addApprovedBtn').onclick = async () => {
       const nameVal = document.getElementById('newApprovedName').value.trim();
+      const groupVal = document.getElementById('newApprovedGroup').value.trim();
       const msgEl = document.getElementById('addApprovedMsg');
       if(!nameVal){ return; }
       const slug = slugify(nameVal);
@@ -1939,18 +2011,38 @@ async function loadAccessTab(){
       try{
         await db.ref('posukPractice/allowedStudents/' + slug).set({
           name: nameVal,
+          group: groupVal,
           addedAt: firebase.database.ServerValue.TIMESTAMP
         });
         document.getElementById('newApprovedName').value = '';
+        document.getElementById('newApprovedGroup').value = '';
         msgEl.style.color = '#8fd694';
         msgEl.textContent = 'Added!';
         loadAccessTab();
+        loadStudents(); // new approved name should appear in the sidebar right away
       }catch(e){
         msgEl.style.color = '#ffb3b3';
         msgEl.textContent = 'Could not add.';
         console.error(e);
       }
     };
+
+    // Editing a student's group inline (rather than a separate form) —
+    // saves as soon as the field loses focus or Enter is pressed, so
+    // moving a student between "B3 WT" / "B3 ET" is a one-field edit.
+    mainEl.querySelectorAll('.group-edit-input').forEach(input => {
+      const slug = input.closest('tr').dataset.slug;
+      const save = async () => {
+        try{
+          await db.ref('posukPractice/allowedStudents/' + slug + '/group').set(input.value.trim());
+          loadStudents(); // refresh sidebar grouping immediately
+        }catch(e){
+          console.error('Could not save group', e);
+        }
+      };
+      input.addEventListener('change', save);
+      input.addEventListener('keydown', (e) => { if(e.key === 'Enter') input.blur(); });
+    });
 
     mainEl.querySelectorAll('.remove-approved-btn').forEach(btn => {
       btn.onclick = async () => {
@@ -1961,6 +2053,7 @@ async function loadAccessTab(){
         try{
           await db.ref('posukPractice/allowedStudents/' + slug).remove();
           loadAccessTab();
+          loadStudents();
         }catch(e){
           console.error(e);
         }
