@@ -1831,14 +1831,18 @@ async function loadAccessTab(){
   const mainEl = document.getElementById('mainContent');
   mainEl.innerHTML = '<div class="loading">Loading access settings…</div>';
   try{
-    const [pinSnap, allowedSnap, practiceLimitSnap] = await Promise.all([
+    const [pinSnap, allowedSnap, practiceLimitSnap, accessLockedSnap, lockMsgSnap] = await Promise.all([
       db.ref('posukPractice/settings/classPin').once('value'),
       db.ref('posukPractice/allowedStudents').once('value'),
-      db.ref('posukPractice/settings/practiceLimit').once('value')
+      db.ref('posukPractice/settings/practiceLimit').once('value'),
+      db.ref('posukPractice/settings/accessLocked').once('value'),
+      db.ref('posukPractice/settings/accessLockMessage').once('value')
     ]);
     const currentPin = pinSnap.val() || '';
     const allowedVal = allowedSnap.val() || {};
     const practiceLimit = practiceLimitSnap.val() || null;
+    const isLocked = accessLockedSnap.val() === true;
+    const lockMessage = lockMsgSnap.val() || '';
     const approvedNames = Object.entries(allowedVal)
       .map(([slug, info]) => ({ slug, name: (info && info.name) || slug, group: (info && info.group) || '' }))
       .sort((a,b) => (a.group||'').localeCompare(b.group||'') || a.name.localeCompare(b.name));
@@ -1854,6 +1858,28 @@ async function loadAccessTab(){
         Students need BOTH the class PIN and an approved name to get into the app.
         Add a name here before sharing the link with a new student.
       </div>
+
+      <div style="margin-bottom:24px;padding:16px;border-radius:12px;background:${isLocked ? '#F6E1E1' : '#fff'};border:2px solid ${isLocked ? 'var(--rimon)' : 'var(--gold)'};">
+        <div style="font-weight:700;margin-bottom:4px;">🔒 Website Access</div>
+        <div style="font-size:0.84rem;color:var(--ink-soft);margin-bottom:10px;">
+          Instantly closes the whole student app — nobody gets in (even with the right PIN and an approved name),
+          and anyone already using it gets covered by a "Currently Closed" screen right away. Use this to close
+          practice for the day/weekend rather than removing every student.
+        </div>
+        <div style="font-weight:700;margin-bottom:8px;">
+          Currently: <span style="color:${isLocked ? 'var(--rimon)' : '#397839'};">${isLocked ? '🔒 Locked — students cannot get in' : '🔓 Open — students can practice'}</span>
+        </div>
+        <div style="margin-bottom:8px;">
+          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Message shown to students while locked (optional)</label>
+          <input id="accessLockMessageInput" type="text" value="${lockMessage}" placeholder="e.g. Practice is closed for Shabbos — back Motzei Shabbos!"
+            style="padding:8px 12px;border-radius:8px;border:2px solid var(--ink-soft);font-size:0.9rem;width:100%;max-width:420px;box-sizing:border-box;">
+        </div>
+        <button class="btn small" id="toggleAccessLockBtn" style="${isLocked ? 'background:#397839;box-shadow:0 4px 0 #244f24;' : 'background:var(--rimon);box-shadow:0 4px 0 #6e1f28;'}">
+          ${isLocked ? '🔓 Unlock Website' : '🔒 Lock Website'}
+        </button>
+        <span id="accessLockMsg" style="margin-left:10px;font-size:0.85rem;"></span>
+      </div>
+
       <div style="margin-bottom:24px;">
         <div style="font-weight:700;margin-bottom:6px;">Class PIN</div>
         <input id="pinInput" type="text" value="${currentPin}" placeholder="e.g. 1234"
@@ -1917,6 +1943,25 @@ async function loadAccessTab(){
         </table>
       </div>`;
     mainEl.innerHTML = html;
+
+    // Locking is a single boolean flip, but always saves whatever message
+    // is currently in the box first, so a teacher who edits the message
+    // and immediately hits Lock doesn't lose that edit.
+    document.getElementById('toggleAccessLockBtn').onclick = async () => {
+      const msgEl = document.getElementById('accessLockMsg');
+      const messageVal = document.getElementById('accessLockMessageInput').value.trim();
+      try{
+        await db.ref('posukPractice/settings/accessLockMessage').set(messageVal);
+        await db.ref('posukPractice/settings/accessLocked').set(!isLocked);
+        msgEl.style.color = '#397839';
+        msgEl.textContent = isLocked ? 'Website unlocked.' : 'Website locked — no one can get in.';
+        loadAccessTab();
+      }catch(e){
+        msgEl.style.color = '#ffb3b3';
+        msgEl.textContent = 'Could not change access.';
+        console.error(e);
+      }
+    };
 
     document.getElementById('savePinBtn').onclick = async () => {
       const val = document.getElementById('pinInput').value.trim();
