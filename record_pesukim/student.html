@@ -57,6 +57,25 @@
     text-align:center;
     box-shadow: 0 6px 18px var(--shadow);
   }
+  /* ---------- Whole-site access lock ----------
+     When locked, every direct child of <body> except the closed screen
+     is hidden — this covers the name gate AND an already-open app, so a
+     teacher closing practice mid-class doesn't just block new logins, it
+     also covers up whatever a student already had on screen. */
+  #studentAppClosedScreen{ display:none; }
+  body.student-app-closed{ margin:0 !important; background: var(--parchment) !important; }
+  body.student-app-closed > *:not(#studentAppClosedScreen):not(script):not(style){ display:none !important; }
+  body.student-app-closed #studentAppClosedScreen{
+    display:flex !important; min-height:100vh; align-items:center; justify-content:center;
+    padding:28px; box-sizing:border-box; text-align:center;
+  }
+  #studentAppClosedCard{ max-width:520px; }
+  #studentAppClosedIcon{ font-size:4rem; line-height:1; margin-bottom:14px; }
+  #studentAppClosedTitle{
+    font-family:'Frank Ruhl Libre', serif; font-size:clamp(1.8rem, 6vw, 2.6rem);
+    font-weight:700; margin:0 0 10px; color: var(--rimon);
+  }
+  #studentAppClosedText{ font-size:1.1rem; color: var(--ink-soft); margin:0; }
   .name-gate input{
     font-family:'Quicksand', sans-serif;
     font-size:1.1rem;
@@ -1392,6 +1411,17 @@
   <footer class="who">Nigri Shluchim Online School · 3rd Grade Chumash</footer>
 </div>
 
+<!-- Shown instead of everything else in .wrap when the teacher has locked
+     the site (posukPractice/settings/accessLocked) — CSS hides every other
+     direct child of body while body.student-app-closed is present. -->
+<div id="studentAppClosedScreen" aria-live="polite">
+  <div id="studentAppClosedCard">
+    <div id="studentAppClosedIcon">🔒</div>
+    <h1 id="studentAppClosedTitle">Currently Closed</h1>
+    <p id="studentAppClosedText">This practice page is currently closed.</p>
+  </div>
+</div>
+
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
@@ -2188,21 +2218,58 @@ function setNameGateMsg(text){
   document.getElementById('nameGateMsg').textContent = text || '';
 }
 
+// Live watcher on the whole-site lock — runs continuously (not just at
+// page load), so a teacher flipping this mid-class immediately covers up
+// whatever a student already has on screen, not just new logins. Any
+// change to the value (either direction) triggers a full reload rather
+// than trying to patch a half-initialized page back together, since the
+// name gate / app init logic only really runs once per page load.
+let siteLockPreviousState = null;
+function startAccessLockWatcher(){
+  db.ref('posukPractice/settings/accessLocked').on('value', async (snap) => {
+    const isLocked = snap.val() === true;
+    if(siteLockPreviousState !== null && siteLockPreviousState !== isLocked){
+      window.location.reload();
+      return;
+    }
+    siteLockPreviousState = isLocked;
+    if(isLocked){
+      let message = 'This practice page is currently closed.';
+      try{
+        const msgSnap = await db.ref('posukPractice/settings/accessLockMessage').once('value');
+        if(msgSnap.val()) message = msgSnap.val();
+      }catch(e){ /* fall back to default message */ }
+      document.getElementById('studentAppClosedText').textContent = message;
+    }
+    document.body.classList.toggle('student-app-closed', isLocked);
+  }, (err) => {
+    console.error('Could not read site lock setting:', err);
+  });
+}
+startAccessLockWatcher();
+
 // Checks the entered PIN against posukPractice/settings/classPin, and the
 // entered name (slugified) against the teacher-approved list at
 // posukPractice/allowedStudents. Both must pass before a student can get in.
 // This exists so anyone who has the link can't just type in any name and
 // show up as "a student" in the teacher dashboard - the teacher has to add
-// the name first, and know the class PIN.
+// the name first, and know the class PIN. The whole-site lock is checked
+// first as a defense-in-depth backstop (startAccessLockWatcher above
+// already covers the whole page visually), and blocks everyone regardless
+// of PIN or approval.
 async function checkAccess(name, pin){
   const slug = slugify(name);
   if(!slug){ return { ok:false, reason:'Please type your name.' }; }
 
-  const [pinSnap, allowedSnap] = await Promise.all([
+  const [lockSnap, pinSnap, allowedSnap] = await Promise.all([
+    db.ref('posukPractice/settings/accessLocked').once('value'),
     db.ref('posukPractice/settings/classPin').once('value'),
     db.ref('posukPractice/allowedStudents/' + slug).once('value')
   ]);
 
+  if(lockSnap.val() === true){
+    return { ok:false, reason:'Practice is closed right now. Ask your teacher.' };
+  }
   const realPin = pinSnap.val();
   if(realPin && String(pin).trim() !== String(realPin).trim()){
     return { ok:false, reason:'Incorrect PIN. Ask your teacher.' };
@@ -2309,9 +2376,15 @@ window.addEventListener('load', async () => {
   if(savedId && savedName){
     // Still re-check the roster (not the PIN) on every visit, in case the
     // teacher has since removed this name - a saved browser shouldn't be
-    // able to bypass that.
+    // able to bypass that. Also skip auto-restoring into the app while the
+    // whole site is locked (startAccessLockWatcher already shows the
+    // closed screen; no need to also spin up a hidden session behind it).
     try{
-      const allowedSnap = await db.ref('posukPractice/allowedStudents/' + savedId).once('value');
+      const [lockSnap, allowedSnap] = await Promise.all([
+        db.ref('posukPractice/settings/accessLocked').once('value'),
+        db.ref('posukPractice/allowedStudents/' + savedId).once('value')
+      ]);
+      if(lockSnap.val() === true) return;
       if(!allowedSnap.exists()){
         localStorage.removeItem('posukPractice_studentName');
         localStorage.removeItem('posukPractice_studentId');
