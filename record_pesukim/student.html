@@ -1160,13 +1160,6 @@
     <p>Read the posuk. Explain what it means. See how you did!</p>
   </header>
 
-  <!-- Shown instead of everything else when the teacher toggles the app off -->
-  <div id="closedScreen" class="name-gate hidden">
-    <div style="font-size:2.6rem;">📚</div>
-    <div style="font-weight:700;font-size:1.15rem;margin-top:8px;color:var(--rimon-dark);">Posuk Practice is closed right now</div>
-    <div style="color:var(--ink-soft);margin-top:8px;">Ask your teacher when it will be open again.</div>
-  </div>
-
   <!-- STEP 0: Name entry (gated by class PIN + teacher-approved name list) -->
   <div id="nameGate" class="name-gate">
     <div>Class PIN</div>
@@ -1351,16 +1344,21 @@
           <div class="record-caption" id="comprehensionRecordCaption">🎙️ Tap • wait for clear question • answer • stay quiet to finish</div>
           <span class="status-tag" id="comprehensionStatus">Not recorded yet</span>
         </div>
+
+        <!-- Moved right under the mic (was previously below the answered-
+             history list and final score block, where a student had to
+             scroll to find it — see Simcha's feedback). -->
+        <div class="chunk-nav-row hidden" id="questionNavRow">
+          <button class="btn small ghost-delete" id="questionPrevBtn">◀️ Previous</button>
+          <button class="btn small gold" id="questionNextBtn">Next ▶️</button>
+        </div>
+
         <div class="comp-status" id="comprehensionGradingMsg"></div>
         <button class="btn small hidden" id="comprehensionRetryBtn" style="margin-top:6px;">🔁 Try checking again</button>
         <div class="comp-result hidden" id="comprehensionResult"></div>
 
         <div id="questionAnsweredHistory" style="margin:12px 0;"></div>
         <div id="questionFinalScore" class="hidden" style="margin:14px 0;padding:16px;border-radius:16px;background:#fff7dc;border:2px solid var(--gold);text-align:center;font-weight:800;font-size:1.05rem;"></div>
-        <div class="chunk-nav-row hidden" id="questionNavRow">
-          <button class="btn small ghost-delete" id="questionPrevBtn">◀️ Previous</button>
-          <button class="btn small gold" id="questionNextBtn">Next ▶️</button>
-        </div>
 
         <div class="hidden" id="questionsDoneBlock" style="text-align:center;margin-top:10px;">
           <div class="comp-status">🎉 All questions done for this posuk!</div>
@@ -1410,40 +1408,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const storage = firebase.storage();
-
-/* ---------- Teacher on/off switch for the whole app ----------
-   posukPractice/settings/appEnabled — missing or true means open (default
-   open, so existing deployments aren't accidentally locked out). Listened
-   to live (not just checked once) so that if the teacher flips it off
-   while a student is mid-session, the closed screen covers the app
-   immediately instead of waiting for a page reload. */
-let appAccessEnabled = true;
-let preClosedScreen = 'nameGate'; // which screen to restore once reopened
-function applyAppEnabledState(enabled){
-  const closedEl = document.getElementById('closedScreen');
-  const nameGateEl = document.getElementById('nameGate');
-  const appEl = document.getElementById('app');
-  if(!closedEl || !nameGateEl || !appEl) return; // not parsed yet
-  if(!enabled){
-    if(!closedEl.classList.contains('hidden')) return;
-    preClosedScreen = appEl.classList.contains('hidden') ? 'nameGate' : 'app';
-    nameGateEl.classList.add('hidden');
-    appEl.classList.add('hidden');
-    closedEl.classList.remove('hidden');
-  }else{
-    if(closedEl.classList.contains('hidden')) return;
-    closedEl.classList.add('hidden');
-    if(preClosedScreen === 'app'){
-      appEl.classList.remove('hidden');
-    }else{
-      nameGateEl.classList.remove('hidden');
-    }
-  }
-}
-db.ref('posukPractice/settings/appEnabled').on('value', snap => {
-  appAccessEnabled = snap.val() !== false;
-  applyAppEnabledState(appAccessEnabled);
-});
 
 /* =========================================================
    COMPREHENSION GRADING — Cloud Function URL
@@ -2334,16 +2298,6 @@ function applyDeepLinkFromURL(){
 }
 
 window.addEventListener('load', async () => {
-  try{
-    const enabledSnap = await db.ref('posukPractice/settings/appEnabled').once('value');
-    if(enabledSnap.val() === false){
-      applyAppEnabledState(false);
-      return; // don't auto-log a returning student in while access is closed
-    }
-  }catch(e){
-    console.error('Could not check app access state:', e);
-    // fail open - don't lock out students over a network hiccup
-  }
   const savedId = localStorage.getItem('posukPractice_studentId');
   const savedName = localStorage.getItem('posukPractice_studentName');
   if(savedId && savedName){
@@ -3159,12 +3113,27 @@ function renderAnsweredQuestionHistory(){
   host.innerHTML='<div style="font-weight:800;margin-bottom:7px;color:var(--ink-soft);">Your answers so far</div>' +
     answered.map(i=>{
       const r=comprehensionQResults[i], q=comprehensionQuestions[i], ok=r&&r.verdict==='correct';
+      // Each past question gets its OWN speaker button so its feedback can
+      // be replayed — previously only the just-answered question's result
+      // box had a working 🔊 button, so earlier questions in this list were
+      // silent once you moved on (see Simcha's feedback).
+      const feedbackBtn = (r && r.feedback)
+        ? `<button type="button" class="speak-btn history-feedback-listen" data-hist-index="${i}" style="margin-top:5px;">🔊 Hear feedback</button>`
+        : '';
       return `<div style="padding:9px 11px;margin:5px 0;border-radius:12px;background:${ok?'#E4F4E4':'#F6E1E1'};border:1px solid ${ok?'#4C9A4C':'var(--rimon)'};">
         <strong>${ok?'✅':'❌'} ${i+1}. ${q?q.question:''}</strong>
         ${r&&r.transcript?`<div style="font-size:.8rem;font-style:italic;margin-top:3px;">You said: “${r.transcript}”</div>`:''}
         ${r&&r.feedback?`<div style="font-size:.8rem;margin-top:2px;">${r.feedback}</div>`:''}
+        ${feedbackBtn}
       </div>`;
     }).join('');
+  host.querySelectorAll('.history-feedback-listen').forEach(btn=>{
+    btn.onclick = () => {
+      const idx = Number(btn.dataset.histIndex);
+      const r = comprehensionQResults[idx];
+      if(r && r.feedback) speakText(r.feedback);
+    };
+  });
 }
 function renderQuestionFinalScore(){
   const el=document.getElementById('questionFinalScore');
