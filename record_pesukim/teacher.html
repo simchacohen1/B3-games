@@ -24,15 +24,16 @@
     color: #E9E4D4;
     min-height:100vh;
   }
-  .wrap{ max-width: 1000px; margin:0 auto; padding: 26px 18px 60px; }
-  header{ text-align:center; margin-bottom: 20px; }
+  .wrap{ max-width: 1400px; margin:0 auto; padding: 22px 24px 50px; }
+  header{ text-align:center; margin-bottom: 16px; }
   header h1{
     font-family:'Frank Ruhl Libre', serif;
     color: var(--gold-light);
-    margin:0 0 4px;
-    font-size: 1.8rem;
+    margin:0 0 3px;
+    font-size: 1.65rem;
   }
-  header p{ margin:0; color:#B7C2D0; font-size:0.9rem; }
+  header p{ margin:0; color:#B7C2D0; font-size:0.88rem; }
+  :focus-visible{ outline: 3px solid var(--gold); outline-offset: 2px; }
 
   .gate{
     max-width: 360px; margin: 60px auto; background:#26374A; border-radius:14px;
@@ -46,22 +47,37 @@
   .btn{
     font-family:'Quicksand', sans-serif; font-weight:700; border:none; border-radius:999px;
     padding: 10px 22px; cursor:pointer; color:#fff; background: var(--rimon);
-    box-shadow: 0 4px 0 #6e1f28;
+    box-shadow: 0 4px 0 #6e1f28; display:inline-flex; align-items:center; gap:7px;
+    transition: filter .1s ease;
   }
+  .btn:hover{ filter:brightness(1.08); }
   .btn:active{ transform: translateY(2px); box-shadow:none; }
   .btn.gold{ background: var(--gold); color:var(--ink); box-shadow: 0 4px 0 #97781a; }
+  .btn.small{ padding:9px 16px; font-size:0.85rem; }
 
-  .layout{ display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
+  .layout{ display:flex; gap:22px; align-items:flex-start; }
+  .students-toggle-btn{ display:none; }
   .students-panel{
-    flex: 0 0 240px;
+    flex: 0 0 230px;
     background:#26374A;
     border: 2px solid #3A5068;
     border-radius: 14px;
     padding: 14px;
-    max-height: 75vh;
+    max-height: 78vh;
     overflow-y:auto;
   }
-  .students-panel h2{ font-size:1rem; color: var(--gold-light); margin:0 0 10px; }
+  .students-panel h2{
+    font-size:0.82rem; color: var(--gold-light); margin:0 0 10px;
+    text-transform:uppercase; letter-spacing:0.04em; font-weight:700;
+  }
+  .student-search-input{
+    width:100%; box-sizing:border-box; padding:8px 12px; margin-bottom:10px;
+    border-radius:10px; border:2px solid #3A5068; background:#1c2a38; color:#E9E4D4;
+    font-family:'Quicksand', sans-serif; font-size:0.85rem;
+  }
+  .student-search-input::placeholder{ color:#8494a6; }
+  .student-search-input:focus{ outline:none; border-color:var(--gold); }
+  .student-count{ font-size:0.72rem; color:#9fb0c2; font-weight:600; margin: -4px 0 10px; }
   .student-item{
     padding: 12px 14px;
     border-radius: 10px;
@@ -84,13 +100,14 @@
     background: var(--parchment);
     color: var(--ink);
     border-radius: 16px;
-    padding: 20px;
+    padding: 22px 26px;
     min-height: 400px;
   }
   .main-panel h2{
     font-family:'Frank Ruhl Libre', serif;
     color: var(--rimon);
-    margin-top:0;
+    margin: 0 0 14px;
+    font-size: 1.45rem;
   }
   .filters{ display:flex; gap:8px; margin-bottom: 14px; flex-wrap:wrap; }
   .filters select{
@@ -168,13 +185,21 @@
   .empty-msg{ color: var(--ink-soft); text-align:center; padding: 40px 0; }
   .loading{ color: var(--ink-soft); text-align:center; padding:20px 0; }
 
-  .tab-bar{ display:flex; gap:8px; margin-bottom:16px; }
+  /* One coordinated bar (not five separate floating ovals) — inactive
+     tabs sit flat and quiet against the white bar, the active tab is the
+     only one that pops in burgundy. */
+  .tab-bar{
+    display:flex; gap:5px; margin-bottom:18px; background:#fff; border-radius:14px;
+    padding:6px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); flex-wrap:wrap;
+  }
   .tab-btn{
     font-family:'Quicksand', sans-serif; font-weight:700; font-size:0.85rem;
-    border: 2px solid var(--ink-soft); background:#fff; color: var(--ink-soft);
-    border-radius: 999px; padding: 8px 18px; cursor:pointer;
+    border: none; background:transparent; color: var(--ink-soft);
+    border-radius: 999px; padding: 10px 16px; cursor:pointer;
+    transition: background .12s ease, color .12s ease;
   }
-  .tab-btn.active{ background: var(--rimon); border-color: var(--rimon); color:#fff; }
+  .tab-btn:hover{ background:#f1e7ce; color:var(--ink); }
+  .tab-btn.active{ background: var(--rimon); color:#fff; }
 
   .summary-row{
     background:#fff; border-radius:12px; padding:14px 16px; margin-bottom:12px;
@@ -268,17 +293,97 @@
     margin:0 0 6px; display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:6px;
   }
   .report-group-meta{ font-size:0.75rem; color: var(--ink-soft); font-weight:600; white-space:nowrap; }
+  /* Each report-line is its own mini CSS grid rather than a flex row, so
+     the score columns land at the same x-position on every row instead of
+     drifting based on how long each student's name happens to be — the
+     "cols-N" variant sets how many score columns to reserve (matches
+     however many of Reading/Translation/Comprehension are switched on),
+     and "no-date" drops the trailing date column for day-grouped rows
+     where the date is already shown once in the card header above. */
   .report-line{
-    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;
-    padding:8px 2px; border-top:1px dashed #e3d7b3; font-size:0.88rem;
+    display:grid; align-items:center; gap:6px 14px;
+    padding:9px 2px; border-top:1px dashed #e3d7b3; font-size:0.88rem;
   }
   .report-line:first-of-type{ border-top:none; }
-  .report-line .rl-name{ font-weight:700; min-width:110px; }
-  .report-line .rl-scores{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-  .report-line .rl-date{ font-size:0.75rem; color: var(--ink-soft); white-space:nowrap; }
+  .report-line.cols-1, .report-col-header.cols-1{ grid-template-columns: minmax(90px,1fr) 88px 78px; }
+  .report-line.cols-2, .report-col-header.cols-2{ grid-template-columns: minmax(90px,1fr) 88px 88px 78px; }
+  .report-line.cols-3, .report-col-header.cols-3{ grid-template-columns: minmax(90px,1fr) 88px 88px 108px 78px; }
+  .report-line.cols-1.no-date, .report-col-header.cols-1.no-date{ grid-template-columns: minmax(90px,1fr) 88px; }
+  .report-line.cols-2.no-date, .report-col-header.cols-2.no-date{ grid-template-columns: minmax(90px,1fr) 88px 88px; }
+  .report-line.cols-3.no-date, .report-col-header.cols-3.no-date{ grid-template-columns: minmax(90px,1fr) 88px 88px 108px; }
+  .report-line .rl-name{ font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* display:contents unwraps this span so its pill children become direct
+     grid items in their own reserved columns, instead of one flex blob
+     that starts wherever the name text happens to end. */
+  .report-line .rl-scores{ display:contents; }
+  .report-line .rl-date{ font-size:0.75rem; color: var(--ink-soft); white-space:nowrap; text-align:right; }
   .report-subgroup{ margin: 10px 0 2px; padding-left:12px; border-left:3px solid var(--gold-light); }
   .report-subgroup-header{ font-weight:700; font-size:0.88rem; color: var(--ink); margin-bottom:2px; }
   .report-groupby-row{ display:flex; gap:8px; margin-bottom:14px; }
+  /* Score-tier coloring so a weak score and a strong score don't share
+     the same flat gold pill — and so "never attempted" (—) reads as
+     visually absent rather than looking like a real recorded 0%. */
+  .score-pill{
+    border-radius:999px; padding:3px 10px; font-weight:700; font-size:0.74rem;
+    border:1.5px solid transparent; white-space:nowrap; text-align:center;
+  }
+  .score-pill.tier-great{ background:#E4F4E4; border-color:#4C9A4C; color:#2f6b2f; }
+  .score-pill.tier-ok{ background:#FBF0D9; border-color:var(--gold); color:#8a6a13; }
+  .score-pill.tier-low{ background:#F6E1E1; border-color:var(--rimon); color:var(--rimon); }
+  .score-pill.tier-none{ background:#f1efe9; border:1.5px dashed #d9d3c2; color:#a39c8a; font-weight:600; }
+  /* A muted heading row above each card's student lines, sharing the same
+     cols-N grid template as .report-line so labels sit directly above
+     their matching pill column instead of teachers having to guess which
+     icon means what. */
+  .report-col-header{
+    display:grid; align-items:end; gap:6px 14px; padding:0 2px 7px;
+    font-size:0.7rem; font-weight:700; color: var(--ink-soft);
+    text-transform:uppercase; letter-spacing:0.03em; border-bottom:2px solid #e3d7b3;
+  }
+  .report-col-header span:not(:first-child){ text-align:center; }
+  .report-col-header span:last-child{ text-align:right; }
+
+  /* ---------- Reports tab: filters card ----------
+     One clean card with a real grid instead of controls scattered across
+     inline flex-wrap, so every label/input lines up and nothing (like the
+     old lone "To" date) strands itself on its own line. */
+  .report-filters-card{
+    background:#fff; border-radius:14px; padding:18px 20px 16px; margin-bottom:16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .report-filters-card h3{
+    font-family:'Frank Ruhl Libre', serif; color: var(--rimon); margin:0 0 14px; font-size:1.02rem;
+  }
+  .report-filters-grid{
+    display:grid; grid-template-columns: repeat(4, minmax(120px,1fr)); gap:14px 16px; margin-bottom:16px;
+  }
+  .report-filters-grid.row2{ grid-template-columns: repeat(3, minmax(140px,1fr)); }
+  .report-filters-grid.row3{ grid-template-columns: repeat(2, minmax(140px,1fr)); max-width:380px; }
+  .report-field label{
+    display:block; font-size:0.74rem; font-weight:700; color: var(--ink-soft); margin-bottom:5px;
+    text-transform:uppercase; letter-spacing:0.03em;
+  }
+  .report-field select, .report-field input[type="date"]{
+    width:100%; box-sizing:border-box; height:40px; padding:0 10px; border-radius:9px;
+    border:2px solid #d8c9a0; font-family:'Quicksand', sans-serif; font-size:0.86rem; background:#fffdf7; color:var(--ink);
+  }
+  .report-field select:focus, .report-field input:focus{ outline:none; border-color:var(--gold); }
+  .report-select-box{
+    border:2px solid #d8c9a0; border-radius:10px; padding:10px 12px; max-height:160px;
+    overflow-y:auto; background:#fffdf7; font-size:0.85rem;
+  }
+  .report-select-box label{ display:block; font-weight:400; margin:4px 0; cursor:pointer; padding:3px 4px; border-radius:6px; }
+  .report-select-box label:hover{ background:#f1e7ce; }
+  .report-select-box label.all-option{
+    font-weight:700; margin:0 0 7px; padding-bottom:7px; border-bottom:1px dashed #e3d7b3;
+  }
+  .report-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+  .bonus-breakdown-card{
+    background:#fff; border-radius:12px; padding:12px 16px; margin-bottom:14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08); display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  }
+  .bonus-breakdown-card .bb-title{ font-weight:700; font-size:0.82rem; color: var(--ink-soft); }
+  .bonus-breakdown-card .bb-item{ display:flex; align-items:center; gap:5px; font-weight:700; font-size:0.9rem; }
 
   /* ---------- Class Roster tab ---------- */
   .roster-table{ width:100%; border-collapse: collapse; }
@@ -331,6 +436,35 @@
   .class-posuk-detail-inline{ margin-top:14px; }
   .class-posuk-detail-inline:empty{ margin-top:0; }
   .not-done-list{ font-size:0.85rem; color: var(--ink-soft); line-height:1.5; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 900px){
+    .layout{ flex-direction:column; }
+    .students-toggle-btn{
+      display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+      background:#26374A; color:#fff; border:2px solid #3A5068; border-radius:12px;
+      padding:11px 14px; font-family:'Quicksand', sans-serif; font-weight:700; font-size:0.9rem;
+      cursor:pointer; margin-bottom:4px;
+    }
+    .students-panel{ display:none; flex-basis:auto; width:100%; max-height:50vh; }
+    .students-panel.open{ display:block; }
+    .report-filters-grid{ grid-template-columns: repeat(2, 1fr); }
+    .report-filters-grid.row2{ grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 600px){
+    .wrap{ padding:16px 12px 40px; }
+    header h1{ font-size:1.35rem; }
+    .tab-bar{ flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .tab-btn{ white-space:nowrap; }
+    .report-filters-grid, .report-filters-grid.row2, .report-filters-grid.row3{ grid-template-columns: 1fr; max-width:none; }
+    .stat-card{ min-width:110px; }
+    .report-line.cols-1, .report-col-header.cols-1{ grid-template-columns: minmax(70px,1fr) 70px 62px; }
+    .report-line.cols-2, .report-col-header.cols-2{ grid-template-columns: minmax(70px,1fr) 70px 70px 62px; }
+    .report-line.cols-3, .report-col-header.cols-3{ grid-template-columns: minmax(70px,1fr) 70px 70px 90px 62px; }
+    .report-line.cols-1.no-date, .report-col-header.cols-1.no-date{ grid-template-columns: minmax(70px,1fr) 70px; }
+    .report-line.cols-2.no-date, .report-col-header.cols-2.no-date{ grid-template-columns: minmax(70px,1fr) 70px 70px; }
+    .report-line.cols-3.no-date, .report-col-header.cols-3.no-date{ grid-template-columns: minmax(70px,1fr) 70px 70px 90px; }
+  }
 </style>
 </head>
 <body>
@@ -350,8 +484,11 @@
     </header>
 
     <div class="layout">
-      <div class="students-panel">
+      <button type="button" class="students-toggle-btn" id="studentsToggleBtn">☰ Students</button>
+      <div class="students-panel" id="studentsPanel">
         <h2>Students</h2>
+        <input type="text" class="student-search-input" id="studentSearchInput" placeholder="Search students" aria-label="Search students">
+        <div id="studentCount" class="student-count"></div>
         <div id="studentList" class="loading">Loading students…</div>
       </div>
 
@@ -678,27 +815,44 @@ function setTab(tab){
   }
 }
 
+// Display-only capitalization (e.g. "chaim chaikin" / "LEIBEL VOGEL" both
+// render as "Chaim Chaikin" / "Leibel Vogel") — never touches the actual
+// stored name, which stays exactly as-is for matching/sorting/lookups.
+function displayName(name){
+  return String(name || '').toLowerCase().replace(/\b\p{L}/gu, c => c.toUpperCase());
+}
+
 async function loadStudents(){
   const listEl = document.getElementById('studentList');
+  const countEl = document.getElementById('studentCount');
   try{
     const snap = await db.ref('posukPractice/students').once('value');
     const val = snap.val();
     if(!val){
       listEl.innerHTML = '<div class="empty-msg">No students yet.</div>';
+      if(countEl) countEl.textContent = '';
       return;
     }
     listEl.innerHTML = '';
-    Object.entries(val)
-      .sort((a,b) => a[1].name.localeCompare(b[1].name))
-      .forEach(([id, info]) => {
+    const entries = Object.entries(val).sort((a,b) => a[1].name.localeCompare(b[1].name));
+    if(countEl) countEl.textContent = entries.length + (entries.length === 1 ? ' student' : ' students');
+    entries.forEach(([id, info]) => {
         studentsMap[id] = info.name;
         studentsInfo[id] = info;
         const div = document.createElement('div');
         div.className = 'student-item';
         div.dataset.id = id;
+        div.dataset.searchName = info.name.toLowerCase();
         const lastActive = info.lastActive ? new Date(info.lastActive).toLocaleDateString() : '';
-        div.innerHTML = `<span class="name-row"><span>${info.name}</span><span class="dispute-badge hidden" id="disputeBadge_${id}"></span></span><span class="last-active">${lastActive}</span>`;
-        div.onclick = () => { setTab('student'); selectStudent(id, info.name, div); };
+        div.innerHTML = `<span class="name-row"><span>${displayName(info.name)}</span><span class="dispute-badge hidden" id="disputeBadge_${id}"></span></span><span class="last-active">${lastActive ? 'Last activity: ' + lastActive : ''}</span>`;
+        div.onclick = () => {
+          setTab('student');
+          selectStudent(id, info.name, div);
+          // On mobile the sidebar is a drawer — picking a student should
+          // close it back up rather than leaving it covering the report.
+          const panel = document.getElementById('studentsPanel');
+          if(panel) panel.classList.remove('open');
+        };
         listEl.appendChild(div);
       });
     markStudentsWithPendingDisputes();
@@ -707,6 +861,20 @@ async function loadStudents(){
     console.error(err);
   }
 }
+
+// Filters the sidebar list as the teacher types, matching against the raw
+// stored name (case-insensitive) rather than the display-cased version.
+document.getElementById('studentSearchInput').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  document.querySelectorAll('#studentList .student-item').forEach(el => {
+    const match = !q || (el.dataset.searchName || '').includes(q);
+    el.style.display = match ? '' : 'none';
+  });
+});
+
+document.getElementById('studentsToggleBtn').onclick = () => {
+  document.getElementById('studentsPanel').classList.toggle('open');
+};
 
 /* Scans every attempt once (reusing the shared cache) so the sidebar can
    flag students with a pending dispute — the teacher shouldn't have to
@@ -977,76 +1145,81 @@ async function loadReportsTab(){
 
     const studentCheckboxes = Object.entries(studentsMap)
       .sort((a,b) => a[1].localeCompare(b[1]))
-      .map(([id, name]) => `<label style="display:block;font-size:0.85rem;font-weight:400;margin:2px 0;">
-        <input type="checkbox" class="report-student-cb" value="${id}"> ${name}</label>`).join('');
+      .map(([id, name]) => `<label>
+        <input type="checkbox" class="report-student-cb" value="${id}"> ${displayName(name)}</label>`).join('');
     const parshaOptions = Object.keys(PARSHA_CONFIG)
       .map(n => `<option value="${n}">${n}</option>`).join('');
 
     mainEl.innerHTML = `
       <h2>🧾 Reports</h2>
-      <div class="report-filters" style="display:flex;flex-wrap:wrap;gap:14px;align-items:start;margin-bottom:14px;">
-        <div>
-          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Student(s)</label>
-          <div id="reportStudentBox" style="border:1px solid #d8c9a0;border-radius:10px;padding:8px 10px;max-height:130px;overflow-y:auto;min-width:170px;background:#fffbf2;">
-            <label style="display:block;font-size:0.85rem;font-weight:600;margin:0 0 4px;">
-              <input type="checkbox" id="reportStudentAll" checked> All Students</label>
-            ${studentCheckboxes}
+      <div class="report-filters-card">
+        <h3>Report Filters</h3>
+        <div class="report-filters-grid">
+          <div class="report-field">
+            <label>Student(s)</label>
+            <div id="reportStudentBox" class="report-select-box">
+              <label class="all-option"><input type="checkbox" id="reportStudentAll" checked> All Students</label>
+              ${studentCheckboxes}
+            </div>
+          </div>
+          <div class="report-field">
+            <label>Parsha</label>
+            <select id="reportParshaFilter"><option value="all">All Parshas</option>${parshaOptions}</select>
+          </div>
+          <div class="report-field">
+            <label>Perek</label>
+            <select id="reportPerekFilter"><option value="all">All Perakim</option></select>
+          </div>
+          <div class="report-field">
+            <label>Posuk</label>
+            <div id="reportPosukBox" class="report-select-box" style="opacity:0.6;pointer-events:none;">
+              <label class="all-option"><input type="checkbox" id="reportPosukAll" checked> All Pesukim</label>
+            </div>
           </div>
         </div>
-        <div>
-          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Parsha</label>
-          <select id="reportParshaFilter"><option value="all">All Parshas</option>${parshaOptions}</select>
-        </div>
-        <div>
-          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Perek</label>
-          <select id="reportPerekFilter"><option value="all">All Perakim</option></select>
-        </div>
-        <div>
-          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Posuk</label>
-          <div id="reportPosukBox" style="border:1px solid #d8c9a0;border-radius:10px;padding:8px 10px;max-height:130px;overflow-y:auto;min-width:110px;background:#f2f2f2;opacity:0.6;pointer-events:none;">
-            <label style="display:block;font-size:0.85rem;font-weight:600;margin:0 0 4px;">
-              <input type="checkbox" id="reportPosukAll" checked> All Pesukim</label>
+        <div class="report-filters-grid row2">
+          <div class="report-field">
+            <label>Show</label>
+            <select id="reportScoreTypeFilter">
+              <option value="all">Reading + Translation + Comprehension</option>
+              <option value="reading">Reading Only</option>
+              <option value="translation">Translation Only</option>
+              <option value="comprehension">Comprehension Only</option>
+            </select>
+          </div>
+          <div class="report-field">
+            <label>Group by</label>
+            <select id="reportGroupBy">
+              <option value="posuk">📖 Posuk</option>
+              <option value="student">👤 Student</option>
+              <option value="day">🗓️ Day</option>
+            </select>
+          </div>
+          <div class="report-field">
+            <label>Range</label>
+            <select id="reportQuickRange">
+              <option value="custom">Custom dates</option>
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+            </select>
           </div>
         </div>
-        <div>
-          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Show</label>
-          <select id="reportScoreTypeFilter">
-            <option value="all">Reading + Translation + Comprehension</option>
-            <option value="reading">Reading Only</option>
-            <option value="translation">Translation Only</option>
-            <option value="comprehension">Comprehension Only</option>
-          </select>
+        <div class="report-filters-grid row3">
+          <div class="report-field">
+            <label>From</label>
+            <input type="date" id="reportDateFrom">
+          </div>
+          <div class="report-field">
+            <label>To</label>
+            <input type="date" id="reportDateTo">
+          </div>
         </div>
-        <div>
-          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Group by</label>
-          <select id="reportGroupBy">
-            <option value="posuk">📖 Posuk</option>
-            <option value="student">👤 Student</option>
-            <option value="day">🗓️ Day</option>
-          </select>
+        <div class="report-actions">
+          <button class="btn small" id="reportGenerateBtn">📊 Generate Report</button>
+          <button class="btn small hidden" id="reportCsvBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;">⬇️ Download CSV</button>
+          <button class="btn small hidden" id="reportPrintBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;">🖨️ Print / Save PDF</button>
         </div>
-        <div>
-          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Range</label>
-          <select id="reportQuickRange">
-            <option value="custom">Custom dates</option>
-            <option value="today">Today</option>
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-          </select>
-        </div>
-        <div>
-          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">From</label>
-          <input type="date" id="reportDateFrom">
-        </div>
-        <div>
-          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">To</label>
-          <input type="date" id="reportDateTo">
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-bottom:14px;">
-        <button class="btn small" id="reportGenerateBtn">📊 Generate Report</button>
-        <button class="btn small hidden" id="reportCsvBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;">⬇️ Download CSV</button>
-        <button class="btn small hidden" id="reportPrintBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;">🖨️ Print / Save PDF</button>
       </div>
       <div id="reportSummary"></div>
       <div id="reportResults"></div>`;
@@ -1220,23 +1393,35 @@ function computeReportSummary(rows, scoreType){
 }
 
 // Renders the summary as an HTML block (used on-screen and in the print view).
+// Same .stat-cards/.stat-card look already used on the Class Stats tab —
+// reused here rather than inventing a second style, and the percentage
+// is the visually loudest thing in each card per the redesign brief.
+// Averages/counts themselves are untouched from computeReportSummary.
 function reportSummaryHtml(rows, scoreType){
   const { distinctStudents, avgReading, avgTranslation, avgComprehension, verdictCounts } = computeReportSummary(rows, scoreType);
-  let summaryHtml = `<div class="attempt" style="margin-bottom:14px;">
-      <div class="row"><span class="label">Pesukim in this report</span><span>${rows.length}</span></div>
-      <div class="row"><span class="label">Students represented</span><span>${distinctStudents}</span></div>`;
+  let html = `<h3 class="section-title" style="margin-top:0;">Report Summary</h3><div class="stat-cards">
+      <div class="stat-card"><div class="num">${rows.length}</div><div class="lbl">Pesukim</div></div>
+      <div class="stat-card"><div class="num">${distinctStudents}</div><div class="lbl">Students</div></div>`;
   if(scoreType === 'all' || scoreType === 'reading'){
-    summaryHtml += `<div class="row"><span class="label">Average reading score</span><span>${avgReading === null ? '—' : avgReading + '%'}</span></div>`;
+    html += `<div class="stat-card"><div class="num">${avgReading === null ? '—' : avgReading + '%'}</div><div class="lbl">Reading</div></div>`;
   }
   if(scoreType === 'all' || scoreType === 'translation'){
-    summaryHtml += `<div class="row"><span class="label">Average translation score</span><span>${avgTranslation === null ? '—' : avgTranslation + '%'}</span></div>`;
+    html += `<div class="stat-card"><div class="num">${avgTranslation === null ? '—' : avgTranslation + '%'}</div><div class="lbl">Translation</div></div>`;
   }
   if(scoreType === 'all' || scoreType === 'comprehension'){
-    summaryHtml += `<div class="row"><span class="label">Average comprehension score</span><span>${avgComprehension === null ? '—' : avgComprehension + '%'}</span></div>`;
-    summaryHtml += `<div class="row"><span class="label">Bonus/freehand breakdown</span><span>🌟${verdictCounts.excellent} ✅${verdictCounts.correct} 🤔${verdictCounts.partial} 💡${verdictCounts.incorrect}</span></div>`;
+    html += `<div class="stat-card"><div class="num">${avgComprehension === null ? '—' : avgComprehension + '%'}</div><div class="lbl">Comprehension</div></div>`;
   }
-  summaryHtml += `</div>`;
-  return summaryHtml;
+  html += `</div>`;
+  if(scoreType === 'all' || scoreType === 'comprehension'){
+    html += `<div class="bonus-breakdown-card">
+      <span class="bb-title">Bonus / freehand breakdown</span>
+      <span class="bb-item" title="Excellent">🌟 ${verdictCounts.excellent}</span>
+      <span class="bb-item" title="Got it">✅ ${verdictCounts.correct}</span>
+      <span class="bb-item" title="Almost">🤔 ${verdictCounts.partial}</span>
+      <span class="bb-item" title="Try again">💡 ${verdictCounts.incorrect}</span>
+    </div>`;
+  }
+  return html;
 }
 
 async function renderReportResults(){
@@ -1299,18 +1484,35 @@ async function renderReportResults(){
 // Small colored score pills for one row's result, used inside every
 // grouping mode below — reused instead of duplicated so all three modes
 // always render a student's scores identically.
+// Buckets a score into a visual tier so weak/strong/unattempted results
+// are distinguishable at a glance instead of every pill being the same
+// flat gold regardless of what it actually says. Falls back to the
+// comprehension verdict when there's no numeric score to bucket by.
+function scoreTier(pct, verdict){
+  if(typeof pct === 'number'){
+    if(pct >= 80) return 'great';
+    if(pct >= 50) return 'ok';
+    return 'low';
+  }
+  if(verdict === 'excellent' || verdict === 'correct') return 'great';
+  if(verdict === 'partial') return 'ok';
+  if(verdict === 'incorrect') return 'low';
+  return 'none';
+}
+
 function reportScorePillsHtml(r, showReadingCol, showTranslationCol, showComprehensionCol){
   let html = '';
   if(showReadingCol){
     const label = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
-    html += `<span class="score-pill" title="Reading">🎙️ ${label}</span>`;
+    html += `<span class="score-pill tier-${scoreTier(r.hebrewScore)}" title="Reading">📖 ${label}</span>`;
   }
   if(showTranslationCol){
     const label = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' : '—';
-    html += `<span class="score-pill" title="Translation">🌐 ${label}</span>`;
+    html += `<span class="score-pill tier-${scoreTier(r.translationScore)}" title="Translation">🗣️ ${label}</span>`;
   }
   if(showComprehensionCol){
-    html += `<span class="score-pill" title="Comprehension">🧠 ${verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore)}</span>`;
+    const label = verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore);
+    html += `<span class="score-pill tier-${scoreTier(r.comprehensionScore, r.comprehensionVerdict)}" title="Comprehension">🧠 ${label}</span>`;
   }
   return html;
 }
@@ -1325,8 +1527,25 @@ function renderGroupedReportInto(containerEl, rows, scoreType){
   const showReadingCol = scoreType === 'all' || scoreType === 'reading';
   const showTranslationCol = scoreType === 'all' || scoreType === 'translation';
   const showComprehensionCol = scoreType === 'all' || scoreType === 'comprehension';
+  // Drives the .cols-N grid-template variant (see CSS) so every line's
+  // score pills land in the same fixed-width columns regardless of name
+  // length — same count for every line in a given render since scoreType
+  // is a single dropdown for the whole report.
+  const colsClass = 'cols-' + [showReadingCol, showTranslationCol, showComprehensionCol].filter(Boolean).length;
   const dateLabel = (r) => typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
   const posukRefLabel = (r) => `${r.parshaName}, Perek ${r.perekNum}, Posuk ${r.posukLabel}`;
+  // One small header row per card so a teacher never has to guess which
+  // column a pill belongs to — shares the exact same grid template as the
+  // lines below it (see .report-col-header CSS) so labels sit directly
+  // above their column.
+  const colHeaderHtml = (nameLabel, includeDate) => {
+    let cells = `<span>${nameLabel}</span>`;
+    if(showReadingCol) cells += `<span>Reading</span>`;
+    if(showTranslationCol) cells += `<span>Translation</span>`;
+    if(showComprehensionCol) cells += `<span>Comprehension</span>`;
+    if(includeDate) cells += `<span>Date</span>`;
+    return `<div class="report-col-header ${colsClass}${includeDate ? '' : ' no-date'}">${cells}</div>`;
+  };
 
   let html = '';
 
@@ -1339,9 +1558,10 @@ function renderGroupedReportInto(containerEl, rows, scoreType){
     studentIdsSorted.forEach(sid => {
       const studentRows = byStudent[sid].slice().sort((a,b) => (a.perekNum - b.perekNum) || (a.posukNum - b.posukNum));
       html += `<div class="report-group-card">
-        <div class="report-group-header"><span>👤 ${studentRows[0].studentName}</span><span class="report-group-meta">${studentRows.length} posuk${studentRows.length===1?'':'im'}</span></div>`;
+        <div class="report-group-header"><span>👤 ${displayName(studentRows[0].studentName)}</span><span class="report-group-meta">${studentRows.length} posuk${studentRows.length===1?'':'im'}</span></div>
+        ${colHeaderHtml('Posuk', true)}`;
       studentRows.forEach(r => {
-        html += `<div class="report-line">
+        html += `<div class="report-line ${colsClass}">
           <span class="rl-name">${posukRefLabel(r)}</span>
           <span class="rl-scores">${reportScorePillsHtml(r, showReadingCol, showTranslationCol, showComprehensionCol)}</span>
           <span class="rl-date">${dateLabel(r)}</span>
@@ -1379,10 +1599,11 @@ function renderGroupedReportInto(containerEl, rows, scoreType){
       posukKeysSorted.forEach(pkey => {
         const posukRows = byPosuk[pkey].slice().sort((a,b) => a.studentName.localeCompare(b.studentName));
         html += `<div class="report-subgroup">
-          <div class="report-subgroup-header">📖 ${posukRefLabel(posukRows[0])}</div>`;
+          <div class="report-subgroup-header">📖 ${posukRefLabel(posukRows[0])}</div>
+          ${colHeaderHtml('Student', false)}`;
         posukRows.forEach(r => {
-          html += `<div class="report-line">
-            <span class="rl-name">${r.studentName}</span>
+          html += `<div class="report-line ${colsClass} no-date">
+            <span class="rl-name">${displayName(r.studentName)}</span>
             <span class="rl-scores">${reportScorePillsHtml(r, showReadingCol, showTranslationCol, showComprehensionCol)}</span>
           </div>`;
         });
@@ -1406,10 +1627,11 @@ function renderGroupedReportInto(containerEl, rows, scoreType){
     posukKeysSorted.forEach(pkey => {
       const posukRows = byPosuk[pkey].slice().sort((a,b) => a.studentName.localeCompare(b.studentName));
       html += `<div class="report-group-card">
-        <div class="report-group-header"><span>📖 ${posukRefLabel(posukRows[0])}</span><span class="report-group-meta">${posukRows.length} student${posukRows.length===1?'':'s'}</span></div>`;
+        <div class="report-group-header"><span>📖 ${posukRefLabel(posukRows[0])}</span><span class="report-group-meta">${posukRows.length} student${posukRows.length===1?'':'s'}</span></div>
+        ${colHeaderHtml('Student', true)}`;
       posukRows.forEach(r => {
-        html += `<div class="report-line">
-          <span class="rl-name">${r.studentName}</span>
+        html += `<div class="report-line ${colsClass}">
+          <span class="rl-name">${displayName(r.studentName)}</span>
           <span class="rl-scores">${reportScorePillsHtml(r, showReadingCol, showTranslationCol, showComprehensionCol)}</span>
           <span class="rl-date">${dateLabel(r)}</span>
         </div>`;
