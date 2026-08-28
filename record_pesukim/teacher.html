@@ -281,6 +281,33 @@
   .status-pill.low{ background:#EFC1C1; color:#7A2626; }
   .status-pill.none{ background:#e8e0c8; color: var(--ink-soft); }
 
+  /* ---------- Report score pills (Reports tab) ----------
+     Each skill column (reading/translation/comprehension) gets its own
+     accent color via a left border, so columns are visually distinct at
+     a glance even when several sit side by side. Within that, the pill's
+     fill color scales with the score itself — strong scores read green,
+     weak scores read red — so a 96% and a 41% don't just look like two
+     numbers of the same weight. */
+  .score-pill{
+    display:inline-block; padding:3px 10px; border-radius:6px; font-weight:700;
+    font-size:0.82rem; border-left:4px solid transparent; white-space:nowrap;
+  }
+  .score-pill.skill-reading{ border-left-color:#3d6fb4; }
+  .score-pill.skill-translation{ border-left-color:#8a4fb4; }
+  .score-pill.skill-comprehension{ border-left-color:#b48a1f; }
+  .score-pill.tier-high{ background:#dff2d0; color:#2f6b1f; }
+  .score-pill.tier-mid{ background:#fff3c4; color:#8a6d1f; }
+  .score-pill.tier-low{ background:#ffe1c2; color:#a4501a; }
+  .score-pill.tier-verylow{ background:#fbd6d6; color:#a12f2f; }
+  .score-pill.tier-none{ background:#f0ecdf; color:#8b8370; }
+
+  /* Column header accents in report tables, matching the pill colors
+     above, so the header itself hints at what's coming down the column. */
+  .roster-table th.col-reading{ color:#3d6fb4; }
+  .roster-table th.col-translation{ color:#8a4fb4; }
+  .roster-table th.col-comprehension{ color:#b48a1f; }
+  .roster-table th.col-date{ color: var(--ink-soft); font-style: italic; }
+
   /* ---------- Class Stats tab ---------- */
   .stat-cards{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
   .stat-card{
@@ -1087,7 +1114,7 @@ function renderPosukGroupHtml(group){
   }else{
     rows.sort((a,b) => a.name.localeCompare(b.name));
     html += `<table class="roster-table"><thead><tr>
-      <th>Student</th><th>Reading</th><th>Translation</th><th>Comprehension</th><th>Last Activity</th>
+      <th>Student</th><th class="col-reading">Reading</th><th class="col-translation">Translation</th><th class="col-comprehension">Comprehension</th><th class="col-date">Last Activity</th>
     </tr></thead><tbody>`;
     rows.forEach(s => {
       const readingLabel = typeof s.reading === 'number' ? Math.round(s.reading) + '%' : 'Not Started';
@@ -1096,9 +1123,9 @@ function renderPosukGroupHtml(group){
       const lastActivityLabel = s.lastActivity ? new Date(s.lastActivity).toLocaleDateString() : '—';
       html += `<tr>
         <td>${s.name}</td>
-        <td>${readingLabel}</td>
-        <td>${translationLabel}</td>
-        <td>${comprehensionLabel}</td>
+        <td>${scoreBadge('reading', readingLabel, s.reading)}</td>
+        <td>${scoreBadge('translation', translationLabel, s.translation)}</td>
+        <td>${scoreBadge('comprehension', comprehensionLabel, s.comprehension)}</td>
         <td>${lastActivityLabel}</td>
       </tr>`;
     });
@@ -1439,6 +1466,22 @@ let reportExportMode = 'flat';
 let reportExportGroups = [];        // used by 'byPosuk'
 let reportExportStudentGroups = []; // used by 'byStudent'
 
+// Assigns each skill column its own accent color (via CSS class, see
+// .score-pill rules) and colors the score itself by strength, so a
+// glance at the report distinguishes reading vs. translation vs.
+// comprehension AND strong vs. weak results, not just rows of plain text.
+function scoreTierClass(score){
+  if(typeof score !== 'number') return 'tier-none';
+  if(score >= 90) return 'tier-high';
+  if(score >= 70) return 'tier-mid';
+  if(score >= 50) return 'tier-low';
+  return 'tier-verylow';
+}
+
+function scoreBadge(skill, label, score){
+  return `<span class="score-pill skill-${skill} ${scoreTierClass(score)}">${label}</span>`;
+}
+
 // Makes a results table sortable by clicking its column headers — works
 // generically across the Flat List, By Posuk, and By Student tables without
 // each view needing its own sort logic, since it just reads the rendered
@@ -1595,10 +1638,10 @@ async function renderFlatReportView(resultsEl, summaryEl, filters){
   if(showParshaCol) headerCells += '<th>Parsha</th>';
   if(showPerekCol) headerCells += '<th>Perek</th>';
   if(showPosukCol) headerCells += '<th>Posuk</th>';
-  if(showReadingCol) headerCells += '<th>Reading %</th>';
-  if(showTranslationCol) headerCells += '<th>Translation %</th>';
-  if(showComprehensionCol) headerCells += '<th>Comprehension</th>';
-  headerCells += '<th>Date</th>';
+  if(showReadingCol) headerCells += '<th class="col-reading">Reading %</th>';
+  if(showTranslationCol) headerCells += '<th class="col-translation">Translation %</th>';
+  if(showComprehensionCol) headerCells += '<th class="col-comprehension">Comprehension</th>';
+  headerCells += '<th class="col-date">Date</th>';
 
   let html = `<table class="roster-table"><thead><tr>${headerCells}</tr></thead><tbody>`;
   displayRows.forEach(r => {
@@ -1610,9 +1653,9 @@ async function renderFlatReportView(resultsEl, summaryEl, filters){
     if(showParshaCol) cells += `<td>${r.parshaName}</td>`;
     if(showPerekCol) cells += `<td>${r.perekNum}</td>`;
     if(showPosukCol) cells += `<td>${r.posukLabel}</td>`;
-    if(showReadingCol) cells += `<td>${scoreLabel}</td>`;
-    if(showTranslationCol) cells += `<td>${translationLabel}</td>`;
-    if(showComprehensionCol) cells += `<td>${verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore)}</td>`;
+    if(showReadingCol) cells += `<td>${scoreBadge('reading', scoreLabel, r.hebrewScore)}</td>`;
+    if(showTranslationCol) cells += `<td>${scoreBadge('translation', translationLabel, r.translationScore)}</td>`;
+    if(showComprehensionCol) cells += `<td>${scoreBadge('comprehension', verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore), r.comprehensionScore)}</td>`;
     cells += `<td>${dateLabel}</td>`;
     html += `<tr>${cells}</tr>`;
   });
@@ -1713,19 +1756,19 @@ async function renderByStudentView(resultsEl, summaryEl, filters){
       html += `<div class="empty-msg">${g.hadAnyMatch ? 'No results match these filters for this student.' : 'No activity matching these filters.'}</div>`;
     }else{
       let headerCells = '<th>Parsha</th><th>Perek</th><th>Posuk</th>';
-      if(showReadingCol) headerCells += '<th>Reading %</th>';
-      if(showTranslationCol) headerCells += '<th>Translation %</th>';
-      if(showComprehensionCol) headerCells += '<th>Comprehension</th>';
-      headerCells += '<th>Date</th>';
+      if(showReadingCol) headerCells += '<th class="col-reading">Reading %</th>';
+      if(showTranslationCol) headerCells += '<th class="col-translation">Translation %</th>';
+      if(showComprehensionCol) headerCells += '<th class="col-comprehension">Comprehension</th>';
+      headerCells += '<th class="col-date">Date</th>';
       html += `<table class="roster-table"><thead><tr>${headerCells}</tr></thead><tbody>`;
       g.rows.forEach(r => {
         const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
         const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' : '—';
         const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
         let cells = `<td>${r.parshaName}</td><td>${r.perekNum}</td><td>${r.posukLabel}</td>`;
-        if(showReadingCol) cells += `<td>${scoreLabel}</td>`;
-        if(showTranslationCol) cells += `<td>${translationLabel}</td>`;
-        if(showComprehensionCol) cells += `<td>${verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore)}</td>`;
+        if(showReadingCol) cells += `<td>${scoreBadge('reading', scoreLabel, r.hebrewScore)}</td>`;
+        if(showTranslationCol) cells += `<td>${scoreBadge('translation', translationLabel, r.translationScore)}</td>`;
+        if(showComprehensionCol) cells += `<td>${scoreBadge('comprehension', verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore), r.comprehensionScore)}</td>`;
         cells += `<td>${dateLabel}</td>`;
         html += `<tr>${cells}</tr>`;
       });
