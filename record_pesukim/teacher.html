@@ -1102,11 +1102,22 @@ async function loadReportsTab(){
   const mainEl = document.getElementById('mainContent');
   mainEl.innerHTML = '<div class="loading">Loading report options…</div>';
   try{
-    await loadAllAttempts(); // warms allAttemptsCache
+    const [, allowedSnap] = await Promise.all([
+      loadAllAttempts(), // warms allAttemptsCache
+      db.ref('posukPractice/allowedStudents').once('value')
+    ]);
+    // Maps a student's id (== their allowedStudents slug) to their assigned
+    // class, so the Class filter below can narrow the Student(s) box without
+    // needing a second, separately-maintained copy of who's in which class.
+    const allowedVal = allowedSnap.val() || {};
+    const slugToClass = {};
+    Object.entries(allowedVal).forEach(([slug, info]) => {
+      slugToClass[slug] = (info && info.classSection) || '';
+    });
 
     const studentCheckboxes = Object.entries(studentsMap)
       .sort((a,b) => a[1].localeCompare(b[1]))
-      .map(([id, name]) => `<label style="display:block;font-size:0.85rem;font-weight:400;margin:2px 0;">
+      .map(([id, name]) => `<label class="report-student-label" data-class="${slugToClass[id] || ''}" style="display:block;font-size:0.85rem;font-weight:400;margin:2px 0;">
         <input type="checkbox" class="report-student-cb" value="${id}"> ${name}</label>`).join('');
     const parshaOptions = Object.keys(PARSHA_CONFIG)
       .map(n => `<option value="${n}">${n}</option>`).join('');
@@ -1121,6 +1132,13 @@ async function loadReportsTab(){
               <input type="checkbox" id="reportStudentAll" checked> All Students</label>
             ${studentCheckboxes}
           </div>
+        </div>
+        <div>
+          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Class</label>
+          <select id="reportClassFilter">
+            <option value="all">All Classes</option>
+            ${CLASS_SECTIONS.map(c => `<option value="${c}">${c}</option>`).join('')}
+          </select>
         </div>
         <div>
           <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Parsha</label>
@@ -1195,6 +1213,25 @@ async function loadReportsTab(){
         if(!studentCbs().some(c => c.checked)) allBox.checked = true;
       };
     });
+
+    // Class filter: a convenience that checks exactly the students in the
+    // chosen class (unchecking everyone else), or restores "All Students"
+    // when set back to "All Classes". The teacher can still fine-tune with
+    // the individual checkboxes afterward — this just sets a starting point.
+    document.getElementById('reportClassFilter').onchange = (e) => {
+      const cls = e.target.value;
+      if(cls === 'all'){
+        allBox.checked = true;
+        studentCbs().forEach(cb => cb.checked = false);
+        return;
+      }
+      allBox.checked = false;
+      studentCbs().forEach(cb => {
+        const label = cb.closest('.report-student-label');
+        cb.checked = !!(label && label.dataset.class === cls);
+      });
+      if(!studentCbs().some(c => c.checked)) allBox.checked = true;
+    };
 
     populatePerekFilter('all');
     document.getElementById('reportParshaFilter').onchange = (e) => populatePerekFilter(e.target.value);
@@ -1804,6 +1841,44 @@ function printReport(){
   setTimeout(() => win.print(), 300);
 }
 
+// The two class sections a student can be assigned to in Manage Access.
+// Stored as posukPractice/allowedStudents/<slug>/classSection. An empty
+// string / missing value means "no class assigned" and such students show
+// under their own "No Class" group in Manage Access and aren't included
+// when a Reports filter narrows down to one specific class.
+const CLASS_SECTIONS = ['B3 EastTrack', 'B3 WestTrack'];
+
+// Renders the Approved Students list grouped into a section per class
+// (in CLASS_SECTIONS order), with a final "No Class" section for anyone
+// not yet assigned. Each row has its own class dropdown so a student can
+// be moved between classes without removing/re-adding them.
+function renderApprovedGroups(approvedNames){
+  const groups = CLASS_SECTIONS.map(c => ({ label: c, students: approvedNames.filter(a => a.classSection === c) }));
+  groups.push({ label: 'No Class', students: approvedNames.filter(a => !CLASS_SECTIONS.includes(a.classSection)) });
+
+  return groups.map(g => `
+    <div style="margin-bottom:16px;">
+      <div style="font-weight:700;color:var(--rimon);margin-bottom:6px;">${g.label} (${g.students.length})</div>
+      <table class="roster-table">
+        <thead><tr><th>Name</th><th style="width:170px;">Class</th><th style="width:90px;"></th></tr></thead>
+        <tbody>
+          ${g.students.length === 0
+            ? '<tr><td colspan="3" class="empty-msg">No students here.</td></tr>'
+            : g.students.map(a => `<tr data-slug="${a.slug}">
+                <td>${a.name}</td>
+                <td>
+                  <select class="approved-class-select" data-slug="${a.slug}" style="padding:6px 8px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;width:100%;">
+                    <option value="" ${a.classSection ? '' : 'selected'}>No Class</option>
+                    ${CLASS_SECTIONS.map(c => `<option value="${c}" ${a.classSection === c ? 'selected' : ''}>${c}</option>`).join('')}
+                  </select>
+                </td>
+                <td><button class="btn small remove-approved-btn" style="background:#8a3a3a;box-shadow:0 4px 0 #5c2626;">Remove</button></td>
+              </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`).join('');
+}
+
 // Must match student.html's slugify exactly - this is the key used both to
 // gate entry there and to manage the approved-name list here.
 function slugify(name){
@@ -1828,7 +1903,7 @@ async function loadAccessTab(){
     const allowedVal = allowedSnap.val() || {};
     const practiceLimit = practiceLimitSnap.val() || null;
     const approvedNames = Object.entries(allowedVal)
-      .map(([slug, info]) => ({ slug, name: (info && info.name) || slug }))
+      .map(([slug, info]) => ({ slug, name: (info && info.name) || slug, classSection: (info && info.classSection) || '' }))
       .sort((a,b) => a.name.localeCompare(b.name));
 
     let html = `<h2>🔑 Manage Access</h2>
@@ -1877,21 +1952,17 @@ async function loadAccessTab(){
 
       <div>
         <div style="font-weight:700;margin-bottom:6px;">Approved Students (${approvedNames.length})</div>
-        <input id="newApprovedName" type="text" placeholder="Student's name" maxlength="30"
-          style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:220px;">
-        <button class="btn small gold" id="addApprovedBtn">Add Student</button>
-        <span id="addApprovedMsg" style="margin-left:10px;font-size:0.85rem;"></span>
-        <table class="roster-table" style="margin-top:14px;">
-          <thead><tr><th>Name</th><th style="width:90px;"></th></tr></thead>
-          <tbody id="approvedList">
-            ${approvedNames.length === 0
-              ? '<tr><td colspan="2" class="empty-msg">No approved students yet.</td></tr>'
-              : approvedNames.map(a => `<tr data-slug="${a.slug}">
-                  <td>${a.name}</td>
-                  <td><button class="btn small remove-approved-btn" style="background:#8a3a3a;box-shadow:0 4px 0 #5c2626;">Remove</button></td>
-                </tr>`).join('')}
-          </tbody>
-        </table>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+          <input id="newApprovedName" type="text" placeholder="Student's name" maxlength="30"
+            style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:220px;">
+          <select id="newApprovedClass" style="padding:8px 10px;border-radius:8px;border:2px solid var(--gold);font-family:'Quicksand',sans-serif;">
+            <option value="">No Class</option>
+            ${CLASS_SECTIONS.map(c => `<option value="${c}">${c}</option>`).join('')}
+          </select>
+          <button class="btn small gold" id="addApprovedBtn">Add Student</button>
+          <span id="addApprovedMsg" style="font-size:0.85rem;"></span>
+        </div>
+        <div id="approvedListWrap">${renderApprovedGroups(approvedNames)}</div>
       </div>`;
     mainEl.innerHTML = html;
 
@@ -1976,6 +2047,7 @@ async function loadAccessTab(){
 
     document.getElementById('addApprovedBtn').onclick = async () => {
       const nameVal = document.getElementById('newApprovedName').value.trim();
+      const classVal = document.getElementById('newApprovedClass').value;
       const msgEl = document.getElementById('addApprovedMsg');
       if(!nameVal){ return; }
       const slug = slugify(nameVal);
@@ -1987,6 +2059,7 @@ async function loadAccessTab(){
       try{
         await db.ref('posukPractice/allowedStudents/' + slug).set({
           name: nameVal,
+          classSection: classVal,
           addedAt: firebase.database.ServerValue.TIMESTAMP
         });
         document.getElementById('newApprovedName').value = '';
@@ -1999,6 +2072,21 @@ async function loadAccessTab(){
         console.error(e);
       }
     };
+
+    // Changing a student's class here only updates the classSection field —
+    // it never touches their name, PIN approval, or any recorded progress.
+    mainEl.querySelectorAll('.approved-class-select').forEach(sel => {
+      sel.onchange = async () => {
+        const slug = sel.dataset.slug;
+        try{
+          await db.ref('posukPractice/allowedStudents/' + slug + '/classSection').set(sel.value);
+          loadAccessTab();
+        }catch(e){
+          console.error(e);
+          alert('Could not update class. Please try again.');
+        }
+      };
+    });
 
     mainEl.querySelectorAll('.remove-approved-btn').forEach(btn => {
       btn.onclick = async () => {
