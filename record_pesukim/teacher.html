@@ -936,38 +936,6 @@ async function loadRoster(){
    "Print to PDF" from). */
 let reportRows = []; // cached rows for the current filter selection, used by CSV/print export
 
-/* ---------- Completion status (roster-aware reporting) ----------
-   The app has no single stored "is this posuk done" flag, so Reports
-   derives one consistently: a posuk is Complete once a student has a
-   recorded result for all three skills (Reading, Translation,
-   Comprehension); In Progress once they have at least one but not all
-   three; Not Started when there's no attempt at all. This is a display
-   convention only — it never changes stored scores, and "Not Started"
-   must never be treated or averaged as 0%. */
-function getPosukCompletionStatus(reading, translation, comprehension){
-  const has = [reading, translation, comprehension].filter(v => typeof v === 'number').length;
-  if(has === 0) return 'not_started';
-  if(has === 3) return 'complete';
-  return 'in_progress';
-}
-function completionLabel(status){
-  return status === 'complete' ? 'Complete' : status === 'in_progress' ? 'In Progress' : 'Not Started';
-}
-function completionPillClass(status){
-  return status === 'complete' ? 'high' : status === 'in_progress' ? 'mid' : 'none';
-}
-// Neutral "may need help" signal: any recorded score below a threshold,
-// or work that was started but never finished. Never applied to a
-// student who simply hasn't started yet — that's its own, non-judgmental
-// "Not Started" state, not a red flag.
-const NEEDS_REVIEW_THRESHOLD = 60;
-function needsReview(reading, translation, comprehension, status){
-  if(status === 'not_started') return false;
-  const scores = [reading, translation, comprehension].filter(v => typeof v === 'number');
-  if(scores.some(v => v < NEEDS_REVIEW_THRESHOLD)) return true;
-  return status === 'in_progress';
-}
-
 function verdictLabel(v){
   if(v === 'excellent') return '🌟 Excellent';
   if(v === 'correct') return '✅ Got it';
@@ -1072,7 +1040,6 @@ async function buildPosukGridData(perekNum, posukNums, studentIds, allAttempts){
       return {
         id, name: studentsMap[id],
         reading, translation, comprehension,
-        status: getPosukCompletionStatus(reading, translation, comprehension),
         lastActivity: latest ? latest.timestamp : null
       };
     });
@@ -1082,14 +1049,9 @@ async function buildPosukGridData(perekNum, posukNums, studentIds, allAttempts){
 }
 
 // Renders one "Parsha • Perek • Posuk" card containing the FULL selected
-// roster (not just students with activity), a completion/participation
-// summary, and the student table. completionFilter/needsReviewOnly only
-// narrow which rows are DISPLAYED — the summary counts above them always
-// reflect the whole selected roster for that posuk, per spec.
-function renderPosukGroupHtml(group, completionFilter, needsReviewOnly){
+// roster (not just students with activity) and the student table.
+function renderPosukGroupHtml(group){
   const total = group.students.length;
-  const counts = { complete: 0, in_progress: 0, not_started: 0 };
-  group.students.forEach(s => counts[s.status]++);
   const avg = arr => arr.length ? Math.round(arr.reduce((a,b) => a+b, 0) / arr.length) : null;
   const readingScores = group.students.map(s => s.reading).filter(v => typeof v === 'number');
   const translationScores = group.students.map(s => s.translation).filter(v => typeof v === 'number');
@@ -1097,18 +1059,11 @@ function renderPosukGroupHtml(group, completionFilter, needsReviewOnly){
   const avgReading = avg(readingScores), avgTranslation = avg(translationScores), avgComprehension = avg(comprehensionScores);
 
   let rows = group.students.slice();
-  if(completionFilter !== 'all') rows = rows.filter(s => s.status === completionFilter);
-  if(needsReviewOnly) rows = rows.filter(s => needsReview(s.reading, s.translation, s.comprehension, s.status));
 
   const refLabel = `${group.parshaName} • Perek ${group.perekNum} • Posuk ${group.posukNum}`;
   let html = `<div class="posuk-group">
     <h3>${refLabel}</h3>
     <div class="summary-meta" style="margin-bottom:10px;">${total} student${total===1?'':'s'} in class</div>
-    <div class="avg-bars" style="margin-bottom:10px;">
-      <div class="avg-bar"><div class="row"><span class="label">✅ Complete</span><span>${counts.complete}</span></div></div>
-      <div class="avg-bar"><div class="row"><span class="label">◐ In Progress</span><span>${counts.in_progress}</span></div></div>
-      <div class="avg-bar"><div class="row"><span class="label">○ Not Started</span><span>${counts.not_started}</span></div></div>
-    </div>
     <div class="avg-bars" style="margin-bottom:12px;">
       <div class="avg-bar"><div class="row"><span class="label">Avg Reading</span><span>${avgReading===null?'—':avgReading+'%'}</span></div><div class="summary-meta">${readingScores.length} of ${total} attempted</div></div>
       <div class="avg-bar"><div class="row"><span class="label">Avg Translation</span><span>${avgTranslation===null?'—':avgTranslation+'%'}</span></div><div class="summary-meta">${translationScores.length} of ${total} attempted</div></div>
@@ -1116,31 +1071,29 @@ function renderPosukGroupHtml(group, completionFilter, needsReviewOnly){
     </div>`;
 
   if(rows.length === 0){
-    html += `<div class="empty-msg">No students match these filters for this posuk.</div>`;
+    html += `<div class="empty-msg">No students in this selection.</div>`;
   }else{
     rows.sort((a,b) => a.name.localeCompare(b.name));
     html += `<table class="roster-table"><thead><tr>
-      <th>Student</th><th>Reading</th><th>Translation</th><th>Comprehension</th><th>Status</th><th>Last Activity</th>
+      <th>Student</th><th>Reading</th><th>Translation</th><th>Comprehension</th><th>Last Activity</th>
     </tr></thead><tbody>`;
     rows.forEach(s => {
       const readingLabel = typeof s.reading === 'number' ? Math.round(s.reading) + '%' : 'Not Started';
       const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'Not Started';
       const comprehensionLabel = typeof s.comprehension === 'number' ? Math.round(s.comprehension) + '%' : 'Not Started';
       const lastActivityLabel = s.lastActivity ? new Date(s.lastActivity).toLocaleDateString() : '—';
-      const flagged = needsReview(s.reading, s.translation, s.comprehension, s.status);
       html += `<tr>
-        <td>${s.name}${flagged ? ' <span class="status-pill low" style="margin-left:6px;">Needs Review</span>' : ''}</td>
+        <td>${s.name}</td>
         <td>${readingLabel}</td>
         <td>${translationLabel}</td>
         <td>${comprehensionLabel}</td>
-        <td><span class="status-pill ${completionPillClass(s.status)}">${completionLabel(s.status)}</span></td>
         <td>${lastActivityLabel}</td>
       </tr>`;
     });
     html += `</tbody></table>`;
   }
   html += `</div>`;
-  return { html, refLabel, total, counts, avgReading, avgTranslation, avgComprehension,
+  return { html, refLabel, total, avgReading, avgTranslation, avgComprehension,
     readingAttempted: readingScores.length, translationAttempted: translationScores.length, comprehensionAttempted: comprehensionScores.length,
     rows };
 }
@@ -1217,21 +1170,6 @@ async function loadReportsTab(){
             <option value="byPosuk">By Posuk (full roster)</option>
             <option value="byStudent">By Student (full roster)</option>
           </select>
-        </div>
-        <div>
-          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Completion</label>
-          <select id="reportCompletionFilter">
-            <option value="all">All</option>
-            <option value="complete">Complete</option>
-            <option value="in_progress">In Progress</option>
-            <option value="not_started">Not Started</option>
-          </select>
-        </div>
-        <div>
-          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">&nbsp;</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:600;padding-top:6px;">
-            <input type="checkbox" id="reportNeedsReviewOnly"> Needs Review only
-          </label>
         </div>
       </div>
       <div style="display:flex;gap:10px;margin-bottom:14px;">
@@ -1443,18 +1381,16 @@ async function renderReportResults(){
     const parshaFilter = document.getElementById('reportParshaFilter').value;
     const perekFilter = document.getElementById('reportPerekFilter').value;
     const posukNums = getSelectedPosukNums(); // null = all
-    const completionFilter = document.getElementById('reportCompletionFilter').value;
-    const needsReviewOnly = document.getElementById('reportNeedsReviewOnly').checked;
 
     if(viewMode === 'byPosuk'){
-      await renderByPosukView(resultsEl, summaryEl, { studentIds, perekFilter, posukNums, completionFilter, needsReviewOnly });
+      await renderByPosukView(resultsEl, summaryEl, { studentIds, perekFilter, posukNums });
       return;
     }
     if(viewMode === 'byStudent'){
-      await renderByStudentView(resultsEl, summaryEl, { studentIds, parshaFilter, perekFilter, posukNums, completionFilter, needsReviewOnly });
+      await renderByStudentView(resultsEl, summaryEl, { studentIds, parshaFilter, perekFilter, posukNums });
       return;
     }
-    await renderFlatReportView(resultsEl, summaryEl, { studentIds, parshaFilter, perekFilter, posukNums, completionFilter, needsReviewOnly });
+    await renderFlatReportView(resultsEl, summaryEl, { studentIds, parshaFilter, perekFilter, posukNums });
   }catch(err){
     resultsEl.innerHTML = '<div class="empty-msg">Could not build the report.</div>';
     console.error(err);
@@ -1464,11 +1400,11 @@ async function renderReportResults(){
 // ---------- Flat List view (original behavior: one row per attempted
 // posuk per student — activity only, since it can span every posuk in
 // every parsha at once). Now also carries a derived Completion status
-// and a Needs Review flag per row, and — when a specific set of students
-// is selected — calls out any of them with zero matching activity so
-// they don't just silently vanish from the list. ----------
+// and — when a specific set of students is selected — calls out any of
+// them with zero matching activity so they don't just silently vanish
+// from the list. ----------
 async function renderFlatReportView(resultsEl, summaryEl, filters){
-  const { studentIds, parshaFilter, perekFilter, posukNums, completionFilter, needsReviewOnly } = filters;
+  const { studentIds, parshaFilter, perekFilter, posukNums } = filters;
   const scoreType = document.getElementById('reportScoreTypeFilter').value;
   const dateFromVal = document.getElementById('reportDateFrom').value;
   const dateToVal = document.getElementById('reportDateTo').value;
@@ -1494,14 +1430,7 @@ async function renderFlatReportView(resultsEl, summaryEl, filters){
   const activeIds = new Set(rows.map(r => r.studentId));
   const inactiveSelected = consideredIds.filter(id => !activeIds.has(id)).map(id => studentsMap[id]).sort();
 
-  rows.forEach(r => {
-    r.status = r.isRange ? null : getPosukCompletionStatus(r.hebrewScore, r.translationScore, r.comprehensionScore);
-    r.flagged = r.isRange ? false : needsReview(r.hebrewScore, r.translationScore, r.comprehensionScore, r.status);
-  });
-
   let displayRows = rows.slice();
-  if(completionFilter !== 'all') displayRows = displayRows.filter(r => r.status === completionFilter);
-  if(needsReviewOnly) displayRows = displayRows.filter(r => r.flagged);
 
   displayRows.sort((a,b) => {
     const n = a.studentName.localeCompare(b.studentName);
@@ -1516,11 +1445,7 @@ async function renderFlatReportView(resultsEl, summaryEl, filters){
 
   if(displayRows.length === 0){
     summaryEl.innerHTML = '';
-    let msg = 'No recordings match these filters yet.';
-    if(completionFilter === 'not_started'){
-      msg += ' The Flat List only ever shows posukim someone attempted — switch to "By Posuk" or "By Student" to see who has Not Started.';
-    }
-    resultsEl.innerHTML = `<div class="empty-msg">${msg}</div>`;
+    resultsEl.innerHTML = `<div class="empty-msg">No recordings match these filters yet.</div>`;
     return;
   }
 
@@ -1543,23 +1468,22 @@ async function renderFlatReportView(resultsEl, summaryEl, filters){
   if(showReadingCol) headerCells += '<th>Reading %</th>';
   if(showTranslationCol) headerCells += '<th>Translation %</th>';
   if(showComprehensionCol) headerCells += '<th>Comprehension</th>';
-  headerCells += '<th>Status</th><th>Date</th>';
+  headerCells += '<th>Date</th>';
 
   let html = `<table class="roster-table"><thead><tr>${headerCells}</tr></thead><tbody>`;
   displayRows.forEach(r => {
     const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
     const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' : '—';
     const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
-    const statusCell = r.status ? `<span class="status-pill ${completionPillClass(r.status)}">${completionLabel(r.status)}</span>` : '—';
     let cells = '';
-    if(showStudentCol) cells += `<td>${r.studentName}${r.flagged ? ' <span class="status-pill low" style="margin-left:6px;">Needs Review</span>' : ''}</td>`;
+    if(showStudentCol) cells += `<td>${r.studentName}</td>`;
     if(showParshaCol) cells += `<td>${r.parshaName}</td>`;
     if(showPerekCol) cells += `<td>${r.perekNum}</td>`;
     if(showPosukCol) cells += `<td>${r.posukLabel}</td>`;
     if(showReadingCol) cells += `<td>${scoreLabel}</td>`;
     if(showTranslationCol) cells += `<td>${translationLabel}</td>`;
     if(showComprehensionCol) cells += `<td>${verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore)}</td>`;
-    cells += `<td>${statusCell}</td><td>${dateLabel}</td>`;
+    cells += `<td>${dateLabel}</td>`;
     html += `<tr>${cells}</tr>`;
   });
   html += '</tbody></table>';
@@ -1570,7 +1494,7 @@ async function renderFlatReportView(resultsEl, summaryEl, filters){
 // each requested posuk's latest attempt. Requires a specific Perek so the
 // number of pesukim (and therefore rows) stays bounded and fast. ----------
 async function renderByPosukView(resultsEl, summaryEl, filters){
-  const { studentIds, perekFilter, posukNums, completionFilter, needsReviewOnly } = filters;
+  const { studentIds, perekFilter, posukNums } = filters;
   document.getElementById('reportCsvBtn').classList.add('hidden');
   document.getElementById('reportPrintBtn').classList.add('hidden');
 
@@ -1583,7 +1507,7 @@ async function renderByPosukView(resultsEl, summaryEl, filters){
 
   const allAttempts = await loadAllAttempts();
   const groups = await buildPosukGridData(parseInt(perekFilter), posukNums, studentIds, allAttempts);
-  reportExportGroups = groups.map(g => renderPosukGroupHtml(g, completionFilter, needsReviewOnly));
+  reportExportGroups = groups.map(g => renderPosukGroupHtml(g));
 
   if(groups.length === 0){
     summaryEl.innerHTML = '';
@@ -1609,7 +1533,7 @@ async function renderByPosukView(resultsEl, summaryEl, filters){
 // filters still get a section — just with an explicit empty state —
 // instead of disappearing from the report entirely. ----------
 async function renderByStudentView(resultsEl, summaryEl, filters){
-  const { studentIds, parshaFilter, perekFilter, posukNums, completionFilter, needsReviewOnly } = filters;
+  const { studentIds, parshaFilter, perekFilter, posukNums } = filters;
   const scoreType = document.getElementById('reportScoreTypeFilter').value;
   const dateFromVal = document.getElementById('reportDateFrom').value;
   const dateToVal = document.getElementById('reportDateTo').value;
@@ -1628,10 +1552,6 @@ async function renderByStudentView(resultsEl, summaryEl, filters){
     : posukNums.includes(r.posukNum));
   if(dateFrom !== null) rows = rows.filter(r => typeof r.timestamp === 'number' && r.timestamp >= dateFrom);
   if(dateTo !== null) rows = rows.filter(r => typeof r.timestamp === 'number' && r.timestamp <= dateTo);
-  rows.forEach(r => {
-    r.status = r.isRange ? null : getPosukCompletionStatus(r.hebrewScore, r.translationScore, r.comprehensionScore);
-    r.flagged = r.isRange ? false : needsReview(r.hebrewScore, r.translationScore, r.comprehensionScore, r.status);
-  });
 
   const ids = (studentIds && studentIds.length ? studentIds : Object.keys(studentsMap))
     .slice().sort((a,b) => studentsMap[a].localeCompare(studentsMap[b]));
@@ -1639,8 +1559,6 @@ async function renderByStudentView(resultsEl, summaryEl, filters){
   reportExportStudentGroups = ids.map(id => {
     const hadAnyMatch = rows.some(r => r.studentId === id);
     let studentRows = rows.filter(r => r.studentId === id);
-    if(completionFilter !== 'all') studentRows = studentRows.filter(r => r.status === completionFilter);
-    if(needsReviewOnly) studentRows = studentRows.filter(r => r.flagged);
     studentRows.sort((a,b) => a.perekNum - b.perekNum || a.posukNum - b.posukNum);
     return { id, name: studentsMap[id], hadAnyMatch, rows: studentRows };
   });
@@ -1668,18 +1586,17 @@ async function renderByStudentView(resultsEl, summaryEl, filters){
       if(showReadingCol) headerCells += '<th>Reading %</th>';
       if(showTranslationCol) headerCells += '<th>Translation %</th>';
       if(showComprehensionCol) headerCells += '<th>Comprehension</th>';
-      headerCells += '<th>Status</th><th>Date</th>';
+      headerCells += '<th>Date</th>';
       html += `<table class="roster-table"><thead><tr>${headerCells}</tr></thead><tbody>`;
       g.rows.forEach(r => {
         const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
         const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' : '—';
         const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
-        const statusCell = r.status ? `<span class="status-pill ${completionPillClass(r.status)}">${completionLabel(r.status)}</span>` : '—';
         let cells = `<td>${r.parshaName}</td><td>${r.perekNum}</td><td>${r.posukLabel}</td>`;
         if(showReadingCol) cells += `<td>${scoreLabel}</td>`;
         if(showTranslationCol) cells += `<td>${translationLabel}</td>`;
         if(showComprehensionCol) cells += `<td>${verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore)}</td>`;
-        cells += `<td>${statusCell}</td><td>${dateLabel}</td>`;
+        cells += `<td>${dateLabel}</td>`;
         html += `<tr>${cells}</tr>`;
       });
       html += '</tbody></table>';
@@ -1703,19 +1620,16 @@ function downloadReportCsv(){
       if(i > 0) lines.push('');
       lines.push([`"Posuk ${i+1}"`].join(','));
       lines.push(['Students in class', g.total].join(','));
-      lines.push(['Complete', g.counts.complete].join(','));
-      lines.push(['In Progress', g.counts.in_progress].join(','));
-      lines.push(['Not Started', g.counts.not_started].join(','));
       lines.push(['Average Reading', g.avgReading === null ? '' : g.avgReading + '%', `${g.readingAttempted} of ${g.total} attempted`].join(','));
       lines.push(['Average Translation', g.avgTranslation === null ? '' : g.avgTranslation + '%', `${g.translationAttempted} of ${g.total} attempted`].join(','));
       lines.push(['Average Comprehension', g.avgComprehension === null ? '' : g.avgComprehension + '%', `${g.comprehensionAttempted} of ${g.total} attempted`].join(','));
-      lines.push(['Student','Reading','Translation','Comprehension','Status','Last Activity'].join(','));
+      lines.push(['Student','Reading','Translation','Comprehension','Last Activity'].join(','));
       g.rows.forEach(s => {
         const readingLabel = typeof s.reading === 'number' ? Math.round(s.reading) + '%' : 'Not Started';
         const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'Not Started';
         const comprehensionLabel = typeof s.comprehension === 'number' ? Math.round(s.comprehension) + '%' : 'Not Started';
         const lastActivityLabel = s.lastActivity ? new Date(s.lastActivity).toLocaleDateString() : '';
-        lines.push([`"${s.name}"`, readingLabel, translationLabel, comprehensionLabel, completionLabel(s.status), lastActivityLabel].join(','));
+        lines.push([`"${s.name}"`, readingLabel, translationLabel, comprehensionLabel, lastActivityLabel].join(','));
       });
     });
   }else if(reportExportMode === 'byStudent'){
@@ -1727,13 +1641,13 @@ function downloadReportCsv(){
       if(g.rows.length === 0){
         lines.push([g.hadAnyMatch ? 'No results match these filters for this student.' : 'No activity matching these filters.'].join(','));
       }else{
-        lines.push(['Parsha','Perek','Posuk','Reading %','Translation %','Comprehension','Status','Date'].join(','));
+        lines.push(['Parsha','Perek','Posuk','Reading %','Translation %','Comprehension','Date'].join(','));
         g.rows.forEach(r => {
           const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) : '';
           const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) : '';
           const verdictText = r.comprehensionVerdict || '';
           const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '';
-          lines.push([`"${r.parshaName}"`, r.perekNum, r.posukLabel, scoreLabel, translationLabel, verdictText, r.status ? completionLabel(r.status) : '', dateLabel].join(','));
+          lines.push([`"${r.parshaName}"`, r.perekNum, r.posukLabel, scoreLabel, translationLabel, verdictText, dateLabel].join(','));
         });
       }
     });
@@ -1761,7 +1675,7 @@ function downloadReportCsv(){
       summaryLines.push(['Bonus/freehand Incorrect', verdictCounts.incorrect].join(','));
     }
 
-    const header = ['Student','Parsha','Perek','Posuk','Reading %','Translation %','Comprehension','Comprehension Score','Status','Date'];
+    const header = ['Student','Parsha','Perek','Posuk','Reading %','Translation %','Comprehension','Comprehension Score','Date'];
     lines = [...summaryLines, '', header.join(',')];
     reportRows.forEach(r => {
       const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) : '';
@@ -1770,7 +1684,7 @@ function downloadReportCsv(){
       const compScoreLabel = typeof r.comprehensionScore === 'number' ? r.comprehensionScore : '';
       const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '';
       // Quote the student/parsha name in case a name ever contains a comma.
-      lines.push([`"${r.studentName}"`, `"${r.parshaName}"`, r.perekNum, r.posukLabel, scoreLabel, translationLabel, verdictText, compScoreLabel, r.status ? completionLabel(r.status) : '', dateLabel].join(','));
+      lines.push([`"${r.studentName}"`, `"${r.parshaName}"`, r.perekNum, r.posukLabel, scoreLabel, translationLabel, verdictText, compScoreLabel, dateLabel].join(','));
     });
   }
 
@@ -1800,19 +1714,16 @@ function printReport(){
         const translationLabel = typeof s.translation === 'number' ? Math.round(s.translation) + '%' : 'Not Started';
         const comprehensionLabel = typeof s.comprehension === 'number' ? Math.round(s.comprehension) + '%' : 'Not Started';
         const lastActivityLabel = s.lastActivity ? new Date(s.lastActivity).toLocaleDateString() : '—';
-        return `<tr><td>${s.name}</td><td>${readingLabel}</td><td>${translationLabel}</td><td>${comprehensionLabel}</td><td>${completionLabel(s.status)}</td><td>${lastActivityLabel}</td></tr>`;
+        return `<tr><td>${s.name}</td><td>${readingLabel}</td><td>${translationLabel}</td><td>${comprehensionLabel}</td><td>${lastActivityLabel}</td></tr>`;
       }).join('');
       return `<h2>${g.refLabel}</h2>
         <table class="summary-table"><tbody>
           <tr><td>Students in class</td><td>${g.total}</td></tr>
-          <tr><td>Complete</td><td>${g.counts.complete}</td></tr>
-          <tr><td>In Progress</td><td>${g.counts.in_progress}</td></tr>
-          <tr><td>Not Started</td><td>${g.counts.not_started}</td></tr>
           <tr><td>Average Reading</td><td>${g.avgReading===null?'—':g.avgReading+'%'} (${g.readingAttempted} of ${g.total} attempted)</td></tr>
           <tr><td>Average Translation</td><td>${g.avgTranslation===null?'—':g.avgTranslation+'%'} (${g.translationAttempted} of ${g.total} attempted)</td></tr>
           <tr><td>Average Comprehension</td><td>${g.avgComprehension===null?'—':g.avgComprehension+'%'} (${g.comprehensionAttempted} of ${g.total} attempted)</td></tr>
         </tbody></table>
-        <table><thead><tr><th>Student</th><th>Reading</th><th>Translation</th><th>Comprehension</th><th>Status</th><th>Last Activity</th></tr></thead>
+        <table><thead><tr><th>Student</th><th>Reading</th><th>Translation</th><th>Comprehension</th><th>Last Activity</th></tr></thead>
         <tbody>${rowsHtml}</tbody></table>`;
     }).join('<div style="height:24px;"></div>');
   }else if(reportExportMode === 'byStudent'){
@@ -1826,9 +1737,9 @@ function printReport(){
           const scoreLabel = typeof r.hebrewScore === 'number' ? Math.round(r.hebrewScore) + '%' : '—';
           const translationLabel = typeof r.translationScore === 'number' ? Math.round(r.translationScore) + '%' : '—';
           const dateLabel = typeof r.timestamp === 'number' ? new Date(r.timestamp).toLocaleDateString() : '—';
-          return `<tr><td>${r.parshaName}</td><td>${r.perekNum}</td><td>${r.posukLabel}</td><td>${scoreLabel}</td><td>${translationLabel}</td><td>${verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore)}</td><td>${r.status ? completionLabel(r.status) : '—'}</td><td>${dateLabel}</td></tr>`;
+          return `<tr><td>${r.parshaName}</td><td>${r.perekNum}</td><td>${r.posukLabel}</td><td>${scoreLabel}</td><td>${translationLabel}</td><td>${verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore)}</td><td>${dateLabel}</td></tr>`;
         }).join('');
-        inner = `<table><thead><tr><th>Parsha</th><th>Perek</th><th>Posuk</th><th>Reading %</th><th>Translation %</th><th>Comprehension</th><th>Status</th><th>Date</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+        inner = `<table><thead><tr><th>Parsha</th><th>Perek</th><th>Posuk</th><th>Reading %</th><th>Translation %</th><th>Comprehension</th><th>Date</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
       }
       return `<h2>${g.name}</h2>${inner}`;
     }).join('<div style="height:24px;"></div>');
@@ -1862,13 +1773,12 @@ function printReport(){
         <td>${scoreLabel}</td>
         <td>${translationLabel}</td>
         <td>${verdictLabelWithScore(r.comprehensionVerdict, r.comprehensionScore)}</td>
-        <td>${r.status ? completionLabel(r.status) : '—'}</td>
         <td>${dateLabel}</td>
       </tr>`;
     }).join('');
     bodyHtml = `<table class="summary-table"><tbody>${summaryRowsHtml}</tbody></table>
       <table><thead><tr>
-        <th>Student</th><th>Parsha</th><th>Perek</th><th>Posuk</th><th>Reading %</th><th>Translation %</th><th>Comprehension</th><th>Status</th><th>Date</th>
+        <th>Student</th><th>Parsha</th><th>Perek</th><th>Posuk</th><th>Reading %</th><th>Translation %</th><th>Comprehension</th><th>Date</th>
       </tr></thead><tbody>${rowsHtml}</tbody></table>`;
   }
 
