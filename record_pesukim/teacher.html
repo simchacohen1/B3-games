@@ -668,25 +668,37 @@ function setTab(tab){
 let studentSearchQuery = '';
 
 // The sidebar roster is the complete, authoritative class list — every
-// active student under posukPractice/students — NOT derived from who
-// happens to have practice history. Students with no recordings still
-// load into studentsMap/studentsInfo and still render below.
+// name the teacher has APPROVED in Manage Access (posukPractice/allowedStudents),
+// not just students who happen to have logged in yet. posukPractice/students
+// only gets an entry the first time a student actually opens student.html, so
+// using that as the roster source silently hid any approved-but-never-logged-in
+// student from the sidebar, Class Roster, Reports, and Class Stats. Activity
+// info (lastActive) is merged in on top where it exists; a student who's
+// approved but has never logged in still shows up, just with no activity yet.
 async function loadStudents(){
   const listEl = document.getElementById('studentList');
   const countEl = document.getElementById('studentCount');
   try{
-    const snap = await db.ref('posukPractice/students').once('value');
-    const val = snap.val();
+    const [allowedSnap, activeSnap] = await Promise.all([
+      db.ref('posukPractice/allowedStudents').once('value'),
+      db.ref('posukPractice/students').once('value')
+    ]);
+    const allowedVal = allowedSnap.val();
+    const activeVal = activeSnap.val() || {};
     studentsMap = {};
     studentsInfo = {};
-    if(!val){
+    if(!allowedVal){
       if(countEl) countEl.textContent = '0 Students';
-      listEl.innerHTML = '<div class="empty-msg">No students yet.</div>';
+      listEl.innerHTML = '<div class="empty-msg">No approved students yet — add some in Manage Access.</div>';
       return;
     }
-    Object.entries(val).forEach(([id, info]) => {
-      studentsMap[id] = info.name;
-      studentsInfo[id] = info;
+    Object.entries(allowedVal).forEach(([id, info]) => {
+      const approvedName = (info && info.name) || id;
+      studentsMap[id] = approvedName;
+      // Prefer the live posukPractice/students record (has lastActive) when
+      // it exists; otherwise fall back to a bare record so this student
+      // still renders correctly with "no activity yet" everywhere.
+      studentsInfo[id] = activeVal[id] || { name: approvedName };
     });
     renderStudentList();
 
