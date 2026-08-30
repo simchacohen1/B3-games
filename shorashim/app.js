@@ -20,6 +20,31 @@ if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
 const cloudDb = firebase.database();
 const cloudStorage = firebase.storage();
 const CLOUD_ROOT = 'posukPractice/shorashimLearning';
+let studentSiteOpen=true;
+function applyStudentSiteOpen(open){
+  studentSiteOpen=open!==false;
+  const closed=document.getElementById('studentSiteClosed');
+  const login=document.getElementById('loginGate');
+  const app=document.getElementById('appShell');
+  if(!closed)return;
+  closed.classList.toggle('hidden',studentSiteOpen);
+  if(!studentSiteOpen){
+    if(login)login.classList.add('hidden');
+    if(app)app.classList.add('hidden');
+  }else if(cloudEnabled){
+    if(login)login.classList.add('hidden');
+    if(app)app.classList.remove('hidden');
+  }else{
+    if(login)login.classList.remove('hidden');
+    if(app)app.classList.add('hidden');
+  }
+}
+function startStudentSiteWatcher(){
+  cloudDb.ref(`${CLOUD_ROOT}/settings/studentSiteOpen`).on('value',snap=>{
+    applyStudentSiteOpen(snap.exists()?snap.val():true);
+  },err=>{console.warn('Could not read Shorashim site availability',err);applyStudentSiteOpen(true);});
+}
+
 let cloudStudentId = null;
 let cloudStudentName = '';
 let cloudEnabled = false;
@@ -58,10 +83,10 @@ function normalizeStudent(s){
 }
 function loadDB(){
   const v2=localStorage.getItem(DB_KEY);
-  if(v2){try{const d=JSON.parse(v2);d.catalog=d.catalog||clone(DEFAULT_CATALOG);d.settings=d.settings||{minReviewMs:800};d.students=d.students||{};Object.values(d.students).forEach(normalizeStudent);return d;}catch(e){console.warn(e);}}
+  if(v2){try{const d=JSON.parse(v2);d.catalog=d.catalog||clone(DEFAULT_CATALOG);d.settings=d.settings||{minReviewMs:800,studentSiteOpen:true};d.students=d.students||{};Object.values(d.students).forEach(normalizeStudent);return d;}catch(e){console.warn(e);}}
   const old=localStorage.getItem(OLD_DB_KEY);
-  if(old){try{const o=JSON.parse(old);o.catalog=clone(DEFAULT_CATALOG);o.settings={minReviewMs:800};Object.values(o.students||{}).forEach(normalizeStudent);saveRaw(o);return o;}catch(e){console.warn(e);}}
-  const students={};DEFAULT_STUDENTS.forEach(n=>students[n]=blankStudent());return {students,currentStudent:DEFAULT_STUDENTS[0],catalog:clone(DEFAULT_CATALOG),settings:{minReviewMs:800}};
+  if(old){try{const o=JSON.parse(old);o.catalog=clone(DEFAULT_CATALOG);o.settings={minReviewMs:800,studentSiteOpen:true};Object.values(o.students||{}).forEach(normalizeStudent);saveRaw(o);return o;}catch(e){console.warn(e);}}
+  const students={};DEFAULT_STUDENTS.forEach(n=>students[n]=blankStudent());return {students,currentStudent:DEFAULT_STUDENTS[0],catalog:clone(DEFAULT_CATALOG),settings:{minReviewMs:800,studentSiteOpen:true}};
 }
 function saveRaw(d){localStorage.setItem(DB_KEY,JSON.stringify(d));}
 function setCloudStatus(text,kind=''){const el=document.getElementById('cloudStatus');if(!el)return;el.textContent=text;el.classList.toggle('syncing',kind==='syncing');el.classList.toggle('error',kind==='error');}
@@ -115,10 +140,12 @@ function slugifyStudent(name){return name.trim().toLowerCase().replace(/[^a-z0-9
 function setLoginMsg(text){const el=document.getElementById('loginMsg');if(el)el.textContent=text||'';}
 async function checkStudentAccess(name,pin){
   const slug=slugifyStudent(name);if(!slug)return {ok:false,reason:'Please type your name.'};
-  const [pinSnap,allowedSnap]=await Promise.all([
+  const [siteSnap,pinSnap,allowedSnap]=await Promise.all([
+    cloudDb.ref(`${CLOUD_ROOT}/settings/studentSiteOpen`).once('value'),
     cloudDb.ref('posukPractice/settings/classPin').once('value'),
     cloudDb.ref('posukPractice/allowedStudents/'+slug).once('value')
   ]);
+  if(siteSnap.exists()&&siteSnap.val()===false)return {ok:false,reason:'Shorashim practice is closed right now. Ask your teacher.'};
   const realPin=pinSnap.val();
   if(realPin&&String(pin).trim()!==String(realPin).trim())return {ok:false,reason:'Incorrect PIN. Ask your teacher.'};
   if(!allowedSnap.exists())return {ok:false,reason:'Ask your teacher to add your name first.'};
@@ -130,18 +157,18 @@ async function loadClassLeaderboard(){
 function startCloudListeners(){
   if(cloudListenersStarted)return;cloudListenersStarted=true;
   cloudDb.ref(`${CLOUD_ROOT}/catalog`).on('value',snap=>{const v=snap.val();if(!v)return;db.catalog=v;saveRaw(db);if(appStarted)renderAll();});
-  cloudDb.ref(`${CLOUD_ROOT}/settings`).on('value',snap=>{const v=snap.val();if(!v)return;db.settings={minReviewMs:800,...v};saveRaw(db);const sel=document.getElementById('minReviewTime');if(sel)sel.value=String(db.settings.minReviewMs||800);if(appStarted)renderAll();});
+  cloudDb.ref(`${CLOUD_ROOT}/settings`).on('value',snap=>{const v=snap.val();if(!v)return;db.settings={minReviewMs:800,studentSiteOpen:true,...v};saveRaw(db);const sel=document.getElementById('minReviewTime');if(sel)sel.value=String(db.settings.minReviewMs||800);if(appStarted)renderAll();});
   cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match`).on('value',snap=>{classMatchLeaderboard=snap.val()||{};if(matchState&&document.getElementById('matchLeaderboard'))document.getElementById('matchLeaderboard').innerHTML=matchLeaderboardHTML(matchState.pairCount);});
 }
 async function enterCloudStudent(name,studentId){
   setLoginMsg('Opening your cards…');setCloudStatus('☁️ Connecting…','syncing');
-  const cachedCatalog=clone(db.catalog||DEFAULT_CATALOG),cachedSettings={minReviewMs:800,...(db.settings||{})},cachedStudent=db.students?.[name]?clone(db.students[name]):null;
+  const cachedCatalog=clone(db.catalog||DEFAULT_CATALOG),cachedSettings={minReviewMs:800,studentSiteOpen:true,...(db.settings||{})},cachedStudent=db.students?.[name]?clone(db.students[name]):null;
   const [catalogSnap,settingsSnap,studentSnap]=await Promise.all([
     cloudDb.ref(`${CLOUD_ROOT}/catalog`).once('value'),
     cloudDb.ref(`${CLOUD_ROOT}/settings`).once('value'),
     cloudDb.ref(`${CLOUD_ROOT}/students/${studentId}`).once('value')
   ]);
-  const catalog=catalogSnap.val()||cachedCatalog;const settings={minReviewMs:800,...(settingsSnap.val()||cachedSettings)};const s=studentSnap.val()||cachedStudent||blankStudent();normalizeStudent(s);s.name=name;s.lastActive=Date.now();
+  const catalog=catalogSnap.val()||cachedCatalog;const settings={minReviewMs:800,studentSiteOpen:true,...(settingsSnap.val()||cachedSettings)};if(settings.studentSiteOpen===false){applyStudentSiteOpen(false);throw new Error('STUDENT_SITE_CLOSED');}const s=studentSnap.val()||cachedStudent||blankStudent();normalizeStudent(s);s.name=name;s.lastActive=Date.now();
   db={students:{[name]:s},currentStudent:name,catalog,settings};currentStudent=name;cloudStudentId=studentId;cloudStudentName=name;cloudEnabled=true;saveRaw(db);
   if(!catalogSnap.exists())cloudDb.ref(`${CLOUD_ROOT}/catalog`).set(catalog).catch(console.warn);
   if(!settingsSnap.exists())cloudDb.ref(`${CLOUD_ROOT}/settings`).set(settings).catch(console.warn);
@@ -155,7 +182,7 @@ async function trySavedStudent(){
 }
 function bindCloudLogin(){
   const btn=document.getElementById('loginBtn'),nameEl=document.getElementById('studentNameInput'),pinEl=document.getElementById('classPinInput');
-  const submit=async()=>{const name=nameEl.value.trim(),pin=pinEl.value.trim();if(!name){setLoginMsg('Please type your name.');return;}btn.disabled=true;setLoginMsg('Checking…');try{const result=await checkStudentAccess(name,pin);if(!result.ok){setLoginMsg(result.reason);return;}localStorage.setItem('posukPractice_studentName',name);localStorage.setItem('posukPractice_studentId',result.slug);await enterCloudStudent(name,result.slug);setLoginMsg('');}catch(err){console.error('Login failed',err);setLoginMsg('Could not connect. Check the internet and try again.');}finally{btn.disabled=false;}};
+  const submit=async()=>{const name=nameEl.value.trim(),pin=pinEl.value.trim();if(!name){setLoginMsg('Please type your name.');return;}btn.disabled=true;setLoginMsg('Checking…');try{const result=await checkStudentAccess(name,pin);if(!result.ok){setLoginMsg(result.reason);return;}localStorage.setItem('posukPractice_studentName',name);localStorage.setItem('posukPractice_studentId',result.slug);await enterCloudStudent(name,result.slug);setLoginMsg('');}catch(err){if(err&&err.message==='STUDENT_SITE_CLOSED'){applyStudentSiteOpen(false);setLoginMsg('');}else{console.error('Login failed',err);setLoginMsg('Could not connect. Check the internet and try again.');}}finally{btn.disabled=false;}};
   btn.onclick=submit;[nameEl,pinEl].forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();submit();}}));
   document.getElementById('switchStudentBtn').onclick=()=>{localStorage.removeItem('posukPractice_studentName');localStorage.removeItem('posukPractice_studentId');location.reload();};
   trySavedStudent();
@@ -345,4 +372,5 @@ function bindActivityTracking(){['pointerdown','keydown','mousemove','touchstart
 function startTicker(){clearInterval(ticker);ticker=setInterval(()=>{const s=student(),studying=['learnScreen','reviewScreen','gamesScreen'].includes(activeScreenId)&&!document.getElementById('studentView').classList.contains('hidden');if(studying&&document.visibilityState==='visible'&&Date.now()-lastInteraction<30000){s.totalActiveSeconds++;if(activeScreenId==='learnScreen'&&s.activeSession)s.activeSession.activeSeconds++;s.lastActive=Date.now();if(s.totalActiveSeconds%10===0)saveDB();}},1000);}
 function renderAll(){renderStudentStats();renderSession();renderWordList();renderGallery();renderReviewAvailability();renderDailyStatus();renderGamesLock();renderTeacher();}
 window.addEventListener('beforeunload',saveDB);
+startStudentSiteWatcher();
 bindCloudLogin();
