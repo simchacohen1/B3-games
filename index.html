@@ -8,7 +8,7 @@
         font-family: Arial, sans-serif;
         background: #f5f7fa;
         text-align: center;
-        padding: 40px;
+        padding: 40px 20px;
     }
 
     h1 {
@@ -18,28 +18,41 @@
     }
 
     .game-container {
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
         gap: 20px;
-        max-width: 400px;
+        max-width: 900px;
         margin: auto;
     }
 
     .game-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
         background: white;
-        padding: 20px;
-        border-radius: 12px;
+        padding: 24px 12px;
+        border-radius: 16px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        font-size: 24px;
-        font-weight: bold;
-        color: #333;
         text-decoration: none;
         transition: transform 0.15s, box-shadow 0.15s;
     }
 
     .game-card:hover {
         transform: translateY(-4px);
-        box-shadow: 0 6px 14px rgba(0,0,0,0.15);
+        box-shadow: 0 8px 18px rgba(0,0,0,0.15);
+    }
+
+    .card-icon {
+        font-size: 40px;
+        line-height: 1;
+    }
+
+    .card-title {
+        font-size: 17px;
+        font-weight: bold;
+        color: #333;
     }
 
     .hidden {
@@ -72,6 +85,8 @@
         padding: 16px;
         text-align: left;
         z-index: 9999;
+        max-height: 80vh;
+        overflow-y: auto;
     }
 
     .admin-panel h2 {
@@ -128,12 +143,46 @@
     <h1>B3 Games</h1>
 
     <div class="game-container">
-        <a class="game-card" data-game-id="tzitzis-game" href="tzitzis_game.html">Tzitzis Game</a>
-        <a class="game-card" data-game-id="tzitzis-quest-arcade" href="tzitzis_quest_arcade_v2.html">Tzitzis Quest Arcade</a>
-        <a class="game-card" data-game-id="kahoot-word-quiz" href="kahoot_word_quiz_engine_paste_only_any_perek.html">Kahoot Word Quiz Engine</a>
-        <a class="game-card" data-game-id="kodesh-construct" href="kodesh-construct.html">Dikduk Arcade</a>
-        <a class="game-card" data-game-id="chumash-quiz" href="chumash-quiz.html">Chumash Quiz</a>
-        <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html">Posuk Practice Scroll</a>
+        <a class="game-card" data-game-id="tzitzis-game" href="tzitzis_game.html">
+            <span class="card-icon">🧵</span>
+            <span class="card-title">Tzitzis Game</span>
+        </a>
+        <a class="game-card" data-game-id="tzitzis-quest-arcade" href="tzitzis_quest_arcade_v2.html">
+            <span class="card-icon">🕹️</span>
+            <span class="card-title">Tzitzis Quest Arcade</span>
+        </a>
+        <a class="game-card" data-game-id="kahoot-word-quiz" href="kahoot_word_quiz_engine_paste_only_any_perek.html">
+            <span class="card-icon">❓</span>
+            <span class="card-title">Kahoot Word Quiz Engine</span>
+        </a>
+        <a class="game-card" data-game-id="kodesh-construct" href="kodesh-construct.html">
+            <span class="card-icon">🔤</span>
+            <span class="card-title">Dikduk Arcade</span>
+        </a>
+        <a class="game-card" data-game-id="chumash-quiz" href="chumash-quiz.html">
+            <span class="card-icon">📖</span>
+            <span class="card-title">Chumash Quiz</span>
+        </a>
+        <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html">
+            <span class="card-icon">📜</span>
+            <span class="card-title">Posuk Practice Scroll</span>
+        </a>
+        <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html">
+            <span class="card-icon">✡️</span>
+            <span class="card-title">Rashi Letters</span>
+        </a>
+        <a class="game-card" data-game-id="shorashim" href="shorashim/teacher.html">
+            <span class="card-icon">🌳</span>
+            <span class="card-title">Shorashim</span>
+        </a>
+        <a class="game-card" data-game-id="class-gallery" href="class-gallery.html">
+            <span class="card-icon">🖼️</span>
+            <span class="card-title">Class Gallery</span>
+        </a>
+        <a class="game-card" data-game-id="game-show" href="player.html">
+            <span class="card-icon">🏆</span>
+            <span class="card-title">Game Show</span>
+        </a>
     </div>
 
     <p id="disabledMessage" class="disabled-note hidden">All games are currently disabled.</p>
@@ -171,7 +220,7 @@
 
       const gameDefinitions = gameCards.map((card) => ({
           id: card.dataset.gameId,
-          name: card.textContent.trim(),
+          name: (card.querySelector(".card-title")?.textContent || card.textContent).trim(),
           element: card
       }));
 
