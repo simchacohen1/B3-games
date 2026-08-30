@@ -876,6 +876,17 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
     #learnWorkspace .editor-actions #saveCardBtn {
       display: inline-flex !important;
     }
+
+    #learnWorkspace .art-choice {
+      width: 82px !important;
+      height: 82px !important;
+      font-size: 46px !important;
+    }
+
+    #learnWorkspace .art-choice img {
+      width: 100%;
+      height: 100%;
+    }
   }
 </style>
 
@@ -1063,6 +1074,7 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
                       <div id="emojiChoices" class="art-choices"></div>
                       <div class="art-section-label illustration-label">Illustrations</div>
                       <div id="illustrationChoices" class="art-choices illustration-choices"></div>
+                      <label class="art-size-control">Selected picture size <input id="artSize" type="range" min="30" max="380" value="126" disabled></label>
                       <div class="button-row art-edit-row">
                         <button id="artSmallerBtn" class="ghost small">Smaller</button>
                         <button id="artBiggerBtn" class="ghost small">Bigger</button>
@@ -1242,7 +1254,7 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-  <script src="app.js?v=20260830d"></script>
+  <script src="app.js?v=20260830f"></script>
 
 <script data-shorashim-workspace-ux="v1">
 (() => {
