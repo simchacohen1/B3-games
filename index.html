@@ -206,7 +206,6 @@
 <p class="subtitle">Games, practice and classroom tools</p>
 
 
-<!-- CHUMASH & SKILLS -->
 <section class="tool-section">
     <h2 class="section-title">📖 Chumash & Skills</h2>
 
@@ -235,7 +234,7 @@
 
         <a class="game-card"
            data-game-id="shorashim"
-           href="shorashim/student.html">
+           href="shorashim/index.html">
             <span class="card-icon">🌳</span>
             <span class="card-title">Shorashim</span>
         </a>
@@ -258,7 +257,6 @@
 </section>
 
 
-<!-- GAMES -->
 <section class="tool-section">
     <h2 class="section-title">🎮 Games</h2>
 
@@ -296,7 +294,6 @@
 </section>
 
 
-<!-- CLASSROOM TOOLS -->
 <section class="tool-section">
     <h2 class="section-title">🧰 Classroom Tools</h2>
 
@@ -428,7 +425,6 @@ const gameCards =
         document.querySelectorAll(".game-card")
     );
 
-
 const gameDefinitions =
     gameCards.map((card) => ({
         id: card.dataset.gameId,
@@ -443,12 +439,10 @@ const gameDefinitions =
         element: card
     }));
 
-
 let currentSettings =
     settingsApi.defaultSettings;
 
 let currentUser = null;
-
 let isAuthorizedAdmin = false;
 
 
@@ -523,7 +517,6 @@ function renderAdminPanel() {
         !isAuthorizedAdmin
     );
 
-
     if (!signedIn) {
 
         adminStatus.textContent =
@@ -531,7 +524,6 @@ function renderAdminPanel() {
 
         return;
     }
-
 
     if (!isAuthorizedAdmin) {
 
@@ -544,7 +536,6 @@ function renderAdminPanel() {
         return;
     }
 
-
     adminStatus.textContent =
         `Signed in as ${currentUser.email}. Changes affect everyone.`;
 
@@ -553,7 +544,6 @@ function renderAdminPanel() {
 
     gameToggles.innerHTML = "";
 
-
     gameDefinitions.forEach((game) => {
 
         const row =
@@ -561,7 +551,6 @@ function renderAdminPanel() {
 
         row.className =
             "admin-row";
-
 
         const label =
             document.createElement("label");
@@ -574,7 +563,6 @@ function renderAdminPanel() {
         label.textContent =
             game.name;
 
-
         const input =
             document.createElement("input");
 
@@ -586,7 +574,6 @@ function renderAdminPanel() {
 
         input.checked =
             currentSettings.games[game.id] !== false;
-
 
         input.addEventListener(
             "change",
@@ -626,11 +613,8 @@ function renderAdminPanel() {
             }
         );
 
-
         row.appendChild(label);
-
         row.appendChild(input);
-
         gameToggles.appendChild(row);
     });
 }
