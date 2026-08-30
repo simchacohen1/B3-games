@@ -2224,29 +2224,74 @@ function setNameGateMsg(text){
 // change to the value (either direction) triggers a full reload rather
 // than trying to patch a half-initialized page back together, since the
 // name gate / app init logic only really runs once per page load.
-let siteLockPreviousState = null;
+// Both the practice-specific lock (posukPractice/settings/accessLocked) and
+// the master admin toggle (b3Games/siteSettings, the same node the B3 Games
+// homepage admin panel writes to) can close this page. They're watched
+// independently but combined into one shared "closed" state before touching
+// the DOM. Each watcher's very first callback only records its value —
+// it does not yet trigger the reload-on-change comparison, since the two
+// listeners resolve at different times and comparing before both have
+// reported once would cause a false reload loop on every page load.
+let lastKnownLocked = false;
+let lastKnownMasterBlocked = false;
+let lockWatcherReady = false;
+let masterWatcherReady = false;
+let previousCombinedClosed = null;
+
+function applyCombinedClosedState(message){
+  if(!(lockWatcherReady && masterWatcherReady)) return;
+  const isClosed = lastKnownLocked || lastKnownMasterBlocked;
+  if(previousCombinedClosed !== null && previousCombinedClosed !== isClosed){
+    window.location.reload();
+    return;
+  }
+  previousCombinedClosed = isClosed;
+  if(isClosed && message){
+    document.getElementById('studentAppClosedText').textContent = message;
+  }
+  document.body.classList.toggle('student-app-closed', isClosed);
+}
+
 function startAccessLockWatcher(){
   db.ref('posukPractice/settings/accessLocked').on('value', async (snap) => {
-    const isLocked = snap.val() === true;
-    if(siteLockPreviousState !== null && siteLockPreviousState !== isLocked){
-      window.location.reload();
-      return;
-    }
-    siteLockPreviousState = isLocked;
-    if(isLocked){
-      let message = 'This practice page is currently closed.';
+    lastKnownLocked = snap.val() === true;
+    let message = null;
+    if(lastKnownLocked){
+      message = 'This practice page is currently closed.';
       try{
         const msgSnap = await db.ref('posukPractice/settings/accessLockMessage').once('value');
         if(msgSnap.val()) message = msgSnap.val();
       }catch(e){ /* fall back to default message */ }
-      document.getElementById('studentAppClosedText').textContent = message;
     }
-    document.body.classList.toggle('student-app-closed', isLocked);
+    lockWatcherReady = true;
+    applyCombinedClosedState(message);
   }, (err) => {
     console.error('Could not read site lock setting:', err);
+    lockWatcherReady = true;
+    applyCombinedClosedState(null);
   });
 }
 startAccessLockWatcher();
+
+// Live watcher on the master admin toggle. If a teacher turns off the whole
+// site, or specifically flips off "posuk-practice-scroll", this closes the
+// page the same way the practice-specific lock above does — so unchecking
+// the game on the homepage genuinely blocks it here too, not just hides
+// its card.
+function startMasterToggleWatcher(){
+  db.ref('b3Games/siteSettings').on('value', (snap) => {
+    const settings = snap.val() || {};
+    const gamesMap = settings.games || {};
+    lastKnownMasterBlocked = settings.siteEnabled === false || gamesMap['posuk-practice-scroll'] === false;
+    masterWatcherReady = true;
+    applyCombinedClosedState(lastKnownMasterBlocked ? 'This game is currently turned off. Ask your teacher.' : null);
+  }, (err) => {
+    console.error('Could not read master site settings:', err);
+    masterWatcherReady = true;
+    applyCombinedClosedState(null);
+  });
+}
+startMasterToggleWatcher();
 
 // Checks the entered PIN against posukPractice/settings/classPin, and the
 // entered name (slugified) against the teacher-approved list at
@@ -2261,12 +2306,18 @@ async function checkAccess(name, pin){
   const slug = slugify(name);
   if(!slug){ return { ok:false, reason:'Please type your name.' }; }
 
-  const [lockSnap, pinSnap, allowedSnap] = await Promise.all([
+  const [lockSnap, pinSnap, allowedSnap, masterSnap] = await Promise.all([
     db.ref('posukPractice/settings/accessLocked').once('value'),
     db.ref('posukPractice/settings/classPin').once('value'),
-    db.ref('posukPractice/allowedStudents/' + slug).once('value')
+    db.ref('posukPractice/allowedStudents/' + slug).once('value'),
+    db.ref('b3Games/siteSettings').once('value')
   ]);
 
+  const masterSettings = masterSnap.val() || {};
+  const masterGames = masterSettings.games || {};
+  if(masterSettings.siteEnabled === false || masterGames['posuk-practice-scroll'] === false){
+    return { ok:false, reason:'This game is currently turned off. Ask your teacher.' };
+  }
   if(lockSnap.val() === true){
     return { ok:false, reason:'Practice is closed right now. Ask your teacher.' };
   }
