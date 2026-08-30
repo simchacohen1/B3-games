@@ -412,6 +412,424 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
   }
 </style>
 
+
+<style data-shorashim-one-screen="v2">
+  /*
+    ONE-SCREEN MODE
+    At desktop/laptop widths, the Learn New Shorashim page itself
+    does not vertically scroll at 100% browser zoom.
+  */
+
+  @media (min-width: 901px) {
+    html:has(body.shorashim-learning-active),
+    body.shorashim-learning-active {
+      height: 100%;
+      overflow: hidden !important;
+    }
+
+    body.shorashim-learning-active {
+      min-height: 100dvh !important;
+    }
+
+    /* Compress the branding/header while a learning session is open. */
+    body.shorashim-learning-active .topbar {
+      box-sizing: border-box !important;
+      min-height: 0 !important;
+      height: 70px !important;
+      padding: 7px 28px !important;
+      margin: 0 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 14px !important;
+    }
+
+    body.shorashim-learning-active .topbar .eyebrow {
+      display: none !important;
+    }
+
+    body.shorashim-learning-active .topbar h1 {
+      font-size: clamp(1.75rem, 2.5vw, 2.25rem) !important;
+      line-height: 1 !important;
+      margin: 0 !important;
+      white-space: nowrap;
+    }
+
+    body.shorashim-learning-active .topbar > * {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
+
+    /* The learning screen owns the rest of the viewport. */
+    body.shorashim-learning-active #learnScreen.active {
+      box-sizing: border-box !important;
+      height: calc(100dvh - 70px) !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+      padding-top: 0 !important;
+      padding-bottom: 8px !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    body.shorashim-learning-active #learnScreen .section-head {
+      flex: 0 0 48px !important;
+      min-height: 48px !important;
+      height: 48px !important;
+      margin: 0 0 6px !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      display: grid !important;
+      grid-template-columns: 180px minmax(0, 1fr) 180px !important;
+      align-items: center !important;
+      gap: 10px !important;
+    }
+
+    body.shorashim-learning-active #learnScreen .section-head .eyebrow {
+      display: none !important;
+    }
+
+    body.shorashim-learning-active #learnScreen .section-head h2 {
+      font-size: clamp(1.4rem, 2vw, 1.75rem) !important;
+      line-height: 1 !important;
+      margin: 0 !important;
+    }
+
+    body.shorashim-learning-active #learnScreen .section-head > * {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
+
+    #learnWorkspace {
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      height: auto !important;
+      overflow: hidden !important;
+    }
+
+    #learnWorkspace .learn-layout {
+      box-sizing: border-box !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      gap: 10px !important;
+      padding-bottom: 0 !important;
+    }
+
+    /* Sidebar stays on-screen; only its list itself can scroll. */
+    #learnWorkspace .word-list-panel {
+      box-sizing: border-box !important;
+      position: static !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      padding: 11px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
+    }
+
+    #learnWorkspace .word-list-panel .panel-title-row {
+      flex: 0 0 auto !important;
+    }
+
+    #learnWorkspace .word-list-panel .mini-note {
+      flex: 0 0 auto !important;
+      margin: 5px 0 7px !important;
+      font-size: .76rem !important;
+      line-height: 1.25 !important;
+    }
+
+    #learnWorkspace .word-list {
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow-y: auto !important;
+    }
+
+    #learnWorkspace .word-list > * {
+      margin-bottom: 7px !important;
+    }
+
+    /* Editor fills the remaining height exactly. */
+    #learnWorkspace .editor-panel {
+      box-sizing: border-box !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+      padding: 10px 12px !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    #learnWorkspace .editor-panel > .panel-title-row {
+      flex: 0 0 38px !important;
+      min-height: 38px !important;
+      margin: 0 0 6px !important;
+      align-items: center !important;
+    }
+
+    #learnWorkspace .editor-panel > .panel-title-row .eyebrow {
+      font-size: .7rem !important;
+      line-height: 1 !important;
+      margin-bottom: 2px !important;
+    }
+
+    #learnWorkspace #editorTitle {
+      font-size: 1rem !important;
+      line-height: 1 !important;
+      margin: 0 !important;
+    }
+
+    #learnWorkspace .ux-quick-save {
+      padding: 8px 13px !important;
+      min-height: 34px !important;
+      height: 34px !important;
+      border-radius: 10px !important;
+    }
+
+    /* The editor content becomes a fixed-height workspace:
+       cards -> tabs -> active tools. */
+    #learnWorkspace #editorContent:not(.hidden) {
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      height: auto !important;
+      overflow: hidden !important;
+      display: grid !important;
+      grid-template-rows:
+        minmax(185px, 1fr)
+        42px
+        minmax(118px, 27%) !important;
+      gap: 6px !important;
+    }
+
+    #learnWorkspace .flip-stage {
+      box-sizing: border-box !important;
+      min-height: 0 !important;
+      height: 100% !important;
+      gap: 10px !important;
+    }
+
+    #learnWorkspace .flashcard.editable {
+      box-sizing: border-box !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      height: 100% !important;
+      border-radius: 17px !important;
+    }
+
+    /* Slightly smaller default content so large words/pictures still fit. */
+    #learnWorkspace .flashcard.editable .hebrew,
+    #learnWorkspace .flashcard.editable .hebrew-word {
+      line-height: 1 !important;
+    }
+
+    /* Compact tab strip. */
+    #learnWorkspace .ux-tool-tabs {
+      box-sizing: border-box !important;
+      min-height: 42px !important;
+      height: 42px !important;
+      margin: 0 !important;
+      padding: 3px 5px !important;
+      border-radius: 12px !important;
+      gap: 5px !important;
+      overflow: hidden !important;
+    }
+
+    #learnWorkspace .ux-tool-tab {
+      box-sizing: border-box !important;
+      min-height: 34px !important;
+      height: 34px !important;
+      padding: 5px 12px !important;
+      font-size: .88rem !important;
+      border-radius: 9px !important;
+    }
+
+    /* Tool area fills the final portion of the screen but never pushes
+       the page below the viewport. */
+    #learnWorkspace .tool-columns {
+      box-sizing: border-box !important;
+      min-height: 0 !important;
+      height: 100% !important;
+      overflow: hidden !important;
+      margin: 0 !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox {
+      box-sizing: border-box !important;
+      min-height: 0 !important;
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 8px 10px !important;
+      border-radius: 12px !important;
+      overflow: hidden !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox > h4 {
+      font-size: .9rem !important;
+      line-height: 1 !important;
+      margin: 0 0 5px !important;
+    }
+
+    /* Text & Card: all controls in two compact columns. */
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="text"].ux-tool-active {
+      display: grid !important;
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      grid-auto-rows: minmax(0, auto) !important;
+      align-content: start !important;
+      column-gap: 16px !important;
+      row-gap: 4px !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="text"] > h4 {
+      grid-column: 1 / -1 !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="text"] label {
+      margin: 0 !important;
+      font-size: .75rem !important;
+      line-height: 1.1 !important;
+      gap: 3px !important;
+    }
+
+    #learnWorkspace .tool-columns input[type="range"] {
+      margin-top: 2px !important;
+      margin-bottom: 2px !important;
+    }
+
+    #learnWorkspace .tool-columns select {
+      min-height: 28px !important;
+      height: 28px !important;
+      padding-top: 2px !important;
+      padding-bottom: 2px !important;
+      font-size: .78rem !important;
+    }
+
+    /* Picture controls: small image buttons and tighter groups. */
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"].ux-tool-active {
+      display: grid !important;
+      grid-template-columns: minmax(170px, 1fr) minmax(220px, 1.4fr) !important;
+      grid-template-rows: auto 1fr !important;
+      column-gap: 14px !important;
+      align-content: start !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] > h4 {
+      grid-column: 1 / -1 !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .art-section-label {
+      margin: 2px 0 !important;
+      font-size: .72rem !important;
+      line-height: 1 !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] button,
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="draw"] button {
+      min-height: 28px !important;
+      padding: 4px 8px !important;
+      font-size: .72rem !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .art-option,
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .emoji-option {
+      width: 42px !important;
+      height: 42px !important;
+      min-width: 42px !important;
+      min-height: 42px !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] img {
+      max-height: 36px !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] .mini-note,
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="pictures"] p:last-child {
+      display: none !important;
+    }
+
+    /* Draw controls in one compact row where possible. */
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="draw"].ux-tool-active {
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: flex-start !important;
+      gap: 5px !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="draw"] .draw-row,
+    #learnWorkspace .tool-columns > .toolbox[data-ux-tool="draw"] .button-row {
+      margin: 0 !important;
+      gap: 5px !important;
+    }
+
+    /* The top quick-save replaces the need for vertical room at bottom. */
+    #learnWorkspace .editor-actions {
+      margin: 0 !important;
+      padding: 0 !important;
+      min-height: 0 !important;
+    }
+
+    #learnWorkspace .editor-actions #saveCardBtn {
+      display: none !important;
+    }
+
+    /* If this footer exists in this screen, keep it from consuming
+       the working viewport. */
+    #learnWorkspace .session-footer {
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+  }
+
+  /* Very short laptop viewport: make cards slightly shorter and
+     give controls enough guaranteed space. */
+  @media (min-width: 901px) and (max-height: 720px) {
+    body.shorashim-learning-active .topbar {
+      height: 58px !important;
+      padding-top: 5px !important;
+      padding-bottom: 5px !important;
+    }
+
+    body.shorashim-learning-active .topbar h1 {
+      font-size: 1.65rem !important;
+    }
+
+    body.shorashim-learning-active #learnScreen.active {
+      height: calc(100dvh - 58px) !important;
+    }
+
+    body.shorashim-learning-active #learnScreen .section-head {
+      flex-basis: 42px !important;
+      height: 42px !important;
+      min-height: 42px !important;
+    }
+
+    #learnWorkspace #editorContent:not(.hidden) {
+      grid-template-rows:
+        minmax(155px, 1fr)
+        38px
+        minmax(108px, 29%) !important;
+    }
+
+    #learnWorkspace .ux-tool-tabs {
+      min-height: 38px !important;
+      height: 38px !important;
+    }
+
+    #learnWorkspace .ux-tool-tab {
+      min-height: 30px !important;
+      height: 30px !important;
+      padding-top: 3px !important;
+      padding-bottom: 3px !important;
+    }
+  }
+
+  /*
+    Narrow/mobile remains naturally scrollable. "No page scroll" is
+    intentionally a desktop/laptop rule, where the two-card workspace
+    is meant to fit in one viewport.
+  */
+</style>
+
 </head>
 <body>
   <section id="studentSiteClosed" class="login-gate hidden">
@@ -945,6 +1363,38 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
     document.addEventListener("DOMContentLoaded", boot, { once: true });
   } else {
     boot();
+  }
+})();
+</script>
+
+
+<script data-shorashim-one-screen="v2">
+(() => {
+  "use strict";
+
+  function syncLearningMode() {
+    const learnScreen = document.getElementById("learnScreen");
+    const active = !!learnScreen && learnScreen.classList.contains("active");
+    document.body.classList.toggle("shorashim-learning-active", active);
+  }
+
+  function bootOneScreen() {
+    syncLearningMode();
+
+    const observer = new MutationObserver(syncLearningMode);
+    observer.observe(document.documentElement, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+
+    window.addEventListener("pageshow", syncLearningMode);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootOneScreen, { once: true });
+  } else {
+    bootOneScreen();
   }
 })();
 </script>
