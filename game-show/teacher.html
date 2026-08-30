@@ -567,6 +567,20 @@ function ensureAudioAwake() {
   }
 }
 
+// Browsers silently re-suspend (or never fully unlock) an AudioContext that
+// isn't tied to a very recent user gesture on THIS tab. Since buzzes are
+// triggered from the student's tab, not this one, the teacher tab can go
+// quiet for long stretches with no gesture of its own to wake it back up.
+// Resuming on every single click anywhere on this page - not just the
+// dedicated "enable sound" button - keeps it alive far more reliably.
+document.addEventListener('click', () => {
+  if (!sharedAudioCtx) {
+    sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  } else if (sharedAudioCtx.state === 'suspended') {
+    sharedAudioCtx.resume();
+  }
+});
+
 function reveal() {
   ensureAudioAwake();
   gameRef.child('revealed').set(true);
@@ -854,32 +868,26 @@ function playAlertSound() {
     }
     const ctx = sharedAudioCtx;
     const startTime = ctx.currentTime;
+    const duration = 0.6;
 
-    // Punchy game-show buzzer: a short low square-wave "thunk" followed by
-    // a brief buzz, rather than a harsh wobbling tone.
-    const thunk = ctx.createOscillator();
-    thunk.type = "square";
-    thunk.frequency.setValueAtTime(110, startTime);
-    thunk.frequency.exponentialRampToValueAtTime(80, startTime + 0.12);
-    const thunkGain = ctx.createGain();
-    thunkGain.gain.setValueAtTime(0.35, startTime);
-    thunkGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.3);
-    thunk.connect(thunkGain);
-    thunkGain.connect(ctx.destination);
-    thunk.start(startTime);
-    thunk.stop(startTime + 0.3);
+    // Loud, sustained, unmistakable game-show buzzer: a flat square-wave
+    // tone held at full volume for a good half-second (not a quick blip
+    // that's easy to miss over classroom noise), with a hard cutoff instead
+    // of a slow fade so it reads as a clean "BZZZT" rather than a chime.
+    const osc = ctx.createOscillator();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(150, startTime);
 
-    const buzz = ctx.createOscillator();
-    buzz.type = "square";
-    buzz.frequency.setValueAtTime(196, startTime + 0.02);
-    const buzzGain = ctx.createGain();
-    buzzGain.gain.setValueAtTime(0.18, startTime + 0.02);
-    buzzGain.gain.setValueAtTime(0.18, startTime + 0.16);
-    buzzGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.26);
-    buzz.connect(buzzGain);
-    buzzGain.connect(ctx.destination);
-    buzz.start(startTime + 0.02);
-    buzz.stop(startTime + 0.26);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(0.5, startTime + 0.02);
+    gain.gain.setValueAtTime(0.5, startTime + duration - 0.05);
+    gain.gain.linearRampToValueAtTime(0, startTime + duration);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration);
 
     document.getElementById('soundStatus').textContent = 'Alert fired (state: ' + ctx.state + ')';
   } catch (err) {
