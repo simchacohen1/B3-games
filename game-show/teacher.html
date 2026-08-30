@@ -39,11 +39,26 @@
   .score-plus { background: #3b6d11; }
   .score-minus { background: #b85042; }
   .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; max-width: 900px; margin: 0 auto; }
-  .team { background: #e7e8d1; border-radius: 12px; padding: 16px 10px; text-align: center; cursor: pointer; border: 3px solid transparent; transition: border-color 0.15s; }
+  .team { background: #e7e8d1; border-radius: 12px; padding: 16px 10px; text-align: center; cursor: pointer; border: 3px solid transparent; transition: border-color 0.15s; position: relative; }
   .team:hover { border-color: #d9a85c; }
   .team.selected { border-color: #b85042; background: #f6e2b8; }
   .team .name { font-weight: bold; font-size: 18px; margin-bottom: 6px; word-break: break-word; }
   .team .score { font-size: 28px; font-weight: bold; color: #b85042; }
+  .team .remove-player {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    background: transparent;
+    border: none;
+    color: #8a5a3a;
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 999px;
+  }
+  .team .remove-player:hover { background: rgba(184, 80, 66, 0.15); color: #b85042; }
   .editor-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(58,36,23,0.6); z-index:1000; overflow-y:auto; padding:20px 0; }
   .editor-panel { max-width: 780px; margin: 0 auto; background:#fdf6ec; border-radius:12px; padding:20px; }
   .editor-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px; }
@@ -645,6 +660,24 @@ function selectPlayer(name) {
   gameRef.child('selectedPlayer').set(name);
 }
 
+function removePlayer(name) {
+  ensureAudioAwake();
+  if (!confirm('Remove "' + name + '" from the game? Their score will be deleted.')) return;
+
+  const updates = { ['scores/' + name]: null };
+
+  gameRef.once('value').then(snap => {
+    const data = snap.val() || {};
+    if (data.selectedPlayer === name) updates.selectedPlayer = null;
+    if (data.buzzedBy === name) updates.buzzedBy = null;
+    if (data.lastWinner === name) { updates.lastWinner = null; updates.lastWinnerStreak = 0; }
+    if (data.buzzPool && data.buzzPool[name] !== undefined) {
+      updates['buzzPool/' + name] = null;
+    }
+    gameRef.update(updates);
+  });
+}
+
 function adjustSelectedScore(delta) {
   ensureAudioAwake();
   if (!currentSelectedPlayer) {
@@ -894,9 +927,14 @@ gameRef.on('value', snapshot => {
     const div = document.createElement('div');
     div.className = 'team' + (name === currentSelectedPlayer ? ' selected' : '');
     div.innerHTML =
+      '<button class="remove-player" title="Remove player">×</button>' +
       '<div class="name">' + name + '</div>' +
       '<div class="score">' + scores[name] + '</div>';
     div.onclick = () => selectPlayer(name);
+    div.querySelector('.remove-player').onclick = (e) => {
+      e.stopPropagation();
+      removePlayer(name);
+    };
     board.appendChild(div);
   });
 });
@@ -974,7 +1012,7 @@ function loadPasted(replace) {
     return;
   }
   if (replace) {
-    const sure = confirmByTyping('REPLACE', "This will replace every question currently in the editor below with the " + rows.length + " pasted questions.");
+    const sure = confirm("Replace every question currently in the editor below with the " + rows.length + " pasted questions?");
     if (!sure) return;
     document.getElementById('editorList').innerHTML = '';
   }
