@@ -14,6 +14,23 @@
   // Reuses the same Firebase project as B3-games, under its own data path.
   firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 </script>
+<script>
+  // Master admin toggle: the same b3Games/siteSettings node the B3 Games
+  // homepage admin panel writes to. If the whole site or just this game
+  // has been switched off, cover the page with a blocked message - even
+  // for someone who already had this tab open.
+  window.addEventListener('DOMContentLoaded', () => {
+    firebase.database().ref('b3Games/siteSettings').on('value', snap => {
+      const settings = snap.val() || {};
+      const gamesMap = settings.games || {};
+      const blocked = settings.siteEnabled === false || gamesMap['class-gallery'] === false;
+      const overlay = document.getElementById('masterBlockedOverlay');
+      if (overlay) overlay.classList.toggle('show', blocked);
+    }, err => {
+      console.warn('Could not read master site settings', err);
+    });
+  });
+</script>
 <style>
   :root{
     --cork-1:#c69463;
@@ -450,9 +467,26 @@
     header h1{font-size:2.3rem;}
     .board{grid-template-columns:repeat(auto-fill, minmax(150px,1fr));gap:26px 14px;}
   }
+.master-blocked-overlay{
+  display:none;
+  position:fixed; inset:0; z-index:99999;
+  background:rgba(74,45,24,0.92);
+  align-items:center; justify-content:center;
+  padding:24px;
+}
+.master-blocked-overlay.show{ display:flex; }
+.master-blocked-card{
+  max-width:420px; background:var(--paper-cream); color:var(--ink);
+  border-radius:16px; padding:28px; text-align:center; font-size:18px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.4);
+}
 </style>
 </head>
 <body>
+
+<div class="master-blocked-overlay" id="masterBlockedOverlay">
+  <div class="master-blocked-card">This game is currently turned off. Ask your teacher.</div>
+</div>
 
 <header>
   <h1>Our Wall of Learning</h1>
