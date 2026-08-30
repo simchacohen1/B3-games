@@ -1,0 +1,275 @@
+name: Simplify Shorashim Review
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Simplify student review screen
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("shorashim/index.html")
+          if not path.exists():
+              raise SystemExit("ERROR: shorashim/index.html was not found.")
+
+          text = path.read_text(encoding="utf-8")
+          marker = 'data-shorashim-review-simple="v1"'
+
+          if marker in text:
+              print("Simplified Review is already installed.")
+              raise SystemExit(0)
+
+          required = [
+              'id="reviewScreen"',
+              'id="reviewMode"',
+              'id="startReviewBtn"',
+              'id="reviewEmpty"',
+              'id="reviewArea"',
+              'id="reviewCounter"',
+              'id="prevReviewBtn"',
+              'id="nextReviewBtn"',
+          ]
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit("ERROR: Expected Review elements not found: " + ", ".join(missing))
+
+          addon = r'''
+          <style data-shorashim-review-simple="v1">
+            /* Hide the complicated student-facing review-mode controls. */
+            #reviewScreen .review-controls {
+              display: none !important;
+            }
+
+            #reviewSimpleBar {
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              gap: 12px;
+              flex-wrap: wrap;
+              margin: 10px 0 14px;
+            }
+
+            #reviewSimpleBar .review-today-label {
+              font-weight: 900;
+              color: #334155;
+            }
+
+            #practiceAllCardsBtn {
+              border-radius: 12px;
+              min-height: 40px;
+              padding: 8px 15px;
+              font-weight: 800;
+            }
+
+            #reviewScreen .review-nav button:disabled {
+              opacity: .38 !important;
+              cursor: not-allowed !important;
+              filter: grayscale(.25);
+            }
+
+            #reviewScreen .review-nav button:disabled:hover {
+              transform: none !important;
+            }
+
+            @media (max-width: 600px) {
+              #reviewSimpleBar {
+                align-items: stretch;
+                flex-direction: column;
+              }
+
+              #practiceAllCardsBtn {
+                width: 100%;
+              }
+            }
+          </style>
+
+          <script data-shorashim-review-simple="v1">
+          (() => {
+            "use strict";
+
+            let reviewWasActive = false;
+            let autoStartTimer = null;
+
+            const byId = id => document.getElementById(id);
+
+            function dispatchChange(el) {
+              if (!el) return;
+              el.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+
+            function getCounterNumbers() {
+              const text = String(byId("reviewCounter")?.textContent || "");
+              const match = text.match(/(\d+)\s*(?:of|\/)\s*(\d+)/i);
+              return match
+                ? { current: Number(match[1]), total: Number(match[2]) }
+                : { current: 0, total: 0 };
+            }
+
+            function updateSingleCardNavigation() {
+              const prev = byId("prevReviewBtn");
+              const next = byId("nextReviewBtn");
+              if (!prev || !next) return;
+
+              const { total } = getCounterNumbers();
+
+              if (total === 1) {
+                /*
+                  With one learned card there is literally no previous/next card.
+                  Keep the buttons visible for layout consistency, but make the
+                  state obvious instead of making them look broken.
+                */
+                prev.disabled = true;
+                next.disabled = true;
+                prev.title = "There is only one learned card.";
+                next.title = "There is only one learned card.";
+              } else {
+                /*
+                  Do not try to replace the app's own navigation logic when there
+                  are multiple cards. Only remove the disabled state that THIS
+                  add-on applied for the one-card case.
+                */
+                if (prev.title === "There is only one learned card.") {
+                  prev.disabled = false;
+                  prev.title = "";
+                }
+                if (next.title === "There is only one learned card.") {
+                  next.disabled = false;
+                  next.title = "";
+                }
+              }
+            }
+
+            function makeSimpleBar() {
+              const screen = byId("reviewScreen");
+              if (!screen || byId("reviewSimpleBar")) return;
+
+              const rule = screen.querySelector(".review-rule");
+              const controls = screen.querySelector(".review-controls");
+              if (!controls) return;
+
+              const bar = document.createElement("div");
+              bar.id = "reviewSimpleBar";
+              bar.className = "card-panel";
+              bar.innerHTML = `
+                <span class="review-today-label">📚 Today's Review</span>
+                <button id="practiceAllCardsBtn" type="button" class="ghost">
+                  Practice All My Cards
+                </button>
+              `;
+
+              controls.parentNode.insertBefore(bar, controls.nextSibling);
+
+              byId("practiceAllCardsBtn").addEventListener("click", () => {
+                const mode = byId("reviewMode");
+                const start = byId("startReviewBtn");
+                if (!mode || !start) return;
+
+                mode.value = "shuffle";
+                dispatchChange(mode);
+                start.click();
+                window.setTimeout(updateSingleCardNavigation, 60);
+              });
+            }
+
+            function startTodaysReviewAutomatically() {
+              const mode = byId("reviewMode");
+              const start = byId("startReviewBtn");
+              if (!mode || !start) return;
+
+              mode.value = "daily";
+              dispatchChange(mode);
+
+              /*
+                Let the existing application own all card loading, progress,
+                timing, and game-unlock behavior. We simply press its existing
+                Start Review button for the student.
+              */
+              start.click();
+              window.setTimeout(updateSingleCardNavigation, 80);
+            }
+
+            function syncReviewScreen() {
+              const screen = byId("reviewScreen");
+              if (!screen) return;
+
+              makeSimpleBar();
+
+              const active = screen.classList.contains("active");
+
+              if (active && !reviewWasActive) {
+                reviewWasActive = true;
+                clearTimeout(autoStartTimer);
+                autoStartTimer = window.setTimeout(startTodaysReviewAutomatically, 80);
+              } else if (!active) {
+                reviewWasActive = false;
+              }
+
+              if (active) updateSingleCardNavigation();
+            }
+
+            function boot() {
+              makeSimpleBar();
+              syncReviewScreen();
+
+              const counter = byId("reviewCounter");
+              if (counter) {
+                new MutationObserver(updateSingleCardNavigation).observe(counter, {
+                  childList: true,
+                  subtree: true,
+                  characterData: true
+                });
+              }
+
+              new MutationObserver(syncReviewScreen).observe(document.documentElement, {
+                subtree: true,
+                attributes: true,
+                attributeFilter: ["class"],
+                childList: true
+              });
+            }
+
+            if (document.readyState === "loading") {
+              document.addEventListener("DOMContentLoaded", boot, { once: true });
+            } else {
+              boot();
+            }
+          })();
+          </script>
+          '''
+
+          lower = text.lower()
+          idx = lower.rfind("</body>")
+          if idx == -1:
+              raise SystemExit("ERROR: Could not find </body>.")
+
+          text = text[:idx] + addon + "\n" + text[idx:]
+          path.write_text(text, encoding="utf-8")
+          print("Installed simplified Shorashim Review.")
+          PY
+
+      - name: Commit Review improvements
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add shorashim/index.html
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Simplify Shorashim review screen"
+          git push
