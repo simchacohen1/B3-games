@@ -317,11 +317,19 @@ function beep(kind){
 async function checkAccess(name, pin){
   const slug = slugify(name);
   if(!slug){ return { ok:false, reason:'Please type your name.' }; }
-  const [lockSnap, pinSnap, allowedSnap] = await Promise.all([
+  const [lockSnap, pinSnap, allowedSnap, siteSettingsSnap] = await Promise.all([
     db.ref('rashiLetters/settings/accessLocked').once('value'),
     db.ref('posukPractice/settings/classPin').once('value'),
-    db.ref('posukPractice/allowedStudents/' + slug).once('value')
+    db.ref('posukPractice/allowedStudents/' + slug).once('value'),
+    db.ref('b3Games/siteSettings').once('value')
   ]);
+  const siteSettings = siteSettingsSnap.val() || {};
+  const gamesMap = siteSettings.games || {};
+  const siteWideOff = siteSettings.siteEnabled === false;
+  const gameSpecificOff = gamesMap['rashi-letters'] === false;
+  if(siteWideOff || gameSpecificOff){
+    return { ok:false, reason:'This game is currently turned off. Ask your teacher.' };
+  }
   if(lockSnap.val() === true){
     return { ok:false, reason:'Practice is closed right now. Ask your teacher.' };
   }
