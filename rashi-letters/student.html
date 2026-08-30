@@ -45,6 +45,11 @@
     border-radius:14px;
     padding:22px;
     box-shadow:0 6px 18px var(--shadow);
+    animation: cardIn .25s ease;
+  }
+  @keyframes cardIn{
+    from{ opacity:0; transform:translateY(6px); }
+    to{ opacity:1; transform:translateY(0); }
   }
   .name-gate{ text-align:center; }
   .name-gate input{
@@ -62,12 +67,20 @@
   .btn:disabled{ opacity:0.45; cursor:not-allowed; box-shadow:none; }
   #gateMsg{ min-height:20px; font-size:0.9rem; color:var(--rimon-dark); font-weight:600; margin-top:4px; }
   #app{ display:none; }
-  .unit-label{ font-size:13px; color:var(--ink-soft); margin-bottom:10px; }
+  .phase-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .unit-label{ font-size:13px; color:var(--ink-soft); }
+  .phase-pill{
+    font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px;
+    background:var(--parchment-dark); color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.4px;
+  }
+  .phase-pill.word{ background:var(--gold-light); color:var(--rimon-dark); }
   .letter-box{
     background:#FFFDF7; border:0.5px solid var(--gold); border-radius:12px;
     padding:1.75rem 1rem; display:flex; justify-content:center; margin-bottom:14px;
+    min-height:150px; align-items:center;
   }
-  #rashiLetter{ font-family:'Mekorot Rashi', serif; font-size:110px; line-height:1; color:var(--ink); }
+  #rashiLetter{ font-family:'Mekorot Rashi', serif; font-size:110px; line-height:1; color:var(--ink); transition:transform .15s ease; }
+  #rashiLetter.word-mode{ font-size:58px; }
   .prompt{ text-align:center; font-size:0.95rem; color:var(--ink-soft); margin-bottom:14px; }
   .choices{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:16px; }
   .choice-btn{
@@ -76,15 +89,23 @@
     cursor:pointer; transition:transform .08s ease;
   }
   .choice-btn:active{ transform:scale(0.97); }
-  .choice-btn.correct{ background:#DCEFD9; border-color:#4C8C4A; }
-  .choice-btn.incorrect{ background:#F4D9D9; border-color:var(--rimon); }
+  .choice-btn.correct{ background:#DCEFD9; border-color:#4C8C4A; animation: pop .35s ease; }
+  .choice-btn.incorrect{ background:#F4D9D9; border-color:var(--rimon); animation: shake .35s ease; }
+  @keyframes pop{
+    0%{ transform:scale(1); } 40%{ transform:scale(1.12); } 100%{ transform:scale(1); }
+  }
+  @keyframes shake{
+    0%,100%{ transform:translateX(0); } 25%{ transform:translateX(-6px); } 75%{ transform:translateX(6px); }
+  }
   #feedback{ min-height:22px; text-align:center; font-size:0.95rem; font-weight:600; margin-bottom:10px; }
-  .progress-track{ width:100%; height:8px; background:var(--parchment-dark); border-radius:4px; overflow:hidden; }
+  .progress-track{ width:100%; height:8px; background:var(--parchment-dark); border-radius:4px; overflow:hidden; margin-bottom:10px; }
   #progFill{ height:100%; background:var(--rimon); border-radius:4px; transition:width .3s ease; }
-  #closedScreen{ display:none; text-align:center; }
-  #closedScreen.show{ display:block; }
-  #completeScreen{ display:none; text-align:center; }
-  #completeScreen.show{ display:block; }
+  .streak-row{ display:flex; justify-content:center; gap:6px; }
+  .streak-star{ font-size:15px; opacity:0.25; transition:opacity .2s ease, transform .2s ease; }
+  .streak-star.lit{ opacity:1; transform:scale(1.15); }
+  #completeScreen, #closedScreen{ display:none; text-align:center; }
+  #completeScreen.show, #closedScreen.show{ display:block; }
+  .confetti-row{ font-size:1.6rem; margin-bottom:6px; letter-spacing:4px; }
 </style>
 </head>
 <body>
@@ -104,17 +125,22 @@
   </div>
 
   <div class="card" id="app">
-    <div class="unit-label" id="unitLabel"></div>
+    <div class="phase-row">
+      <div class="unit-label" id="unitLabel"></div>
+      <div class="phase-pill" id="phasePill">Letter</div>
+    </div>
     <div class="letter-box"><span id="rashiLetter"></span></div>
-    <div class="prompt">Which letter is this?</div>
+    <div class="prompt" id="promptText">Which letter is this?</div>
     <div class="choices" id="choicesRow"></div>
     <div id="feedback"></div>
     <div class="progress-track"><div id="progFill" style="width:0%"></div></div>
+    <div class="streak-row" id="streakRow"></div>
   </div>
 
   <div class="card" id="completeScreen">
+    <div class="confetti-row">🎉🎊🎉</div>
     <div style="font-family:'Frank Ruhl Libre', serif; font-size:1.5rem; color:var(--rimon-dark); margin-bottom:8px;">כל הכבוד!</div>
-    <p>You finished all the Rashi letters. Great work!</p>
+    <p>You finished all the Rashi letters and words. Great work!</p>
   </div>
 
   <div class="card" id="closedScreen">
@@ -138,24 +164,63 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 const UNITS = [
-  { id:'zayin', label:'ז', type:'single', correct:'ז', distractors:['ו','ר','נ'] },
-  { id:'bet', label:'בּ / ב', type:'pair', pair:['בּ','ב'], distractors:['כ','ר'] },
-  { id:'tsadi', label:'צ', type:'single', correct:'צ', distractors:['ע','ן','ר'] },
-  { id:'alef', label:'א', type:'single', correct:'א', distractors:['ת','ע','ה'] },
-  { id:'tsadisofit', label:'ץ', type:'single', correct:'ץ', distractors:['ן','ף','ך'] },
-  { id:'memsofit', label:'ם', type:'single', correct:'ם', distractors:['ס','ט','ו'] },
-  { id:'shin', label:'שׁ / שׂ', type:'pair', pair:['שׁ','שׂ'], distractors:['ס','ע'] },
-  { id:'samech', label:'ס', type:'single', correct:'ס', distractors:['ם','ה','ו'] },
-  { id:'finalreview', label:'שׁ / שׂ (review)', type:'pair', pair:['שׁ','שׂ'], distractors:['ב','צ'] }
+  { id:'zayin', label:'ז', type:'single', correct:'ז', distractors:['ו','ר','נ'],
+    words:[
+      {w:'זֶה', t:'ז'}, {w:'זָר', t:'ז'}, {w:'זַךְ', t:'ז'}, {w:'זֵר', t:'ז'},
+      {w:'זָקֵן', t:'ז'}, {w:'זָכַר', t:'ז'}, {w:'זָמַר', t:'ז'}, {w:'גָּזַל', t:'ז'}
+    ]},
+  { id:'bet', label:'בּ / ב', type:'pair', pair:['בּ','ב'], distractors:['כ','ר'],
+    words:[
+      {w:'בַּיִת', t:'בּ'}, {w:'בֵּן', t:'בּ'}, {w:'בֹּקֶר', t:'בּ'}, {w:'בָּנָה', t:'בּ'},
+      {w:'עֶרֶב', t:'ב'}, {w:'זָהָב', t:'ב'}, {w:'לֵב', t:'ב'}, {w:'אֹהֵב', t:'ב'}
+    ]},
+  { id:'tsadi', label:'צ', type:'single', correct:'צ', distractors:['ע','ן','ר'],
+    words:[
+      {w:'צַד', t:'צ'}, {w:'צָר', t:'צ'}, {w:'צֵל', t:'צ'}, {w:'צַדִּיק', t:'צ'},
+      {w:'צֶדֶק', t:'צ'}, {w:'צָמַח', t:'צ'}, {w:'צַיִד', t:'צ'}, {w:'צֶבַע', t:'צ'}
+    ]},
+  { id:'alef', label:'א', type:'single', correct:'א', distractors:['ת','ע','ה'],
+    words:[
+      {w:'אָב', t:'א'}, {w:'אָח', t:'א'}, {w:'אֶרֶז', t:'א'}, {w:'אֹהֶל', t:'א'},
+      {w:'אֹכֶל', t:'א'}, {w:'אֲדָמָה', t:'א'}, {w:'אֱמֶת', t:'א'}, {w:'אַהֲבָה', t:'א'}
+    ]},
+  { id:'tsadisofit', label:'ץ', type:'single', correct:'ץ', distractors:['ן','ף','ך'],
+    words:[
+      {w:'עֵץ', t:'ץ'}, {w:'רָץ', t:'ץ'}, {w:'אֶרֶץ', t:'ץ'}, {w:'קוֹץ', t:'ץ'},
+      {w:'חוּץ', t:'ץ'}, {w:'קָפַץ', t:'ץ'}, {w:'פָּרַץ', t:'ץ'}, {w:'רָחַץ', t:'ץ'}
+    ]},
+  { id:'memsofit', label:'ם', type:'single', correct:'ם', distractors:['ס','ט','ו'],
+    words:[
+      {w:'יָם', t:'ם'}, {w:'חַם', t:'ם'}, {w:'דָּם', t:'ם'}, {w:'מַיִם', t:'ם'},
+      {w:'יוֹם', t:'ם'}, {w:'מָקוֹם', t:'ם'}, {w:'פָּנִים', t:'ם'}, {w:'עוֹלָם', t:'ם'}
+    ]},
+  { id:'shin', label:'שׁ / שׂ', type:'pair', pair:['שׁ','שׂ'], distractors:['ס','ע'],
+    words:[
+      {w:'שָׁב', t:'שׁ'}, {w:'שׁוֹר', t:'שׁ'}, {w:'שַׁבָּת', t:'שׁ'}, {w:'שָׁמַר', t:'שׁ'},
+      {w:'שַׂר', t:'שׂ'}, {w:'שָׂדֶה', t:'שׂ'}, {w:'שָׂרַף', t:'שׂ'}, {w:'שִׂיחַ', t:'שׂ'}
+    ]},
+  { id:'samech', label:'ס', type:'single', correct:'ס', distractors:['ם','ה','ו'],
+    words:[
+      {w:'סַף', t:'ס'}, {w:'סוּס', t:'ס'}, {w:'סוּר', t:'ס'}, {w:'סֵפֶר', t:'ס'},
+      {w:'סָגַר', t:'ס'}, {w:'סָעַר', t:'ס'}, {w:'סָקַל', t:'ס'}, {w:'כִּסֵּא', t:'ס'}
+    ]},
+  { id:'finalreview', label:'שׁ / שׂ (review)', type:'pair', pair:['שׁ','שׂ'], distractors:['ב','צ'],
+    words:[
+      {w:'שָׁלוֹם', t:'שׁ'}, {w:'שָׁמַיִם', t:'שׁ'}, {w:'שָׁלַח', t:'שׁ'}, {w:'שַׁחַר', t:'שׁ'},
+      {w:'שָׂמֵחַ', t:'שׂ'}, {w:'שָׂפָה', t:'שׂ'}, {w:'שָׂכָר', t:'שׂ'}, {w:'שֶׂה', t:'שׂ'}
+    ]}
 ];
 const NEEDED_IN_A_ROW = 3;
 
 let studentName = null;
 let studentId = null;
 let unitIndex = 0;
+let phase = 'letter'; // 'letter' | 'word'
 let streak = 0;
 let currentTarget = null;
+let currentWord = null;
 let answering = false;
+let audioCtx = null;
 
 function slugify(name){
   return String(name).trim().toLowerCase().replace(/[^a-z0-9\u0590-\u05FF]+/g,'_').replace(/(^_|_$)/g,'');
@@ -167,6 +232,28 @@ function shuffle(arr){
     [a[i],a[j]] = [a[j],a[i]];
   }
   return a;
+}
+
+function beep(kind){
+  try{
+    if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    if(kind === 'correct'){
+      o.frequency.setValueAtTime(520, audioCtx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(780, audioCtx.currentTime + 0.15);
+      g.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.22);
+      o.start(); o.stop(audioCtx.currentTime + 0.22);
+    } else {
+      o.frequency.setValueAtTime(200, audioCtx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.18);
+      g.gain.setValueAtTime(0.07, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.24);
+      o.start(); o.stop(audioCtx.currentTime + 0.24);
+    }
+  }catch(e){ /* audio not critical */ }
 }
 
 async function checkAccess(name, pin){
@@ -220,9 +307,11 @@ document.getElementById('startBtn').onclick = async () => {
 };
 
 async function loadProgress(){
-  const snap = await db.ref('rashiLetters/progress/' + studentId + '/currentUnitIndex').once('value');
-  const savedIndex = snap.val();
+  const snap = await db.ref('rashiLetters/progress/' + studentId).once('value');
+  const rec = snap.val() || {};
+  const savedIndex = rec.currentUnitIndex;
   unitIndex = (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex < UNITS.length) ? savedIndex : 0;
+  phase = (rec.currentPhase === 'word') ? 'word' : 'letter';
   streak = 0;
 }
 
@@ -230,11 +319,22 @@ function pickTarget(unit){
   if(unit.type === 'single'){ return unit.correct; }
   return unit.pair[Math.floor(Math.random()*2)];
 }
-function choicesFor(unit, target){
+function choicesFor(unit){
   if(unit.type === 'single'){
     return shuffle([unit.correct, ...unit.distractors]);
   }
   return shuffle([...unit.pair, ...unit.distractors]);
+}
+
+function updateStreakStars(){
+  const row = document.getElementById('streakRow');
+  row.innerHTML = '';
+  for(let i=0;i<NEEDED_IN_A_ROW;i++){
+    const s = document.createElement('span');
+    s.className = 'streak-star' + (i < streak ? ' lit' : '');
+    s.textContent = '★';
+    row.appendChild(s);
+  }
 }
 
 function renderQuestion(){
@@ -244,14 +344,35 @@ function renderQuestion(){
     return;
   }
   const unit = UNITS[unitIndex];
-  currentTarget = pickTarget(unit);
+  const rashiEl = document.getElementById('rashiLetter');
+  const pill = document.getElementById('phasePill');
+  const promptEl = document.getElementById('promptText');
+
+  if(phase === 'letter'){
+    currentTarget = pickTarget(unit);
+    currentWord = null;
+    rashiEl.classList.remove('word-mode');
+    rashiEl.textContent = currentTarget;
+    promptEl.textContent = 'Which letter is this?';
+    pill.textContent = 'Letter';
+    pill.classList.remove('word');
+  } else {
+    const wordEntry = unit.words[Math.floor(Math.random()*unit.words.length)];
+    currentWord = wordEntry;
+    currentTarget = wordEntry.t;
+    rashiEl.classList.add('word-mode');
+    rashiEl.textContent = wordEntry.w;
+    promptEl.textContent = 'Which letter is in this word?';
+    pill.textContent = 'Word';
+    pill.classList.add('word');
+  }
+
   document.getElementById('unitLabel').textContent =
     'Letter ' + (unitIndex+1) + ' of ' + UNITS.length + ' \u00b7 ' + unit.label;
-  document.getElementById('rashiLetter').textContent = currentTarget;
   document.getElementById('feedback').textContent = '';
   const row = document.getElementById('choicesRow');
   row.innerHTML = '';
-  const opts = choicesFor(unit, currentTarget);
+  const opts = choicesFor(unit);
   opts.forEach(letter => {
     const b = document.createElement('button');
     b.className = 'choice-btn';
@@ -259,8 +380,10 @@ function renderQuestion(){
     b.onclick = () => handleAnswer(letter, b);
     row.appendChild(b);
   });
-  const pct = Math.round((unitIndex / UNITS.length) * 100 + (streak/NEEDED_IN_A_ROW)*(100/UNITS.length));
+  const phaseFrac = (phase === 'word' ? 1 : 0) + (streak/NEEDED_IN_A_ROW);
+  const pct = Math.round(((unitIndex*2 + phaseFrac) / (UNITS.length*2)) * 100);
   document.getElementById('progFill').style.width = Math.min(pct,100) + '%';
+  updateStreakStars();
   answering = false;
 }
 
@@ -277,23 +400,34 @@ async function handleAnswer(letter, btnEl){
     fb.style.color = 'var(--rimon-dark)';
     fb.textContent = 'Correct!';
     streak += 1;
+    beep('correct');
   }else{
     btnEl.classList.add('incorrect');
     fb.style.color = 'var(--rimon)';
     fb.textContent = 'Not quite. Try again next time.';
     streak = 0;
+    beep('incorrect');
   }
-  await logAttempt(unit.id, isCorrect);
+  updateStreakStars();
+  await logAttempt(unit.id, phase, isCorrect);
+
   if(streak >= NEEDED_IN_A_ROW){
-    unitIndex += 1;
     streak = 0;
+    if(phase === 'letter'){
+      phase = 'word';
+    } else {
+      phase = 'letter';
+      unitIndex += 1;
+    }
     await db.ref('rashiLetters/progress/' + studentId + '/currentUnitIndex').set(unitIndex);
+    await db.ref('rashiLetters/progress/' + studentId + '/currentPhase').set(phase);
   }
   setTimeout(renderQuestion, 900);
 }
 
-async function logAttempt(unitId, correct){
-  const path = 'rashiLetters/progress/' + studentId + '/units/' + unitId;
+async function logAttempt(unitId, ph, correct){
+  const key = unitId + '_' + ph;
+  const path = 'rashiLetters/progress/' + studentId + '/units/' + key;
   const snap = await db.ref(path).once('value');
   const existing = snap.val() || { attempts:0, correct:0 };
   await db.ref(path).set({
