@@ -50,6 +50,12 @@
         line-height: 1;
     }
 
+    .card-icon.rashi-script {
+        font-family: 'Noto Rashi Hebrew', serif;
+        font-weight: 600;
+        font-size: 34px;
+    }
+
     .card-title {
         font-size: 17px;
         font-weight: bold;
@@ -210,6 +216,9 @@
         color: #92400e;
     }
 </style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Rashi+Hebrew:wght@600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
@@ -242,7 +251,7 @@
             <span class="card-closed-badge">Closed</span>
         </a>
         <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html">
-            <span class="card-icon">✡️</span>
+            <span class="card-icon rashi-script">רש״י</span>
             <span class="card-title">Rashi Letters</span>
             <span class="card-closed-badge">Closed</span>
         </a>
