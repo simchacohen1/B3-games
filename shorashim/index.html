@@ -832,6 +832,53 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
   */
 </style>
 
+<!-- Keep the learning editor spacious without trapping it in a fixed-height
+     desktop viewport. The workspace is intentionally scrollable when its
+     cards or tools need more room. -->
+<style data-shorashim-scrollable-workspace="v1">
+  @media (min-width: 901px) {
+    html:has(body.shorashim-learning-active),
+    body.shorashim-learning-active {
+      height: auto !important;
+      overflow: auto !important;
+    }
+
+    body.shorashim-learning-active #learnScreen.active,
+    #learnWorkspace,
+    #learnWorkspace .learn-layout,
+    #learnWorkspace .editor-panel,
+    #learnWorkspace #editorContent:not(.hidden),
+    #learnWorkspace .tool-columns,
+    #learnWorkspace .tool-columns > .toolbox {
+      height: auto !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+    }
+
+    body.shorashim-learning-active #learnScreen.active,
+    #learnWorkspace .editor-panel {
+      display: block !important;
+    }
+
+    #learnWorkspace #editorContent:not(.hidden) {
+      display: block !important;
+    }
+
+    #learnWorkspace .flashcard.editable {
+      height: clamp(245px, 34vh, 350px) !important;
+      max-height: 350px !important;
+    }
+
+    #learnWorkspace .tool-columns > .toolbox {
+      padding: 13px 14px !important;
+    }
+
+    #learnWorkspace .editor-actions #saveCardBtn {
+      display: inline-flex !important;
+    }
+  }
+</style>
+
 </head>
 <body>
   <section id="studentSiteClosed" class="login-gate hidden">
@@ -1195,7 +1242,7 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-  <script src="app.js?v=20260829c"></script>
+  <script src="app.js?v=20260830a"></script>
 
 <script data-shorashim-workspace-ux="v1">
 (() => {
