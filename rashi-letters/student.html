@@ -158,7 +158,7 @@ let currentTarget = null;
 let answering = false;
 
 function slugify(name){
-  return String(name).trim().toLowerCase().replace(/[^a-z0-9\u0590-\u05FF]+/g,'-').replace(/(^-|-$)/g,'');
+  return String(name).trim().toLowerCase().replace(/[^a-z0-9\u0590-\u05FF]+/g,'_').replace(/(^_|_$)/g,'');
 }
 function shuffle(arr){
   const a = arr.slice();
