@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rashi Letters</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  @font-face{
+    font-family: 'Mekorot Rashi';
+    src: url('./fonts/Mekorot-Rashi.ttf') format('truetype');
+    font-display: swap;
+  }
+  :root{
+    --parchment: #F1E7CE;
+    --parchment-dark: #E4D4AC;
+    --ink: #3B2A1E;
+    --ink-soft: #6B5842;
+    --rimon: #8C2F39;
+    --rimon-dark: #6E1F28;
+    --gold: #C9A227;
+    --gold-light: #E4C662;
+    --shadow: rgba(59,42,30,0.25);
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0;
+    background: radial-gradient(circle at 20% 10%, #F6EEDA 0%, #E9DBB8 55%, #DCC998 100%);
+    font-family:'Quicksand', sans-serif;
+    color: var(--ink);
+    min-height:100vh;
+  }
+  .wrap{ max-width:520px; margin:0 auto; padding:28px 18px 60px; }
+  header.top{ text-align:center; margin-bottom:22px; }
+  header.top h1{
+    font-family:'Frank Ruhl Libre', serif;
+    font-weight:700; font-size:1.9rem;
+    color: var(--rimon-dark); margin:0 0 4px; letter-spacing:0.5px;
+  }
+  header.top p{ margin:0; color:var(--ink-soft); font-size:0.95rem; }
+  .card{
+    background: var(--parchment);
+    border:2px solid var(--gold);
+    border-radius:14px;
+    padding:22px;
+    box-shadow:0 6px 18px var(--shadow);
+  }
+  .name-gate{ text-align:center; }
+  .name-gate input{
+    font-family:'Quicksand', sans-serif; font-size:1.1rem;
+    padding:10px 14px; border-radius:10px; border:2px solid var(--gold);
+    width:70%; max-width:320px; margin:10px 0; display:block; margin-left:auto; margin-right:auto;
+  }
+  .btn{
+    font-family:'Quicksand', sans-serif; font-weight:700; font-size:1rem;
+    border:none; border-radius:999px; padding:12px 26px; cursor:pointer;
+    color:#fff; background:var(--rimon); box-shadow:0 4px 0 var(--rimon-dark);
+    transition:transform .08s ease;
+  }
+  .btn:active{ transform:translateY(3px); box-shadow:0 1px 0 var(--rimon-dark); }
+  .btn:disabled{ opacity:0.45; cursor:not-allowed; box-shadow:none; }
+  #gateMsg{ min-height:20px; font-size:0.9rem; color:var(--rimon-dark); font-weight:600; margin-top:4px; }
+  #app{ display:none; }
+  .unit-label{ font-size:13px; color:var(--ink-soft); margin-bottom:10px; }
+  .letter-box{
+    background:#FFFDF7; border:0.5px solid var(--gold); border-radius:12px;
+    padding:1.75rem 1rem; display:flex; justify-content:center; margin-bottom:14px;
+  }
+  #rashiLetter{ font-family:'Mekorot Rashi', serif; font-size:110px; line-height:1; color:var(--ink); }
+  .prompt{ text-align:center; font-size:0.95rem; color:var(--ink-soft); margin-bottom:14px; }
+  .choices{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+  .choice-btn{
+    font-family:'Frank Ruhl Libre', serif; font-size:2.2rem; height:70px;
+    border-radius:12px; border:2px solid var(--gold); background:#FFFDF7; color:var(--ink);
+    cursor:pointer; transition:transform .08s ease;
+  }
+  .choice-btn:active{ transform:scale(0.97); }
+  .choice-btn.correct{ background:#DCEFD9; border-color:#4C8C4A; }
+  .choice-btn.incorrect{ background:#F4D9D9; border-color:var(--rimon); }
+  #feedback{ min-height:22px; text-align:center; font-size:0.95rem; font-weight:600; margin-bottom:10px; }
+  .progress-track{ width:100%; height:8px; background:var(--parchment-dark); border-radius:4px; overflow:hidden; }
+  #progFill{ height:100%; background:var(--rimon); border-radius:4px; transition:width .3s ease; }
+  #closedScreen{ display:none; text-align:center; }
+  #closedScreen.show{ display:block; }
+  #completeScreen{ display:none; text-align:center; }
+  #completeScreen.show{ display:block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>אותיות רש"י</h1>
+    <p>Rashi Letters Practice</p>
+  </header>
+
+  <div class="card name-gate" id="nameGate">
+    <div>Your name</div>
+    <input id="studentNameInput" type="text" placeholder="Type your name here" maxlength="30">
+    <div>Class PIN</div>
+    <input id="classPinInput" type="password" placeholder="Ask your teacher" maxlength="20" inputmode="numeric">
+    <div><button class="btn" id="startBtn">Start</button></div>
+    <div id="gateMsg"></div>
+  </div>
+
+  <div class="card" id="app">
+    <div class="unit-label" id="unitLabel"></div>
+    <div class="letter-box"><span id="rashiLetter"></span></div>
+    <div class="prompt">Which letter is this?</div>
+    <div class="choices" id="choicesRow"></div>
+    <div id="feedback"></div>
+    <div class="progress-track"><div id="progFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="card" id="completeScreen">
+    <div style="font-family:'Frank Ruhl Libre', serif; font-size:1.5rem; color:var(--rimon-dark); margin-bottom:8px;">כל הכבוד!</div>
+    <p>You finished all the Rashi letters. Great work!</p>
+  </div>
+
+  <div class="card" id="closedScreen">
+    <p>Practice is closed right now. Ask your teacher.</p>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
+  authDomain: "b3-games.firebaseapp.com",
+  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
+  projectId: "b3-games",
+  storageBucket: "b3-games.firebasestorage.app",
+  messagingSenderId: "568530046190",
+  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const UNITS = [
+  { id:'zayin', label:'ז', type:'single', correct:'ז', distractors:['ו','ר','נ'] },
+  { id:'bet', label:'בּ / ב', type:'pair', pair:['בּ','ב'], distractors:['כ','ר'] },
+  { id:'tsadi', label:'צ', type:'single', correct:'צ', distractors:['ע','ן','ר'] },
+  { id:'alef', label:'א', type:'single', correct:'א', distractors:['ת','ע','ה'] },
+  { id:'tsadisofit', label:'ץ', type:'single', correct:'ץ', distractors:['ן','ף','ך'] },
+  { id:'memsofit', label:'ם', type:'single', correct:'ם', distractors:['ס','ט','ו'] },
+  { id:'shin', label:'שׁ / שׂ', type:'pair', pair:['שׁ','שׂ'], distractors:['ס','ע'] },
+  { id:'samech', label:'ס', type:'single', correct:'ס', distractors:['ם','ה','ו'] },
+  { id:'finalreview', label:'שׁ / שׂ (review)', type:'pair', pair:['שׁ','שׂ'], distractors:['ב','צ'] }
+];
+const NEEDED_IN_A_ROW = 3;
+
+let studentName = null;
+let studentId = null;
+let unitIndex = 0;
+let streak = 0;
+let currentTarget = null;
+let answering = false;
+
+function slugify(name){
+  return String(name).trim().toLowerCase().replace(/[^a-z0-9\u0590-\u05FF]+/g,'-').replace(/(^-|-$)/g,'');
+}
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+async function checkAccess(name, pin){
+  const slug = slugify(name);
+  if(!slug){ return { ok:false, reason:'Please type your name.' }; }
+  const [lockSnap, pinSnap, allowedSnap] = await Promise.all([
+    db.ref('rashiLetters/settings/accessLocked').once('value'),
+    db.ref('posukPractice/settings/classPin').once('value'),
+    db.ref('posukPractice/allowedStudents/' + slug).once('value')
+  ]);
+  if(lockSnap.val() === true){
+    return { ok:false, reason:'Practice is closed right now. Ask your teacher.' };
+  }
+  const realPin = pinSnap.val();
+  if(realPin && String(pin).trim() !== String(realPin).trim()){
+    return { ok:false, reason:'Incorrect PIN. Ask your teacher.' };
+  }
+  if(!allowedSnap.exists()){
+    return { ok:false, reason:'Ask your teacher to add your name first.' };
+  }
+  return { ok:true, slug };
+}
+
+document.getElementById('startBtn').onclick = async () => {
+  const val = document.getElementById('studentNameInput').value.trim();
+  const pin = document.getElementById('classPinInput').value.trim();
+  if(!val){ return; }
+  const startBtn = document.getElementById('startBtn');
+  startBtn.disabled = true;
+  const msg = document.getElementById('gateMsg');
+  msg.textContent = 'Checking…';
+  try{
+    const result = await checkAccess(val, pin);
+    if(!result.ok){
+      msg.textContent = result.reason;
+      startBtn.disabled = false;
+      return;
+    }
+    msg.textContent = '';
+    studentName = val;
+    studentId = result.slug;
+    await loadProgress();
+    document.getElementById('nameGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    renderQuestion();
+  }catch(e){
+    console.error(e);
+    msg.textContent = 'Something went wrong. Try again.';
+    startBtn.disabled = false;
+  }
+};
+
+async function loadProgress(){
+  const snap = await db.ref('rashiLetters/progress/' + studentId + '/currentUnitIndex').once('value');
+  const savedIndex = snap.val();
+  unitIndex = (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex < UNITS.length) ? savedIndex : 0;
+  streak = 0;
+}
+
+function pickTarget(unit){
+  if(unit.type === 'single'){ return unit.correct; }
+  return unit.pair[Math.floor(Math.random()*2)];
+}
+function choicesFor(unit, target){
+  if(unit.type === 'single'){
+    return shuffle([unit.correct, ...unit.distractors]);
+  }
+  return shuffle([...unit.pair, ...unit.distractors]);
+}
+
+function renderQuestion(){
+  if(unitIndex >= UNITS.length){
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('completeScreen').classList.add('show');
+    return;
+  }
+  const unit = UNITS[unitIndex];
+  currentTarget = pickTarget(unit);
+  document.getElementById('unitLabel').textContent =
+    'Letter ' + (unitIndex+1) + ' of ' + UNITS.length + ' \u00b7 ' + unit.label;
+  document.getElementById('rashiLetter').textContent = currentTarget;
+  document.getElementById('feedback').textContent = '';
+  const row = document.getElementById('choicesRow');
+  row.innerHTML = '';
+  const opts = choicesFor(unit, currentTarget);
+  opts.forEach(letter => {
+    const b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.textContent = letter;
+    b.onclick = () => handleAnswer(letter, b);
+    row.appendChild(b);
+  });
+  const pct = Math.round((unitIndex / UNITS.length) * 100 + (streak/NEEDED_IN_A_ROW)*(100/UNITS.length));
+  document.getElementById('progFill').style.width = Math.min(pct,100) + '%';
+  answering = false;
+}
+
+async function handleAnswer(letter, btnEl){
+  if(answering) return;
+  answering = true;
+  const unit = UNITS[unitIndex];
+  const isCorrect = (letter === currentTarget);
+  const fb = document.getElementById('feedback');
+  const allBtns = document.querySelectorAll('.choice-btn');
+  allBtns.forEach(b => b.disabled = true);
+  if(isCorrect){
+    btnEl.classList.add('correct');
+    fb.style.color = 'var(--rimon-dark)';
+    fb.textContent = 'Correct!';
+    streak += 1;
+  }else{
+    btnEl.classList.add('incorrect');
+    fb.style.color = 'var(--rimon)';
+    fb.textContent = 'Not quite. Try again next time.';
+    streak = 0;
+  }
+  await logAttempt(unit.id, isCorrect);
+  if(streak >= NEEDED_IN_A_ROW){
+    unitIndex += 1;
+    streak = 0;
+    await db.ref('rashiLetters/progress/' + studentId + '/currentUnitIndex').set(unitIndex);
+  }
+  setTimeout(renderQuestion, 900);
+}
+
+async function logAttempt(unitId, correct){
+  const path = 'rashiLetters/progress/' + studentId + '/units/' + unitId;
+  const snap = await db.ref(path).once('value');
+  const existing = snap.val() || { attempts:0, correct:0 };
+  await db.ref(path).set({
+    attempts: (existing.attempts||0) + 1,
+    correct: (existing.correct||0) + (correct?1:0)
+  });
+  await db.ref('rashiLetters/progress/' + studentId + '/lastActive').set(firebase.database.ServerValue.TIMESTAMP);
+  await db.ref('rashiLetters/progress/' + studentId + '/name').set(studentName);
+}
+</script>
+</body>
+</html>
