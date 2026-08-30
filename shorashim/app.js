@@ -39,10 +39,45 @@ function applyStudentSiteOpen(open){
     if(app)app.classList.add('hidden');
   }
 }
+// This game can be closed from two places: its own setting
+// (shorashimLearning/settings/studentSiteOpen), or the master admin toggle
+// at b3Games/siteSettings (the same node the B3 Games homepage admin panel
+// writes to). Both watchers run independently, but are combined into one
+// "should be open" value before touching the UI, and neither watcher acts
+// until BOTH have reported at least once — otherwise whichever one happens
+// to arrive first would briefly force its own answer, causing a flash of
+// the wrong state on page load.
+let ownSettingOpen=true, masterSettingOpen=true;
+let ownWatcherReady=false, masterWatcherReady=false;
+function recomputeSiteOpen(){
+  if(!(ownWatcherReady && masterWatcherReady)) return;
+  applyStudentSiteOpen(ownSettingOpen && masterSettingOpen);
+}
 function startStudentSiteWatcher(){
   cloudDb.ref(`${CLOUD_ROOT}/settings/studentSiteOpen`).on('value',snap=>{
-    applyStudentSiteOpen(snap.exists()?snap.val():true);
-  },err=>{console.warn('Could not read Shorashim site availability',err);applyStudentSiteOpen(true);});
+    ownSettingOpen = snap.exists()?snap.val():true;
+    ownWatcherReady = true;
+    recomputeSiteOpen();
+  },err=>{
+    console.warn('Could not read Shorashim site availability',err);
+    ownSettingOpen = true;
+    ownWatcherReady = true;
+    recomputeSiteOpen();
+  });
+}
+function startMasterToggleWatcher(){
+  cloudDb.ref('b3Games/siteSettings').on('value',snap=>{
+    const settings = snap.val()||{};
+    const gamesMap = settings.games||{};
+    masterSettingOpen = !(settings.siteEnabled===false || gamesMap['shorashim']===false);
+    masterWatcherReady = true;
+    recomputeSiteOpen();
+  },err=>{
+    console.warn('Could not read master site settings',err);
+    masterSettingOpen = true;
+    masterWatcherReady = true;
+    recomputeSiteOpen();
+  });
 }
 
 let cloudStudentId = null;
@@ -140,11 +175,15 @@ function slugifyStudent(name){return name.trim().toLowerCase().replace(/[^a-z0-9
 function setLoginMsg(text){const el=document.getElementById('loginMsg');if(el)el.textContent=text||'';}
 async function checkStudentAccess(name,pin){
   const slug=slugifyStudent(name);if(!slug)return {ok:false,reason:'Please type your name.'};
-  const [siteSnap,pinSnap,allowedSnap]=await Promise.all([
+  const [siteSnap,pinSnap,allowedSnap,masterSnap]=await Promise.all([
     cloudDb.ref(`${CLOUD_ROOT}/settings/studentSiteOpen`).once('value'),
     cloudDb.ref('posukPractice/settings/classPin').once('value'),
-    cloudDb.ref('posukPractice/allowedStudents/'+slug).once('value')
+    cloudDb.ref('posukPractice/allowedStudents/'+slug).once('value'),
+    cloudDb.ref('b3Games/siteSettings').once('value')
   ]);
+  const masterSettings=masterSnap.val()||{};
+  const masterGames=masterSettings.games||{};
+  if(masterSettings.siteEnabled===false||masterGames['shorashim']===false)return {ok:false,reason:'This game is currently turned off. Ask your teacher.'};
   if(siteSnap.exists()&&siteSnap.val()===false)return {ok:false,reason:'Shorashim practice is closed right now. Ask your teacher.'};
   const realPin=pinSnap.val();
   if(realPin&&String(pin).trim()!==String(realPin).trim())return {ok:false,reason:'Incorrect PIN. Ask your teacher.'};
@@ -373,4 +412,5 @@ function startTicker(){clearInterval(ticker);ticker=setInterval(()=>{const s=stu
 function renderAll(){renderStudentStats();renderSession();renderWordList();renderGallery();renderReviewAvailability();renderDailyStatus();renderGamesLock();renderTeacher();}
 window.addEventListener('beforeunload',saveDB);
 startStudentSiteWatcher();
+startMasterToggleWatcher();
 bindCloudLogin();
