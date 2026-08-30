@@ -1,444 +1,363 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Shorashim Learning Lab</title>
-  <style>
-:root{
-  --bg:#f6f7fb;--panel:#fff;--ink:#172033;--muted:#6b7280;--line:#e5e7eb;
-  --primary:#4f46e5;--primary2:#eef2ff;--danger:#b91c1c;--green:#047857;--gold:#a16207;
-  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-}
-*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#eef2ff 0,#f8fafc 260px,#f6f7fb 100%);color:var(--ink)}
-button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}.muted{color:var(--muted)}
-.app-shell{max-width:1480px;margin:0 auto;padding:24px}.topbar{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:24px}.topbar h1{margin:2px 0 0;font-size:clamp(28px,4vw,46px)}
-.eyebrow{text-transform:uppercase;letter-spacing:.09em;font-size:12px;font-weight:800;color:var(--primary)}.topbar-actions{display:flex;background:#fff;border:1px solid var(--line);padding:4px;border-radius:14px;box-shadow:0 4px 14px #00000010}.seg{border:0;background:transparent;border-radius:10px;padding:10px 18px;font-weight:800;color:var(--muted)}.seg.active{background:var(--primary);color:#fff}
-.card-panel{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:0 12px 35px #1720330d}.compact{padding:12px 16px}.prototype-picker{display:flex;gap:14px;justify-content:space-between;align-items:center;margin-bottom:18px}.prototype-picker>div{flex:1}.prototype-picker select{min-width:220px}
-select,input,textarea{border:1px solid #cbd5e1;border-radius:10px;padding:9px 10px;background:#fff}.primary,.ghost,.danger{border:0;border-radius:12px;padding:11px 16px;font-weight:800}.primary{background:var(--primary);color:#fff}.primary:hover{filter:brightness(.96)}.ghost{background:#f1f5f9;color:#334155}.danger{background:#fee2e2;color:#991b1b}.big{font-size:18px;padding:14px 26px}.small{padding:8px 10px;font-size:13px}
-.screen{display:none}.screen.active{display:block}.hero-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.hero-grid.two{grid-template-columns:repeat(2,minmax(0,1fr));max-width:900px}.feature-card{min-height:170px;text-align:left;border:1px solid var(--line);border-radius:24px;padding:22px;background:#fff;box-shadow:0 12px 30px #0000000b;display:flex;flex-direction:column;gap:8px;transition:.15s}.feature-card:hover{transform:translateY(-2px)}.feature-card strong{font-size:21px}.feature-card span:last-child{color:var(--muted)}.feature-icon{font-size:38px}.feature-card.learn{background:linear-gradient(145deg,#eef2ff,#fff)}.feature-card.affix{background:linear-gradient(145deg,#f0fdfa,#fff)}.feature-card.review{background:linear-gradient(145deg,#ecfdf5,#fff)}.feature-card.games{background:linear-gradient(145deg,#fdf4ff,#fff)}.feature-card.gallery{background:linear-gradient(145deg,#fff7ed,#fff)}.feature-card.locked{filter:grayscale(.5);opacity:.72}
-.stats-grid,.teacher-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px}.stat-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px}.stat-card .value{font-size:28px;font-weight:900;margin-top:4px}.stat-card .label{font-size:13px;color:var(--muted);font-weight:700}
-.section-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:8px 0 18px}.section-head h2{margin:2px 0 0;font-size:30px}.session-status{font-size:13px;font-weight:800;background:#eef2ff;color:#4338ca;padding:9px 12px;border-radius:999px}.center-panel{text-align:center;max-width:620px;margin:60px auto}.center-panel h3{font-size:26px;margin:0 0 8px}.center-panel p{color:var(--muted);line-height:1.6}
-.learn-layout{display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start}.panel-title-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.panel-title-row h3{margin:0}.pill,.badge{display:inline-flex;align-items:center;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:900;background:#eef2ff;color:#4338ca}.pill.subtle{background:#f1f5f9;color:#475569}.badge{background:#fef3c7;color:#92400e}.word-list{display:flex;flex-direction:column;gap:8px;max-height:780px;overflow:auto;padding-right:4px}.word-row{border:1px solid var(--line);border-radius:14px;padding:11px;background:#fff;text-align:left}.word-row:hover:not(:disabled){border-color:#a5b4fc;background:#f8faff}.word-row.active{border-color:var(--primary);background:#eef2ff}.word-row.learned{opacity:.62}.word-row.locked{opacity:.45}.word-row .hebrew{font-size:27px;font-weight:800;direction:rtl}.word-row .meta{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}.editor-panel{min-height:700px}.empty-state{text-align:center;color:var(--muted);padding:50px 20px}
-.example-teaching{border:1px solid #c7d2fe;background:#eef2ff;border-radius:16px;padding:14px;margin:12px 0}.example-teaching h4{margin:0 0 8px}.example-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.example-pair{background:#fff;border-radius:12px;padding:9px}.example-pair .heb{font-size:22px;font-weight:900;direction:rtl}.example-pair .eng{font-size:13px;color:var(--muted);margin-top:4px}.affix-mark{color:#4f46e5;background:#e0e7ff;border-radius:6px;padding:0 2px}
-.flip-stage{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.flashcard{position:relative;overflow:hidden;border-radius:24px;border:2px solid #e2e8f0;background:#fff9e8;min-height:360px;box-shadow:inset 0 0 0 1px #ffffff80}.card-label{position:absolute;top:14px;left:14px;font-size:11px;letter-spacing:.08em;font-weight:900;color:#64748b;background:#ffffffd9;border-radius:999px;padding:5px 8px;z-index:10}.editable .movable{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);user-select:none;cursor:move;z-index:5;max-width:88%;white-space:normal;overflow-wrap:anywhere;text-align:center;line-height:1.08}.hebrew-text{font-size:58px;font-weight:800;direction:rtl}.english-text{font-size:46px;font-weight:800}.card-examples{position:absolute;left:8%;right:8%;top:45%;display:grid;gap:5px;text-align:center;z-index:4;pointer-events:none}.card-examples .heb-example{direction:rtl;font-size:22px;font-weight:800}.card-examples.back-examples{top:62%;font-size:14px;color:#475569}.approved-art-layer,.review-art-layer,.gallery-art-layer{position:absolute;inset:0;z-index:3;pointer-events:none}.art-item{position:absolute;transform:translate(-50%,-50%);user-select:none;pointer-events:auto}.art-item.emoji{line-height:1}.art-item.illustration img{width:100%;height:100%;object-fit:contain;display:block}.art-item.selected{outline:3px solid #6366f1;outline-offset:3px;border-radius:10px}.editable canvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;touch-action:none}.tool-columns{display:grid;grid-template-columns:1.1fr .9fr 1fr;gap:12px;margin-top:14px}.toolbox{border:1px solid var(--line);border-radius:16px;padding:14px;background:#fafafa}.toolbox h4{margin:0 0 10px}.toolbox label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:9px 0;font-size:13px;font-weight:700}.toolbox input[type="range"]{max-width:135px}.art-choices{display:flex;flex-wrap:wrap;gap:8px}.art-choice{font-size:30px;border:1px solid var(--line);background:#fff;border-radius:12px;width:50px;height:50px;padding:4px}.art-choice img{width:100%;height:100%;object-fit:contain}.art-section-label{font-size:12px;font-weight:800;color:#64748b;margin:8px 0}.mini-note{font-size:12px;color:var(--muted)}.button-row,.draw-row,.editor-actions,.review-nav{display:flex;gap:8px;flex-wrap:wrap}.editor-actions{justify-content:flex-end;margin-top:14px}.session-footer{display:flex;justify-content:space-between;align-items:center;margin-top:18px}
-.review-rule{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;background:#fffbeb;border-color:#fde68a}.review-controls{display:flex;gap:14px;align-items:end;flex-wrap:wrap;margin-bottom:18px}.review-controls label{display:flex;flex-direction:column;gap:6px;font-weight:800}.review-meta{display:flex;justify-content:space-between;gap:10px;max-width:760px;margin:0 auto 10px;flex-wrap:wrap}.review-card-wrap{display:flex;justify-content:center}.review-card{width:min(760px,92vw);min-height:440px;border:2px solid #dbeafe;background:#fff;box-shadow:0 24px 70px #1e3a8a18;padding:0}.review-hebrew,.review-english{font-size:72px;font-weight:900;position:absolute;left:50%;top:28%;transform:translate(-50%,-50%);direction:rtl;max-width:88%;white-space:normal;overflow-wrap:anywhere;text-align:center;line-height:1.08}.review-english{font-size:54px;direction:ltr}.review-examples{position:absolute;left:8%;right:8%;top:46%;display:grid;gap:6px;text-align:center}.review-examples .heb-example{direction:rtl;font-size:24px;font-weight:800}.review-examples.back{top:63%;font-size:17px;color:#475569}.review-drawing{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}.review-nav{justify-content:center;margin-top:14px}.keyboard-hint{text-align:center;color:#64748b;margin-top:10px;font-size:13px}.too-fast{max-width:760px;margin:0 auto 8px;background:#fee2e2;color:#991b1b;border-radius:12px;padding:8px 12px;font-weight:800;text-align:center}
-.gallery-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.gallery-item{background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px}.gallery-card{position:relative;height:190px;border:1px solid var(--line);border-radius:14px;overflow:hidden}.gallery-card .g-hebrew{position:absolute;left:50%;top:27%;transform:translate(-50%,-50%);direction:rtl;font-size:34px;font-weight:900;max-width:88%;text-align:center}.gallery-card .g-examples{position:absolute;left:8%;right:8%;top:45%;text-align:center;font-size:14px;direction:rtl}.gallery-card img.g-drawing{position:absolute;inset:0;width:100%;height:100%}.gallery-item .g-meta{margin-top:8px;display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
-.table-wrap{overflow:auto}.teacher-table{width:100%;border-collapse:collapse}.teacher-table th,.teacher-table td{text-align:left;padding:13px;border-bottom:1px solid var(--line)}.teacher-table th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#64748b}.teacher-table tr.clickable:hover{background:#f8fafc;cursor:pointer}.history-list{display:flex;flex-direction:column;gap:8px}.history-row{display:grid;grid-template-columns:150px 100px 1fr 170px;gap:12px;padding:10px;border-bottom:1px solid var(--line)}.subhead{margin-top:28px}
-.manager-controls{display:flex;gap:16px;align-items:end;flex-wrap:wrap}.manager-controls label{display:flex;flex-direction:column;gap:6px;font-weight:800}.catalog-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}.catalog-row{display:grid;grid-template-columns:52px 130px 1fr auto;gap:10px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px}.catalog-row.hidden-item{opacity:.5}.catalog-term{font-size:24px;font-weight:900;direction:rtl}.catalog-actions{display:flex;gap:6px;flex-wrap:wrap}.order-buttons{display:flex;flex-direction:column;gap:4px}.order-buttons button{padding:3px 7px;border:0;border-radius:7px;background:#f1f5f9}
-.game-stage{margin-top:18px;min-height:360px}.game-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px}.match-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.match-tile{min-height:92px;border:2px solid #e2e8f0;background:#fff;border-radius:14px;font-weight:800;padding:10px}.match-tile.hebrew{font-size:24px;direction:rtl}.match-tile.selected{border-color:#6366f1;background:#eef2ff}.match-tile.matched{opacity:.35;pointer-events:none}.shoot-prompt{text-align:center;font-size:42px;font-weight:900;direction:rtl;margin:20px 0}.targets{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.target{min-height:150px;border:0;border-radius:50%;background:radial-gradient(circle,#fff 0 28%,#fee2e2 29% 48%,#fff 49% 67%,#fecaca 68% 100%);box-shadow:0 10px 25px #0001;font-weight:900;padding:22px}.target.correct{outline:5px solid #10b981}.target.wrong{outline:5px solid #ef4444}
-dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialog-card{min-width:min(430px,92vw);padding:22px;display:flex;flex-direction:column;gap:12px}.dialog-card.wide{min-width:min(650px,92vw)}.dialog-card label{display:flex;flex-direction:column;gap:5px;font-weight:800}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
-@media(max-width:1050px){.hero-grid,.stats-grid,.teacher-summary,.gallery-grid{grid-template-columns:repeat(2,1fr)}.learn-layout{grid-template-columns:1fr}.word-list{max-height:320px}.tool-columns{grid-template-columns:1fr}.flip-stage{grid-template-columns:1fr}.match-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:650px){.app-shell{padding:14px}.topbar,.prototype-picker,.section-head,.session-footer{align-items:stretch;flex-direction:column}.hero-grid,.hero-grid.two,.stats-grid,.teacher-summary,.gallery-grid,.targets{grid-template-columns:1fr}.topbar-actions{align-self:flex-start}.review-card{min-height:390px}.review-hebrew{font-size:56px}.review-english{font-size:42px}.catalog-row{grid-template-columns:40px 1fr}.catalog-actions{grid-column:1/-1}.history-row{grid-template-columns:1fr}}
+<meta charset="UTF-8">
+<title>B3 Games</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #f5f7fa;
+        text-align: center;
+        padding: 40px 20px;
+    }
 
-/* Simplified kid-friendly color choices */
-.color-control{display:flex;flex-direction:column;gap:7px;margin:10px 0;font-size:13px;font-weight:800}.color-control.compact-color{flex:1;min-width:180px}.color-swatches{display:flex;flex-wrap:wrap;gap:7px}.color-swatch{width:30px;height:30px;border-radius:9px;border:2px solid #cbd5e1;padding:0;box-shadow:inset 0 0 0 1px #fff8;position:relative}.color-swatch:hover{transform:translateY(-1px);border-color:#64748b}.color-swatch.active{border-color:#111827;box-shadow:0 0 0 3px #c7d2fe}.color-swatch.active:after{content:'✓';position:absolute;inset:0;display:grid;place-items:center;font-weight:1000;color:#fff;text-shadow:0 1px 3px #000}.color-swatch[style*="255, 255, 255"].active:after,.color-swatch[style*="#ffffff"].active:after{color:#111827;text-shadow:none}.background-swatches .color-swatch{width:34px;height:34px}
+    h1 {
+        font-size: 48px;
+        margin-bottom: 30px;
+        color: #333;
+    }
 
-/* Picture editing */
-.approved-art-layer{pointer-events:none}.approved-art-layer .art-item{pointer-events:auto;touch-action:none;cursor:grab}.approved-art-layer .art-item:active{cursor:grabbing}.art-item.illustration img{pointer-events:none;-webkit-user-drag:none;user-select:none}.art-item.selected{outline:4px solid #4f46e5;outline-offset:4px;background:#ffffff30}.art-edit-row{margin-top:10px}.danger.small{padding:7px 10px}
+    .game-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 20px;
+        max-width: 900px;
+        margin: auto;
+    }
 
-/* Game menu and shared arcade UI */
-.game-menu-grid{margin-bottom:4px}.game-scorebox{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.game-scorebox>b,.game-scorebox>span{background:#f1f5f9;border-radius:999px;padding:7px 10px}.game-result-banner,.game-finish{text-align:center;margin:18px auto 0;padding:18px;border-radius:18px;background:#f8fafc;border:1px solid var(--line);max-width:620px}.game-finish{margin-top:60px}.game-finish .finish-icon{font-size:58px}.game-message{text-align:center;font-weight:900;color:#475569;margin-top:10px;min-height:24px}.game-message.correct{color:#047857}.game-message.wrong,.game-message.miss{color:#b91c1c}
+    .game-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: white;
+        padding: 24px 12px;
+        border-radius: 16px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        text-decoration: none;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
 
-/* Match */
-.match-layout{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:18px;align-items:start}.match-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.match-tile{transition:transform .12s,border-color .12s,background .12s}.match-tile:hover:not(:disabled){transform:translateY(-2px)}.leaderboard{border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px}.leaderboard-title{font-weight:1000;margin-bottom:8px}.leaderboard-row{display:flex;justify-content:space-between;gap:8px;padding:7px 5px;border-bottom:1px solid #eef2f7;font-size:13px}.leaderboard-row:last-child{border-bottom:0}.leaderboard-row.current{background:#eef2ff;border-radius:8px;color:#3730a3}
+    .game-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 18px rgba(0,0,0,0.15);
+    }
 
-/* Target Shoot */
-.shoot-arena{height:360px;position:relative;overflow:hidden;border-radius:24px;background:linear-gradient(#dbeafe 0 60%,#dcfce7 60%);border:3px solid #bfdbfe;cursor:crosshair;user-select:none}.moving-target{position:absolute;width:150px;height:76px;border-radius:50%;display:grid;place-items:center;text-align:center;padding:8px;font-weight:1000;background:radial-gradient(circle,#fff 0 27%,#fecaca 28% 47%,#fff 48% 66%,#ef4444 67% 100%);box-shadow:0 10px 24px #0002;will-change:transform;pointer-events:none}.moving-target.bullseye{box-shadow:0 0 0 7px #22c55e,0 12px 30px #0002;transform:scale(1.08)}.moving-target.wrong-hit{box-shadow:0 0 0 7px #991b1b,0 12px 30px #0002}.crosshair{position:absolute;transform:translate(-50%,-50%);font-size:38px;font-weight:1000;color:#111827;opacity:0;z-index:8;pointer-events:none;text-shadow:0 1px 2px #fff}.crosshair.visible{opacity:.8}.shooter-base{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);font-size:44px;z-index:3;pointer-events:none}.dart-shot{position:absolute;z-index:9;font-size:28px;transform-origin:center;transition:transform .28s linear,opacity .38s ease;pointer-events:none}.shoot-prompt{margin:8px 0 14px}
+    .card-icon {
+        font-size: 40px;
+        line-height: 1;
+    }
 
-/* Whack-a-Word */
-.whack-prompt{text-align:center;font-size:46px;font-weight:1000;direction:rtl;margin:10px 0 18px}.whack-board{display:grid;grid-template-columns:repeat(3,1fr);gap:20px 16px;max-width:760px;margin:0 auto}.whack-hole{height:125px;position:relative;overflow:hidden;border-radius:18px 18px 50% 50%;background:linear-gradient(to bottom,transparent 0 55%,#78350f 56% 69%,#451a03 70% 100%)}.mole{position:absolute;left:50%;bottom:-105px;transform:translateX(-50%);width:88%;min-height:94px;border:0;border-radius:50% 50% 38% 38%;background:#d6a56c;border:4px solid #92400e;font-weight:1000;padding:12px;transition:bottom .18s ease,transform .12s;box-shadow:inset 0 -10px #b77942;cursor:pointer}.mole:before{content:'👀';display:block;font-size:20px;margin-bottom:2px}.mole.up{bottom:14px}.mole.hit{background:#86efac;border-color:#16a34a;transform:translateX(-50%) scale(.92)}.mole.wrong{background:#fca5a5;border-color:#dc2626;transform:translateX(-50%) rotate(-4deg)}
+    .card-title {
+        font-size: 17px;
+        font-weight: bold;
+        color: #333;
+    }
 
-/* Word Race */
-.race-track{display:grid;gap:12px;margin:14px 0 20px}.race-lane{display:grid;grid-template-columns:90px 1fr;align-items:center;gap:10px}.lane-name{font-weight:1000}.race-road{height:72px;position:relative;border-radius:12px;overflow:hidden;background:repeating-linear-gradient(90deg,#475569 0 70px,#4b5563 70px 140px);border:4px solid #94a3b8}.race-road:after{content:'';position:absolute;left:0;right:0;top:50%;border-top:3px dashed #f8fafc}.race-car{position:absolute;left:-28px;top:9px;font-size:44px;z-index:2;transition:left .55s cubic-bezier(.2,.8,.2,1)}.race-car.computer{top:8px}.finish-line{position:absolute;right:3px;top:7px;font-size:42px;z-index:2}.race-prompt{text-align:center;font-size:46px;font-weight:1000;direction:rtl;margin:12px 0}.race-answers{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:820px;margin:0 auto}.race-answer{min-height:80px;border:2px solid #cbd5e1;border-radius:16px;background:#fff;font-size:17px;font-weight:900;padding:12px}.race-answer:hover{border-color:#6366f1;background:#eef2ff}.race-answer.correct{border-color:#16a34a;background:#dcfce7}.race-answer.wrong{border-color:#dc2626;background:#fee2e2}
+    .hidden {
+        display: none !important;
+    }
 
-@media(max-width:900px){.match-layout{grid-template-columns:1fr}.leaderboard{max-width:520px;margin:0 auto}.whack-board{grid-template-columns:repeat(2,1fr)}.race-answers{grid-template-columns:1fr}.shoot-arena{height:330px}}
-@media(max-width:650px){.game-scorebox{justify-content:flex-start}.match-grid{grid-template-columns:repeat(2,1fr)}.whack-board{grid-template-columns:1fr 1fr;gap:10px}.whack-hole{height:110px}.race-lane{grid-template-columns:60px 1fr}.lane-name{font-size:12px}.race-prompt,.whack-prompt{font-size:38px}.moving-target{width:120px;height:68px;font-size:12px}.shoot-arena{height:320px}}
+    .admin-button {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        z-index: 9999;
+        border: none;
+        border-radius: 999px;
+        padding: 10px 16px;
+        background: #1f2937;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    }
 
-/* ===== Classroom login / cloud version ===== */
-.login-gate{
-  min-height:100vh; display:flex; align-items:center; justify-content:center;
-  padding:24px; background:radial-gradient(circle at 25% 15%,#fff8dc 0,#f3ead0 48%,#dfd0a7 100%);
-}
-.login-card{
-  width:min(440px,100%); background:#fff; border:2px solid #d7b94b; border-radius:24px;
-  padding:30px; box-shadow:0 18px 50px rgba(55,43,20,.18); text-align:center;
-}
-.login-card h1{margin:.2rem 0 .4rem;font-size:2rem}.login-card p{color:#6b6256;margin:0 0 20px}
-.login-icon{font-size:3.3rem;line-height:1;margin-bottom:8px}
-.login-card label{display:block;text-align:left;font-weight:800;margin:14px 0 6px;color:#34312c}
-.login-card input{width:100%;margin-top:7px;padding:13px 14px;border:2px solid #d8d3c6;border-radius:13px;font:inherit;background:#fff}
-.login-card input:focus{outline:none;border-color:#b99928;box-shadow:0 0 0 3px rgba(185,153,40,.13)}
-.login-card .big{width:100%;margin-top:18px}
-.login-msg{min-height:1.3em;margin-top:12px;font-weight:700;color:#b42318;font-size:.9rem}
-.signed-in-as{white-space:nowrap}.cloud-status{font-size:.82rem;color:#5d695c;white-space:nowrap}
-.cloud-status.syncing{color:#8a6d1a}.cloud-status.error{color:#b42318}
-@media(max-width:650px){.login-card{padding:23px 18px}.signed-in-as{width:100%;text-align:right}.cloud-status{margin-left:auto}}
+    .admin-panel {
+        position: fixed;
+        top: 60px;
+        right: 12px;
+        width: 300px;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 14px 32px rgba(0,0,0,0.18);
+        padding: 16px;
+        text-align: left;
+        z-index: 9999;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
 
+    .admin-panel h2 {
+        margin: 0 0 12px;
+        font-size: 20px;
+    }
+
+    .admin-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 10px 0;
+        font-size: 15px;
+    }
+
+    .admin-action {
+        width: 100%;
+        border: none;
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-top: 8px;
+        background: #1f2937;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .admin-action.secondary {
+        background: #e5e7eb;
+        color: #111827;
+    }
+
+    .disabled-note {
+        margin-top: 40px;
+        color: #4b5563;
+    }
+
+    .admin-message {
+        font-size: 13px;
+        line-height: 1.4;
+        color: #4b5563;
+        margin: 0 0 12px;
+    }
 </style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="site-settings.js"></script>
 </head>
+
 <body>
-  <section id="studentSiteClosed" class="login-gate hidden">
-    <div class="login-card">
-      <div class="login-icon">🔒</div>
-      <div class="eyebrow">Shorashim Learning Lab</div>
-      <h1>Practice is closed right now</h1>
-      <p>Your teacher has closed Shorashim practice for now. Please wait until your teacher opens it again.</p>
+    <h1>B3 Games</h1>
+
+    <div class="game-container">
+        <a class="game-card" data-game-id="tzitzis-game" href="tzitzis_game.html">
+            <span class="card-icon">🧵</span>
+            <span class="card-title">Tzitzis Game</span>
+        </a>
+        <a class="game-card" data-game-id="tzitzis-quest-arcade" href="tzitzis_quest_arcade_v2.html">
+            <span class="card-icon">🕹️</span>
+            <span class="card-title">Tzitzis Quest Arcade</span>
+        </a>
+        <a class="game-card" data-game-id="kahoot-word-quiz" href="kahoot_word_quiz_engine_paste_only_any_perek.html">
+            <span class="card-icon">❓</span>
+            <span class="card-title">Kahoot Word Quiz Engine</span>
+        </a>
+        <a class="game-card" data-game-id="kodesh-construct" href="kodesh-construct.html">
+            <span class="card-icon">🔤</span>
+            <span class="card-title">Dikduk Arcade</span>
+        </a>
+        <a class="game-card" data-game-id="chumash-quiz" href="chumash-quiz.html">
+            <span class="card-icon">📖</span>
+            <span class="card-title">Chumash Quiz</span>
+        </a>
+        <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html">
+            <span class="card-icon">📜</span>
+            <span class="card-title">Posuk Practice Scroll</span>
+        </a>
+        <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html">
+            <span class="card-icon">✡️</span>
+            <span class="card-title">Rashi Letters</span>
+        </a>
+        <a class="game-card" data-game-id="shorashim" href="shorashim/index.html">
+            <span class="card-icon">🌳</span>
+            <span class="card-title">Shorashim</span>
+        </a>
+        <a class="game-card" data-game-id="class-gallery" href="class-gallery.html">
+            <span class="card-icon">🖼️</span>
+            <span class="card-title">Class Gallery</span>
+        </a>
+        <a class="game-card" data-game-id="game-show" href="player.html">
+            <span class="card-icon">🏆</span>
+            <span class="card-title">Game Show</span>
+        </a>
     </div>
-  </section>
 
-  <section id="loginGate" class="login-gate">
-    <div class="login-card">
-      <div class="login-icon">🌱</div>
-      <div class="eyebrow">Shorashim Learning Lab</div>
-      <h1>Ready to learn?</h1>
-      <p>Use the same class PIN and student name you use for Posuk Practice.</p>
-      <label>Class PIN
-        <input id="classPinInput" type="password" inputmode="numeric" maxlength="20" placeholder="Ask your teacher" autocomplete="off" />
-      </label>
-      <label>Your name
-        <input id="studentNameInput" type="text" maxlength="30" placeholder="Type your name" autocomplete="name" />
-      </label>
-      <button id="loginBtn" class="primary big">Start Learning</button>
-      <div id="loginMsg" class="login-msg" aria-live="polite"></div>
+    <p id="disabledMessage" class="disabled-note hidden">All games are currently disabled.</p>
+
+    <button id="adminAccessButton" class="admin-button">Admin</button>
+
+    <div id="adminPanel" class="admin-panel hidden">
+      <h2>Game Controls</h2>
+      <p id="adminStatus" class="admin-message">Checking sign-in…</p>
+
+      <button id="signInButton" class="admin-action">Sign in with Google</button>
+      <button id="signOutButton" class="admin-action secondary hidden">Sign out</button>
+
+      <div id="adminControls" class="hidden">
+        <div class="admin-row">
+          <label for="siteEnabledToggle">Site enabled</label>
+          <input id="siteEnabledToggle" type="checkbox">
+        </div>
+        <div id="gameToggles"></div>
+      </div>
     </div>
-  </section>
 
-  <div id="appShell" class="app-shell hidden">
-    <header class="topbar">
-      <div>
-        <div class="eyebrow">Hebrew vocabulary practice</div>
-        <h1>Shorashim Learning Lab</h1>
-      </div>
-      <div class="topbar-actions">
-        <span class="signed-in-as">👋 <b id="signedInStudentName"></b></span>
-        <span id="cloudStatus" class="cloud-status">☁️ Connected</span>
-        <button id="switchStudentBtn" class="ghost small">Not you?</button>
-        <button id="studentModeBtn" class="seg active hidden" tabindex="-1" aria-hidden="true">Student</button>
-        <button id="teacherModeBtn" class="seg hidden" tabindex="-1" aria-hidden="true">Teacher</button>
-      </div>
-    </header>
+    <script>
+      const settingsApi = window.B3SiteSettings;
+      const adminAccessButton = document.getElementById("adminAccessButton");
+      const adminPanel = document.getElementById("adminPanel");
+      const adminControls = document.getElementById("adminControls");
+      const signInButton = document.getElementById("signInButton");
+      const signOutButton = document.getElementById("signOutButton");
+      const siteEnabledToggle = document.getElementById("siteEnabledToggle");
+      const gameToggles = document.getElementById("gameToggles");
+      const disabledMessage = document.getElementById("disabledMessage");
+      const adminStatus = document.getElementById("adminStatus");
+      const gameCards = Array.from(document.querySelectorAll(".game-card"));
 
-    <main>
-      <section id="studentView">
-        <div class="prototype-picker card-panel compact hidden" aria-hidden="true">
-          <div>
-            <b>Prototype only: preview as a student</b>
-            <div class="mini-note">In the classroom version, each boy signs in and lands directly in his own account. Students will not see this dropdown.</div>
-          </div>
-          <select id="studentSelect" aria-label="Preview student"></select>
-          <button id="addStudentBtn" class="ghost">+ Add test student</button>
-        </div>
+      const gameDefinitions = gameCards.map((card) => ({
+          id: card.dataset.gameId,
+          name: (card.querySelector(".card-title")?.textContent || card.textContent).trim(),
+          element: card
+      }));
 
-        <section id="studentHome" class="screen active">
-          <div class="hero-grid">
-            <button class="feature-card learn" data-go="learnScreen" data-track="shorashim">
-              <span class="feature-icon">✏️</span>
-              <strong>Learn New Shorashim</strong>
-              <span>New roots unlock one by one, in teacher order.</span>
-            </button>
-            <button class="feature-card affix" data-go="affixHomeScreen">
-              <span class="feature-icon">🧩</span>
-              <strong>Learn Prefixes & Suffixes</strong>
-              <span>Learn each affix with clear Hebrew examples.</span>
-            </button>
-            <button class="feature-card review" data-go="reviewScreen">
-              <span class="feature-icon">🔁</span>
-              <strong>Flashcard Review</strong>
-              <span>Daily full review comes before games.</span>
-            </button>
-            <button id="gamesHomeCard" class="feature-card games locked" data-go="gamesScreen">
-              <span class="feature-icon">🎮</span>
-              <strong>Games</strong>
-              <span id="gamesHomeMessage">Finish today's flashcard review to unlock.</span>
-            </button>
-            <button class="feature-card gallery" data-go="galleryScreen">
-              <span class="feature-icon">🖼️</span>
-              <strong>My Card Gallery</strong>
-              <span>See the cards you created.</span>
-            </button>
-          </div>
-          <div class="stats-grid" id="studentStats"></div>
-        </section>
+      let currentSettings = settingsApi.defaultSettings;
+      let currentUser = null;
+      let isAuthorizedAdmin = false;
 
-        <section id="affixHomeScreen" class="screen">
-          <div class="section-head">
-            <button class="backBtn ghost">← Home</button>
-            <div><div class="eyebrow">Prefixes & suffixes</div><h2>Choose What to Learn</h2></div>
-          </div>
-          <div class="hero-grid two">
-            <button class="feature-card affix" data-go="learnScreen" data-track="prefix">
-              <span class="feature-icon">前</span><strong>Prefixes</strong><span>Learn prefixes in order, with examples.</span>
-            </button>
-            <button class="feature-card affix" data-go="learnScreen" data-track="suffix">
-              <span class="feature-icon">🔚</span><strong>Suffixes</strong><span>Learn suffixes in order, with examples.</span>
-            </button>
-          </div>
-        </section>
+      function renderGames() {
+          let visibleCount = 0;
 
-        <section id="learnScreen" class="screen">
-          <div class="section-head">
-            <button class="backBtn ghost">← Home</button>
-            <div>
-              <div class="eyebrow">Current learning session</div>
-              <h2 id="learnHeading">Learn New Shorashim</h2>
-            </div>
-            <div class="session-status" id="sessionStatus">No active session</div>
-          </div>
+          gameDefinitions.forEach((game) => {
+              const shouldShow =
+                  currentSettings.siteEnabled &&
+                  currentSettings.games[game.id] !== false;
 
-          <div id="startSessionPanel" class="card-panel center-panel">
-            <h3 id="startSessionTitle">Ready to learn?</h3>
-            <p>Items created in this session are <b>New</b>. When the session ends, they automatically move into your Learned pile.</p>
-            <button id="startSessionBtn" class="primary big">Start Session</button>
-          </div>
+              game.element.classList.toggle("hidden", !shouldShow);
 
-          <div id="learnWorkspace" class="hidden">
-            <div class="learn-layout">
-              <aside class="card-panel word-list-panel">
-                <div class="panel-title-row">
-                  <h3 id="pathTitle">Your Learning Path</h3>
-                  <span id="availableCount" class="pill"></span>
-                </div>
-                <p class="mini-note">Items unlock strictly in order. You may reopen cards made in this session; future items stay locked.</p>
-                <div id="wordList" class="word-list"></div>
-              </aside>
+              if (shouldShow) {
+                  visibleCount += 1;
+              }
+          });
 
-              <section class="card-panel editor-panel">
-                <div class="panel-title-row">
-                  <div><div class="eyebrow">Customize this card</div><h3 id="editorTitle">Next item</h3></div>
-                  <span id="newBadge" class="badge hidden">NEW</span>
-                </div>
+          disabledMessage.classList.toggle("hidden", visibleCount !== 0);
+      }
 
-                <div id="emptyEditor" class="empty-state">Start a session to receive the next item.</div>
+      function renderAdminPanel() {
+          const signedIn = Boolean(currentUser);
 
-                <div id="editorContent" class="hidden">
-                  <div id="exampleTeachingBox" class="example-teaching hidden"></div>
-                  <div class="flip-stage">
-                    <div class="flashcard editable" id="frontCard">
-                      <div class="card-label">FRONT</div>
-                      <div id="hebrewText" class="movable hebrew-text" tabindex="0"></div>
-                      <div id="frontExamples" class="card-examples"></div>
-                      <div id="approvedArtLayer" class="approved-art-layer"></div>
-                      <canvas id="drawCanvas" width="620" height="360"></canvas>
-                    </div>
-                    <div class="flashcard editable" id="backCard">
-                      <div class="card-label">BACK</div>
-                      <div id="englishText" class="movable english-text" tabindex="0"></div>
-                      <div id="backExamples" class="card-examples back-examples"></div>
-                    </div>
-                  </div>
+          signInButton.classList.toggle("hidden", signedIn);
+          signOutButton.classList.toggle("hidden", !signedIn);
+          adminControls.classList.toggle("hidden", !isAuthorizedAdmin);
 
-                  <div class="tool-columns">
-                    <div class="toolbox">
-                      <h4>Text & card</h4>
-                      <label>Hebrew size <input id="hebrewSize" type="range" min="34" max="96" value="58"></label>
-                      <label>Hebrew font
-                        <select id="hebrewFont">
-                          <option value="David, 'Times New Roman', serif">Classic — David</option>
-                          <option value="Gisha, Arial, sans-serif">Simple — Gisha</option>
-                          <option value="FrankRuehl, 'Frank Ruehl', 'Times New Roman', serif">Book — FrankRuehl</option>
-                          <option value="Aharoni, 'Arial Rounded MT Bold', Arial, sans-serif">Rounded — Aharoni</option>
-                        </select>
-                      </label>
-                      <div class="color-control"><span>Hebrew color</span><div class="color-swatches" data-color-target="hebrewColor"></div><input id="hebrewColor" type="hidden" value="#1f2937"></div>
-                      <label>English size <input id="englishSize" type="range" min="24" max="74" value="46"></label>
-                      <label>English font
-                        <select id="englishFont">
-                          <option value="Arial, sans-serif">Simple</option>
-                          <option value="Georgia, serif">Book</option>
-                          <option value="'Trebuchet MS', sans-serif">Rounded</option>
-                          <option value="'Times New Roman', serif">Classic</option>
-                        </select>
-                      </label>
-                      <div class="color-control"><span>English color</span><div class="color-swatches" data-color-target="englishColor"></div><input id="englishColor" type="hidden" value="#1f2937"></div>
-                      <div class="color-control"><span>Card background</span><div class="color-swatches background-swatches" data-color-target="backgroundColor"></div><input id="backgroundColor" type="hidden" value="#fff9e8"></div>
-                    </div>
+          if (!signedIn) {
+              adminStatus.textContent =
+                  "Sign in with the authorized Google account to change game settings.";
+              return;
+          }
 
-                    <div class="toolbox">
-                      <h4>Pictures</h4>
-                      <div class="art-section-label">Emojis</div>
-                      <div id="emojiChoices" class="art-choices"></div>
-                      <div class="art-section-label illustration-label">Illustrations</div>
-                      <div id="illustrationChoices" class="art-choices illustration-choices"></div>
-                      <div class="button-row art-edit-row">
-                        <button id="artSmallerBtn" class="ghost small">Smaller</button>
-                        <button id="artBiggerBtn" class="ghost small">Bigger</button>
-                        <button id="removeArtBtn" class="danger small">Delete selected</button>
-                        <button id="removeAllArtBtn" class="ghost small">Remove all</button>
-                      </div>
-                      <p class="mini-note">Tap a picture to select it. Drag it anywhere on the card, resize it, or press Delete. You can add more than one. Outside uploads are disabled.</p>
-                    </div>
+          if (!isAuthorizedAdmin) {
+              adminStatus.textContent =
+                  `Signed in as ${currentUser.email || "an unauthorized account"}. This account cannot edit settings.`;
+              return;
+          }
 
-                    <div class="toolbox">
-                      <h4>Draw & color</h4>
-                      <div class="draw-row">
-                        <div class="color-control compact-color"><span>Color</span><div class="color-swatches" data-color-target="drawColor"></div><input id="drawColor" type="hidden" value="#2563eb"></div>
-                        <label>Brush <input id="brushSize" type="range" min="2" max="24" value="6"></label>
-                      </div>
-                      <div class="button-row">
-                        <button id="eraserBtn" class="ghost small">Eraser</button>
-                        <button id="undoBtn" class="ghost small">Undo</button>
-                        <button id="clearDrawingBtn" class="ghost small">Clear</button>
-                      </div>
-                    </div>
-                  </div>
+          adminStatus.textContent =
+              `Signed in as ${currentUser.email}. Changes affect everyone.`;
 
-                  <div class="editor-actions">
-                    <button id="saveCardBtn" class="primary">Save Card & Go to Next</button>
-                    <button id="resetCardBtn" class="ghost">Reset Design</button>
-                  </div>
-                </div>
-              </section>
-            </div>
-            <div class="session-footer card-panel">
-              <div><b id="sessionNewCount">0 new cards</b> <span class="muted">created this session</span></div>
-              <button id="endSessionBtn" class="danger">End Session & Move to Learned</button>
-            </div>
-          </div>
-        </section>
+          siteEnabledToggle.checked = currentSettings.siteEnabled;
+          gameToggles.innerHTML = "";
 
-        <section id="reviewScreen" class="screen">
-          <div class="section-head">
-            <button class="backBtn ghost">← Home</button>
-            <div><div class="eyebrow">Flashcard mode</div><h2>Review Learned Cards</h2></div>
-            <div id="dailyReviewBadge" class="session-status"></div>
-          </div>
+          gameDefinitions.forEach((game) => {
+              const row = document.createElement("div");
+              row.className = "admin-row";
 
-          <div class="review-rule card-panel">
-            <b>Games unlock after every currently learned card has had a real review today.</b>
-            <span>You do <b>not</b> have to flip a card if you know it. Say the Hebrew and translation aloud, then go Next. Going too fast will not count.</span>
-          </div>
+              const label = document.createElement("label");
+              label.setAttribute("for", `toggle-${game.id}`);
+              label.textContent = game.name;
 
-          <div class="review-controls card-panel">
-            <label>Review mode
-              <select id="reviewMode">
-                <option value="daily">Today's Full Review — all learned cards</option>
-                <option value="shuffle">Shuffle all</option>
-                <option value="recent">Recently learned</option>
-                <option value="order">Order learned</option>
-                <option value="reverse">Reverse order</option>
-                <option value="last5">Last 5 cards</option>
-                <option value="last10">Last 10 cards</option>
-                <option value="last20">Last 20 cards</option>
-              </select>
-            </label>
-            <label id="recentWindowWrap" class="hidden">Recent window
-              <select id="recentWindow"><option value="1">Today</option><option value="3">Last 3 days</option><option value="7" selected>Last 7 days</option></select>
-            </label>
-            <button id="startReviewBtn" class="primary">Start Review</button>
-          </div>
+              const input = document.createElement("input");
+              input.type = "checkbox";
+              input.id = `toggle-${game.id}`;
+              input.checked = currentSettings.games[game.id] !== false;
 
-          <div id="reviewEmpty" class="card-panel empty-state">No learned cards yet. Finish a learning session first.</div>
-          <div id="reviewArea" class="hidden">
-            <div class="review-meta">
-              <span id="reviewCounter" class="pill"></span>
-              <span id="reviewProgressToday" class="pill subtle"></span>
-              <span id="reviewPasuk" class="muted"></span>
-            </div>
-            <div id="tooFastMessage" class="too-fast hidden">Give yourself a moment to say the word and meaning.</div>
-            <div class="review-card-wrap">
-              <button id="reviewFlipCard" class="flashcard review-card" aria-label="Flip flashcard">
-                <div id="reviewSideLabel" class="card-label">FRONT</div>
-                <div id="reviewHebrew" class="review-hebrew"></div>
-                <div id="reviewExamples" class="review-examples"></div>
-                <div id="reviewArtLayer" class="review-art-layer"></div>
-                <img id="reviewDrawing" class="review-drawing hidden" alt="Student drawing" />
-                <div id="reviewEnglish" class="review-english hidden"></div>
-                <div id="reviewBackExamples" class="review-examples back hidden"></div>
-              </button>
-            </div>
-            <div class="review-nav">
-              <button id="prevReviewBtn" class="ghost">← Previous</button>
-              <button id="flipReviewBtn" class="primary">↑ Flip</button>
-              <button id="nextReviewBtn" class="ghost">Next →</button>
-            </div>
-            <div class="keyboard-hint">Keyboard: <kbd>←</kbd> previous · <kbd>↑</kbd> flip · <kbd>→</kbd> next</div>
-          </div>
-        </section>
+              input.addEventListener("change", async () => {
+                  const oldValue = !input.checked;
 
-        <section id="gamesScreen" class="screen">
-          <div class="section-head">
-            <button class="backBtn ghost">← Home</button>
-            <div><div class="eyebrow">Unlocked after today's review</div><h2>Practice Games</h2></div>
-          </div>
-          <div id="gamesLockedPanel" class="card-panel center-panel hidden">
-            <h3>🔒 Games are locked</h3>
-            <p>Finish today's full flashcard review first.</p>
-            <button class="primary" data-go="reviewScreen">Go to Flashcards</button>
-          </div>
-          <div id="gamesUnlockedPanel">
-            <div class="hero-grid two game-menu-grid">
-              <button class="feature-card game-choice" data-game="match"><span class="feature-icon">🧩</span><strong>Match</strong><span>8 pairs, timed. Beat your class leaderboard time.</span></button>
-              <button class="feature-card game-choice" data-game="shoot"><span class="feature-icon">🎯</span><strong>Target Shoot</strong><span>Aim and fire at moving targets with the correct meaning.</span></button>
-              <button class="feature-card game-choice" data-game="whack"><span class="feature-icon">🔨</span><strong>Whack-a-Word</strong><span>Whack the correct meaning before it disappears.</span></button>
-              <button class="feature-card game-choice" data-game="race"><span class="feature-icon">🏎️</span><strong>Word Race</strong><span>Answer quickly to race your car to the finish line.</span></button>
-            </div>
-            <div id="gameStage" class="card-panel game-stage hidden"></div>
-          </div>
-        </section>
+                  try {
+                      currentSettings.games[game.id] = input.checked;
+                      renderGames();
+                      await settingsApi.updateGameEnabled(game.id, input.checked);
+                  } catch (error) {
+                      currentSettings.games[game.id] = oldValue;
+                      input.checked = oldValue;
+                      renderGames();
+                      alert("Could not save this game setting. Make sure you are signed in with the authorized account.");
+                      console.error(error);
+                  }
+              });
 
-        <section id="galleryScreen" class="screen">
-          <div class="section-head"><button class="backBtn ghost">← Home</button><div><div class="eyebrow">Student creations</div><h2>My Card Gallery</h2></div></div>
-          <div id="galleryGrid" class="gallery-grid"></div>
-        </section>
-      </section>
+              row.appendChild(label);
+              row.appendChild(input);
+              gameToggles.appendChild(row);
+          });
+      }
 
-      <section id="teacherView" class="hidden">
-        <div class="section-head">
-          <div><div class="eyebrow">Teacher dashboard</div><h2>Class Progress</h2></div>
-          <div class="button-row"><button id="manageListBtn" class="primary">Manage Learning Lists</button><button id="seedDemoBtn" class="ghost">Add Demo Activity</button></div>
-        </div>
+      adminAccessButton.addEventListener("click", () => {
+          adminPanel.classList.toggle("hidden");
+          if (!adminPanel.classList.contains("hidden")) {
+              renderAdminPanel();
+          }
+      });
 
-        <div class="teacher-summary" id="teacherSummary"></div>
-        <div class="card-panel table-wrap">
-          <table class="teacher-table">
-            <thead><tr><th>Student</th><th>Shorashim</th><th>Affixes</th><th>Study time</th><th>Sessions</th><th>Today's review</th><th>Last active</th></tr></thead>
-            <tbody id="teacherTableBody"></tbody>
-          </table>
-        </div>
+      signInButton.addEventListener("click", async () => {
+          try {
+              await settingsApi.signInWithGoogle();
+          } catch (error) {
+              alert("Google sign-in did not complete.");
+              console.error(error);
+          }
+      });
 
-        <div id="teacherStudentDetail" class="hidden">
-          <div class="section-head subhead"><button id="closeStudentDetail" class="ghost">← Class</button><div><div class="eyebrow">Student details</div><h2 id="detailStudentName"></h2></div></div>
-          <div id="detailStats" class="stats-grid"></div>
-          <div class="card-panel"><h3>Learning history</h3><div id="detailHistory" class="history-list"></div></div>
-          <div class="card-panel"><h3>Card gallery</h3><div id="teacherCardGallery" class="gallery-grid"></div></div>
-        </div>
+      signOutButton.addEventListener("click", async () => {
+          try {
+              await settingsApi.signOut();
+          } catch (error) {
+              alert("Could not sign out.");
+              console.error(error);
+          }
+      });
 
-        <div id="manageListPanel" class="hidden">
-          <div class="section-head subhead"><button id="closeManageList" class="ghost">← Dashboard</button><div><div class="eyebrow">Teacher controls</div><h2>Manage Learning Lists</h2></div></div>
-          <div class="card-panel manager-controls">
-            <label>List <select id="manageTrack"><option value="shorashim">Shorashim</option><option value="prefix">Prefixes</option><option value="suffix">Suffixes</option></select></label>
-            <button id="addCatalogItemBtn" class="primary">+ Add Item</button>
-            <label>Minimum time per reviewed card
-              <select id="minReviewTime"><option value="500">0.5 seconds</option><option value="800" selected>0.8 seconds</option><option value="1000">1 second</option><option value="1500">1.5 seconds</option><option value="2000">2 seconds</option></select>
-            </label>
-          </div>
-          <div id="catalogList" class="catalog-list"></div>
-        </div>
-      </section>
-    </main>
-  </div>
+      siteEnabledToggle.addEventListener("change", async () => {
+          const oldValue = !siteEnabledToggle.checked;
 
-  <dialog id="addStudentDialog"><form method="dialog" class="dialog-card" id="addStudentForm"><h3>Add test student</h3><label>Name <input id="newStudentName" autocomplete="off" required /></label><div class="dialog-actions"><button value="cancel" class="ghost">Cancel</button><button value="default" class="primary" id="confirmAddStudent">Add</button></div></form></dialog>
+          try {
+              currentSettings.siteEnabled = siteEnabledToggle.checked;
+              renderGames();
+              await settingsApi.updateSiteEnabled(siteEnabledToggle.checked);
+          } catch (error) {
+              currentSettings.siteEnabled = oldValue;
+              siteEnabledToggle.checked = oldValue;
+              renderGames();
+              alert("Could not save the site setting. Make sure you are signed in with the authorized account.");
+              console.error(error);
+          }
+      });
 
-  <dialog id="catalogDialog">
-    <form method="dialog" class="dialog-card wide" id="catalogForm">
-      <h3 id="catalogDialogTitle">Edit item</h3>
-      <input id="catalogEditId" type="hidden" />
-      <label>Main Hebrew / symbol <input id="catalogFront" required /></label>
-      <label>English meaning <input id="catalogEnglish" required /></label>
-      <label>Pasuk / order note <input id="catalogPasuk" /></label>
-      <label id="catalogWordWrap">Word as it appears <input id="catalogWord" /></label>
-      <label id="catalogExamplesWrap">Examples (one per line: Hebrew | English)
-        <textarea id="catalogExamples" rows="5"></textarea>
-      </label>
-      <div class="dialog-actions"><button value="cancel" class="ghost">Cancel</button><button value="default" class="primary" id="saveCatalogItemBtn">Save</button></div>
-    </form>
-  </dialog>
+      settingsApi.onAuthStateChanged((user, authorized) => {
+          currentUser = user;
+          isAuthorizedAdmin = authorized;
+          renderAdminPanel();
+      });
 
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-  <script src="app.js?v=20260829c"></script>
+      settingsApi.subscribe((settings) => {
+          currentSettings = settings;
+          renderGames();
+          renderAdminPanel();
+      });
+    </script>
 </body>
 </html>
