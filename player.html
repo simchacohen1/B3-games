@@ -24,12 +24,17 @@
   .countdown { margin-top: 16px; font-size: 20px; color: #b85042; font-weight: bold; }
   .score-display { margin-top: 20px; font-size: 18px; }
   .hidden { display: none; }
+  .master-blocked { max-width: 400px; margin: 60px auto 0 auto; background: white; border-radius: 12px; border: 1px solid #d9a85c; padding: 28px; font-size: 18px; }
 </style>
 </head>
 <body>
 
 <h1>Game Show</h1>
 <div class="subtitle">Get ready to play!</div>
+
+<div class="master-blocked hidden" id="masterBlocked">
+  This game is currently turned off. Ask your teacher.
+</div>
 
 <div class="name-box" id="nameBox">
   <input type="text" id="nameInput" placeholder="Type your name" />
@@ -83,11 +88,38 @@ setRef.on('value', snap => {
 
 let myName = "";
 
+// Master admin toggle: the same b3Games/siteSettings node the B3 Games
+// homepage admin panel writes to. If the whole site or just this game has
+// been switched off, block joining and show the closed message - even for
+// a student who already had this tab open.
+let masterBlocked = false;
+function applyMasterBlocked() {
+  document.getElementById('masterBlocked').classList.toggle('hidden', !masterBlocked);
+  document.getElementById('nameBox').classList.toggle('hidden', masterBlocked);
+  if (masterBlocked) {
+    document.getElementById('gameArea').classList.add('hidden');
+  } else if (myName) {
+    document.getElementById('nameBox').classList.add('hidden');
+    document.getElementById('gameArea').classList.remove('hidden');
+  }
+}
+db.ref('b3Games/siteSettings').on('value', snap => {
+  const settings = snap.val() || {};
+  const gamesMap = settings.games || {};
+  masterBlocked = settings.siteEnabled === false || gamesMap['game-show'] === false;
+  applyMasterBlocked();
+}, err => {
+  console.warn('Could not read master site settings', err);
+  masterBlocked = false;
+  applyMasterBlocked();
+});
+
 function sanitize(name) {
   return name.replace(/[.#$\[\]]/g, '_');
 }
 
 function joinGame() {
+  if (masterBlocked) return;
   const val = document.getElementById('nameInput').value.trim();
   if (!val) return;
   myName = sanitize(val);
@@ -121,6 +153,7 @@ function playBuzzSound() {
 }
 
 function buzzIn() {
+  if (masterBlocked) return;
   // Guard against buzzing during the lockout window, even if the button
   // state hasn't refreshed yet.
   if (lockedUntil && Date.now() < lockedUntil) return;
