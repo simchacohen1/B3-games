@@ -10,7 +10,12 @@
       "tzitzis-quest-arcade": true,
       "kahoot-word-quiz": true,
       "kodesh-construct": true,
-      "chumash-quiz": true
+      "chumash-quiz": true,
+      "posuk-practice-scroll": true,
+      "rashi-letters": true,
+      "shorashim": true,
+      "class-gallery": true,
+      "game-show": true
     }
   };
 
