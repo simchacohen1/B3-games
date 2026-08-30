@@ -89,6 +89,10 @@
     cursor:pointer; transition:transform .08s ease;
   }
   .choice-btn:active{ transform:scale(0.97); }
+  .choice-btn.word-btn{
+    font-family:'Mekorot Rashi', serif; font-size:1.5rem; height:auto; min-height:70px;
+    padding:8px 6px; display:flex; align-items:center; justify-content:center;
+  }
   .choice-btn.correct{ background:#DCEFD9; border-color:#4C8C4A; animation: pop .35s ease; }
   .choice-btn.incorrect{ background:#F4D9D9; border-color:var(--rimon); animation: shake .35s ease; }
   @keyframes pop{
@@ -166,48 +170,102 @@ const db = firebase.database();
 const UNITS = [
   { id:'zayin', label:'ז', type:'single', correct:'ז', distractors:['ו','ר','נ'],
     words:[
-      {w:'זֶה', t:'ז'}, {w:'זָר', t:'ז'}, {w:'זַךְ', t:'ז'}, {w:'זֵר', t:'ז'},
-      {w:'זָקֵן', t:'ז'}, {w:'זָכַר', t:'ז'}, {w:'זָמַר', t:'ז'}, {w:'גָּזַל', t:'ז'}
+      {w:'זֶה', decoys:['זֶר', 'דֶּה', 'נֶה']},
+      {w:'זָר', decoys:['זָן', 'דָּר', 'נָר']},
+      {w:'זַךְ', decoys:['רַךְ', 'זַד', 'דַּךְ']},
+      {w:'זֵר', decoys:['נֵר', 'זֵן', 'רֵר']},
+      {w:'זָקֵן', decoys:['רָקֵן', 'זָמֵן', 'זָדֵן']},
+      {w:'זָכַר', decoys:['זָכָה', 'נָכַר', 'זָבַר']},
+      {w:'זָמַר', decoys:['זָמַן', 'דָּמַר', 'זָכַר']},
+      {w:'גָּזַל', decoys:['גָּדַל', 'גָּזַר', 'נָּזַל']}
     ]},
   { id:'bet', label:'בּ / ב', type:'pair', pair:['בּ','ב'], distractors:['כ','ר'],
     words:[
-      {w:'בַּיִת', t:'בּ'}, {w:'בֵּן', t:'בּ'}, {w:'בֹּקֶר', t:'בּ'}, {w:'בָּנָה', t:'בּ'},
-      {w:'עֶרֶב', t:'ב'}, {w:'זָהָב', t:'ב'}, {w:'לֵב', t:'ב'}, {w:'אֹהֵב', t:'ב'}
+      {w:'בַּיִת', decoys:['כַּיִת', 'בַּיִל', 'בַּיִד']},
+      {w:'בֵּן', decoys:['כֵּן', 'בֵּד', 'רֵּן']},
+      {w:'בֹּקֶר', decoys:['כֹּקֶר', 'בֹּסֶר', 'בֹּקֵר']},
+      {w:'בָּנָה', decoys:['כָּנָה', 'בָּרָה', 'בָּנַע']},
+      {w:'עֶרֶב', decoys:['עֶרֶכ', 'עֶדֶב', 'אֶרֶב']},
+      {w:'זָהָב', decoys:['זָהָר', 'דָּהָב', 'זָכָב']},
+      {w:'לֵב', decoys:['לֵר', 'כֵּב', 'לֵד']},
+      {w:'אֹהֵב', decoys:['אֹהֵר', 'אֹכֵב', 'עֹהֵב']}
     ]},
   { id:'tsadi', label:'צ', type:'single', correct:'צ', distractors:['ע','ן','ר'],
     words:[
-      {w:'צַד', t:'צ'}, {w:'צָר', t:'צ'}, {w:'צֵל', t:'צ'}, {w:'צַדִּיק', t:'צ'},
-      {w:'צֶדֶק', t:'צ'}, {w:'צָמַח', t:'צ'}, {w:'צַיִד', t:'צ'}, {w:'צֶבַע', t:'צ'}
+      {w:'צַד', decoys:['עַד', 'צַר', 'נַד']},
+      {w:'צָר', decoys:['עָר', 'צָד', 'נָר']},
+      {w:'צֵל', decoys:['עֵל', 'צֵן', 'נֵל']},
+      {w:'צַדִּיק', decoys:['עַדִּיק', 'צַדִּיל', 'נַדִּיק']},
+      {w:'צֶדֶק', decoys:['עֶדֶק', 'צֶרֶק', 'נֶדֶק']},
+      {w:'צָמַח', decoys:['עָמַח', 'צָמַד', 'נָמַח']},
+      {w:'צַיִד', decoys:['עַיִד', 'צַיִר', 'נַיִד']},
+      {w:'צֶבַע', decoys:['עֶבַע', 'צֶבַד', 'נֶבַע']}
     ]},
   { id:'alef', label:'א', type:'single', correct:'א', distractors:['ת','ע','ה'],
     words:[
-      {w:'אָב', t:'א'}, {w:'אָח', t:'א'}, {w:'אֶרֶז', t:'א'}, {w:'אֹהֶל', t:'א'},
-      {w:'אֹכֶל', t:'א'}, {w:'אֲדָמָה', t:'א'}, {w:'אֱמֶת', t:'א'}, {w:'אַהֲבָה', t:'א'}
+      {w:'אָב', decoys:['עָב', 'אָר', 'תָּב']},
+      {w:'אָח', decoys:['עָח', 'אָה', 'תָּח']},
+      {w:'אֶרֶז', decoys:['עֶרֶז', 'אֶרֶד', 'תֶּרֶז']},
+      {w:'אֹהֶל', decoys:['עֹהֶל', 'אֹהֵל', 'תֹּהֶל']},
+      {w:'אֹכֶל', decoys:['עֹכֶל', 'אֹכֵל', 'תֹּכֶל']},
+      {w:'אֲדָמָה', decoys:['עֲדָמָה', 'אֲדָרָה', 'תַּדָמָה']},
+      {w:'אֱמֶת', decoys:['עֱמֶת', 'אֱמֵן', 'תֱּמֶת']},
+      {w:'אַהֲבָה', decoys:['עַהֲבָה', 'אַהֲרָה', 'תַּהֲבָה']}
     ]},
   { id:'tsadisofit', label:'ץ', type:'single', correct:'ץ', distractors:['ן','ף','ך'],
     words:[
-      {w:'עֵץ', t:'ץ'}, {w:'רָץ', t:'ץ'}, {w:'אֶרֶץ', t:'ץ'}, {w:'קוֹץ', t:'ץ'},
-      {w:'חוּץ', t:'ץ'}, {w:'קָפַץ', t:'ץ'}, {w:'פָּרַץ', t:'ץ'}, {w:'רָחַץ', t:'ץ'}
+      {w:'עֵץ', decoys:['עֵן', 'עֵד', 'עֵף']},
+      {w:'רָץ', decoys:['רָן', 'רָד', 'רָף']},
+      {w:'אֶרֶץ', decoys:['אֶרֶן', 'אֶרֶד', 'אֶרֶף']},
+      {w:'קוֹץ', decoys:['קוֹן', 'קוֹד', 'קוֹף']},
+      {w:'חוּץ', decoys:['חוּן', 'חוּד', 'חוּף']},
+      {w:'קָפַץ', decoys:['קָפַן', 'קָפַד', 'קָפַף']},
+      {w:'פָּרַץ', decoys:['פָּרַן', 'פָּרַד', 'פָּרַף']},
+      {w:'רָחַץ', decoys:['רָחַן', 'רָחַד', 'רָחַף']}
     ]},
   { id:'memsofit', label:'ם', type:'single', correct:'ם', distractors:['ס','ט','ו'],
     words:[
-      {w:'יָם', t:'ם'}, {w:'חַם', t:'ם'}, {w:'דָּם', t:'ם'}, {w:'מַיִם', t:'ם'},
-      {w:'יוֹם', t:'ם'}, {w:'מָקוֹם', t:'ם'}, {w:'פָּנִים', t:'ם'}, {w:'עוֹלָם', t:'ם'}
+      {w:'יָם', decoys:['יָס', 'יָן', 'יָך']},
+      {w:'חַם', decoys:['חַס', 'חַן', 'חַך']},
+      {w:'דָּם', decoys:['דָּס', 'דָּן', 'דָּך']},
+      {w:'מַיִם', decoys:['מַיִס', 'מַיִן', 'נַיִם']},
+      {w:'יוֹם', decoys:['יוֹס', 'יוֹן', 'יוֹך']},
+      {w:'מָקוֹם', decoys:['מָקוֹס', 'מָקוֹן', 'נָקוֹם']},
+      {w:'פָּנִים', decoys:['פָּנִיס', 'פָּנִין', 'כָּנִים']},
+      {w:'עוֹלָם', decoys:['עוֹלָס', 'עוֹלָן', 'עוֹלָך']}
     ]},
   { id:'shin', label:'שׁ / שׂ', type:'pair', pair:['שׁ','שׂ'], distractors:['ס','ע'],
     words:[
-      {w:'שָׁב', t:'שׁ'}, {w:'שׁוֹר', t:'שׁ'}, {w:'שַׁבָּת', t:'שׁ'}, {w:'שָׁמַר', t:'שׁ'},
-      {w:'שַׂר', t:'שׂ'}, {w:'שָׂדֶה', t:'שׂ'}, {w:'שָׂרַף', t:'שׂ'}, {w:'שִׂיחַ', t:'שׂ'}
+      {w:'שָׁב', decoys:['סָב', 'שָׁד', 'עָב']},
+      {w:'שׁוֹר', decoys:['סוֹר', 'שׁוֹד', 'עוֹר']},
+      {w:'שַׁבָּת', decoys:['סַבָּת', 'שַׁבָּד', 'עַבָּת']},
+      {w:'שָׁמַר', decoys:['סָמַר', 'שָׁמַד', 'עָמַר']},
+      {w:'שַׂר', decoys:['סַר', 'שַׁר', 'עַר']},
+      {w:'שָׂדֶה', decoys:['סָדֶה', 'שָׁדֶה', 'עָדֶה']},
+      {w:'שָׂרַף', decoys:['סָרַף', 'שָׁרַף', 'עָרַף']},
+      {w:'שִׂיחַ', decoys:['סִיחַ', 'שִׁיחַ', 'עִיחַ']}
     ]},
   { id:'samech', label:'ס', type:'single', correct:'ס', distractors:['ם','ה','ו'],
     words:[
-      {w:'סַף', t:'ס'}, {w:'סוּס', t:'ס'}, {w:'סוּר', t:'ס'}, {w:'סֵפֶר', t:'ס'},
-      {w:'סָגַר', t:'ס'}, {w:'סָעַר', t:'ס'}, {w:'סָקַל', t:'ס'}, {w:'כִּסֵּא', t:'ס'}
+      {w:'סַף', decoys:['מַף', 'סַר', 'הַף']},
+      {w:'סוּס', decoys:['מוּס', 'סוּר', 'הוּס']},
+      {w:'סוּר', decoys:['מוּר', 'סוּס', 'הוּר']},
+      {w:'סֵפֶר', decoys:['מֵפֶר', 'סֵבֶר', 'הֵפֶר']},
+      {w:'סָגַר', decoys:['מָגַר', 'סָדַר', 'הָגַר']},
+      {w:'סָעַר', decoys:['מָעַר', 'סָעַד', 'הָעַר']},
+      {w:'סָקַל', decoys:['מָקַל', 'סָקַר', 'הָקַל']},
+      {w:'כִּסֵּא', decoys:['כִּמֵּא', 'כִּסֵּד', 'כִּהֵּא']}
     ]},
   { id:'finalreview', label:'שׁ / שׂ (review)', type:'pair', pair:['שׁ','שׂ'], distractors:['ב','צ'],
     words:[
-      {w:'שָׁלוֹם', t:'שׁ'}, {w:'שָׁמַיִם', t:'שׁ'}, {w:'שָׁלַח', t:'שׁ'}, {w:'שַׁחַר', t:'שׁ'},
-      {w:'שָׂמֵחַ', t:'שׂ'}, {w:'שָׂפָה', t:'שׂ'}, {w:'שָׂכָר', t:'שׂ'}, {w:'שֶׂה', t:'שׂ'}
+      {w:'שָׁלוֹם', decoys:['שָׂלוֹם', 'סָלוֹם', 'שָׁרוֹם']},
+      {w:'שָׁמַיִם', decoys:['שָׂמַיִם', 'סָמַיִם', 'שָׁמַיִר']},
+      {w:'שָׁלַח', decoys:['שָׂלַח', 'סָלַח', 'שָׁלַד']},
+      {w:'שַׁחַר', decoys:['שַׂחַר', 'סַחַר', 'שַׁחַד']},
+      {w:'שָׂמֵחַ', decoys:['שָׁמֵחַ', 'סָמֵחַ', 'שָׂמֵחָ']},
+      {w:'שָׂפָה', decoys:['שָׁפָה', 'סָפָה', 'שָׂפָד']},
+      {w:'שָׂכָר', decoys:['שָׁכָר', 'סָכָר', 'שָׂכָד']},
+      {w:'שֶׂה', decoys:['שֶׁה', 'סֶה', 'שֶׂד']}
     ]}
 ];
 const NEEDED_IN_A_ROW = 3;
@@ -359,10 +417,10 @@ function renderQuestion(){
   } else {
     const wordEntry = unit.words[Math.floor(Math.random()*unit.words.length)];
     currentWord = wordEntry;
-    currentTarget = wordEntry.t;
+    currentTarget = wordEntry.w;
     rashiEl.classList.add('word-mode');
     rashiEl.textContent = wordEntry.w;
-    promptEl.textContent = 'Which letter is in this word?';
+    promptEl.textContent = 'Which word below matches this word exactly?';
     pill.textContent = 'Word';
     pill.classList.add('word');
   }
@@ -372,14 +430,26 @@ function renderQuestion(){
   document.getElementById('feedback').textContent = '';
   const row = document.getElementById('choicesRow');
   row.innerHTML = '';
-  const opts = choicesFor(unit);
-  opts.forEach(letter => {
-    const b = document.createElement('button');
-    b.className = 'choice-btn';
-    b.textContent = letter;
-    b.onclick = () => handleAnswer(letter, b);
-    row.appendChild(b);
-  });
+
+  if(phase === 'letter'){
+    const opts = choicesFor(unit);
+    opts.forEach(letter => {
+      const b = document.createElement('button');
+      b.className = 'choice-btn';
+      b.textContent = letter;
+      b.onclick = () => handleAnswer(letter, b);
+      row.appendChild(b);
+    });
+  } else {
+    const opts = shuffle([currentWord.w, ...currentWord.decoys]);
+    opts.forEach(word => {
+      const b = document.createElement('button');
+      b.className = 'choice-btn word-btn';
+      b.textContent = word;
+      b.onclick = () => handleAnswer(word, b);
+      row.appendChild(b);
+    });
+  }
   const phaseFrac = (phase === 'word' ? 1 : 0) + (streak/NEEDED_IN_A_ROW);
   const pct = Math.round(((unitIndex*2 + phaseFrac) / (UNITS.length*2)) * 100);
   document.getElementById('progFill').style.width = Math.min(pct,100) + '%';
