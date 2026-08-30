@@ -843,43 +843,43 @@ function enableSound() {
 
 function playAlertSound() {
   try {
+    // Don't just bail if there's no audio context yet - create or resume it
+    // right here, so a buzz-in works even if "enable sound" was never
+    // clicked, or the browser suspended it again in the background.
     if (!sharedAudioCtx) {
-      document.getElementById('soundStatus').textContent = 'No audio context - click enable sound';
-      return;
+      sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
     if (sharedAudioCtx.state === 'suspended') {
       sharedAudioCtx.resume();
     }
     const ctx = sharedAudioCtx;
     const startTime = ctx.currentTime;
-    const duration = 0.45;
 
-    // Harsh buzzer tone: a low sawtooth wave with fast frequency wobble,
-    // reads as a classic game-show "BZZZT" rather than a pleasant chime.
-    const osc = ctx.createOscillator();
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(150, startTime);
+    // Punchy game-show buzzer: a short low square-wave "thunk" followed by
+    // a brief buzz, rather than a harsh wobbling tone.
+    const thunk = ctx.createOscillator();
+    thunk.type = "square";
+    thunk.frequency.setValueAtTime(110, startTime);
+    thunk.frequency.exponentialRampToValueAtTime(80, startTime + 0.12);
+    const thunkGain = ctx.createGain();
+    thunkGain.gain.setValueAtTime(0.35, startTime);
+    thunkGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.3);
+    thunk.connect(thunkGain);
+    thunkGain.connect(ctx.destination);
+    thunk.start(startTime);
+    thunk.stop(startTime + 0.3);
 
-    const wobble = ctx.createOscillator();
-    wobble.type = "sine";
-    wobble.frequency.setValueAtTime(28, startTime);
-    const wobbleGain = ctx.createGain();
-    wobbleGain.gain.setValueAtTime(35, startTime);
-    wobble.connect(wobbleGain);
-    wobbleGain.connect(osc.frequency);
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.3, startTime);
-    gain.gain.setValueAtTime(0.3, startTime + duration - 0.05);
-    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(startTime);
-    wobble.start(startTime);
-    osc.stop(startTime + duration);
-    wobble.stop(startTime + duration);
+    const buzz = ctx.createOscillator();
+    buzz.type = "square";
+    buzz.frequency.setValueAtTime(196, startTime + 0.02);
+    const buzzGain = ctx.createGain();
+    buzzGain.gain.setValueAtTime(0.18, startTime + 0.02);
+    buzzGain.gain.setValueAtTime(0.18, startTime + 0.16);
+    buzzGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.26);
+    buzz.connect(buzzGain);
+    buzzGain.connect(ctx.destination);
+    buzz.start(startTime + 0.02);
+    buzz.stop(startTime + 0.26);
 
     document.getElementById('soundStatus').textContent = 'Alert fired (state: ' + ctx.state + ')';
   } catch (err) {
