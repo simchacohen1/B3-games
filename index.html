@@ -2,51 +2,27 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>B3 Tools</title>
-
+<title>B3 Games</title>
 <style>
-    * {
-        box-sizing: border-box;
-    }
-
     body {
         font-family: Arial, sans-serif;
         background: #f5f7fa;
         text-align: center;
         padding: 40px 20px;
-        margin: 0;
-        color: #333;
     }
 
     h1 {
         font-size: 48px;
-        margin: 0 0 8px;
+        margin-bottom: 30px;
         color: #333;
-    }
-
-    .subtitle {
-        margin: 0 0 35px;
-        color: #6b7280;
-        font-size: 18px;
-    }
-
-    .tool-section {
-        max-width: 1000px;
-        margin: 0 auto 42px;
-    }
-
-    .section-title {
-        text-align: left;
-        font-size: 24px;
-        margin: 0 0 16px;
-        color: #374151;
     }
 
     .game-container {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
         gap: 20px;
+        max-width: 900px;
+        margin: auto;
     }
 
     .game-card {
@@ -54,10 +30,9 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 10px;
-        min-height: 145px;
+        gap: 8px;
         background: white;
-        padding: 24px 14px;
+        padding: 24px 12px;
         border-radius: 16px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         text-decoration: none;
@@ -70,7 +45,7 @@
     }
 
     .card-icon {
-        font-size: 42px;
+        font-size: 40px;
         line-height: 1;
     }
 
@@ -103,7 +78,7 @@
         position: fixed;
         top: 60px;
         right: 12px;
-        width: 320px;
+        width: 300px;
         background: white;
         border-radius: 16px;
         box-shadow: 0 14px 32px rgba(0,0,0,0.18);
@@ -148,7 +123,6 @@
     .disabled-note {
         margin-top: 40px;
         color: #4b5563;
-        font-size: 18px;
     }
 
     .admin-message {
@@ -157,42 +131,7 @@
         color: #4b5563;
         margin: 0 0 12px;
     }
-
-    @media (max-width: 600px) {
-        body {
-            padding: 70px 14px 30px;
-        }
-
-        h1 {
-            font-size: 36px;
-        }
-
-        .game-container {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 12px;
-        }
-
-        .game-card {
-            min-height: 125px;
-            padding: 18px 8px;
-        }
-
-        .card-icon {
-            font-size: 36px;
-        }
-
-        .card-title {
-            font-size: 15px;
-        }
-
-        .admin-panel {
-            left: 12px;
-            right: 12px;
-            width: auto;
-        }
-    }
 </style>
-
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
@@ -201,546 +140,224 @@
 </head>
 
 <body>
-
-<h1>B3 Tools</h1>
-<p class="subtitle">Games, practice and classroom tools</p>
-
-
-<section class="tool-section">
-    <h2 class="section-title">📖 Chumash & Skills</h2>
+    <h1>B3 Games</h1>
 
     <div class="game-container">
-
-        <a class="game-card"
-           data-game-id="chumash-quiz"
-           href="chumash-quiz.html">
-            <span class="card-icon">📖</span>
-            <span class="card-title">Chumash Quiz</span>
-        </a>
-
-        <a class="game-card"
-           data-game-id="posuk-practice-scroll"
-           href="record_pesukim/student.html">
-            <span class="card-icon">📜</span>
-            <span class="card-title">Posuk Practice</span>
-        </a>
-
-        <a class="game-card"
-           data-game-id="rashi-letters"
-           href="rashi-letters/student.html">
-            <span class="card-icon">✡️</span>
-            <span class="card-title">Rashi Letters</span>
-        </a>
-
-        <a class="game-card"
-           data-game-id="shorashim"
-           href="shorashim/index.html">
-            <span class="card-icon">🌳</span>
-            <span class="card-title">Shorashim</span>
-        </a>
-
-        <a class="game-card"
-           data-game-id="kodesh-construct"
-           href="kodesh-construct.html">
-            <span class="card-icon">🔤</span>
-            <span class="card-title">Dikduk Arcade</span>
-        </a>
-
-        <a class="game-card"
-           data-game-id="kahoot-word-quiz"
-           href="kahoot_word_quiz_engine_paste_only_any_perek.html">
-            <span class="card-icon">❓</span>
-            <span class="card-title">Kahoot Word Quiz</span>
-        </a>
-
-    </div>
-</section>
-
-
-<section class="tool-section">
-    <h2 class="section-title">🎮 Games</h2>
-
-    <div class="game-container">
-
-        <a class="game-card"
-           data-game-id="tzitzis-game"
-           href="tzitzis_game.html">
+        <a class="game-card" data-game-id="tzitzis-game" href="tzitzis_game.html">
             <span class="card-icon">🧵</span>
             <span class="card-title">Tzitzis Game</span>
         </a>
-
-        <a class="game-card"
-           data-game-id="tzitzis-quest-arcade"
-           href="tzitzis_quest_arcade_v2.html">
+        <a class="game-card" data-game-id="tzitzis-quest-arcade" href="tzitzis_quest_arcade_v2.html">
             <span class="card-icon">🕹️</span>
             <span class="card-title">Tzitzis Quest Arcade</span>
         </a>
-
-        <a class="game-card"
-           data-game-id="dvarim-game"
-           href="kahoot_teacher_teams.html">
-            <span class="card-icon">⚡</span>
-            <span class="card-title">Dvarim Game</span>
+        <a class="game-card" data-game-id="kahoot-word-quiz" href="kahoot_word_quiz_engine_paste_only_any_perek.html">
+            <span class="card-icon">❓</span>
+            <span class="card-title">Kahoot Word Quiz Engine</span>
         </a>
-
-        <a class="game-card"
-           data-game-id="game-show"
-           href="player.html">
-            <span class="card-icon">🏆</span>
-            <span class="card-title">Game Show</span>
+        <a class="game-card" data-game-id="kodesh-construct" href="kodesh-construct.html">
+            <span class="card-icon">🔤</span>
+            <span class="card-title">Dikduk Arcade</span>
         </a>
-
-    </div>
-</section>
-
-
-<section class="tool-section">
-    <h2 class="section-title">🧰 Classroom Tools</h2>
-
-    <div class="game-container">
-
-        <a class="game-card"
-           data-game-id="class-gallery"
-           href="class-gallery.html">
+        <a class="game-card" data-game-id="chumash-quiz" href="chumash-quiz.html">
+            <span class="card-icon">📖</span>
+            <span class="card-title">Chumash Quiz</span>
+        </a>
+        <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html">
+            <span class="card-icon">📜</span>
+            <span class="card-title">Posuk Practice Scroll</span>
+        </a>
+        <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html">
+            <span class="card-icon">✡️</span>
+            <span class="card-title">Rashi Letters</span>
+        </a>
+        <a class="game-card" data-game-id="shorashim" href="shorashim/teacher.html">
+            <span class="card-icon">🌳</span>
+            <span class="card-title">Shorashim</span>
+        </a>
+        <a class="game-card" data-game-id="class-gallery" href="class-gallery.html">
             <span class="card-icon">🖼️</span>
             <span class="card-title">Class Gallery</span>
         </a>
-
-        <a class="game-card"
-           data-game-id="work-timer"
-           href="work-timer-v4-index.html">
-            <span class="card-icon">⏱️</span>
-            <span class="card-title">Work Timer</span>
+        <a class="game-card" data-game-id="game-show" href="player.html">
+            <span class="card-icon">🏆</span>
+            <span class="card-title">Game Show</span>
         </a>
-
-        <a class="game-card"
-           data-game-id="davening"
-           href="https://simchacohen1.github.io/davening_student_app/">
-            <span class="card-icon">🕍</span>
-            <span class="card-title">Davening Player</span>
-        </a>
-
-        <a class="game-card"
-           data-game-id="student-rewards"
-           href="https://student-rewards.simcha5770.chatgpt.site/">
-            <span class="card-icon">⭐</span>
-            <span class="card-title">Points & Rewards</span>
-        </a>
-
-        <a class="game-card"
-           data-game-id="elul-yom-kippur-slides"
-           href="Elul_Yom_Kippur_Class_Slides_ENGAGED%20(3).html">
-            <span class="card-icon">🍎</span>
-            <span class="card-title">Elul & Yom Kippur</span>
-        </a>
-
     </div>
-</section>
 
+    <p id="disabledMessage" class="disabled-note hidden">All games are currently disabled.</p>
 
-<p id="disabledMessage"
-   class="disabled-note hidden">
-    All B3 tools are currently unavailable.
-</p>
+    <button id="adminAccessButton" class="admin-button">Admin</button>
 
+    <div id="adminPanel" class="admin-panel hidden">
+      <h2>Game Controls</h2>
+      <p id="adminStatus" class="admin-message">Checking sign-in…</p>
 
-<button id="adminAccessButton"
-        class="admin-button">
-    Admin
-</button>
+      <button id="signInButton" class="admin-action">Sign in with Google</button>
+      <button id="signOutButton" class="admin-action secondary hidden">Sign out</button>
 
-
-<div id="adminPanel"
-     class="admin-panel hidden">
-
-    <h2>Tool Controls</h2>
-
-    <p id="adminStatus"
-       class="admin-message">
-        Checking sign-in…
-    </p>
-
-    <button id="signInButton"
-            class="admin-action">
-        Sign in with Google
-    </button>
-
-    <button id="signOutButton"
-            class="admin-action secondary hidden">
-        Sign out
-    </button>
-
-    <div id="adminControls"
-         class="hidden">
-
+      <div id="adminControls" class="hidden">
         <div class="admin-row">
-            <label for="siteEnabledToggle">
-                Student website enabled
-            </label>
-
-            <input id="siteEnabledToggle"
-                   type="checkbox">
+          <label for="siteEnabledToggle">Site enabled</label>
+          <input id="siteEnabledToggle" type="checkbox">
         </div>
-
-        <hr>
-
         <div id="gameToggles"></div>
-
+      </div>
     </div>
-</div>
 
-
-<script>
-const settingsApi = window.B3SiteSettings;
-
-const adminAccessButton =
-    document.getElementById("adminAccessButton");
-
-const adminPanel =
-    document.getElementById("adminPanel");
-
-const adminControls =
-    document.getElementById("adminControls");
-
-const signInButton =
-    document.getElementById("signInButton");
-
-const signOutButton =
-    document.getElementById("signOutButton");
-
-const siteEnabledToggle =
-    document.getElementById("siteEnabledToggle");
-
-const gameToggles =
-    document.getElementById("gameToggles");
-
-const disabledMessage =
-    document.getElementById("disabledMessage");
-
-const adminStatus =
-    document.getElementById("adminStatus");
-
-const gameCards =
-    Array.from(
-        document.querySelectorAll(".game-card")
-    );
-
-const gameDefinitions =
-    gameCards.map((card) => ({
-        id: card.dataset.gameId,
-
-        name:
-            (
-                card.querySelector(".card-title")?.textContent
-                ||
-                card.textContent
-            ).trim(),
-
-        element: card
-    }));
-
-let currentSettings =
-    settingsApi.defaultSettings;
-
-let currentUser = null;
-let isAuthorizedAdmin = false;
-
-
-function updateSectionVisibility() {
-
-    document
-        .querySelectorAll(".tool-section")
-        .forEach((section) => {
-
-            const visibleCards =
-                Array.from(
-                    section.querySelectorAll(".game-card")
-                ).filter(
-                    (card) =>
-                        !card.classList.contains("hidden")
-                );
-
-            section.classList.toggle(
-                "hidden",
-                visibleCards.length === 0
-            );
-        });
-}
-
-
-function renderGames() {
-
-    let visibleCount = 0;
-
-    gameDefinitions.forEach((game) => {
-
-        const shouldShow =
-            currentSettings.siteEnabled &&
-            currentSettings.games[game.id] !== false;
-
-        game.element.classList.toggle(
-            "hidden",
-            !shouldShow
-        );
-
-        if (shouldShow) {
-            visibleCount += 1;
-        }
-    });
-
-    updateSectionVisibility();
-
-    disabledMessage.classList.toggle(
-        "hidden",
-        visibleCount !== 0
-    );
-}
-
-
-function renderAdminPanel() {
-
-    const signedIn =
-        Boolean(currentUser);
-
-    signInButton.classList.toggle(
-        "hidden",
-        signedIn
-    );
-
-    signOutButton.classList.toggle(
-        "hidden",
-        !signedIn
-    );
-
-    adminControls.classList.toggle(
-        "hidden",
-        !isAuthorizedAdmin
-    );
-
-    if (!signedIn) {
-
-        adminStatus.textContent =
-            "Sign in with the authorized Google account to change B3 tool settings.";
-
-        return;
-    }
-
-    if (!isAuthorizedAdmin) {
-
-        adminStatus.textContent =
-            `Signed in as ${
-                currentUser.email ||
-                "an unauthorized account"
-            }. This account cannot edit settings.`;
-
-        return;
-    }
-
-    adminStatus.textContent =
-        `Signed in as ${currentUser.email}. Changes affect everyone.`;
-
-    siteEnabledToggle.checked =
-        currentSettings.siteEnabled;
-
-    gameToggles.innerHTML = "";
-
-    gameDefinitions.forEach((game) => {
-
-        const row =
-            document.createElement("div");
-
-        row.className =
-            "admin-row";
-
-        const label =
-            document.createElement("label");
-
-        label.setAttribute(
-            "for",
-            `toggle-${game.id}`
-        );
-
-        label.textContent =
-            game.name;
-
-        const input =
-            document.createElement("input");
-
-        input.type =
-            "checkbox";
-
-        input.id =
-            `toggle-${game.id}`;
-
-        input.checked =
-            currentSettings.games[game.id] !== false;
-
-        input.addEventListener(
-            "change",
-            async () => {
-
-                const oldValue =
-                    !input.checked;
-
-                try {
-
-                    currentSettings.games[game.id] =
-                        input.checked;
-
-                    renderGames();
-
-                    await settingsApi.updateGameEnabled(
-                        game.id,
-                        input.checked
-                    );
-
-                } catch (error) {
-
-                    currentSettings.games[game.id] =
-                        oldValue;
-
-                    input.checked =
-                        oldValue;
-
-                    renderGames();
-
-                    alert(
-                        "Could not save this tool setting. Make sure you are signed in with the authorized account."
-                    );
-
-                    console.error(error);
-                }
-            }
-        );
-
-        row.appendChild(label);
-        row.appendChild(input);
-        gameToggles.appendChild(row);
-    });
-}
-
-
-adminAccessButton.addEventListener(
-    "click",
-    () => {
-
-        adminPanel.classList.toggle(
-            "hidden"
-        );
-
-        if (
-            !adminPanel.classList.contains("hidden")
-        ) {
-            renderAdminPanel();
-        }
-    }
-);
-
-
-signInButton.addEventListener(
-    "click",
-    async () => {
-
-        try {
-
-            await settingsApi.signInWithGoogle();
-
-        } catch (error) {
-
-            alert(
-                "Google sign-in did not complete."
-            );
-
-            console.error(error);
-        }
-    }
-);
-
-
-signOutButton.addEventListener(
-    "click",
-    async () => {
-
-        try {
-
-            await settingsApi.signOut();
-
-        } catch (error) {
-
-            alert(
-                "Could not sign out."
-            );
-
-            console.error(error);
-        }
-    }
-);
-
-
-siteEnabledToggle.addEventListener(
-    "change",
-    async () => {
-
-        const oldValue =
-            !siteEnabledToggle.checked;
-
-        try {
-
-            currentSettings.siteEnabled =
-                siteEnabledToggle.checked;
-
-            renderGames();
-
-            await settingsApi.updateSiteEnabled(
-                siteEnabledToggle.checked
-            );
-
-        } catch (error) {
-
-            currentSettings.siteEnabled =
-                oldValue;
-
-            siteEnabledToggle.checked =
-                oldValue;
-
-            renderGames();
-
-            alert(
-                "Could not save the site setting. Make sure you are signed in with the authorized account."
-            );
-
-            console.error(error);
-        }
-    }
-);
-
-
-settingsApi.onAuthStateChanged(
-    (user, authorized) => {
-
-        currentUser =
-            user;
-
-        isAuthorizedAdmin =
-            authorized;
-
-        renderAdminPanel();
-    }
-);
-
-
-settingsApi.subscribe(
-    (settings) => {
-
-        currentSettings =
-            settings;
-
-        renderGames();
-
-        renderAdminPanel();
-    }
-);
-</script>
-
+    <script>
+      const settingsApi = window.B3SiteSettings;
+      const adminAccessButton = document.getElementById("adminAccessButton");
+      const adminPanel = document.getElementById("adminPanel");
+      const adminControls = document.getElementById("adminControls");
+      const signInButton = document.getElementById("signInButton");
+      const signOutButton = document.getElementById("signOutButton");
+      const siteEnabledToggle = document.getElementById("siteEnabledToggle");
+      const gameToggles = document.getElementById("gameToggles");
+      const disabledMessage = document.getElementById("disabledMessage");
+      const adminStatus = document.getElementById("adminStatus");
+      const gameCards = Array.from(document.querySelectorAll(".game-card"));
+
+      const gameDefinitions = gameCards.map((card) => ({
+          id: card.dataset.gameId,
+          name: (card.querySelector(".card-title")?.textContent || card.textContent).trim(),
+          element: card
+      }));
+
+      let currentSettings = settingsApi.defaultSettings;
+      let currentUser = null;
+      let isAuthorizedAdmin = false;
+
+      function renderGames() {
+          let visibleCount = 0;
+
+          gameDefinitions.forEach((game) => {
+              const shouldShow =
+                  currentSettings.siteEnabled &&
+                  currentSettings.games[game.id] !== false;
+
+              game.element.classList.toggle("hidden", !shouldShow);
+
+              if (shouldShow) {
+                  visibleCount += 1;
+              }
+          });
+
+          disabledMessage.classList.toggle("hidden", visibleCount !== 0);
+      }
+
+      function renderAdminPanel() {
+          const signedIn = Boolean(currentUser);
+
+          signInButton.classList.toggle("hidden", signedIn);
+          signOutButton.classList.toggle("hidden", !signedIn);
+          adminControls.classList.toggle("hidden", !isAuthorizedAdmin);
+
+          if (!signedIn) {
+              adminStatus.textContent =
+                  "Sign in with the authorized Google account to change game settings.";
+              return;
+          }
+
+          if (!isAuthorizedAdmin) {
+              adminStatus.textContent =
+                  `Signed in as ${currentUser.email || "an unauthorized account"}. This account cannot edit settings.`;
+              return;
+          }
+
+          adminStatus.textContent =
+              `Signed in as ${currentUser.email}. Changes affect everyone.`;
+
+          siteEnabledToggle.checked = currentSettings.siteEnabled;
+          gameToggles.innerHTML = "";
+
+          gameDefinitions.forEach((game) => {
+              const row = document.createElement("div");
+              row.className = "admin-row";
+
+              const label = document.createElement("label");
+              label.setAttribute("for", `toggle-${game.id}`);
+              label.textContent = game.name;
+
+              const input = document.createElement("input");
+              input.type = "checkbox";
+              input.id = `toggle-${game.id}`;
+              input.checked = currentSettings.games[game.id] !== false;
+
+              input.addEventListener("change", async () => {
+                  const oldValue = !input.checked;
+
+                  try {
+                      currentSettings.games[game.id] = input.checked;
+                      renderGames();
+                      await settingsApi.updateGameEnabled(game.id, input.checked);
+                  } catch (error) {
+                      currentSettings.games[game.id] = oldValue;
+                      input.checked = oldValue;
+                      renderGames();
+                      alert("Could not save this game setting. Make sure you are signed in with the authorized account.");
+                      console.error(error);
+                  }
+              });
+
+              row.appendChild(label);
+              row.appendChild(input);
+              gameToggles.appendChild(row);
+          });
+      }
+
+      adminAccessButton.addEventListener("click", () => {
+          adminPanel.classList.toggle("hidden");
+          if (!adminPanel.classList.contains("hidden")) {
+              renderAdminPanel();
+          }
+      });
+
+      signInButton.addEventListener("click", async () => {
+          try {
+              await settingsApi.signInWithGoogle();
+          } catch (error) {
+              alert("Google sign-in did not complete.");
+              console.error(error);
+          }
+      });
+
+      signOutButton.addEventListener("click", async () => {
+          try {
+              await settingsApi.signOut();
+          } catch (error) {
+              alert("Could not sign out.");
+              console.error(error);
+          }
+      });
+
+      siteEnabledToggle.addEventListener("change", async () => {
+          const oldValue = !siteEnabledToggle.checked;
+
+          try {
+              currentSettings.siteEnabled = siteEnabledToggle.checked;
+              renderGames();
+              await settingsApi.updateSiteEnabled(siteEnabledToggle.checked);
+          } catch (error) {
+              currentSettings.siteEnabled = oldValue;
+              siteEnabledToggle.checked = oldValue;
+              renderGames();
+              alert("Could not save the site setting. Make sure you are signed in with the authorized account.");
+              console.error(error);
+          }
+      });
+
+      settingsApi.onAuthStateChanged((user, authorized) => {
+          currentUser = user;
+          isAuthorizedAdmin = authorized;
+          renderAdminPanel();
+      });
+
+      settingsApi.subscribe((settings) => {
+          currentSettings = settings;
+          renderGames();
+          renderAdminPanel();
+      });
+    </script>
 </body>
 </html>
