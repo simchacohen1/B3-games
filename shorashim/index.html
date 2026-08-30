@@ -36,6 +36,8 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
 
 /* Picture editing */
 .approved-art-layer{pointer-events:none}.approved-art-layer .art-item{pointer-events:auto;touch-action:none;cursor:grab}.approved-art-layer .art-item:active{cursor:grabbing}.art-item.illustration img{pointer-events:none;-webkit-user-drag:none;user-select:none}.art-item.selected{outline:4px solid #4f46e5;outline-offset:4px;background:#ffffff30}.art-edit-row{margin-top:10px}.danger.small{padding:7px 10px}
+/* While the Draw tool is active, placed pictures must not intercept pointer events -- otherwise a drag near a sticker moves the sticker instead of drawing on the canvas underneath it. */
+.ux-drawing .approved-art-layer .art-item{pointer-events:none}
 
 /* Game menu and shared arcade UI */
 .game-menu-grid{margin-bottom:4px}.game-scorebox{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.game-scorebox>b,.game-scorebox>span{background:#f1f5f9;border-radius:999px;padding:7px 10px}.game-result-banner,.game-finish{text-align:center;margin:18px auto 0;padding:18px;border-radius:18px;background:#f8fafc;border:1px solid var(--line);max-width:620px}.game-finish{margin-top:60px}.game-finish .finish-icon{font-size:58px}.game-message{text-align:center;font-weight:900;color:#475569;margin-top:10px;min-height:24px}.game-message.correct{color:#047857}.game-message.wrong,.game-message.miss{color:#b91c1c}
@@ -1268,6 +1270,11 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
     workspace.querySelectorAll(".tool-columns > .toolbox").forEach(box => {
       box.classList.toggle("ux-tool-active", box.dataset.uxTool === key);
     });
+
+    // Give the Draw tool exclusive control of the card surface: while it's
+    // active, placed emoji/illustration stickers stop intercepting pointer
+    // events so a drag near one draws on the canvas instead of moving it.
+    workspace.classList.toggle("ux-drawing", key === "draw");
 
     try {
       sessionStorage.setItem("shorashim-editor-tool", key);
