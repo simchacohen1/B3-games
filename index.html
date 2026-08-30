@@ -36,7 +36,8 @@
         border-radius: 16px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         text-decoration: none;
-        transition: transform 0.15s, box-shadow 0.15s;
+        transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+        position: relative;
     }
 
     .game-card:hover {
@@ -57,6 +58,33 @@
 
     .hidden {
         display: none !important;
+    }
+
+    /* Toggled-off games: stay visible, grey out, block interaction for everyone */
+    .game-card.disabled {
+        opacity: 0.4;
+        filter: grayscale(60%);
+        pointer-events: none;
+        cursor: not-allowed;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    }
+
+    .game-card.disabled:hover {
+        transform: none;
+    }
+
+    .card-closed-badge {
+        font-size: 12px;
+        font-weight: bold;
+        color: #b91c1c;
+        background: #fee2e2;
+        border-radius: 999px;
+        padding: 2px 10px;
+        display: none;
+    }
+
+    .game-card.disabled .card-closed-badge {
+        display: inline-block;
     }
 
     .admin-button {
@@ -131,6 +159,56 @@
         color: #4b5563;
         margin: 0 0 12px;
     }
+
+    /* Teacher Tools section — admin-only, always live, ignores toggles */
+    .teacher-tools-section {
+        max-width: 900px;
+        margin: 56px auto 0;
+        padding-top: 32px;
+        border-top: 2px solid #e5e7eb;
+    }
+
+    .teacher-tools-section h2 {
+        font-size: 26px;
+        color: #1f2937;
+        margin-bottom: 6px;
+    }
+
+    .teacher-tools-subtitle {
+        color: #6b7280;
+        font-size: 14px;
+        margin: 0 0 24px;
+    }
+
+    .teacher-tools-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 20px;
+    }
+
+    .teacher-tool-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        padding: 24px 12px;
+        border-radius: 16px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        text-decoration: none;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .teacher-tool-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 18px rgba(0,0,0,0.15);
+    }
+
+    .teacher-tool-card .card-title {
+        color: #92400e;
+    }
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
@@ -146,38 +224,61 @@
         <a class="game-card" data-game-id="kahoot-word-quiz" href="kahoot-word-quiz/index.html">
             <span class="card-icon">❓</span>
             <span class="card-title">Kahoot Word Quiz Engine</span>
+            <span class="card-closed-badge">Closed</span>
         </a>
         <a class="game-card" data-game-id="kodesh-construct" href="kodesh-construct/index.html">
             <span class="card-icon">🔤</span>
             <span class="card-title">Dikduk Arcade</span>
+            <span class="card-closed-badge">Closed</span>
         </a>
         <a class="game-card" data-game-id="chumash-quiz" href="chumash-quiz/index.html">
             <span class="card-icon">📖</span>
             <span class="card-title">Chumash Quiz</span>
+            <span class="card-closed-badge">Closed</span>
         </a>
         <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html">
             <span class="card-icon">📜</span>
             <span class="card-title">Posuk Practice Scroll</span>
+            <span class="card-closed-badge">Closed</span>
         </a>
         <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html">
             <span class="card-icon">✡️</span>
             <span class="card-title">Rashi Letters</span>
+            <span class="card-closed-badge">Closed</span>
         </a>
         <a class="game-card" data-game-id="shorashim" href="shorashim/index.html">
             <span class="card-icon">🌳</span>
             <span class="card-title">Shorashim</span>
+            <span class="card-closed-badge">Closed</span>
         </a>
         <a class="game-card" data-game-id="class-gallery" href="class-gallery/index.html">
             <span class="card-icon">🖼️</span>
             <span class="card-title">Class Gallery</span>
+            <span class="card-closed-badge">Closed</span>
         </a>
         <a class="game-card" data-game-id="game-show" href="game-show/player.html">
             <span class="card-icon">🏆</span>
             <span class="card-title">Game Show</span>
+            <span class="card-closed-badge">Closed</span>
         </a>
     </div>
 
     <p id="disabledMessage" class="disabled-note hidden">All games are currently disabled.</p>
+
+    <div id="teacherToolsSection" class="teacher-tools-section hidden">
+        <h2>👩‍🏫 Teacher Tools</h2>
+        <p class="teacher-tools-subtitle">Always available to you, regardless of student toggle state.</p>
+        <div class="teacher-tools-container">
+            <a class="teacher-tool-card" href="game-show/teacher.html">
+                <span class="card-icon">🏆</span>
+                <span class="card-title">Game Show — Host</span>
+            </a>
+            <a class="teacher-tool-card" href="record_pesukim/teacher.html">
+                <span class="card-icon">📜</span>
+                <span class="card-title">Posuk Practice Scroll — Teacher Dashboard</span>
+            </a>
+        </div>
+    </div>
 
     <button id="adminAccessButton" class="admin-button">Admin</button>
 
@@ -208,6 +309,7 @@
       const gameToggles = document.getElementById("gameToggles");
       const disabledMessage = document.getElementById("disabledMessage");
       const adminStatus = document.getElementById("adminStatus");
+      const teacherToolsSection = document.getElementById("teacherToolsSection");
       const gameCards = Array.from(document.querySelectorAll(".game-card"));
 
       const gameDefinitions = gameCards.map((card) => ({
@@ -221,21 +323,19 @@
       let isAuthorizedAdmin = false;
 
       function renderGames() {
-          let visibleCount = 0;
-
           gameDefinitions.forEach((game) => {
               const shouldShow =
                   currentSettings.siteEnabled &&
                   currentSettings.games[game.id] !== false;
 
-              game.element.classList.toggle("hidden", !shouldShow);
-
-              if (shouldShow) {
-                  visibleCount += 1;
-              }
+              // Cards always stay visible for everyone. When off, they grey out
+              // and become unclickable — same behavior for admin and students.
+              game.element.classList.toggle("disabled", !shouldShow);
           });
 
-          disabledMessage.classList.toggle("hidden", visibleCount !== 0);
+          // Overall "everything is off" banner only reflects the master toggle,
+          // since individual cards now show their own closed state directly.
+          disabledMessage.classList.toggle("hidden", currentSettings.siteEnabled);
       }
 
       function renderAdminPanel() {
@@ -244,6 +344,7 @@
           signInButton.classList.toggle("hidden", signedIn);
           signOutButton.classList.toggle("hidden", !signedIn);
           adminControls.classList.toggle("hidden", !isAuthorizedAdmin);
+          teacherToolsSection.classList.toggle("hidden", !isAuthorizedAdmin);
 
           if (!signedIn) {
               adminStatus.textContent =
