@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rashi Letters — Teacher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  @font-face{
+    font-family: 'Mekorot Rashi';
+    src: url('./fonts/Mekorot-Rashi.ttf') format('truetype');
+    font-display: swap;
+  }
+  :root{
+    --parchment: #F1E7CE;
+    --parchment-dark: #E4D4AC;
+    --ink: #3B2A1E;
+    --ink-soft: #6B5842;
+    --rimon: #8C2F39;
+    --rimon-dark: #6E1F28;
+    --gold: #C9A227;
+    --shadow: rgba(59,42,30,0.25);
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0;
+    background: radial-gradient(circle at 20% 10%, #F6EEDA 0%, #E9DBB8 55%, #DCC998 100%);
+    font-family:'Quicksand', sans-serif; color:var(--ink); min-height:100vh;
+  }
+  .wrap{ max-width:900px; margin:0 auto; padding:28px 18px 60px; }
+  header.top{ text-align:center; margin-bottom:20px; }
+  header.top h1{
+    font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:1.9rem;
+    color:var(--rimon-dark); margin:0 0 4px;
+  }
+  header.top p{ margin:0; color:var(--ink-soft); font-size:0.9rem; }
+  .toolbar{
+    display:flex; justify-content:space-between; align-items:center; gap:12px;
+    background:var(--parchment); border:2px solid var(--gold); border-radius:14px;
+    padding:14px 18px; margin-bottom:18px; flex-wrap:wrap;
+  }
+  .btn{
+    font-family:'Quicksand', sans-serif; font-weight:700; font-size:0.9rem;
+    border:none; border-radius:999px; padding:9px 18px; cursor:pointer;
+    color:#fff; background:var(--rimon); box-shadow:0 3px 0 var(--rimon-dark);
+  }
+  .btn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--rimon-dark); }
+  .btn.gold{ background:var(--gold); box-shadow:0 3px 0 #97781a; color:var(--ink); }
+  table{ width:100%; border-collapse:collapse; background:#FFFDF7; border:2px solid var(--gold); border-radius:14px; overflow:hidden; }
+  thead th{
+    background:var(--parchment-dark); text-align:left; padding:10px 12px;
+    font-size:0.85rem; color:var(--ink-soft); font-weight:700;
+  }
+  tbody td{ padding:10px 12px; border-top:0.5px solid var(--parchment-dark); font-size:0.9rem; }
+  .unit-pill{
+    display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.75rem;
+    font-weight:700; margin:2px; background:var(--parchment-dark); color:var(--ink-soft);
+  }
+  .unit-pill.done{ background:#DCEFD9; color:#2E5C2C; }
+  .accuracy-good{ color:#2E5C2C; font-weight:700; }
+  .accuracy-mid{ color:#8C6B1F; font-weight:700; }
+  .accuracy-low{ color:var(--rimon); font-weight:700; }
+  .empty{ text-align:center; padding:40px; color:var(--ink-soft); }
+  .rashi-sample{ font-family:'Mekorot Rashi', serif; font-size:1.4rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>אותיות רש"י</h1>
+    <p>Teacher dashboard — student progress</p>
+  </header>
+
+  <div class="toolbar">
+    <div>
+      <label style="font-size:0.85rem; color:var(--ink-soft);">
+        <input type="checkbox" id="lockToggle"> Close practice for students
+      </label>
+    </div>
+    <button class="btn gold" id="refreshBtn">Refresh</button>
+  </div>
+
+  <div id="tableHolder">
+    <div class="empty">Loading…</div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
+  authDomain: "b3-games.firebaseapp.com",
+  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
+  projectId: "b3-games",
+  storageBucket: "b3-games.firebasestorage.app",
+  messagingSenderId: "568530046190",
+  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const UNITS = [
+  { id:'zayin', label:'ז' },
+  { id:'bet', label:'בּ/ב' },
+  { id:'tsadi', label:'צ' },
+  { id:'alef', label:'א' },
+  { id:'tsadisofit', label:'ץ' },
+  { id:'memsofit', label:'ם' },
+  { id:'shin', label:'שׁ/שׂ' },
+  { id:'samech', label:'ס' },
+  { id:'finalreview', label:'שׁ/שׂ review' }
+];
+
+function fmtTime(ts){
+  if(!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+function accuracyClass(pct){
+  if(pct === null) return '';
+  if(pct >= 80) return 'accuracy-good';
+  if(pct >= 50) return 'accuracy-mid';
+  return 'accuracy-low';
+}
+
+async function loadDashboard(){
+  const holder = document.getElementById('tableHolder');
+  const snap = await db.ref('rashiLetters/progress').once('value');
+  const data = snap.val() || {};
+  const rows = Object.keys(data).map(slug => {
+    const rec = data[slug];
+    const units = rec.units || {};
+    let totalAttempts = 0, totalCorrect = 0;
+    const unitCells = UNITS.map((u,i) => {
+      const stat = units[u.id];
+      const done = (typeof rec.currentUnitIndex === 'number') && rec.currentUnitIndex > i;
+      if(stat){
+        totalAttempts += (stat.attempts||0);
+        totalCorrect += (stat.correct||0);
+      }
+      const pct = stat && stat.attempts ? Math.round((stat.correct/stat.attempts)*100) : null;
+      const label = u.label + (pct !== null ? ' ' + pct + '%' : '');
+      return '<span class="unit-pill' + (done ? ' done' : '') + '">' + label + '</span>';
+    }).join('');
+    const overallPct = totalAttempts ? Math.round((totalCorrect/totalAttempts)*100) : null;
+    return {
+      slug, name: rec.name || slug,
+      currentUnit: (typeof rec.currentUnitIndex === 'number') ? Math.min(rec.currentUnitIndex+1, UNITS.length) : 1,
+      overallPct, unitCells, lastActive: rec.lastActive
+    };
+  }).sort((a,b) => a.name.localeCompare(b.name));
+
+  if(rows.length === 0){
+    holder.innerHTML = '<div class="empty">No student activity yet.</div>';
+    return;
+  }
+
+  let html = '<table><thead><tr>' +
+    '<th>Student</th><th>Unit</th><th>Accuracy</th><th>Letters</th><th>Last active</th>' +
+    '</tr></thead><tbody>';
+  rows.forEach(r => {
+    const accClass = accuracyClass(r.overallPct);
+    html += '<tr>' +
+      '<td>' + r.name + '</td>' +
+      '<td>' + r.currentUnit + ' / ' + UNITS.length + '</td>' +
+      '<td class="' + accClass + '">' + (r.overallPct !== null ? r.overallPct + '%' : '—') + '</td>' +
+      '<td>' + r.unitCells + '</td>' +
+      '<td>' + fmtTime(r.lastActive) + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  holder.innerHTML = html;
+}
+
+async function loadLockState(){
+  const snap = await db.ref('rashiLetters/settings/accessLocked').once('value');
+  document.getElementById('lockToggle').checked = (snap.val() === true);
+}
+document.getElementById('lockToggle').addEventListener('change', async (e) => {
+  await db.ref('rashiLetters/settings/accessLocked').set(e.target.checked);
+});
+document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
+
+loadLockState();
+loadDashboard();
+</script>
+</body>
+</html>
