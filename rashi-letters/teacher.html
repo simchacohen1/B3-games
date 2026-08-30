@@ -28,7 +28,7 @@
     background: radial-gradient(circle at 20% 10%, #F6EEDA 0%, #E9DBB8 55%, #DCC998 100%);
     font-family:'Quicksand', sans-serif; color:var(--ink); min-height:100vh;
   }
-  .wrap{ max-width:900px; margin:0 auto; padding:28px 18px 60px; }
+  .wrap{ max-width:960px; margin:0 auto; padding:28px 18px 60px; }
   header.top{ text-align:center; margin-bottom:20px; }
   header.top h1{
     font-family:'Frank Ruhl Libre', serif; font-weight:700; font-size:1.9rem;
@@ -58,6 +58,11 @@
     font-weight:700; margin:2px; background:var(--parchment-dark); color:var(--ink-soft);
   }
   .unit-pill.done{ background:#DCEFD9; color:#2E5C2C; }
+  .phase-tag{
+    display:inline-block; padding:2px 9px; border-radius:999px; font-size:0.72rem;
+    font-weight:700; background:var(--gold); color:var(--ink);
+  }
+  .phase-tag.word{ background:var(--rimon); color:#fff; }
   .accuracy-good{ color:#2E5C2C; font-weight:700; }
   .accuracy-mid{ color:#8C6B1F; font-weight:700; }
   .accuracy-low{ color:var(--rimon); font-weight:700; }
@@ -134,20 +139,23 @@ async function loadDashboard(){
     const units = rec.units || {};
     let totalAttempts = 0, totalCorrect = 0;
     const unitCells = UNITS.map((u,i) => {
-      const stat = units[u.id];
+      const letterStat = units[u.id + '_letter'];
+      const wordStat = units[u.id + '_word'];
+      const attempts = (letterStat?letterStat.attempts:0||0) + (wordStat?wordStat.attempts:0||0);
+      const correct = (letterStat?letterStat.correct:0||0) + (wordStat?wordStat.correct:0||0);
       const done = (typeof rec.currentUnitIndex === 'number') && rec.currentUnitIndex > i;
-      if(stat){
-        totalAttempts += (stat.attempts||0);
-        totalCorrect += (stat.correct||0);
-      }
-      const pct = stat && stat.attempts ? Math.round((stat.correct/stat.attempts)*100) : null;
+      totalAttempts += attempts;
+      totalCorrect += correct;
+      const pct = attempts ? Math.round((correct/attempts)*100) : null;
       const label = u.label + (pct !== null ? ' ' + pct + '%' : '');
       return '<span class="unit-pill' + (done ? ' done' : '') + '">' + label + '</span>';
     }).join('');
     const overallPct = totalAttempts ? Math.round((totalCorrect/totalAttempts)*100) : null;
+    const phase = rec.currentPhase === 'word' ? 'word' : 'letter';
     return {
       slug, name: rec.name || slug,
       currentUnit: (typeof rec.currentUnitIndex === 'number') ? Math.min(rec.currentUnitIndex+1, UNITS.length) : 1,
+      phase,
       overallPct, unitCells, lastActive: rec.lastActive
     };
   }).sort((a,b) => a.name.localeCompare(b.name));
@@ -158,13 +166,17 @@ async function loadDashboard(){
   }
 
   let html = '<table><thead><tr>' +
-    '<th>Student</th><th>Unit</th><th>Accuracy</th><th>Letters</th><th>Last active</th>' +
+    '<th>Student</th><th>Unit</th><th>Phase</th><th>Accuracy</th><th>Letters</th><th>Last active</th>' +
     '</tr></thead><tbody>';
   rows.forEach(r => {
     const accClass = accuracyClass(r.overallPct);
+    const phaseTag = r.phase === 'word'
+      ? '<span class="phase-tag word">Word</span>'
+      : '<span class="phase-tag">Letter</span>';
     html += '<tr>' +
       '<td>' + r.name + '</td>' +
       '<td>' + r.currentUnit + ' / ' + UNITS.length + '</td>' +
+      '<td>' + phaseTag + '</td>' +
       '<td class="' + accClass + '">' + (r.overallPct !== null ? r.overallPct + '%' : '—') + '</td>' +
       '<td>' + r.unitCells + '</td>' +
       '<td>' + fmtTime(r.lastActive) + '</td>' +
