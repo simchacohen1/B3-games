@@ -7,7 +7,12 @@ from datetime import datetime
 
 ROOT = Path(__file__).resolve().parent
 OUTPUT = ROOT / "all-pages.html"
-EXCLUDED = {"index.html", "all-pages.html"}
+# Only the repo-root copies are excluded (the homepage and this generated
+# index) -- comparing by relative path, not just filename, so a per-game
+# index.html inside its own folder (e.g. chumash-quiz/index.html) still
+# shows up here. Also exclude old-path redirect stubs kept alive for
+# bookmarked links, so they don't show up as duplicate cards.
+EXCLUDED = {"index.html", "all-pages.html", "work_timer_v4/index.html"}
 
 def get_title(path: Path) -> str:
     try:
@@ -35,7 +40,7 @@ def last_changed(path: Path):
 pages = []
 for path in ROOT.rglob("*.html"):
     relative = path.relative_to(ROOT)
-    if path.name.lower() in EXCLUDED:
+    if relative.as_posix().lower() in EXCLUDED:
         continue
     if any(part.startswith(".") for part in relative.parts):
         continue

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#111827" />
+  <title>Work Timer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Personal time tracker</p>
+        <h1>Work Timer</h1>
+      </div>
+      <button id="themeBtn" class="icon-btn" type="button" aria-label="Toggle dark mode">◐</button>
+    </header>
+
+    <section class="timer-card">
+      <div id="statusPill" class="status-pill stopped">NOT RUNNING</div>
+      <div id="timerDisplay" class="timer-display">00:00:00</div>
+      <div id="liveEarnings" class="live-earnings">$0.00</div>
+      <p class="rate-line">at $<span id="rateLabel">50.00</span> per hour</p>
+
+      <label class="client-current">
+        Client
+        <input id="currentClientInput" type="text" maxlength="80" placeholder="Enter client name" />
+      </label>
+
+      <div class="controls">
+        <button id="startBtn" class="btn start" type="button">▶ Start</button>
+        <button id="pauseBtn" class="btn pause" type="button" disabled>⏸ Pause</button>
+        <button id="stopBtn" class="btn stop" type="button" disabled>■ Stop</button>
+      </div>
+    </section>
+
+    <section class="summary-grid">
+      <article class="summary-card">
+        <span>Today</span>
+        <strong id="todayTime">00:00:00</strong>
+        <small id="todayPay">$0.00</small>
+      </article>
+      <article class="summary-card">
+        <span>This week</span>
+        <strong id="weekTime">00:00:00</strong>
+        <small id="weekPay">$0.00</small>
+      </article>
+      <article class="summary-card">
+        <span>This month</span>
+        <strong id="monthTime">00:00:00</strong>
+        <small id="monthPay">$0.00</small>
+      </article>
+    </section>
+
+    <section class="panel settings-panel">
+      <div>
+        <h2>Settings</h2>
+        <p>Your information is saved only in this browser.</p>
+      </div>
+      <label class="rate-control">
+        Hourly rate
+        <span>
+          $
+          <input id="rateInput" type="number" min="0" step="0.01" value="50.00" />
+        </span>
+      </label>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <h2>Work sessions</h2>
+          <p>Add forgotten time, edit entries, or export your records.</p>
+        </div>
+        <div class="toolbar">
+          <button id="addManualBtn" class="secondary-btn" type="button">+ Add time</button>
+          <button id="exportPdfBtn" class="secondary-btn primary-export" type="button">Export PDF</button>
+          <button id="exportBtn" class="secondary-btn" type="button">Export CSV</button>
+          <button id="backupBtn" class="secondary-btn" type="button">Backup</button>
+          <label class="secondary-btn file-label">
+            Restore
+            <input id="restoreInput" type="file" accept=".json,application/json" hidden />
+          </label>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Date</th>
+              <th>Start</th>
+              <th>Stop</th>
+              <th>Duration</th>
+              <th>Amount</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="sessionBody"></tbody>
+        </table>
+        <div id="emptyState" class="empty-state">
+          No sessions yet. Press <strong>Start</strong> when you begin working.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="sessionDialog">
+    <form id="sessionForm" method="dialog">
+      <div class="dialog-header">
+        <h2 id="dialogTitle">Add work session</h2>
+        <button id="closeDialogBtn" class="icon-btn" type="button" aria-label="Close">×</button>
+      </div>
+
+      <input id="sessionIdInput" type="hidden" />
+
+      <label>
+        Client
+        <input id="clientInput" type="text" maxlength="80" placeholder="Client name" required />
+      </label>
+
+      <label>
+        Date
+        <input id="dateInput" type="date" required />
+      </label>
+
+      <div class="form-grid">
+        <label>
+          Start time
+          <input id="startTimeInput" type="time" step="1" required />
+        </label>
+        <label>
+          Stop time
+          <input id="stopTimeInput" type="time" step="1" required />
+        </label>
+      </div>
+
+      <label>
+        Notes
+        <input id="notesInput" type="text" maxlength="120" placeholder="Optional" />
+      </label>
+
+      <p id="formError" class="form-error" role="alert"></p>
+
+      <div class="dialog-actions">
+        <button id="cancelDialogBtn" class="secondary-btn" type="button">Cancel</button>
+        <button class="btn start" type="submit">Save session</button>
+      </div>
+    </form>
+  </dialog>
+
+
+  <dialog id="exportDialog">
+    <form id="exportForm">
+      <div class="dialog-header">
+        <div>
+          <h2>Export work sessions</h2>
+          <p>Choose the dates and client to include.</p>
+        </div>
+        <button id="closeExportDialogBtn" class="icon-btn" type="button" aria-label="Close">×</button>
+      </div>
+
+      <div class="form-grid">
+        <label>
+          From
+          <input id="exportFromInput" type="date" required />
+        </label>
+        <label>
+          To
+          <input id="exportToInput" type="date" required />
+        </label>
+      </div>
+
+      <label>
+        Client
+        <select id="exportClientInput">
+          <option value="">All clients</option>
+        </select>
+      </label>
+
+      <div id="exportPreview" class="export-preview"></div>
+      <p id="exportError" class="form-error" role="alert"></p>
+
+      <div class="dialog-actions export-actions">
+        <button id="cancelExportBtn" class="secondary-btn" type="button">Cancel</button>
+        <button id="confirmCsvBtn" class="secondary-btn" type="button">Export CSV</button>
+        <button id="confirmPdfBtn" class="btn start" type="button">Export PDF</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
