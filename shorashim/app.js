@@ -285,7 +285,10 @@ async function saveDrawingToCloud(itemKey,dataURL){
   if(!cloudEnabled||!cloudStudentId||!dataURL)return dataURL||'';
   try{
     const safe=itemKey.replace(/[^a-zA-Z0-9_-]/g,'_');
-    const path=`${CLOUD_ROOT}/${cloudStudentId}/drawings/${safe}.png`;
+    // Keep drawings with the same student record used by the realtime database.
+    // The previous path omitted `students`, which made the files land outside
+    // the student's data hierarchy and could be rejected by storage rules.
+    const path=`${CLOUD_ROOT}/students/${cloudStudentId}/drawings/${safe}.png`;
     const ref=cloudStorage.ref(path);
     await ref.put(dataURLToBlob(dataURL));
     return await ref.getDownloadURL();
