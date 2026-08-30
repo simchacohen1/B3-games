@@ -851,18 +851,36 @@ function playAlertSound() {
       sharedAudioCtx.resume();
     }
     const ctx = sharedAudioCtx;
-    [660, 880].forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.15);
-      gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.15);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.15 + 0.2);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(ctx.currentTime + i * 0.15);
-      osc.stop(ctx.currentTime + i * 0.15 + 0.2);
-    });
+    const startTime = ctx.currentTime;
+    const duration = 0.45;
+
+    // Harsh buzzer tone: a low sawtooth wave with fast frequency wobble,
+    // reads as a classic game-show "BZZZT" rather than a pleasant chime.
+    const osc = ctx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(150, startTime);
+
+    const wobble = ctx.createOscillator();
+    wobble.type = "sine";
+    wobble.frequency.setValueAtTime(28, startTime);
+    const wobbleGain = ctx.createGain();
+    wobbleGain.gain.setValueAtTime(35, startTime);
+    wobble.connect(wobbleGain);
+    wobbleGain.connect(osc.frequency);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.3, startTime);
+    gain.gain.setValueAtTime(0.3, startTime + duration - 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(startTime);
+    wobble.start(startTime);
+    osc.stop(startTime + duration);
+    wobble.stop(startTime + duration);
+
     document.getElementById('soundStatus').textContent = 'Alert fired (state: ' + ctx.state + ')';
   } catch (err) {
     document.getElementById('soundStatus').textContent = 'Sound error: ' + err.message;
