@@ -1115,26 +1115,24 @@
     color:var(--ink);
   }
   .translation-action-btn:active{ transform:translateY(1px); }
-  .translation-help{
+  .dispute-pill-row{
     margin-top:7px;
+  }
+  .dispute-pill{
+    border:1.5px solid var(--rimon);
+    background:#fff;
+    color:var(--rimon);
+    border-radius:999px;
+    padding:6px 12px;
+    min-height:30px;
+    font-family:'Quicksand',sans-serif;
     font-size:.75rem;
-    color:var(--ink-soft);
-  }
-  .translation-help summary{
-    display:inline-block;
+    font-weight:800;
     cursor:pointer;
-    user-select:none;
-    font-weight:700;
-    color:var(--ink-soft);
-    list-style:none;
+    box-shadow:none;
   }
-  .translation-help summary::-webkit-details-marker{ display:none; }
-  .translation-help summary::before{ content:'⋯ '; font-weight:900; }
-  .translation-help-body{ margin-top:6px; }
-  .translation-help .chunk-dispute-btn{
-    padding:5px 9px;
-    font-size:.72rem;
-  }
+  .dispute-pill:hover{ background:var(--rimon); color:#fff; }
+  .dispute-pill:active{ transform:translateY(1px); }
   .translation-review-note{
     margin-top:7px;
     font-size:.75rem;
@@ -3105,19 +3103,15 @@ function renderAnsweredQuestionHistory(){
   if(!host) return;
   const answered=Object.keys(comprehensionQResults).map(Number).sort((a,b)=>a-b);
   if(!answered.length){ host.innerHTML=''; return; }
-  // Same idea as the translation summary's per-piece "Need help?" accordion:
-  // only offer it once every question has been answered (matches how
-  // translation only shows dispute once every chunk is graded), since
-  // disputing before then would try to write into a questionResults array
-  // in Firebase that doesn't exist yet — autosaveComprehensionQuestions()
-  // only creates it once the whole set is complete, and would otherwise
-  // clobber an early dispute when it finally writes.
-  const allAnswered = answered.length === comprehensionQuestions.length;
+  // Each question now autosaves the moment it's graded (see
+  // autosaveSingleQuestionResult), so currentAttemptRef already exists by
+  // the time any question is answered — dispute doesn't need to wait for
+  // the whole set to be done anymore.
   host.innerHTML='<div style="font-weight:800;margin-bottom:7px;color:var(--ink-soft);">Your answers so far</div>' +
     answered.map(i=>{
       const r=comprehensionQResults[i], q=comprehensionQuestions[i], ok=r&&r.verdict==='correct';
       let helpHtml = '';
-      if(!ok && allAnswered){
+      if(!ok){
         const dStatus = r && r.disputeStatus;
         if(dStatus === 'pending'){
           helpHtml = '<div class="translation-review-note">⚠️ Dispute sent — your teacher will review it.</div>';
@@ -3125,13 +3119,11 @@ function renderAnsweredQuestionHistory(){
           helpHtml = '<div class="translation-review-note">✔️ Teacher reviewed — final: ' +
             (r.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</div>';
         }else{
+          // Direct pill, one tap to dispute — matches the translation piece pill.
           helpHtml =
-            '<details class="translation-help">' +
-              '<summary>Need help?</summary>' +
-              '<div class="translation-help-body">' +
-                '<button type="button" class="btn small ghost-delete comp-q-dispute-btn" data-q-index="' + i + '">⚠️ Dispute this answer</button>' +
-              '</div>' +
-            '</details>';
+            '<div class="dispute-pill-row">' +
+              '<button type="button" class="dispute-pill comp-q-dispute-btn" data-q-index="' + i + '">⚠️ Dispute this answer</button>' +
+            '</div>';
         }
       }
       return `<div style="padding:9px 11px;margin:5px 0;border-radius:12px;background:${ok?'#E4F4E4':'#F6E1E1'};border:1px solid ${ok?'#4C9A4C':'var(--rimon)'};">
@@ -4094,6 +4086,10 @@ async function gradeCurrentQuestionAnswer(){
     document.getElementById('questionsDoneBlock').classList.toggle('hidden', !allAnswered);
     renderAnsweredQuestionHistory();
     renderQuestionFinalScore();
+    // Save this question right away rather than waiting for the whole set
+    // to finish — this is what lets a student dispute a wrong answer
+    // immediately instead of only once every question is done.
+    autosaveSingleQuestionResult(idx);
     if(allAnswered){
       await autosaveComprehensionQuestions();
       renderQuestionFinalScore();
@@ -4134,9 +4130,12 @@ function renderQuestionResult(verdict, feedback, transcript){
 }
 
 // Uploads every answered question's audio + result once ALL questions for
-// this posuk/range have been graded (same "save once complete" pattern
-// autosaveTranslation already uses for its per-chunk recordings), then
-// marks the comprehension task done.
+// this posuk/range have been graded — acts as a final consistency pass
+// (each question already autosaved itself individually as it was graded,
+// via autosaveSingleQuestionResult, so this mostly just recomputes the
+// final score and flips the "done" checkmark). Reads disputeStatus/
+// finalVerdict from local state so a dispute made mid-quiz, before this
+// runs, isn't wiped out by this batch write.
 async function autosaveComprehensionQuestions(){
   const idxs = Object.keys(comprehensionQResults).map(Number);
   if(!idxs.length || !currentPosukKey) return;
@@ -4149,12 +4148,14 @@ async function autosaveComprehensionQuestions(){
 
     const questionResultsData = await Promise.all(idxs.map(async i => {
       const r = comprehensionQResults[i];
-      const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_question_' + currentAttemptId + '_q' + i + '.' + r.ext;
       let url = r.audioURL || null;
       if(r.blob){
+        const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_question_' + currentAttemptId + '_q' + i + '.' + r.ext;
         try{
           await storage.ref(path).put(r.blob);
           url = await storage.ref(path).getDownloadURL();
+          r.audioURL = url;
+          r.blob = null;
         }catch(err){ console.error('Could not upload question answer audio', i, err); }
       }
       return {
@@ -4163,7 +4164,9 @@ async function autosaveComprehensionQuestions(){
         verdict: r.verdict,
         feedback: r.feedback,
         transcript: r.transcript,
-        audioURL: url
+        audioURL: url,
+        disputeStatus: r.disputeStatus || null,
+        finalVerdict: r.finalVerdict || null
       };
     }));
 
@@ -4185,6 +4188,59 @@ async function autosaveComprehensionQuestions(){
     const gradingMsg = document.getElementById('comprehensionGradingMsg');
     gradingMsg.textContent = (gradingMsg.textContent ? gradingMsg.textContent + ' ' : '') +
       "Couldn't save automatically — check your internet connection.";
+  }
+}
+
+// Saves ONE question's answer the moment it's graded, instead of waiting
+// for the whole question set to finish. This is what makes currentAttemptRef
+// (and this question's slot in questionResults) exist right away, so a
+// student can dispute a wrong answer immediately rather than only once
+// every question is done.
+async function autosaveSingleQuestionResult(idx){
+  const r = comprehensionQResults[idx];
+  if(!r || !currentPosukKey) return;
+  try{
+    if(!currentAttemptRef){
+      currentAttemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
+      currentAttemptId = currentAttemptRef.key;
+    }
+    let url = r.audioURL || null;
+    if(r.blob){
+      const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_question_' + currentAttemptId + '_q' + idx + '.' + r.ext;
+      try{
+        await storage.ref(path).put(r.blob);
+        url = await storage.ref(path).getDownloadURL();
+        r.audioURL = url;
+        r.blob = null;
+      }catch(err){ console.error('Could not upload question answer audio', idx, err); }
+    }
+    await currentAttemptRef.update({
+      timestamp: Date.now(),
+      parsha: currentParshaName || null,
+      perek: currentPerekNum,
+      posukStart: currentPosukNum,
+      posukEnd: currentPosukEndNum || currentPosukNum,
+      isRange: currentIsRange,
+      posukText: currentPosukText,
+      posukTranslation: currentPosukTranslation
+    });
+    await currentAttemptRef.child('questionResults').child(String(idx)).update({
+      question: comprehensionQuestions[idx].question,
+      posukNum: comprehensionQuestions[idx].posukNum,
+      verdict: r.verdict,
+      feedback: r.feedback,
+      transcript: r.transcript,
+      audioURL: url
+    });
+    // Keep the running score reasonably current as answers come in; the
+    // final batch save recomputes it exactly once everything is done.
+    const answeredIdxs = Object.keys(comprehensionQResults).map(Number);
+    const correctSoFar = answeredIdxs.filter(i => comprehensionQResults[i].verdict === 'correct').length;
+    await currentAttemptRef.update({
+      questionScore: Math.round((correctSoFar / comprehensionQuestions.length) * 100) + '%'
+    });
+  }catch(err){
+    console.error('Autosave (single question) failed', err);
   }
 }
 
@@ -4943,13 +4999,12 @@ function showTranslationSummary(level){
         helpHtml = '<div class="translation-review-note">✔️ Teacher reviewed — final: ' +
           (r.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</div>';
       }else{
+        // Direct pill, not tucked behind an extra "Need help?" tap — a
+        // wrong piece should be one tap away from disputed, not two.
         helpHtml =
-          '<details class="translation-help">' +
-            '<summary>Need help?</summary>' +
-            '<div class="translation-help-body">' +
-              '<button type="button" class="btn small ghost-delete chunk-dispute-btn" data-chunk-index="' + i + '">⚠️ Dispute this piece</button>' +
-            '</div>' +
-          '</details>';
+          '<div class="dispute-pill-row">' +
+            '<button type="button" class="dispute-pill chunk-dispute-btn" data-chunk-index="' + i + '">⚠️ Dispute this piece</button>' +
+          '</div>';
       }
     }
 
@@ -5295,6 +5350,11 @@ async function loadHistory(){
           rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">⚠️ Dispute pending — you asked for ${a.hebrewDisputeRequested}%</div>`;
         }else if(a.hebrewDisputeStatus === 'resolved' && hasFinal){
           rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">✔️ Teacher reviewed — final score: ${a.hebrewFinalScore}%</div>`;
+        }else if(isPercentScore && effScore < 100){
+          // Never disputed and we're looking at a saved past attempt —
+          // same permanent way in from History as translation/comprehension
+          // already have, for anything under a perfect score.
+          rowsHtml += `<div class="row" id="historyHebrewDisputeRow_${a.id}"><button type="button" class="dispute-pill history-hebrew-dispute-btn" data-attempt-id="${a.id}">⚠️ Dispute this score</button></div>`;
         }
       }
       if(activeTab === 'translate' && Array.isArray(a.translationChunkResults) && a.translationChunkResults.length){
@@ -5325,7 +5385,7 @@ async function loadHistory(){
             // to flag it was the live "Need help?" accordion right after
             // grading, which is easy to miss or navigate away from. Give a
             // second, permanent way in from History.
-            rowsHtml += `<div class="row"><button type="button" class="btn small ghost-delete history-chunk-dispute-btn" data-attempt-id="${a.id}" data-chunk-index="${idx}">⚠️ Dispute this piece</button></div>`;
+            rowsHtml += `<div class="row"><button type="button" class="dispute-pill history-chunk-dispute-btn" data-attempt-id="${a.id}" data-chunk-index="${idx}">⚠️ Dispute this piece</button></div>`;
           }
         });
       }
@@ -5344,7 +5404,7 @@ async function loadHistory(){
           }else if(q.disputeStatus === 'resolved' && q.finalVerdict){
             rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">✔️ Teacher reviewed — final: ${q.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again'}</div>`;
           }else if(effQVerdict !== 'correct'){
-            rowsHtml += `<div class="row"><button type="button" class="btn small ghost-delete history-question-dispute-btn" data-attempt-id="${a.id}" data-q-index="${qIdx}">⚠️ Dispute this answer</button></div>`;
+            rowsHtml += `<div class="row"><button type="button" class="dispute-pill history-question-dispute-btn" data-attempt-id="${a.id}" data-q-index="${qIdx}">⚠️ Dispute this answer</button></div>`;
           }
         });
       }
@@ -5380,7 +5440,7 @@ async function loadHistory(){
           // the just-graded screen) — same gap as translation had: the
           // only chance to flag this was the live dispute button right
           // after grading. Give a second, permanent way in from History.
-          rowsHtml += `<div class="row" id="historyCompDisputeRow_${a.id}"><button type="button" class="btn small ghost-delete history-comp-dispute-btn" data-attempt-id="${a.id}">⚠️ Dispute this grade</button></div>`;
+          rowsHtml += `<div class="row" id="historyCompDisputeRow_${a.id}"><button type="button" class="dispute-pill history-comp-dispute-btn" data-attempt-id="${a.id}">⚠️ Dispute this grade</button></div>`;
         }
         if(a.comprehensionClarifyQuestion){
           rowsHtml += `
@@ -5412,6 +5472,9 @@ async function loadHistory(){
           parseInt(btn.getAttribute('data-q-index'), 10),
           btn
         );
+      });
+      div.querySelectorAll('.history-hebrew-dispute-btn').forEach(btn => {
+        btn.onclick = () => openHistoryHebrewDisputeForm(btn.getAttribute('data-attempt-id'));
       });
       listEl.appendChild(div);
     });
@@ -5527,6 +5590,43 @@ async function submitHistoryQuestionDispute(attemptId, qIndex, btnEl){
     btnEl.disabled = false;
     btnEl.textContent = '⚠️ Dispute this answer';
     alert('Could not save your dispute — check your internet and try again.');
+  }
+}
+
+// History equivalent of openHebrewDisputeForm/submitHebrewDispute — same
+// "I should get: __%" input, but scoped to a saved past attempt's own
+// Firebase path via its attemptId.
+function openHistoryHebrewDisputeForm(attemptId){
+  const row = document.getElementById('historyHebrewDisputeRow_' + attemptId);
+  if(!row) return;
+  row.innerHTML =
+    '<span style="font-size:0.85rem;">I should get: </span>' +
+    '<input type="number" id="historyHebrewDisputeInput_' + attemptId + '" min="0" max="100" placeholder="0-100" ' +
+    'style="width:70px;padding:6px;border-radius:8px;border:2px solid var(--ink-soft);font-family:\'Quicksand\',sans-serif;text-align:center;"> ' +
+    '<span style="font-size:0.85rem;">%</span> ' +
+    '<button class="btn small" id="historyHebrewDisputeSubmitBtn_' + attemptId + '">Submit</button>';
+  document.getElementById('historyHebrewDisputeSubmitBtn_' + attemptId).onclick = () => submitHistoryHebrewDispute(attemptId);
+}
+
+async function submitHistoryHebrewDispute(attemptId){
+  const input = document.getElementById('historyHebrewDisputeInput_' + attemptId);
+  const val = parseInt(input.value, 10);
+  if(isNaN(val) || val < 0 || val > 100){
+    alert('Please enter a number between 0 and 100.');
+    return;
+  }
+  const row = document.getElementById('historyHebrewDisputeRow_' + attemptId);
+  row.innerHTML = '<span style="font-size:0.85rem;color:var(--ink-soft);">Saving…</span>';
+  try{
+    await db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey + '/' + attemptId).update({
+      hebrewDisputeRequested: val,
+      hebrewDisputeStatus: 'pending',
+      hebrewDisputeAt: Date.now()
+    });
+    loadHistory();
+  }catch(err){
+    console.error('Could not save history hebrew dispute', err);
+    row.innerHTML = '<span style="font-size:0.85rem;color:var(--rimon);">Could not save your dispute — check your internet and try again.</span>';
   }
 }
 </script>
