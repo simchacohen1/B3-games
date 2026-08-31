@@ -57,25 +57,6 @@
     text-align:center;
     box-shadow: 0 6px 18px var(--shadow);
   }
-  /* ---------- Whole-site access lock ----------
-     When locked, every direct child of <body> except the closed screen
-     is hidden — this covers the name gate AND an already-open app, so a
-     teacher closing practice mid-class doesn't just block new logins, it
-     also covers up whatever a student already had on screen. */
-  #studentAppClosedScreen{ display:none; }
-  body.student-app-closed{ margin:0 !important; background: var(--parchment) !important; }
-  body.student-app-closed > *:not(#studentAppClosedScreen):not(script):not(style){ display:none !important; }
-  body.student-app-closed #studentAppClosedScreen{
-    display:flex !important; min-height:100vh; align-items:center; justify-content:center;
-    padding:28px; box-sizing:border-box; text-align:center;
-  }
-  #studentAppClosedCard{ max-width:520px; }
-  #studentAppClosedIcon{ font-size:4rem; line-height:1; margin-bottom:14px; }
-  #studentAppClosedTitle{
-    font-family:'Frank Ruhl Libre', serif; font-size:clamp(1.8rem, 6vw, 2.6rem);
-    font-weight:700; margin:0 0 10px; color: var(--rimon);
-  }
-  #studentAppClosedText{ font-size:1.1rem; color: var(--ink-soft); margin:0; }
   .name-gate input{
     font-family:'Quicksand', sans-serif;
     font-size:1.1rem;
@@ -1133,12 +1114,6 @@
     border-color:var(--gold);
     color:var(--ink);
   }
-  .translation-action-btn.delete{
-    background:#fff;
-    border-color:var(--rimon);
-    color:var(--rimon);
-  }
-  .translation-action-btn.delete:hover{ background:var(--rimon); color:#fff; }
   .translation-action-btn:active{ transform:translateY(1px); }
   .translation-help{
     margin-top:7px;
@@ -1369,21 +1344,16 @@
           <div class="record-caption" id="comprehensionRecordCaption">🎙️ Tap • wait for clear question • answer • stay quiet to finish</div>
           <span class="status-tag" id="comprehensionStatus">Not recorded yet</span>
         </div>
-
-        <!-- Moved right under the mic (was previously below the answered-
-             history list and final score block, where a student had to
-             scroll to find it — see Simcha's feedback). -->
-        <div class="chunk-nav-row hidden" id="questionNavRow">
-          <button class="btn small ghost-delete" id="questionPrevBtn">◀️ Previous</button>
-          <button class="btn small gold" id="questionNextBtn">Next ▶️</button>
-        </div>
-
         <div class="comp-status" id="comprehensionGradingMsg"></div>
         <button class="btn small hidden" id="comprehensionRetryBtn" style="margin-top:6px;">🔁 Try checking again</button>
         <div class="comp-result hidden" id="comprehensionResult"></div>
 
         <div id="questionAnsweredHistory" style="margin:12px 0;"></div>
         <div id="questionFinalScore" class="hidden" style="margin:14px 0;padding:16px;border-radius:16px;background:#fff7dc;border:2px solid var(--gold);text-align:center;font-weight:800;font-size:1.05rem;"></div>
+        <div class="chunk-nav-row hidden" id="questionNavRow">
+          <button class="btn small ghost-delete" id="questionPrevBtn">◀️ Previous</button>
+          <button class="btn small gold" id="questionNextBtn">Next ▶️</button>
+        </div>
 
         <div class="hidden" id="questionsDoneBlock" style="text-align:center;margin-top:10px;">
           <div class="comp-status">🎉 All questions done for this posuk!</div>
@@ -1409,17 +1379,6 @@
   </div>
 
   <footer class="who">Nigri Shluchim Online School · 3rd Grade Chumash</footer>
-</div>
-
-<!-- Shown instead of everything else in .wrap when the teacher has locked
-     the site (posukPractice/settings/accessLocked) — CSS hides every other
-     direct child of body while body.student-app-closed is present. -->
-<div id="studentAppClosedScreen" aria-live="polite">
-  <div id="studentAppClosedCard">
-    <div id="studentAppClosedIcon">🔒</div>
-    <h1 id="studentAppClosedTitle">Currently Closed</h1>
-    <p id="studentAppClosedText">This practice page is currently closed.</p>
-  </div>
 </div>
 
 <!-- Firebase SDKs -->
@@ -2218,109 +2177,21 @@ function setNameGateMsg(text){
   document.getElementById('nameGateMsg').textContent = text || '';
 }
 
-// Live watcher on the whole-site lock — runs continuously (not just at
-// page load), so a teacher flipping this mid-class immediately covers up
-// whatever a student already has on screen, not just new logins. Any
-// change to the value (either direction) triggers a full reload rather
-// than trying to patch a half-initialized page back together, since the
-// name gate / app init logic only really runs once per page load.
-// Both the practice-specific lock (posukPractice/settings/accessLocked) and
-// the master admin toggle (b3Games/siteSettings, the same node the B3 Games
-// homepage admin panel writes to) can close this page. They're watched
-// independently but combined into one shared "closed" state before touching
-// the DOM. Each watcher's very first callback only records its value —
-// it does not yet trigger the reload-on-change comparison, since the two
-// listeners resolve at different times and comparing before both have
-// reported once would cause a false reload loop on every page load.
-let lastKnownLocked = false;
-let lastKnownMasterBlocked = false;
-let lockWatcherReady = false;
-let masterWatcherReady = false;
-let previousCombinedClosed = null;
-
-function applyCombinedClosedState(message){
-  if(!(lockWatcherReady && masterWatcherReady)) return;
-  const isClosed = lastKnownLocked || lastKnownMasterBlocked;
-  if(previousCombinedClosed !== null && previousCombinedClosed !== isClosed){
-    window.location.reload();
-    return;
-  }
-  previousCombinedClosed = isClosed;
-  if(isClosed && message){
-    document.getElementById('studentAppClosedText').textContent = message;
-  }
-  document.body.classList.toggle('student-app-closed', isClosed);
-}
-
-function startAccessLockWatcher(){
-  db.ref('posukPractice/settings/accessLocked').on('value', async (snap) => {
-    lastKnownLocked = snap.val() === true;
-    let message = null;
-    if(lastKnownLocked){
-      message = 'This practice page is currently closed.';
-      try{
-        const msgSnap = await db.ref('posukPractice/settings/accessLockMessage').once('value');
-        if(msgSnap.val()) message = msgSnap.val();
-      }catch(e){ /* fall back to default message */ }
-    }
-    lockWatcherReady = true;
-    applyCombinedClosedState(message);
-  }, (err) => {
-    console.error('Could not read site lock setting:', err);
-    lockWatcherReady = true;
-    applyCombinedClosedState(null);
-  });
-}
-startAccessLockWatcher();
-
-// Live watcher on the master admin toggle. If a teacher turns off the whole
-// site, or specifically flips off "posuk-practice-scroll", this closes the
-// page the same way the practice-specific lock above does — so unchecking
-// the game on the homepage genuinely blocks it here too, not just hides
-// its card.
-function startMasterToggleWatcher(){
-  db.ref('b3Games/siteSettings').on('value', (snap) => {
-    const settings = snap.val() || {};
-    const gamesMap = settings.games || {};
-    lastKnownMasterBlocked = settings.siteEnabled === false || gamesMap['posuk-practice-scroll'] === false;
-    masterWatcherReady = true;
-    applyCombinedClosedState(lastKnownMasterBlocked ? 'This game is currently turned off. Ask your teacher.' : null);
-  }, (err) => {
-    console.error('Could not read master site settings:', err);
-    masterWatcherReady = true;
-    applyCombinedClosedState(null);
-  });
-}
-startMasterToggleWatcher();
-
 // Checks the entered PIN against posukPractice/settings/classPin, and the
 // entered name (slugified) against the teacher-approved list at
 // posukPractice/allowedStudents. Both must pass before a student can get in.
 // This exists so anyone who has the link can't just type in any name and
 // show up as "a student" in the teacher dashboard - the teacher has to add
-// the name first, and know the class PIN. The whole-site lock is checked
-// first as a defense-in-depth backstop (startAccessLockWatcher above
-// already covers the whole page visually), and blocks everyone regardless
-// of PIN or approval.
+// the name first, and know the class PIN.
 async function checkAccess(name, pin){
   const slug = slugify(name);
   if(!slug){ return { ok:false, reason:'Please type your name.' }; }
 
-  const [lockSnap, pinSnap, allowedSnap, masterSnap] = await Promise.all([
-    db.ref('posukPractice/settings/accessLocked').once('value'),
+  const [pinSnap, allowedSnap] = await Promise.all([
     db.ref('posukPractice/settings/classPin').once('value'),
-    db.ref('posukPractice/allowedStudents/' + slug).once('value'),
-    db.ref('b3Games/siteSettings').once('value')
+    db.ref('posukPractice/allowedStudents/' + slug).once('value')
   ]);
 
-  const masterSettings = masterSnap.val() || {};
-  const masterGames = masterSettings.games || {};
-  if(masterSettings.siteEnabled === false || masterGames['posuk-practice-scroll'] === false){
-    return { ok:false, reason:'This game is currently turned off. Ask your teacher.' };
-  }
-  if(lockSnap.val() === true){
-    return { ok:false, reason:'Practice is closed right now. Ask your teacher.' };
-  }
   const realPin = pinSnap.val();
   if(realPin && String(pin).trim() !== String(realPin).trim()){
     return { ok:false, reason:'Incorrect PIN. Ask your teacher.' };
@@ -2427,15 +2298,9 @@ window.addEventListener('load', async () => {
   if(savedId && savedName){
     // Still re-check the roster (not the PIN) on every visit, in case the
     // teacher has since removed this name - a saved browser shouldn't be
-    // able to bypass that. Also skip auto-restoring into the app while the
-    // whole site is locked (startAccessLockWatcher already shows the
-    // closed screen; no need to also spin up a hidden session behind it).
+    // able to bypass that.
     try{
-      const [lockSnap, allowedSnap] = await Promise.all([
-        db.ref('posukPractice/settings/accessLocked').once('value'),
-        db.ref('posukPractice/allowedStudents/' + savedId).once('value')
-      ]);
-      if(lockSnap.val() === true) return;
+      const allowedSnap = await db.ref('posukPractice/allowedStudents/' + savedId).once('value');
       if(!allowedSnap.exists()){
         localStorage.removeItem('posukPractice_studentName');
         localStorage.removeItem('posukPractice_studentId');
@@ -3243,35 +3108,12 @@ function renderAnsweredQuestionHistory(){
   host.innerHTML='<div style="font-weight:800;margin-bottom:7px;color:var(--ink-soft);">Your answers so far</div>' +
     answered.map(i=>{
       const r=comprehensionQResults[i], q=comprehensionQuestions[i], ok=r&&r.verdict==='correct';
-      // Each past question gets its OWN speaker button so its feedback can
-      // be replayed — previously only the just-answered question's result
-      // box had a working 🔊 button, so earlier questions in this list were
-      // silent once you moved on (see Simcha's feedback).
-      const feedbackBtn = (r && r.feedback)
-        ? `<button type="button" class="speak-btn history-feedback-listen" data-hist-index="${i}" style="margin-top:5px;">🔊 Hear feedback</button>`
-        : '';
-      // Every answered question also gets a Delete option, matching
-      // Translate's per-piece delete — previously an answered question
-      // could only be redone (by navigating back to it), never removed
-      // outright once it was recorded (see Simcha's feedback).
-      const deleteBtn = `<button type="button" class="translation-action-btn delete history-delete-btn" data-hist-index="${i}" style="margin-top:5px;">🗑️ Delete</button>`;
       return `<div style="padding:9px 11px;margin:5px 0;border-radius:12px;background:${ok?'#E4F4E4':'#F6E1E1'};border:1px solid ${ok?'#4C9A4C':'var(--rimon)'};">
         <strong>${ok?'✅':'❌'} ${i+1}. ${q?q.question:''}</strong>
         ${r&&r.transcript?`<div style="font-size:.8rem;font-style:italic;margin-top:3px;">You said: “${r.transcript}”</div>`:''}
         ${r&&r.feedback?`<div style="font-size:.8rem;margin-top:2px;">${r.feedback}</div>`:''}
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">${feedbackBtn}${deleteBtn}</div>
       </div>`;
     }).join('');
-  host.querySelectorAll('.history-feedback-listen').forEach(btn=>{
-    btn.onclick = () => {
-      const idx = Number(btn.dataset.histIndex);
-      const r = comprehensionQResults[idx];
-      if(r && r.feedback) speakText(r.feedback);
-    };
-  });
-  host.querySelectorAll('.history-delete-btn').forEach(btn=>{
-    btn.onclick = () => deleteComprehensionAnswer(Number(btn.dataset.histIndex));
-  });
 }
 function renderQuestionFinalScore(){
   const el=document.getElementById('questionFinalScore');
@@ -4227,57 +4069,13 @@ function renderQuestionResult(verdict, feedback, transcript){
   document.getElementById('questionReplayBtn').onclick = () => speakText(feedback);
 }
 
-// Removes one already-answered question so the student can answer it
-// again later, matching the delete option Translate has for each
-// recorded piece. Looks up the saved entry by question text rather than
-// array position, since Firebase's questionResults array is compacted —
-// it only contains answered questions, so index there won't line up with
-// this question's index once other answers have been added/removed.
-async function deleteComprehensionAnswer(index){
-  if(!confirm('Delete this answer? You can answer it again after.')) return;
-  const q = comprehensionQuestions[index];
-
-  if(currentAttemptRef && q){
-    try{
-      const snap = await currentAttemptRef.once('value');
-      const val = snap.val();
-      const match = val && Array.isArray(val.questionResults)
-        ? val.questionResults.find(r => r.question === q.question)
-        : null;
-      if(match && match.audioURL){
-        try{ await storage.refFromURL(match.audioURL).delete(); }
-        catch(err){ console.warn('Could not delete stored answer audio', err); }
-      }
-    }catch(err){ console.warn('Could not look up saved comprehension answer', err); }
-  }
-
-  delete comprehensionQResults[index];
-  comprehensionQIndex = index;
-  renderComprehensionQuestionUI();
-  await autosaveComprehensionQuestions();
-}
-
 // Uploads every answered question's audio + result once ALL questions for
 // this posuk/range have been graded (same "save once complete" pattern
 // autosaveTranslation already uses for its per-chunk recordings), then
 // marks the comprehension task done.
 async function autosaveComprehensionQuestions(){
   const idxs = Object.keys(comprehensionQResults).map(Number);
-  if(!currentPosukKey) return;
-  if(!idxs.length){
-    // Every answered question has since been deleted — clear the saved
-    // record instead of leaving stale results behind, mirroring how
-    // autosaveTranslation handles a translate tab with nothing left in it.
-    if(currentAttemptRef){
-      try{ await currentAttemptRef.update({ questionResults: null, questionScore: null }); }
-      catch(err){ console.error('Could not clear saved comprehension answers', err); }
-    }
-    if(attemptSaved.comprehension){
-      attemptSaved.comprehension = false;
-      document.getElementById('comprehensionCheck').classList.add('hidden');
-    }
-    return;
-  }
+  if(!idxs.length || !currentPosukKey) return;
   try{
     if(!currentAttemptRef){
       currentAttemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
@@ -4317,18 +4115,7 @@ async function autosaveComprehensionQuestions(){
       questionResults: questionResultsData,
       questionScore: Math.round((correctCount / comprehensionQuestions.length) * 100) + '%'
     });
-
-    // Only a fully-answered set counts as "done" for the tab checkmark —
-    // a partial re-save (e.g. right after deleting one answer, with
-    // others still unanswered) should not show it.
-    const allAnswered = comprehensionQuestions.length > 0 &&
-      comprehensionQuestions.every((_, i) => !!comprehensionQResults[i]);
-    if(allAnswered){
-      markTaskSaved('comprehension');
-    }else if(attemptSaved.comprehension){
-      attemptSaved.comprehension = false;
-      document.getElementById('comprehensionCheck').classList.add('hidden');
-    }
+    markTaskSaved('comprehension');
   }catch(err){
     console.error('Autosave (comprehension questions) failed', err);
     const gradingMsg = document.getElementById('comprehensionGradingMsg');
@@ -5078,18 +4865,10 @@ function showTranslationSummary(level){
     const feedbackBtn = r.feedback
       ? '<button type="button" class="translation-action-btn chunk-feedback-listen" data-chunk-index="' + i + '">🔊 Feedback</button>'
       : '';
-    // Redo is now offered for EVERY piece, correct or not — a student may
-    // want to try again even after getting it right (previously the button
-    // only appeared for incorrect pieces, per Simcha's feedback).
-    const redoBtn =
+    const redoBtn = isCorrect ? '' :
       '<button type="button" class="translation-action-btn redo chunk-fix-pill" data-chunk-index="' + i + '">' +
         '<span class="chunk-fix-status" data-status-index="' + i + '">🔁 Redo</span>' +
       '</button>';
-    // Delete removes this piece's saved recording entirely (no immediate
-    // re-record forced) — the student can leave it blank or come back to
-    // it later, same idea as the delete buttons on Reading/Comprehension.
-    const deleteBtn =
-      '<button type="button" class="translation-action-btn delete chunk-delete-pill" data-chunk-index="' + i + '">🗑️ Delete</button>';
 
     let helpHtml = '';
     if(!isCorrect){
@@ -5116,7 +4895,7 @@ function showTranslationSummary(level){
         '<div class="translation-piece-hebrew">' + chunk.hebrew + '</div>' +
       '</div>' +
       '<div class="translation-heard"><strong>I heard:</strong> “' + said + '”</div>' +
-      '<div class="translation-piece-actions">' + recordingBtn + feedbackBtn + redoBtn + deleteBtn + '</div>' +
+      '<div class="translation-piece-actions">' + recordingBtn + feedbackBtn + redoBtn + '</div>' +
       helpHtml +
     '</div>';
   }).join('') + '</div>';
@@ -5149,10 +4928,6 @@ function showTranslationSummary(level){
 
   resultEl.querySelectorAll('.chunk-fix-pill').forEach(btn => {
     btn.onclick = () => recordChunkFix(parseInt(btn.getAttribute('data-chunk-index'), 10), btn);
-  });
-
-  resultEl.querySelectorAll('.chunk-delete-pill').forEach(btn => {
-    btn.onclick = () => deleteTranslationChunk(parseInt(btn.getAttribute('data-chunk-index'), 10), level);
   });
 
   resultEl.querySelectorAll('.chunk-dispute-btn').forEach(btn => {
@@ -5247,66 +5022,12 @@ async function recordChunkFix(index, btnEl){
   }
 }
 
-// Removes one piece's recording entirely (local state + the uploaded
-// audio file + the saved record), without forcing an immediate re-record —
-// same idea as the Delete button on Reading/Comprehension, just scoped to
-// a single translation piece instead of the whole attempt.
-//
-// Note: translationChunkResults is saved as a COMPACTED array (only pieces
-// that have a result, in chunk-index order) — its array position is NOT
-// the same as the chunk's own index once earlier pieces are missing/deleted.
-// So the saved audio URL to clean up is looked up by matching chunkHebrew
-// text rather than assuming array position === chunk index.
-async function deleteTranslationChunk(index, level){
-  if(!confirm('Delete this piece\'s recording? You can record it again anytime.')) return;
-
-  // If this piece was already autosaved, remove its uploaded audio file
-  // from Storage too, not just the local state.
-  if(currentAttemptRef){
-    try{
-      const snap = await currentAttemptRef.child('translationChunkResults').once('value');
-      const saved = snap.val();
-      const chunkHebrew = level.chunks[index] && level.chunks[index].hebrew;
-      if(Array.isArray(saved) && chunkHebrew){
-        const match = saved.find(c => c && c.chunkHebrew === chunkHebrew);
-        if(match && match.audioURL){
-          storage.refFromURL(match.audioURL).delete().catch(() => {});
-        }
-      }
-    }catch(err){
-      console.error('Could not check saved chunk before delete', err);
-    }
-  }
-
-  delete translationSegments[index];
-  delete translationGradedResults[index];
-
-  showTranslationSummary(level);
-  renderCurrentChunk();
-  await autosaveTranslation(level);
-}
-
 // Same one-attempt-per-posuk-visit pattern as autosaveHebrew/
 // autosaveComprehension, but stores the whole set of graded chunks (not
 // just one), since a full session covers the entire posuk at once.
 async function autosaveTranslation(level){
   const idxs = Object.keys(translationGradedResults).map(Number);
-  if(!currentPosukKey) return;
-  // If every piece has been deleted, clear the saved translation fields
-  // entirely instead of just silently doing nothing — otherwise a stale
-  // translationChunkResults from before the last delete would keep showing
-  // up in the teacher dashboard and student history.
-  if(!idxs.length){
-    if(currentAttemptRef){
-      try{
-        await currentAttemptRef.update({ translationChunkResults: null, translationScore: null });
-      }catch(err){ console.error('Could not clear translation after deleting all pieces', err); }
-    }
-    document.getElementById('translationStatus').textContent = 'Ready';
-    attemptSaved.translation = false;
-    document.getElementById('translateCheck').classList.add('hidden');
-    return;
-  }
+  if(!idxs.length || !currentPosukKey) return;
   try{
     if(!currentAttemptRef){
       currentAttemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
@@ -5521,7 +5242,7 @@ async function loadHistory(){
         const effCorrectCount = a.translationChunkResults.filter(c => (c.finalVerdict || c.verdict) === 'correct').length;
         const effScoreLabel = Math.round((effCorrectCount / a.translationChunkResults.length) * 100) + '%';
         rowsHtml += `<div class="row"><span class="label">🌐 Translation</span><span class="score-pill">${effScoreLabel}</span></div>`;
-        a.translationChunkResults.forEach(c => {
+        a.translationChunkResults.forEach((c, idx) => {
           // Same as Hebrew/comprehension: once a teacher finalizes a
           // disputed chunk, that decision is the official verdict.
           const effVerdict = c.finalVerdict || c.verdict;
@@ -5534,6 +5255,13 @@ async function loadHistory(){
             rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">⚠️ Dispute pending — your teacher will review it.</div>`;
           }else if(c.disputeStatus === 'resolved' && c.finalVerdict){
             rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">✔️ Teacher reviewed — final: ${c.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again'}</div>`;
+          }else if(effVerdict !== 'correct'){
+            // Marked wrong, never disputed, and we're looking at a saved
+            // past attempt (not the just-graded screen) — the only chance
+            // to flag it was the live "Need help?" accordion right after
+            // grading, which is easy to miss or navigate away from. Give a
+            // second, permanent way in from History.
+            rowsHtml += `<div class="row"><button type="button" class="btn small ghost-delete history-chunk-dispute-btn" data-attempt-id="${a.id}" data-chunk-index="${idx}">⚠️ Dispute this piece</button></div>`;
           }
         });
       }
@@ -5590,6 +5318,13 @@ async function loadHistory(){
       div.innerHTML = rowsHtml;
       const delBtn = div.querySelector('.attempt-delete-btn');
       delBtn.onclick = () => deleteAttempt(a, delBtn);
+      div.querySelectorAll('.history-chunk-dispute-btn').forEach(btn => {
+        btn.onclick = () => submitHistoryChunkDispute(
+          btn.getAttribute('data-attempt-id'),
+          parseInt(btn.getAttribute('data-chunk-index'), 10),
+          btn
+        );
+      });
       listEl.appendChild(div);
     });
   }catch(err){
@@ -5628,6 +5363,29 @@ async function deleteAttempt(attempt, btnEl){
     btnEl.textContent = '🗑️ Delete';
     alert('Could not delete this attempt. Please try again.');
     console.error(err);
+  }
+}
+
+// Same idea as submitChunkDispute (used right on the just-graded screen),
+// but for a chunk inside a *saved past attempt* viewed from History. That
+// screen has no in-memory translationGradedResults / currentAttemptRef to
+// lean on, so this writes straight to the attempt's own Firebase path
+// using its saved attemptId, then reloads History to reflect the change.
+async function submitHistoryChunkDispute(attemptId, chunkIndex, btnEl){
+  btnEl.disabled = true;
+  btnEl.textContent = 'Sending…';
+  try{
+    await db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey + '/' + attemptId +
+      '/translationChunkResults/' + chunkIndex).update({
+      disputeStatus: 'pending',
+      disputeAt: Date.now()
+    });
+    loadHistory();
+  }catch(err){
+    console.error('Could not save history chunk dispute', err);
+    btnEl.disabled = false;
+    btnEl.textContent = '⚠️ Dispute this piece';
+    alert('Could not save your dispute — check your internet and try again.');
   }
 }
 </script>
