@@ -12,9 +12,16 @@
   body { font-family: Calibri, Arial, sans-serif; background: #fdf6ec; margin: 0; padding: 20px; color: #3a2417; text-align: center; }
   h1 { color: #b85042; margin-bottom: 4px; }
   .subtitle { color: #7d5236; margin-bottom: 20px; font-style: italic; }
-  .name-box { max-width: 400px; margin: 0 auto 30px auto; }
-  .name-box input { font-size: 18px; padding: 10px; width: 70%; border-radius: 8px; border: 1px solid #d9a85c; }
-  .name-box button { font-size: 16px; padding: 10px 16px; border-radius: 8px; border: none; background: #7d5236; color: white; cursor: pointer; margin-left: 6px; }
+  .name-box { max-width: 420px; margin: 0 auto 30px auto; background: white; border: 1px solid #d9a85c; border-radius: 12px; padding: 24px; text-align: left; }
+  .name-box h2 { margin: 0 0 6px; text-align: center; color: #7d5236; }
+  .login-note { margin: 0 0 18px; text-align: center; color: #7d5236; font-size: 14px; }
+  .name-box label { display: block; font-weight: bold; margin: 12px 0 5px; }
+  .name-box input { font-size: 18px; padding: 11px 12px; width: 100%; border-radius: 8px; border: 1px solid #d9a85c; box-sizing: border-box; }
+  .name-box button { font-size: 17px; padding: 11px 16px; border-radius: 8px; border: none; background: #7d5236; color: white; cursor: pointer; margin-top: 16px; width: 100%; }
+  .name-box button:disabled { background: #aaa; cursor: wait; }
+  .login-msg { min-height: 1.25em; margin-top: 10px; color: #b85042; font-weight: bold; text-align: center; }
+  .signed-in { max-width: 500px; margin: 0 auto 12px auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; color: #7d5236; font-size: 14px; }
+  .switch-btn { border: 1px solid #d9a85c; background: white; color: #7d5236; border-radius: 8px; padding: 7px 10px; cursor: pointer; }
   .panel { max-width: 500px; margin: 0 auto 24px auto; background: white; border-radius: 12px; border: 1px solid #d9a85c; padding: 24px; }
   .qnum { color: #7d5236; font-size: 13px; margin-bottom: 8px; }
   .qtext { font-size: 24px; font-weight: bold; margin-bottom: 20px; white-space: pre-line; }
@@ -37,11 +44,21 @@
 </div>
 
 <div class="name-box" id="nameBox">
-  <input type="text" id="nameInput" placeholder="Type your name" />
-  <button onclick="joinGame()">Join</button>
+  <h2>Student Login</h2>
+  <p class="login-note">Use the same student name and Class PIN as Posuk Practice and Shorashim.</p>
+  <label for="classPinInput">Class PIN</label>
+  <input type="password" id="classPinInput" placeholder="Ask your teacher" maxlength="20" inputmode="numeric" autocomplete="off" />
+  <label for="studentNameInput">Your name</label>
+  <input type="text" id="studentNameInput" placeholder="Type your name" maxlength="30" autocomplete="name" />
+  <button id="joinButton" onclick="joinGame()">Join Game</button>
+  <div id="loginMsg" class="login-msg" aria-live="polite"></div>
 </div>
 
 <div id="gameArea" class="hidden">
+  <div class="signed-in">
+    <span>Playing as <b id="signedInName"></b></span>
+    <button class="switch-btn" id="switchStudentBtn" type="button">Switch student</button>
+  </div>
   <div class="panel">
     <div class="qnum" id="qnum">Question 1 of 1</div>
     <div class="qtext" id="qtext"></div>
@@ -87,6 +104,23 @@ setRef.on('value', snap => {
 });
 
 let myName = "";
+let myStudentId = "";
+
+function sanitize(name) {
+  return String(name || '').replace(/[.#$\[\]]/g, '_');
+}
+
+function slugify(name) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function setLoginMsg(text) {
+  document.getElementById('loginMsg').textContent = text || '';
+}
 
 // Master admin toggle: the same b3Games/siteSettings node the B3 Games
 // homepage admin panel writes to. If the whole site or just this game has
@@ -95,12 +129,15 @@ let myName = "";
 let masterBlocked = false;
 function applyMasterBlocked() {
   document.getElementById('masterBlocked').classList.toggle('hidden', !masterBlocked);
-  document.getElementById('nameBox').classList.toggle('hidden', masterBlocked);
   if (masterBlocked) {
+    document.getElementById('nameBox').classList.add('hidden');
     document.getElementById('gameArea').classList.add('hidden');
-  } else if (myName) {
+  } else if (myStudentId) {
     document.getElementById('nameBox').classList.add('hidden');
     document.getElementById('gameArea').classList.remove('hidden');
+  } else {
+    document.getElementById('nameBox').classList.remove('hidden');
+    document.getElementById('gameArea').classList.add('hidden');
   }
 }
 db.ref('b3Games/siteSettings').on('value', snap => {
@@ -114,19 +151,120 @@ db.ref('b3Games/siteSettings').on('value', snap => {
   applyMasterBlocked();
 });
 
-function sanitize(name) {
-  return name.replace(/[.#$\[\]]/g, '_');
+// This is the exact same student-access source used by Posuk Practice and
+// Shorashim: one shared Class PIN plus the teacher-approved student roster.
+async function checkStudentAccess(name, pin) {
+  const slug = slugify(name);
+  if (!slug) return { ok: false, reason: 'Please type your name.' };
+
+  const [pinSnap, allowedSnap] = await Promise.all([
+    db.ref('posukPractice/settings/classPin').once('value'),
+    db.ref('posukPractice/allowedStudents/' + slug).once('value')
+  ]);
+
+  const realPin = pinSnap.val();
+  if (realPin && String(pin).trim() !== String(realPin).trim()) {
+    return { ok: false, reason: 'Incorrect PIN. Ask your teacher.' };
+  }
+  if (!allowedSnap.exists()) {
+    return { ok: false, reason: 'Ask your teacher to add your name first.' };
+  }
+
+  const allowedData = allowedSnap.val();
+  const displayName = allowedData && typeof allowedData === 'object' && allowedData.name
+    ? String(allowedData.name)
+    : name.trim();
+
+  return { ok: true, slug, displayName };
 }
 
-function joinGame() {
-  if (masterBlocked) return;
-  const val = document.getElementById('nameInput').value.trim();
-  if (!val) return;
-  myName = sanitize(val);
+function enterGame(displayName, studentId) {
+  myStudentId = studentId;
+  myName = sanitize(displayName);
+
+  localStorage.setItem('posukPractice_studentName', displayName);
+  localStorage.setItem('posukPractice_studentId', studentId);
+
+  document.getElementById('signedInName').textContent = displayName;
   gameRef.child('scores').child(myName).transaction(current => current || 0);
-  document.getElementById('nameBox').classList.add('hidden');
-  document.getElementById('gameArea').classList.remove('hidden');
+  applyMasterBlocked();
+
+  if (lastData && lastData.scores && lastData.scores[myName] !== undefined) {
+    document.getElementById('myScore').textContent = lastData.scores[myName];
+  }
 }
+
+async function joinGame() {
+  if (masterBlocked) return;
+
+  const name = document.getElementById('studentNameInput').value.trim();
+  const pin = document.getElementById('classPinInput').value.trim();
+  const joinButton = document.getElementById('joinButton');
+
+  if (!name) {
+    setLoginMsg('Please type your name.');
+    return;
+  }
+
+  joinButton.disabled = true;
+  setLoginMsg('Checking…');
+
+  try {
+    const result = await checkStudentAccess(name, pin);
+    if (!result.ok) {
+      setLoginMsg(result.reason);
+      return;
+    }
+
+    setLoginMsg('');
+    enterGame(result.displayName, result.slug);
+  } catch (error) {
+    console.error('Game Show login failed:', error);
+    setLoginMsg('Could not check your login. Try again.');
+  } finally {
+    joinButton.disabled = false;
+  }
+}
+
+async function restoreSharedStudentLogin() {
+  const savedId = localStorage.getItem('posukPractice_studentId');
+  const savedName = localStorage.getItem('posukPractice_studentName');
+  if (!savedId || !savedName) return;
+
+  try {
+    const allowedSnap = await db.ref('posukPractice/allowedStudents/' + savedId).once('value');
+    if (!allowedSnap.exists()) {
+      localStorage.removeItem('posukPractice_studentId');
+      localStorage.removeItem('posukPractice_studentName');
+      return;
+    }
+
+    const allowedData = allowedSnap.val();
+    const displayName = allowedData && typeof allowedData === 'object' && allowedData.name
+      ? String(allowedData.name)
+      : savedName;
+    enterGame(displayName, savedId);
+  } catch (error) {
+    console.warn('Could not restore shared student login:', error);
+  }
+}
+
+document.getElementById('switchStudentBtn').addEventListener('click', () => {
+  localStorage.removeItem('posukPractice_studentId');
+  localStorage.removeItem('posukPractice_studentName');
+  location.reload();
+});
+
+['classPinInput', 'studentNameInput'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      joinGame();
+    }
+  });
+});
+
+restoreSharedStudentLogin();
 
 let sharedPlayerCtx = null;
 
