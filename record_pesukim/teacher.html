@@ -485,9 +485,8 @@ function effTranslationScore(record){
 function hasPendingDispute(record){
   if(!record) return false;
   if(record.hebrewDisputeStatus === 'pending' || record.comprehensionDisputeStatus === 'pending') return true;
-  if(Array.isArray(record.translationChunkResults)){
-    return record.translationChunkResults.some(c => c.disputeStatus === 'pending');
-  }
+  if(Array.isArray(record.translationChunkResults) && record.translationChunkResults.some(c => c.disputeStatus === 'pending')) return true;
+  if(Array.isArray(record.questionResults) && record.questionResults.some(q => q.disputeStatus === 'pending')) return true;
   return false;
 }
 
@@ -815,6 +814,14 @@ async function markStudentsWithPendingDisputes(){
               if(c.disputeStatus === 'pending'){
                 count++;
                 if(!firstTarget) firstTarget = { posukKey, tab: 'translate' };
+              }
+            });
+          }
+          if(Array.isArray(a.questionResults)){
+            a.questionResults.forEach(q => {
+              if(q.disputeStatus === 'pending'){
+                count++;
+                if(!firstTarget) firstTarget = { posukKey, tab: 'comprehension' };
               }
             });
           }
@@ -2609,7 +2616,7 @@ function renderPosukDetail(posukKey){
       if(Array.isArray(a.questionResults) && a.questionResults.length){
         const qScore = effQuestionScore(a);
         lines += `<div class="top-line"><span>Detail questions</span><span class="score-pill">${typeof qScore === 'number' ? qScore + '%' : '—'}</span></div>`;
-        a.questionResults.forEach(q => {
+        a.questionResults.forEach((q, qIdx) => {
           const qVerdict = q.finalVerdict || q.verdict;
           let qHtml = '<span class="comp-badge">' + (qVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</span>';
           if(q.question) qHtml += '<span style="font-weight:700;">' + q.question + '</span>';
@@ -2617,6 +2624,7 @@ function renderPosukDetail(posukKey){
           if(q.transcript) qHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + q.transcript + '"</span>';
           if(q.feedback) qHtml += '<span style="width:100%;font-size:0.82rem;">' + q.feedback + '</span>';
           lines += `<div class="comp-result ${qVerdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:4px;">${qHtml}</div>`;
+          lines += renderQuestionDisputeSection(a, posukKey, qIdx, q);
         });
       }
 
@@ -2655,63 +2663,80 @@ function renderPosukDetail(posukKey){
     };
   }
 
-  // Only wire controls that are actually visible for the selected skill.
+  // Score/verdict overrides are now always available, not just once a
+  // student has disputed — so every control that renderDisputeSection /
+  // renderTranslationChunkDisputeSection / renderQuestionDisputeSection
+  // produces gets wired, regardless of pending status.
   relevantAttempts.forEach(a => {
-    if(studentActiveTab === 'reading' && a.hebrewDisputeStatus === 'pending'){
+    if(studentActiveTab === 'reading' && a.hebrewAudioURL){
       wireFinalizeHebrew(a, posukKey);
     }
-    if(studentActiveTab === 'comprehension' && a.comprehensionDisputeStatus === 'pending'){
+    if(studentActiveTab === 'comprehension' && a.comprehensionAudioURL){
       wireFinalizeComprehension(a, posukKey);
     }
     if(studentActiveTab === 'translate' && Array.isArray(a.translationChunkResults)){
       a.translationChunkResults.forEach((c, chunkIdx) => {
-        if(c.disputeStatus === 'pending'){
-          wireFinalizeTranslationChunk(a, posukKey, chunkIdx, c);
-        }
+        wireFinalizeTranslationChunk(a, posukKey, chunkIdx, c);
+      });
+    }
+    if(studentActiveTab === 'comprehension' && Array.isArray(a.questionResults)){
+      a.questionResults.forEach((q, qIdx) => {
+        wireFinalizeQuestion(a, posukKey, qIdx, q);
       });
     }
   });
 }
 
 /* Builds the little banner/finalize block for one skill on one attempt.
-   Pending disputes get a red flag + an inline override control; already-
-   resolved ones get a quiet confirmation note; no dispute means nothing. */
+   Now always renders an override control (a teacher can adjust a score
+   even if the student never disputed it) — pending disputes additionally
+   get a red flag banner and a one-click "accept" shortcut; resolved ones
+   get a quiet confirmation note alongside the (still-editable) control. */
 function renderDisputeSection(a, posukKey, skill){
   if(skill === 'hebrew'){
+    const hasFinal = typeof a.hebrewFinalScore === 'number';
+    const effScore = hasFinal ? a.hebrewFinalScore : a.hebrewScore;
+    let banner = '';
     if(a.hebrewDisputeStatus === 'pending'){
-      return `<div class="dispute-banner">⚠️ Student disputes this score — asked for ${a.hebrewDisputeRequested}%</div>
-        <div class="finalize-row" id="finalizeHebrew_${a.attemptId}">
-          <span>Final score:</span>
-          <input type="number" min="0" max="100" id="finalizeHebrewInput_${a.attemptId}" value="${a.hebrewDisputeRequested}">
-          <span>%</span>
-          <button class="btn" id="finalizeHebrewAcceptBtn_${a.attemptId}">Accept student's number</button>
-          <button class="btn gold" id="finalizeHebrewSaveBtn_${a.attemptId}">Save final score</button>
-          <button class="btn small" style="background:var(--ink-soft);box-shadow:none;" id="finalizeHebrewKeepBtn_${a.attemptId}">Keep original (${a.hebrewScore}%)</button>
-        </div>`;
+      banner = `<div class="dispute-banner">⚠️ Student disputes this score — asked for ${a.hebrewDisputeRequested}%</div>`;
+    }else if(a.hebrewDisputeStatus === 'resolved' && hasFinal){
+      banner = `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final score set to ${a.hebrewFinalScore}%</div>`;
     }
-    if(a.hebrewDisputeStatus === 'resolved' && typeof a.hebrewFinalScore === 'number'){
-      return `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final score set to ${a.hebrewFinalScore}%</div>`;
-    }
-    return '';
+    const prefill = a.hebrewDisputeStatus === 'pending' ? a.hebrewDisputeRequested : effScore;
+    const acceptBtn = a.hebrewDisputeStatus === 'pending'
+      ? `<button class="btn" id="finalizeHebrewAcceptBtn_${a.attemptId}">Accept student's number</button>`
+      : '';
+    return `${banner}
+      <div class="finalize-row" id="finalizeHebrew_${a.attemptId}">
+        <span>Adjust score:</span>
+        <input type="number" min="0" max="100" id="finalizeHebrewInput_${a.attemptId}" value="${prefill}">
+        <span>%</span>
+        ${acceptBtn}
+        <button class="btn gold" id="finalizeHebrewSaveBtn_${a.attemptId}">Save</button>
+      </div>`;
   }
   // comprehension
   const labelMap = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' };
+  let banner = '';
   if(a.comprehensionDisputeStatus === 'pending'){
-    const options = Object.entries(labelMap).map(([key,label]) =>
-      `<option value="${key}" ${key === a.comprehensionDisputeRequested ? 'selected' : ''}>${label}</option>`).join('');
-    return `<div class="dispute-banner">⚠️ Student disputes this grade — asked for ${labelMap[a.comprehensionDisputeRequested] || a.comprehensionDisputeRequested}</div>
-      <div class="finalize-row" id="finalizeComp_${a.attemptId}">
-        <span>Final grade:</span>
-        <select id="finalizeCompSelect_${a.attemptId}">${options}</select>
-        <button class="btn" id="finalizeCompAcceptBtn_${a.attemptId}">Accept student's request</button>
-        <button class="btn gold" id="finalizeCompSaveBtn_${a.attemptId}">Save final grade</button>
-        <button class="btn small" style="background:var(--ink-soft);box-shadow:none;" id="finalizeCompKeepBtn_${a.attemptId}">Keep original (${labelMap[a.comprehensionVerdict] || a.comprehensionVerdict})</button>
-      </div>`;
+    banner = `<div class="dispute-banner">⚠️ Student disputes this grade — asked for ${labelMap[a.comprehensionDisputeRequested] || a.comprehensionDisputeRequested}</div>`;
+  }else if(a.comprehensionDisputeStatus === 'resolved' && a.comprehensionFinalVerdict){
+    banner = `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final grade set to ${labelMap[a.comprehensionFinalVerdict] || a.comprehensionFinalVerdict}</div>`;
   }
-  if(a.comprehensionDisputeStatus === 'resolved' && a.comprehensionFinalVerdict){
-    return `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final grade set to ${labelMap[a.comprehensionFinalVerdict] || a.comprehensionFinalVerdict}</div>`;
-  }
-  return '';
+  const selectedTier = a.comprehensionDisputeStatus === 'pending' ? a.comprehensionDisputeRequested
+    : (a.comprehensionFinalVerdict || a.comprehensionVerdict);
+  const options = Object.entries(labelMap).map(([key,label]) =>
+    `<option value="${key}" ${key === selectedTier ? 'selected' : ''}>${label}</option>`).join('');
+  const acceptBtn = a.comprehensionDisputeStatus === 'pending'
+    ? `<button class="btn" id="finalizeCompAcceptBtn_${a.attemptId}">Accept student's request</button>`
+    : '';
+  return `${banner}
+    <div class="finalize-row" id="finalizeComp_${a.attemptId}">
+      <span>Adjust grade:</span>
+      <select id="finalizeCompSelect_${a.attemptId}">${options}</select>
+      ${acceptBtn}
+      <button class="btn gold" id="finalizeCompSaveBtn_${a.attemptId}">Save</button>
+    </div>`;
 }
 
 // Same idea as renderDisputeSection, but scoped to one chunk within a
@@ -2719,18 +2744,35 @@ function renderDisputeSection(a, posukKey, skill){
 // dispute a single piece rather than the whole posuk (translation has no
 // single overall score to dispute).
 function renderTranslationChunkDisputeSection(a, posukKey, chunkIdx, c){
+  const effVerdict = c.finalVerdict || c.verdict;
+  let banner = '';
   if(c.disputeStatus === 'pending'){
-    return `<div class="dispute-banner">⚠️ Student disputes this piece</div>
-      <div class="finalize-row" id="finalizeChunk_${a.attemptId}_${chunkIdx}">
-        <span>Final:</span>
-        <button class="btn" id="finalizeChunkCorrectBtn_${a.attemptId}_${chunkIdx}">Mark correct</button>
-        <button class="btn small" style="background:var(--ink-soft);box-shadow:none;" id="finalizeChunkKeepBtn_${a.attemptId}_${chunkIdx}">Keep original (${c.verdict === 'correct' ? '✅ Correct' : '💡 Try again'})</button>
-      </div>`;
+    banner = `<div class="dispute-banner">⚠️ Student disputes this piece</div>`;
+  }else if(c.disputeStatus === 'resolved' && c.finalVerdict){
+    banner = `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final: ${c.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again'}</div>`;
   }
-  if(c.disputeStatus === 'resolved' && c.finalVerdict){
-    return `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final: ${c.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again'}</div>`;
+  return `${banner}
+    <div class="finalize-row" id="finalizeChunk_${a.attemptId}_${chunkIdx}">
+      <span>Adjust:</span>
+      <button class="btn" id="finalizeChunkCorrectBtn_${a.attemptId}_${chunkIdx}" ${effVerdict === 'correct' ? 'disabled' : ''}>Mark correct</button>
+      <button class="btn small" style="background:var(--ink-soft);box-shadow:none;" id="finalizeChunkWrongBtn_${a.attemptId}_${chunkIdx}" ${effVerdict !== 'correct' ? 'disabled' : ''}>Mark wrong</button>
+    </div>`;
+}
+
+function renderQuestionDisputeSection(a, posukKey, qIdx, q){
+  const effVerdict = q.finalVerdict || q.verdict;
+  let banner = '';
+  if(q.disputeStatus === 'pending'){
+    banner = `<div class="dispute-banner">⚠️ Student disputes this answer</div>`;
+  }else if(q.disputeStatus === 'resolved' && q.finalVerdict){
+    banner = `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final: ${q.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again'}</div>`;
   }
-  return '';
+  return `${banner}
+    <div class="finalize-row" id="finalizeQuestion_${a.attemptId}_${qIdx}">
+      <span>Adjust:</span>
+      <button class="btn" id="finalizeQuestionCorrectBtn_${a.attemptId}_${qIdx}" ${effVerdict === 'correct' ? 'disabled' : ''}>Mark correct</button>
+      <button class="btn small" style="background:var(--ink-soft);box-shadow:none;" id="finalizeQuestionWrongBtn_${a.attemptId}_${qIdx}" ${effVerdict !== 'correct' ? 'disabled' : ''}>Mark wrong</button>
+    </div>`;
 }
 
 function attemptRef(posukKey, attemptId){
@@ -2741,7 +2783,6 @@ function wireFinalizeHebrew(a, posukKey){
   const input = document.getElementById('finalizeHebrewInput_' + a.attemptId);
   const acceptBtn = document.getElementById('finalizeHebrewAcceptBtn_' + a.attemptId);
   const saveBtn = document.getElementById('finalizeHebrewSaveBtn_' + a.attemptId);
-  const keepBtn = document.getElementById('finalizeHebrewKeepBtn_' + a.attemptId);
   if(!input || !saveBtn) return;
 
   const finalize = async (finalScore) => {
@@ -2768,16 +2809,14 @@ function wireFinalizeHebrew(a, posukKey){
     }
   };
 
-  acceptBtn.onclick = () => finalize(a.hebrewDisputeRequested);
+  acceptBtn && (acceptBtn.onclick = () => finalize(a.hebrewDisputeRequested));
   saveBtn.onclick = () => finalize(parseInt(input.value, 10));
-  keepBtn.onclick = () => finalize(a.hebrewScore);
 }
 
 function wireFinalizeComprehension(a, posukKey){
   const select = document.getElementById('finalizeCompSelect_' + a.attemptId);
   const acceptBtn = document.getElementById('finalizeCompAcceptBtn_' + a.attemptId);
   const saveBtn = document.getElementById('finalizeCompSaveBtn_' + a.attemptId);
-  const keepBtn = document.getElementById('finalizeCompKeepBtn_' + a.attemptId);
   if(!select || !saveBtn) return;
 
   const finalize = async (finalVerdict) => {
@@ -2801,15 +2840,14 @@ function wireFinalizeComprehension(a, posukKey){
     }
   };
 
-  acceptBtn.onclick = () => finalize(a.comprehensionDisputeRequested);
+  acceptBtn && (acceptBtn.onclick = () => finalize(a.comprehensionDisputeRequested));
   saveBtn.onclick = () => finalize(select.value);
-  keepBtn.onclick = () => finalize(a.comprehensionVerdict);
 }
 
 function wireFinalizeTranslationChunk(a, posukKey, chunkIdx, c){
   const correctBtn = document.getElementById('finalizeChunkCorrectBtn_' + a.attemptId + '_' + chunkIdx);
-  const keepBtn = document.getElementById('finalizeChunkKeepBtn_' + a.attemptId + '_' + chunkIdx);
-  if(!correctBtn || !keepBtn) return;
+  const wrongBtn = document.getElementById('finalizeChunkWrongBtn_' + a.attemptId + '_' + chunkIdx);
+  if(!correctBtn || !wrongBtn) return;
 
   const finalize = async (finalVerdict) => {
     try{
@@ -2832,7 +2870,36 @@ function wireFinalizeTranslationChunk(a, posukKey, chunkIdx, c){
   };
 
   correctBtn.onclick = () => finalize('correct');
-  keepBtn.onclick = () => finalize(c.verdict);
+  wrongBtn.onclick = () => finalize('incorrect');
+}
+
+function wireFinalizeQuestion(a, posukKey, qIdx, q){
+  const correctBtn = document.getElementById('finalizeQuestionCorrectBtn_' + a.attemptId + '_' + qIdx);
+  const wrongBtn = document.getElementById('finalizeQuestionWrongBtn_' + a.attemptId + '_' + qIdx);
+  if(!correctBtn || !wrongBtn) return;
+
+  const finalize = async (finalVerdict) => {
+    try{
+      await attemptRef(posukKey, a.attemptId).child('questionResults').child(String(qIdx)).update({
+        finalVerdict: finalVerdict,
+        disputeStatus: 'resolved',
+        disputeResolvedAt: Date.now()
+      });
+      allAttemptsCache = null;
+      await selectStudent(activeStudentId, studentsMap[activeStudentId],
+        [...document.querySelectorAll('.student-item')].find(e => e.dataset.id === activeStudentId));
+      selectedPosukKey = posukKey;
+      await renderStudentGrid();
+      renderPosukDetail(posukKey);
+      markStudentsWithPendingDisputes();
+    }catch(err){
+      console.error(err);
+      alert('Could not save the final verdict — check your internet and try again.');
+    }
+  };
+
+  correctBtn.onclick = () => finalize('correct');
+  wrongBtn.onclick = () => finalize('incorrect');
 }
 
 /* ---------- Shared helpers ---------- */
