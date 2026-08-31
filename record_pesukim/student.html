@@ -5303,6 +5303,12 @@ async function loadHistory(){
         }else if(a.comprehensionDisputeStatus === 'resolved' && a.comprehensionFinalVerdict){
           const finalLabel = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[a.comprehensionFinalVerdict] || a.comprehensionFinalVerdict;
           rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">✔️ Teacher reviewed — final grade: ${finalLabel}</div>`;
+        }else{
+          // Never disputed and we're looking at a saved past attempt (not
+          // the just-graded screen) — same gap as translation had: the
+          // only chance to flag this was the live dispute button right
+          // after grading. Give a second, permanent way in from History.
+          rowsHtml += `<div class="row" id="historyCompDisputeRow_${a.id}"><button type="button" class="btn small ghost-delete history-comp-dispute-btn" data-attempt-id="${a.id}">⚠️ Dispute this grade</button></div>`;
         }
         if(a.comprehensionClarifyQuestion){
           rowsHtml += `
@@ -5324,6 +5330,9 @@ async function loadHistory(){
           parseInt(btn.getAttribute('data-chunk-index'), 10),
           btn
         );
+      });
+      div.querySelectorAll('.history-comp-dispute-btn').forEach(btn => {
+        btn.onclick = () => openHistoryComprehensionDisputeForm(btn.getAttribute('data-attempt-id'));
       });
       listEl.appendChild(div);
     });
@@ -5386,6 +5395,38 @@ async function submitHistoryChunkDispute(attemptId, chunkIndex, btnEl){
     btnEl.disabled = false;
     btnEl.textContent = '⚠️ Dispute this piece';
     alert('Could not save your dispute — check your internet and try again.');
+  }
+}
+
+// History equivalent of openComprehensionDisputeForm/submitComprehensionDispute
+// (used on the just-graded screen) — same tier-picker UI, but scoped to a
+// saved past attempt's own Firebase path via its attemptId instead of the
+// in-memory currentAttemptRef, since History has no live attempt in progress.
+function openHistoryComprehensionDisputeForm(attemptId){
+  const row = document.getElementById('historyCompDisputeRow_' + attemptId);
+  if(!row) return;
+  const tiers = [['excellent','🌟 Excellent'],['correct','✅ Got it'],['partial','🤔 Almost'],['incorrect','💡 Try again']];
+  row.innerHTML =
+    '<span style="font-size:0.85rem;display:block;margin-bottom:6px;">I think I deserve:</span>' +
+    tiers.map(([key,label]) => '<button class="btn small gold" data-tier="' + key + '" style="margin:2px;">' + label + '</button>').join('');
+  row.querySelectorAll('button[data-tier]').forEach(btn => {
+    btn.onclick = () => submitHistoryComprehensionDispute(attemptId, btn.dataset.tier, row);
+  });
+}
+
+async function submitHistoryComprehensionDispute(attemptId, tier, row){
+  row.innerHTML = '<span style="font-size:0.85rem;color:var(--ink-soft);">Saving…</span>';
+  const labelMap = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' };
+  try{
+    await db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey + '/' + attemptId).update({
+      comprehensionDisputeRequested: tier,
+      comprehensionDisputeStatus: 'pending',
+      comprehensionDisputeAt: Date.now()
+    });
+    loadHistory();
+  }catch(err){
+    console.error('Could not save history comprehension dispute', err);
+    row.innerHTML = '<span style="font-size:0.85rem;color:var(--rimon);">Could not save your dispute — check your internet and try again.</span>';
   }
 }
 </script>
