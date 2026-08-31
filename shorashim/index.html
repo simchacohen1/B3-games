@@ -994,10 +994,10 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
           <div class="section-head">
             <button class="backBtn ghost">← Home</button>
             <div>
-              <div class="eyebrow">Current learning session</div>
+              <div class="eyebrow">Learn and customize</div>
               <h2 id="learnHeading">Learn New Shorashim</h2>
             </div>
-            <div class="session-status" id="sessionStatus">No active session</div>
+            <div class="session-status" id="sessionStatus">Cards save as you go</div>
           </div>
 
           <div id="startSessionPanel" class="card-panel center-panel">
@@ -1013,7 +1013,7 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
                   <h3 id="pathTitle">Your Learning Path</h3>
                   <span id="availableCount" class="pill"></span>
                 </div>
-                <p class="mini-note">Items unlock strictly in order. You may redesign learned cards from My Card Gallery; future items stay locked.</p>
+                <p class="mini-note">New items unlock strictly in order. Any learned card can always be opened here and edited; future items stay locked.</p>
                 <div id="wordList" class="word-list"></div>
               </aside>
 
@@ -1023,7 +1023,7 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
                   <span id="newBadge" class="badge hidden">NEW</span>
                 </div>
 
-                <div id="emptyEditor" class="empty-state">Start a session to receive the next item.</div>
+                <div id="emptyEditor" class="empty-state">Choose a learned card to edit, or customize the next new card.</div>
 
                 <div id="editorContent" class="hidden">
                   <div id="exampleTeachingBox" class="example-teaching hidden"></div>
@@ -1124,12 +1124,14 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
             <span>You do <b>not</b> have to flip a card if you know it. Say the Hebrew and translation aloud, then go Next. Going too fast will not count.</span>
           </div>
 
-          <div class="review-controls card-panel">
-            <p class="mini-note">Review every word you have learned.</p>
-            <button id="startReviewBtn" class="primary">Start Full Review</button>
+          <div id="reviewSetup" class="card-panel review-setup">
+            <div class="review-setup-top"><label>List view <select id="reviewSort"><option value="learned">Order learned</option><option value="alpha">Alphabetical</option><option value="manual">My custom order</option></select></label><span id="reviewSelectionCount" class="pill"></span></div>
+            <div class="button-row"><button id="selectAllReview" class="ghost small">Select all</button><button id="clearReviewSelection" class="ghost small">Clear selection</button></div>
+            <div id="reviewPicker" class="review-picker"></div>
+            <div class="review-start-row"><div><b>Review order:</b> <label><input type="radio" name="reviewOrderMode" value="order" checked> In order</label> <label><input type="radio" name="reviewOrderMode" value="shuffle"> Shuffle</label></div><button id="startReviewBtn" class="primary">Review Selected</button></div>
           </div>
 
-          <div id="reviewEmpty" class="card-panel empty-state">No learned cards yet. Finish a learning session first.</div>
+          <div id="reviewEmpty" class="card-panel empty-state">No learned cards yet. Learn your first card, then come back to review.</div>
           <div id="reviewArea" class="hidden">
             <div class="review-meta">
               <span id="reviewCounter" class="pill"></span>
@@ -1151,6 +1153,7 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
             <div class="review-nav">
               <button id="prevReviewBtn" class="ghost">← Previous</button>
               <button id="flipReviewBtn" class="primary">↑ Flip</button>
+              <button id="editReviewBtn" class="ghost">✏️ Edit Card</button>
               <button id="nextReviewBtn" class="ghost">Next →</button>
             </div>
             <div class="keyboard-hint">Keyboard: <kbd>←</kbd> previous · <kbd>↑</kbd> flip · <kbd>→</kbd> next</div>
@@ -1193,7 +1196,7 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
         <div class="teacher-summary" id="teacherSummary"></div>
         <div class="card-panel table-wrap">
           <table class="teacher-table">
-            <thead><tr><th>Student</th><th>Shorashim</th><th>Affixes</th><th>Study time</th><th>Sessions</th><th>Today's review</th><th>Last active</th></tr></thead>
+            <thead><tr><th>Student</th><th>Shorashim</th><th>Affixes</th><th>Study time</th><th>Cards</th><th>Today's review</th><th>Last active</th></tr></thead>
             <tbody id="teacherTableBody"></tbody>
           </table>
         </div>

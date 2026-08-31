@@ -67,3 +67,5 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
 .signed-in-as{white-space:nowrap}.cloud-status{font-size:.82rem;color:#5d695c;white-space:nowrap}
 .cloud-status.syncing{color:#8a6d1a}.cloud-status.error{color:#b42318}
 @media(max-width:650px){.login-card{padding:23px 18px}.signed-in-as{width:100%;text-align:right}.cloud-status{margin-left:auto}}
+
+.review-setup{display:grid;gap:12px}.review-setup-top,.review-start-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.review-picker{display:grid;gap:7px;max-height:330px;overflow:auto;border:1px solid var(--line);border-radius:14px;padding:8px}.review-pick-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:#fafafa}.review-pick-row label{display:flex;align-items:center;gap:10px;flex:1}.review-pick-row .hebrew{font-size:24px;direction:rtl}.review-pick-row span{color:var(--muted)}
