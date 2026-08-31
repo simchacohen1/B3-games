@@ -890,6 +890,11 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
   }
 </style>
 
+
+<style id="review-grid-fullscreen-fix">
+.review-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;max-height:52vh;overflow:auto;padding:6px}.review-pick-row{position:relative;border:1px solid #dbe3ef;border-radius:16px;background:#fff;padding:14px;min-height:92px;display:flex;align-items:center;cursor:default}.review-pick-row label{width:100%;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:center}.review-pick-row .hebrew{font-size:28px;direction:rtl}.review-pick-row label span{grid-column:2;color:#64748b}.review-pick-row.manual-draggable{cursor:grab;touch-action:none}.review-pick-row.manual-draggable:active{cursor:grabbing}.review-pick-row.dragging{opacity:.45;outline:3px solid #6366f1}.review-pick-row.drag-over{box-shadow:inset 0 0 0 3px #818cf8}.review-drag-hint{display:none;font-size:12px;color:#6366f1;font-weight:800;grid-column:2}.review-pick-row.manual-draggable .review-drag-hint{display:block}
+body.shorashim-review-active{overflow:hidden}body.shorashim-review-active .topbar{display:none!important}body.shorashim-review-active #reviewScreen.active{height:100vh;padding:12px;display:flex;flex-direction:column;overflow:hidden}body.shorashim-review-active #reviewScreen .section-head{flex:0 0 auto;margin:0 0 8px}body.shorashim-review-active #reviewScreen .review-rule,body.shorashim-review-active #reviewScreen #reviewSetup,body.shorashim-review-active #reviewScreen #reviewEmpty{display:none!important}body.shorashim-review-active #reviewScreen #reviewArea{display:flex!important;flex:1;min-height:0;flex-direction:column;justify-content:center}body.shorashim-review-active #reviewScreen .review-card{min-height:0;height:min(66vh,620px)}
+</style>
 </head>
 <body>
   <section id="studentSiteClosed" class="login-gate hidden">
