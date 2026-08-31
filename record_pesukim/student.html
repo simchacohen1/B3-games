@@ -566,8 +566,12 @@
     z-index: 20;
     transition: opacity 0.2s ease, background-color 0.2s ease;
   }
-  #prevPosukBtn{ left: calc(50vw - 466px); }
-  #nextPosukBtn{ right: calc(50vw - 466px); }
+  /* Anchored by their FAR edge (not the edge nearest the card) so that
+     growing wider to fit the "Prev Posuk"/"Next Posuk" text expands away
+     from the card instead of into it — with a fixed left/right value the
+     wider pill buttons were overlapping onto the learning area. */
+  #prevPosukBtn{ right: calc(50vw + 410px); left: auto; }
+  #nextPosukBtn{ left: calc(50vw + 410px); right: auto; }
   @media (max-width: 959px){
     /* On mobile, the sticky posuk box (z-index 30) scrolls up over
        anything vertically centered, so the arrows are pinned to the top
@@ -3122,12 +3126,29 @@ function renderAnsweredQuestionHistory(){
       // posuk's questions — tagging which posuk each question belongs to
       // makes that clear instead of just "question 6".
       const posukTag = (currentIsRange && q && q.posukNum) ? 'פסוק ' + hebrewNumeral(q.posukNum) + ' — ' : '';
+      // Wrong answers get the same dispute option here as the fresh result
+      // card does — a student reviewing past answers shouldn't have to
+      // scroll back up to a now-blank recording area to find it.
+      let disputeHtml = '';
+      if(!ok){
+        if(r && r.disputeStatus === 'pending'){
+          disputeHtml = '<div style="font-size:0.8rem;color:var(--ink-soft);margin-top:5px;">⚠️ Dispute pending — your teacher will review it.</div>';
+        }else if(r && r.disputeStatus === 'resolved' && r.finalVerdict){
+          disputeHtml = '<div style="font-size:0.8rem;color:var(--ink-soft);margin-top:5px;">✔️ Teacher reviewed — final: ' + (r.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</div>';
+        }else{
+          disputeHtml = '<button type="button" class="btn small ghost-delete history-dispute-btn" data-q-index="' + i + '" style="margin-top:6px;">⚠️ Dispute this answer</button>';
+        }
+      }
       return `<div style="padding:9px 11px;margin:5px 0;border-radius:12px;background:${ok?'#E4F4E4':'#F6E1E1'};border:1px solid ${ok?'#4C9A4C':'var(--rimon)'};">
         <strong>${ok?'✅':'❌'} ${posukTag}Question ${i+1}. ${q?q.question:''}</strong>
         ${r&&r.transcript?`<div style="font-size:.8rem;font-style:italic;margin-top:3px;">You said: “${r.transcript}”</div>`:''}
         ${r&&r.feedback?`<div style="font-size:.8rem;margin-top:2px;">${r.feedback}</div>`:''}
+        ${disputeHtml}
       </div>`;
     }).join('');
+  host.querySelectorAll('.history-dispute-btn').forEach(btn => {
+    btn.onclick = () => submitQuestionDispute(parseInt(btn.getAttribute('data-q-index'), 10));
+  });
 }
 function renderQuestionFinalScore(){
   const el=document.getElementById('questionFinalScore');
@@ -4096,16 +4117,24 @@ function renderQuestionResult(idx, verdict, feedback, transcript, disputeStatus,
    the computer's incorrect verdict was wrong, so there's nothing to pick —
    one tap marks it pending for the teacher to review. */
 async function submitQuestionDispute(idx){
-  const row = document.getElementById('questionDisputeRow');
-  if(row) row.innerHTML = '<span style="font-size:0.85rem;color:var(--ink-soft);">Saving…</span>';
-  if(comprehensionQResults[idx]) comprehensionQResults[idx].disputeStatus = 'pending';
+  if(!comprehensionQResults[idx]) return;
+  comprehensionQResults[idx].disputeStatus = 'pending';
+  renderAnsweredQuestionHistory();
+  if(idx === comprehensionQIndex){
+    const r = comprehensionQResults[idx];
+    renderQuestionResult(idx, r.verdict, r.feedback, r.transcript, r.disputeStatus, r.finalVerdict);
+  }
   try{
     await autosaveComprehensionQuestions();
-    if(row) row.innerHTML = '<span style="font-size:0.85rem;color:var(--ink-soft);">⚠️ Dispute sent — your teacher will review it.</span>';
   }catch(err){
     console.error(err);
-    if(comprehensionQResults[idx]) comprehensionQResults[idx].disputeStatus = null;
-    if(row) row.innerHTML = '<span style="font-size:0.85rem;color:var(--rimon);">Could not save your dispute — check your internet and try again.</span>';
+    comprehensionQResults[idx].disputeStatus = null;
+    renderAnsweredQuestionHistory();
+    if(idx === comprehensionQIndex){
+      const r = comprehensionQResults[idx];
+      renderQuestionResult(idx, r.verdict, r.feedback, r.transcript, r.disputeStatus, r.finalVerdict);
+    }
+    alert('Could not save your dispute — check your internet and try again.');
   }
 }
 
@@ -4932,13 +4961,13 @@ function showTranslationSummary(level){
         helpHtml = '<div class="translation-review-note">✔️ Teacher reviewed — final: ' +
           (r.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</div>';
       }else{
+        // No need to hide this behind a "Need help?" toggle — matches how
+        // the dispute option is shown immediately elsewhere (reading,
+        // comprehension) rather than requiring an extra tap to reveal it.
         helpHtml =
-          '<details class="translation-help">' +
-            '<summary>Need help?</summary>' +
-            '<div class="translation-help-body">' +
-              '<button type="button" class="btn small ghost-delete chunk-dispute-btn" data-chunk-index="' + i + '">⚠️ Dispute this piece</button>' +
-            '</div>' +
-          '</details>';
+          '<div class="translation-help-body">' +
+            '<button type="button" class="btn small ghost-delete chunk-dispute-btn" data-chunk-index="' + i + '">⚠️ Dispute this piece</button>' +
+          '</div>';
       }
     }
 
