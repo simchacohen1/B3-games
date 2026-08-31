@@ -238,7 +238,7 @@ function bindNavigation(){
   }));
   document.querySelectorAll('.backBtn').forEach(b=>b.onclick=()=>goScreen('studentHome'));
 }
-function goScreen(id){if(activeScreenId==='gamesScreen'&&id!=='gamesScreen')cleanupGameRuntime();if(id!=='learnScreen'&&window.__shorashimRedesignMode){window.__shorashimRedesignMode=false;window.__shorashimRedesignKey=null;window.__shorashimEditorDirty=false;selectedItemKey=null;}document.querySelectorAll('#studentView .screen').forEach(s=>s.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');activeScreenId=id;window.scrollTo(0,0);lastInteraction=Date.now();if(id==='learnScreen')renderLearningScreen();if(id==='reviewScreen'){renderReviewAvailability();renderDailyStatus();}if(id==='gamesScreen')renderGamesLock();if(id==='galleryScreen')renderGallery();}
+function goScreen(id){if(id!=='reviewScreen')document.body.classList.remove('shorashim-review-active');if(activeScreenId==='gamesScreen'&&id!=='gamesScreen')cleanupGameRuntime();if(id!=='learnScreen'&&window.__shorashimRedesignMode){window.__shorashimRedesignMode=false;window.__shorashimRedesignKey=null;window.__shorashimEditorDirty=false;selectedItemKey=null;}document.querySelectorAll('#studentView .screen').forEach(s=>s.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');activeScreenId=id;window.scrollTo(0,0);lastInteraction=Date.now();if(id==='learnScreen')renderLearningScreen();if(id==='reviewScreen'){renderReviewAvailability();renderDailyStatus();}if(id==='gamesScreen')renderGamesLock();if(id==='galleryScreen')renderGallery();}
 function bindModes(){document.getElementById('studentModeBtn').onclick=()=>showMode('student');document.getElementById('teacherModeBtn').onclick=()=>showMode('teacher');}
 function showMode(mode){const studentMode=mode==='student';document.getElementById('studentView').classList.toggle('hidden',!studentMode);document.getElementById('teacherView').classList.toggle('hidden',studentMode);document.getElementById('studentModeBtn').classList.toggle('active',studentMode);document.getElementById('teacherModeBtn').classList.toggle('active',!studentMode);if(!studentMode)renderTeacher();}
 function bindStudentDialog(){const dlg=document.getElementById('addStudentDialog');document.getElementById('addStudentBtn').onclick=()=>dlg.showModal();document.getElementById('confirmAddStudent').onclick=e=>{e.preventDefault();const inp=document.getElementById('newStudentName'),name=inp.value.trim();if(!name)return;if(!db.students[name])db.students[name]=blankStudent();currentStudent=name;inp.value='';dlg.close();saveDB();populateStudents();renderAll();};}
@@ -337,7 +337,8 @@ function ensureDailyReview(s=student()){const t=todayKey();if(s.dailyReview?.dat
 function dailyProgress(s=student()){const dr=ensureDailyReview(s),keys=eligibleLearnedCards(s).map(c=>c.itemKey),seen=keys.filter(k=>dr.seen[k]).length,complete=keys.length>0&&seen===keys.length;if(complete&&!dr.completedAt)dr.completedAt=Date.now();return {seen,total:keys.length,complete};}
 function gamesUnlocked(s=student()){return dailyProgress(s).complete;}
 function bindReview(){
-  document.getElementById('startReviewBtn').onclick=startReview;document.getElementById('flipReviewBtn').onclick=flipReview;document.getElementById('reviewFlipCard').onclick=flipReview;document.getElementById('prevReviewBtn').onclick=()=>moveReview(-1);document.getElementById('nextReviewBtn').onclick=()=>moveReview(1);document.getElementById('editReviewBtn').onclick=()=>{const c=reviewDeck[reviewIndex];if(c)openRedesignCard(c.itemKey);};
+  document.getElementById('startReviewBtn').onclick=startReview;
+  document.getElementById('chooseReviewCardsBtn').onclick=chooseDifferentReviewCards;document.getElementById('flipReviewBtn').onclick=flipReview;document.getElementById('reviewFlipCard').onclick=flipReview;document.getElementById('prevReviewBtn').onclick=()=>moveReview(-1);document.getElementById('nextReviewBtn').onclick=()=>moveReview(1);document.getElementById('editReviewBtn').onclick=()=>{const c=reviewDeck[reviewIndex];if(c)openRedesignCard(c.itemKey);};
   document.getElementById('reviewSort').onchange=renderReviewPicker;document.getElementById('selectAllReview').onclick=()=>{document.querySelectorAll('.review-pick-check').forEach(x=>x.checked=true);updateReviewSelectionCount();};document.getElementById('clearReviewSelection').onclick=()=>{document.querySelectorAll('.review-pick-check').forEach(x=>x.checked=false);updateReviewSelectionCount();};
   document.addEventListener('keydown',e=>{if(activeScreenId!=='reviewScreen'||document.getElementById('reviewArea').classList.contains('hidden')||!reviewDeck.length)return;if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;if(e.key==='ArrowRight'){e.preventDefault();moveReview(1);}else if(e.key==='ArrowLeft'){e.preventDefault();moveReview(-1);}else if(e.key==='ArrowUp'){e.preventDefault();flipReview();}});
 }
@@ -349,6 +350,19 @@ function moveManualReviewCard(key,dir){const arr=reviewSortedCards(),i=arr.findI
 function updateReviewSelectionCount(){const n=document.querySelectorAll('.review-pick-check:checked').length;document.getElementById('reviewSelectionCount').textContent=`${n} selected`;document.getElementById('startReviewBtn').disabled=!n;}
 function renderReviewAvailability(){const has=eligibleLearnedCards().length>0;document.getElementById('reviewEmpty').classList.toggle('hidden',has);document.getElementById('reviewSetup').classList.toggle('hidden',!has);if(!has)document.getElementById('reviewArea').classList.add('hidden');else renderReviewPicker();}
 function startReview(){const keys=[...document.querySelectorAll('.review-pick-check:checked')].map(x=>x.dataset.key),map=new Map(eligibleLearnedCards().map(c=>[c.itemKey,c]));let arr=keys.map(k=>map.get(k)).filter(Boolean);if(!arr.length){alert('Select at least one card to review.');return;}if(document.querySelector('input[name="reviewOrderMode"]:checked')?.value==='shuffle')arr=shuffle(arr.slice());reviewDeck=arr;reviewIndex=0;reviewFlipped=false;document.getElementById('reviewEmpty').classList.add('hidden');document.getElementById('reviewSetup').classList.add('hidden');document.body.classList.add('shorashim-review-active');document.getElementById('reviewArea').classList.remove('hidden');renderReviewCard();}
+
+
+function chooseDifferentReviewCards(){
+  document.body.classList.remove('shorashim-review-active');
+  reviewDeck=[];
+  reviewIndex=0;
+  reviewFlipped=false;
+  document.getElementById('reviewArea').classList.add('hidden');
+  document.getElementById('reviewEmpty').classList.add('hidden');
+  document.getElementById('reviewSetup').classList.remove('hidden');
+  renderReviewPicker();
+  window.scrollTo(0,0);
+}
 
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function flipReview(){if(!reviewDeck.length)return;reviewFlipped=!reviewFlipped;renderReviewCard(false);}
