@@ -110,6 +110,29 @@
   #completeScreen, #closedScreen{ display:none; text-align:center; }
   #completeScreen.show, #closedScreen.show{ display:block; }
   .confetti-row{ font-size:1.6rem; margin-bottom:6px; letter-spacing:4px; }
+  .mode-gate-section{ margin-bottom:16px; }
+  .mode-gate-section h3{ font-size:0.9rem; margin:0 0 8px; color:var(--ink-soft); font-weight:600; }
+  .continue-btn{ width:100%; margin-bottom:4px; }
+  .letter-grid{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+  .letter-pick-btn{
+    font-family:'Mekorot Rashi', serif; font-size:1.6rem;
+    border:2px solid var(--gold); border-radius:10px; background:#FFFDF7; color:var(--ink);
+    padding:10px 2px; cursor:pointer; transition:transform .08s ease, background .15s ease;
+  }
+  .letter-pick-btn:active{ transform:scale(0.95); }
+  .letter-pick-btn.selected{ background:var(--gold-light); border-color:var(--rimon); }
+  .mode-type-row{ display:flex; gap:8px; }
+  .mode-type-btn{
+    flex:1; font-family:'Quicksand', sans-serif; font-weight:600; font-size:0.82rem;
+    border:2px solid var(--gold); border-radius:10px; background:#FFFDF7; color:var(--ink-soft);
+    padding:10px 4px; cursor:pointer;
+  }
+  .mode-type-btn.selected{ background:var(--gold-light); color:var(--rimon-dark); border-color:var(--rimon); }
+  .hidden{ display:none !important; }
+  .menu-link{
+    background:none; border:none; color:var(--ink-soft); font-size:0.78rem;
+    text-decoration:underline; cursor:pointer; padding:0; font-family:'Quicksand', sans-serif;
+  }
 </style>
 </head>
 <body>
@@ -128,10 +151,34 @@
     <div id="gateMsg"></div>
   </div>
 
+  <div class="card" id="modeGate" style="display:none;">
+    <div class="mode-gate-section">
+      <button class="btn continue-btn" id="continueBtn">📚 Continue My Progress</button>
+    </div>
+    <div class="mode-gate-section">
+      <h3>Or practice one letter:</h3>
+      <div class="letter-grid" id="letterGrid"></div>
+    </div>
+    <div class="mode-gate-section hidden" id="modeTypeSection">
+      <h3>What do you want to practice?</h3>
+      <div class="mode-type-row">
+        <button class="mode-type-btn selected" data-mode="mixed">Both</button>
+        <button class="mode-type-btn" data-mode="letter">Letters Only</button>
+        <button class="mode-type-btn" data-mode="word">Words Only</button>
+      </div>
+    </div>
+    <div style="text-align:center;">
+      <button class="btn hidden" id="startPracticeBtn">Start Practicing</button>
+    </div>
+  </div>
+
   <div class="card" id="app">
     <div class="phase-row">
       <div class="unit-label" id="unitLabel"></div>
-      <div class="phase-pill" id="phasePill">Letter</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button class="menu-link" id="menuLinkBtn">⬅ Menu</button>
+        <div class="phase-pill" id="phasePill">Letter</div>
+      </div>
     </div>
     <div class="letter-box"><span id="rashiLetter"></span></div>
     <div class="prompt" id="promptText">Which letter is this?</div>
@@ -279,6 +326,9 @@ let currentTarget = null;
 let currentWord = null;
 let answering = false;
 let audioCtx = null;
+let mode = 'continue'; // 'continue' | 'practice'
+let practiceUnitId = null;
+let practiceModeType = 'mixed'; // 'letter' | 'word' | 'mixed'
 
 function slugify(name){
   return String(name).trim().toLowerCase().replace(/[^a-z0-9\u0590-\u05FF]+/g,'_').replace(/(^_|_$)/g,'');
@@ -363,8 +413,7 @@ document.getElementById('startBtn').onclick = async () => {
     studentId = result.slug;
     await loadProgress();
     document.getElementById('nameGate').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    renderQuestion();
+    showModeGate();
   }catch(e){
     console.error(e);
     msg.textContent = 'Something went wrong. Try again.';
@@ -379,6 +428,70 @@ async function loadProgress(){
   unitIndex = (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex < UNITS.length) ? savedIndex : 0;
   phase = (rec.currentPhase === 'word') ? 'word' : 'letter';
   streak = 0;
+}
+
+function renderLetterGrid(){
+  const grid = document.getElementById('letterGrid');
+  if(grid.dataset.built) return;
+  grid.dataset.built = '1';
+  UNITS.forEach(u => {
+    const b = document.createElement('button');
+    b.className = 'letter-pick-btn';
+    b.textContent = u.label;
+    b.onclick = () => selectPracticeLetter(u.id, b);
+    grid.appendChild(b);
+  });
+}
+
+function selectPracticeLetter(unitId, btnEl){
+  practiceUnitId = unitId;
+  document.querySelectorAll('.letter-pick-btn').forEach(b => b.classList.remove('selected'));
+  btnEl.classList.add('selected');
+  document.getElementById('modeTypeSection').classList.remove('hidden');
+  document.getElementById('startPracticeBtn').classList.remove('hidden');
+}
+
+function showModeGate(){
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('completeScreen').classList.remove('show');
+  document.getElementById('modeGate').style.display = 'block';
+  renderLetterGrid();
+}
+
+document.getElementById('continueBtn').onclick = () => {
+  mode = 'continue';
+  document.getElementById('modeGate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  renderQuestion();
+};
+
+document.querySelectorAll('.mode-type-btn').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.mode-type-btn').forEach(x => x.classList.remove('selected'));
+    b.classList.add('selected');
+    practiceModeType = b.dataset.mode;
+  };
+});
+
+document.getElementById('startPracticeBtn').onclick = () => {
+  if(!practiceUnitId) return;
+  mode = 'practice';
+  streak = 0;
+  phase = (practiceModeType === 'word') ? 'word' : 'letter';
+  document.getElementById('modeGate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  renderQuestion();
+};
+
+document.getElementById('menuLinkBtn').onclick = () => {
+  showModeGate();
+};
+
+function getActiveUnit(){
+  if(mode === 'practice'){
+    return UNITS.find(u => u.id === practiceUnitId) || UNITS[0];
+  }
+  return UNITS[unitIndex];
 }
 
 function pickTarget(unit){
@@ -404,12 +517,17 @@ function updateStreakStars(){
 }
 
 function renderQuestion(){
-  if(unitIndex >= UNITS.length){
+  if(mode === 'continue' && unitIndex >= UNITS.length){
     document.getElementById('app').style.display = 'none';
     document.getElementById('completeScreen').classList.add('show');
     return;
   }
-  const unit = UNITS[unitIndex];
+  if(mode === 'practice'){
+    if(practiceModeType === 'letter') phase = 'letter';
+    else if(practiceModeType === 'word') phase = 'word';
+    // 'mixed' leaves phase as-is so it can toggle naturally on streak completion
+  }
+  const unit = getActiveUnit();
   const rashiEl = document.getElementById('rashiLetter');
   const pill = document.getElementById('phasePill');
   const promptEl = document.getElementById('promptText');
@@ -433,8 +551,9 @@ function renderQuestion(){
     pill.classList.add('word');
   }
 
-  document.getElementById('unitLabel').textContent =
-    'Letter ' + (unitIndex+1) + ' of ' + UNITS.length + ' \u00b7 ' + unit.label;
+  document.getElementById('unitLabel').textContent = (mode === 'continue')
+    ? ('Letter ' + (unitIndex+1) + ' of ' + UNITS.length + ' \u00b7 ' + unit.label)
+    : ('Practicing \u00b7 ' + unit.label);
   document.getElementById('feedback').textContent = '';
   const row = document.getElementById('choicesRow');
   row.innerHTML = '';
@@ -458,8 +577,13 @@ function renderQuestion(){
       row.appendChild(b);
     });
   }
-  const phaseFrac = (phase === 'word' ? 1 : 0) + (streak/NEEDED_IN_A_ROW);
-  const pct = Math.round(((unitIndex*2 + phaseFrac) / (UNITS.length*2)) * 100);
+  let pct;
+  if(mode === 'continue'){
+    const phaseFrac = (phase === 'word' ? 1 : 0) + (streak/NEEDED_IN_A_ROW);
+    pct = Math.round(((unitIndex*2 + phaseFrac) / (UNITS.length*2)) * 100);
+  } else {
+    pct = Math.round((streak/NEEDED_IN_A_ROW) * 100);
+  }
   document.getElementById('progFill').style.width = Math.min(pct,100) + '%';
   updateStreakStars();
   answering = false;
@@ -468,7 +592,7 @@ function renderQuestion(){
 async function handleAnswer(letter, btnEl){
   if(answering) return;
   answering = true;
-  const unit = UNITS[unitIndex];
+  const unit = getActiveUnit();
   const isCorrect = (letter === currentTarget);
   const fb = document.getElementById('feedback');
   const allBtns = document.querySelectorAll('.choice-btn');
@@ -491,14 +615,21 @@ async function handleAnswer(letter, btnEl){
 
   if(streak >= NEEDED_IN_A_ROW){
     streak = 0;
-    if(phase === 'letter'){
-      phase = 'word';
-    } else {
-      phase = 'letter';
-      unitIndex += 1;
+    if(mode === 'continue'){
+      if(phase === 'letter'){
+        phase = 'word';
+      } else {
+        phase = 'letter';
+        unitIndex += 1;
+      }
+      await db.ref('rashiLetters/progress/' + studentId + '/currentUnitIndex').set(unitIndex);
+      await db.ref('rashiLetters/progress/' + studentId + '/currentPhase').set(phase);
+    } else if(practiceModeType === 'mixed'){
+      // Focused practice on one letter: alternate letter/word forever,
+      // never touching the student's saved main-progression position.
+      phase = (phase === 'letter') ? 'word' : 'letter';
     }
-    await db.ref('rashiLetters/progress/' + studentId + '/currentUnitIndex').set(unitIndex);
-    await db.ref('rashiLetters/progress/' + studentId + '/currentPhase').set(phase);
+    // Letters-only or Words-only practice just loops the same phase.
   }
   setTimeout(renderQuestion, 900);
 }
