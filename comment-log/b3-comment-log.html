@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>B3 Comment Log</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --paper:#EEF2E9;
+    --paper-line:#C9D6C2;
+    --card:#FBFAF5;
+    --ink:#1B3A4B;
+    --ink-soft:#4C6572;
+    --brass:#AD8A54;
+    --brass-dim:#D8C9A8;
+    --stamp-red:#A23B3B;
+    --stamp-green:#4B7F52;
+    --shadow: 0 1px 0 rgba(27,58,75,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    min-height:100vh;
+  }
+  .app{
+    display:flex;
+    min-height:100vh;
+  }
+  /* Spine / nav rail */
+  .spine{
+    width:220px;
+    flex-shrink:0;
+    background:var(--ink);
+    color:#EFE7D6;
+    padding:28px 0;
+    display:flex;
+    flex-direction:column;
+  }
+  .spine h1{
+    font-family:'Fraunces', serif;
+    font-style:italic;
+    font-weight:500;
+    font-size:22px;
+    margin:0 0 2px 24px;
+    color:#F4EEDF;
+  }
+  .spine .sub{
+    font-size:11px;
+    letter-spacing:0.03em;
+    color:var(--brass-dim);
+    margin:0 0 32px 24px;
+  }
+  .tab{
+    display:block;
+    width:100%;
+    text-align:left;
+    background:none;
+    border:none;
+    color:#CBD9DC;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:15px;
+    padding:12px 24px;
+    cursor:pointer;
+    position:relative;
+    border-left:3px solid transparent;
+  }
+  .tab:hover{ color:#F4EEDF; }
+  .tab.active{
+    color:#F4EEDF;
+    border-left:3px solid var(--brass);
+    background:rgba(173,138,84,0.12);
+  }
+  .spine-foot{
+    margin-top:auto;
+    padding:0 24px;
+    font-size:11px;
+    color:var(--ink-soft);
+    line-height:1.5;
+  }
+  .spine-foot button{
+    background:none;border:1px solid var(--brass-dim);color:var(--brass-dim);
+    font-size:11px; padding:5px 9px; border-radius:3px; cursor:pointer; margin-top:8px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .spine-foot button:hover{ background:rgba(173,138,84,0.15); }
+
+  /* Main */
+  main{
+    flex:1;
+    padding:40px 48px 60px;
+    max-width:1100px;
+  }
+  .page-title{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:32px;
+    margin:0 0 6px;
+  }
+  .page-sub{
+    color:var(--ink-soft);
+    font-size:14px;
+    margin:0 0 32px;
+  }
+
+  /* Stat strip */
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:1px;
+    background:var(--paper-line);
+    border:1px solid var(--paper-line);
+    margin-bottom:36px;
+  }
+  .stat{
+    background:var(--card);
+    padding:18px 20px;
+  }
+  .stat .num{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:28px;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .stat .lbl{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin-top:4px;
+  }
+  .stat.alert .num{ color:var(--stamp-red); }
+
+  section.block{
+    margin-bottom:40px;
+  }
+  h2.block-title{
+    font-family:'Fraunces', serif;
+    font-style:italic;
+    font-weight:500;
+    font-size:19px;
+    margin:0 0 14px;
+    border-bottom:1px solid var(--paper-line);
+    padding-bottom:8px;
+  }
+
+  /* trend chart */
+  .trend-wrap{
+    background:var(--card);
+    border:1px solid var(--paper-line);
+    padding:20px 20px 10px;
+  }
+  .trend-bars{
+    display:flex; align-items:flex-end; gap:4px; height:120px;
+  }
+  .trend-bar{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+  .trend-bar .fill{ width:100%; background:var(--brass); border-radius:2px 2px 0 0; min-height:2px; }
+  .trend-bar .day{ font-size:9.5px; color:var(--ink-soft); margin-top:6px; font-family:'IBM Plex Mono',monospace; }
+
+  /* attention list */
+  .attn-list{ background:var(--card); border:1px solid var(--paper-line); }
+  .attn-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:11px 18px; border-bottom:1px solid var(--paper-line); font-size:14px;
+  }
+  .attn-row:last-child{ border-bottom:none; }
+  .attn-row .since{ color:var(--stamp-red); font-family:'IBM Plex Mono', monospace; font-size:12.5px; }
+  .empty-note{ padding:16px 18px; color:var(--ink-soft); font-size:13.5px; }
+
+  /* two-pane layout for Students/Assignments */
+  .two-pane{ display:flex; gap:28px; align-items:flex-start; }
+  .pane-list{
+    width:260px; flex-shrink:0;
+    background:var(--card); border:1px solid var(--paper-line);
+    max-height:600px; overflow-y:auto;
+  }
+  .pane-search{
+    width:100%; border:none; border-bottom:1px solid var(--paper-line);
+    padding:12px 16px; font-family:'IBM Plex Sans', sans-serif; font-size:13.5px;
+    background:transparent; color:var(--ink); outline:none;
+  }
+  .pane-item{
+    padding:11px 16px; font-size:14px; cursor:pointer; border-bottom:1px solid var(--paper-line);
+    display:flex; justify-content:space-between;
+  }
+  .pane-item:last-child{ border-bottom:none; }
+  .pane-item:hover{ background:rgba(173,138,84,0.08); }
+  .pane-item.active{ background:rgba(173,138,84,0.16); font-weight:600; }
+  .pane-item .count{ color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; font-size:12px; }
+
+  .pane-detail{ flex:1; min-width:0; }
+  .detail-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
+  .detail-head h3{ font-family:'Fraunces', serif; font-weight:600; font-size:24px; margin:0; }
+  .range-btns{ display:flex; gap:6px; }
+  .range-btns button{
+    background:none; border:1px solid var(--paper-line); color:var(--ink-soft);
+    font-size:12.5px; padding:5px 11px; cursor:pointer; font-family:'IBM Plex Sans',sans-serif;
+  }
+  .range-btns button.active{ background:var(--ink); color:#F4EEDF; border-color:var(--ink); }
+
+  table.log-table{ width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--paper-line); }
+  table.log-table th{
+    text-align:left; font-size:11.5px; letter-spacing:0.02em; color:var(--ink-soft);
+    font-weight:600; padding:9px 14px; border-bottom:1px solid var(--paper-line);
+  }
+  table.log-table td{ padding:11px 14px; font-size:14px; border-bottom:1px solid var(--paper-line); vertical-align:top; }
+  table.log-table tr:last-child td{ border-bottom:none; }
+  table.log-table td.when{ font-family:'IBM Plex Mono', monospace; font-size:12.5px; color:var(--ink-soft); white-space:nowrap; }
+
+  .progress-line{ display:flex; align-items:center; gap:10px; margin-bottom:16px; font-size:13.5px; color:var(--ink-soft); }
+  .progress-bar{ flex:1; height:6px; background:var(--paper-line); position:relative; max-width:280px; }
+  .progress-bar .fill{ position:absolute; left:0; top:0; bottom:0; background:var(--stamp-green); }
+
+  .loading, .err{ padding:40px; color:var(--ink-soft); font-size:14px; }
+  .err{ color:var(--stamp-red); }
+  ::-webkit-scrollbar{ width:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--paper-line); }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <nav class="spine">
+    <h1>B3 Log</h1>
+    <p class="sub">Comment &amp; submission record</p>
+    <button class="tab active" data-view="overview">Overview</button>
+    <button class="tab" data-view="students">Students</button>
+    <button class="tab" data-view="assignments">Assignments</button>
+    <div class="spine-foot">
+      <div id="last-synced">Not yet loaded</div>
+      <button id="refresh-btn">Refresh data</button>
+    </div>
+  </nav>
+
+  <main id="main">
+    <div class="loading">Loading the ledger…</div>
+  </main>
+</div>
+
+<script>
+/* ======================= CONFIG ======================= */
+// Publish your Sheet: File > Share > Publish to web > select the "Comments" sheet > CSV > Publish.
+// Paste the resulting URL below.
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQw28wjYc8VpVtPQUylXeWJwij944FdrAEpTOEpZELxS2YKuKVMxpRBFQBf__NuYN9OdpnsQThDiqVD/pub?gid=1855984246&single=true&output=csv";
+/* ======================================================== */
+
+let RECORDS = []; // {assignment, student, comment, capturedAt (Date)}
+let currentView = "overview";
+let selectedStudent = null;
+let selectedAssignment = null;
+let studentRange = "week";
+
+const mainEl = document.getElementById('main');
+const lastSyncedEl = document.getElementById('last-synced');
+
+function parseDate(str){
+  const d = new Date(str);
+  return isNaN(d) ? null : d;
+}
+
+function loadData(){
+  mainEl.innerHTML = '<div class="loading">Loading the ledger…</div>';
+  if (CSV_URL.includes("PASTE_YOUR")){
+    mainEl.innerHTML = '<div class="err">Set CSV_URL at the top of this file to your published Sheet CSV link, then refresh.</div>';
+    return;
+  }
+  Papa.parse(CSV_URL, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results){
+      RECORDS = results.data
+        .filter(r => r.Assignment && r.Student)
+        .map(r => ({
+          assignment: r.Assignment.trim(),
+          student: r.Student.trim(),
+          comment: (r.Comment || '').trim(),
+          capturedAt: parseDate(r['Captured At'])
+        }))
+        .filter(r => r.capturedAt);
+      lastSyncedEl.textContent = "Synced " + new Date().toLocaleTimeString();
+      render();
+    },
+    error: function(err){
+      mainEl.innerHTML = '<div class="err">Could not load the sheet. Check the CSV_URL and that the sheet is published to the web.</div>';
+    }
+  });
+}
+
+function render(){
+  if (currentView === 'overview') renderOverview();
+  else if (currentView === 'students') renderStudents();
+  else if (currentView === 'assignments') renderAssignments();
+}
+
+/* ---------------- Overview ---------------- */
+function renderOverview(){
+  const students = [...new Set(RECORDS.map(r=>r.student))];
+  const assignments = [...new Set(RECORDS.map(r=>r.assignment))];
+  const now = new Date();
+  const weekAgo = new Date(now - 7*24*3600*1000);
+  const commentsThisWeek = RECORDS.filter(r => r.capturedAt >= weekAgo).length;
+
+  // last capture per student
+  const lastSeen = {};
+  RECORDS.forEach(r => {
+    if (!lastSeen[r.student] || r.capturedAt > lastSeen[r.student]) lastSeen[r.student] = r.capturedAt;
+  });
+  const needsAttention = students
+    .map(s => ({student:s, last:lastSeen[s]}))
+    .filter(x => (now - x.last) > 7*24*3600*1000)
+    .sort((a,b)=> a.last - b.last);
+
+  // trend: last 14 days, count of comments captured per day
+  const days = [];
+  for (let i=13; i>=0; i--){
+    const d = new Date(now); d.setDate(d.getDate()-i); d.setHours(0,0,0,0);
+    days.push(d);
+  }
+  const counts = days.map(d => {
+    const next = new Date(d); next.setDate(next.getDate()+1);
+    return RECORDS.filter(r => r.capturedAt >= d && r.capturedAt < next).length;
+  });
+  const maxCount = Math.max(1, ...counts);
+
+  mainEl.innerHTML = `
+    <h2 class="page-title">Overview</h2>
+    <p class="page-sub">What's been logged across every run of the capture tool.</p>
+
+    <div class="stats">
+      <div class="stat"><div class="num">${students.length}</div><div class="lbl">Students with entries</div></div>
+      <div class="stat"><div class="num">${assignments.length}</div><div class="lbl">Assignments logged</div></div>
+      <div class="stat"><div class="num">${commentsThisWeek}</div><div class="lbl">Comments captured this week</div></div>
+      <div class="stat ${needsAttention.length ? 'alert':''}"><div class="num">${needsAttention.length}</div><div class="lbl">No entry in 7+ days</div></div>
+    </div>
+
+    <section class="block">
+      <h2 class="block-title">Capture activity, last 14 days</h2>
+      <div class="trend-wrap">
+        <div class="trend-bars">
+          ${days.map((d,i)=>`
+            <div class="trend-bar">
+              <div class="fill" style="height:${(counts[i]/maxCount*90)||2}px" title="${counts[i]} on ${d.toLocaleDateString()}"></div>
+              <div class="day">${d.getMonth()+1}/${d.getDate()}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2 class="block-title">Needs attention</h2>
+      <div class="attn-list">
+        ${needsAttention.length ? needsAttention.map(x => `
+          <div class="attn-row">
+            <span>${x.student}</span>
+            <span class="since">last entry ${x.last.toLocaleDateString()}</span>
+          </div>`).join('') : '<div class="empty-note">Everyone has an entry within the last week.</div>'}
+      </div>
+    </section>
+  `;
+}
+
+/* ---------------- Students ---------------- */
+function renderStudents(){
+  const students = [...new Set(RECORDS.map(r=>r.student))].sort();
+  if (!selectedStudent && students.length) selectedStudent = students[0];
+
+  mainEl.innerHTML = `
+    <h2 class="page-title">Students</h2>
+    <p class="page-sub">Each student's comment history over time.</p>
+    <div class="two-pane">
+      <div class="pane-list">
+        <input class="pane-search" id="student-search" placeholder="Search students…">
+        <div id="student-items"></div>
+      </div>
+      <div class="pane-detail" id="student-detail"></div>
+    </div>
+  `;
+
+  const itemsEl = document.getElementById('student-items');
+  function drawList(filter=''){
+    const f = filter.toLowerCase();
+    itemsEl.innerHTML = students
+      .filter(s => s.toLowerCase().includes(f))
+      .map(s => {
+        const n = RECORDS.filter(r=>r.student===s).length;
+        return `<div class="pane-item ${s===selectedStudent?'active':''}" data-name="${s}">
+          <span>${s}</span><span class="count">${n}</span>
+        </div>`;
+      }).join('');
+    itemsEl.querySelectorAll('.pane-item').forEach(el => {
+      el.addEventListener('click', () => {
+        selectedStudent = el.dataset.name;
+        drawList(document.getElementById('student-search').value);
+        drawDetail();
+      });
+    });
+  }
+  document.getElementById('student-search').addEventListener('input', e => drawList(e.target.value));
+
+  function drawDetail(){
+    const detailEl = document.getElementById('student-detail');
+    if (!selectedStudent){ detailEl.innerHTML = '<div class="empty-note">No students yet.</div>'; return; }
+    const now = new Date();
+    const cutoffs = { week: 7, month: 30, year: 365, all: null };
+    const days = cutoffs[studentRange];
+    const cutoffDate = days ? new Date(now - days*24*3600*1000) : null;
+
+    const rows = RECORDS
+      .filter(r => r.student === selectedStudent && (!cutoffDate || r.capturedAt >= cutoffDate))
+      .sort((a,b) => b.capturedAt - a.capturedAt);
+
+    detailEl.innerHTML = `
+      <div class="detail-head">
+        <h3>${selectedStudent}</h3>
+        <div class="range-btns">
+          ${['week','month','year','all'].map(r => `<button data-range="${r}" class="${studentRange===r?'active':''}">${r[0].toUpperCase()+r.slice(1)}</button>`).join('')}
+        </div>
+      </div>
+      <table class="log-table">
+        <thead><tr><th>Assignment</th><th>Comment</th><th>Captured</th></tr></thead>
+        <tbody>
+          ${rows.length ? rows.map(r => `
+            <tr><td>${r.assignment}</td><td>${r.comment || '—'}</td><td class="when">${r.capturedAt.toLocaleString()}</td></tr>
+          `).join('') : `<tr><td colspan="3" style="color:var(--ink-soft)">No entries in this range.</td></tr>`}
+        </tbody>
+      </table>
+    `;
+    detailEl.querySelectorAll('.range-btns button').forEach(b => {
+      b.addEventListener('click', () => { studentRange = b.dataset.range; drawDetail(); });
+    });
+  }
+
+  drawList();
+  drawDetail();
+}
+
+/* ---------------- Assignments ---------------- */
+function renderAssignments(){
+  const assignments = [...new Set(RECORDS.map(r=>r.assignment))];
+  // sort by most recent activity
+  const lastActive = {};
+  RECORDS.forEach(r => { if (!lastActive[r.assignment] || r.capturedAt > lastActive[r.assignment]) lastActive[r.assignment] = r.capturedAt; });
+  assignments.sort((a,b) => lastActive[b] - lastActive[a]);
+
+  if (!selectedAssignment && assignments.length) selectedAssignment = assignments[0];
+
+  mainEl.innerHTML = `
+    <h2 class="page-title">Assignments</h2>
+    <p class="page-sub">Who's logged for each assignment, and what was said.</p>
+    <div class="two-pane">
+      <div class="pane-list">
+        <input class="pane-search" id="assign-search" placeholder="Search assignments…">
+        <div id="assign-items"></div>
+      </div>
+      <div class="pane-detail" id="assign-detail"></div>
+    </div>
+  `;
+
+  const itemsEl = document.getElementById('assign-items');
+  function drawList(filter=''){
+    const f = filter.toLowerCase();
+    itemsEl.innerHTML = assignments
+      .filter(a => a.toLowerCase().includes(f))
+      .map(a => {
+        const n = RECORDS.filter(r=>r.assignment===a).length;
+        return `<div class="pane-item ${a===selectedAssignment?'active':''}" data-name="${a}">
+          <span>${a}</span><span class="count">${n}</span>
+        </div>`;
+      }).join('');
+    itemsEl.querySelectorAll('.pane-item').forEach(el => {
+      el.addEventListener('click', () => {
+        selectedAssignment = el.dataset.name;
+        drawList(document.getElementById('assign-search').value);
+        drawDetail();
+      });
+    });
+  }
+  document.getElementById('assign-search').addEventListener('input', e => drawList(e.target.value));
+
+  function drawDetail(){
+    const detailEl = document.getElementById('assign-detail');
+    if (!selectedAssignment){ detailEl.innerHTML = '<div class="empty-note">No assignments yet.</div>'; return; }
+    const rows = RECORDS
+      .filter(r => r.assignment === selectedAssignment)
+      .sort((a,b) => a.student.localeCompare(b.student));
+    const allStudents = new Set(RECORDS.map(r=>r.student)).size;
+    const pct = allStudents ? Math.round(rows.length/allStudents*100) : 0;
+
+    detailEl.innerHTML = `
+      <div class="detail-head"><h3>${selectedAssignment}</h3></div>
+      <div class="progress-line">
+        <span>${rows.length} of ${allStudents} students seen anywhere</span>
+        <div class="progress-bar"><div class="fill" style="width:${pct}%"></div></div>
+        <span>${pct}%</span>
+      </div>
+      <table class="log-table">
+        <thead><tr><th>Student</th><th>Comment</th><th>Captured</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr><td>${r.student}</td><td>${r.comment || '—'}</td><td class="when">${r.capturedAt.toLocaleString()}</td></tr>
+          `).join('')}
+        </tbody>
+      </table>
+      <p style="font-size:12px;color:var(--ink-soft);margin-top:10px;">
+        "Seen anywhere" compares against every student who has ever appeared in the log — not your full class roster, which this tool doesn't have.
+      </p>
+    `;
+  }
+
+  drawList();
+  drawDetail();
+}
+
+/* ---------------- Nav wiring ---------------- */
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    currentView = tab.dataset.view;
+    render();
+  });
+});
+document.getElementById('refresh-btn').addEventListener('click', loadData);
+
+loadData();
+</script>
+</body>
+</html>
