@@ -13,7 +13,8 @@
       "rashi-letters": true,
       "shorashim": true,
       "class-gallery": true,
-      "game-show": true
+      "game-show": true,
+      "student-rewards": true
     }
   };
 
