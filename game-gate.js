@@ -19,6 +19,11 @@
  * determined student could still get around it), but it closes the gap
  * where a game page ignored the toggle entirely when opened directly
  * (bookmark, browser history, an already-open tab, etc.).
+ *
+ * It also keeps checking while the page stays open (a short poll, plus
+ * an immediate re-check whenever the tab regains focus), so a game that
+ * gets toggled off while a student is already on the page shuts down on
+ * its own instead of staying playable until they reload.
  */
 (function () {
   "use strict";
@@ -47,9 +52,13 @@
     if (el && el.parentNode) el.parentNode.removeChild(el);
   }
 
+  var closedOverlayEl = null;
+
   function showClosed() {
     document.documentElement.style.visibility = "visible";
     reveal();
+
+    if (closedOverlayEl) return; // already showing, nothing to do
 
     var overlay = document.createElement("div");
     overlay.setAttribute("id", "b3-gate-overlay");
@@ -64,7 +73,16 @@
       '<a href="' + backHref + '" style="background:#1f2937;color:white;padding:10px 20px;' +
       'border-radius:999px;text-decoration:none;font-weight:bold;">Back to Games</a>';
 
+    document.title = "Closed — " + document.title;
+    closedOverlayEl = overlay;
     (document.body || document.documentElement).appendChild(overlay);
+  }
+
+  function hideClosedOverlay() {
+    if (closedOverlayEl && closedOverlayEl.parentNode) {
+      closedOverlayEl.parentNode.removeChild(closedOverlayEl);
+    }
+    closedOverlayEl = null;
   }
 
   function isEnabled(settings) {
@@ -86,10 +104,13 @@
   function decide(settings) {
     if (isEnabled(settings)) {
       reveal();
+      hideClosedOverlay();
     } else {
       showClosed();
     }
   }
+
+  var hasDecidedOnce = false;
 
   function applyDecision() {
     fetch(DATABASE_URL + "/" + SETTINGS_PATH + ".json", { cache: "no-store" })
@@ -97,12 +118,31 @@
         if (!res.ok) throw new Error("gate fetch failed: " + res.status);
         return res.json();
       })
-      .then(decide)
+      .then(function (settings) {
+        hasDecidedOnce = true;
+        decide(settings);
+      })
       .catch(function (err) {
-        console.warn("game-gate.js: could not reach settings, using local fallback.", err);
-        decide(readLocalFallback());
+        console.warn("game-gate.js: could not reach settings.", err);
+        // Only fall back to the locally-cached value on the very first
+        // check (nothing to go on yet). On a later poll, a transient
+        // network blip should not suddenly lock out a student who was
+        // already confirmed open — just skip this cycle and try again
+        // on the next poll.
+        if (!hasDecidedOnce) {
+          hasDecidedOnce = true;
+          decide(readLocalFallback());
+        }
       });
   }
 
+  var POLL_INTERVAL_MS = 15000;
+
   applyDecision();
+  setInterval(applyDecision, POLL_INTERVAL_MS);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") {
+      applyDecision();
+    }
+  });
 })();
