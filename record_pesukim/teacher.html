@@ -831,9 +831,11 @@ async function markStudentsWithPendingDisputes(){
           const name = studentsMap[id];
           if(target){
             studentActiveTab = target.tab;
-            selectedPosukKey = target.posukKey;
           }
-          selectStudent(id, name, rowEl || document.createElement('div'));
+          // Pass the target posuk straight into selectStudent (instead of
+          // just setting the global here) so it survives selectStudent's
+          // own reset and actually opens the dispute, not just the grid.
+          selectStudent(id, name, rowEl || document.createElement('div'), target ? target.posukKey : null);
         };
       }else{
         badge.textContent = '';
@@ -2257,9 +2259,12 @@ function formatPracticeWindow(limit){
   return (ep&&ev) ? `Perek ${sp}, Posuk ${sv} → Perek ${ep}, Posuk ${ev}` : 'All pesukim available';
 }
 
-async function selectStudent(id, name, el){
+async function selectStudent(id, name, el, forcedPosukKey){
   activeStudentId = id;
-  selectedPosukKey = null;
+  // Normal clicks (student row, tab switch) reset to the grid view as
+  // before. A dispute-badge click passes forcedPosukKey so the detail
+  // panel opens directly on the actual dispute instead of the grid.
+  selectedPosukKey = forcedPosukKey || null;
   [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
   el.classList.add('active');
 
@@ -2346,7 +2351,15 @@ async function selectStudent(id, name, el){
     wireStudentAdminButtons(id, name);
 
     await renderStudentGrid();
-    if(selectedPosukKey) renderPosukDetail(selectedPosukKey);
+    if(selectedPosukKey){
+      renderPosukDetail(selectedPosukKey);
+      if(forcedPosukKey){
+        // Came from the sidebar dispute badge — jump straight to it
+        // instead of leaving the teacher to scroll down and find it.
+        const detailEl = document.getElementById('posukDetail');
+        if(detailEl) detailEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
   }catch(err){
     mainEl.innerHTML = '<div class="empty-msg">Could not load this student\'s recordings.</div>';
     console.error(err);
@@ -2531,6 +2544,57 @@ async function renderStudentGrid(){
   }
 }
 
+// Scans the active student's already-loaded data (no extra DB call) for
+// the next pending dispute, in perek/posuk order, skill order reading ->
+// comprehension -> translate. Powers the "Next dispute" button so the
+// teacher can chain through all of a student's disputes without hunting.
+function nextPendingDisputeTarget(){
+  const keys = sortPosukKeys(Object.keys(studentPosukData));
+  for(const posukKey of keys){
+    for(const a of studentPosukData[posukKey].attempts){
+      if(a.hebrewDisputeStatus === 'pending') return { posukKey, tab: 'reading' };
+      if(a.comprehensionDisputeStatus === 'pending') return { posukKey, tab: 'comprehension' };
+      if(Array.isArray(a.translationChunkResults) && a.translationChunkResults.some(c => c.disputeStatus === 'pending')){
+        return { posukKey, tab: 'translate' };
+      }
+    }
+  }
+  return null;
+}
+
+function countPendingDisputesForStudent(){
+  let count = 0;
+  Object.values(studentPosukData).forEach(({ attempts }) => {
+    attempts.forEach(a => {
+      if(a.hebrewDisputeStatus === 'pending') count++;
+      if(a.comprehensionDisputeStatus === 'pending') count++;
+      if(Array.isArray(a.translationChunkResults)){
+        count += a.translationChunkResults.filter(c => c.disputeStatus === 'pending').length;
+      }
+    });
+  });
+  return count;
+}
+
+// Wired onto every ".next-dispute-btn" that renderDisputeSection /
+// renderTranslationChunkDisputeSection print next to a just-resolved
+// dispute, so the teacher can jump straight to whatever's next — same
+// tab or not, same posuk or not — instead of scrolling to find it.
+function wireNextDisputeButtons(){
+  document.querySelectorAll('.next-dispute-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const target = nextPendingDisputeTarget();
+      if(!target) return;
+      studentActiveTab = target.tab;
+      selectedPosukKey = target.posukKey;
+      await renderStudentGrid();
+      renderPosukDetail(target.posukKey);
+      const detailEl = document.getElementById('posukDetail');
+      if(detailEl) detailEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+  });
+}
+
 function renderPosukDetail(posukKey){
   const detailEl = document.getElementById('posukDetail');
   if(!detailEl || !studentPosukData[posukKey]) return;
@@ -2654,6 +2718,7 @@ function renderPosukDetail(posukKey){
       }
     };
   }
+  wireNextDisputeButtons();
 
   // Only wire controls that are actually visible for the selected skill.
   relevantAttempts.forEach(a => {
@@ -2690,7 +2755,9 @@ function renderDisputeSection(a, posukKey, skill){
         </div>`;
     }
     if(a.hebrewDisputeStatus === 'resolved' && typeof a.hebrewFinalScore === 'number'){
-      return `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final score set to ${a.hebrewFinalScore}%</div>`;
+      const remaining = countPendingDisputesForStudent();
+      return `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final score set to ${a.hebrewFinalScore}%</div>` +
+        (remaining > 0 ? `<button class="btn small next-dispute-btn" style="margin-top:6px;background:var(--navy);box-shadow:0 4px 0 #0f1822;">→ Next dispute (${remaining} left)</button>` : '');
     }
     return '';
   }
@@ -2709,7 +2776,9 @@ function renderDisputeSection(a, posukKey, skill){
       </div>`;
   }
   if(a.comprehensionDisputeStatus === 'resolved' && a.comprehensionFinalVerdict){
-    return `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final grade set to ${labelMap[a.comprehensionFinalVerdict] || a.comprehensionFinalVerdict}</div>`;
+    const remaining = countPendingDisputesForStudent();
+    return `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final grade set to ${labelMap[a.comprehensionFinalVerdict] || a.comprehensionFinalVerdict}</div>` +
+      (remaining > 0 ? `<button class="btn small next-dispute-btn" style="margin-top:6px;background:var(--navy);box-shadow:0 4px 0 #0f1822;">→ Next dispute (${remaining} left)</button>` : '');
   }
   return '';
 }
@@ -2728,7 +2797,9 @@ function renderTranslationChunkDisputeSection(a, posukKey, chunkIdx, c){
       </div>`;
   }
   if(c.disputeStatus === 'resolved' && c.finalVerdict){
-    return `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final: ${c.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again'}</div>`;
+    const remaining = countPendingDisputesForStudent();
+    return `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final: ${c.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again'}</div>` +
+      (remaining > 0 ? `<button class="btn small next-dispute-btn" style="margin-top:6px;background:var(--navy);box-shadow:0 4px 0 #0f1822;">→ Next dispute (${remaining} left)</button>` : '');
   }
   return '';
 }
@@ -2750,15 +2821,18 @@ function wireFinalizeHebrew(a, posukKey){
       return;
     }
     try{
-      await attemptRef(posukKey, a.attemptId).update({
+      const updates = {
         hebrewFinalScore: finalScore,
         hebrewDisputeStatus: 'resolved',
         hebrewDisputeResolvedAt: Date.now()
-      });
-      allAttemptsCache = null; // stats need to be recomputed with the override
-      await selectStudent(activeStudentId, studentsMap[activeStudentId],
-        [...document.querySelectorAll('.student-item')].find(e => e.dataset.id === activeStudentId));
-      selectedPosukKey = posukKey;
+      };
+      await attemptRef(posukKey, a.attemptId).update(updates);
+      // Patch the already-loaded attempt in place (it's the same object
+      // referenced from studentPosukData) instead of re-fetching from the
+      // DB and rebuilding the whole student view — that's what was
+      // snapping the scroll position back to the top.
+      Object.assign(a, updates);
+      allAttemptsCache = null; // Reports/Class Stats/sidebar recompute fresh next load
       await renderStudentGrid();
       renderPosukDetail(posukKey);
       markStudentsWithPendingDisputes();
@@ -2783,15 +2857,14 @@ function wireFinalizeComprehension(a, posukKey){
   const finalize = async (finalVerdict) => {
     if(!VERDICT_INFO[finalVerdict]) return;
     try{
-      await attemptRef(posukKey, a.attemptId).update({
+      const updates = {
         comprehensionFinalVerdict: finalVerdict,
         comprehensionDisputeStatus: 'resolved',
         comprehensionDisputeResolvedAt: Date.now()
-      });
+      };
+      await attemptRef(posukKey, a.attemptId).update(updates);
+      Object.assign(a, updates);
       allAttemptsCache = null;
-      await selectStudent(activeStudentId, studentsMap[activeStudentId],
-        [...document.querySelectorAll('.student-item')].find(e => e.dataset.id === activeStudentId));
-      selectedPosukKey = posukKey;
       await renderStudentGrid();
       renderPosukDetail(posukKey);
       markStudentsWithPendingDisputes();
@@ -2813,15 +2886,14 @@ function wireFinalizeTranslationChunk(a, posukKey, chunkIdx, c){
 
   const finalize = async (finalVerdict) => {
     try{
-      await attemptRef(posukKey, a.attemptId).child('translationChunkResults').child(String(chunkIdx)).update({
+      const updates = {
         finalVerdict: finalVerdict,
         disputeStatus: 'resolved',
         disputeResolvedAt: Date.now()
-      });
+      };
+      await attemptRef(posukKey, a.attemptId).child('translationChunkResults').child(String(chunkIdx)).update(updates);
+      Object.assign(c, updates); // c is a.translationChunkResults[chunkIdx] itself
       allAttemptsCache = null;
-      await selectStudent(activeStudentId, studentsMap[activeStudentId],
-        [...document.querySelectorAll('.student-item')].find(e => e.dataset.id === activeStudentId));
-      selectedPosukKey = posukKey;
       await renderStudentGrid();
       renderPosukDetail(posukKey);
       markStudentsWithPendingDisputes();
