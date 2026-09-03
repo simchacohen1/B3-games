@@ -126,6 +126,11 @@ let quizListenerRef = null;
 let sessionListenerRef = null;
 let responseListenerRef = null;
 
+const CLASS_ROSTERS={
+  et:{label:'ET',students:['chaikin_mayer_chaim','gourarie_yossi','huebner_sholom_dovber','lapine_moshe','notik_kehos','oriechman_yisroel','raichman_moshe_tuvia','rosenfeld_avrohom','rozmarin_levi','traxler_arik','simcha_cohen']},
+  wt:{label:'WT',students:['greenberg_ari','rosenfeld_zev','schtroks_levi','simmonds_yisroel_aryeh','vogel_leibel','wolf_yisroel_arye_leib','simcha_cohen']}
+};
+
 function slugify(name) {
   return String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
 }
@@ -240,6 +245,10 @@ function questionState(i){
 }
 function responseFor(i){ return myResponses[i]||myResponses[String(i)]||null; }
 function getQuestions(){ return quizData ? asArray(quizData.questions) : []; }
+function quizAllowsStudent(){
+  const classId=quizData&&quizData.classId;
+  return !classId||classId==='all'||!CLASS_ROSTERS[classId]||CLASS_ROSTERS[classId].students.includes(myStudentId);
+}
 
 function render(){
   if(!myStudentId) return;
@@ -250,6 +259,13 @@ function render(){
   if(!activeQuizId || !quizData){ noQuiz.classList.remove('hidden'); return; }
   const questions=getQuestions();
   if(!questions.length){ noQuiz.classList.remove('hidden'); return; }
+  if(!quizAllowsStudent()){
+    const className=(CLASS_ROSTERS[quizData.classId]||{}).label||'another class';
+    wait.classList.remove('hidden');
+    document.getElementById('waitingTitle').textContent='This quiz is for '+className;
+    document.getElementById('waitingText').textContent='Please wait for your class quiz.';
+    return;
+  }
   const started=!!(sessionData&&sessionData.started);
   if(!started){
     wait.classList.remove('hidden');
