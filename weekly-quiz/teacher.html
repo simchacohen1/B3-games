@@ -162,6 +162,12 @@
         <h2 style="margin-top:0">Quiz Editor</h2>
         <label style="font-weight:700">Quiz title</label>
         <input type="text" id="editorTitle" style="width:100%;margin:5px 0 10px" placeholder="Example: Vayeira 18:1–8 Comprehension">
+        <label style="font-weight:700">Class</label>
+        <select id="editorClass" style="margin:5px 0 10px">
+          <option value="all">All B3 students</option>
+          <option value="et">ET</option>
+          <option value="wt">WT</option>
+        </select>
         <div class="paste-help">
           Fastest weekly setup: paste from Google Sheets/Excel with 6 columns:<br>
           <b>Question | Choice A | Choice B | Choice C | Choice D | Correct</b><br>
@@ -223,6 +229,11 @@ const db=firebase.database();
 let roster={}; let quizzes={}; let activeQuizId=''; let currentQuizId=''; let quizData=null; let sessionData={}; let responses={}; let currentQ=0; let editorQuestions=[];
 let activeQuizRef=null,sessionRef=null,responseRef=null;
 
+const CLASS_ROSTERS={
+  et:{label:'ET',students:['chaikin_mayer_chaim','gourarie_yossi','huebner_sholom_dovber','lapine_moshe','notik_kehos','oriechman_yisroel','raichman_moshe_tuvia','rosenfeld_avrohom','rozmarin_levi','traxler_arik','simcha_cohen']},
+  wt:{label:'WT',students:['greenberg_ari','rosenfeld_zev','schtroks_levi','simmonds_yisroel_aryeh','vogel_leibel','wolf_yisroel_arye_leib','simcha_cohen']}
+};
+
 function asArray(v){ if(!v)return[]; if(Array.isArray(v))return v; return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]); }
 function slugTitle(s){ return String(s||'quiz').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,35)||'quiz'; }
 function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -254,7 +265,8 @@ function attachActive(id){
 
 function renderLive(){
   const qs=currentQuestions();
-  document.getElementById('liveQuizTitle').textContent=quizData?(quizData.title||'Untitled quiz'):'No active quiz';
+  const classLabel=quizData&&quizData.classId&&quizData.classId!=='all'?(CLASS_ROSTERS[quizData.classId]||{}).label:'';
+  document.getElementById('liveQuizTitle').textContent=quizData?(quizData.title||'Untitled quiz')+(classLabel?' • '+classLabel:''):'No active quiz';
   document.getElementById('liveStatus').textContent=sessionData.started?'Live':'Not started';
   document.getElementById('liveStatus').classList.toggle('live',!!sessionData.started);
   document.getElementById('modeSelect').value=sessionData.mode||'paced';
@@ -299,7 +311,9 @@ async function resetResponses(){
 }
 
 function rosterRows(){
-  return Object.keys(roster).map(id=>({id,name:(roster[id]&&roster[id].name)||id})).sort((a,b)=>a.name.localeCompare(b.name));
+  const classId=quizData&&quizData.classId;
+  const allowed=CLASS_ROSTERS[classId]&&CLASS_ROSTERS[classId].students;
+  return Object.keys(roster).filter(id=>!allowed||allowed.includes(id)).map(id=>({id,name:(roster[id]&&roster[id].name)||id})).sort((a,b)=>a.name.localeCompare(b.name));
 }
 function renderLiveGrid(){
   const table=document.getElementById('liveGrid'); if(!table)return; const qs=currentQuestions(); const students=rosterRows();
@@ -323,10 +337,10 @@ function inspectCell(studentId,i){
 function renderQuizList(){
   const box=document.getElementById('quizList'); if(!box)return; box.innerHTML=''; const ids=Object.keys(quizzes).sort((a,b)=>((quizzes[b].createdAt||0)-(quizzes[a].createdAt||0)));
   if(!ids.length){box.innerHTML='<div class="small">No quizzes yet. Click + New.</div>';return;}
-  ids.forEach(id=>{const q=quizzes[id]||{};const div=document.createElement('div');div.className='quiz-item'+(id===activeQuizId?' active':'');div.innerHTML='<div class="quiz-item-title">'+esc(q.title||'Untitled')+'</div><div class="small">'+asArray(q.questions).length+' questions'+(id===activeQuizId?' • ACTIVE':'')+'</div>';div.onclick=()=>loadQuizEditor(id);box.appendChild(div);});
+  ids.forEach(id=>{const q=quizzes[id]||{};const classLabel=q.classId&&q.classId!=='all'?((CLASS_ROSTERS[q.classId]||{}).label||q.classId):'All B3';const div=document.createElement('div');div.className='quiz-item'+(id===activeQuizId?' active':'');div.innerHTML='<div class="quiz-item-title">'+esc(q.title||'Untitled')+'</div><div class="small">'+esc(classLabel)+' • '+asArray(q.questions).length+' questions'+(id===activeQuizId?' • ACTIVE':'')+'</div>';div.onclick=()=>loadQuizEditor(id);box.appendChild(div);});
 }
-function newQuizDraft(){currentQuizId='';document.getElementById('editorTitle').value='';editorQuestions=[];renderEditorRows();document.getElementById('deleteQuizBtn').disabled=true;setupMsg('New quiz draft.');}
-function loadQuizEditor(id){currentQuizId=id;const q=quizzes[id]||{};document.getElementById('editorTitle').value=q.title||'';editorQuestions=asArray(q.questions).map(x=>({q:x.q||'',choices:asArray(x.choices),correctIndex:Number(x.correctIndex)||0}));renderEditorRows();document.getElementById('deleteQuizBtn').disabled=false;setupMsg(id===activeQuizId?'This is the active quiz.':'Loaded saved quiz.');}
+function newQuizDraft(){currentQuizId='';document.getElementById('editorTitle').value='';document.getElementById('editorClass').value='all';editorQuestions=[];renderEditorRows();document.getElementById('deleteQuizBtn').disabled=true;setupMsg('New quiz draft.');}
+function loadQuizEditor(id){currentQuizId=id;const q=quizzes[id]||{};document.getElementById('editorTitle').value=q.title||'';document.getElementById('editorClass').value=CLASS_ROSTERS[q.classId]?q.classId:'all';editorQuestions=asArray(q.questions).map(x=>({q:x.q||'',choices:asArray(x.choices),correctIndex:Number(x.correctIndex)||0}));renderEditorRows();document.getElementById('deleteQuizBtn').disabled=false;setupMsg(id===activeQuizId?'This is the active quiz.':'Loaded saved quiz.');}
 function addEditorRow(data){editorQuestions.push(data||{q:'',choices:['','','',''],correctIndex:0});renderEditorRows();}
 function renderEditorRows(){
   const box=document.getElementById('editorRows');box.innerHTML='';editorQuestions.forEach((r,i)=>{
@@ -349,9 +363,9 @@ function cleanedEditorQuestions(){
   return editorQuestions.map(r=>{const choices=r.choices.map(x=>String(x||'').trim()).filter(Boolean);let ci=Number(r.correctIndex)||0;if(ci>=choices.length)ci=0;return{q:String(r.q||'').trim(),choices,correctIndex:ci};}).filter(r=>r.q&&r.choices.length>=2);
 }
 async function saveQuiz(makeActive=false){
-  const title=document.getElementById('editorTitle').value.trim(); const questions=cleanedEditorQuestions(); if(!title){alert('Give the quiz a title.');return null;} if(!questions.length){alert('Add at least one question with at least two choices.');return null;}
+  const title=document.getElementById('editorTitle').value.trim(); const classId=document.getElementById('editorClass').value; const questions=cleanedEditorQuestions(); if(!title){alert('Give the quiz a title.');return null;} if(!questions.length){alert('Add at least one question with at least two choices.');return null;}
   let id=currentQuizId; if(!id) id=Date.now()+'_'+slugTitle(title); const existing=quizzes[id]||{};
-  await db.ref('b3Quiz/quizzes/'+id).set({title,questions,createdAt:existing.createdAt||firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP}); currentQuizId=id;
+  await db.ref('b3Quiz/quizzes/'+id).set({title,classId,questions,createdAt:existing.createdAt||firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP}); currentQuizId=id;
   if(makeActive){await db.ref('b3Quiz/settings/activeQuizId').set(id); const state={started:false,mode:'paced',activeQuestion:0,questionStates:{}};questions.forEach((_,i)=>{state.questionStates[i]={open:i===0,reveal:false};});await db.ref('b3Quiz/sessions/'+id).set(state);}
   setupMsg(makeActive?'Saved and made active.':'Saved.');document.getElementById('deleteQuizBtn').disabled=false;return id;
 }
