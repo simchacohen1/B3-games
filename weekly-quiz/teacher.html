@@ -230,8 +230,8 @@ let roster={}; let quizzes={}; let activeQuizId=''; let currentQuizId=''; let qu
 let activeQuizRef=null,sessionRef=null,responseRef=null;
 
 const CLASS_ROSTERS={
-  et:{label:'ET',students:['chaikin_mayer_chaim','gourarie_yossi','huebner_sholom_dovber','lapine_moshe','notik_kehos','oriechman_yisroel','raichman_moshe_tuvia','rosenfeld_avrohom','rozmarin_levi','traxler_arik','simcha_cohen']},
-  wt:{label:'WT',students:['greenberg_ari','rosenfeld_zev','schtroks_levi','simmonds_yisroel_aryeh','vogel_leibel','wolf_yisroel_arye_leib','simcha_cohen']}
+  et:{label:'ET',students:['chaim_chaikin','yossi_gourarie','sholom_huebner','moshe_lapine','kehos_notik','yisroel_oirechman','moshe_raichman','avrohom_rosenfeld','levi_rozmarin','arik_traxler','simcha_cohen']},
+  wt:{label:'WT',students:['ari_greenberg','zev_rosenfeld','levi_schtroks','yisroel_aryeh_simmonds','leibel_vogel','leib_wolf','simcha_cohen']}
 };
 
 function asArray(v){ if(!v)return[]; if(Array.isArray(v))return v; return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]); }
