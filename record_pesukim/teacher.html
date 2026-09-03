@@ -2697,8 +2697,15 @@ function renderPosukDetail(posukKey){
           compCardHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + a.comprehensionTranscript + '"</span>';
         }
         lines += `<div class="comp-result ${cVerdict || ''}">${compCardHtml}</div>`;
-        lines += renderDisputeSection(a, posukKey, 'comprehension');
       }
+
+      // comprehensionDisputeStatus is a whole-attempt flag — the student is
+      // disputing the overall comprehension grade for this posuk, whether
+      // that grade came from the detail questions above or the legacy
+      // freehand explanation. Render it once per attempt here so a dispute
+      // on a detail-question attempt (no comprehensionAudioURL) still shows
+      // its banner and finalize controls instead of silently vanishing.
+      lines += renderDisputeSection(a, posukKey, 'comprehension');
     }
 
     html += `<div class="attempt-row">${lines}</div>`;
