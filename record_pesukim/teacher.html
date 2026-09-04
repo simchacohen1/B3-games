@@ -2610,7 +2610,11 @@ function renderPosukDetail(posukKey){
   // multiple skills, but the teacher detail view should never mix them.
   const relevantAttempts = attempts.filter(a => {
     if(studentActiveTab === 'reading'){
-      return !!a.hebrewAudioURL || typeof effHebrewScore(a) === 'number';
+      // A pending/resolved hebrew dispute must always surface here even if
+      // this attempt is missing hebrewAudioURL/hebrewScore — otherwise a
+      // disputed attempt with thin data silently disappears from every tab
+      // with no way for the teacher to ever find or resolve it.
+      return !!a.hebrewAudioURL || typeof effHebrewScore(a) === 'number' || !!a.hebrewDisputeStatus;
     }
     if(studentActiveTab === 'translate'){
       return Array.isArray(a.translationChunkResults) && a.translationChunkResults.length > 0;
@@ -2758,7 +2762,7 @@ function renderDisputeSection(a, posukKey, skill){
           <span>%</span>
           <button class="btn" id="finalizeHebrewAcceptBtn_${a.attemptId}">Accept student's number</button>
           <button class="btn gold" id="finalizeHebrewSaveBtn_${a.attemptId}">Save final score</button>
-          <button class="btn small" style="background:var(--ink-soft);box-shadow:none;" id="finalizeHebrewKeepBtn_${a.attemptId}">Keep original (${a.hebrewScore}%)</button>
+          <button class="btn small" style="background:var(--ink-soft);box-shadow:none;" id="finalizeHebrewKeepBtn_${a.attemptId}">Keep original (${typeof a.hebrewScore === 'number' ? a.hebrewScore + '%' : 'no score recorded'})</button>
         </div>`;
     }
     if(a.hebrewDisputeStatus === 'resolved' && typeof a.hebrewFinalScore === 'number'){
