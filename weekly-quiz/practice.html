@@ -71,6 +71,12 @@ button:hover:not(:disabled){transform:translateY(-2px)}
 .score{font-size:54px;font-weight:900;color:#4e3eb8}
 .result-msg{font-size:22px;font-weight:900;margin:8px 0 18px}
 .footer-note{text-align:center;color:#6a7d90;font-size:12px;margin-top:20px}
+
+.listen-btn{background:#fff1a8;color:#5b4a00;border:2px solid #e7ca50;border-radius:999px;padding:8px 12px;font-size:17px;box-shadow:none}
+.listen-line{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
+.answer-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.answer-audio{min-width:50px;padding:12px 10px;background:#fff1a8;color:#5b4a00;border:2px solid #e7ca50;border-radius:12px;font-size:20px;box-shadow:none}
+.audio-tip{background:#fff8d2;border:2px dashed #e2c64d;border-radius:14px;padding:10px 12px;text-align:center;font-weight:900;margin-bottom:14px}
 @media(max-width:600px){h1{font-size:27px}.card{padding:16px;border-radius:19px}.question{font-size:24px}.type-grid{grid-template-columns:1fr 1fr}}
 </style>
 </head>
@@ -95,7 +101,7 @@ button:hover:not(:disabled){transform:translateY(-2px)}
 
     <div id="builder">
       <div class="card">
-        <div class="step-title"><span class="step-bubble">1</span> Pick your Pesukim</div>
+        <div class="step-title"><span class="step-bubble">1</span> Pick your Pesukim <button class="listen-btn" type="button" onclick="speakStudentText('Pick the pesukim you want to practice.')">🔊</button></div>
         <div class="selection-note" id="posukCount">No pesukim selected yet.</div>
         <div id="posukGrid" class="posuk-grid"></div>
         <div class="quick-row">
@@ -107,7 +113,7 @@ button:hover:not(:disabled){transform:translateY(-2px)}
       </div>
 
       <div class="card">
-        <div class="step-title"><span class="step-bubble">2</span> What do you want to practice?</div>
+        <div class="step-title"><span class="step-bubble">2</span> What do you want to practice? <button class="listen-btn" type="button" onclick="speakStudentText('What do you want to practice? Shoreshim, words and phrases, comprehension, or mixed.')">🔊</button></div>
         <div class="type-grid">
           <div class="type-card selected" data-type="shorashim" onclick="pickType('shorashim')"><div class="type-icon">🌳</div><div class="type-name">Shoreshim</div></div>
           <div class="type-card" data-type="translation" onclick="pickType('translation')"><div class="type-icon">🧩</div><div class="type-name">Words & Phrases</div></div>
@@ -117,7 +123,7 @@ button:hover:not(:disabled){transform:translateY(-2px)}
       </div>
 
       <div class="card">
-        <div class="step-title"><span class="step-bubble">3</span> How many questions?</div>
+        <div class="step-title"><span class="step-bubble">3</span> How many questions? <button class="listen-btn" type="button" onclick="speakStudentText('How many questions do you want? Five, ten, or fifteen.')">🔊</button></div>
         <div class="choice-row">
           <button class="count-btn selected" data-count="5" onclick="pickCount(5)">5 Questions</button>
           <button class="count-btn" data-count="10" onclick="pickCount(10)">10 Questions</button>
@@ -133,7 +139,7 @@ button:hover:not(:disabled){transform:translateY(-2px)}
     <div id="quizCard" class="card hidden">
       <div class="quiz-head"><div class="pill" id="quizTypePill"></div><div class="pill" id="qNum"></div></div>
       <div class="progressbar"><div class="progressfill" id="progressFill"></div></div>
-      <div class="question" id="question" dir="auto"></div>
+      <div class="listen-line"><button id="questionListenBtn" class="listen-btn" type="button">🔊 Hear question</button></div><div class="question" id="question" dir="auto"></div>
       <div class="answers" id="answers"></div>
       <div id="feedback" class="feedback">Choose your answer.</div>
       <button id="checkBtn" class="primary big-btn" style="width:100%;margin-top:14px" onclick="checkAnswer()" disabled>Check My Answer</button>
@@ -143,7 +149,7 @@ button:hover:not(:disabled){transform:translateY(-2px)}
     <div id="resultCard" class="card result hidden">
       <div class="stars" id="stars">⭐⭐⭐</div>
       <div class="score" id="score"></div>
-      <div class="result-msg" id="resultMsg"></div>
+      <div class="result-msg" id="resultMsg"></div><button class="listen-btn" type="button" onclick="speakStudentText(document.getElementById('resultMsg').textContent)">🔊 Hear my result</button>
       <button class="green big-btn" onclick="sameAgain()">🔁 Practice These Pesukim Again</button>
       <button class="primary big-btn" style="margin-top:10px" onclick="backToBuilder()">🎨 Build a Different Quiz</button>
     </div>
@@ -163,6 +169,44 @@ const firebaseConfig={
   appId:"1:568530046190:web:fd765fdd27e55a3c73f7ff"
 };
 firebase.initializeApp(firebaseConfig);const db=firebase.database();
+
+const SYNTHESIZE_SPEECH_URL='https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech';
+const ttsAudioCache=new Map();
+let ttsAudioEl=null;
+
+async function speakStudentText(text){
+  if(!text)return;
+  try{
+    if(!ttsAudioEl)ttsAudioEl=new Audio();
+    ttsAudioEl.pause();
+
+    let audioUrl=ttsAudioCache.get(text);
+    if(!audioUrl){
+      const res=await fetch(SYNTHESIZE_SPEECH_URL,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({text:String(text)})
+      });
+      if(!res.ok)throw new Error('Speech request failed');
+      const data=await res.json();
+      if(!data.audioContent)throw new Error('No audio returned');
+
+      const bytes=atob(data.audioContent);
+      const nums=new Uint8Array(bytes.length);
+      for(let i=0;i<bytes.length;i++)nums[i]=bytes.charCodeAt(i);
+      const blob=new Blob([nums],{type:'audio/mp3'});
+      audioUrl=URL.createObjectURL(blob);
+      ttsAudioCache.set(text,audioUrl);
+    }
+
+    ttsAudioEl.src=audioUrl;
+    await ttsAudioEl.play();
+  }catch(e){
+    console.error('Natural voice playback failed:',e);
+    alert('The voice could not play right now. Please try the speaker again.');
+  }
+}
+
 const PESUKIM={"1": {"he": "וַיֵּרָא אֵלָיו יְהוָה, בְּאֵלֹנֵי מַמְרֵא; וְהוּא יֹשֵׁב פֶּתַח-הָאֹהֶל, כְּחֹם הַיּוֹם.", "en": "And the LORD appeared unto him by the terebinths of Mamre, as he sat in the tent door in the heat of the day."}, "2": {"he": "וַיִּשָּׂא עֵינָיו, וַיַּרְא, וְהִנֵּה שְׁלֹשָׁה אֲנָשִׁים, נִצָּבִים עָלָיו; וַיַּרְא, וַיָּרָץ לִקְרָאתָם מִפֶּתַח הָאֹהֶל, וַיִּשְׁתַּחוּ, אָרְצָה.", "en": "He lifted up his eyes and saw three men standing opposite him; he ran from the tent door to meet them and bowed to the earth."}, "3": {"he": "וַיֹּאמַר: אֲדֹנָי, אִם-נָא מָצָאתִי חֵן בְּעֵינֶיךָ--אַל-נָא תַעֲבֹר, מֵעַל עַבְדֶּךָ.", "en": "He said: My lord, if I have found favor in your sight, please do not pass by your servant."}, "4": {"he": "יֻקַּח-נָא מְעַט-מַיִם, וְרַחֲצוּ רַגְלֵיכֶם; וְהִשָּׁעֲנוּ, תַּחַת הָעֵץ.", "en": "Let a little water be brought; wash your feet and rest under the tree."}, "5": {"he": "וְאֶקְחָה פַת-לֶחֶם וְסַעֲדוּ לִבְּכֶם, אַחַר תַּעֲבֹרוּ--כִּי-עַל-כֵּן עֲבַרְתֶּם, עַל-עַבְדְּכֶם; וַיֹּאמְרוּ, כֵּן תַּעֲשֶׂה כַּאֲשֶׁר דִּבַּרְתָּ.", "en": "I will bring bread so you can strengthen yourselves; afterward you may continue. They said: Do as you have said."}, "6": {"he": "וַיְמַהֵר אַבְרָהָם הָאֹהֱלָה, אֶל-שָׂרָה; וַיֹּאמֶר, מַהֲרִי שְׁלֹשׁ סְאִים קֶמַח סֹלֶת--לוּשִׁי, וַעֲשִׂי עֻגוֹת.", "en": "Avrohom hurried to the tent to Sarah and told her to quickly prepare three measures of fine flour, knead it, and make cakes."}, "7": {"he": "וְאֶל-הַבָּקָר, רָץ אַבְרָהָם; וַיִּקַּח בֶּן-בָּקָר רַךְ וָטוֹב, וַיִּתֵּן אֶל-הַנַּעַר, וַיְמַהֵר, לַעֲשׂוֹת אֹתוֹ.", "en": "Avrohom ran to the herd, took a tender and good calf, gave it to the servant, and he hurried to prepare it."}, "8": {"he": "וַיִּקַּח חֶמְאָה וְחָלָב, וּבֶן-הַבָּקָר אֲשֶׁר עָשָׂה, וַיִּתֵּן, לִפְנֵיהֶם; וְהוּא-עֹמֵד עֲלֵיהֶם תַּחַת הָעֵץ, וַיֹּאכֵלוּ.", "en": "He took curd, milk, and the prepared calf and placed them before the guests; he stood near them under the tree while they ate."}, "9": {"he": "וַיֹּאמְרוּ אֵלָיו, אַיֵּה שָׂרָה אִשְׁתֶּךָ; וַיֹּאמֶר, הִנֵּה בָאֹהֶל.", "en": "They asked him: Where is Sarah your wife? He said: She is in the tent."}, "10": {"he": "וַיֹּאמֶר, שׁוֹב אָשׁוּב אֵלֶיךָ כָּעֵת חַיָּה, וְהִנֵּה-בֵן, לְשָׂרָה אִשְׁתֶּךָ; וְשָׂרָה שֹׁמַעַת פֶּתַח הָאֹהֶל, וְהוּא אַחֲרָיו.", "en": "He said: I will surely return to you at this time, and Sarah your wife will have a son. Sarah was listening at the tent entrance."}, "11": {"he": "וְאַבְרָהָם וְשָׂרָה זְקֵנִים, בָּאִים בַּיָּמִים; חָדַל לִהְיוֹת לְשָׂרָה, אֹרַח כַּנָּשִׁים.", "en": "Avrohom and Sarah were old and advanced in years."}, "12": {"he": "וַתִּצְחַק שָׂרָה, בְּקִרְבָּהּ לֵאמֹר: אַחֲרֵי בְלֹתִי הָיְתָה-לִּי עֶדְנָה, וַאדֹנִי זָקֵן.", "en": "Sarah laughed within herself and spoke about being old, and that her husband was old."}, "13": {"he": "וַיֹּאמֶר יְהוָה, אֶל-אַבְרָהָם: לָמָּה זֶּה צָחֲקָה שָׂרָה לֵאמֹר, הַאַף אֻמְנָם אֵלֵד--וַאֲנִי זָקַנְתִּי.", "en": "Hashem said to Avrohom: Why did Sarah laugh and say, Shall I really give birth when I am old?"}, "14": {"he": "הֲיִפָּלֵא מֵיְהוָה, דָּבָר; לַמּוֹעֵד אָשׁוּב אֵלֶיךָ, כָּעֵת חַיָּה--וּלְשָׂרָה בֵן.", "en": "Is anything too hard for Hashem? At the appointed time I will return to you, and Sarah will have a son."}, "15": {"he": "וַתְּכַחֵשׁ שָׂרָה לֵאמֹר לֹא צָחַקְתִּי, כִּי יָרֵאָה; וַיֹּאמֶר לֹא, כִּי צָחָקְתְּ.", "en": "Sarah denied it and said she had not laughed because she was afraid. He said: No, you did laugh."}, "16": {"he": "וַיָּקֻמוּ מִשָּׁם הָאֲנָשִׁים, וַיַּשְׁקִפוּ עַל-פְּנֵי סְדֹם; וְאַבְרָהָם--הֹלֵךְ עִמָּם, לְשַׁלְּחָם.", "en": "The men rose from there and looked toward Sedom; Avrohom went with them to send them on their way."}, "17": {"he": "וַיהוָה, אָמָר: הַמְכַסֶּה אֲנִי מֵאַבְרָהָם, אֲשֶׁר אֲנִי עֹשֶׂה.", "en": "Hashem said: Shall I hide from Avrohom what I am doing?"}, "18": {"he": "וְאַבְרָהָם--הָיוֹ יִהְיֶה לְגוֹי גָּדוֹל, וְעָצוּם; וְנִבְרְכוּ-בוֹ--כֹּל, גּוֹיֵי הָאָרֶץ.", "en": "Avrohom will surely become a great and mighty nation, and all the nations of the earth will be blessed through him."}, "19": {"he": "כִּי יְדַעְתִּיו, לְמַעַן אֲשֶׁר יְצַוֶּה אֶת-בָּנָיו וְאֶת-בֵּיתוֹ אַחֲרָיו, וְשָׁמְרוּ דֶּרֶךְ יְהוָה, לַעֲשׂוֹת צְדָקָה וּמִשְׁפָּט--לְמַעַן, הָבִיא יְהוָה עַל-אַבְרָהָם, אֵת אֲשֶׁר-דִּבֶּר, עָלָיו.", "en": "Hashem knows Avrohom so that he will command his children and household to keep Hashem's way by doing righteousness and justice."}, "20": {"he": "וַיֹּאמֶר יְהוָה, זַעֲקַת סְדֹם וַעֲמֹרָה כִּי-רָבָּה; וְחַטָּאתָם--כִּי כָבְדָה, מְאֹד.", "en": "Hashem said that the cry of Sedom and Amorah was great and their sin was very serious."}, "21": {"he": "אֵרְדָה-נָּא וְאֶרְאֶה, הַכְּצַעֲקָתָהּ הַבָּאָה אֵלַי עָשׂוּ כָּלָה; וְאִם-לֹא, אֵדָעָה.", "en": "Hashem said He would go down and see whether they had acted according to the cry that had come before Him."}, "22": {"he": "וַיִּפְנוּ מִשָּׁם הָאֲנָשִׁים, וַיֵּלְכוּ סְדֹמָה; וְאַבְרָהָם--עוֹדֶנּוּ עֹמֵד, לִפְנֵי יְהוָה.", "en": "The men turned from there and went toward Sedom, while Avrohom remained standing before Hashem."}, "23": {"he": "וַיִּגַּשׁ אַבְרָהָם, וַיֹּאמַר: הַאַף תִּסְפֶּה, צַדִּיק עִם-רָשָׁע.", "en": "Avrohom came near and asked whether the righteous would be swept away together with the wicked."}, "24": {"he": "אוּלַי יֵשׁ חֲמִשִּׁים צַדִּיקִם, בְּתוֹךְ הָעִיר; הַאַף תִּסְפֶּה וְלֹא-תִשָּׂא לַמָּקוֹם, לְמַעַן חֲמִשִּׁים הַצַּדִּיקִם אֲשֶׁר בְּקִרְבָּהּ.", "en": "Avrohom asked: Perhaps there are fifty righteous people in the city; will You not forgive the place for their sake?"}, "25": {"he": "חָלִלָה לְּךָ מֵעֲשֹׂת כַּדָּבָר הַזֶּה, לְהָמִית צַדִּיק עִם-רָשָׁע, וְהָיָה כַצַּדִּיק, כָּרָשָׁע; חָלִלָה לָּךְ--הֲשֹׁפֵט כָּל-הָאָרֶץ, לֹא יַעֲשֶׂה מִשְׁפָּט.", "en": "Avrohom said it would be wrong to kill the righteous together with the wicked, and asked whether the Judge of all the earth would not do justice."}, "26": {"he": "וַיֹּאמֶר יְהוָה, אִם-אֶמְצָא בִסְדֹם חֲמִשִּׁים צַדִּיקִם בְּתוֹךְ הָעִיר--וְנָשָׂאתִי לְכָל-הַמָּקוֹם, בַּעֲבוּרָם.", "en": "Hashem said that if He found fifty righteous people in Sedom, He would forgive the whole place for their sake."}, "27": {"he": "וַיַּעַן אַבְרָהָם, וַיֹּאמַר: הִנֵּה-נָא הוֹאַלְתִּי לְדַבֵּר אֶל-אֲדֹנָי, וְאָנֹכִי עָפָר וָאֵפֶר.", "en": "Avrohom answered that he had dared to speak before Hashem even though he was dust and ashes."}, "28": {"he": "אוּלַי יַחְסְרוּן חֲמִשִּׁים הַצַּדִּיקִם, חֲמִשָּׁה--הֲתַשְׁחִית בַּחֲמִשָּׁה, אֶת-כָּל-הָעִיר; וַיֹּאמֶר, לֹא אַשְׁחִית, אִם-אֶמְצָא שָׁם, אַרְבָּעִים וַחֲמִשָּׁה.", "en": "Avrohom asked about forty-five righteous people. Hashem said He would not destroy the city if He found forty-five."}, "29": {"he": "וַיֹּסֶף עוֹד לְדַבֵּר אֵלָיו, וַיֹּאמַר, אוּלַי יִמָּצְאוּן שָׁם, אַרְבָּעִים; וַיֹּאמֶר לֹא אֶעֱשֶׂה, בַּעֲבוּר הָאַרְבָּעִים.", "en": "Avrohom asked about forty righteous people. Hashem said He would not do it for the sake of the forty."}, "30": {"he": "וַיֹּאמֶר אַל-נָא יִחַר לַאדֹנָי, וַאֲדַבֵּרָה--אוּלַי יִמָּצְאוּן שָׁם, שְׁלֹשִׁים; וַיֹּאמֶר לֹא אֶעֱשֶׂה, אִם-אֶמְצָא שָׁם שְׁלֹשִׁים.", "en": "Avrohom asked about thirty righteous people. Hashem said He would not do it if He found thirty."}, "31": {"he": "וַיֹּאמֶר, הִנֵּה-נָא הוֹאַלְתִּי לְדַבֵּר אֶל-אֲדֹנָי--אוּלַי יִמָּצְאוּן שָׁם, עֶשְׂרִים; וַיֹּאמֶר לֹא אַשְׁחִית, בַּעֲבוּר הָעֶשְׂרִים.", "en": "Avrohom asked about twenty righteous people. Hashem said He would not destroy the city for the sake of twenty."}, "32": {"he": "וַיֹּאמֶר אַל-נָא יִחַר לַאדֹנָי, וַאֲדַבְּרָה אַךְ-הַפַּעַם--אוּלַי יִמָּצְאוּן שָׁם, עֲשָׂרָה; וַיֹּאמֶר לֹא אַשְׁחִית, בַּעֲבוּר הָעֲשָׂרָה.", "en": "Avrohom asked about ten righteous people. Hashem said He would not destroy the city for the sake of ten."}, "33": {"he": "וַיֵּלֶךְ יְהוָה--כַּאֲשֶׁר כִּלָּה, לְדַבֵּר אֶל-אַבְרָהָם; וְאַבְרָהָם, שָׁב לִמְקֹמוֹ.", "en": "When Hashem finished speaking with Avrohom, Hashem departed, and Avrohom returned to his place."}};
 const HEB_NUMS=["א", "ב", "ג", "ד", "ה", "ו", "ז", "ח", "ט", "י", "יא", "יב", "יג", "יד", "טו", "טז", "יז", "יח", "יט", "כ", "כא", "כב", "כג", "כד", "כה", "כו", "כז", "כח", "כט", "ל", "לא", "לב", "לג"];
 let studentId='',studentName='',selected=new Set(),quizType='shorashim',questionCount=5,items=[],qIndex=0,selectedAnswer=null,checked=false,correct=0,results=[];
@@ -226,9 +270,9 @@ function renderQuestion(){
   document.getElementById('quizTypePill').textContent=typeLabel(q.skillType||quizType);
   document.getElementById('qNum').textContent='Question '+(qIndex+1)+' of '+items.length;
   document.getElementById('progressFill').style.width=((qIndex/items.length)*100)+'%';
-  document.getElementById('question').textContent=q.question||'';
+  document.getElementById('question').textContent=q.question||'';document.getElementById('questionListenBtn').onclick=()=>speakStudentText(q.question||'');
   const a=document.getElementById('answers');a.innerHTML='';
-  choices.forEach((c,i)=>{const b=document.createElement('button');b.className='answer';b.textContent=String.fromCharCode(65+i)+'. '+c;b.onclick=()=>choose(i);a.appendChild(b);});
+  choices.forEach((c,i)=>{const row=document.createElement('div');row.className='answer-row';const b=document.createElement('button');b.className='answer';b.textContent=String.fromCharCode(65+i)+'. '+c;b.onclick=()=>choose(i);const sp=document.createElement('button');sp.type='button';sp.className='answer-audio';sp.textContent='🔊';sp.title='Hear this answer';sp.onclick=()=>speakStudentText(c);row.appendChild(b);row.appendChild(sp);a.appendChild(row);});
   selectedAnswer=null;checked=false;document.getElementById('checkBtn').disabled=true;document.getElementById('checkBtn').classList.remove('hidden');document.getElementById('nextBtn').classList.add('hidden');const f=document.getElementById('feedback');f.className='feedback';f.textContent='Choose your answer.';
 }
 function choose(i){if(checked)return;selectedAnswer=i;document.querySelectorAll('.answer').forEach((b,j)=>b.classList.toggle('selected',j===i));document.getElementById('checkBtn').disabled=false;}
