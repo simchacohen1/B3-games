@@ -30,6 +30,7 @@
   .login-msg { min-height:22px; color:var(--bad); text-align:center; font-weight:700; margin-top:10px; }
   .signed { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; color:var(--muted); font-size:14px; }
   .quiz-title { text-align:center; font-size:24px; font-weight:800; margin-bottom:5px; color:var(--blue); }
+  .launch-meta { text-align:center; color:var(--muted); font-size:13px; margin-bottom:5px; }
   .qmeta { text-align:center; color:var(--muted); margin-bottom:14px; }
   .question { font-size:28px; font-weight:800; line-height:1.25; text-align:center; white-space:pre-line; margin:18px 0; unicode-bidi:plaintext; }
   .choices { display:grid; gap:10px; }
@@ -55,7 +56,7 @@
 <body>
 <header>
   <h1>B3 Weekly Quiz</h1>
-  <div class="subtitle">Chumash • Shorashim • Review</div>
+  <div class="subtitle">Shoreshim • Words & Phrases • Comprehension</div>
 </header>
 <div class="wrap">
   <div id="masterBlocked" class="card blocked hidden">This quiz is currently unavailable. Please wait for Rabbi Cohen to reopen it.</div>
@@ -78,7 +79,7 @@
     </div>
 
     <div id="noQuizCard" class="card waiting hidden">
-      <div class="big">No quiz is active yet.</div>
+      <div class="big">No quiz is active for your class.</div>
       <div style="margin-top:8px;color:var(--muted);">Please wait for Rabbi Cohen.</div>
     </div>
 
@@ -87,8 +88,14 @@
       <div id="waitingText" style="margin-top:8px;color:var(--muted);"></div>
     </div>
 
+    <div id="completeCard" class="card waiting hidden">
+      <div class="big">All answers are recorded.</div>
+      <div style="margin-top:8px;color:var(--muted);">Please wait for Rabbi Cohen.</div>
+    </div>
+
     <div id="quizCard" class="card hidden">
       <div class="quiz-title" id="quizTitle"></div>
+      <div class="launch-meta" id="launchMeta"></div>
       <div class="qmeta" id="qmeta"></div>
       <div class="question" id="questionText" dir="auto"></div>
       <div class="choices" id="choices"></div>
@@ -113,250 +120,211 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let masterBlocked = false;
-let myStudentId = '';
-let myName = '';
-let activeQuizId = '';
-let quizData = null;
-let sessionData = null;
-let myResponses = {};
-let selectedChoice = null;
-let displayedQuestion = 0;
-let quizListenerRef = null;
-let sessionListenerRef = null;
-let responseListenerRef = null;
+let masterBlocked=false;
+let myStudentId='';
+let myName='';
+let myClassId='';
+let classLaunchId='';
+let personalLaunchId='';
+let activeLaunchId='';
+let launchData=null;
+let myResponses={};
+let selectedChoice=null;
+let displayedQuestion=0;
+let classLaunchRef=null, personalLaunchRef=null, launchRef=null, responseRef=null;
+let markingComplete=false;
 
 const CLASS_ROSTERS={
-  et:{label:'ET',students:['chaim_chaikin','yossi_gourarie','sholom_huebner','moshe_lapine','kehos_notik','yisroel_oirechman','moshe_raichman','avrohom_rosenfeld','levi_rozmarin','arik_traxler','simcha_cohen']},
-  wt:{label:'WT',students:['ari_greenberg','zev_rosenfeld','levi_schtroks','yisroel_aryeh_simmonds','leibel_vogel','leib_wolf','simcha_cohen']}
+  et:{label:'East Track',students:['chaim_chaikin','yossi_gourarie','sholom_huebner','moshe_lapine','kehos_notik','yisroel_oirechman','moshe_raichman','avrohom_rosenfeld','levi_rozmarin','arik_traxler','simcha_cohen']},
+  wt:{label:'West Track',students:['ari_greenberg','zev_rosenfeld','levi_schtroks','yisroel_aryeh_simmonds','leibel_vogel','leib_wolf','simcha_cohen']}
 };
 
-function slugify(name) {
-  return String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+function slugify(name){return String(name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');}
+function asArray(v){if(!v)return[];if(Array.isArray(v))return v;return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]);}
+function setLoginMsg(t){document.getElementById('loginMsg').textContent=t||'';}
+function studentClass(id){
+  if(CLASS_ROSTERS.et.students.includes(id) && !CLASS_ROSTERS.wt.students.includes(id)) return 'et';
+  if(CLASS_ROSTERS.wt.students.includes(id) && !CLASS_ROSTERS.et.students.includes(id)) return 'wt';
+  return '';
 }
-function asArray(v) {
-  if (!v) return [];
-  if (Array.isArray(v)) return v;
-  return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]);
-}
-function setLoginMsg(t){ document.getElementById('loginMsg').textContent=t||''; }
+function classLabel(id){return (CLASS_ROSTERS[id]||{}).label||id||'';}
 
-function applyMasterBlocked() {
-  document.getElementById('masterBlocked').classList.toggle('hidden', !masterBlocked);
-  if (masterBlocked) {
-    document.getElementById('loginCard').classList.add('hidden');
-    document.getElementById('studentArea').classList.add('hidden');
-  } else if (myStudentId) {
-    document.getElementById('loginCard').classList.add('hidden');
-    document.getElementById('studentArea').classList.remove('hidden');
-  } else {
-    document.getElementById('loginCard').classList.remove('hidden');
-    document.getElementById('studentArea').classList.add('hidden');
-  }
+function applyMasterBlocked(){
+  document.getElementById('masterBlocked').classList.toggle('hidden',!masterBlocked);
+  if(masterBlocked){document.getElementById('loginCard').classList.add('hidden');document.getElementById('studentArea').classList.add('hidden');}
+  else if(myStudentId){document.getElementById('loginCard').classList.add('hidden');document.getElementById('studentArea').classList.remove('hidden');}
+  else{document.getElementById('loginCard').classList.remove('hidden');document.getElementById('studentArea').classList.add('hidden');}
 }
 
-db.ref('b3Games/siteSettings').on('value', snap => {
-  const s=snap.val()||{}; const games=s.games||{};
-  masterBlocked = s.siteEnabled===false || games['weekly-quiz']===false;
+db.ref('b3Games/siteSettings').on('value',snap=>{
+  const s=snap.val()||{},games=s.games||{};
+  masterBlocked=s.siteEnabled===false||games['weekly-quiz']===false;
   applyMasterBlocked();
-}, ()=>{ masterBlocked=false; applyMasterBlocked(); });
+},()=>{masterBlocked=false;applyMasterBlocked();});
 
 async function checkStudentAccess(name,pin){
-  const slug=slugify(name);
-  if(!slug) return {ok:false,reason:'Please type your name.'};
+  const slug=slugify(name);if(!slug)return{ok:false,reason:'Please type your name.'};
   const [pinSnap,allowedSnap]=await Promise.all([
     db.ref('posukPractice/settings/classPin').once('value'),
     db.ref('posukPractice/allowedStudents/'+slug).once('value')
   ]);
   const realPin=pinSnap.val();
-  if(realPin && String(pin).trim()!==String(realPin).trim()) return {ok:false,reason:'Incorrect PIN. Ask your teacher.'};
-  if(!allowedSnap.exists()) return {ok:false,reason:'Ask your teacher to add your name first.'};
-  const d=allowedSnap.val();
-  const displayName=d && typeof d==='object' && d.name ? String(d.name) : name.trim();
-  return {ok:true,slug,displayName};
+  if(realPin&&String(pin).trim()!==String(realPin).trim())return{ok:false,reason:'Incorrect PIN. Ask your teacher.'};
+  if(!allowedSnap.exists())return{ok:false,reason:'Ask your teacher to add your name first.'};
+  const d=allowedSnap.val(),displayName=d&&typeof d==='object'&&d.name?String(d.name):name.trim();
+  const classId=(d&&typeof d==='object'&&['et','wt'].includes(d.classId))?d.classId:studentClass(slug);
+  if(!classId)return{ok:false,reason:'Your class is not assigned yet. Ask Rabbi Cohen.'};
+  return{ok:true,slug,displayName,classId};
 }
 
 async function joinQuiz(){
-  if(masterBlocked) return;
-  const name=document.getElementById('studentNameInput').value.trim();
-  const pin=document.getElementById('classPinInput').value.trim();
-  const btn=document.getElementById('joinBtn');
+  if(masterBlocked)return;
+  const name=document.getElementById('studentNameInput').value.trim(),pin=document.getElementById('classPinInput').value.trim(),btn=document.getElementById('joinBtn');
   if(!name){setLoginMsg('Please type your name.');return;}
-  btn.disabled=true; setLoginMsg('Checking…');
-  try{
-    const r=await checkStudentAccess(name,pin);
-    if(!r.ok){setLoginMsg(r.reason);return;}
-    enterStudent(r.displayName,r.slug);
-  }catch(e){ console.error(e); setLoginMsg('Could not check your login. Try again.'); }
+  btn.disabled=true;setLoginMsg('Checking…');
+  try{const r=await checkStudentAccess(name,pin);if(!r.ok){setLoginMsg(r.reason);return;}enterStudent(r.displayName,r.slug,r.classId);}
+  catch(e){console.error(e);setLoginMsg('Could not check your login. Try again.');}
   finally{btn.disabled=false;}
 }
 
-function enterStudent(displayName,studentId){
-  myName=displayName; myStudentId=studentId;
+function enterStudent(displayName,studentId,classId){
+  myName=displayName;myStudentId=studentId;myClassId=classId;
   localStorage.setItem('posukPractice_studentName',displayName);
   localStorage.setItem('posukPractice_studentId',studentId);
+  localStorage.setItem('weeklyQuiz_classId',classId);
   document.getElementById('studentNameLabel').textContent=displayName;
   applyMasterBlocked();
-  listenForActiveQuiz();
+  listenForLaunches();
 }
 
 async function restoreLogin(){
-  const id=localStorage.getItem('posukPractice_studentId');
-  const name=localStorage.getItem('posukPractice_studentName');
-  if(!id||!name) return;
+  const id=localStorage.getItem('posukPractice_studentId'),name=localStorage.getItem('posukPractice_studentName');
+  if(!id||!name)return;
   try{
     const snap=await db.ref('posukPractice/allowedStudents/'+id).once('value');
-    if(!snap.exists()) return switchStudent(false);
-    const d=snap.val(); enterStudent(d&&d.name?String(d.name):name,id);
+    if(!snap.exists())return switchStudent(false);
+    const d=snap.val(),classId=(d&&['et','wt'].includes(d.classId))?d.classId:(localStorage.getItem('weeklyQuiz_classId')||studentClass(id));
+    if(!classId)return switchStudent(false);
+    enterStudent(d&&d.name?String(d.name):name,id,classId);
   }catch(e){console.warn(e);}
 }
+
 function switchStudent(reload=true){
-  localStorage.removeItem('posukPractice_studentId');
-  localStorage.removeItem('posukPractice_studentName');
-  if(reload) location.reload();
+  localStorage.removeItem('posukPractice_studentId');localStorage.removeItem('posukPractice_studentName');localStorage.removeItem('weeklyQuiz_classId');
+  if(reload)location.reload();
 }
 
-function detachQuizListeners(){
-  if(quizListenerRef) quizListenerRef.off();
-  if(sessionListenerRef) sessionListenerRef.off();
-  if(responseListenerRef) responseListenerRef.off();
-  quizListenerRef=sessionListenerRef=responseListenerRef=null;
+function detachLaunchListeners(){
+  if(classLaunchRef)classLaunchRef.off();if(personalLaunchRef)personalLaunchRef.off();if(launchRef)launchRef.off();if(responseRef)responseRef.off();
+  classLaunchRef=personalLaunchRef=launchRef=responseRef=null;
 }
 
-function listenForActiveQuiz(){
-  db.ref('b3Quiz/settings/activeQuizId').on('value', snap=>{
-    const id=snap.val()||'';
-    if(id===activeQuizId) return;
-    detachQuizListeners();
-    activeQuizId=id; quizData=null; sessionData=null; myResponses={};
-    if(!id){ render(); return; }
-    quizListenerRef=db.ref('b3Quiz/quizzes/'+id);
-    sessionListenerRef=db.ref('b3Quiz/sessions/'+id);
-    responseListenerRef=db.ref('b3Quiz/responses/'+id+'/'+myStudentId);
-    quizListenerRef.on('value',s=>{quizData=s.val(); render();});
-    sessionListenerRef.on('value',s=>{sessionData=s.val()||{}; render();});
-    responseListenerRef.on('value',s=>{myResponses=s.val()||{}; render();});
-  });
+function listenForLaunches(){
+  detachLaunchListeners();
+  classLaunchRef=db.ref('b3Quiz/settings/activeLaunchByClass/'+myClassId);
+  personalLaunchRef=db.ref('b3Quiz/settings/studentActiveLaunch/'+myStudentId);
+  classLaunchRef.on('value',s=>{classLaunchId=s.val()||'';chooseActiveLaunch();});
+  personalLaunchRef.on('value',s=>{personalLaunchId=s.val()||'';chooseActiveLaunch();});
 }
 
-function questionState(i){
-  const qs=(sessionData&&sessionData.questionStates)||{};
-  return qs[i]||qs[String(i)]||{open:false,reveal:false};
-}
-function responseFor(i){ return myResponses[i]||myResponses[String(i)]||null; }
-function getQuestions(){ return quizData ? asArray(quizData.questions) : []; }
-function quizAllowsStudent(){
-  const classId=quizData&&quizData.classId;
-  return !classId||classId==='all'||!CLASS_ROSTERS[classId]||CLASS_ROSTERS[classId].students.includes(myStudentId);
+function chooseActiveLaunch(){
+  const id=personalLaunchId||classLaunchId||'';
+  if(id===activeLaunchId)return;
+  if(launchRef)launchRef.off();if(responseRef)responseRef.off();launchRef=responseRef=null;
+  activeLaunchId=id;launchData=null;myResponses={};selectedChoice=null;displayedQuestion=0;
+  if(!id){render();return;}
+  launchRef=db.ref('b3Quiz/launches/'+id);
+  responseRef=db.ref('b3Quiz/responses/'+id+'/'+myStudentId);
+  launchRef.on('value',s=>{launchData=s.val();render();});
+  responseRef.on('value',s=>{myResponses=s.val()||{};render();});
 }
 
+function getQuestions(){return launchData&&launchData.quizSnapshot?asArray(launchData.quizSnapshot.questions):[];}
+function questionState(i){const qs=(launchData&&launchData.questionStates)||{};return qs[i]||qs[String(i)]||{open:false,reveal:false};}
+function responseFor(i){return myResponses[i]||myResponses[String(i)]||null;}
+function launchAllowsStudent(){
+  if(!launchData)return false;
+  const targets=launchData.targetStudents||null;
+  if(targets&&Object.keys(targets).length)return !!targets[myStudentId];
+  return launchData.classId===myClassId;
+}
+
+function hideAll(){['noQuizCard','waitingCard','completeCard','quizCard'].forEach(id=>document.getElementById(id).classList.add('hidden'));}
 function render(){
-  if(!myStudentId) return;
-  const noQuiz=document.getElementById('noQuizCard');
-  const wait=document.getElementById('waitingCard');
-  const card=document.getElementById('quizCard');
-  noQuiz.classList.add('hidden'); wait.classList.add('hidden'); card.classList.add('hidden');
-  if(!activeQuizId || !quizData){ noQuiz.classList.remove('hidden'); return; }
-  const questions=getQuestions();
-  if(!questions.length){ noQuiz.classList.remove('hidden'); return; }
-  if(!quizAllowsStudent()){
-    const className=(CLASS_ROSTERS[quizData.classId]||{}).label||'another class';
-    wait.classList.remove('hidden');
-    document.getElementById('waitingTitle').textContent='This quiz is for '+className;
-    document.getElementById('waitingText').textContent='Please wait for your class quiz.';
-    return;
-  }
-  const started=!!(sessionData&&sessionData.started);
-  if(!started){
-    wait.classList.remove('hidden');
+  if(!myStudentId)return;hideAll();
+  if(!activeLaunchId||!launchData){document.getElementById('noQuizCard').classList.remove('hidden');return;}
+  if(!launchAllowsStudent()){document.getElementById('noQuizCard').classList.remove('hidden');return;}
+  const questions=getQuestions();if(!questions.length){document.getElementById('noQuizCard').classList.remove('hidden');return;}
+  if(!launchData.started){
+    document.getElementById('waitingCard').classList.remove('hidden');
     document.getElementById('waitingTitle').textContent='Quiz not started yet';
     document.getElementById('waitingText').textContent='Please wait for Rabbi Cohen.';
     return;
   }
-  const mode=(sessionData&&sessionData.mode)||'paced';
-  if(mode==='paced') displayedQuestion=Math.max(0,Math.min(questions.length-1,Number(sessionData.activeQuestion)||0));
+  const mode=launchData.mode||'paced';
+  if(mode==='paced')displayedQuestion=Math.max(0,Math.min(questions.length-1,Number(launchData.activeQuestion)||0));
   else displayedQuestion=Math.max(0,Math.min(questions.length-1,displayedQuestion));
-  const st=questionState(displayedQuestion);
-  const resp=responseFor(displayedQuestion);
-  if(!st.open && !resp && !st.reveal){
-    wait.classList.remove('hidden');
+  const answeredCount=questions.reduce((n,_,i)=>n+(responseFor(i)?1:0),0);
+  if(answeredCount===questions.length) markCompletion();
+  if(answeredCount===questions.length&&mode==='test'){
+    document.getElementById('completeCard').classList.remove('hidden');return;
+  }
+  const st=questionState(displayedQuestion),resp=responseFor(displayedQuestion);
+  if(!st.open&&!resp&&!st.reveal){
+    document.getElementById('waitingCard').classList.remove('hidden');
     document.getElementById('waitingTitle').textContent='Waiting for Question '+(displayedQuestion+1)+'…';
     document.getElementById('waitingText').textContent='Rabbi Cohen will open it when the class is ready.';
     return;
   }
-  card.classList.remove('hidden');
-  const q=questions[displayedQuestion];
-  document.getElementById('quizTitle').textContent=quizData.title||'B3 Weekly Quiz';
+  document.getElementById('quizCard').classList.remove('hidden');
+  const q=questions[displayedQuestion],snap=launchData.quizSnapshot||{};
+  document.getElementById('quizTitle').textContent=snap.title||'B3 Weekly Quiz';
+  const retake=launchData.retakeOf?' • Retake '+(launchData.attemptNumber||2):'';
+  document.getElementById('launchMeta').textContent=classLabel(launchData.classId)+retake;
   document.getElementById('qmeta').textContent='Question '+(displayedQuestion+1)+' of '+questions.length;
   document.getElementById('questionText').textContent=q.q||'';
-  selectedChoice = resp ? Number(resp.choiceIndex) : null;
-  renderChoices(q,resp,st);
-  renderNav(mode,questions);
-  const answeredCount=questions.reduce((n,_,i)=>n+(responseFor(i)?1:0),0);
+  selectedChoice=resp?Number(resp.choiceIndex):null;
+  renderChoices(q,resp,st);renderNav(mode,questions);
   document.getElementById('progressText').textContent=answeredCount+' of '+questions.length+' answered';
 }
 
 function renderChoices(q,resp,st){
-  const box=document.getElementById('choices'); box.innerHTML='';
-  const choices=asArray(q.choices);
+  const box=document.getElementById('choices');box.innerHTML='';const choices=asArray(q.choices);
   choices.forEach((choice,i)=>{
-    const b=document.createElement('button'); b.className='choice'; b.type='button'; b.dir='auto';
-    b.textContent=String.fromCharCode(65+i)+'. '+choice;
-    if(selectedChoice===i) b.classList.add('selected');
-    if(st.reveal){
-      if(Number(q.correctIndex)===i) b.classList.add('correct-reveal');
-      else if(resp && Number(resp.choiceIndex)===i) b.classList.add('wrong-reveal');
-    }
-    b.disabled=!!resp || !st.open || !!st.reveal;
-    b.onclick=()=>{ selectedChoice=i; document.querySelectorAll('.choice').forEach(x=>x.classList.remove('selected')); b.classList.add('selected'); };
+    const b=document.createElement('button');b.className='choice';b.type='button';b.dir='auto';b.textContent=String.fromCharCode(65+i)+'. '+choice;
+    if(selectedChoice===i)b.classList.add('selected');
+    if(st.reveal){if(Number(q.correctIndex)===i)b.classList.add('correct-reveal');else if(resp&&Number(resp.choiceIndex)===i)b.classList.add('wrong-reveal');}
+    b.disabled=!!resp||!st.open||!!st.reveal;
+    b.onclick=()=>{selectedChoice=i;document.querySelectorAll('.choice').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');};
     box.appendChild(b);
   });
-  const submit=document.getElementById('submitBtn');
-  submit.disabled=!!resp || !st.open || !!st.reveal;
-  submit.classList.toggle('hidden', !!resp || !st.open || !!st.reveal);
-  const status=document.getElementById('answerStatus');
-  status.className='status hidden';
-  if(resp && !st.reveal){ status.textContent='Answer recorded.'; status.classList.remove('hidden'); }
+  const submit=document.getElementById('submitBtn');submit.disabled=!!resp||!st.open||!!st.reveal;submit.classList.toggle('hidden',!!resp||!st.open||!!st.reveal);
+  const status=document.getElementById('answerStatus');status.className='status hidden';
+  if(resp&&!st.reveal){status.textContent='Answer recorded.';status.classList.remove('hidden');}
   if(st.reveal){
-    status.classList.remove('hidden');
-    const correct=resp && !!resp.correct;
-    status.classList.add(correct?'good':'bad');
-    status.textContent = resp ? (correct?'Correct!':'Your answer is marked. The correct answer is shown above.') : 'The correct answer is shown above.';
+    status.classList.remove('hidden');const correct=resp&&!!resp.correct;status.classList.add(correct?'good':'bad');
+    status.textContent=resp?(correct?'Correct!':'Your answer is marked. The correct answer is shown above.'):'The correct answer is shown above.';
   }
 }
 
 function renderNav(mode,questions){
-  const nav=document.getElementById('questionNav'); nav.innerHTML='';
-  if(mode!=='test'){nav.classList.add('hidden');return;}
-  nav.classList.remove('hidden');
-  questions.forEach((q,i)=>{
-    const st=questionState(i); const resp=responseFor(i);
-    const b=document.createElement('button'); b.textContent=i+1;
-    if(i===displayedQuestion) b.classList.add('active');
-    if(resp) b.classList.add('answered');
-    b.disabled=!st.open && !resp && !st.reveal;
-    b.onclick=()=>{displayedQuestion=i; render();};
-    nav.appendChild(b);
-  });
+  const nav=document.getElementById('questionNav');nav.innerHTML='';if(mode!=='test'){nav.classList.add('hidden');return;}nav.classList.remove('hidden');
+  questions.forEach((q,i)=>{const st=questionState(i),resp=responseFor(i),b=document.createElement('button');b.textContent=i+1;if(i===displayedQuestion)b.classList.add('active');if(resp)b.classList.add('answered');b.disabled=!st.open&&!resp&&!st.reveal;b.onclick=()=>{displayedQuestion=i;render();};nav.appendChild(b);});
 }
 
 async function submitAnswer(){
-  if(selectedChoice===null){
-    const s=document.getElementById('answerStatus'); s.textContent='Choose an answer first.'; s.className='status bad'; return;
-  }
-  const qs=getQuestions(); const q=qs[displayedQuestion]; const st=questionState(displayedQuestion);
-  if(!st.open || responseFor(displayedQuestion)) return;
-  const ref=db.ref('b3Quiz/responses/'+activeQuizId+'/'+myStudentId+'/'+displayedQuestion);
-  const answer={
-    name:myName,
-    choiceIndex:selectedChoice,
-    correct:Number(selectedChoice)===Number(q.correctIndex),
-    submittedAt:firebase.database.ServerValue.TIMESTAMP
-  };
-  try{ await ref.set(answer); }
-  catch(e){
-    console.error(e); const s=document.getElementById('answerStatus'); s.textContent='Could not save your answer. Try again.'; s.className='status bad';
-  }
+  if(selectedChoice===null){const s=document.getElementById('answerStatus');s.textContent='Choose an answer first.';s.className='status bad';return;}
+  const qs=getQuestions(),q=qs[displayedQuestion],st=questionState(displayedQuestion);if(!st.open||responseFor(displayedQuestion))return;
+  const ref=db.ref('b3Quiz/responses/'+activeLaunchId+'/'+myStudentId+'/'+displayedQuestion);
+  const correct=Number(selectedChoice)===Number(q.correctIndex);
+  const answer={name:myName,choiceIndex:selectedChoice,originalCorrect:correct,correct,adjusted:false,submittedAt:firebase.database.ServerValue.TIMESTAMP};
+  try{await ref.set(answer);}catch(e){console.error(e);const s=document.getElementById('answerStatus');s.textContent='Could not save your answer. Try again.';s.className='status bad';}
+}
+
+async function markCompletion(){
+  if(markingComplete||!activeLaunchId||!myStudentId)return;markingComplete=true;
+  try{await db.ref('b3Quiz/completions/'+activeLaunchId+'/'+myStudentId).set({name:myName,completedAt:firebase.database.ServerValue.TIMESTAMP});}
+  catch(e){console.warn(e);}finally{markingComplete=false;}
 }
 
 ['classPinInput','studentNameInput'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();joinQuiz();}}));

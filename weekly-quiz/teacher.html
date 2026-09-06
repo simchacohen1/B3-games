@@ -10,18 +10,19 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
-  :root { --ink:#18324a; --blue:#2d6ea3; --blue2:#1f5885; --light:#eef6fc; --line:#bdd5e8; --good:#2e8b57; --bad:#c74b50; --gold:#d9a441; --muted:#64788b; --gray:#e7edf2; }
+  :root { --ink:#18324a; --blue:#2d6ea3; --blue2:#1f5885; --light:#eef6fc; --line:#bdd5e8; --good:#2e8b57; --bad:#c74b50; --gold:#d9a441; --muted:#64788b; --gray:#e7edf2; --purple:#7757a6; }
   * { box-sizing:border-box; }
   body { margin:0; font-family:Calibri, Arial, sans-serif; background:#f4f8fb; color:var(--ink); }
   header { background:white; border-bottom:1px solid var(--line); padding:14px 18px; text-align:center; position:sticky; top:0; z-index:20; }
   h1 { margin:0; color:var(--blue); font-size:28px; }
   .subtitle { color:var(--muted); font-size:14px; }
-  .wrap { max-width:1260px; margin:18px auto 40px; padding:0 14px; }
+  .wrap { max-width:1320px; margin:18px auto 40px; padding:0 14px; }
   .card { background:white; border:1px solid var(--line); border-radius:14px; padding:18px; margin-bottom:16px; box-shadow:0 4px 16px rgba(32,72,105,.05); }
   .hidden { display:none !important; }
   button,input,select,textarea { font:inherit; }
   button { border:none; border-radius:9px; padding:9px 14px; cursor:pointer; font-weight:700; }
-  .primary{background:var(--blue);color:white}.good{background:var(--good);color:white}.danger{background:var(--bad);color:white}.secondary{background:#e8f1f7;color:var(--ink)}.gold{background:var(--gold);color:#332711}
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .primary{background:var(--blue);color:white}.good{background:var(--good);color:white}.danger{background:var(--bad);color:white}.secondary{background:#e8f1f7;color:var(--ink)}.gold{background:var(--gold);color:#332711}.purple{background:var(--purple);color:white}
   .tabs { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-bottom:16px; }
   .tab { background:#dfeaf2; color:var(--ink); }
   .tab.active { background:var(--blue); color:white; }
@@ -31,8 +32,8 @@
   .status-pill { display:inline-block; padding:6px 10px; border-radius:999px; font-size:13px; font-weight:800; background:#e7edf2; }
   .status-pill.live { background:#e8f7ef; color:#236a40; }
   .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  select,input[type=text],input[type=password],textarea { border:1px solid var(--line); border-radius:9px; padding:9px 10px; background:white; color:var(--ink); }
-  textarea { width:100%; min-height:140px; resize:vertical; }
+  select,input[type=text],input[type=password],input[type=number],textarea { border:1px solid var(--line); border-radius:9px; padding:9px 10px; background:white; color:var(--ink); }
+  textarea { width:100%; min-height:130px; resize:vertical; }
   .question-card { text-align:center; }
   .qnum { color:var(--muted); font-size:14px; }
   .qtext { font-size:28px; line-height:1.25; font-weight:800; white-space:pre-line; margin:10px 0 12px; unicode-bidi:plaintext; }
@@ -54,26 +55,45 @@
   td.blank { background:#f3f5f7; color:#9ba8b3; }
   td.correct { background:#d9f1e3; color:#17673b; }
   td.incorrect { background:#f8d9dc; color:#962f35; }
+  td.adjusted { outline:2px solid var(--gold); outline-offset:-3px; }
   td.locked { box-shadow:inset 0 0 0 2px #d9dee3; }
   .summary-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
   .summary { background:#f0f6fa; border-radius:10px; padding:10px 14px; min-width:130px; }
   .summary b { font-size:21px; color:var(--blue); }
   .setup-grid { display:grid; grid-template-columns:320px 1fr; gap:16px; }
-  .quiz-list { max-height:520px; overflow:auto; }
-  .quiz-item { border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:8px; cursor:pointer; }
-  .quiz-item.active { border-color:var(--blue); background:#edf6fc; }
-  .quiz-item-title { font-weight:800; }
+  .quiz-list,.launch-list { max-height:520px; overflow:auto; }
+  .quiz-item,.launch-item { border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:8px; cursor:pointer; }
+  .quiz-item.active,.launch-item.active { border-color:var(--blue); background:#edf6fc; }
+  .quiz-item-title,.launch-item-title { font-weight:800; }
   .small { font-size:13px; color:var(--muted); }
   .editor-row { border:1px solid var(--line); border-radius:10px; padding:10px; margin-top:10px; background:#fbfdff; }
   .editor-row input { width:100%; margin-top:5px; }
   .choice-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:7px; }
   .editor-head { display:flex; justify-content:space-between; gap:8px; align-items:center; }
-  .paste-help { background:#f0f6fa; padding:10px; border-radius:8px; color:var(--muted); font-size:13px; margin-bottom:8px; }
-  .lock-overlay { position:fixed; inset:0; background:#f4f8fb; display:flex; align-items:center; justify-content:center; z-index:99; }
-  .lock-box { width:min(380px,90vw); background:white; border:1px solid var(--line); border-radius:14px; padding:25px; text-align:center; }
+  .paste-help,.info-box { background:#f0f6fa; padding:10px; border-radius:8px; color:var(--muted); font-size:13px; margin-bottom:8px; }
+  .generator-grid { display:grid; grid-template-columns:repeat(4,minmax(150px,1fr)); gap:10px; margin:10px 0; }
+  .generator-grid label { font-weight:700; font-size:13px; display:flex; flex-direction:column; gap:5px; }
+  .generator-candidates { display:grid; gap:8px; margin-top:10px; }
+  .candidate { border:1px solid var(--line); border-radius:10px; padding:10px; background:#fbfdff; display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:start; }
+  .candidate .focus { font-weight:800; color:var(--blue); }
+  .candidate .reason { font-size:12px; color:var(--muted); margin-top:3px; }
+  .candidate .answer { color:var(--good); font-size:13px; margin-top:4px; }
+  .skill-tag { display:inline-block; padding:3px 7px; border-radius:999px; font-size:11px; font-weight:800; background:#e8f1f7; color:var(--blue2); margin-left:6px; }
+  .launch-controls { display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:10px; align-items:end; }
+  .launch-controls label { display:flex; flex-direction:column; gap:5px; font-size:13px; font-weight:700; }
+  .lock-overlay,.modal-overlay { position:fixed; inset:0; background:rgba(244,248,251,.96); display:flex; align-items:center; justify-content:center; z-index:99; }
+  .lock-box,.modal-box { width:min(520px,92vw); background:white; border:1px solid var(--line); border-radius:14px; padding:25px; text-align:center; box-shadow:0 18px 50px rgba(0,0,0,.18); }
   .lock-box input { width:100%; margin:12px 0; font-size:18px; }
   .lock-error { color:var(--bad); min-height:20px; }
-  @media(max-width:850px){.setup-grid{grid-template-columns:1fr}.choice-grid{grid-template-columns:1fr}}
+  .modal-box { text-align:left; }
+  .modal-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:14px; }
+  .progress-layout { display:grid; grid-template-columns:280px 1fr; gap:16px; }
+  .skill-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:12px 0; }
+  .skill-card { background:#f0f6fa; border-radius:12px; padding:14px; text-align:center; }
+  .skill-card .big { font-size:28px; font-weight:900; color:var(--blue); }
+  .parent-summary { background:#fffdf4; border:1px solid #eadb9b; border-radius:10px; padding:14px; line-height:1.5; }
+  .audit-note { color:#8b6a15; font-size:12px; }
+  @media(max-width:900px){.setup-grid,.progress-layout{grid-template-columns:1fr}.generator-grid{grid-template-columns:1fr 1fr}.launch-controls{grid-template-columns:1fr 1fr}.choice-grid{grid-template-columns:1fr}.skill-cards{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -87,41 +107,63 @@
   </div>
 </div>
 
+<div id="answerModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <h2 style="margin-top:0;color:var(--blue)">Review Student Answer</h2>
+    <div id="modalAnswerInfo"></div>
+    <label style="display:block;margin-top:12px;font-weight:700">Adjustment note (teacher only)</label>
+    <input id="modalAdjustmentNote" type="text" style="width:100%;margin-top:5px" placeholder="Optional reason">
+    <div class="modal-actions">
+      <button class="good" onclick="adjustCurrentAnswer(true)">Mark Correct</button>
+      <button class="danger" onclick="adjustCurrentAnswer(false)">Mark Incorrect</button>
+      <button class="secondary" onclick="clearCurrentAnswer()">Clear for retry</button>
+      <button class="secondary" onclick="closeAnswerModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <header>
   <h1>B3 Weekly Quiz — Teacher</h1>
-  <div class="subtitle">Live monitoring, teacher-paced questions, and weekly quiz setup</div>
+  <div class="subtitle">Quiz generator • independent ET/WT launches • live monitoring • long-term progress</div>
 </header>
 <div class="wrap hidden" id="mainContent">
   <div class="tabs">
     <button id="tabLive" class="tab active" onclick="showTab('live')">Live Quiz</button>
     <button id="tabSetup" class="tab" onclick="showTab('setup')">Quiz Setup</button>
     <button id="tabResults" class="tab" onclick="showTab('results')">Results</button>
+    <button id="tabProgress" class="tab" onclick="showTab('progress')">Student Progress</button>
   </div>
 
   <section id="panelLive" class="panel active">
     <div class="card">
       <div class="topline">
         <div>
-          <div class="quiz-name" id="liveQuizTitle">No active quiz</div>
+          <div class="quiz-name" id="liveQuizTitle">No active launch</div>
+          <div class="small" id="liveLaunchMeta"></div>
           <span id="liveStatus" class="status-pill">Not started</span>
         </div>
         <div class="controls">
+          <label style="font-weight:700">Live class
+            <select id="liveClassSelect" onchange="changeLiveClass()">
+              <option value="et">East Track</option>
+              <option value="wt">West Track</option>
+            </select>
+          </label>
           <label style="font-weight:700">Mode
             <select id="modeSelect" onchange="changeMode()">
               <option value="paced">One question at a time</option>
               <option value="test">Open test / student navigation</option>
             </select>
           </label>
-          <button class="good" onclick="startQuiz()">Start</button>
-          <button class="danger" onclick="stopQuiz()">Stop</button>
-          <button class="secondary" onclick="resetResponses()">Reset answers</button>
+          <button class="good" onclick="startLaunch()">Start</button>
+          <button class="danger" onclick="stopLaunch()">End Launch</button>
         </div>
       </div>
     </div>
 
     <div class="card question-card">
       <div class="qnum" id="liveQnum">Question —</div>
-      <div class="qtext" id="liveQtext" dir="auto">Choose or create a quiz in Quiz Setup.</div>
+      <div class="qtext" id="liveQtext" dir="auto">Launch a quiz to ET or WT from Quiz Setup.</div>
       <div class="answer-line" id="liveAnswer"></div>
       <div class="controls" style="justify-content:center;margin-top:10px;">
         <button class="secondary" onclick="prevQuestion()">← Previous</button>
@@ -135,16 +177,14 @@
 
     <div class="card">
       <div class="topline">
-        <div>
-          <h2 style="margin:0">Live Student Grid</h2>
-          <div class="small">Updates as students submit. Click a colored box to inspect or clear that student's answer.</div>
-        </div>
+        <div><h2 style="margin:0">Live Student Grid</h2><div class="small">Gray = no answer, green = correct, red = incorrect. Gold outline = teacher-adjusted result.</div></div>
         <button class="secondary" onclick="copyStudentLink()">Copy student link</button>
       </div>
       <div class="legend">
         <span><span class="sw" style="background:#f3f5f7"></span>No answer</span>
         <span><span class="sw" style="background:#d9f1e3"></span>Correct</span>
         <span><span class="sw" style="background:#f8d9dc"></span>Incorrect</span>
+        <span><span class="sw" style="background:#fff4c9;border:2px solid var(--gold)"></span>Adjusted</span>
       </div>
       <div class="grid-wrap"><table id="liveGrid"></table></div>
       <div class="summary-row" id="liveSummary"></div>
@@ -152,67 +192,158 @@
   </section>
 
   <section id="panelSetup" class="panel">
+    <div class="card">
+      <h2 style="margin-top:0">Built-in Quiz Generator</h2>
+      <div class="info-box">Paste the pesukim you are testing. The generator drafts questions into the editor; nothing is saved or launched until you review it.</div>
+      <div class="generator-grid">
+        <label>Quiz type
+          <select id="generatorType" onchange="generatorTypeChanged()">
+            <option value="shorashim">Shoreshim</option>
+            <option value="translation">Words & Phrases</option>
+            <option value="comprehension">Comprehension</option>
+            <option value="mixed">Mixed (optional)</option>
+          </select>
+        </label>
+        <label>How many questions
+          <input type="number" id="generatorCount" min="1" max="40" value="10">
+        </label>
+        <label>Choices per question
+          <select id="generatorChoices"><option value="3" selected>3 choices (default)</option><option value="4">4 choices</option></select>
+        </label>
+        <label>Source label
+          <input type="text" id="generatorSourceLabel" placeholder="Example: Vayeira 18:1–5">
+        </label>
+      </div>
+      <div id="mixedCounts" class="generator-grid hidden">
+        <label>Shoreshim<input type="number" id="mixedShoreshim" min="0" max="30" value="5"></label>
+        <label>Words & Phrases<input type="number" id="mixedTranslation" min="0" max="30" value="5"></label>
+        <label>Comprehension<input type="number" id="mixedComprehension" min="0" max="30" value="5"></label>
+      </div>
+      <label style="font-weight:700">Paste the pesukim / source text</label>
+      <textarea id="generatorSource" dir="auto" placeholder="Paste the five pesukim here..."></textarea>
+      <div class="controls" style="margin-top:9px">
+        <button id="generateBtn" class="purple" onclick="generateQuizDraft()">Generate Quiz Draft</button>
+        <span id="generatorStatus" class="small"></span>
+      </div>
+      <div id="generatorReview" class="hidden">
+        <div class="topline" style="margin-top:14px"><h3 style="margin:0">Generated Questions</h3><div class="controls"><button class="secondary" onclick="setAllCandidates(true)">Select all</button><button class="secondary" onclick="setAllCandidates(false)">Uncheck all</button></div></div>
+        <div class="small" style="margin:4px 0 8px">All generated items are selected by default. Uncheck anything you do not want.</div>
+        <div id="candidateList" class="generator-candidates"></div>
+        <div class="controls" style="margin-top:10px"><button class="good" onclick="addSelectedCandidates(false)">Add selected to editor</button><button class="primary" onclick="addSelectedCandidates(true)">Replace editor with selected</button></div>
+      </div>
+    </div>
+
     <div class="setup-grid">
       <div class="card">
         <div class="topline"><h2 style="margin:0">Saved Quizzes</h2><button class="primary" onclick="newQuizDraft()">+ New</button></div>
-        <div class="small" style="margin:5px 0 12px">The student URL stays the same. You only change which quiz is active.</div>
+        <div class="small" style="margin:5px 0 12px">A saved quiz is just the question set. ET and WT are chosen only when you launch it.</div>
         <div id="quizList" class="quiz-list"></div>
       </div>
-      <div class="card">
-        <h2 style="margin-top:0">Quiz Editor</h2>
-        <label style="font-weight:700">Quiz title</label>
-        <input type="text" id="editorTitle" style="width:100%;margin:5px 0 10px" placeholder="Example: Vayeira 18:1–8 Comprehension">
-        <label style="font-weight:700">Class</label>
-        <select id="editorClass" style="margin:5px 0 10px">
-          <option value="all">All B3 students</option>
-          <option value="et">ET</option>
-          <option value="wt">WT</option>
-        </select>
-        <div class="paste-help">
-          Fastest weekly setup: paste from Google Sheets/Excel with 6 columns:<br>
-          <b>Question | Choice A | Choice B | Choice C | Choice D | Correct</b><br>
-          Correct can be A/B/C/D, 1/2/3/4, or the exact correct choice. Two or three choices also work if blank columns are omitted.
+      <div>
+        <div class="card">
+          <h2 style="margin-top:0">Quiz Editor</h2>
+          <label style="font-weight:700">Quiz title</label>
+          <input type="text" id="editorTitle" style="width:100%;margin:5px 0 10px" placeholder="Example: Vayeira 18:1–8 Comprehension">
+          <div class="generator-grid" style="grid-template-columns:1fr 1fr">
+            <label>Quiz skill type
+              <select id="editorSkillType" onchange="editorSkillChanged()">
+                <option value="shorashim">Shoreshim</option>
+                <option value="translation">Words & Phrases</option>
+                <option value="comprehension">Comprehension</option>
+                <option value="mixed">Mixed</option>
+              </select>
+            </label>
+            <label>Source label
+              <input type="text" id="editorSourceLabel" placeholder="Example: Vayeira 18:1–5">
+            </label>
+          </div>
+          <div class="paste-help">
+            Fast manual setup from Google Sheets/Excel: copy rows and paste them below. Use columns:<br>
+            <b>Question | Choice A | Choice B | Choice C | Choice D | Correct</b><br>
+            You do <b>not</b> type “\t”. Copying from a spreadsheet inserts the real tabs automatically. Correct may be A/B/C/D, 1/2/3/4, or the exact answer.
+          </div>
+          <textarea id="pasteBox" placeholder="Example row shown with | for clarity:\nWhat did Avrohom see? | Three men | Two men | A camel | A"></textarea>
+          <div class="controls" style="margin-top:8px">
+            <button class="secondary" onclick="loadPasted(false)">Add pasted questions</button>
+            <button class="secondary" onclick="loadPasted(true)">Replace with pasted questions</button>
+            <button class="secondary" onclick="addEditorRow()">+ Add question manually</button>
+          </div>
+          <div id="editorRows"></div>
+          <div class="controls" style="margin-top:14px">
+            <button class="good" onclick="saveQuiz()">Save quiz</button>
+            <button class="danger" id="deleteQuizBtn" onclick="deleteCurrentQuiz()">Delete quiz</button>
+          </div>
+          <div id="setupMsg" class="small" style="margin-top:9px"></div>
         </div>
-        <textarea id="pasteBox" placeholder="What did Avrohom see?\tThree men\tTwo men\tA camel\tA king\tA"></textarea>
-        <div class="controls" style="margin-top:8px">
-          <button class="secondary" onclick="loadPasted(false)">Add pasted questions</button>
-          <button class="secondary" onclick="loadPasted(true)">Replace with pasted questions</button>
-          <button class="secondary" onclick="addEditorRow()">+ Add question manually</button>
+
+        <div class="card">
+          <h2 style="margin-top:0">Launch This Quiz</h2>
+          <div class="info-box">Every launch is independent. Launching the same saved quiz to ET and WT creates separate dates, sessions, answers, and results.</div>
+          <div class="launch-controls">
+            <label>Class<select id="launchClass"><option value="et">East Track</option><option value="wt">West Track</option></select></label>
+            <label>Mode<select id="launchMode"><option value="paced">One question at a time</option><option value="test">Open test</option></select></label>
+            <label>Launch note<input type="text" id="launchNote" placeholder="Optional"></label>
+            <button class="primary" onclick="launchSelectedQuiz()">Launch Quiz</button>
+          </div>
+          <div id="launchMsg" class="small" style="margin-top:9px"></div>
         </div>
-        <div id="editorRows"></div>
-        <div class="controls" style="margin-top:14px">
-          <button class="good" onclick="saveQuiz()">Save quiz</button>
-          <button class="primary" onclick="saveAndActivateQuiz()">Save & make active</button>
-          <button class="danger" id="deleteQuizBtn" onclick="deleteCurrentQuiz()">Delete quiz</button>
-        </div>
-        <div id="setupMsg" class="small" style="margin-top:9px"></div>
       </div>
     </div>
   </section>
 
   <section id="panelResults" class="panel">
-    <div class="card">
-      <div class="topline">
-        <div><h2 style="margin:0">Results</h2><div id="resultsQuizTitle" class="small"></div></div>
-        <div class="controls"><button class="primary" onclick="downloadCSV()">Download CSV</button><button class="secondary" onclick="copyResultsTSV()">Copy for Google Sheets</button></div>
+    <div class="setup-grid">
+      <div class="card">
+        <div class="topline"><h2 style="margin:0">Quiz History</h2><select id="resultsClassFilter" onchange="renderLaunchHistory()"><option value="all">All classes</option><option value="et">ET</option><option value="wt">WT</option></select></div>
+        <div class="small" style="margin:5px 0 12px">Each launch is preserved separately, including retakes.</div>
+        <div id="launchHistory" class="launch-list"></div>
       </div>
-      <div class="grid-wrap" style="margin-top:12px"><table id="resultsTable"></table></div>
+      <div>
+        <div class="card">
+          <div class="topline">
+            <div><h2 style="margin:0" id="resultsQuizTitle">Results</h2><div id="resultsMeta" class="small"></div></div>
+            <div class="controls"><button class="primary" onclick="downloadCSV()">Download CSV</button><button class="secondary" onclick="copyResultsTSV()">Copy for Google Sheets</button><button id="endSelectedBtn" class="danger hidden" onclick="endSelectedLaunch()">End this launch</button></div>
+          </div>
+          <div class="grid-wrap" style="margin-top:12px"><table id="resultsTable"></table></div>
+          <div class="small" style="margin-top:8px">Click a question result to review/adjust it. Parent-facing summaries use only the final adjusted result; the audit trail stays teacher-only.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="panelProgress" class="panel">
+    <div class="progress-layout">
+      <div class="card">
+        <h2 style="margin-top:0">Choose Student</h2>
+        <label style="font-weight:700">Class</label>
+        <select id="progressClass" style="width:100%;margin:5px 0 10px" onchange="populateProgressStudents()"><option value="et">East Track</option><option value="wt">West Track</option></select>
+        <label style="font-weight:700">Student</label>
+        <select id="progressStudent" style="width:100%;margin-top:5px" onchange="renderStudentProgress()"></select>
+      </div>
+      <div>
+        <div class="card">
+          <div class="topline"><div><h2 id="progressStudentName" style="margin:0">Student Progress</h2><div class="small">Uses final scores, with retakes replacing the earlier attempt for current skill averages.</div></div><button class="secondary" onclick="copyParentSummary()">Copy parent summary</button></div>
+          <div id="skillCards" class="skill-cards"></div>
+          <div id="parentSummary" class="parent-summary"></div>
+        </div>
+        <div class="card">
+          <h2 style="margin-top:0">Assessment History</h2>
+          <div class="grid-wrap"><table id="progressHistory"></table></div>
+        </div>
+      </div>
     </div>
   </section>
 </div>
 
 <script>
-const TEACHER_PASSWORD='class123'; // Same convenience-style lock as your current Game Show. Change if desired.
+const TEACHER_PASSWORD='class123';
+const GENERATE_WEEKLY_QUIZ_URL='https://us-central1-b3-games.cloudfunctions.net/generateWeeklyQuiz';
+
 function checkPassword(){
-  if(document.getElementById('lockPassword').value===TEACHER_PASSWORD){
-    document.getElementById('lockOverlay').style.display='none';
-    document.getElementById('mainContent').classList.remove('hidden');
-    sessionStorage.setItem('weeklyQuizTeacherUnlocked','yes');
-  }else document.getElementById('lockError').textContent='Incorrect password.';
+  if(document.getElementById('lockPassword').value===TEACHER_PASSWORD){document.getElementById('lockOverlay').style.display='none';document.getElementById('mainContent').classList.remove('hidden');sessionStorage.setItem('weeklyQuizTeacherUnlocked','yes');}
+  else document.getElementById('lockError').textContent='Incorrect password.';
 }
-if(sessionStorage.getItem('weeklyQuizTeacherUnlocked')==='yes'){
-  document.getElementById('lockOverlay').style.display='none'; document.getElementById('mainContent').classList.remove('hidden');
-}
+if(sessionStorage.getItem('weeklyQuizTeacherUnlocked')==='yes'){document.getElementById('lockOverlay').style.display='none';document.getElementById('mainContent').classList.remove('hidden');}
 
 const firebaseConfig={
   apiKey:"AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
@@ -223,176 +354,273 @@ const firebaseConfig={
   messagingSenderId:"568530046190",
   appId:"1:568530046190:web:fd765fdd27e55a3c73f7ff"
 };
-firebase.initializeApp(firebaseConfig);
-const db=firebase.database();
-
-let roster={}; let quizzes={}; let activeQuizId=''; let currentQuizId=''; let quizData=null; let sessionData={}; let responses={}; let currentQ=0; let editorQuestions=[];
-let activeQuizRef=null,sessionRef=null,responseRef=null;
+firebase.initializeApp(firebaseConfig);const db=firebase.database();
 
 const CLASS_ROSTERS={
-  et:{label:'ET',students:['chaim_chaikin','yossi_gourarie','sholom_huebner','moshe_lapine','kehos_notik','yisroel_oirechman','moshe_raichman','avrohom_rosenfeld','levi_rozmarin','arik_traxler','simcha_cohen']},
-  wt:{label:'WT',students:['ari_greenberg','zev_rosenfeld','levi_schtroks','yisroel_aryeh_simmonds','leibel_vogel','leib_wolf','simcha_cohen']}
+  et:{label:'East Track',students:['chaim_chaikin','yossi_gourarie','sholom_huebner','moshe_lapine','kehos_notik','yisroel_oirechman','moshe_raichman','avrohom_rosenfeld','levi_rozmarin','arik_traxler','simcha_cohen']},
+  wt:{label:'West Track',students:['ari_greenberg','zev_rosenfeld','levi_schtroks','yisroel_aryeh_simmonds','leibel_vogel','leib_wolf','simcha_cohen']}
 };
+const SKILL_LABELS={shorashim:'Shoreshim',translation:'Words & Phrases',comprehension:'Comprehension',mixed:'Mixed'};
 
-function asArray(v){ if(!v)return[]; if(Array.isArray(v))return v; return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]); }
-function slugTitle(s){ return String(s||'quiz').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,35)||'quiz'; }
-function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function showTab(name){ ['live','setup','results'].forEach(n=>{document.getElementById('panel'+n[0].toUpperCase()+n.slice(1)).classList.toggle('active',n===name);document.getElementById('tab'+n[0].toUpperCase()+n.slice(1)).classList.toggle('active',n===name);}); if(name==='results') renderResults(); }
+let roster={},quizzes={},allLaunches={},allResponses={},completions={},audit={};
+let currentQuizId='',editorQuestions=[],generatorCandidates=[];
+let liveClassId='et',activeLaunchByClass={},activeLaunchId='',liveLaunch=null,liveResponses={},currentQ=0;
+let liveLaunchRef=null,liveResponseRef=null;
+let resultsLaunchId='';
+let modalContext=null;
+
+function asArray(v){if(!v)return[];if(Array.isArray(v))return v;return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]);}
+function slugTitle(s){return String(s||'quiz').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,35)||'quiz';}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmtDate(ts){if(!ts)return'—';try{return new Date(Number(ts)).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return'—';}}
+function classLabel(id){return(CLASS_ROSTERS[id]||{}).label||id||'';}
+function skillLabel(id){return SKILL_LABELS[id]||id||'Comprehension';}
+function showTab(name){['live','setup','results','progress'].forEach(n=>{document.getElementById('panel'+n[0].toUpperCase()+n.slice(1)).classList.toggle('active',n===name);document.getElementById('tab'+n[0].toUpperCase()+n.slice(1)).classList.toggle('active',n===name);});if(name==='results')renderResults();if(name==='progress'){populateProgressStudents();renderStudentProgress();}}
 function setupMsg(t){document.getElementById('setupMsg').textContent=t||'';}
-function currentQuestions(){return quizData?asArray(quizData.questions):[];}
-function qState(i){const qs=sessionData.questionStates||{};return qs[i]||qs[String(i)]||{open:false,reveal:false};}
-function responseFor(studentId,i){const r=responses[studentId]||{};return r[i]||r[String(i)]||null;}
+function launchMsg(t){document.getElementById('launchMsg').textContent=t||'';}
 
-// Reuse the exact roster already approved for Posuk Practice/Shorashim.
-db.ref('posukPractice/allowedStudents').on('value',snap=>{roster=snap.val()||{};renderLiveGrid();renderResults();});
+// ---------- Shared data listeners ----------
+db.ref('posukPractice/allowedStudents').on('value',snap=>{roster=snap.val()||{};renderLiveGrid();renderResults();populateProgressStudents();});
 db.ref('b3Quiz/quizzes').on('value',snap=>{quizzes=snap.val()||{};renderQuizList();});
-db.ref('b3Quiz/settings/activeQuizId').on('value',snap=>{
-  activeQuizId=snap.val()||'';
-  if(!currentQuizId && activeQuizId) currentQuizId=activeQuizId;
-  attachActive(activeQuizId);
-  renderQuizList();
-});
+db.ref('b3Quiz/launches').on('value',snap=>{allLaunches=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
+db.ref('b3Quiz/responses').on('value',snap=>{allResponses=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
+db.ref('b3Quiz/completions').on('value',snap=>{completions=snap.val()||{};renderResults();renderStudentProgress();});
+db.ref('b3Quiz/audit').on('value',snap=>{audit=snap.val()||{};renderResults();renderStudentProgress();});
+db.ref('b3Quiz/settings/activeLaunchByClass').on('value',snap=>{activeLaunchByClass=snap.val()||{};attachLiveLaunch(activeLaunchByClass[liveClassId]||'');renderLaunchHistory();});
 
-function detachActive(){ if(activeQuizRef)activeQuizRef.off(); if(sessionRef)sessionRef.off(); if(responseRef)responseRef.off(); activeQuizRef=sessionRef=responseRef=null; }
-function attachActive(id){
-  detachActive(); quizData=null;sessionData={};responses={};currentQ=0;
-  if(!id){renderLive();renderLiveGrid();renderResults();return;}
-  activeQuizRef=db.ref('b3Quiz/quizzes/'+id); sessionRef=db.ref('b3Quiz/sessions/'+id); responseRef=db.ref('b3Quiz/responses/'+id);
-  activeQuizRef.on('value',s=>{quizData=s.val();renderLive();renderLiveGrid();renderResults();});
-  sessionRef.on('value',s=>{sessionData=s.val()||{}; if(sessionData.activeQuestion!==undefined)currentQ=Number(sessionData.activeQuestion)||0; renderLive();renderLiveGrid();});
-  responseRef.on('value',s=>{responses=s.val()||{};renderLiveGrid();renderResults();});
+// ---------- Built-in generator ----------
+function generatorTypeChanged(){
+  const t=document.getElementById('generatorType').value;
+  document.getElementById('mixedCounts').classList.toggle('hidden',t!=='mixed');
+  if(t!=='mixed')document.getElementById('editorSkillType').value=t;
 }
-
-function renderLive(){
-  const qs=currentQuestions();
-  const classLabel=quizData&&quizData.classId&&quizData.classId!=='all'?(CLASS_ROSTERS[quizData.classId]||{}).label:'';
-  document.getElementById('liveQuizTitle').textContent=quizData?(quizData.title||'Untitled quiz')+(classLabel?' • '+classLabel:''):'No active quiz';
-  document.getElementById('liveStatus').textContent=sessionData.started?'Live':'Not started';
-  document.getElementById('liveStatus').classList.toggle('live',!!sessionData.started);
-  document.getElementById('modeSelect').value=sessionData.mode||'paced';
-  if(!qs.length){ document.getElementById('liveQnum').textContent='Question —';document.getElementById('liveQtext').textContent='Choose or create a quiz in Quiz Setup.';document.getElementById('liveAnswer').textContent='';document.getElementById('questionStrip').innerHTML='';return; }
-  currentQ=Math.max(0,Math.min(qs.length-1,currentQ)); const q=qs[currentQ]; const st=qState(currentQ); const choices=asArray(q.choices);
-  document.getElementById('liveQnum').textContent='Question '+(currentQ+1)+' of '+qs.length+(st.open?' • OPEN':' • LOCKED');
-  document.getElementById('liveQtext').textContent=q.q||'';
-  document.getElementById('liveAnswer').textContent=st.reveal?'Correct answer: '+(choices[Number(q.correctIndex)]||''):'Correct answer: '+(choices[Number(q.correctIndex)]||'');
-  document.getElementById('revealBtn').textContent=st.reveal?'Hide answer from students':'Reveal answer to students';
-  const strip=document.getElementById('questionStrip'); strip.innerHTML='';
-  qs.forEach((_,i)=>{const s=qState(i);const b=document.createElement('button');b.textContent=i+1;if(i===currentQ)b.classList.add('active');if(s.open)b.classList.add('open');if(s.reveal)b.classList.add('reveal');b.onclick=()=>goQuestion(i);strip.appendChild(b);});
+async function generateQuizDraft(){
+  const sourceText=document.getElementById('generatorSource').value.trim(),quizType=document.getElementById('generatorType').value,choiceCount=Number(document.getElementById('generatorChoices').value)||3;
+  const mixedCounts={shorashim:Number(document.getElementById('mixedShoreshim').value)||0,translation:Number(document.getElementById('mixedTranslation').value)||0,comprehension:Number(document.getElementById('mixedComprehension').value)||0};
+  const count=quizType==='mixed'?(mixedCounts.shorashim+mixedCounts.translation+mixedCounts.comprehension):(Number(document.getElementById('generatorCount').value)||10);
+  if(!sourceText){alert('Paste the pesukim/source text first.');return;}
+  const btn=document.getElementById('generateBtn'),status=document.getElementById('generatorStatus');btn.disabled=true;status.textContent='Generating…';
+  try{
+    const resp=await fetch(GENERATE_WEEKLY_QUIZ_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sourceText,quizType,choiceCount,count,mixedCounts})});
+    const data=await resp.json().catch(()=>({}));
+    if(!resp.ok)throw new Error(data.error||'Generator service error');
+    generatorCandidates=(data.items||[]).map(x=>({selected:true,skillType:x.skillType||quizType,focus:x.focus||'',q:x.question||'',choices:asArray(x.choices),correctIndex:Number(x.correctIndex)||0,whySelected:x.whySelected||''}));
+    if(!generatorCandidates.length)throw new Error('No usable questions were returned.');
+    document.getElementById('generatorReview').classList.remove('hidden');renderCandidates();
+    const warning=data.warning?' '+data.warning:'';status.textContent='Generated '+generatorCandidates.length+' question(s).'+warning;
+    const label=document.getElementById('generatorSourceLabel').value.trim();if(label)document.getElementById('editorSourceLabel').value=label;
+    document.getElementById('editorSkillType').value=quizType;
+  }catch(e){console.error(e);status.textContent='Generator could not run: '+e.message+' If the Cloud Function is not deployed yet, use the included weekly-quiz-cloud-function.js.';}
+  finally{btn.disabled=false;}
 }
-
-function goQuestion(i){ currentQ=i; if(activeQuizId) db.ref('b3Quiz/sessions/'+activeQuizId+'/activeQuestion').set(i); else renderLive(); }
-function prevQuestion(){const qs=currentQuestions();if(qs.length)goQuestion(Math.max(0,currentQ-1));}
-async function nextQuestion(){
-  const qs=currentQuestions(); if(!qs.length)return;
-  const next=Math.min(qs.length-1,currentQ+1);
-  if((sessionData.mode||'paced')==='paced' && activeQuizId){
-    const updates={}; updates['questionStates/'+currentQ+'/open']=false; updates['activeQuestion']=next; updates['questionStates/'+next+'/open']=true; updates['questionStates/'+next+'/reveal']=false;
-    await db.ref('b3Quiz/sessions/'+activeQuizId).update(updates);
-  }else goQuestion(next);
-}
-async function setCurrentOpen(open){ if(!activeQuizId)return; await db.ref('b3Quiz/sessions/'+activeQuizId+'/questionStates/'+currentQ+'/open').set(!!open); }
-async function toggleReveal(){ if(!activeQuizId)return; const st=qState(currentQ); await db.ref('b3Quiz/sessions/'+activeQuizId+'/questionStates/'+currentQ+'/reveal').set(!st.reveal); }
-async function changeMode(){
-  if(!activeQuizId)return; const mode=document.getElementById('modeSelect').value; const qs=currentQuestions(); const updates={mode};
-  if(mode==='test') qs.forEach((_,i)=>{updates['questionStates/'+i+'/open']=true;updates['questionStates/'+i+'/reveal']=false;});
-  else qs.forEach((_,i)=>{updates['questionStates/'+i+'/open']=i===currentQ;updates['questionStates/'+i+'/reveal']=false;});
-  await db.ref('b3Quiz/sessions/'+activeQuizId).update(updates);
-}
-async function startQuiz(){
-  if(!activeQuizId||!currentQuestions().length){alert('Create and activate a quiz first.');return;}
-  const mode=document.getElementById('modeSelect').value; const qs=currentQuestions(); const updates={started:true,mode,activeQuestion:currentQ,startedAt:firebase.database.ServerValue.TIMESTAMP};
-  qs.forEach((_,i)=>{updates['questionStates/'+i+'/open']=mode==='test'||i===currentQ;updates['questionStates/'+i+'/reveal']=false;});
-  await db.ref('b3Quiz/sessions/'+activeQuizId).update(updates);
-}
-async function stopQuiz(){if(activeQuizId)await db.ref('b3Quiz/sessions/'+activeQuizId+'/started').set(false);}
-async function resetResponses(){
-  if(!activeQuizId)return; const x=prompt('This clears every student answer for this quiz. Type RESET to confirm:'); if(x!=='RESET')return;
-  await db.ref('b3Quiz/responses/'+activeQuizId).remove();
-}
-
-function rosterRows(){
-  const classId=quizData&&quizData.classId;
-  const allowed=CLASS_ROSTERS[classId]&&CLASS_ROSTERS[classId].students;
-  return Object.keys(roster).filter(id=>!allowed||allowed.includes(id)).map(id=>({id,name:(roster[id]&&roster[id].name)||id})).sort((a,b)=>a.name.localeCompare(b.name));
-}
-function renderLiveGrid(){
-  const table=document.getElementById('liveGrid'); if(!table)return; const qs=currentQuestions(); const students=rosterRows();
-  if(!qs.length){table.innerHTML='<tr><td>No active quiz.</td></tr>';document.getElementById('liveSummary').innerHTML='';return;}
-  let html='<thead><tr><th>Student</th>'+qs.map((_,i)=>'<th>Q'+(i+1)+'</th>').join('')+'<th>Score</th></tr></thead><tbody>';
-  students.forEach(st=>{
-    let correct=0,answered=0; html+='<tr><td>'+esc(st.name)+'</td>';
-    qs.forEach((q,i)=>{const r=responseFor(st.id,i);const locked=!qState(i).open;let cls='blank';let txt='—';if(r){answered++;if(r.correct){correct++;cls='correct';txt='✓';}else{cls='incorrect';txt='×';}}if(locked)cls+=' locked';html+='<td class="cell '+cls+'" onclick="inspectCell(\''+esc(st.id)+'\','+i+')">'+txt+'</td>';});
-    const pct=answered?Math.round(correct/qs.length*100):0; html+='<td><b>'+correct+'/'+qs.length+'</b> ('+pct+'%)</td></tr>';
+function renderCandidates(){
+  const box=document.getElementById('candidateList');box.innerHTML='';
+  generatorCandidates.forEach((x,i)=>{
+    const div=document.createElement('div');div.className='candidate';
+    const ans=x.choices[Number(x.correctIndex)]||'';
+    div.innerHTML='<input type="checkbox" '+(x.selected?'checked':'')+' onchange="generatorCandidates['+i+'].selected=this.checked"><div><div class="focus">'+esc(x.focus||x.q)+' <span class="skill-tag">'+esc(skillLabel(x.skillType))+'</span></div><div>'+esc(x.q)+'</div><div class="answer">Correct: '+esc(ans)+'</div><div class="reason">'+esc(x.whySelected||'')+'</div></div>';
+    box.appendChild(div);
   });
-  table.innerHTML=html+'</tbody>';
-  let totalAnswered=0,totalCorrect=0; Object.keys(responses).forEach(sid=>{Object.values(responses[sid]||{}).forEach(r=>{if(r){totalAnswered++;if(r.correct)totalCorrect++;}})});
-  document.getElementById('liveSummary').innerHTML='<div class="summary"><div>Students</div><b>'+students.length+'</b></div><div class="summary"><div>Answers submitted</div><b>'+totalAnswered+'</b></div><div class="summary"><div>Correct answers</div><b>'+totalCorrect+'</b></div>';
 }
-function inspectCell(studentId,i){
-  const r=responseFor(studentId,i); if(!r)return; const st=roster[studentId]||{}; const qs=currentQuestions(); const q=qs[i]; const choices=asArray(q.choices); const chosen=choices[Number(r.choiceIndex)]||'(unknown)';
-  const clear=confirm(((st.name||studentId)+' — Question '+(i+1)+'\n\nAnswer: '+chosen+'\nResult: '+(r.correct?'Correct':'Incorrect')+'\n\nPress OK to CLEAR this answer so the student may try again.\nPress Cancel to leave it unchanged.'));
-  if(clear) db.ref('b3Quiz/responses/'+activeQuizId+'/'+studentId+'/'+i).remove();
+function setAllCandidates(v){generatorCandidates.forEach(x=>x.selected=!!v);renderCandidates();}
+function addSelectedCandidates(replace){
+  const chosen=generatorCandidates.filter(x=>x.selected).map(x=>({q:x.q,choices:x.choices.slice(),correctIndex:Number(x.correctIndex)||0,skillType:x.skillType}));
+  if(!chosen.length){alert('Nothing is selected.');return;}
+  if(replace)editorQuestions=[];editorQuestions.push(...chosen);renderEditorRows();setupMsg((replace?'Replaced editor with ':'Added ')+chosen.length+' generated question(s). Review them, then save.');
 }
 
+// ---------- Quiz library / editor ----------
 function renderQuizList(){
-  const box=document.getElementById('quizList'); if(!box)return; box.innerHTML=''; const ids=Object.keys(quizzes).sort((a,b)=>((quizzes[b].createdAt||0)-(quizzes[a].createdAt||0)));
-  if(!ids.length){box.innerHTML='<div class="small">No quizzes yet. Click + New.</div>';return;}
-  ids.forEach(id=>{const q=quizzes[id]||{};const classLabel=q.classId&&q.classId!=='all'?((CLASS_ROSTERS[q.classId]||{}).label||q.classId):'All B3';const div=document.createElement('div');div.className='quiz-item'+(id===activeQuizId?' active':'');div.innerHTML='<div class="quiz-item-title">'+esc(q.title||'Untitled')+'</div><div class="small">'+esc(classLabel)+' • '+asArray(q.questions).length+' questions'+(id===activeQuizId?' • ACTIVE':'')+'</div>';div.onclick=()=>loadQuizEditor(id);box.appendChild(div);});
+  const box=document.getElementById('quizList');if(!box)return;box.innerHTML='';
+  const ids=Object.keys(quizzes).sort((a,b)=>((quizzes[b].updatedAt||quizzes[b].createdAt||0)-(quizzes[a].updatedAt||quizzes[a].createdAt||0)));
+  if(!ids.length){box.innerHTML='<div class="small">No quizzes yet. Click + New or use the generator.</div>';return;}
+  ids.forEach(id=>{const q=quizzes[id]||{},div=document.createElement('div');div.className='quiz-item'+(id===currentQuizId?' active':'');div.innerHTML='<div class="quiz-item-title">'+esc(q.title||'Untitled')+'</div><div class="small">'+esc(skillLabel(q.skillType||'comprehension'))+' • '+asArray(q.questions).length+' questions</div>';div.onclick=()=>loadQuizEditor(id);box.appendChild(div);});
 }
-function newQuizDraft(){currentQuizId='';document.getElementById('editorTitle').value='';document.getElementById('editorClass').value='all';editorQuestions=[];renderEditorRows();document.getElementById('deleteQuizBtn').disabled=true;setupMsg('New quiz draft.');}
-function loadQuizEditor(id){currentQuizId=id;const q=quizzes[id]||{};document.getElementById('editorTitle').value=q.title||'';document.getElementById('editorClass').value=CLASS_ROSTERS[q.classId]?q.classId:'all';editorQuestions=asArray(q.questions).map(x=>({q:x.q||'',choices:asArray(x.choices),correctIndex:Number(x.correctIndex)||0}));renderEditorRows();document.getElementById('deleteQuizBtn').disabled=false;setupMsg(id===activeQuizId?'This is the active quiz.':'Loaded saved quiz.');}
-function addEditorRow(data){editorQuestions.push(data||{q:'',choices:['','','',''],correctIndex:0});renderEditorRows();}
+function newQuizDraft(){
+  currentQuizId='';document.getElementById('editorTitle').value='';document.getElementById('editorSkillType').value='shorashim';document.getElementById('editorSourceLabel').value='';editorQuestions=[];renderEditorRows();document.getElementById('deleteQuizBtn').disabled=true;setupMsg('New quiz draft.');renderQuizList();
+}
+function loadQuizEditor(id){
+  currentQuizId=id;const q=quizzes[id]||{};document.getElementById('editorTitle').value=q.title||'';document.getElementById('editorSkillType').value=q.skillType||'comprehension';document.getElementById('editorSourceLabel').value=q.sourceLabel||'';
+  editorQuestions=asArray(q.questions).map(x=>({q:x.q||'',choices:asArray(x.choices),correctIndex:Number(x.correctIndex)||0,skillType:x.skillType||q.skillType||'comprehension'}));renderEditorRows();document.getElementById('deleteQuizBtn').disabled=false;setupMsg('Loaded saved quiz.');renderQuizList();
+}
+function defaultEditorChoices(){return document.getElementById('generatorChoices').value==='4'?['','','','']:['','',''];}
+function addEditorRow(data){editorQuestions.push(data||{q:'',choices:defaultEditorChoices(),correctIndex:0,skillType:document.getElementById('editorSkillType').value==='mixed'?'comprehension':document.getElementById('editorSkillType').value});renderEditorRows();}
+function editorSkillChanged(){const t=document.getElementById('editorSkillType').value;if(t!=='mixed')editorQuestions.forEach(x=>x.skillType=t);renderEditorRows();}
 function renderEditorRows(){
-  const box=document.getElementById('editorRows');box.innerHTML='';editorQuestions.forEach((r,i)=>{
-    while(r.choices.length<4)r.choices.push('');
-    const d=document.createElement('div');d.className='editor-row';d.innerHTML='<div class="editor-head"><b>Question '+(i+1)+'</b><button class="danger" style="padding:5px 9px" onclick="removeEditorRow('+i+')">Remove</button></div><input type="text" dir="auto" value="'+esc(r.q)+'" oninput="editorQuestions['+i+'].q=this.value" placeholder="Question"><div class="choice-grid">'+r.choices.slice(0,4).map((c,ci)=>'<div><label style="font-size:12px">'+String.fromCharCode(65+ci)+(Number(r.correctIndex)===ci?' ✓ correct':'')+'</label><input type="text" dir="auto" value="'+esc(c)+'" oninput="editorQuestions['+i+'].choices['+ci+']=this.value"></div>').join('')+'</div><div style="margin-top:7px"><label style="font-size:12px">Correct answer</label> <select onchange="editorQuestions['+i+'].correctIndex=Number(this.value);renderEditorRows()">'+[0,1,2,3].map(ci=>'<option value="'+ci+'" '+(Number(r.correctIndex)===ci?'selected':'')+'>'+String.fromCharCode(65+ci)+'</option>').join('')+'</select></div>';
+  const box=document.getElementById('editorRows');box.innerHTML='';const quizSkill=document.getElementById('editorSkillType').value;
+  editorQuestions.forEach((r,i)=>{
+    if(!Array.isArray(r.choices))r.choices=[];while(r.choices.length<3)r.choices.push('');if(r.choices.length>4)r.choices=r.choices.slice(0,4);
+    const d=document.createElement('div');d.className='editor-row';
+    d.innerHTML='<div class="editor-head"><b>Question '+(i+1)+'</b><div class="controls"><select onchange="editorQuestions['+i+'].skillType=this.value" '+(quizSkill!=='mixed'?'disabled':'')+'><option value="shorashim" '+(r.skillType==='shorashim'?'selected':'')+'>Shoreshim</option><option value="translation" '+(r.skillType==='translation'?'selected':'')+'>Words & Phrases</option><option value="comprehension" '+(r.skillType==='comprehension'?'selected':'')+'>Comprehension</option></select><button class="danger" style="padding:5px 9px" onclick="removeEditorRow('+i+')">Remove</button></div></div><input type="text" dir="auto" value="'+esc(r.q)+'" oninput="editorQuestions['+i+'].q=this.value" placeholder="Question"><div class="choice-grid">'+r.choices.map((c,ci)=>'<div><label style="font-size:12px">'+String.fromCharCode(65+ci)+(Number(r.correctIndex)===ci?' ✓ correct':'')+'</label><input type="text" dir="auto" value="'+esc(c)+'" oninput="editorQuestions['+i+'].choices['+ci+']=this.value"></div>').join('')+'</div><div class="controls" style="margin-top:7px"><label style="font-size:12px">Correct answer <select onchange="editorQuestions['+i+'].correctIndex=Number(this.value);renderEditorRows()">'+r.choices.map((_,ci)=>'<option value="'+ci+'" '+(Number(r.correctIndex)===ci?'selected':'')+'>'+String.fromCharCode(65+ci)+'</option>').join('')+'</select></label>'+(r.choices.length<4?'<button class="secondary" onclick="addChoice('+i+')">+ 4th choice</button>':'<button class="secondary" onclick="removeFourthChoice('+i+')">Use 3 choices</button>')+'</div>';
     box.appendChild(d);
   });
 }
+function addChoice(i){if(editorQuestions[i].choices.length<4)editorQuestions[i].choices.push('');renderEditorRows();}
+function removeFourthChoice(i){if(editorQuestions[i].choices.length>3){editorQuestions[i].choices=editorQuestions[i].choices.slice(0,3);if(editorQuestions[i].correctIndex>2)editorQuestions[i].correctIndex=0;}renderEditorRows();}
 function removeEditorRow(i){editorQuestions.splice(i,1);renderEditorRows();}
-function parseCorrectToken(token,choices){
-  const t=String(token||'').trim(); if(/^[A-Da-d]$/.test(t))return t.toUpperCase().charCodeAt(0)-65; if(/^[1-4]$/.test(t))return Number(t)-1; const idx=choices.findIndex(c=>c.trim().toLowerCase()===t.toLowerCase()); return idx>=0?idx:0;
-}
+function parseCorrectToken(token,choices){const t=String(token||'').trim();if(/^[A-Da-d]$/.test(t))return t.toUpperCase().charCodeAt(0)-65;if(/^[1-4]$/.test(t))return Number(t)-1;const idx=choices.findIndex(c=>c.trim().toLowerCase()===t.toLowerCase());return idx>=0?idx:0;}
 function parsePasted(text){
   return text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(line=>{
-    const cells=line.includes('\t')?line.split('\t'):line.split(','); const q=(cells.shift()||'').trim(); const correct=(cells.pop()||'').trim(); const choices=cells.map(x=>x.trim()).filter(Boolean).slice(0,4); while(choices.length<4)choices.push(''); return {q,choices,correctIndex:parseCorrectToken(correct,choices)};
-  }).filter(x=>x.q);
+    let cells=line.includes('\t')?line.split('\t'):line.split(',');cells=cells.map(x=>x.trim());const q=(cells.shift()||'').trim(),correct=(cells.pop()||'').trim();const choices=cells.filter(Boolean).slice(0,4);return{q,choices,correctIndex:parseCorrectToken(correct,choices),skillType:document.getElementById('editorSkillType').value==='mixed'?'comprehension':document.getElementById('editorSkillType').value};
+  }).filter(x=>x.q&&x.choices.length>=2);
 }
-function loadPasted(replace){const rows=parsePasted(document.getElementById('pasteBox').value);if(!rows.length){alert('Nothing usable was found. Paste one question per line.');return;}if(replace)editorQuestions=[];editorQuestions.push(...rows);document.getElementById('pasteBox').value='';renderEditorRows();setupMsg('Loaded '+rows.length+' question(s) into the editor.');}
+function loadPasted(replace){const rows=parsePasted(document.getElementById('pasteBox').value);if(!rows.length){alert('Nothing usable was found. Copy rows from Sheets/Excel, or use comma-separated rows.');return;}if(replace)editorQuestions=[];editorQuestions.push(...rows);document.getElementById('pasteBox').value='';renderEditorRows();setupMsg('Loaded '+rows.length+' question(s) into the editor.');}
 function cleanedEditorQuestions(){
-  return editorQuestions.map(r=>{const choices=r.choices.map(x=>String(x||'').trim()).filter(Boolean);let ci=Number(r.correctIndex)||0;if(ci>=choices.length)ci=0;return{q:String(r.q||'').trim(),choices,correctIndex:ci};}).filter(r=>r.q&&r.choices.length>=2);
+  const quizSkill=document.getElementById('editorSkillType').value;
+  return editorQuestions.map(r=>{const choices=r.choices.map(x=>String(x||'').trim()).filter(Boolean).slice(0,4);let ci=Number(r.correctIndex)||0;if(ci>=choices.length)ci=0;return{q:String(r.q||'').trim(),choices,correctIndex:ci,skillType:quizSkill==='mixed'?(r.skillType||'comprehension'):quizSkill};}).filter(r=>r.q&&r.choices.length>=2);
 }
-async function saveQuiz(makeActive=false){
-  const title=document.getElementById('editorTitle').value.trim(); const classId=document.getElementById('editorClass').value; const questions=cleanedEditorQuestions(); if(!title){alert('Give the quiz a title.');return null;} if(!questions.length){alert('Add at least one question with at least two choices.');return null;}
-  let id=currentQuizId; if(!id) id=Date.now()+'_'+slugTitle(title); const existing=quizzes[id]||{};
-  await db.ref('b3Quiz/quizzes/'+id).set({title,classId,questions,createdAt:existing.createdAt||firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP}); currentQuizId=id;
-  if(makeActive){await db.ref('b3Quiz/settings/activeQuizId').set(id); const state={started:false,mode:'paced',activeQuestion:0,questionStates:{}};questions.forEach((_,i)=>{state.questionStates[i]={open:i===0,reveal:false};});await db.ref('b3Quiz/sessions/'+id).set(state);}
-  setupMsg(makeActive?'Saved and made active.':'Saved.');document.getElementById('deleteQuizBtn').disabled=false;return id;
+async function saveQuiz(){
+  const title=document.getElementById('editorTitle').value.trim(),skillType=document.getElementById('editorSkillType').value,sourceLabel=document.getElementById('editorSourceLabel').value.trim(),questions=cleanedEditorQuestions();
+  if(!title){alert('Give the quiz a title.');return null;}if(!questions.length){alert('Add at least one question with at least two choices.');return null;}
+  let id=currentQuizId;if(!id)id=Date.now()+'_'+slugTitle(title);const existing=quizzes[id]||{};
+  await db.ref('b3Quiz/quizzes/'+id).set({title,skillType,sourceLabel,questions,createdAt:existing.createdAt||firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP});currentQuizId=id;setupMsg('Saved.');document.getElementById('deleteQuizBtn').disabled=false;renderQuizList();return id;
 }
-function saveAndActivateQuiz(){saveQuiz(true);}
 async function deleteCurrentQuiz(){
-  if(!currentQuizId)return; const title=(quizzes[currentQuizId]&&quizzes[currentQuizId].title)||'this quiz'; const x=prompt('Delete "'+title+'" and its responses? Type DELETE to confirm:');if(x!=='DELETE')return;
-  const id=currentQuizId; await Promise.all([db.ref('b3Quiz/quizzes/'+id).remove(),db.ref('b3Quiz/sessions/'+id).remove(),db.ref('b3Quiz/responses/'+id).remove()]); if(activeQuizId===id)await db.ref('b3Quiz/settings/activeQuizId').remove();newQuizDraft();
+  if(!currentQuizId)return;const title=(quizzes[currentQuizId]&&quizzes[currentQuizId].title)||'this quiz',x=prompt('Delete "'+title+'" from the saved quiz library? Historical launches and results will NOT be deleted. Type DELETE to confirm:');if(x!=='DELETE')return;
+  await db.ref('b3Quiz/quizzes/'+currentQuizId).remove();newQuizDraft();
 }
 
+// ---------- Launching: ET and WT are independent ----------
+function makeQuestionStates(questions,mode){const out={};questions.forEach((_,i)=>out[i]={open:mode==='test'||i===0,reveal:false});return out;}
+async function launchSelectedQuiz(){
+  if(!currentQuizId||!quizzes[currentQuizId]){alert('Choose and save a quiz first.');return;}
+  const classId=document.getElementById('launchClass').value,mode=document.getElementById('launchMode').value,note=document.getElementById('launchNote').value.trim(),quiz=quizzes[currentQuizId],questions=asArray(quiz.questions);
+  if(!questions.length){alert('This quiz has no questions.');return;}
+  const old=activeLaunchByClass[classId]||'';
+  if(old&&!confirm(classLabel(classId)+' already has an active launch. Replace the active launch? The old results will remain saved.'))return;
+  const id=Date.now()+'_'+classId+'_'+slugTitle(quiz.title),snapshot={title:quiz.title||'Untitled',skillType:quiz.skillType||'comprehension',sourceLabel:quiz.sourceLabel||'',questions};
+  const launch={quizId:currentQuizId,quizSnapshot:snapshot,classId,note,createdAt:firebase.database.ServerValue.TIMESTAMP,started:false,mode,activeQuestion:0,questionStates:makeQuestionStates(questions,mode),attemptGroupId:id,attemptNumber:1,retakeOf:''};
+  await db.ref('b3Quiz/launches/'+id).set(launch);await db.ref('b3Quiz/settings/activeLaunchByClass/'+classId).set(id);
+  launchMsg('Launched to '+classLabel(classId)+'. It is staged and ready. Click Start on the Live Quiz tab.');liveClassId=classId;document.getElementById('liveClassSelect').value=classId;showTab('live');
+}
+
+// ---------- Live view ----------
+function changeLiveClass(){liveClassId=document.getElementById('liveClassSelect').value;attachLiveLaunch(activeLaunchByClass[liveClassId]||'');}
+function detachLive(){if(liveLaunchRef)liveLaunchRef.off();if(liveResponseRef)liveResponseRef.off();liveLaunchRef=liveResponseRef=null;}
+function attachLiveLaunch(id){
+  if(id===activeLaunchId&&liveLaunchRef)return;detachLive();activeLaunchId=id;liveLaunch=null;liveResponses={};currentQ=0;
+  if(!id){renderLive();renderLiveGrid();return;}
+  liveLaunchRef=db.ref('b3Quiz/launches/'+id);liveResponseRef=db.ref('b3Quiz/responses/'+id);
+  liveLaunchRef.on('value',s=>{liveLaunch=s.val();if(liveLaunch&&liveLaunch.activeQuestion!==undefined)currentQ=Number(liveLaunch.activeQuestion)||0;renderLive();renderLiveGrid();});
+  liveResponseRef.on('value',s=>{liveResponses=s.val()||{};renderLiveGrid();});
+}
+function liveQuestions(){return liveLaunch&&liveLaunch.quizSnapshot?asArray(liveLaunch.quizSnapshot.questions):[];}
+function qState(i,launch=liveLaunch){const qs=(launch&&launch.questionStates)||{};return qs[i]||qs[String(i)]||{open:false,reveal:false};}
+function responseFor(studentId,i,responses=liveResponses){const r=responses[studentId]||{};return r[i]||r[String(i)]||null;}
+function renderLive(){
+  const qs=liveQuestions(),snap=liveLaunch&&liveLaunch.quizSnapshot||{};
+  document.getElementById('liveQuizTitle').textContent=liveLaunch?(snap.title||'Untitled'):'No active launch for '+classLabel(liveClassId);
+  document.getElementById('liveLaunchMeta').textContent=liveLaunch?(classLabel(liveLaunch.classId)+' • '+skillLabel(snap.skillType)+' • created '+fmtDate(liveLaunch.createdAt)+(liveLaunch.note?' • '+liveLaunch.note:'')):'';
+  document.getElementById('liveStatus').textContent=liveLaunch&&liveLaunch.started?'Live':'Not started';document.getElementById('liveStatus').classList.toggle('live',!!(liveLaunch&&liveLaunch.started));
+  document.getElementById('modeSelect').value=liveLaunch&&liveLaunch.mode||'paced';
+  if(!qs.length){document.getElementById('liveQnum').textContent='Question —';document.getElementById('liveQtext').textContent='Launch a quiz to ET or WT from Quiz Setup.';document.getElementById('liveAnswer').textContent='';document.getElementById('questionStrip').innerHTML='';return;}
+  currentQ=Math.max(0,Math.min(qs.length-1,currentQ));const q=qs[currentQ],st=qState(currentQ),choices=asArray(q.choices);
+  document.getElementById('liveQnum').textContent='Question '+(currentQ+1)+' of '+qs.length+(st.open?' • OPEN':' • LOCKED');document.getElementById('liveQtext').textContent=q.q||'';document.getElementById('liveAnswer').textContent='Correct answer: '+(choices[Number(q.correctIndex)]||'');document.getElementById('revealBtn').textContent=st.reveal?'Hide answer from students':'Reveal answer to students';
+  const strip=document.getElementById('questionStrip');strip.innerHTML='';qs.forEach((_,i)=>{const s=qState(i),b=document.createElement('button');b.textContent=i+1;if(i===currentQ)b.classList.add('active');if(s.open)b.classList.add('open');if(s.reveal)b.classList.add('reveal');b.onclick=()=>goQuestion(i);strip.appendChild(b);});
+}
+function goQuestion(i){currentQ=i;if(activeLaunchId)db.ref('b3Quiz/launches/'+activeLaunchId+'/activeQuestion').set(i);else renderLive();}
+function prevQuestion(){const qs=liveQuestions();if(qs.length)goQuestion(Math.max(0,currentQ-1));}
+async function nextQuestion(){const qs=liveQuestions();if(!qs.length||!activeLaunchId)return;const next=Math.min(qs.length-1,currentQ+1);if((liveLaunch.mode||'paced')==='paced'){const updates={};updates['questionStates/'+currentQ+'/open']=false;updates['activeQuestion']=next;updates['questionStates/'+next+'/open']=true;updates['questionStates/'+next+'/reveal']=false;await db.ref('b3Quiz/launches/'+activeLaunchId).update(updates);}else goQuestion(next);}
+async function setCurrentOpen(open){if(activeLaunchId)await db.ref('b3Quiz/launches/'+activeLaunchId+'/questionStates/'+currentQ+'/open').set(!!open);}
+async function toggleReveal(){if(!activeLaunchId)return;await db.ref('b3Quiz/launches/'+activeLaunchId+'/questionStates/'+currentQ+'/reveal').set(!qState(currentQ).reveal);}
+async function changeMode(){if(!activeLaunchId)return;const mode=document.getElementById('modeSelect').value,qs=liveQuestions(),updates={mode};qs.forEach((_,i)=>{updates['questionStates/'+i+'/open']=mode==='test'||i===currentQ;updates['questionStates/'+i+'/reveal']=false;});await db.ref('b3Quiz/launches/'+activeLaunchId).update(updates);}
+async function startLaunch(){if(!activeLaunchId||!liveQuestions().length){alert('Launch a quiz first.');return;}const updates={started:true,startedAt:liveLaunch.startedAt||firebase.database.ServerValue.TIMESTAMP};await db.ref('b3Quiz/launches/'+activeLaunchId).update(updates);}
+async function stopLaunch(){
+  if(!activeLaunchId||!liveLaunch)return;if(!confirm('End this '+classLabel(liveLaunch.classId)+' launch? All data stays saved.'))return;
+  await db.ref('b3Quiz/launches/'+activeLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP});if(activeLaunchByClass[liveLaunch.classId]===activeLaunchId)await db.ref('b3Quiz/settings/activeLaunchByClass/'+liveLaunch.classId).remove();
+}
+function rosterRowsForLaunch(launch=liveLaunch){
+  if(!launch)return[];const targets=launch.targetStudents&&Object.keys(launch.targetStudents).filter(k=>launch.targetStudents[k]);const allowed=targets&&targets.length?targets:(CLASS_ROSTERS[launch.classId]||{}).students||[];
+  return allowed.map(id=>({id,name:(roster[id]&&roster[id].name)||id})).filter(x=>x.id!=='simcha_cohen').sort((a,b)=>a.name.localeCompare(b.name));
+}
+function renderLiveGrid(){
+  const table=document.getElementById('liveGrid');if(!table)return;const qs=liveQuestions(),students=rosterRowsForLaunch();
+  if(!qs.length){table.innerHTML='<tr><td>No active launch.</td></tr>';document.getElementById('liveSummary').innerHTML='';return;}
+  let html='<thead><tr><th>Student</th>'+qs.map((_,i)=>'<th>Q'+(i+1)+'</th>').join('')+'<th>Score</th></tr></thead><tbody>';
+  students.forEach(st=>{let correct=0,answered=0;html+='<tr><td>'+esc(st.name)+'</td>';qs.forEach((q,i)=>{const r=responseFor(st.id,i),locked=!qState(i).open;let cls='blank',txt='—';if(r){answered++;if(r.correct){correct++;cls='correct';txt='✓';}else{cls='incorrect';txt='×';}if(r.adjusted)cls+=' adjusted';}if(locked)cls+=' locked';html+='<td class="cell '+cls+'" onclick="openAnswerModal(\''+esc(st.id)+'\','+i+',\'live\')">'+txt+'</td>';});html+='<td><b>'+correct+'/'+qs.length+'</b> ('+Math.round(correct/qs.length*100)+'%)</td></tr>';});table.innerHTML=html+'</tbody>';
+  let totalAnswered=0,totalCorrect=0;Object.values(liveResponses).forEach(sr=>Object.values(sr||{}).forEach(r=>{if(r){totalAnswered++;if(r.correct)totalCorrect++;}}));document.getElementById('liveSummary').innerHTML='<div class="summary"><div>Students</div><b>'+students.length+'</b></div><div class="summary"><div>Answers submitted</div><b>'+totalAnswered+'</b></div><div class="summary"><div>Final correct</div><b>'+totalCorrect+'</b></div>';
+}
+
+// ---------- Answer review / adjustment audit ----------
+function launchById(id){return allLaunches[id]||(id===activeLaunchId?liveLaunch:null);}
+function responsesByLaunch(id){return allResponses[id]||(id===activeLaunchId?liveResponses:{});}
+function openAnswerModal(studentId,i,source,launchId){
+  const lid=launchId||(source==='live'?activeLaunchId:resultsLaunchId),launch=launchById(lid),responses=responsesByLaunch(lid),r=responseFor(studentId,i,responses);if(!launch||!r)return;
+  const q=asArray(launch.quizSnapshot&&launch.quizSnapshot.questions)[i],choices=asArray(q&&q.choices),chosen=choices[Number(r.choiceIndex)]||'(unknown)',correct=choices[Number(q.correctIndex)]||'(unknown)',st=roster[studentId]||{};
+  modalContext={launchId:lid,studentId,i,response:r};document.getElementById('modalAdjustmentNote').value='';document.getElementById('modalAnswerInfo').innerHTML='<b>'+esc(st.name||r.name||studentId)+'</b> — Question '+(i+1)+'<br><br><b>Question:</b> '+esc(q.q||'')+'<br><b>Student answer:</b> '+esc(chosen)+'<br><b>Answer key:</b> '+esc(correct)+'<br><b>Current final result:</b> '+(r.correct?'Correct':'Incorrect')+(r.adjusted?' <span class="audit-note">(teacher adjusted)</span>':'');document.getElementById('answerModal').classList.remove('hidden');
+}
+function closeAnswerModal(){document.getElementById('answerModal').classList.add('hidden');modalContext=null;}
+async function writeAudit(type,before,after,note,extra={}){if(!modalContext)return;const ref=db.ref('b3Quiz/audit/'+modalContext.launchId+'/'+modalContext.studentId).push();await ref.set({type,questionIndex:modalContext.i,before,after,note:note||'',at:firebase.database.ServerValue.TIMESTAMP,...extra});}
+async function adjustCurrentAnswer(markCorrect){
+  if(!modalContext)return;const note=document.getElementById('modalAdjustmentNote').value.trim(),r=modalContext.response,before=!!r.correct;if(before===!!markCorrect&&!note){closeAnswerModal();return;}
+  await writeAudit('score_adjustment',before,!!markCorrect,note,{originalCorrect:r.originalCorrect!==undefined?!!r.originalCorrect:before});await db.ref('b3Quiz/responses/'+modalContext.launchId+'/'+modalContext.studentId+'/'+modalContext.i).update({correct:!!markCorrect,adjusted:true,adjustedAt:firebase.database.ServerValue.TIMESTAMP,adjustmentNote:note||''});closeAnswerModal();
+}
+async function clearCurrentAnswer(){
+  if(!modalContext)return;if(!confirm('Clear this answer so the student may try this question again? The original answer will remain in the teacher audit trail.'))return;const note=document.getElementById('modalAdjustmentNote').value.trim(),r=modalContext.response;await writeAudit('answer_cleared',r,null,note,{clearedResponse:r});await db.ref('b3Quiz/responses/'+modalContext.launchId+'/'+modalContext.studentId+'/'+modalContext.i).remove();closeAnswerModal();
+}
+
+// ---------- Results / history ----------
+function launchResponses(id){return allResponses[id]||{};}
+function launchQuestions(l){return l&&l.quizSnapshot?asArray(l.quizSnapshot.questions):[];}
+function launchStudentRows(l){return rosterRowsForLaunch(l);}
+function launchScore(lid,studentId){const l=allLaunches[lid],qs=launchQuestions(l),rr=allResponses[lid]||{},sr=rr[studentId]||{};let correct=0,answered=0;qs.forEach((_,i)=>{const r=sr[i]||sr[String(i)];if(r){answered++;if(r.correct)correct++;}});return{correct,answered,total:qs.length,pct:qs.length?Math.round(correct/qs.length*100):0};}
+function renderLaunchHistory(){
+  const box=document.getElementById('launchHistory');if(!box)return;const filter=document.getElementById('resultsClassFilter')?document.getElementById('resultsClassFilter').value:'all';let ids=Object.keys(allLaunches).filter(id=>filter==='all'||allLaunches[id].classId===filter).sort((a,b)=>(Number(allLaunches[b].createdAt)||0)-(Number(allLaunches[a].createdAt)||0));box.innerHTML='';
+  if(!ids.length){box.innerHTML='<div class="small">No quiz launches yet.</div>';return;}
+  ids.forEach(id=>{const l=allLaunches[id]||{},snap=l.quizSnapshot||{},target=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[],retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'',div=document.createElement('div');div.className='launch-item'+(id===resultsLaunchId?' active':'');div.innerHTML='<div class="launch-item-title">'+esc(snap.title||'Untitled')+'</div><div class="small">'+esc(classLabel(l.classId))+retake+(target.length?' • '+esc((roster[target[0]]&&roster[target[0]].name)||target[0]):'')+' • '+esc(fmtDate(l.createdAt))+(l.started?' • ACTIVE':'')+'</div>';div.onclick=()=>{resultsLaunchId=id;renderLaunchHistory();renderResults();};box.appendChild(div);});
+  if(!resultsLaunchId&&ids[0]){resultsLaunchId=ids[0];renderLaunchHistory();renderResults();}
+}
 function renderResults(){
-  const table=document.getElementById('resultsTable');if(!table)return;const qs=currentQuestions();const students=rosterRows();document.getElementById('resultsQuizTitle').textContent=quizData?(quizData.title||''):'';
-  if(!qs.length){table.innerHTML='<tr><td>No active quiz.</td></tr>';return;}
-  let html='<thead><tr><th>Student</th><th>Score</th><th>Percent</th>'+qs.map((_,i)=>'<th>Q'+(i+1)+'</th>').join('')+'</tr></thead><tbody>';
-  students.forEach(st=>{let correct=0;const cells=qs.map((q,i)=>{const r=responseFor(st.id,i);if(r&&r.correct)correct++;return'<td>'+(r?(r.correct?'Correct':'Incorrect'):'—')+'</td>';}).join('');html+='<tr><td>'+esc(st.name)+'</td><td>'+correct+'/'+qs.length+'</td><td>'+Math.round(correct/qs.length*100)+'%</td>'+cells+'</tr>';});table.innerHTML=html+'</tbody>';
+  const table=document.getElementById('resultsTable');if(!table)return;const l=allLaunches[resultsLaunchId];if(!l){table.innerHTML='<tr><td>Choose a launch from Quiz History.</td></tr>';document.getElementById('resultsQuizTitle').textContent='Results';document.getElementById('resultsMeta').textContent='';return;}
+  const qs=launchQuestions(l),students=launchStudentRows(l),rr=allResponses[resultsLaunchId]||{},snap=l.quizSnapshot||{},retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'';
+  document.getElementById('resultsQuizTitle').textContent=snap.title||'Results';document.getElementById('resultsMeta').textContent=classLabel(l.classId)+' • '+skillLabel(snap.skillType)+' • '+fmtDate(l.createdAt)+retake+(l.note?' • '+l.note:'');
+  const endBtn=document.getElementById('endSelectedBtn');endBtn.classList.toggle('hidden',!l.started);
+  if(!qs.length){table.innerHTML='<tr><td>No questions.</td></tr>';return;}
+  let html='<thead><tr><th>Student</th><th>Score</th><th>Percent</th><th>Completed</th>'+qs.map((_,i)=>'<th>Q'+(i+1)+'</th>').join('')+'<th>Retake</th></tr></thead><tbody>';
+  students.forEach(st=>{const sr=rr[st.id]||{},score=launchScore(resultsLaunchId,st.id),comp=completions[resultsLaunchId]&&completions[resultsLaunchId][st.id],cells=qs.map((q,i)=>{const r=sr[i]||sr[String(i)];if(!r)return'<td class="cell blank">—</td>';const cls=(r.correct?'correct':'incorrect')+(r.adjusted?' adjusted':'');return'<td class="cell '+cls+'" onclick="openAnswerModal(\''+esc(st.id)+'\','+i+',\'results\',\''+esc(resultsLaunchId)+'\')">'+(r.correct?'✓':'×')+(r.adjusted?'*':'')+'</td>';}).join('');html+='<tr><td>'+esc(st.name)+'</td><td><b>'+score.correct+'/'+score.total+'</b></td><td>'+score.pct+'%</td><td>'+esc(comp?fmtDate(comp.completedAt):'—')+'</td>'+cells+'<td><button class="secondary" onclick="event.stopPropagation();launchRetake(\''+esc(st.id)+'\')">Retake</button></td></tr>';});table.innerHTML=html+'</tbody>';
+}
+async function endSelectedLaunch(){const l=allLaunches[resultsLaunchId];if(!l)return;if(!confirm('End this launch? Data will remain saved.'))return;await db.ref('b3Quiz/launches/'+resultsLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP});if(l.targetStudents){for(const sid of Object.keys(l.targetStudents)){const snap=await db.ref('b3Quiz/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===resultsLaunchId)await db.ref('b3Quiz/settings/studentActiveLaunch/'+sid).remove();}}else if(activeLaunchByClass[l.classId]===resultsLaunchId)await db.ref('b3Quiz/settings/activeLaunchByClass/'+l.classId).remove();}
+async function launchRetake(studentId){
+  const base=allLaunches[resultsLaunchId];if(!base)return;const snap=base.quizSnapshot||{},qs=launchQuestions(base),group=base.attemptGroupId||resultsLaunchId;let maxAttempt=1;Object.values(allLaunches).forEach(l=>{if((l.attemptGroupId||'')===group&&l.targetStudents&&l.targetStudents[studentId])maxAttempt=Math.max(maxAttempt,Number(l.attemptNumber)||1);});const attempt=maxAttempt+1,id=Date.now()+'_retake_'+studentId+'_'+slugTitle(snap.title||'quiz');
+  const launch={quizId:base.quizId||'',quizSnapshot:snap,classId:base.classId,targetStudents:{[studentId]:true},createdAt:firebase.database.ServerValue.TIMESTAMP,started:true,startedAt:firebase.database.ServerValue.TIMESTAMP,mode:'test',activeQuestion:0,questionStates:makeQuestionStates(qs,'test'),attemptGroupId:group,attemptNumber:attempt,retakeOf:resultsLaunchId,note:'Student retake'};
+  await db.ref('b3Quiz/launches/'+id).set(launch);await db.ref('b3Quiz/settings/studentActiveLaunch/'+studentId).set(id);alert('Retake '+attempt+' is now active for '+((roster[studentId]&&roster[studentId].name)||studentId)+'. It does not affect the rest of the class.');
 }
 function resultsMatrix(){
-  const qs=currentQuestions();const rows=[['Student','Score','Percent',...qs.map((_,i)=>'Q'+(i+1))]];rosterRows().forEach(st=>{let correct=0;const answers=qs.map((q,i)=>{const r=responseFor(st.id,i);if(r&&r.correct)correct++;if(!r)return '';const choices=asArray(q.choices);return (r.correct?'Correct: ':'Incorrect: ')+(choices[Number(r.choiceIndex)]||'');});rows.push([st.name,correct+'/'+qs.length,Math.round(correct/qs.length*100)+'%',...answers]);});return rows;
+  const l=allLaunches[resultsLaunchId];if(!l)return[];const qs=launchQuestions(l),students=launchStudentRows(l),rr=allResponses[resultsLaunchId]||{},rows=[['Quiz',l.quizSnapshot&&l.quizSnapshot.title||''],['Class',classLabel(l.classId)],['Date',fmtDate(l.createdAt)],['Attempt',l.retakeOf?'Retake '+(l.attemptNumber||2):'First attempt'],[],['Student','Score','Percent',...qs.map((_,i)=>'Q'+(i+1))]];
+  students.forEach(st=>{const score=launchScore(resultsLaunchId,st.id),sr=rr[st.id]||{},answers=qs.map((q,i)=>{const r=sr[i]||sr[String(i)];if(!r)return'';const choices=asArray(q.choices);return(r.correct?'Correct: ':'Incorrect: ')+(choices[Number(r.choiceIndex)]||'')+(r.adjusted?' [adjusted]':'');});rows.push([st.name,score.correct+'/'+score.total,score.pct+'%',...answers]);});return rows;
 }
-function csvEscape(v){const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
-function downloadCSV(){
-  if(!quizData)return;const csv=resultsMatrix().map(r=>r.map(csvEscape).join(',')).join('\r\n');const blob=new Blob(["\uFEFF"+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(quizData.title||'B3 Quiz').replace(/[^a-z0-9]+/gi,'_')+'_results.csv';a.click();URL.revokeObjectURL(a.href);
+function csvEscape(v){const s=String(v??'');return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function downloadCSV(){const rows=resultsMatrix(),l=allLaunches[resultsLaunchId];if(!rows.length||!l)return;const csv=rows.map(r=>r.map(csvEscape).join(',')).join('\r\n'),blob=new Blob(["\uFEFF"+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=((l.quizSnapshot&&l.quizSnapshot.title)||'B3_Quiz').replace(/[^a-z0-9]+/gi,'_')+'_'+l.classId+'_'+resultsLaunchId.slice(0,13)+'.csv';a.click();URL.revokeObjectURL(a.href);}
+async function copyResultsTSV(){const rows=resultsMatrix();if(!rows.length)return;const tsv=rows.map(r=>r.join('\t')).join('\n');try{await navigator.clipboard.writeText(tsv);alert('Copied. Paste directly into Google Sheets.');}catch(e){prompt('Copy this and paste into Google Sheets:',tsv);}}
+
+// ---------- Long-term student progress ----------
+function populateProgressStudents(){
+  const cls=document.getElementById('progressClass').value,sel=document.getElementById('progressStudent'),old=sel.value,ids=((CLASS_ROSTERS[cls]||{}).students||[]).filter(id=>id!=='simcha_cohen');sel.innerHTML='';ids.map(id=>({id,name:(roster[id]&&roster[id].name)||id})).sort((a,b)=>a.name.localeCompare(b.name)).forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=x.name;sel.appendChild(o);});if(ids.includes(old))sel.value=old;renderStudentProgress();
 }
-async function copyResultsTSV(){const tsv=resultsMatrix().map(r=>r.join('\t')).join('\n');try{await navigator.clipboard.writeText(tsv);alert('Copied. Paste directly into Google Sheets.');}catch(e){prompt('Copy this and paste into Google Sheets:',tsv);}}
+function studentLaunchRecords(studentId){
+  const records=[];Object.entries(allLaunches).forEach(([lid,l])=>{const targets=l.targetStudents&&Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]);const belongs=targets&&targets.length?targets.includes(studentId):((CLASS_ROSTERS[l.classId]||{}).students||[]).includes(studentId);if(!belongs)return;const qs=launchQuestions(l),sr=(allResponses[lid]||{})[studentId]||{};if(!Object.keys(sr).length)return;const bySkill={};qs.forEach((q,i)=>{const skill=q.skillType||(l.quizSnapshot&&l.quizSnapshot.skillType)||'comprehension',r=sr[i]||sr[String(i)];if(!bySkill[skill])bySkill[skill]={correct:0,total:0,answered:0};bySkill[skill].total++;if(r){bySkill[skill].answered++;if(r.correct)bySkill[skill].correct++;}});const adjusted=Object.values(sr).filter(r=>r&&r.adjusted).length;records.push({launchId:lid,launch:l,title:l.quizSnapshot&&l.quizSnapshot.title||'Untitled',date:Number(l.createdAt)||0,attemptGroupId:l.attemptGroupId||lid,attemptNumber:Number(l.attemptNumber)||1,retake:!!l.retakeOf,bySkill,adjusted});});return records.sort((a,b)=>a.date-b.date);
+}
+function currentSkillStats(studentId){
+  const records=studentLaunchRecords(studentId),latestByGroup={};records.forEach(r=>{const g=r.attemptGroupId;if(!latestByGroup[g]||r.attemptNumber>=latestByGroup[g].attemptNumber)latestByGroup[g]=r;});const stats={shorashim:{correct:0,total:0,groups:0},translation:{correct:0,total:0,groups:0},comprehension:{correct:0,total:0,groups:0}};Object.values(latestByGroup).forEach(r=>Object.entries(r.bySkill).forEach(([skill,v])=>{if(!stats[skill])return;stats[skill].correct+=v.correct;stats[skill].total+=v.total;stats[skill].groups++;}));Object.values(stats).forEach(s=>s.pct=s.total?Math.round(s.correct/s.total*100):null);return{stats,records,latestByGroup};
+}
+function makeParentSummary(name,stats){
+  const available=Object.entries(stats).filter(([,v])=>v.pct!==null).sort((a,b)=>b[1].pct-a[1].pct);if(!available.length)return'No quiz data is available yet for '+name+'.';
+  if(available.length===1){const [k,v]=available[0];return name+' currently has a '+v.pct+'% final average in '+skillLabel(k)+'. More quiz data will give a fuller picture over time.';}
+  const top=available[0],low=available[available.length-1];let lowPhrase=low[1].pct>=90?'is also very strong':low[1].pct>=80?'is also strong':low[1].pct>=70?'is developing well':'currently needs the most support';
+  let text=name+' is currently strongest in '+skillLabel(top[0])+' ('+top[1].pct+'%). '+skillLabel(low[0])+' '+lowPhrase+' ('+low[1].pct+'%).';if(available.length===3){const mid=available[1];text+=' '+skillLabel(mid[0])+' is '+mid[1].pct+'%.';}return text+' These percentages use the student\'s current final results.';
+}
+function renderStudentProgress(){
+  const sel=document.getElementById('progressStudent');if(!sel||!sel.value){document.getElementById('skillCards').innerHTML='';document.getElementById('parentSummary').textContent='Choose a student.';document.getElementById('progressHistory').innerHTML='';return;}const sid=sel.value,name=(roster[sid]&&roster[sid].name)||sel.options[sel.selectedIndex].textContent||sid,{stats,records}=currentSkillStats(sid);document.getElementById('progressStudentName').textContent=name+' — Progress';
+  document.getElementById('skillCards').innerHTML=['shorashim','translation','comprehension'].map(k=>'<div class="skill-card"><div>'+skillLabel(k)+'</div><div class="big">'+(stats[k].pct===null?'—':stats[k].pct+'%')+'</div><div class="small">'+stats[k].groups+' assessment'+(stats[k].groups===1?'':'s')+'</div></div>').join('');document.getElementById('parentSummary').textContent=makeParentSummary(name,stats);
+  let html='<thead><tr><th>Date</th><th>Quiz</th><th>Class</th><th>Attempt</th><th>Shoreshim</th><th>Words/Phrases</th><th>Comprehension</th><th>Adjusted</th></tr></thead><tbody>';records.slice().reverse().forEach(r=>{function cell(skill){const v=r.bySkill[skill];return v&&v.total?Math.round(v.correct/v.total*100)+'%':'—';}html+='<tr><td>'+esc(fmtDate(r.date))+'</td><td>'+esc(r.title)+'</td><td>'+esc(classLabel(r.launch.classId))+'</td><td>'+(r.retake?'Retake '+r.attemptNumber:'First')+'</td><td>'+cell('shorashim')+'</td><td>'+cell('translation')+'</td><td>'+cell('comprehension')+'</td><td>'+(r.adjusted?r.adjusted:'—')+'</td></tr>';});document.getElementById('progressHistory').innerHTML=html+'</tbody>';
+}
+async function copyParentSummary(){const text=document.getElementById('parentSummary').textContent;if(!text)return;try{await navigator.clipboard.writeText(text);alert('Parent summary copied.');}catch(e){prompt('Copy parent summary:',text);}}
+
+// ---------- Links ----------
 function getStudentLink(){return window.location.href.replace(/teacher\.html(?:\?.*)?$/,'');}
 async function copyStudentLink(){const link=getStudentLink();try{await navigator.clipboard.writeText(link);alert('Student link copied.');}catch(e){prompt('Copy student link:',link);}}
 
-newQuizDraft();
+newQuizDraft();generatorTypeChanged();populateProgressStudents();
 </script>
 </body>
 </html>
