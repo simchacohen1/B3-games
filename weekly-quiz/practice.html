@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>B3 Practice Quiz — Perek י״ח</title>
+<script src="../game-gate.js" data-game-id="weekly-quiz"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+:root{--ink:#19324d;--purple:#6c4fd3;--blue:#3197e3;--green:#35b86b;--yellow:#ffd85b;--orange:#ff9b4a;--pink:#ff6fae;--line:#cfe0ef;}
+*{box-sizing:border-box}
+body{margin:0;font-family:Trebuchet MS,Arial,sans-serif;color:var(--ink);background:
+radial-gradient(circle at 12% 10%,#fff0a8 0 9%,transparent 10%),
+radial-gradient(circle at 92% 8%,#d7c7ff 0 10%,transparent 11%),
+linear-gradient(180deg,#dff4ff,#f7efff 55%,#fff8d9);min-height:100vh}
+.hidden{display:none!important}
+header{text-align:center;padding:24px 14px 10px}
+.logo{font-size:52px}
+h1{margin:4px 0 2px;font-size:34px;color:#4e3eb8}
+.tagline{font-size:17px;font-weight:700;color:#55708d}
+.wrap{max-width:980px;margin:0 auto;padding:14px 16px 45px}
+.card{background:rgba(255,255,255,.96);border:3px solid white;border-radius:24px;padding:22px;box-shadow:0 10px 28px rgba(52,79,120,.15);margin-bottom:18px}
+.step-title{display:flex;align-items:center;gap:10px;font-size:25px;font-weight:900;margin-bottom:10px}
+.step-bubble{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:50%;color:white;background:var(--purple);font-size:20px}
+.login-card{max-width:560px;margin:16px auto}
+label{font-weight:900;display:block;margin:12px 0 6px}
+input,select,button{font:inherit}
+input[type=text],input[type=password]{width:100%;padding:13px 14px;border:2px solid var(--line);border-radius:14px;font-size:19px}
+button{border:0;border-radius:14px;padding:12px 16px;font-weight:900;cursor:pointer;transition:transform .12s,box-shadow .12s}
+button:hover:not(:disabled){transform:translateY(-2px)}
+.primary{background:linear-gradient(135deg,#6c4fd3,#8a68ee);color:white;box-shadow:0 5px 0 #4e36ad}
+.green{background:var(--green);color:white;box-shadow:0 5px 0 #238b4d}
+.soft{background:#edf5fb;color:var(--ink)}
+.big-btn{font-size:20px;padding:16px 22px}
+.login-msg{min-height:22px;color:#c43f5b;font-weight:900;text-align:center;margin-top:10px}
+.signed{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;font-size:14px}
+.practice-banner{background:linear-gradient(90deg,#fff2a8,#ffe0f0);border:2px dashed #f2b83f;border-radius:16px;padding:12px;text-align:center;font-weight:900;margin-bottom:14px}
+.posuk-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(66px,1fr));gap:9px}
+.posuk-btn{min-height:58px;background:#eef7ff;color:#36506a;border:2px solid #c7e1f5;box-shadow:none;font-size:18px}
+.posuk-btn.selected{background:linear-gradient(135deg,#35b86b,#55d58b);color:white;border-color:#2ca05a;box-shadow:0 4px 0 #238b4d}
+.quick-row,.choice-row{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+.type-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.type-card{background:white;border:3px solid #d8e6f2;border-radius:18px;padding:18px 12px;text-align:center;cursor:pointer;transition:.15s}
+.type-card:hover{transform:translateY(-3px)}
+.type-card.selected{border-color:#755be0;background:#f0ebff;box-shadow:0 6px 0 #c6b7ff}
+.type-icon{font-size:38px}
+.type-name{font-size:19px;font-weight:900;margin-top:4px}
+.count-btn{background:#fff7d4;border:2px solid #f4d75f;color:#6c5a13}
+.count-btn.selected{background:#ffd85b;box-shadow:0 4px 0 #d9b739}
+.selection-note{font-weight:900;color:#55708d;margin:10px 0 0}
+.loading{text-align:center;padding:30px}
+.spinner{width:62px;height:62px;border-radius:50%;border:8px solid #e9dcff;border-top-color:#7456dd;margin:0 auto 14px;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.quiz-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.pill{background:#e9f5ff;padding:7px 11px;border-radius:999px;font-weight:900}
+.question{font-size:29px;line-height:1.25;font-weight:900;text-align:center;margin:24px 0;unicode-bidi:plaintext}
+.answers{display:grid;gap:11px}
+.answer{width:100%;text-align:left;background:#f8fbff;border:3px solid #d5e5f2;color:var(--ink);font-size:20px;padding:16px;border-radius:16px;box-shadow:none}
+.answer.selected{border-color:#7357d8;background:#eee8ff}
+.answer.correct{border-color:#2ca05a;background:#e8f8ef}
+.answer.wrong{border-color:#d94e64;background:#fdecef}
+.feedback{margin-top:15px;padding:14px;border-radius:14px;text-align:center;font-weight:900;font-size:18px;background:#eef5fb}
+.feedback.good{background:#e8f8ef;color:#237343}
+.feedback.bad{background:#fdecef;color:#a23c4d}
+.progressbar{height:16px;background:#e8edf2;border-radius:999px;overflow:hidden;margin-top:10px}
+.progressfill{height:100%;background:linear-gradient(90deg,#53c97e,#7c5ce1);width:0}
+.result{text-align:center}
+.stars{font-size:54px;letter-spacing:5px}
+.score{font-size:54px;font-weight:900;color:#4e3eb8}
+.result-msg{font-size:22px;font-weight:900;margin:8px 0 18px}
+.footer-note{text-align:center;color:#6a7d90;font-size:12px;margin-top:20px}
+@media(max-width:600px){h1{font-size:27px}.card{padding:16px;border-radius:19px}.question{font-size:24px}.type-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🌈📖✨</div>
+  <h1>Build My Practice Quiz!</h1>
+  <div class="tagline">Perek י״ח • Choose what YOU want to practice</div>
+</header>
+<div class="wrap">
+  <div id="loginCard" class="card login-card">
+    <div class="step-title"><span class="step-bubble">👋</span> Who are you?</div>
+    <label>Your name</label><input id="studentName" type="text" placeholder="Type your name">
+    <label>Class PIN</label><input id="classPin" type="password" inputmode="numeric" placeholder="Class PIN">
+    <button class="primary big-btn" style="width:100%;margin-top:16px" onclick="login()">Start Practicing!</button>
+    <div id="loginMsg" class="login-msg"></div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="signed"><span>Hi, <b id="who"></b>! 👋</span><button class="soft" onclick="switchStudent()">Switch student</button></div>
+    <div class="practice-banner">⭐ PRACTICE ONLY — This does not change your real quiz grade. Practice as many times as you want! ⭐</div>
+
+    <div id="builder">
+      <div class="card">
+        <div class="step-title"><span class="step-bubble">1</span> Pick your Pesukim</div>
+        <div class="selection-note" id="posukCount">No pesukim selected yet.</div>
+        <div id="posukGrid" class="posuk-grid"></div>
+        <div class="quick-row">
+          <button class="soft" onclick="selectRange(1,5)">Alef–Hei</button>
+          <button class="soft" onclick="selectRange(1,10)">Alef–Yud</button>
+          <button class="soft" onclick="selectAll()">Select All</button>
+          <button class="soft" onclick="clearAll()">Clear</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="step-title"><span class="step-bubble">2</span> What do you want to practice?</div>
+        <div class="type-grid">
+          <div class="type-card selected" data-type="shorashim" onclick="pickType('shorashim')"><div class="type-icon">🌳</div><div class="type-name">Shoreshim</div></div>
+          <div class="type-card" data-type="translation" onclick="pickType('translation')"><div class="type-icon">🧩</div><div class="type-name">Words & Phrases</div></div>
+          <div class="type-card" data-type="comprehension" onclick="pickType('comprehension')"><div class="type-icon">💡</div><div class="type-name">Comprehension</div></div>
+          <div class="type-card" data-type="mixed" onclick="pickType('mixed')"><div class="type-icon">🎯</div><div class="type-name">Mixed</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="step-title"><span class="step-bubble">3</span> How many questions?</div>
+        <div class="choice-row">
+          <button class="count-btn selected" data-count="5" onclick="pickCount(5)">5 Questions</button>
+          <button class="count-btn" data-count="10" onclick="pickCount(10)">10 Questions</button>
+          <button class="count-btn" data-count="15" onclick="pickCount(15)">15 Questions</button>
+        </div>
+        <button class="green big-btn" style="width:100%;margin-top:20px" onclick="generatePractice()">🚀 Make My Practice Quiz!</button>
+        <div id="builderMsg" class="login-msg"></div>
+      </div>
+    </div>
+
+    <div id="loadingCard" class="card loading hidden"><div class="spinner"></div><div style="font-size:24px;font-weight:900">Building your quiz…</div><div style="margin-top:8px">Fresh questions are coming! ✨</div></div>
+
+    <div id="quizCard" class="card hidden">
+      <div class="quiz-head"><div class="pill" id="quizTypePill"></div><div class="pill" id="qNum"></div></div>
+      <div class="progressbar"><div class="progressfill" id="progressFill"></div></div>
+      <div class="question" id="question" dir="auto"></div>
+      <div class="answers" id="answers"></div>
+      <div id="feedback" class="feedback">Choose your answer.</div>
+      <button id="checkBtn" class="primary big-btn" style="width:100%;margin-top:14px" onclick="checkAnswer()" disabled>Check My Answer</button>
+      <button id="nextBtn" class="green big-btn hidden" style="width:100%;margin-top:14px" onclick="nextQuestion()">Next Question ➜</button>
+    </div>
+
+    <div id="resultCard" class="card result hidden">
+      <div class="stars" id="stars">⭐⭐⭐</div>
+      <div class="score" id="score"></div>
+      <div class="result-msg" id="resultMsg"></div>
+      <button class="green big-btn" onclick="sameAgain()">🔁 Practice These Pesukim Again</button>
+      <button class="primary big-btn" style="margin-top:10px" onclick="backToBuilder()">🎨 Build a Different Quiz</button>
+    </div>
+    <div class="footer-note">Perek י״ח text is built into this first practice version so Rabbi Cohen can expand it to more perakim later.</div>
+  </div>
+</div>
+
+<script>
+const GENERATE_URL='https://us-central1-b3-games.cloudfunctions.net/generateWeeklyQuiz';
+const firebaseConfig={
+  apiKey:"AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
+  authDomain:"b3-games.firebaseapp.com",
+  databaseURL:"https://b3-games-default-rtdb.firebaseio.com",
+  projectId:"b3-games",
+  storageBucket:"b3-games.firebasestorage.app",
+  messagingSenderId:"568530046190",
+  appId:"1:568530046190:web:fd765fdd27e55a3c73f7ff"
+};
+firebase.initializeApp(firebaseConfig);const db=firebase.database();
+const PESUKIM={"1": {"he": "וַיֵּרָא אֵלָיו יְהוָה, בְּאֵלֹנֵי מַמְרֵא; וְהוּא יֹשֵׁב פֶּתַח-הָאֹהֶל, כְּחֹם הַיּוֹם.", "en": "And the LORD appeared unto him by the terebinths of Mamre, as he sat in the tent door in the heat of the day."}, "2": {"he": "וַיִּשָּׂא עֵינָיו, וַיַּרְא, וְהִנֵּה שְׁלֹשָׁה אֲנָשִׁים, נִצָּבִים עָלָיו; וַיַּרְא, וַיָּרָץ לִקְרָאתָם מִפֶּתַח הָאֹהֶל, וַיִּשְׁתַּחוּ, אָרְצָה.", "en": "He lifted up his eyes and saw three men standing opposite him; he ran from the tent door to meet them and bowed to the earth."}, "3": {"he": "וַיֹּאמַר: אֲדֹנָי, אִם-נָא מָצָאתִי חֵן בְּעֵינֶיךָ--אַל-נָא תַעֲבֹר, מֵעַל עַבְדֶּךָ.", "en": "He said: My lord, if I have found favor in your sight, please do not pass by your servant."}, "4": {"he": "יֻקַּח-נָא מְעַט-מַיִם, וְרַחֲצוּ רַגְלֵיכֶם; וְהִשָּׁעֲנוּ, תַּחַת הָעֵץ.", "en": "Let a little water be brought; wash your feet and rest under the tree."}, "5": {"he": "וְאֶקְחָה פַת-לֶחֶם וְסַעֲדוּ לִבְּכֶם, אַחַר תַּעֲבֹרוּ--כִּי-עַל-כֵּן עֲבַרְתֶּם, עַל-עַבְדְּכֶם; וַיֹּאמְרוּ, כֵּן תַּעֲשֶׂה כַּאֲשֶׁר דִּבַּרְתָּ.", "en": "I will bring bread so you can strengthen yourselves; afterward you may continue. They said: Do as you have said."}, "6": {"he": "וַיְמַהֵר אַבְרָהָם הָאֹהֱלָה, אֶל-שָׂרָה; וַיֹּאמֶר, מַהֲרִי שְׁלֹשׁ סְאִים קֶמַח סֹלֶת--לוּשִׁי, וַעֲשִׂי עֻגוֹת.", "en": "Avrohom hurried to the tent to Sarah and told her to quickly prepare three measures of fine flour, knead it, and make cakes."}, "7": {"he": "וְאֶל-הַבָּקָר, רָץ אַבְרָהָם; וַיִּקַּח בֶּן-בָּקָר רַךְ וָטוֹב, וַיִּתֵּן אֶל-הַנַּעַר, וַיְמַהֵר, לַעֲשׂוֹת אֹתוֹ.", "en": "Avrohom ran to the herd, took a tender and good calf, gave it to the servant, and he hurried to prepare it."}, "8": {"he": "וַיִּקַּח חֶמְאָה וְחָלָב, וּבֶן-הַבָּקָר אֲשֶׁר עָשָׂה, וַיִּתֵּן, לִפְנֵיהֶם; וְהוּא-עֹמֵד עֲלֵיהֶם תַּחַת הָעֵץ, וַיֹּאכֵלוּ.", "en": "He took curd, milk, and the prepared calf and placed them before the guests; he stood near them under the tree while they ate."}, "9": {"he": "וַיֹּאמְרוּ אֵלָיו, אַיֵּה שָׂרָה אִשְׁתֶּךָ; וַיֹּאמֶר, הִנֵּה בָאֹהֶל.", "en": "They asked him: Where is Sarah your wife? He said: She is in the tent."}, "10": {"he": "וַיֹּאמֶר, שׁוֹב אָשׁוּב אֵלֶיךָ כָּעֵת חַיָּה, וְהִנֵּה-בֵן, לְשָׂרָה אִשְׁתֶּךָ; וְשָׂרָה שֹׁמַעַת פֶּתַח הָאֹהֶל, וְהוּא אַחֲרָיו.", "en": "He said: I will surely return to you at this time, and Sarah your wife will have a son. Sarah was listening at the tent entrance."}, "11": {"he": "וְאַבְרָהָם וְשָׂרָה זְקֵנִים, בָּאִים בַּיָּמִים; חָדַל לִהְיוֹת לְשָׂרָה, אֹרַח כַּנָּשִׁים.", "en": "Avrohom and Sarah were old and advanced in years."}, "12": {"he": "וַתִּצְחַק שָׂרָה, בְּקִרְבָּהּ לֵאמֹר: אַחֲרֵי בְלֹתִי הָיְתָה-לִּי עֶדְנָה, וַאדֹנִי זָקֵן.", "en": "Sarah laughed within herself and spoke about being old, and that her husband was old."}, "13": {"he": "וַיֹּאמֶר יְהוָה, אֶל-אַבְרָהָם: לָמָּה זֶּה צָחֲקָה שָׂרָה לֵאמֹר, הַאַף אֻמְנָם אֵלֵד--וַאֲנִי זָקַנְתִּי.", "en": "Hashem said to Avrohom: Why did Sarah laugh and say, Shall I really give birth when I am old?"}, "14": {"he": "הֲיִפָּלֵא מֵיְהוָה, דָּבָר; לַמּוֹעֵד אָשׁוּב אֵלֶיךָ, כָּעֵת חַיָּה--וּלְשָׂרָה בֵן.", "en": "Is anything too hard for Hashem? At the appointed time I will return to you, and Sarah will have a son."}, "15": {"he": "וַתְּכַחֵשׁ שָׂרָה לֵאמֹר לֹא צָחַקְתִּי, כִּי יָרֵאָה; וַיֹּאמֶר לֹא, כִּי צָחָקְתְּ.", "en": "Sarah denied it and said she had not laughed because she was afraid. He said: No, you did laugh."}, "16": {"he": "וַיָּקֻמוּ מִשָּׁם הָאֲנָשִׁים, וַיַּשְׁקִפוּ עַל-פְּנֵי סְדֹם; וְאַבְרָהָם--הֹלֵךְ עִמָּם, לְשַׁלְּחָם.", "en": "The men rose from there and looked toward Sedom; Avrohom went with them to send them on their way."}, "17": {"he": "וַיהוָה, אָמָר: הַמְכַסֶּה אֲנִי מֵאַבְרָהָם, אֲשֶׁר אֲנִי עֹשֶׂה.", "en": "Hashem said: Shall I hide from Avrohom what I am doing?"}, "18": {"he": "וְאַבְרָהָם--הָיוֹ יִהְיֶה לְגוֹי גָּדוֹל, וְעָצוּם; וְנִבְרְכוּ-בוֹ--כֹּל, גּוֹיֵי הָאָרֶץ.", "en": "Avrohom will surely become a great and mighty nation, and all the nations of the earth will be blessed through him."}, "19": {"he": "כִּי יְדַעְתִּיו, לְמַעַן אֲשֶׁר יְצַוֶּה אֶת-בָּנָיו וְאֶת-בֵּיתוֹ אַחֲרָיו, וְשָׁמְרוּ דֶּרֶךְ יְהוָה, לַעֲשׂוֹת צְדָקָה וּמִשְׁפָּט--לְמַעַן, הָבִיא יְהוָה עַל-אַבְרָהָם, אֵת אֲשֶׁר-דִּבֶּר, עָלָיו.", "en": "Hashem knows Avrohom so that he will command his children and household to keep Hashem's way by doing righteousness and justice."}, "20": {"he": "וַיֹּאמֶר יְהוָה, זַעֲקַת סְדֹם וַעֲמֹרָה כִּי-רָבָּה; וְחַטָּאתָם--כִּי כָבְדָה, מְאֹד.", "en": "Hashem said that the cry of Sedom and Amorah was great and their sin was very serious."}, "21": {"he": "אֵרְדָה-נָּא וְאֶרְאֶה, הַכְּצַעֲקָתָהּ הַבָּאָה אֵלַי עָשׂוּ כָּלָה; וְאִם-לֹא, אֵדָעָה.", "en": "Hashem said He would go down and see whether they had acted according to the cry that had come before Him."}, "22": {"he": "וַיִּפְנוּ מִשָּׁם הָאֲנָשִׁים, וַיֵּלְכוּ סְדֹמָה; וְאַבְרָהָם--עוֹדֶנּוּ עֹמֵד, לִפְנֵי יְהוָה.", "en": "The men turned from there and went toward Sedom, while Avrohom remained standing before Hashem."}, "23": {"he": "וַיִּגַּשׁ אַבְרָהָם, וַיֹּאמַר: הַאַף תִּסְפֶּה, צַדִּיק עִם-רָשָׁע.", "en": "Avrohom came near and asked whether the righteous would be swept away together with the wicked."}, "24": {"he": "אוּלַי יֵשׁ חֲמִשִּׁים צַדִּיקִם, בְּתוֹךְ הָעִיר; הַאַף תִּסְפֶּה וְלֹא-תִשָּׂא לַמָּקוֹם, לְמַעַן חֲמִשִּׁים הַצַּדִּיקִם אֲשֶׁר בְּקִרְבָּהּ.", "en": "Avrohom asked: Perhaps there are fifty righteous people in the city; will You not forgive the place for their sake?"}, "25": {"he": "חָלִלָה לְּךָ מֵעֲשֹׂת כַּדָּבָר הַזֶּה, לְהָמִית צַדִּיק עִם-רָשָׁע, וְהָיָה כַצַּדִּיק, כָּרָשָׁע; חָלִלָה לָּךְ--הֲשֹׁפֵט כָּל-הָאָרֶץ, לֹא יַעֲשֶׂה מִשְׁפָּט.", "en": "Avrohom said it would be wrong to kill the righteous together with the wicked, and asked whether the Judge of all the earth would not do justice."}, "26": {"he": "וַיֹּאמֶר יְהוָה, אִם-אֶמְצָא בִסְדֹם חֲמִשִּׁים צַדִּיקִם בְּתוֹךְ הָעִיר--וְנָשָׂאתִי לְכָל-הַמָּקוֹם, בַּעֲבוּרָם.", "en": "Hashem said that if He found fifty righteous people in Sedom, He would forgive the whole place for their sake."}, "27": {"he": "וַיַּעַן אַבְרָהָם, וַיֹּאמַר: הִנֵּה-נָא הוֹאַלְתִּי לְדַבֵּר אֶל-אֲדֹנָי, וְאָנֹכִי עָפָר וָאֵפֶר.", "en": "Avrohom answered that he had dared to speak before Hashem even though he was dust and ashes."}, "28": {"he": "אוּלַי יַחְסְרוּן חֲמִשִּׁים הַצַּדִּיקִם, חֲמִשָּׁה--הֲתַשְׁחִית בַּחֲמִשָּׁה, אֶת-כָּל-הָעִיר; וַיֹּאמֶר, לֹא אַשְׁחִית, אִם-אֶמְצָא שָׁם, אַרְבָּעִים וַחֲמִשָּׁה.", "en": "Avrohom asked about forty-five righteous people. Hashem said He would not destroy the city if He found forty-five."}, "29": {"he": "וַיֹּסֶף עוֹד לְדַבֵּר אֵלָיו, וַיֹּאמַר, אוּלַי יִמָּצְאוּן שָׁם, אַרְבָּעִים; וַיֹּאמֶר לֹא אֶעֱשֶׂה, בַּעֲבוּר הָאַרְבָּעִים.", "en": "Avrohom asked about forty righteous people. Hashem said He would not do it for the sake of the forty."}, "30": {"he": "וַיֹּאמֶר אַל-נָא יִחַר לַאדֹנָי, וַאֲדַבֵּרָה--אוּלַי יִמָּצְאוּן שָׁם, שְׁלֹשִׁים; וַיֹּאמֶר לֹא אֶעֱשֶׂה, אִם-אֶמְצָא שָׁם שְׁלֹשִׁים.", "en": "Avrohom asked about thirty righteous people. Hashem said He would not do it if He found thirty."}, "31": {"he": "וַיֹּאמֶר, הִנֵּה-נָא הוֹאַלְתִּי לְדַבֵּר אֶל-אֲדֹנָי--אוּלַי יִמָּצְאוּן שָׁם, עֶשְׂרִים; וַיֹּאמֶר לֹא אַשְׁחִית, בַּעֲבוּר הָעֶשְׂרִים.", "en": "Avrohom asked about twenty righteous people. Hashem said He would not destroy the city for the sake of twenty."}, "32": {"he": "וַיֹּאמֶר אַל-נָא יִחַר לַאדֹנָי, וַאֲדַבְּרָה אַךְ-הַפַּעַם--אוּלַי יִמָּצְאוּן שָׁם, עֲשָׂרָה; וַיֹּאמֶר לֹא אַשְׁחִית, בַּעֲבוּר הָעֲשָׂרָה.", "en": "Avrohom asked about ten righteous people. Hashem said He would not destroy the city for the sake of ten."}, "33": {"he": "וַיֵּלֶךְ יְהוָה--כַּאֲשֶׁר כִּלָּה, לְדַבֵּר אֶל-אַבְרָהָם; וְאַבְרָהָם, שָׁב לִמְקֹמוֹ.", "en": "When Hashem finished speaking with Avrohom, Hashem departed, and Avrohom returned to his place."}};
+const HEB_NUMS=["א", "ב", "ג", "ד", "ה", "ו", "ז", "ח", "ט", "י", "יא", "יב", "יג", "יד", "טו", "טז", "יז", "יח", "יט", "כ", "כא", "כב", "כג", "כד", "כה", "כו", "כז", "כח", "כט", "ל", "לא", "לב", "לג"];
+let studentId='',studentName='',selected=new Set(),quizType='shorashim',questionCount=5,items=[],qIndex=0,selectedAnswer=null,checked=false,correct=0,results=[];
+
+function slugify(s){return String(s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');}
+function setLoginMsg(t){document.getElementById('loginMsg').textContent=t||'';}
+async function login(){
+  const name=document.getElementById('studentName').value.trim(),pin=document.getElementById('classPin').value.trim(),id=slugify(name);
+  if(!id){setLoginMsg('Type your name first.');return;}
+  setLoginMsg('Checking…');
+  try{
+    const [p,a]=await Promise.all([db.ref('posukPractice/settings/classPin').once('value'),db.ref('posukPractice/allowedStudents/'+id).once('value')]);
+    if(p.val()&&String(p.val()).trim()!==pin){setLoginMsg('That PIN is not correct.');return;}
+    if(!a.exists()){setLoginMsg('Ask Rabbi Cohen to add your name first.');return;}
+    const d=a.val();studentId=id;studentName=d&&d.name?String(d.name):name;
+    localStorage.setItem('posukPractice_studentId',studentId);localStorage.setItem('posukPractice_studentName',studentName);
+    enterApp();
+  }catch(e){console.error(e);setLoginMsg('Could not sign in. Try again.');}
+}
+function enterApp(){
+  document.getElementById('loginCard').classList.add('hidden');document.getElementById('app').classList.remove('hidden');document.getElementById('who').textContent=studentName;renderPosukGrid();
+}
+async function restore(){
+  const id=localStorage.getItem('posukPractice_studentId'),name=localStorage.getItem('posukPractice_studentName');
+  if(!id||!name)return;
+  try{const s=await db.ref('posukPractice/allowedStudents/'+id).once('value');if(!s.exists())return;studentId=id;studentName=(s.val()&&s.val().name)||name;enterApp();}catch(e){}
+}
+function switchStudent(){localStorage.removeItem('posukPractice_studentId');localStorage.removeItem('posukPractice_studentName');location.reload();}
+function renderPosukGrid(){
+  const g=document.getElementById('posukGrid');g.innerHTML='';
+  for(let i=1;i<=33;i++){const b=document.createElement('button');b.className='posuk-btn'+(selected.has(i)?' selected':'');b.innerHTML='<b>Posuk '+HEB_NUMS[i-1]+'</b><br><span style="font-size:12px">'+i+'</span>';b.onclick=()=>{selected.has(i)?selected.delete(i):selected.add(i);renderPosukGrid();};g.appendChild(b);}
+  document.getElementById('posukCount').textContent=selected.size?(selected.size+' posuk'+(selected.size===1?'':'im')+' selected'):'No pesukim selected yet.';
+}
+function selectRange(a,b){selected=new Set();for(let i=a;i<=b;i++)selected.add(i);renderPosukGrid();}
+function selectAll(){selected=new Set(Array.from({length:33},(_,i)=>i+1));renderPosukGrid();}
+function clearAll(){selected.clear();renderPosukGrid();}
+function pickType(t){quizType=t;document.querySelectorAll('.type-card').forEach(x=>x.classList.toggle('selected',x.dataset.type===t));}
+function pickCount(n){questionCount=n;document.querySelectorAll('.count-btn').forEach(x=>x.classList.toggle('selected',Number(x.dataset.count)===n));}
+function typeLabel(t){return {shorashim:'🌳 Shoreshim',translation:'🧩 Words & Phrases',comprehension:'💡 Comprehension',mixed:'🎯 Mixed'}[t]||t;}
+function sourceText(){
+  return [...selected].sort((a,b)=>a-b).map(n=>'Perek 18, Posuk '+n+'\nHebrew: '+PESUKIM[n].he+'\nMeaning: '+PESUKIM[n].en).join('\n\n');
+}
+function mixedCounts(n){const base=Math.floor(n/3),r=n%3;return {shorashim:base+(r>0?1:0),translation:base+(r>1?1:0),comprehension:base};}
+async function generatePractice(){
+  const msg=document.getElementById('builderMsg');msg.textContent='';
+  if(!selected.size){msg.textContent='Pick at least one posuk first.';return;}
+  document.getElementById('builder').classList.add('hidden');document.getElementById('resultCard').classList.add('hidden');document.getElementById('loadingCard').classList.remove('hidden');
+  try{
+    const body={sourceText:sourceText(),quizType,choiceCount:3,count:questionCount,mixedCounts:quizType==='mixed'?mixedCounts(questionCount):{shorashim:0,translation:0,comprehension:0}};
+    const r=await fetch(GENERATE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(data.error||'Could not make the quiz.');
+    items=Array.isArray(data.items)?data.items:[];
+    if(!items.length)throw new Error(data.warning||'No questions were generated. Try a few more pesukim.');
+    qIndex=0;selectedAnswer=null;checked=false;correct=0;results=[];
+    document.getElementById('loadingCard').classList.add('hidden');document.getElementById('quizCard').classList.remove('hidden');renderQuestion();
+  }catch(e){console.error(e);document.getElementById('loadingCard').classList.add('hidden');document.getElementById('builder').classList.remove('hidden');msg.textContent=e.message||'Could not make the quiz. Try again.';}
+}
+function renderQuestion(){
+  const q=items[qIndex],choices=Array.isArray(q.choices)?q.choices:[];
+  document.getElementById('quizTypePill').textContent=typeLabel(q.skillType||quizType);
+  document.getElementById('qNum').textContent='Question '+(qIndex+1)+' of '+items.length;
+  document.getElementById('progressFill').style.width=((qIndex/items.length)*100)+'%';
+  document.getElementById('question').textContent=q.question||'';
+  const a=document.getElementById('answers');a.innerHTML='';
+  choices.forEach((c,i)=>{const b=document.createElement('button');b.className='answer';b.textContent=String.fromCharCode(65+i)+'. '+c;b.onclick=()=>choose(i);a.appendChild(b);});
+  selectedAnswer=null;checked=false;document.getElementById('checkBtn').disabled=true;document.getElementById('checkBtn').classList.remove('hidden');document.getElementById('nextBtn').classList.add('hidden');const f=document.getElementById('feedback');f.className='feedback';f.textContent='Choose your answer.';
+}
+function choose(i){if(checked)return;selectedAnswer=i;document.querySelectorAll('.answer').forEach((b,j)=>b.classList.toggle('selected',j===i));document.getElementById('checkBtn').disabled=false;}
+function checkAnswer(){
+  if(selectedAnswer===null||checked)return;checked=true;const q=items[qIndex],ci=Number(q.correctIndex)||0,isRight=selectedAnswer===ci;if(isRight)correct++;
+  results.push({question:q.question||'',skillType:q.skillType||quizType,correct:isRight});
+  document.querySelectorAll('.answer').forEach((b,j)=>{b.disabled=true;if(j===ci)b.classList.add('correct');else if(j===selectedAnswer)b.classList.add('wrong');});
+  const f=document.getElementById('feedback');f.className='feedback '+(isRight?'good':'bad');f.textContent=isRight?'🎉 Yes! Great job!':'💪 Good practice! The green answer is the correct one.';
+  document.getElementById('checkBtn').classList.add('hidden');const n=document.getElementById('nextBtn');n.classList.remove('hidden');n.textContent=qIndex===items.length-1?'See My Score ⭐':'Next Question ➜';
+}
+function nextQuestion(){if(qIndex<items.length-1){qIndex++;renderQuestion();}else finish();}
+async function finish(){
+  document.getElementById('quizCard').classList.add('hidden');document.getElementById('resultCard').classList.remove('hidden');document.getElementById('progressFill').style.width='100%';
+  const pct=Math.round(correct/items.length*100);document.getElementById('score').textContent=correct+' / '+items.length;
+  document.getElementById('stars').textContent=pct>=90?'⭐⭐⭐⭐⭐':pct>=75?'⭐⭐⭐⭐':pct>=60?'⭐⭐⭐':pct>=40?'⭐⭐':'⭐';
+  document.getElementById('resultMsg').textContent=pct>=90?'Amazing! You are really ready! 🎉':pct>=75?'Great work! One more practice could make you even stronger!':pct>=60?'Nice job! Keep practicing and watch your score climb!':'Practice makes progress — try it again! 💪';
+  const attempt={studentId,studentName,perek:18,pesukim:[...selected].sort((a,b)=>a-b),quizType,questionCount:items.length,correct,percent:pct,results,createdAt:firebase.database.ServerValue.TIMESTAMP};
+  try{await db.ref('b3Quiz/practiceAttempts/'+studentId).push(attempt);}catch(e){console.warn('Practice attempt was not saved',e);}
+}
+function sameAgain(){document.getElementById('resultCard').classList.add('hidden');generatePractice();}
+function backToBuilder(){items=[];document.getElementById('resultCard').classList.add('hidden');document.getElementById('quizCard').classList.add('hidden');document.getElementById('builder').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});}
+renderPosukGrid();restore();
+</script>
+</body>
+</html>
