@@ -154,6 +154,9 @@ function slugify(name){return String(name||'').trim().toLowerCase().replace(/[^a
 function asArray(v){if(!v)return[];if(Array.isArray(v))return v;return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]);}
 function setLoginMsg(t){document.getElementById('loginMsg').textContent=t||'';}
 function studentClass(id){
+  // Teacher test account: Simcha Cohen is intentionally listed in both classes.
+  // Default it to East Track so the teacher can test the student experience.
+  if(id==='simcha_cohen') return 'et';
   if(CLASS_ROSTERS.et.students.includes(id) && !CLASS_ROSTERS.wt.students.includes(id)) return 'et';
   if(CLASS_ROSTERS.wt.students.includes(id) && !CLASS_ROSTERS.et.students.includes(id)) return 'wt';
   return '';
