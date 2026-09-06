@@ -29,6 +29,12 @@
   .primary:disabled, .choice:disabled, button:disabled { opacity:.55; cursor:not-allowed; }
   .login-msg { min-height:22px; color:var(--bad); text-align:center; font-weight:700; margin-top:10px; }
   .signed { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; color:var(--muted); font-size:14px; }
+  .practice-link-card { display:flex; align-items:center; justify-content:space-between; gap:12px; background:linear-gradient(135deg,#fff1a8,#f3dcff); border:2px solid #e8c954; border-radius:16px; padding:15px 17px; margin-bottom:16px; text-decoration:none; color:var(--ink); box-shadow:0 5px 14px rgba(80,66,140,.12); }
+  .practice-link-card:hover { transform:translateY(-2px); }
+  .practice-link-title { font-size:20px; font-weight:900; color:#5a44b7; }
+  .practice-link-sub { font-size:13px; color:#66788b; margin-top:2px; }
+  .practice-link-go { font-size:30px; }
+
   .quiz-title { text-align:center; font-size:24px; font-weight:800; margin-bottom:5px; color:var(--blue); }
   .launch-meta { text-align:center; color:var(--muted); font-size:13px; margin-bottom:5px; }
   .qmeta { text-align:center; color:var(--muted); margin-bottom:14px; }
@@ -77,6 +83,11 @@
       <span>Signed in as <b id="studentNameLabel"></b></span>
       <button class="secondary" onclick="switchStudent()">Switch student</button>
     </div>
+
+    <a class="practice-link-card" href="practice.html">
+      <div><div class="practice-link-title">🌈 Make a Practice Quiz</div><div class="practice-link-sub">Pick your own pesukim from Perek י״ח and practice before the real quiz.</div></div>
+      <div class="practice-link-go">➜</div>
+    </a>
 
     <div id="noQuizCard" class="card waiting hidden">
       <div class="big">No quiz is active for your class.</div>
