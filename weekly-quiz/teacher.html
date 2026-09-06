@@ -93,6 +93,21 @@
   .skill-card .big { font-size:28px; font-weight:900; color:var(--blue); }
   .parent-summary { background:#fffdf4; border:1px solid #eadb9b; border-radius:10px; padding:14px; line-height:1.5; }
   .audit-note { color:#8b6a15; font-size:12px; }
+  .preview-box { width:min(820px,94vw); max-height:92vh; overflow:auto; background:white; border:1px solid var(--line); border-radius:16px; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,.2); }
+  .preview-banner { background:#fff7db; border:1px solid #eadb9b; border-radius:10px; padding:9px 12px; text-align:center; font-weight:700; color:#745b12; margin-bottom:14px; }
+  .preview-question { font-size:28px; font-weight:800; line-height:1.25; text-align:center; white-space:pre-line; margin:18px 0; unicode-bidi:plaintext; }
+  .preview-choices { display:grid; gap:10px; }
+  .preview-choice { width:100%; text-align:left; background:#f7fbfe; border:2px solid var(--line); color:var(--ink); font-size:19px; padding:14px 15px; border-radius:12px; }
+  .preview-choice:hover:not(:disabled) { border-color:var(--blue); }
+  .preview-choice.selected { border-color:var(--blue); background:#e5f2fb; }
+  .preview-choice.correct { border-color:var(--good); background:#eaf7ef; }
+  .preview-choice.wrong { border-color:var(--bad); background:#fdecee; }
+  .preview-status { margin-top:14px; padding:12px; border-radius:10px; text-align:center; font-weight:700; background:#f1f5f7; min-height:44px; }
+  .preview-status.good { background:#eaf7ef; color:#1f6b40; }
+  .preview-status.bad { background:#fdecee; color:#9b3439; }
+  .preview-nav { display:flex; justify-content:center; gap:7px; flex-wrap:wrap; margin-top:15px; }
+  .preview-nav button { min-width:40px; padding:7px 9px; background:#e8f1f7; color:var(--ink); }
+  .preview-nav button.active { background:var(--blue); color:white; }
   @media(max-width:900px){.setup-grid,.progress-layout{grid-template-columns:1fr}.generator-grid{grid-template-columns:1fr 1fr}.launch-controls{grid-template-columns:1fr 1fr}.choice-grid{grid-template-columns:1fr}.skill-cards{grid-template-columns:1fr}}
 </style>
 </head>
@@ -119,6 +134,29 @@
       <button class="secondary" onclick="clearCurrentAnswer()">Clear for retry</button>
       <button class="secondary" onclick="closeAnswerModal()">Close</button>
     </div>
+  </div>
+</div>
+
+<div id="quizPreviewOverlay" class="modal-overlay hidden">
+  <div class="preview-box">
+    <div class="topline">
+      <div>
+        <h2 id="previewTitle" style="margin:0;color:var(--blue)">Quiz Preview</h2>
+        <div id="previewMeta" class="small" style="margin-top:3px"></div>
+      </div>
+      <button class="secondary" onclick="closeQuizPreview()">Close Preview</button>
+    </div>
+    <div class="preview-banner">Teacher Preview — this does not launch the quiz, save answers, or affect student data.</div>
+    <div id="previewQMeta" class="qnum" style="text-align:center"></div>
+    <div id="previewQuestion" class="preview-question" dir="auto"></div>
+    <div id="previewChoices" class="preview-choices"></div>
+    <div id="previewStatus" class="preview-status">Choose an answer, then click Check Answer.</div>
+    <div class="controls" style="justify-content:center;margin-top:14px">
+      <button class="secondary" onclick="previewPrevious()">← Previous</button>
+      <button class="good" id="previewCheckBtn" onclick="checkPreviewAnswer()">Check Answer</button>
+      <button class="primary" onclick="previewNext()">Next →</button>
+    </div>
+    <div id="previewNav" class="preview-nav"></div>
   </div>
 </div>
 
@@ -270,6 +308,7 @@
           </div>
           <div id="editorRows"></div>
           <div class="controls" style="margin-top:14px">
+            <button class="purple" onclick="openQuizPreview()">▶ Try Out Quiz</button>
             <button class="good" onclick="saveQuiz()">Save quiz</button>
             <button class="danger" id="deleteQuizBtn" onclick="deleteCurrentQuiz()">Delete quiz</button>
           </div>
@@ -366,6 +405,7 @@ const SKILL_LABELS={shorashim:'Shoreshim',translation:'Words & Phrases',comprehe
 
 let roster={},quizzes={},allLaunches={},allResponses={},completions={},audit={};
 let currentQuizId='',editorQuestions=[],generatorCandidates=[];
+let previewQuestions=[],previewIndex=0,previewSelected=null,previewChecked=false;
 let liveClassId='et',activeLaunchByClass={},activeLaunchId='',liveLaunch=null,liveResponses={},currentQ=0;
 let liveLaunchRef=null,liveResponseRef=null;
 let resultsLaunchId='';
@@ -429,6 +469,76 @@ function addSelectedCandidates(replace){
   const chosen=generatorCandidates.filter(x=>x.selected).map(x=>({q:x.q,choices:x.choices.slice(),correctIndex:Number(x.correctIndex)||0,skillType:x.skillType}));
   if(!chosen.length){alert('Nothing is selected.');return;}
   if(replace)editorQuestions=[];editorQuestions.push(...chosen);renderEditorRows();setupMsg((replace?'Replaced editor with ':'Added ')+chosen.length+' generated question(s). Review them, then save.');
+}
+
+// ---------- Teacher preview / try-out ----------
+function openQuizPreview(){
+  const questions=cleanedEditorQuestions();
+  if(!questions.length){alert('Add at least one complete question before previewing.');return;}
+  previewQuestions=questions.map(q=>({q:q.q,choices:asArray(q.choices).slice(),correctIndex:Number(q.correctIndex)||0,skillType:q.skillType||document.getElementById('editorSkillType').value}));
+  previewIndex=0;previewSelected=null;previewChecked=false;
+  document.getElementById('previewTitle').textContent=(document.getElementById('editorTitle').value.trim()||'Quiz Preview');
+  document.getElementById('previewMeta').textContent=skillLabel(document.getElementById('editorSkillType').value)+' • '+previewQuestions.length+' question'+(previewQuestions.length===1?'':'s');
+  document.getElementById('quizPreviewOverlay').classList.remove('hidden');
+  renderQuizPreview();
+}
+function closeQuizPreview(){document.getElementById('quizPreviewOverlay').classList.add('hidden');}
+function choosePreviewAnswer(i){
+  if(previewChecked)return;
+  previewSelected=i;
+  renderQuizPreview();
+}
+function renderQuizPreview(){
+  if(!previewQuestions.length)return;
+  previewIndex=Math.max(0,Math.min(previewQuestions.length-1,previewIndex));
+  const q=previewQuestions[previewIndex],choices=asArray(q.choices);
+  document.getElementById('previewQMeta').textContent='Question '+(previewIndex+1)+' of '+previewQuestions.length+(q.skillType?' • '+skillLabel(q.skillType):'');
+  document.getElementById('previewQuestion').textContent=q.q||'';
+  const box=document.getElementById('previewChoices');box.innerHTML='';
+  choices.forEach((choice,i)=>{
+    const b=document.createElement('button');
+    b.type='button';b.className='preview-choice';b.dir='auto';
+    b.textContent=String.fromCharCode(65+i)+'. '+choice;
+    if(previewSelected===i)b.classList.add('selected');
+    if(previewChecked){
+      if(i===Number(q.correctIndex))b.classList.add('correct');
+      else if(i===previewSelected)b.classList.add('wrong');
+    }
+    b.disabled=previewChecked;
+    b.onclick=()=>choosePreviewAnswer(i);
+    box.appendChild(b);
+  });
+  const status=document.getElementById('previewStatus');
+  status.className='preview-status';
+  if(!previewChecked){
+    status.textContent=previewSelected===null?'Choose an answer, then click Check Answer.':'Answer selected. Click Check Answer.';
+  }else{
+    const correct=previewSelected===Number(q.correctIndex);
+    status.classList.add(correct?'good':'bad');
+    status.textContent=correct?'Correct!':'Not correct. The correct answer is shown in green.';
+  }
+  document.getElementById('previewCheckBtn').disabled=previewSelected===null||previewChecked;
+  const nav=document.getElementById('previewNav');nav.innerHTML='';
+  previewQuestions.forEach((_,i)=>{
+    const b=document.createElement('button');b.textContent=i+1;
+    if(i===previewIndex)b.classList.add('active');
+    b.onclick=()=>{previewIndex=i;previewSelected=null;previewChecked=false;renderQuizPreview();};
+    nav.appendChild(b);
+  });
+}
+function checkPreviewAnswer(){
+  if(previewSelected===null)return;
+  previewChecked=true;renderQuizPreview();
+}
+function previewNext(){
+  if(!previewQuestions.length)return;
+  if(previewIndex<previewQuestions.length-1)previewIndex++;
+  previewSelected=null;previewChecked=false;renderQuizPreview();
+}
+function previewPrevious(){
+  if(!previewQuestions.length)return;
+  if(previewIndex>0)previewIndex--;
+  previewSelected=null;previewChecked=false;renderQuizPreview();
 }
 
 // ---------- Quiz library / editor ----------
@@ -657,6 +767,8 @@ function renderStudentProgress(){
   let html='<thead><tr><th>Date</th><th>Quiz</th><th>Class</th><th>Attempt</th><th>Shoreshim</th><th>Words/Phrases</th><th>Comprehension</th><th>Adjusted</th></tr></thead><tbody>';records.slice().reverse().forEach(r=>{function cell(skill){const v=r.bySkill[skill];return v&&v.total?Math.round(v.correct/v.total*100)+'%':'—';}html+='<tr><td>'+esc(fmtDate(r.date))+'</td><td>'+esc(r.title)+'</td><td>'+esc(classLabel(r.launch.classId))+'</td><td>'+(r.retake?'Retake '+r.attemptNumber:'First')+'</td><td>'+cell('shorashim')+'</td><td>'+cell('translation')+'</td><td>'+cell('comprehension')+'</td><td>'+(r.adjusted?r.adjusted:'—')+'</td></tr>';});document.getElementById('progressHistory').innerHTML=html+'</tbody>';
 }
 async function copyParentSummary(){const text=document.getElementById('parentSummary').textContent;if(!text)return;try{await navigator.clipboard.writeText(text);alert('Parent summary copied.');}catch(e){prompt('Copy parent summary:',text);}}
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('quizPreviewOverlay').classList.contains('hidden'))closeQuizPreview();});
 
 // ---------- Links ----------
 function getStudentLink(){return window.location.href.replace(/teacher\.html(?:\?.*)?$/,'');}
