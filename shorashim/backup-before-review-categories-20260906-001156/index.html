@@ -995,19 +995,6 @@ body.shorashim-review-active #chooseReviewCardsBtn {
 }
 </style>
 
-  <style id="review-track-tabs-v1">
-    .review-track-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:10px}
-    .review-track-intro .mini-note{margin:0}
-    .review-track-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 16px}
-    .review-track-btn{border:1px solid #dbe3ef;border-radius:16px;background:#f8fafc;padding:13px 14px;text-align:left;font-weight:900;color:#334155;display:flex;flex-direction:column;gap:4px;cursor:pointer}
-    .review-track-btn:hover{border-color:#a5b4fc;background:#f8faff}
-    .review-track-btn.active{border-color:#4f46e5;background:#eef2ff;color:#3730a3;box-shadow:inset 0 0 0 1px #4f46e5}
-    .review-track-btn .track-title{font-size:16px}
-    .review-track-btn .track-progress{font-size:12px;font-weight:800;color:#64748b}
-    .review-track-btn.active .track-progress{color:#6366f1}
-    .review-track-empty{grid-column:1/-1;border:1px dashed #cbd5e1;border-radius:14px;padding:24px;text-align:center;color:#64748b;background:#f8fafc;font-weight:800}
-    @media(max-width:640px){.review-track-tabs{grid-template-columns:1fr}.review-track-intro{align-items:flex-start;flex-direction:column}}
-  </style>
 </head>
 <body>
   <section id="studentSiteClosed" class="login-gate hidden">
@@ -1243,14 +1230,6 @@ body.shorashim-review-active #chooseReviewCardsBtn {
           </div>
 
           <div id="reviewSetup" class="card-panel review-setup">
-            <div class="review-track-intro">
-              <div><b>What do you want to review?</b><div class="mini-note">Choose one group. Your daily progress is shown separately for each group.</div></div>
-            </div>
-            <div class="review-track-tabs" role="group" aria-label="Choose flashcard category">
-              <button type="button" class="review-track-btn active" data-review-track="shorashim" aria-pressed="true"><span class="track-title">ðŸŒ± Shorashim</span><span class="track-progress">No learned cards yet</span></button>
-              <button type="button" class="review-track-btn" data-review-track="prefix" aria-pressed="false"><span class="track-title">âž¡ï¸ Prefixes</span><span class="track-progress">No learned cards yet</span></button>
-              <button type="button" class="review-track-btn" data-review-track="suffix" aria-pressed="false"><span class="track-title">ðŸ”š Suffixes</span><span class="track-progress">No learned cards yet</span></button>
-            </div>
             <div class="review-setup-top"><label>List view <select id="reviewSort"><option value="learned">Order learned</option><option value="alpha">Alphabetical</option><option value="manual">My custom order</option></select></label><span id="reviewSelectionCount" class="pill"></span></div>
             <div class="button-row"><button id="selectAllReview" class="ghost small">Select all</button><button id="clearReviewSelection" class="ghost small">Clear selection</button></div>
             <div id="reviewPicker" class="review-picker"></div>
@@ -1341,7 +1320,7 @@ body.shorashim-review-active #chooseReviewCardsBtn {
             <label>List <select id="manageTrack"><option value="shorashim">Shorashim</option><option value="prefix">Prefixes</option><option value="suffix">Suffixes</option></select></label>
             <button id="addCatalogItemBtn" class="primary">+ Add Item</button>
             <label>Minimum time per reviewed card
-              <select id="minReviewTime"><option value="500" selected>0.5 seconds</option><option value="800">0.8 seconds</option><option value="1000">1 second</option><option value="1500">1.5 seconds</option><option value="2000">2 seconds</option></select>
+              <select id="minReviewTime"><option value="500">0.5 seconds</option><option value="800" selected>0.8 seconds</option><option value="1000">1 second</option><option value="1500">1.5 seconds</option><option value="2000">2 seconds</option></select>
             </label>
           </div>
           <div id="catalogList" class="catalog-list"></div>
@@ -1370,8 +1349,7 @@ body.shorashim-review-active #chooseReviewCardsBtn {
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-  <script src="app.js?v=20260905-reviewcats1"></script>
-  <script src="review-categories.js?v=20260905-reviewcats1"></script>
+  <script src="app.js?v=20260830f"></script>
 
 <script data-shorashim-workspace-ux="v1">
 (() => {
