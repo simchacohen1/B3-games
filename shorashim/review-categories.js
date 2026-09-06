@@ -12,6 +12,27 @@
     suffix: { label: 'Suffixes', empty: 'suffixes' }
   };
 
+  function fixStaticReviewLabelsAndAffixIcons() {
+    // Keep these labels plain text so emoji/mojibake cannot appear before them.
+    document.querySelectorAll('[data-review-track]').forEach(btn => {
+      const meta = TRACK_META[btn.dataset.reviewTrack];
+      const title = btn.querySelector('.track-title');
+      if (meta && title) title.textContent = meta.label;
+    });
+
+    // Use simple Hebrew examples for the Prefix/Suffix learning cards.
+    const prefixIcon = document.querySelector('[data-track="prefix"] .feature-icon');
+    if (prefixIcon) {
+      prefixIcon.textContent = 'ב־';
+      prefixIcon.setAttribute('dir', 'rtl');
+    }
+    const suffixIcon = document.querySelector('[data-track="suffix"] .feature-icon');
+    if (suffixIcon) {
+      suffixIcon.textContent = '־ו';
+      suffixIcon.setAttribute('dir', 'rtl');
+    }
+  }
+
   function cardsForReviewTrack(track = reviewTrack, s = student()) {
     return learnedCards(s, track, false).filter(c => !!getItem(c.itemKey));
   }
@@ -152,6 +173,10 @@
     originalRenderDailyStatus();
     updateReviewTrackTabs();
   };
+
+  // Fix the static labels/icons too. This lets one direct JS replacement clean
+  // up older index.html copies that contained broken emoji encoding or 前.
+  fixStaticReviewLabelsAndAffixIcons();
 
   // Handles the already-rendered login screen before init(), and also makes
   // the enhancement safe if this file is loaded after a student session.
