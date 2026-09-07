@@ -61,6 +61,8 @@
   .nav button { min-width:42px; padding:8px 10px; background:#e8f1f7; color:var(--ink); }
   .nav button.active { background:var(--blue); color:white; }
   .nav button.answered { outline:2px solid var(--good); }
+  .question-step-nav { display:flex; justify-content:space-between; gap:12px; margin-top:16px; }
+  .question-step-nav button { flex:1; max-width:220px; font-size:18px; }
   .blocked { text-align:center; font-size:22px; font-weight:800; color:var(--bad); padding:55px 20px; }
   .progress { text-align:center; color:var(--muted); font-size:14px; margin-top:12px; }
 </style>
@@ -119,6 +121,10 @@
       <div class="choices" id="choices"></div>
       <div class="submit-row"><button class="primary" id="submitBtn" onclick="submitAnswer()">Submit answer</button></div>
       <div id="answerStatus" class="status hidden"></div>
+      <div id="questionStepNav" class="question-step-nav hidden">
+        <button id="prevQuestionBtn" class="secondary" type="button" onclick="goStudentQuestion(-1)">← Previous</button>
+        <button id="nextQuestionBtn" class="primary" type="button" onclick="goStudentQuestion(1)">Next →</button>
+      </div>
       <div id="questionNav" class="nav hidden"></div>
       <div id="progressText" class="progress"></div>
     </div>
@@ -295,13 +301,41 @@ function chooseActiveLaunch(){
   if(!id){render();return;}
   launchRef=db.ref('b3Quiz/launches/'+id);
   responseRef=db.ref('b3Quiz/responses/'+id+'/'+myStudentId);
-  launchRef.on('value',s=>{launchData=s.val();render();});
+  launchRef.on('value',s=>{
+    const firstLoad=!launchData;
+    launchData=s.val();
+    if(firstLoad&&launchData&&(launchData.mode||'paced')==='paced'){
+      displayedQuestion=Math.max(0,Number(launchData.activeQuestion)||0);
+    }
+    render();
+  });
   responseRef.on('value',s=>{myResponses=s.val()||{};render();});
 }
 
 function getQuestions(){return launchData&&launchData.quizSnapshot?asArray(launchData.quizSnapshot.questions):[];}
 function questionState(i){const qs=(launchData&&launchData.questionStates)||{};return qs[i]||qs[String(i)]||{open:false,reveal:false};}
 function responseFor(i){return myResponses[i]||myResponses[String(i)]||null;}
+
+function studentCanVisitQuestion(i,mode){
+  if(mode==='test')return true;
+  const active=Math.max(0,Number(launchData&&launchData.activeQuestion)||0);
+  if(i<0||i>active)return false;
+  if(i<active)return !responseFor(i); // missed earlier question: always available
+  const st=questionState(i);
+  return !!st.open||!!responseFor(i)||!!st.reveal;
+}
+
+function studentEffectiveQuestionState(i,mode){
+  const st=questionState(i);
+  if(mode==='test')return {...st,open:true};
+  const active=Math.max(0,Number(launchData&&launchData.activeQuestion)||0);
+  if(i<active&&!responseFor(i)){
+    // Catch-up rule: a teacher lock/reveal must not prevent a student from
+    // answering a question they missed. Do not reveal the answer first.
+    return {...st,open:true,reveal:false};
+  }
+  return st;
+}
 function launchAllowsStudent(){
   if(!launchData)return false;
   const targets=launchData.targetStudents||null;
@@ -322,14 +356,27 @@ function render(){
     return;
   }
   const mode=launchData.mode||'paced';
-  if(mode==='paced')displayedQuestion=Math.max(0,Math.min(questions.length-1,Number(launchData.activeQuestion)||0));
-  else displayedQuestion=Math.max(0,Math.min(questions.length-1,displayedQuestion));
+  displayedQuestion=Math.max(0,Math.min(questions.length-1,displayedQuestion));
+  if(mode==='paced'&&!studentCanVisitQuestion(displayedQuestion,mode)){
+    const active=Math.max(0,Math.min(questions.length-1,Number(launchData.activeQuestion)||0));
+    // Prefer the current teacher question. If it is locked, take the student
+    // to the newest earlier unanswered question so the child can catch up.
+    if(studentCanVisitQuestion(active,mode)){
+      displayedQuestion=active;
+    }else{
+      let catchup=-1;
+      for(let i=active-1;i>=0;i--){
+        if(studentCanVisitQuestion(i,mode)){catchup=i;break;}
+      }
+      displayedQuestion=catchup>=0?catchup:active;
+    }
+  }
   const answeredCount=questions.reduce((n,_,i)=>n+(responseFor(i)?1:0),0);
   if(answeredCount===questions.length) markCompletion();
   if(answeredCount===questions.length&&mode==='test'){
     document.getElementById('completeCard').classList.remove('hidden');return;
   }
-  const st=questionState(displayedQuestion),resp=responseFor(displayedQuestion);
+  let st=studentEffectiveQuestionState(displayedQuestion,mode),resp=responseFor(displayedQuestion);
   if(!st.open&&!resp&&!st.reveal){
     document.getElementById('waitingCard').classList.remove('hidden');
     document.getElementById('waitingTitle').textContent='Waiting for Question '+(displayedQuestion+1)+'…';
@@ -371,13 +418,68 @@ function renderChoices(q,resp,st){
 }
 
 function renderNav(mode,questions){
-  const nav=document.getElementById('questionNav');nav.innerHTML='';if(mode!=='test'){nav.classList.add('hidden');return;}nav.classList.remove('hidden');
-  questions.forEach((q,i)=>{const st=questionState(i),resp=responseFor(i),b=document.createElement('button');b.textContent=i+1;if(i===displayedQuestion)b.classList.add('active');if(resp)b.classList.add('answered');b.disabled=!st.open&&!resp&&!st.reveal;b.onclick=()=>{displayedQuestion=i;render();};nav.appendChild(b);});
+  const nav=document.getElementById('questionNav');
+  const stepNav=document.getElementById('questionStepNav');
+  const prev=document.getElementById('prevQuestionBtn');
+  const next=document.getElementById('nextQuestionBtn');
+  nav.innerHTML='';
+
+  nav.classList.remove('hidden');
+  stepNav.classList.remove('hidden');
+
+  const visitable=[];
+  questions.forEach((_,i)=>{
+    if(studentCanVisitQuestion(i,mode))visitable.push(i);
+  });
+
+  const prevIndex=[...visitable].reverse().find(i=>i<displayedQuestion);
+  const nextIndex=visitable.find(i=>i>displayedQuestion);
+  prev.disabled=prevIndex===undefined;
+  next.disabled=nextIndex===undefined;
+
+  prev.onclick=()=>{if(prevIndex!==undefined){displayedQuestion=prevIndex;selectedChoice=null;render();}};
+  next.onclick=()=>{if(nextIndex!==undefined){displayedQuestion=nextIndex;selectedChoice=null;render();}};
+
+  questions.forEach((q,i)=>{
+    const resp=responseFor(i);
+    const b=document.createElement('button');
+    b.type='button';
+    b.textContent=i+1;
+    if(i===displayedQuestion)b.classList.add('active');
+    if(resp)b.classList.add('answered');
+
+    // Open Test: all questions.
+    // Paced: current teacher question + ANY earlier unanswered question.
+    b.disabled=!studentCanVisitQuestion(i,mode);
+    b.title=mode==='paced'&&i<Number(launchData.activeQuestion||0)&&!resp
+      ? 'You missed this question — you can still answer it.'
+      : '';
+
+    b.onclick=()=>{displayedQuestion=i;selectedChoice=null;render();};
+    nav.appendChild(b);
+  });
+}
+
+function goStudentQuestion(delta){
+  if(!launchData)return;
+  const mode=launchData.mode||'paced';
+  const questions=getQuestions();
+  const visitable=[];
+  questions.forEach((_,i)=>{if(studentCanVisitQuestion(i,mode))visitable.push(i);});
+  if(!visitable.length)return;
+
+  const pos=visitable.indexOf(displayedQuestion);
+  if(pos<0)return;
+  const nextPos=Math.max(0,Math.min(visitable.length-1,pos+(Number(delta)||0)));
+  if(nextPos===pos)return;
+  displayedQuestion=visitable[nextPos];
+  selectedChoice=null;
+  render();
 }
 
 async function submitAnswer(){
   if(selectedChoice===null){const s=document.getElementById('answerStatus');s.textContent='Choose an answer first.';s.className='status bad';return;}
-  const qs=getQuestions(),q=qs[displayedQuestion],st=questionState(displayedQuestion);if(!st.open||responseFor(displayedQuestion))return;
+  const qs=getQuestions(),q=qs[displayedQuestion],mode=launchData.mode||'paced',st=studentEffectiveQuestionState(displayedQuestion,mode);if(!st.open||responseFor(displayedQuestion))return;
   const ref=db.ref('b3Quiz/responses/'+activeLaunchId+'/'+myStudentId+'/'+displayedQuestion);
   const correct=Number(selectedChoice)===Number(q.correctIndex);
   const answer={name:myName,choiceIndex:selectedChoice,originalCorrect:correct,correct,adjusted:false,submittedAt:firebase.database.ServerValue.TIMESTAMP};
@@ -391,6 +493,11 @@ async function markCompletion(){
 }
 
 ['classPinInput','studentNameInput'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();joinQuiz();}}));
+document.addEventListener('keydown',e=>{
+  if(!launchData)return;
+  if(e.key==='ArrowLeft'){e.preventDefault();goStudentQuestion(-1);}
+  if(e.key==='ArrowRight'){e.preventDefault();goStudentQuestion(1);}
+});
 restoreLogin();
 </script>
 </body>
