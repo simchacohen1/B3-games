@@ -509,10 +509,10 @@ const TEACHER_PASSWORD='class123';
 const GENERATE_WEEKLY_QUIZ_URL='https://us-central1-b3-games.cloudfunctions.net/generateWeeklyQuiz';
 
 function checkPassword(){
-  if(document.getElementById('lockPassword').value===TEACHER_PASSWORD){document.getElementById('lockOverlay').style.display='none';document.getElementById('mainContent').classList.remove('hidden');sessionStorage.setItem('weeklyQuizTeacherUnlocked','yes');}
+  if(document.getElementById('lockPassword').value===TEACHER_PASSWORD){document.getElementById('lockOverlay').style.display='none';document.getElementById('mainContent').classList.remove('hidden');localStorage.setItem('weeklyQuizTeacherUnlocked','yes');}
   else document.getElementById('lockError').textContent='Incorrect password.';
 }
-if(sessionStorage.getItem('weeklyQuizTeacherUnlocked')==='yes'){document.getElementById('lockOverlay').style.display='none';document.getElementById('mainContent').classList.remove('hidden');}
+if(localStorage.getItem('weeklyQuizTeacherUnlocked')==='yes'){document.getElementById('lockOverlay').style.display='none';document.getElementById('mainContent').classList.remove('hidden');}
 
 const firebaseConfig={
   apiKey:"AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
@@ -1006,6 +1006,5 @@ async function copyStudentLink(){const link=getStudentLink();try{await navigator
 
 newQuizDraft();generatorTypeChanged();populateProgressStudents();
 </script>
-<script src="weekly-quiz-score-release.js"></script>
 </body>
 </html>
