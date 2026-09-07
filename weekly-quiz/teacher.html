@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- BUILD: 2026-09-07 FRIENDLY-LAUNCH-UI -->
 <!-- BUILD: 2026-09-07 18:31 ET | LIVE-ANYTIME-MAKEUP-FORCE-CHANGE -->
 <html lang="en">
 <head>
@@ -170,6 +171,79 @@
   }
 
   @media(max-width:900px){.setup-grid,.progress-layout{grid-template-columns:1fr}.generator-grid{grid-template-columns:1fr 1fr}.launch-controls{grid-template-columns:1fr 1fr}.choice-grid{grid-template-columns:1fr}.skill-cards{grid-template-columns:1fr}}
+
+  /* Friendlier teacher dashboard */
+  body { background:linear-gradient(180deg,#edf5fb 0,#f8fbfd 260px,#f4f8fb 100%); }
+  header { padding:18px 20px 16px; box-shadow:0 2px 12px rgba(32,72,105,.07); }
+  h1 { font-size:30px; letter-spacing:-.4px; }
+  .tabs { background:white; border:1px solid var(--line); border-radius:14px; padding:7px; box-shadow:0 4px 16px rgba(32,72,105,.06); }
+  .tab { flex:1 1 150px; min-height:44px; border-radius:10px; font-size:15px; }
+  .card { box-shadow:0 8px 24px rgba(32,72,105,.07); }
+  .launch-card { border:2px solid #a9cce5; box-shadow:0 12px 30px rgba(45,110,163,.12); overflow:hidden; }
+  .launch-card h2 { font-size:25px; color:var(--blue); margin-bottom:4px; }
+  .launch-intro { color:var(--muted); margin-bottom:16px; line-height:1.45; }
+
+  .launch-step { margin-top:18px; padding-top:17px; border-top:1px solid #dce9f2; }
+  .launch-step:first-of-type { margin-top:0; padding-top:0; border-top:0; }
+  .step-title { display:flex; align-items:center; gap:9px; font-size:17px; font-weight:900; margin-bottom:10px; color:var(--ink); }
+  .step-number { width:27px; height:27px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; background:var(--blue); color:white; font-size:14px; flex:0 0 auto; }
+
+  .launch-mode-picker { display:grid; grid-template-columns:repeat(3,1fr); gap:11px; }
+  .launch-mode-card {
+    border:2px solid #d4e3ee; background:#fbfdff; border-radius:14px; padding:15px;
+    cursor:pointer; text-align:left; transition:.15s ease; min-height:128px;
+  }
+  .launch-mode-card:hover { border-color:#8ab8d8; transform:translateY(-1px); }
+  .launch-mode-card.active { border-color:var(--blue); background:#edf7fe; box-shadow:0 0 0 3px rgba(45,110,163,.10); }
+  .launch-mode-icon { font-size:25px; line-height:1; margin-bottom:8px; }
+  .launch-mode-title { font-size:17px; font-weight:900; color:var(--blue2); margin-bottom:5px; }
+  .launch-mode-desc { font-size:13px; color:var(--muted); line-height:1.35; font-weight:500; }
+
+  .choice-pills { display:flex; gap:8px; flex-wrap:wrap; }
+  .choice-pill {
+    border:1px solid var(--line); background:#f5f9fc; color:var(--ink); border-radius:999px;
+    padding:9px 14px; font-weight:800;
+  }
+  .choice-pill.active { background:var(--blue); color:white; border-color:var(--blue); }
+
+  .class-picker { display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:520px; }
+  .class-choice {
+    border:2px solid #d4e3ee; background:white; border-radius:12px; padding:13px 15px;
+    font-weight:900; color:var(--ink); text-align:center;
+  }
+  .class-choice.active { border-color:var(--blue); background:#edf7fe; color:var(--blue2); }
+
+  .launch-options-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .launch-field { display:flex; flex-direction:column; gap:5px; font-size:13px; font-weight:800; }
+  .launch-field input,.launch-field select { width:100%; min-height:42px; }
+  .score-toggle {
+    display:flex; align-items:center; gap:10px; border:1px solid var(--line); background:#f8fbfd;
+    border-radius:11px; padding:11px 13px; font-weight:800; min-height:44px;
+  }
+  .score-toggle input { width:19px; height:19px; }
+
+  .launch-student-select { max-width:520px; width:100%; min-height:44px; }
+  .student-checklist { margin-top:8px; }
+  .student-checklist label { padding:8px 9px; border-radius:8px; background:white; border:1px solid #e1ebf2; }
+  .student-checklist label:hover { background:#f2f8fc; }
+
+  .launch-help {
+    margin-top:13px; border-radius:11px; padding:12px 14px; background:#f6fbff; border:1px solid #cde2f1;
+    font-size:13px; line-height:1.45; color:#456278;
+  }
+  .launch-main-button {
+    width:100%; min-height:52px; margin-top:17px; font-size:18px; border-radius:12px;
+    box-shadow:0 6px 16px rgba(45,110,163,.20);
+  }
+  .launch-source-msg { margin-top:10px; padding:10px 12px; border-radius:9px; background:#f7f1ff; color:var(--purple); font-weight:800; }
+  .launch-success { margin-top:10px; font-weight:800; color:var(--good); }
+
+  @media(max-width:760px){
+    .launch-mode-picker { grid-template-columns:1fr; }
+    .launch-options-grid { grid-template-columns:1fr; }
+    .class-picker { grid-template-columns:1fr; }
+  }
+
 </style>
 </head>
 <body>
@@ -448,40 +522,103 @@
           <div id="setupMsg" class="small" style="margin-top:9px"></div>
         </div>
 
-        <div class="card">
-          <h2 style="margin-top:0">Launch This Quiz</h2>
-          <div class="info-box">Every launch is independent. You can give the same saved quiz to East Track, West Track, or just one student. Each launch keeps its own date, answers, retakes, and results.</div>
-          <div class="launch-controls">
-            <label>Test type
-              <select id="launchDeliveryType" onchange="updateLaunchTargetUI()">
-                <option value="live">Live Class Test</option>
-                <option value="anytime">Take Anytime</option>
-                <option value="makeup">Make-Up Test</option>
+        <div class="card launch-card">
+          <h2>Give This Quiz to Students</h2>
+          <div class="launch-intro">Choose how you want the quiz to work. The page will only show you the choices that matter for that type of test.</div>
+
+          <div class="launch-step">
+            <div class="step-title"><span class="step-number">1</span> How should students take it?</div>
+
+            <select id="launchDeliveryType" class="hidden" onchange="updateLaunchTargetUI()">
+              <option value="live">Live Class Test</option>
+              <option value="anytime">Take Anytime</option>
+              <option value="makeup">Make-Up Test</option>
+            </select>
+
+            <div class="launch-mode-picker">
+              <button type="button" class="launch-mode-card" id="deliveryCardLive" onclick="selectDelivery('live')">
+                <div class="launch-mode-icon">▶</div>
+                <div class="launch-mode-title">Live Class Test</div>
+                <div class="launch-mode-desc">You control the test during class: start it, open or lock questions, and move the class along.</div>
+              </button>
+              <button type="button" class="launch-mode-card" id="deliveryCardAnytime" onclick="selectDelivery('anytime')">
+                <div class="launch-mode-icon">⏱</div>
+                <div class="launch-mode-title">Take Anytime</div>
+                <div class="launch-mode-desc">Students may log in later and take it independently. A completed attempt stays finished unless you allow a retake.</div>
+              </button>
+              <button type="button" class="launch-mode-card" id="deliveryCardMakeup" onclick="selectDelivery('makeup')">
+                <div class="launch-mode-icon">↻</div>
+                <div class="launch-mode-title">Make-Up Test</div>
+                <div class="launch-mode-desc">Give the original test only to absent or unfinished students without reopening it for everybody.</div>
+              </button>
+            </div>
+          </div>
+
+          <div class="launch-step">
+            <div class="step-title"><span class="step-number">2</span> Who should receive it?</div>
+
+            <select id="launchTargetType" class="hidden" onchange="updateLaunchTargetUI()">
+              <option value="class">Whole class</option>
+              <option value="student">Individual student</option>
+              <option value="multiple">Several students</option>
+            </select>
+
+            <div id="launchTargetPills" class="choice-pills">
+              <button type="button" id="targetClassBtn" class="choice-pill" onclick="selectLaunchTarget('class')">Whole class</button>
+              <button type="button" id="targetStudentBtn" class="choice-pill" onclick="selectLaunchTarget('student')">One student</button>
+              <button type="button" id="targetMultipleBtn" class="choice-pill" onclick="selectLaunchTarget('multiple')">Several students</button>
+            </div>
+
+            <div id="launchClassWrap" style="margin-top:12px">
+              <select id="launchClass" class="hidden" onchange="populateLaunchStudents()">
+                <option value="et">East Track</option>
+                <option value="wt">West Track</option>
               </select>
-            </label>
-            <label>Give quiz to
-              <select id="launchTargetType" onchange="updateLaunchTargetUI()">
-                <option value="class">Whole class</option>
-                <option value="student">Individual student</option>
-                <option value="multiple">Several students</option>
-              </select>
-            </label>
-            <label id="launchClassWrap">Class<select id="launchClass" onchange="populateLaunchStudents()"><option value="et">East Track</option><option value="wt">West Track</option></select></label>
-            <label id="launchStudentWrap" class="hidden">Student<select id="launchStudent"></select></label>
-            <label id="launchModeWrap">Mode<select id="launchMode"><option value="paced">One question at a time</option><option value="test">Open test</option></select></label>
-            <label>Launch note<input type="text" id="launchNote" placeholder="Optional"></label>
-            <label style="display:flex;flex-direction:row;align-items:center;gap:7px;padding-bottom:8px">
-              <input type="checkbox" id="launchShowScore"> Show score when finished
-            </label>
-            <button class="primary" onclick="launchSelectedQuiz()">Launch Quiz</button>
-            <div id="launchMultiWrap" class="hidden" style="grid-column:1/-1">
-              <div style="font-weight:700;font-size:13px;margin-bottom:6px">Choose students</div>
+              <div class="class-picker">
+                <button type="button" id="classEtBtn" class="class-choice" onclick="selectLaunchClass('et')">East Track</button>
+                <button type="button" id="classWtBtn" class="class-choice" onclick="selectLaunchClass('wt')">West Track</button>
+              </div>
+            </div>
+
+            <div id="launchStudentWrap" class="hidden" style="margin-top:12px">
+              <label class="launch-field">Choose student
+                <select id="launchStudent" class="launch-student-select"></select>
+              </label>
+            </div>
+
+            <div id="launchMultiWrap" class="hidden" style="margin-top:12px">
+              <div style="font-weight:800;font-size:13px;margin-bottom:7px">Choose students</div>
               <div id="launchStudentChecklist" class="student-checklist"></div>
             </div>
           </div>
-          <div id="launchTypeHelp" class="launch-type-help">Live Class Test: you start it and control the questions during class.</div>
-          <div id="makeupSourceMsg" class="small" style="margin-top:8px;color:var(--purple);font-weight:700"></div>
-          <div id="launchMsg" class="small" style="margin-top:9px"></div>
+
+          <div class="launch-step">
+            <div class="step-title"><span class="step-number">3</span> Test options</div>
+
+            <div class="launch-options-grid">
+              <label id="launchModeWrap" class="launch-field">Live test style
+                <select id="launchMode">
+                  <option value="paced">One question at a time</option>
+                  <option value="test">Open test — students may navigate</option>
+                </select>
+              </label>
+
+              <label class="launch-field">Optional note
+                <input type="text" id="launchNote" placeholder="Example: Monday make-up">
+              </label>
+            </div>
+
+            <label class="score-toggle" style="margin-top:10px">
+              <input type="checkbox" id="launchShowScore">
+              <span>Show students their score when they finish</span>
+            </label>
+
+            <div id="launchTypeHelp" class="launch-help">Live Class Test: you start it and control opening, locking, and revealing questions during class.</div>
+            <div id="makeupSourceMsg" class="launch-source-msg hidden"></div>
+          </div>
+
+          <button id="friendlyLaunchBtn" class="primary launch-main-button" onclick="launchSelectedQuiz()">Set Up Live Class Test</button>
+          <div id="launchMsg" class="launch-success"></div>
         </div>
       </div>
     </div>
@@ -858,6 +995,65 @@ function classForStudent(studentId){
   if((CLASS_ROSTERS.wt.students||[]).includes(studentId))return'wt';
   return'';
 }
+
+function selectDelivery(type){
+  document.getElementById('launchDeliveryType').value=type;
+  updateLaunchTargetUI();
+}
+function selectLaunchTarget(type){
+  const delivery=document.getElementById('launchDeliveryType').value;
+  if(delivery==='live')type='class';
+  if(delivery==='makeup'&&type==='class')type='multiple';
+  document.getElementById('launchTargetType').value=type;
+  updateLaunchTargetUI();
+}
+function selectLaunchClass(classId){
+  document.getElementById('launchClass').value=classId;
+  populateLaunchStudents();
+  syncFriendlyLaunchUI();
+}
+function syncFriendlyLaunchUI(){
+  const delivery=document.getElementById('launchDeliveryType').value;
+  const target=document.getElementById('launchTargetType').value;
+  const classId=document.getElementById('launchClass').value;
+
+  [['live','deliveryCardLive'],['anytime','deliveryCardAnytime'],['makeup','deliveryCardMakeup']].forEach(([v,id])=>{
+    const el=document.getElementById(id); if(el)el.classList.toggle('active',delivery===v);
+  });
+
+  const targetPills=document.getElementById('launchTargetPills');
+  const classBtn=document.getElementById('targetClassBtn');
+  const oneBtn=document.getElementById('targetStudentBtn');
+  const multiBtn=document.getElementById('targetMultipleBtn');
+
+  if(delivery==='live'){
+    if(targetPills)targetPills.classList.add('hidden');
+  }else{
+    if(targetPills)targetPills.classList.remove('hidden');
+    if(classBtn)classBtn.classList.toggle('hidden',delivery==='makeup');
+  }
+
+  if(classBtn)classBtn.classList.toggle('active',target==='class');
+  if(oneBtn)oneBtn.classList.toggle('active',target==='student');
+  if(multiBtn)multiBtn.classList.toggle('active',target==='multiple');
+
+  const et=document.getElementById('classEtBtn'),wt=document.getElementById('classWtBtn');
+  if(et)et.classList.toggle('active',classId==='et');
+  if(wt)wt.classList.toggle('active',classId==='wt');
+
+  const btn=document.getElementById('friendlyLaunchBtn');
+  if(btn){
+    btn.textContent=delivery==='live'?'Set Up Live Class Test':
+      delivery==='anytime'?'Assign Take Anytime Test':'Assign Make-Up Test';
+    btn.className='primary launch-main-button';
+    if(delivery==='makeup')btn.className='purple launch-main-button';
+    if(delivery==='anytime')btn.className='good launch-main-button';
+  }
+
+  const source=document.getElementById('makeupSourceMsg');
+  if(source)source.classList.toggle('hidden',!source.textContent.trim());
+}
+
 function populateLaunchStudents(){
   const sel=document.getElementById('launchStudent');if(!sel)return;
   const old=sel.value;
@@ -904,6 +1100,7 @@ function updateLaunchTargetUI(){
   else help.textContent='Make-Up Test: assign the test only to the selected student(s). It does not reopen the test for the rest of the class.';
 
   populateLaunchStudents();
+  syncFriendlyLaunchUI();
 }
 async function launchSelectedQuiz(){
   const delivery=document.getElementById('launchDeliveryType').value;
@@ -1004,7 +1201,7 @@ async function launchSelectedQuiz(){
     launchMsg((delivery==='makeup'?'Make-Up Test':'Take Anytime')+' is now available to '+targetLabel+'.');
     if(delivery==='makeup')makeupSourceLaunchId='';
     makeupPreselected.clear();
-    document.getElementById('makeupSourceMsg').textContent='';
+    document.getElementById('makeupSourceMsg').textContent='';document.getElementById('makeupSourceMsg').classList.add('hidden');
   }
 }
 // ---------- Live view ----------
@@ -1125,7 +1322,7 @@ function openMakeupFromResults(){
   document.getElementById('launchShowScore').checked=base.showScore===true;
   document.getElementById('launchNote').value='Make-up from '+((base.quizSnapshot&&base.quizSnapshot.title)||'original test');
   updateLaunchTargetUI();
-  document.getElementById('makeupSourceMsg').textContent='Using the exact original test from Results: '+((base.quizSnapshot&&base.quizSnapshot.title)||'Untitled')+'. Students who did not finish are preselected.';
+  document.getElementById('makeupSourceMsg').textContent='Using the exact original test from Results: '+((base.quizSnapshot&&base.quizSnapshot.title)||'Untitled')+'. Students who did not finish are preselected.'; document.getElementById('makeupSourceMsg').classList.remove('hidden');
   showTab('setup');
   document.getElementById('launchTypeHelp').scrollIntoView({behavior:'smooth',block:'center'});
 }
