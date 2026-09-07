@@ -108,8 +108,9 @@
     </div>
 
     <div id="completeCard" class="card waiting hidden">
-      <div class="big">All answers are recorded.</div>
-      <div style="margin-top:8px;color:var(--muted);">Please wait for Rabbi Cohen.</div>
+      <div class="big" id="completeTitle">Test submitted.</div>
+      <div id="completeText" style="margin-top:8px;color:var(--muted);">Your answers are recorded.</div>
+      <div id="completeScore" class="hidden" style="margin-top:16px;font-size:30px;font-weight:900;color:var(--good);"></div>
     </div>
 
     <div id="quizCard" class="card hidden">
@@ -344,6 +345,37 @@ function launchAllowsStudent(){
 }
 
 function hideAll(){['noQuizCard','waitingCard','completeCard','quizCard'].forEach(id=>document.getElementById(id).classList.add('hidden'));}
+function renderCompletionCard(questions){
+  const delivery=launchData&&launchData.deliveryType||'live';
+  const title=document.getElementById('completeTitle');
+  const text=document.getElementById('completeText');
+  const score=document.getElementById('completeScore');
+
+  title.textContent='Test submitted.';
+  if(delivery==='live'){
+    text.textContent='Your answers are recorded. Please wait for Rabbi Cohen.';
+  }else if(delivery==='makeup'){
+    text.textContent='Your make-up test is complete. Your answers are recorded.';
+  }else{
+    text.textContent='Your test is complete. Your answers are recorded.';
+  }
+
+  if(launchData&&launchData.showScore===true){
+    let correct=0;
+    questions.forEach((_,i)=>{
+      const r=responseFor(i);
+      if(r&&r.correct)correct++;
+    });
+    const total=questions.length;
+    const pct=total?Math.round(correct/total*100):0;
+    score.textContent=correct+' / '+total+' — '+pct+'%';
+    score.classList.remove('hidden');
+  }else{
+    score.textContent='';
+    score.classList.add('hidden');
+  }
+}
+
 function render(){
   if(!myStudentId)return;hideAll();
   if(!activeLaunchId||!launchData){document.getElementById('noQuizCard').classList.remove('hidden');return;}
@@ -374,6 +406,7 @@ function render(){
   const answeredCount=questions.reduce((n,_,i)=>n+(responseFor(i)?1:0),0);
   if(answeredCount===questions.length) markCompletion();
   if(answeredCount===questions.length&&mode==='test'){
+    renderCompletionCard(questions);
     document.getElementById('completeCard').classList.remove('hidden');return;
   }
   let st=studentEffectiveQuestionState(displayedQuestion,mode),resp=responseFor(displayedQuestion);
@@ -500,6 +533,5 @@ document.addEventListener('keydown',e=>{
 });
 restoreLogin();
 </script>
-<script src="weekly-quiz-score-release.js"></script>
 </body>
 </html>
