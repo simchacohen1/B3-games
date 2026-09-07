@@ -81,6 +81,9 @@
   .skill-tag { display:inline-block; padding:3px 7px; border-radius:999px; font-size:11px; font-weight:800; background:#e8f1f7; color:var(--blue2); margin-left:6px; }
   .launch-controls { display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:10px; align-items:end; }
   .launch-controls label { display:flex; flex-direction:column; gap:5px; font-size:13px; font-weight:700; }
+  .student-checklist { border:1px solid var(--line); border-radius:10px; padding:10px; max-height:190px; overflow:auto; background:#fbfdff; display:grid; grid-template-columns:repeat(2,minmax(180px,1fr)); gap:6px 12px; }
+  .student-checklist label { display:flex; flex-direction:row; align-items:center; gap:7px; font-weight:600; margin:0; }
+  .launch-type-help { background:#fff8df; border:1px solid #eadb9b; border-radius:9px; padding:9px 11px; margin-top:10px; font-size:13px; color:#6f5a18; }
   .lock-overlay,.modal-overlay { position:fixed; inset:0; background:rgba(244,248,251,.96); display:flex; align-items:center; justify-content:center; z-index:99; }
   .lock-box,.modal-box { width:min(520px,92vw); background:white; border:1px solid var(--line); border-radius:14px; padding:25px; text-align:center; box-shadow:0 18px 50px rgba(0,0,0,.18); }
   .lock-box input { width:100%; margin:12px 0; font-size:18px; }
@@ -322,6 +325,7 @@
             </select>
           </label>
           <button class="good" onclick="startLaunch()">Start</button>
+          <button id="scoreReleaseBtn" class="secondary" onclick="toggleScoreRelease()">Score hidden</button>
           <button class="danger" onclick="stopLaunch()">End Launch</button>
         </div>
       </div>
@@ -447,13 +451,35 @@
           <h2 style="margin-top:0">Launch This Quiz</h2>
           <div class="info-box">Every launch is independent. You can give the same saved quiz to East Track, West Track, or just one student. Each launch keeps its own date, answers, retakes, and results.</div>
           <div class="launch-controls">
-            <label>Give quiz to<select id="launchTargetType" onchange="updateLaunchTargetUI()"><option value="class">Whole class</option><option value="student">Individual student</option></select></label>
-            <label id="launchClassWrap">Class<select id="launchClass"><option value="et">East Track</option><option value="wt">West Track</option></select></label>
+            <label>Test type
+              <select id="launchDeliveryType" onchange="updateLaunchTargetUI()">
+                <option value="live">Live Class Test</option>
+                <option value="anytime">Take Anytime</option>
+                <option value="makeup">Make-Up Test</option>
+              </select>
+            </label>
+            <label>Give quiz to
+              <select id="launchTargetType" onchange="updateLaunchTargetUI()">
+                <option value="class">Whole class</option>
+                <option value="student">Individual student</option>
+                <option value="multiple">Several students</option>
+              </select>
+            </label>
+            <label id="launchClassWrap">Class<select id="launchClass" onchange="populateLaunchStudents()"><option value="et">East Track</option><option value="wt">West Track</option></select></label>
             <label id="launchStudentWrap" class="hidden">Student<select id="launchStudent"></select></label>
-            <label>Mode<select id="launchMode"><option value="paced">One question at a time</option><option value="test">Open test</option></select></label>
+            <label id="launchModeWrap">Mode<select id="launchMode"><option value="paced">One question at a time</option><option value="test">Open test</option></select></label>
             <label>Launch note<input type="text" id="launchNote" placeholder="Optional"></label>
+            <label style="display:flex;flex-direction:row;align-items:center;gap:7px;padding-bottom:8px">
+              <input type="checkbox" id="launchShowScore"> Show score when finished
+            </label>
             <button class="primary" onclick="launchSelectedQuiz()">Launch Quiz</button>
+            <div id="launchMultiWrap" class="hidden" style="grid-column:1/-1">
+              <div style="font-weight:700;font-size:13px;margin-bottom:6px">Choose students</div>
+              <div id="launchStudentChecklist" class="student-checklist"></div>
+            </div>
           </div>
+          <div id="launchTypeHelp" class="launch-type-help">Live Class Test: you start it and control the questions during class.</div>
+          <div id="makeupSourceMsg" class="small" style="margin-top:8px;color:var(--purple);font-weight:700"></div>
           <div id="launchMsg" class="small" style="margin-top:9px"></div>
         </div>
       </div>
@@ -471,7 +497,7 @@
         <div class="card">
           <div class="topline">
             <div><h2 style="margin:0" id="resultsQuizTitle">Results</h2><div id="resultsMeta" class="small"></div></div>
-            <div class="controls"><button class="primary" onclick="downloadCSV()">Download CSV</button><button class="secondary" onclick="copyResultsTSV()">Copy for Google Sheets</button><button id="endSelectedBtn" class="danger hidden" onclick="endSelectedLaunch()">End this launch</button></div>
+            <div class="controls"><button class="primary" onclick="downloadCSV()">Download CSV</button><button class="secondary" onclick="copyResultsTSV()">Copy for Google Sheets</button><button id="assignMakeupBtn" class="purple" onclick="openMakeupFromResults()">Assign Make-Up</button><button id="resultsScoreBtn" class="secondary" onclick="toggleResultsScoreRelease()">Score hidden</button><button id="endSelectedBtn" class="danger hidden" onclick="endSelectedLaunch()">End this launch</button></div>
           </div>
           <div class="grid-wrap" style="margin-top:12px"><table id="resultsTable"></table></div>
           <div class="small" style="margin-top:8px">Click a question result to review/adjust it. Parent-facing summaries use only the final adjusted result; the audit trail stays teacher-only.</div>
@@ -538,6 +564,8 @@ let liveClassId='et',activeLaunchByClass={},activeLaunchId='',liveLaunch=null,li
 let liveLaunchRef=null,liveResponseRef=null;
 let resultsLaunchId='';
 let modalContext=null;
+let makeupSourceLaunchId='';
+let makeupPreselected=new Set();
 
 function asArray(v){if(!v)return[];if(Array.isArray(v))return v;return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]);}
 function slugTitle(s){return String(s||'quiz').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,35)||'quiz';}
@@ -832,48 +860,152 @@ function classForStudent(studentId){
 function populateLaunchStudents(){
   const sel=document.getElementById('launchStudent');if(!sel)return;
   const old=sel.value;
-  const ids=[...new Set([...(CLASS_ROSTERS.et.students||[]),...(CLASS_ROSTERS.wt.students||[])])].filter(id=>id!=='simcha_cohen');
-  const rows=ids.map(id=>({id,name:(roster[id]&&roster[id].name)||id,classId:classForStudent(id)})).sort((a,b)=>a.name.localeCompare(b.name));
+  const allIds=[...new Set([...(CLASS_ROSTERS.et.students||[]),...(CLASS_ROSTERS.wt.students||[])])].filter(id=>id!=='simcha_cohen');
+  const rows=allIds.map(id=>({id,name:(roster[id]&&roster[id].name)||id,classId:classForStudent(id)})).sort((a,b)=>a.name.localeCompare(b.name));
   sel.innerHTML='';
   rows.forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=x.name+' — '+classLabel(x.classId);sel.appendChild(o);});
   if(rows.some(x=>x.id===old))sel.value=old;
+
+  const checklist=document.getElementById('launchStudentChecklist');
+  if(checklist){
+    const cls=document.getElementById('launchClass').value;
+    const classRows=rows.filter(x=>x.classId===cls);
+    checklist.innerHTML=classRows.map(x=>'<label><input type="checkbox" value="'+esc(x.id)+'" '+(makeupPreselected.has(x.id)?'checked':'')+'> '+esc(x.name)+'</label>').join('');
+  }
+}
+function selectedLaunchStudents(){
+  return [...document.querySelectorAll('#launchStudentChecklist input[type="checkbox"]:checked')].map(x=>x.value);
 }
 function updateLaunchTargetUI(){
-  const individual=document.getElementById('launchTargetType').value==='student';
-  document.getElementById('launchClassWrap').classList.toggle('hidden',individual);
-  document.getElementById('launchStudentWrap').classList.toggle('hidden',!individual);
-  if(individual)populateLaunchStudents();
+  const delivery=document.getElementById('launchDeliveryType').value;
+  const target=document.getElementById('launchTargetType');
+  const classOpt=target.querySelector('option[value="class"]');
+
+  if(delivery==='live'){
+    target.value='class';
+    target.disabled=true;
+    classOpt.disabled=false;
+  }else{
+    target.disabled=false;
+    classOpt.disabled=delivery==='makeup';
+    if(delivery==='makeup'&&target.value==='class')target.value='multiple';
+  }
+
+  const t=target.value;
+  document.getElementById('launchClassWrap').classList.toggle('hidden',t==='student');
+  document.getElementById('launchStudentWrap').classList.toggle('hidden',t!=='student');
+  document.getElementById('launchMultiWrap').classList.toggle('hidden',t!=='multiple');
+  document.getElementById('launchModeWrap').classList.toggle('hidden',delivery!=='live');
+
+  const help=document.getElementById('launchTypeHelp');
+  if(delivery==='live')help.textContent='Live Class Test: you start it and control opening, locking, and revealing questions during class.';
+  else if(delivery==='anytime')help.textContent='Take Anytime: the test is available immediately. Each assigned student may complete it later. After submitting all questions, that attempt is finished unless you assign a retake.';
+  else help.textContent='Make-Up Test: assign the test only to the selected student(s). It does not reopen the test for the rest of the class.';
+
+  populateLaunchStudents();
 }
 async function launchSelectedQuiz(){
-  if(!currentQuizId||!quizzes[currentQuizId]){alert('Choose and save a quiz first.');return;}
-  const targetType=document.getElementById('launchTargetType').value,mode=document.getElementById('launchMode').value,note=document.getElementById('launchNote').value.trim(),quiz=quizzes[currentQuizId],questions=asArray(quiz.questions);
-  if(!questions.length){alert('This quiz has no questions.');return;}
-  let classId='',studentId='',targetStudents=null,targetLabel='';
-  if(targetType==='student'){
-    studentId=document.getElementById('launchStudent').value;
-    if(!studentId){alert('Choose a student.');return;}
-    classId=classForStudent(studentId);
-    if(!classId){alert('That student is not assigned to East Track or West Track yet.');return;}
-    targetStudents={[studentId]:true};
-    targetLabel=(roster[studentId]&&roster[studentId].name)||studentId;
-    const personalSnap=await db.ref('b3Quiz/settings/studentActiveLaunch/'+studentId).once('value');
-    const oldPersonal=personalSnap.val()||'';
-    if(oldPersonal&&!confirm(targetLabel+' already has an individual quiz active. Replace it? The old results will remain saved.'))return;
+  const delivery=document.getElementById('launchDeliveryType').value;
+  const targetType=document.getElementById('launchTargetType').value;
+  const note=document.getElementById('launchNote').value.trim();
+  const showScore=document.getElementById('launchShowScore').checked===true;
+
+  let quiz=null,questions=[],quizId=currentQuizId,snapshot=null;
+  if(delivery==='makeup'&&makeupSourceLaunchId&&allLaunches[makeupSourceLaunchId]){
+    const base=allLaunches[makeupSourceLaunchId];
+    snapshot=JSON.parse(JSON.stringify(base.quizSnapshot||{}));
+    quizId=base.quizId||'';
+    questions=asArray(snapshot.questions);
   }else{
+    if(!currentQuizId||!quizzes[currentQuizId]){alert('Choose and save a quiz first.');return;}
+    quiz=quizzes[currentQuizId];
+    questions=asArray(quiz.questions);
+    snapshot={title:quiz.title||'Untitled',skillType:quiz.skillType||'comprehension',sourceLabel:quiz.sourceLabel||'',questions};
+  }
+  if(!questions.length){alert('This quiz has no questions.');return;}
+
+  let classId='',studentIds=[],targetStudents=null,targetLabel='';
+  if(delivery==='live'){
     classId=document.getElementById('launchClass').value;
     targetLabel=classLabel(classId);
     const old=activeLaunchByClass[classId]||'';
     if(old&&!confirm(classLabel(classId)+' already has an active class launch. Replace it? The old results will remain saved.'))return;
+  }else if(targetType==='student'){
+    const studentId=document.getElementById('launchStudent').value;
+    if(!studentId){alert('Choose a student.');return;}
+    classId=classForStudent(studentId);
+    if(!classId){alert('That student is not assigned to East Track or West Track yet.');return;}
+    studentIds=[studentId];
+    targetStudents={[studentId]:true};
+    targetLabel=(roster[studentId]&&roster[studentId].name)||studentId;
+  }else if(targetType==='multiple'){
+    classId=document.getElementById('launchClass').value;
+    studentIds=selectedLaunchStudents();
+    if(!studentIds.length){alert('Choose at least one student.');return;}
+    targetStudents=Object.fromEntries(studentIds.map(id=>[id,true]));
+    targetLabel=studentIds.length+' selected student'+(studentIds.length===1?'':'s');
+  }else{
+    classId=document.getElementById('launchClass').value;
+    studentIds=((CLASS_ROSTERS[classId]||{}).students||[]).filter(id=>id!=='simcha_cohen');
+    if(!studentIds.length){alert('No students are assigned to this class.');return;}
+    targetStudents=Object.fromEntries(studentIds.map(id=>[id,true]));
+    targetLabel=classLabel(classId);
   }
-  const id=Date.now()+'_'+(studentId||classId)+'_'+slugTitle(quiz.title),snapshot={title:quiz.title||'Untitled',skillType:quiz.skillType||'comprehension',sourceLabel:quiz.sourceLabel||'',questions};
-  const launch={quizId:currentQuizId,quizSnapshot:snapshot,classId,targetStudents,note,createdAt:firebase.database.ServerValue.TIMESTAMP,started:false,mode,activeQuestion:0,questionStates:makeQuestionStates(questions,mode),attemptGroupId:id,attemptNumber:1,retakeOf:''};
-  await db.ref('b3Quiz/launches/'+id).set(launch);
-  if(studentId)await db.ref('b3Quiz/settings/studentActiveLaunch/'+studentId).set(id);
-  else await db.ref('b3Quiz/settings/activeLaunchByClass/'+classId).set(id);
-  launchMsg('Launched to '+targetLabel+'. It is staged and ready. Click Start on the Live Quiz tab.');
-  liveClassId=classId;document.getElementById('liveClassSelect').value=classId;showTab('live');attachLiveLaunch(id);
-}
 
+  if(delivery!=='live'){
+    const activeChecks=await Promise.all(studentIds.map(async sid=>{
+      const s=await db.ref('b3Quiz/settings/studentActiveLaunch/'+sid).once('value');
+      return {sid,old:s.val()||''};
+    }));
+    const conflicts=activeChecks.filter(x=>x.old);
+    if(conflicts.length){
+      const names=conflicts.map(x=>(roster[x.sid]&&roster[x.sid].name)||x.sid).join(', ');
+      if(!confirm('These student(s) already have an individual quiz assigned: '+names+'. Replace their current assignment? Their old results will remain saved.'))return;
+    }
+  }
+
+  const mode=delivery==='live'?document.getElementById('launchMode').value:'test';
+  const autoStart=delivery!=='live';
+  const id=Date.now()+'_'+(delivery==='live'?classId:'assigned')+'_'+slugTitle(snapshot.title||'quiz');
+  const launch={
+    quizId,
+    quizSnapshot:snapshot,
+    classId,
+    targetStudents:delivery==='live'?null:targetStudents,
+    note,
+    deliveryType:delivery,
+    showScore,
+    createdAt:firebase.database.ServerValue.TIMESTAMP,
+    started:autoStart,
+    mode,
+    activeQuestion:0,
+    questionStates:makeQuestionStates(questions,mode),
+    attemptGroupId:id,
+    attemptNumber:1,
+    retakeOf:''
+  };
+  if(autoStart)launch.startedAt=firebase.database.ServerValue.TIMESTAMP;
+  if(makeupSourceLaunchId)launch.makeupOf=makeupSourceLaunchId;
+
+  await db.ref('b3Quiz/launches/'+id).set(launch);
+
+  if(delivery==='live'){
+    await db.ref('b3Quiz/settings/activeLaunchByClass/'+classId).set(id);
+    launchMsg('Live Class Test staged for '+targetLabel+'. Click Start on the Live Quiz tab.');
+    liveClassId=classId;
+    document.getElementById('liveClassSelect').value=classId;
+    showTab('live');
+    attachLiveLaunch(id);
+  }else{
+    const updates={};
+    studentIds.forEach(sid=>updates['b3Quiz/settings/studentActiveLaunch/'+sid]=id);
+    await db.ref().update(updates);
+    launchMsg((delivery==='makeup'?'Make-Up Test':'Take Anytime')+' is now available to '+targetLabel+'.');
+    if(delivery==='makeup')makeupSourceLaunchId='';
+    makeupPreselected.clear();
+    document.getElementById('makeupSourceMsg').textContent='';
+  }
+}
 // ---------- Live view ----------
 function changeLiveClass(){liveClassId=document.getElementById('liveClassSelect').value;attachLiveLaunch(activeLaunchByClass[liveClassId]||'');}
 function detachLive(){if(liveLaunchRef)liveLaunchRef.off();if(liveResponseRef)liveResponseRef.off();liveLaunchRef=liveResponseRef=null;}
@@ -893,6 +1025,8 @@ function renderLive(){
   const targetIds=liveLaunch&&liveLaunch.targetStudents?Object.keys(liveLaunch.targetStudents).filter(k=>liveLaunch.targetStudents[k]):[];const targetText=targetIds.length?((roster[targetIds[0]]&&roster[targetIds[0]].name)||targetIds[0]):classLabel(liveLaunch&&liveLaunch.classId);document.getElementById('liveLaunchMeta').textContent=liveLaunch?(targetText+' • '+skillLabel(snap.skillType)+' • created '+fmtDate(liveLaunch.createdAt)+(liveLaunch.note?' • '+liveLaunch.note:'')):'';
   document.getElementById('liveStatus').textContent=liveLaunch&&liveLaunch.started?'Live':'Not started';document.getElementById('liveStatus').classList.toggle('live',!!(liveLaunch&&liveLaunch.started));
   document.getElementById('modeSelect').value=liveLaunch&&liveLaunch.mode||'paced';
+  const scoreBtn=document.getElementById('scoreReleaseBtn');
+  if(scoreBtn){scoreBtn.disabled=!liveLaunch;scoreBtn.textContent=liveLaunch&&liveLaunch.showScore===true?'Score shown':'Score hidden';}
   if(!qs.length){document.getElementById('liveQnum').textContent='Question —';document.getElementById('liveQtext').textContent='Launch a quiz to ET or WT from Quiz Setup.';document.getElementById('liveAnswer').textContent='';document.getElementById('questionStrip').innerHTML='';return;}
   currentQ=Math.max(0,Math.min(qs.length-1,currentQ));const q=qs[currentQ],st=qState(currentQ),choices=asArray(q.choices);
   document.getElementById('liveQnum').textContent='Question '+(currentQ+1)+' of '+qs.length+(st.open?' • OPEN':' • LOCKED');document.getElementById('liveQtext').textContent=q.q||'';document.getElementById('liveAnswer').textContent='Correct answer: '+(choices[Number(q.correctIndex)]||'');document.getElementById('revealBtn').textContent=st.reveal?'Hide answer from students':'Reveal answer to students';
@@ -905,6 +1039,10 @@ async function setCurrentOpen(open){if(activeLaunchId)await db.ref('b3Quiz/launc
 async function toggleReveal(){if(!activeLaunchId)return;await db.ref('b3Quiz/launches/'+activeLaunchId+'/questionStates/'+currentQ+'/reveal').set(!qState(currentQ).reveal);}
 async function changeMode(){if(!activeLaunchId)return;const mode=document.getElementById('modeSelect').value,qs=liveQuestions(),updates={mode};qs.forEach((_,i)=>{updates['questionStates/'+i+'/open']=mode==='test'||i===currentQ;updates['questionStates/'+i+'/reveal']=false;});await db.ref('b3Quiz/launches/'+activeLaunchId).update(updates);}
 async function startLaunch(){if(!activeLaunchId||!liveQuestions().length){alert('Launch a quiz first.');return;}const updates={started:true,startedAt:liveLaunch.startedAt||firebase.database.ServerValue.TIMESTAMP};await db.ref('b3Quiz/launches/'+activeLaunchId).update(updates);}
+async function toggleScoreRelease(){
+  if(!activeLaunchId||!liveLaunch)return;
+  await db.ref('b3Quiz/launches/'+activeLaunchId+'/showScore').set(!(liveLaunch.showScore===true));
+}
 async function stopLaunch(){
   if(!activeLaunchId||!liveLaunch)return;const targets=liveLaunch.targetStudents?Object.keys(liveLaunch.targetStudents).filter(k=>liveLaunch.targetStudents[k]):[];const who=targets.length?((roster[targets[0]]&&roster[targets[0]].name)||targets[0]):classLabel(liveLaunch.classId);if(!confirm('End this '+who+' launch? All data stays saved.'))return;
   await db.ref('b3Quiz/launches/'+activeLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP});
@@ -956,15 +1094,44 @@ function renderResults(){
   const table=document.getElementById('resultsTable');if(!table)return;const l=allLaunches[resultsLaunchId];if(!l){table.innerHTML='<tr><td>Choose a launch from Quiz History.</td></tr>';document.getElementById('resultsQuizTitle').textContent='Results';document.getElementById('resultsMeta').textContent='';return;}
   const qs=launchQuestions(l),students=launchStudentRows(l),rr=allResponses[resultsLaunchId]||{},snap=l.quizSnapshot||{},retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'';
   document.getElementById('resultsQuizTitle').textContent=snap.title||'Results';document.getElementById('resultsMeta').textContent=classLabel(l.classId)+' • '+skillLabel(snap.skillType)+' • '+fmtDate(l.createdAt)+retake+(l.note?' • '+l.note:'');
+  const resultsScoreBtn=document.getElementById('resultsScoreBtn');
+  if(resultsScoreBtn)resultsScoreBtn.textContent=l.showScore===true?'Score shown':'Score hidden';
   const endBtn=document.getElementById('endSelectedBtn');endBtn.classList.toggle('hidden',!l.started);
   if(!qs.length){table.innerHTML='<tr><td>No questions.</td></tr>';return;}
   let html='<thead><tr><th>Student</th><th>Score</th><th>Percent</th><th>Completed</th>'+qs.map((_,i)=>'<th>Q'+(i+1)+'</th>').join('')+'<th>Retake</th></tr></thead><tbody>';
   students.forEach(st=>{const sr=rr[st.id]||{},score=launchScore(resultsLaunchId,st.id),comp=completions[resultsLaunchId]&&completions[resultsLaunchId][st.id],cells=qs.map((q,i)=>{const r=sr[i]||sr[String(i)];if(!r)return'<td class="cell blank">—</td>';const cls=(r.correct?'correct':'incorrect')+(r.adjusted?' adjusted':'');return'<td class="cell '+cls+'" onclick="openAnswerModal(\''+esc(st.id)+'\','+i+',\'results\',\''+esc(resultsLaunchId)+'\')">'+(r.correct?'✓':'×')+(r.adjusted?'*':'')+'</td>';}).join('');html+='<tr><td>'+esc(st.name)+'</td><td><b>'+score.correct+'/'+score.total+'</b></td><td>'+score.pct+'%</td><td>'+esc(comp?fmtDate(comp.completedAt):'—')+'</td>'+cells+'<td><button class="secondary" onclick="event.stopPropagation();launchRetake(\''+esc(st.id)+'\')">Retake</button></td></tr>';});table.innerHTML=html+'</tbody>';
 }
+async function toggleResultsScoreRelease(){
+  const l=allLaunches[resultsLaunchId];
+  if(!l)return;
+  await db.ref('b3Quiz/launches/'+resultsLaunchId+'/showScore').set(!(l.showScore===true));
+}
+function openMakeupFromResults(){
+  const base=allLaunches[resultsLaunchId];
+  if(!base){alert('Choose a test from Quiz History first.');return;}
+  makeupSourceLaunchId=resultsLaunchId;
+  makeupPreselected=new Set();
+
+  const qs=launchQuestions(base);
+  launchStudentRows(base).forEach(st=>{
+    const score=launchScore(resultsLaunchId,st.id);
+    if(score.answered<qs.length)makeupPreselected.add(st.id);
+  });
+
+  document.getElementById('launchDeliveryType').value='makeup';
+  document.getElementById('launchTargetType').value='multiple';
+  document.getElementById('launchClass').value=base.classId||'et';
+  document.getElementById('launchShowScore').checked=base.showScore===true;
+  document.getElementById('launchNote').value='Make-up from '+((base.quizSnapshot&&base.quizSnapshot.title)||'original test');
+  updateLaunchTargetUI();
+  document.getElementById('makeupSourceMsg').textContent='Using the exact original test from Results: '+((base.quizSnapshot&&base.quizSnapshot.title)||'Untitled')+'. Students who did not finish are preselected.';
+  showTab('setup');
+  document.getElementById('launchTypeHelp').scrollIntoView({behavior:'smooth',block:'center'});
+}
 async function endSelectedLaunch(){const l=allLaunches[resultsLaunchId];if(!l)return;if(!confirm('End this launch? Data will remain saved.'))return;await db.ref('b3Quiz/launches/'+resultsLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP});if(l.targetStudents){for(const sid of Object.keys(l.targetStudents)){const snap=await db.ref('b3Quiz/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===resultsLaunchId)await db.ref('b3Quiz/settings/studentActiveLaunch/'+sid).remove();}}else if(activeLaunchByClass[l.classId]===resultsLaunchId)await db.ref('b3Quiz/settings/activeLaunchByClass/'+l.classId).remove();}
 async function launchRetake(studentId){
   const base=allLaunches[resultsLaunchId];if(!base)return;const snap=base.quizSnapshot||{},qs=launchQuestions(base),group=base.attemptGroupId||resultsLaunchId;let maxAttempt=1;Object.values(allLaunches).forEach(l=>{if((l.attemptGroupId||'')===group&&l.targetStudents&&l.targetStudents[studentId])maxAttempt=Math.max(maxAttempt,Number(l.attemptNumber)||1);});const attempt=maxAttempt+1,id=Date.now()+'_retake_'+studentId+'_'+slugTitle(snap.title||'quiz');
-  const launch={quizId:base.quizId||'',quizSnapshot:snap,classId:base.classId,targetStudents:{[studentId]:true},createdAt:firebase.database.ServerValue.TIMESTAMP,started:true,startedAt:firebase.database.ServerValue.TIMESTAMP,mode:'test',activeQuestion:0,questionStates:makeQuestionStates(qs,'test'),attemptGroupId:group,attemptNumber:attempt,retakeOf:resultsLaunchId,note:'Student retake'};
+  const launch={quizId:base.quizId||'',quizSnapshot:snap,classId:base.classId,targetStudents:{[studentId]:true},createdAt:firebase.database.ServerValue.TIMESTAMP,started:true,startedAt:firebase.database.ServerValue.TIMESTAMP,mode:'test',deliveryType:'anytime',showScore:base.showScore===true,activeQuestion:0,questionStates:makeQuestionStates(qs,'test'),attemptGroupId:group,attemptNumber:attempt,retakeOf:resultsLaunchId,note:'Student retake'};
   await db.ref('b3Quiz/launches/'+id).set(launch);await db.ref('b3Quiz/settings/studentActiveLaunch/'+studentId).set(id);alert('Retake '+attempt+' is now active for '+((roster[studentId]&&roster[studentId].name)||studentId)+'. It does not affect the rest of the class.');
 }
 function resultsMatrix(){
@@ -1004,7 +1171,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElemen
 function getStudentLink(){return window.location.href.replace(/teacher\.html(?:\?.*)?$/,'');}
 async function copyStudentLink(){const link=getStudentLink();try{await navigator.clipboard.writeText(link);alert('Student link copied.');}catch(e){prompt('Copy student link:',link);}}
 
-newQuizDraft();generatorTypeChanged();populateProgressStudents();
+newQuizDraft();generatorTypeChanged();populateProgressStudents();updateLaunchTargetUI();
 </script>
 </body>
 </html>
