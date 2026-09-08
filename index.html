@@ -215,7 +215,10 @@
     if(realPin&&String(pin).trim()!==String(realPin).trim())return{ok:false,reason:"Incorrect PIN. Ask Rabbi Cohen."};
     if(!allowedSnap.exists())return{ok:false,reason:"Your name is not on the B3 student list."};
     const d=allowedSnap.val()||{};
-    const classId=d&&typeof d==="object"?d.classId:"";
+    // Rabbi Cohen's own student-test login defaults to ET so he can test the
+    // student experience in an InPrivate/incognito window without changing
+    // his teacher/admin account or needing a Firebase classId on his test row.
+    const classId=(slug==="simcha_cohen")?"et":(d&&typeof d==="object"?d.classId:"");
     if(!["et","wt"].includes(classId))return{ok:false,reason:"Your ET/WT class is not assigned yet. Ask Rabbi Cohen."};
     return{ok:true,id:slug,name:(d&&d.name)?String(d.name):name.trim(),classId};
   }
@@ -249,8 +252,9 @@
       const snap=await db.ref("posukPractice/allowedStudents/"+id).once("value");
       if(!snap.exists()){showLogin();return;}
       const d=snap.val()||{};
-      if(!["et","wt"].includes(d.classId)){showLogin();return;}
-      enterStudent({id:id,name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),classId:d.classId});
+      const restoredClassId=(id==="simcha_cohen")?"et":d.classId;
+      if(!["et","wt"].includes(restoredClassId)){showLogin();return;}
+      enterStudent({id:id,name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
     }catch(e){console.warn(e);showLogin();}
   }
 

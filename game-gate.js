@@ -32,7 +32,7 @@
   var ET_ROSTER = [
     "chaim_chaikin", "mayer_chaim_chaikin", "yossi_gourarie", "sholom_huebner", "sholom_dovber_huebner",
     "moshe_lapine", "kehos_notik", "yisroel_oirechman", "moshe_raichman", "moshe_tuvia_raichman",
-    "avrohom_rosenfeld", "levi_rozmarin", "arik_traxler"
+    "avrohom_rosenfeld", "levi_rozmarin", "arik_traxler", "simcha_cohen"
   ];
   var WT_ROSTER = [
     "ari_greenberg", "zev_rosenfeld", "levi_schtroks", "yisroel_aryeh_simmonds", "leibel_vogel", "leib_wolf"
