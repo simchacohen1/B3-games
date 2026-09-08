@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- BUILD: 2026-09-08 CHUMASH-UNDERSTANDING-SKILLS | BASED-ON-UPLOADED-CURRENT-TEACHER -->
 <!-- BUILD: 2026-09-07 FRIENDLY-LAUNCH-UI -->
 <!-- BUILD: 2026-09-07 18:31 ET | LIVE-ANYTIME-MAKEUP-FORCE-CHANGE -->
 <html lang="en">
@@ -446,6 +447,7 @@
             <option value="shorashim">Shoreshim</option>
             <option value="translation">Words & Phrases</option>
             <option value="comprehension">Comprehension</option>
+            <option value="integrated">Chumash Understanding &amp; Skills</option>
             <option value="mixed">Mixed (optional)</option>
           </select>
         </label>
@@ -458,6 +460,10 @@
         <label>Source label
           <input type="text" id="generatorSourceLabel" placeholder="Example: Vayeira 18:1–5">
         </label>
+      </div>
+      <div id="integratedSkillsInfo" class="info-box hidden" style="border:1px solid #b9d8ee;background:#f4faff;margin-top:2px">
+        <b style="color:var(--blue)">Chumash Understanding &amp; Skills</b><br>
+        Mostly regular translation and comprehension, with a few easy third-grade skills mixed in: <b>מי אמר אל מי</b>, <b>על מי נאמר</b>, and simple <b>prefix / shoresh / suffix</b> word parts. The new skills are introduced gradually and only used when the pasted pesukim clearly support them.
       </div>
       <div id="mixedCounts" class="generator-grid hidden">
         <label>Shoreshim<input type="number" id="mixedShoreshim" min="0" max="30" value="5"></label>
@@ -728,14 +734,74 @@ db.ref('b3Quiz/settings/activeLaunchByClass').on('value',snap=>{activeLaunchByCl
 function generatorTypeChanged(){
   const t=document.getElementById('generatorType').value;
   document.getElementById('mixedCounts').classList.toggle('hidden',t!=='mixed');
-  if(t!=='mixed')document.getElementById('editorSkillType').value=t;
+  const info=document.getElementById('integratedSkillsInfo');
+  if(info)info.classList.toggle('hidden',t!=='integrated');
+  if(t==='integrated')document.getElementById('editorSkillType').value='mixed';
+  else if(t!=='mixed')document.getElementById('editorSkillType').value=t;
+}
+function integratedChumashCounts(count){
+  const n=Math.max(1,Math.min(40,Number(count)||10));
+  const shorashim=n>=5?1:0;
+  let translation=Math.max(1,Math.round((n-shorashim)*0.4));
+  if(translation+shorashim>n)translation=Math.max(0,n-shorashim);
+  let comprehension=Math.max(0,n-shorashim-translation);
+  if(n>=2&&comprehension===0&&translation>1){translation--;comprehension=1;}
+  return{shorashim,translation,comprehension};
+}
+function integratedChumashSource(sourceText,count){
+  const n=Math.max(1,Math.min(40,Number(count)||10));
+  let specialRule='Use at most ONE newer-skill question, choosing the clearest type supported by the pesukim.';
+  if(n>=9)specialRule='Aim for THREE newer-skill questions total: ONE simple Word Parts question, ONE מי אמר אל מי question, and ONE על מי נאמר question — but only when the pesukim clearly support each one.';
+  else if(n>=5)specialRule='Aim for about TWO newer-skill questions total, choosing the clearest supported types.';
+  return `ACTUAL PESUKIM / SOURCE TEXT BEGIN
+${sourceText}
+ACTUAL PESUKIM / SOURCE TEXT END
+
+TEACHER GENERATOR DIRECTIONS — THESE DIRECTIONS ARE NOT TEST MATERIAL:
+Create a third-grade quiz called "Chumash Understanding & Skills." Most questions must remain ordinary, literal Words & Phrases translation and straightforward comprehension. ${specialRule}
+
+NEW SKILL: WORD PARTS
+- Use an EXACT Hebrew word from the ACTUAL PESUKIM section only.
+- Ask something very simple about an obvious prefix, shoresh, or suffix.
+- Good examples: identify the shoresh; identify an obvious prefix; identify what an obvious suffix means.
+- Do NOT ask advanced binyan, tense, person, gender, conjugation, or complicated dikduk.
+- If the word's breakdown could reasonably be debated, do not use that word.
+- Return skillType "shorashim" for Word Parts.
+- Begin whySelected with "[Word Parts]".
+
+NEW SKILL: מי אמר אל מי
+- Ask "מי אמר אל מי?" only when the ACTUAL PESUKIM clearly contain speech.
+- Both the speaker and the person spoken to must be clear from the ACTUAL PESUKIM.
+- Never invent a speaker or listener.
+- Return skillType "comprehension".
+- Begin whySelected with "[מי אמר אל מי]".
+
+NEW SKILL: על מי נאמר
+- Use a short phrase from the ACTUAL PESUKIM and ask who it is said about.
+- Only use it when the referent is clear from the ACTUAL PESUKIM.
+- Return skillType "comprehension".
+- Begin whySelected with "[על מי נאמר]".
+
+QUALITY AND TRANSLATION RULES
+- The newer skill types together should normally be about 30% or less of the quiz.
+- If a newer skill is not clearly supported, replace it with a normal translation/comprehension question instead of inventing material.
+- The Hebrew itself is authoritative. Prefer literal, accurate translation over loose paraphrase.
+- Preserve important Hebrew wording and images when they can be expressed simply in English.
+- If two English translations are genuinely equivalent, do not use one as a wrong answer.
+- Keep every question clear, fair, easy-to-moderate, and appropriate for an 8-year-old third grader.
+- Do not make any question about these teacher directions. Test only the ACTUAL PESUKIM section.`;
 }
 async function generateQuizDraft(){
-  const sourceText=document.getElementById('generatorSource').value.trim(),quizType=document.getElementById('generatorType').value,choiceCount=Number(document.getElementById('generatorChoices').value)||3;
-  const mixedCounts={shorashim:Number(document.getElementById('mixedShoreshim').value)||0,translation:Number(document.getElementById('mixedTranslation').value)||0,comprehension:Number(document.getElementById('mixedComprehension').value)||0};
-  const count=quizType==='mixed'?(mixedCounts.shorashim+mixedCounts.translation+mixedCounts.comprehension):(Number(document.getElementById('generatorCount').value)||10);
-  if(!sourceText){alert('Paste the pesukim/source text first.');return;}
-  const btn=document.getElementById('generateBtn'),status=document.getElementById('generatorStatus');btn.disabled=true;status.textContent='Generating…';
+  const rawSource=document.getElementById('generatorSource').value.trim(),requestedType=document.getElementById('generatorType').value,choiceCount=Number(document.getElementById('generatorChoices').value)||3;
+  const normalMixedCounts={shorashim:Number(document.getElementById('mixedShoreshim').value)||0,translation:Number(document.getElementById('mixedTranslation').value)||0,comprehension:Number(document.getElementById('mixedComprehension').value)||0};
+  const integrated=requestedType==='integrated';
+  const requestedCount=Number(document.getElementById('generatorCount').value)||10;
+  const mixedCounts=integrated?integratedChumashCounts(requestedCount):normalMixedCounts;
+  const quizType=integrated?'mixed':requestedType;
+  const count=integrated?requestedCount:(quizType==='mixed'?(mixedCounts.shorashim+mixedCounts.translation+mixedCounts.comprehension):requestedCount);
+  const sourceText=integrated?integratedChumashSource(rawSource,count):rawSource;
+  if(!rawSource){alert('Paste the pesukim/source text first.');return;}
+  const btn=document.getElementById('generateBtn'),status=document.getElementById('generatorStatus');btn.disabled=true;status.textContent=integrated?'Generating Chumash Understanding & Skills…':'Generating…';
   try{
     const resp=await fetch(GENERATE_WEEKLY_QUIZ_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sourceText,quizType,choiceCount,count,mixedCounts})});
     const data=await resp.json().catch(()=>({}));
@@ -743,9 +809,9 @@ async function generateQuizDraft(){
     generatorCandidates=(data.items||[]).map(x=>({selected:true,skillType:x.skillType||quizType,focus:x.focus||'',q:x.question||'',choices:asArray(x.choices),correctIndex:Number(x.correctIndex)||0,whySelected:x.whySelected||''}));
     if(!generatorCandidates.length)throw new Error('No usable questions were returned.');
     document.getElementById('generatorReview').classList.remove('hidden');renderCandidates();
-    const warning=data.warning?' '+data.warning:'';status.textContent='Generated '+generatorCandidates.length+' question(s).'+warning;
+    const warning=data.warning?' '+data.warning:'';status.textContent=(integrated?'Generated '+generatorCandidates.length+' Chumash Understanding & Skills question(s).':'Generated '+generatorCandidates.length+' question(s).')+warning;
     const label=document.getElementById('generatorSourceLabel').value.trim();if(label)document.getElementById('editorSourceLabel').value=label;
-    document.getElementById('editorSkillType').value=quizType;
+    document.getElementById('editorSkillType').value=integrated?'mixed':quizType;
   }catch(e){console.error(e);status.textContent='Generator could not run: '+e.message+' If the Cloud Function is not deployed yet, use the included weekly-quiz-cloud-function.js.';}
   finally{btn.disabled=false;}
 }
