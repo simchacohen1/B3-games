@@ -117,6 +117,7 @@
   let currentSettings=settingsApi.defaultSettings;
   let currentUser=null;
   let isAuthorizedAdmin=false;
+  let teacherToolsAutoOpened=false;
   let myStudentId="";
   let myStudentName="";
   let myClassId="";
@@ -255,6 +256,11 @@
 
   function renderAdminPanel(){
     const signedIn=Boolean(currentUser);
+    if(isAuthorizedAdmin && !teacherToolsAutoOpened){
+      el("adminPanel").classList.remove("hidden");
+      teacherToolsAutoOpened=true;
+    }
+    el("adminAccessButton").textContent=isAuthorizedAdmin ? (el("adminPanel").classList.contains("hidden") ? "Teacher Tools" : "Hide Teacher Tools") : "Admin";
     el("signInButton").classList.toggle("hidden",signedIn);
     el("signOutButton").classList.toggle("hidden",!signedIn);
     el("adminControls").classList.toggle("hidden",!isAuthorizedAdmin);
@@ -311,7 +317,11 @@
   el("studentNameInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
   el("classPinInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
   el("switchStudentBtn").addEventListener("click",switchStudent);
-  el("adminAccessButton").addEventListener("click",()=>{el("adminPanel").classList.toggle("hidden");if(!el("adminPanel").classList.contains("hidden"))renderAdminPanel();});
+  el("adminAccessButton").addEventListener("click",()=>{
+    el("adminPanel").classList.toggle("hidden");
+    el("adminAccessButton").textContent=isAuthorizedAdmin ? (el("adminPanel").classList.contains("hidden") ? "Teacher Tools" : "Hide Teacher Tools") : "Admin";
+    if(!el("adminPanel").classList.contains("hidden"))renderAdminPanel();
+  });
   el("signInButton").addEventListener("click",()=>settingsApi.signInWithGoogle().catch(e=>{
     const detail=(e&&e.code)?e.code:(e&&e.message)?e.message:"Unknown error";
     el("adminStatus").textContent="Google sign-in failed: "+detail;
