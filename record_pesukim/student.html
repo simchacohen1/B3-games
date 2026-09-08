@@ -4829,8 +4829,11 @@ async function finishTranslationPillRecording(idx){
 }
 
 // Grades ONE piece as soon as its recording is done, independently of the
-// others. Updates translationGradedResults (and re-renders the pill so its
-// gold/green/red state shows up) the moment its own grade comes back.
+// others. The full evidence for that piece is also saved immediately — Hebrew,
+// transcript, verdict/feedback, and the actual audio URL — BEFORE a dispute can
+// be offered. This prevents an occasional "blank dispute" when another skill
+// had already created the shared attempt record but translation itself had not
+// yet finished its full-posuk autosave.
 function gradeSingleTranslationSegment(idx, level){
   const chunk = level.chunks[idx];
   const seg = translationSegments[idx];
@@ -4847,18 +4850,26 @@ function gradeSingleTranslationSegment(idx, level){
       if(!res.ok) throw new Error('Grading request failed');
       const data = await res.json();
       if(data.verdict === 'no_speech'){
-        translationGradedResults[idx] = { verdict:'incorrect', feedback:"Didn't catch that piece — try recording again.", transcript:'' };
+        translationGradedResults[idx] = { verdict:'incorrect', feedback:"Didn't catch that piece — try recording again.", transcript:'', evidenceSaved:false };
       } else {
-        translationGradedResults[idx] = { verdict: data.verdict, feedback: data.feedback || '', transcript: data.transcript || '' };
+        translationGradedResults[idx] = { verdict: data.verdict, feedback: data.feedback || '', transcript: data.transcript || '', evidenceSaved:false };
+      }
+
+      // Save this individual piece now, not only after the entire posuk is
+      // finished. A dispute button is only shown after this succeeds.
+      try{
+        await saveTranslationChunkEvidence(idx, level);
+      }catch(saveErr){
+        console.error('Could not save translation piece evidence', idx, saveErr);
+        translationGradedResults[idx].evidenceSaved = false;
       }
     }catch(err){
       console.error('gradeTranslationChunk error', err);
-      translationGradedResults[idx] = { verdict:'incorrect', feedback:'Could not check this piece — check your internet.', transcript:'' };
+      translationGradedResults[idx] = { verdict:'incorrect', feedback:'Could not check this piece — check your internet.', transcript:'', evidenceSaved:false };
     }
-    // Show the live score/breakdown card as soon as THIS piece is graded,
-    // rather than waiting for every piece in the posuk to be recorded —
-    // a student who stops partway through should already see (and be able
-    // to dispute) whatever pieces have come back.
+    // Show the live score/breakdown card as soon as THIS piece is graded.
+    // If its evidence could not be saved, the dispute control stays hidden
+    // rather than sending the teacher a dispute with no recording.
     showTranslationSummary(level);
     renderCurrentChunk();
   })();
@@ -4961,14 +4972,16 @@ function showTranslationSummary(level){
       }else if(dStatus === 'resolved'){
         helpHtml = '<div class="translation-review-note">✔️ Teacher reviewed — final: ' +
           (r.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</div>';
-      }else{
-        // No need to hide this behind a "Need help?" toggle — matches how
-        // the dispute option is shown immediately elsewhere (reading,
-        // comprehension) rather than requiring an extra tap to reveal it.
+      }else if(r.evidenceSaved){
+        // Only offer a dispute once the recording + transcript + grade for
+        // this exact piece are safely in Firebase. That guarantees the
+        // teacher has evidence to review.
         helpHtml =
           '<div class="translation-help-body">' +
             '<button type="button" class="btn small ghost-delete chunk-dispute-btn" data-chunk-index="' + i + '">⚠️ Dispute this piece</button>' +
           '</div>';
+      }else{
+        helpHtml = '<div class="translation-review-note">⚠️ This recording has not finished saving yet, so a dispute cannot be sent. Check your internet or redo this piece.</div>';
       }
     }
 
@@ -5085,9 +5098,15 @@ async function recordChunkFix(index, btnEl){
 
         translationSegments[index] = { blob, ext };
         translationGradedResults[index] = { verdict: data.verdict, feedback: data.feedback || '', transcript: data.transcript || '' };
+        // Save this replacement piece immediately at its real chunk index.
+        // If the full posuk is already complete, refresh the normal full
+        // translation autosave as well; otherwise do not pack sparse chunks.
+        await saveTranslationChunkEvidence(index, level);
         showTranslationSummary(level);
         renderCurrentChunk();
-        await autosaveTranslation(level);
+        const gradedIdxs = Object.keys(translationGradedResults).map(Number).sort((a,b)=>a-b);
+        const allDone = gradedIdxs.length === level.chunks.length && gradedIdxs.every((v,i)=>v===i);
+        if(allDone) await autosaveTranslation(level);
       }catch(err){
         console.error(err);
         btnEl.style.pointerEvents = '';
@@ -5105,11 +5124,68 @@ async function recordChunkFix(index, btnEl){
   }
 }
 
+// Saves ONE translation chunk's complete review evidence immediately.
+// This is deliberately separate from the full-posuk autosave: it can run
+// after any single piece is graded, even if the student stops before doing
+// the remaining pieces. The exact chunk index is preserved in Firebase.
+async function saveTranslationChunkEvidence(index, level){
+  if(!currentPosukKey || !level || !level.chunks[index] || !translationGradedResults[index]){
+    throw new Error('Translation piece is not ready to save.');
+  }
+  if(!currentAttemptRef){
+    currentAttemptRef = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey).push();
+    currentAttemptId = currentAttemptRef.key;
+  }
+
+  const r = translationGradedResults[index];
+  const seg = translationSegments[index];
+  let url = r.audioURL || null;
+
+  if(!url && seg && seg.blob){
+    const ext = seg.ext || 'webm';
+    const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_translation_' + currentAttemptId + '_chunk' + index + '.' + ext;
+    await storage.ref(path).put(seg.blob);
+    url = await storage.ref(path).getDownloadURL();
+    r.audioURL = url;
+    r.audioStoragePath = path;
+  }
+
+  // A dispute without audio is not reviewable, so treat missing audio as a
+  // save failure instead of creating a thin/blank chunk record.
+  if(!url) throw new Error('Translation audio was not saved.');
+
+  const chunk = level.chunks[index];
+  const now = Date.now();
+  const updates = {
+    timestamp: now,
+    parsha: currentParshaName || null,
+    perek: currentPerekNum,
+    posukStart: currentPosukNum,
+    posukEnd: currentPosukEndNum || currentPosukNum,
+    isRange: currentIsRange,
+    posukText: currentPosukText,
+    posukTranslation: currentPosukTranslation
+  };
+  const base = 'translationChunkResults/' + index + '/';
+  updates[base + 'chunkHebrew'] = chunk.hebrew;
+  updates[base + 'posukNum'] = chunk.posukNum || currentPosukNum;
+  updates[base + 'verdict'] = r.verdict;
+  updates[base + 'feedback'] = r.feedback || '';
+  updates[base + 'transcript'] = r.transcript || '';
+  updates[base + 'audioURL'] = url;
+  updates[base + 'disputeStatus'] = r.disputeStatus || null;
+  updates[base + 'finalVerdict'] = r.finalVerdict || null;
+
+  await currentAttemptRef.update(updates);
+  r.evidenceSaved = true;
+  return url;
+}
+
 // Same one-attempt-per-posuk-visit pattern as autosaveHebrew/
 // autosaveComprehension, but stores the whole set of graded chunks (not
 // just one), since a full session covers the entire posuk at once.
 async function autosaveTranslation(level){
-  const idxs = Object.keys(translationGradedResults).map(Number);
+  const idxs = Object.keys(translationGradedResults).map(Number).sort((a,b) => a-b);
   if(!idxs.length || !currentPosukKey) return;
   try{
     if(!currentAttemptRef){
@@ -5118,29 +5194,18 @@ async function autosaveTranslation(level){
     }
     const correctCount = idxs.filter(i => translationGradedResults[i].verdict === 'correct').length;
 
-    // Upload every segment's audio (fire-and-forget-ish, but awaited so we
-    // know the URLs before writing the attempt record).
-    const chunkResults = await Promise.all(idxs.map(async i => {
-      const seg = translationSegments[i];
-      const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_translation_' + currentAttemptId + '_chunk' + i + '.' + seg.ext;
-      let url = null;
-      try{
-        await storage.ref(path).put(seg.blob);
-        url = await storage.ref(path).getDownloadURL();
-      }catch(err){ console.error('Could not upload translation segment', i, err); }
-      return {
-        chunkHebrew: level.chunks[i].hebrew,
-        posukNum: level.chunks[i].posukNum || currentPosukNum,
-        verdict: translationGradedResults[i].verdict,
-        feedback: translationGradedResults[i].feedback,
-        transcript: translationGradedResults[i].transcript,
-        audioURL: url,
-        disputeStatus: translationGradedResults[i].disputeStatus || null,
-        finalVerdict: translationGradedResults[i].finalVerdict || null
-      };
-    }));
+    // Reuse per-piece audio URLs already saved by saveTranslationChunkEvidence.
+    // If one earlier upload failed, retry it here before the full-posuk save.
+    for(const i of idxs){
+      await saveTranslationChunkEvidence(i, level);
+    }
 
-    await currentAttemptRef.update({
+    // At this point every completed piece has its complete evidence safely
+    // stored at its true chunk index. When all pieces are done, write the
+    // normal dense array too so existing progress/history code keeps the
+    // same shape it has always used.
+    const allDone = idxs.length === level.chunks.length && idxs.every((v, i) => v === i);
+    const updateData = {
       timestamp: Date.now(),
       parsha: currentParshaName || null,
       perek: currentPerekNum,
@@ -5149,10 +5214,29 @@ async function autosaveTranslation(level){
       isRange: currentIsRange,
       posukText: currentPosukText,
       posukTranslation: currentPosukTranslation,
-      translationChunkResults: chunkResults,
       translationScore: Math.round((correctCount / level.chunks.length) * 100) + '%'
-    });
-    markTaskSaved('translation');
+    };
+
+    if(allDone){
+      updateData.translationChunkResults = idxs.map(i => {
+        const r = translationGradedResults[i];
+        const chunk = level.chunks[i];
+        return {
+          chunkHebrew: chunk.hebrew,
+          posukNum: chunk.posukNum || currentPosukNum,
+          verdict: r.verdict,
+          feedback: r.feedback || '',
+          transcript: r.transcript || '',
+          audioURL: r.audioURL || null,
+          disputeStatus: r.disputeStatus || null,
+          finalVerdict: r.finalVerdict || null
+        };
+      });
+    }
+
+    await currentAttemptRef.update(updateData);
+    if(allDone) markTaskSaved('translation');
+    showTranslationSummary(level);
   }catch(err){
     console.error('Autosave (translation) failed', err);
     const gradingMsg = document.getElementById('translationGradingMsg');
@@ -5169,19 +5253,31 @@ async function autosaveTranslation(level){
    summary immediately, then patches just that chunk's fields in Firebase
    (not a full autosave, so we don't re-upload every chunk's audio again). */
 async function submitChunkDispute(index, level, btnEl){
-  translationGradedResults[index].disputeStatus = 'pending';
-  showTranslationSummary(level);
-  let tries = 0;
-  while(!currentAttemptRef && tries < 20){
-    await new Promise(r => setTimeout(r, 250));
-    tries++;
+  const r = translationGradedResults[index];
+  if(!r) return;
+
+  // Never mark a dispute pending until the teacher-review evidence for this
+  // exact piece is confirmed saved. This is the key guard against blank
+  // translation disputes.
+  const originalText = btnEl ? btnEl.textContent : '';
+  if(btnEl){
+    btnEl.disabled = true;
+    btnEl.textContent = '⏳ Saving recording…';
   }
-  if(!currentAttemptRef){
-    translationGradedResults[index].disputeStatus = null;
-    showTranslationSummary(level);
-    alert('Could not save — please try again in a moment.');
+  try{
+    await saveTranslationChunkEvidence(index, level);
+  }catch(err){
+    console.error('Could not save translation evidence before dispute', err);
+    if(btnEl){
+      btnEl.disabled = false;
+      btnEl.textContent = originalText || '⚠️ Dispute this piece';
+    }
+    alert('Your recording did not finish saving, so the dispute was NOT sent. Check your internet or redo this piece and try again.');
     return;
   }
+
+  r.disputeStatus = 'pending';
+  showTranslationSummary(level);
   try{
     await currentAttemptRef.child('translationChunkResults').child(String(index)).update({
       disputeStatus: 'pending',
@@ -5189,11 +5285,12 @@ async function submitChunkDispute(index, level, btnEl){
     });
   }catch(err){
     console.error('Could not save chunk dispute', err);
-    translationGradedResults[index].disputeStatus = null;
+    r.disputeStatus = null;
     showTranslationSummary(level);
     alert('Could not save your dispute — check your internet and try again.');
   }
 }
+
 
 /* ---------- Dispute flow (Comprehension) ----------
    Tier-based rather than a typed number, since comprehension is graded

@@ -469,26 +469,46 @@ function comprehensionSkillInfo(record){
   }
   return null;
 }
+// Translation chunks are normally a dense array after the student finishes
+// the whole posuk. During the new per-piece evidence save, however, Firebase
+// may temporarily return a sparse numeric-key object (for example only chunk
+// "4" exists so far). Normalize both shapes so the teacher can see and
+// review a dispute even if the student stopped before finishing every piece.
+function translationChunkEntries(chunks){
+  if(Array.isArray(chunks)){
+    return chunks.map((c,i) => [i,c]).filter(([,c]) => c && typeof c === 'object');
+  }
+  if(chunks && typeof chunks === 'object'){
+    return Object.keys(chunks)
+      .filter(k => /^\d+$/.test(k))
+      .sort((a,b) => Number(a) - Number(b))
+      .map(k => [Number(k), chunks[k]])
+      .filter(([,c]) => c && typeof c === 'object');
+  }
+  return [];
+}
+function translationChunkValues(chunks){
+  return translationChunkEntries(chunks).map(([,c]) => c);
+}
+
 // Translation isn't stored as a single percentage (each chunk piece is
 // graded correct/incorrect separately), so its percentage is derived here
 // from the saved per-chunk results — same math as the "X% correct" badge
-// shown on the Translate tab itself in student.html. No dispute mechanism
-// exists for translation (only Hebrew reading and comprehension have one).
+// shown on the Translate tab itself in student.html.
 function effTranslationScore(record){
-  if(!record || !Array.isArray(record.translationChunkResults) || !record.translationChunkResults.length) return null;
-  const total = record.translationChunkResults.length;
+  if(!record) return null;
+  const chunks = translationChunkValues(record.translationChunkResults);
+  if(!chunks.length) return null;
+  const total = chunks.length;
   // Once a teacher finalizes a disputed chunk, that decision is the
   // official verdict for scoring purposes too — not just the badge.
-  const correct = record.translationChunkResults.filter(c => (c.finalVerdict || c.verdict) === 'correct').length;
+  const correct = chunks.filter(c => (c.finalVerdict || c.verdict) === 'correct').length;
   return Math.round((correct / total) * 100);
 }
 function hasPendingDispute(record){
   if(!record) return false;
   if(record.hebrewDisputeStatus === 'pending' || record.comprehensionDisputeStatus === 'pending') return true;
-  if(Array.isArray(record.translationChunkResults)){
-    return record.translationChunkResults.some(c => c.disputeStatus === 'pending');
-  }
-  return false;
+  return translationChunkValues(record.translationChunkResults).some(c => c.disputeStatus === 'pending');
 }
 
 document.getElementById('enterBtn').onclick = () => {
@@ -810,14 +830,12 @@ async function markStudentsWithPendingDisputes(){
             count++;
             if(!firstTarget) firstTarget = { posukKey, tab: 'comprehension' };
           }
-          if(Array.isArray(a.translationChunkResults)){
-            a.translationChunkResults.forEach(c => {
-              if(c.disputeStatus === 'pending'){
-                count++;
-                if(!firstTarget) firstTarget = { posukKey, tab: 'translate' };
-              }
-            });
-          }
+          translationChunkValues(a.translationChunkResults).forEach(c => {
+            if(c.disputeStatus === 'pending'){
+              count++;
+              if(!firstTarget) firstTarget = { posukKey, tab: 'translate' };
+            }
+          });
         });
       });
       if(count > 0){
@@ -2554,7 +2572,7 @@ function nextPendingDisputeTarget(){
     for(const a of studentPosukData[posukKey].attempts){
       if(a.hebrewDisputeStatus === 'pending') return { posukKey, tab: 'reading' };
       if(a.comprehensionDisputeStatus === 'pending') return { posukKey, tab: 'comprehension' };
-      if(Array.isArray(a.translationChunkResults) && a.translationChunkResults.some(c => c.disputeStatus === 'pending')){
+      if(translationChunkValues(a.translationChunkResults).some(c => c.disputeStatus === 'pending')){
         return { posukKey, tab: 'translate' };
       }
     }
@@ -2568,9 +2586,7 @@ function countPendingDisputesForStudent(){
     attempts.forEach(a => {
       if(a.hebrewDisputeStatus === 'pending') count++;
       if(a.comprehensionDisputeStatus === 'pending') count++;
-      if(Array.isArray(a.translationChunkResults)){
-        count += a.translationChunkResults.filter(c => c.disputeStatus === 'pending').length;
-      }
+      count += translationChunkValues(a.translationChunkResults).filter(c => c.disputeStatus === 'pending').length;
     });
   });
   return count;
@@ -2617,7 +2633,7 @@ function renderPosukDetail(posukKey){
       return !!a.hebrewAudioURL || typeof effHebrewScore(a) === 'number' || !!a.hebrewDisputeStatus;
     }
     if(studentActiveTab === 'translate'){
-      return Array.isArray(a.translationChunkResults) && a.translationChunkResults.length > 0;
+      return translationChunkEntries(a.translationChunkResults).length > 0;
     }
     return (Array.isArray(a.questionResults) && a.questionResults.length > 0) || !!a.comprehensionAudioURL;
   });
@@ -2662,7 +2678,7 @@ function renderPosukDetail(posukKey){
     if(studentActiveTab === 'translate'){
       const tScore = effTranslationScore(a);
       lines += `<div class="top-line"><span>Overall translation</span><span class="score-pill">${tScore === null ? '—' : tScore + '%'}</span></div>`;
-      a.translationChunkResults.forEach((c, chunkIdx) => {
+      translationChunkEntries(a.translationChunkResults).forEach(([chunkIdx, c]) => {
         const effVerdict = c.finalVerdict || c.verdict;
         let chunkHtml = '<span class="comp-badge">' + (effVerdict === 'correct' ? '✅' : '💡') + '</span>' +
           '<span dir="rtl" style="font-family:\'Noto Serif Hebrew\',serif;">' + (c.chunkHebrew || '') + '</span>';
@@ -2739,9 +2755,9 @@ function renderPosukDetail(posukKey){
     if(studentActiveTab === 'comprehension' && a.comprehensionDisputeStatus === 'pending'){
       wireFinalizeComprehension(a, posukKey);
     }
-    if(studentActiveTab === 'translate' && Array.isArray(a.translationChunkResults)){
-      a.translationChunkResults.forEach((c, chunkIdx) => {
-        if(c.disputeStatus === 'pending'){
+    if(studentActiveTab === 'translate'){
+      translationChunkEntries(a.translationChunkResults).forEach(([chunkIdx, c]) => {
+        if(c.disputeStatus === 'pending' && c.audioURL){
           wireFinalizeTranslationChunk(a, posukKey, chunkIdx, c);
         }
       });
@@ -2800,6 +2816,16 @@ function renderDisputeSection(a, posukKey, skill){
 // single overall score to dispute).
 function renderTranslationChunkDisputeSection(a, posukKey, chunkIdx, c){
   if(c.disputeStatus === 'pending'){
+    // Old/incomplete disputes may exist from before the student-side fix.
+    // Do not invite the teacher to rule on a translation when the recording
+    // evidence is missing; make the problem explicit instead.
+    if(!c.audioURL){
+      return `<div class="dispute-banner">⚠️ Student disputes this piece — but the recording is missing.</div>
+        <div class="finalize-row" style="border-color:var(--rimon);background:#F6E1E1;">
+          <strong>Cannot fairly review this dispute.</strong>
+          <span>The student must redo this translation piece so a recording is saved.</span>
+        </div>`;
+    }
     return `<div class="dispute-banner">⚠️ Student disputes this piece</div>
       <div class="finalize-row" id="finalizeChunk_${a.attemptId}_${chunkIdx}">
         <span>Final:</span>
