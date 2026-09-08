@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B3 Weekly Quiz → Nigri School Marks</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+:root{--ink:#18324a;--blue:#2d6ea3;--line:#bdd5e8;--good:#2e8b57;--warn:#9a6b00;--bad:#b43e45;--muted:#667b8c;}
+*{box-sizing:border-box}
+body{margin:0;font-family:Calibri,Arial,sans-serif;background:#f4f8fb;color:var(--ink)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:18px;text-align:center}
+h1{margin:0;color:var(--blue);font-size:28px}
+.wrap{max-width:1200px;margin:18px auto;padding:0 14px 40px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 5px 18px rgba(30,70,100,.06)}
+.grid{display:grid;grid-template-columns:320px 1fr;gap:16px}
+@media(max-width:850px){.grid{grid-template-columns:1fr}}
+button,.button,input,select,textarea{font:inherit}
+button,.button{border:0;border-radius:10px;padding:10px 15px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block}
+.primary{background:var(--blue);color:#fff} .secondary{background:#e8f1f7;color:var(--ink)} .good{background:var(--good);color:#fff}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+select,input,textarea{border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fff;color:var(--ink)}
+.field{display:flex;flex-direction:column;gap:5px;font-weight:700;font-size:13px}
+.formgrid{display:grid;grid-template-columns:repeat(2,minmax(180px,1fr));gap:10px}
+@media(max-width:650px){.formgrid{grid-template-columns:1fr}}
+.launch-list{max-height:620px;overflow:auto}
+.launch{border:1px solid var(--line);border-radius:10px;padding:10px;margin:7px 0;cursor:pointer}
+.launch.active{border:2px solid var(--blue);background:#eef7fd}
+.launch b{display:block} .small{font-size:13px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;margin-top:12px} th,td{border-bottom:1px solid #dce7ef;padding:8px;text-align:left} th{background:#edf5fa}
+.mark{font-weight:800} .ok{color:var(--good)} .review{color:var(--warn)} .bad{color:var(--bad)}
+.status-select{min-width:128px}
+.notice{background:#fff8df;border:1px solid #eadb9b;border-radius:10px;padding:11px 13px;color:#6f5a18;margin:10px 0}
+.install{background:#eef7fd;border:1px solid #c9dfef;border-radius:12px;padding:14px}
+.bookmark{background:#7757a6;color:#fff!important;font-weight:800;padding:10px 14px;border-radius:10px;text-decoration:none;display:inline-block}
+.hidden{display:none!important}
+.lock{max-width:400px;margin:80px auto}
+</style>
+</head>
+<body>
+<header><h1>B3 Weekly Quiz → Nigri School Marks</h1><div class="small">Copies final Weekly Quiz grades into Nigri for you to review. It never presses Create Mark or Save.</div></header>
+
+<div id="lock" class="wrap lock">
+  <div class="card">
+    <h2>Teacher Access</h2>
+    <div class="small">Use the same teacher password as B3 Weekly Quiz.</div>
+    <input id="pw" type="password" style="width:100%;margin:10px 0" onkeydown="if(event.key==='Enter')unlock()">
+    <button class="primary" onclick="unlock()">Open</button>
+    <div id="lockmsg" class="bad" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<div id="app" class="wrap hidden">
+  <div class="card install">
+    <b>One-time setup on this computer</b>
+    <div style="margin:7px 0">Drag this purple button to your browser's bookmarks bar:</div>
+    <a id="bookmarklet" class="bookmark" href="#">Nigri Fill from B3</a>
+    <div class="small" style="margin-top:7px">You will use that same bookmark twice: once to fill the Create Mark screen, and again after the student list appears.</div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="controls" style="justify-content:space-between"><h2 style="margin:0">Quiz History</h2>
+        <select id="classFilter" onchange="renderHistory()"><option value="all">All</option><option value="et">B3 ET</option><option value="wt">B3 WT</option></select>
+      </div>
+      <div class="small" style="margin:6px 0 10px">Choose the class quiz whose marks you want to send.</div>
+      <div id="history" class="launch-list">Loading…</div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2 id="title" style="margin-top:0">Choose a quiz</h2>
+        <div id="meta" class="small"></div>
+
+        <div id="details" class="hidden">
+          <div class="formgrid" style="margin-top:14px">
+            <label class="field">Nigri Grade<select id="grade"><option>B3 ET</option><option>B3 WT</option></select></label>
+            <label class="field">Nigri Topic
+              <select id="topic">
+                <option>Shoreshim</option>
+                <option>Chumash Comprehension</option>
+                <option>Chumash Translation</option>
+                <option>Chumash</option>
+                <option>Chumash-Rashi</option>
+                <option>Halacha-Yahadus</option>
+                <option>Parsha</option>
+              </select>
+            </label>
+            <label class="field">Nigri Type
+              <select id="type"><option>Quiz</option><option>Test/Project</option><option>Classwork</option><option>Homework</option></select>
+            </label>
+            <label class="field">Date<input id="date" type="date"></label>
+            <label class="field">Name<input id="name" type="text"></label>
+            <label class="field">Comment on each child (optional)<input id="comment" type="text" placeholder="Leave blank for no comment"></label>
+          </div>
+          <label class="field" style="margin-top:10px">Description<textarea id="description" rows="3"></textarea></label>
+
+          <div class="notice">
+            Students who completed the quiz are set to <b>Present</b>. A student with no completed score is marked <b>Review</b> so the helper will not guess whether he was absent.
+          </div>
+
+          <div style="overflow:auto"><table>
+            <thead><tr><th>Student</th><th>Final mark</th><th>Source attempt</th><th>Attendance in Nigri</th></tr></thead>
+            <tbody id="students"></tbody>
+          </table></div>
+
+          <div class="controls" style="margin-top:16px">
+            <button class="good" onclick="copyPacket()">Copy for Nigri</button>
+            <a class="button secondary" target="_blank" href="https://www.nigrijewishonlineschool.com/main/default_os_prog.asp?section=teachers&subSection=tests&side=1">Open Nigri School Marks</a>
+          </div>
+          <div id="copied" class="small" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TEACHER_PASSWORD='class123';
+const firebaseConfig={
+  apiKey:"AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
+  authDomain:"b3-games.firebaseapp.com",
+  databaseURL:"https://b3-games-default-rtdb.firebaseio.com",
+  projectId:"b3-games",
+  storageBucket:"b3-games.firebasestorage.app",
+  messagingSenderId:"568530046190",
+  appId:"1:568530046190:web:fd765fdd27e55a3c73f7ff"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+
+const CLASS_ROSTERS={
+  et:['chaim_chaikin','yossi_gourarie','sholom_huebner','moshe_lapine','kehos_notik','yisroel_oirechman','moshe_raichman','avrohom_rosenfeld','levi_rozmarin','arik_traxler'],
+  wt:['ari_greenberg','zev_rosenfeld','levi_schtroks','yisroel_aryeh_simmonds','leibel_vogel','leib_wolf']
+};
+
+let roster={}, launches={}, responses={}, completions={}, selectedId='';
+
+const bookmarkCode = "javascript:(async function(){\n function norm(s){\n  return String(s||'').toLowerCase()\n   .normalize('NFD').replace(/[\\u0300-\\u036f]/g,'')\n   .replace(/[^a-z0-9]+/g,' ').trim().replace(/\\s+/g,' ');\n }\n function fire(el){\n  ['input','change','blur'].forEach(t=>{\n   try{ el.dispatchEvent(new Event(t,{bubbles:true})); }catch(e){}\n  });\n }\n function setSelectByText(sel,target){\n  if(!sel || !target) return false;\n  const t=norm(target);\n  let opt=[...sel.options].find(o=>norm(o.textContent)===t);\n  if(!opt) opt=[...sel.options].find(o=>norm(o.textContent).includes(t) || t.includes(norm(o.textContent)));\n  if(!opt) return false;\n  sel.value=opt.value;\n  opt.selected=true;\n  fire(sel);\n  return true;\n }\n function rowLabelControl(label, selector){\n  const want=norm(label);\n  for(const tr of document.querySelectorAll('tr')){\n   const cells=[...tr.children].filter(x=>/^(TD|TH)$/.test(x.tagName));\n   if(!cells.length) continue;\n   const first=norm(cells[0].innerText || cells[0].textContent);\n   if(first===want || first.startsWith(want+' ') || first.includes(want)){\n    const found=tr.querySelector(selector);\n    if(found) return found;\n   }\n  }\n  // Generic fallback: look for a nearby label/cell that contains the word.\n  const all=[...document.querySelectorAll('td,th,label,div,span')];\n  for(const el of all){\n   const txt=norm(el.innerText || el.textContent);\n   if(txt===want){\n    const scope=el.closest('tr') || el.parentElement;\n    const found=scope && scope.querySelector(selector);\n    if(found) return found;\n   }\n  }\n  return null;\n }\n function setValue(el,val){\n  if(!el || val===undefined || val===null) return false;\n  el.focus();\n  el.value=String(val);\n  fire(el);\n  return true;\n }\n function studentTokens(st){\n  const fromName=norm(st.name).split(' ').filter(x=>x.length>1);\n  const fromId=norm(String(st.id||'').replace(/_/g,' ')).split(' ').filter(x=>x.length>1);\n  return [...new Set([...fromName,...fromId])];\n }\n function scoreRowMatch(tr,st){\n  const row=norm(tr.innerText || tr.textContent);\n  const toks=studentTokens(st);\n  if(!toks.length) return 0;\n  let hit=0;\n  toks.forEach(t=>{ if(row.includes(t)) hit++; });\n  // Last name is especially important because Nigri displays Lastname Firstname.\n  const last=norm(st.name).split(' ').filter(Boolean).slice(-1)[0] || '';\n  if(last && !row.includes(last)) return 0;\n  return hit;\n }\n function findStudentRow(st, used){\n  const rows=[...document.querySelectorAll('tr')].filter(tr=>{\n   if(used.has(tr)) return false;\n   return tr.querySelector('input,select,textarea') && tr.innerText && tr.innerText.trim().length>0;\n  });\n  let best=null,bestScore=0;\n  for(const tr of rows){\n   const sc=scoreRowMatch(tr,st);\n   if(sc>bestScore){best=tr;bestScore=sc;}\n  }\n  return bestScore>=2 ? best : null;\n }\n function findMarkInput(tr){\n  // Nigri normally places the mark in the third cell.\n  const cells=[...tr.querySelectorAll(':scope > td')];\n  if(cells[2]){\n   const x=cells[2].querySelector('input[type=\"text\"],input[type=\"number\"],input:not([type])');\n   if(x) return x;\n  }\n  const inputs=[...tr.querySelectorAll('input')].filter(i=>{\n   const ty=(i.type||'text').toLowerCase();\n   return !['checkbox','radio','file','hidden','submit','button'].includes(ty);\n  });\n  return inputs[0] || null;\n }\n function findAttendanceSelect(tr){\n  return [...tr.querySelectorAll('select')].find(s=>{\n   const opts=[...s.options].map(o=>norm(o.textContent));\n   return opts.some(x=>x==='present') && opts.some(x=>x==='absent');\n  }) || null;\n }\n function findComment(tr){\n  return tr.querySelector('textarea') || null;\n }\n\n let raw='';\n try{\n  if(navigator.clipboard && navigator.clipboard.readText){\n   raw=await navigator.clipboard.readText();\n  }\n }catch(e){}\n if(!raw || !raw.trim().startsWith('B3NIGRI:')){\n  raw=prompt('Paste the B3 School Marks packet that you copied from the Weekly Quiz:','') || '';\n }\n raw=raw.trim();\n if(!raw.startsWith('B3NIGRI:')){\n  alert('I could not find a B3 School Marks packet. Go back to the B3 School Marks Bridge, click \u201cCopy for Nigri,\u201d then try this bookmark again.');\n  return;\n }\n\n let packet;\n try{ packet=JSON.parse(raw.slice('B3NIGRI:'.length)); }\n catch(e){ alert('The copied B3 School Marks packet is not valid. Please copy it again.'); return; }\n\n // STEP 1: Fill the Create Mark / record header fields.\n let setupFilled=0;\n const gradeSel=rowLabelControl('Grade','select');\n const topicSel=rowLabelControl('Topic','select');\n const dateInput=rowLabelControl('Date','input');\n const nameInput=rowLabelControl('Name','input');\n const descInput=rowLabelControl('Description','textarea,input');\n\n if(gradeSel && setSelectByText(gradeSel,packet.grade)) setupFilled++;\n if(topicSel && setSelectByText(topicSel,packet.topic)) setupFilled++;\n if(dateInput && setValue(dateInput,packet.date)) setupFilled++;\n if(nameInput && setValue(nameInput,packet.name)) setupFilled++;\n if(descInput && setValue(descInput,packet.description||'')) setupFilled++;\n\n // Type is a radio group. The page order shown by Nigri is:\n // Homework, Test/Project, Quiz, Classwork.\n if(packet.type){\n  const typeRow=[...document.querySelectorAll('tr')].find(tr=>{\n   const cells=[...tr.children].filter(x=>/^(TD|TH)$/.test(x.tagName));\n   return cells.length && norm(cells[0].innerText||cells[0].textContent).includes('type');\n  });\n  if(typeRow){\n   const radios=[...typeRow.querySelectorAll('input[type=\"radio\"]')];\n   const order={'homework':0,'test/project':1,'test project':1,'quiz':2,'classwork':3};\n   const idx=order[norm(packet.type)];\n   if(radios[idx]){\n    radios[idx].checked=true;\n    fire(radios[idx]);\n    setupFilled++;\n   }\n  }\n }\n\n // If this is the initial Create Mark page, children do not exist yet.\n const pageText=norm(document.body.innerText || '');\n const createButton=[...document.querySelectorAll('button,input[type=\"submit\"],input[type=\"button\"]')].find(el=>\n  norm(el.innerText || el.value || '').includes('create mark')\n );\n const hasStudentRows=(packet.students||[]).some(st=>findStudentRow(st,new Set()));\n\n if(createButton && !hasStudentRows){\n  alert('School Mark setup filled. Please review it and click \u201cCreate Mark!\u201d yourself. After the student list appears, click this same \u201cNigri Fill from B3\u201d bookmark again.');\n  return;\n }\n\n // STEP 2: Fill student grades/statuses. Never clicks Save.\n const used=new Set();\n const unmatched=[];\n let gradesFilled=0,statusesFilled=0,commentsFilled=0;\n\n for(const st of (packet.students||[])){\n  const tr=findStudentRow(st,used);\n  if(!tr){ unmatched.push(st.name); continue; }\n  used.add(tr);\n\n  const att=findAttendanceSelect(tr);\n  if(att && st.attendance && st.attendance!=='review' && st.attendance!=='leave'){\n   if(setSelectByText(att,st.attendance==='absent'?'Absent':'Present')) statusesFilled++;\n  }\n\n  if(st.mark!==null && st.mark!==undefined && st.mark!==''){\n   const mark=findMarkInput(tr);\n   if(mark && setValue(mark,st.mark)) gradesFilled++;\n  }\n\n  if(packet.comment && packet.comment.trim()){\n   const c=findComment(tr);\n   if(c && setValue(c,packet.comment)) commentsFilled++;\n  }\n }\n\n let msg='Filled '+gradesFilled+' student mark'+(gradesFilled===1?'':'s')+'.';\n if(statusesFilled) msg+=' Updated '+statusesFilled+' Present/Absent status'+(statusesFilled===1?'':'es')+'.';\n if(commentsFilled) msg+=' Added '+commentsFilled+' comment'+(commentsFilled===1?'':'s')+'.';\n if(unmatched.length){\n  msg+=' Not matched automatically: \u2022 '+unmatched.join(' \u2022 ')+' Please fill/check those manually.';\n }\n msg+=' Please review everything. I did NOT press Save.';\n alert(msg);\n})();";
+document.getElementById('bookmarklet').href=bookmarkCode;
+
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function arr(v){if(!v)return[];if(Array.isArray(v))return v;return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]);}
+function fmtDate(ts){if(!ts)return'';const d=new Date(Number(ts));return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function isoDate(ts){if(!ts)return'';const d=new Date(Number(ts));const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return y+'-'+m+'-'+day;}
+function gradeLabel(c){return c==='wt'?'B3 WT':'B3 ET';}
+function skillTopic(s){
+  if(s==='shorashim')return'Shoreshim';
+  if(s==='translation')return'Chumash Translation';
+  if(s==='comprehension'||s==='mixed')return'Chumash Comprehension';
+  return'Chumash Comprehension';
+}
+function defaultDescription(s){
+  if(s==='shorashim')return'This is the weekly schoolwide shoreshim test.';
+  if(s==='translation')return'This is the weekly Chumash words and phrases quiz.';
+  if(s==='mixed')return'This is the weekly Chumash comprehension and skills quiz.';
+  return'This is the weekly Chumash comprehension quiz.';
+}
+function studentName(id){return (roster[id]&&roster[id].name)||id.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());}
+
+async function unlock(){
+  if(document.getElementById('pw').value!==TEACHER_PASSWORD){document.getElementById('lockmsg').textContent='Incorrect password.';return;}
+  document.getElementById('lock').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  await loadData();
+}
+
+async function loadData(){
+  const [a,b,c,d]=await Promise.all([
+    db.ref('posukPractice/allowedStudents').once('value'),
+    db.ref('b3Quiz/launches').once('value'),
+    db.ref('b3Quiz/responses').once('value'),
+    db.ref('b3Quiz/completions').once('value')
+  ]);
+  roster=a.val()||{}; launches=b.val()||{}; responses=c.val()||{}; completions=d.val()||{};
+  renderHistory();
+}
+
+function renderHistory(){
+  const f=document.getElementById('classFilter').value;
+  let ids=Object.keys(launches).filter(id=>f==='all'||launches[id].classId===f);
+  ids.sort((a,b)=>(Number(launches[b].createdAt)||0)-(Number(launches[a].createdAt)||0));
+  const box=document.getElementById('history');box.innerHTML='';
+  if(!ids.length){box.innerHTML='<div class="small">No quiz launches found.</div>';return;}
+  ids.forEach(id=>{
+    const l=launches[id]||{}, q=l.quizSnapshot||{};
+    const target=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]&&k!=='simcha_cohen'):[];
+    const tags=[];
+    if(l.retakeOf)tags.push('Retake '+(l.attemptNumber||2));
+    if(l.makeupOf)tags.push('Make-Up');
+    if(l.deliveryType==='anytime'&&!l.retakeOf)tags.push('Take Anytime');
+    const div=document.createElement('div');div.className='launch'+(id===selectedId?' active':'');
+    div.innerHTML='<b>'+esc(q.title||'Untitled')+'</b><div class="small">'+esc(gradeLabel(l.classId))+' • '+esc(fmtDate(l.createdAt))+(tags.length?' • '+esc(tags.join(' • ')):'')+(target.length && target.length<((CLASS_ROSTERS[l.classId]||[]).length)?' • '+target.length+' student'+(target.length===1?'':'s'):'')+'</div>';
+    div.onclick=()=>{selectedId=id;renderHistory();renderSelected();};
+    box.appendChild(div);
+  });
+}
+
+function questions(l){return arr(l&&l.quizSnapshot&&l.quizSnapshot.questions);}
+function rawScore(lid,sid){
+  const l=launches[lid]; if(!l)return null;
+  const qs=questions(l), sr=(responses[lid]||{})[sid]||{};
+  let correct=0,answered=0;
+  qs.forEach((q,i)=>{const r=sr[i]||sr[String(i)];if(r){answered++;if(r.correct)correct++;}});
+  const done=!!(completions[lid]&&completions[lid][sid]) || (qs.length>0&&answered===qs.length);
+  return {correct,answered,total:qs.length,pct:qs.length?Math.round(correct/qs.length*100):null,done};
+}
+
+function belongsToBase(lid,baseId,sid){
+  if(lid===baseId)return true;
+  const l=launches[lid]||{}, base=launches[baseId]||{};
+  if(l.classId!==base.classId)return false;
+  if(l.retakeOf===baseId || l.makeupOf===baseId)return true;
+  if((l.attemptGroupId||'') && (l.attemptGroupId===(base.attemptGroupId||baseId)))return true;
+  // Follow one level of retake from a related makeup/retake.
+  const parent=l.retakeOf||l.makeupOf;
+  if(parent){
+    const p=launches[parent]||{};
+    if(parent===baseId || p.retakeOf===baseId || p.makeupOf===baseId)return true;
+  }
+  return false;
+}
+
+function finalForStudent(baseId,sid){
+  const candidates=[];
+  Object.keys(launches).forEach(lid=>{
+    if(!belongsToBase(lid,baseId,sid))return;
+    const l=launches[lid]||{};
+    const targets=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[];
+    const classMember=(CLASS_ROSTERS[l.classId]||[]).includes(sid);
+    if(targets.length && !targets.includes(sid))return;
+    if(!targets.length && !classMember)return;
+    const sc=rawScore(lid,sid);
+    if(!sc)return;
+    candidates.push({lid,l,sc});
+  });
+  if(!candidates.length)return{mark:null,done:false,source:'No attempt'};
+  const finished=candidates.filter(x=>x.sc.done);
+  const pool=finished.length?finished:candidates.filter(x=>x.sc.answered>0);
+  if(!pool.length)return{mark:null,done:false,source:'No completed attempt'};
+  pool.sort((a,b)=>{
+    const an=Number(a.l.attemptNumber)||1,bn=Number(b.l.attemptNumber)||1;
+    if(an!==bn)return bn-an;
+    return (Number(b.l.createdAt)||0)-(Number(a.l.createdAt)||0);
+  });
+  const x=pool[0], tags=[];
+  if(x.l.makeupOf)tags.push('Make-Up');
+  if(x.l.retakeOf)tags.push('Retake '+(x.l.attemptNumber||2));
+  if(!tags.length)tags.push('Original');
+  return{mark:x.sc.done?x.sc.pct:null,done:x.sc.done,source:tags.join(' '),lid:x.lid};
+}
+
+function renderSelected(){
+  const l=launches[selectedId]; if(!l)return;
+  const snap=l.quizSnapshot||{}, skill=snap.skillType||'comprehension';
+  document.getElementById('title').textContent=snap.title||'Results';
+  document.getElementById('meta').textContent=gradeLabel(l.classId)+' • '+fmtDate(l.createdAt)+' • '+(skill||'');
+  document.getElementById('details').classList.remove('hidden');
+  document.getElementById('grade').value=gradeLabel(l.classId);
+  document.getElementById('topic').value=skillTopic(skill);
+  document.getElementById('date').value=isoDate(l.createdAt);
+  document.getElementById('name').value=snap.title||'Weekly Quiz';
+  document.getElementById('description').value=defaultDescription(skill);
+  document.getElementById('comment').value='';
+
+  const ids=(CLASS_ROSTERS[l.classId]||[]).slice();
+  const body=document.getElementById('students');body.innerHTML='';
+  ids.forEach(sid=>{
+    const f=finalForStudent(selectedId,sid);
+    const tr=document.createElement('tr');
+    tr.dataset.sid=sid;tr.dataset.mark=f.mark===null?'':String(f.mark);
+    tr.innerHTML='<td><b>'+esc(studentName(sid))+'</b></td>'+
+      '<td class="mark '+(f.done?'ok':'review')+'">'+(f.mark===null?'— Review':f.mark+'%')+'</td>'+
+      '<td>'+esc(f.source)+'</td>'+
+      '<td><select class="status-select" data-sid="'+esc(sid)+'">'+
+        (f.done?'<option value="present" selected>Present</option><option value="absent">Absent</option><option value="review">Leave unchanged</option>':
+                '<option value="review" selected>Review / leave unchanged</option><option value="absent">Absent</option><option value="present">Present</option>')+
+      '</select></td>';
+    body.appendChild(tr);
+  });
+}
+
+function toUsDate(iso){
+  if(!iso)return'';
+  const [y,m,d]=iso.split('-');
+  return m+'/'+d+'/'+y;
+}
+
+async function copyPacket(){
+  if(!selectedId)return;
+  const students=[...document.querySelectorAll('#students tr')].map(tr=>{
+    const sid=tr.dataset.sid;
+    const val=tr.dataset.mark;
+    return{id:sid,name:studentName(sid),mark:val===''?null:Number(val),attendance:tr.querySelector('select').value};
+  });
+  const packet={
+    version:1,
+    source:'B3 Weekly Quiz',
+    launchId:selectedId,
+    grade:document.getElementById('grade').value,
+    topic:document.getElementById('topic').value,
+    type:document.getElementById('type').value,
+    date:toUsDate(document.getElementById('date').value),
+    name:document.getElementById('name').value.trim(),
+    description:document.getElementById('description').value.trim(),
+    comment:document.getElementById('comment').value.trim(),
+    students
+  };
+  const text='B3NIGRI:'+JSON.stringify(packet);
+  try{
+    await navigator.clipboard.writeText(text);
+    document.getElementById('copied').textContent='Copied. Open Nigri and click the “Nigri Fill from B3” bookmark.';
+  }catch(e){
+    prompt('Copy all of this, then open Nigri:',text);
+  }
+}
+</script>
+</body>
+</html>
