@@ -146,6 +146,36 @@
   let myClassId="";
 
   function slugify(name){return String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");}
+
+  // Existing B3 student records were created before ET/WT classId was added.
+  // Keep those logins working by using the established class rosters whenever
+  // a Firebase row does not yet contain classId.
+  const FALLBACK_CLASS_ROSTERS={
+    et:new Set([
+      "mayer_chaim_chaikin","chaim_chaikin","yossi_gourarie",
+      "sholom_dovber_huebner","sholom_huebner","moshe_lapine","kehos_notik",
+      "yisroel_oirechman","moshe_tuvia_raichman","moshe_raichman",
+      "avrohom_rosenfeld","levi_rozmarin","arik_traxler","simcha_cohen"
+    ]),
+    wt:new Set([
+      "ari_greenberg","zev_rosenfeld","levi_schtroks","yisroel_aryeh_simmonds",
+      "leibel_vogel","leib_wolf"
+    ])
+  };
+
+  function fallbackClassForStudent(id,name){
+    const candidates=[slugify(id),slugify(name)].filter(Boolean);
+    if(candidates.some(x=>FALLBACK_CLASS_ROSTERS.et.has(x)))return "et";
+    if(candidates.some(x=>FALLBACK_CLASS_ROSTERS.wt.has(x)))return "wt";
+    return "";
+  }
+
+  function resolveStudentClassId(id,name,databaseClassId){
+    const dbClass=String(databaseClassId||"").toLowerCase();
+    if(["et","wt"].includes(dbClass))return dbClass;
+    return fallbackClassForStudent(id,name);
+  }
+
   function setLoginMsg(t){el("loginMsg").textContent=t||"";}
 
   function showLogin(){
@@ -213,12 +243,10 @@
     if(realPin&&String(pin).trim()!==String(realPin).trim())return{ok:false,reason:"Incorrect PIN. Ask Rabbi Cohen."};
     if(!allowedSnap.exists())return{ok:false,reason:"Your name is not on the B3 student list."};
     const d=allowedSnap.val()||{};
-    // Rabbi Cohen's own student-test login defaults to ET so he can test the
-    // student experience in an InPrivate/incognito window without changing
-    // his teacher/admin account or needing a Firebase classId on his test row.
-    const classId=(slug==="simcha_cohen")?"et":(d&&typeof d==="object"?d.classId:"");
-    if(!["et","wt"].includes(classId))return{ok:false,reason:"Your ET/WT class is not assigned yet. Ask Rabbi Cohen."};
-    return{ok:true,id:slug,name:(d&&d.name)?String(d.name):name.trim(),classId};
+    const displayName=(d&&d.name)?String(d.name):name.trim();
+    const classId=resolveStudentClassId(slug,displayName,d&&typeof d==="object"?d.classId:"");
+    if(!["et","wt"].includes(classId))return{ok:false,reason:"I could not match your name to ET or WT. Ask Rabbi Cohen."};
+    return{ok:true,id:slug,name:displayName,classId};
   }
 
   function enterStudent(r){
@@ -250,9 +278,10 @@
       const snap=await db.ref("posukPractice/allowedStudents/"+id).once("value");
       if(!snap.exists()){showLogin();return;}
       const d=snap.val()||{};
-      const restoredClassId=(id==="simcha_cohen")?"et":d.classId;
+      const displayName=d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student");
+      const restoredClassId=resolveStudentClassId(id,displayName,d.classId);
       if(!["et","wt"].includes(restoredClassId)){showLogin();return;}
-      enterStudent({id:id,name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
+      enterStudent({id:id,name:displayName,classId:restoredClassId});
     }catch(e){console.warn(e);showLogin();}
   }
 

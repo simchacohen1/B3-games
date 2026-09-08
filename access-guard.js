@@ -111,6 +111,30 @@
     return localStorage.getItem("b3Games_studentId") || localStorage.getItem("posukPractice_studentId") || "";
   }
 
+  function studentKey(value) {
+    return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  }
+
+  // Backward compatibility: many existing allowedStudents rows predate the
+  // classId field. Use the established rosters instead of locking them out.
+  const FALLBACK_ET = new Set([
+    "mayer_chaim_chaikin","chaim_chaikin","yossi_gourarie",
+    "sholom_dovber_huebner","sholom_huebner","moshe_lapine","kehos_notik",
+    "yisroel_oirechman","moshe_tuvia_raichman","moshe_raichman",
+    "avrohom_rosenfeld","levi_rozmarin","arik_traxler","simcha_cohen"
+  ]);
+  const FALLBACK_WT = new Set([
+    "ari_greenberg","zev_rosenfeld","levi_schtroks","yisroel_aryeh_simmonds",
+    "leibel_vogel","leib_wolf"
+  ]);
+
+  function rosterClassFor(studentId, displayName) {
+    const keys = [studentKey(studentId), studentKey(displayName)].filter(Boolean);
+    if (keys.some(function (key) { return FALLBACK_ET.has(key); })) return "et";
+    if (keys.some(function (key) { return FALLBACK_WT.has(key); })) return "wt";
+    return "";
+  }
+
   async function resolveStudentClass() {
     const studentId = getStoredStudentId();
     if (!studentId) {
@@ -128,15 +152,25 @@
       }
 
       const data = snap.val() || {};
-      const classId = data && typeof data === "object" ? data.classId : "";
+      studentDisplayName = data && data.name ? String(data.name) : "";
+      let classId = data && typeof data === "object" ? String(data.classId || "").toLowerCase() : "";
+
+      if (!['et', 'wt'].includes(classId)) {
+        const storedId = localStorage.getItem("b3Games_studentId") || "";
+        const storedClass = String(localStorage.getItem("b3Games_studentClass") || "").toLowerCase();
+        if (storedId === studentId && ['et', 'wt'].includes(storedClass)) {
+          classId = storedClass;
+        } else {
+          classId = rosterClassFor(studentId, studentDisplayName);
+        }
+      }
+
       if (!['et', 'wt'].includes(classId)) {
         studentClassId = "";
-        studentDisplayName = data && data.name ? String(data.name) : "";
         return;
       }
 
       studentClassId = classId;
-      studentDisplayName = data && data.name ? String(data.name) : "";
       localStorage.setItem("b3Games_studentId", studentId);
       localStorage.setItem("b3Games_studentClass", classId);
       if (studentDisplayName) localStorage.setItem("b3Games_studentName", studentDisplayName);
@@ -153,7 +187,7 @@
     // Rabbi Cohen's authorized Google account always bypasses student locks.
     // This includes ET/WT schedules, manual class overrides, the emergency
     // student master lock, and individual activity switches.
-    if (teacherBypass || localStorage.getItem("b3TeacherBypass") === "1") {
+    if (teacherBypass) {
       showAllowed();
       return;
     }
