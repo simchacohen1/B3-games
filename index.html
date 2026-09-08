@@ -253,7 +253,7 @@
     el("signInButton").classList.toggle("hidden",signedIn);
     el("signOutButton").classList.toggle("hidden",!signedIn);
     el("adminControls").classList.toggle("hidden",!isAuthorizedAdmin);
-    if(!signedIn){el("adminStatus").textContent="Sign in with the authorized Google account to change access.";return;}
+    if(!signedIn){el("adminStatus").textContent="Sign in with simcha5770@gmail.com to change access.";return;}
     if(!isAuthorizedAdmin){el("adminStatus").textContent=`Signed in as ${currentUser.email||"an unauthorized account"}. This account cannot edit settings.`;return;}
     el("adminStatus").textContent=`Signed in as ${currentUser.email}. Your teacher access bypasses all student locks; ET and WT can be controlled separately.`;
     el("siteEnabledToggle").checked=currentSettings.siteEnabled;
@@ -307,7 +307,12 @@
   el("classPinInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
   el("switchStudentBtn").addEventListener("click",switchStudent);
   el("adminAccessButton").addEventListener("click",()=>{el("adminPanel").classList.toggle("hidden");if(!el("adminPanel").classList.contains("hidden"))renderAdminPanel();});
-  el("signInButton").addEventListener("click",()=>settingsApi.signInWithGoogle().catch(e=>{alert("Google sign-in did not complete.");console.error(e);}));
+  el("signInButton").addEventListener("click",()=>settingsApi.signInWithGoogle().catch(e=>{
+    const detail=(e&&e.code)?e.code:(e&&e.message)?e.message:"Unknown error";
+    el("adminStatus").textContent="Google sign-in failed: "+detail;
+    alert("Google sign-in failed. The Admin panel now shows the exact error.");
+    console.error(e);
+  }));
   el("signOutButton").addEventListener("click",()=>settingsApi.signOut().catch(e=>{alert("Could not sign out.");console.error(e);}));
   el("siteEnabledToggle").addEventListener("change",async()=>{
     const old=!el("siteEnabledToggle").checked;

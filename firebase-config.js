@@ -1,7 +1,7 @@
 window.B3_FIREBASE_CONFIG = {
   apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
   authDomain: "b3-games.firebaseapp.com",
-  databaseURL: "https://b3-games-default-rtdb.firebaseio.com/",
+  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
   projectId: "b3-games",
   storageBucket: "b3-games.firebasestorage.app",
   messagingSenderId: "568530046190",

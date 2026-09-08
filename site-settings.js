@@ -358,9 +358,23 @@
     if (!services || !services.auth) return Promise.reject(new Error("Firebase Authentication is not configured."));
     const provider = new window.firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
-    return services.auth.signInWithPopup(provider).then(function (result) {
+
+    return services.auth.signInWithPopup(provider).catch(function (error) {
+      const code = error && error.code ? error.code : "";
+      if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request" || code === "auth/operation-not-supported-in-this-environment") {
+        return services.auth.signInWithRedirect(provider).then(function () { return null; });
+      }
+      throw error;
+    }).then(function (result) {
+      // Redirect sign-in leaves this page and returns later, so there is no
+      // immediate result object in that branch. onAuthStateChanged will finish it.
+      if (!result) return null;
       if (!isAuthorizedUser(result.user)) {
-        return services.auth.signOut().then(function () { throw new Error("This Google account is not authorized."); });
+        return services.auth.signOut().then(function () {
+          const error = new Error("This Google account is not authorized. Please use simcha5770@gmail.com.");
+          error.code = "b3/unauthorized-admin";
+          throw error;
+        });
       }
       return result.user;
     });
