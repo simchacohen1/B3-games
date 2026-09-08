@@ -101,6 +101,11 @@
 (function(){
   "use strict";
   const settingsApi=window.B3SiteSettings;
+  // Initialize Firebase before using Database/Auth. Without this, the script
+  // stops here and the Admin button never receives its click handler.
+  if (!window.firebase.apps.length) {
+    window.firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+  }
   const db=window.firebase.database();
   const dayLabels={sun:"Sun",mon:"Mon",tue:"Tue",wed:"Wed",thu:"Thu",fri:"Fri",sat:"Sat"};
   const classLabels={et:"ET",wt:"WT"};
