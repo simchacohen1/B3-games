@@ -26,9 +26,9 @@
   .master-row{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;margin:12px 0}.master-row label{font-weight:800}
   .class-card{border:1px solid #dbe4ee;border-radius:15px;padding:13px;margin:12px 0;background:#f8fafc}.class-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.class-title{font-weight:900;font-size:18px}.status-pill{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:900}.status-open{background:#dcfce7;color:#166534}.status-closed{background:#fee2e2;color:#991b1b}.status-reason{font-size:12px;color:#64748b;margin-top:4px}
   .mode-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:12px 0}.mode-btn{border:1px solid #cbd5e1;background:white;border-radius:9px;padding:8px 5px;font-size:12px;font-weight:800;cursor:pointer}.mode-btn.active{background:#1f2937;color:white;border-color:#1f2937}
-  details{margin-top:8px}summary{cursor:pointer;font-weight:800;color:#334155}.schedule-grid{margin-top:9px}.schedule-row{display:grid;grid-template-columns:62px 34px 1fr 1fr;align-items:center;gap:6px;margin:6px 0;font-size:12px}.schedule-row input[type="time"]{width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px}.schedule-row label{font-weight:700}.game-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0;font-size:14px;padding-bottom:6px;border-bottom:1px solid #eef2f7}
+  details{margin-top:8px}summary{cursor:pointer;font-weight:800;color:#334155}.schedule-grid{margin-top:9px}.schedule-help{font-size:11px;color:#64748b;margin:7px 0 10px;line-height:1.35}.schedule-day{border-top:1px solid #e5e7eb;padding:8px 0}.schedule-day:first-child{border-top:0}.schedule-day-name{font-weight:900;font-size:12px;margin-bottom:5px}.lock-range{display:grid;grid-template-columns:24px 44px 1fr 22px 1fr;align-items:center;gap:5px;margin:5px 0;font-size:11px}.lock-range input[type="time"]{width:100%;padding:5px;border:1px solid #cbd5e1;border-radius:8px;font-size:11px}.lock-range .to{text-align:center;color:#64748b}.game-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0;font-size:14px;padding-bottom:6px;border-bottom:1px solid #eef2f7}
   .tz-note{font-size:11px;color:#64748b;margin-top:7px}
-  @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.schedule-row{grid-template-columns:54px 30px 1fr 1fr}.admin-panel{top:54px}}
+  @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 40px 1fr 18px 1fr}.admin-panel{top:54px}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
@@ -230,8 +230,12 @@
     const access=currentSettings.classAccess[classId];
     const info=settingsApi.describeClassAccess(currentSettings,classId,new Date());
     const rows=settingsApi.dayKeys.map(day=>{
-      const r=access.schedule[day];
-      return `<div class="schedule-row"><label>${dayLabels[day]}</label><input type="checkbox" data-schedule-enabled="${classId}:${day}" ${r.enabled?"checked":""}><input type="time" data-schedule-start="${classId}:${day}" value="${r.start}"><input type="time" data-schedule-end="${classId}:${day}" value="${r.end}"></div>`;
+      const ranges=Array.isArray(access.lockWindows[day])?access.lockWindows[day]:[];
+      const rangeRows=[0,1].map(i=>{
+        const r=ranges[i]||null;
+        return `<div class="lock-range"><input type="checkbox" data-lock-enabled="${classId}:${day}:${i}" ${r?"checked":""}><span>Lock ${i+1}</span><input type="time" data-lock-start="${classId}:${day}:${i}" value="${r?r.start:"00:00"}"><span class="to">to</span><input type="time" data-lock-end="${classId}:${day}:${i}" value="${r?r.end:"00:00"}"></div>`;
+      }).join("");
+      return `<div class="schedule-day"><div class="schedule-day-name">${dayLabels[day]}</div>${rangeRows}</div>`;
     }).join("");
     return `<div class="class-card" data-class-card="${classId}">
       <div class="class-top"><div><div class="class-title">${classLabels[classId]}</div><div class="status-reason">${info.reason}</div></div><span class="status-pill ${info.open?"status-open":"status-closed"}">${info.open?"OPEN":"LOCKED"}</span></div>
@@ -240,7 +244,7 @@
         <button class="mode-btn ${access.mode==="open"?"active":""}" data-class-mode="${classId}:open">Unlock Now</button>
         <button class="mode-btn ${access.mode==="locked"?"active":""}" data-class-mode="${classId}:locked">Lock Now</button>
       </div>
-      <details><summary>Edit automatic schedule</summary><div class="schedule-grid">${rows}</div></details>
+      <details><summary>Edit automatic locked times</summary><div class="schedule-grid"><div class="schedule-help">The class is OPEN by default. Check only the periods when it should automatically LOCK. Times use New York time.</div>${rows}</div></details>
     </div>`;
   }
 
@@ -277,19 +281,24 @@
       try{await settingsApi.updateClassMode(classId,mode);}catch(e){alert("Could not save the class access setting.");console.error(e);}
     }));
 
-    function saveScheduleFromDom(classId){
-      const schedule=JSON.parse(JSON.stringify(currentSettings.classAccess[classId].schedule));
+    function saveLockWindowsFromDom(classId){
+      const lockWindows={};
       settingsApi.dayKeys.forEach(day=>{
-        const enabled=document.querySelector(`[data-schedule-enabled="${classId}:${day}"]`);
-        const start=document.querySelector(`[data-schedule-start="${classId}:${day}"]`);
-        const end=document.querySelector(`[data-schedule-end="${classId}:${day}"]`);
-        if(enabled&&start&&end)schedule[day]={enabled:enabled.checked,start:start.value||"00:00",end:end.value||"23:59"};
+        lockWindows[day]=[];
+        [0,1].forEach(i=>{
+          const enabled=document.querySelector(`[data-lock-enabled="${classId}:${day}:${i}"]`);
+          const start=document.querySelector(`[data-lock-start="${classId}:${day}:${i}"]`);
+          const end=document.querySelector(`[data-lock-end="${classId}:${day}:${i}"]`);
+          if(enabled&&enabled.checked&&start&&end){
+            lockWindows[day].push({start:start.value||"00:00",end:end.value||"00:00"});
+          }
+        });
       });
-      return settingsApi.updateClassSchedule(classId,schedule);
+      return settingsApi.updateClassLockWindows(classId,lockWindows);
     }
 
     ["et","wt"].forEach(classId=>{
-      document.querySelectorAll(`[data-schedule-enabled^="${classId}:"] , [data-schedule-start^="${classId}:"] , [data-schedule-end^="${classId}:"]`).forEach(input=>input.addEventListener("change",()=>saveScheduleFromDom(classId).catch(e=>{alert("Could not save the schedule.");console.error(e);}))); 
+      document.querySelectorAll(`[data-lock-enabled^="${classId}:"] , [data-lock-start^="${classId}:"] , [data-lock-end^="${classId}:"]`).forEach(input=>input.addEventListener("change",()=>saveLockWindowsFromDom(classId).catch(e=>{alert("Could not save the locked times.");console.error(e);}))); 
     });
   }
 
