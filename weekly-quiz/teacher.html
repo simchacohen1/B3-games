@@ -400,7 +400,7 @@
             </select>
           </label>
           <button class="good" onclick="startLaunch()">Start</button>
-          <button id="scoreReleaseBtn" class="secondary" onclick="toggleScoreRelease()">Score hidden</button>
+          <button id="scoreReleaseBtn" class="secondary" onclick="toggleScoreRelease()">Score & review hidden</button>
           <button class="danger" onclick="stopLaunch()">End Launch</button>
         </div>
       </div>
@@ -610,7 +610,7 @@
 
             <label class="score-toggle" style="margin-top:10px">
               <input type="checkbox" id="launchShowScore">
-              <span>Show students their score when they finish</span>
+              <span>Show students their score & right/wrong review when they finish</span>
             </label>
 
             <div id="launchTypeHelp" class="launch-help">Live Class Test: you start it and control opening, locking, and revealing questions during class.</div>
@@ -635,7 +635,7 @@
         <div class="card">
           <div class="topline">
             <div><h2 style="margin:0" id="resultsQuizTitle">Results</h2><div id="resultsMeta" class="small"></div></div>
-            <div class="controls"><button class="primary" onclick="downloadCSV()">Download CSV</button><button class="secondary" onclick="copyResultsTSV()">Copy for Google Sheets</button><button id="assignMakeupBtn" class="purple" onclick="openMakeupFromResults()">Assign Make-Up</button><button id="resultsScoreBtn" class="secondary" onclick="toggleResultsScoreRelease()">Score hidden</button><button id="endSelectedBtn" class="danger hidden" onclick="endSelectedLaunch()">End this launch</button></div>
+            <div class="controls"><button class="primary" onclick="downloadCSV()">Download CSV</button><button class="secondary" onclick="copyResultsTSV()">Copy for Google Sheets</button><button id="assignMakeupBtn" class="purple" onclick="openMakeupFromResults()">Assign Make-Up</button><button id="resultsScoreBtn" class="secondary" onclick="toggleResultsScoreRelease()">Score & review hidden</button><button id="endSelectedBtn" class="danger hidden" onclick="endSelectedLaunch()">End this launch</button></div>
           </div>
           <div class="grid-wrap" style="margin-top:12px"><table id="resultsTable"></table></div>
           <div class="small" style="margin-top:8px">Click a question result to review/adjust it. Parent-facing summaries use only the final adjusted result; the audit trail stays teacher-only.</div>
@@ -1224,7 +1224,7 @@ function renderLive(){
   document.getElementById('liveStatus').textContent=liveLaunch&&liveLaunch.started?'Live':'Not started';document.getElementById('liveStatus').classList.toggle('live',!!(liveLaunch&&liveLaunch.started));
   document.getElementById('modeSelect').value=liveLaunch&&liveLaunch.mode||'paced';
   const scoreBtn=document.getElementById('scoreReleaseBtn');
-  if(scoreBtn){scoreBtn.disabled=!liveLaunch;scoreBtn.textContent=liveLaunch&&liveLaunch.showScore===true?'Score shown':'Score hidden';}
+  if(scoreBtn){scoreBtn.disabled=!liveLaunch;scoreBtn.textContent=liveLaunch&&liveLaunch.showScore===true?'Score & review shown':'Score & review hidden';}
   if(!qs.length){document.getElementById('liveQnum').textContent='Question —';document.getElementById('liveQtext').textContent='Launch a quiz to ET or WT from Quiz Setup.';document.getElementById('liveAnswer').textContent='';document.getElementById('questionStrip').innerHTML='';return;}
   currentQ=Math.max(0,Math.min(qs.length-1,currentQ));const q=qs[currentQ],st=qState(currentQ),choices=asArray(q.choices);
   document.getElementById('liveQnum').textContent='Question '+(currentQ+1)+' of '+qs.length+(st.open?' • OPEN':' • LOCKED');document.getElementById('liveQtext').textContent=q.q||'';document.getElementById('liveAnswer').textContent='Correct answer: '+(choices[Number(q.correctIndex)]||'');document.getElementById('revealBtn').textContent=st.reveal?'Hide answer from students':'Reveal answer to students';
@@ -1232,10 +1232,10 @@ function renderLive(){
 }
 function goQuestion(i){currentQ=i;if(activeLaunchId)db.ref('b3Quiz/launches/'+activeLaunchId+'/activeQuestion').set(i);else renderLive();}
 function prevQuestion(){const qs=liveQuestions();if(qs.length)goQuestion(Math.max(0,currentQ-1));}
-async function nextQuestion(){const qs=liveQuestions();if(!qs.length||!activeLaunchId)return;const next=Math.min(qs.length-1,currentQ+1);if((liveLaunch.mode||'paced')==='paced'){const updates={};updates['questionStates/'+currentQ+'/open']=false;updates['activeQuestion']=next;updates['questionStates/'+next+'/open']=true;updates['questionStates/'+next+'/reveal']=false;await db.ref('b3Quiz/launches/'+activeLaunchId).update(updates);}else goQuestion(next);}
+async function nextQuestion(){const qs=liveQuestions();if(!qs.length||!activeLaunchId)return;const next=Math.min(qs.length-1,currentQ+1);if((liveLaunch.mode||'paced')==='paced'){const updates={};/* Opening the next question must never push a student off an unfinished earlier question. Leave previously reached questions available; the student chooses when to move. */updates['activeQuestion']=next;updates['questionStates/'+next+'/open']=true;updates['questionStates/'+next+'/reveal']=false;await db.ref('b3Quiz/launches/'+activeLaunchId).update(updates);}else goQuestion(next);}
 async function setCurrentOpen(open){if(activeLaunchId)await db.ref('b3Quiz/launches/'+activeLaunchId+'/questionStates/'+currentQ+'/open').set(!!open);}
 async function toggleReveal(){if(!activeLaunchId)return;await db.ref('b3Quiz/launches/'+activeLaunchId+'/questionStates/'+currentQ+'/reveal').set(!qState(currentQ).reveal);}
-async function changeMode(){if(!activeLaunchId)return;const mode=document.getElementById('modeSelect').value,qs=liveQuestions(),updates={mode};qs.forEach((_,i)=>{updates['questionStates/'+i+'/open']=mode==='test'||i===currentQ;updates['questionStates/'+i+'/reveal']=false;});await db.ref('b3Quiz/launches/'+activeLaunchId).update(updates);}
+async function changeMode(){if(!activeLaunchId)return;const mode=document.getElementById('modeSelect').value,qs=liveQuestions(),updates={mode};qs.forEach((_,i)=>{updates['questionStates/'+i+'/open']=mode==='test'||i<=currentQ;updates['questionStates/'+i+'/reveal']=false;});await db.ref('b3Quiz/launches/'+activeLaunchId).update(updates);}
 async function startLaunch(){if(!activeLaunchId||!liveQuestions().length){alert('Launch a quiz first.');return;}const updates={started:true,startedAt:liveLaunch.startedAt||firebase.database.ServerValue.TIMESTAMP};await db.ref('b3Quiz/launches/'+activeLaunchId).update(updates);}
 async function toggleScoreRelease(){
   if(!activeLaunchId||!liveLaunch)return;
@@ -1293,7 +1293,7 @@ function renderResults(){
   const qs=launchQuestions(l),students=launchStudentRows(l),rr=allResponses[resultsLaunchId]||{},snap=l.quizSnapshot||{},retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'';
   document.getElementById('resultsQuizTitle').textContent=snap.title||'Results';document.getElementById('resultsMeta').textContent=classLabel(l.classId)+' • '+skillLabel(snap.skillType)+' • '+fmtDate(l.createdAt)+retake+(l.note?' • '+l.note:'');
   const resultsScoreBtn=document.getElementById('resultsScoreBtn');
-  if(resultsScoreBtn)resultsScoreBtn.textContent=l.showScore===true?'Score shown':'Score hidden';
+  if(resultsScoreBtn)resultsScoreBtn.textContent=l.showScore===true?'Score & review shown':'Score & review hidden';
   const endBtn=document.getElementById('endSelectedBtn');endBtn.classList.toggle('hidden',!l.started);
   if(!qs.length){table.innerHTML='<tr><td>No questions.</td></tr>';return;}
   let html='<thead><tr><th>Student</th><th>Score</th><th>Percent</th><th>Completed</th>'+qs.map((_,i)=>'<th>Q'+(i+1)+'</th>').join('')+'<th>Retake</th></tr></thead><tbody>';

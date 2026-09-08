@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!-- BUILD: 2026-09-07 18:31 ET | LIVE-ANYTIME-MAKEUP-FORCE-CHANGE -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -7,7 +6,6 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<script src="../game-gate.js" data-game-id="weekly-quiz"></script>
 <title>B3 Weekly Quiz</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -36,12 +34,6 @@
   .practice-link-sub { font-size:13px; color:#66788b; margin-top:2px; }
   .practice-link-go { font-size:30px; }
 
-  .audio-help{background:#fff8d2;border:2px dashed #e2c64d;border-radius:13px;padding:10px 12px;text-align:center;font-weight:800;margin-bottom:14px}
-  .listen-line{display:flex;justify-content:center;margin:8px 0 2px}
-  .listen-btn{background:#fff1a8;color:#5b4a00;border:2px solid #e7ca50;border-radius:999px;padding:8px 13px;font-size:17px;box-shadow:none}
-  .choice-row-audio{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
-  .choice-audio{min-width:48px;padding:11px 10px;background:#fff1a8;color:#5b4a00;border:2px solid #e7ca50;border-radius:11px;font-size:19px}
-
   .quiz-title { text-align:center; font-size:24px; font-weight:800; margin-bottom:5px; color:var(--blue); }
   .launch-meta { text-align:center; color:var(--muted); font-size:13px; margin-bottom:5px; }
   .qmeta { text-align:center; color:var(--muted); margin-bottom:14px; }
@@ -62,10 +54,27 @@
   .nav button { min-width:42px; padding:8px 10px; background:#e8f1f7; color:var(--ink); }
   .nav button.active { background:var(--blue); color:white; }
   .nav button.answered { outline:2px solid var(--good); }
-  .question-step-nav { display:flex; justify-content:space-between; gap:12px; margin-top:16px; }
-  .question-step-nav button { flex:1; max-width:220px; font-size:18px; }
   .blocked { text-align:center; font-size:22px; font-weight:800; color:var(--bad); padding:55px 20px; }
   .progress { text-align:center; color:var(--muted); font-size:14px; margin-top:12px; }
+  .history-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+  .history-head h2 { margin:0; color:var(--blue); }
+  .past-list { display:grid; gap:10px; }
+  .past-row { border:1px solid var(--line); border-radius:12px; padding:13px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:#fafdff; }
+  .past-title { font-weight:800; font-size:17px; }
+  .past-meta { color:var(--muted); font-size:13px; margin-top:3px; }
+  .score-pill { display:inline-block; background:#eaf7ef; color:#1f6b40; border-radius:999px; padding:4px 9px; font-weight:800; margin-top:6px; }
+  .score-pill.hidden-score { background:#f1f5f7; color:var(--muted); }
+  .review-question { border:1px solid var(--line); border-radius:12px; padding:15px; margin:12px 0; background:#fbfdff; }
+  .review-question.correct { border-color:#8fc8a5; background:#eef9f2; }
+  .review-question.incorrect { border-color:#e1a4a8; background:#fff1f2; }
+  .review-q { font-weight:800; font-size:18px; white-space:pre-line; margin-bottom:8px; }
+  .review-answer { margin:5px 0; }
+  .review-result { font-weight:900; margin-top:8px; }
+  .review-result.good { color:#1f6b40; }
+  .review-result.bad { color:#9b3439; }
+  .review-actions { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  .complete-score { font-size:34px; font-weight:900; color:var(--good); margin:10px 0 4px; }
+  @media(max-width:600px){ .past-row{align-items:flex-start;flex-direction:column;} .past-row button{width:100%;} }
 </style>
 </head>
 <body>
@@ -74,7 +83,7 @@
   <div class="subtitle">Shoreshim • Words & Phrases • Comprehension</div>
 </header>
 <div class="wrap">
-  <div id="masterBlocked" class="card blocked hidden">This quiz is currently unavailable. Please wait for Rabbi Cohen to reopen it.</div>
+  <div id="masterBlocked" class="card blocked hidden">The weekly quiz is turned off right now. Please wait for Rabbi Cohen.</div>
 
   <div id="loginCard" class="card">
     <h2 style="text-align:center;margin-top:0;">Student Login</h2>
@@ -109,26 +118,37 @@
     </div>
 
     <div id="completeCard" class="card waiting hidden">
-      <div class="big" id="completeTitle">Test submitted.</div>
-      <div id="completeText" style="margin-top:8px;color:var(--muted);">Your answers are recorded.</div>
-      <div id="completeScore" class="hidden" style="margin-top:16px;font-size:30px;font-weight:900;color:var(--good);"></div>
+      <div class="big" id="completeTitle">Quiz complete!</div>
+      <div id="completeScore" class="complete-score hidden"></div>
+      <div id="completeMessage" style="margin-top:8px;color:var(--muted);">All of your answers are recorded.</div>
+      <button id="completeReviewBtn" class="primary hidden" style="margin-top:16px;" onclick="openPastQuiz(activeLaunchId)">Review my quiz</button>
     </div>
 
     <div id="quizCard" class="card hidden">
       <div class="quiz-title" id="quizTitle"></div>
       <div class="launch-meta" id="launchMeta"></div>
       <div class="qmeta" id="qmeta"></div>
-      <div class="listen-line"><button id="questionListenBtn" class="listen-btn" type="button">🔊 Hear question</button></div>
       <div class="question" id="questionText" dir="auto"></div>
       <div class="choices" id="choices"></div>
       <div class="submit-row"><button class="primary" id="submitBtn" onclick="submitAnswer()">Submit answer</button></div>
       <div id="answerStatus" class="status hidden"></div>
-      <div id="questionStepNav" class="question-step-nav hidden">
-        <button id="prevQuestionBtn" class="secondary" type="button" onclick="goStudentQuestion(-1)">← Previous</button>
-        <button id="nextQuestionBtn" class="primary" type="button" onclick="goStudentQuestion(1)">Next →</button>
-      </div>
       <div id="questionNav" class="nav hidden"></div>
       <div id="progressText" class="progress"></div>
+    </div>
+
+    <div id="reviewCard" class="card hidden">
+      <div class="review-actions">
+        <button class="secondary" onclick="closePastQuiz()">← Back to quizzes</button>
+        <div><div class="quiz-title" id="reviewTitle" style="text-align:right;"></div><div class="launch-meta" id="reviewMeta" style="text-align:right;"></div></div>
+      </div>
+      <div id="reviewScore" class="complete-score hidden"></div>
+      <div id="reviewNotice" class="status"></div>
+      <div id="reviewQuestions"></div>
+    </div>
+
+    <div id="pastQuizzesCard" class="card">
+      <div class="history-head"><h2>📚 My Past Quizzes</h2><span class="past-meta">Read-only</span></div>
+      <div id="pastQuizList" class="past-list"><div class="past-meta">Loading your quiz history…</div></div>
     </div>
   </div>
 </div>
@@ -146,45 +166,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-
-const SYNTHESIZE_SPEECH_URL='https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech';
-const ttsAudioCache=new Map();
-let ttsAudioEl=null;
-
-async function speakStudentText(text){
-  if(!text)return;
-  try{
-    if(!ttsAudioEl)ttsAudioEl=new Audio();
-    ttsAudioEl.pause();
-
-    let audioUrl=ttsAudioCache.get(text);
-    if(!audioUrl){
-      const res=await fetch(SYNTHESIZE_SPEECH_URL,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({text:String(text)})
-      });
-      if(!res.ok)throw new Error('Speech request failed');
-      const data=await res.json();
-      if(!data.audioContent)throw new Error('No audio returned');
-
-      const bytes=atob(data.audioContent);
-      const nums=new Uint8Array(bytes.length);
-      for(let i=0;i<bytes.length;i++)nums[i]=bytes.charCodeAt(i);
-      const blob=new Blob([nums],{type:'audio/mp3'});
-      audioUrl=URL.createObjectURL(blob);
-      ttsAudioCache.set(text,audioUrl);
-    }
-
-    ttsAudioEl.src=audioUrl;
-    await ttsAudioEl.play();
-  }catch(e){
-    console.error('Natural voice playback failed:',e);
-    alert('The voice could not play right now. Please try the speaker again.');
-  }
-}
-
-
 let masterBlocked=false;
 let myStudentId='';
 let myName='';
@@ -197,6 +178,8 @@ let myResponses={};
 let selectedChoice=null;
 let displayedQuestion=0;
 let classLaunchRef=null, personalLaunchRef=null, launchRef=null, responseRef=null;
+let historyLaunchRef=null, historyCompletionRef=null;
+let allLaunches={}, allCompletions={};
 let markingComplete=false;
 
 const CLASS_ROSTERS={
@@ -206,6 +189,8 @@ const CLASS_ROSTERS={
 
 function slugify(name){return String(name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');}
 function asArray(v){if(!v)return[];if(Array.isArray(v))return v;return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]);}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmtDate(ts){if(!ts)return'';try{return new Date(Number(ts)).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch(e){return'';}}
 function setLoginMsg(t){document.getElementById('loginMsg').textContent=t||'';}
 function studentClass(id){
   // Teacher test account: Simcha Cohen is intentionally listed in both classes.
@@ -224,9 +209,11 @@ function applyMasterBlocked(){
   else{document.getElementById('loginCard').classList.remove('hidden');document.getElementById('studentArea').classList.add('hidden');}
 }
 
-db.ref('b3Games/siteSettings').on('value',snap=>{
-  const s=snap.val()||{},games=s.games||{};
-  masterBlocked=s.siteEnabled===false||games['weekly-quiz']===false;
+// The weekly quiz has its own access flow. A B3 Games site/class lock must NOT
+// block a direct quiz link. The only B3 setting honored here is the explicit
+// per-tool Weekly Quiz switch, if Rabbi Cohen turns that specific tool off.
+db.ref('b3Games/siteSettings/games/weekly-quiz').on('value',snap=>{
+  masterBlocked=snap.val()===false;
   applyMasterBlocked();
 },()=>{masterBlocked=false;applyMasterBlocked();});
 
@@ -263,6 +250,7 @@ function enterStudent(displayName,studentId,classId){
   document.getElementById('studentNameLabel').textContent=displayName;
   applyMasterBlocked();
   listenForLaunches();
+  listenForHistory();
 }
 
 async function restoreLogin(){
@@ -295,6 +283,15 @@ function listenForLaunches(){
   personalLaunchRef.on('value',s=>{personalLaunchId=s.val()||'';chooseActiveLaunch();});
 }
 
+function listenForHistory(){
+  if(historyLaunchRef)historyLaunchRef.off();
+  if(historyCompletionRef)historyCompletionRef.off();
+  historyLaunchRef=db.ref('b3Quiz/launches');
+  historyCompletionRef=db.ref('b3Quiz/completions');
+  historyLaunchRef.on('value',s=>{allLaunches=s.val()||{};renderPastQuizzes();});
+  historyCompletionRef.on('value',s=>{allCompletions=s.val()||{};renderPastQuizzes();});
+}
+
 function chooseActiveLaunch(){
   const id=personalLaunchId||classLaunchId||'';
   if(id===activeLaunchId)return;
@@ -303,40 +300,27 @@ function chooseActiveLaunch(){
   if(!id){render();return;}
   launchRef=db.ref('b3Quiz/launches/'+id);
   responseRef=db.ref('b3Quiz/responses/'+id+'/'+myStudentId);
-  launchRef.on('value',s=>{
-    const firstLoad=!launchData;
-    launchData=s.val();
-    if(firstLoad&&launchData&&(launchData.mode||'paced')==='paced'){
-      displayedQuestion=Math.max(0,Number(launchData.activeQuestion)||0);
-    }
-    render();
-  });
+  launchRef.on('value',s=>{launchData=s.val();render();});
   responseRef.on('value',s=>{myResponses=s.val()||{};render();});
 }
 
 function getQuestions(){return launchData&&launchData.quizSnapshot?asArray(launchData.quizSnapshot.questions):[];}
 function questionState(i){const qs=(launchData&&launchData.questionStates)||{};return qs[i]||qs[String(i)]||{open:false,reveal:false};}
 function responseFor(i){return myResponses[i]||myResponses[String(i)]||null;}
-
-function studentCanVisitQuestion(i,mode){
-  if(mode==='test')return true;
-  const active=Math.max(0,Number(launchData&&launchData.activeQuestion)||0);
-  if(i<0||i>active)return false;
-  if(i<active)return !responseFor(i); // missed earlier question: always available
-  const st=questionState(i);
-  return !!st.open||!!responseFor(i)||!!st.reveal;
-}
-
 function studentEffectiveQuestionState(i,mode){
   const st=questionState(i);
   if(mode==='test')return {...st,open:true};
   const active=Math.max(0,Number(launchData&&launchData.activeQuestion)||0);
   if(i<active&&!responseFor(i)){
-    // Catch-up rule: a teacher lock/reveal must not prevent a student from
-    // answering a question they missed. Do not reveal the answer first.
+    // A student who fell behind may always finish an earlier unanswered question.
+    // Do not reveal the answer first, even if the class has moved on.
     return {...st,open:true,reveal:false};
   }
   return st;
+}
+function studentCanVisitQuestion(i,mode){
+  const st=studentEffectiveQuestionState(i,mode),resp=responseFor(i);
+  return !!(st.open||resp||st.reveal);
 }
 function launchAllowsStudent(){
   if(!launchData)return false;
@@ -346,75 +330,42 @@ function launchAllowsStudent(){
 }
 
 function hideAll(){['noQuizCard','waitingCard','completeCard','quizCard'].forEach(id=>document.getElementById(id).classList.add('hidden'));}
-function renderCompletionCard(questions){
-  const delivery=launchData&&launchData.deliveryType||'live';
-  const title=document.getElementById('completeTitle');
-  const text=document.getElementById('completeText');
-  const score=document.getElementById('completeScore');
-
-  title.textContent='Test submitted.';
-  if(delivery==='live'){
-    text.textContent='Your answers are recorded. Please wait for Rabbi Cohen.';
-  }else if(delivery==='makeup'){
-    text.textContent='Your make-up test is complete. Your answers are recorded.';
-  }else{
-    text.textContent='Your test is complete. Your answers are recorded.';
-  }
-
-  if(launchData&&launchData.showScore===true){
-    let correct=0;
-    questions.forEach((_,i)=>{
-      const r=responseFor(i);
-      if(r&&r.correct)correct++;
-    });
-    const total=questions.length;
-    const pct=total?Math.round(correct/total*100):0;
-    score.textContent=correct+' / '+total+' — '+pct+'%';
-    score.classList.remove('hidden');
-  }else{
-    score.textContent='';
-    score.classList.add('hidden');
-  }
-}
-
 function render(){
   if(!myStudentId)return;hideAll();
-  if(!activeLaunchId||!launchData){document.getElementById('noQuizCard').classList.remove('hidden');return;}
-  if(!launchAllowsStudent()){document.getElementById('noQuizCard').classList.remove('hidden');return;}
-  const questions=getQuestions();if(!questions.length){document.getElementById('noQuizCard').classList.remove('hidden');return;}
+  if(!activeLaunchId||!launchData){document.getElementById('noQuizCard').classList.remove('hidden');renderPastQuizzes();return;}
+  if(!launchAllowsStudent()){document.getElementById('noQuizCard').classList.remove('hidden');renderPastQuizzes();return;}
+  const questions=getQuestions();if(!questions.length){document.getElementById('noQuizCard').classList.remove('hidden');renderPastQuizzes();return;}
   if(!launchData.started){
     document.getElementById('waitingCard').classList.remove('hidden');
     document.getElementById('waitingTitle').textContent='Quiz not started yet';
     document.getElementById('waitingText').textContent='Please wait for Rabbi Cohen.';
+    renderPastQuizzes();
     return;
   }
   const mode=launchData.mode||'paced';
   displayedQuestion=Math.max(0,Math.min(questions.length-1,displayedQuestion));
   if(mode==='paced'&&!studentCanVisitQuestion(displayedQuestion,mode)){
     const active=Math.max(0,Math.min(questions.length-1,Number(launchData.activeQuestion)||0));
-    // Prefer the current teacher question. If it is locked, take the student
-    // to the newest earlier unanswered question so the child can catch up.
-    if(studentCanVisitQuestion(active,mode)){
-      displayedQuestion=active;
-    }else{
+    if(studentCanVisitQuestion(active,mode))displayedQuestion=active;
+    else{
       let catchup=-1;
-      for(let i=active-1;i>=0;i--){
-        if(studentCanVisitQuestion(i,mode)){catchup=i;break;}
-      }
+      for(let i=active-1;i>=0;i--){if(studentCanVisitQuestion(i,mode)){catchup=i;break;}}
       displayedQuestion=catchup>=0?catchup:active;
     }
   }
   const answeredCount=questions.reduce((n,_,i)=>n+(responseFor(i)?1:0),0);
-  if(answeredCount===questions.length) markCompletion();
-  if(answeredCount===questions.length&&mode==='test'){
+  if(answeredCount===questions.length){
+    markCompletion();
     renderCompletionCard(questions);
-    document.getElementById('completeCard').classList.remove('hidden');return;
+    renderPastQuizzes();
+    return;
   }
-  let st=studentEffectiveQuestionState(displayedQuestion,mode),resp=responseFor(displayedQuestion);
+  const st=studentEffectiveQuestionState(displayedQuestion,mode),resp=responseFor(displayedQuestion);
   if(!st.open&&!resp&&!st.reveal){
     document.getElementById('waitingCard').classList.remove('hidden');
     document.getElementById('waitingTitle').textContent='Waiting for Question '+(displayedQuestion+1)+'…';
     document.getElementById('waitingText').textContent='Rabbi Cohen will open it when the class is ready.';
+    renderPastQuizzes();
     return;
   }
   document.getElementById('quizCard').classList.remove('hidden');
@@ -424,23 +375,41 @@ function render(){
   document.getElementById('launchMeta').textContent=classLabel(launchData.classId)+retake;
   document.getElementById('qmeta').textContent='Question '+(displayedQuestion+1)+' of '+questions.length;
   document.getElementById('questionText').textContent=q.q||'';
-  document.getElementById('questionListenBtn').onclick=()=>speakStudentText(q.q||'');
   selectedChoice=resp?Number(resp.choiceIndex):null;
   renderChoices(q,resp,st);renderNav(mode,questions);
   document.getElementById('progressText').textContent=answeredCount+' of '+questions.length+' answered';
+  renderPastQuizzes();
+}
+
+function scoreFromResponses(questions,responses){
+  const rr=responses||{};let correct=0,answered=0;
+  questions.forEach((_,i)=>{const r=rr[i]||rr[String(i)];if(r){answered++;if(r.correct===true)correct++;}});
+  return {correct,answered,total:questions.length,pct:questions.length?Math.round(correct/questions.length*100):0};
+}
+function renderCompletionCard(questions){
+  const card=document.getElementById('completeCard'),scoreEl=document.getElementById('completeScore'),msg=document.getElementById('completeMessage'),btn=document.getElementById('completeReviewBtn');
+  card.classList.remove('hidden');
+  const score=scoreFromResponses(questions,myResponses);
+  if(launchData&&launchData.showScore===true){
+    scoreEl.textContent=score.correct+' / '+score.total+' — '+score.pct+'%';scoreEl.classList.remove('hidden');
+    msg.textContent='Your score is ready. You can review every question below, and you can come back to it later in My Past Quizzes.';
+    btn.classList.remove('hidden');
+  }else{
+    scoreEl.textContent='';scoreEl.classList.add('hidden');
+    msg.textContent='All of your answers are recorded. Your score and right/wrong review will appear here as soon as Rabbi Cohen releases them.';
+    btn.classList.add('hidden');
+  }
 }
 
 function renderChoices(q,resp,st){
   const box=document.getElementById('choices');box.innerHTML='';const choices=asArray(q.choices);
   choices.forEach((choice,i)=>{
-    const row=document.createElement('div');row.className='choice-row-audio';
     const b=document.createElement('button');b.className='choice';b.type='button';b.dir='auto';b.textContent=String.fromCharCode(65+i)+'. '+choice;
     if(selectedChoice===i)b.classList.add('selected');
     if(st.reveal){if(Number(q.correctIndex)===i)b.classList.add('correct-reveal');else if(resp&&Number(resp.choiceIndex)===i)b.classList.add('wrong-reveal');}
     b.disabled=!!resp||!st.open||!!st.reveal;
     b.onclick=()=>{selectedChoice=i;document.querySelectorAll('.choice').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');};
-    const sp=document.createElement('button');sp.type='button';sp.className='choice-audio';sp.textContent='🔊';sp.title='Hear this answer';sp.onclick=()=>speakStudentText(choice);
-    row.appendChild(b);row.appendChild(sp);box.appendChild(row);
+    box.appendChild(b);
   });
   const submit=document.getElementById('submitBtn');submit.disabled=!!resp||!st.open||!!st.reveal;submit.classList.toggle('hidden',!!resp||!st.open||!!st.reveal);
   const status=document.getElementById('answerStatus');status.className='status hidden';
@@ -452,68 +421,18 @@ function renderChoices(q,resp,st){
 }
 
 function renderNav(mode,questions){
-  const nav=document.getElementById('questionNav');
-  const stepNav=document.getElementById('questionStepNav');
-  const prev=document.getElementById('prevQuestionBtn');
-  const next=document.getElementById('nextQuestionBtn');
-  nav.innerHTML='';
-
-  nav.classList.remove('hidden');
-  stepNav.classList.remove('hidden');
-
-  const visitable=[];
-  questions.forEach((_,i)=>{
-    if(studentCanVisitQuestion(i,mode))visitable.push(i);
-  });
-
-  const prevIndex=[...visitable].reverse().find(i=>i<displayedQuestion);
-  const nextIndex=visitable.find(i=>i>displayedQuestion);
-  prev.disabled=prevIndex===undefined;
-  next.disabled=nextIndex===undefined;
-
-  prev.onclick=()=>{if(prevIndex!==undefined){displayedQuestion=prevIndex;selectedChoice=null;render();}};
-  next.onclick=()=>{if(nextIndex!==undefined){displayedQuestion=nextIndex;selectedChoice=null;render();}};
-
+  const nav=document.getElementById('questionNav');nav.innerHTML='';nav.classList.remove('hidden');
   questions.forEach((q,i)=>{
-    const resp=responseFor(i);
-    const b=document.createElement('button');
-    b.type='button';
-    b.textContent=i+1;
-    if(i===displayedQuestion)b.classList.add('active');
-    if(resp)b.classList.add('answered');
-
-    // Open Test: all questions.
-    // Paced: current teacher question + ANY earlier unanswered question.
-    b.disabled=!studentCanVisitQuestion(i,mode);
-    b.title=mode==='paced'&&i<Number(launchData.activeQuestion||0)&&!resp
-      ? 'You missed this question — you can still answer it.'
-      : '';
-
-    b.onclick=()=>{displayedQuestion=i;selectedChoice=null;render();};
-    nav.appendChild(b);
+    const st=studentEffectiveQuestionState(i,mode),resp=responseFor(i),b=document.createElement('button');
+    b.textContent=i+1;if(i===displayedQuestion)b.classList.add('active');if(resp)b.classList.add('answered');
+    b.disabled=!st.open&&!resp&&!st.reveal;
+    b.onclick=()=>{displayedQuestion=i;render();};nav.appendChild(b);
   });
-}
-
-function goStudentQuestion(delta){
-  if(!launchData)return;
-  const mode=launchData.mode||'paced';
-  const questions=getQuestions();
-  const visitable=[];
-  questions.forEach((_,i)=>{if(studentCanVisitQuestion(i,mode))visitable.push(i);});
-  if(!visitable.length)return;
-
-  const pos=visitable.indexOf(displayedQuestion);
-  if(pos<0)return;
-  const nextPos=Math.max(0,Math.min(visitable.length-1,pos+(Number(delta)||0)));
-  if(nextPos===pos)return;
-  displayedQuestion=visitable[nextPos];
-  selectedChoice=null;
-  render();
 }
 
 async function submitAnswer(){
   if(selectedChoice===null){const s=document.getElementById('answerStatus');s.textContent='Choose an answer first.';s.className='status bad';return;}
-  const qs=getQuestions(),q=qs[displayedQuestion],mode=launchData.mode||'paced',st=studentEffectiveQuestionState(displayedQuestion,mode);if(!st.open||responseFor(displayedQuestion))return;
+  const qs=getQuestions(),q=qs[displayedQuestion],mode=launchData&&launchData.mode||'paced',st=studentEffectiveQuestionState(displayedQuestion,mode);if(!st.open||responseFor(displayedQuestion))return;
   const ref=db.ref('b3Quiz/responses/'+activeLaunchId+'/'+myStudentId+'/'+displayedQuestion);
   const correct=Number(selectedChoice)===Number(q.correctIndex);
   const answer={name:myName,choiceIndex:selectedChoice,originalCorrect:correct,correct,adjusted:false,submittedAt:firebase.database.ServerValue.TIMESTAMP};
@@ -522,16 +441,56 @@ async function submitAnswer(){
 
 async function markCompletion(){
   if(markingComplete||!activeLaunchId||!myStudentId)return;markingComplete=true;
-  try{await db.ref('b3Quiz/completions/'+activeLaunchId+'/'+myStudentId).set({name:myName,completedAt:firebase.database.ServerValue.TIMESTAMP});}
-  catch(e){console.warn(e);}finally{markingComplete=false;}
+  try{
+    const ref=db.ref('b3Quiz/completions/'+activeLaunchId+'/'+myStudentId),existing=await ref.once('value');
+    if(!existing.exists()){
+      const qs=getQuestions(),score=scoreFromResponses(qs,myResponses);
+      await ref.set({name:myName,completedAt:firebase.database.ServerValue.TIMESTAMP,correct:score.correct,total:score.total,pct:score.pct});
+    }
+  }catch(e){console.warn(e);}finally{markingComplete=false;}
 }
 
+function completedLaunchRows(){
+  if(!myStudentId)return[];
+  return Object.entries(allLaunches||{}).map(([id,launch])=>{
+    const comp=allCompletions&&allCompletions[id]&&allCompletions[id][myStudentId];
+    return comp?{id,launch,comp}:null;
+  }).filter(Boolean).sort((a,b)=>Number((b.comp&&b.comp.completedAt)||b.launch.endedAt||b.launch.createdAt||0)-Number((a.comp&&a.comp.completedAt)||a.launch.endedAt||a.launch.createdAt||0));
+}
+function renderPastQuizzes(){
+  const box=document.getElementById('pastQuizList');if(!box||!myStudentId)return;
+  const rows=completedLaunchRows();
+  if(!rows.length){box.innerHTML='<div class="past-meta">No completed quizzes yet.</div>';return;}
+  box.innerHTML=rows.map(({id,launch,comp})=>{
+    const snap=launch.quizSnapshot||{},title=snap.title||'Weekly Quiz',retake=launch.retakeOf?' • Retake '+(launch.attemptNumber||2):'',date=fmtDate(comp.completedAt||launch.createdAt),released=launch.showScore===true;
+    let scoreText='Score not released yet';
+    if(released&&Number.isFinite(Number(comp.total))&&Number(comp.total)>0)scoreText=Number(comp.correct||0)+' / '+Number(comp.total)+' — '+Number(comp.pct||0)+'%';
+    return '<div class="past-row"><div><div class="past-title">'+esc(title)+'</div><div class="past-meta">'+esc(date)+esc(retake)+'</div><span class="score-pill '+(released?'':'hidden-score')+'">'+esc(scoreText)+'</span></div><button class="secondary" onclick="openPastQuiz(\''+esc(id)+'\')">Review</button></div>';
+  }).join('');
+}
+async function openPastQuiz(launchId){
+  const launch=allLaunches&&allLaunches[launchId];if(!launch||!myStudentId)return;
+  const snap=launch.quizSnapshot||{},questions=asArray(snap.questions),review=document.getElementById('reviewCard');
+  document.getElementById('reviewTitle').textContent=snap.title||'Weekly Quiz';
+  document.getElementById('reviewMeta').textContent=fmtDate((allCompletions[launchId]&&allCompletions[launchId][myStudentId]||{}).completedAt||launch.createdAt)+(launch.retakeOf?' • Retake '+(launch.attemptNumber||2):'');
+  document.getElementById('reviewQuestions').innerHTML='<div class="past-meta">Loading your answers…</div>';review.classList.remove('hidden');
+  review.scrollIntoView({behavior:'smooth',block:'start'});
+  try{
+    const rs=await db.ref('b3Quiz/responses/'+launchId+'/'+myStudentId).once('value'),responses=rs.val()||{},score=scoreFromResponses(questions,responses),released=launch.showScore===true;
+    const scoreEl=document.getElementById('reviewScore'),notice=document.getElementById('reviewNotice');
+    if(released){scoreEl.textContent=score.correct+' / '+score.total+' — '+score.pct+'%';scoreEl.classList.remove('hidden');notice.textContent='This review is read-only. Green answers were correct; red answers were incorrect.';notice.className='status good';}
+    else{scoreEl.textContent='';scoreEl.classList.add('hidden');notice.textContent='Your answers are saved. Rabbi Cohen has not released the score/right-wrong review yet.';notice.className='status';}
+    document.getElementById('reviewQuestions').innerHTML=questions.map((q,i)=>{
+      const r=responses[i]||responses[String(i)]||null,choices=asArray(q.choices),chosen=r?choices[Number(r.choiceIndex)]:'No answer',correct=choices[Number(q.correctIndex)]||'';
+      const cls=released&&r?(r.correct===true?' correct':' incorrect'):'';
+      const result=released?(r?(r.correct===true?'✓ Correct':'✗ Incorrect'):'No answer'):'';
+      return '<div class="review-question'+cls+'"><div class="review-q">'+(i+1)+'. '+esc(q.q||'')+'</div><div class="review-answer"><b>Your answer:</b> '+esc(chosen||'')+'</div>'+(released?'<div class="review-answer"><b>Correct answer:</b> '+esc(correct)+'</div><div class="review-result '+(r&&r.correct===true?'good':'bad')+'">'+esc(result)+'</div>':'')+'</div>';
+    }).join('');
+  }catch(e){console.error(e);document.getElementById('reviewQuestions').innerHTML='<div class="status bad">Could not load this review. Please try again.</div>';}
+}
+function closePastQuiz(){document.getElementById('reviewCard').classList.add('hidden');document.getElementById('pastQuizzesCard').scrollIntoView({behavior:'smooth',block:'start'});}
+
 ['classPinInput','studentNameInput'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();joinQuiz();}}));
-document.addEventListener('keydown',e=>{
-  if(!launchData)return;
-  if(e.key==='ArrowLeft'){e.preventDefault();goStudentQuestion(-1);}
-  if(e.key==='ArrowRight'){e.preventDefault();goStudentQuestion(1);}
-});
 restoreLogin();
 </script>
 </body>
