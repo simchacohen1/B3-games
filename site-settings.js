@@ -25,20 +25,36 @@
 
   const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
-  function allDaySchedule() {
-    const schedule = {};
-    DAY_KEYS.forEach(function (day) {
-      schedule[day] = { enabled: true, start: "00:00", end: "23:59" };
+  function blankLockWindows() {
+    const result = {};
+    DAY_KEYS.forEach(function (day) { result[day] = []; });
+    return result;
+  }
+
+  function defaultLockWindows(classId) {
+    const result = blankLockWindows();
+    ["mon", "tue", "wed", "thu"].forEach(function (day) {
+      if (classId === "et") {
+        result[day] = [
+          { start: "08:45", end: "12:00" },
+          { start: "12:45", end: "15:15" }
+        ];
+      } else {
+        result[day] = [
+          { start: "12:20", end: "15:35" },
+          { start: "16:15", end: "18:45" }
+        ];
+      }
     });
-    return schedule;
+    return result;
   }
 
   const defaultSettings = {
     siteEnabled: true,
     games: GAME_DEFAULTS,
     classAccess: {
-      et: { mode: "auto", schedule: allDaySchedule() },
-      wt: { mode: "auto", schedule: allDaySchedule() }
+      et: { mode: "auto", lockWindows: defaultLockWindows("et") },
+      wt: { mode: "auto", lockWindows: defaultLockWindows("wt") }
     }
   };
 
@@ -50,23 +66,80 @@
     return deepClone(defaultSettings);
   }
 
-  function normalizeDay(value, fallback) {
-    const source = value && typeof value === "object" ? value : {};
-    return {
-      enabled: typeof source.enabled === "boolean" ? source.enabled : fallback.enabled,
-      start: /^\d{2}:\d{2}$/.test(source.start || "") ? source.start : fallback.start,
-      end: /^\d{2}:\d{2}$/.test(source.end || "") ? source.end : fallback.end
-    };
+  function validTime(value) {
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || ""));
+  }
+
+  function normalizeRange(value) {
+    if (!value || typeof value !== "object") return null;
+    if (!validTime(value.start) || !validTime(value.end)) return null;
+    return { start: value.start, end: value.end };
+  }
+
+  function normalizeDayLockWindows(value, fallback) {
+    if (!Array.isArray(value)) return deepClone(fallback || []);
+    return value.map(normalizeRange).filter(Boolean).slice(0, 6);
+  }
+
+  function legacyScheduleIsOldAllDay(schedule) {
+    if (!schedule || typeof schedule !== "object") return false;
+    return DAY_KEYS.every(function (day) {
+      const r = schedule[day];
+      return r && r.enabled !== false && r.start === "00:00" && r.end === "23:59";
+    });
+  }
+
+  // Compatibility with the first ET/WT build. That version stored the times
+  // when a class was OPEN. This converts a customized old open window into the
+  // equivalent locked periods. The untouched old all-day default is migrated
+  // to Rabbi Cohen's new default lock periods instead.
+  function legacyOpenScheduleToLockWindows(schedule, fallback) {
+    if (!schedule || typeof schedule !== "object") return deepClone(fallback);
+    if (legacyScheduleIsOldAllDay(schedule)) return deepClone(fallback);
+
+    const result = blankLockWindows();
+    DAY_KEYS.forEach(function (day) {
+      const r = schedule[day];
+      if (!r || r.enabled === false) {
+        result[day] = [{ start: "00:00", end: "00:00" }]; // locked all day
+        return;
+      }
+      const start = validTime(r.start) ? r.start : "00:00";
+      const end = validTime(r.end) ? r.end : "23:59";
+      if (start === end || (start === "00:00" && end === "23:59")) {
+        result[day] = [];
+        return;
+      }
+      if (start < end) {
+        const ranges = [];
+        if (start !== "00:00") ranges.push({ start: "00:00", end: start });
+        if (end !== "23:59") ranges.push({ start: end, end: "00:00" });
+        result[day] = ranges;
+      } else {
+        // Old open period crossed midnight, so the locked gap is end -> start.
+        result[day] = [{ start: end, end: start }];
+      }
+    });
+    return result;
   }
 
   function normalizeClassAccess(value, fallback) {
     const source = value && typeof value === "object" ? value : {};
     const mode = ["auto", "open", "locked"].includes(source.mode) ? source.mode : fallback.mode;
-    const schedule = {};
-    DAY_KEYS.forEach(function (day) {
-      schedule[day] = normalizeDay(source.schedule && source.schedule[day], fallback.schedule[day]);
-    });
-    return { mode: mode, schedule: schedule };
+    let lockWindows;
+
+    if (source.lockWindows && typeof source.lockWindows === "object") {
+      lockWindows = {};
+      DAY_KEYS.forEach(function (day) {
+        lockWindows[day] = normalizeDayLockWindows(source.lockWindows[day], fallback.lockWindows[day]);
+      });
+    } else if (source.schedule && typeof source.schedule === "object") {
+      lockWindows = legacyOpenScheduleToLockWindows(source.schedule, fallback.lockWindows);
+    } else {
+      lockWindows = deepClone(fallback.lockWindows);
+    }
+
+    return { mode: mode, lockWindows: lockWindows };
   }
 
   function normalizeSettings(settings) {
@@ -79,9 +152,7 @@
 
     normalized.games = Object.assign({}, GAME_DEFAULTS);
     Object.keys(sourceGames).forEach(function (gameId) {
-      if (typeof sourceGames[gameId] === "boolean") {
-        normalized.games[gameId] = sourceGames[gameId];
-      }
+      if (typeof sourceGames[gameId] === "boolean") normalized.games[gameId] = sourceGames[gameId];
     });
 
     const fallbackAccess = cloneDefaultSettings().classAccess;
@@ -111,10 +182,7 @@
     const config = getConfiguredFirebaseOptions();
     if (!config || !window.firebase || !window.firebase.database) return null;
 
-    if (!window.firebase.apps.length) {
-      window.firebase.initializeApp(config);
-    }
-
+    if (!window.firebase.apps.length) window.firebase.initializeApp(config);
     if (!firebaseDb) firebaseDb = window.firebase.database();
     if (window.firebase.auth && !firebaseAuth) firebaseAuth = window.firebase.auth();
     activeMode = "firebase";
@@ -140,19 +208,14 @@
   function requireAuthorizedUser() {
     const services = ensureFirebase();
     if (!services || !services.auth) return Promise.resolve();
-
     const user = services.auth.currentUser;
-    if (!isAuthorizedUser(user)) {
-      return Promise.reject(new Error("You are not signed in with the authorized administrator account."));
-    }
-
+    if (!isAuthorizedUser(user)) return Promise.reject(new Error("You are not signed in with the authorized administrator account."));
     return user.getIdToken(true).then(function () { return undefined; });
   }
 
   function readOnce() {
     const services = ensureFirebase();
     if (!services) return Promise.resolve(readLocalFallback());
-
     return services.db.ref(SETTINGS_KEY).once("value").then(function (snapshot) {
       return normalizeSettings(snapshot.val());
     });
@@ -166,14 +229,11 @@
     }
 
     const ref = services.db.ref(SETTINGS_KEY);
-    const handler = function (snapshot) {
-      callback(normalizeSettings(snapshot.val()));
-    };
+    const handler = function (snapshot) { callback(normalizeSettings(snapshot.val())); };
     const errorHandler = function (error) {
       console.error("Could not read B3 site settings:", error);
       callback(readLocalFallback());
     };
-
     ref.on("value", handler, errorHandler);
     return function unsubscribe() { ref.off("value", handler); };
   }
@@ -209,21 +269,21 @@
   function updateClassMode(classId, mode) {
     if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
     if (!["auto", "open", "locked"].includes(mode)) return Promise.reject(new Error("Unknown access mode."));
-
     return readOnce().then(function (settings) {
       settings.classAccess[classId].mode = mode;
       return save(settings);
     });
   }
 
-  function updateClassSchedule(classId, schedule) {
+  function updateClassLockWindows(classId, lockWindows) {
     if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
-
     return readOnce().then(function (settings) {
-      settings.classAccess[classId].schedule = normalizeClassAccess(
-        { mode: settings.classAccess[classId].mode, schedule: schedule },
-        settings.classAccess[classId]
-      ).schedule;
+      const fallback = settings.classAccess[classId].lockWindows;
+      const normalized = {};
+      DAY_KEYS.forEach(function (day) {
+        normalized[day] = normalizeDayLockWindows(lockWindows && lockWindows[day], fallback[day]);
+      });
+      settings.classAccess[classId].lockWindows = normalized;
       return save(settings);
     });
   }
@@ -256,17 +316,18 @@
     };
   }
 
-  function isWithinSchedule(schedule, date) {
+  function minuteIsInRange(minutes, range) {
+    const start = timeToMinutes(range.start);
+    const end = timeToMinutes(range.end);
+    if (start === end) return true; // explicit all-day lock
+    if (start < end) return minutes >= start && minutes < end;
+    return minutes >= start || minutes < end;
+  }
+
+  function isInLockedPeriod(lockWindows, date) {
     const now = getNewYorkNow(date);
-    const rule = schedule && schedule[now.day];
-    if (!rule || rule.enabled === false) return false;
-
-    const start = timeToMinutes(rule.start);
-    const end = timeToMinutes(rule.end);
-
-    if (start === end) return true;
-    if (start < end) return now.minutes >= start && now.minutes <= end;
-    return now.minutes >= start || now.minutes <= end;
+    const ranges = lockWindows && Array.isArray(lockWindows[now.day]) ? lockWindows[now.day] : [];
+    return ranges.some(function (range) { return minuteIsInRange(now.minutes, range); });
   }
 
   function isClassOpen(settings, classId, date) {
@@ -277,7 +338,7 @@
     const access = normalized.classAccess[classId];
     if (access.mode === "open") return true;
     if (access.mode === "locked") return false;
-    return isWithinSchedule(access.schedule, date);
+    return !isInLockedPeriod(access.lockWindows, date);
   }
 
   function describeClassAccess(settings, classId, date) {
@@ -288,24 +349,18 @@
     const access = normalized.classAccess[classId];
     if (access.mode === "open") return { open: true, reason: "Manual override: OPEN" };
     if (access.mode === "locked") return { open: false, reason: "Manual override: LOCKED" };
-    return {
-      open: isWithinSchedule(access.schedule, date),
-      reason: "Automatic schedule"
-    };
+    const locked = isInLockedPeriod(access.lockWindows, date);
+    return { open: !locked, reason: locked ? "Automatic schedule: LOCKED period" : "Automatic schedule: open" };
   }
 
   function signInWithGoogle() {
     const services = ensureFirebase();
     if (!services || !services.auth) return Promise.reject(new Error("Firebase Authentication is not configured."));
-
     const provider = new window.firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
-
     return services.auth.signInWithPopup(provider).then(function (result) {
       if (!isAuthorizedUser(result.user)) {
-        return services.auth.signOut().then(function () {
-          throw new Error("This Google account is not authorized.");
-        });
+        return services.auth.signOut().then(function () { throw new Error("This Google account is not authorized."); });
       }
       return result.user;
     });
@@ -337,7 +392,7 @@
     updateSiteEnabled: updateSiteEnabled,
     updateGameEnabled: updateGameEnabled,
     updateClassMode: updateClassMode,
-    updateClassSchedule: updateClassSchedule,
+    updateClassLockWindows: updateClassLockWindows,
     isClassOpen: isClassOpen,
     describeClassAccess: describeClassAccess,
     signInWithGoogle: signInWithGoogle,
@@ -346,9 +401,6 @@
     isAuthorizedUser: isAuthorizedUser,
     timeZone: TIME_ZONE,
     dayKeys: DAY_KEYS.slice(),
-    getMode: function () {
-      ensureFirebase();
-      return activeMode;
-    }
+    getMode: function () { ensureFirebase(); return activeMode; }
   };
 })();
