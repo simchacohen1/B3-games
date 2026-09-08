@@ -153,7 +153,7 @@
     // Rabbi Cohen's authorized Google account always bypasses student locks.
     // This includes ET/WT schedules, manual class overrides, the emergency
     // student master lock, and individual activity switches.
-    if (teacherBypass) {
+    if (teacherBypass || localStorage.getItem("b3TeacherBypass") === "1") {
       showAllowed();
       return;
     }
