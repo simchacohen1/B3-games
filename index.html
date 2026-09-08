@@ -2,34 +2,34 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>B3 Games</title>
-<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
-body{font-family:Arial,sans-serif;background:#f5f7fa;text-align:center;padding:40px 20px}
-h1{font-size:48px;margin-bottom:30px;color:#333}
-.game-container,.teacher-tools-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:20px;max-width:900px;margin:auto}
-.game-card,.teacher-tool-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px 12px;border-radius:16px;text-decoration:none;transition:transform .15s,box-shadow .15s,opacity .15s;position:relative}
-.game-card{background:white;box-shadow:0 4px 10px rgba(0,0,0,.1)}
-.game-card:hover,.teacher-tool-card:hover{transform:translateY(-4px);box-shadow:0 8px 18px rgba(0,0,0,.15)}
-.card-icon{font-size:40px;line-height:1}.card-icon.rashi-script{font-family:'Noto Rashi Hebrew',serif;font-weight:600;font-size:34px}
-.card-title{font-size:17px;font-weight:bold;color:#333}
-.hidden{display:none!important}
-.game-card.disabled{opacity:.4;filter:grayscale(60%);pointer-events:none;cursor:not-allowed;box-shadow:0 4px 10px rgba(0,0,0,.06)}
-.card-closed-badge{font-size:12px;font-weight:bold;color:#b91c1c;background:#fee2e2;border-radius:999px;padding:2px 10px;display:none}
-.game-card.disabled .card-closed-badge{display:inline-block}
-.admin-button{position:fixed;top:12px;right:12px;z-index:9999;border:none;border-radius:999px;padding:10px 16px;background:#1f2937;color:white;font-weight:bold;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.15)}
-.admin-panel{position:fixed;top:60px;right:12px;width:300px;background:white;border-radius:16px;box-shadow:0 14px 32px rgba(0,0,0,.18);padding:16px;text-align:left;z-index:9999;max-height:80vh;overflow-y:auto}
-.admin-panel h2{margin:0 0 12px;font-size:20px}.admin-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0;font-size:15px}
-.admin-action{width:100%;border:none;border-radius:10px;padding:10px 12px;margin-top:8px;background:#1f2937;color:white;font-weight:bold;cursor:pointer}.admin-action.secondary{background:#e5e7eb;color:#111827}
-.disabled-note{margin-top:40px;color:#4b5563}.admin-message{font-size:13px;line-height:1.4;color:#4b5563;margin:0 0 12px}
-.teacher-tools-section{max-width:900px;margin:56px auto 0;padding-top:32px;border-top:2px solid #e5e7eb}.teacher-tools-section h2{font-size:26px;color:#1f2937;margin-bottom:6px}
-.teacher-tools-subtitle{color:#6b7280;font-size:14px;margin:0 0 24px}
-.teacher-tool-card{background:#fffbeb;border:1px solid #fde68a;box-shadow:0 4px 10px rgba(0,0,0,.08)}
-.teacher-tool-card .card-title{color:#92400e}
+  *{box-sizing:border-box}
+  body{font-family:Arial,sans-serif;background:#f5f7fa;color:#1f2937;text-align:center;margin:0;padding:32px 18px 60px}
+  h1{font-size:46px;margin:8px 0 8px;color:#26364a}
+  .subtitle{color:#64748b;margin-bottom:24px}
+  .hidden{display:none!important}
+  .student-bar{max-width:900px;margin:0 auto 18px;background:white;border-radius:16px;padding:12px 16px;box-shadow:0 3px 12px rgba(0,0,0,.08);display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left}
+  .student-bar strong{font-size:16px}.student-bar span{color:#64748b;font-size:13px}.student-bar button{border:0;border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer;background:#e2e8f0;color:#1f2937}
+  .login-card,.locked-card{max-width:520px;margin:24px auto;background:white;border-radius:20px;padding:26px;box-shadow:0 8px 24px rgba(0,0,0,.10);text-align:left}
+  .login-card h2,.locked-card h2{margin:0 0 8px;color:#26364a}.login-card p,.locked-card p{color:#64748b;line-height:1.45}
+  .login-card label{display:block;font-weight:700;margin:12px 0 6px}.login-card input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px}.login-card button{width:100%;margin-top:14px;border:0;border-radius:11px;padding:12px;background:#2563eb;color:white;font-weight:800;font-size:16px;cursor:pointer}.login-msg{margin-top:10px;color:#b91c1c;min-height:20px}
+  .lock-icon{font-size:54px;text-align:center}.locked-card{text-align:center}
+  .game-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:18px;max-width:900px;margin:auto}
+  .game-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:white;padding:24px 12px;border-radius:16px;box-shadow:0 4px 10px rgba(0,0,0,.1);text-decoration:none;transition:transform .15s,box-shadow .15s;min-height:125px}
+  .game-card:hover{transform:translateY(-4px);box-shadow:0 8px 18px rgba(0,0,0,.15)}
+  .card-icon{font-size:40px;line-height:1}.card-title{font-size:17px;font-weight:bold;color:#333}.disabled-note{margin-top:35px;color:#64748b}
+  .admin-button{position:fixed;top:12px;right:12px;z-index:9999;border:0;border-radius:999px;padding:10px 16px;background:#1f2937;color:white;font-weight:bold;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.15)}
+  .admin-panel{position:fixed;top:58px;right:12px;width:min(440px,calc(100vw - 24px));background:white;border-radius:18px;box-shadow:0 14px 38px rgba(0,0,0,.22);padding:18px;text-align:left;z-index:9999;max-height:86vh;overflow-y:auto}
+  .admin-panel h2{margin:0 0 4px}.admin-panel h3{font-size:16px;margin:18px 0 8px}.admin-message{font-size:13px;line-height:1.4;color:#64748b;margin:0 0 12px}.admin-action{width:100%;border:0;border-radius:10px;padding:10px 12px;margin-top:8px;background:#1f2937;color:white;font-weight:bold;cursor:pointer}.admin-action.secondary{background:#e5e7eb;color:#111827}
+  .master-row{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;margin:12px 0}.master-row label{font-weight:800}
+  .class-card{border:1px solid #dbe4ee;border-radius:15px;padding:13px;margin:12px 0;background:#f8fafc}.class-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.class-title{font-weight:900;font-size:18px}.status-pill{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:900}.status-open{background:#dcfce7;color:#166534}.status-closed{background:#fee2e2;color:#991b1b}.status-reason{font-size:12px;color:#64748b;margin-top:4px}
+  .mode-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:12px 0}.mode-btn{border:1px solid #cbd5e1;background:white;border-radius:9px;padding:8px 5px;font-size:12px;font-weight:800;cursor:pointer}.mode-btn.active{background:#1f2937;color:white;border-color:#1f2937}
+  details{margin-top:8px}summary{cursor:pointer;font-weight:800;color:#334155}.schedule-grid{margin-top:9px}.schedule-row{display:grid;grid-template-columns:62px 34px 1fr 1fr;align-items:center;gap:6px;margin:6px 0;font-size:12px}.schedule-row input[type="time"]{width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px}.schedule-row label{font-weight:700}.game-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0;font-size:14px;padding-bottom:6px;border-bottom:1px solid #eef2f7}
+  .tz-note{font-size:11px;color:#64748b;margin-top:7px}
+  @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.schedule-row{grid-template-columns:54px 30px 1fr 1fr}.admin-panel{top:54px}}
 </style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Rashi+Hebrew:wght@600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
@@ -37,64 +37,279 @@ h1{font-size:48px;margin-bottom:30px;color:#333}
 <script src="site-settings.js"></script>
 </head>
 <body>
-<h1>B3 Games</h1>
-<div class="game-container">
-  <a class="game-card" data-game-id="kodesh-construct" href="kodesh-construct/index.html" target="_blank" rel="noopener"><span class="card-icon">🔤</span><span class="card-title">Dikduk Arcade</span><span class="card-closed-badge">Closed</span></a>
-  <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html" target="_blank" rel="noopener"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span><span class="card-closed-badge">Closed</span></a>
-  <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html" target="_blank" rel="noopener"><span class="card-icon rashi-script">רש״י</span><span class="card-title">Rashi Letters</span><span class="card-closed-badge">Closed</span></a>
-  <a class="game-card" data-game-id="shorashim" href="shorashim/index.html" target="_blank" rel="noopener"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span><span class="card-closed-badge">Closed</span></a>
-  <a class="game-card" data-game-id="class-gallery" href="class-gallery/index.html" target="_blank" rel="noopener"><span class="card-icon">🖼️</span><span class="card-title">Class Gallery</span><span class="card-closed-badge">Closed</span></a>
-  <a class="game-card" data-game-id="game-show" href="game-show/player.html" target="_blank" rel="noopener"><span class="card-icon">🏆</span><span class="card-title">Game Show</span><span class="card-closed-badge">Closed</span></a>
-  <a class="game-card" data-game-id="student-rewards" href="https://student-rewards.simcha5770.chatgpt.site/student" target="_blank" rel="noopener"><span class="card-icon">🌟</span><span class="card-title">Student Rewards</span><span class="card-closed-badge">Closed</span></a>
-  <a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html" target="_blank" rel="noopener"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz & Practice</span><span class="card-closed-badge">Closed</span></a>
-</div>
-<p id="disabledMessage" class="disabled-note hidden">All games are currently disabled.</p>
+  <h1>B3 Games</h1>
+  <div class="subtitle">Learning games and practice tools</div>
 
-<div id="teacherToolsSection" class="teacher-tools-section hidden">
-  <h2>👩‍🏫 Teacher Tools</h2>
-  <p class="teacher-tools-subtitle">Always available to you, regardless of student toggle state.</p>
-  <div class="teacher-tools-container">
-    <a class="teacher-tool-card" href="kahoot-word-quiz/index.html" target="_blank" rel="noopener"><span class="card-icon">❓</span><span class="card-title">Kahoot Word Quiz Engine</span></a>
-    <a class="teacher-tool-card" href="chumash-quiz/index.html" target="_blank" rel="noopener"><span class="card-icon">📖</span><span class="card-title">Chumash Quiz</span></a>
-    <a class="teacher-tool-card" href="game-show/teacher.html" target="_blank" rel="noopener"><span class="card-icon">🏆</span><span class="card-title">Game Show — Host</span></a>
-    <a class="teacher-tool-card" href="record_pesukim/teacher.html" target="_blank" rel="noopener"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll — Teacher Dashboard</span></a>
-    <a class="teacher-tool-card" href="shorashim/teacher.html" target="_blank" rel="noopener"><span class="card-icon">🌳</span><span class="card-title">Shorashim — Teacher Dashboard</span></a>
-    <a class="teacher-tool-card" href="rashi-letters/teacher.html" target="_blank" rel="noopener"><span class="card-icon rashi-script">רש״י</span><span class="card-title">Rashi Letters — Teacher Dashboard</span></a>
-    <a class="teacher-tool-card" href="kahoot-teacher-teams/index.html" target="_blank" rel="noopener"><span class="card-icon">❓</span><span class="card-title">Kahoot Word Quiz — Teacher Teams</span></a>
-    <a class="teacher-tool-card" href="https://student-rewards.simcha5770.chatgpt.site/" target="_blank" rel="noopener"><span class="card-icon">🏅</span><span class="card-title">Student Rewards — Teacher</span></a>
-    <a class="teacher-tool-card" href="weekly-quiz/teacher.html" target="_blank" rel="noopener"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz — Teacher</span></a>
-    <a class="teacher-tool-card" href="file:///C:/Users/simch/Downloads/School_Materials/HTML_Tools/B3_Class_Dashboard__10_.html" target="_blank" rel="noopener"><span class="card-icon">📊</span><span class="card-title">Class Dashboard</span></a>
-    <a class="teacher-tool-card" href="file:///C:/Users/simch/Downloads/Code_Projects/HTML_Tools/sync%20(1).html" target="_blank" rel="noopener"><span class="card-icon">🔄</span><span class="card-title">Sync to Nigri</span></a>
+  <div id="studentBar" class="student-bar hidden">
+    <div><strong id="studentNameLabel"></strong><br><span id="studentClassLabel"></span></div>
+    <button id="switchStudentBtn" type="button">Switch student</button>
   </div>
-</div>
 
-<button id="adminAccessButton" class="admin-button">Admin</button>
-<div id="adminPanel" class="admin-panel hidden">
-  <h2>Game Controls</h2><p id="adminStatus" class="admin-message">Checking sign-in…</p>
-  <button id="signInButton" class="admin-action">Sign in with Google</button>
-  <button id="signOutButton" class="admin-action secondary hidden">Sign out</button>
-  <div id="adminControls" class="hidden"><div class="admin-row"><label for="siteEnabledToggle">Site enabled</label><input id="siteEnabledToggle" type="checkbox"></div><div id="gameToggles"></div></div>
-</div>
+  <div id="loginCard" class="login-card">
+    <h2>Student Sign In</h2>
+    <p>Use the same name and Class PIN you use for the other B3 tools.</p>
+    <label for="classPinInput">Class PIN</label>
+    <input id="classPinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="Class PIN">
+    <label for="studentNameInput">Your name</label>
+    <input id="studentNameInput" type="text" autocomplete="name" placeholder="First and last name">
+    <button id="studentSignInBtn" type="button">Open B3 Games</button>
+    <div id="loginMsg" class="login-msg" aria-live="polite"></div>
+  </div>
+
+  <div id="lockedCard" class="locked-card hidden">
+    <div class="lock-icon">🔒</div>
+    <h2 id="lockedTitle">B3 Games is locked</h2>
+    <p id="lockedMessage">Your class cannot use B3 Games right now.</p>
+  </div>
+
+  <div id="gamesArea" class="hidden">
+    <div class="game-container">
+      <a class="game-card" data-game-id="tzitzis-game" href="tzitzis_game.html"><span class="card-icon">🧵</span><span class="card-title">Tzitzis Game</span></a>
+      <a class="game-card" data-game-id="tzitzis-quest-arcade" href="tzitzis_quest_arcade_v2.html"><span class="card-icon">🕹️</span><span class="card-title">Tzitzis Quest Arcade</span></a>
+      <a class="game-card" data-game-id="kahoot-word-quiz" href="kahoot_word_quiz_engine_paste_only_any_perek.html"><span class="card-icon">❓</span><span class="card-title">Kahoot Word Quiz Engine</span></a>
+      <a class="game-card" data-game-id="kodesh-construct" href="kodesh-construct.html"><span class="card-icon">🔤</span><span class="card-title">Dikduk Arcade</span></a>
+      <a class="game-card" data-game-id="chumash-quiz" href="chumash-quiz.html"><span class="card-icon">📖</span><span class="card-title">Chumash Quiz</span></a>
+      <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
+      <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html"><span class="card-icon">✡️</span><span class="card-title">Rashi Letters</span></a>
+      <a class="game-card" data-game-id="shorashim" href="shorashim/teacher.html"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span></a>
+      <a class="game-card" data-game-id="class-gallery" href="class-gallery.html"><span class="card-icon">🖼️</span><span class="card-title">Class Gallery</span></a>
+      <a class="game-card" data-game-id="game-show" href="player.html"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a>
+    </div>
+    <p id="disabledMessage" class="disabled-note hidden">No activities are available right now.</p>
+  </div>
+
+  <button id="adminAccessButton" class="admin-button">Admin</button>
+  <div id="adminPanel" class="admin-panel hidden">
+    <h2>B3 Access Controls</h2>
+    <p id="adminStatus" class="admin-message">Checking sign-in…</p>
+    <button id="signInButton" class="admin-action">Sign in with Google</button>
+    <button id="signOutButton" class="admin-action secondary hidden">Sign out</button>
+
+    <div id="adminControls" class="hidden">
+      <div class="master-row"><label for="siteEnabledToggle">Emergency master access</label><input id="siteEnabledToggle" type="checkbox"></div>
+      <p class="admin-message">Turn this off only when you want both ET and WT students locked immediately. Your authorized teacher account will still have access.</p>
+
+      <div id="classControls"></div>
+
+      <h3>Individual activity switches</h3>
+      <div id="gameToggles"></div>
+      <div class="tz-note">Automatic schedules use America/New_York time.</div>
+    </div>
+  </div>
+
 <script>
-const settingsApi=window.B3SiteSettings;
-const adminAccessButton=document.getElementById("adminAccessButton"),adminPanel=document.getElementById("adminPanel"),adminControls=document.getElementById("adminControls"),signInButton=document.getElementById("signInButton"),signOutButton=document.getElementById("signOutButton"),siteEnabledToggle=document.getElementById("siteEnabledToggle"),gameToggles=document.getElementById("gameToggles"),disabledMessage=document.getElementById("disabledMessage"),adminStatus=document.getElementById("adminStatus"),teacherToolsSection=document.getElementById("teacherToolsSection");
-const gameCards=Array.from(document.querySelectorAll(".game-card"));
-const gameDefinitions=gameCards.map(card=>({id:card.dataset.gameId,name:(card.querySelector(".card-title")?.textContent||card.textContent).trim(),element:card}));
-let currentSettings=settingsApi.defaultSettings,currentUser=null,isAuthorizedAdmin=false;
-function renderGames(){gameDefinitions.forEach(game=>{const shouldShow=currentSettings.siteEnabled&&currentSettings.games[game.id]!==false;game.element.classList.toggle("disabled",!shouldShow);});disabledMessage.classList.toggle("hidden",currentSettings.siteEnabled);}
-function renderAdminPanel(){
-  const signedIn=Boolean(currentUser);signInButton.classList.toggle("hidden",signedIn);signOutButton.classList.toggle("hidden",!signedIn);adminControls.classList.toggle("hidden",!isAuthorizedAdmin);teacherToolsSection.classList.toggle("hidden",!isAuthorizedAdmin);
-  if(!signedIn){adminStatus.textContent="Sign in with the authorized Google account to change game settings.";return;}
-  if(!isAuthorizedAdmin){adminStatus.textContent=`Signed in as ${currentUser.email||"an unauthorized account"}. This account cannot edit settings.`;return;}
-  adminStatus.textContent=`Signed in as ${currentUser.email}. Changes affect everyone.`;siteEnabledToggle.checked=currentSettings.siteEnabled;gameToggles.innerHTML="";
-  gameDefinitions.forEach(game=>{const row=document.createElement("div");row.className="admin-row";const label=document.createElement("label");label.setAttribute("for",`toggle-${game.id}`);label.textContent=game.name;const input=document.createElement("input");input.type="checkbox";input.id=`toggle-${game.id}`;input.checked=currentSettings.games[game.id]!==false;input.addEventListener("change",async()=>{const oldValue=!input.checked;try{currentSettings.games[game.id]=input.checked;renderGames();await settingsApi.updateGameEnabled(game.id,input.checked);}catch(error){currentSettings.games[game.id]=oldValue;input.checked=oldValue;renderGames();alert("Could not save this game setting. Make sure you are signed in with the authorized account.");console.error(error);}});row.appendChild(label);row.appendChild(input);gameToggles.appendChild(row);});
-}
-adminAccessButton.addEventListener("click",()=>{adminPanel.classList.toggle("hidden");if(!adminPanel.classList.contains("hidden"))renderAdminPanel();});
-signInButton.addEventListener("click",async()=>{try{await settingsApi.signInWithGoogle();}catch(error){alert("Google sign-in did not complete.");console.error(error);}});
-signOutButton.addEventListener("click",async()=>{try{await settingsApi.signOut();}catch(error){alert("Could not sign out.");console.error(error);}});
-siteEnabledToggle.addEventListener("change",async()=>{const oldValue=!siteEnabledToggle.checked;try{currentSettings.siteEnabled=siteEnabledToggle.checked;renderGames();await settingsApi.updateSiteEnabled(siteEnabledToggle.checked);}catch(error){currentSettings.siteEnabled=oldValue;siteEnabledToggle.checked=oldValue;renderGames();alert("Could not save the site setting. Make sure you are signed in with the authorized account.");console.error(error);}});
-settingsApi.onAuthStateChanged((user,authorized)=>{currentUser=user;isAuthorizedAdmin=authorized;renderAdminPanel();});
-settingsApi.subscribe(settings=>{currentSettings=settings;renderGames();renderAdminPanel();});
+(function(){
+  "use strict";
+  const settingsApi=window.B3SiteSettings;
+  const db=window.firebase.database();
+  const dayLabels={sun:"Sun",mon:"Mon",tue:"Tue",wed:"Wed",thu:"Thu",fri:"Fri",sat:"Sat"};
+  const classLabels={et:"ET",wt:"WT"};
+
+  const el=id=>document.getElementById(id);
+  const gameCards=Array.from(document.querySelectorAll(".game-card"));
+  const gameDefinitions=gameCards.map(card=>({id:card.dataset.gameId,name:(card.querySelector(".card-title")?.textContent||card.textContent).trim(),element:card}));
+
+  let currentSettings=settingsApi.defaultSettings;
+  let currentUser=null;
+  let isAuthorizedAdmin=false;
+  let myStudentId="";
+  let myStudentName="";
+  let myClassId="";
+
+  function slugify(name){return String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");}
+  function setLoginMsg(t){el("loginMsg").textContent=t||"";}
+
+  function showLogin(){
+    el("loginCard").classList.remove("hidden");
+    el("studentBar").classList.add("hidden");
+    el("lockedCard").classList.add("hidden");
+    el("gamesArea").classList.add("hidden");
+  }
+
+  function renderStudentAccess(){
+    // The authorized teacher account is never treated as ET or WT. It can
+    // always open the homepage and protected activities so Rabbi Cohen can
+    // test or manage them while students are locked.
+    if(isAuthorizedAdmin){
+      el("loginCard").classList.add("hidden");
+      el("studentBar").classList.remove("hidden");
+      el("studentNameLabel").textContent="Rabbi Cohen";
+      el("studentClassLabel").textContent="Teacher access · ET/WT locks do not apply";
+      el("switchStudentBtn").classList.add("hidden");
+      el("lockedCard").classList.add("hidden");
+      el("gamesArea").classList.remove("hidden");
+      gameDefinitions.forEach(game=>game.element.classList.remove("hidden"));
+      el("disabledMessage").classList.add("hidden");
+      return;
+    }
+
+    if(!myStudentId||!myClassId){showLogin();return;}
+    el("loginCard").classList.add("hidden");
+    el("studentBar").classList.remove("hidden");
+    el("switchStudentBtn").classList.remove("hidden");
+    el("studentNameLabel").textContent=myStudentName||"Student";
+    el("studentClassLabel").textContent=classLabels[myClassId]+" · access follows your class schedule";
+
+    const info=settingsApi.describeClassAccess(currentSettings,myClassId,new Date());
+    if(!info.open){
+      el("gamesArea").classList.add("hidden");
+      el("lockedCard").classList.remove("hidden");
+      el("lockedTitle").textContent=classLabels[myClassId]+" is locked right now";
+      el("lockedMessage").textContent=currentSettings.siteEnabled===false?"B3 Games is closed for everyone right now.":"Your class cannot use B3 Games right now. Rabbi Cohen can override the schedule at any time.";
+      return;
+    }
+
+    el("lockedCard").classList.add("hidden");
+    el("gamesArea").classList.remove("hidden");
+    let visible=0;
+    gameDefinitions.forEach(game=>{
+      const show=currentSettings.games[game.id]!==false;
+      game.element.classList.toggle("hidden",!show);
+      if(show) visible++;
+    });
+    el("disabledMessage").classList.toggle("hidden",visible!==0);
+  }
+
+  async function checkStudentAccess(name,pin){
+    const slug=slugify(name);
+    if(!slug)return{ok:false,reason:"Please type your name."};
+    const [pinSnap,allowedSnap]=await Promise.all([
+      db.ref("posukPractice/settings/classPin").once("value"),
+      db.ref("posukPractice/allowedStudents/"+slug).once("value")
+    ]);
+    const realPin=pinSnap.val();
+    if(realPin&&String(pin).trim()!==String(realPin).trim())return{ok:false,reason:"Incorrect PIN. Ask Rabbi Cohen."};
+    if(!allowedSnap.exists())return{ok:false,reason:"Your name is not on the B3 student list."};
+    const d=allowedSnap.val()||{};
+    const classId=d&&typeof d==="object"?d.classId:"";
+    if(!["et","wt"].includes(classId))return{ok:false,reason:"Your ET/WT class is not assigned yet. Ask Rabbi Cohen."};
+    return{ok:true,id:slug,name:(d&&d.name)?String(d.name):name.trim(),classId};
+  }
+
+  function enterStudent(r){
+    myStudentId=r.id;myStudentName=r.name;myClassId=r.classId;
+    localStorage.setItem("b3Games_studentId",myStudentId);
+    localStorage.setItem("b3Games_studentName",myStudentName);
+    localStorage.setItem("b3Games_studentClass",myClassId);
+    localStorage.setItem("posukPractice_studentId",myStudentId);
+    localStorage.setItem("posukPractice_studentName",myStudentName);
+    localStorage.setItem("weeklyQuiz_classId",myClassId);
+    renderStudentAccess();
+  }
+
+  async function studentSignIn(){
+    const btn=el("studentSignInBtn");
+    btn.disabled=true;setLoginMsg("Checking…");
+    try{
+      const r=await checkStudentAccess(el("studentNameInput").value,el("classPinInput").value);
+      if(!r.ok){setLoginMsg(r.reason);return;}
+      setLoginMsg("");enterStudent(r);
+    }catch(e){console.error(e);setLoginMsg("Could not check your login. Try again.");}
+    finally{btn.disabled=false;}
+  }
+
+  async function restoreStudent(){
+    const id=localStorage.getItem("b3Games_studentId")||localStorage.getItem("posukPractice_studentId");
+    if(!id){showLogin();return;}
+    try{
+      const snap=await db.ref("posukPractice/allowedStudents/"+id).once("value");
+      if(!snap.exists()){showLogin();return;}
+      const d=snap.val()||{};
+      if(!["et","wt"].includes(d.classId)){showLogin();return;}
+      enterStudent({id:id,name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),classId:d.classId});
+    }catch(e){console.warn(e);showLogin();}
+  }
+
+  function switchStudent(){
+    ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","posukPractice_studentId","posukPractice_studentName","weeklyQuiz_classId"].forEach(k=>localStorage.removeItem(k));
+    myStudentId=myStudentName=myClassId="";
+    el("studentNameInput").value="";el("classPinInput").value="";setLoginMsg("");showLogin();
+  }
+
+  function classCardHtml(classId){
+    const access=currentSettings.classAccess[classId];
+    const info=settingsApi.describeClassAccess(currentSettings,classId,new Date());
+    const rows=settingsApi.dayKeys.map(day=>{
+      const r=access.schedule[day];
+      return `<div class="schedule-row"><label>${dayLabels[day]}</label><input type="checkbox" data-schedule-enabled="${classId}:${day}" ${r.enabled?"checked":""}><input type="time" data-schedule-start="${classId}:${day}" value="${r.start}"><input type="time" data-schedule-end="${classId}:${day}" value="${r.end}"></div>`;
+    }).join("");
+    return `<div class="class-card" data-class-card="${classId}">
+      <div class="class-top"><div><div class="class-title">${classLabels[classId]}</div><div class="status-reason">${info.reason}</div></div><span class="status-pill ${info.open?"status-open":"status-closed"}">${info.open?"OPEN":"LOCKED"}</span></div>
+      <div class="mode-buttons">
+        <button class="mode-btn ${access.mode==="auto"?"active":""}" data-class-mode="${classId}:auto">Automatic</button>
+        <button class="mode-btn ${access.mode==="open"?"active":""}" data-class-mode="${classId}:open">Unlock Now</button>
+        <button class="mode-btn ${access.mode==="locked"?"active":""}" data-class-mode="${classId}:locked">Lock Now</button>
+      </div>
+      <details><summary>Edit automatic schedule</summary><div class="schedule-grid">${rows}</div></details>
+    </div>`;
+  }
+
+  function renderAdminPanel(){
+    const signedIn=Boolean(currentUser);
+    el("signInButton").classList.toggle("hidden",signedIn);
+    el("signOutButton").classList.toggle("hidden",!signedIn);
+    el("adminControls").classList.toggle("hidden",!isAuthorizedAdmin);
+    if(!signedIn){el("adminStatus").textContent="Sign in with the authorized Google account to change access.";return;}
+    if(!isAuthorizedAdmin){el("adminStatus").textContent=`Signed in as ${currentUser.email||"an unauthorized account"}. This account cannot edit settings.`;return;}
+    el("adminStatus").textContent=`Signed in as ${currentUser.email}. Your teacher access bypasses all student locks; ET and WT can be controlled separately.`;
+    el("siteEnabledToggle").checked=currentSettings.siteEnabled;
+    const openScheduleEditors=Array.from(el("classControls").querySelectorAll(".class-card details[open]")).map(details=>details.closest(".class-card")?.dataset.classCard).filter(Boolean);
+    el("classControls").innerHTML=classCardHtml("et")+classCardHtml("wt");
+    openScheduleEditors.forEach(classId=>{const details=el("classControls").querySelector(`[data-class-card="${classId}"] details`);if(details)details.open=true;});
+    bindClassControls();
+
+    el("gameToggles").innerHTML="";
+    gameDefinitions.forEach(game=>{
+      const row=document.createElement("div");row.className="game-toggle-row";
+      const label=document.createElement("label");label.textContent=game.name;
+      const input=document.createElement("input");input.type="checkbox";input.checked=currentSettings.games[game.id]!==false;
+      input.addEventListener("change",async()=>{
+        const old=!input.checked;
+        try{currentSettings.games[game.id]=input.checked;renderStudentAccess();await settingsApi.updateGameEnabled(game.id,input.checked);}catch(e){input.checked=old;currentSettings.games[game.id]=old;alert("Could not save this activity setting.");console.error(e);}
+      });
+      row.append(label,input);el("gameToggles").appendChild(row);
+    });
+  }
+
+  function bindClassControls(){
+    document.querySelectorAll("[data-class-mode]").forEach(btn=>btn.addEventListener("click",async()=>{
+      const [classId,mode]=btn.dataset.classMode.split(":");
+      try{await settingsApi.updateClassMode(classId,mode);}catch(e){alert("Could not save the class access setting.");console.error(e);}
+    }));
+
+    function saveScheduleFromDom(classId){
+      const schedule=JSON.parse(JSON.stringify(currentSettings.classAccess[classId].schedule));
+      settingsApi.dayKeys.forEach(day=>{
+        const enabled=document.querySelector(`[data-schedule-enabled="${classId}:${day}"]`);
+        const start=document.querySelector(`[data-schedule-start="${classId}:${day}"]`);
+        const end=document.querySelector(`[data-schedule-end="${classId}:${day}"]`);
+        if(enabled&&start&&end)schedule[day]={enabled:enabled.checked,start:start.value||"00:00",end:end.value||"23:59"};
+      });
+      return settingsApi.updateClassSchedule(classId,schedule);
+    }
+
+    ["et","wt"].forEach(classId=>{
+      document.querySelectorAll(`[data-schedule-enabled^="${classId}:"] , [data-schedule-start^="${classId}:"] , [data-schedule-end^="${classId}:"]`).forEach(input=>input.addEventListener("change",()=>saveScheduleFromDom(classId).catch(e=>{alert("Could not save the schedule.");console.error(e);}))); 
+    });
+  }
+
+  el("studentSignInBtn").addEventListener("click",studentSignIn);
+  el("studentNameInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
+  el("classPinInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
+  el("switchStudentBtn").addEventListener("click",switchStudent);
+  el("adminAccessButton").addEventListener("click",()=>{el("adminPanel").classList.toggle("hidden");if(!el("adminPanel").classList.contains("hidden"))renderAdminPanel();});
+  el("signInButton").addEventListener("click",()=>settingsApi.signInWithGoogle().catch(e=>{alert("Google sign-in did not complete.");console.error(e);}));
+  el("signOutButton").addEventListener("click",()=>settingsApi.signOut().catch(e=>{alert("Could not sign out.");console.error(e);}));
+  el("siteEnabledToggle").addEventListener("change",async()=>{
+    const old=!el("siteEnabledToggle").checked;
+    try{currentSettings.siteEnabled=el("siteEnabledToggle").checked;renderStudentAccess();await settingsApi.updateSiteEnabled(el("siteEnabledToggle").checked);}catch(e){currentSettings.siteEnabled=old;el("siteEnabledToggle").checked=old;alert("Could not save the master setting.");console.error(e);}
+  });
+
+  settingsApi.onAuthStateChanged((user,authorized)=>{currentUser=user;isAuthorizedAdmin=authorized;renderStudentAccess();renderAdminPanel();});
+  settingsApi.subscribe(settings=>{currentSettings=settings;renderStudentAccess();renderAdminPanel();});
+  setInterval(()=>{renderStudentAccess();},15000);
+  restoreStudent();
+})();
 </script>
 </body>
 </html>
