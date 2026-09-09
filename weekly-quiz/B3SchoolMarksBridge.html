@@ -38,35 +38,17 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border-bottom:1p
   <div class="card">
     <h2>Teacher Access</h2>
     <div class="small">Use the same teacher password as B3 Weekly Quiz.</div>
-    <form id="teacherLoginForm" onsubmit="event.preventDefault(); unlock();">
-      <input
-        id="teacherUsername"
-        name="username"
-        type="text"
-        value="B3 Teacher"
-        autocomplete="username"
-        readonly
-        style="position:absolute;left:-10000px;width:1px;height:1px;opacity:0"
-        aria-hidden="true"
-      >
-      <input
-        id="pw"
-        name="password"
-        type="password"
-        autocomplete="current-password"
-        style="width:100%;margin:10px 0"
-      >
-      <button class="primary" type="submit">Open</button>
-    </form>
+    <input id="pw" type="password" style="width:100%;margin:10px 0" onkeydown="if(event.key==='Enter')unlock()">
+    <button class="primary" onclick="unlock()">Open</button>
     <div id="lockmsg" class="bad" style="margin-top:8px"></div>
   </div>
 </div>
 
 <div id="app" class="wrap hidden">
   <div class="card install">
-    <b>One-time setup</b>
-    <div style="margin-top:7px">Install the <b>B3 Nigri School Marks Auto-Fill</b> Edge/Chrome extension once. After that, the normal weekly job is one button from this page.</div>
-    <div class="small" style="margin-top:6px">The extension never contains your Nigri password and never presses the final Save.</div>
+    <b>Nothing to install</b>
+    <div style="margin-top:7px">This page saves the marks straight to Nigri by itself — no browser extension needed.</div>
+    <div class="small" style="margin-top:6px">Double-check the topic, date, and each student's row below before you click the button — once it says "Saved", the marks are already saved on the real Nigri gradebook.</div>
   </div>
 
   <div class="grid">
@@ -105,7 +87,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border-bottom:1p
           <label class="field">Name<input id="name" type="text"></label>
           <label class="field">Comment on each child (optional)<input id="comment" type="text" placeholder="Leave blank for no comment"></label>
         </div>
-        <label class="field" style="margin-top:10px">Description <span class="small">(type exactly what you want saved in Nigri; may be left blank)</span><textarea id="description" rows="3"></textarea></label>
+        <label class="field" style="margin-top:10px">Description<textarea id="description" rows="3"></textarea></label>
 
         <div class="notice">
           A completed quiz defaults to <b>Present</b>. If a boy has no completed result, this page leaves him as <b>Review</b> so nothing is guessed. Choose Absent or Present here before preparing Nigri.
@@ -117,10 +99,10 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border-bottom:1p
         </table></div>
 
         <div class="controls" style="margin-top:16px">
-          <button class="good" style="font-size:17px;padding:13px 20px" onclick="prepareNigri()">Prepare Nigri School Mark</button>
+          <button id="syncBtn" class="good" style="font-size:17px;padding:13px 20px" onclick="prepareNigri()">Sync to Nigri</button>
         </div>
         <div id="status" class="small" style="margin-top:10px"></div>
-        <div class="small" style="margin-top:10px"><b>What happens:</b> the extension opens Nigri in a background tab, opens Create New Mark, fills the header, creates the mark, fills every student row, sets “Marking done” when available, scrolls to Save, then brings Nigri to the front. You review and press Save.</div>
+        <div class="small" style="margin-top:10px"><b>What happens:</b> this creates a new mark on Nigri (grade/topic/type/name/date), fills in every student's score and attendance, sets "Marking done", and clicks the real Save — all in one step. It usually takes 20-40 seconds.</div>
       </div>
     </div>
   </div>
@@ -169,19 +151,17 @@ function fmtDate(ts){if(!ts)return'';return new Date(Number(ts)).toLocaleDateStr
 function isoDate(ts){const d=new Date(Number(ts));return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function gradeLabel(c){return c==='wt'?'B3 WT':'B3 ET';}
 function skillTopic(s){if(s==='shorashim')return'Shoroshim';if(s==='translation')return'Chumash Translation';return'Chumash Comprehension';}
-function defaultDescription(s){ return ''; }
+function defaultDescription(s){
+  if(s==='shorashim')return'This is a weekly schoolwide shoreshim test.';
+  if(s==='translation')return'This is a weekly Chumash words and phrases quiz.';
+  if(s==='mixed')return'This is a weekly Chumash comprehension and skills quiz.';
+  return'This is a weekly Chumash comprehension quiz.';
+}
 function displayName(id){return (roster[id]&&roster[id].name)||id.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());}
 
 async function unlock(){
-  const entered=document.getElementById('pw').value;
-  if(entered!==TEACHER_PASSWORD){
-    document.getElementById('lockmsg').textContent='Incorrect password.';
-    return;
-  }
-  sessionStorage.setItem('b3SchoolMarksUnlocked','yes');
-  document.getElementById('lock').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
-  await loadData();
+  if(document.getElementById('pw').value!==TEACHER_PASSWORD){document.getElementById('lockmsg').textContent='Incorrect password.';return;}
+  document.getElementById('lock').classList.add('hidden');document.getElementById('app').classList.remove('hidden');await loadData();
 }
 async function loadData(){
   const [a,b,c,d]=await Promise.all([
@@ -285,7 +265,14 @@ function renderSelected(){
       '</select></td>';body.appendChild(tr);
   });
 }
-function toUsDate(iso){if(!iso)return'';const [y,m,d]=iso.split('-');return m+'/'+d+'/'+y;}
+// --- Direct connection to the Render sync service (same one the ---
+// --- attendance "Sync to Nigri" button already uses successfully). ---
+const SYNC_URL='https://nigrisync.onrender.com/sync-marks';
+const SYNC_KEY='1qaz2wsx';
+// Nigri's real "Type" radio buttons use these lowercase ids -- the
+// dropdown below shows the friendlier labels a teacher expects to see.
+const NIGRI_TYPE_MAP={'Quiz':'quiz','Test/Project':'test','Classwork':'classwork','Homework':'homework'};
+
 function buildPacket(){
   if(!selectedId)return null;
   const students=[...document.querySelectorAll('#students tr')].map(tr=>{
@@ -298,33 +285,57 @@ function buildPacket(){
     grade:document.getElementById('grade').value,
     topic:document.getElementById('topic').value,
     type:document.getElementById('type').value,
-    date:toUsDate(document.getElementById('date').value),
+    // Nigri's real date field is a plain YYYY-MM-DD date input, so this
+    // stays in that ISO form -- confirmed against the live site's HTML
+    // (2026-09-08). Converting to M/D/YYYY here would silently fail to
+    // fill it in.
+    date:document.getElementById('date').value,
     name:document.getElementById('name').value.trim(),
     description:document.getElementById('description').value.trim(),
     comment:document.getElementById('comment').value.trim(),
     students
   };
 }
-function prepareNigri(){
+async function prepareNigri(){
   const packet=buildPacket();if(!packet)return;
   const unresolved=packet.students.filter(s=>s.attendance==='review'&&s.mark===null);
   if(unresolved.length){
     const names=unresolved.map(s=>s.nigriName).join(', ');
     if(!confirm('These students still say Review / leave unchanged: '+names+'. Continue without guessing their attendance?'))return;
   }
-  let holder=document.getElementById('b3NigriPacket');
-  if(!holder){holder=document.createElement('textarea');holder.id='b3NigriPacket';holder.style.display='none';document.body.appendChild(holder);}
-  holder.value=JSON.stringify(packet);
-  const status=document.getElementById('status');status.className='';status.textContent='Starting Nigri in the background…';
-  document.dispatchEvent(new CustomEvent('b3NigriPrepare'));
+  if(!packet.name){alert('Give this mark a Name before syncing.');return;}
+
+  const body={
+    class_section:packet.grade,
+    topic:packet.topic,
+    test_name:packet.name,
+    type:NIGRI_TYPE_MAP[packet.type]||'quiz',
+    date:packet.date,
+    description:packet.description,
+    students:packet.students.map(s=>({name:s.nigriName,mark:s.mark,attendance:s.attendance,comment:packet.comment||undefined}))
+  };
+
+  const btn=document.getElementById('syncBtn'),status=document.getElementById('status');
+  btn.disabled=true;status.className='';status.textContent='Syncing to Nigri… this can take under a minute, please wait.';
+
+  try{
+    const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json','X-Sync-Key':SYNC_KEY},body:JSON.stringify(body)});
+    const data=await res.json().catch(()=>({}));
+    if(res.ok&&data.status==='success'){
+      const failed=(data.results||[]).filter(r=>r.includes('FAILED'));
+      status.className='ready';
+      status.textContent='Saved to Nigri! (mark #'+data.test_id+')'+(failed.length?' -- but check these: '+failed.join('; '):'');
+    }else{
+      status.className='error';
+      status.textContent='Nigri did not save this: '+(data.detail||'Unknown error ('+res.status+').');
+    }
+  }catch(e){
+    status.className='error';
+    status.textContent='Could not reach the sync service: '+e.message;
+  }finally{
+    btn.disabled=false;
+  }
 }
-window.addEventListener('message',e=>{
-  if(!e.data||e.data.source!=='B3_NIGRI_EXTENSION')return;
-  const s=document.getElementById('status');
-  if(e.data.type==='status'){s.className='';s.textContent=e.data.message||'';}
-  if(e.data.type==='ready'){s.className='ready';s.textContent=e.data.message||'Nigri is ready for your final Save.';}
-  if(e.data.type==='error'){s.className='error';s.textContent=e.data.message||'Nigri preparation stopped.';}
-});
 </script>
 </body>
 </html>
