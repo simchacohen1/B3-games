@@ -590,8 +590,8 @@
       z-index: 40;
     }
     .nav-arrow:hover, .nav-arrow:focus, .nav-arrow:active{ opacity: 1; }
-    #prevPosukBtn{ left: 8px; }
-    #nextPosukBtn{ right: 8px; }
+    #prevPosukBtn{ left: 8px; right:auto; }
+    #nextPosukBtn{ right: 8px; left:auto; }
   }
   .nav-arrow:disabled{
     opacity: 0.4;
@@ -606,6 +606,11 @@
      still giving a pressed feel via the box-shadow only. */
   .nav-arrow:active{
     transform: translateY(-50%);
+  }
+  @media (max-width: 959px){
+    /* Mobile arrows are top-pinned rather than vertically centered, so the
+       desktop active transform must not pull them half a button upward. */
+    .nav-arrow:active{ transform:none; }
   }
 
   .history{
@@ -2280,6 +2285,9 @@ function applyDeepLinkFromURL(){
   const perekParam = parseInt(params.get('perek'));
   const posukParam = parseInt(params.get('posuk'));
   const endPosukParam = parseInt(params.get('endPosuk'));
+  const requestedTab = ['reading','translate','comprehension'].includes(params.get('tab'))
+    ? params.get('tab')
+    : null;
   if(!perekParam || !ALL_PERAKIM.includes(perekParam)) return;
   if(!perekAllowedByClassLimit(perekParam) ||
      (posukParam && !isWithinClassPracticeLimit(perekParam, posukParam)) ||
@@ -2301,6 +2309,10 @@ function applyDeepLinkFromURL(){
         await posukSelect.onchange();
       }
     }
+    // progress.html already includes the skill tab in its link. Honor it
+    // only after the perek/posuk has finished loading so resetRecordingUI()
+    // cannot put the student back on the default Reading tab afterward.
+    if(requestedTab) setActiveTab(requestedTab);
   });
 }
 
@@ -2811,7 +2823,11 @@ async function fetchChapter(perekNum){
 async function fetchClassroomReferenceChapter(perekNum){
   if(classroomReferenceCache[perekNum]) return classroomReferenceCache[perekNum];
   try{
-    const snap = await db.ref('posukPractice/classroomTranslations/' + perekNum).once('value');
+    const snap = await promiseWithTimeout(
+      db.ref('posukPractice/classroomTranslations/' + perekNum).once('value'),
+      10000,
+      'Classroom translation reference'
+    );
     const raw = snap.val() || {};
     const arr = [];
     Object.entries(raw).forEach(([posuk, value]) => {
@@ -4279,10 +4295,18 @@ function defaultTranslationLevelIndex(levels){
   return levels.length >= 2 ? levels.length - 2 : 0;
 }
 
+function promiseWithTimeout(promise, ms, label){
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error((label || 'Request') + ' timed out')), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
   const chunkRef = db.ref('posukPractice/translationChunks/' + part.key);
   try{
-    const snap = await chunkRef.once('value');
+    const snap = await promiseWithTimeout(chunkRef.once('value'), 10000, 'Translation cache');
     if(myToken !== translationLoadToken) return null;
     if(snap.exists() && snap.val() && Array.isArray(snap.val().levels) && snap.val().levels.length){
       return snap.val().levels;
@@ -4372,10 +4396,21 @@ async function loadOrGenerateTranslationChunks(){
     key: currentPosukKey
   }];
 
-  const loaded = await Promise.all(parts.map(async part => ({
-    part,
-    levels: await fetchOrGenerateTranslationLevelsForPart(part, myToken)
-  })));
+  const loaded = await Promise.all(parts.map(async part => {
+    try{
+      return {
+        part,
+        levels: await promiseWithTimeout(
+          fetchOrGenerateTranslationLevelsForPart(part, myToken),
+          50000,
+          'Preparing translation pieces'
+        )
+      };
+    }catch(err){
+      console.error('Translation pieces timed out for', part.key, err);
+      return { part, levels: null };
+    }
+  }));
   if(myToken !== translationLoadToken) return;
 
   translationLevels = currentIsRange
@@ -4412,6 +4447,8 @@ function renderCurrentChunk(){
   const nextBtn = document.getElementById('chunkNextBtn');
 
   if(!translationLevels){
+    const retryBtn = document.getElementById('translationRetryBtn');
+    if(retryBtn) retryBtn.classList.add('hidden');
     stripEl.textContent = 'Loading…';
     progressEl.textContent = 'Getting the translation pieces ready…';
     levelLabelEl.textContent = '';
