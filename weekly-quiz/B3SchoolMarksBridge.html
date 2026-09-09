@@ -437,7 +437,9 @@ async function prepareNigri(){
         studentName:s.nigriName,
         scoreText:'Score: '+s.mark+'%'
       },qs,sr);
-      return{...s,report_base64:pdfBase64,report_filename:(s.nigriName||'student').replace(/[^A-Za-z0-9 _-]/g,'')+' - '+(packet.name||'Report')+'.pdf'};
+      const safeName=(s.nigriName||'student').replace(/[^A-Za-z0-9 _-]/g,'');
+      const safeQuiz=(packet.name||'Report').replace(/[^A-Za-z0-9 _-]/g,'');
+      return{...s,report_base64:pdfBase64,report_filename:safeName+' - '+safeQuiz+'.pdf'};
     }catch(e){
       console.error('Report build failed for',s.nigriName,e);
       return{...s,report_base64:undefined,report_filename:undefined};
