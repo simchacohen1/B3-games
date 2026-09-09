@@ -91,7 +91,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border-bottom:1p
         <label class="field" style="margin-top:10px">Description<textarea id="description" rows="3"></textarea></label>
 
         <div class="notice">
-          A completed quiz defaults to <b>Present</b>. If a boy has no completed result, this page leaves him as <b>Review</b> so nothing is guessed. Choose Absent or Present here before preparing Nigri.
+          A completed quiz defaults to <b>Present</b>. If a boy has no completed result, his mark syncs as <b>0%</b> and his Nigri comment gets a direct link so he can take the quiz. Attendance still defaults to <b>Review / leave unchanged</b> for him so nothing is guessed — choose Absent or Present here before preparing Nigri if you know which it should be.
         </div>
 
         <div style="overflow:auto"><table>
@@ -258,11 +258,12 @@ function renderSelected(){
   document.getElementById('comment').value='';
   const body=document.getElementById('students');body.innerHTML='';
   (CLASS_ROSTERS[l.classId]||[]).forEach(sid=>{
-    const f=finalForStudent(selectedId,sid),tr=document.createElement('tr');
-    tr.dataset.sid=sid;tr.dataset.mark=f.mark===null?'':String(f.mark);
+    const f=finalForStudent(selectedId,sid),tr=document.createElement('tr'),missing=f.mark===null;
+    tr.dataset.sid=sid;tr.dataset.mark=missing?'0':String(f.mark);
+    tr.dataset.missing=missing?'1':'';
     tr.dataset.lid=f.lid||'';tr.dataset.attempt=f.source||'';
     tr.innerHTML='<td><b>'+esc(NIGRI_NAMES[sid]||displayName(sid))+'</b><div class="small">'+esc(displayName(sid))+'</div></td>'+
-      '<td class="mark '+(f.done?'ok':'review')+'">'+(f.mark===null?'— Review':f.mark+'%')+'</td>'+
+      '<td class="mark '+(f.done?'ok':'review')+'" title="'+(missing?'No completed attempt on record. This will sync as 0% and the comment will include a link for the student to take the quiz.':'')+'">'+(missing?'0% — missing':f.mark+'%')+'</td>'+
       '<td>'+esc(f.source)+'</td>'+
       '<td><select class="status-select">'+
       (f.done?'<option value="present" selected>Present</option><option value="absent">Absent</option><option value="review">Leave unchanged</option>':
@@ -382,6 +383,12 @@ function buildStudentReportPDF(meta,questions,studentResponses){
 // --- attendance "Sync to Nigri" button already uses successfully). ---
 const SYNC_URL='https://nigrisync.onrender.com/sync-marks';
 const SYNC_KEY='1qaz2wsx';
+// Direct student-quiz link for a missing student's Nigri comment. Opening this
+// sends the student straight to this exact quiz (bypassing whatever launch
+// would otherwise be chosen for them), the same way copyLaunchLink() does on
+// teacher.html.
+const QUIZ_BASE_URL='https://simchacohen1.github.io/B3-games/quiz/';
+function quizLinkFor(launchId){return QUIZ_BASE_URL+'?launch='+encodeURIComponent(launchId);}
 // Nigri's real "Type" radio buttons use these lowercase ids -- the
 // dropdown below shows the friendlier labels a teacher expects to see.
 const NIGRI_TYPE_MAP={'Quiz':'quiz','Test/Project':'test','Classwork':'classwork','Homework':'homework'};
@@ -389,8 +396,11 @@ const NIGRI_TYPE_MAP={'Quiz':'quiz','Test/Project':'test','Classwork':'classwork
 function buildPacket(){
   if(!selectedId)return null;
   const students=[...document.querySelectorAll('#students tr')].map(tr=>{
-    const sid=tr.dataset.sid,val=tr.dataset.mark;
-    return{id:sid,nigriName:NIGRI_NAMES[sid]||displayName(sid),displayName:displayName(sid),mark:val===''?null:Number(val),attendance:tr.querySelector('select').value,lid:tr.dataset.lid||null,attempt:tr.dataset.attempt||''};
+    const sid=tr.dataset.sid,val=tr.dataset.mark,missing=tr.dataset.missing==='1';
+    // A missing student (no completed attempt at all) syncs as a 0, not a
+    // blank -- see the per-student comment below, which adds a direct link
+    // so the student/parent can go take the quiz.
+    return{id:sid,nigriName:NIGRI_NAMES[sid]||displayName(sid),displayName:displayName(sid),mark:missing?0:(val===''?null:Number(val)),missing,attendance:tr.querySelector('select').value,lid:tr.dataset.lid||null,attempt:tr.dataset.attempt||''};
   });
   return{
     version:3,source:'B3 Weekly Quiz',launchId:selectedId,
@@ -411,7 +421,7 @@ function buildPacket(){
 }
 async function prepareNigri(){
   const packet=buildPacket();if(!packet)return;
-  const unresolved=packet.students.filter(s=>s.attendance==='review'&&s.mark===null);
+  const unresolved=packet.students.filter(s=>s.attendance==='review'&&s.missing);
   if(unresolved.length){
     const names=unresolved.map(s=>s.nigriName).join(', ');
     if(!confirm('These students still say Review / leave unchanged: '+names+'. Continue without guessing their attendance?'))return;
@@ -426,7 +436,7 @@ async function prepareNigri(){
   // or left as Review have nothing to report on, so they're skipped.
   const attemptTag=(l)=>{const tags=[];if(l.makeupOf)tags.push('Make-Up');if(l.retakeOf)tags.push('Retake '+(l.attemptNumber||2));if(!tags.length)tags.push('Original');return tags.join(' ');};
   const studentsWithReports=packet.students.map(s=>{
-    if(s.mark===null||!s.lid||!launches[s.lid])return{...s,report_base64:undefined,report_filename:undefined};
+    if(s.missing||!s.lid||!launches[s.lid])return{...s,report_base64:undefined,report_filename:undefined};
     try{
       const l=launches[s.lid],qs=questions(l),sr=(responses[s.lid]||{})[s.id]||{};
       const pdfBase64=buildStudentReportPDF({
@@ -453,7 +463,14 @@ async function prepareNigri(){
     type:NIGRI_TYPE_MAP[packet.type]||'quiz',
     date:packet.date,
     description:packet.description,
-    students:studentsWithReports.map(s=>({name:s.nigriName,mark:s.mark,attendance:s.attendance,comment:packet.comment||undefined,report_base64:s.report_base64,report_filename:s.report_filename}))
+    students:studentsWithReports.map(s=>{
+      let comment=packet.comment||undefined;
+      if(s.missing){
+        const link=quizLinkFor(selectedId);
+        comment='Did not take this quiz yet. Take it here: '+link+(packet.comment?' — '+packet.comment:'');
+      }
+      return{name:s.nigriName,mark:s.mark,attendance:s.attendance,comment,report_base64:s.report_base64,report_filename:s.report_filename};
+    })
   };
 
   status.textContent='Syncing to Nigri… this can take under a minute, please wait.';
