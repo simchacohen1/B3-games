@@ -5,6 +5,13 @@ const TEACHER_PASSCODE="vayeira5786";
 // AI picture-choice helper. Deploy the matching generateShorashimArt Cloud Function.
 const GENERATE_SHORASHIM_ART_URL="https://us-central1-b3-games.cloudfunctions.net/generateShorashimArt";
 let state={catalog:{shorashim:[],prefix:[],suffix:[]},settings:{minReviewMs:500,studentSiteOpen:true},students:{},leaderboards:{}};let currentTrack='shorashim';
+const teacherArtStyle=document.createElement('style');
+teacherArtStyle.textContent=`
+.teacher-art-preview{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.teacher-art-chip{font-size:28px;line-height:1;border:1px solid #d7dbea;background:#fff;border-radius:10px;padding:8px 10px;cursor:pointer}
+.teacher-art-chip:hover{background:#fff3f3;border-color:#e39b9b}
+`;
+document.head.appendChild(teacherArtStyle);
 const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 /* ===== Meaning-aware picture choices =====
@@ -253,7 +260,73 @@ function namedLists(){
   return [...new Set(['Main List',...saved,...fromItems])].sort((a,b)=>a.localeCompare(b));
 }
 function refreshNamedLists(prefer){const sel=$('teacherListName');if(!sel)return;const names=namedLists();const wanted=prefer||sel.value||'Main List';sel.innerHTML=names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');sel.value=names.includes(wanted)?wanted:'Main List'}
-function renderCatalog(){currentTrack=$('teacherTrack').value;refreshNamedLists();const chosen=$('teacherListName')?.value||'Main List',all=state.catalog[currentTrack]||[],list=all.filter(i=>listNameOf(i)===chosen);$('teacherCatalog').innerHTML=list.map((i,idx)=>`<div class="catalog-teacher-row${i.hidden?' hidden-item':''}" data-id="${esc(i.id)}"><div class="mini-actions"><button data-a="up" ${idx===0?'disabled':''}>▲</button><button data-a="down" ${idx===list.length-1?'disabled':''}>▼</button></div><div class="hebrew">${esc(i.front)}</div><div><b>${esc(i.english)}</b><div class="mini-note">${i.pasuk?`Pasuk ${esc(i.pasuk)} • `:''}${i.hidden?'Hidden from future learning':'Active'} • ${esc(chosen)}</div></div><div class="mini-actions"><button data-a="edit" class="ghost">Edit</button><button data-a="hide" class="${i.hidden?'primary':'ghost'}">${i.hidden?'Restore':'Hide'}</button><button data-a="delete" class="danger catalog-remove-btn">🗑 Delete</button></div></div>`).join('')||'<p class="mini-note">This list is empty.\nAdd an item or use Bulk Add.</p>';[...$('teacherCatalog').querySelectorAll('.catalog-teacher-row')].forEach(row=>{const id=row.dataset.id;row.querySelector('[data-a=up]').onclick=()=>moveNamed(id,-1);row.querySelector('[data-a=down]').onclick=()=>moveNamed(id,1);row.querySelector('[data-a=edit]').onclick=()=>openEdit(id);row.querySelector('[data-a=hide]').onclick=()=>toggleHide(id);row.querySelector('[data-a=delete]').onclick=()=>deleteCatalogItem(id)})}
+function renderCatalog(){
+  currentTrack=$('teacherTrack').value;
+  refreshNamedLists();
+  const chosen=$('teacherListName')?.value||'Main List',
+        all=state.catalog[currentTrack]||[],
+        list=all.filter(i=>listNameOf(i)===chosen);
+
+  $('teacherCatalog').innerHTML=list.map((i,idx)=>{
+    const art=(Array.isArray(i.art)?i.art:[]).map(a=>`<button type="button" class="teacher-art-chip" data-a="art" data-art="${esc(a)}" title="Click to remove this picture">${esc(a)}</button>`).join('');
+    const artBlock=currentTrack==='shorashim'
+      ? `<div class="teacher-art-preview">${art||'<span class="mini-note">No pictures yet</span>'}</div>
+         <div class="mini-actions">
+           <button data-a="regen" class="ghost">↻ Regenerate Pictures</button>
+         </div>`
+      : '';
+
+    return `<div class="catalog-teacher-row${i.hidden?' hidden-item':''}" data-id="${esc(i.id)}">
+      <div class="mini-actions"><button data-a="up" ${idx===0?'disabled':''}>▲</button><button data-a="down" ${idx===list.length-1?'disabled':''}>▼</button></div>
+      <div class="hebrew">${esc(i.front)}</div>
+      <div>
+        <b>${esc(i.english)}</b>
+        <div class="mini-note">${i.pasuk?`Pasuk ${esc(i.pasuk)} • `:''}${i.hidden?'Hidden from future learning':'Active'} • ${esc(chosen)}</div>
+        ${artBlock}
+      </div>
+      <div class="mini-actions">
+        <button data-a="edit" class="ghost">Edit Word</button>
+        <button data-a="hide" class="${i.hidden?'primary':'ghost'}">${i.hidden?'Restore':'Hide'}</button>
+        <button data-a="delete" class="danger catalog-remove-btn">🗑 Delete</button>
+      </div>
+    </div>`;
+  }).join('')||'<p class="mini-note">This list is empty.\nAdd an item or use Bulk Add.</p>';
+
+  [...$('teacherCatalog').querySelectorAll('.catalog-teacher-row')].forEach(row=>{
+    const id=row.dataset.id;
+    row.querySelector('[data-a=up]').onclick=()=>moveNamed(id,-1);
+    row.querySelector('[data-a=down]').onclick=()=>moveNamed(id,1);
+    row.querySelector('[data-a=edit]').onclick=()=>openEdit(id);
+    row.querySelector('[data-a=hide]').onclick=()=>toggleHide(id);
+    row.querySelector('[data-a=delete]').onclick=()=>deleteCatalogItem(id);
+    const regen=row.querySelector('[data-a=regen]');
+    if(regen) regen.onclick=()=>regeneratePictures(id);
+    row.querySelectorAll('[data-a=art]').forEach(btn=>{
+      btn.onclick=()=>removePictureChoice(id,btn.dataset.art);
+    });
+  });
+}
+
+async function regeneratePictures(id){
+  const item=(state.catalog[currentTrack]||[]).find(x=>x.id===id);
+  if(!item)return;
+  status('☁️ Regenerating pictures…','syncing');
+  item.autoArt=true;
+  await fillArtForShorashim([item],{force:true});
+  renderCatalog();
+  await saveCatalog();
+}
+
+async function removePictureChoice(id,artValue){
+  const item=(state.catalog[currentTrack]||[]).find(x=>x.id===id);
+  if(!item)return;
+  item.art=(Array.isArray(item.art)?item.art:[]).filter(x=>String(x)!==String(artValue));
+  item.art=sanitizeClassArt(item.art);
+  item.autoArt=false;
+  renderCatalog();
+  await saveCatalog();
+}
+
 async function moveNamed(id,dir){const all=state.catalog[currentTrack],chosen=$('teacherListName').value,list=all.filter(i=>listNameOf(i)===chosen),i=list.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=list.length)return;const ai=all.indexOf(list[i]),aj=all.indexOf(list[j]);[all[ai],all[aj]]=[all[aj],all[ai]];renderCatalog();await saveCatalog()}
 async function saveCatalog(){status('☁️ Saving…','syncing');await db.ref(`${ROOT}/catalog`).set(state.catalog);status('☁️ Saved')}
 async function move(id,dir){const l=state.catalog[currentTrack],i=l.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=l.length)return;[l[i],l[j]]=[l[j],l[i]];renderCatalog();await saveCatalog()}
