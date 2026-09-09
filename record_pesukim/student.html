@@ -4373,7 +4373,9 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
   try{
     const snap = await promiseWithTimeout(chunkRef.once('value'), 10000, 'Translation cache');
     if(myToken !== translationLoadToken) return null;
-    if(snap.exists() && snap.val() && Array.isArray(snap.val().levels) && snap.val().levels.length){
+    // v3 translation source set includes Kehot. Older cached chunk answer keys
+    // were generated without Kehot, so deliberately ignore/rebuild them once.
+    if(snap.exists() && snap.val() && snap.val().sourceVersion === 3 && Array.isArray(snap.val().levels) && snap.val().levels.length){
       return snap.val().levels;
     }
   }catch(err){
@@ -4396,7 +4398,9 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
           body: JSON.stringify({
             posukText: part.text,
             posukTranslation: part.translation || '',
-            classroomReferenceTranslation
+            classroomReferenceTranslation,
+            perekNum: currentPerekNum,
+            posukNum: part.posukNum
           }),
         });
         clearTimeout(timeout);
@@ -4412,7 +4416,7 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
     if(!res || !res.ok) throw (lastErr || new Error('Chunk generation request failed'));
     const data = await res.json();
     if(!data.levels || !Array.isArray(data.levels) || !data.levels.length) throw new Error('No levels returned');
-    chunkRef.set({ levels: data.levels, generatedAt: Date.now() }).catch(err => {
+    chunkRef.set({ levels: data.levels, sourceVersion: 3, generatedAt: Date.now() }).catch(err => {
       console.error('Could not cache translation chunks', part.key, err);
     });
     return data.levels;
@@ -4948,6 +4952,8 @@ function gradeSingleTranslationSegment(idx, level){
       formData.append('audio', seg.blob, 'recording.' + seg.ext);
       formData.append('chunkHebrew', chunk.hebrew);
       formData.append('acceptedTranslations', JSON.stringify(chunk.english || []));
+      formData.append('perekNum', String(currentPerekNum || ''));
+      formData.append('posukNum', String(chunk.posukNum || currentPosukNum || ''));
       const res = await fetch(GRADE_TRANSLATION_CHUNK_URL, { method:'POST', body: formData });
       if(!res.ok) throw new Error('Grading request failed');
       const data = await res.json();
