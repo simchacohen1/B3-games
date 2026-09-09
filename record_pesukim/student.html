@@ -2066,7 +2066,8 @@ function stopMicMeter(type){
 }
 let chapterCache = {}; // cache fetched Sefaria Hebrew chapters this session
 let translationCache = {};
-let classroomReferenceCache = {}; // Ba'er Hetev classroom wording from Firebase // cache fetched Sefaria English chapters this session
+let classroomReferenceCache = {}; // Ba'er Hetev classroom wording from Firebase
+let kehotTranslationCache = {}; // Kehot Chumash English from Sefaria, accepted for comprehension answers
 
 /* ---------- Text-to-speech (reads comprehension feedback + clarifying
    questions aloud) ----------
@@ -2544,6 +2545,7 @@ perekSelect.onchange = async () => {
   warmQuestionGradingService();
   fetchChapterTranslation(perekNum).catch(err => console.error('Translation prefetch failed', err));
   fetchClassroomReferenceChapter(perekNum).catch(err => console.error('Classroom reference prefetch failed', err));
+  fetchKehotChapterTranslation(perekNum).catch(err => console.error('Kehot comprehension reference prefetch failed', err));
   document.getElementById('fetchMsg').textContent = 'Loading pesukim…';
   try{
     const pesukim = await fetchChapter(perekNum);
@@ -2849,6 +2851,55 @@ async function getClassroomReferenceForPart(part){
   if(!part || !part.posukNum) return '';
   const refs = await fetchClassroomReferenceChapter(currentPerekNum);
   return refs[part.posukNum - 1] || '';
+}
+
+/* Kehot is an additional ACCEPTED comprehension reference, not a replacement
+   for Metsudah and not a source for literal translation grading. It is fetched
+   directly from the specific Kehot Chumash English version on Sefaria. */
+const KEHOT_SEFARIA_VERSION = 'The Kehot Chumash; Chabad House Publications, Los Angeles';
+
+async function fetchKehotChapterTranslation(perekNum){
+  if(kehotTranslationCache[perekNum]) return kehotTranslationCache[perekNum];
+
+  const cacheKey = 'posukPractice_kehot_translation_v1_' + perekNum;
+  try{
+    const localCached = localStorage.getItem(cacheKey);
+    if(localCached){
+      const arr = JSON.parse(localCached);
+      if(Array.isArray(arr) && arr.length){
+        kehotTranslationCache[perekNum] = arr;
+        return arr;
+      }
+    }
+  }catch(err){
+    console.warn('Could not read cached Kehot translation', err);
+  }
+
+  try{
+    const sectionRef = 'Genesis ' + perekNum;
+    const url = 'https://www.sefaria.org/api/v3/texts/' +
+      encodeURIComponent(sectionRef) + '?version=' +
+      encodeURIComponent('english|' + KEHOT_SEFARIA_VERSION);
+    const res = await promiseWithTimeout(
+      fetch(url, { headers:{ 'Accept':'application/json' } }),
+      12000,
+      'Kehot Chumash reference'
+    );
+    if(!res.ok) throw new Error('Sefaria Kehot HTTP ' + res.status);
+    const data = await res.json();
+    const version = Array.isArray(data.versions) ? data.versions[0] : null;
+    const raw = version && Array.isArray(version.text) ? version.text : [];
+    const cleaned = raw.map(stripTags);
+    kehotTranslationCache[perekNum] = cleaned;
+    try{ localStorage.setItem(cacheKey, JSON.stringify(cleaned)); }catch(_err){}
+    return cleaned;
+  }catch(err){
+    // Kehot is supplementary. If it cannot load, the existing Metsudah /
+    // classroom-reference grading continues normally.
+    console.warn('Could not load Kehot Chumash comprehension reference', err);
+    kehotTranslationCache[perekNum] = [];
+    return [];
+  }
 }
 
 async function fetchChapterTranslation(perekNum){
@@ -3947,8 +3998,12 @@ async function gradeComprehensionAttempt(){
     formData.append('audio', currentAudio.comprehension, 'recording.' + currentAudioExt.comprehension);
     formData.append('posukText', currentPosukText || '');
     formData.append('posukTranslation', currentPosukTranslation || '');
-    const classroomRefs = await fetchClassroomReferenceChapter(currentPerekNum);
+    const [classroomRefs, kehotRefs] = await Promise.all([
+      fetchClassroomReferenceChapter(currentPerekNum),
+      fetchKehotChapterTranslation(currentPerekNum)
+    ]);
     formData.append('classroomReferenceTranslation', classroomRefs[currentPosukNum - 1] || '');
+    formData.append('kehotReferenceTranslation', kehotRefs[currentPosukNum - 1] || '');
 
     const res = await fetch(GRADE_COMPREHENSION_URL, { method: 'POST', body: formData });
     if(!res.ok) throw new Error('Grading request failed');
@@ -4037,8 +4092,12 @@ async function gradeCurrentQuestionAnswer(){
     if(current.expectedAnswer) formData.append('expectedAnswer', current.expectedAnswer);
     formData.append('posukTranslation', currentPosukTranslation || '');
     formData.append('posukText', currentPosukText || '');
-    const classroomRefs = await fetchClassroomReferenceChapter(currentPerekNum);
+    const [classroomRefs, kehotRefs] = await Promise.all([
+      fetchClassroomReferenceChapter(currentPerekNum),
+      fetchKehotChapterTranslation(currentPerekNum)
+    ]);
     formData.append('classroomReferenceTranslation', classroomRefs[currentPosukNum - 1] || '');
+    formData.append('kehotReferenceTranslation', kehotRefs[currentPosukNum - 1] || '');
 
     const res = await fetch(GRADE_QUESTION_ANSWER_URL, { method: 'POST', body: formData });
     if(!res.ok) throw new Error('Grading request failed');
