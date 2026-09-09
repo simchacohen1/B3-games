@@ -644,7 +644,7 @@
         <div class="card">
           <div class="topline">
             <div><h2 style="margin:0" id="resultsQuizTitle">Results</h2><div id="resultsMeta" class="small"></div></div>
-            <div class="controls"><button class="primary" onclick="downloadCSV()">Download CSV</button><button class="secondary" onclick="copyResultsTSV()">Copy for Google Sheets</button><button id="assignMakeupBtn" class="purple" onclick="openMakeupFromResults()">Assign Make-Up</button><button id="resultsScoreBtn" class="secondary" onclick="toggleResultsScoreRelease()">Score & review hidden</button><button id="endSelectedBtn" class="danger hidden" onclick="endSelectedLaunch()">End this launch</button></div>
+            <div class="controls"><button class="primary" onclick="downloadCSV()">Download CSV</button><button class="secondary" onclick="copyResultsTSV()">Copy for Google Sheets</button><button class="secondary" onclick="copyLaunchLink(resultsLaunchId)">Copy Direct Link</button><button id="assignMakeupBtn" class="purple" onclick="openMakeupFromResults()">Assign Make-Up</button><button id="resultsScoreBtn" class="secondary" onclick="toggleResultsScoreRelease()">Score & review hidden</button><button id="endSelectedBtn" class="danger hidden" onclick="endSelectedLaunch()">End this launch</button></div>
           </div>
           <div class="grid-wrap" style="margin-top:12px"><table id="resultsTable"></table></div>
           <div class="small" style="margin-top:8px">Click a question result to review/adjust it. Parent-facing summaries use only the final adjusted result; the audit trail stays teacher-only.</div>
@@ -1570,7 +1570,7 @@ function launchScore(lid,studentId){const l=allLaunches[lid],qs=launchQuestions(
 function renderLaunchHistory(){
   const box=document.getElementById('launchHistory');if(!box)return;const filter=document.getElementById('resultsClassFilter')?document.getElementById('resultsClassFilter').value:'all';let ids=Object.keys(allLaunches).filter(id=>filter==='all'||allLaunches[id].classId===filter).sort((a,b)=>(Number(allLaunches[b].createdAt)||0)-(Number(allLaunches[a].createdAt)||0));box.innerHTML='';
   if(!ids.length){box.innerHTML='<div class="small">No quiz launches yet.</div>';return;}
-  ids.forEach(id=>{const l=allLaunches[id]||{},snap=l.quizSnapshot||{},target=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[],retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'',div=document.createElement('div');div.className='launch-item'+(id===resultsLaunchId?' active':'');div.innerHTML='<div class="launch-item-title">'+esc(snap.title||'Untitled')+'</div><div class="small">'+esc(classLabel(l.classId))+retake+(target.length?' • '+esc((roster[target[0]]&&roster[target[0]].name)||target[0]):'')+' • '+esc(fmtDate(l.createdAt))+(l.started?' • ACTIVE':'')+'</div>';div.onclick=()=>{resultsLaunchId=id;renderLaunchHistory();renderResults();};box.appendChild(div);});
+  ids.forEach(id=>{const l=allLaunches[id]||{},snap=l.quizSnapshot||{},target=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[],retake=l.retakeOf?' • Retake '+(l.attemptNumber||2):'',div=document.createElement('div');div.className='launch-item'+(id===resultsLaunchId?' active':'');div.innerHTML='<div class="launch-item-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>'+esc(snap.title||'Untitled')+'</span><button class="danger" style="padding:3px 9px;font-size:11px;border-radius:7px;flex:none" title="Delete this launch permanently" onclick="event.stopPropagation();deleteLaunch(\''+esc(id)+'\')">Delete</button></div><div class="small">'+esc(classLabel(l.classId))+retake+(target.length?' • '+esc((roster[target[0]]&&roster[target[0]].name)||target[0]):'')+' • '+esc(fmtDate(l.createdAt))+(l.started?' • ACTIVE':'')+'</div>';div.onclick=()=>{resultsLaunchId=id;renderLaunchHistory();renderResults();};box.appendChild(div);});
   if(!resultsLaunchId&&ids[0]){resultsLaunchId=ids[0];renderLaunchHistory();renderResults();}
 }
 function renderResults(){
@@ -1582,7 +1582,22 @@ function renderResults(){
   const endBtn=document.getElementById('endSelectedBtn');endBtn.classList.toggle('hidden',!l.started);
   if(!qs.length){table.innerHTML='<tr><td>No questions.</td></tr>';return;}
   let html='<thead><tr><th>Student</th><th>Score</th><th>Percent</th><th>Completed</th>'+qs.map((_,i)=>'<th>Q'+(i+1)+'</th>').join('')+'<th>Retake</th></tr></thead><tbody>';
-  students.forEach(st=>{const sr=rr[st.id]||{},score=launchScore(resultsLaunchId,st.id),comp=completions[resultsLaunchId]&&completions[resultsLaunchId][st.id],cells=qs.map((q,i)=>{const r=sr[i]||sr[String(i)];if(!r)return'<td class="cell blank">—</td>';const cls=(r.correct?'correct':'incorrect')+(r.adjusted?' adjusted':'');return'<td class="cell '+cls+'" onclick="openAnswerModal(\''+esc(st.id)+'\','+i+',\'results\',\''+esc(resultsLaunchId)+'\')">'+(r.correct?'✓':'×')+(r.adjusted?'*':'')+'</td>';}).join('');html+='<tr><td>'+esc(st.name)+'</td><td><b>'+score.correct+'/'+score.total+'</b></td><td>'+score.pct+'%</td><td>'+esc(comp?fmtDate(comp.completedAt):'—')+'</td>'+cells+'<td><button class="secondary" onclick="event.stopPropagation();launchRetake(\''+esc(st.id)+'\')">Retake</button></td></tr>';});table.innerHTML=html+'</tbody>';
+  students.forEach(st=>{
+    const display=studentDisplayAttempt(resultsLaunchId,st.id),showingOther=display.id!==resultsLaunchId,dqs=showingOther?launchQuestions(allLaunches[display.id]):qs,dr=allResponses[display.id]||{},dsr=dr[st.id]||{},score=launchScore(display.id,st.id),comp=completions[display.id]&&completions[display.id][st.id];
+    const cells=dqs.map((q,i)=>{const r=dsr[i]||dsr[String(i)];if(!r)return'<td class="cell blank">—</td>';const cls=(r.correct?'correct':'incorrect')+(r.adjusted?' adjusted':'');return'<td class="cell '+cls+'" onclick="event.stopPropagation();openAnswerModal(\''+esc(st.id)+'\','+i+',\'results\',\''+esc(display.id)+'\')">'+(r.correct?'✓':'×')+(r.adjusted?'*':'')+'</td>';}).join('');
+    const nameCell=esc(st.name)+(showingOther?'<div class="small" style="color:var(--blue);cursor:pointer" onclick="event.stopPropagation();resultsLaunchId=\''+esc(display.id)+'\';renderLaunchHistory();renderResults();" title="This score is from a later retake — click to open it directly">showing Retake '+display.attempt+'</div>':'');
+    let retakeCell;
+    if(display.pendingNewer.length){
+      const p=display.pendingNewer[display.pendingNewer.length-1];
+      retakeCell='<div class="small" style="color:var(--gold);font-weight:700;cursor:pointer;margin-bottom:4px" onclick="event.stopPropagation();resultsLaunchId=\''+esc(p.id)+'\';renderLaunchHistory();renderResults();" title="Click to open this retake">Retake '+p.attempt+' assigned — not yet completed</div><button class="secondary" onclick="event.stopPropagation();copyLaunchLink(\''+esc(p.id)+'\')">Copy that retake\'s link</button>';
+    }else if(showingOther){
+      retakeCell='<div class="small" style="color:var(--good);font-weight:700;margin-bottom:4px">Retake '+display.attempt+' completed'+(comp?' '+esc(fmtDate(comp.completedAt)):'')+'</div><button class="secondary" onclick="event.stopPropagation();launchRetake(\''+esc(st.id)+'\')">Retake again</button>';
+    }else{
+      retakeCell='<button class="secondary" onclick="event.stopPropagation();launchRetake(\''+esc(st.id)+'\')">Retake</button>';
+    }
+    html+='<tr><td>'+nameCell+'</td><td><b>'+score.correct+'/'+score.total+'</b></td><td>'+score.pct+'%</td><td>'+esc(comp?fmtDate(comp.completedAt):'—')+'</td>'+cells+'<td>'+retakeCell+'</td></tr>';
+  });
+  table.innerHTML=html+'</tbody>';
 }
 async function toggleResultsScoreRelease(){
   const l=allLaunches[resultsLaunchId];
@@ -1615,7 +1630,53 @@ async function endSelectedLaunch(){const l=allLaunches[resultsLaunchId];if(!l)re
 async function launchRetake(studentId){
   const base=allLaunches[resultsLaunchId];if(!base)return;const snap=base.quizSnapshot||{},qs=launchQuestions(base),group=base.attemptGroupId||resultsLaunchId;let maxAttempt=1;Object.values(allLaunches).forEach(l=>{if((l.attemptGroupId||'')===group&&l.targetStudents&&l.targetStudents[studentId])maxAttempt=Math.max(maxAttempt,Number(l.attemptNumber)||1);});const attempt=maxAttempt+1,id=Date.now()+'_retake_'+studentId+'_'+slugTitle(snap.title||'quiz');
   const launch={quizId:base.quizId||'',quizSnapshot:snap,classId:base.classId,targetStudents:{[studentId]:true},createdAt:firebase.database.ServerValue.TIMESTAMP,started:true,startedAt:firebase.database.ServerValue.TIMESTAMP,mode:'test',deliveryType:'anytime',showScore:base.showScore===true,activeQuestion:0,questionStates:makeQuestionStates(qs,'test'),attemptGroupId:group,attemptNumber:attempt,retakeOf:resultsLaunchId,note:'Student retake'};
-  await db.ref('b3Quiz/launches/'+id).set(launch);await db.ref('b3Quiz/settings/studentActiveLaunch/'+studentId).set(id);alert('Retake '+attempt+' is now active for '+((roster[studentId]&&roster[studentId].name)||studentId)+'. It does not affect the rest of the class.');
+  await db.ref('b3Quiz/launches/'+id).set(launch);await db.ref('b3Quiz/settings/studentActiveLaunch/'+studentId).set(id);
+  const name=(roster[studentId]&&roster[studentId].name)||studentId,link=getLaunchLink(id);
+  try{await navigator.clipboard.writeText(link);alert('Retake '+attempt+' is now active for '+name+'. It does not affect the rest of the class.\n\nA direct link to this retake was copied — paste it wherever you message '+name+'.');}
+  catch(e){prompt('Retake '+attempt+' is now active for '+name+'. Copy this direct link to send:',link);}
+}
+async function deleteLaunch(id){
+  const l=allLaunches[id];if(!l){alert('That launch no longer exists.');return;}
+  const snap=l.quizSnapshot||{},retakeLabel=l.retakeOf?(' (Retake '+(l.attemptNumber||2)+')'):'',target=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[],who=target.length?' for '+((roster[target[0]]&&roster[target[0]].name)||target[0]):'';
+  const x=prompt('Delete "'+(snap.title||'Untitled')+retakeLabel+'"'+who+'? This permanently removes its results, responses, and audit trail. This cannot be undone. Type DELETE to confirm:');
+  if(x!=='DELETE')return;
+  await db.ref('b3Quiz/launches/'+id).remove();
+  await db.ref('b3Quiz/responses/'+id).remove();
+  await db.ref('b3Quiz/completions/'+id).remove();
+  await db.ref('b3Quiz/audit/'+id).remove();
+  // Clean up any dangling pointers so no student/class is left aimed at a deleted launch.
+  if(activeLaunchByClass[l.classId]===id)await db.ref('b3Quiz/settings/activeLaunchByClass/'+l.classId).remove();
+  if(l.targetStudents){for(const sid of Object.keys(l.targetStudents)){const s=await db.ref('b3Quiz/settings/studentActiveLaunch/'+sid).once('value');if(s.val()===id)await db.ref('b3Quiz/settings/studentActiveLaunch/'+sid).remove();}}
+  if(resultsLaunchId===id)resultsLaunchId='';
+  renderLaunchHistory();renderResults();
+}
+// ---------- Retake chain helpers ----------
+// Finds every launch belonging to the same retake chain (attemptGroupId) as
+// baseId that this student is part of, whether they're the base launch or a
+// personal retake targeted at them, sorted from first attempt to latest.
+function studentAttemptChain(baseId,studentId){
+  const base=allLaunches[baseId];if(!base)return[];const group=base.attemptGroupId||baseId,chain=[];
+  Object.keys(allLaunches).forEach(id=>{
+    const l=allLaunches[id];if(!l)return;
+    const belongs=id===baseId||(l.targetStudents&&l.targetStudents[studentId]);
+    if(!belongs)return;
+    if((l.attemptGroupId||id)!==group)return;
+    const comp=completions[id]&&completions[id][studentId];
+    chain.push({id,launch:l,attempt:Number(l.attemptNumber)||1,completed:!!comp,completedAt:comp?comp.completedAt:null});
+  });
+  chain.sort((a,b)=>a.attempt-b.attempt);
+  return chain;
+}
+// Of that chain, picks which attempt's score should be shown for this student
+// on the currently displayed launch: the newest COMPLETED attempt if any exist
+// (so a finished retake replaces a stale 0/10 on the original), otherwise the
+// currently displayed launch itself even if unfinished.
+function studentDisplayAttempt(baseId,studentId){
+  const chain=studentAttemptChain(baseId,studentId);if(!chain.length)return{id:baseId,attempt:1,completed:false,pendingNewer:[]};
+  const completedOnes=chain.filter(a=>a.completed);
+  const display=completedOnes.length?completedOnes[completedOnes.length-1]:(chain.find(a=>a.id===baseId)||chain[chain.length-1]);
+  const pendingNewer=chain.filter(a=>a.attempt>display.attempt&&!a.completed);
+  return{id:display.id,attempt:display.attempt,completed:display.completed,completedAt:display.completedAt,pendingNewer};
 }
 function resultsMatrix(){
   const l=allLaunches[resultsLaunchId];if(!l)return[];const qs=launchQuestions(l),students=launchStudentRows(l),rr=allResponses[resultsLaunchId]||{},rows=[['Quiz',l.quizSnapshot&&l.quizSnapshot.title||''],['Class',classLabel(l.classId)],['Date',fmtDate(l.createdAt)],['Attempt',l.retakeOf?'Retake '+(l.attemptNumber||2):'First attempt'],[],['Student','Score','Percent',...qs.map((_,i)=>'Q'+(i+1))]];
@@ -1653,6 +1714,16 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElemen
 // ---------- Links ----------
 function getStudentLink(){return window.location.href.replace(/teacher\.html(?:\?.*)?$/,'');}
 async function copyStudentLink(){const link=getStudentLink();try{await navigator.clipboard.writeText(link);alert('Student link copied.');}catch(e){prompt('Copy student link:',link);}}
+// A direct link to one exact launch (the original test or any specific retake).
+// Opening it sends that student straight to that quiz, bypassing whatever
+// launch would otherwise be chosen for them.
+function getLaunchLink(id){return getStudentLink()+'?launch='+encodeURIComponent(id);}
+async function copyLaunchLink(id){
+  if(!id){alert('Choose a test from Quiz History first.');return;}
+  const link=getLaunchLink(id);
+  try{await navigator.clipboard.writeText(link);alert('Direct link to this exact quiz copied. Sending it to a student takes them straight to it.');}
+  catch(e){prompt('Copy this direct link:',link);}
+}
 
 newQuizDraft();generatorTypeChanged();populateProgressStudents();updateLaunchTargetUI();
 </script>
