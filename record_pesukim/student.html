@@ -3998,6 +3998,9 @@ async function gradeComprehensionAttempt(){
     formData.append('audio', currentAudio.comprehension, 'recording.' + currentAudioExt.comprehension);
     formData.append('posukText', currentPosukText || '');
     formData.append('posukTranslation', currentPosukTranslation || '');
+    formData.append('perekNum', String(currentPerekNum || ''));
+    formData.append('posukNum', String(currentPosukNum || ''));
+    formData.append('endPosukNum', String(currentPosukEndNum || currentPosukNum || ''));
     const [classroomRefs, kehotRefs] = await Promise.all([
       fetchClassroomReferenceChapter(currentPerekNum),
       fetchKehotChapterTranslation(currentPerekNum)
@@ -4092,6 +4095,9 @@ async function gradeCurrentQuestionAnswer(){
     if(current.expectedAnswer) formData.append('expectedAnswer', current.expectedAnswer);
     formData.append('posukTranslation', currentPosukTranslation || '');
     formData.append('posukText', currentPosukText || '');
+    formData.append('perekNum', String(currentPerekNum || ''));
+    formData.append('posukNum', String((current && current.posukNum) || currentPosukNum || ''));
+    formData.append('endPosukNum', String((current && current.posukNum) || currentPosukNum || ''));
     const [classroomRefs, kehotRefs] = await Promise.all([
       fetchClassroomReferenceChapter(currentPerekNum),
       fetchKehotChapterTranslation(currentPerekNum)
