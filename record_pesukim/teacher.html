@@ -426,9 +426,14 @@ function effComprehensionVerdict(record){
   return record ? (record.comprehensionFinalVerdict || record.comprehensionVerdict) : null;
 }
 function effQuestionScore(record){
-  if(!record || !Array.isArray(record.questionResults) || !record.questionResults.length) return null;
+  if(!record) return null;
+  const questions = questionResultValues(record.questionResults);
+  if(questions.length){
+    const correct = questions.filter(q => (q.finalVerdict || q.verdict) === 'correct').length;
+    return Math.round((correct / questions.length) * 100);
+  }
 
-  // Newer/older records may store "80%" or 80. Accept either.
+  // Backward compatibility for a record that has only the stored aggregate.
   if(typeof record.questionScore === 'number' && Number.isFinite(record.questionScore)){
     return Math.max(0, Math.min(100, Math.round(record.questionScore)));
   }
@@ -436,11 +441,7 @@ function effQuestionScore(record){
     const n = parseFloat(record.questionScore.replace('%','').trim());
     if(Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(n)));
   }
-
-  // Backstop: derive the score directly from the saved per-question verdicts.
-  const total = record.questionResults.length;
-  const correct = record.questionResults.filter(q => q && (q.finalVerdict || q.verdict) === 'correct').length;
-  return total ? Math.round((correct / total) * 100) : null;
+  return null;
 }
 function hasQuestionComprehension(record){
   return effQuestionScore(record) !== null;
@@ -491,6 +492,26 @@ function translationChunkValues(chunks){
   return translationChunkEntries(chunks).map(([,c]) => c);
 }
 
+// Question answers are usually stored as an array, but Firebase can expose a
+// sparse numeric-key object if only some questions were saved. Normalize both
+// shapes so per-question disputes are never hidden from the teacher.
+function questionResultEntries(results){
+  if(Array.isArray(results)){
+    return results.map((q,i) => [i,q]).filter(([,q]) => q && typeof q === 'object');
+  }
+  if(results && typeof results === 'object'){
+    return Object.keys(results)
+      .filter(k => /^\d+$/.test(k))
+      .sort((a,b) => Number(a) - Number(b))
+      .map(k => [Number(k), results[k]])
+      .filter(([,q]) => q && typeof q === 'object');
+  }
+  return [];
+}
+function questionResultValues(results){
+  return questionResultEntries(results).map(([,q]) => q);
+}
+
 // Translation isn't stored as a single percentage (each chunk piece is
 // graded correct/incorrect separately), so its percentage is derived here
 // from the saved per-chunk results — same math as the "X% correct" badge
@@ -508,6 +529,7 @@ function effTranslationScore(record){
 function hasPendingDispute(record){
   if(!record) return false;
   if(record.hebrewDisputeStatus === 'pending' || record.comprehensionDisputeStatus === 'pending') return true;
+  if(questionResultValues(record.questionResults).some(q => q.disputeStatus === 'pending')) return true;
   return translationChunkValues(record.translationChunkResults).some(c => c.disputeStatus === 'pending');
 }
 
@@ -830,6 +852,12 @@ async function markStudentsWithPendingDisputes(){
             count++;
             if(!firstTarget) firstTarget = { posukKey, tab: 'comprehension' };
           }
+          questionResultValues(a.questionResults).forEach(q => {
+            if(q.disputeStatus === 'pending'){
+              count++;
+              if(!firstTarget) firstTarget = { posukKey, tab: 'comprehension' };
+            }
+          });
           translationChunkValues(a.translationChunkResults).forEach(c => {
             if(c.disputeStatus === 'pending'){
               count++;
@@ -2571,6 +2599,7 @@ function nextPendingDisputeTarget(){
   for(const posukKey of keys){
     for(const a of studentPosukData[posukKey].attempts){
       if(a.hebrewDisputeStatus === 'pending') return { posukKey, tab: 'reading' };
+      if(questionResultValues(a.questionResults).some(q => q.disputeStatus === 'pending')) return { posukKey, tab: 'comprehension' };
       if(a.comprehensionDisputeStatus === 'pending') return { posukKey, tab: 'comprehension' };
       if(translationChunkValues(a.translationChunkResults).some(c => c.disputeStatus === 'pending')){
         return { posukKey, tab: 'translate' };
@@ -2586,6 +2615,7 @@ function countPendingDisputesForStudent(){
     attempts.forEach(a => {
       if(a.hebrewDisputeStatus === 'pending') count++;
       if(a.comprehensionDisputeStatus === 'pending') count++;
+      count += questionResultValues(a.questionResults).filter(q => q.disputeStatus === 'pending').length;
       count += translationChunkValues(a.translationChunkResults).filter(c => c.disputeStatus === 'pending').length;
     });
   });
@@ -2635,7 +2665,7 @@ function renderPosukDetail(posukKey){
     if(studentActiveTab === 'translate'){
       return translationChunkEntries(a.translationChunkResults).length > 0;
     }
-    return (Array.isArray(a.questionResults) && a.questionResults.length > 0) || !!a.comprehensionAudioURL;
+    return questionResultEntries(a.questionResults).length > 0 || !!a.comprehensionAudioURL;
   });
 
   let html = `<div class="posuk-group">
@@ -2690,10 +2720,11 @@ function renderPosukDetail(posukKey){
     }
 
     if(studentActiveTab === 'comprehension'){
-      if(Array.isArray(a.questionResults) && a.questionResults.length){
+      const questionEntries = questionResultEntries(a.questionResults);
+      if(questionEntries.length){
         const qScore = effQuestionScore(a);
         lines += `<div class="top-line"><span>Detail questions</span><span class="score-pill">${typeof qScore === 'number' ? qScore + '%' : '—'}</span></div>`;
-        a.questionResults.forEach(q => {
+        questionEntries.forEach(([questionIdx, q]) => {
           const qVerdict = q.finalVerdict || q.verdict;
           let qHtml = '<span class="comp-badge">' + (qVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</span>';
           if(q.question) qHtml += '<span style="font-weight:700;">' + q.question + '</span>';
@@ -2701,6 +2732,7 @@ function renderPosukDetail(posukKey){
           if(q.transcript) qHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + q.transcript + '"</span>';
           if(q.feedback) qHtml += '<span style="width:100%;font-size:0.82rem;">' + q.feedback + '</span>';
           lines += `<div class="comp-result ${qVerdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:4px;">${qHtml}</div>`;
+          lines += renderQuestionDisputeSection(a, posukKey, questionIdx, q);
         });
       }
 
@@ -2752,8 +2784,11 @@ function renderPosukDetail(posukKey){
     if(studentActiveTab === 'reading' && a.hebrewDisputeStatus === 'pending'){
       wireFinalizeHebrew(a, posukKey);
     }
-    if(studentActiveTab === 'comprehension' && a.comprehensionDisputeStatus === 'pending'){
-      wireFinalizeComprehension(a, posukKey);
+    if(studentActiveTab === 'comprehension'){
+      questionResultEntries(a.questionResults).forEach(([questionIdx, q]) => {
+        if(q.disputeStatus === 'pending') wireFinalizeQuestion(a, posukKey, questionIdx, q);
+      });
+      if(a.comprehensionDisputeStatus === 'pending') wireFinalizeComprehension(a, posukKey);
     }
     if(studentActiveTab === 'translate'){
       translationChunkEntries(a.translationChunkResults).forEach(([chunkIdx, c]) => {
@@ -2805,6 +2840,36 @@ function renderDisputeSection(a, posukKey, skill){
   if(a.comprehensionDisputeStatus === 'resolved' && a.comprehensionFinalVerdict){
     const remaining = countPendingDisputesForStudent();
     return `<div class="summary-meta" style="margin-top:4px;">✔️ Dispute reviewed — final grade set to ${labelMap[a.comprehensionFinalVerdict] || a.comprehensionFinalVerdict}</div>` +
+      (remaining > 0 ? `<button class="btn small next-dispute-btn" style="margin-top:6px;background:var(--navy);box-shadow:0 4px 0 #0f1822;">→ Next dispute (${remaining} left)</button>` : '');
+  }
+  return '';
+}
+
+// Per-question comprehension disputes are stored inside questionResults,
+// not in the older whole-attempt comprehensionDisputeStatus field. Show the
+// student's saved recording and the computer's original verdict above, then
+// let the teacher either mark the answer correct or keep the original result.
+function renderQuestionDisputeSection(a, posukKey, questionIdx, q){
+  if(q.disputeStatus === 'pending'){
+    const original = q.verdict === 'correct' ? '✅ Correct' : '💡 Try again';
+    if(!q.audioURL){
+      return `<div class="dispute-banner">⚠️ Student disputes this question — computer originally marked: ${original}</div>
+        <div class="finalize-row" id="finalizeQuestion_${a.attemptId}_${questionIdx}" style="border-color:var(--rimon);background:#F6E1E1;">
+          <strong>Recording is missing.</strong>
+          <span>You can resolve it by keeping the original result, or have the student redo the question.</span>
+          <button class="btn small" style="background:var(--ink-soft);box-shadow:none;" id="finalizeQuestionKeepBtn_${a.attemptId}_${questionIdx}">Keep original (${original})</button>
+        </div>`;
+    }
+    return `<div class="dispute-banner">⚠️ Student disputes this question — computer originally marked: ${original}</div>
+      <div class="finalize-row" id="finalizeQuestion_${a.attemptId}_${questionIdx}">
+        <span>Teacher decision:</span>
+        <button class="btn" id="finalizeQuestionCorrectBtn_${a.attemptId}_${questionIdx}">Mark correct</button>
+        <button class="btn small" style="background:var(--ink-soft);box-shadow:none;" id="finalizeQuestionKeepBtn_${a.attemptId}_${questionIdx}">Keep original (${original})</button>
+      </div>`;
+  }
+  if(q.disputeStatus === 'resolved' && q.finalVerdict){
+    const remaining = countPendingDisputesForStudent();
+    return `<div class="summary-meta" style="margin-top:4px;">✔️ Question dispute reviewed — final: ${q.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again'}</div>` +
       (remaining > 0 ? `<button class="btn small next-dispute-btn" style="margin-top:6px;background:var(--navy);box-shadow:0 4px 0 #0f1822;">→ Next dispute (${remaining} left)</button>` : '');
   }
   return '';
@@ -2914,6 +2979,44 @@ function wireFinalizeComprehension(a, posukKey){
   acceptBtn.onclick = () => finalize(a.comprehensionDisputeRequested);
   saveBtn.onclick = () => finalize(select.value);
   keepBtn.onclick = () => finalize(a.comprehensionVerdict);
+}
+
+function wireFinalizeQuestion(a, posukKey, questionIdx, q){
+  const correctBtn = document.getElementById('finalizeQuestionCorrectBtn_' + a.attemptId + '_' + questionIdx);
+  const keepBtn = document.getElementById('finalizeQuestionKeepBtn_' + a.attemptId + '_' + questionIdx);
+  if(!keepBtn) return;
+
+  const finalize = async (finalVerdict) => {
+    try{
+      const entries = questionResultEntries(a.questionResults);
+      const total = entries.length;
+      const correct = entries.filter(([idx, item]) => {
+        const verdict = idx === questionIdx ? finalVerdict : (item.finalVerdict || item.verdict);
+        return verdict === 'correct';
+      }).length;
+      const questionScore = total ? Math.round((correct / total) * 100) + '%' : a.questionScore;
+      const resolvedAt = Date.now();
+      const updates = {
+        [`questionResults/${questionIdx}/finalVerdict`]: finalVerdict,
+        [`questionResults/${questionIdx}/disputeStatus`]: 'resolved',
+        [`questionResults/${questionIdx}/disputeResolvedAt`]: resolvedAt,
+        questionScore
+      };
+      await attemptRef(posukKey, a.attemptId).update(updates);
+      Object.assign(q, { finalVerdict, disputeStatus:'resolved', disputeResolvedAt:resolvedAt });
+      a.questionScore = questionScore;
+      allAttemptsCache = null;
+      await renderStudentGrid();
+      renderPosukDetail(posukKey);
+      markStudentsWithPendingDisputes();
+    }catch(err){
+      console.error(err);
+      alert('Could not save the question decision — check your internet and try again.');
+    }
+  };
+
+  if(correctBtn) correctBtn.onclick = () => finalize('correct');
+  keepBtn.onclick = () => finalize(q.verdict || 'incorrect');
 }
 
 function wireFinalizeTranslationChunk(a, posukKey, chunkIdx, c){
