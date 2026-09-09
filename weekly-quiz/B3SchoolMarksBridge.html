@@ -254,7 +254,7 @@ function renderSelected(){
   document.getElementById('topic').value=skillTopic(skill);
   document.getElementById('date').value=isoDate(l.createdAt);
   document.getElementById('name').value=snap.title||'Weekly Quiz';
-  document.getElementById('description').value=defaultDescription(skill);
+  document.getElementById('description').value='';
   document.getElementById('comment').value='';
   const body=document.getElementById('students');body.innerHTML='';
   (CLASS_ROSTERS[l.classId]||[]).forEach(sid=>{
