@@ -14,6 +14,36 @@ const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/&/g,
    items that still have only those generic choices are repaired once when
    the teacher dashboard loads.  Original hand-curated art is left alone. */
 const GENERIC_ART_CHOICES=new Set(['✨','⭐','🖍️']);
+
+const UNSUITABLE_ART_CHOICES=new Set([
+  '👫','👬','👭','🧑‍🤝‍🧑','👩‍❤️‍👨','👨‍❤️‍👩','👩‍❤️‍👩','👨‍❤️‍👨',
+  '💑','💏','👩‍❤️‍💋‍👨','👨‍❤️‍💋‍👩','👩‍❤️‍💋‍👩','👨‍❤️‍💋‍👨',
+  '👨‍👩‍👦','👨‍👩‍👧','👨‍👩‍👧‍👦','👨‍👩‍👦‍👦','👨‍👩‍👧‍👧',
+  '👩','👩‍🦱','👩‍🦰','👩‍🦳','👩‍🦲','👧','👵','🤰','🤱','👰','👸','🧕',
+  '👩‍👦','👩‍👧','👩‍👧‍👦','👩‍👦‍👦','👩‍👧‍👧','👨‍👧','👨‍👧‍👦'
+]);
+
+function isClassSafeArtChoice(value){
+  const v=String(value||'').trim();
+  if(!v) return false;
+  if(UNSUITABLE_ART_CHOICES.has(v)) return false;
+
+  // Automatic Unicode people cannot reliably be shown with the required
+  // modest clothing and Jewish head covering on every device, so reject
+  // person/couple/family emoji and favor objects, symbols, scenery, etc.
+  if(/[\u{1F466}-\u{1F469}\u{1F471}-\u{1F478}\u{1F481}-\u{1F487}\u{1F575}\u{1F57A}\u{1F645}-\u{1F647}\u{1F64B}-\u{1F64F}\u{1F9D1}-\u{1F9DD}]/u.test(v)) return false;
+
+  // Explicit romance/affection symbols are not appropriate for these cards.
+  if(['🫶','💋','💌'].includes(v)) return false;
+  return true;
+}
+
+function sanitizeClassArt(art){
+  return [...new Set((Array.isArray(art)?art:[])
+    .map(x=>String(x||'').trim())
+    .filter(isClassSafeArtChoice))].slice(0,4);
+}
+
 const SMART_ART_RULES=[
   [/entrance|opening|door/,['🚪','🏠','⛺','↔️']],
   [/\btent\b|ohel/,['⛺','🏕️','🏠','🌵']],
@@ -25,12 +55,12 @@ const SMART_ART_RULES=[
   [/\bday\b|daytime/,['☀️','🌤️','📅','🌅']],
   [/\blift\b|\blifted\b|\bcarry\b|\bcarried\b|\braise\b/,['⬆️','🙌','📦','💪']],
   [/\beye\b|\beyes\b/,['👁️','👀','🙂','🔎']],
-  [/\bthree\b|\b3\b/,['3️⃣','🔺','👨‍👨‍👦','✨']],
-  [/\bman\b|\bmen\b|\bperson\b|\bpeople\b/,['👨','🧍','👥','🙂']],
+  [/\bthree\b|\b3\b/,['3️⃣','🔺','🔢','🧩']],
+  [/\bman\b|\bmen\b|\bperson\b|\bpeople\b/,['👥','📛','🏠','🗣️']],
   [/\bstand\b|\bstood\b|standing|firm/,['🧍','📍','⬆️','🚶']],
   [/\brun\b|\bran\b|running|hurr(y|ied)|quick/,['🏃','💨','👟','⚡']],
   [/\bcall\b|\bcalled\b|\bsay\b|\bsaid\b|\bspeak\b|\bspoke\b/,['🗣️','💬','📣','👄']],
-  [/greet|meet|toward|towards/,['🤝','👋','👥','➡️']],
+  [/greet|meet|toward|towards/,['🤝','👥','➡️','📍']],
   [/\bbow\b|bowed|prostrate/,['🙇','🙏','🧎','⬇️']],
   [/\bland\b|\bearth\b|ground/,['🌍','🏞️','🌱','🗺️']],
   [/\bfind\b|\bfound\b/,['🔎','💡','✅','🎯']],
@@ -50,7 +80,7 @@ const SMART_ART_RULES=[
   [/knead|kneaded/,['🤲','🍞','🥣','👨‍🍳']],
   [/\bcake\b|\bcakes\b/,['🍰','🧁','🥮','🎂']],
   [/cattle|cow|ox|bull/,['🐄','🐂','🐮','🌾']],
-  [/\bson\b|\bboy\b|\byouth\b|\blad\b/,['👦','🧒','👨‍👦','🏃']],
+  [/\bson\b|\bboy\b|\byouth\b|\blad\b/,['🧢','📘','🏃','🏠']],
   [/soft|tender/,['🧸','☁️','🪶','🤲']],
   [/\bgood\b|fine|excellent/,['👍','⭐','😊','✅']],
   [/\bgive\b|\bgave\b|\bgiven\b/,['🎁','🤲','➡️','💝']],
@@ -69,9 +99,9 @@ const SMART_ART_RULES=[
   [/\bhand\b|\bhands\b/,['✋','🤲','🖐️','👋']],
   [/\bhead\b/,['👤','🧠','🎩','🙂']],
   [/\bmouth\b/,['👄','🗣️','💬','😮']],
-  [/\bchild\b|\bchildren\b/,['🧒','👦','🧸','🏠']],
-  [/\bmother\b|\bwoman\b|\bwomen\b/,['👩','👩‍👦','🏠','❤️']],
-  [/\bfather\b/,['👨','👨‍👦','🏠','❤️']],
+  [/\bchild\b|\bchildren\b/,['🧸','🏠','🎒','📘']],
+  [/\bmother\b|\bwoman\b|\bwomen\b/,['🏠','❤️','🌷','📛']],
+  [/\bfather\b/,['🏠','📘','👔','❤️']],
   [/\bwalk\b|\bgo\b|\bwent\b/,['🚶','👣','➡️','🛣️']],
   [/\bcome\b|\bcame\b/,['➡️','🚶','👋','🏠']],
   [/\bup\b|\babove\b/,['⬆️','🪜','☝️','🚀']],
@@ -98,9 +128,9 @@ const SMART_ART_RULES=[
   [/\bhorse\b/,['🐎','🏇','🌾','🛣️']],
   [/\bbird\b/,['🐦','🪶','🪺','🌳']],
   [/\bseed\b|plant/,['🌱','🌾','🫘','🌻']],
-  [/\bhim\b|\bhis\b|\bhe\b/,['👦','👉','👀','🙂']],
-  [/\bthem\b|\bthey\b/,['👥','👉','➡️','🤝']],
-  [/\byou\b|\byour\b/,['👉','🙂','🏠','💬']],
+  [/\bhim\b|\bhis\b|\bhe\b/,['👉','👀','📍','🔹']],
+  [/\bthem\b|\bthey\b/,['👥','👉','➡️','🔗']],
+  [/\byou\b|\byour\b/,['👉','🏠','💬','📍']],
   [/\bto\b|\btoward\b|\btowards\b/,['➡️','👉','🛣️','🏠']],
   [/\bon\b|\bupon\b/,['⬆️','📍','🔝','🧱']]
 ];
@@ -115,7 +145,7 @@ function smartArtFor(english='',front=''){
   const add=v=>{if(v&&!found.includes(v))found.push(v)};
   SMART_ART_RULES.forEach(([re,choices])=>{if(re.test(text))choices.forEach(add)});
   // Offline fallback must never pad with unrelated brain/lightbulb/arrow icons.
-  return found.slice(0,4);
+  return sanitizeClassArt(found);
 }
 function hasBadAutoArt(item){
   const art=Array.isArray(item?.art)?item.art:[];
@@ -123,6 +153,8 @@ function hasBadAutoArt(item){
   if(item?.autoArt===true) return true;
   // Old bulk imports used only these generic placeholders.
   if(!art.length || art.every(x=>GENERIC_ART_CHOICES.has(x))) return true;
+  // Repair any already-saved picture choice that violates the class image rules.
+  if(art.some(x=>!isClassSafeArtChoice(x))) return true;
   return false;
 }
 
@@ -148,7 +180,7 @@ async function generateAiArtForItems(items){
       if(!res.ok) throw new Error(`AI art request failed (${res.status})`);
       const data=await res.json();
       for(const row of (data.items||[])){
-        const art=Array.isArray(row.art)?row.art.filter(Boolean).slice(0,4):[];
+        const art=sanitizeClassArt(row.art);
         if(row.id&&art.length) out.set(String(row.id),art);
       }
     }catch(err){
@@ -168,11 +200,16 @@ async function fillArtForShorashim(items,{force=false}={}){
     // Offline/service fallback: use the local semantic rules rather than leaving a blank card.
     if(!art||!art.length) art=smartArtFor(item.english,item.front);
     if(art&&art.length){
-      item.art=art.slice(0,4);
-      item.autoArt=false;       // finished AI/fallback result; do not regenerate every login
-      item.aiArtGenerated=true;
-      item.aiArtGeneratedAt=Date.now();
-      changed++;
+      item.art=sanitizeClassArt(art);
+      if(item.art.length){
+        item.autoArt=false;       // finished AI/fallback result; do not regenerate every login
+        item.aiArtGenerated=true;
+        item.aiArtGeneratedAt=Date.now();
+        changed++;
+      }else{
+        item.art=[];
+        item.autoArt=true;
+      }
     }else{
       // Keep it eligible for a future retry if both AI and local fallback fail.
       item.art=[];
