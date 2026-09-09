@@ -177,9 +177,8 @@
     updateReviewTrackTabs();
   };
 
-  /* ===== Smart picture fallback for bulk/custom Shorashim =====
-     This protects student screens even before the teacher dashboard has had
-     a chance to backfill old generic items. */
+  /* ===== Meaning-aware pictures for bulk/custom Shorashim =====
+     Only genuinely related choices are shown; unrelated filler icons are never added. */
   const GENERIC_ART = new Set(['✨','⭐','🖍️']);
   const ART_RULES = [
     [/entrance|opening|door/,['🚪','🏠','⛺','↔️'],{src:'assets/illustrations/entrance.svg',label:'A doorway entrance'}],
@@ -270,7 +269,6 @@
     [/\bto\b|\btoward\b|\btowards\b/,['➡️','👉','🛣️','🏠']],
     [/\bon\b|\bupon\b/,['⬆️','📍','🔝','🧱']]
   ];
-  const FALLBACK_ART = ['🎯','💡','📖','🧩','🔎','🌟','📌','🧠','🎨','✅','➡️','👀'];
 
   function genericArt(art) {
     return !Array.isArray(art) || !art.length || art.every(x => GENERIC_ART.has(x));
@@ -283,11 +281,8 @@
     ART_RULES.forEach(([re, choices]) => {
       if (re.test(text)) choices.forEach(add);
     });
-    let hash = 0;
-    for (const ch of text) hash = ((hash * 31) + ch.charCodeAt(0)) >>> 0;
-    for (let i = 0; out.length < 4 && i < FALLBACK_ART.length; i++) {
-      add(FALLBACK_ART[(hash + i * 3) % FALLBACK_ART.length]);
-    }
+    // Never pad with generic filler icons. If we do not have a genuinely
+    // relevant match, show fewer choices (or none) instead of misleading art.
     return out.slice(0, 4);
   }
 
@@ -316,9 +311,13 @@
     const ills = document.getElementById('illustrationChoices');
     if (!emojis || !ills) return originalRenderArtChoices(item);
 
-    const art = genericArt(item.art) ? smartArt(item) : (item.art || []);
+    const art = (item.autoArt || genericArt(item.art)) ? smartArt(item) : (item.art || []);
     emojis.innerHTML = '';
     ills.innerHTML = '';
+
+    if (!art.length) {
+      emojis.innerHTML = '<span class="mini-note">No matching picture suggestion yet.</span>';
+    }
 
     art.forEach(value => {
       const b = document.createElement('button');
