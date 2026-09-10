@@ -759,182 +759,141 @@ body{
 .door-window{position:absolute;left:18px;right:18px;top:24px;height:84px;border:5px solid #6a4024;background:linear-gradient(155deg,#bcd9ee,#eaf6ff 55%,#9dbfd9);display:flex;align-items:center;justify-content:center;font-size:2rem;color:#173f72;box-shadow:inset 0 0 18px rgba(41,95,140,.25);}
 .door-label{font-size:.74rem;text-transform:uppercase;letter-spacing:.5px;text-shadow:0 1px #4f2f1b;}
 
-/* ---- Stick-figure avatar ----
-   .avatar is positioned/scaled by JS (left/bottom/transform:scale) to express
-   depth. .avatar-figure is a separate inner element so a CSS walk-cycle
-   animation can move it independently, with no conflict with JS's inline
-   transform on the parent. */
-.avatar{position:absolute;width:46px;height:82px;transform:translateX(-50%);z-index:22;transform-origin:50% 100%;}
-.avatar-figure{position:relative;width:100%;height:100%;transition:transform .12s ease;}
+/* ---- Lanky mascot avatar ----
+   Replaces the old stick figure. JS still controls the outer .avatar for
+   position/depth; the inner figure handles the funny loose-limbed motion. */
+.avatar{
+  position:absolute;
+  width:72px;
+  height:132px;
+  transform:translateX(-50%);
+  z-index:22;
+  transform-origin:50% 100%;
+  pointer-events:auto;
+}
+.avatar-figure{
+  position:relative;
+  width:100%;
+  height:100%;
+  transition:transform .12s ease;
+  transform-origin:50% 100%;
+  filter:drop-shadow(0 5px 5px rgba(0,0,0,.18));
+}
 .avatar-figure.face-left{transform:scaleX(-1);}
-.avatar-shadow{position:absolute;bottom:-4px;left:50%;width:34px;height:9px;background:radial-gradient(ellipse at center,rgba(30,20,10,.35),transparent 72%);transform:translateX(-50%);z-index:1;}
-.sf-head{position:absolute;top:0;left:50%;width:24px;height:24px;margin-left:-12px;border-radius:50%;background:#fff6e6;border:3px solid #17325c;box-shadow:inset 0 -3px 0 rgba(23,50,92,.12);z-index:5;}
-.sf-eye{position:absolute;top:10px;width:3px;height:3px;border-radius:50%;background:#17325c;}
-.sf-eye.left{left:6px;}.sf-eye.right{right:6px;}
-.sf-mouth{position:absolute;top:15px;left:50%;width:10px;height:5px;margin-left:-5px;border:2px solid #17325c;border-top:none;border-radius:0 0 10px 10px;}
-.sf-torso{position:absolute;top:22px;left:50%;width:5px;height:26px;margin-left:-2.5px;background:#1e5aa6;border-radius:3px;z-index:4;}
-.sf-arm{position:absolute;top:26px;left:50%;width:5px;height:22px;margin-left:-2.5px;background:#2d75c0;border-radius:3px;transform-origin:50% 4px;z-index:3;}
-.sf-arm.left{transform:rotate(18deg);}
-.sf-arm.right{transform:rotate(-18deg);}
-.sf-leg{position:absolute;top:46px;left:50%;width:6px;height:28px;margin-left:-3px;background:#17325c;border-radius:3px;transform-origin:50% 3px;z-index:2;}
-.sf-leg.left{transform:rotate(-14deg);}
-.sf-leg.right{transform:rotate(14deg);}
-/* Silly, exaggerated walk cycle — legs and arms swing opposite each other,
-   whole figure bobs with each step. Only runs while a movement key is held. */
-.avatar-figure.walking .sf-leg.left{animation:sfLegL .5s ease-in-out infinite;}
-.avatar-figure.walking .sf-leg.right{animation:sfLegR .5s ease-in-out infinite;}
-.avatar-figure.walking .sf-arm.left{animation:sfArmL .5s ease-in-out infinite;}
-.avatar-figure.walking .sf-arm.right{animation:sfArmR .5s ease-in-out infinite;}
-.avatar-figure.walking{animation:sfBob .25s ease-in-out infinite;}
-@keyframes sfLegL{0%,100%{transform:rotate(-34deg);}50%{transform:rotate(30deg);}}
-@keyframes sfLegR{0%,100%{transform:rotate(30deg);}50%{transform:rotate(-34deg);}}
-@keyframes sfArmL{0%,100%{transform:rotate(30deg);}50%{transform:rotate(-34deg);}}
-@keyframes sfArmR{0%,100%{transform:rotate(-34deg);}50%{transform:rotate(30deg);}}
-@keyframes sfBob{0%,100%{transform:translateY(0);}50%{transform:translateY(-5px);}}
+.avatar-shadow{
+  position:absolute;
+  bottom:-3px;
+  left:50%;
+  width:48px;
+  height:10px;
+  background:radial-gradient(ellipse at center,rgba(30,20,10,.32),transparent 72%);
+  transform:translateX(-50%);
+  z-index:1;
+}
+.lanky-head{
+  position:absolute;
+  top:0;
+  left:50%;
+  width:34px;
+  height:34px;
+  margin-left:-17px;
+  border-radius:50%;
+  background:#fff9ef;
+  border:4px solid #17325c;
+  z-index:7;
+}
+.lanky-eye{position:absolute;top:11px;width:4px;height:4px;border-radius:50%;background:#17325c;}
+.lanky-eye.left{left:8px}.lanky-eye.right{right:8px}
+.lanky-mouth{position:absolute;top:19px;left:50%;width:13px;height:7px;margin-left:-6.5px;border:2px solid #17325c;border-top:none;border-radius:0 0 12px 12px;}
+.lanky-neck{position:absolute;top:31px;left:50%;width:5px;height:10px;margin-left:-2.5px;background:#17325c;border-radius:999px;z-index:5;}
+.lanky-body{position:absolute;top:39px;left:50%;width:6px;height:39px;margin-left:-3px;background:#1e5aa6;border-radius:999px;z-index:5;}
+.lanky-arm,.lanky-leg{position:absolute;left:50%;border-radius:999px;transform-origin:50% 4px;}
+.lanky-arm{top:43px;width:5px;height:42px;margin-left:-2.5px;background:#2d75c0;z-index:4;}
+.lanky-arm.left{transform:rotate(27deg)}
+.lanky-arm.right{transform:rotate(-27deg)}
+.lanky-hand{position:absolute;bottom:-4px;left:50%;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:#17325c;}
+.lanky-leg{top:76px;width:6px;height:48px;margin-left:-3px;background:#17325c;z-index:3;}
+.lanky-leg.left{transform:rotate(-14deg)}
+.lanky-leg.right{transform:rotate(14deg)}
+.lanky-foot{position:absolute;bottom:-3px;left:50%;width:15px;height:6px;margin-left:-3px;border-radius:8px;background:#17325c;}
+
+/* Loose, lanky walk: big arm swing, floppy legs, head bob and a tiny wobble. */
+.avatar-figure.walking{animation:lankyBob .34s ease-in-out infinite;}
+.avatar-figure.walking .lanky-head{animation:lankyHead .68s ease-in-out infinite;}
+.avatar-figure.walking .lanky-arm.left{animation:lankyArmL .62s ease-in-out infinite;}
+.avatar-figure.walking .lanky-arm.right{animation:lankyArmR .62s ease-in-out infinite;}
+.avatar-figure.walking .lanky-leg.left{animation:lankyLegL .62s ease-in-out infinite;}
+.avatar-figure.walking .lanky-leg.right{animation:lankyLegR .62s ease-in-out infinite;}
+.avatar-figure:not(.walking){animation:lankyIdle 2.5s ease-in-out infinite;}
+@keyframes lankyBob{0%,100%{translate:0 0;rotate:-1deg}50%{translate:0 -7px;rotate:1.5deg}}
+@keyframes lankyHead{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(5deg)}}
+@keyframes lankyArmL{0%,100%{transform:rotate(-48deg)}50%{transform:rotate(42deg)}}
+@keyframes lankyArmR{0%,100%{transform:rotate(42deg)}50%{transform:rotate(-48deg)}}
+@keyframes lankyLegL{0%,100%{transform:rotate(38deg)}50%{transform:rotate(-32deg)}}
+@keyframes lankyLegR{0%,100%{transform:rotate(-32deg)}50%{transform:rotate(38deg)}}
+@keyframes lankyIdle{0%,100%{rotate:-1.2deg;translate:0 0}50%{rotate:1.2deg;translate:0 -2px}}
 
 .walk-hud{position:absolute;left:14px;top:14px;z-index:26;display:flex;flex-direction:column;gap:2px;color:#42546a;font-weight:700;font-size:.78rem;text-shadow:0 1px white;pointer-events:none;white-space:nowrap;background:rgba(255,255,255,.7);border-radius:10px;padding:6px 10px;}
 .hallway-help{position:absolute;right:20px;top:17px;z-index:26;background:rgba(255,255,255,.82);border:1px solid rgba(70,80,90,.15);border-radius:999px;padding:7px 12px;color:#52606f;font-size:.7rem;font-weight:700;box-shadow:0 3px 8px rgba(0,0,0,.08);}
 
-/* Directional pad: cross layout, bottom-center */
-.hall-dpad{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:30;display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,38px);gap:5px;}
-.hall-nav-btn{width:42px;height:38px;border-radius:12px;background:#fff;color:#1a5797;border:2px solid #d7e6f6;box-shadow:0 5px 12px rgba(0,0,0,.15);z-index:30;font-size:1.1rem;cursor:pointer;}
-.hall-nav-btn.up{grid-column:2;grid-row:1;}
-.hall-nav-btn.left{grid-column:1;grid-row:2;}
-.hall-nav-btn.right{grid-column:3;grid-row:2;}
-.hall-nav-btn.down{grid-column:2;grid-row:3;}
+/* Clearer movement controls: two labeled control pods */
+.hall-controls{
+  position:absolute;
+  left:18px;
+  bottom:16px;
+  z-index:31;
+  display:flex;
+  align-items:flex-end;
+  gap:10px;
+  user-select:none;
+  touch-action:none;
+}
+.control-pod{
+  background:rgba(255,255,255,.88);
+  border:1px solid rgba(55,85,120,.16);
+  border-radius:16px;
+  padding:8px;
+  box-shadow:0 8px 22px rgba(0,0,0,.14);
+  backdrop-filter:blur(5px);
+}
+.control-label{
+  display:block;
+  text-align:center;
+  font-size:.62rem;
+  line-height:1;
+  font-weight:900;
+  letter-spacing:.45px;
+  text-transform:uppercase;
+  color:#607187;
+  margin-bottom:6px;
+}
+.walk-controls{display:grid;grid-template-columns:58px 58px;gap:6px;}
+.wall-controls{display:grid;grid-template-columns:58px 58px;gap:6px;}
+.hall-nav-btn{
+  min-width:58px;
+  height:48px;
+  border-radius:13px;
+  background:linear-gradient(#ffffff,#eef5fc);
+  color:#174f8c;
+  border:2px solid #cfe0f2;
+  box-shadow:0 4px 0 #b9cee4,0 7px 12px rgba(0,0,0,.12);
+  font-family:'Quicksand';
+  font-weight:900;
+  font-size:.72rem;
+  line-height:1.05;
+  cursor:pointer;
+  touch-action:none;
+  transition:transform .08s ease,box-shadow .08s ease,background .12s ease;
+}
+.hall-nav-btn .arrow{display:block;font-size:1.15rem;line-height:1;margin-bottom:2px;}
+.hall-nav-btn:hover{background:linear-gradient(#fff,#e5f1ff)}
+.hall-nav-btn:active,.hall-nav-btn.pressed{transform:translateY(3px);box-shadow:0 1px 0 #b9cee4,0 3px 7px rgba(0,0,0,.10)}
 .empty-hall{top:140px;width:310px;background:rgba(255,253,246,.94);border:3px solid #be8550;border-radius:12px;padding:24px;color:#4b3827;box-shadow:0 10px 25px rgba(0,0,0,.2);font-family:'Quicksand';}
 .section-label{position:absolute;top:100px;width:170px;transform:translateX(-50%);text-align:center;background:linear-gradient(#fff8ea,#f3e6cc);border:3px solid #9b6134;border-radius:10px;padding:12px 10px;box-shadow:0 8px 16px rgba(60,35,10,.22);}
 .section-label strong{display:block;font-family:'Caveat',cursive;font-size:1.5rem;color:#173f72;line-height:1;margin-bottom:4px;}
 .section-label .section-count{font-size:.72rem;font-weight:800;color:#3f6d39;letter-spacing:.3px;}
 .section-label .section-empty{font-size:.72rem;font-weight:700;color:#8a7357;font-style:italic;}
 .empty-hall strong{display:block;font-family:'Caveat';font-size:1.8rem;color:#214f82;margin-bottom:6px}.empty-hall span{font-size:.8rem;}
-
-
-
-/* ---- Lanky helper mascot ---- */
-.hall-helper{
-  position:absolute;
-  right:18px;
-  bottom:20px;
-  z-index:34;
-  display:flex;
-  align-items:flex-end;
-  gap:10px;
-  max-width:min(360px, calc(100% - 24px));
-}
-.hall-helper.hidden{display:none;}
-.hall-helper.minimized .hall-helper-bubble{display:none;}
-.hall-helper-bubble{
-  position:relative;
-  background:linear-gradient(#fffefb,#f4ead7);
-  border:3px solid #315f9d;
-  color:#24384c;
-  border-radius:16px;
-  padding:12px 14px;
-  font-size:.83rem;
-  line-height:1.25;
-  font-weight:800;
-  box-shadow:0 12px 22px rgba(0,0,0,.18);
-  min-width:170px;
-}
-.hall-helper-bubble::after{
-  content:"";
-  position:absolute;
-  right:16px;
-  bottom:-13px;
-  width:20px;
-  height:20px;
-  background:inherit;
-  border-right:3px solid #315f9d;
-  border-bottom:3px solid #315f9d;
-  transform:rotate(45deg);
-}
-.hall-helper-close{
-  position:absolute;
-  top:-10px;
-  right:-10px;
-  width:24px;
-  height:24px;
-  border:none;
-  border-radius:50%;
-  background:#315f9d;
-  color:#fff;
-  font-weight:900;
-  cursor:pointer;
-  box-shadow:0 3px 8px rgba(0,0,0,.18);
-}
-.hall-helper-figure{
-  position:relative;
-  width:96px;
-  height:146px;
-  transform-origin:50% 100%;
-  animation:helperSway 2.4s ease-in-out infinite;
-  filter:drop-shadow(0 7px 10px rgba(0,0,0,.18));
-}
-.hall-helper-figure[data-mode="excited"]{animation:helperHop .42s ease-in-out infinite;}
-.hall-helper-figure[data-mode="think"]{animation:helperThink 1.6s ease-in-out infinite;}
-.hall-helper-shadow{
-  position:absolute;
-  left:50%;
-  bottom:6px;
-  width:54px;
-  height:11px;
-  transform:translateX(-50%);
-  background:radial-gradient(ellipse at center, rgba(25,20,12,.28), transparent 72%);
-}
-.hf-head{
-  position:absolute;
-  top:2px;
-  left:50%;
-  width:34px;
-  height:34px;
-  margin-left:-17px;
-  border-radius:50%;
-  background:#fff8ef;
-  border:4px solid #174277;
-  z-index:4;
-}
-.hf-eye{position:absolute;top:11px;width:4px;height:4px;border-radius:50%;background:#174277;}
-.hf-eye.left{left:8px;}.hf-eye.right{right:8px;}
-.hf-mouth{position:absolute;left:50%;top:18px;width:12px;height:6px;margin-left:-6px;border:2px solid #174277;border-top:none;border-radius:0 0 12px 12px;}
-.hf-torso{
-  position:absolute;
-  top:35px;
-  left:50%;
-  width:6px;
-  height:42px;
-  margin-left:-3px;
-  background:#1e5aa6;
-  border-radius:999px;
-  z-index:3;
-}
-.hf-arm,.hf-leg{
-  position:absolute;
-  left:50%;
-  background:#1e5aa6;
-  border-radius:999px;
-  transform-origin:50% 4px;
-}
-.hf-arm{top:40px;width:5px;height:38px;margin-left:-2.5px;z-index:2;}
-.hf-arm.left{transform:rotate(28deg);} 
-.hf-arm.right{transform:rotate(-28deg);} 
-.hf-leg{top:75px;width:6px;height:52px;margin-left:-3px;z-index:1;}
-.hf-leg.left{transform:rotate(-16deg);} 
-.hf-leg.right{transform:rotate(16deg);} 
-.hall-helper-figure[data-mode="wave"] .hf-arm.right{animation:helperWave .55s ease-in-out infinite;}
-.hall-helper-figure[data-mode="point"] .hf-arm.right{transform:rotate(-72deg) !important;height:44px;}
-.hall-helper-figure[data-mode="point"] .hf-arm.left{transform:rotate(36deg) !important;}
-.hall-helper-figure[data-mode="excited"] .hf-arm.left{animation:helperLimbL .5s ease-in-out infinite;}
-.hall-helper-figure[data-mode="excited"] .hf-arm.right{animation:helperLimbR .5s ease-in-out infinite;}
-.hall-helper-figure[data-mode="excited"] .hf-leg.left{animation:helperLimbR .5s ease-in-out infinite;}
-.hall-helper-figure[data-mode="excited"] .hf-leg.right{animation:helperLimbL .5s ease-in-out infinite;}
-.hall-helper-figure[data-mode="think"] .hf-head{transform:rotate(-12deg);}
-@keyframes helperSway{0%,100%{transform:rotate(-3deg) translateY(0);}50%{transform:rotate(3deg) translateY(-2px);}}
-@keyframes helperWave{0%,100%{transform:rotate(-26deg);}50%{transform:rotate(-92deg);}}
-@keyframes helperHop{0%,100%{transform:translateY(0) rotate(-2deg);}50%{transform:translateY(-8px) rotate(2deg);}}
-@keyframes helperThink{0%,100%{transform:translateY(0);}50%{transform:translateY(-2px) rotate(-1deg);}}
-@keyframes helperLimbL{0%,100%{transform:rotate(-32deg);}50%{transform:rotate(30deg);}}
-@keyframes helperLimbR{0%,100%{transform:rotate(30deg);}50%{transform:rotate(-32deg);}}
 
 /* Modals now match the brighter app chrome */
 .overlay{backdrop-filter:blur(4px);background:rgba(24,37,54,.55);}
@@ -958,12 +917,9 @@ footer{color:#705c48;background:#f6efe6;padding:0 0 18px;font-weight:600;}
   .filters{justify-content:center}.top-actions{justify-content:center}.pending-note{position:static}
   .hallway-stage{padding:12px 8px}.hallway-wrap{padding:0 8px}.hallway-viewport{min-height:500px;height:68vh;border-radius:14px}
   .hall-sign{font-size:1.25rem;padding:6px 12px;top:35px}.hall-sign-left{left:3%}.hall-sign-right{right:3%}
-  .bench,.plant{display:none}.hallway-help{display:none}.walk-hud{font-size:.72rem;gap:7px}.walk-arrow{font-size:1.4rem}
+  .bench,.plant{display:none}.hallway-help{display:none}.walk-hud{display:none}.hall-controls{left:8px;bottom:8px;gap:6px}.control-pod{padding:6px}.hall-nav-btn{min-width:50px;width:50px;height:44px;font-size:.64rem}.walk-controls,.wall-controls{grid-template-columns:50px 50px;gap:5px}
   .room-banner{margin-top:8px;margin-bottom:-48px;font-size:.72rem}
   .wall-post{width:170px}.door-plaque{width:128px}.hall-door{width:100px}
-  .hall-helper{right:8px;bottom:14px;gap:6px;max-width:calc(100% - 14px)}
-  .hall-helper-bubble{padding:10px 12px;font-size:.74rem;min-width:140px}
-  .hall-helper-figure{width:78px;height:122px}
 }
 
 </style>
@@ -1007,11 +963,21 @@ footer{color:#705c48;background:#f6efe6;padding:0 0 18px;font-weight:600;}
 
 <div class="hallway-stage">
   <div id="boardArea"></div>
-  <div class="hall-dpad">
-    <button class="hall-nav-btn up" id="navUpBtn" aria-label="Step forward" type="button">▲</button>
-    <button class="hall-nav-btn left" id="navLeftBtn" aria-label="Walk left" type="button">◀</button>
-    <button class="hall-nav-btn right" id="navRightBtn" aria-label="Walk right" type="button">▶</button>
-    <button class="hall-nav-btn down" id="navDownBtn" aria-label="Step back" type="button">▼</button>
+  <div class="hall-controls" aria-label="Hallway movement controls">
+    <div class="control-pod">
+      <span class="control-label">Walk hall</span>
+      <div class="walk-controls">
+        <button class="hall-nav-btn up" id="navUpBtn" aria-label="Walk forward" type="button"><span class="arrow">▲</span>Forward</button>
+        <button class="hall-nav-btn down" id="navDownBtn" aria-label="Walk back" type="button"><span class="arrow">▼</span>Back</button>
+      </div>
+    </div>
+    <div class="control-pod">
+      <span class="control-label">Move to wall</span>
+      <div class="wall-controls">
+        <button class="hall-nav-btn left" id="navLeftBtn" aria-label="Step toward left wall" type="button"><span class="arrow">◀</span>Left</button>
+        <button class="hall-nav-btn right" id="navRightBtn" aria-label="Step toward right wall" type="button"><span class="arrow">▶</span>Right</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1178,11 +1144,6 @@ const DEPTH_MIN = -1, DEPTH_MAX = 1;
 let lastTriggeredDoor = null;
 let viewportEl = null, worldEl = null, avatarEl = null, avatarFigureEl = null;
 let currentLayout = { doors: [], posts: [], worldWidth: 700 };
-let helperEl = null, helperFigureEl = null, helperBubbleEl = null;
-let helperDismissed = false;
-let helperTipIndex = 0;
-let lastActivityAt = Date.now();
-let lastHelperKey = '';
 
 function catToColor(cat){
   const map = {Chumash:'blue', Parsha:'yellow', Halacha:'green', Other:'pink'};
@@ -1416,38 +1377,28 @@ function renderHallway(visible, boardIsEmpty, groups){
         <div class="floor-strip"></div>
         ${doorsHtml}
         ${postsHtml}
-        <div class="avatar" id="avatarEl" aria-label="student walking through the gallery">
+        <div class="avatar" id="avatarEl" aria-label="lanky hallway mascot walking through the gallery">
           <div class="avatar-shadow"></div>
           <div class="avatar-figure" id="avatarFigure">
-            <div class="sf-head">
-              <div class="sf-eye left"></div><div class="sf-eye right"></div>
-              <div class="sf-mouth"></div>
+            <div class="lanky-head">
+              <div class="lanky-eye left"></div><div class="lanky-eye right"></div>
+              <div class="lanky-mouth"></div>
             </div>
-            <div class="sf-torso"></div>
-            <div class="sf-arm left"></div><div class="sf-arm right"></div>
-            <div class="sf-leg left"></div><div class="sf-leg right"></div>
+            <div class="lanky-neck"></div>
+            <div class="lanky-body"></div>
+            <div class="lanky-arm left"><span class="lanky-hand"></span></div>
+            <div class="lanky-arm right"><span class="lanky-hand"></span></div>
+            <div class="lanky-leg left"><span class="lanky-foot"></span></div>
+            <div class="lanky-leg right"><span class="lanky-foot"></span></div>
           </div>
         </div>
       </div>
 
       <div class="walk-hud" aria-hidden="true">
-        <span>↑ ↓ walk down the hall</span>
-        <span>← → step toward a wall</span>
+        <span>Keyboard: ↑ ↓ walk the hall</span>
+        <span>← → move toward a wall</span>
       </div>
       <div class="hallway-help">Walk into a door to go in.</div>
-      <div class="hall-helper" id="hallHelper">
-        <div class="hall-helper-bubble" id="hallHelperBubble">
-          Hi! Use ↑ ↓ to walk down the hall and walk into a door to go in.
-          <button class="hall-helper-close" id="hallHelperClose" type="button" aria-label="Hide helper">×</button>
-        </div>
-        <div class="hall-helper-figure" id="hallHelperFigure" data-mode="wave" role="button" tabindex="0" aria-label="Hallway helper mascot">
-          <div class="hall-helper-shadow"></div>
-          <div class="hf-head"><div class="hf-eye left"></div><div class="hf-eye right"></div><div class="hf-mouth"></div></div>
-          <div class="hf-torso"></div>
-          <div class="hf-arm left"></div><div class="hf-arm right"></div>
-          <div class="hf-leg left"></div><div class="hf-leg right"></div>
-        </div>
-      </div>
     </div>
   `;
 
@@ -1455,27 +1406,10 @@ function renderHallway(visible, boardIsEmpty, groups){
   worldEl = document.getElementById('hallwayWorld');
   avatarEl = document.getElementById('avatarEl');
   avatarFigureEl = document.getElementById('avatarFigure');
-  helperEl = document.getElementById('hallHelper');
-  helperFigureEl = document.getElementById('hallHelperFigure');
-  helperBubbleEl = document.getElementById('hallHelperBubble');
-  const helperCloseBtn = document.getElementById('hallHelperClose');
-  if(helperCloseBtn){
-    helperCloseBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      helperDismissed = true;
-      if(helperEl) helperEl.classList.add('minimized');
-    });
-  }
-  if(helperFigureEl){
-    const handler = () => { helperDismissed = false; if(helperEl) helperEl.classList.remove('minimized'); cycleHelperTip(); };
-    helperFigureEl.addEventListener('click', handler);
-    helperFigureEl.addEventListener('keydown', (e) => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); handler(); } });
-  }
 
   avatarX = Math.max(90, Math.min(worldWidth - 90, avatarX));
   updatePositions();
   checkProximity();
-  showWelcomeHint();
 
   document.querySelectorAll('.wall-post').forEach(el => {
     el.addEventListener('click', (e) => {
@@ -1550,86 +1484,6 @@ function checkProximity(){
     if(!el) return;
     el.classList.toggle('near', Math.abs(avatarX - p.x) < 60);
   });
-  updateHelperContext();
-}
-
-
-function setHelper(text, mode='idle', key='generic'){
-  if(!helperEl || !helperBubbleEl || !helperFigureEl) return;
-  if(helperDismissed) return;
-  if(lastHelperKey === key && helperBubbleEl.dataset.text === text) return;
-  helperBubbleEl.dataset.text = text;
-  helperBubbleEl.innerHTML = `${escapeHtml(text)}<button class="hall-helper-close" id="hallHelperClose" type="button" aria-label="Hide helper">×</button>`;
-  const closeBtn = document.getElementById('hallHelperClose');
-  if(closeBtn){
-    closeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      helperDismissed = true;
-      helperEl.classList.add('minimized');
-    });
-  }
-  helperFigureEl.setAttribute('data-mode', mode);
-  lastHelperKey = key;
-}
-
-function showWelcomeHint(){
-  if(roomFilter && roomFilter.type === 'lockers'){
-    setHelper('Welcome to Student Lockers! Walk farther to see more students.', 'wave', 'welcome-lockers');
-  }else if(roomFilter && roomFilter.type === 'weeks'){
-    setHelper('Welcome to Browse by Week! Keep walking to explore another week.', 'wave', 'welcome-weeks');
-  }else if(currentLayout.posts.length === 0){
-    setHelper('Hi! Nothing is pinned yet. Click Pin Your Work to add the first project.', 'wave', 'welcome-empty');
-  }else{
-    setHelper('Hi! Use ↑ ↓ to walk down the hall and ← → to step toward a wall.', 'wave', 'welcome-main');
-  }
-}
-
-function updateHelperContext(){
-  if(!helperEl || anyOverlayOpen()) return;
-
-  const nearDoor = currentLayout.doors.find(d => Math.abs(avatarX - d.x) < 55);
-  const nearPost = currentLayout.posts.find(p => Math.abs(avatarX - p.x) < 60);
-
-  if(nearDoor){
-    if(nearDoor.elId === 'doorStudents') return setHelper('This door opens Student Lockers.', 'point', 'door-students');
-    if(nearDoor.elId === 'doorWeeks') return setHelper('This door lets you browse by week.', 'point', 'door-weeks');
-    if(nearDoor.elId === 'doorExit') return setHelper('This door takes you back to the main hallway.', 'point', 'door-exit');
-  }
-
-  if(nearPost){
-    return setHelper('You are near a project. Click it to open it.', 'excited', 'near-project');
-  }
-
-  if(roomFilter && roomFilter.type === 'lockers'){
-    return setHelper('Keep walking to see more student lockers.', 'idle', 'room-lockers');
-  }
-  if(roomFilter && roomFilter.type === 'weeks'){
-    return setHelper('Keep walking to browse another week of work.', 'idle', 'room-weeks');
-  }
-  if(currentLayout.posts.length === 0){
-    return setHelper('Nothing is pinned here yet. Try Pin Your Work!', 'think', 'empty');
-  }
-  return setHelper('Want a closer look? Step toward a wall with ← or →.', 'idle', 'hall-default');
-}
-
-function cycleHelperTip(){
-  const tips = roomFilter ? [
-    'Keep walking to reveal more of this room.',
-    'Click a project to open it.',
-    roomFilter.type === 'lockers' ? 'Use Exit to go back to the main hallway.' : 'Browse farther to see another week.'
-  ] : [
-    'Walk into a door to go in.',
-    'Click a project to open it.',
-    'Use Pin Your Work to add a new project.'
-  ];
-  const idx = helperTipIndex % tips.length;
-  helperTipIndex += 1;
-  const mode = idx === 0 ? 'point' : idx === 1 ? 'excited' : 'wave';
-  setHelper(tips[idx], mode, 'tip-' + idx + '-' + (roomFilter ? roomFilter.type : 'main'));
-}
-
-function noteActivity(){
-  lastActivityAt = Date.now();
 }
 
 function enterRoom(type){
@@ -1690,16 +1544,33 @@ function normKey(key){
 window.addEventListener('keydown', (e) => {
   if(isTypingContext()) return;
   const k = normKey(e.key);
-  if(k){ keysDown[k] = true; noteActivity(); e.preventDefault(); }
+  if(k){ keysDown[k] = true; e.preventDefault(); }
 });
 window.addEventListener('keyup', (e) => {
   const k = normKey(e.key);
   if(k){ keysDown[k] = false; }
 });
 
+function nudgeMovement(key){
+  if(key === 'up') avatarX += 34;
+  if(key === 'down') avatarX -= 34;
+  if(key === 'left'){ avatarY = Math.max(DEPTH_MIN, avatarY - 0.12); facing = 'left'; }
+  if(key === 'right'){ avatarY = Math.min(DEPTH_MAX, avatarY + 0.12); facing = 'right'; }
+  avatarX = Math.max(0, Math.min(currentLayout.worldWidth - 20, avatarX));
+  updatePositions();
+  checkProximity();
+}
 function bindNavHold(btn, key){
-  const start = (e) => { e.preventDefault(); keysDown[key] = true; noteActivity(); };
-  const stop = () => { keysDown[key] = false; };
+  const start = (e) => {
+    e.preventDefault();
+    keysDown[key] = true;
+    btn.classList.add('pressed');
+    nudgeMovement(key); // a quick tap now gives a clear movement
+  };
+  const stop = () => {
+    keysDown[key] = false;
+    btn.classList.remove('pressed');
+  };
   btn.addEventListener('pointerdown', start);
   btn.addEventListener('pointerup', stop);
   btn.addEventListener('pointerleave', stop);
@@ -1710,8 +1581,8 @@ bindNavHold(document.getElementById('navRightBtn'), 'right');
 bindNavHold(document.getElementById('navUpBtn'), 'up');
 bindNavHold(document.getElementById('navDownBtn'), 'down');
 
-const AVATAR_SPEED = 6;
-const LEAN_SPEED = 0.012;
+const AVATAR_SPEED = 7.5;
+const LEAN_SPEED = 0.018;
 function animate(){
   if(!anyOverlayOpen()){
     let movedX = false, movedY = false;
@@ -1729,12 +1600,8 @@ function animate(){
       avatarX = Math.max(0, Math.min(currentLayout.worldWidth - 20, avatarX));
     }
     if(movedX || movedY){
-      noteActivity();
       updatePositions();
       checkProximity();
-    }else if(Date.now() - lastActivityAt > 7000){
-      cycleHelperTip();
-      lastActivityAt = Date.now() - 3000;
     }
   }
   requestAnimationFrame(animate);
