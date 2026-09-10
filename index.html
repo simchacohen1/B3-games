@@ -35,6 +35,10 @@
   .mode-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:12px 0}.mode-btn{border:1px solid #cbd5e1;background:white;border-radius:9px;padding:8px 5px;font-size:12px;font-weight:800;cursor:pointer}.mode-btn.active{background:#1f2937;color:white;border-color:#1f2937}
   details{margin-top:8px}summary{cursor:pointer;font-weight:800;color:#334155}.schedule-grid{margin-top:9px}.schedule-help{font-size:11px;color:#64748b;margin:7px 0 10px;line-height:1.35}.schedule-day{border-top:1px solid #e5e7eb;padding:8px 0}.schedule-day:first-child{border-top:0}.schedule-day-name{font-weight:900;font-size:12px;margin-bottom:5px}.lock-range{display:grid;grid-template-columns:24px 44px 1fr 22px 1fr;align-items:center;gap:5px;margin:5px 0;font-size:11px}.lock-range input[type="time"]{width:100%;padding:5px;border:1px solid #cbd5e1;border-radius:8px;font-size:11px}.lock-range .to{text-align:center;color:#64748b}.game-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0;font-size:14px;padding-bottom:6px;border-bottom:1px solid #eef2f7}
   .tz-note{font-size:11px;color:#64748b;margin-top:7px}
+  .special-access-note{max-width:900px;margin:0 auto 16px;padding:11px 14px;border:1px solid #86efac;background:#f0fdf4;border-radius:12px;color:#166534;font-size:14px;font-weight:700;text-align:left}
+  .override-box{border:1px solid #bfdbfe;background:#eff6ff;border-radius:14px;padding:12px;margin-top:10px}
+  .override-box label{font-size:13px;font-weight:800;color:#1e3a8a}.override-student-select{width:100%;margin:7px 0 9px;padding:9px;border:1px solid #93c5fd;border-radius:9px;background:white}
+  .override-game-list{background:white;border:1px solid #dbeafe;border-radius:10px;padding:4px 10px}.override-game-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #eff6ff;font-size:13px}.override-game-row:last-child{border-bottom:0}.override-game-row span{min-width:0}.override-off-note{display:block;color:#9a3412;font-size:10px;margin-top:2px}.override-empty{font-size:12px;color:#64748b;padding:7px 0}.override-saving{font-size:11px;color:#64748b;min-height:16px;margin-top:6px}
   @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 40px 1fr 18px 1fr}.admin-panel{top:54px}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
@@ -70,6 +74,7 @@
   </div>
 
   <div id="gamesArea" class="hidden">
+    <div id="specialAccessNote" class="special-access-note hidden">Special access from Rabbi Cohen: while B3 Games is locked, only the activity or activities shown below are available to you.</div>
         <div class="game-container">
       <a class="game-card" data-game-id="kodesh-construct" href="kodesh-construct/index.html" target="_blank" rel="noopener"><span class="card-icon">🔤</span><span class="card-title">Dikduk Arcade</span></a>
       <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html" target="_blank" rel="noopener"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
@@ -116,6 +121,15 @@
 
       <h3>Individual activity switches</h3>
       <div id="gameToggles"></div>
+
+      <h3>Student access while locked</h3>
+      <p class="admin-message">Choose one student, then check only the activities that student may use while B3 Games or that student's class is locked. An activity switched off above always stays off.</p>
+      <div class="override-box">
+        <label for="overrideStudentSelect">Student</label>
+        <select id="overrideStudentSelect" class="override-student-select"><option value="">Loading students…</option></select>
+        <div id="overrideGameToggles" class="override-game-list"><div class="override-empty">Choose a student.</div></div>
+        <div id="overrideSaveStatus" class="override-saving" aria-live="polite"></div>
+      </div>
       <div class="tz-note">Automatic schedules use America/New_York time.</div>
     </div>
   </div>
@@ -144,38 +158,10 @@
   let myStudentId="";
   let myStudentName="";
   let myClassId="";
+  let overrideRoster=[];
+  let selectedOverrideStudentId="";
 
   function slugify(name){return String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");}
-
-  // Existing B3 student records were created before ET/WT classId was added.
-  // Keep those logins working by using the established class rosters whenever
-  // a Firebase row does not yet contain classId.
-  const FALLBACK_CLASS_ROSTERS={
-    et:new Set([
-      "mayer_chaim_chaikin","chaim_chaikin","yossi_gourarie",
-      "sholom_dovber_huebner","sholom_huebner","moshe_lapine","kehos_notik",
-      "yisroel_oirechman","moshe_tuvia_raichman","moshe_raichman",
-      "avrohom_rosenfeld","levi_rozmarin","arik_traxler","simcha_cohen"
-    ]),
-    wt:new Set([
-      "ari_greenberg","zev_rosenfeld","levi_schtroks","yisroel_aryeh_simmonds",
-      "leibel_vogel","leib_wolf"
-    ])
-  };
-
-  function fallbackClassForStudent(id,name){
-    const candidates=[slugify(id),slugify(name)].filter(Boolean);
-    if(candidates.some(x=>FALLBACK_CLASS_ROSTERS.et.has(x)))return "et";
-    if(candidates.some(x=>FALLBACK_CLASS_ROSTERS.wt.has(x)))return "wt";
-    return "";
-  }
-
-  function resolveStudentClassId(id,name,databaseClassId){
-    const dbClass=String(databaseClassId||"").toLowerCase();
-    if(["et","wt"].includes(dbClass))return dbClass;
-    return fallbackClassForStudent(id,name);
-  }
-
   function setLoginMsg(t){el("loginMsg").textContent=t||"";}
 
   function showLogin(){
@@ -186,10 +172,14 @@
     el("teacherToolsSection").classList.add("hidden");
   }
 
+  function studentHasOverride(gameId,studentId=myStudentId){
+    if(!studentId||!gameId)return false;
+    if(typeof settingsApi.studentHasGameOverride==="function")return settingsApi.studentHasGameOverride(currentSettings,studentId,gameId);
+    return Boolean(currentSettings.studentGameOverrides?.[studentId]?.[gameId]===true);
+  }
+
   function renderStudentAccess(){
-    // The authorized teacher account is never treated as ET or WT. It can
-    // always open the homepage and protected activities so Rabbi Cohen can
-    // test or manage them while students are locked.
+    // The authorized teacher account is never treated as ET or WT.
     if(isAuthorizedAdmin){
       el("loginCard").classList.add("hidden");
       el("studentBar").classList.remove("hidden");
@@ -198,6 +188,7 @@
       el("switchStudentBtn").classList.add("hidden");
       el("lockedCard").classList.add("hidden");
       el("gamesArea").classList.remove("hidden");
+      el("specialAccessNote")?.classList.add("hidden");
       el("teacherToolsSection").classList.remove("hidden");
       gameDefinitions.forEach(game=>game.element.classList.remove("hidden"));
       el("disabledMessage").classList.add("hidden");
@@ -210,26 +201,41 @@
     el("studentBar").classList.remove("hidden");
     el("switchStudentBtn").classList.remove("hidden");
     el("studentNameLabel").textContent=myStudentName||"Student";
-    el("studentClassLabel").textContent=classLabels[myClassId]+" · access follows your class schedule";
 
     const info=settingsApi.describeClassAccess(currentSettings,myClassId,new Date());
-    if(!info.open){
-      el("gamesArea").classList.add("hidden");
-      el("lockedCard").classList.remove("hidden");
-      el("lockedTitle").textContent=classLabels[myClassId]+" is locked right now";
-      el("lockedMessage").textContent=currentSettings.siteEnabled===false?"B3 Games is closed for everyone right now.":"Your class cannot use B3 Games right now. Rabbi Cohen can override the schedule at any time.";
+    let visible=0;
+    gameDefinitions.forEach(game=>{
+      const activityEnabled=currentSettings.games?.[game.id]!==false;
+      const exceptionAllowed=studentHasOverride(game.id);
+      const show=activityEnabled&&(info.open||exceptionAllowed);
+      game.element.classList.toggle("hidden",!show);
+      if(show)visible++;
+    });
+
+    if(info.open){
+      el("studentClassLabel").textContent=classLabels[myClassId]+" · access follows your class schedule";
+      el("lockedCard").classList.add("hidden");
+      el("gamesArea").classList.remove("hidden");
+      el("specialAccessNote")?.classList.add("hidden");
+      el("disabledMessage").classList.toggle("hidden",visible!==0);
       return;
     }
 
-    el("lockedCard").classList.add("hidden");
-    el("gamesArea").classList.remove("hidden");
-    let visible=0;
-    gameDefinitions.forEach(game=>{
-      const show=currentSettings.games[game.id]!==false;
-      game.element.classList.toggle("hidden",!show);
-      if(show) visible++;
-    });
-    el("disabledMessage").classList.toggle("hidden",visible!==0);
+    if(visible>0){
+      el("studentClassLabel").textContent=classLabels[myClassId]+" · special activity access";
+      el("lockedCard").classList.add("hidden");
+      el("gamesArea").classList.remove("hidden");
+      el("specialAccessNote")?.classList.remove("hidden");
+      el("disabledMessage").classList.add("hidden");
+      return;
+    }
+
+    el("studentClassLabel").textContent=classLabels[myClassId]+" · access follows your class schedule";
+    el("gamesArea").classList.add("hidden");
+    el("specialAccessNote")?.classList.add("hidden");
+    el("lockedCard").classList.remove("hidden");
+    el("lockedTitle").textContent=currentSettings.siteEnabled===false?"B3 Games is locked":classLabels[myClassId]+" is locked right now";
+    el("lockedMessage").textContent=currentSettings.siteEnabled===false?"B3 Games is closed right now. Rabbi Cohen can give you access to a specific activity.":"Your class cannot use B3 Games right now. Rabbi Cohen can give you access to a specific activity.";
   }
 
   async function checkStudentAccess(name,pin){
@@ -243,10 +249,12 @@
     if(realPin&&String(pin).trim()!==String(realPin).trim())return{ok:false,reason:"Incorrect PIN. Ask Rabbi Cohen."};
     if(!allowedSnap.exists())return{ok:false,reason:"Your name is not on the B3 student list."};
     const d=allowedSnap.val()||{};
-    const displayName=(d&&d.name)?String(d.name):name.trim();
-    const classId=resolveStudentClassId(slug,displayName,d&&typeof d==="object"?d.classId:"");
-    if(!["et","wt"].includes(classId))return{ok:false,reason:"I could not match your name to ET or WT. Ask Rabbi Cohen."};
-    return{ok:true,id:slug,name:displayName,classId};
+    // Rabbi Cohen's own student-test login defaults to ET so he can test the
+    // student experience in an InPrivate/incognito window without changing
+    // his teacher/admin account or needing a Firebase classId on his test row.
+    const classId=(slug==="simcha_cohen")?"et":(d&&typeof d==="object"?d.classId:"");
+    if(!["et","wt"].includes(classId))return{ok:false,reason:"Your ET/WT class is not assigned yet. Ask Rabbi Cohen."};
+    return{ok:true,id:slug,name:(d&&d.name)?String(d.name):name.trim(),classId};
   }
 
   function enterStudent(r){
@@ -278,10 +286,9 @@
       const snap=await db.ref("posukPractice/allowedStudents/"+id).once("value");
       if(!snap.exists()){showLogin();return;}
       const d=snap.val()||{};
-      const displayName=d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student");
-      const restoredClassId=resolveStudentClassId(id,displayName,d.classId);
+      const restoredClassId=(id==="simcha_cohen")?"et":d.classId;
       if(!["et","wt"].includes(restoredClassId)){showLogin();return;}
-      enterStudent({id:id,name:displayName,classId:restoredClassId});
+      enterStudent({id:id,name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
     }catch(e){console.warn(e);showLogin();}
   }
 
@@ -311,6 +318,63 @@
       </div>
       <details><summary>Edit automatic locked times</summary><div class="schedule-grid"><div class="schedule-help">The class is OPEN by default. Check only the periods when it should automatically LOCK. Times use New York time.</div>${rows}</div></details>
     </div>`;
+  }
+
+  function renderStudentOverrideControls(){
+    const select=el("overrideStudentSelect");
+    const list=el("overrideGameToggles");
+    if(!select||!list)return;
+
+    const previous=selectedOverrideStudentId||select.value;
+    select.innerHTML='<option value="">Choose a student…</option>';
+    overrideRoster.forEach(student=>{
+      const option=document.createElement("option");
+      option.value=student.id;
+      option.textContent=student.name+(student.classId?` (${classLabels[student.classId]||student.classId.toUpperCase()})`:"");
+      select.appendChild(option);
+    });
+    if(previous&&overrideRoster.some(s=>s.id===previous)){select.value=previous;selectedOverrideStudentId=previous;}
+    else if(overrideRoster.length){selectedOverrideStudentId=overrideRoster[0].id;select.value=selectedOverrideStudentId;}
+    else selectedOverrideStudentId="";
+
+    select.onchange=()=>{selectedOverrideStudentId=select.value;renderStudentOverrideControls();};
+    list.innerHTML="";
+    if(!selectedOverrideStudentId){list.innerHTML='<div class="override-empty">No student selected.</div>';return;}
+
+    gameDefinitions.forEach(game=>{
+      const row=document.createElement("label");row.className="override-game-row";
+      const text=document.createElement("span");text.textContent=game.name;
+      if(currentSettings.games?.[game.id]===false){
+        const note=document.createElement("small");note.className="override-off-note";note.textContent="Activity switch is OFF";text.appendChild(note);
+      }
+      const input=document.createElement("input");input.type="checkbox";input.checked=studentHasOverride(game.id,selectedOverrideStudentId);
+      input.addEventListener("change",async()=>{
+        const studentId=selectedOverrideStudentId;
+        const enabled=input.checked;
+        const old=!enabled;
+        const status=el("overrideSaveStatus");
+        if(status)status.textContent="Saving…";
+        currentSettings.studentGameOverrides=currentSettings.studentGameOverrides||{};
+        currentSettings.studentGameOverrides[studentId]=currentSettings.studentGameOverrides[studentId]||{};
+        if(enabled)currentSettings.studentGameOverrides[studentId][game.id]=true;
+        else{delete currentSettings.studentGameOverrides[studentId][game.id];if(!Object.keys(currentSettings.studentGameOverrides[studentId]).length)delete currentSettings.studentGameOverrides[studentId];}
+        renderStudentAccess();
+        try{
+          await settingsApi.updateStudentGameOverride(studentId,game.id,enabled);
+          if(status)status.textContent="Saved";
+        }catch(e){
+          currentSettings.studentGameOverrides=currentSettings.studentGameOverrides||{};
+          currentSettings.studentGameOverrides[studentId]=currentSettings.studentGameOverrides[studentId]||{};
+          if(old)currentSettings.studentGameOverrides[studentId][game.id]=true;
+          else{delete currentSettings.studentGameOverrides[studentId][game.id];if(!Object.keys(currentSettings.studentGameOverrides[studentId]).length)delete currentSettings.studentGameOverrides[studentId];}
+          input.checked=old;
+          if(status)status.textContent="Could not save";
+          alert("Could not save this student's special access.");
+          console.error(e);
+        }
+      });
+      row.append(text,input);list.appendChild(row);
+    });
   }
 
   function renderAdminPanel(){
@@ -343,6 +407,7 @@
       });
       row.append(label,input);el("gameToggles").appendChild(row);
     });
+    renderStudentOverrideControls();
   }
 
   function bindClassControls(){
@@ -392,6 +457,12 @@
     const old=!el("siteEnabledToggle").checked;
     try{currentSettings.siteEnabled=el("siteEnabledToggle").checked;renderStudentAccess();await settingsApi.updateSiteEnabled(el("siteEnabledToggle").checked);}catch(e){currentSettings.siteEnabled=old;el("siteEnabledToggle").checked=old;alert("Could not save the master setting.");console.error(e);}
   });
+
+  db.ref("posukPractice/allowedStudents").on("value",snap=>{
+    const data=snap.val()||{};
+    overrideRoster=Object.entries(data).map(([id,info])=>({id,name:(info&&info.name)?String(info.name):id,classId:(info&&info.classId)||""})).sort((a,b)=>a.name.localeCompare(b.name));
+    if(isAuthorizedAdmin)renderStudentOverrideControls();
+  },err=>console.warn("Could not load student override roster",err));
 
   settingsApi.onAuthStateChanged((user,authorized)=>{currentUser=user;isAuthorizedAdmin=authorized;try{if(authorized)localStorage.setItem("b3TeacherBypass","1");else localStorage.removeItem("b3TeacherBypass");}catch(e){}renderStudentAccess();renderAdminPanel();});
   settingsApi.subscribe(settings=>{currentSettings=settings;renderStudentAccess();renderAdminPanel();});

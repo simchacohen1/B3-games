@@ -52,6 +52,10 @@
   const defaultSettings = {
     siteEnabled: true,
     games: GAME_DEFAULTS,
+    // Per-student exceptions. A true value lets that student use only that
+    // activity while the master/class lock is active. Individual activity
+    // switches still win, so a game explicitly turned off stays off.
+    studentGameOverrides: {},
     classAccess: {
       et: { mode: "auto", lockWindows: defaultLockWindows("et") },
       wt: { mode: "auto", lockWindows: defaultLockWindows("wt") }
@@ -142,6 +146,22 @@
     return { mode: mode, lockWindows: lockWindows };
   }
 
+  function normalizeStudentGameOverrides(value) {
+    const result = {};
+    if (!value || typeof value !== "object") return result;
+
+    Object.keys(value).forEach(function (studentId) {
+      const raw = value[studentId];
+      if (!raw || typeof raw !== "object") return;
+      const clean = {};
+      Object.keys(raw).forEach(function (gameId) {
+        if (raw[gameId] === true) clean[gameId] = true;
+      });
+      if (Object.keys(clean).length) result[studentId] = clean;
+    });
+    return result;
+  }
+
   function normalizeSettings(settings) {
     const source = settings && typeof settings === "object" ? deepClone(settings) : {};
     const normalized = deepClone(source);
@@ -154,6 +174,8 @@
     Object.keys(sourceGames).forEach(function (gameId) {
       if (typeof sourceGames[gameId] === "boolean") normalized.games[gameId] = sourceGames[gameId];
     });
+
+    normalized.studentGameOverrides = normalizeStudentGameOverrides(source.studentGameOverrides);
 
     const fallbackAccess = cloneDefaultSettings().classAccess;
     normalized.classAccess = {
@@ -262,6 +284,38 @@
   function updateGameEnabled(gameId, enabled) {
     return readOnce().then(function (settings) {
       settings.games[gameId] = Boolean(enabled);
+      return save(settings);
+    });
+  }
+
+  function studentHasGameOverride(settings, studentId, gameId) {
+    if (!studentId || !gameId) return false;
+    const normalized = normalizeSettings(settings);
+    return Boolean(
+      normalized.studentGameOverrides &&
+      normalized.studentGameOverrides[studentId] &&
+      normalized.studentGameOverrides[studentId][gameId] === true
+    );
+  }
+
+  function updateStudentGameOverride(studentId, gameId, enabled) {
+    studentId = String(studentId || "").trim();
+    gameId = String(gameId || "").trim();
+    if (!studentId) return Promise.reject(new Error("Student is required."));
+    if (!gameId) return Promise.reject(new Error("Activity is required."));
+
+    return readOnce().then(function (settings) {
+      settings.studentGameOverrides = settings.studentGameOverrides || {};
+      settings.studentGameOverrides[studentId] = settings.studentGameOverrides[studentId] || {};
+
+      if (enabled) {
+        settings.studentGameOverrides[studentId][gameId] = true;
+      } else {
+        delete settings.studentGameOverrides[studentId][gameId];
+        if (!Object.keys(settings.studentGameOverrides[studentId]).length) {
+          delete settings.studentGameOverrides[studentId];
+        }
+      }
       return save(settings);
     });
   }
@@ -405,6 +459,8 @@
     save: save,
     updateSiteEnabled: updateSiteEnabled,
     updateGameEnabled: updateGameEnabled,
+    updateStudentGameOverride: updateStudentGameOverride,
+    studentHasGameOverride: studentHasGameOverride,
     updateClassMode: updateClassMode,
     updateClassLockWindows: updateClassLockWindows,
     isClassOpen: isClassOpen,
