@@ -210,6 +210,32 @@
     return { open:!locked, reason:locked ? "Automatic schedule: LOCKED" : "Automatic schedule: open" };
   }
 
+  function studentHasGameOverride(settings) {
+    var studentId = getStoredStudentId();
+    if (!studentId || !settings || !settings.studentGameOverrides) return false;
+    var studentMap = settings.studentGameOverrides[studentId];
+    return Boolean(studentMap && studentMap[gameId] === true);
+  }
+
+  // Shorashim also has its own internal master-site watcher. When this shared
+  // gate grants a student-specific exception, keep that internal master check
+  // open too. Its separate Shorashim-only lock still remains authoritative.
+  function syncEmbeddedGameOverride(active) {
+    if (gameId !== "shorashim" || !active) return;
+    setTimeout(function () {
+      try {
+        if (typeof recomputeSiteOpen === "function") {
+          masterSettingOpen = true;
+          masterWatcherReady = true;
+          recomputeSiteOpen();
+        }
+      } catch (err) {
+        // The Shorashim app may not have finished loading yet; the next 5-second
+        // gate refresh will try again.
+      }
+    }, 0);
+  }
+
   function decide(settings) {
     lastSettings = settings || lastSettings || {};
 
@@ -218,13 +244,23 @@
       return;
     }
 
-    if (lastSettings.siteEnabled === false) {
-      showClosed("B3 Games is closed", "The emergency master access switch is off. Rabbi Cohen must turn it back on.");
+    // An individually disabled activity always stays disabled, even if this
+    // student has an exception for it.
+    if (lastSettings.games && lastSettings.games[gameId] === false) {
+      showClosed("This activity is turned off", "This individual activity is disabled in Teacher Tools. Student exceptions do not override an activity that is switched off.");
       return;
     }
 
-    if (lastSettings.games && lastSettings.games[gameId] === false) {
-      showClosed("This activity is turned off", "This individual activity is disabled in Teacher Tools. Class Unlock Now does not override an activity that is switched off.");
+    // Per-student/per-game exceptions bypass the emergency master lock and the
+    // ET/WT class lock, but only for this one activity.
+    if (studentHasGameOverride(lastSettings)) {
+      syncEmbeddedGameOverride(true);
+      showOpen();
+      return;
+    }
+
+    if (lastSettings.siteEnabled === false) {
+      showClosed("B3 Games is closed", "B3 Games is locked right now. Rabbi Cohen can give you access to a specific activity.");
       return;
     }
 
