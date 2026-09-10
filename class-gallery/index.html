@@ -809,6 +809,133 @@ body{
 .section-label .section-empty{font-size:.72rem;font-weight:700;color:#8a7357;font-style:italic;}
 .empty-hall strong{display:block;font-family:'Caveat';font-size:1.8rem;color:#214f82;margin-bottom:6px}.empty-hall span{font-size:.8rem;}
 
+
+
+/* ---- Lanky helper mascot ---- */
+.hall-helper{
+  position:absolute;
+  right:18px;
+  bottom:20px;
+  z-index:34;
+  display:flex;
+  align-items:flex-end;
+  gap:10px;
+  max-width:min(360px, calc(100% - 24px));
+}
+.hall-helper.hidden{display:none;}
+.hall-helper.minimized .hall-helper-bubble{display:none;}
+.hall-helper-bubble{
+  position:relative;
+  background:linear-gradient(#fffefb,#f4ead7);
+  border:3px solid #315f9d;
+  color:#24384c;
+  border-radius:16px;
+  padding:12px 14px;
+  font-size:.83rem;
+  line-height:1.25;
+  font-weight:800;
+  box-shadow:0 12px 22px rgba(0,0,0,.18);
+  min-width:170px;
+}
+.hall-helper-bubble::after{
+  content:"";
+  position:absolute;
+  right:16px;
+  bottom:-13px;
+  width:20px;
+  height:20px;
+  background:inherit;
+  border-right:3px solid #315f9d;
+  border-bottom:3px solid #315f9d;
+  transform:rotate(45deg);
+}
+.hall-helper-close{
+  position:absolute;
+  top:-10px;
+  right:-10px;
+  width:24px;
+  height:24px;
+  border:none;
+  border-radius:50%;
+  background:#315f9d;
+  color:#fff;
+  font-weight:900;
+  cursor:pointer;
+  box-shadow:0 3px 8px rgba(0,0,0,.18);
+}
+.hall-helper-figure{
+  position:relative;
+  width:96px;
+  height:146px;
+  transform-origin:50% 100%;
+  animation:helperSway 2.4s ease-in-out infinite;
+  filter:drop-shadow(0 7px 10px rgba(0,0,0,.18));
+}
+.hall-helper-figure[data-mode="excited"]{animation:helperHop .42s ease-in-out infinite;}
+.hall-helper-figure[data-mode="think"]{animation:helperThink 1.6s ease-in-out infinite;}
+.hall-helper-shadow{
+  position:absolute;
+  left:50%;
+  bottom:6px;
+  width:54px;
+  height:11px;
+  transform:translateX(-50%);
+  background:radial-gradient(ellipse at center, rgba(25,20,12,.28), transparent 72%);
+}
+.hf-head{
+  position:absolute;
+  top:2px;
+  left:50%;
+  width:34px;
+  height:34px;
+  margin-left:-17px;
+  border-radius:50%;
+  background:#fff8ef;
+  border:4px solid #174277;
+  z-index:4;
+}
+.hf-eye{position:absolute;top:11px;width:4px;height:4px;border-radius:50%;background:#174277;}
+.hf-eye.left{left:8px;}.hf-eye.right{right:8px;}
+.hf-mouth{position:absolute;left:50%;top:18px;width:12px;height:6px;margin-left:-6px;border:2px solid #174277;border-top:none;border-radius:0 0 12px 12px;}
+.hf-torso{
+  position:absolute;
+  top:35px;
+  left:50%;
+  width:6px;
+  height:42px;
+  margin-left:-3px;
+  background:#1e5aa6;
+  border-radius:999px;
+  z-index:3;
+}
+.hf-arm,.hf-leg{
+  position:absolute;
+  left:50%;
+  background:#1e5aa6;
+  border-radius:999px;
+  transform-origin:50% 4px;
+}
+.hf-arm{top:40px;width:5px;height:38px;margin-left:-2.5px;z-index:2;}
+.hf-arm.left{transform:rotate(28deg);} 
+.hf-arm.right{transform:rotate(-28deg);} 
+.hf-leg{top:75px;width:6px;height:52px;margin-left:-3px;z-index:1;}
+.hf-leg.left{transform:rotate(-16deg);} 
+.hf-leg.right{transform:rotate(16deg);} 
+.hall-helper-figure[data-mode="wave"] .hf-arm.right{animation:helperWave .55s ease-in-out infinite;}
+.hall-helper-figure[data-mode="point"] .hf-arm.right{transform:rotate(-72deg) !important;height:44px;}
+.hall-helper-figure[data-mode="point"] .hf-arm.left{transform:rotate(36deg) !important;}
+.hall-helper-figure[data-mode="excited"] .hf-arm.left{animation:helperLimbL .5s ease-in-out infinite;}
+.hall-helper-figure[data-mode="excited"] .hf-arm.right{animation:helperLimbR .5s ease-in-out infinite;}
+.hall-helper-figure[data-mode="excited"] .hf-leg.left{animation:helperLimbR .5s ease-in-out infinite;}
+.hall-helper-figure[data-mode="excited"] .hf-leg.right{animation:helperLimbL .5s ease-in-out infinite;}
+.hall-helper-figure[data-mode="think"] .hf-head{transform:rotate(-12deg);}
+@keyframes helperSway{0%,100%{transform:rotate(-3deg) translateY(0);}50%{transform:rotate(3deg) translateY(-2px);}}
+@keyframes helperWave{0%,100%{transform:rotate(-26deg);}50%{transform:rotate(-92deg);}}
+@keyframes helperHop{0%,100%{transform:translateY(0) rotate(-2deg);}50%{transform:translateY(-8px) rotate(2deg);}}
+@keyframes helperThink{0%,100%{transform:translateY(0);}50%{transform:translateY(-2px) rotate(-1deg);}}
+@keyframes helperLimbL{0%,100%{transform:rotate(-32deg);}50%{transform:rotate(30deg);}}
+@keyframes helperLimbR{0%,100%{transform:rotate(30deg);}50%{transform:rotate(-32deg);}}
+
 /* Modals now match the brighter app chrome */
 .overlay{backdrop-filter:blur(4px);background:rgba(24,37,54,.55);}
 .modal,.lightbox-content{background:#fffdf8;border:1px solid #e8dccb;border-radius:16px;box-shadow:0 24px 60px rgba(20,30,40,.3);}
@@ -834,6 +961,9 @@ footer{color:#705c48;background:#f6efe6;padding:0 0 18px;font-weight:600;}
   .bench,.plant{display:none}.hallway-help{display:none}.walk-hud{font-size:.72rem;gap:7px}.walk-arrow{font-size:1.4rem}
   .room-banner{margin-top:8px;margin-bottom:-48px;font-size:.72rem}
   .wall-post{width:170px}.door-plaque{width:128px}.hall-door{width:100px}
+  .hall-helper{right:8px;bottom:14px;gap:6px;max-width:calc(100% - 14px)}
+  .hall-helper-bubble{padding:10px 12px;font-size:.74rem;min-width:140px}
+  .hall-helper-figure{width:78px;height:122px}
 }
 
 </style>
@@ -1048,6 +1178,11 @@ const DEPTH_MIN = -1, DEPTH_MAX = 1;
 let lastTriggeredDoor = null;
 let viewportEl = null, worldEl = null, avatarEl = null, avatarFigureEl = null;
 let currentLayout = { doors: [], posts: [], worldWidth: 700 };
+let helperEl = null, helperFigureEl = null, helperBubbleEl = null;
+let helperDismissed = false;
+let helperTipIndex = 0;
+let lastActivityAt = Date.now();
+let lastHelperKey = '';
 
 function catToColor(cat){
   const map = {Chumash:'blue', Parsha:'yellow', Halacha:'green', Other:'pink'};
@@ -1300,6 +1435,19 @@ function renderHallway(visible, boardIsEmpty, groups){
         <span>← → step toward a wall</span>
       </div>
       <div class="hallway-help">Walk into a door to go in.</div>
+      <div class="hall-helper" id="hallHelper">
+        <div class="hall-helper-bubble" id="hallHelperBubble">
+          Hi! Use ↑ ↓ to walk down the hall and walk into a door to go in.
+          <button class="hall-helper-close" id="hallHelperClose" type="button" aria-label="Hide helper">×</button>
+        </div>
+        <div class="hall-helper-figure" id="hallHelperFigure" data-mode="wave" role="button" tabindex="0" aria-label="Hallway helper mascot">
+          <div class="hall-helper-shadow"></div>
+          <div class="hf-head"><div class="hf-eye left"></div><div class="hf-eye right"></div><div class="hf-mouth"></div></div>
+          <div class="hf-torso"></div>
+          <div class="hf-arm left"></div><div class="hf-arm right"></div>
+          <div class="hf-leg left"></div><div class="hf-leg right"></div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -1307,10 +1455,27 @@ function renderHallway(visible, boardIsEmpty, groups){
   worldEl = document.getElementById('hallwayWorld');
   avatarEl = document.getElementById('avatarEl');
   avatarFigureEl = document.getElementById('avatarFigure');
+  helperEl = document.getElementById('hallHelper');
+  helperFigureEl = document.getElementById('hallHelperFigure');
+  helperBubbleEl = document.getElementById('hallHelperBubble');
+  const helperCloseBtn = document.getElementById('hallHelperClose');
+  if(helperCloseBtn){
+    helperCloseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      helperDismissed = true;
+      if(helperEl) helperEl.classList.add('minimized');
+    });
+  }
+  if(helperFigureEl){
+    const handler = () => { helperDismissed = false; if(helperEl) helperEl.classList.remove('minimized'); cycleHelperTip(); };
+    helperFigureEl.addEventListener('click', handler);
+    helperFigureEl.addEventListener('keydown', (e) => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); handler(); } });
+  }
 
   avatarX = Math.max(90, Math.min(worldWidth - 90, avatarX));
   updatePositions();
   checkProximity();
+  showWelcomeHint();
 
   document.querySelectorAll('.wall-post').forEach(el => {
     el.addEventListener('click', (e) => {
@@ -1385,6 +1550,86 @@ function checkProximity(){
     if(!el) return;
     el.classList.toggle('near', Math.abs(avatarX - p.x) < 60);
   });
+  updateHelperContext();
+}
+
+
+function setHelper(text, mode='idle', key='generic'){
+  if(!helperEl || !helperBubbleEl || !helperFigureEl) return;
+  if(helperDismissed) return;
+  if(lastHelperKey === key && helperBubbleEl.dataset.text === text) return;
+  helperBubbleEl.dataset.text = text;
+  helperBubbleEl.innerHTML = `${escapeHtml(text)}<button class="hall-helper-close" id="hallHelperClose" type="button" aria-label="Hide helper">×</button>`;
+  const closeBtn = document.getElementById('hallHelperClose');
+  if(closeBtn){
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      helperDismissed = true;
+      helperEl.classList.add('minimized');
+    });
+  }
+  helperFigureEl.setAttribute('data-mode', mode);
+  lastHelperKey = key;
+}
+
+function showWelcomeHint(){
+  if(roomFilter && roomFilter.type === 'lockers'){
+    setHelper('Welcome to Student Lockers! Walk farther to see more students.', 'wave', 'welcome-lockers');
+  }else if(roomFilter && roomFilter.type === 'weeks'){
+    setHelper('Welcome to Browse by Week! Keep walking to explore another week.', 'wave', 'welcome-weeks');
+  }else if(currentLayout.posts.length === 0){
+    setHelper('Hi! Nothing is pinned yet. Click Pin Your Work to add the first project.', 'wave', 'welcome-empty');
+  }else{
+    setHelper('Hi! Use ↑ ↓ to walk down the hall and ← → to step toward a wall.', 'wave', 'welcome-main');
+  }
+}
+
+function updateHelperContext(){
+  if(!helperEl || anyOverlayOpen()) return;
+
+  const nearDoor = currentLayout.doors.find(d => Math.abs(avatarX - d.x) < 55);
+  const nearPost = currentLayout.posts.find(p => Math.abs(avatarX - p.x) < 60);
+
+  if(nearDoor){
+    if(nearDoor.elId === 'doorStudents') return setHelper('This door opens Student Lockers.', 'point', 'door-students');
+    if(nearDoor.elId === 'doorWeeks') return setHelper('This door lets you browse by week.', 'point', 'door-weeks');
+    if(nearDoor.elId === 'doorExit') return setHelper('This door takes you back to the main hallway.', 'point', 'door-exit');
+  }
+
+  if(nearPost){
+    return setHelper('You are near a project. Click it to open it.', 'excited', 'near-project');
+  }
+
+  if(roomFilter && roomFilter.type === 'lockers'){
+    return setHelper('Keep walking to see more student lockers.', 'idle', 'room-lockers');
+  }
+  if(roomFilter && roomFilter.type === 'weeks'){
+    return setHelper('Keep walking to browse another week of work.', 'idle', 'room-weeks');
+  }
+  if(currentLayout.posts.length === 0){
+    return setHelper('Nothing is pinned here yet. Try Pin Your Work!', 'think', 'empty');
+  }
+  return setHelper('Want a closer look? Step toward a wall with ← or →.', 'idle', 'hall-default');
+}
+
+function cycleHelperTip(){
+  const tips = roomFilter ? [
+    'Keep walking to reveal more of this room.',
+    'Click a project to open it.',
+    roomFilter.type === 'lockers' ? 'Use Exit to go back to the main hallway.' : 'Browse farther to see another week.'
+  ] : [
+    'Walk into a door to go in.',
+    'Click a project to open it.',
+    'Use Pin Your Work to add a new project.'
+  ];
+  const idx = helperTipIndex % tips.length;
+  helperTipIndex += 1;
+  const mode = idx === 0 ? 'point' : idx === 1 ? 'excited' : 'wave';
+  setHelper(tips[idx], mode, 'tip-' + idx + '-' + (roomFilter ? roomFilter.type : 'main'));
+}
+
+function noteActivity(){
+  lastActivityAt = Date.now();
 }
 
 function enterRoom(type){
@@ -1445,7 +1690,7 @@ function normKey(key){
 window.addEventListener('keydown', (e) => {
   if(isTypingContext()) return;
   const k = normKey(e.key);
-  if(k){ keysDown[k] = true; e.preventDefault(); }
+  if(k){ keysDown[k] = true; noteActivity(); e.preventDefault(); }
 });
 window.addEventListener('keyup', (e) => {
   const k = normKey(e.key);
@@ -1453,7 +1698,7 @@ window.addEventListener('keyup', (e) => {
 });
 
 function bindNavHold(btn, key){
-  const start = (e) => { e.preventDefault(); keysDown[key] = true; };
+  const start = (e) => { e.preventDefault(); keysDown[key] = true; noteActivity(); };
   const stop = () => { keysDown[key] = false; };
   btn.addEventListener('pointerdown', start);
   btn.addEventListener('pointerup', stop);
@@ -1484,8 +1729,12 @@ function animate(){
       avatarX = Math.max(0, Math.min(currentLayout.worldWidth - 20, avatarX));
     }
     if(movedX || movedY){
+      noteActivity();
       updatePositions();
       checkProximity();
+    }else if(Date.now() - lastActivityAt > 7000){
+      cycleHelperTip();
+      lastActivityAt = Date.now() - 3000;
     }
   }
   requestAnimationFrame(animate);
