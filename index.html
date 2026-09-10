@@ -147,6 +147,27 @@
   const dayLabels={sun:"Sun",mon:"Mon",tue:"Tue",wed:"Wed",thu:"Thu",fri:"Fri",sat:"Sat"};
   const classLabels={et:"ET",wt:"WT"};
 
+  // Class fallback for approved students whose Firebase allowedStudents row
+  // predates the ET/WT classId field. Keep this in sync with game-gate.js.
+  const ET_ROSTER=new Set([
+    "chaim_chaikin","mayer_chaim_chaikin","yossi_gourarie","sholom_huebner","sholom_dovber_huebner",
+    "moshe_lapine","kehos_notik","yisroel_oirechman","moshe_raichman","moshe_tuvia_raichman",
+    "avrohom_rosenfeld","levi_rozmarin","arik_traxler","simcha_cohen"
+  ]);
+  const WT_ROSTER=new Set([
+    "ari_greenberg","zev_rosenfeld","levi_schtroks","yisroel_aryeh_simmonds","leibel_vogel","leib_wolf"
+  ]);
+  function rosterClass(studentId){
+    if(ET_ROSTER.has(studentId))return "et";
+    if(WT_ROSTER.has(studentId))return "wt";
+    return "";
+  }
+  function resolvedStudentClass(studentId,data){
+    const stored=(data&&typeof data==="object")?data.classId:"";
+    if(stored==="et"||stored==="wt")return stored;
+    return rosterClass(studentId);
+  }
+
   const el=id=>document.getElementById(id);
   const gameCards=Array.from(document.querySelectorAll(".game-card"));
   const gameDefinitions=gameCards.map(card=>({id:card.dataset.gameId,name:(card.querySelector(".card-title")?.textContent||card.textContent).trim(),element:card}));
@@ -249,10 +270,9 @@
     if(realPin&&String(pin).trim()!==String(realPin).trim())return{ok:false,reason:"Incorrect PIN. Ask Rabbi Cohen."};
     if(!allowedSnap.exists())return{ok:false,reason:"Your name is not on the B3 student list."};
     const d=allowedSnap.val()||{};
-    // Rabbi Cohen's own student-test login defaults to ET so he can test the
-    // student experience in an InPrivate/incognito window without changing
-    // his teacher/admin account or needing a Firebase classId on his test row.
-    const classId=(slug==="simcha_cohen")?"et":(d&&typeof d==="object"?d.classId:"");
+    // Use the Firebase classId when present; for older approved-student rows
+    // that do not have one yet, fall back to the known B3 ET/WT roster.
+    const classId=resolvedStudentClass(slug,d);
     if(!["et","wt"].includes(classId))return{ok:false,reason:"Your ET/WT class is not assigned yet. Ask Rabbi Cohen."};
     return{ok:true,id:slug,name:(d&&d.name)?String(d.name):name.trim(),classId};
   }
@@ -286,7 +306,7 @@
       const snap=await db.ref("posukPractice/allowedStudents/"+id).once("value");
       if(!snap.exists()){showLogin();return;}
       const d=snap.val()||{};
-      const restoredClassId=(id==="simcha_cohen")?"et":d.classId;
+      const restoredClassId=resolvedStudentClass(id,d);
       if(!["et","wt"].includes(restoredClassId)){showLogin();return;}
       enterStudent({id:id,name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
     }catch(e){console.warn(e);showLogin();}
