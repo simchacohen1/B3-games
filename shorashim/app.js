@@ -268,7 +268,38 @@ document.addEventListener('pointerup',()=>{editorDragActive=false;},true);
 function bindColorSwatches(){document.querySelectorAll('.color-swatches').forEach(box=>{const id=box.dataset.colorTarget,palette=id==='backgroundColor'?BACKGROUND_SWATCHES:COLOR_SWATCHES;box.innerHTML='';palette.forEach(color=>{const b=document.createElement('button');b.type='button';b.className='color-swatch';b.style.background=color;b.title=color;b.setAttribute('aria-label',`Choose ${color}`);b.onclick=()=>{document.getElementById(id).value=color;renderColorSwatches();applyEditorControls();};box.appendChild(b);});});renderColorSwatches();}
 function renderColorSwatches(){document.querySelectorAll('.color-swatches').forEach(box=>{const id=box.dataset.colorTarget,current=document.getElementById(id)?.value;box.querySelectorAll('.color-swatch').forEach(b=>b.classList.toggle('active',rgbToHex(b.style.backgroundColor)===String(current).toLowerCase()));});}
 function rgbToHex(c){if(!c)return c;if(c.startsWith('#'))return c.toLowerCase();const m=c.match(/\d+/g);if(!m)return c;return '#'+m.slice(0,3).map(x=>(+x).toString(16).padStart(2,'0')).join('');}
-function applyEditorControls(){const h=document.getElementById('hebrewText'),e=document.getElementById('englishText'),font=document.getElementById('hebrewFont'),bg=document.getElementById('backgroundColor').value;h.style.fontSize=document.getElementById('hebrewSize').value+'px';h.style.fontFamily=font.value;h.style.fontWeight=['700','500','900','800'][font.selectedIndex]||'700';h.style.letterSpacing=['0','0.2px','-0.4px','1.2px'][font.selectedIndex]||'0';h.style.color=document.getElementById('hebrewColor').value;e.style.fontSize=document.getElementById('englishSize').value+'px';e.style.fontFamily=document.getElementById('englishFont').value;e.style.color=document.getElementById('englishColor').value;document.getElementById('frontCard').style.background=bg;document.getElementById('backCard').style.background=bg;renderColorSwatches();}
+const CARD_DESIGN_WIDTH=620;
+const CARD_DESIGN_HEIGHT=360;
+
+function cardDisplayScale(card){
+  const width=card?.clientWidth||CARD_DESIGN_WIDTH;
+  return width/CARD_DESIGN_WIDTH;
+}
+
+function hebrewFontVisualStyle(fontFamily){
+  const v=String(fontFamily||'');
+  if(v.includes('Gisha')) return {weight:'500',letterSpacing:'0.2px'};
+  if(v.includes('FrankRuehl')||v.includes('Frank Ruehl')) return {weight:'900',letterSpacing:'-0.4px'};
+  if(v.includes('Aharoni')||v.includes('Arial Rounded')) return {weight:'800',letterSpacing:'1.2px'};
+  return {weight:'700',letterSpacing:'0'};
+}
+
+function scaleEditorCardContents(){
+  const front=document.getElementById('frontCard');
+  if(!front)return;
+  const scale=cardDisplayScale(front);
+  const h=document.getElementById('hebrewText');
+  const e=document.getElementById('englishText');
+  const hs=Number(document.getElementById('hebrewSize')?.value||58);
+  const es=Number(document.getElementById('englishSize')?.value||46);
+  if(h)h.style.fontSize=(hs*scale)+'px';
+  if(e)e.style.fontSize=(es*scale)+'px';
+  document.querySelectorAll('#frontExamples .heb-example').forEach(x=>x.style.fontSize=(22*scale)+'px');
+  const backExamples=document.getElementById('backExamples');
+  if(backExamples)backExamples.style.fontSize=(14*scale)+'px';
+  document.querySelectorAll('#approvedArtLayer .art-item').forEach(applyArtSize);
+}
+function applyEditorControls(){const h=document.getElementById('hebrewText'),e=document.getElementById('englishText'),font=document.getElementById('hebrewFont'),bg=document.getElementById('backgroundColor').value;h.style.fontFamily=font.value;h.style.fontWeight=['700','500','900','800'][font.selectedIndex]||'700';h.style.letterSpacing=['0','0.2px','-0.4px','1.2px'][font.selectedIndex]||'0';h.style.color=document.getElementById('hebrewColor').value;e.style.fontFamily=document.getElementById('englishFont').value;e.style.fontWeight='800';e.style.color=document.getElementById('englishColor').value;document.getElementById('frontCard').style.background=bg;document.getElementById('backCard').style.background=bg;scaleEditorCardContents();renderColorSwatches();}
 function loadEditorItem(key){const s=student(),item=getItem(key);if(!item||!canEditItem(key,s))return;selectedItemKey=key;window.__shorashimRedesignKey=window.__shorashimRedesignMode?key:null;const existing=s.cards[key],d=normalizeDesign(existing?.design);document.getElementById('emptyEditor').classList.add('hidden');document.getElementById('editorContent').classList.remove('hidden');document.getElementById('editorTitle').textContent=`${item.front} — ${item.english}`;document.getElementById('hebrewText').textContent=item.front;document.getElementById('englishText').textContent=item.english;setExamples(item);Object.entries({hebrewSize:d.hebrewSize,hebrewFont:d.hebrewFont,hebrewColor:d.hebrewColor,englishSize:d.englishSize,englishFont:d.englishFont,englishColor:d.englishColor,backgroundColor:d.backgroundColor}).forEach(([id,v])=>document.getElementById(id).value=v);const h=document.getElementById('hebrewText'),e=document.getElementById('englishText');h.style.left=d.hebrewPos.left+'%';h.style.top=d.hebrewPos.top+'%';e.style.left=d.englishPos.left+'%';e.style.top=d.englishPos.top+'%';renderArtChoices(item);renderEditorArts(d.arts);applyEditorControls();clearCanvas(false);drawHistory=[];if(d.drawing)loadDrawing(d.drawing);const badge=document.getElementById('newBadge'),learned=!!existing?.learnedAt;badge.textContent=learned?'LEARNED':(existing?'NEW':'NEXT');badge.classList.remove('hidden');document.getElementById('saveCardBtn').textContent=learned?'Save Redesign':(existing?'Save Changes & Continue':'Save Card & Go to Next');window.__shorashimEditorDirty=false;renderWordList();}
 function setExamples(item){const teach=document.getElementById('exampleTeachingBox'),front=document.getElementById('frontExamples'),back=document.getElementById('backExamples');const ex=item.examples||[];teach.classList.toggle('hidden',!ex.length);front.innerHTML='';back.innerHTML='';if(!ex.length){teach.innerHTML='';return;}teach.innerHTML=`<h4>Examples</h4><div class="example-grid">${ex.map(x=>`<div class="example-pair"><div class="heb">${highlightExample(x)}</div><div class="eng">${escapeHTML(x.english)}</div></div>`).join('')}</div>`;front.innerHTML=ex.slice(0,3).map(x=>`<div class="heb-example">${highlightExample(x)}</div>`).join('');back.innerHTML=ex.slice(0,3).map(x=>`<div>${escapeHTML(x.english)}</div>`).join('');}
 function highlightExample(x){let h=escapeHTML(x.hebrew);if(!x.highlight)return h;const mark=escapeHTML(x.highlight);const idx=h.indexOf(mark);if(idx<0)return h;return h.slice(0,idx)+`<span class="affix-mark">${mark}</span>`+h.slice(idx+mark.length);}
@@ -276,7 +307,7 @@ function renderArtChoices(item){const emojis=document.getElementById('emojiChoic
 function renderEditorArts(arts){const layer=document.getElementById('approvedArtLayer');layer.innerHTML='';selectedArtEl=null;(arts||[]).forEach(a=>addArtToEditor(a,true));}
 function addArtToEditor(spec,fromSaved=false){const layer=document.getElementById('approvedArtLayer'),count=layer.children.length,presets=[[50,70],[28,68],[72,68],[38,80],[62,80]],p=presets[count%presets.length];const a={kind:spec.kind||'emoji',value:spec.value||'',label:spec.label||'',left:spec.left??p[0],top:spec.top??p[1],size:spec.size??(spec.kind==='illustration'?180:126)};const el=document.createElement('div');el.className='art-item '+a.kind;el.dataset.kind=a.kind;el.dataset.value=a.value;el.dataset.label=a.label;el.dataset.size=a.size;el.style.left=a.left+'%';el.style.top=a.top+'%';if(a.kind==='illustration'){const img=document.createElement('img');img.src=a.value;img.alt=a.label;img.draggable=false;img.style.pointerEvents='none';el.appendChild(img);}else el.textContent=a.value;applyArtSize(el);el.style.touchAction='none';el.style.cursor='grab';makeDraggable(el,document.getElementById('frontCard'),()=>selectArt(el));el.onclick=e=>{selectArt(el);e.stopPropagation();};layer.appendChild(el);if(!fromSaved)selectArt(el);}
 function selectArt(el){document.querySelectorAll('#approvedArtLayer .art-item').forEach(x=>x.classList.remove('selected'));selectedArtEl=el;const control=document.getElementById('artSize');if(control){control.disabled=!el;if(el)control.value=String(el.dataset.size||84);}if(el)el.classList.add('selected');}
-function applyArtSize(el){const size=Number(el.dataset.size||84);if(el.dataset.kind==='illustration'){el.style.width=size+'px';el.style.height=Math.round(size*.68)+'px';}else el.style.fontSize=size+'px';}
+function applyArtSize(el){const baseSize=Number(el.dataset.size||84),scale=cardDisplayScale(document.getElementById('frontCard')),size=baseSize*scale;if(el.dataset.kind==='illustration'){el.style.width=size+'px';el.style.height=Math.round(size*.68)+'px';}else el.style.fontSize=size+'px';}
 function setSelectedArtSize(size){if(!selectedArtEl)return;selectedArtEl.dataset.size=Math.max(30,Math.min(380,Number(size)||84));applyArtSize(selectedArtEl);constrainElement(selectedArtEl,document.getElementById('frontCard'));selectArt(selectedArtEl);}
 function resizeSelectedArt(delta){if(!selectedArtEl)return;setSelectedArtSize(Number(selectedArtEl.dataset.size||84)+delta);}
 function removeSelectedArt(){if(!selectedArtEl)return;selectedArtEl.remove();selectArt(null);}
@@ -368,7 +399,7 @@ function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random
 function flipReview(){if(!reviewDeck.length)return;reviewFlipped=!reviewFlipped;renderReviewCard(false);}
 function qualifyCurrentCard(){if(!reviewDeck.length)return true;const c=reviewDeck[reviewIndex],dr=ensureDailyReview(),already=!!dr.seen[c.itemKey];if(already)return true;const elapsed=performance.now()-reviewShownAt,min=db.settings.minReviewMs||500;if(elapsed<min){const msg=document.getElementById('tooFastMessage');msg.textContent=`Give yourself a moment to say the word and meaning. (${(min/1000).toFixed(1)}s minimum)`;msg.classList.remove('hidden');setTimeout(()=>msg.classList.add('hidden'),1200);return false;}dr.seen[c.itemKey]=Date.now();const p=dailyProgress();saveDB();renderDailyStatus();if(p.complete){const msg=document.getElementById('tooFastMessage');msg.textContent='✅ Today’s full review is complete!';msg.classList.remove('hidden');setTimeout(()=>msg.classList.add('hidden'),2600);}return true;}
 function moveReview(dir){if(!reviewDeck.length||!qualifyCurrentCard())return;reviewIndex=(reviewIndex+dir+reviewDeck.length)%reviewDeck.length;reviewFlipped=false;renderReviewCard();}
-function renderReviewCard(resetTimer=true){const c=reviewDeck[reviewIndex],item=getItem(c.itemKey);if(!item)return;const d=normalizeDesign(c.design),card=document.getElementById('reviewFlipCard'),h=document.getElementById('reviewHebrew'),e=document.getElementById('reviewEnglish'),ex=document.getElementById('reviewExamples'),bex=document.getElementById('reviewBackExamples'),layer=document.getElementById('reviewArtLayer'),img=document.getElementById('reviewDrawing');document.getElementById('reviewCounter').textContent=`${reviewIndex+1} of ${reviewDeck.length}`;document.getElementById('reviewPasuk').textContent=`${singularTrack(c.itemType)}${item.pasuk?` • Pasuk ${item.pasuk}`:''} • learned ${fmtDate(c.learnedAt)}`;card.style.background=d.backgroundColor;h.textContent=item.front;h.style.fontSize=d.hebrewSize+'px';h.style.fontFamily=d.hebrewFont;h.style.color=d.hebrewColor;h.style.left=d.hebrewPos.left+'%';h.style.top=d.hebrewPos.top+'%';e.textContent=item.english;e.style.fontSize=d.englishSize+'px';e.style.fontFamily=d.englishFont;e.style.color=d.englishColor;e.style.left=d.englishPos.left+'%';e.style.top=d.englishPos.top+'%';ex.innerHTML=(item.examples||[]).slice(0,3).map(x=>`<div class="heb-example">${highlightExample(x)}</div>`).join('');bex.innerHTML=(item.examples||[]).slice(0,3).map(x=>`<div>${escapeHTML(x.english)}</div>`).join('');renderReadOnlyArts(layer,d.arts,1.05);img.src=d.drawing||'';img.classList.toggle('hidden',!d.drawing||reviewFlipped);h.classList.toggle('hidden',reviewFlipped);ex.classList.toggle('hidden',reviewFlipped||!(item.examples||[]).length);layer.classList.toggle('hidden',reviewFlipped);e.classList.toggle('hidden',!reviewFlipped);bex.classList.toggle('hidden',!reviewFlipped||!(item.examples||[]).length);document.getElementById('reviewSideLabel').textContent=reviewFlipped?'BACK':'FRONT';if(resetTimer)reviewShownAt=performance.now();renderDailyStatus();}
+function renderReviewCard(resetTimer=true){const c=reviewDeck[reviewIndex],item=getItem(c.itemKey);if(!item)return;const d=normalizeDesign(c.design),card=document.getElementById('reviewFlipCard'),h=document.getElementById('reviewHebrew'),e=document.getElementById('reviewEnglish'),ex=document.getElementById('reviewExamples'),bex=document.getElementById('reviewBackExamples'),layer=document.getElementById('reviewArtLayer'),img=document.getElementById('reviewDrawing');document.getElementById('reviewCounter').textContent=`${reviewIndex+1} of ${reviewDeck.length}`;document.getElementById('reviewPasuk').textContent=`${singularTrack(c.itemType)}${item.pasuk?` • Pasuk ${item.pasuk}`:''} • learned ${fmtDate(c.learnedAt)}`;card.style.background=d.backgroundColor;const scale=cardDisplayScale(card),fontStyle=hebrewFontVisualStyle(d.hebrewFont);h.textContent=item.front;h.style.fontSize=(d.hebrewSize*scale)+'px';h.style.fontFamily=d.hebrewFont;h.style.fontWeight=fontStyle.weight;h.style.letterSpacing=fontStyle.letterSpacing;h.style.color=d.hebrewColor;h.style.left=d.hebrewPos.left+'%';h.style.top=d.hebrewPos.top+'%';e.textContent=item.english;e.style.fontSize=(d.englishSize*scale)+'px';e.style.fontFamily=d.englishFont;e.style.fontWeight='800';e.style.color=d.englishColor;e.style.left=d.englishPos.left+'%';e.style.top=d.englishPos.top+'%';ex.innerHTML=(item.examples||[]).slice(0,3).map(x=>`<div class="heb-example">${highlightExample(x)}</div>`).join('');ex.querySelectorAll('.heb-example').forEach(x=>x.style.fontSize=(22*scale)+'px');bex.innerHTML=(item.examples||[]).slice(0,3).map(x=>`<div>${escapeHTML(x.english)}</div>`).join('');bex.style.fontSize=(14*scale)+'px';renderReadOnlyArts(layer,d.arts,scale);img.src=d.drawing||'';img.classList.toggle('hidden',!d.drawing||reviewFlipped);h.classList.toggle('hidden',reviewFlipped);ex.classList.toggle('hidden',reviewFlipped||!(item.examples||[]).length);layer.classList.toggle('hidden',reviewFlipped);e.classList.toggle('hidden',!reviewFlipped);bex.classList.toggle('hidden',!reviewFlipped||!(item.examples||[]).length);document.getElementById('reviewSideLabel').textContent=reviewFlipped?'BACK':'FRONT';if(resetTimer)reviewShownAt=performance.now();renderDailyStatus();}
 function renderReadOnlyArts(layer,arts,scale=1){layer.innerHTML='';(arts||[]).forEach(a=>{const el=document.createElement('div');el.className='art-item '+(a.kind||'emoji');el.style.left=(a.left??50)+'%';el.style.top=(a.top??66)+'%';const size=(a.size||84)*scale;if(a.kind==='illustration'){el.style.width=size+'px';el.style.height=Math.round(size*.68)+'px';const im=document.createElement('img');im.src=a.value;im.alt=a.label||'illustration';el.appendChild(im);}else{el.style.fontSize=size+'px';el.textContent=a.value||'';}layer.appendChild(el);});}
 function renderDailyStatus(){const p=dailyProgress();document.getElementById('dailyReviewBadge').textContent=p.total?`${p.seen} / ${p.total} reviewed today${p.complete?' ✓':''}`:'No learned cards yet';document.getElementById('reviewProgressToday').textContent=p.total?`Today: ${p.seen} / ${p.total}`:'Today: 0';renderHomeGameState();}
 
@@ -513,6 +544,54 @@ function installFloatingReviewControls(){
     setup.insertBefore(startRow,picker);
   }
 }
+
+function installExactCardPreviewFix(){
+  if(document.getElementById('shorashim-exact-card-preview-v2'))return;
+  const style=document.createElement('style');
+  style.id='shorashim-exact-card-preview-v2';
+  style.textContent=`
+    #learnWorkspace #editorContent:not(.hidden){
+      grid-template-rows:auto 42px minmax(118px,1fr) !important;
+    }
+    #learnWorkspace .flip-stage{
+      height:auto !important;
+      min-height:0 !important;
+      align-items:start !important;
+    }
+    #learnWorkspace .flashcard.editable{
+      width:100% !important;
+      aspect-ratio:620 / 360 !important;
+      height:auto !important;
+      min-height:0 !important;
+      max-height:none !important;
+      align-self:start !important;
+    }
+    .review-card,
+    body.shorashim-review-active #reviewScreen .review-card{
+      aspect-ratio:620 / 360 !important;
+      height:auto !important;
+      min-height:0 !important;
+      max-height:none !important;
+    }
+    .review-examples{top:45% !important;}
+    .review-examples.back{top:62% !important;}
+  `;
+  document.head.appendChild(style);
+}
+installExactCardPreviewFix();
+
+let cardPreviewResizeFrame=0;
+window.addEventListener('resize',()=>{
+  cancelAnimationFrame(cardPreviewResizeFrame);
+  cardPreviewResizeFrame=requestAnimationFrame(()=>{
+    if(activeScreenId==='learnScreen'&&!document.getElementById('editorContent')?.classList.contains('hidden')){
+      applyEditorControls();
+    }
+    if(activeScreenId==='reviewScreen'&&reviewDeck.length){
+      renderReviewCard(false);
+    }
+  });
+});
 
 function renderAll(){updateReviewGameCopy();installFloatingReviewControls();renderStudentStats();renderSession();renderWordList();renderGallery();renderReviewAvailability();renderDailyStatus();renderGamesLock();renderTeacher();}
 window.addEventListener('beforeunload',saveDB);
