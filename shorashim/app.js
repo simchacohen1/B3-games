@@ -347,7 +347,7 @@ function renderReviewPicker(){const box=document.getElementById('reviewPicker'),
 function bindReviewDragDrop(box){let dragged=null;box.querySelectorAll('.review-pick-row').forEach(row=>{row.addEventListener('dragstart',e=>{if(e.target.closest('input')){e.preventDefault();return}dragged=row;row.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',row.dataset.key)});row.addEventListener('dragend',()=>{row.classList.remove('dragging');box.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));dragged=null});row.addEventListener('dragover',e=>{if(!dragged||dragged===row)return;e.preventDefault();row.classList.add('drag-over')});row.addEventListener('dragleave',()=>row.classList.remove('drag-over'));row.addEventListener('drop',e=>{e.preventDefault();row.classList.remove('drag-over');if(!dragged||dragged===row)return;const rows=[...box.querySelectorAll('.review-pick-row')],from=rows.indexOf(dragged),to=rows.indexOf(row);if(from<to)row.after(dragged);else row.before(dragged);saveManualReviewOrderFromGrid(box)});});}
 function saveManualReviewOrderFromGrid(box){[...box.querySelectorAll('.review-pick-row')].forEach((row,n)=>{const c=student().cards[row.dataset.key];if(c)c.reviewOrder=n});saveDB();}
 function moveManualReviewCard(key,dir){const arr=reviewSortedCards(),i=arr.findIndex(c=>c.itemKey===key),j=i+dir;if(i<0||j<0||j>=arr.length)return;arr.forEach((c,n)=>c.reviewOrder=n);[arr[i].reviewOrder,arr[j].reviewOrder]=[arr[j].reviewOrder,arr[i].reviewOrder];saveDB();renderReviewPicker();}
-function updateReviewSelectionCount(){const n=document.querySelectorAll('.review-pick-check:checked').length;document.getElementById('reviewSelectionCount').textContent=`${n} selected`;document.getElementById('startReviewBtn').disabled=!n;}
+function updateReviewSelectionCount(){const n=document.querySelectorAll('.review-pick-check:checked').length;document.getElementById('reviewSelectionCount').textContent=`${n} selected`;const btn=document.getElementById('startReviewBtn');btn.disabled=!n;btn.textContent=n?`Review ${n} Selected`:'Review Selected';}
 function renderReviewAvailability(){const has=eligibleLearnedCards().length>0;document.getElementById('reviewEmpty').classList.toggle('hidden',has);document.getElementById('reviewSetup').classList.toggle('hidden',!has);if(!has)document.getElementById('reviewArea').classList.add('hidden');else renderReviewPicker();}
 function startReview(){const keys=[...document.querySelectorAll('.review-pick-check:checked')].map(x=>x.dataset.key),map=new Map(eligibleLearnedCards().map(c=>[c.itemKey,c]));let arr=keys.map(k=>map.get(k)).filter(Boolean);if(!arr.length){alert('Select at least one card to review.');return;}if(document.querySelector('input[name="reviewOrderMode"]:checked')?.value==='shuffle')arr=shuffle(arr.slice());reviewDeck=arr;reviewIndex=0;reviewFlipped=false;document.getElementById('reviewEmpty').classList.add('hidden');document.getElementById('reviewSetup').classList.add('hidden');document.body.classList.add('shorashim-review-active');document.getElementById('reviewArea').classList.remove('hidden');renderReviewCard();}
 
@@ -460,7 +460,61 @@ function updateReviewGameCopy(){
   const gamesEyebrow=document.querySelector('#gamesScreen .section-head .eyebrow');
   if(gamesEyebrow)gamesEyebrow.textContent='Practice with your learned cards';
 }
-function renderAll(){updateReviewGameCopy();renderStudentStats();renderSession();renderWordList();renderGallery();renderReviewAvailability();renderDailyStatus();renderGamesLock();renderTeacher();}
+
+function installFloatingReviewControls(){
+  if(!document.getElementById('shorashim-floating-review-controls-v1')){
+    const style=document.createElement('style');
+    style.id='shorashim-floating-review-controls-v1';
+    style.textContent=`
+      #reviewSetup .review-start-row{
+        display:flex !important;
+        align-items:center !important;
+        justify-content:space-between !important;
+        gap:14px !important;
+        flex-wrap:wrap !important;
+        margin:12px 0 10px !important;
+        padding:10px 12px !important;
+        background:#f8fafc !important;
+        border:1px solid #e2e8f0 !important;
+        border-radius:14px !important;
+      }
+      #reviewSetup #startReviewBtn{
+        position:fixed !important;
+        right:28px !important;
+        bottom:24px !important;
+        z-index:1200 !important;
+        min-width:200px !important;
+        min-height:54px !important;
+        padding:14px 22px !important;
+        border-radius:16px !important;
+        font-size:16px !important;
+        box-shadow:0 14px 34px rgba(79,70,229,.34) !important;
+      }
+      #reviewSetup #startReviewBtn:disabled{
+        opacity:.55 !important;
+        box-shadow:0 8px 20px rgba(15,23,42,.14) !important;
+      }
+      @media(max-width:650px){
+        #reviewSetup #startReviewBtn{
+          left:14px !important;
+          right:14px !important;
+          bottom:14px !important;
+          width:calc(100% - 28px) !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  const setup=document.getElementById('reviewSetup');
+  const picker=document.getElementById('reviewPicker');
+  const startRow=setup?.querySelector('.review-start-row');
+  if(setup&&picker&&startRow&&startRow.nextElementSibling!==picker){
+    setup.insertBefore(startRow,picker);
+  }
+}
+
+function renderAll(){updateReviewGameCopy();installFloatingReviewControls();renderStudentStats();renderSession();renderWordList();renderGallery();renderReviewAvailability();renderDailyStatus();renderGamesLock();renderTeacher();}
 window.addEventListener('beforeunload',saveDB);
 startStudentSiteWatcher();
 startMasterToggleWatcher();
