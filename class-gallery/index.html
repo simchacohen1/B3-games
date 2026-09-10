@@ -648,6 +648,192 @@
 .picker-item:last-child{border-bottom:none;}
 .picker-item:hover{background:rgba(0,0,0,0.03);}
 .picker-item .count{font-size:0.72rem;color:#8a7357;}
+
+
+/* ===== 2026 immersive hallway visual redesign ===== */
+:root{
+  --navy:#123d79;
+  --navy-2:#1e5aa6;
+  --cream:#fffaf0;
+  --hall-cream:#f3e5cc;
+  --gold:#f2bd4b;
+  --soft-blue:#d7ebfb;
+}
+html{background:#f6efe6;}
+body{
+  background:linear-gradient(#fffaf5 0 120px,#ead7bd 120px 100%);
+  color:#2f302e;
+  overflow-x:hidden;
+}
+
+/* Top application bar */
+.app-topbar{
+  min-height:112px;
+  background:rgba(255,255,255,.97);
+  border-bottom:1px solid #e6e0d8;
+  box-shadow:0 5px 18px rgba(63,43,19,.12);
+  padding:15px clamp(18px,3vw,46px);
+  display:grid;
+  grid-template-columns:minmax(280px,1.15fr) auto minmax(300px,1fr);
+  gap:22px;
+  align-items:center;
+  position:relative;
+  z-index:20;
+}
+.brand-block{display:flex;align-items:center;gap:15px;min-width:0;}
+.brand-block h1{
+  margin:0;
+  font-family:'Caveat',cursive;
+  font-size:clamp(2rem,3vw,3rem);
+  line-height:.92;
+  color:#123d79;
+  text-shadow:none;
+  white-space:nowrap;
+}
+.brand-block h1::after{
+  content:"";display:block;width:88%;height:5px;border-radius:999px;
+  background:linear-gradient(90deg,#f7c84a,#ffd973 75%,transparent);
+  transform:rotate(-1deg);margin-top:6px;
+}
+.brand-block p{margin:5px 0 0;color:#3d3d3a;font-size:.9rem;font-weight:700;letter-spacing:.2px;}
+.brand-scroll{width:52px;height:58px;position:relative;flex:0 0 auto;filter:drop-shadow(0 2px 1px rgba(0,0,0,.2));}
+.brand-scroll::before,.brand-scroll::after{content:"";position:absolute;top:4px;bottom:4px;width:8px;border-radius:6px;background:#8b5126;border:2px solid #5f351a;z-index:2;}
+.brand-scroll::before{left:2px}.brand-scroll::after{right:2px}
+.brand-scroll span{position:absolute;left:7px;right:7px;top:9px;bottom:9px;background:#f7e2ad;border:2px solid #8b5126;border-radius:5px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.25);}
+.filters{justify-content:center;gap:8px;}
+.chip{background:#edf2f6;color:#334;border:0;padding:9px 16px;box-shadow:none;}
+.chip[data-filter="Chumash"]{background:#d9efe5;}
+.chip[data-filter="Parsha"]{background:#ffe8af;}
+.chip[data-filter="Halacha"]{background:#f9d5df;}
+.chip[data-filter="Other"]{background:#e5ddf7;}
+.chip.active{background:#2f7fe3;color:white;box-shadow:0 3px 10px rgba(47,127,227,.28);}
+.top-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;}
+.pin-btn{background:linear-gradient(#46bb70,#249b51);border-radius:17px;padding:13px 20px;box-shadow:0 4px 0 #19763d,0 8px 16px rgba(36,155,81,.2);font-size:.95rem;}
+.teacher-link{background:#f6fbff;border:2px solid #73aef1;color:#19559c;border-radius:14px;padding:11px 15px;font-weight:800;}
+.pending-note{position:absolute;right:22px;bottom:-14px;box-shadow:0 3px 8px rgba(0,0,0,.15);z-index:3;}
+
+.hallway-wrap{max-width:1320px;margin:0 auto;padding:0 24px;position:relative;z-index:12;}
+.portal-btns-hidden{display:none!important;}
+.room-banner{
+  width:max-content;max-width:calc(100% - 40px);margin:18px auto -54px;position:relative;z-index:30;
+  background:linear-gradient(#eebf6d,#dba653);border:4px solid #8c562e;border-radius:9px;
+  box-shadow:0 6px 0 #68401f,0 11px 22px rgba(0,0,0,.22);padding:9px 18px;color:#3f2717;
+}
+.room-banner::before,.room-banner::after{content:"";position:absolute;top:-25px;width:5px;height:24px;background:#453c35;border-radius:4px;}
+.room-banner::before{left:20px}.room-banner::after{right:20px}
+.room-banner button{background:#173f72;border-radius:8px;}
+
+.hallway-stage{max-width:1320px;margin:0 auto 26px;padding:22px 24px 0;}
+.hallway-viewport{
+  height:min(650px,calc(100vh - 175px));min-height:500px;
+  border-radius:20px;overflow:hidden;position:relative;
+  background:#e9dac3;
+  box-shadow:0 18px 50px rgba(49,31,13,.28),inset 0 0 0 5px #7b4b2c;
+  isolation:isolate;
+}
+.corridor-bg{position:absolute;inset:0;overflow:hidden;z-index:0;background:linear-gradient(#f0e6d5,#ddc5a5);}
+.corridor-ceiling{position:absolute;left:0;right:0;top:0;height:36%;background:linear-gradient(180deg,#e9e0d4 0,#f7eee3 100%);clip-path:polygon(0 0,100% 0,62% 100%,38% 100%);box-shadow:inset 0 -12px 24px rgba(79,51,27,.06);}
+.corridor-left-wall{position:absolute;left:0;top:0;bottom:0;width:53%;clip-path:polygon(0 0,73% 28%,73% 65%,0 100%);background:linear-gradient(90deg,#c88d53 0 2%,#e8d4b6 2% 70%,#f3e4cd 100%);box-shadow:inset -18px 0 35px rgba(80,48,24,.10);}
+.corridor-right-wall{position:absolute;right:0;top:0;bottom:0;width:53%;clip-path:polygon(100% 0,27% 28%,27% 65%,100% 100%);background:linear-gradient(270deg,#c88d53 0 2%,#e8d4b6 2% 70%,#f3e4cd 100%);box-shadow:inset 18px 0 35px rgba(80,48,24,.10);}
+.corridor-end-wall{position:absolute;left:38%;top:27%;width:24%;height:39%;background:linear-gradient(#f6ead6,#e7d3b7);border:9px solid #9b6134;border-bottom-width:14px;box-shadow:0 0 35px rgba(255,243,202,.75),inset 0 0 0 2px rgba(255,255,255,.6);z-index:1;}
+.growth-mural{position:absolute;inset:14% 9% auto;text-align:center;color:#295b7d;font-family:'Caveat',cursive;font-size:clamp(1rem,2vw,1.65rem);line-height:.9;background:linear-gradient(160deg,#dbeaf4,#fff7c8);padding:15px 7px;border-radius:6px;transform:rotate(-1deg);box-shadow:0 3px 8px rgba(0,0,0,.14);}
+.growth-mural strong{display:block;color:#2b6e4c;font-size:1.15em;margin-top:6px;}
+.corridor-floor{position:absolute;left:0;right:0;bottom:0;height:43%;clip-path:polygon(0 100%,100% 100%,62% 0,38% 0);background:repeating-linear-gradient(0deg,rgba(87,118,154,.14) 0 2px,transparent 2px 64px),repeating-linear-gradient(74deg,rgba(52,95,145,.22) 0 2px,transparent 2px 145px),repeating-linear-gradient(106deg,rgba(52,95,145,.22) 0 2px,transparent 2px 145px),linear-gradient(#efe6d7,#f7f1e8 68%,#ded4c7);box-shadow:inset 0 18px 28px rgba(85,50,20,.08);}
+.ceiling-light{position:absolute;z-index:2;width:92px;height:26px;background:#fff6c6;border:4px solid #dfd0ae;box-shadow:0 0 24px #fff4b6;transform:perspective(350px) rotateX(30deg);}
+.light-one{left:23%;top:7%;}.light-two{left:calc(50% - 46px);top:16%;width:76px;height:20px}.light-three{right:23%;top:7%;}
+.hall-sign{position:absolute;top:55px;z-index:4;background:linear-gradient(#b77a45,#976037);color:#402410;border:4px solid #6f4426;border-radius:8px;padding:8px 26px;font-family:'Caveat',cursive;font-size:clamp(1.4rem,2.7vw,2.3rem);font-weight:700;box-shadow:0 5px 8px rgba(0,0,0,.2),inset 0 1px #dfb27d;}
+.hall-sign-left{left:5%;transform:rotate(-1deg)}.hall-sign-right{right:5%;transform:rotate(1deg)}
+.plant{position:absolute;bottom:30px;width:76px;height:90px;background:radial-gradient(ellipse at 50% 20%,#4b8d52 0 8%,transparent 9%),radial-gradient(ellipse at 28% 36%,#4b8d52 0 10%,transparent 11%),radial-gradient(ellipse at 72% 38%,#3d7b46 0 10%,transparent 11%),linear-gradient(#f3efe6 0 65%,#e5ded2 65%);border-radius:50% 50% 17px 17px;filter:drop-shadow(0 5px 7px rgba(0,0,0,.25));z-index:3;}
+.plant span{position:absolute;bottom:9px;left:0;right:0;text-align:center;color:#2f70a6}.plant-left{left:18px}.plant-right{right:18px}
+.bench{position:absolute;bottom:35px;z-index:3;background:linear-gradient(#9a6339,#754522);border:4px solid #5b351d;border-radius:6px;box-shadow:0 6px 10px rgba(0,0,0,.22);color:#fff;font-weight:800;}
+.bench-left{left:115px;width:210px;height:62px;padding:8px 12px}.bench-left span{display:inline-block;background:#244f8b;padding:2px 8px;margin:2px;border-radius:2px;font-size:.7rem}.bench-left span:nth-child(2){background:#477c45}.bench-left span:nth-child(3){background:#8b5d31}
+.bench-right{right:110px;width:210px;height:62px;display:flex;align-items:center;justify-content:center;text-align:center;font-family:'Caveat';font-size:1.05rem;color:#ffe59b;}
+
+/* The scrolling game layer */
+.hallway-world{position:absolute;inset:0 auto 0 0;z-index:7;will-change:transform;pointer-events:none;}
+.wall-strip,.floor-strip{display:none;}
+.wall-post,.hall-door,.avatar{pointer-events:auto;}
+.wall-post{
+  top:112px;width:198px;min-height:238px;padding:12px 12px 14px;border-radius:3px;
+  background:#fffdf6;border:1px solid rgba(79,53,28,.14);
+  box-shadow:0 10px 20px rgba(40,25,11,.28),0 2px 3px rgba(0,0,0,.12);
+  transform-origin:50% 50%;
+  transform:perspective(850px) rotateY(8deg) rotateZ(var(--card-tilt,0deg)) scale(.92);
+  transition:transform .18s ease,filter .18s ease,box-shadow .18s ease;
+}
+.wall-post.wall-right{top:142px;transform:perspective(850px) rotateY(-8deg) rotateZ(var(--card-tilt,0deg)) scale(.92);}
+.wall-post.near{transform:perspective(850px) rotateY(0deg) rotateZ(0deg) translateY(-14px) scale(1.12)!important;z-index:18;filter:saturate(1.08);box-shadow:0 24px 38px rgba(40,25,11,.35);}
+.project-image-wrap{position:relative;margin:-3px -2px 9px;}
+.wall-post img{height:102px;object-fit:cover;margin:0;border-radius:3px;}
+.project-placeholder{height:95px;margin-bottom:9px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:3.2rem;background:linear-gradient(145deg,#f5efe3,#e8dcc9);box-shadow:inset 0 0 0 1px rgba(80,50,20,.08);}
+.wall-post h3{font-size:1.42rem;color:#26384e;}
+.wall-post .desc{-webkit-line-clamp:3;font-size:.76rem;}
+.wall-post .by{font-size:.72rem;color:#315f8a;}
+.wall-post .pin{width:16px;height:16px;top:-9px;}
+.wall-post .card-category{font-size:.58rem;padding:3px 7px;}
+.card-sticker{z-index:8;}
+
+.hall-door{
+  bottom:39%;width:116px;height:190px;padding:0 10px 15px;border-radius:12px 12px 2px 2px;
+  background:linear-gradient(90deg,#82522f,#b97d48 18%,#8e5a32 82%,#654020);
+  border:7px solid #744724;color:white;box-shadow:0 12px 18px rgba(0,0,0,.32),inset 0 0 0 3px rgba(255,255,255,.12);
+  transform:perspective(650px) rotateY(0deg) scale(.82);transform-origin:bottom center;
+  transition:transform .18s ease,filter .18s ease;
+  overflow:visible;
+}
+.hall-door.students{background:linear-gradient(90deg,#7a4a2a,#b67b47 18%,#8b5730 82%,#654020)}
+.hall-door.weeks{background:linear-gradient(90deg,#7a4a2a,#b67b47 18%,#8b5730 82%,#654020)}
+.hall-door.exit{background:linear-gradient(90deg,#5d704d,#83a46d 18%,#6d895a 82%,#4a5b3f)}
+.hall-door.near{transform:perspective(650px) rotateY(0) translateY(-10px) scale(1.04);filter:brightness(1.06);z-index:16;}
+.door-plaque{position:absolute;left:50%;top:-50px;transform:translateX(-50%);width:150px;padding:7px 8px;border-radius:9px;background:linear-gradient(#315f9d,#1a477f);border:3px solid #163960;box-shadow:0 4px 8px rgba(0,0,0,.24);font-size:.78rem;line-height:1.05;}
+.hall-door.weeks .door-plaque{background:linear-gradient(#6b5ba9,#4f418c);border-color:#403574}.hall-door.exit .door-plaque{background:linear-gradient(#5d8b54,#3f6d39);border-color:#31562c}
+.door-window{position:absolute;left:18px;right:18px;top:24px;height:84px;border:5px solid #6a4024;background:linear-gradient(155deg,#bcd9ee,#eaf6ff 55%,#9dbfd9);display:flex;align-items:center;justify-content:center;font-size:2rem;color:#173f72;box-shadow:inset 0 0 18px rgba(41,95,140,.25);}
+.door-label{font-size:.74rem;text-transform:uppercase;letter-spacing:.5px;text-shadow:0 1px #4f2f1b;}
+
+/* Friendlier CSS avatar with kippah and backpack */
+.avatar{bottom:51px;width:82px;height:128px;transform:translateX(-50%);z-index:22;filter:drop-shadow(0 8px 5px rgba(0,0,0,.2));}
+.avatar-head{position:absolute!important;top:16px!important;left:22px;width:38px!important;height:39px!important;border-radius:48% 48% 46% 46%!important;background:#e7b47e!important;margin:0!important;box-shadow:inset 0 -3px rgba(140,86,44,.12)!important;z-index:4;}
+.avatar-kippah{position:absolute;top:10px;left:27px;width:28px;height:13px;background:#102c58;border-radius:50% 50% 26% 26%;border:2px solid #081a36;z-index:6;box-shadow:inset 0 2px #274f8b;}
+.avatar-ear{position:absolute;top:29px;width:8px;height:13px;background:#dda870;border-radius:50%;z-index:3}.avatar-ear.left{left:17px}.avatar-ear.right{right:17px}
+.avatar-body{position:absolute!important;top:50px!important;left:13px;width:56px!important;height:51px!important;border-radius:16px 16px 9px 9px!important;background:linear-gradient(#2d75c0,#15539a)!important;margin:0!important;border:2px solid #0d477f;z-index:3;}
+.avatar-backpack{position:absolute;top:55px;left:17px;width:48px;height:48px;border-radius:15px 15px 11px 11px;background:linear-gradient(#245b9b,#164477);border:3px solid #103968;z-index:7;color:#d8e8f7;display:flex;align-items:center;justify-content:center;font-size:1.25rem;box-shadow:inset 0 0 0 2px rgba(255,255,255,.09)}
+.avatar-leg{position:absolute;top:95px;width:17px;height:31px;border-radius:3px 3px 8px 8px;background:#303a52;border-bottom:8px solid white;z-index:2}.avatar-leg.left{left:20px;transform:rotate(7deg)}.avatar-leg.right{right:20px;transform:rotate(-7deg)}
+
+.walk-hud{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:26;display:flex;align-items:center;gap:14px;color:#42546a;font-weight:700;font-size:.9rem;text-shadow:0 1px white;pointer-events:none;white-space:nowrap;}
+.walk-arrow{font-size:2rem;color:#52667f;line-height:1;}
+.hallway-help{position:absolute;right:20px;bottom:17px;z-index:26;background:rgba(255,255,255,.82);border:1px solid rgba(70,80,90,.15);border-radius:999px;padding:7px 12px;color:#52606f;font-size:.7rem;font-weight:700;box-shadow:0 3px 8px rgba(0,0,0,.08);}
+.hall-nav-btn{display:block;bottom:14px;width:50px;height:50px;background:#fff;color:#1a5797;border:2px solid #d7e6f6;box-shadow:0 5px 12px rgba(0,0,0,.15);z-index:30;}
+.hall-nav-btn.left{left:16px}.hall-nav-btn.right{right:16px}
+.empty-hall{top:140px;width:310px;background:rgba(255,253,246,.94);border:3px solid #be8550;border-radius:12px;padding:24px;color:#4b3827;box-shadow:0 10px 25px rgba(0,0,0,.2);font-family:'Quicksand';}
+.empty-hall strong{display:block;font-family:'Caveat';font-size:1.8rem;color:#214f82;margin-bottom:6px}.empty-hall span{font-size:.8rem;}
+
+/* Modals now match the brighter app chrome */
+.overlay{backdrop-filter:blur(4px);background:rgba(24,37,54,.55);}
+.modal,.lightbox-content{background:#fffdf8;border:1px solid #e8dccb;border-radius:16px;box-shadow:0 24px 60px rgba(20,30,40,.3);}
+.modal h2,.lightbox-content h2{color:#163f73;}
+.lightbox-content .card-category{background:#285f99;color:white;}
+.modal input[type=text],.modal textarea,.modal select{border-color:#d8c8ae;border-radius:9px;}
+
+footer{color:#705c48;background:#f6efe6;padding:0 0 18px;font-weight:600;}
+
+@media (max-width:1080px){
+  .app-topbar{grid-template-columns:1fr auto;}
+  .filters{grid-column:1 / -1;grid-row:2;order:3;}
+  .top-actions{grid-column:2;grid-row:1;}
+  .brand-block{grid-column:1;grid-row:1;}
+  .hallway-viewport{height:590px;}
+}
+@media (max-width:720px){
+  .app-topbar{display:flex;flex-direction:column;align-items:stretch;gap:13px;padding:13px 14px;}
+  .brand-block{justify-content:center;text-align:center}.brand-block h1{white-space:normal}.brand-block h1::after{margin-left:auto;margin-right:auto}
+  .filters{justify-content:center}.top-actions{justify-content:center}.pending-note{position:static}
+  .hallway-stage{padding:12px 8px}.hallway-wrap{padding:0 8px}.hallway-viewport{min-height:500px;height:68vh;border-radius:14px}
+  .hall-sign{font-size:1.25rem;padding:6px 12px;top:35px}.hall-sign-left{left:3%}.hall-sign-right{right:3%}
+  .bench,.plant{display:none}.hallway-help{display:none}.walk-hud{font-size:.72rem;gap:7px}.walk-arrow{font-size:1.4rem}
+  .room-banner{margin-top:8px;margin-bottom:-48px;font-size:.72rem}
+  .wall-post{width:170px}.door-plaque{width:128px}.hall-door{width:100px}
+}
+
 </style>
 </head>
 <body>
@@ -656,12 +842,15 @@
   <div class="master-blocked-card">This game is currently turned off. Ask your teacher.</div>
 </div>
 
-<header>
-  <h1>Our Wall of Learning</h1>
-  <p>Chumash &middot; Parsha &middot; Halacha &mdash; pinned by our class</p>
-</header>
+<div class="app-topbar">
+  <div class="brand-block">
+    <div class="brand-scroll" aria-hidden="true"><span></span></div>
+    <div>
+      <h1>Our Wall of Learning</h1>
+      <p>Chumash &middot; Parsha &middot; Halacha</p>
+    </div>
+  </div>
 
-<div class="toolbar">
   <div class="filters" id="filters">
     <button class="chip active" data-filter="all">All</button>
     <button class="chip" data-filter="Chumash">Chumash</button>
@@ -669,21 +858,18 @@
     <button class="chip" data-filter="Halacha">Halacha</button>
     <button class="chip" data-filter="Other">Other</button>
   </div>
-  <button class="pin-btn" id="openModalBtn">+ Pin Your Work</button>
-</div>
 
-<div class="toolbar" style="margin-top:0;">
-  <button class="teacher-link" id="teacherReviewBtn">🔑 Teacher Review</button>
-  <span class="pending-note" id="pendingNote"></span>
+  <div class="top-actions">
+    <button class="pin-btn" id="openModalBtn">＋ Pin Your Work</button>
+    <button class="teacher-link" id="teacherReviewBtn">🔑 Teacher Review</button>
+    <span class="pending-note" id="pendingNote"></span>
+  </div>
 </div>
 
 <div class="hallway-wrap">
-  <div class="hallway-toolbar">
-    <div class="portal-btns" id="portalBtns">
-      <button class="portal-btn" id="doorStudentsBtn" type="button">🔒 Student Lockers</button>
-      <button class="portal-btn" id="doorWeeksBtn" type="button">📅 Browse by Week</button>
-    </div>
-    <span class="walk-hint">Walk with ← → or A / D. Walk into a door (or tap it) to go in.</span>
+  <div class="portal-btns portal-btns-hidden" id="portalBtns" aria-hidden="true">
+    <button class="portal-btn" id="doorStudentsBtn" type="button">Student Lockers</button>
+    <button class="portal-btn" id="doorWeeksBtn" type="button">Browse by Week</button>
   </div>
   <div class="room-banner" id="roomBanner">
     <span id="roomBannerText"></span>
@@ -870,7 +1056,7 @@ let currentFilter = 'all';
 
 // ---- Hallway state ----
 let roomFilter = null;           // null | {type:'student', value} | {type:'week', value}
-let avatarX = 0;
+let avatarX = 540;
 const keysDown = {};
 let lastTriggeredDoor = null;
 let viewportEl = null, worldEl = null, avatarEl = null;
@@ -965,43 +1151,40 @@ function updateRoomBanner(){
 function renderHallway(visible, boardIsEmpty){
   const boardArea = document.getElementById('boardArea');
 
-  if(boardIsEmpty){
-    boardArea.innerHTML = `<div class="empty-state"><h2>This corkboard is empty!</h2><p>Be the first to pin your project.</p></div>`;
-    currentLayout = { doors: [], posts: [], worldWidth: 700 };
-    return;
-  }
-
-  const spacing = 190;
-  const startX = 340;
-  const worldWidth = Math.max(startX + visible.length * spacing + 260, 700);
-
+  // Keep the immersive hallway visible even when there is no work yet.
+  const spacing = 230;
+  const startX = 910;
+  const worldWidth = Math.max(startX + Math.max(visible.length, 1) * spacing + 620, 1900);
   currentLayout = { doors: [], posts: [], worldWidth };
 
   let doorsHtml = '';
   if(roomFilter){
-    doorsHtml += `<div class="hall-door exit" id="doorExit" style="left:110px;"><div class="door-label">🚪 Exit</div></div>`;
-    currentLayout.doors.push({ elId: 'doorExit', x: 110, onEnter: exitRoom });
+    doorsHtml += `<div class="hall-door exit" id="doorExit" style="left:430px;"><div class="door-plaque">Main Hallway</div><div class="door-window">↩</div><div class="door-label">Exit</div></div>`;
+    currentLayout.doors.push({ elId: 'doorExit', x: 430, onEnter: exitRoom });
   }else{
-    doorsHtml += `<div class="hall-door students" id="doorStudents" style="left:110px;"><div class="door-label">🔒 Lockers</div></div>`;
-    doorsHtml += `<div class="hall-door weeks" id="doorWeeks" style="left:220px;"><div class="door-label">📅 Weeks</div></div>`;
-    currentLayout.doors.push({ elId: 'doorStudents', x: 110, onEnter: openStudentPicker });
-    currentLayout.doors.push({ elId: 'doorWeeks', x: 220, onEnter: openWeekPicker });
+    doorsHtml += `<div class="hall-door students" id="doorStudents" style="left:390px;"><div class="door-plaque">Student Lockers</div><div class="door-window">🔒</div><div class="door-label">Lockers</div></div>`;
+    doorsHtml += `<div class="hall-door weeks" id="doorWeeks" style="left:690px;"><div class="door-plaque">Browse by Week</div><div class="door-window">📅</div><div class="door-label">Weeks</div></div>`;
+    currentLayout.doors.push({ elId: 'doorStudents', x: 390, onEnter: openStudentPicker });
+    currentLayout.doors.push({ elId: 'doorWeeks', x: 690, onEnter: openWeekPicker });
   }
 
   let postsHtml = '';
   if(visible.length === 0){
-    postsHtml = `<div class="empty-hall" style="left:${startX}px;">Nothing here yet.</div>`;
+    postsHtml = `<div class="empty-hall" style="left:${startX}px;"><strong>${boardIsEmpty ? 'Be the first to pin your work!' : 'Nothing in this section yet.'}</strong><span>Your class projects will appear along the hallway.</span></div>`;
   }else{
     visible.forEach((post, i) => {
       const x = startX + i * spacing;
       const color = colorFor(post);
       const rot = rotationFor(post.id);
       const elId = `wallpost-${post.id}`;
+      const side = i % 2 === 0 ? 'wall-left' : 'wall-right';
       currentLayout.posts.push({ elId, x });
 
       let imgHtml = '';
       if(post.image){
-        imgHtml = `<img src="${post.image}" alt="${escapeHtml(post.title)}"><div class="tape left"></div><div class="tape right"></div>`;
+        imgHtml = `<div class="project-image-wrap"><img src="${post.image}" alt="${escapeHtml(post.title)}"><div class="tape left"></div><div class="tape right"></div></div>`;
+      }else{
+        imgHtml = `<div class="project-placeholder" aria-hidden="true">${post.category === 'Chumash' ? '📖' : post.category === 'Parsha' ? '✨' : post.category === 'Halacha' ? '⚖️' : '📝'}</div>`;
       }
       const stickerHtml = post.sticker ? `<div class="card-sticker">${post.sticker}</div>` : '';
       const teacherDeleteHtml = isTeacher ? `<button class="delete-x show" title="Remove from board" data-id="${post.id}">&times;</button>` : '';
@@ -1010,7 +1193,7 @@ function renderHallway(visible, boardIsEmpty){
       if(post.videoUrl) mediaBadges += `<span class="media-badge">🎬 Video</span>`;
 
       postsHtml += `
-        <div class="card ${color} wall-post" id="${elId}" data-id="${post.id}" style="left:${x}px;transform:rotate(${rot}deg);">
+        <div class="card ${color} wall-post ${side}" id="${elId}" data-id="${post.id}" style="left:${x}px;--card-tilt:${rot}deg;">
           <div class="pin"></div>
           ${teacherDeleteHtml}
           ${imgHtml}
@@ -1026,16 +1209,46 @@ function renderHallway(visible, boardIsEmpty){
 
   boardArea.innerHTML = `
     <div class="hallway-viewport" id="hallwayViewport">
+      <div class="corridor-bg" aria-hidden="true">
+        <div class="corridor-ceiling"></div>
+        <div class="corridor-left-wall"></div>
+        <div class="corridor-right-wall"></div>
+        <div class="corridor-end-wall">
+          <div class="growth-mural"><span>Small Steps</span><strong>Big Growth!</strong></div>
+        </div>
+        <div class="corridor-floor"></div>
+        <div class="ceiling-light light-one"></div>
+        <div class="ceiling-light light-two"></div>
+        <div class="ceiling-light light-three"></div>
+        <div class="plant plant-left"><span>✦</span></div>
+        <div class="plant plant-right"><span>✦</span></div>
+        <div class="bench bench-left"><span>LEARN</span><span>GROW</span><span>BELONG</span></div>
+        <div class="bench bench-right"><span>Good Talmidim<br>Change the World!</span></div>
+        <div class="hall-sign hall-sign-left">Amazing Work!</div>
+        <div class="hall-sign hall-sign-right">Torah in Action!</div>
+      </div>
+
       <div class="hallway-world" id="hallwayWorld" style="width:${worldWidth}px;">
         <div class="wall-strip"></div>
         <div class="floor-strip"></div>
         ${doorsHtml}
         ${postsHtml}
-        <div class="avatar" id="avatarEl">
+        <div class="avatar" id="avatarEl" aria-label="student walking through the gallery">
+          <div class="avatar-kippah"></div>
           <div class="avatar-head"></div>
+          <div class="avatar-ear left"></div><div class="avatar-ear right"></div>
           <div class="avatar-body"></div>
+          <div class="avatar-backpack"><span>✡</span></div>
+          <div class="avatar-leg left"></div><div class="avatar-leg right"></div>
         </div>
       </div>
+
+      <div class="walk-hud" aria-hidden="true">
+        <span class="walk-arrow">←</span>
+        <span>Walk with <b>← →</b> or <b>A / D</b></span>
+        <span class="walk-arrow">→</span>
+      </div>
+      <div class="hallway-help">Walk into a door, or click it, to go in.</div>
     </div>
   `;
 
@@ -1043,7 +1256,7 @@ function renderHallway(visible, boardIsEmpty){
   worldEl = document.getElementById('hallwayWorld');
   avatarEl = document.getElementById('avatarEl');
 
-  avatarX = Math.max(0, Math.min(worldWidth - 20, avatarX));
+  avatarX = Math.max(90, Math.min(worldWidth - 90, avatarX));
   updatePositions();
   checkProximity();
 
@@ -1113,7 +1326,7 @@ function checkProximity(){
 
 function enterRoom(type, value){
   roomFilter = { type, value };
-  avatarX = 0;
+  avatarX = 540;
   lastTriggeredDoor = null;
   closeAllPickers();
   render();
@@ -1121,7 +1334,7 @@ function enterRoom(type, value){
 
 function exitRoom(){
   roomFilter = null;
-  avatarX = 0;
+  avatarX = 540;
   lastTriggeredDoor = null;
   render();
 }
@@ -1216,7 +1429,7 @@ function isTypingContext(){
   return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT');
 }
 function anyOverlayOpen(){
-  return document.querySelector('.overlay.show') !== null;
+  return document.querySelector('.overlay.show') !== null || document.querySelector('.lightbox.show') !== null;
 }
 function normKey(key){
   if(key === 'ArrowLeft' || key === 'a' || key === 'A') return 'left';
