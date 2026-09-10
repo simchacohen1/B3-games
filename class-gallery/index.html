@@ -803,6 +803,10 @@ body{
 .hall-nav-btn.right{grid-column:3;grid-row:2;}
 .hall-nav-btn.down{grid-column:2;grid-row:3;}
 .empty-hall{top:140px;width:310px;background:rgba(255,253,246,.94);border:3px solid #be8550;border-radius:12px;padding:24px;color:#4b3827;box-shadow:0 10px 25px rgba(0,0,0,.2);font-family:'Quicksand';}
+.section-label{position:absolute;top:100px;width:170px;transform:translateX(-50%);text-align:center;background:linear-gradient(#fff8ea,#f3e6cc);border:3px solid #9b6134;border-radius:10px;padding:12px 10px;box-shadow:0 8px 16px rgba(60,35,10,.22);}
+.section-label strong{display:block;font-family:'Caveat',cursive;font-size:1.5rem;color:#173f72;line-height:1;margin-bottom:4px;}
+.section-label .section-count{font-size:.72rem;font-weight:800;color:#3f6d39;letter-spacing:.3px;}
+.section-label .section-empty{font-size:.72rem;font-weight:700;color:#8a7357;font-style:italic;}
 .empty-hall strong{display:block;font-family:'Caveat';font-size:1.8rem;color:#214f82;margin-bottom:6px}.empty-hall span{font-size:.8rem;}
 
 /* Modals now match the brighter app chrome */
@@ -865,10 +869,6 @@ footer{color:#705c48;background:#f6efe6;padding:0 0 18px;font-weight:600;}
 </div>
 
 <div class="hallway-wrap">
-  <div class="portal-btns portal-btns-hidden" id="portalBtns" aria-hidden="true">
-    <button class="portal-btn" id="doorStudentsBtn" type="button">Student Lockers</button>
-    <button class="portal-btn" id="doorWeeksBtn" type="button">Browse by Week</button>
-  </div>
   <div class="room-banner" id="roomBanner">
     <span id="roomBannerText"></span>
     <button id="exitRoomBtn" type="button">Exit to Main Hallway</button>
@@ -995,24 +995,6 @@ footer{color:#705c48;background:#f6efe6;padding:0 0 18px;font-weight:600;}
   </div>
 </div>
 
-<!-- Student Locker Picker -->
-<div class="overlay" id="studentPickerOverlay">
-  <div class="modal">
-    <button class="close-x" id="closeStudentPickerBtn">&times;</button>
-    <h2>Student Lockers</h2>
-    <div class="picker-list" id="studentPickerList"></div>
-  </div>
-</div>
-
-<!-- Week Picker -->
-<div class="overlay" id="weekPickerOverlay">
-  <div class="modal">
-    <button class="close-x" id="closeWeekPickerBtn">&times;</button>
-    <h2>Browse by Week</h2>
-    <div class="picker-list" id="weekPickerList"></div>
-  </div>
-</div>
-
 <script>
 const ROSTERS = {
   'B3 WT': [
@@ -1057,12 +1039,12 @@ let posts = [];
 let currentFilter = 'all';
 
 // ---- Hallway state ----
-let roomFilter = null;           // null | {type:'student', value} | {type:'week', value}
-let avatarX = 540;
-let avatarY = 0.35;   // depth: 0 = right up close to the viewer, 1 = deep near the back wall
+let roomFilter = null;           // null | {type:'lockers'} | {type:'weeks'}
+let avatarX = 540;               // unbounded — how far down the hallway you've walked
+let avatarY = 0;                 // -1..1 — leaning toward the left wall (-1) or right wall (+1)
 let facing = 'right';
 const keysDown = {};
-const DEPTH_MIN = 0, DEPTH_MAX = 1;
+const DEPTH_MIN = -1, DEPTH_MAX = 1;
 let lastTriggeredDoor = null;
 let viewportEl = null, worldEl = null, avatarEl = null, avatarFigureEl = null;
 let currentLayout = { doors: [], posts: [], worldWidth: 700 };
@@ -1119,6 +1101,27 @@ function escapeHtml(str){
   return div.innerHTML;
 }
 
+function buildLockerGroups(pool){
+  const allStudents = Array.from(new Set([...(ROSTERS['B3 WT']||[]), ...(ROSTERS['B3 ET']||[])]));
+  const byStudent = {};
+  pool.forEach(p => { (byStudent[p.studentName] = byStudent[p.studentName] || []).push(p); });
+  const names = Array.from(new Set([...allStudents, ...Object.keys(byStudent)])).sort((a,b)=>a.localeCompare(b));
+  return names.map(name => ({
+    label: name,
+    posts: (byStudent[name] || []).slice().reverse()
+  }));
+}
+
+function buildWeekGroups(pool){
+  const byWeek = {};
+  pool.forEach(p => { const k = weekKey(p.createdAt); (byWeek[k] = byWeek[k] || []).push(p); });
+  const keys = Object.keys(byWeek).sort((a,b) => b.localeCompare(a));
+  return keys.map(k => ({
+    label: weekLabel(k),
+    posts: byWeek[k].slice().reverse()
+  }));
+}
+
 function render(){
   const pendingCount = posts.filter(p => p.status === 'pending').length;
   const pendingNote = document.getElementById('pendingNote');
@@ -1130,75 +1133,51 @@ function render(){
   }
 
   const approved = posts.filter(p => p.status === 'approved');
-  let pool = currentFilter === 'all' ? approved : approved.filter(p => p.category === currentFilter);
-  if(roomFilter){
-    if(roomFilter.type === 'student') pool = pool.filter(p => p.studentName === roomFilter.value);
-    if(roomFilter.type === 'week') pool = pool.filter(p => weekKey(p.createdAt) === roomFilter.value);
-  }
-  const visible = pool.slice().reverse(); // newest first
+  const pool = currentFilter === 'all' ? approved : approved.filter(p => p.category === currentFilter);
 
   updateRoomBanner();
-  renderHallway(visible, approved.length === 0);
+
+  if(roomFilter && roomFilter.type === 'lockers'){
+    renderHallway(null, false, buildLockerGroups(pool));
+  }else if(roomFilter && roomFilter.type === 'weeks'){
+    renderHallway(null, false, buildWeekGroups(pool));
+  }else{
+    const visible = pool.slice().reverse(); // newest first
+    renderHallway(visible, approved.length === 0, null);
+  }
 }
 
 function updateRoomBanner(){
   const banner = document.getElementById('roomBanner');
   const text = document.getElementById('roomBannerText');
   if(roomFilter){
-    if(roomFilter.type === 'student') text.textContent = `📍 You're in ${roomFilter.value}'s locker`;
-    if(roomFilter.type === 'week') text.textContent = `📍 You're viewing the week of ${weekLabel(roomFilter.value)}`;
+    if(roomFilter.type === 'lockers') text.textContent = `📍 Walking through the Student Lockers — keep walking to see each locker`;
+    if(roomFilter.type === 'weeks') text.textContent = `📍 Browsing by Week — keep walking to see each week`;
     banner.classList.add('show');
   }else{
     banner.classList.remove('show');
   }
 }
 
-function renderHallway(visible, boardIsEmpty){
-  const boardArea = document.getElementById('boardArea');
+function buildCardHtml(post, x, extraClass){
+  const color = colorFor(post);
+  const rot = rotationFor(post.id);
+  const elId = `wallpost-${post.id}`;
 
-  // Keep the immersive hallway visible even when there is no work yet.
-  const spacing = 230;
-  const startX = 910;
-  const worldWidth = Math.max(startX + Math.max(visible.length, 1) * spacing + 620, 1900);
-  currentLayout = { doors: [], posts: [], worldWidth };
-
-  let doorsHtml = '';
-  if(roomFilter){
-    doorsHtml += `<div class="hall-door exit" id="doorExit" style="left:430px;"><div class="door-plaque">Main Hallway</div><div class="door-window">↩</div><div class="door-label">Exit</div></div>`;
-    currentLayout.doors.push({ elId: 'doorExit', x: 430, onEnter: exitRoom });
+  let imgHtml = '';
+  if(post.image){
+    imgHtml = `<div class="project-image-wrap"><img src="${post.image}" alt="${escapeHtml(post.title)}"><div class="tape left"></div><div class="tape right"></div></div>`;
   }else{
-    doorsHtml += `<div class="hall-door students" id="doorStudents" style="left:390px;"><div class="door-plaque">Student Lockers</div><div class="door-window">🔒</div><div class="door-label">Lockers</div></div>`;
-    doorsHtml += `<div class="hall-door weeks" id="doorWeeks" style="left:690px;"><div class="door-plaque">Browse by Week</div><div class="door-window">📅</div><div class="door-label">Weeks</div></div>`;
-    currentLayout.doors.push({ elId: 'doorStudents', x: 390, onEnter: openStudentPicker });
-    currentLayout.doors.push({ elId: 'doorWeeks', x: 690, onEnter: openWeekPicker });
+    imgHtml = `<div class="project-placeholder" aria-hidden="true">${post.category === 'Chumash' ? '📖' : post.category === 'Parsha' ? '✨' : post.category === 'Halacha' ? '⚖️' : '📝'}</div>`;
   }
+  const stickerHtml = post.sticker ? `<div class="card-sticker">${post.sticker}</div>` : '';
+  const teacherDeleteHtml = isTeacher ? `<button class="delete-x show" title="Remove from board" data-id="${post.id}">&times;</button>` : '';
+  let mediaBadges = '';
+  if(post.audioUrl) mediaBadges += `<span class="media-badge">🎧 Audio</span>`;
+  if(post.videoUrl) mediaBadges += `<span class="media-badge">🎬 Video</span>`;
 
-  let postsHtml = '';
-  if(visible.length === 0){
-    postsHtml = `<div class="empty-hall" style="left:${startX}px;"><strong>${boardIsEmpty ? 'Be the first to pin your work!' : 'Nothing in this section yet.'}</strong><span>Your class projects will appear along the hallway.</span></div>`;
-  }else{
-    visible.forEach((post, i) => {
-      const x = startX + i * spacing;
-      const color = colorFor(post);
-      const rot = rotationFor(post.id);
-      const elId = `wallpost-${post.id}`;
-      const side = i % 2 === 0 ? 'wall-left' : 'wall-right';
-      currentLayout.posts.push({ elId, x });
-
-      let imgHtml = '';
-      if(post.image){
-        imgHtml = `<div class="project-image-wrap"><img src="${post.image}" alt="${escapeHtml(post.title)}"><div class="tape left"></div><div class="tape right"></div></div>`;
-      }else{
-        imgHtml = `<div class="project-placeholder" aria-hidden="true">${post.category === 'Chumash' ? '📖' : post.category === 'Parsha' ? '✨' : post.category === 'Halacha' ? '⚖️' : '📝'}</div>`;
-      }
-      const stickerHtml = post.sticker ? `<div class="card-sticker">${post.sticker}</div>` : '';
-      const teacherDeleteHtml = isTeacher ? `<button class="delete-x show" title="Remove from board" data-id="${post.id}">&times;</button>` : '';
-      let mediaBadges = '';
-      if(post.audioUrl) mediaBadges += `<span class="media-badge">🎧 Audio</span>`;
-      if(post.videoUrl) mediaBadges += `<span class="media-badge">🎬 Video</span>`;
-
-      postsHtml += `
-        <div class="card ${color} wall-post ${side}" id="${elId}" data-id="${post.id}" style="left:${x}px;--card-tilt:${rot}deg;">
+  return { elId, html: `
+        <div class="card ${color} wall-post${extraClass ? ' ' + extraClass : ''}" id="${elId}" data-id="${post.id}" style="left:${x}px;--card-tilt:${rot}deg;">
           <div class="pin"></div>
           ${teacherDeleteHtml}
           ${imgHtml}
@@ -1208,9 +1187,73 @@ function renderHallway(visible, boardIsEmpty){
           <div class="by">${escapeHtml(post.studentName)}${post.className ? ` &middot; ${escapeHtml(post.className)}` : ''}</div>
           ${mediaBadges ? `<div class="media-badges">${mediaBadges}</div>` : ''}
           ${stickerHtml}
-        </div>`;
-    });
+        </div>` };
+}
+
+function renderHallway(visible, boardIsEmpty, groups){
+  const boardArea = document.getElementById('boardArea');
+  const spacing = 230;
+  const startX = 910;
+
+  let doorsHtml = '', postsHtml = '', worldWidth;
+  currentLayout = { doors: [], posts: [], worldWidth: 1900 };
+
+  if(roomFilter){
+    doorsHtml += `<div class="hall-door exit" id="doorExit" style="left:430px;"><div class="door-plaque">Main Hallway</div><div class="door-window">↩</div><div class="door-label">Exit</div></div>`;
+    currentLayout.doors.push({ elId: 'doorExit', x: 430, onEnter: exitRoom });
+  }else{
+    doorsHtml += `<div class="hall-door students" id="doorStudents" style="left:390px;"><div class="door-plaque">Student Lockers</div><div class="door-window">🔒</div><div class="door-label">Lockers</div></div>`;
+    doorsHtml += `<div class="hall-door weeks" id="doorWeeks" style="left:690px;"><div class="door-plaque">Browse by Week</div><div class="door-window">📅</div><div class="door-label">Weeks</div></div>`;
+    currentLayout.doors.push({ elId: 'doorStudents', x: 390, onEnter: () => enterRoom('lockers') });
+    currentLayout.doors.push({ elId: 'doorWeeks', x: 690, onEnter: () => enterRoom('weeks') });
   }
+
+  if(groups){
+    // Grouped layout (Lockers / Weeks room): each group gets a floating label
+    // sign, then its posts continue along the same wall-hung strip. Walking
+    // further (up) just keeps revealing the next group — no popups.
+    let x = startX;
+    let anyPosts = false;
+    if(groups.length === 0){
+      postsHtml = `<div class="empty-hall" style="left:${startX}px;"><strong>Nothing pinned yet.</strong><span>Keep walking — new sections will appear here as work is pinned.</span></div>`;
+      worldWidth = 1900;
+    }else{
+      groups.forEach(g => {
+        const emptyNote = g.posts.length === 0 ? `<span class="section-empty">Nothing pinned yet</span>` : `<span class="section-count">${g.posts.length} pinned</span>`;
+        postsHtml += `<div class="section-label" style="left:${x}px;"><strong>${escapeHtml(g.label)}</strong>${emptyNote}</div>`;
+        x += 210;
+        g.posts.forEach((post, j) => {
+          const side = j % 2 === 0 ? 'wall-left' : 'wall-right';
+          const { elId, html } = buildCardHtml(post, x, side);
+          currentLayout.posts.push({ elId, x });
+          postsHtml += html;
+          anyPosts = true;
+          x += spacing;
+        });
+        x += 140; // gap before the next section's label
+      });
+      worldWidth = Math.max(x + 500, 1900);
+      if(!anyPosts && groups.every(g => g.posts.length === 0)){
+        // still show the labeled (empty) sections — that's expected and fine
+      }
+    }
+  }else{
+    // Flat layout (Main Hallway): a single continuous strip of every visible post.
+    if(visible.length === 0){
+      postsHtml = `<div class="empty-hall" style="left:${startX}px;"><strong>${boardIsEmpty ? 'Be the first to pin your work!' : 'Nothing in this section yet.'}</strong><span>Your class projects will appear along the hallway.</span></div>`;
+      worldWidth = 1900;
+    }else{
+      visible.forEach((post, i) => {
+        const x = startX + i * spacing;
+        const side = i % 2 === 0 ? 'wall-left' : 'wall-right';
+        const { elId, html } = buildCardHtml(post, x, side);
+        currentLayout.posts.push({ elId, x });
+        postsHtml += html;
+      });
+      worldWidth = Math.max(startX + visible.length * spacing + 620, 1900);
+    }
+  }
+  currentLayout.worldWidth = worldWidth;
 
   boardArea.innerHTML = `
     <div class="hallway-viewport" id="hallwayViewport">
@@ -1253,10 +1296,10 @@ function renderHallway(visible, boardIsEmpty){
       </div>
 
       <div class="walk-hud" aria-hidden="true">
-        <span>← → walk down the hall</span>
-        <span>↑ ↓ step forward / back</span>
+        <span>↑ ↓ walk down the hall</span>
+        <span>← → step toward a wall</span>
       </div>
-      <div class="hallway-help">Walk into a door, or click it, to go in.</div>
+      <div class="hallway-help">Walk into a door to go in.</div>
     </div>
   `;
 
@@ -1296,8 +1339,8 @@ function renderHallway(visible, boardIsEmpty){
   if(roomFilter){
     document.getElementById('doorExit').addEventListener('click', exitRoom);
   }else{
-    document.getElementById('doorStudents').addEventListener('click', openStudentPicker);
-    document.getElementById('doorWeeks').addEventListener('click', openWeekPicker);
+    document.getElementById('doorStudents').addEventListener('click', () => enterRoom('lockers'));
+    document.getElementById('doorWeeks').addEventListener('click', () => enterRoom('weeks'));
   }
 }
 
@@ -1305,13 +1348,13 @@ function updatePositions(){
   if(!avatarEl || !worldEl || !viewportEl) return;
   avatarEl.style.left = avatarX + 'px';
 
-  // Depth (avatarY: 0 = close to the viewer, 1 = deep near the back wall).
-  // Walking "forward" moves the figure up the screen toward the vanishing
-  // point and shrinks it; walking "back" brings it down and larger again.
+  // Lean (avatarY: 0 = centered in the hallway, ±1 = right up against a wall).
+  // Leaning either way brings the figure a bit lower and larger, as if
+  // stepping closer to get a good look at a post.
   const vh = viewportEl.clientHeight || 500;
-  const depthT = Math.max(DEPTH_MIN, Math.min(DEPTH_MAX, avatarY));
-  const bottomPx = vh * (0.045 + depthT * 0.36);
-  const scale = 1.1 - depthT * 0.55;
+  const leanT = Math.max(0, Math.min(1, Math.abs(avatarY)));
+  const bottomPx = vh * (0.045 + (1 - leanT) * 0.10);
+  const scale = 1.0 + leanT * 0.18;
   avatarEl.style.bottom = bottomPx + 'px';
   avatarEl.style.transform = `translateX(-50%) scale(${scale.toFixed(3)})`;
 
@@ -1344,81 +1387,20 @@ function checkProximity(){
   });
 }
 
-function enterRoom(type, value){
-  roomFilter = { type, value };
+function enterRoom(type){
+  roomFilter = { type };
   avatarX = 540;
-  avatarY = 0.35;
+  avatarY = 0;
   lastTriggeredDoor = null;
-  closeAllPickers();
   render();
 }
 
 function exitRoom(){
   roomFilter = null;
   avatarX = 540;
-  avatarY = 0.35;
+  avatarY = 0;
   lastTriggeredDoor = null;
   render();
-}
-
-function openStudentPicker(){
-  const approved = posts.filter(p => p.status === 'approved');
-  const counts = {};
-  approved.forEach(p => { counts[p.studentName] = (counts[p.studentName] || 0) + 1; });
-  const names = Object.keys(counts).sort();
-  const listEl = document.getElementById('studentPickerList');
-
-  if(names.length === 0){
-    listEl.innerHTML = `<div class="empty-review">No pinned work yet.</div>`;
-  }else{
-    listEl.innerHTML = names.map(name => `
-      <div class="picker-item" data-name="${escapeHtml(name)}">
-        <span>${escapeHtml(name)}</span>
-        <span class="count">${counts[name]} pinned</span>
-      </div>
-    `).join('');
-    listEl.querySelectorAll('.picker-item').forEach(item => {
-      item.addEventListener('click', () => {
-        document.getElementById('studentPickerOverlay').classList.remove('show');
-        enterRoom('student', item.dataset.name);
-      });
-    });
-  }
-  document.getElementById('studentPickerOverlay').classList.add('show');
-}
-
-function openWeekPicker(){
-  const approved = posts.filter(p => p.status === 'approved');
-  const counts = {};
-  approved.forEach(p => {
-    const key = weekKey(p.createdAt);
-    counts[key] = (counts[key] || 0) + 1;
-  });
-  const keys = Object.keys(counts).sort().reverse();
-  const listEl = document.getElementById('weekPickerList');
-
-  if(keys.length === 0){
-    listEl.innerHTML = `<div class="empty-review">No pinned work yet.</div>`;
-  }else{
-    listEl.innerHTML = keys.map(key => `
-      <div class="picker-item" data-key="${key}">
-        <span>${weekLabel(key)}</span>
-        <span class="count">${counts[key]} pinned</span>
-      </div>
-    `).join('');
-    listEl.querySelectorAll('.picker-item').forEach(item => {
-      item.addEventListener('click', () => {
-        document.getElementById('weekPickerOverlay').classList.remove('show');
-        enterRoom('week', item.dataset.key);
-      });
-    });
-  }
-  document.getElementById('weekPickerOverlay').classList.add('show');
-}
-
-function closeAllPickers(){
-  document.getElementById('studentPickerOverlay').classList.remove('show');
-  document.getElementById('weekPickerOverlay').classList.remove('show');
 }
 
 function openLightbox(post){
@@ -1484,14 +1466,14 @@ bindNavHold(document.getElementById('navUpBtn'), 'up');
 bindNavHold(document.getElementById('navDownBtn'), 'down');
 
 const AVATAR_SPEED = 6;
-const DEPTH_SPEED = 0.012;
+const LEAN_SPEED = 0.012;
 function animate(){
   if(!anyOverlayOpen()){
     let movedX = false, movedY = false;
-    if(keysDown.left){ avatarX -= AVATAR_SPEED; movedX = true; facing = 'left'; }
-    if(keysDown.right){ avatarX += AVATAR_SPEED; movedX = true; facing = 'right'; }
-    if(keysDown.up){ avatarY = Math.min(DEPTH_MAX, avatarY + DEPTH_SPEED); movedY = true; }
-    if(keysDown.down){ avatarY = Math.max(DEPTH_MIN, avatarY - DEPTH_SPEED); movedY = true; }
+    if(keysDown.up){ avatarX += AVATAR_SPEED; movedX = true; }
+    if(keysDown.down){ avatarX -= AVATAR_SPEED; movedX = true; }
+    if(keysDown.left){ avatarY = Math.max(DEPTH_MIN, avatarY - LEAN_SPEED); movedY = true; facing = 'left'; }
+    if(keysDown.right){ avatarY = Math.min(DEPTH_MAX, avatarY + LEAN_SPEED); movedY = true; facing = 'right'; }
 
     if(avatarFigureEl){
       avatarFigureEl.classList.toggle('walking', movedX || movedY);
@@ -1510,22 +1492,7 @@ function animate(){
 }
 animate();
 
-document.getElementById('doorStudentsBtn').addEventListener('click', openStudentPicker);
-document.getElementById('doorWeeksBtn').addEventListener('click', openWeekPicker);
 document.getElementById('exitRoomBtn').addEventListener('click', exitRoom);
-
-document.getElementById('closeStudentPickerBtn').addEventListener('click', () => {
-  document.getElementById('studentPickerOverlay').classList.remove('show');
-});
-document.getElementById('closeWeekPickerBtn').addEventListener('click', () => {
-  document.getElementById('weekPickerOverlay').classList.remove('show');
-});
-document.getElementById('studentPickerOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'studentPickerOverlay') e.target.classList.remove('show');
-});
-document.getElementById('weekPickerOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'weekPickerOverlay') e.target.classList.remove('show');
-});
 
 document.getElementById('filters').addEventListener('click', (e) => {
   if(e.target.classList.contains('chip')){
