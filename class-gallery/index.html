@@ -481,6 +481,173 @@
   border-radius:16px; padding:28px; text-align:center; font-size:18px;
   box-shadow:0 20px 60px rgba(0,0,0,0.4);
 }
+
+/* ===== Hallway ===== */
+.hallway-wrap{
+  max-width:1100px;
+  margin:20px auto 0;
+  padding:0 20px;
+}
+.hallway-toolbar{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+.portal-btns{display:flex;gap:8px;flex-wrap:wrap;}
+.portal-btn{
+  background:var(--wood);
+  color:var(--paper-cream);
+  border:none;
+  padding:8px 14px;
+  border-radius:8px;
+  font-family:'Quicksand';
+  font-weight:700;
+  font-size:0.8rem;
+  cursor:pointer;
+  box-shadow:0 3px 0 var(--wood-dark);
+  transition:transform .1s ease;
+}
+.portal-btn:hover{transform:translateY(-1px);}
+.portal-btn:active{transform:translateY(1px);box-shadow:0 1px 0 var(--wood-dark);}
+.walk-hint{font-size:0.75rem;color:#5b4632;font-weight:600;}
+.room-banner{
+  display:none;
+  align-items:center;
+  gap:12px;
+  background:var(--yellow);
+  color:#3a2a0d;
+  font-weight:700;
+  padding:8px 14px;
+  border-radius:8px;
+  font-size:0.85rem;
+  margin-bottom:10px;
+}
+.room-banner.show{display:flex;}
+.room-banner button{
+  background:#3a2a0d;
+  color:#fff;
+  border:none;
+  padding:5px 10px;
+  border-radius:6px;
+  font-weight:700;
+  cursor:pointer;
+  font-size:0.75rem;
+}
+
+.hallway-stage{
+  position:relative;
+  max-width:1100px;
+  margin:0 auto 40px;
+  padding:0 20px;
+}
+.hallway-viewport{
+  position:relative;
+  height:420px;
+  overflow:hidden;
+  border-radius:14px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.35), inset 0 0 0 6px var(--wood-dark);
+  background:linear-gradient(to bottom, #e8d9c0 0%, #e8d9c0 62%, #b9946a 62%, #8a6a48 100%);
+}
+.hallway-world{
+  position:absolute;
+  top:0; left:0; bottom:0;
+  will-change:transform;
+}
+.wall-strip{
+  position:absolute;
+  top:0; left:0; right:0; height:62%;
+  background-image:repeating-linear-gradient(90deg, rgba(0,0,0,0.03) 0 2px, transparent 2px 90px);
+}
+.floor-strip{
+  position:absolute;
+  bottom:0; left:0; right:0; height:38%;
+  background:repeating-linear-gradient(90deg, rgba(0,0,0,0.05) 0 2px, transparent 2px 70px);
+}
+.wall-post{
+  position:absolute;
+  top:26px;
+  width:170px;
+  cursor:pointer;
+  transition:transform .15s ease;
+}
+.wall-post.near{transform:translateY(-6px) scale(1.04) !important;z-index:6;}
+.empty-hall{
+  position:absolute;
+  top:40px;
+  width:300px;
+  color:#5b4632;
+  font-family:'Caveat';
+  font-size:1.6rem;
+  text-align:center;
+}
+.hall-door{
+  position:absolute;
+  bottom:38%;
+  width:70px;
+  height:130px;
+  border-radius:8px 8px 0 0;
+  cursor:pointer;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  padding-bottom:8px;
+  color:#fff;
+  font-size:0.7rem;
+  font-weight:700;
+  text-align:center;
+  box-shadow:inset 0 0 0 4px rgba(0,0,0,0.2), 0 4px 8px rgba(0,0,0,0.3);
+  transition:transform .15s ease;
+}
+.hall-door.near{transform:translateY(-4px) scale(1.05);}
+.hall-door.students{background:var(--blue-dark);}
+.hall-door.weeks{background:var(--pink);}
+.hall-door.exit{background:var(--green);}
+.hall-door .door-label{padding:0 4px;line-height:1.2;}
+.avatar{
+  position:absolute;
+  bottom:38%;
+  width:34px;
+  transform:translateX(-50%);
+  z-index:8;
+}
+.avatar .avatar-head{
+  width:22px;height:22px;border-radius:50%;
+  background:#f0c088;
+  margin:0 auto;
+  box-shadow:0 1px 2px rgba(0,0,0,0.3);
+}
+.avatar .avatar-body{
+  width:30px;height:26px;border-radius:8px 8px 4px 4px;
+  background:var(--blue-dark);
+  margin:2px auto 0;
+}
+.hall-nav-btn{
+  position:absolute;
+  bottom:24px;
+  width:48px;height:48px;
+  border-radius:50%;
+  border:none;
+  background:rgba(74,45,24,0.75);
+  color:#fdf6e8;
+  font-size:1.2rem;
+  cursor:pointer;
+  z-index:10;
+}
+.hall-nav-btn.left{left:34px;}
+.hall-nav-btn.right{right:34px;}
+@media (hover:hover){ .hall-nav-btn{display:none;} }
+
+.picker-list{max-height:320px;overflow-y:auto;}
+.picker-item{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 4px;border-bottom:1px solid #e0cfa8;cursor:pointer;
+}
+.picker-item:last-child{border-bottom:none;}
+.picker-item:hover{background:rgba(0,0,0,0.03);}
+.picker-item .count{font-size:0.72rem;color:#8a7357;}
 </style>
 </head>
 <body>
@@ -510,7 +677,25 @@
   <span class="pending-note" id="pendingNote"></span>
 </div>
 
-<div id="boardArea"></div>
+<div class="hallway-wrap">
+  <div class="hallway-toolbar">
+    <div class="portal-btns" id="portalBtns">
+      <button class="portal-btn" id="doorStudentsBtn" type="button">🔒 Student Lockers</button>
+      <button class="portal-btn" id="doorWeeksBtn" type="button">📅 Browse by Week</button>
+    </div>
+    <span class="walk-hint">Walk with ← → or A / D. Walk into a door (or tap it) to go in.</span>
+  </div>
+  <div class="room-banner" id="roomBanner">
+    <span id="roomBannerText"></span>
+    <button id="exitRoomBtn" type="button">Exit to Main Hallway</button>
+  </div>
+</div>
+
+<div class="hallway-stage">
+  <div id="boardArea"></div>
+  <button class="hall-nav-btn left" id="navLeftBtn" aria-label="Walk left" type="button">◀</button>
+  <button class="hall-nav-btn right" id="navRightBtn" aria-label="Walk right" type="button">▶</button>
+</div>
 
 <footer>Everything pinned here is visible to the whole class.</footer>
 
@@ -622,6 +807,24 @@
   </div>
 </div>
 
+<!-- Student Locker Picker -->
+<div class="overlay" id="studentPickerOverlay">
+  <div class="modal">
+    <button class="close-x" id="closeStudentPickerBtn">&times;</button>
+    <h2>Student Lockers</h2>
+    <div class="picker-list" id="studentPickerList"></div>
+  </div>
+</div>
+
+<!-- Week Picker -->
+<div class="overlay" id="weekPickerOverlay">
+  <div class="modal">
+    <button class="close-x" id="closeWeekPickerBtn">&times;</button>
+    <h2>Browse by Week</h2>
+    <div class="picker-list" id="weekPickerList"></div>
+  </div>
+</div>
+
 <script>
 const ROSTERS = {
   'B3 WT': [
@@ -665,6 +868,14 @@ const colorClasses = ['blue','yellow','green','pink'];
 let posts = [];
 let currentFilter = 'all';
 
+// ---- Hallway state ----
+let roomFilter = null;           // null | {type:'student', value} | {type:'week', value}
+let avatarX = 0;
+const keysDown = {};
+let lastTriggeredDoor = null;
+let viewportEl = null, worldEl = null, avatarEl = null;
+let currentLayout = { doors: [], posts: [], worldWidth: 700 };
+
 function catToColor(cat){
   const map = {Chumash:'blue', Parsha:'yellow', Halacha:'green', Other:'pink'};
   return map[cat] || 'pink';
@@ -672,6 +883,23 @@ function catToColor(cat){
 
 function colorFor(post){
   return post.color || catToColor(post.category);
+}
+
+function weekKey(dateStr){
+  const d = dateStr ? new Date(dateStr) : new Date();
+  const day = d.getDay();
+  const start = new Date(d);
+  start.setDate(d.getDate() - day);
+  start.setHours(0,0,0,0);
+  return start.toISOString().slice(0,10);
+}
+
+function weekLabel(key){
+  const start = new Date(key + 'T00:00:00');
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const fmt = (dt) => dt.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+  return `${fmt(start)} \u2013 ${fmt(end)}`;
 }
 
 function rotationFor(id){
@@ -701,10 +929,6 @@ function escapeHtml(str){
 }
 
 function render(){
-  const boardArea = document.getElementById('boardArea');
-  const approved = posts.filter(p => p.status === 'approved');
-  const visible = currentFilter === 'all' ? approved : approved.filter(p => p.category === currentFilter);
-
   const pendingCount = posts.filter(p => p.status === 'pending').length;
   const pendingNote = document.getElementById('pendingNote');
   if(pendingCount > 0){
@@ -714,56 +938,129 @@ function render(){
     pendingNote.classList.remove('show');
   }
 
-  if(visible.length === 0){
+  const approved = posts.filter(p => p.status === 'approved');
+  let pool = currentFilter === 'all' ? approved : approved.filter(p => p.category === currentFilter);
+  if(roomFilter){
+    if(roomFilter.type === 'student') pool = pool.filter(p => p.studentName === roomFilter.value);
+    if(roomFilter.type === 'week') pool = pool.filter(p => weekKey(p.createdAt) === roomFilter.value);
+  }
+  const visible = pool.slice().reverse(); // newest first
+
+  updateRoomBanner();
+  renderHallway(visible, approved.length === 0);
+}
+
+function updateRoomBanner(){
+  const banner = document.getElementById('roomBanner');
+  const text = document.getElementById('roomBannerText');
+  if(roomFilter){
+    if(roomFilter.type === 'student') text.textContent = `📍 You're in ${roomFilter.value}'s locker`;
+    if(roomFilter.type === 'week') text.textContent = `📍 You're viewing the week of ${weekLabel(roomFilter.value)}`;
+    banner.classList.add('show');
+  }else{
+    banner.classList.remove('show');
+  }
+}
+
+function renderHallway(visible, boardIsEmpty){
+  const boardArea = document.getElementById('boardArea');
+
+  if(boardIsEmpty){
     boardArea.innerHTML = `<div class="empty-state"><h2>This corkboard is empty!</h2><p>Be the first to pin your project.</p></div>`;
+    currentLayout = { doors: [], posts: [], worldWidth: 700 };
     return;
   }
 
-  const board = document.createElement('div');
-  board.className = 'board';
+  const spacing = 190;
+  const startX = 340;
+  const worldWidth = Math.max(startX + visible.length * spacing + 260, 700);
 
-  visible.slice().reverse().forEach(post => {
-    const color = colorFor(post);
-    const rot = rotationFor(post.id);
-    const card = document.createElement('div');
-    card.className = `card ${color}`;
-    card.style.transform = `rotate(${rot}deg)`;
-    card.dataset.id = post.id;
+  currentLayout = { doors: [], posts: [], worldWidth };
 
-    let imgHtml = '';
-    if(post.image){
-      imgHtml = `<img src="${post.image}" alt="${escapeHtml(post.title)}">
-        <div class="tape left"></div><div class="tape right"></div>`;
-    }
+  let doorsHtml = '';
+  if(roomFilter){
+    doorsHtml += `<div class="hall-door exit" id="doorExit" style="left:110px;"><div class="door-label">🚪 Exit</div></div>`;
+    currentLayout.doors.push({ elId: 'doorExit', x: 110, onEnter: exitRoom });
+  }else{
+    doorsHtml += `<div class="hall-door students" id="doorStudents" style="left:110px;"><div class="door-label">🔒 Lockers</div></div>`;
+    doorsHtml += `<div class="hall-door weeks" id="doorWeeks" style="left:220px;"><div class="door-label">📅 Weeks</div></div>`;
+    currentLayout.doors.push({ elId: 'doorStudents', x: 110, onEnter: openStudentPicker });
+    currentLayout.doors.push({ elId: 'doorWeeks', x: 220, onEnter: openWeekPicker });
+  }
 
-    const stickerHtml = post.sticker ? `<div class="card-sticker">${post.sticker}</div>` : '';
-    const teacherDeleteHtml = isTeacher ? `<button class="delete-x show" title="Remove from board" data-id="${post.id}">&times;</button>` : '';
+  let postsHtml = '';
+  if(visible.length === 0){
+    postsHtml = `<div class="empty-hall" style="left:${startX}px;">Nothing here yet.</div>`;
+  }else{
+    visible.forEach((post, i) => {
+      const x = startX + i * spacing;
+      const color = colorFor(post);
+      const rot = rotationFor(post.id);
+      const elId = `wallpost-${post.id}`;
+      currentLayout.posts.push({ elId, x });
 
-    let mediaBadges = '';
-    if(post.audioUrl) mediaBadges += `<span class="media-badge">🎧 Audio</span>`;
-    if(post.videoUrl) mediaBadges += `<span class="media-badge">🎬 Video</span>`;
+      let imgHtml = '';
+      if(post.image){
+        imgHtml = `<img src="${post.image}" alt="${escapeHtml(post.title)}"><div class="tape left"></div><div class="tape right"></div>`;
+      }
+      const stickerHtml = post.sticker ? `<div class="card-sticker">${post.sticker}</div>` : '';
+      const teacherDeleteHtml = isTeacher ? `<button class="delete-x show" title="Remove from board" data-id="${post.id}">&times;</button>` : '';
+      let mediaBadges = '';
+      if(post.audioUrl) mediaBadges += `<span class="media-badge">🎧 Audio</span>`;
+      if(post.videoUrl) mediaBadges += `<span class="media-badge">🎬 Video</span>`;
 
-    card.innerHTML = `
-      <div class="pin"></div>
-      ${teacherDeleteHtml}
-      ${imgHtml}
-      <span class="card-category">${escapeHtml(post.category)}</span>
-      <h3>${escapeHtml(post.title)}</h3>
-      <div class="desc">${escapeHtml(post.description)}</div>
-      <div class="by">${escapeHtml(post.studentName)}${post.className ? ` &middot; ${escapeHtml(post.className)}` : ''}</div>
-      ${mediaBadges ? `<div class="media-badges">${mediaBadges}</div>` : ''}
-      ${stickerHtml}
-    `;
-
-    card.addEventListener('click', (e) => {
-      if(e.target.classList.contains('delete-x')) return;
-      openLightbox(post);
+      postsHtml += `
+        <div class="card ${color} wall-post" id="${elId}" data-id="${post.id}" style="left:${x}px;transform:rotate(${rot}deg);">
+          <div class="pin"></div>
+          ${teacherDeleteHtml}
+          ${imgHtml}
+          <span class="card-category">${escapeHtml(post.category)}</span>
+          <h3>${escapeHtml(post.title)}</h3>
+          <div class="desc">${escapeHtml(post.description)}</div>
+          <div class="by">${escapeHtml(post.studentName)}${post.className ? ` &middot; ${escapeHtml(post.className)}` : ''}</div>
+          ${mediaBadges ? `<div class="media-badges">${mediaBadges}</div>` : ''}
+          ${stickerHtml}
+        </div>`;
     });
+  }
 
-    if(isTeacher){
-      card.querySelector('.delete-x').addEventListener('click', async (e) => {
+  boardArea.innerHTML = `
+    <div class="hallway-viewport" id="hallwayViewport">
+      <div class="hallway-world" id="hallwayWorld" style="width:${worldWidth}px;">
+        <div class="wall-strip"></div>
+        <div class="floor-strip"></div>
+        ${doorsHtml}
+        ${postsHtml}
+        <div class="avatar" id="avatarEl">
+          <div class="avatar-head"></div>
+          <div class="avatar-body"></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  viewportEl = document.getElementById('hallwayViewport');
+  worldEl = document.getElementById('hallwayWorld');
+  avatarEl = document.getElementById('avatarEl');
+
+  avatarX = Math.max(0, Math.min(worldWidth - 20, avatarX));
+  updatePositions();
+  checkProximity();
+
+  document.querySelectorAll('.wall-post').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if(e.target.classList.contains('delete-x')) return;
+      const post = posts.find(p => p.id === el.dataset.id);
+      if(post) openLightbox(post);
+    });
+  });
+
+  if(isTeacher){
+    document.querySelectorAll('.wall-post .delete-x').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if(confirm(`Remove "${post.title}" by ${post.studentName} from the board?`)){
+        const post = posts.find(p => p.id === btn.dataset.id);
+        if(post && confirm(`Remove "${post.title}" by ${post.studentName} from the board?`)){
           try{
             await dbRef.child(post.id).remove();
           }catch(err){
@@ -771,13 +1068,122 @@ function render(){
           }
         }
       });
+    });
+  }
+
+  if(roomFilter){
+    document.getElementById('doorExit').addEventListener('click', exitRoom);
+  }else{
+    document.getElementById('doorStudents').addEventListener('click', openStudentPicker);
+    document.getElementById('doorWeeks').addEventListener('click', openWeekPicker);
+  }
+}
+
+function updatePositions(){
+  if(!avatarEl || !worldEl || !viewportEl) return;
+  avatarEl.style.left = avatarX + 'px';
+  const vw = viewportEl.clientWidth || 900;
+  let camX = avatarX - vw / 2;
+  camX = Math.max(0, Math.min(Math.max(currentLayout.worldWidth - vw, 0), camX));
+  worldEl.style.transform = `translateX(${-camX}px)`;
+}
+
+function checkProximity(){
+  currentLayout.doors.forEach(d => {
+    const el = document.getElementById(d.elId);
+    if(!el) return;
+    const dist = Math.abs(avatarX - d.x);
+    if(dist < 45){
+      el.classList.add('near');
+      if(lastTriggeredDoor !== d.elId){
+        lastTriggeredDoor = d.elId;
+        d.onEnter();
+      }
+    }else{
+      el.classList.remove('near');
+      if(lastTriggeredDoor === d.elId) lastTriggeredDoor = null;
     }
-
-    board.appendChild(card);
   });
+  currentLayout.posts.forEach(p => {
+    const el = document.getElementById(p.elId);
+    if(!el) return;
+    el.classList.toggle('near', Math.abs(avatarX - p.x) < 60);
+  });
+}
 
-  boardArea.innerHTML = '';
-  boardArea.appendChild(board);
+function enterRoom(type, value){
+  roomFilter = { type, value };
+  avatarX = 0;
+  lastTriggeredDoor = null;
+  closeAllPickers();
+  render();
+}
+
+function exitRoom(){
+  roomFilter = null;
+  avatarX = 0;
+  lastTriggeredDoor = null;
+  render();
+}
+
+function openStudentPicker(){
+  const approved = posts.filter(p => p.status === 'approved');
+  const counts = {};
+  approved.forEach(p => { counts[p.studentName] = (counts[p.studentName] || 0) + 1; });
+  const names = Object.keys(counts).sort();
+  const listEl = document.getElementById('studentPickerList');
+
+  if(names.length === 0){
+    listEl.innerHTML = `<div class="empty-review">No pinned work yet.</div>`;
+  }else{
+    listEl.innerHTML = names.map(name => `
+      <div class="picker-item" data-name="${escapeHtml(name)}">
+        <span>${escapeHtml(name)}</span>
+        <span class="count">${counts[name]} pinned</span>
+      </div>
+    `).join('');
+    listEl.querySelectorAll('.picker-item').forEach(item => {
+      item.addEventListener('click', () => {
+        document.getElementById('studentPickerOverlay').classList.remove('show');
+        enterRoom('student', item.dataset.name);
+      });
+    });
+  }
+  document.getElementById('studentPickerOverlay').classList.add('show');
+}
+
+function openWeekPicker(){
+  const approved = posts.filter(p => p.status === 'approved');
+  const counts = {};
+  approved.forEach(p => {
+    const key = weekKey(p.createdAt);
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  const keys = Object.keys(counts).sort().reverse();
+  const listEl = document.getElementById('weekPickerList');
+
+  if(keys.length === 0){
+    listEl.innerHTML = `<div class="empty-review">No pinned work yet.</div>`;
+  }else{
+    listEl.innerHTML = keys.map(key => `
+      <div class="picker-item" data-key="${key}">
+        <span>${weekLabel(key)}</span>
+        <span class="count">${counts[key]} pinned</span>
+      </div>
+    `).join('');
+    listEl.querySelectorAll('.picker-item').forEach(item => {
+      item.addEventListener('click', () => {
+        document.getElementById('weekPickerOverlay').classList.remove('show');
+        enterRoom('week', item.dataset.key);
+      });
+    });
+  }
+  document.getElementById('weekPickerOverlay').classList.add('show');
+}
+
+function closeAllPickers(){
+  document.getElementById('studentPickerOverlay').classList.remove('show');
+  document.getElementById('weekPickerOverlay').classList.remove('show');
 }
 
 function openLightbox(post){
@@ -802,6 +1208,73 @@ function openLightbox(post){
 
 document.getElementById('lightbox').addEventListener('click', (e) => {
   if(e.target.id === 'lightbox') e.target.classList.remove('show');
+});
+
+// ---- Avatar movement ----
+function isTypingContext(){
+  const el = document.activeElement;
+  return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT');
+}
+function anyOverlayOpen(){
+  return document.querySelector('.overlay.show') !== null;
+}
+function normKey(key){
+  if(key === 'ArrowLeft' || key === 'a' || key === 'A') return 'left';
+  if(key === 'ArrowRight' || key === 'd' || key === 'D') return 'right';
+  return null;
+}
+window.addEventListener('keydown', (e) => {
+  if(isTypingContext()) return;
+  const k = normKey(e.key);
+  if(k){ keysDown[k] = true; e.preventDefault(); }
+});
+window.addEventListener('keyup', (e) => {
+  const k = normKey(e.key);
+  if(k){ keysDown[k] = false; }
+});
+
+function bindNavHold(btn, key){
+  const start = (e) => { e.preventDefault(); keysDown[key] = true; };
+  const stop = () => { keysDown[key] = false; };
+  btn.addEventListener('pointerdown', start);
+  btn.addEventListener('pointerup', stop);
+  btn.addEventListener('pointerleave', stop);
+  btn.addEventListener('pointercancel', stop);
+}
+bindNavHold(document.getElementById('navLeftBtn'), 'left');
+bindNavHold(document.getElementById('navRightBtn'), 'right');
+
+const AVATAR_SPEED = 6;
+function animate(){
+  if(!anyOverlayOpen()){
+    let moved = false;
+    if(keysDown.left){ avatarX -= AVATAR_SPEED; moved = true; }
+    if(keysDown.right){ avatarX += AVATAR_SPEED; moved = true; }
+    if(moved){
+      avatarX = Math.max(0, Math.min(currentLayout.worldWidth - 20, avatarX));
+      updatePositions();
+      checkProximity();
+    }
+  }
+  requestAnimationFrame(animate);
+}
+animate();
+
+document.getElementById('doorStudentsBtn').addEventListener('click', openStudentPicker);
+document.getElementById('doorWeeksBtn').addEventListener('click', openWeekPicker);
+document.getElementById('exitRoomBtn').addEventListener('click', exitRoom);
+
+document.getElementById('closeStudentPickerBtn').addEventListener('click', () => {
+  document.getElementById('studentPickerOverlay').classList.remove('show');
+});
+document.getElementById('closeWeekPickerBtn').addEventListener('click', () => {
+  document.getElementById('weekPickerOverlay').classList.remove('show');
+});
+document.getElementById('studentPickerOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'studentPickerOverlay') e.target.classList.remove('show');
+});
+document.getElementById('weekPickerOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'weekPickerOverlay') e.target.classList.remove('show');
 });
 
 document.getElementById('filters').addEventListener('click', (e) => {
