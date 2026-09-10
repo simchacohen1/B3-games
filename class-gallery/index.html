@@ -606,39 +606,8 @@
 .hall-door.weeks{background:var(--pink);}
 .hall-door.exit{background:var(--green);}
 .hall-door .door-label{padding:0 4px;line-height:1.2;}
-.avatar{
-  position:absolute;
-  bottom:38%;
-  width:34px;
-  transform:translateX(-50%);
-  z-index:8;
-}
-.avatar .avatar-head{
-  width:22px;height:22px;border-radius:50%;
-  background:#f0c088;
-  margin:0 auto;
-  box-shadow:0 1px 2px rgba(0,0,0,0.3);
-}
-.avatar .avatar-body{
-  width:30px;height:26px;border-radius:8px 8px 4px 4px;
-  background:var(--blue-dark);
-  margin:2px auto 0;
-}
-.hall-nav-btn{
-  position:absolute;
-  bottom:24px;
-  width:48px;height:48px;
-  border-radius:50%;
-  border:none;
-  background:rgba(74,45,24,0.75);
-  color:#fdf6e8;
-  font-size:1.2rem;
-  cursor:pointer;
-  z-index:10;
-}
-.hall-nav-btn.left{left:34px;}
-.hall-nav-btn.right{right:34px;}
-@media (hover:hover){ .hall-nav-btn{display:none;} }
+/* Original avatar/head/body and nav-button rules removed here — replaced by
+   the stick-figure avatar and directional pad defined in the redesign block below. */
 
 .picker-list{max-height:320px;overflow-y:auto;}
 .picker-item{
@@ -790,20 +759,49 @@ body{
 .door-window{position:absolute;left:18px;right:18px;top:24px;height:84px;border:5px solid #6a4024;background:linear-gradient(155deg,#bcd9ee,#eaf6ff 55%,#9dbfd9);display:flex;align-items:center;justify-content:center;font-size:2rem;color:#173f72;box-shadow:inset 0 0 18px rgba(41,95,140,.25);}
 .door-label{font-size:.74rem;text-transform:uppercase;letter-spacing:.5px;text-shadow:0 1px #4f2f1b;}
 
-/* Friendlier CSS avatar with kippah and backpack */
-.avatar{bottom:51px;width:82px;height:128px;transform:translateX(-50%);z-index:22;filter:drop-shadow(0 8px 5px rgba(0,0,0,.2));}
-.avatar-head{position:absolute!important;top:16px!important;left:22px;width:38px!important;height:39px!important;border-radius:48% 48% 46% 46%!important;background:#e7b47e!important;margin:0!important;box-shadow:inset 0 -3px rgba(140,86,44,.12)!important;z-index:4;}
-.avatar-kippah{position:absolute;top:10px;left:27px;width:28px;height:13px;background:#102c58;border-radius:50% 50% 26% 26%;border:2px solid #081a36;z-index:6;box-shadow:inset 0 2px #274f8b;}
-.avatar-ear{position:absolute;top:29px;width:8px;height:13px;background:#dda870;border-radius:50%;z-index:3}.avatar-ear.left{left:17px}.avatar-ear.right{right:17px}
-.avatar-body{position:absolute!important;top:50px!important;left:13px;width:56px!important;height:51px!important;border-radius:16px 16px 9px 9px!important;background:linear-gradient(#2d75c0,#15539a)!important;margin:0!important;border:2px solid #0d477f;z-index:3;}
-.avatar-backpack{position:absolute;top:55px;left:17px;width:48px;height:48px;border-radius:15px 15px 11px 11px;background:linear-gradient(#245b9b,#164477);border:3px solid #103968;z-index:7;color:#d8e8f7;display:flex;align-items:center;justify-content:center;font-size:1.25rem;box-shadow:inset 0 0 0 2px rgba(255,255,255,.09)}
-.avatar-leg{position:absolute;top:95px;width:17px;height:31px;border-radius:3px 3px 8px 8px;background:#303a52;border-bottom:8px solid white;z-index:2}.avatar-leg.left{left:20px;transform:rotate(7deg)}.avatar-leg.right{right:20px;transform:rotate(-7deg)}
+/* ---- Stick-figure avatar ----
+   .avatar is positioned/scaled by JS (left/bottom/transform:scale) to express
+   depth. .avatar-figure is a separate inner element so a CSS walk-cycle
+   animation can move it independently, with no conflict with JS's inline
+   transform on the parent. */
+.avatar{position:absolute;width:46px;height:82px;transform:translateX(-50%);z-index:22;transform-origin:50% 100%;}
+.avatar-figure{position:relative;width:100%;height:100%;transition:transform .12s ease;}
+.avatar-figure.face-left{transform:scaleX(-1);}
+.avatar-shadow{position:absolute;bottom:-4px;left:50%;width:34px;height:9px;background:radial-gradient(ellipse at center,rgba(30,20,10,.35),transparent 72%);transform:translateX(-50%);z-index:1;}
+.sf-head{position:absolute;top:0;left:50%;width:24px;height:24px;margin-left:-12px;border-radius:50%;background:#fff6e6;border:3px solid #17325c;box-shadow:inset 0 -3px 0 rgba(23,50,92,.12);z-index:5;}
+.sf-eye{position:absolute;top:10px;width:3px;height:3px;border-radius:50%;background:#17325c;}
+.sf-eye.left{left:6px;}.sf-eye.right{right:6px;}
+.sf-mouth{position:absolute;top:15px;left:50%;width:10px;height:5px;margin-left:-5px;border:2px solid #17325c;border-top:none;border-radius:0 0 10px 10px;}
+.sf-torso{position:absolute;top:22px;left:50%;width:5px;height:26px;margin-left:-2.5px;background:#1e5aa6;border-radius:3px;z-index:4;}
+.sf-arm{position:absolute;top:26px;left:50%;width:5px;height:22px;margin-left:-2.5px;background:#2d75c0;border-radius:3px;transform-origin:50% 4px;z-index:3;}
+.sf-arm.left{transform:rotate(18deg);}
+.sf-arm.right{transform:rotate(-18deg);}
+.sf-leg{position:absolute;top:46px;left:50%;width:6px;height:28px;margin-left:-3px;background:#17325c;border-radius:3px;transform-origin:50% 3px;z-index:2;}
+.sf-leg.left{transform:rotate(-14deg);}
+.sf-leg.right{transform:rotate(14deg);}
+/* Silly, exaggerated walk cycle — legs and arms swing opposite each other,
+   whole figure bobs with each step. Only runs while a movement key is held. */
+.avatar-figure.walking .sf-leg.left{animation:sfLegL .5s ease-in-out infinite;}
+.avatar-figure.walking .sf-leg.right{animation:sfLegR .5s ease-in-out infinite;}
+.avatar-figure.walking .sf-arm.left{animation:sfArmL .5s ease-in-out infinite;}
+.avatar-figure.walking .sf-arm.right{animation:sfArmR .5s ease-in-out infinite;}
+.avatar-figure.walking{animation:sfBob .25s ease-in-out infinite;}
+@keyframes sfLegL{0%,100%{transform:rotate(-34deg);}50%{transform:rotate(30deg);}}
+@keyframes sfLegR{0%,100%{transform:rotate(30deg);}50%{transform:rotate(-34deg);}}
+@keyframes sfArmL{0%,100%{transform:rotate(30deg);}50%{transform:rotate(-34deg);}}
+@keyframes sfArmR{0%,100%{transform:rotate(-34deg);}50%{transform:rotate(30deg);}}
+@keyframes sfBob{0%,100%{transform:translateY(0);}50%{transform:translateY(-5px);}}
 
-.walk-hud{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:26;display:flex;align-items:center;gap:14px;color:#42546a;font-weight:700;font-size:.9rem;text-shadow:0 1px white;pointer-events:none;white-space:nowrap;}
-.walk-arrow{font-size:2rem;color:#52667f;line-height:1;}
-.hallway-help{position:absolute;right:20px;bottom:17px;z-index:26;background:rgba(255,255,255,.82);border:1px solid rgba(70,80,90,.15);border-radius:999px;padding:7px 12px;color:#52606f;font-size:.7rem;font-weight:700;box-shadow:0 3px 8px rgba(0,0,0,.08);}
-.hall-nav-btn{display:block;bottom:14px;width:50px;height:50px;background:#fff;color:#1a5797;border:2px solid #d7e6f6;box-shadow:0 5px 12px rgba(0,0,0,.15);z-index:30;}
-.hall-nav-btn.left{left:16px}.hall-nav-btn.right{right:16px}
+.walk-hud{position:absolute;left:14px;top:14px;z-index:26;display:flex;flex-direction:column;gap:2px;color:#42546a;font-weight:700;font-size:.78rem;text-shadow:0 1px white;pointer-events:none;white-space:nowrap;background:rgba(255,255,255,.7);border-radius:10px;padding:6px 10px;}
+.hallway-help{position:absolute;right:20px;top:17px;z-index:26;background:rgba(255,255,255,.82);border:1px solid rgba(70,80,90,.15);border-radius:999px;padding:7px 12px;color:#52606f;font-size:.7rem;font-weight:700;box-shadow:0 3px 8px rgba(0,0,0,.08);}
+
+/* Directional pad: cross layout, bottom-center */
+.hall-dpad{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:30;display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,38px);gap:5px;}
+.hall-nav-btn{width:42px;height:38px;border-radius:12px;background:#fff;color:#1a5797;border:2px solid #d7e6f6;box-shadow:0 5px 12px rgba(0,0,0,.15);z-index:30;font-size:1.1rem;cursor:pointer;}
+.hall-nav-btn.up{grid-column:2;grid-row:1;}
+.hall-nav-btn.left{grid-column:1;grid-row:2;}
+.hall-nav-btn.right{grid-column:3;grid-row:2;}
+.hall-nav-btn.down{grid-column:2;grid-row:3;}
 .empty-hall{top:140px;width:310px;background:rgba(255,253,246,.94);border:3px solid #be8550;border-radius:12px;padding:24px;color:#4b3827;box-shadow:0 10px 25px rgba(0,0,0,.2);font-family:'Quicksand';}
 .empty-hall strong{display:block;font-family:'Caveat';font-size:1.8rem;color:#214f82;margin-bottom:6px}.empty-hall span{font-size:.8rem;}
 
@@ -879,8 +877,12 @@ footer{color:#705c48;background:#f6efe6;padding:0 0 18px;font-weight:600;}
 
 <div class="hallway-stage">
   <div id="boardArea"></div>
-  <button class="hall-nav-btn left" id="navLeftBtn" aria-label="Walk left" type="button">◀</button>
-  <button class="hall-nav-btn right" id="navRightBtn" aria-label="Walk right" type="button">▶</button>
+  <div class="hall-dpad">
+    <button class="hall-nav-btn up" id="navUpBtn" aria-label="Step forward" type="button">▲</button>
+    <button class="hall-nav-btn left" id="navLeftBtn" aria-label="Walk left" type="button">◀</button>
+    <button class="hall-nav-btn right" id="navRightBtn" aria-label="Walk right" type="button">▶</button>
+    <button class="hall-nav-btn down" id="navDownBtn" aria-label="Step back" type="button">▼</button>
+  </div>
 </div>
 
 <footer>Everything pinned here is visible to the whole class.</footer>
@@ -1057,9 +1059,12 @@ let currentFilter = 'all';
 // ---- Hallway state ----
 let roomFilter = null;           // null | {type:'student', value} | {type:'week', value}
 let avatarX = 540;
+let avatarY = 0.35;   // depth: 0 = right up close to the viewer, 1 = deep near the back wall
+let facing = 'right';
 const keysDown = {};
+const DEPTH_MIN = 0, DEPTH_MAX = 1;
 let lastTriggeredDoor = null;
-let viewportEl = null, worldEl = null, avatarEl = null;
+let viewportEl = null, worldEl = null, avatarEl = null, avatarFigureEl = null;
 let currentLayout = { doors: [], posts: [], worldWidth: 700 };
 
 function catToColor(cat){
@@ -1234,19 +1239,22 @@ function renderHallway(visible, boardIsEmpty){
         ${doorsHtml}
         ${postsHtml}
         <div class="avatar" id="avatarEl" aria-label="student walking through the gallery">
-          <div class="avatar-kippah"></div>
-          <div class="avatar-head"></div>
-          <div class="avatar-ear left"></div><div class="avatar-ear right"></div>
-          <div class="avatar-body"></div>
-          <div class="avatar-backpack"><span>✡</span></div>
-          <div class="avatar-leg left"></div><div class="avatar-leg right"></div>
+          <div class="avatar-shadow"></div>
+          <div class="avatar-figure" id="avatarFigure">
+            <div class="sf-head">
+              <div class="sf-eye left"></div><div class="sf-eye right"></div>
+              <div class="sf-mouth"></div>
+            </div>
+            <div class="sf-torso"></div>
+            <div class="sf-arm left"></div><div class="sf-arm right"></div>
+            <div class="sf-leg left"></div><div class="sf-leg right"></div>
+          </div>
         </div>
       </div>
 
       <div class="walk-hud" aria-hidden="true">
-        <span class="walk-arrow">←</span>
-        <span>Walk with <b>← →</b> or <b>A / D</b></span>
-        <span class="walk-arrow">→</span>
+        <span>← → walk down the hall</span>
+        <span>↑ ↓ step forward / back</span>
       </div>
       <div class="hallway-help">Walk into a door, or click it, to go in.</div>
     </div>
@@ -1255,6 +1263,7 @@ function renderHallway(visible, boardIsEmpty){
   viewportEl = document.getElementById('hallwayViewport');
   worldEl = document.getElementById('hallwayWorld');
   avatarEl = document.getElementById('avatarEl');
+  avatarFigureEl = document.getElementById('avatarFigure');
 
   avatarX = Math.max(90, Math.min(worldWidth - 90, avatarX));
   updatePositions();
@@ -1295,6 +1304,17 @@ function renderHallway(visible, boardIsEmpty){
 function updatePositions(){
   if(!avatarEl || !worldEl || !viewportEl) return;
   avatarEl.style.left = avatarX + 'px';
+
+  // Depth (avatarY: 0 = close to the viewer, 1 = deep near the back wall).
+  // Walking "forward" moves the figure up the screen toward the vanishing
+  // point and shrinks it; walking "back" brings it down and larger again.
+  const vh = viewportEl.clientHeight || 500;
+  const depthT = Math.max(DEPTH_MIN, Math.min(DEPTH_MAX, avatarY));
+  const bottomPx = vh * (0.045 + depthT * 0.36);
+  const scale = 1.1 - depthT * 0.55;
+  avatarEl.style.bottom = bottomPx + 'px';
+  avatarEl.style.transform = `translateX(-50%) scale(${scale.toFixed(3)})`;
+
   const vw = viewportEl.clientWidth || 900;
   let camX = avatarX - vw / 2;
   camX = Math.max(0, Math.min(Math.max(currentLayout.worldWidth - vw, 0), camX));
@@ -1327,6 +1347,7 @@ function checkProximity(){
 function enterRoom(type, value){
   roomFilter = { type, value };
   avatarX = 540;
+  avatarY = 0.35;
   lastTriggeredDoor = null;
   closeAllPickers();
   render();
@@ -1335,6 +1356,7 @@ function enterRoom(type, value){
 function exitRoom(){
   roomFilter = null;
   avatarX = 540;
+  avatarY = 0.35;
   lastTriggeredDoor = null;
   render();
 }
@@ -1434,6 +1456,8 @@ function anyOverlayOpen(){
 function normKey(key){
   if(key === 'ArrowLeft' || key === 'a' || key === 'A') return 'left';
   if(key === 'ArrowRight' || key === 'd' || key === 'D') return 'right';
+  if(key === 'ArrowUp' || key === 'w' || key === 'W') return 'up';
+  if(key === 'ArrowDown' || key === 's' || key === 'S') return 'down';
   return null;
 }
 window.addEventListener('keydown', (e) => {
@@ -1456,15 +1480,28 @@ function bindNavHold(btn, key){
 }
 bindNavHold(document.getElementById('navLeftBtn'), 'left');
 bindNavHold(document.getElementById('navRightBtn'), 'right');
+bindNavHold(document.getElementById('navUpBtn'), 'up');
+bindNavHold(document.getElementById('navDownBtn'), 'down');
 
 const AVATAR_SPEED = 6;
+const DEPTH_SPEED = 0.012;
 function animate(){
   if(!anyOverlayOpen()){
-    let moved = false;
-    if(keysDown.left){ avatarX -= AVATAR_SPEED; moved = true; }
-    if(keysDown.right){ avatarX += AVATAR_SPEED; moved = true; }
-    if(moved){
+    let movedX = false, movedY = false;
+    if(keysDown.left){ avatarX -= AVATAR_SPEED; movedX = true; facing = 'left'; }
+    if(keysDown.right){ avatarX += AVATAR_SPEED; movedX = true; facing = 'right'; }
+    if(keysDown.up){ avatarY = Math.min(DEPTH_MAX, avatarY + DEPTH_SPEED); movedY = true; }
+    if(keysDown.down){ avatarY = Math.max(DEPTH_MIN, avatarY - DEPTH_SPEED); movedY = true; }
+
+    if(avatarFigureEl){
+      avatarFigureEl.classList.toggle('walking', movedX || movedY);
+      avatarFigureEl.classList.toggle('face-left', facing === 'left');
+    }
+
+    if(movedX){
       avatarX = Math.max(0, Math.min(currentLayout.worldWidth - 20, avatarX));
+    }
+    if(movedX || movedY){
       updatePositions();
       checkProximity();
     }
