@@ -731,7 +731,7 @@ body{
   transition:transform .18s ease,filter .18s ease,box-shadow .18s ease;
 }
 .wall-post.wall-right{top:142px;transform:perspective(850px) rotateY(-8deg) rotateZ(var(--card-tilt,0deg)) scale(.92);}
-.wall-post.near{transform:perspective(850px) rotateY(0deg) rotateZ(0deg) translateY(-14px) scale(1.12)!important;z-index:18;filter:saturate(1.08);box-shadow:0 24px 38px rgba(40,25,11,.35);}
+.wall-post.near{z-index:18;filter:saturate(1.12) brightness(1.04);box-shadow:0 24px 38px rgba(40,25,11,.35),0 0 0 4px rgba(242,189,75,.38);}
 .project-image-wrap{position:relative;margin:-3px -2px 9px;}
 .wall-post img{height:102px;object-fit:cover;margin:0;border-radius:3px;}
 .project-placeholder{height:95px;margin-bottom:9px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:3.2rem;background:linear-gradient(145deg,#f5efe3,#e8dcc9);box-shadow:inset 0 0 0 1px rgba(80,50,20,.08);}
@@ -753,144 +753,132 @@ body{
 .hall-door.students{background:linear-gradient(90deg,#7a4a2a,#b67b47 18%,#8b5730 82%,#654020)}
 .hall-door.weeks{background:linear-gradient(90deg,#7a4a2a,#b67b47 18%,#8b5730 82%,#654020)}
 .hall-door.exit{background:linear-gradient(90deg,#5d704d,#83a46d 18%,#6d895a 82%,#4a5b3f)}
-.hall-door.near{transform:perspective(650px) rotateY(0) translateY(-10px) scale(1.04);filter:brightness(1.06);z-index:16;}
+.hall-door.near{filter:brightness(1.10) saturate(1.05);z-index:20;box-shadow:0 18px 28px rgba(0,0,0,.36),0 0 0 5px rgba(242,189,75,.38),inset 0 0 0 3px rgba(255,255,255,.12);}
 .door-plaque{position:absolute;left:50%;top:-50px;transform:translateX(-50%);width:150px;padding:7px 8px;border-radius:9px;background:linear-gradient(#315f9d,#1a477f);border:3px solid #163960;box-shadow:0 4px 8px rgba(0,0,0,.24);font-size:.78rem;line-height:1.05;}
 .hall-door.weeks .door-plaque{background:linear-gradient(#6b5ba9,#4f418c);border-color:#403574}.hall-door.exit .door-plaque{background:linear-gradient(#5d8b54,#3f6d39);border-color:#31562c}
 .door-window{position:absolute;left:18px;right:18px;top:24px;height:84px;border:5px solid #6a4024;background:linear-gradient(155deg,#bcd9ee,#eaf6ff 55%,#9dbfd9);display:flex;align-items:center;justify-content:center;font-size:2rem;color:#173f72;box-shadow:inset 0 0 18px rgba(41,95,140,.25);}
 .door-label{font-size:.74rem;text-transform:uppercase;letter-spacing:.5px;text-shadow:0 1px #4f2f1b;}
 
-/* ---- Walking avatar (uses the mascot figure) ----
-   .avatar is positioned/scaled by JS (left/bottom) to express movement.
-   .avatar-figure is a separate inner element so a CSS walk-cycle animation
-   can move it independently, with no conflict with JS's inline transform on
-   the parent. .wf-scale shrinks the mascot's full-size figure (authored at
-   96x146 for the corner widget) down to fit the in-hallway character. */
-.avatar{position:absolute;width:50px;height:74px;bottom:38px;transform:translateX(-50%);z-index:22;transform-origin:50% 100%;}
-.avatar-figure{position:relative;width:100%;height:100%;transition:transform .12s ease;}
+/* ---- Lanky mascot avatar ----
+   Replaces the old stick figure. JS still controls the outer .avatar for
+   position/depth; the inner figure handles the funny loose-limbed motion. */
+.avatar{
+  position:absolute;
+  width:72px;
+  height:132px;
+  transform:translateX(-50%);
+  z-index:22;
+  transform-origin:50% 100%;
+  pointer-events:auto;
+}
+.avatar-figure{
+  position:relative;
+  width:100%;
+  height:100%;
+  transition:transform .12s ease;
+  transform-origin:50% 100%;
+  filter:drop-shadow(0 5px 5px rgba(0,0,0,.18));
+}
 .avatar-figure.face-left{transform:scaleX(-1);}
-.avatar-shadow{position:absolute;bottom:-4px;left:50%;width:34px;height:9px;background:radial-gradient(ellipse at center,rgba(30,20,10,.35),transparent 72%);transform:translateX(-50%);z-index:1;}
-.wf-scale{position:absolute;left:50%;bottom:0;width:96px;height:146px;margin-left:-48px;transform:scale(0.52);transform-origin:50% 100%;}
-/* Silly, exaggerated walk cycle — legs and arms swing opposite each other,
-   whole figure bobs with each step. Only runs while a movement key is held. */
-.avatar-figure.walking .hf-leg.left{animation:sfLegL .5s ease-in-out infinite;}
-.avatar-figure.walking .hf-leg.right{animation:sfLegR .5s ease-in-out infinite;}
-.avatar-figure.walking .hf-arm.left{animation:sfArmL .5s ease-in-out infinite;}
-.avatar-figure.walking .hf-arm.right{animation:sfArmR .5s ease-in-out infinite;}
-.avatar-figure.walking{animation:sfBob .25s ease-in-out infinite;}
-@keyframes sfLegL{0%,100%{transform:rotate(-34deg);}50%{transform:rotate(30deg);}}
-@keyframes sfLegR{0%,100%{transform:rotate(30deg);}50%{transform:rotate(-34deg);}}
-@keyframes sfArmL{0%,100%{transform:rotate(30deg);}50%{transform:rotate(-34deg);}}
-@keyframes sfArmR{0%,100%{transform:rotate(-34deg);}50%{transform:rotate(30deg);}}
-@keyframes sfBob{0%,100%{transform:translateY(0);}50%{transform:translateY(-5px);}}
+.avatar-shadow{
+  position:absolute;
+  bottom:-3px;
+  left:50%;
+  width:48px;
+  height:10px;
+  background:radial-gradient(ellipse at center,rgba(30,20,10,.32),transparent 72%);
+  transform:translateX(-50%);
+  z-index:1;
+}
+.lanky-head{
+  position:absolute;
+  top:0;
+  left:50%;
+  width:34px;
+  height:34px;
+  margin-left:-17px;
+  border-radius:50%;
+  background:#fff9ef;
+  border:4px solid #17325c;
+  z-index:7;
+}
+.lanky-eye{position:absolute;top:11px;width:4px;height:4px;border-radius:50%;background:#17325c;}
+.lanky-eye.left{left:8px}.lanky-eye.right{right:8px}
+.lanky-mouth{position:absolute;top:19px;left:50%;width:13px;height:7px;margin-left:-6.5px;border:2px solid #17325c;border-top:none;border-radius:0 0 12px 12px;}
+.lanky-neck{position:absolute;top:31px;left:50%;width:5px;height:10px;margin-left:-2.5px;background:#17325c;border-radius:999px;z-index:5;}
+.lanky-body{position:absolute;top:39px;left:50%;width:6px;height:39px;margin-left:-3px;background:#1e5aa6;border-radius:999px;z-index:5;}
+.lanky-arm,.lanky-leg{position:absolute;left:50%;border-radius:999px;transform-origin:50% 4px;}
+.lanky-arm{top:43px;width:5px;height:42px;margin-left:-2.5px;background:#2d75c0;z-index:4;}
+.lanky-arm.left{transform:rotate(27deg)}
+.lanky-arm.right{transform:rotate(-27deg)}
+.lanky-hand{position:absolute;bottom:-4px;left:50%;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:#17325c;}
+.lanky-leg{top:76px;width:6px;height:48px;margin-left:-3px;background:#17325c;z-index:3;}
+.lanky-leg.left{transform:rotate(-14deg)}
+.lanky-leg.right{transform:rotate(14deg)}
+.lanky-foot{position:absolute;bottom:-3px;left:50%;width:15px;height:6px;margin-left:-3px;border-radius:8px;background:#17325c;}
+
+/* Loose, lanky walk: big arm swing, floppy legs, head bob and a tiny wobble. */
+.avatar-figure.walking{animation:lankyBob .34s ease-in-out infinite;}
+.avatar-figure.walking .lanky-head{animation:lankyHead .68s ease-in-out infinite;}
+.avatar-figure.walking .lanky-arm.left{animation:lankyArmL .62s ease-in-out infinite;}
+.avatar-figure.walking .lanky-arm.right{animation:lankyArmR .62s ease-in-out infinite;}
+.avatar-figure.walking .lanky-leg.left{animation:lankyLegL .62s ease-in-out infinite;}
+.avatar-figure.walking .lanky-leg.right{animation:lankyLegR .62s ease-in-out infinite;}
+.avatar-figure:not(.walking){animation:lankyIdle 2.5s ease-in-out infinite;}
+@keyframes lankyBob{0%,100%{translate:0 0;rotate:-1deg}50%{translate:0 -7px;rotate:1.5deg}}
+@keyframes lankyHead{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(5deg)}}
+@keyframes lankyArmL{0%,100%{transform:rotate(-48deg)}50%{transform:rotate(42deg)}}
+@keyframes lankyArmR{0%,100%{transform:rotate(42deg)}50%{transform:rotate(-48deg)}}
+@keyframes lankyLegL{0%,100%{transform:rotate(38deg)}50%{transform:rotate(-32deg)}}
+@keyframes lankyLegR{0%,100%{transform:rotate(-32deg)}50%{transform:rotate(38deg)}}
+@keyframes lankyIdle{0%,100%{rotate:-1.2deg;translate:0 0}50%{rotate:1.2deg;translate:0 -2px}}
 
 .walk-hud{position:absolute;left:14px;top:14px;z-index:26;display:flex;flex-direction:column;gap:2px;color:#42546a;font-weight:700;font-size:.78rem;text-shadow:0 1px white;pointer-events:none;white-space:nowrap;background:rgba(255,255,255,.7);border-radius:10px;padding:6px 10px;}
 .hallway-help{position:absolute;right:20px;top:17px;z-index:26;background:rgba(255,255,255,.82);border:1px solid rgba(70,80,90,.15);border-radius:999px;padding:7px 12px;color:#52606f;font-size:.7rem;font-weight:700;box-shadow:0 3px 8px rgba(0,0,0,.08);}
 
-/* Directional pad: cross layout, bottom-center */
-.hall-dpad{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:30;display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,38px);gap:5px;}
-.hall-nav-btn{width:42px;height:38px;border-radius:12px;background:#fff;color:#1a5797;border:2px solid #d7e6f6;box-shadow:0 5px 12px rgba(0,0,0,.15);z-index:30;font-size:1.1rem;cursor:pointer;}
-.hall-nav-btn.up{grid-column:2;grid-row:1;}
-.hall-nav-btn.left{grid-column:1;grid-row:2;}
-.hall-nav-btn.right{grid-column:3;grid-row:2;}
-.hall-nav-btn.down{grid-column:2;grid-row:3;}
+/* Game-style movement: keyboard first, touch controls only when useful */
+.walk-hud{
+  position:absolute;
+  left:50%;
+  bottom:14px;
+  top:auto;
+  transform:translateX(-50%);
+  z-index:35;
+  display:flex;
+  gap:8px;
+  align-items:center;
+  color:#42546a;
+  font-weight:800;
+  font-size:.78rem;
+  text-shadow:0 1px white;
+  pointer-events:none;
+  white-space:nowrap;
+  background:rgba(255,255,255,.82);
+  border:1px solid rgba(70,80,90,.14);
+  border-radius:999px;
+  padding:8px 14px;
+  box-shadow:0 5px 14px rgba(0,0,0,.10);
+  backdrop-filter:blur(5px);
+}
+.walk-hud span+span::before{content:"•";margin-right:8px;color:#9aa9b8;}
+.hallway-help{display:none;}
+.hall-controls{display:none;}
+.control-pod{background:rgba(255,255,255,.88);border:1px solid rgba(55,85,120,.16);border-radius:16px;padding:7px;box-shadow:0 8px 22px rgba(0,0,0,.14);backdrop-filter:blur(5px);}
+.control-label{display:none;}
+.walk-controls,.wall-controls{display:grid;grid-template-columns:54px 54px;gap:5px;}
+.hall-nav-btn{min-width:54px;height:46px;border-radius:13px;background:linear-gradient(#fff,#edf5fc);color:#174f8c;border:2px solid #cfe0f2;box-shadow:0 4px 0 #b9cee4,0 7px 12px rgba(0,0,0,.12);font-family:'Quicksand';font-weight:900;font-size:.68rem;line-height:1.05;cursor:pointer;touch-action:none;}
+.hall-nav-btn .arrow{display:block;font-size:1.12rem;line-height:1;margin-bottom:2px;}
+.hall-nav-btn:active,.hall-nav-btn.pressed{transform:translateY(3px);box-shadow:0 1px 0 #b9cee4,0 3px 7px rgba(0,0,0,.10)}
+@media (pointer:coarse){
+  .hall-controls{position:absolute;left:12px;bottom:12px;z-index:36;display:flex;gap:7px;user-select:none;touch-action:none;}
+  .walk-hud{bottom:72px;font-size:.7rem;}
+}
 .empty-hall{top:140px;width:310px;background:rgba(255,253,246,.94);border:3px solid #be8550;border-radius:12px;padding:24px;color:#4b3827;box-shadow:0 10px 25px rgba(0,0,0,.2);font-family:'Quicksand';}
 .section-label{position:absolute;top:100px;width:170px;transform:translateX(-50%);text-align:center;background:linear-gradient(#fff8ea,#f3e6cc);border:3px solid #9b6134;border-radius:10px;padding:12px 10px;box-shadow:0 8px 16px rgba(60,35,10,.22);}
 .section-label strong{display:block;font-family:'Caveat',cursive;font-size:1.5rem;color:#173f72;line-height:1;margin-bottom:4px;}
 .section-label .section-count{font-size:.72rem;font-weight:800;color:#3f6d39;letter-spacing:.3px;}
 .section-label .section-empty{font-size:.72rem;font-weight:700;color:#8a7357;font-style:italic;}
 .empty-hall strong{display:block;font-family:'Caveat';font-size:1.8rem;color:#214f82;margin-bottom:6px}.empty-hall span{font-size:.8rem;}
-
-
-
-/* ---- Lanky helper mascot ---- */
-.hall-helper{
-  position:absolute;
-  right:18px;
-  bottom:20px;
-  z-index:34;
-  max-width:min(300px, calc(100% - 24px));
-}
-.hall-helper.hidden{display:none;}
-.hall-helper.minimized .hall-helper-bubble{display:none;}
-.hall-helper-bubble{
-  position:relative;
-  background:linear-gradient(#fffefb,#f4ead7);
-  border:3px solid #315f9d;
-  color:#24384c;
-  border-radius:16px;
-  padding:12px 14px;
-  font-size:.83rem;
-  line-height:1.25;
-  font-weight:800;
-  box-shadow:0 12px 22px rgba(0,0,0,.18);
-  min-width:170px;
-  cursor:pointer;
-}
-.hall-helper-bubble::after{
-  content:"";
-  position:absolute;
-  right:16px;
-  bottom:-13px;
-  width:20px;
-  height:20px;
-  background:inherit;
-  border-right:3px solid #315f9d;
-  border-bottom:3px solid #315f9d;
-  transform:rotate(45deg);
-}
-.hall-helper-close{
-  position:absolute;
-  top:-10px;
-  right:-10px;
-  width:24px;
-  height:24px;
-  border:none;
-  border-radius:50%;
-  background:#315f9d;
-  color:#fff;
-  font-weight:900;
-  cursor:pointer;
-  box-shadow:0 3px 8px rgba(0,0,0,.18);
-}
-.hf-head{
-  position:absolute;
-  top:2px;
-  left:50%;
-  width:34px;
-  height:34px;
-  margin-left:-17px;
-  border-radius:50%;
-  background:#fff8ef;
-  border:4px solid #174277;
-  z-index:4;
-}
-.hf-eye{position:absolute;top:11px;width:4px;height:4px;border-radius:50%;background:#174277;}
-.hf-eye.left{left:8px;}.hf-eye.right{right:8px;}
-.hf-mouth{position:absolute;left:50%;top:18px;width:12px;height:6px;margin-left:-6px;border:2px solid #174277;border-top:none;border-radius:0 0 12px 12px;}
-.hf-torso{
-  position:absolute;
-  top:35px;
-  left:50%;
-  width:6px;
-  height:42px;
-  margin-left:-3px;
-  background:#1e5aa6;
-  border-radius:999px;
-  z-index:3;
-}
-.hf-arm,.hf-leg{
-  position:absolute;
-  left:50%;
-  background:#1e5aa6;
-  border-radius:999px;
-  transform-origin:50% 4px;
-}
-.hf-arm{top:40px;width:5px;height:38px;margin-left:-2.5px;z-index:2;}
-.hf-arm.left{transform:rotate(28deg);} 
-.hf-arm.right{transform:rotate(-28deg);} 
-.hf-leg{top:75px;width:6px;height:52px;margin-left:-3px;z-index:1;}
-.hf-leg.left{transform:rotate(-16deg);} 
-.hf-leg.right{transform:rotate(16deg);} 
 
 /* Modals now match the brighter app chrome */
 .overlay{backdrop-filter:blur(4px);background:rgba(24,37,54,.55);}
@@ -914,11 +902,9 @@ footer{color:#705c48;background:#f6efe6;padding:0 0 18px;font-weight:600;}
   .filters{justify-content:center}.top-actions{justify-content:center}.pending-note{position:static}
   .hallway-stage{padding:12px 8px}.hallway-wrap{padding:0 8px}.hallway-viewport{min-height:500px;height:68vh;border-radius:14px}
   .hall-sign{font-size:1.25rem;padding:6px 12px;top:35px}.hall-sign-left{left:3%}.hall-sign-right{right:3%}
-  .bench,.plant{display:none}.hallway-help{display:none}.walk-hud{font-size:.72rem;gap:7px}.walk-arrow{font-size:1.4rem}
+  .bench,.plant{display:none}.hallway-help{display:none}.walk-hud{font-size:.67rem;bottom:10px;padding:7px 11px}.hall-controls{left:8px;bottom:8px;gap:5px}.control-pod{padding:5px}.hall-nav-btn{min-width:48px;width:48px;height:42px;font-size:.62rem}.walk-controls,.wall-controls{grid-template-columns:48px 48px;gap:4px}
   .room-banner{margin-top:8px;margin-bottom:-48px;font-size:.72rem}
   .wall-post{width:170px}.door-plaque{width:128px}.hall-door{width:100px}
-  .hall-helper{right:8px;bottom:14px;max-width:calc(100% - 14px)}
-  .hall-helper-bubble{padding:10px 12px;font-size:.74rem;min-width:140px}
 }
 
 </style>
@@ -962,11 +948,15 @@ footer{color:#705c48;background:#f6efe6;padding:0 0 18px;font-weight:600;}
 
 <div class="hallway-stage">
   <div id="boardArea"></div>
-  <div class="hall-dpad">
-    <button class="hall-nav-btn up" id="navUpBtn" aria-label="Step forward" type="button">▲</button>
-    <button class="hall-nav-btn left" id="navLeftBtn" aria-label="Walk left" type="button">◀</button>
-    <button class="hall-nav-btn right" id="navRightBtn" aria-label="Walk right" type="button">▶</button>
-    <button class="hall-nav-btn down" id="navDownBtn" aria-label="Step back" type="button">▼</button>
+  <div class="hall-controls" aria-label="Touch movement controls">
+    <div class="control-pod"><div class="walk-controls">
+      <button class="hall-nav-btn up" id="navUpBtn" aria-label="Walk forward" type="button"><span class="arrow">▲</span>Go</button>
+      <button class="hall-nav-btn down" id="navDownBtn" aria-label="Walk back" type="button"><span class="arrow">▼</span>Back</button>
+    </div></div>
+    <div class="control-pod"><div class="wall-controls">
+      <button class="hall-nav-btn left" id="navLeftBtn" aria-label="Move left" type="button"><span class="arrow">◀</span>Left</button>
+      <button class="hall-nav-btn right" id="navRightBtn" aria-label="Move right" type="button"><span class="arrow">▶</span>Right</button>
+    </div></div>
   </div>
 </div>
 
@@ -1125,19 +1115,14 @@ let currentFilter = 'all';
 
 // ---- Hallway state ----
 let roomFilter = null;           // null | {type:'lockers'} | {type:'weeks'}
-let avatarX = 540;               // unbounded — how far down the hallway you've walked
+let avatarX = 0;                 // distance travelled down the hallway
 let avatarY = 0;                 // -1..1 — leaning toward the left wall (-1) or right wall (+1)
 let facing = 'right';
 const keysDown = {};
 const DEPTH_MIN = -1, DEPTH_MAX = 1;
 let lastTriggeredDoor = null;
-let viewportEl = null, worldEl = null, avatarEl = null, avatarFigureEl = null;
-let currentLayout = { doors: [], posts: [], worldWidth: 700 };
-let helperEl = null, helperBubbleEl = null;
-let helperDismissed = false;
-let helperTipIndex = 0;
-let lastActivityAt = Date.now();
-let lastHelperKey = '';
+let viewportEl = null, worldEl = null, avatarEl = null, avatarFigureEl = null, corridorBgEl = null;
+let currentLayout = { doors: [], posts: [], labels: [], worldWidth: 700 };
 
 function catToColor(cat){
   const map = {Chumash:'blue', Parsha:'yellow', Halacha:'green', Other:'pink'};
@@ -1286,16 +1271,16 @@ function renderHallway(visible, boardIsEmpty, groups){
   const startX = 910;
 
   let doorsHtml = '', postsHtml = '', worldWidth;
-  currentLayout = { doors: [], posts: [], worldWidth: 1900 };
+  currentLayout = { doors: [], posts: [], labels: [], worldWidth: 1900 };
 
   if(roomFilter){
     doorsHtml += `<div class="hall-door exit" id="doorExit" style="left:430px;"><div class="door-plaque">Main Hallway</div><div class="door-window">↩</div><div class="door-label">Exit</div></div>`;
-    currentLayout.doors.push({ elId: 'doorExit', x: 430, onEnter: exitRoom });
+    currentLayout.doors.push({ elId: 'doorExit', x: 430, side: -1, onEnter: exitRoom });
   }else{
     doorsHtml += `<div class="hall-door students" id="doorStudents" style="left:390px;"><div class="door-plaque">Student Lockers</div><div class="door-window">🔒</div><div class="door-label">Lockers</div></div>`;
     doorsHtml += `<div class="hall-door weeks" id="doorWeeks" style="left:690px;"><div class="door-plaque">Browse by Week</div><div class="door-window">📅</div><div class="door-label">Weeks</div></div>`;
-    currentLayout.doors.push({ elId: 'doorStudents', x: 390, onEnter: () => enterRoom('lockers') });
-    currentLayout.doors.push({ elId: 'doorWeeks', x: 690, onEnter: () => enterRoom('weeks') });
+    currentLayout.doors.push({ elId: 'doorStudents', x: 390, side: -1, onEnter: () => enterRoom('lockers') });
+    currentLayout.doors.push({ elId: 'doorWeeks', x: 690, side: 1, onEnter: () => enterRoom('weeks') });
   }
 
   if(groups){
@@ -1308,14 +1293,16 @@ function renderHallway(visible, boardIsEmpty, groups){
       postsHtml = `<div class="empty-hall" style="left:${startX}px;"><strong>Nothing pinned yet.</strong><span>Keep walking — new sections will appear here as work is pinned.</span></div>`;
       worldWidth = 1900;
     }else{
-      groups.forEach(g => {
+      groups.forEach((g, groupIndex) => {
         const emptyNote = g.posts.length === 0 ? `<span class="section-empty">Nothing pinned yet</span>` : `<span class="section-count">${g.posts.length} pinned</span>`;
-        postsHtml += `<div class="section-label" style="left:${x}px;"><strong>${escapeHtml(g.label)}</strong>${emptyNote}</div>`;
+        const sectionId = `section-label-${groupIndex}`;
+        postsHtml += `<div class="section-label" id="${sectionId}" style="left:${x}px;"><strong>${escapeHtml(g.label)}</strong>${emptyNote}</div>`;
+        currentLayout.labels.push({ elId: sectionId, x, side: 0 });
         x += 210;
         g.posts.forEach((post, j) => {
           const side = j % 2 === 0 ? 'wall-left' : 'wall-right';
           const { elId, html } = buildCardHtml(post, x, side);
-          currentLayout.posts.push({ elId, x });
+          currentLayout.posts.push({ elId, x, side: side === 'wall-left' ? -1 : 1 });
           postsHtml += html;
           anyPosts = true;
           x += spacing;
@@ -1337,7 +1324,7 @@ function renderHallway(visible, boardIsEmpty, groups){
         const x = startX + i * spacing;
         const side = i % 2 === 0 ? 'wall-left' : 'wall-right';
         const { elId, html } = buildCardHtml(post, x, side);
-        currentLayout.posts.push({ elId, x });
+        currentLayout.posts.push({ elId, x, side: side === 'wall-left' ? -1 : 1 });
         postsHtml += html;
       });
       worldWidth = Math.max(startX + visible.length * spacing + 620, 1900);
@@ -1371,30 +1358,28 @@ function renderHallway(visible, boardIsEmpty, groups){
         <div class="floor-strip"></div>
         ${doorsHtml}
         ${postsHtml}
-        <div class="avatar" id="avatarEl" aria-label="student walking through the gallery">
+        <div class="avatar" id="avatarEl" aria-label="lanky hallway mascot walking through the gallery">
           <div class="avatar-shadow"></div>
           <div class="avatar-figure" id="avatarFigure">
-            <div class="wf-scale">
-              <div class="hf-head"><div class="hf-eye left"></div><div class="hf-eye right"></div><div class="hf-mouth"></div></div>
-              <div class="hf-torso"></div>
-              <div class="hf-arm left"></div><div class="hf-arm right"></div>
-              <div class="hf-leg left"></div><div class="hf-leg right"></div>
+            <div class="lanky-head">
+              <div class="lanky-eye left"></div><div class="lanky-eye right"></div>
+              <div class="lanky-mouth"></div>
             </div>
+            <div class="lanky-neck"></div>
+            <div class="lanky-body"></div>
+            <div class="lanky-arm left"><span class="lanky-hand"></span></div>
+            <div class="lanky-arm right"><span class="lanky-hand"></span></div>
+            <div class="lanky-leg left"><span class="lanky-foot"></span></div>
+            <div class="lanky-leg right"><span class="lanky-foot"></span></div>
           </div>
         </div>
       </div>
 
       <div class="walk-hud" aria-hidden="true">
-        <span>↑ ↓ walk down the hall</span>
-        <span>← → step toward a wall</span>
+        <span>Move with Arrow Keys or WASD</span>
+        <span>Walk into a doorway to enter</span>
       </div>
       <div class="hallway-help">Walk into a door to go in.</div>
-      <div class="hall-helper" id="hallHelper">
-        <div class="hall-helper-bubble" id="hallHelperBubble" role="button" tabindex="0" aria-label="Hallway tip">
-          Hi! Use ↑ ↓ to walk down the hall and walk into a door to go in.
-          <button class="hall-helper-close" id="hallHelperClose" type="button" aria-label="Hide helper">×</button>
-        </div>
-      </div>
     </div>
   `;
 
@@ -1402,26 +1387,11 @@ function renderHallway(visible, boardIsEmpty, groups){
   worldEl = document.getElementById('hallwayWorld');
   avatarEl = document.getElementById('avatarEl');
   avatarFigureEl = document.getElementById('avatarFigure');
-  helperEl = document.getElementById('hallHelper');
-  helperBubbleEl = document.getElementById('hallHelperBubble');
-  const helperCloseBtn = document.getElementById('hallHelperClose');
-  if(helperCloseBtn){
-    helperCloseBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      helperDismissed = true;
-      if(helperEl) helperEl.classList.add('minimized');
-    });
-  }
-  if(helperBubbleEl){
-    const handler = (e) => { if(e.target.classList.contains('hall-helper-close')) return; helperDismissed = false; if(helperEl) helperEl.classList.remove('minimized'); cycleHelperTip(); };
-    helperBubbleEl.addEventListener('click', handler);
-    helperBubbleEl.addEventListener('keydown', (e) => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); handler(e); } });
-  }
+  corridorBgEl = viewportEl ? viewportEl.querySelector('.corridor-bg') : null;
 
   avatarX = Math.max(90, Math.min(worldWidth - 90, avatarX));
   updatePositions();
   checkProximity();
-  showWelcomeHint();
 
   document.querySelectorAll('.wall-post').forEach(el => {
     el.addEventListener('click', (e) => {
@@ -1455,22 +1425,101 @@ function renderHallway(visible, boardIsEmpty, groups){
   }
 }
 
+function clamp01(v){ return Math.max(0, Math.min(1, v)); }
+function lerp(a,b,t){ return a + (b-a)*t; }
+
+function projectHallItem(item, kind){
+  const el = document.getElementById(item.elId);
+  if(!el || !viewportEl) return;
+
+  const vw = viewportEl.clientWidth || 1000;
+  const vh = viewportEl.clientHeight || 600;
+  const rel = item.x - avatarX; // positive = ahead, negative = already passed
+  const FAR = 1550;
+  const PASSED = 220;
+
+  if(rel > FAR || rel < -PASSED){
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = '';
+
+  // Objects far ahead are near the vanishing point. As we walk toward them,
+  // they grow and sweep outward, making the WORLD move around the player.
+  let close = clamp01(1 - Math.max(rel, 0) / FAR);
+  close = Math.pow(close, 1.15);
+  const passedT = rel < 0 ? clamp01((-rel) / PASSED) : 0;
+  const side = item.side || 0;
+
+  let x;
+  if(side === 0){
+    x = vw * .5;
+  }else{
+    const farX = vw * (.5 + side * .035);
+    const nearX = vw * (.5 + side * .39);
+    x = lerp(farX, nearX, close);
+    if(passedT) x += side * vw * .24 * passedT;
+  }
+
+  let y, scale;
+  if(kind === 'door'){
+    y = lerp(vh * .39, vh * .49, close) + passedT * vh * .05;
+    scale = lerp(.28, 1.06, close) + passedT * .12;
+  }else if(kind === 'label'){
+    y = lerp(vh * .34, vh * .20, close);
+    scale = lerp(.38, 1.0, close);
+  }else{
+    y = lerp(vh * .37, vh * .25, close) + passedT * vh * .03;
+    scale = lerp(.30, 1.03, close) + passedT * .10;
+  }
+
+  const opacity = passedT ? (1 - passedT) : clamp01(.35 + close * .8);
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  el.style.bottom = 'auto';
+  el.style.opacity = opacity.toFixed(3);
+  el.style.zIndex = String(Math.round(8 + close * 20));
+
+  let rotateY = 0;
+  if(kind === 'post' && side){ rotateY = side < 0 ? 8 : -8; }
+  const transform = `translate(-50%,-50%) perspective(850px) rotateY(${rotateY}deg) scale(${scale.toFixed(3)})`;
+  el.style.setProperty('transform', transform, 'important');
+}
+
 function updatePositions(){
   if(!avatarEl || !worldEl || !viewportEl) return;
+  const vw = viewportEl.clientWidth || 1000;
+  const vh = viewportEl.clientHeight || 600;
 
-  // avatarY (-1..1) is a small purely-horizontal nudge — leaning toward the
-  // left or right wall shifts the figure a few pixels that way on screen.
-  // It never changes size or vertical position, so left/right never looks
-  // like up/down motion.
-  const LEAN_PX = 26;
-  avatarEl.style.left = (avatarX + avatarY * LEAN_PX) + 'px';
-  avatarEl.style.bottom = '';
-  avatarEl.style.transform = 'translateX(-50%)';
+  // Fishtopia-style feel: the player remains the same size. Left/right moves
+  // the player around the screen; forward/back moves the hallway past him.
+  const playerX = vw * .5 + avatarY * Math.min(vw * .15, 150);
+  avatarEl.style.left = playerX + 'px';
+  avatarEl.style.bottom = Math.max(30, vh * .055) + 'px';
+  avatarEl.style.transform = 'translateX(-50%) scale(1)';
 
-  const vw = viewportEl.clientWidth || 900;
-  let camX = avatarX - vw / 2;
-  camX = Math.max(0, Math.min(Math.max(currentLayout.worldWidth - vw, 0), camX));
-  worldEl.style.transform = `translateX(${-camX}px)`;
+  // The world itself no longer slides sideways as one giant strip.
+  worldEl.style.transform = 'none';
+  worldEl.style.width = '100%';
+
+  currentLayout.doors.forEach(d => projectHallItem(d, 'door'));
+  currentLayout.posts.forEach(p => projectHallItem(p, 'post'));
+  currentLayout.labels.forEach(l => projectHallItem(l, 'label'));
+
+  // A tiny camera sway gives lateral movement some life without resizing player.
+  if(corridorBgEl){
+    corridorBgEl.style.transform = `translateX(${(-avatarY * 10).toFixed(1)}px) scale(1.025)`;
+  }
+  const floor = viewportEl.querySelector('.corridor-floor');
+  if(floor){
+    const shift = Math.round((avatarX * 1.4) % 128);
+    floor.style.backgroundPosition = `0 ${shift}px, ${shift}px 0, ${-shift}px 0, 0 0`;
+  }
+}
+
+function doorLaneReached(d){
+  if(!d.side) return Math.abs(avatarY) < .35;
+  return d.side < 0 ? avatarY < -.58 : avatarY > .58;
 }
 
 function checkProximity(){
@@ -1478,106 +1527,31 @@ function checkProximity(){
     const el = document.getElementById(d.elId);
     if(!el) return;
     const dist = Math.abs(avatarX - d.x);
-    if(dist < 45){
-      el.classList.add('near');
+    const laneOK = doorLaneReached(d);
+    const near = dist < 95 && laneOK;
+    el.classList.toggle('near', near);
+    if(near){
       if(lastTriggeredDoor !== d.elId){
         lastTriggeredDoor = d.elId;
         d.onEnter();
       }
-    }else{
-      el.classList.remove('near');
-      if(lastTriggeredDoor === d.elId) lastTriggeredDoor = null;
+    }else if(lastTriggeredDoor === d.elId){
+      lastTriggeredDoor = null;
     }
   });
+
   currentLayout.posts.forEach(p => {
     const el = document.getElementById(p.elId);
     if(!el) return;
-    el.classList.toggle('near', Math.abs(avatarX - p.x) < 60);
+    const dist = Math.abs(avatarX - p.x);
+    const laneOK = p.side < 0 ? avatarY < -.38 : avatarY > .38;
+    el.classList.toggle('near', dist < 120 && laneOK);
   });
-  updateHelperContext();
-}
-
-
-function setHelper(text, mode='idle', key='generic'){
-  if(!helperEl || !helperBubbleEl) return;
-  if(helperDismissed) return;
-  if(lastHelperKey === key && helperBubbleEl.dataset.text === text) return;
-  helperBubbleEl.dataset.text = text;
-  helperBubbleEl.innerHTML = `${escapeHtml(text)}<button class="hall-helper-close" id="hallHelperClose" type="button" aria-label="Hide helper">×</button>`;
-  const closeBtn = document.getElementById('hallHelperClose');
-  if(closeBtn){
-    closeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      helperDismissed = true;
-      helperEl.classList.add('minimized');
-    });
-  }
-  lastHelperKey = key;
-}
-
-function showWelcomeHint(){
-  if(roomFilter && roomFilter.type === 'lockers'){
-    setHelper('Welcome to Student Lockers! Walk farther to see more students.', 'wave', 'welcome-lockers');
-  }else if(roomFilter && roomFilter.type === 'weeks'){
-    setHelper('Welcome to Browse by Week! Keep walking to explore another week.', 'wave', 'welcome-weeks');
-  }else if(currentLayout.posts.length === 0){
-    setHelper('Hi! Nothing is pinned yet. Click Pin Your Work to add the first project.', 'wave', 'welcome-empty');
-  }else{
-    setHelper('Hi! Use ↑ ↓ to walk down the hall and ← → to step toward a wall.', 'wave', 'welcome-main');
-  }
-}
-
-function updateHelperContext(){
-  if(!helperEl || anyOverlayOpen()) return;
-
-  const nearDoor = currentLayout.doors.find(d => Math.abs(avatarX - d.x) < 55);
-  const nearPost = currentLayout.posts.find(p => Math.abs(avatarX - p.x) < 60);
-
-  if(nearDoor){
-    if(nearDoor.elId === 'doorStudents') return setHelper('This door opens Student Lockers.', 'point', 'door-students');
-    if(nearDoor.elId === 'doorWeeks') return setHelper('This door lets you browse by week.', 'point', 'door-weeks');
-    if(nearDoor.elId === 'doorExit') return setHelper('This door takes you back to the main hallway.', 'point', 'door-exit');
-  }
-
-  if(nearPost){
-    return setHelper('You are near a project. Click it to open it.', 'excited', 'near-project');
-  }
-
-  if(roomFilter && roomFilter.type === 'lockers'){
-    return setHelper('Keep walking to see more student lockers.', 'idle', 'room-lockers');
-  }
-  if(roomFilter && roomFilter.type === 'weeks'){
-    return setHelper('Keep walking to browse another week of work.', 'idle', 'room-weeks');
-  }
-  if(currentLayout.posts.length === 0){
-    return setHelper('Nothing is pinned here yet. Try Pin Your Work!', 'think', 'empty');
-  }
-  return setHelper('Want a closer look? Step toward a wall with ← or →.', 'idle', 'hall-default');
-}
-
-function cycleHelperTip(){
-  const tips = roomFilter ? [
-    'Keep walking to reveal more of this room.',
-    'Click a project to open it.',
-    roomFilter.type === 'lockers' ? 'Use Exit to go back to the main hallway.' : 'Browse farther to see another week.'
-  ] : [
-    'Walk into a door to go in.',
-    'Click a project to open it.',
-    'Use Pin Your Work to add a new project.'
-  ];
-  const idx = helperTipIndex % tips.length;
-  helperTipIndex += 1;
-  const mode = idx === 0 ? 'point' : idx === 1 ? 'excited' : 'wave';
-  setHelper(tips[idx], mode, 'tip-' + idx + '-' + (roomFilter ? roomFilter.type : 'main'));
-}
-
-function noteActivity(){
-  lastActivityAt = Date.now();
 }
 
 function enterRoom(type){
   roomFilter = { type };
-  avatarX = 540;
+  avatarX = 0;
   avatarY = 0;
   lastTriggeredDoor = null;
   render();
@@ -1585,7 +1559,7 @@ function enterRoom(type){
 
 function exitRoom(){
   roomFilter = null;
-  avatarX = 540;
+  avatarX = 0;
   avatarY = 0;
   lastTriggeredDoor = null;
   render();
@@ -1633,16 +1607,33 @@ function normKey(key){
 window.addEventListener('keydown', (e) => {
   if(isTypingContext()) return;
   const k = normKey(e.key);
-  if(k){ keysDown[k] = true; noteActivity(); e.preventDefault(); }
+  if(k){ keysDown[k] = true; e.preventDefault(); }
 });
 window.addEventListener('keyup', (e) => {
   const k = normKey(e.key);
   if(k){ keysDown[k] = false; }
 });
 
+function nudgeMovement(key){
+  if(key === 'up') avatarX += 24;
+  if(key === 'down') avatarX -= 24;
+  if(key === 'left'){ avatarY = Math.max(DEPTH_MIN, avatarY - 0.10); facing = 'left'; }
+  if(key === 'right'){ avatarY = Math.min(DEPTH_MAX, avatarY + 0.10); facing = 'right'; }
+  avatarX = Math.max(0, Math.min(currentLayout.worldWidth - 20, avatarX));
+  updatePositions();
+  checkProximity();
+}
 function bindNavHold(btn, key){
-  const start = (e) => { e.preventDefault(); keysDown[key] = true; noteActivity(); };
-  const stop = () => { keysDown[key] = false; };
+  const start = (e) => {
+    e.preventDefault();
+    keysDown[key] = true;
+    btn.classList.add('pressed');
+    nudgeMovement(key); // a quick tap now gives a clear movement
+  };
+  const stop = () => {
+    keysDown[key] = false;
+    btn.classList.remove('pressed');
+  };
   btn.addEventListener('pointerdown', start);
   btn.addEventListener('pointerup', stop);
   btn.addEventListener('pointerleave', stop);
@@ -1653,8 +1644,8 @@ bindNavHold(document.getElementById('navRightBtn'), 'right');
 bindNavHold(document.getElementById('navUpBtn'), 'up');
 bindNavHold(document.getElementById('navDownBtn'), 'down');
 
-const AVATAR_SPEED = 6;
-const LEAN_SPEED = 0.012;
+const AVATAR_SPEED = 5.8;
+const LEAN_SPEED = 0.020;
 function animate(){
   if(!anyOverlayOpen()){
     let movedX = false, movedY = false;
@@ -1672,17 +1663,14 @@ function animate(){
       avatarX = Math.max(0, Math.min(currentLayout.worldWidth - 20, avatarX));
     }
     if(movedX || movedY){
-      noteActivity();
       updatePositions();
       checkProximity();
-    }else if(Date.now() - lastActivityAt > 7000){
-      cycleHelperTip();
-      lastActivityAt = Date.now() - 3000;
     }
   }
   requestAnimationFrame(animate);
 }
 animate();
+window.addEventListener('resize', () => { updatePositions(); checkProximity(); });
 
 document.getElementById('exitRoomBtn').addEventListener('click', exitRoom);
 
