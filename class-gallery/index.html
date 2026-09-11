@@ -69,6 +69,31 @@ button,input,select,textarea{font:inherit}
 
 .lightbox-card{max-width:650px;max-height:90vh;overflow:auto}.lightbox-card img{display:block;width:100%;max-height:390px;object-fit:contain;background:#f5efe6;border-radius:9px;margin-bottom:14px}.lightbox-card video{width:100%;border-radius:9px;margin-bottom:12px}.lightbox-card audio{width:100%;margin-bottom:12px}.lightbox-card .category{display:inline-block;background:#315576;color:#fff;border-radius:999px;padding:4px 10px;font-size:.7rem;font-weight:800}.lightbox-card .desc{line-height:1.5;color:#594c3f}.lightbox-card .by{margin-top:13px;font-weight:800;color:#715c46}.lightbox-card a{display:inline-block;margin-top:11px;color:#315f8f;font-weight:800}.teacher-lightbox-actions{margin-top:16px;display:flex;justify-content:flex-end}
 
+/* Avatar chooser: original friendly monster characters. */
+.avatar-modal{width:min(760px,100%)}
+.avatar-intro{margin:-4px 0 16px;color:#6f604f;line-height:1.45}
+.avatar-grid{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:12px}
+.avatar-choice{border:2px solid #e2d5c4;background:#fffaf2;border-radius:16px;padding:12px 8px 10px;cursor:pointer;text-align:center;transition:.16s ease;box-shadow:0 4px 12px rgba(72,49,29,.06)}
+.avatar-choice:hover{transform:translateY(-2px);border-color:#b99a73;box-shadow:0 7px 17px rgba(72,49,29,.11)}
+.avatar-choice.selected{border-color:#427250;box-shadow:0 0 0 3px rgba(66,114,80,.13),0 7px 17px rgba(72,49,29,.11)}
+.avatar-preview{height:96px;display:flex;align-items:center;justify-content:center}
+.avatar-mini{--c:#5ca6d8;--a:#274a68;position:relative;width:64px;height:70px;border-radius:42% 42% 35% 35%;background:var(--c);box-shadow:inset 0 -8px 0 rgba(0,0,0,.08)}
+.avatar-mini:before,.avatar-mini:after{content:'';position:absolute;background:var(--c)}
+.avatar-mini.ears:before{width:18px;height:25px;border-radius:70% 20% 60% 30%;left:-6px;top:3px;transform:rotate(-25deg)}
+.avatar-mini.ears:after{width:18px;height:25px;border-radius:20% 70% 30% 60%;right:-6px;top:3px;transform:rotate(25deg)}
+.avatar-mini.horns:before{width:11px;height:26px;border-radius:60% 60% 20% 20%;left:8px;top:-14px;transform:rotate(-20deg);background:var(--a)}
+.avatar-mini.horns:after{width:11px;height:26px;border-radius:60% 60% 20% 20%;right:8px;top:-14px;transform:rotate(20deg);background:var(--a)}
+.avatar-mini.onehorn:before{width:13px;height:30px;border-radius:65% 65% 20% 20%;left:26px;top:-18px;transform:rotate(5deg);background:var(--a)}
+.avatar-mini.onehorn:after{display:none}
+.avatar-face{position:absolute;inset:0}
+.avatar-eye{position:absolute;top:25px;width:17px;height:20px;border-radius:50%;background:#fff;box-shadow:inset 0 -2px 0 rgba(0,0,0,.08)}
+.avatar-eye:after{content:'';position:absolute;width:7px;height:9px;border-radius:50%;background:#28313a;left:5px;top:6px}
+.avatar-eye.e1{left:13px}.avatar-eye.e2{right:13px}.avatar-eye.single{left:24px;width:19px}.avatar-eye.single~.avatar-eye{display:none}
+.avatar-mouth{position:absolute;left:24px;top:49px;width:18px;height:8px;border-bottom:3px solid #39444e;border-radius:0 0 50% 50%}
+.avatar-name{font-weight:800;color:#4c4034;font-size:.8rem;margin-top:3px}
+.avatar-actions-note{font-size:.73rem;color:#8a7763;margin-right:auto;align-self:center}
+@media(max-width:650px){.avatar-grid{grid-template-columns:repeat(2,minmax(120px,1fr))}}
+
 /* Coarse pointer fallback: only appears on touch devices, not the desktop view. */
 .touch-pad{display:none}
 @media(pointer:coarse){
@@ -86,6 +111,7 @@ button,input,select,textarea{font:inherit}
   <div class="center-reticle" aria-hidden="true"></div>
   <div class="top-controls">
     <button class="glass-btn primary" id="openModalBtn">＋ Pin Work</button>
+    <button class="glass-btn" id="avatarBtn">Avatar</button>
     <button class="glass-btn" id="teacherReviewBtn">Teacher</button>
     <span class="pending-note" id="pendingNote"></span>
   </div>
@@ -95,6 +121,17 @@ button,input,select,textarea{font:inherit}
     <button class="touch-btn down" data-move="back">▼</button>
     <button class="touch-btn left" data-move="left">◀</button>
     <button class="touch-btn right" data-move="right">▶</button>
+  </div>
+</div>
+
+<!-- Avatar chooser -->
+<div class="overlay" id="avatarOverlay">
+  <div class="modal avatar-modal">
+    <button class="close-x" id="closeAvatarBtn">&times;</button>
+    <h2>Choose Your Explorer</h2>
+    <p class="avatar-intro">Pick a friendly explorer for the school world. You can change it anytime.</p>
+    <div class="avatar-grid" id="avatarGrid"></div>
+    <div class="modal-actions"><span class="avatar-actions-note">Your choice is saved on this device.</span><button type="button" class="btn-primary" id="useAvatarBtn">Use This Avatar</button></div>
   </div>
 </div>
 
@@ -210,6 +247,19 @@ let dragging=false,dragStartX=0,dragLastX=0,dragMoved=0,pointerDownAt=0;
 let viewYaw=0;                 // mouse/touch drag changes the view, never the student's walking direction
 let navTween=null;             // smooth click-to-go movement
 const avatarState={x:0,z:hallMaxZ-8,angle:Math.PI};
+const AVATAR_STORAGE_KEY='classGalleryExplorerAvatarV1';
+const AVATAR_STYLES=[
+  {id:'sprout',name:'Sprout',body:0x58b7a1,accent:0x2f6d61,feature:'antennae',eyes:2,shape:'round'},
+  {id:'pebble',name:'Pebble',body:0x6296d2,accent:0x294d76,feature:'ears',eyes:2,shape:'squat'},
+  {id:'comet',name:'Comet',body:0x8a6bd1,accent:0x513584,feature:'onehorn',eyes:1,shape:'round'},
+  {id:'zip',name:'Zip',body:0xf08a55,accent:0xa74f2b,feature:'horns',eyes:2,shape:'tall'},
+  {id:'moss',name:'Moss',body:0x79ad54,accent:0x3e6d2d,feature:'ears',eyes:2,shape:'round'},
+  {id:'sunny',name:'Sunny',body:0xe7b84c,accent:0x8b6720,feature:'antennae',eyes:2,shape:'tall'},
+  {id:'berry',name:'Berry',body:0xc75f8c,accent:0x7a3155,feature:'horns',eyes:1,shape:'squat'},
+  {id:'sky',name:'Sky',body:0x59b9d7,accent:0x2e6a82,feature:'onehorn',eyes:2,shape:'round'}
+];
+let selectedAvatarId=localStorage.getItem(AVATAR_STORAGE_KEY)||'sprout';
+let avatarChooserFirstVisit=!localStorage.getItem(AVATAR_STORAGE_KEY);
 
 function makeNoiseTexture(base='#eee3d2',grid=false){
   const c=document.createElement('canvas'); c.width=c.height=512; const ctx=c.getContext('2d');
@@ -239,6 +289,7 @@ function init3D(){
   renderer.domElement.addEventListener('pointerdown',onPointerDown);renderer.domElement.addEventListener('pointermove',onPointerMove);renderer.domElement.addEventListener('pointerup',onPointerUp);renderer.domElement.addEventListener('pointercancel',()=>dragging=false);
   window.addEventListener('resize',onResize);
   animate();
+  if(avatarChooserFirstVisit)setTimeout(openAvatarChooser,250);
 }
 
 function resetWorld(){
@@ -585,16 +636,79 @@ function exitStudentGallery(){
 }
 
 function createAvatar(){
+  avatarParts={};
+  const cfg=AVATAR_STYLES.find(a=>a.id===selectedAvatarId)||AVATAR_STYLES[0];
   const g=new THREE.Group();
-  const skin=new THREE.MeshStandardMaterial({color:0xf0c6a2,roughness:.72});const shirt=new THREE.MeshStandardMaterial({color:0xf7f7f1,roughness:.75});const pants=new THREE.MeshStandardMaterial({color:0x243d5c,roughness:.7});const shoe=new THREE.MeshStandardMaterial({color:0x2a241f,roughness:.8});const blue=new THREE.MeshStandardMaterial({color:0x173f72,roughness:.68});
-  const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.24,.55,8,16),shirt);torso.position.y=1.02;torso.castShadow=true;g.add(torso);
-  const head=new THREE.Mesh(new THREE.SphereGeometry(.22,20,16),skin);head.position.y=1.6;head.castShadow=true;g.add(head);
-  const kippah=new THREE.Mesh(new THREE.SphereGeometry(.225,20,12,0,Math.PI*2,0,Math.PI/2),blue);kippah.position.y=1.71;kippah.scale.y=.42;kippah.castShadow=true;g.add(kippah);
-  const armGeo=new THREE.CapsuleGeometry(.07,.48,6,10),legGeo=new THREE.CapsuleGeometry(.085,.55,6,10);
-  ['L','R'].forEach((s,idx)=>{const arm=new THREE.Mesh(armGeo,shirt);arm.position.set(idx?-.31:.31,1.08,0);arm.rotation.z=idx?.12:-.12;arm.castShadow=true;g.add(arm);avatarParts['arm'+s]=arm;const leg=new THREE.Mesh(legGeo,pants);leg.position.set(idx?-.14:.14,.43,0);leg.castShadow=true;g.add(leg);avatarParts['leg'+s]=leg;const foot=new THREE.Mesh(new THREE.BoxGeometry(.14,.1,.28),shoe);foot.position.set(idx?-.14:.14,.08,-.06);foot.castShadow=true;g.add(foot);avatarParts['foot'+s]=foot;});
-  const shadow=new THREE.Mesh(new THREE.CircleGeometry(.42,32),new THREE.MeshBasicMaterial({color:0x3b3025,transparent:true,opacity:.18,depthWrite:false}));shadow.rotation.x=-Math.PI/2;shadow.position.y=.012;g.add(shadow);
+  g.userData.avatarId=cfg.id;
+  const bodyMat=new THREE.MeshStandardMaterial({color:cfg.body,roughness:.66});
+  const accentMat=new THREE.MeshStandardMaterial({color:cfg.accent,roughness:.62});
+  const whiteMat=new THREE.MeshStandardMaterial({color:0xfffdf8,roughness:.55});
+  const darkMat=new THREE.MeshStandardMaterial({color:0x27323a,roughness:.62});
+  const footMat=new THREE.MeshStandardMaterial({color:cfg.accent,roughness:.76});
+
+  const bodyRadius=cfg.shape==='squat'?.38:.33;
+  const bodyLen=cfg.shape==='tall'?.72:cfg.shape==='squat'?.42:.58;
+  const torso=new THREE.Mesh(new THREE.CapsuleGeometry(bodyRadius,bodyLen,10,20),bodyMat);
+  torso.position.y=cfg.shape==='squat'?.86:.96;torso.castShadow=true;g.add(torso);
+
+  const headY=cfg.shape==='tall'?1.63:cfg.shape==='squat'?1.39:1.55;
+  const headScale=cfg.shape==='squat'?1.12:1;
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.34,24,18),bodyMat);head.position.y=headY;head.scale.set(headScale,1,headScale);head.castShadow=true;g.add(head);
+
+  // Eyes are deliberately oversized and simple so the explorer reads as a creature, not a human child.
+  const eyeXs=cfg.eyes===1?[0]:[-.13,.13];
+  eyeXs.forEach((x,idx)=>{
+    const eye=new THREE.Mesh(new THREE.SphereGeometry(cfg.eyes===1?.105:.09,18,14),whiteMat);eye.position.set(x,headY+.035,-.292);eye.scale.z=.55;g.add(eye);
+    const pupil=new THREE.Mesh(new THREE.SphereGeometry(cfg.eyes===1?.047:.041,14,12),darkMat);pupil.position.set(x,headY+.025,-.347);pupil.scale.z=.45;g.add(pupil);
+  });
+
+  const smile=new THREE.Mesh(new THREE.TorusGeometry(.095,.018,8,20,Math.PI),darkMat);smile.position.set(0,headY-.115,-.326);smile.rotation.z=Math.PI;smile.rotation.x=Math.PI/2;g.add(smile);
+
+  const addHorn=(x,zrot=0)=>{const h=new THREE.Mesh(new THREE.ConeGeometry(.075,.27,14),accentMat);h.position.set(x,headY+.38,0);h.rotation.z=zrot;h.castShadow=true;g.add(h);};
+  if(cfg.feature==='horns'){addHorn(-.16,-.18);addHorn(.16,.18);}
+  if(cfg.feature==='onehorn')addHorn(0,0);
+  if(cfg.feature==='antennae'){
+    [-.14,.14].forEach((x,i)=>{const stem=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,.27,10),accentMat);stem.position.set(x,headY+.39,0);stem.rotation.z=i?-.12:.12;g.add(stem);const tip=new THREE.Mesh(new THREE.SphereGeometry(.07,14,12),bodyMat);tip.position.set(x+(i?.015:-.015),headY+.54,0);g.add(tip);});
+  }
+  if(cfg.feature==='ears'){
+    [-1,1].forEach(side=>{const ear=new THREE.Mesh(new THREE.ConeGeometry(.13,.34,16),bodyMat);ear.position.set(side*.34,headY+.11,0);ear.rotation.z=side<0?.9:-.9;ear.castShadow=true;g.add(ear);});
+  }
+
+  const armGeo=new THREE.CapsuleGeometry(.075,.42,6,10),legGeo=new THREE.CapsuleGeometry(.095,.43,6,10);
+  ['L','R'].forEach((side,idx)=>{
+    const sx=idx?-.40:.40;
+    const arm=new THREE.Mesh(armGeo,bodyMat);arm.position.set(sx,.98,0);arm.rotation.z=idx?.24:-.24;arm.castShadow=true;g.add(arm);avatarParts['arm'+side]=arm;
+    const leg=new THREE.Mesh(legGeo,accentMat);leg.position.set(idx?-.15:.15,.34,0);leg.castShadow=true;g.add(leg);avatarParts['leg'+side]=leg;
+    const foot=new THREE.Mesh(new THREE.SphereGeometry(.13,16,12),footMat);foot.scale.set(1,.55,1.35);foot.position.set(idx?-.15:.15,.08,-.08);foot.castShadow=true;g.add(foot);avatarParts['foot'+side]=foot;
+  });
+
+  const shadow=new THREE.Mesh(new THREE.CircleGeometry(.48,32),new THREE.MeshBasicMaterial({color:0x3b3025,transparent:true,opacity:.16,depthWrite:false}));shadow.rotation.x=-Math.PI/2;shadow.position.y=.012;g.add(shadow);
   return g;
 }
+
+function rebuildAvatar(){
+  if(!scene)return;
+  if(avatar){scene.remove(avatar);disposeGroup(avatar);}
+  avatar=createAvatar();scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);avatar.rotation.y=avatarState.angle;
+}
+
+function avatarChoiceMarkup(cfg){
+  const c='#'+cfg.body.toString(16).padStart(6,'0'),a='#'+cfg.accent.toString(16).padStart(6,'0');
+  const featureClass=cfg.feature==='ears'?' ears':cfg.feature==='horns'?' horns':cfg.feature==='onehorn'?' onehorn':'';
+  const eyes=cfg.eyes===1?`<span class="avatar-eye single"></span><span class="avatar-eye"></span>`:`<span class="avatar-eye e1"></span><span class="avatar-eye e2"></span>`;
+  return `<button type="button" class="avatar-choice${cfg.id===selectedAvatarId?' selected':''}" data-avatar-id="${cfg.id}"><div class="avatar-preview"><div class="avatar-mini${featureClass}" style="--c:${c};--a:${a}"><div class="avatar-face">${eyes}<span class="avatar-mouth"></span></div></div></div><div class="avatar-name">${cfg.name}</div></button>`;
+}
+function renderAvatarChooser(){
+  const grid=document.getElementById('avatarGrid');if(!grid)return;
+  grid.innerHTML=AVATAR_STYLES.map(avatarChoiceMarkup).join('');
+  grid.querySelectorAll('.avatar-choice').forEach(btn=>btn.onclick=()=>{selectedAvatarId=btn.dataset.avatarId;grid.querySelectorAll('.avatar-choice').forEach(x=>x.classList.toggle('selected',x===btn));rebuildAvatar();});
+}
+function openAvatarChooser(){renderAvatarChooser();document.getElementById('avatarOverlay').classList.add('show');}
+function closeAvatarChooser(save=true){
+  if(save)localStorage.setItem(AVATAR_STORAGE_KEY,selectedAvatarId);
+  document.getElementById('avatarOverlay').classList.remove('show');avatarChooserFirstVisit=false;
+}
+
 
 function disposeGroup(group){group.traverse(obj=>{if(obj.geometry)obj.geometry.dispose?.();if(obj.material){const mats=Array.isArray(obj.material)?obj.material:[obj.material];mats.forEach(m=>{if(m.map)m.map.dispose?.();m.dispose?.();});}});}
 
@@ -716,6 +830,12 @@ setTimeout(()=>document.getElementById('startHelp').classList.add('hide'),5000);
 /* ---------- data render ---------- */
 dbRef.on('value',snapshot=>{const data=snapshot.val()||{};posts=Object.keys(data).map(id=>({id,...data[id]}));updatePending();buildScene();if(isTeacher&&document.getElementById('reviewListArea').style.display!=='none')renderReviewList();},err=>console.error('Firebase read failed:',err));
 function updatePending(){const n=posts.filter(p=>p.status==='pending').length;const el=document.getElementById('pendingNote');if(n){el.textContent=`${n} waiting`;el.classList.add('show')}else el.classList.remove('show');}
+
+/* ---------- avatar chooser ---------- */
+document.getElementById('avatarBtn').onclick=openAvatarChooser;
+document.getElementById('closeAvatarBtn').onclick=()=>closeAvatarChooser(true);
+document.getElementById('useAvatarBtn').onclick=()=>closeAvatarChooser(true);
+document.getElementById('avatarOverlay').addEventListener('click',e=>{if(e.target.id==='avatarOverlay')closeAvatarChooser(true);});
 
 /* ---------- submission modal ---------- */
 document.getElementById('classSelect').addEventListener('change',e=>{const s=document.getElementById('studentName'),roster=ROSTERS[e.target.value];s.innerHTML=roster?'<option value="">Choose your name...</option>'+roster.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join(''):'<option value="">Choose your class first...</option>';});
