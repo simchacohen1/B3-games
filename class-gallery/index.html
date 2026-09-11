@@ -89,7 +89,7 @@ button,input,select,textarea{font:inherit}
     <button class="glass-btn" id="teacherReviewBtn">Teacher</button>
     <span class="pending-note" id="pendingNote"></span>
   </div>
-  <div class="start-help" id="startHelp">↑ ↓ walk &nbsp; • &nbsp; ← → turn &nbsp; • &nbsp; click a paper to open it</div>
+  <div class="start-help" id="startHelp">↑ ↓ walk &nbsp; • &nbsp; ← → turn &nbsp; • &nbsp; drag the hallway to look around &nbsp; • &nbsp; click a board, name, or far-away paper to go there</div>
   <div class="touch-pad" aria-label="Touch movement controls">
     <button class="touch-btn up" data-move="forward">▲</button>
     <button class="touch-btn down" data-move="back">▼</button>
@@ -182,11 +182,13 @@ window.addEventListener('DOMContentLoaded',()=>{
 
 /* ---------- 3D hallway ---------- */
 let scene,camera,renderer,clock,avatar,avatarParts={};
-let worldGroup,projectMeshes=[],interactiveMeshes=[];
+let worldGroup,projectMeshes=[],interactiveMeshes=[],navigationMeshes=[];
 let hallMinZ=-70,hallMaxZ=70;
 const pressed={forward:false,back:false,left:false,right:false};
 const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
 let dragging=false,dragStartX=0,dragLastX=0,dragMoved=0;
+let viewYaw=0;                 // mouse/touch drag changes the view, never the student's walking direction
+let navTween=null;             // smooth click-to-go movement
 const avatarState={x:0,z:hallMaxZ-8,angle:Math.PI};
 
 function makeNoiseTexture(base='#eee3d2',grid=false){
@@ -221,7 +223,7 @@ function init3D(){
 
 function buildHallway(){
   if(worldGroup){scene.remove(worldGroup);disposeGroup(worldGroup);}
-  worldGroup=new THREE.Group();scene.add(worldGroup);projectMeshes=[];interactiveMeshes=[];
+  worldGroup=new THREE.Group();scene.add(worldGroup);projectMeshes=[];interactiveMeshes=[];navigationMeshes=[];
 
   const approved=posts.filter(p=>p.status==='approved');
   const byStudent={};approved.forEach(p=>(byStudent[p.studentName]=byStudent[p.studentName]||[]).push(p));
@@ -294,18 +296,20 @@ function addStudentSection(sec,z,frameMat,corkMat,woodMat,trimMat,index){
   addBulletinBoard(-1,z,sec.posts.slice(0,4),leftTitle,sec.name,frameMat,corkMat);
   addBulletinBoard(1,z,sec.posts.slice(4,8),rightTitle,sec.name,frameMat,corkMat);
   const subtitle=sec.parts>1?`Student Gallery • ${sec.part} of ${sec.parts}`:'Student Gallery';
-  const sign=makePlaqueMesh(sec.name,subtitle,3.25,.7);sign.position.set(0,4.12,z);sign.rotation.y=Math.PI;worldGroup.add(sign);
+  const sign=makePlaqueMesh(sec.name,subtitle,3.25,.7);sign.position.set(0,4.12,z);sign.rotation.y=Math.PI;
+  sign.userData.navTarget={z,side:0,kind:'name'};navigationMeshes.push(sign);worldGroup.add(sign);
 }
 
 function addBulletinBoard(side,z,boardPosts,title,studentName,frameMat,corkMat){
   const x=side<0?-3.91:3.91, rot=side<0?Math.PI/2:-Math.PI/2;
-  const frame=new THREE.Mesh(new THREE.BoxGeometry(3.72,2.48,.14),frameMat);frame.position.set(x,2.53,z);frame.rotation.y=rot;frame.castShadow=true;frame.receiveShadow=true;worldGroup.add(frame);
-  const cork=new THREE.Mesh(new THREE.BoxGeometry(3.42,2.18,.08),corkMat);cork.position.set(x+(side<0?.085:-.085),2.53,z);cork.rotation.y=rot;cork.castShadow=true;worldGroup.add(cork);
-  const titleMesh=makeSmallBoardTitle(title,3.0,.34);titleMesh.position.set(x+(side<0?.145:-.145),3.42,z);titleMesh.rotation.y=rot;worldGroup.add(titleMesh);
+  const target={z,side,kind:'board'};
+  const frame=new THREE.Mesh(new THREE.BoxGeometry(3.72,2.48,.14),frameMat);frame.position.set(x,2.53,z);frame.rotation.y=rot;frame.castShadow=true;frame.receiveShadow=true;frame.userData.navTarget=target;navigationMeshes.push(frame);worldGroup.add(frame);
+  const cork=new THREE.Mesh(new THREE.BoxGeometry(3.42,2.18,.08),corkMat);cork.position.set(x+(side<0?.085:-.085),2.53,z);cork.rotation.y=rot;cork.castShadow=true;cork.userData.navTarget=target;navigationMeshes.push(cork);worldGroup.add(cork);
+  const titleMesh=makeSmallBoardTitle(title,3.0,.34);titleMesh.position.set(x+(side<0?.145:-.145),3.42,z);titleMesh.rotation.y=rot;titleMesh.userData.navTarget=target;navigationMeshes.push(titleMesh);worldGroup.add(titleMesh);
 
   const slots=[[-.88,.37],[.88,.37],[-.88,-.58],[.88,-.58]];
   if(boardPosts.length===0){
-    const empty=makeEmptyCard(studentName);empty.position.set(x+(side<0?.15:-.15),2.32,z);empty.rotation.y=rot;worldGroup.add(empty);return;
+    const empty=makeEmptyCard(studentName);empty.position.set(x+(side<0?.15:-.15),2.32,z);empty.rotation.y=rot;empty.userData.navTarget=target;navigationMeshes.push(empty);worldGroup.add(empty);return;
   }
   boardPosts.forEach((post,i)=>{
     const [zOff,yOff]=slots[i];
@@ -313,7 +317,8 @@ function addBulletinBoard(side,z,boardPosts,title,studentName,frameMat,corkMat){
     card.position.set(x+(side<0?.15:-.15),2.48+yOff,z+zOff);
     card.rotation.y=rot;
     card.userData.postId=post.id;
-    worldGroup.add(card);projectMeshes.push(card);interactiveMeshes.push(card);
+    card.userData.navTarget={z,side,kind:'project'};
+    worldGroup.add(card);projectMeshes.push(card);interactiveMeshes.push(card);navigationMeshes.push(card);
   });
 }
 
@@ -370,23 +375,70 @@ function createAvatar(){
 
 function disposeGroup(group){group.traverse(obj=>{if(obj.geometry)obj.geometry.dispose?.();if(obj.material){const mats=Array.isArray(obj.material)?obj.material:[obj.material];mats.forEach(m=>{if(m.map)m.map.dispose?.();m.dispose?.();});}});}
 
+function shortestAngleDelta(from,to){return Math.atan2(Math.sin(to-from),Math.cos(to-from));}
+function smoothStep01(t){return t*t*(3-2*t);}
+function navigateTo(target){
+  if(!target)return;
+  Object.keys(pressed).forEach(k=>pressed[k]=false);
+  const endX=target.side?target.side*.72:0;
+  const endZ=Math.max(hallMinZ+2.3,Math.min(hallMaxZ-2.3,target.z));
+  const travelDirection=endZ<avatarState.z?Math.PI:0;
+  const endAngle=target.side<0?-Math.PI/2:target.side>0?Math.PI/2:travelDirection;
+  const distance=Math.hypot(endX-avatarState.x,endZ-avatarState.z);
+  navTween={elapsed:0,duration:Math.min(1.15,Math.max(.45,distance*.022)),startX:avatarState.x,startZ:avatarState.z,startAngle:avatarState.angle,startViewYaw:viewYaw,endX,endZ,endAngle};
+}
+
 function updateAvatar(dt){
-  const move=(pressed.forward?1:0)-(pressed.back?1:0);const turn=(pressed.left?1:0)-(pressed.right?1:0);
-  avatarState.angle+=turn*dt*1.72;
-  const speed=3.4;avatarState.x+=Math.sin(avatarState.angle)*move*speed*dt;avatarState.z+=Math.cos(avatarState.angle)*move*speed*dt;
+  let walking=false;
+  if(navTween){
+    navTween.elapsed+=dt;const raw=Math.min(1,navTween.elapsed/navTween.duration),t=smoothStep01(raw);
+    avatarState.x=THREE.MathUtils.lerp(navTween.startX,navTween.endX,t);
+    avatarState.z=THREE.MathUtils.lerp(navTween.startZ,navTween.endZ,t);
+    avatarState.angle=navTween.startAngle+shortestAngleDelta(navTween.startAngle,navTween.endAngle)*t;
+    viewYaw=navTween.startViewYaw*(1-t);
+    walking=raw<1;
+    if(raw>=1){navTween=null;viewYaw=0;}
+  }else{
+    const move=(pressed.forward?1:0)-(pressed.back?1:0);const turn=(pressed.left?1:0)-(pressed.right?1:0);
+    avatarState.angle+=turn*dt*1.72;
+    const speed=3.4;avatarState.x+=Math.sin(avatarState.angle)*move*speed*dt;avatarState.z+=Math.cos(avatarState.angle)*move*speed*dt;
+    walking=Math.abs(move)>.01;
+  }
   avatarState.x=Math.max(-3.15,Math.min(3.15,avatarState.x));avatarState.z=Math.max(hallMinZ+2.1,Math.min(hallMaxZ-2.1,avatarState.z));
   avatar.position.set(avatarState.x,0,avatarState.z);avatar.rotation.y=avatarState.angle;
-  const t=performance.now()*.009;const walking=Math.abs(move)>.01;if(walking){const swing=Math.sin(t)*.65;avatarParts.armL.rotation.x=swing;avatarParts.armR.rotation.x=-swing;avatarParts.legL.rotation.x=-swing*.7;avatarParts.legR.rotation.x=swing*.7;}else{avatarParts.armL.rotation.x*=.8;avatarParts.armR.rotation.x*=.8;avatarParts.legL.rotation.x*=.8;avatarParts.legR.rotation.x*=.8;}
-  const forward=new THREE.Vector3(Math.sin(avatarState.angle),0,Math.cos(avatarState.angle));
-  const desired=new THREE.Vector3(avatarState.x,2.35,avatarState.z).addScaledVector(forward,-3.25);desired.y=2.25;
-  camera.position.lerp(desired,1-Math.pow(.0002,dt));const look=new THREE.Vector3(avatarState.x,1.25,avatarState.z).addScaledVector(forward,2.35);camera.lookAt(look);
+  const t=performance.now()*.009;if(walking){const swing=Math.sin(t)*.65;avatarParts.armL.rotation.x=swing;avatarParts.armR.rotation.x=-swing;avatarParts.legL.rotation.x=-swing*.7;avatarParts.legR.rotation.x=swing*.7;}else{avatarParts.armL.rotation.x*=.8;avatarParts.armR.rotation.x*=.8;avatarParts.legL.rotation.x*=.8;avatarParts.legR.rotation.x*=.8;}
+
+  // The view direction is independent of the student's walking direction.
+  const viewAngle=avatarState.angle+viewYaw;
+  const viewForward=new THREE.Vector3(Math.sin(viewAngle),0,Math.cos(viewAngle));
+  const desired=new THREE.Vector3(avatarState.x,2.35,avatarState.z).addScaledVector(viewForward,-3.25);desired.y=2.25;
+  camera.position.lerp(desired,1-Math.pow(.0002,dt));const look=new THREE.Vector3(avatarState.x,1.25,avatarState.z).addScaledVector(viewForward,2.35);camera.lookAt(look);
 }
 function animate(){requestAnimationFrame(animate);const dt=Math.min(.04,clock.getDelta());updateAvatar(dt);renderer.render(scene,camera);}
 function onResize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);}
 
 function onPointerDown(e){dragging=true;dragStartX=dragLastX=e.clientX;dragMoved=0;renderer.domElement.setPointerCapture?.(e.pointerId);}
-function onPointerMove(e){if(!dragging)return;const dx=e.clientX-dragLastX;dragMoved+=Math.abs(dx);dragLastX=e.clientX;if(Math.abs(dx)>0){avatarState.angle-=dx*.006;}}
-function onPointerUp(e){if(!dragging)return;dragging=false;if(dragMoved<8){const rect=renderer.domElement.getBoundingClientRect();pointer.x=((e.clientX-rect.left)/rect.width)*2-1;pointer.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointer,camera);const hits=raycaster.intersectObjects(interactiveMeshes,false);if(hits[0]){const post=posts.find(p=>p.id===hits[0].object.userData.postId);if(post)openLightbox(post);}}}
+function onPointerMove(e){
+  if(!dragging)return;
+  const dx=e.clientX-dragLastX;dragMoved+=Math.abs(dx);dragLastX=e.clientX;
+  // Grab the hallway: dragging the scene left looks right, and vice versa. The student does not turn.
+  if(Math.abs(dx)>0){viewYaw+=dx*.006;viewYaw=Math.atan2(Math.sin(viewYaw),Math.cos(viewYaw));}
+}
+function onPointerUp(e){
+  if(!dragging)return;dragging=false;
+  if(dragMoved>=8)return;
+  const rect=renderer.domElement.getBoundingClientRect();pointer.x=((e.clientX-rect.left)/rect.width)*2-1;pointer.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointer,camera);
+  const targets=[...new Set([...interactiveMeshes,...navigationMeshes])];
+  const hits=raycaster.intersectObjects(targets,false);if(!hits[0])return;
+  const obj=hits[0].object,target=obj.userData.navTarget,postId=obj.userData.postId;
+  if(postId){
+    const post=posts.find(p=>p.id===postId);
+    const endX=target?.side?target.side*.72:avatarState.x;
+    const distance=target?Math.hypot(endX-avatarState.x,target.z-avatarState.z):0;
+    if(post&&distance<3.1){openLightbox(post);return;}
+  }
+  if(target)navigateTo(target);
+}
 
 window.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;const k=e.key.toLowerCase();if(k==='arrowup'||k==='w')pressed.forward=true;if(k==='arrowdown'||k==='s')pressed.back=true;if(k==='arrowleft'||k==='a')pressed.left=true;if(k==='arrowright'||k==='d')pressed.right=true;if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(k))e.preventDefault();});
 window.addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(k==='arrowup'||k==='w')pressed.forward=false;if(k==='arrowdown'||k==='s')pressed.back=false;if(k==='arrowleft'||k==='a')pressed.left=false;if(k==='arrowright'||k==='d')pressed.right=false;});
