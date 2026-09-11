@@ -907,6 +907,133 @@ footer{color:#705c48;background:#f6efe6;padding:0 0 18px;font-weight:600;}
   .wall-post{width:170px}.door-plaque{width:128px}.hall-door{width:100px}
 }
 
+
+
+/* ===== Fishtopia-style room system v2 ===== */
+.room-banner{display:none!important;}
+.hallway-viewport{perspective:950px;background:#eadbc8;}
+.corridor-bg{transition:transform .12s linear, filter .25s ease;}
+
+/* The hallway walls now have real display surfaces so projects feel mounted,
+   not like floating tiles. */
+.corridor-left-display,.corridor-right-display{
+  position:absolute;
+  top:17%;
+  bottom:18%;
+  width:34%;
+  z-index:2;
+  background:
+    radial-gradient(circle at 20% 30%,rgba(70,43,22,.18) 0 1px,transparent 1.5px),
+    radial-gradient(circle at 70% 62%,rgba(70,43,22,.14) 0 1px,transparent 1.5px),
+    linear-gradient(135deg,#c99561,#ad7445);
+  background-size:17px 19px,23px 21px,auto;
+  border-top:12px solid #81502d;
+  border-bottom:12px solid #81502d;
+  box-shadow:inset 0 0 0 4px rgba(255,244,224,.22),0 10px 30px rgba(49,31,13,.12);
+  opacity:.94;
+}
+.corridor-left-display{
+  left:0;
+  clip-path:polygon(0 0,100% 15%,100% 85%,0 100%);
+  border-right:10px solid #81502d;
+}
+.corridor-right-display{
+  right:0;
+  clip-path:polygon(0 15%,100% 0,100% 100%,0 85%);
+  border-left:10px solid #81502d;
+}
+
+/* A neutral architectural end to the corridor — no random floating poster. */
+.corridor-end-wall{overflow:hidden;background:linear-gradient(#f4eadb,#e0c7a7);}
+.end-hall-opening{
+  position:absolute;inset:10% 14% 6%;
+  border:7px solid #8c5a34;border-bottom-width:10px;
+  background:linear-gradient(180deg,#d8ecfb 0 46%,#9ec6e3 46% 49%,#dfead3 49% 100%);
+  box-shadow:inset 0 0 25px rgba(33,74,109,.18),0 0 25px rgba(255,244,201,.55);
+}
+.end-hall-opening::before,.end-hall-opening::after{
+  content:"";position:absolute;background:#8c5a34;
+}
+.end-hall-opening::before{left:49%;top:0;bottom:0;width:5px;}
+.end-hall-opening::after{top:48%;left:0;right:0;height:5px;}
+.scene-title{
+  position:absolute;z-index:25;left:50%;top:18px;transform:translateX(-50%);
+  max-width:min(560px,64%);padding:8px 22px;
+  border-radius:10px;background:linear-gradient(#b87a45,#955d32);
+  border:4px solid #6f4426;color:#fff8e9;
+  font-family:'Caveat',cursive;font-size:clamp(1.35rem,2.2vw,2rem);font-weight:700;
+  text-align:center;line-height:1;box-shadow:0 6px 10px rgba(0,0,0,.22);
+}
+.scene-title small{display:block;font-family:'Quicksand',sans-serif;font-size:.64rem;letter-spacing:.3px;margin-top:4px;color:#ffe7bc;}
+
+/* Distinct spaces, not the exact same backdrop every time. */
+.scene-lockers .corridor-left-display,.scene-lockers .corridor-right-display{
+  background:repeating-linear-gradient(90deg,#5e8fbd 0 34px,#376b9d 34px 38px,#729fc9 38px 70px,#315f8c 70px 74px);
+  border-color:#274f77;
+}
+.scene-lockers .hall-sign{display:none;}
+.scene-weeks .corridor-left-display,.scene-weeks .corridor-right-display{
+  background:
+    linear-gradient(rgba(255,250,237,.18),rgba(255,250,237,.18)),
+    radial-gradient(circle at 25% 35%,rgba(75,42,20,.18) 0 1px,transparent 1.5px),
+    linear-gradient(135deg,#d3a66e,#b77e49);
+  background-size:auto,18px 19px,auto;
+}
+.scene-student .corridor-left-display,.scene-student .corridor-right-display,
+.scene-week .corridor-left-display,.scene-week .corridor-right-display{
+  opacity:1;
+}
+
+/* Mounted project: transform the mount, not the card itself. */
+.wall-post{
+  width:224px!important;min-height:0!important;padding:0!important;
+  background:transparent!important;border:0!important;box-shadow:none!important;
+  transform-origin:50% 50%;
+}
+.wall-mount{
+  position:relative;padding:9px;background:#b67d49;
+  border:8px solid #754522;border-radius:5px;
+  box-shadow:0 10px 18px rgba(39,23,10,.30),inset 0 0 0 2px rgba(255,235,204,.22);
+}
+.wall-mount::before{
+  content:"";position:absolute;inset:7px;background:
+  radial-gradient(circle at 20% 30%,rgba(61,35,17,.15) 0 1px,transparent 1.4px),
+  radial-gradient(circle at 75% 60%,rgba(61,35,17,.12) 0 1px,transparent 1.4px),#c99561;
+  background-size:15px 17px,21px 19px,auto;border-radius:2px;
+}
+.mounted-card{
+  position:relative!important;width:100%!important;min-height:0!important;
+  padding:12px 12px 14px!important;margin:0!important;
+  transform:rotate(var(--card-tilt,0deg));
+  box-shadow:0 5px 10px rgba(0,0,0,.24)!important;
+  z-index:2;
+}
+.wall-post.near .wall-mount{box-shadow:0 14px 25px rgba(39,23,10,.38),0 0 0 4px rgba(242,189,75,.45);}
+.wall-post.near .mounted-card{transform:rotate(0deg);}
+
+/* Doors are part of the walls and can lead to real separate scenes. */
+.hall-door{transform-origin:50% 100%!important;}
+.hall-door .door-plaque{white-space:normal;max-height:64px;overflow:hidden;}
+.hall-door.portal-door{width:132px;height:198px;}
+.hall-door.portal-door .door-window{font-size:1.45rem;line-height:1.05;text-align:center;padding:7px;}
+.hall-door.portal-door .door-label{font-size:.68rem;}
+
+/* Lateral movement should actually feel like movement across the hallway. */
+.avatar{transition:left .06s linear;}
+.corridor-floor{will-change:background-position,transform;}
+
+/* Soft scene transition */
+.hallway-viewport.scene-changing::after{
+  content:"";position:absolute;inset:0;z-index:100;background:#fff8eb;animation:sceneFlash .32s ease both;pointer-events:none;
+}
+@keyframes sceneFlash{0%{opacity:0}45%{opacity:.92}100%{opacity:0}}
+
+@media(max-width:720px){
+  .scene-title{top:10px;max-width:72%;padding:6px 12px;font-size:1.25rem;}
+  .corridor-left-display,.corridor-right-display{width:36%;}
+  .wall-post{width:180px!important;}
+}
+
 </style>
 </head>
 <body>
@@ -1213,25 +1340,24 @@ function render(){
   updateRoomBanner();
 
   if(roomFilter && roomFilter.type === 'lockers'){
-    renderHallway(null, false, buildLockerGroups(pool));
+    renderHallway(null, false, buildLockerGroups(pool), { scene:'lockers', title:'Student Lockers', subtitle:'Walk to a student door and enter' });
   }else if(roomFilter && roomFilter.type === 'weeks'){
-    renderHallway(null, false, buildWeekGroups(pool));
+    renderHallway(null, false, buildWeekGroups(pool), { scene:'weeks', title:'Browse by Week', subtitle:'Walk to a week door and enter' });
+  }else if(roomFilter && roomFilter.type === 'student'){
+    const visible = pool.filter(p => p.studentName === roomFilter.value).slice().reverse();
+    renderHallway(visible, visible.length === 0, null, { scene:'student', title:roomFilter.value, subtitle:'Student Gallery' });
+  }else if(roomFilter && roomFilter.type === 'week'){
+    const visible = pool.filter(p => weekKey(p.createdAt) === roomFilter.value).slice().reverse();
+    renderHallway(visible, visible.length === 0, null, { scene:'week', title:weekLabel(roomFilter.value), subtitle:'Week Gallery' });
   }else{
-    const visible = pool.slice().reverse(); // newest first
-    renderHallway(visible, approved.length === 0, null);
+    const visible = pool.slice().reverse();
+    renderHallway(visible, approved.length === 0, null, { scene:'main', title:'Main Hallway', subtitle:'Explore the class Wall of Learning' });
   }
 }
 
 function updateRoomBanner(){
   const banner = document.getElementById('roomBanner');
-  const text = document.getElementById('roomBannerText');
-  if(roomFilter){
-    if(roomFilter.type === 'lockers') text.textContent = `📍 Walking through the Student Lockers — keep walking to see each locker`;
-    if(roomFilter.type === 'weeks') text.textContent = `📍 Browsing by Week — keep walking to see each week`;
-    banner.classList.add('show');
-  }else{
-    banner.classList.remove('show');
-  }
+  if(banner) banner.classList.remove('show');
 }
 
 function buildCardHtml(post, x, extraClass){
@@ -1252,7 +1378,9 @@ function buildCardHtml(post, x, extraClass){
   if(post.videoUrl) mediaBadges += `<span class="media-badge">🎬 Video</span>`;
 
   return { elId, html: `
-        <div class="card ${color} wall-post${extraClass ? ' ' + extraClass : ''}" id="${elId}" data-id="${post.id}" style="left:${x}px;--card-tilt:${rot}deg;">
+    <div class="wall-post ${extraClass || ''}" id="${elId}" data-id="${post.id}" style="left:${x}px;--card-tilt:${rot}deg;">
+      <div class="wall-mount">
+        <div class="card ${color} mounted-card">
           <div class="pin"></div>
           ${teacherDeleteHtml}
           ${imgHtml}
@@ -1262,85 +1390,108 @@ function buildCardHtml(post, x, extraClass){
           <div class="by">${escapeHtml(post.studentName)}${post.className ? ` &middot; ${escapeHtml(post.className)}` : ''}</div>
           ${mediaBadges ? `<div class="media-badges">${mediaBadges}</div>` : ''}
           ${stickerHtml}
-        </div>` };
+        </div>
+      </div>
+    </div>` };
 }
 
-function renderHallway(visible, boardIsEmpty, groups){
+function buildDoorHtml(id, label, x, side, kind='portal', countText=''){
+  const icon = kind === 'student' ? '👤' : kind === 'week' ? '📅' : kind === 'back' ? '↩' : kind === 'lockers' ? '🔒' : '📅';
+  const safeLabel = escapeHtml(label);
+  const detail = countText ? `<div style="font-size:.58rem;opacity:.9;margin-top:4px;">${escapeHtml(countText)}</div>` : '';
+  return `<div class="hall-door portal-door ${side < 0 ? 'door-left' : 'door-right'}" id="${id}">
+    <div class="door-plaque">${safeLabel}${detail}</div>
+    <div class="door-window">${icon}</div>
+    <div class="door-label">Enter</div>
+  </div>`;
+}
+
+function renderHallway(visible, boardIsEmpty, groups, opts={}){
   const boardArea = document.getElementById('boardArea');
-  const spacing = 230;
-  const startX = 910;
+  const scene = opts.scene || 'main';
+  const title = opts.title || 'Main Hallway';
+  const subtitle = opts.subtitle || '';
 
-  let doorsHtml = '', postsHtml = '', worldWidth;
-  currentLayout = { doors: [], posts: [], labels: [], worldWidth: 1900 };
+  let doorsHtml = '';
+  let postsHtml = '';
+  currentLayout = { doors: [], posts: [], labels: [], worldWidth: 1800 };
 
-  if(roomFilter){
-    doorsHtml += `<div class="hall-door exit" id="doorExit" style="left:430px;"><div class="door-plaque">Main Hallway</div><div class="door-window">↩</div><div class="door-label">Exit</div></div>`;
-    currentLayout.doors.push({ elId: 'doorExit', x: 430, side: -1, onEnter: exitRoom });
-  }else{
-    doorsHtml += `<div class="hall-door students" id="doorStudents" style="left:390px;"><div class="door-plaque">Student Lockers</div><div class="door-window">🔒</div><div class="door-label">Lockers</div></div>`;
-    doorsHtml += `<div class="hall-door weeks" id="doorWeeks" style="left:690px;"><div class="door-plaque">Browse by Week</div><div class="door-window">📅</div><div class="door-label">Weeks</div></div>`;
-    currentLayout.doors.push({ elId: 'doorStudents', x: 390, side: -1, onEnter: () => enterRoom('lockers') });
-    currentLayout.doors.push({ elId: 'doorWeeks', x: 690, side: 1, onEnter: () => enterRoom('weeks') });
+  // Main hub: two real doors at the same depth on opposite walls.
+  if(scene === 'main'){
+    const dx = 430;
+    doorsHtml += buildDoorHtml('doorStudents','Student Lockers',dx,-1,'lockers');
+    doorsHtml += buildDoorHtml('doorWeeks','Browse by Week',dx,1,'weeks');
+    currentLayout.doors.push({elId:'doorStudents',x:dx,side:-1,onEnter:()=>enterRoom('lockers')});
+    currentLayout.doors.push({elId:'doorWeeks',x:dx,side:1,onEnter:()=>enterRoom('weeks')});
   }
 
-  if(groups){
-    // Grouped layout (Lockers / Weeks room): each group gets a floating label
-    // sign, then its posts continue along the same wall-hung strip. Walking
-    // further (up) just keeps revealing the next group — no popups.
-    let x = startX;
-    let anyPosts = false;
-    if(groups.length === 0){
-      postsHtml = `<div class="empty-hall" style="left:${startX}px;"><strong>Nothing pinned yet.</strong><span>Keep walking — new sections will appear here as work is pinned.</span></div>`;
-      worldWidth = 1900;
-    }else{
-      groups.forEach((g, groupIndex) => {
-        const emptyNote = g.posts.length === 0 ? `<span class="section-empty">Nothing pinned yet</span>` : `<span class="section-count">${g.posts.length} pinned</span>`;
-        const sectionId = `section-label-${groupIndex}`;
-        postsHtml += `<div class="section-label" id="${sectionId}" style="left:${x}px;"><strong>${escapeHtml(g.label)}</strong>${emptyNote}</div>`;
-        currentLayout.labels.push({ elId: sectionId, x, side: 0 });
-        x += 210;
-        g.posts.forEach((post, j) => {
-          const side = j % 2 === 0 ? 'wall-left' : 'wall-right';
-          const { elId, html } = buildCardHtml(post, x, side);
-          currentLayout.posts.push({ elId, x, side: side === 'wall-left' ? -1 : 1 });
-          postsHtml += html;
-          anyPosts = true;
-          x += spacing;
-        });
-        x += 140; // gap before the next section's label
+  // Portal halls: every student/week is a real doorway to another screen.
+  if(scene === 'lockers' || scene === 'weeks'){
+    const backId='doorBackMain';
+    doorsHtml += buildDoorHtml(backId,'Main Hallway',260,-1,'back');
+    currentLayout.doors.push({elId:backId,x:260,side:-1,onEnter:exitRoom});
+
+    const list = groups || [];
+    let maxX = 620;
+    list.forEach((g,i)=>{
+      const side = i % 2 === 0 ? -1 : 1;
+      const depth = 650 + Math.floor(i/2) * 440;
+      const id = `portal-${scene}-${i}`;
+      doorsHtml += buildDoorHtml(id,g.label,depth,side,scene === 'lockers' ? 'student' : 'week',`${g.posts.length} pinned`);
+      currentLayout.doors.push({
+        elId:id,x:depth,side,
+        onEnter:()=> scene === 'lockers' ? enterRoom('student',g.label) : enterRoom('week',weekKeyFromLabelGroup(g, list, i))
       });
-      worldWidth = Math.max(x + 500, 1900);
-      if(!anyPosts && groups.every(g => g.posts.length === 0)){
-        // still show the labeled (empty) sections — that's expected and fine
-      }
+      maxX = Math.max(maxX, depth);
+    });
+    currentLayout.worldWidth = Math.max(1800,maxX+850);
+
+    if(list.length === 0){
+      postsHtml = `<div class="empty-hall" id="portalEmpty"><strong>Nothing here yet.</strong><span>New doors will appear as work is pinned.</span></div>`;
+      currentLayout.labels.push({elId:'portalEmpty',x:720,side:0});
     }
-  }else{
-    // Flat layout (Main Hallway): a single continuous strip of every visible post.
-    if(visible.length === 0){
-      postsHtml = `<div class="empty-hall" style="left:${startX}px;"><strong>${boardIsEmpty ? 'Be the first to pin your work!' : 'Nothing in this section yet.'}</strong><span>Your class projects will appear along the hallway.</span></div>`;
-      worldWidth = 1900;
+  }
+
+  // Gallery rooms: back door plus projects mounted in paired wall bays.
+  if(scene === 'student' || scene === 'week'){
+    const backId='doorBackLobby';
+    const backLabel = scene === 'student' ? 'Student Lockers' : 'Browse by Week';
+    doorsHtml += buildDoorHtml(backId,backLabel,260,-1,'back');
+    currentLayout.doors.push({elId:backId,x:260,side:-1,onEnter:()=>enterRoom(scene === 'student' ? 'lockers' : 'weeks')});
+  }
+
+  // Projects: two at each depth, one truly mounted on each wall.
+  if(scene === 'main' || scene === 'student' || scene === 'week'){
+    const list = visible || [];
+    const startX = scene === 'main' ? 760 : 600;
+    const spacing = 390;
+    if(list.length === 0){
+      postsHtml += `<div class="empty-hall" id="galleryEmpty"><strong>${boardIsEmpty ? 'Nothing pinned here yet.' : 'Nothing in this section yet.'}</strong><span>Projects will appear mounted along these walls.</span></div>`;
+      currentLayout.labels.push({elId:'galleryEmpty',x:startX,side:0});
+      currentLayout.worldWidth = Math.max(currentLayout.worldWidth,1600);
     }else{
-      visible.forEach((post, i) => {
-        const x = startX + i * spacing;
-        const side = i % 2 === 0 ? 'wall-left' : 'wall-right';
-        const { elId, html } = buildCardHtml(post, x, side);
-        currentLayout.posts.push({ elId, x, side: side === 'wall-left' ? -1 : 1 });
+      list.forEach((post,i)=>{
+        const side = i % 2 === 0 ? -1 : 1;
+        const depth = startX + Math.floor(i/2) * spacing;
+        const sideClass = side < 0 ? 'wall-left' : 'wall-right';
+        const {elId,html}=buildCardHtml(post,depth,sideClass);
         postsHtml += html;
+        currentLayout.posts.push({elId,x:depth,side});
       });
-      worldWidth = Math.max(startX + visible.length * spacing + 620, 1900);
+      const lastDepth = startX + Math.floor((list.length-1)/2)*spacing;
+      currentLayout.worldWidth = Math.max(currentLayout.worldWidth,lastDepth+900);
     }
   }
-  currentLayout.worldWidth = worldWidth;
 
   boardArea.innerHTML = `
-    <div class="hallway-viewport" id="hallwayViewport">
+    <div class="hallway-viewport scene-${scene}" id="hallwayViewport">
       <div class="corridor-bg" aria-hidden="true">
         <div class="corridor-ceiling"></div>
         <div class="corridor-left-wall"></div>
         <div class="corridor-right-wall"></div>
-        <div class="corridor-end-wall">
-          <div class="growth-mural"><span>Small Steps</span><strong>Big Growth!</strong></div>
-        </div>
+        <div class="corridor-left-display"></div>
+        <div class="corridor-right-display"></div>
+        <div class="corridor-end-wall"><div class="end-hall-opening"></div></div>
         <div class="corridor-floor"></div>
         <div class="ceiling-light light-one"></div>
         <div class="ceiling-light light-two"></div>
@@ -1353,216 +1504,202 @@ function renderHallway(visible, boardIsEmpty, groups){
         <div class="hall-sign hall-sign-right">Torah in Action!</div>
       </div>
 
-      <div class="hallway-world" id="hallwayWorld" style="width:${worldWidth}px;">
-        <div class="wall-strip"></div>
-        <div class="floor-strip"></div>
+      <div class="scene-title">${escapeHtml(title)}${subtitle ? `<small>${escapeHtml(subtitle)}</small>` : ''}</div>
+
+      <div class="hallway-world" id="hallwayWorld">
         ${doorsHtml}
         ${postsHtml}
         <div class="avatar" id="avatarEl" aria-label="lanky hallway mascot walking through the gallery">
           <div class="avatar-shadow"></div>
           <div class="avatar-figure" id="avatarFigure">
-            <div class="lanky-head">
-              <div class="lanky-eye left"></div><div class="lanky-eye right"></div>
-              <div class="lanky-mouth"></div>
-            </div>
-            <div class="lanky-neck"></div>
-            <div class="lanky-body"></div>
-            <div class="lanky-arm left"><span class="lanky-hand"></span></div>
-            <div class="lanky-arm right"><span class="lanky-hand"></span></div>
-            <div class="lanky-leg left"><span class="lanky-foot"></span></div>
-            <div class="lanky-leg right"><span class="lanky-foot"></span></div>
+            <div class="lanky-head"><div class="lanky-eye left"></div><div class="lanky-eye right"></div><div class="lanky-mouth"></div></div>
+            <div class="lanky-neck"></div><div class="lanky-body"></div>
+            <div class="lanky-arm left"><span class="lanky-hand"></span></div><div class="lanky-arm right"><span class="lanky-hand"></span></div>
+            <div class="lanky-leg left"><span class="lanky-foot"></span></div><div class="lanky-leg right"><span class="lanky-foot"></span></div>
           </div>
         </div>
       </div>
 
-      <div class="walk-hud" aria-hidden="true">
-        <span>Move with Arrow Keys or WASD</span>
-        <span>Walk into a doorway to enter</span>
-      </div>
-      <div class="hallway-help">Walk into a door to go in.</div>
-    </div>
-  `;
+      <div class="walk-hud" aria-hidden="true"><span>Arrow Keys / WASD</span><span>Walk toward a doorway to enter</span></div>
+    </div>`;
 
-  viewportEl = document.getElementById('hallwayViewport');
-  worldEl = document.getElementById('hallwayWorld');
-  avatarEl = document.getElementById('avatarEl');
-  avatarFigureEl = document.getElementById('avatarFigure');
-  corridorBgEl = viewportEl ? viewportEl.querySelector('.corridor-bg') : null;
+  viewportEl=document.getElementById('hallwayViewport');
+  worldEl=document.getElementById('hallwayWorld');
+  avatarEl=document.getElementById('avatarEl');
+  avatarFigureEl=document.getElementById('avatarFigure');
+  corridorBgEl=viewportEl ? viewportEl.querySelector('.corridor-bg') : null;
 
-  avatarX = Math.max(90, Math.min(worldWidth - 90, avatarX));
+  avatarX=Math.max(0,Math.min(currentLayout.worldWidth-80,avatarX));
   updatePositions();
   checkProximity();
 
-  document.querySelectorAll('.wall-post').forEach(el => {
-    el.addEventListener('click', (e) => {
+  document.querySelectorAll('.wall-post').forEach(el=>{
+    el.addEventListener('click',(e)=>{
       if(e.target.classList.contains('delete-x')) return;
-      const post = posts.find(p => p.id === el.dataset.id);
+      const post=posts.find(p=>p.id===el.dataset.id);
       if(post) openLightbox(post);
     });
   });
 
   if(isTeacher){
-    document.querySelectorAll('.wall-post .delete-x').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
+    document.querySelectorAll('.wall-post .delete-x').forEach(btn=>{
+      btn.addEventListener('click',async(e)=>{
         e.stopPropagation();
-        const post = posts.find(p => p.id === btn.dataset.id);
+        const post=posts.find(p=>p.id===btn.dataset.id);
         if(post && confirm(`Remove "${post.title}" by ${post.studentName} from the board?`)){
-          try{
-            await dbRef.child(post.id).remove();
-          }catch(err){
-            alert('Could not remove that project. Check your connection and try again.');
-          }
+          try{await dbRef.child(post.id).remove();}
+          catch(err){alert('Could not remove that project. Check your connection and try again.');}
         }
       });
     });
   }
 
-  if(roomFilter){
-    document.getElementById('doorExit').addEventListener('click', exitRoom);
-  }else{
-    document.getElementById('doorStudents').addEventListener('click', () => enterRoom('lockers'));
-    document.getElementById('doorWeeks').addEventListener('click', () => enterRoom('weeks'));
-  }
+  currentLayout.doors.forEach(d=>{
+    const el=document.getElementById(d.elId);
+    if(el) el.addEventListener('click',d.onEnter);
+  });
+}
+
+function weekKeyFromLabelGroup(group, list, index){
+  // buildWeekGroups returns newest weeks in order; recover the key by matching
+  // the rendered label against the current approved data.
+  const approved = posts.filter(p=>p.status==='approved');
+  const keys = Array.from(new Set(approved.map(p=>weekKey(p.createdAt)))).sort((a,b)=>b.localeCompare(a));
+  const match = keys.find(k=>weekLabel(k)===group.label);
+  return match || keys[index] || weekKey(new Date().toISOString());
 }
 
 function clamp01(v){ return Math.max(0, Math.min(1, v)); }
 function lerp(a,b,t){ return a + (b-a)*t; }
 
 function projectHallItem(item, kind){
-  const el = document.getElementById(item.elId);
+  const el=document.getElementById(item.elId);
   if(!el || !viewportEl) return;
+  const vw=viewportEl.clientWidth||1000;
+  const vh=viewportEl.clientHeight||600;
+  const rel=item.x-avatarX;
+  const FAR=1450;
+  const PASSED=120;
+  if(rel>FAR || rel< -PASSED){el.style.display='none';return;}
+  el.style.display='';
 
-  const vw = viewportEl.clientWidth || 1000;
-  const vh = viewportEl.clientHeight || 600;
-  const rel = item.x - avatarX; // positive = ahead, negative = already passed
-  const FAR = 1550;
-  const PASSED = 220;
+  let close=clamp01(1-Math.max(rel,0)/FAR);
+  close=Math.pow(close,1.18);
+  const passedT=rel<0?clamp01((-rel)/PASSED):0;
+  const side=item.side||0;
 
-  if(rel > FAR || rel < -PASSED){
-    el.style.display = 'none';
-    return;
+  // Anchor items to the side wall plane. The wall and its mounted item sweep
+  // together toward the edge as the player walks past.
+  let x=vw*.5;
+  if(side){
+    const farX=vw*(.5+side*.045);
+    const nearX=vw*(.5+side*.425);
+    x=lerp(farX,nearX,close);
+    if(passedT) x += side*vw*.16*passedT;
   }
-  el.style.display = '';
 
-  // Objects far ahead are near the vanishing point. As we walk toward them,
-  // they grow and sweep outward, making the WORLD move around the player.
-  let close = clamp01(1 - Math.max(rel, 0) / FAR);
-  close = Math.pow(close, 1.15);
-  const passedT = rel < 0 ? clamp01((-rel) / PASSED) : 0;
-  const side = item.side || 0;
-
-  let x;
-  if(side === 0){
-    x = vw * .5;
+  let y,scale;
+  if(kind==='door'){
+    y=lerp(vh*.43,vh*.51,close);
+    scale=lerp(.25,1.08,close);
+  }else if(kind==='label'){
+    y=lerp(vh*.40,vh*.31,close);
+    scale=lerp(.36,.92,close);
   }else{
-    const farX = vw * (.5 + side * .035);
-    const nearX = vw * (.5 + side * .39);
-    x = lerp(farX, nearX, close);
-    if(passedT) x += side * vw * .24 * passedT;
+    y=lerp(vh*.41,vh*.33,close);
+    scale=lerp(.26,1.00,close);
   }
 
-  let y, scale;
-  if(kind === 'door'){
-    y = lerp(vh * .39, vh * .49, close) + passedT * vh * .05;
-    scale = lerp(.28, 1.06, close) + passedT * .12;
-  }else if(kind === 'label'){
-    y = lerp(vh * .34, vh * .20, close);
-    scale = lerp(.38, 1.0, close);
-  }else{
-    y = lerp(vh * .37, vh * .25, close) + passedT * vh * .03;
-    scale = lerp(.30, 1.03, close) + passedT * .10;
-  }
+  // Lateral player movement creates parallax instead of leaving left/right dead.
+  const laneParallax = -avatarY * side * 18 * close;
+  x += laneParallax;
 
-  const opacity = passedT ? (1 - passedT) : clamp01(.35 + close * .8);
-  el.style.left = x + 'px';
-  el.style.top = y + 'px';
-  el.style.bottom = 'auto';
-  el.style.opacity = opacity.toFixed(3);
-  el.style.zIndex = String(Math.round(8 + close * 20));
+  const opacity=passedT?(1-passedT):clamp01(.28+close*.9);
+  el.style.left=x+'px';
+  el.style.top=y+'px';
+  el.style.bottom='auto';
+  el.style.opacity=opacity.toFixed(3);
+  el.style.zIndex=String(Math.round(8+close*24));
 
-  let rotateY = 0;
-  if(kind === 'post' && side){ rotateY = side < 0 ? 8 : -8; }
-  const transform = `translate(-50%,-50%) perspective(850px) rotateY(${rotateY}deg) scale(${scale.toFixed(3)})`;
-  el.style.setProperty('transform', transform, 'important');
+  let rotateY=0;
+  if(side) rotateY=side<0?13:-13;
+  if(kind==='door') rotateY=side<0?9:-9;
+  const wallLean = side ? side * lerp(1,5,close) : 0;
+  el.style.setProperty('transform',`translate(-50%,-50%) perspective(900px) rotateY(${rotateY}deg) rotateZ(${wallLean*.15}deg) scale(${scale.toFixed(3)})`,'important');
 }
 
 function updatePositions(){
   if(!avatarEl || !worldEl || !viewportEl) return;
-  const vw = viewportEl.clientWidth || 1000;
-  const vh = viewportEl.clientHeight || 600;
+  const vw=viewportEl.clientWidth||1000;
+  const vh=viewportEl.clientHeight||600;
 
-  // Fishtopia-style feel: the player remains the same size. Left/right moves
-  // the player around the screen; forward/back moves the hallway past him.
-  const playerX = vw * .5 + avatarY * Math.min(vw * .15, 150);
-  avatarEl.style.left = playerX + 'px';
-  avatarEl.style.bottom = Math.max(30, vh * .055) + 'px';
-  avatarEl.style.transform = 'translateX(-50%) scale(1)';
+  // Player stays essentially the same size, but now crosses much more of the
+  // hallway so left/right behaves like a game, not a tiny lean control.
+  const playerX=vw*.5 + avatarY*Math.min(vw*.28,280);
+  avatarEl.style.left=playerX+'px';
+  avatarEl.style.bottom=Math.max(26,vh*.052)+'px';
+  avatarEl.style.transform='translateX(-50%) scale(1)';
+  worldEl.style.transform='none';
+  worldEl.style.width='100%';
 
-  // The world itself no longer slides sideways as one giant strip.
-  worldEl.style.transform = 'none';
-  worldEl.style.width = '100%';
+  currentLayout.doors.forEach(d=>projectHallItem(d,'door'));
+  currentLayout.posts.forEach(p=>projectHallItem(p,'post'));
+  currentLayout.labels.forEach(l=>projectHallItem(l,'label'));
 
-  currentLayout.doors.forEach(d => projectHallItem(d, 'door'));
-  currentLayout.posts.forEach(p => projectHallItem(p, 'post'));
-  currentLayout.labels.forEach(l => projectHallItem(l, 'label'));
-
-  // A tiny camera sway gives lateral movement some life without resizing player.
   if(corridorBgEl){
-    corridorBgEl.style.transform = `translateX(${(-avatarY * 10).toFixed(1)}px) scale(1.025)`;
+    corridorBgEl.style.transform=`translateX(${(-avatarY*34).toFixed(1)}px) scale(1.055)`;
   }
-  const floor = viewportEl.querySelector('.corridor-floor');
+  const floor=viewportEl.querySelector('.corridor-floor');
   if(floor){
-    const shift = Math.round((avatarX * 1.4) % 128);
-    floor.style.backgroundPosition = `0 ${shift}px, ${shift}px 0, ${-shift}px 0, 0 0`;
+    const shift=Math.round((avatarX*2.2)%128);
+    floor.style.backgroundPosition=`0 ${shift}px, ${shift}px 0, ${-shift}px 0, 0 0`;
+    floor.style.transform=`translateX(${(-avatarY*24).toFixed(1)}px) scaleX(1.06)`;
   }
+  const leftDisplay=viewportEl.querySelector('.corridor-left-display');
+  const rightDisplay=viewportEl.querySelector('.corridor-right-display');
+  if(leftDisplay) leftDisplay.style.backgroundPosition=`${-Math.round(avatarX*.35)}px 0, ${-Math.round(avatarX*.2)}px 0, 0 0`;
+  if(rightDisplay) rightDisplay.style.backgroundPosition=`${Math.round(avatarX*.35)}px 0, ${Math.round(avatarX*.2)}px 0, 0 0`;
 }
 
 function doorLaneReached(d){
-  if(!d.side) return Math.abs(avatarY) < .35;
-  return d.side < 0 ? avatarY < -.58 : avatarY > .58;
+  if(!d.side) return Math.abs(avatarY)<.25;
+  return d.side<0 ? avatarY<-.68 : avatarY>.68;
 }
 
 function checkProximity(){
-  currentLayout.doors.forEach(d => {
-    const el = document.getElementById(d.elId);
+  currentLayout.doors.forEach(d=>{
+    const el=document.getElementById(d.elId);
     if(!el) return;
-    const dist = Math.abs(avatarX - d.x);
-    const laneOK = doorLaneReached(d);
-    const near = dist < 95 && laneOK;
-    el.classList.toggle('near', near);
+    const dist=Math.abs(avatarX-d.x);
+    const laneOK=doorLaneReached(d);
+    const near=dist<82 && laneOK;
+    el.classList.toggle('near',near);
     if(near){
-      if(lastTriggeredDoor !== d.elId){
-        lastTriggeredDoor = d.elId;
-        d.onEnter();
-      }
-    }else if(lastTriggeredDoor === d.elId){
-      lastTriggeredDoor = null;
-    }
+      if(lastTriggeredDoor!==d.elId){lastTriggeredDoor=d.elId;d.onEnter();}
+    }else if(lastTriggeredDoor===d.elId){lastTriggeredDoor=null;}
   });
-
-  currentLayout.posts.forEach(p => {
-    const el = document.getElementById(p.elId);
+  currentLayout.posts.forEach(p=>{
+    const el=document.getElementById(p.elId);
     if(!el) return;
-    const dist = Math.abs(avatarX - p.x);
-    const laneOK = p.side < 0 ? avatarY < -.38 : avatarY > .38;
-    el.classList.toggle('near', dist < 120 && laneOK);
+    const dist=Math.abs(avatarX-p.x);
+    const laneOK=p.side<0?avatarY<-.45:avatarY>.45;
+    el.classList.toggle('near',dist<115&&laneOK);
   });
 }
 
-function enterRoom(type){
-  roomFilter = { type };
-  avatarX = 0;
-  avatarY = 0;
-  lastTriggeredDoor = null;
+function enterRoom(type,value){
+  roomFilter={type,value};
+  avatarX=0;avatarY=0;lastTriggeredDoor=null;
   render();
+  const vp=document.getElementById('hallwayViewport');
+  if(vp){vp.classList.add('scene-changing');setTimeout(()=>vp.classList.remove('scene-changing'),340);}
 }
 
 function exitRoom(){
-  roomFilter = null;
-  avatarX = 0;
-  avatarY = 0;
-  lastTriggeredDoor = null;
+  roomFilter=null;avatarX=0;avatarY=0;lastTriggeredDoor=null;
   render();
+  const vp=document.getElementById('hallwayViewport');
+  if(vp){vp.classList.add('scene-changing');setTimeout(()=>vp.classList.remove('scene-changing'),340);}
 }
 
 function openLightbox(post){
@@ -1617,8 +1754,8 @@ window.addEventListener('keyup', (e) => {
 function nudgeMovement(key){
   if(key === 'up') avatarX += 24;
   if(key === 'down') avatarX -= 24;
-  if(key === 'left'){ avatarY = Math.max(DEPTH_MIN, avatarY - 0.10); facing = 'left'; }
-  if(key === 'right'){ avatarY = Math.min(DEPTH_MAX, avatarY + 0.10); facing = 'right'; }
+  if(key === 'left'){ avatarY = Math.max(DEPTH_MIN, avatarY - 0.16); facing = 'left'; }
+  if(key === 'right'){ avatarY = Math.min(DEPTH_MAX, avatarY + 0.16); facing = 'right'; }
   avatarX = Math.max(0, Math.min(currentLayout.worldWidth - 20, avatarX));
   updatePositions();
   checkProximity();
