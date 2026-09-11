@@ -173,6 +173,9 @@ let posts = [];
 let isTeacher = false;
 let sceneMode = 'hallway';
 let activeClassroomId = null;
+let activeStudentName = null;
+let studentHallPositions = {};
+let hallDoorPositions = {};
 
 /* ---------- basic helpers ---------- */
 function escapeHtml(str){ const d=document.createElement('div'); d.textContent=str||''; return d.innerHTML; }
@@ -200,6 +203,7 @@ window.addEventListener('DOMContentLoaded',()=>{
 let scene,camera,renderer,clock,avatar,avatarParts={};
 let worldGroup,projectMeshes=[],interactiveMeshes=[],navigationMeshes=[];
 let hallMinZ=-70,hallMaxZ=70,moveMinX=-3.15,moveMaxX=3.15;
+let cameraMinX=-3.78,cameraMaxX=3.78,cameraMinZ=-69.5,cameraMaxZ=69.5;
 const pressed={forward:false,back:false,left:false,right:false};
 const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
 let dragging=false,dragStartX=0,dragLastX=0,dragMoved=0,pointerDownAt=0;
@@ -245,23 +249,44 @@ function buildScene(){
   if(sceneMode==='classroom'){
     const room=CLASSROOMS.find(r=>r.id===activeClassroomId) || CLASSROOMS[0];
     buildClassroom(room);
+  }else if(sceneMode==='studentGallery'){
+    buildStudentGallery(activeStudentName);
   }else buildHallway();
 }
 function buildHallway(){
   resetWorld();
   moveMinX=-3.15;moveMaxX=3.15;
+  studentHallPositions={};hallDoorPositions={};
 
   const approved=posts.filter(p=>p.status==='approved' && (!p.galleryRoom || p.galleryRoom==='hallway'));
   const byStudent={};approved.forEach(p=>(byStudent[p.studentName]=byStudent[p.studentName]||[]).push(p));
   Object.values(byStudent).forEach(arr=>arr.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))));
-  const studentNames=Object.keys(byStudent).filter(Boolean).sort((a,b)=>a.localeCompare(b));
-  const sections=[];
-  studentNames.forEach(name=>{const arr=byStudent[name]||[];const parts=Math.max(1,Math.ceil(arr.length/4));for(let i=0;i<parts;i++)sections.push({name,posts:arr.slice(i*4,i*4+4),part:i+1,parts});});
-  const sectionGap=10.2,margin=12,length=Math.max(78,Math.max(1,sections.length)*sectionGap+margin*2);
+  const extraNames=Object.keys(byStudent).filter(n=>n&&!ALL_STUDENTS.includes(n)).sort((a,b)=>a.localeCompare(b));
+  const studentNames=[...ALL_STUDENTS,...extraNames];
+  const sections=studentNames.map(name=>({name,posts:(byStudent[name]||[]).slice(0,4),total:(byStudent[name]||[]).length}));
+
+  // Build the hallway as protected "stations". A station is either a student display,
+  // a classroom door, or a directory. This guarantees boards can never cover a door.
+  const stations=[];
+  stations.push({kind:'directory'});
+  let roomIndex=0;
+  sections.forEach((sec,i)=>{
+    stations.push({kind:'student',sec});
+    if((i+1)%4===0 && roomIndex<CLASSROOMS.length){
+      stations.push({kind:'door',room:CLASSROOMS[roomIndex],doorIndex:roomIndex});
+      roomIndex++;
+    }
+    if((i+1)%8===0 && i<sections.length-1)stations.push({kind:'directory'});
+  });
+  while(roomIndex<CLASSROOMS.length){stations.push({kind:'door',room:CLASSROOMS[roomIndex],doorIndex:roomIndex});roomIndex++;}
+  if(stations[stations.length-1]?.kind!=='directory')stations.push({kind:'directory'});
+
+  const stationGap=9.8,margin=12,length=Math.max(88,stations.length*stationGap+margin*2);
   hallMinZ=-length/2;hallMaxZ=length/2;
+  cameraMinX=-3.80;cameraMaxX=3.80;cameraMinZ=hallMinZ+.24;cameraMaxZ=hallMaxZ-.24;
   if(avatarState.z<hallMinZ+4||avatarState.z>hallMaxZ-4){avatarState.z=hallMaxZ-8;avatarState.x=0;avatarState.angle=Math.PI;}
 
-  const wallTex=makeNoiseTexture('#e7dac7');wallTex.repeat.set(1,10);
+  const wallTex=makeNoiseTexture('#e7dac7');wallTex.repeat.set(1,Math.max(10,length/8));
   const floorTex=makeNoiseTexture('#e8e4dc',true);floorTex.repeat.set(3,length/4);
   const ceilingTex=makeNoiseTexture('#f2eee8');ceilingTex.repeat.set(2,length/8);
   const woodTex=makeWoodTexture();woodTex.repeat.set(.7,2.5);
@@ -279,29 +304,29 @@ function buildHallway(){
   addBox(worldGroup,.09,.26,length,trimMat,-3.96,.24,0,false,true);addBox(worldGroup,.09,.26,length,trimMat,3.96,.24,0,false,true);
   addBox(worldGroup,.09,.16,length,trimMat,-3.96,1.08,0,false,true);addBox(worldGroup,.09,.16,length,trimMat,3.96,1.08,0,false,true);
 
-  // Warm ceiling lights; repeating pools of light make the corridor feel physically long.
   for(let z=hallMinZ+6;z<hallMaxZ-4;z+=8.5){
     const panelMat=new THREE.MeshStandardMaterial({color:0xfff7dc,emissive:0xffe8aa,emissiveIntensity:1.45,roughness:.35});
     addBox(worldGroup,1.8,.05,.52,panelMat,0,4.72,z,false,false);
     const light=new THREE.PointLight(0xffe7b2,.46,12,2);light.position.set(0,4.45,z);worldGroup.add(light);
   }
 
-  // End walls with large four-pane windows, matching the reference image.
   addEndWall(hallMinZ,false,wallMat,trimMat);addEndWall(hallMaxZ,true,wallMat,trimMat);
 
   const boardFrameMat=new THREE.MeshStandardMaterial({map:woodTex,roughness:.55,color:0x8c5c36});
   const corkMat=new THREE.MeshStandardMaterial({map:corkTex,roughness:.88,color:0xe1aa72});
 
-  sections.forEach((sec,i)=>{
-    const z=hallMaxZ-margin-i*sectionGap;
-    addStudentSection(sec,z,boardFrameMat,corkMat,woodMat,trimMat,i);
-  });
-
-  // Each door is now a real classroom entrance. Add more rooms by editing CLASSROOMS above.
-  CLASSROOMS.forEach((room,i)=>{
-    const z=hallMaxZ-margin-5.1-i*17.5;
-    const side=i%2===0?-1:1;
-    addDoor(side,z,woodMat,trimMat,room.label,room.id);
+  stations.forEach((station,i)=>{
+    const z=hallMaxZ-margin-i*stationGap;
+    if(station.kind==='student'){
+      studentHallPositions[station.sec.name]={z};
+      addStudentSection(station.sec,z,boardFrameMat,corkMat,woodMat,trimMat,i);
+    }else if(station.kind==='door'){
+      const side=station.doorIndex%2===0?-1:1;
+      hallDoorPositions[station.room.id]={z,side};
+      addDoor(side,z,woodMat,trimMat,station.room.label,station.room.id);
+    }else if(station.kind==='directory'){
+      addDirectoryStation(z,boardFrameMat,corkMat);
+    }
   });
 }
 
@@ -324,9 +349,42 @@ function addStudentSection(sec,z,frameMat,corkMat,woodMat,trimMat,index){
   const rightTitle=index%2===0?'Torah in Action!':'Look What I Learned!';
   addBulletinBoard(-1,z,sec.posts.slice(0,2),leftTitle,sec.name,frameMat,corkMat);
   addBulletinBoard(1,z,sec.posts.slice(2,4),rightTitle,sec.name,frameMat,corkMat);
-  const subtitle=sec.parts>1?`Student Gallery • ${sec.part} of ${sec.parts}`:'Student Gallery';
-  const sign=makeDoubleSidedPlaque(sec.name,subtitle,3.25,.7);sign.position.set(0,4.12,z);
-  markNavigable(sign,{z,side:0,kind:'name'});worldGroup.add(sign);
+  const count=sec.total||0;
+  const subtitle=count?`${count} project${count===1?'':'s'} • Click name for all`:'Student Gallery • Click name';
+  const sign=makeDoubleSidedPlaque(sec.name,subtitle,3.45,.72);sign.position.set(0,4.12,z);
+  markNavigable(sign,{z,side:0,kind:'studentRoom',studentName:sec.name});worldGroup.add(sign);
+}
+
+function addDirectoryStation(z,frameMat,corkMat){
+  addDirectoryBoard(-1,z,'B3 ET',ROSTERS['B3 ET']||[],frameMat,corkMat);
+  addDirectoryBoard(1,z,'B3 WT',ROSTERS['B3 WT']||[],frameMat,corkMat);
+  const sign=makeDoubleSidedPlaque('Find a Student','Click a name to visit his gallery',3.8,.76);sign.position.set(0,4.12,z);
+  markNavigable(sign,{z,side:0,kind:'directory'});worldGroup.add(sign);
+}
+
+function addDirectoryBoard(side,z,classLabel,names,frameMat,corkMat){
+  const x=side<0?-3.91:3.91,rot=side<0?Math.PI/2:-Math.PI/2;
+  const target={z,side,kind:'directory'};
+  const frame=new THREE.Mesh(new THREE.BoxGeometry(4.15,3.28,.14),frameMat);frame.position.set(x,2.46,z);frame.rotation.y=rot;frame.castShadow=true;frame.receiveShadow=true;frame.userData.navTarget=target;navigationMeshes.push(frame);worldGroup.add(frame);
+  const cork=new THREE.Mesh(new THREE.BoxGeometry(3.84,2.98,.08),corkMat);cork.position.set(x+(side<0?.09:-.09),2.46,z);cork.rotation.y=rot;cork.userData.navTarget=target;navigationMeshes.push(cork);worldGroup.add(cork);
+  const title=makeSmallBoardTitle(`Find a Student • ${classLabel}`,3.42,.34);title.position.set(x+(side<0?.18:-.18),3.72,z);title.rotation.y=rot;title.userData.navTarget=target;navigationMeshes.push(title);worldGroup.add(title);
+
+  const top=3.38,bottom=1.28,step=names.length>1?(top-bottom)/(names.length-1):0;
+  names.forEach((name,i)=>{
+    const label=makeDirectoryNameLabel(name,3.18,.19);
+    label.position.set(x+(side<0?.205:-.205),top-i*step,z);
+    label.rotation.y=rot;
+    label.userData.navTarget={z,side,kind:'studentRoom',studentName:name};
+    navigationMeshes.push(label);worldGroup.add(label);
+  });
+}
+
+function makeDirectoryNameLabel(name,w,h){
+  const c=document.createElement('canvas');c.width=1000;c.height=72;const ctx=c.getContext('2d');
+  ctx.fillStyle='rgba(255,250,240,.96)';roundedRect(ctx,5,5,990,62,14);ctx.fill();
+  ctx.strokeStyle='rgba(126,91,55,.34)';ctx.lineWidth=3;ctx.stroke();
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#43566a';ctx.font='700 31px Quicksand, sans-serif';ctx.fillText(name,500,37);
+  const tex=makeTexture(c);return new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:.82,side:THREE.FrontSide,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3}));
 }
 
 function addBulletinBoard(side,z,boardPosts,title,studentName,frameMat,corkMat,wallX=3.91,targetExtra={}){
@@ -398,16 +456,39 @@ function createProjectCard(post){
 }
 
 function buildClassroom(room){
-  resetWorld();
   const roomPosts=posts.filter(p=>p.status==='approved' && p.galleryRoom===room.id).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
-  const roomLength=14, roomWidth=9.2, roomHeight=4.85;
+  buildGalleryClassroom({
+    title:room.label,
+    subtitle:room.subtitle,
+    roomPosts,
+    exitKind:'exitDoor',
+    exitId:room.id
+  });
+}
+
+function buildStudentGallery(studentName){
+  const roomPosts=posts.filter(p=>p.status==='approved' && p.studentName===studentName).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  buildGalleryClassroom({
+    title:studentName || 'Student Gallery',
+    subtitle:'Student Gallery • All Approved Work',
+    roomPosts,
+    exitKind:'exitStudentGallery',
+    exitId:studentName || ''
+  });
+}
+
+function buildGalleryClassroom({title,subtitle,roomPosts,exitKind,exitId}){
+  resetWorld();
+  const rowCount=Math.max(1,Math.ceil(roomPosts.length/4));
+  const roomLength=Math.max(14,10+rowCount*4.25),roomWidth=9.2,roomHeight=4.85;
   hallMinZ=-roomLength/2;hallMaxZ=roomLength/2;moveMinX=-3.45;moveMaxX=3.45;
+  cameraMinX=-roomWidth/2+.28;cameraMaxX=roomWidth/2-.28;cameraMinZ=hallMinZ+.28;cameraMaxZ=hallMaxZ-.28;
   avatarState.x=Math.max(moveMinX,Math.min(moveMaxX,avatarState.x));
   avatarState.z=Math.max(hallMinZ+1.4,Math.min(hallMaxZ-1.5,avatarState.z));
 
-  const wallTex=makeNoiseTexture('#e8ddcc');wallTex.repeat.set(1,5);
-  const floorTex=makeNoiseTexture('#dedbd4',true);floorTex.repeat.set(3,4);
-  const ceilingTex=makeNoiseTexture('#f3efe8');ceilingTex.repeat.set(2,2);
+  const wallTex=makeNoiseTexture('#e8ddcc');wallTex.repeat.set(1,Math.max(5,roomLength/3));
+  const floorTex=makeNoiseTexture('#dedbd4',true);floorTex.repeat.set(3,roomLength/4);
+  const ceilingTex=makeNoiseTexture('#f3efe8');ceilingTex.repeat.set(2,roomLength/7);
   const woodTex=makeWoodTexture();woodTex.repeat.set(.8,2.2);
   const corkTex=makeCorkTexture();corkTex.repeat.set(1.5,1.1);
   const wallMat=new THREE.MeshStandardMaterial({map:wallTex,roughness:.9,color:0xfffbf2});
@@ -427,61 +508,80 @@ function buildClassroom(room){
   addBox(worldGroup,.1,.25,roomLength,trimMat,-roomWidth/2+.12,.25,0,false,true);addBox(worldGroup,.1,.25,roomLength,trimMat,roomWidth/2-.12,.25,0,false,true);
   addBox(worldGroup,roomWidth,.24,.1,trimMat,0,.25,hallMinZ+.12,false,true);addBox(worldGroup,roomWidth,.24,.1,trimMat,0,.25,hallMaxZ-.12,false,true);
 
-  // Ceiling fixtures
-  [-4.3,0,4.3].forEach(z=>{const panelMat=new THREE.MeshStandardMaterial({color:0xfff7dc,emissive:0xffe8aa,emissiveIntensity:1.35,roughness:.35});addBox(worldGroup,2.1,.05,.58,panelMat,0,roomHeight-.1,z,false,false);const light=new THREE.PointLight(0xffe7b2,.55,12,2);light.position.set(0,roomHeight-.4,z);worldGroup.add(light);});
+  for(let z=hallMinZ+3.3;z<hallMaxZ-2.5;z+=4.4){
+    const panelMat=new THREE.MeshStandardMaterial({color:0xfff7dc,emissive:0xffe8aa,emissiveIntensity:1.35,roughness:.35});
+    addBox(worldGroup,2.1,.05,.58,panelMat,0,roomHeight-.1,z,false,false);const light=new THREE.PointLight(0xffe7b2,.55,12,2);light.position.set(0,roomHeight-.4,z);worldGroup.add(light);
+  }
 
-  // Front teaching wall / board.
   const chalkMat=new THREE.MeshStandardMaterial({color:0x274f44,roughness:.88});
-  addBox(worldGroup,4.5,1.7,.09,chalkMat,0,2.55,hallMinZ+.13,false,true);
-  const roomSign=makeSmallBoardTitle(room.label,3.6,.45);roomSign.position.set(0,4.0,hallMinZ+.20);worldGroup.add(roomSign);
-  const subSign=makeSmallBoardTitle(room.subtitle,3.2,.32);subSign.position.set(0,1.42,hallMinZ+.20);worldGroup.add(subSign);
+  addBox(worldGroup,4.9,1.7,.09,chalkMat,0,2.55,hallMinZ+.13,false,true);
+  const roomSign=makeSmallBoardTitle(title,4.1,.45);roomSign.position.set(0,4.0,hallMinZ+.20);worldGroup.add(roomSign);
+  const subSign=makeSmallBoardTitle(subtitle,3.65,.32);subSign.position.set(0,1.42,hallMinZ+.20);worldGroup.add(subSign);
 
-  // Classroom windows on the front corners.
   const skyMat=new THREE.MeshStandardMaterial({color:0xaed6ef,emissive:0x9dcbe8,emissiveIntensity:.38,roughness:.35});
   [-3.35,3.35].forEach(x=>{addBox(worldGroup,1.25,1.65,.07,skyMat,x,2.75,hallMinZ+.14,false,false);});
 
-  // Student desks: three rows with a center aisle.
+  // Real classroom furniture, while leaving a broad center aisle for walking.
   const deskTop=new THREE.MeshStandardMaterial({color:0xb77c48,roughness:.65});
   const metal=new THREE.MeshStandardMaterial({color:0x69737c,roughness:.48,metalness:.24});
-  [-2.5,-.3,1.9].forEach(z=>[-2.3,0,2.3].forEach(x=>{
+  const deskRows=[];for(let z=hallMinZ+4.5;z<Math.min(hallMaxZ-5.0,hallMinZ+13.5);z+=3.0)deskRows.push(z);
+  deskRows.forEach(z=>[-2.3,2.3].forEach(x=>{
     addBox(worldGroup,1.25,.11,.72,deskTop,x,.86,z,true,true);
     addBox(worldGroup,.08,.75,.08,metal,x-.48,.45,z-.25,true,true);addBox(worldGroup,.08,.75,.08,metal,x+.48,.45,z-.25,true,true);
     addBox(worldGroup,.08,.75,.08,metal,x-.48,.45,z+.25,true,true);addBox(worldGroup,.08,.75,.08,metal,x+.48,.45,z+.25,true,true);
     addBox(worldGroup,.86,.08,.45,deskTop,x,.48,z+.72,true,true);addBox(worldGroup,.08,.48,.08,metal,x-.34,.25,z+.72,true,true);addBox(worldGroup,.08,.48,.08,metal,x+.34,.25,z+.72,true,true);
   }));
-  addBox(worldGroup,2.0,.14,.9,deskTop,2.6,.94,-5.1,true,true);
+  addBox(worldGroup,2.0,.14,.9,deskTop,2.6,.94,hallMinZ+2.2,true,true);
 
-  // Wall projects: only create as many boards as are useful, avoiding rows of empty student-specific placeholders.
+  // Projects occupy protected side-wall bays. The last four feet before the exit door stay empty.
+  const boardStart=hallMinZ+3.4,boardSpacing=4.15;
   if(roomPosts.length===0){
-    addBulletinBoard(-1,0,[],`${room.label} Projects`,'',frameMat,corkMat,roomWidth/2-.12,{roomId:room.id,kind:'roomBoard'});
+    addBulletinBoard(-1,boardStart,[],`${title} Projects`,'',frameMat,corkMat,roomWidth/2-.12,{kind:'roomBoard'});
   }else{
-    const chunks=[];for(let i=0;i<roomPosts.length;i+=2)chunks.push(roomPosts.slice(i,i+2));
-    const boardZ=[-4.2,-.4,3.4];
-    chunks.slice(0,6).forEach((chunk,i)=>{const side=i%2===0?-1:1;const slot=Math.floor(i/2);addBulletinBoard(side,boardZ[slot],chunk,`${room.label} Projects`,'',frameMat,corkMat,roomWidth/2-.12,{roomId:room.id,kind:'roomBoard'});});
+    for(let row=0;row<rowCount;row++){
+      const z=boardStart+row*boardSpacing;
+      const base=row*4;
+      addBulletinBoard(-1,z,roomPosts.slice(base,base+2),`${title} Projects`,'',frameMat,corkMat,roomWidth/2-.12,{kind:'roomBoard'});
+      if(roomPosts.slice(base+2,base+4).length)addBulletinBoard(1,z,roomPosts.slice(base+2,base+4),`${title} Projects`,'',frameMat,corkMat,roomWidth/2-.12,{kind:'roomBoard'});
+    }
   }
 
-  addClassroomExitDoor(room,woodMat,trimMat,roomWidth,roomHeight);
+  addRoomExitDoor({label:'Back to Hallway',exitKind,exitId},woodMat,trimMat);
 }
 
-function addClassroomExitDoor(room,woodMat,trimMat,roomWidth,roomHeight){
-  const z=hallMaxZ-.09,target={z:hallMaxZ-1.0,side:0,kind:'exitDoor',roomId:room.id};
+function addRoomExitDoor({label,exitKind,exitId},woodMat,trimMat){
+  const z=hallMaxZ-.09,target={z:hallMaxZ-1.2,side:0,kind:exitKind,exitId};
   const door=addBox(worldGroup,1.7,3.3,.13,woodMat,0,1.72,z,true,true);door.userData.navTarget=target;navigationMeshes.push(door);
   const panelMat=new THREE.MeshStandardMaterial({color:0x81502e,roughness:.65});[-.43,.43].forEach(x=>{const p=addBox(worldGroup,.58,.75,.07,panelMat,x,1.9,z-.09,true,true);p.userData.navTarget=target;navigationMeshes.push(p);});
-  const sign=makeSmallBoardTitle('Back to Hallway',1.65,.3);sign.position.set(0,3.62,z-.09);sign.rotation.y=Math.PI;sign.userData.navTarget=target;navigationMeshes.push(sign);worldGroup.add(sign);
+  const sign=makeSmallBoardTitle(label,1.65,.3);sign.position.set(0,3.62,z-.09);sign.rotation.y=Math.PI;sign.userData.navTarget=target;navigationMeshes.push(sign);worldGroup.add(sign);
 }
 
 function enterClassroom(roomId){
   if(!CLASSROOMS.some(r=>r.id===roomId))return;
-  sceneMode='classroom';activeClassroomId=roomId;navTween=null;viewYaw=0;
-  avatarState.x=0;avatarState.z=5.0;avatarState.angle=Math.PI;
+  sceneMode='classroom';activeClassroomId=roomId;activeStudentName=null;navTween=null;viewYaw=0;
   buildScene();
+  avatarState.x=0;avatarState.z=hallMaxZ-2.4;avatarState.angle=Math.PI;
+  snapCameraToAvatar();
+}
+function enterStudentGallery(studentName){
+  if(!studentName)return;
+  sceneMode='studentGallery';activeStudentName=studentName;activeClassroomId=null;navTween=null;viewYaw=0;
+  buildScene();
+  avatarState.x=0;avatarState.z=hallMaxZ-2.4;avatarState.angle=Math.PI;
+  snapCameraToAvatar();
 }
 function exitClassroom(){
-  const roomId=activeClassroomId;sceneMode='hallway';activeClassroomId=null;navTween=null;viewYaw=0;
+  const roomId=activeClassroomId;sceneMode='hallway';activeClassroomId=null;activeStudentName=null;navTween=null;viewYaw=0;
   buildScene();
-  const i=Math.max(0,CLASSROOMS.findIndex(r=>r.id===roomId));
-  const margin=12,z=hallMaxZ-margin-5.1-i*17.5,side=i%2===0?-1:1;
-  avatarState.x=side*.65;avatarState.z=z;avatarState.angle=side<0?Math.PI/2:-Math.PI/2;
+  const pos=hallDoorPositions[roomId];avatarState.x=0;avatarState.z=pos?.z??(hallMaxZ-8);avatarState.angle=Math.PI;
+  snapCameraToAvatar();
+}
+function exitStudentGallery(){
+  const studentName=activeStudentName;sceneMode='hallway';activeStudentName=null;activeClassroomId=null;navTween=null;viewYaw=0;
+  buildScene();
+  const pos=studentHallPositions[studentName];avatarState.x=0;avatarState.z=(pos?.z??(hallMaxZ-8))+1.5;avatarState.angle=Math.PI;
+  avatarState.z=Math.max(hallMinZ+2,Math.min(hallMaxZ-2,avatarState.z));
+  snapCameraToAvatar();
 }
 
 function createAvatar(){
@@ -511,6 +611,30 @@ function navigateTo(target,onArrive=null){
   navTween={elapsed:0,duration:Math.min(1.2,Math.max(.42,distance*.022)),startX:avatarState.x,startZ:avatarState.z,startAngle:avatarState.angle,startViewYaw:viewYaw,endX,endZ,endAngle,onArrive};
 }
 
+function cameraPoseForCurrentView(){
+  const viewAngle=avatarState.angle+viewYaw;
+  const viewForward=new THREE.Vector3(Math.sin(viewAngle),0,Math.cos(viewAngle));
+  const back=viewForward.clone().multiplyScalar(-1);
+  let distance=3.25;const pad=.16,eps=.0001;
+  const candidates=[];
+  if(back.x>eps)candidates.push((cameraMaxX-pad-avatarState.x)/back.x);
+  else if(back.x<-eps)candidates.push((cameraMinX+pad-avatarState.x)/back.x);
+  if(back.z>eps)candidates.push((cameraMaxZ-pad-avatarState.z)/back.z);
+  else if(back.z<-eps)candidates.push((cameraMinZ+pad-avatarState.z)/back.z);
+  candidates.filter(v=>Number.isFinite(v)&&v>0).forEach(v=>distance=Math.min(distance,v));
+  distance=Math.max(.72,distance);
+  const position=new THREE.Vector3(avatarState.x,2.25,avatarState.z).addScaledVector(back,distance);
+  position.x=Math.max(cameraMinX+pad,Math.min(cameraMaxX-pad,position.x));
+  position.z=Math.max(cameraMinZ+pad,Math.min(cameraMaxZ-pad,position.z));
+  const look=new THREE.Vector3(avatarState.x,1.25,avatarState.z).addScaledVector(viewForward,2.35);
+  return {position,look};
+}
+function snapCameraToAvatar(){
+  if(!camera||!avatar)return;
+  avatar.position.set(avatarState.x,0,avatarState.z);avatar.rotation.y=avatarState.angle;
+  const pose=cameraPoseForCurrentView();camera.position.copy(pose.position);camera.lookAt(pose.look);
+}
+
 function updateAvatar(dt){
   let walking=false;
   if(navTween){
@@ -531,11 +655,10 @@ function updateAvatar(dt){
   avatar.position.set(avatarState.x,0,avatarState.z);avatar.rotation.y=avatarState.angle;
   const t=performance.now()*.009;if(walking){const swing=Math.sin(t)*.65;avatarParts.armL.rotation.x=swing;avatarParts.armR.rotation.x=-swing;avatarParts.legL.rotation.x=-swing*.7;avatarParts.legR.rotation.x=swing*.7;}else{avatarParts.armL.rotation.x*=.8;avatarParts.armR.rotation.x*=.8;avatarParts.legL.rotation.x*=.8;avatarParts.legR.rotation.x*=.8;}
 
-  // The view direction is independent of the student's walking direction.
-  const viewAngle=avatarState.angle+viewYaw;
-  const viewForward=new THREE.Vector3(Math.sin(viewAngle),0,Math.cos(viewAngle));
-  const desired=new THREE.Vector3(avatarState.x,2.35,avatarState.z).addScaledVector(viewForward,-3.25);desired.y=2.25;
-  camera.position.lerp(desired,1-Math.pow(.0002,dt));const look=new THREE.Vector3(avatarState.x,1.25,avatarState.z).addScaledVector(viewForward,2.35);camera.lookAt(look);
+  // Collision-aware third-person camera: when a wall is behind you, the camera moves closer
+  // instead of crossing through the wall and producing a blank beige screen.
+  const pose=cameraPoseForCurrentView();
+  camera.position.lerp(pose.position,1-Math.pow(.0002,dt));camera.lookAt(pose.look);
 }
 function animate(){requestAnimationFrame(animate);const dt=Math.min(.04,clock.getDelta());updateAvatar(dt);renderer.render(scene,camera);}
 function onResize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);}
@@ -550,7 +673,6 @@ function onPointerMove(e){
 function onPointerUp(e){
   if(!dragging)return;dragging=false;renderer.domElement.releasePointerCapture?.(e.pointerId);
   const held=performance.now()-pointerDownAt;
-  // A long press is deliberately inert; it can never become an accidental jump/"super zoom".
   if(dragMoved>=8 || held>420)return;
   const rect=renderer.domElement.getBoundingClientRect();pointer.x=((e.clientX-rect.left)/rect.width)*2-1;pointer.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointer,camera);
   const targets=[...new Set([...interactiveMeshes,...navigationMeshes])];
@@ -561,9 +683,19 @@ function onPointerUp(e){
     if(d<2.8)enterClassroom(target.roomId);else navigateTo(target,()=>enterClassroom(target.roomId));
     return;
   }
+  if(target?.kind==='studentRoom'){
+    const d=Math.hypot((target.side?target.side*.62:0)-avatarState.x,target.z-avatarState.z);
+    if(d<3.0)enterStudentGallery(target.studentName);else navigateTo(target,()=>enterStudentGallery(target.studentName));
+    return;
+  }
   if(target?.kind==='exitDoor'){
     const d=Math.hypot(avatarState.x,target.z-avatarState.z);
     if(d<2.5)exitClassroom();else navigateTo(target,exitClassroom);
+    return;
+  }
+  if(target?.kind==='exitStudentGallery'){
+    const d=Math.hypot(avatarState.x,target.z-avatarState.z);
+    if(d<2.5)exitStudentGallery();else navigateTo(target,exitStudentGallery);
     return;
   }
   if(postId){
