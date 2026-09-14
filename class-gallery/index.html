@@ -64,6 +64,8 @@ button,input,select,textarea{font:inherit}
 .glass-btn.primary{background:rgba(64,113,75,.86)}
 .pending-note{display:none;position:absolute;right:0;top:48px;white-space:nowrap;padding:6px 10px;border-radius:999px;background:#f2c55d;color:#4c3515;font-size:.72rem;font-weight:800;box-shadow:0 4px 12px rgba(0,0,0,.16)}
 .pending-note.show{display:block}
+.online-note{display:none;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.72);background:rgba(45,36,27,.64);color:#fffdf6;border-radius:999px;padding:9px 13px;font-size:.72rem;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.18);backdrop-filter:blur(9px);white-space:nowrap}
+.online-note.show{display:flex}.online-dot{width:8px;height:8px;border-radius:50%;background:#78df8c;box-shadow:0 0 0 3px rgba(120,223,140,.18)}
 
 .start-help{position:fixed;left:50%;bottom:24px;z-index:35;transform:translateX(-50%);padding:9px 16px;border-radius:999px;background:rgba(255,253,248,.84);color:#4b4034;font-size:.76rem;font-weight:800;box-shadow:0 6px 22px rgba(0,0,0,.14);backdrop-filter:blur(10px);pointer-events:none;transition:opacity .65s ease,transform .65s ease}
 .start-help.hide{opacity:0;transform:translate(-50%,18px)}
@@ -90,6 +92,7 @@ button,input,select,textarea{font:inherit}
 .btn-primary{background:#427250;color:#fff}.btn-secondary{background:#ebe3d7;color:#4c4034}.btn-danger{background:#b44f47;color:#fff}.btn-primary:disabled{opacity:.55;cursor:not-allowed}
 .status-msg{min-height:18px;margin-top:9px;font-size:.8rem;font-weight:800}
 .review-item{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #eadfce}.review-item:last-child{border-bottom:0}.review-item img{width:72px;height:72px;object-fit:cover;border-radius:8px}.review-item .info{min-width:0;flex:1}.review-item h4{margin:0 0 3px;font-family:'Caveat';font-size:1.35rem}.review-item p{font-size:.78rem;margin:0;color:#67594b}.review-item .meta{font-size:.7rem;color:#8a7763;margin-top:4px}.review-actions{display:flex;flex-direction:column;gap:6px}.review-actions button{border:0;border-radius:8px;padding:7px 10px;color:#fff;font-size:.72rem;font-weight:800;cursor:pointer}.btn-approve{background:#477b55}.btn-reject{background:#b34e47}.empty-review{padding:20px;text-align:center;color:#8c7b69}
+.teacher-live-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;margin-bottom:10px;border-radius:12px;background:#f3ecdf;border:1px solid #e4d7c4}.teacher-live-controls strong{display:block;font-size:.82rem}.teacher-live-controls span{display:block;font-size:.7rem;color:#7a6855;margin-top:2px}.teacher-live-controls button{border:0;border-radius:999px;padding:8px 13px;color:white;font-size:.72rem;font-weight:800;cursor:pointer;background:#477b55}.teacher-live-controls button.off{background:#a64d47}
 
 .lightbox-card{max-width:650px;max-height:90vh;overflow:auto}.lightbox-card img{display:block;width:100%;max-height:390px;object-fit:contain;background:#f5efe6;border-radius:9px;margin-bottom:14px}.lightbox-card video{width:100%;border-radius:9px;margin-bottom:12px}.lightbox-card audio{width:100%;margin-bottom:12px}.lightbox-card .category{display:inline-block;background:#315576;color:#fff;border-radius:999px;padding:4px 10px;font-size:.7rem;font-weight:800}.lightbox-card .desc{line-height:1.5;color:#594c3f}.lightbox-card .by{margin-top:13px;font-weight:800;color:#715c46}.lightbox-card a{display:inline-block;margin-top:11px;color:#315f8f;font-weight:800}.teacher-lightbox-actions{margin-top:16px;display:flex;justify-content:flex-end}
 
@@ -126,7 +129,7 @@ button,input,select,textarea{font:inherit}
   .touch-btn.up{left:44px;top:2px}.touch-btn.down{left:44px;bottom:2px}.touch-btn.left{left:2px;top:44px}.touch-btn.right{right:2px;top:44px}
   .start-help{bottom:160px}
 }
-@media(max-width:650px){.top-controls{right:10px;top:10px}.glass-btn{padding:9px 11px;font-size:.72rem}.modal,.lightbox-card{padding:21px}.center-reticle{display:none}}
+@media(max-width:650px){.top-controls{right:10px;top:10px}.online-note{position:fixed;left:10px;top:58px;width:max-content}.glass-btn{padding:9px 11px;font-size:.72rem}.modal,.lightbox-card{padding:21px}.center-reticle{display:none}}
 </style>
 </head>
 <body>
@@ -134,6 +137,7 @@ button,input,select,textarea{font:inherit}
   <div id="threeHost"></div>
   <div class="center-reticle" aria-hidden="true"></div>
   <div class="top-controls">
+    <span class="online-note" id="onlineNote"><span class="online-dot"></span><span id="onlineText">Just you online</span></span>
     <button class="glass-btn primary" id="openModalBtn">＋ Pin Work</button>
     <button class="glass-btn" id="avatarBtn">Avatar</button>
     <button class="glass-btn" id="teacherReviewBtn">Teacher</button>
@@ -210,7 +214,10 @@ button,input,select,textarea{font:inherit}
       <div class="status-msg" id="loginStatus"></div>
       <div class="modal-actions"><button type="button" class="btn-primary" id="loginSubmitBtn">Log in</button></div>
     </div>
-    <div id="reviewListArea" style="display:none;"><div id="reviewList"></div></div>
+    <div id="reviewListArea" style="display:none;">
+      <div class="teacher-live-controls"><div><strong>Live Classmates</strong><span id="teacherOnlineNames">No students online right now.</span></div><button type="button" id="livePresenceToggleBtn">On</button></div>
+      <div id="reviewList"></div>
+    </div>
   </div>
 </div>
 
@@ -294,6 +301,7 @@ const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
 let dragging=false,dragStartX=0,dragLastX=0,dragMoved=0,pointerDownAt=0;
 let viewYaw=0;                 // mouse/touch drag changes the view, never the student's walking direction
 let navTween=null;             // smooth click-to-go movement
+let localAvatarWalking=false;
 const avatarState={x:0,z:hallMaxZ-8,angle:Math.PI};
 const AVATAR_STORAGE_KEY='classGalleryExplorerAvatarV1';
 const AVATAR_STYLES=[
@@ -308,6 +316,38 @@ const AVATAR_STYLES=[
 ];
 let selectedAvatarId=localStorage.getItem(AVATAR_STORAGE_KEY)||'sprout';
 let avatarChooserFirstVisit=!localStorage.getItem(AVATAR_STORAGE_KEY);
+
+/* ---------- live classmates ----------
+   Identity comes from the existing B3 Games login. Unknown IDs never enter
+   presence, and clients only listen to their own ET or WT roster branch. */
+const PRESENCE_STUDENTS={
+  chaim_chaikin:{name:'Mayer Chaim Chaikin',classId:'et'},mayer_chaim_chaikin:{name:'Mayer Chaim Chaikin',classId:'et'},
+  yossi_gourarie:{name:'Yossi Gourarie',classId:'et'},sholom_huebner:{name:'Sholom DovBer Huebner',classId:'et'},sholom_dovber_huebner:{name:'Sholom DovBer Huebner',classId:'et'},
+  moshe_lapine:{name:'Moshe Lapine',classId:'et'},kehos_notik:{name:'Kehos Notik',classId:'et'},yisroel_oirechman:{name:'Yisroel Oirechman',classId:'et'},
+  moshe_raichman:{name:'Moshe Tuvia Raichman',classId:'et'},moshe_tuvia_raichman:{name:'Moshe Tuvia Raichman',classId:'et'},
+  avrohom_rosenfeld:{name:'Avrohom Rosenfeld',classId:'et'},levi_rozmarin:{name:'Levi Rozmarin',classId:'et'},arik_traxler:{name:'Arik Traxler',classId:'et'},
+  ari_greenberg:{name:'Ari Greenberg',classId:'wt'},zev_rosenfeld:{name:'Zev Rosenfeld',classId:'wt'},levi_schtroks:{name:'Levi Schtroks',classId:'wt'},
+  yisroel_aryeh_simmonds:{name:'Yisroel Aryeh Simmonds',classId:'wt'},leibel_vogel:{name:'Leibel Vogel',classId:'wt'},leib_wolf:{name:'Yisroel Arye Leib Wolf',classId:'wt'},
+  simcha_cohen:{name:'Rabbi Cohen',classId:(['et','wt'].includes(localStorage.getItem('b3Games_studentClass'))?localStorage.getItem('b3Games_studentClass'):'et')}
+};
+const presenceStudentId=localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId')||'';
+const presenceProfile=PRESENCE_STUDENTS[presenceStudentId]||null;
+const presenceSessionId=sessionStorage.getItem('classGalleryPresenceSession')||(((window.crypto&&window.crypto.randomUUID?window.crypto.randomUUID():('s'+Date.now()+Math.random().toString(36).slice(2)))).replace(/[^a-zA-Z0-9_-]/g,''));
+sessionStorage.setItem('classGalleryPresenceSession',presenceSessionId);
+const presenceRoot=window.firebase?firebase.database().ref('b3Games/classGalleryPresence'):null;
+const presenceSettingsRef=window.firebase?firebase.database().ref('b3Games/classGalleryPresenceSettings/liveEnabled'):null;
+let livePresenceEnabled=true,presenceStarted=false,presenceOwnRef=null,presenceClassRef=null,presenceValueHandler=null;
+let presenceHeartbeat=null,lastPresenceWrite=0,lastPresencePayload='';
+let remoteAvatarsGroup=null,remoteAvatars=new Map(),latestPresenceStudents=new Map();
+let teacherPresenceRef=null,teacherPresenceHandler=null;
+
+if(presenceSettingsRef){
+  presenceSettingsRef.on('value',snap=>{
+    livePresenceEnabled=snap.val()!==false;updateLivePresenceToggle();
+    if(livePresenceEnabled)startLivePresence();else stopLivePresence(true);
+  },err=>console.warn('Could not read live classmates setting',err));
+}
+window.addEventListener('pagehide',()=>{if(presenceOwnRef)presenceOwnRef.remove().catch(()=>{});});
 
 function makeNoiseTexture(base='#eee3d2',grid=false){
   const c=document.createElement('canvas'); c.width=c.height=512; const ctx=c.getContext('2d');
@@ -333,10 +373,12 @@ function init3D(){
   scene.add(new THREE.HemisphereLight(0xfff6e5,0x7a695b,1.25));
   const sun=new THREE.DirectionalLight(0xffeed0,1.05);sun.position.set(2,9,6);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-16;sun.shadow.camera.right=16;sun.shadow.camera.top=24;sun.shadow.camera.bottom=-24;scene.add(sun);
   buildScene();
-  avatar=createAvatar();scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);
+  avatar=createAvatar(selectedAvatarId);avatarParts=avatar.userData.parts;scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);
+  remoteAvatarsGroup=new THREE.Group();scene.add(remoteAvatarsGroup);
   renderer.domElement.addEventListener('pointerdown',onPointerDown);renderer.domElement.addEventListener('pointermove',onPointerMove);renderer.domElement.addEventListener('pointerup',onPointerUp);renderer.domElement.addEventListener('pointercancel',()=>dragging=false);
   window.addEventListener('resize',onResize);
   animate();
+  startLivePresence();
   if(avatarChooserFirstVisit)setTimeout(openAvatarChooser,250);
 }
 
@@ -660,32 +702,32 @@ function enterClassroom(roomId){
   sceneMode='classroom';activeClassroomId=roomId;activeStudentName=null;navTween=null;viewYaw=0;
   buildScene();
   avatarState.x=0;avatarState.z=hallMaxZ-2.4;avatarState.angle=Math.PI;
-  snapCameraToAvatar();
+  snapCameraToAvatar();refreshRemoteAvatars();syncLivePresence(true);
 }
 function enterStudentGallery(studentName){
   if(!studentName)return;
   sceneMode='studentGallery';activeStudentName=studentName;activeClassroomId=null;navTween=null;viewYaw=0;
   buildScene();
   avatarState.x=0;avatarState.z=hallMaxZ-2.4;avatarState.angle=Math.PI;
-  snapCameraToAvatar();
+  snapCameraToAvatar();refreshRemoteAvatars();syncLivePresence(true);
 }
 function exitClassroom(){
   const roomId=activeClassroomId;sceneMode='hallway';activeClassroomId=null;activeStudentName=null;navTween=null;viewYaw=0;
   buildScene();
   const pos=hallDoorPositions[roomId];avatarState.x=0;avatarState.z=pos?.z??(hallMaxZ-8);avatarState.angle=Math.PI;
-  snapCameraToAvatar();
+  snapCameraToAvatar();refreshRemoteAvatars();syncLivePresence(true);
 }
 function exitStudentGallery(){
   const studentName=activeStudentName;sceneMode='hallway';activeStudentName=null;activeClassroomId=null;navTween=null;viewYaw=0;
   buildScene();
   const pos=studentHallPositions[studentName];avatarState.x=0;avatarState.z=(pos?.z??(hallMaxZ-8))+1.5;avatarState.angle=Math.PI;
   avatarState.z=Math.max(hallMinZ+2,Math.min(hallMaxZ-2,avatarState.z));
-  snapCameraToAvatar();
+  snapCameraToAvatar();refreshRemoteAvatars();syncLivePresence(true);
 }
 
-function createAvatar(){
-  avatarParts={};
-  const cfg=AVATAR_STYLES.find(a=>a.id===selectedAvatarId)||AVATAR_STYLES[0];
+function createAvatar(avatarId=selectedAvatarId){
+  const parts={};
+  const cfg=AVATAR_STYLES.find(a=>a.id===avatarId)||AVATAR_STYLES[0];
   const g=new THREE.Group();
   g.userData.avatarId=cfg.id;
   const bodyMat=new THREE.MeshStandardMaterial({color:cfg.body,roughness:.66});
@@ -725,19 +767,21 @@ function createAvatar(){
   const armGeo=new THREE.CapsuleGeometry(.075,.42,6,10),legGeo=new THREE.CapsuleGeometry(.095,.43,6,10);
   ['L','R'].forEach((side,idx)=>{
     const sx=idx?-.40:.40;
-    const arm=new THREE.Mesh(armGeo,bodyMat);arm.position.set(sx,.98,0);arm.rotation.z=idx?.24:-.24;arm.castShadow=true;g.add(arm);avatarParts['arm'+side]=arm;
-    const leg=new THREE.Mesh(legGeo,accentMat);leg.position.set(idx?-.15:.15,.34,0);leg.castShadow=true;g.add(leg);avatarParts['leg'+side]=leg;
-    const foot=new THREE.Mesh(new THREE.SphereGeometry(.13,16,12),footMat);foot.scale.set(1,.55,1.35);foot.position.set(idx?-.15:.15,.08,-.08);foot.castShadow=true;g.add(foot);avatarParts['foot'+side]=foot;
+    const arm=new THREE.Mesh(armGeo,bodyMat);arm.position.set(sx,.98,0);arm.rotation.z=idx?.24:-.24;arm.castShadow=true;g.add(arm);parts['arm'+side]=arm;
+    const leg=new THREE.Mesh(legGeo,accentMat);leg.position.set(idx?-.15:.15,.34,0);leg.castShadow=true;g.add(leg);parts['leg'+side]=leg;
+    const foot=new THREE.Mesh(new THREE.SphereGeometry(.13,16,12),footMat);foot.scale.set(1,.55,1.35);foot.position.set(idx?-.15:.15,.08,-.08);foot.castShadow=true;g.add(foot);parts['foot'+side]=foot;
   });
 
   const shadow=new THREE.Mesh(new THREE.CircleGeometry(.48,32),new THREE.MeshBasicMaterial({color:0x3b3025,transparent:true,opacity:.16,depthWrite:false}));shadow.rotation.x=-Math.PI/2;shadow.position.y=.012;g.add(shadow);
+  g.userData.parts=parts;
   return g;
 }
 
 function rebuildAvatar(){
   if(!scene)return;
   if(avatar){scene.remove(avatar);disposeGroup(avatar);}
-  avatar=createAvatar();scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);avatar.rotation.y=avatarState.angle;
+  avatar=createAvatar(selectedAvatarId);avatarParts=avatar.userData.parts;scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);avatar.rotation.y=avatarState.angle;
+  syncLivePresence(true);
 }
 
 function avatarChoiceMarkup(cfg){
@@ -759,6 +803,114 @@ function closeAvatarChooser(save=true){
 
 
 function disposeGroup(group){group.traverse(obj=>{if(obj.geometry)obj.geometry.dispose?.();if(obj.material){const mats=Array.isArray(obj.material)?obj.material:[obj.material];mats.forEach(m=>{if(m.map)m.map.dispose?.();m.dispose?.();});}});}
+
+function currentPresenceSpace(){
+  if(sceneMode==='classroom')return 'classroom:'+String(activeClassroomId||'');
+  if(sceneMode==='studentGallery')return 'student:'+String(activeStudentName||'');
+  return 'hallway';
+}
+function safePresenceNumber(value,fallback=0){const n=Number(value);return Number.isFinite(n)?n:fallback;}
+function makeStudentNameSprite(name){
+  const c=document.createElement('canvas');c.width=768;c.height=150;const ctx=c.getContext('2d');
+  ctx.font='700 44px Quicksand, sans-serif';const text=String(name||'Classmate');const width=Math.min(720,Math.max(245,ctx.measureText(text).width+82));const x=(768-width)/2;
+  ctx.fillStyle='rgba(255,252,245,.95)';roundedRect(ctx,x,13,width,112,30);ctx.fill();ctx.strokeStyle='rgba(73,57,42,.26)';ctx.lineWidth=5;ctx.stroke();
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#354453';ctx.fillText(text,384,69);
+  const tex=makeTexture(c),mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false});const sprite=new THREE.Sprite(mat);sprite.scale.set(2.5,.49,1);sprite.position.set(0,2.25,0);return sprite;
+}
+function clearRemoteAvatars(){
+  remoteAvatars.forEach(entry=>{remoteAvatarsGroup?.remove(entry.group);disposeGroup(entry.group);});
+  remoteAvatars.clear();latestPresenceStudents.clear();
+}
+function updateOnlineBadge(){
+  const note=document.getElementById('onlineNote'),textEl=document.getElementById('onlineText');if(!note||!textEl)return;
+  if(!presenceProfile||!livePresenceEnabled){note.classList.remove('show');return;}
+  const count=latestPresenceStudents.size;
+  textEl.textContent=count===0?'Just you online':count===1?'1 classmate online':`${count} classmates online`;
+  note.classList.add('show');
+}
+function updateLivePresenceToggle(){
+  const btn=document.getElementById('livePresenceToggleBtn');if(!btn)return;
+  btn.textContent=livePresenceEnabled?'On':'Off';btn.classList.toggle('off',!livePresenceEnabled);btn.setAttribute('aria-pressed',String(livePresenceEnabled));
+}
+function startTeacherPresenceMonitor(){
+  if(!presenceRoot||teacherPresenceRef)return;
+  teacherPresenceRef=presenceRoot;teacherPresenceHandler=snapshot=>{
+    const raw=snapshot.val()||{},now=Date.now(),online=[];
+    ['et','wt'].forEach(classId=>Object.entries(raw[classId]||{}).forEach(([studentId,sessions])=>{
+      const known=PRESENCE_STUDENTS[studentId];if(!known||known.classId!==classId||studentId==='simcha_cohen')return;
+      const active=Object.values(sessions||{}).some(data=>{const updated=safePresenceNumber(data?.updatedAt,0);return data&&(!updated||now-updated<=50000);});
+      if(active)online.push(`${known.name} (${classId.toUpperCase()})`);
+    }));
+    const unique=[...new Set(online)].sort((a,b)=>a.localeCompare(b)),el=document.getElementById('teacherOnlineNames');
+    if(el)el.textContent=unique.length?'Online: '+unique.join(', '):'No students online right now.';
+  };
+  teacherPresenceRef.on('value',teacherPresenceHandler,err=>console.warn('Teacher presence list unavailable',err));
+}
+function latestStudentSessions(raw){
+  const result=new Map(),now=Date.now();
+  Object.entries(raw||{}).forEach(([studentId,sessions])=>{
+    if(studentId===presenceStudentId)return;
+    const known=PRESENCE_STUDENTS[studentId];if(!known||known.classId!==presenceProfile?.classId)return;
+    let latest=null;
+    Object.values(sessions||{}).forEach(data=>{if(!data||typeof data!=='object')return;const updated=safePresenceNumber(data.updatedAt,0);if(updated&&now-updated>50000)return;if(!latest||updated>safePresenceNumber(latest.updatedAt,0))latest=data;});
+    if(latest)result.set(studentId,{...latest,name:known.name});
+  });
+  return result;
+}
+function refreshRemoteAvatars(){
+  if(!remoteAvatarsGroup)return;
+  const activeSpace=currentPresenceSpace();
+  remoteAvatars.forEach((entry,studentId)=>{
+    if(!latestPresenceStudents.has(studentId)){remoteAvatarsGroup.remove(entry.group);disposeGroup(entry.group);remoteAvatars.delete(studentId);}
+  });
+  latestPresenceStudents.forEach((data,studentId)=>{
+    const avatarId=AVATAR_STYLES.some(a=>a.id===data.avatarId)?data.avatarId:'sprout';
+    let entry=remoteAvatars.get(studentId);
+    if(!entry||entry.avatarId!==avatarId){
+      if(entry){remoteAvatarsGroup.remove(entry.group);disposeGroup(entry.group);}
+      const group=createAvatar(avatarId);group.add(makeStudentNameSprite(data.name));group.scale.setScalar(.93);remoteAvatarsGroup.add(group);
+      entry={group,avatarId,parts:group.userData.parts,targetX:0,targetZ:0,targetAngle:0,walking:false};remoteAvatars.set(studentId,entry);
+      group.position.set(safePresenceNumber(data.x),0,safePresenceNumber(data.z));group.rotation.y=safePresenceNumber(data.angle,Math.PI);
+    }
+    entry.targetX=Math.max(moveMinX,Math.min(moveMaxX,safePresenceNumber(data.x)));
+    entry.targetZ=Math.max(hallMinZ+1.1,Math.min(hallMaxZ-1.1,safePresenceNumber(data.z)));
+    entry.targetAngle=safePresenceNumber(data.angle,Math.PI);entry.walking=!!data.walking;
+    entry.group.visible=data.space===activeSpace;
+  });
+  updateOnlineBadge();
+}
+function handlePresenceSnapshot(snapshot){latestPresenceStudents=latestStudentSessions(snapshot.val()||{});refreshRemoteAvatars();}
+function syncLivePresence(force=false){
+  if(!presenceStarted||!presenceOwnRef||!livePresenceEnabled)return;
+  const now=Date.now();if(!force&&now-lastPresenceWrite<120)return;
+  const core={x:Number(avatarState.x.toFixed(3)),z:Number(avatarState.z.toFixed(3)),angle:Number(avatarState.angle.toFixed(3)),space:currentPresenceSpace(),avatarId:selectedAvatarId,walking:!!localAvatarWalking};
+  const serialized=JSON.stringify(core);if(!force&&serialized===lastPresencePayload)return;
+  lastPresencePayload=serialized;lastPresenceWrite=now;
+  presenceOwnRef.set({...core,updatedAt:firebase.database.ServerValue.TIMESTAMP}).catch(err=>console.warn('Live classmates update failed',err));
+}
+function stopLivePresence(removeOwn=true){
+  if(presenceClassRef&&presenceValueHandler)presenceClassRef.off('value',presenceValueHandler);
+  presenceValueHandler=null;presenceClassRef=null;presenceStarted=false;
+  if(presenceHeartbeat){clearInterval(presenceHeartbeat);presenceHeartbeat=null;}
+  if(removeOwn&&presenceOwnRef){const oldRef=presenceOwnRef;presenceOwnRef=null;oldRef.remove().catch(()=>{});oldRef.onDisconnect().cancel().catch(()=>{});}else presenceOwnRef=null;
+  clearRemoteAvatars();updateOnlineBadge();
+}
+function startLivePresence(){
+  if(!scene||!presenceProfile||!presenceRoot||!livePresenceEnabled||presenceStarted)return;
+  presenceStarted=true;presenceClassRef=presenceRoot.child(presenceProfile.classId);presenceOwnRef=presenceClassRef.child(presenceStudentId).child(presenceSessionId);
+  presenceOwnRef.onDisconnect().remove();presenceValueHandler=handlePresenceSnapshot;presenceClassRef.on('value',presenceValueHandler,err=>console.warn('Live classmates unavailable',err));
+  syncLivePresence(true);presenceHeartbeat=setInterval(()=>syncLivePresence(true),15000);updateOnlineBadge();
+}
+function updateRemoteAvatars(dt){
+  const ease=1-Math.pow(.0005,dt),t=performance.now()*.009;
+  remoteAvatars.forEach(entry=>{
+    if(!entry.group.visible)return;
+    entry.group.position.x=THREE.MathUtils.lerp(entry.group.position.x,entry.targetX,ease);entry.group.position.z=THREE.MathUtils.lerp(entry.group.position.z,entry.targetZ,ease);
+    entry.group.rotation.y+=shortestAngleDelta(entry.group.rotation.y,entry.targetAngle)*ease;
+    const p=entry.parts,swing=entry.walking?Math.sin(t)*.65:0;
+    if(p.armL){p.armL.rotation.x=THREE.MathUtils.lerp(p.armL.rotation.x,swing,.28);p.armR.rotation.x=THREE.MathUtils.lerp(p.armR.rotation.x,-swing,.28);p.legL.rotation.x=THREE.MathUtils.lerp(p.legL.rotation.x,-swing*.7,.28);p.legR.rotation.x=THREE.MathUtils.lerp(p.legR.rotation.x,swing*.7,.28);}
+  });
+}
 
 function shortestAngleDelta(from,to){return Math.atan2(Math.sin(to-from),Math.cos(to-from));}
 function smoothStep01(t){return t*t*(3-2*t);}
@@ -814,6 +966,7 @@ function updateAvatar(dt){
     walking=Math.abs(move)>.01;
   }
   avatarState.x=Math.max(moveMinX,Math.min(moveMaxX,avatarState.x));avatarState.z=Math.max(hallMinZ+1.1,Math.min(hallMaxZ-1.1,avatarState.z));
+  localAvatarWalking=walking;
   avatar.position.set(avatarState.x,0,avatarState.z);avatar.rotation.y=avatarState.angle;
   const t=performance.now()*.009;if(walking){const swing=Math.sin(t)*.65;avatarParts.armL.rotation.x=swing;avatarParts.armR.rotation.x=-swing;avatarParts.legL.rotation.x=-swing*.7;avatarParts.legR.rotation.x=swing*.7;}else{avatarParts.armL.rotation.x*=.8;avatarParts.armR.rotation.x*=.8;avatarParts.legL.rotation.x*=.8;avatarParts.legR.rotation.x*=.8;}
 
@@ -821,8 +974,9 @@ function updateAvatar(dt){
   // instead of crossing through the wall and producing a blank beige screen.
   const pose=cameraPoseForCurrentView();
   camera.position.lerp(pose.position,1-Math.pow(.0002,dt));camera.lookAt(pose.look);
+  syncLivePresence(false);
 }
-function animate(){requestAnimationFrame(animate);const dt=Math.min(.04,clock.getDelta());updateAvatar(dt);renderer.render(scene,camera);}
+function animate(){requestAnimationFrame(animate);const dt=Math.min(.04,clock.getDelta());updateAvatar(dt);updateRemoteAvatars(dt);renderer.render(scene,camera);}
 function onResize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);}
 
 function onPointerDown(e){dragging=true;dragStartX=dragLastX=e.clientX;dragMoved=0;pointerDownAt=performance.now();renderer.domElement.setPointerCapture?.(e.pointerId);}
@@ -877,7 +1031,7 @@ setTimeout(()=>document.getElementById('startHelp').classList.add('hide'),5000);
 
 /* ---------- data render ---------- */
 if(dbRef){
-  dbRef.on('value',snapshot=>{const data=snapshot.val()||{};posts=Object.keys(data).map(id=>({id,...data[id]}));updatePending();buildScene();if(isTeacher&&document.getElementById('reviewListArea').style.display!=='none')renderReviewList();},err=>console.error('Firebase read failed:',err));
+  dbRef.on('value',snapshot=>{const data=snapshot.val()||{};posts=Object.keys(data).map(id=>({id,...data[id]}));updatePending();buildScene();refreshRemoteAvatars();if(isTeacher&&document.getElementById('reviewListArea').style.display!=='none')renderReviewList();},err=>console.error('Firebase read failed:',err));
 }
 function updatePending(){const n=posts.filter(p=>p.status==='pending').length;const el=document.getElementById('pendingNote');if(n){el.textContent=`${n} waiting`;el.classList.add('show')}else el.classList.remove('show');}
 
@@ -899,7 +1053,8 @@ document.getElementById('projectForm').addEventListener('submit',async e=>{
 /* ---------- review ---------- */
 const reviewOverlay=document.getElementById('reviewOverlay');document.getElementById('teacherReviewBtn').onclick=()=>{reviewOverlay.classList.add('show');isTeacher?showReviewList():(document.getElementById('reviewLoginArea').style.display='block',document.getElementById('reviewListArea').style.display='none')};document.getElementById('closeReviewBtn').onclick=()=>reviewOverlay.classList.remove('show');reviewOverlay.addEventListener('click',e=>{if(e.target===reviewOverlay)reviewOverlay.classList.remove('show')});
 document.getElementById('loginSubmitBtn').onclick=()=>{const val=document.getElementById('teacherPasscode').value,stat=document.getElementById('loginStatus');if(val===TEACHER_PASSCODE){isTeacher=true;document.getElementById('teacherPasscode').value='';stat.textContent='';showReviewList()}else{stat.textContent='Incorrect passcode.';stat.style.color='#b34e47'}};
-function showReviewList(){document.getElementById('reviewLoginArea').style.display='none';document.getElementById('reviewListArea').style.display='block';renderReviewList();}
+document.getElementById('livePresenceToggleBtn').onclick=async()=>{if(!isTeacher||!presenceSettingsRef)return;const btn=document.getElementById('livePresenceToggleBtn');btn.disabled=true;try{await presenceSettingsRef.set(!livePresenceEnabled)}catch(err){alert('Could not change Live Classmates right now.');console.error(err)}finally{btn.disabled=false}};
+function showReviewList(){document.getElementById('reviewLoginArea').style.display='none';document.getElementById('reviewListArea').style.display='block';updateLivePresenceToggle();startTeacherPresenceMonitor();renderReviewList();}
 function renderReviewList(){const pending=posts.filter(p=>p.status==='pending'),list=document.getElementById('reviewList');if(!pending.length){list.innerHTML='<div class="empty-review">No projects waiting for review.</div>';return;}list.innerHTML=pending.map(p=>`<div class="review-item">${p.image?`<img src="${p.image}" alt="">`:''}<div class="info"><h4>${escapeHtml(p.title)}</h4><p>${escapeHtml(p.description).slice(0,100)}</p><div class="meta">${escapeHtml(p.studentName)} · ${escapeHtml(p.category)} · ${escapeHtml(p.galleryRoom&&p.galleryRoom!=='hallway'?classroomLabel(p.galleryRoom)+' Classroom':'Main Hallway')}${p.audioUrl?' · 🎧':''}${p.videoUrl?' · 🎬':''}</div></div><div class="review-actions"><button class="btn-approve" data-action="approve" data-id="${p.id}">Approve</button><button class="btn-reject" data-action="reject" data-id="${p.id}">Reject</button></div></div>`).join('');list.querySelectorAll('button[data-action]').forEach(btn=>btn.onclick=async()=>{btn.disabled=true;try{btn.dataset.action==='approve'?await dbRef.child(btn.dataset.id).update({status:'approved'}):await dbRef.child(btn.dataset.id).remove()}catch(err){alert('Could not update that project.');btn.disabled=false}});}
 
 /* ---------- lightbox ---------- */
