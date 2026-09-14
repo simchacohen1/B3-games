@@ -13,7 +13,31 @@
 <script src="../firebase-config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.min.js"></script>
 <script>
-  firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+  /* School networks sometimes block one CDN. Try two independent fallbacks
+     before the gallery application starts. */
+  if (!window.THREE) {
+    document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.min.js"><\/script>');
+  }
+</script>
+<script>
+  if (!window.THREE) {
+    document.write('<script src="https://unpkg.com/three@0.160.1/build/three.min.js"><\/script>');
+  }
+</script>
+<script>
+  window.__galleryBootIssue = "";
+  try {
+    if (!window.firebase) {
+      window.__galleryBootIssue = "Firebase could not load on this device or network.";
+    } else if (!window.B3_FIREBASE_CONFIG) {
+      window.__galleryBootIssue = "The gallery Firebase configuration could not load.";
+    } else {
+      firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+    }
+  } catch (err) {
+    console.error("Gallery Firebase startup failed:", err);
+    window.__galleryBootIssue = "The gallery could not connect to Firebase.";
+  }
 </script>
 <style>
 :root{
@@ -194,6 +218,29 @@ button,input,select,textarea{font:inherit}
 <div class="lightbox" id="lightbox"><div class="lightbox-card" id="lightboxContent"></div></div>
 
 <script>
+function showGalleryStartupError(title, detail){
+  let box=document.getElementById('galleryStartupError');
+  if(!box){
+    box=document.createElement('div');
+    box.id='galleryStartupError';
+    box.style.cssText='position:fixed;inset:0;z-index:999999;display:flex;align-items:center;justify-content:center;padding:24px;background:#d0c1b0;font-family:Arial,sans-serif;color:#33281f;';
+    box.innerHTML='<div style="max-width:620px;background:#fffaf1;border-radius:20px;padding:30px 32px;box-shadow:0 18px 55px rgba(0,0,0,.25);text-align:center"><div style="font-size:46px;margin-bottom:8px">🏫</div><h1 id="galleryStartupTitle" style="font-size:26px;margin:0 0 12px"></h1><p id="galleryStartupDetail" style="font-size:17px;line-height:1.5;margin:0 0 18px;color:#665746"></p><button onclick="location.reload()" style="border:0;border-radius:10px;padding:11px 18px;background:#427250;color:white;font-weight:700;cursor:pointer">Try Again</button></div>';
+    document.body.appendChild(box);
+  }
+  document.getElementById('galleryStartupTitle').textContent=title||'The gallery could not start';
+  document.getElementById('galleryStartupDetail').textContent=detail||'Please refresh the page.';
+}
+
+if(window.__galleryBootIssue){
+  setTimeout(()=>showGalleryStartupError('The gallery could not connect',window.__galleryBootIssue),0);
+}
+if(!window.THREE){
+  setTimeout(()=>showGalleryStartupError(
+    'The 3D hallway could not load',
+    'This device or school network blocked the 3D library. Please press Try Again. If it continues, tell Rabbi Cohen.'
+  ),0);
+}
+
 const ROSTERS = {
   'B3 WT': ['Ari Greenberg','Zev Rosenfeld','Levi Schtroks','Yisroel Aryeh Simmonds','Leibel Vogel','Yisroel Arye Leib Wolf'],
   'B3 ET': ['Mayer Chaim Chaikin','Yossi Gourarie','Sholom DovBer Huebner','Moshe Lapine','Kehos Notik','Yisroel Oirechman','Moshe Tuvia Raichman','Avrohom Rosenfeld','Levi Rozmarin','Arik Traxler']
@@ -205,7 +252,7 @@ const CLASSROOMS = [
   {id:'parsha', label:'Parsha', subtitle:'Weekly Parsha'},
   {id:'halacha', label:'Halacha', subtitle:'Halacha & Yahadus'}
 ];
-const dbRef = firebase.database().ref('classGallery/posts');
+const dbRef = window.firebase ? firebase.database().ref('classGallery/posts') : null;
 let posts = [];
 let isTeacher = false;
 let sceneMode = 'hallway';
@@ -230,6 +277,7 @@ populateRoomSelect();
 
 /* ---------- Firebase lock ---------- */
 window.addEventListener('DOMContentLoaded',()=>{
+  if(!window.firebase) return;
   firebase.database().ref('b3Games/siteSettings').on('value',snap=>{
     const settings=snap.val()||{}, games=settings.games||{};
     document.getElementById('masterBlockedOverlay').classList.toggle('show',settings.siteEnabled===false||games['class-gallery']===false);
@@ -828,7 +876,9 @@ document.querySelectorAll('.touch-btn').forEach(btn=>{const key=btn.dataset.move
 setTimeout(()=>document.getElementById('startHelp').classList.add('hide'),5000);
 
 /* ---------- data render ---------- */
-dbRef.on('value',snapshot=>{const data=snapshot.val()||{};posts=Object.keys(data).map(id=>({id,...data[id]}));updatePending();buildScene();if(isTeacher&&document.getElementById('reviewListArea').style.display!=='none')renderReviewList();},err=>console.error('Firebase read failed:',err));
+if(dbRef){
+  dbRef.on('value',snapshot=>{const data=snapshot.val()||{};posts=Object.keys(data).map(id=>({id,...data[id]}));updatePending();buildScene();if(isTeacher&&document.getElementById('reviewListArea').style.display!=='none')renderReviewList();},err=>console.error('Firebase read failed:',err));
+}
 function updatePending(){const n=posts.filter(p=>p.status==='pending').length;const el=document.getElementById('pendingNote');if(n){el.textContent=`${n} waiting`;el.classList.add('show')}else el.classList.remove('show');}
 
 /* ---------- avatar chooser ---------- */
@@ -856,7 +906,17 @@ function renderReviewList(){const pending=posts.filter(p=>p.status==='pending'),
 const lightbox=document.getElementById('lightbox');function openLightbox(post){const box=document.getElementById('lightboxContent');box.innerHTML=`<button class="close-x" id="lightboxClose">&times;</button>${post.image?`<img src="${post.image}" alt="${escapeHtml(post.title)}">`:''}${post.videoUrl?`<video controls src="${escapeHtml(post.videoUrl)}"></video>`:''}${post.audioUrl?`<audio controls src="${escapeHtml(post.audioUrl)}"></audio>`:''}<span class="category">${escapeHtml(post.category)}</span><h2>${escapeHtml(post.title)}</h2><div class="desc">${escapeHtml(post.description)}</div>${post.link?`<a href="${escapeHtml(post.link)}" target="_blank" rel="noopener">Open link →</a>`:''}<div class="by">${escapeHtml(post.studentName)}${post.className?` · ${escapeHtml(post.className)}`:''}</div>${isTeacher?`<div class="teacher-lightbox-actions"><button class="btn-danger" id="deleteProjectBtn">Remove from hallway</button></div>`:''}`;lightbox.classList.add('show');document.getElementById('lightboxClose').onclick=()=>lightbox.classList.remove('show');if(isTeacher)document.getElementById('deleteProjectBtn').onclick=async()=>{if(confirm(`Remove "${post.title}" by ${post.studentName}?`)){await dbRef.child(post.id).remove();lightbox.classList.remove('show')}};}
 lightbox.addEventListener('click',e=>{if(e.target===lightbox)lightbox.classList.remove('show')});
 
-init3D();
+if(window.THREE){
+  try{
+    init3D();
+  }catch(err){
+    console.error('3D gallery startup failed:',err);
+    showGalleryStartupError(
+      'The 3D hallway could not start',
+      (err && err.message ? err.message + ' — ' : '') + 'Please press Try Again. If this keeps happening, tell Rabbi Cohen.'
+    );
+  }
+}
 </script>
 </body>
 </html>
