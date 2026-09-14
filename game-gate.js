@@ -18,6 +18,8 @@
   var SETTINGS_PATH = "b3Games/siteSettings";
   var TIME_ZONE = "America/New_York";
   var POLL_INTERVAL_MS = 5000;
+  var FETCH_TIMEOUT_MS = 4500;
+  var FIRST_LOAD_FAILSAFE_MS = 5500;
 
   var scriptEl = document.currentScript;
   var gameId = scriptEl && (scriptEl.getAttribute("data-game-id") || scriptEl.getAttribute("data-b3-tool-id"));
@@ -65,6 +67,15 @@
   var studentClassId = "";
   var classResolved = false;
   var requestInFlight = false;
+  var firstDecisionMade = false;
+  var firstLoadFailsafe = setTimeout(function () {
+    if (firstDecisionMade) return;
+    console.warn("B3 game gate: first access check is taking too long.");
+    showClosed(
+      "Still checking access…",
+      "The access check is taking longer than expected. This page will keep trying automatically."
+    );
+  }, FIRST_LOAD_FAILSAFE_MS);
 
   function reveal() {
     var el = document.getElementById("b3-gate-hide-style");
@@ -77,12 +88,22 @@
     overlay = null;
   }
 
+  function markFirstDecision() {
+    firstDecisionMade = true;
+    if (firstLoadFailsafe) {
+      clearTimeout(firstLoadFailsafe);
+      firstLoadFailsafe = null;
+    }
+  }
+
   function showOpen() {
+    markFirstDecision();
     reveal();
     removeOverlay();
   }
 
   function showClosed(title, message) {
+    markFirstDecision();
     reveal();
     if (!overlay) {
       overlay = document.createElement("div");
@@ -127,9 +148,32 @@
 
   function fetchJson(url) {
     var sep = url.indexOf("?") >= 0 ? "&" : "?";
-    return fetch(url + sep + "_=" + Date.now(), { cache: "no-store" }).then(function (res) {
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      return res.json();
+    var target = url + sep + "_=" + Date.now();
+
+    // Never allow a Firebase request to hang forever. A hung request used to
+    // leave the entire page hidden because the gate was waiting for a decision.
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      var timer = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        reject(new Error("Access check timed out"));
+      }, FETCH_TIMEOUT_MS);
+
+      fetch(target, { cache: "no-store" }).then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      }).then(function (data) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(data);
+      }).catch(function (err) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(err);
+      });
     });
   }
 
@@ -291,9 +335,12 @@
       // decision instead of suddenly changing access on a brief network error.
       if (lastSettings) decide(lastSettings);
       else {
-        // First-load network failure: do not falsely tell the student the
-        // teacher locked the site. Let the page open and retry shortly.
-        showOpen();
+        // Do not leave the page blank and do not bypass the teacher's access
+        // controls. Show a useful message and retry automatically.
+        showClosed(
+          "Having trouble checking access",
+          "We could not reach the B3 access settings yet. This page will try again automatically in a few seconds."
+        );
       }
     }).finally(function () {
       requestInFlight = false;
