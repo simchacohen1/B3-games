@@ -97,6 +97,24 @@ button,input,select,textarea{font:inherit}
 
 .lightbox-card{max-width:650px;max-height:90vh;overflow:auto}.lightbox-card img{display:block;width:100%;max-height:390px;object-fit:contain;background:#f5efe6;border-radius:9px;margin-bottom:14px}.lightbox-card video{width:100%;border-radius:9px;margin-bottom:12px}.lightbox-card audio{width:100%;margin-bottom:12px}.lightbox-card .category{display:inline-block;background:#315576;color:#fff;border-radius:999px;padding:4px 10px;font-size:.7rem;font-weight:800}.lightbox-card .desc{line-height:1.5;color:#594c3f}.lightbox-card .by{margin-top:13px;font-weight:800;color:#715c46}.lightbox-card a{display:inline-block;margin-top:11px;color:#315f8f;font-weight:800}.teacher-lightbox-actions{margin-top:16px;display:flex;justify-content:flex-end}
 
+
+/* Fast all-posts overview */
+.posts-overview{width:min(1120px,100%);max-height:calc(100vh - 54px);display:flex;flex-direction:column;padding:0;overflow:hidden}
+.posts-overview-head{padding:22px 24px 15px;border-bottom:1px solid #e7dac7;background:#fffdf8;position:sticky;top:0;z-index:2}
+.posts-overview-head h2{margin:0 44px 3px 0}.posts-overview-count{font-size:.76rem;color:#806e5a;font-weight:700}
+.posts-overview-tools{display:grid;grid-template-columns:minmax(180px,1fr) 180px 160px 145px;gap:9px;margin-top:14px}
+.posts-overview-tools input,.posts-overview-tools select{width:100%;border:2px solid #ddcdb6;border-radius:9px;background:#fff;padding:9px 10px;color:#33281f;font-size:.8rem}
+.posts-grid-wrap{overflow:auto;padding:17px 20px 24px;background:#f5efe5}
+.posts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+.post-overview-card{background:#fffdf8;border:1px solid #e1d3c0;border-radius:14px;overflow:hidden;box-shadow:0 5px 15px rgba(67,48,30,.08);display:flex;flex-direction:column;min-height:295px}
+.post-overview-thumb{height:150px;background:#e9e0d3;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+.post-overview-thumb img{width:100%;height:100%;object-fit:cover;display:block}.post-overview-placeholder{font-size:2.8rem;opacity:.76}
+.post-overview-media{position:absolute;right:8px;bottom:8px;padding:4px 7px;border-radius:999px;background:rgba(42,34,27,.75);color:#fff;font-size:.67rem;font-weight:800}
+.post-overview-body{padding:12px 13px 9px;display:flex;flex-direction:column;flex:1}.post-overview-category{font-size:.63rem;font-weight:900;color:#315576;text-transform:uppercase;letter-spacing:.5px}.post-overview-title{margin:4px 0 3px;font-family:'Caveat',cursive;font-size:1.45rem;line-height:1.05;color:#3c5267}.post-overview-student{font-size:.75rem;font-weight:800;color:#614f3e}.post-overview-meta{font-size:.66rem;color:#907d69;margin-top:4px;line-height:1.35}.post-overview-desc{font-size:.7rem;color:#665748;line-height:1.35;margin-top:7px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.post-overview-actions{display:flex;gap:7px;padding:0 13px 13px}.post-overview-actions button{flex:1;border:0;border-radius:9px;padding:8px 7px;font-size:.7rem;font-weight:900;cursor:pointer}.post-open-btn{background:#e9e0d3;color:#4d4034}.post-go-btn{background:#427250;color:#fff}.overview-empty{grid-column:1/-1;text-align:center;padding:45px 18px;color:#897764;font-weight:800}
+@media(max-width:760px){.posts-overview-tools{grid-template-columns:1fr 1fr}.posts-overview{max-height:calc(100vh - 24px)}.posts-grid-wrap{padding:12px}.posts-grid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}}
+@media(max-width:480px){.posts-overview-tools{grid-template-columns:1fr}.posts-grid{grid-template-columns:1fr 1fr}.post-overview-thumb{height:120px}.post-overview-card{min-height:270px}}
+
 /* Avatar chooser: original friendly monster characters. */
 .avatar-modal{width:min(760px,100%)}
 .avatar-intro{margin:-4px 0 16px;color:#6f604f;line-height:1.45}
@@ -143,6 +161,7 @@ button,input,select,textarea{font:inherit}
     <span class="tag-pop" id="tagPop"></span>
     <button class="glass-btn primary" id="openModalBtn">＋ Pin Work</button>
     <button class="glass-btn" id="avatarBtn">Avatar</button>
+    <button class="glass-btn" id="allPostsBtn">All Posts</button>
     <button class="glass-btn" id="teacherReviewBtn">Teacher</button>
     <span class="pending-note" id="pendingNote"></span>
   </div>
@@ -222,6 +241,25 @@ button,input,select,textarea{font:inherit}
       <div class="teacher-live-controls"><div><strong>Tag Game</strong><span id="teacherTagStatus">Students can chase and tag classmates who are in the same gallery space.</span></div><button type="button" id="tagGameToggleBtn">Off</button></div>
       <div id="reviewList"></div>
     </div>
+  </div>
+</div>
+
+
+<!-- Fast All Posts Overview -->
+<div class="overlay" id="postsOverviewOverlay">
+  <div class="modal posts-overview">
+    <div class="posts-overview-head">
+      <button class="close-x" id="closePostsOverviewBtn">&times;</button>
+      <h2>All Current Posts</h2>
+      <div class="posts-overview-count" id="postsOverviewCount">Loading current gallery posts…</div>
+      <div class="posts-overview-tools">
+        <input type="text" id="postsOverviewSearch" placeholder="Search student, title, category…">
+        <select id="postsOverviewStudent"><option value="">All students</option></select>
+        <select id="postsOverviewCategory"><option value="">All categories</option></select>
+        <select id="postsOverviewSort"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="student">Student A–Z</option></select>
+      </div>
+    </div>
+    <div class="posts-grid-wrap"><div class="posts-grid" id="postsOverviewGrid"></div></div>
   </div>
 </div>
 
@@ -1140,7 +1178,7 @@ setTimeout(()=>document.getElementById('startHelp').classList.add('hide'),5000);
 
 /* ---------- data render ---------- */
 if(dbRef){
-  dbRef.on('value',snapshot=>{const data=snapshot.val()||{};posts=Object.keys(data).map(id=>({id,...data[id]}));updatePending();buildScene();refreshRemoteAvatars();if(isTeacher&&document.getElementById('reviewListArea').style.display!=='none')renderReviewList();},err=>console.error('Firebase read failed:',err));
+  dbRef.on('value',snapshot=>{const data=snapshot.val()||{};posts=Object.keys(data).map(id=>({id,...data[id]}));updatePending();buildScene();refreshRemoteAvatars();if(isTeacher&&document.getElementById('reviewListArea').style.display!=='none')renderReviewList();if(document.getElementById('postsOverviewOverlay')?.classList.contains('show'))renderPostsOverview();},err=>console.error('Firebase read failed:',err));
 }
 function updatePending(){const n=posts.filter(p=>p.status==='pending').length;const el=document.getElementById('pendingNote');if(n){el.textContent=`${n} waiting`;el.classList.add('show')}else el.classList.remove('show');}
 
@@ -1166,6 +1204,66 @@ document.getElementById('livePresenceToggleBtn').onclick=async()=>{if(!isTeacher
 document.getElementById('tagGameToggleBtn').onclick=async()=>{if(!isTeacher||!tagSettingsRef)return;const btn=document.getElementById('tagGameToggleBtn'),next=!tagGameEnabled;btn.disabled=true;try{if(next&&tagRoot)await Promise.all(['et','wt'].map(c=>tagRoot.child(c).remove()));await tagSettingsRef.set(next)}catch(err){alert('Could not change Tag right now.');console.error(err)}finally{btn.disabled=false}};
 function showReviewList(){document.getElementById('reviewLoginArea').style.display='none';document.getElementById('reviewListArea').style.display='block';updateLivePresenceToggle();updateTagGameToggle();startTeacherPresenceMonitor();renderReviewList();}
 function renderReviewList(){const pending=posts.filter(p=>p.status==='pending'),list=document.getElementById('reviewList');if(!pending.length){list.innerHTML='<div class="empty-review">No projects waiting for review.</div>';return;}list.innerHTML=pending.map(p=>`<div class="review-item">${p.image?`<img src="${p.image}" alt="">`:''}<div class="info"><h4>${escapeHtml(p.title)}</h4><p>${escapeHtml(p.description).slice(0,100)}</p><div class="meta">${escapeHtml(p.studentName)} · ${escapeHtml(p.category)} · ${escapeHtml(p.galleryRoom&&p.galleryRoom!=='hallway'?classroomLabel(p.galleryRoom)+' Classroom':'Main Hallway')}${p.audioUrl?' · 🎧':''}${p.videoUrl?' · 🎬':''}</div></div><div class="review-actions"><button class="btn-approve" data-action="approve" data-id="${p.id}">Approve</button><button class="btn-reject" data-action="reject" data-id="${p.id}">Reject</button></div></div>`).join('');list.querySelectorAll('button[data-action]').forEach(btn=>btn.onclick=async()=>{btn.disabled=true;try{btn.dataset.action==='approve'?await dbRef.child(btn.dataset.id).update({status:'approved'}):await dbRef.child(btn.dataset.id).remove()}catch(err){alert('Could not update that project.');btn.disabled=false}});}
+
+
+/* ---------- fast all-posts overview ---------- */
+const postsOverviewOverlay=document.getElementById('postsOverviewOverlay');
+const postsOverviewGrid=document.getElementById('postsOverviewGrid');
+const postsOverviewSearch=document.getElementById('postsOverviewSearch');
+const postsOverviewStudent=document.getElementById('postsOverviewStudent');
+const postsOverviewCategory=document.getElementById('postsOverviewCategory');
+const postsOverviewSort=document.getElementById('postsOverviewSort');
+function approvedCurrentPosts(){return posts.filter(p=>p.status==='approved');}
+function postDateLabel(value){if(!value)return '';const d=new Date(value);return Number.isNaN(d.getTime())?'':d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}
+function postLocationLabel(post){if(post.galleryRoom&&post.galleryRoom!=='hallway')return classroomLabel(post.galleryRoom)+' Classroom';return 'Main Hallway';}
+function overviewPlaceholder(post){return post.category==='Chumash'?'📖':post.category==='Parsha'?'✨':post.category==='Halacha'?'⚖️':'📝';}
+function refreshOverviewFilters(){
+  const approved=approvedCurrentPosts();
+  const currentStudent=postsOverviewStudent.value,currentCategory=postsOverviewCategory.value;
+  const students=[...new Set(approved.map(p=>p.studentName).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const categories=[...new Set(approved.map(p=>p.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  postsOverviewStudent.innerHTML='<option value="">All students</option>'+students.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  postsOverviewCategory.innerHTML='<option value="">All categories</option>'+categories.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  if(students.includes(currentStudent))postsOverviewStudent.value=currentStudent;
+  if(categories.includes(currentCategory))postsOverviewCategory.value=currentCategory;
+}
+function renderPostsOverview(){
+  refreshOverviewFilters();
+  const q=postsOverviewSearch.value.trim().toLowerCase(),student=postsOverviewStudent.value,category=postsOverviewCategory.value,sort=postsOverviewSort.value;
+  let visible=approvedCurrentPosts().filter(p=>{
+    if(student&&p.studentName!==student)return false;if(category&&p.category!==category)return false;
+    if(q){const hay=[p.studentName,p.title,p.category,p.description,p.className,postLocationLabel(p)].join(' ').toLowerCase();if(!hay.includes(q))return false;}return true;
+  });
+  visible.sort((a,b)=>sort==='oldest'?String(a.createdAt||'').localeCompare(String(b.createdAt||'')):sort==='student'?String(a.studentName||'').localeCompare(String(b.studentName||''))||String(b.createdAt||'').localeCompare(String(a.createdAt||'')):String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const total=approvedCurrentPosts().length;document.getElementById('postsOverviewCount').textContent=visible.length===total?`${total} current post${total===1?'':'s'}`:`Showing ${visible.length} of ${total} current posts`;
+  if(!visible.length){postsOverviewGrid.innerHTML='<div class="overview-empty">No current posts match those filters.</div>';return;}
+  postsOverviewGrid.innerHTML=visible.map(post=>{
+    const media=[post.videoUrl?'🎬':'',post.audioUrl?'🎧':'',post.link?'🔗':''].filter(Boolean).join(' ');
+    return `<article class="post-overview-card" data-post-id="${escapeHtml(post.id)}"><div class="post-overview-thumb">${post.image?`<img src="${escapeHtml(post.image)}" alt="">`:`<div class="post-overview-placeholder">${overviewPlaceholder(post)}</div>`}${media?`<span class="post-overview-media">${media}</span>`:''}</div><div class="post-overview-body"><div class="post-overview-category">${escapeHtml(post.category||'Other')}</div><div class="post-overview-title">${escapeHtml(post.title||'Untitled')}</div><div class="post-overview-student">${escapeHtml(post.studentName||'')}</div><div class="post-overview-meta">${escapeHtml(postLocationLabel(post))}${postDateLabel(post.createdAt)?` · ${escapeHtml(postDateLabel(post.createdAt))}`:''}</div>${post.description?`<div class="post-overview-desc">${escapeHtml(post.description)}</div>`:''}</div><div class="post-overview-actions"><button type="button" class="post-open-btn" data-overview-action="open">Open</button><button type="button" class="post-go-btn" data-overview-action="go">Go There</button></div></article>`;
+  }).join('');
+}
+function openPostsOverview(){renderPostsOverview();postsOverviewOverlay.classList.add('show');postsOverviewSearch.focus();}
+function closePostsOverview(){postsOverviewOverlay.classList.remove('show');}
+function focusCurrentScenePost(post){
+  const mesh=projectMeshes.find(m=>m.userData?.postId===post.id);if(!mesh)return false;
+  const target=mesh.userData.navTarget;if(!target){openLightbox(post);return true;}
+  const endX=target.side?target.side*.62:avatarState.x,distance=Math.hypot(endX-avatarState.x,target.z-avatarState.z);
+  if(distance<3){openLightbox(post);}else navigateTo(target,()=>openLightbox(post));return true;
+}
+function jumpToOverviewPost(post){
+  if(!post)return;closePostsOverview();lightbox.classList.remove('show');
+  const roomId=post.galleryRoom&&post.galleryRoom!=='hallway'?post.galleryRoom:'';
+  if(roomId&&CLASSROOMS.some(r=>r.id===roomId)){
+    enterClassroom(roomId);if(!focusCurrentScenePost(post)&&post.studentName){enterStudentGallery(post.studentName);focusCurrentScenePost(post);}return;
+  }
+  sceneMode='hallway';activeClassroomId=null;activeStudentName=null;navTween=null;viewYaw=0;buildScene();refreshRemoteAvatars();syncLivePresence(true);
+  if(!focusCurrentScenePost(post)&&post.studentName){enterStudentGallery(post.studentName);focusCurrentScenePost(post);}
+}
+document.getElementById('allPostsBtn').onclick=openPostsOverview;
+document.getElementById('closePostsOverviewBtn').onclick=closePostsOverview;
+postsOverviewOverlay.addEventListener('click',e=>{if(e.target===postsOverviewOverlay)closePostsOverview();});
+[postsOverviewSearch,postsOverviewStudent,postsOverviewCategory,postsOverviewSort].forEach(el=>el.addEventListener(el.tagName==='INPUT'?'input':'change',renderPostsOverview));
+postsOverviewGrid.addEventListener('click',e=>{const btn=e.target.closest('button[data-overview-action]');if(!btn)return;const card=btn.closest('[data-post-id]'),post=posts.find(p=>p.id===card?.dataset.postId&&p.status==='approved');if(!post)return;if(btn.dataset.overviewAction==='open')openLightbox(post);else jumpToOverviewPost(post);});
 
 /* ---------- lightbox ---------- */
 const lightbox=document.getElementById('lightbox');function openLightbox(post){const box=document.getElementById('lightboxContent');box.innerHTML=`<button class="close-x" id="lightboxClose">&times;</button>${post.image?`<img src="${post.image}" alt="${escapeHtml(post.title)}">`:''}${post.videoUrl?`<video controls src="${escapeHtml(post.videoUrl)}"></video>`:''}${post.audioUrl?`<audio controls src="${escapeHtml(post.audioUrl)}"></audio>`:''}<span class="category">${escapeHtml(post.category)}</span><h2>${escapeHtml(post.title)}</h2><div class="desc">${escapeHtml(post.description)}</div>${post.link?`<a href="${escapeHtml(post.link)}" target="_blank" rel="noopener">Open link →</a>`:''}<div class="by">${escapeHtml(post.studentName)}${post.className?` · ${escapeHtml(post.className)}`:''}</div>${isTeacher?`<div class="teacher-lightbox-actions"><button class="btn-danger" id="deleteProjectBtn">Remove from hallway</button></div>`:''}`;lightbox.classList.add('show');document.getElementById('lightboxClose').onclick=()=>lightbox.classList.remove('show');if(isTeacher)document.getElementById('deleteProjectBtn').onclick=async()=>{if(confirm(`Remove "${post.title}" by ${post.studentName}?`)){await dbRef.child(post.id).remove();lightbox.classList.remove('show')}};}
