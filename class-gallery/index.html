@@ -66,6 +66,7 @@ button,input,select,textarea{font:inherit}
 .pending-note.show{display:block}
 .online-note{display:none;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.72);background:rgba(45,36,27,.64);color:#fffdf6;border-radius:999px;padding:9px 13px;font-size:.72rem;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.18);backdrop-filter:blur(9px);white-space:nowrap}
 .online-note.show{display:flex}.online-dot{width:8px;height:8px;border-radius:50%;background:#78df8c;box-shadow:0 0 0 3px rgba(120,223,140,.18)}
+.tag-hud{display:none;position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:31;align-items:center;gap:9px;padding:10px 16px;border-radius:999px;background:rgba(116,45,36,.91);color:#fff9ee;font-size:.78rem;font-weight:900;letter-spacing:.02em;box-shadow:0 8px 26px rgba(0,0,0,.24);backdrop-filter:blur(10px);pointer-events:none}.tag-hud.show{display:flex}.tag-hud.safe{background:rgba(53,87,62,.9)}.tag-hud .tag-icon{font-size:1rem}.tag-pop{position:fixed;left:50%;top:66px;transform:translateX(-50%) translateY(-8px);z-index:32;opacity:0;pointer-events:none;background:#fff8e9;color:#4b3728;border:1px solid rgba(95,65,43,.18);border-radius:13px;padding:10px 16px;font-weight:900;font-size:.82rem;box-shadow:0 10px 30px rgba(0,0,0,.2);transition:.18s ease}.tag-pop.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 .start-help{position:fixed;left:50%;bottom:24px;z-index:35;transform:translateX(-50%);padding:9px 16px;border-radius:999px;background:rgba(255,253,248,.84);color:#4b4034;font-size:.76rem;font-weight:800;box-shadow:0 6px 22px rgba(0,0,0,.14);backdrop-filter:blur(10px);pointer-events:none;transition:opacity .65s ease,transform .65s ease}
 .start-help.hide{opacity:0;transform:translate(-50%,18px)}
@@ -92,7 +93,7 @@ button,input,select,textarea{font:inherit}
 .btn-primary{background:#427250;color:#fff}.btn-secondary{background:#ebe3d7;color:#4c4034}.btn-danger{background:#b44f47;color:#fff}.btn-primary:disabled{opacity:.55;cursor:not-allowed}
 .status-msg{min-height:18px;margin-top:9px;font-size:.8rem;font-weight:800}
 .review-item{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #eadfce}.review-item:last-child{border-bottom:0}.review-item img{width:72px;height:72px;object-fit:cover;border-radius:8px}.review-item .info{min-width:0;flex:1}.review-item h4{margin:0 0 3px;font-family:'Caveat';font-size:1.35rem}.review-item p{font-size:.78rem;margin:0;color:#67594b}.review-item .meta{font-size:.7rem;color:#8a7763;margin-top:4px}.review-actions{display:flex;flex-direction:column;gap:6px}.review-actions button{border:0;border-radius:8px;padding:7px 10px;color:#fff;font-size:.72rem;font-weight:800;cursor:pointer}.btn-approve{background:#477b55}.btn-reject{background:#b34e47}.empty-review{padding:20px;text-align:center;color:#8c7b69}
-.teacher-live-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;margin-bottom:10px;border-radius:12px;background:#f3ecdf;border:1px solid #e4d7c4}.teacher-live-controls strong{display:block;font-size:.82rem}.teacher-live-controls span{display:block;font-size:.7rem;color:#7a6855;margin-top:2px}.teacher-live-controls button{border:0;border-radius:999px;padding:8px 13px;color:white;font-size:.72rem;font-weight:800;cursor:pointer;background:#477b55}.teacher-live-controls button.off{background:#a64d47}
+.teacher-live-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;margin-bottom:10px;border-radius:12px;background:#f3ecdf;border:1px solid #e4d7c4}.teacher-live-controls strong{display:block;font-size:.82rem}.teacher-live-controls span{display:block;font-size:.7rem;color:#7a6855;margin-top:2px}.teacher-live-controls button{border:0;border-radius:999px;padding:8px 13px;color:white;font-size:.72rem;font-weight:800;cursor:pointer;background:#477b55}.teacher-live-controls button.off{background:#a64d47}.teacher-live-controls button.tag-on{background:#9b4f34}
 
 .lightbox-card{max-width:650px;max-height:90vh;overflow:auto}.lightbox-card img{display:block;width:100%;max-height:390px;object-fit:contain;background:#f5efe6;border-radius:9px;margin-bottom:14px}.lightbox-card video{width:100%;border-radius:9px;margin-bottom:12px}.lightbox-card audio{width:100%;margin-bottom:12px}.lightbox-card .category{display:inline-block;background:#315576;color:#fff;border-radius:999px;padding:4px 10px;font-size:.7rem;font-weight:800}.lightbox-card .desc{line-height:1.5;color:#594c3f}.lightbox-card .by{margin-top:13px;font-weight:800;color:#715c46}.lightbox-card a{display:inline-block;margin-top:11px;color:#315f8f;font-weight:800}.teacher-lightbox-actions{margin-top:16px;display:flex;justify-content:flex-end}
 
@@ -138,6 +139,8 @@ button,input,select,textarea{font:inherit}
   <div class="center-reticle" aria-hidden="true"></div>
   <div class="top-controls">
     <span class="online-note" id="onlineNote"><span class="online-dot"></span><span id="onlineText">Just you online</span></span>
+    <span class="tag-hud" id="tagHud"><span class="tag-icon">🏷️</span><span id="tagHudText">Tag game</span></span>
+    <span class="tag-pop" id="tagPop"></span>
     <button class="glass-btn primary" id="openModalBtn">＋ Pin Work</button>
     <button class="glass-btn" id="avatarBtn">Avatar</button>
     <button class="glass-btn" id="teacherReviewBtn">Teacher</button>
@@ -216,6 +219,7 @@ button,input,select,textarea{font:inherit}
     </div>
     <div id="reviewListArea" style="display:none;">
       <div class="teacher-live-controls"><div><strong>Live Classmates</strong><span id="teacherOnlineNames">No students online right now.</span></div><button type="button" id="livePresenceToggleBtn">On</button></div>
+      <div class="teacher-live-controls"><div><strong>Tag Game</strong><span id="teacherTagStatus">Students can chase and tag classmates who are in the same gallery space.</span></div><button type="button" id="tagGameToggleBtn">Off</button></div>
       <div id="reviewList"></div>
     </div>
   </div>
@@ -336,17 +340,29 @@ const presenceSessionId=sessionStorage.getItem('classGalleryPresenceSession')||(
 sessionStorage.setItem('classGalleryPresenceSession',presenceSessionId);
 const presenceRoot=window.firebase?firebase.database().ref('b3Games/classGalleryPresence'):null;
 const presenceSettingsRef=window.firebase?firebase.database().ref('b3Games/classGalleryPresenceSettings/liveEnabled'):null;
+const tagSettingsRef=window.firebase?firebase.database().ref('b3Games/classGalleryPresenceSettings/tagEnabled'):null;
+const tagRoot=window.firebase?firebase.database().ref('b3Games/classGalleryTag'):null;
 let livePresenceEnabled=true,presenceStarted=false,presenceOwnRef=null,presenceClassRef=null,presenceValueHandler=null;
 let presenceHeartbeat=null,lastPresenceWrite=0,lastPresencePayload='';
 let remoteAvatarsGroup=null,remoteAvatars=new Map(),latestPresenceStudents=new Map();
 let teacherPresenceRef=null,teacherPresenceHandler=null;
 let teacherPresenceViewer=localStorage.getItem('b3TeacherBypass')==='1';
+let tagGameEnabled=false,tagClassRef=null,tagStateHandler=null,tagState={};
+let tagAttemptBusy=false,lastTagAttemptAt=0,lastSeenTagEvent='',tagPopTimer=null;
+const TAG_DISTANCE=1.18,TAG_GRACE_MS=3000;
 
 if(presenceSettingsRef){
   presenceSettingsRef.on('value',snap=>{
     livePresenceEnabled=snap.val()!==false;updateLivePresenceToggle();
     if(livePresenceEnabled)startLivePresence();else stopLivePresence(true);
   },err=>console.warn('Could not read live classmates setting',err));
+}
+if(tagSettingsRef){
+  tagSettingsRef.on('value',snap=>{
+    tagGameEnabled=snap.val()===true;updateTagGameToggle();
+    if(tagGameEnabled)startTagState();else stopTagState();
+    refreshRemoteAvatars();updateTagHud();
+  },err=>console.warn('Could not read Tag setting',err));
 }
 window.addEventListener('pagehide',()=>{if(presenceOwnRef)presenceOwnRef.remove().catch(()=>{});});
 
@@ -365,11 +381,29 @@ function makeCorkTexture(){
 }
 function addBox(parent,w,h,d,mat,x,y,z,cast=true,receive=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=cast;m.receiveShadow=receive;parent.add(m);return m;}
 
+function createHallwayRenderer(){
+  // A high-performance GPU request can be rejected even when ordinary WebGL works.
+  // Retry with fewer demands before reporting that the browser cannot start 3D.
+  const options=[
+    {antialias:true},
+    {antialias:false,powerPreference:'low-power'},
+    {antialias:false}
+  ];
+  let lastError;
+  for(const option of options){
+    try{return new THREE.WebGLRenderer(option)}
+    catch(err){lastError=err;console.warn('Hallway WebGL attempt failed:',option,err)}
+  }
+  throw new Error('This browser could not create a WebGL context after three attempts. '+
+    'Please close other 3D tabs and press Try Again. If it still fails, tell Rabbi Cohen.'+
+    (lastError?.message?' ('+lastError.message+')':''));
+}
+
 function init3D(){
   const host=document.getElementById('threeHost');
   scene=new THREE.Scene();scene.background=new THREE.Color(0xe9dfd0);scene.fog=new THREE.Fog(0xe9dfd0,46,155);
   camera=new THREE.PerspectiveCamera(56,innerWidth/innerHeight,.05,220);
-  renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;host.appendChild(renderer.domElement);
+  renderer=createHallwayRenderer();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;host.appendChild(renderer.domElement);
   clock=new THREE.Clock();
   scene.add(new THREE.HemisphereLight(0xfff6e5,0x7a695b,1.25));
   const sun=new THREE.DirectionalLight(0xffeed0,1.05);sun.position.set(2,9,6);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-16;sun.shadow.camera.right=16;sun.shadow.camera.top=24;sun.shadow.camera.bottom=-24;scene.add(sun);
@@ -833,6 +867,68 @@ function updateLivePresenceToggle(){
   const btn=document.getElementById('livePresenceToggleBtn');if(!btn)return;
   btn.textContent=livePresenceEnabled?'On':'Off';btn.classList.toggle('off',!livePresenceEnabled);btn.setAttribute('aria-pressed',String(livePresenceEnabled));
 }
+function updateTagGameToggle(){
+  const btn=document.getElementById('tagGameToggleBtn');if(btn){btn.textContent=tagGameEnabled?'On':'Off';btn.classList.toggle('off',!tagGameEnabled);btn.classList.toggle('tag-on',tagGameEnabled);btn.setAttribute('aria-pressed',String(tagGameEnabled));}
+  const status=document.getElementById('teacherTagStatus');if(status)status.textContent=tagGameEnabled?'Tag is ON. Each class has its own game; the student marked IT can tag a nearby classmate.':'Students can chase and tag classmates who are in the same gallery space.';
+}
+function currentTagStudentKey(){return presenceProfile?presenceStudentId:'';}
+function showTagPop(message){
+  const el=document.getElementById('tagPop');if(!el||!message)return;el.textContent=message;el.classList.add('show');
+  if(tagPopTimer)clearTimeout(tagPopTimer);tagPopTimer=setTimeout(()=>el.classList.remove('show'),2100);
+}
+function updateTagHud(){
+  const hud=document.getElementById('tagHud'),txt=document.getElementById('tagHudText');if(!hud||!txt)return;
+  const active=tagGameEnabled&&livePresenceEnabled&&presenceProfile&&!teacherPresenceViewer;
+  if(!active){hud.classList.remove('show','safe');return;}
+  const itId=String(tagState.itStudentId||'');
+  if(!itId){txt.textContent='Tag: waiting for another classmate';hud.classList.add('show','safe');return;}
+  const iAmIt=itId===currentTagStudentKey();hud.classList.add('show');hud.classList.toggle('safe',!iAmIt);
+  if(iAmIt){const immuneUntil=safePresenceNumber(tagState.immunityUntil,0),remain=Math.max(0,immuneUntil-Date.now());txt.textContent=remain>0?'YOU’RE IT! Get ready…':'YOU’RE IT! Chase a classmate!';}
+  else{const known=PRESENCE_STUDENTS[itId];txt.textContent=`Tag: ${known?.name||'A classmate'} is IT`;}
+}
+function makeItSprite(){
+  const c=document.createElement('canvas');c.width=300;c.height=120;const ctx=c.getContext('2d');
+  ctx.fillStyle='rgba(164,67,48,.97)';roundedRect(ctx,45,12,210,86,34);ctx.fill();ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=5;ctx.stroke();
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='900 48px Quicksand, sans-serif';ctx.fillStyle='#fff9ec';ctx.fillText('IT!',150,55);
+  const tex=makeTexture(c),mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false});const sp=new THREE.Sprite(mat);sp.scale.set(1.35,.54,1);sp.position.set(0,2.86,0);sp.userData.tagMarker=true;return sp;
+}
+function setRemoteItMarker(entry,isIt){
+  if(!entry?.group)return;let marker=entry.group.children.find(ch=>ch.userData?.tagMarker);
+  if(isIt&&!marker)entry.group.add(makeItSprite());else if(!isIt&&marker){entry.group.remove(marker);if(marker.material?.map)marker.material.map.dispose?.();marker.material?.dispose?.();}
+}
+function stopTagState(){
+  if(tagClassRef&&tagStateHandler)tagClassRef.off('value',tagStateHandler);tagClassRef=null;tagStateHandler=null;tagState={};tagAttemptBusy=false;lastSeenTagEvent='';updateTagHud();
+  remoteAvatars.forEach(entry=>setRemoteItMarker(entry,false));
+}
+function startTagState(){
+  if(!tagGameEnabled||!tagRoot||!presenceProfile||teacherPresenceViewer)return;
+  const wanted=tagRoot.child(presenceProfile.classId);if(tagClassRef&&tagClassRef.toString()===wanted.toString())return;
+  stopTagState();tagClassRef=wanted;tagStateHandler=snap=>{
+    const prevEvent=lastSeenTagEvent;tagState=snap.val()||{};const evt=tagState.lastTag||{};const eventKey=`${evt.at||''}:${evt.from||''}:${evt.to||''}`;
+    if(eventKey&&eventKey!==prevEvent){lastSeenTagEvent=eventKey;if(evt.to===presenceStudentId)showTagPop('You were tagged — now YOU’RE IT!');else if(evt.from===presenceStudentId){const n=PRESENCE_STUDENTS[evt.to]?.name||'your classmate';showTagPop(`You tagged ${n}!`);}else if(evt.to&&evt.from){const a=PRESENCE_STUDENTS[evt.from]?.name||'Someone',b=PRESENCE_STUDENTS[evt.to]?.name||'a classmate';showTagPop(`${a} tagged ${b}!`);}}
+    ensureTagItPlayer();refreshRemoteAvatars();updateTagHud();
+  };tagClassRef.on('value',tagStateHandler,err=>console.warn('Tag game unavailable',err));
+}
+function onlineTagCandidates(){
+  const candidates=[];if(presenceProfile)candidates.push(presenceStudentId);
+  latestPresenceStudents.forEach((data,id)=>{if(data.classId===presenceProfile?.classId)candidates.push(id);});
+  return [...new Set(candidates)].filter(id=>PRESENCE_STUDENTS[id]&&id!=='simcha_cohen').sort();
+}
+function ensureTagItPlayer(){
+  if(!tagGameEnabled||!tagClassRef||tagAttemptBusy)return;
+  const candidates=onlineTagCandidates();if(candidates.length<2)return;
+  const current=String(tagState.itStudentId||'');if(current&&candidates.includes(current))return;
+  const elected=candidates[0];if(presenceStudentId!==elected)return;
+  tagAttemptBusy=true;tagClassRef.transaction(cur=>{cur=cur||{};const curIt=String(cur.itStudentId||'');if(curIt&&candidates.includes(curIt))return;return {...cur,itStudentId:elected,immunityUntil:Date.now()+1500,startedAt:firebase.database.ServerValue.TIMESTAMP,lastTag:null};},()=>{tagAttemptBusy=false;});
+}
+function maybeTagNearbyClassmate(){
+  if(!tagGameEnabled||!tagClassRef||tagAttemptBusy||tagState.itStudentId!==presenceStudentId)return;
+  const now=Date.now();if(now<safePresenceNumber(tagState.immunityUntil,0)||now-lastTagAttemptAt<500)return;
+  const space=currentPresenceSpace();let targetId=null,best=TAG_DISTANCE;
+  latestPresenceStudents.forEach((data,id)=>{if(data.space!==space)return;const entry=remoteAvatars.get(id);if(!entry?.group?.visible)return;const d=Math.hypot(entry.group.position.x-avatarState.x,entry.group.position.z-avatarState.z);if(d<best){best=d;targetId=id;}});
+  if(!targetId)return;lastTagAttemptAt=now;tagAttemptBusy=true;
+  tagClassRef.transaction(cur=>{cur=cur||{};if(cur.itStudentId!==presenceStudentId||Date.now()<safePresenceNumber(cur.immunityUntil,0))return;return {...cur,itStudentId:targetId,immunityUntil:Date.now()+TAG_GRACE_MS,lastTag:{from:presenceStudentId,to:targetId,at:firebase.database.ServerValue.TIMESTAMP}};},()=>{tagAttemptBusy=false;});
+}
 function startTeacherPresenceMonitor(){
   if(!presenceRoot||teacherPresenceRef)return;
   teacherPresenceRef=presenceRoot;teacherPresenceHandler=snapshot=>{
@@ -881,9 +977,9 @@ function refreshRemoteAvatars(){
     entry.targetX=Math.max(moveMinX,Math.min(moveMaxX,safePresenceNumber(data.x)));
     entry.targetZ=Math.max(hallMinZ+1.1,Math.min(hallMaxZ-1.1,safePresenceNumber(data.z)));
     entry.targetAngle=safePresenceNumber(data.angle,Math.PI);entry.walking=!!data.walking;
-    entry.group.visible=data.space===activeSpace;
+    entry.group.visible=data.space===activeSpace;setRemoteItMarker(entry,tagGameEnabled&&tagState.itStudentId===studentId);
   });
-  updateOnlineBadge();
+  updateOnlineBadge();ensureTagItPlayer();updateTagHud();
 }
 function handlePresenceSnapshot(snapshot){latestPresenceStudents=latestStudentSessions(snapshot.val()||{});refreshRemoteAvatars();}
 function syncLivePresence(force=false){
@@ -989,7 +1085,7 @@ function updateAvatar(dt){
   camera.position.lerp(pose.position,1-Math.pow(.0002,dt));camera.lookAt(pose.look);
   syncLivePresence(false);
 }
-function animate(){requestAnimationFrame(animate);const dt=Math.min(.04,clock.getDelta());updateAvatar(dt);updateRemoteAvatars(dt);renderer.render(scene,camera);}
+function animate(){requestAnimationFrame(animate);const dt=Math.min(.04,clock.getDelta());updateAvatar(dt);updateRemoteAvatars(dt);maybeTagNearbyClassmate();updateTagHud();renderer.render(scene,camera);}
 function onResize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);}
 
 function onPointerDown(e){dragging=true;dragStartX=dragLastX=e.clientX;dragMoved=0;pointerDownAt=performance.now();renderer.domElement.setPointerCapture?.(e.pointerId);}
@@ -1067,7 +1163,8 @@ document.getElementById('projectForm').addEventListener('submit',async e=>{
 const reviewOverlay=document.getElementById('reviewOverlay');document.getElementById('teacherReviewBtn').onclick=()=>{reviewOverlay.classList.add('show');isTeacher?showReviewList():(document.getElementById('reviewLoginArea').style.display='block',document.getElementById('reviewListArea').style.display='none')};document.getElementById('closeReviewBtn').onclick=()=>reviewOverlay.classList.remove('show');reviewOverlay.addEventListener('click',e=>{if(e.target===reviewOverlay)reviewOverlay.classList.remove('show')});
 document.getElementById('loginSubmitBtn').onclick=()=>{const val=document.getElementById('teacherPasscode').value,stat=document.getElementById('loginStatus');if(val===TEACHER_PASSCODE){isTeacher=true;enableTeacherPresenceView();document.getElementById('teacherPasscode').value='';stat.textContent='';showReviewList()}else{stat.textContent='Incorrect passcode.';stat.style.color='#b34e47'}};
 document.getElementById('livePresenceToggleBtn').onclick=async()=>{if(!isTeacher||!presenceSettingsRef)return;const btn=document.getElementById('livePresenceToggleBtn');btn.disabled=true;try{await presenceSettingsRef.set(!livePresenceEnabled)}catch(err){alert('Could not change Live Classmates right now.');console.error(err)}finally{btn.disabled=false}};
-function showReviewList(){document.getElementById('reviewLoginArea').style.display='none';document.getElementById('reviewListArea').style.display='block';updateLivePresenceToggle();startTeacherPresenceMonitor();renderReviewList();}
+document.getElementById('tagGameToggleBtn').onclick=async()=>{if(!isTeacher||!tagSettingsRef)return;const btn=document.getElementById('tagGameToggleBtn'),next=!tagGameEnabled;btn.disabled=true;try{if(next&&tagRoot)await Promise.all(['et','wt'].map(c=>tagRoot.child(c).remove()));await tagSettingsRef.set(next)}catch(err){alert('Could not change Tag right now.');console.error(err)}finally{btn.disabled=false}};
+function showReviewList(){document.getElementById('reviewLoginArea').style.display='none';document.getElementById('reviewListArea').style.display='block';updateLivePresenceToggle();updateTagGameToggle();startTeacherPresenceMonitor();renderReviewList();}
 function renderReviewList(){const pending=posts.filter(p=>p.status==='pending'),list=document.getElementById('reviewList');if(!pending.length){list.innerHTML='<div class="empty-review">No projects waiting for review.</div>';return;}list.innerHTML=pending.map(p=>`<div class="review-item">${p.image?`<img src="${p.image}" alt="">`:''}<div class="info"><h4>${escapeHtml(p.title)}</h4><p>${escapeHtml(p.description).slice(0,100)}</p><div class="meta">${escapeHtml(p.studentName)} · ${escapeHtml(p.category)} · ${escapeHtml(p.galleryRoom&&p.galleryRoom!=='hallway'?classroomLabel(p.galleryRoom)+' Classroom':'Main Hallway')}${p.audioUrl?' · 🎧':''}${p.videoUrl?' · 🎬':''}</div></div><div class="review-actions"><button class="btn-approve" data-action="approve" data-id="${p.id}">Approve</button><button class="btn-reject" data-action="reject" data-id="${p.id}">Reject</button></div></div>`).join('');list.querySelectorAll('button[data-action]').forEach(btn=>btn.onclick=async()=>{btn.disabled=true;try{btn.dataset.action==='approve'?await dbRef.child(btn.dataset.id).update({status:'approved'}):await dbRef.child(btn.dataset.id).remove()}catch(err){alert('Could not update that project.');btn.disabled=false}});}
 
 /* ---------- lightbox ---------- */
