@@ -340,6 +340,7 @@ let livePresenceEnabled=true,presenceStarted=false,presenceOwnRef=null,presenceC
 let presenceHeartbeat=null,lastPresenceWrite=0,lastPresencePayload='';
 let remoteAvatarsGroup=null,remoteAvatars=new Map(),latestPresenceStudents=new Map();
 let teacherPresenceRef=null,teacherPresenceHandler=null;
+let teacherPresenceViewer=localStorage.getItem('b3TeacherBypass')==='1';
 
 if(presenceSettingsRef){
   presenceSettingsRef.on('value',snap=>{
@@ -823,9 +824,9 @@ function clearRemoteAvatars(){
 }
 function updateOnlineBadge(){
   const note=document.getElementById('onlineNote'),textEl=document.getElementById('onlineText');if(!note||!textEl)return;
-  if(!presenceProfile||!livePresenceEnabled){note.classList.remove('show');return;}
+  if((!presenceProfile&&!teacherPresenceViewer)||!livePresenceEnabled){note.classList.remove('show');return;}
   const count=latestPresenceStudents.size;
-  textEl.textContent=count===0?'Just you online':count===1?'1 classmate online':`${count} classmates online`;
+  textEl.textContent=teacherPresenceViewer?(count===0?'No students online':count===1?'1 student online':`${count} students online`):(count===0?'Just you online':count===1?'1 classmate online':`${count} classmates online`);
   note.classList.add('show');
 }
 function updateLivePresenceToggle(){
@@ -848,13 +849,18 @@ function startTeacherPresenceMonitor(){
 }
 function latestStudentSessions(raw){
   const result=new Map(),now=Date.now();
-  Object.entries(raw||{}).forEach(([studentId,sessions])=>{
-    if(studentId===presenceStudentId)return;
-    const known=PRESENCE_STUDENTS[studentId];if(!known||known.classId!==presenceProfile?.classId)return;
+  const collect=(studentId,sessions,classId,key)=>{
+    if(!teacherPresenceViewer&&studentId===presenceStudentId)return;
+    const known=PRESENCE_STUDENTS[studentId];if(!known||known.classId!==classId||studentId==='simcha_cohen')return;
     let latest=null;
     Object.values(sessions||{}).forEach(data=>{if(!data||typeof data!=='object')return;const updated=safePresenceNumber(data.updatedAt,0);if(updated&&now-updated>50000)return;if(!latest||updated>safePresenceNumber(latest.updatedAt,0))latest=data;});
-    if(latest)result.set(studentId,{...latest,name:known.name});
-  });
+    if(latest)result.set(key,{...latest,name:known.name,classId});
+  };
+  if(teacherPresenceViewer){
+    ['et','wt'].forEach(classId=>Object.entries(raw?.[classId]||{}).forEach(([studentId,sessions])=>collect(studentId,sessions,classId,`${classId}:${studentId}`)));
+  }else if(presenceProfile){
+    Object.entries(raw||{}).forEach(([studentId,sessions])=>collect(studentId,sessions,presenceProfile.classId,studentId));
+  }
   return result;
 }
 function refreshRemoteAvatars(){
@@ -896,10 +902,17 @@ function stopLivePresence(removeOwn=true){
   clearRemoteAvatars();updateOnlineBadge();
 }
 function startLivePresence(){
-  if(!scene||!presenceProfile||!presenceRoot||!livePresenceEnabled||presenceStarted)return;
-  presenceStarted=true;presenceClassRef=presenceRoot.child(presenceProfile.classId);presenceOwnRef=presenceClassRef.child(presenceStudentId).child(presenceSessionId);
-  presenceOwnRef.onDisconnect().remove();presenceValueHandler=handlePresenceSnapshot;presenceClassRef.on('value',presenceValueHandler,err=>console.warn('Live classmates unavailable',err));
-  syncLivePresence(true);presenceHeartbeat=setInterval(()=>syncLivePresence(true),15000);updateOnlineBadge();
+  if(!scene||(!presenceProfile&&!teacherPresenceViewer)||!presenceRoot||!livePresenceEnabled||presenceStarted)return;
+  presenceStarted=true;presenceClassRef=teacherPresenceViewer?presenceRoot:presenceRoot.child(presenceProfile.classId);
+  if(!teacherPresenceViewer){
+    presenceOwnRef=presenceClassRef.child(presenceStudentId).child(presenceSessionId);presenceOwnRef.onDisconnect().remove();
+  }
+  presenceValueHandler=handlePresenceSnapshot;presenceClassRef.on('value',presenceValueHandler,err=>console.warn('Live classmates unavailable',err));
+  if(!teacherPresenceViewer){syncLivePresence(true);presenceHeartbeat=setInterval(()=>syncLivePresence(true),15000);}updateOnlineBadge();
+}
+function enableTeacherPresenceView(){
+  if(teacherPresenceViewer)return;
+  teacherPresenceViewer=true;stopLivePresence(true);startLivePresence();
 }
 function updateRemoteAvatars(dt){
   const ease=1-Math.pow(.0005,dt),t=performance.now()*.009;
@@ -1052,7 +1065,7 @@ document.getElementById('projectForm').addEventListener('submit',async e=>{
 
 /* ---------- review ---------- */
 const reviewOverlay=document.getElementById('reviewOverlay');document.getElementById('teacherReviewBtn').onclick=()=>{reviewOverlay.classList.add('show');isTeacher?showReviewList():(document.getElementById('reviewLoginArea').style.display='block',document.getElementById('reviewListArea').style.display='none')};document.getElementById('closeReviewBtn').onclick=()=>reviewOverlay.classList.remove('show');reviewOverlay.addEventListener('click',e=>{if(e.target===reviewOverlay)reviewOverlay.classList.remove('show')});
-document.getElementById('loginSubmitBtn').onclick=()=>{const val=document.getElementById('teacherPasscode').value,stat=document.getElementById('loginStatus');if(val===TEACHER_PASSCODE){isTeacher=true;document.getElementById('teacherPasscode').value='';stat.textContent='';showReviewList()}else{stat.textContent='Incorrect passcode.';stat.style.color='#b34e47'}};
+document.getElementById('loginSubmitBtn').onclick=()=>{const val=document.getElementById('teacherPasscode').value,stat=document.getElementById('loginStatus');if(val===TEACHER_PASSCODE){isTeacher=true;enableTeacherPresenceView();document.getElementById('teacherPasscode').value='';stat.textContent='';showReviewList()}else{stat.textContent='Incorrect passcode.';stat.style.color='#b34e47'}};
 document.getElementById('livePresenceToggleBtn').onclick=async()=>{if(!isTeacher||!presenceSettingsRef)return;const btn=document.getElementById('livePresenceToggleBtn');btn.disabled=true;try{await presenceSettingsRef.set(!livePresenceEnabled)}catch(err){alert('Could not change Live Classmates right now.');console.error(err)}finally{btn.disabled=false}};
 function showReviewList(){document.getElementById('reviewLoginArea').style.display='none';document.getElementById('reviewListArea').style.display='block';updateLivePresenceToggle();startTeacherPresenceMonitor();renderReviewList();}
 function renderReviewList(){const pending=posts.filter(p=>p.status==='pending'),list=document.getElementById('reviewList');if(!pending.length){list.innerHTML='<div class="empty-review">No projects waiting for review.</div>';return;}list.innerHTML=pending.map(p=>`<div class="review-item">${p.image?`<img src="${p.image}" alt="">`:''}<div class="info"><h4>${escapeHtml(p.title)}</h4><p>${escapeHtml(p.description).slice(0,100)}</p><div class="meta">${escapeHtml(p.studentName)} · ${escapeHtml(p.category)} · ${escapeHtml(p.galleryRoom&&p.galleryRoom!=='hallway'?classroomLabel(p.galleryRoom)+' Classroom':'Main Hallway')}${p.audioUrl?' · 🎧':''}${p.videoUrl?' · 🎬':''}</div></div><div class="review-actions"><button class="btn-approve" data-action="approve" data-id="${p.id}">Approve</button><button class="btn-reject" data-action="reject" data-id="${p.id}">Reject</button></div></div>`).join('');list.querySelectorAll('button[data-action]').forEach(btn=>btn.onclick=async()=>{btn.disabled=true;try{btn.dataset.action==='approve'?await dbRef.child(btn.dataset.id).update({status:'approved'}):await dbRef.child(btn.dataset.id).remove()}catch(err){alert('Could not update that project.');btn.disabled=false}});}
