@@ -3945,15 +3945,21 @@ async function submitHebrewDispute(){
   const val = 100;
   const row = document.getElementById('hebrewDisputeRow');
   row.innerHTML = '<span style="font-size:0.85rem;color:var(--ink-soft);">Saving…</span>';
-  // The recording may still be autosaving (currentAttemptRef is created
-  // there), so give it a moment to finish before we try to attach to it.
+  // currentAttemptRef is created (via .push()) the moment autosaveHebrew()
+  // starts, well before its score/audio actually finish writing - so
+  // checking currentAttemptRef alone isn't enough to know the record has
+  // real data behind it. Wait for attemptSaved.hebrew instead, which only
+  // flips true once the autosave update() has actually succeeded. This
+  // keeps a student from filing a dispute against an attempt that ends up
+  // with no hebrewScore/hebrewAudioURL at all (e.g. a slow or failed
+  // audio upload), which would leave the teacher nothing to review.
   let tries = 0;
-  while(!currentAttemptRef && tries < 20){
+  while(!attemptSaved.hebrew && tries < 20){
     await new Promise(r => setTimeout(r, 250));
     tries++;
   }
-  if(!currentAttemptRef){
-    row.innerHTML = '<span style="font-size:0.85rem;color:var(--rimon);">Could not save — please try again in a moment.</span>';
+  if(!attemptSaved.hebrew){
+    row.innerHTML = '<span style="font-size:0.85rem;color:var(--rimon);">Still saving your reading — please wait a moment and try again.</span>';
     return;
   }
   try{
