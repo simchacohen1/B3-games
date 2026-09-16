@@ -153,6 +153,7 @@
   .comp-result.correct{ background:#E4F4E4; border:2px solid #4C9A4C; }
   .comp-result.partial{ background:#FBF0D9; border:2px solid var(--gold); }
   .comp-result.incorrect{ background:#F6E1E1; border:2px solid var(--rimon); }
+  .comp-result.none{ background:#f0ecdf; border:2px solid #8b8370; }
   .comp-badge{
     font-weight:700;
     border-radius: 999px;
@@ -165,6 +166,7 @@
   .comp-result.correct .comp-badge{ background:#4C9A4C; }
   .comp-result.partial .comp-badge{ background: var(--gold); color: var(--ink); }
   .comp-result.incorrect .comp-badge{ background: var(--rimon); }
+  .comp-result.none .comp-badge{ background:#8b8370; }
   .hebrew-word-breakdown{
     width:100%; font-family:'Frank Ruhl Libre', serif; font-size:1.15rem;
     direction:rtl; line-height:1.6; margin:4px 0;
@@ -2687,7 +2689,7 @@ function renderPosukDetail(posukKey){
       const hScore = effHebrewScore(a);
       const hTier = (typeof hScore === 'number')
         ? (hScore >= 80 ? 'correct' : (hScore >= 50 ? 'partial' : 'incorrect'))
-        : 'correct';
+        : 'none';
 
       let hebrewCardHtml = '<span class="comp-badge">' + (typeof hScore === 'number' ? hScore + '%' : '—') + '</span>';
       if(Array.isArray(a.hebrewWords) && a.hebrewWords.length){
