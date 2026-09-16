@@ -62,6 +62,7 @@ button,input,select,textarea{font:inherit}
 .glass-btn{border:1px solid rgba(255,255,255,.7);background:rgba(45,36,27,.64);color:#fffdf6;border-radius:999px;padding:10px 15px;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.18);backdrop-filter:blur(9px);cursor:pointer;transition:.18s ease}
 .glass-btn:hover{transform:translateY(-1px);background:rgba(45,36,27,.78)}
 .glass-btn.primary{background:rgba(64,113,75,.86)}
+.glass-btn.tag-join{display:none;background:rgba(53,87,62,.9)}.glass-btn.tag-join.show{display:inline-flex}.glass-btn.tag-join.playing{background:rgba(155,79,52,.94)}
 .pending-note{display:none;position:absolute;right:0;top:48px;white-space:nowrap;padding:6px 10px;border-radius:999px;background:#f2c55d;color:#4c3515;font-size:.72rem;font-weight:800;box-shadow:0 4px 12px rgba(0,0,0,.16)}
 .pending-note.show{display:block}
 .online-note{display:none;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.72);background:rgba(45,36,27,.64);color:#fffdf6;border-radius:999px;padding:9px 13px;font-size:.72rem;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.18);backdrop-filter:blur(9px);white-space:nowrap}
@@ -159,6 +160,7 @@ button,input,select,textarea{font:inherit}
     <span class="online-note" id="onlineNote"><span class="online-dot"></span><span id="onlineText">Just you online</span></span>
     <span class="tag-hud" id="tagHud"><span class="tag-icon">🏷️</span><span id="tagHudText">Tag game</span></span>
     <span class="tag-pop" id="tagPop"></span>
+    <button class="glass-btn tag-join" id="tagJoinBtn" aria-pressed="false">Play Tag</button>
     <button class="glass-btn primary" id="openModalBtn">＋ Pin Work</button>
     <button class="glass-btn" id="avatarBtn">Avatar</button>
     <button class="glass-btn" id="allPostsBtn">All Posts</button>
@@ -239,6 +241,7 @@ button,input,select,textarea{font:inherit}
     <div id="reviewListArea" style="display:none;">
       <div class="teacher-live-controls"><div><strong>Live Classmates</strong><span id="teacherOnlineNames">No students online right now.</span></div><button type="button" id="livePresenceToggleBtn">On</button></div>
       <div class="teacher-live-controls"><div><strong>Tag Game</strong><span id="teacherTagStatus">Students can chase and tag classmates who are in the same gallery space.</span></div><button type="button" id="tagGameToggleBtn">Off</button></div>
+      <div class="teacher-live-controls"><div><strong>Rabbi Cohen Plays</strong><span id="teacherJoinTagStatus">Join only when you want your avatar to be part of the game.</span></div><button type="button" id="teacherJoinTagBtn" class="off">Join</button></div>
       <div id="reviewList"></div>
     </div>
   </div>
@@ -385,7 +388,7 @@ let presenceHeartbeat=null,lastPresenceWrite=0,lastPresencePayload='';
 let remoteAvatarsGroup=null,remoteAvatars=new Map(),latestPresenceStudents=new Map();
 let teacherPresenceRef=null,teacherPresenceHandler=null;
 let teacherPresenceViewer=localStorage.getItem('b3TeacherBypass')==='1';
-let tagGameEnabled=false,tagClassRef=null,tagStateHandler=null,tagState={};
+let tagGameEnabled=false,tagOptedIn=false,tagClassRef=null,tagStateHandler=null,tagState={};
 let tagAttemptBusy=false,lastTagAttemptAt=0,lastSeenTagEvent='',tagPopTimer=null;
 const TAG_DISTANCE=1.18,TAG_GRACE_MS=3000;
 
@@ -469,7 +472,7 @@ function buildScene(){
 }
 function buildHallway(){
   resetWorld();
-  moveMinX=-3.15;moveMaxX=3.15;
+  moveMinX=-5.75;moveMaxX=5.75;
   studentHallPositions={};hallDoorPositions={};
 
   const approved=posts.filter(p=>p.status==='approved' && (!p.galleryRoom || p.galleryRoom==='hallway'));
@@ -497,7 +500,7 @@ function buildHallway(){
 
   const stationGap=9.8,margin=12,length=Math.max(88,stations.length*stationGap+margin*2);
   hallMinZ=-length/2;hallMaxZ=length/2;
-  cameraMinX=-3.80;cameraMaxX=3.80;cameraMinZ=hallMinZ+.24;cameraMaxZ=hallMaxZ-.24;
+  cameraMinX=-6.42;cameraMaxX=6.42;cameraMinZ=hallMinZ+.24;cameraMaxZ=hallMaxZ-.24;
   if(avatarState.z<hallMinZ+4||avatarState.z>hallMaxZ-4){avatarState.z=hallMaxZ-8;avatarState.x=0;avatarState.angle=Math.PI;}
 
   const wallTex=makeNoiseTexture('#e7dac7');wallTex.repeat.set(1,Math.max(10,length/8));
@@ -511,12 +514,20 @@ function buildHallway(){
   const woodMat=new THREE.MeshStandardMaterial({map:woodTex,roughness:.62,color:0xffffff});
   const trimMat=new THREE.MeshStandardMaterial({map:woodTex,roughness:.55,color:0xa97b57});
 
-  addBox(worldGroup,8.25,.16,length,floorMat,0,-.08,0,false,true);
-  addBox(worldGroup,8.25,.12,length,ceilingMat,0,4.82,0,false,true);
-  addBox(worldGroup,.16,4.9,length,wallMat,-4.08,2.37,0,false,true);
-  addBox(worldGroup,.16,4.9,length,wallMat,4.08,2.37,0,false,true);
-  addBox(worldGroup,.09,.26,length,trimMat,-3.96,.24,0,false,true);addBox(worldGroup,.09,.26,length,trimMat,3.96,.24,0,false,true);
-  addBox(worldGroup,.09,.16,length,trimMat,-3.96,1.08,0,false,true);addBox(worldGroup,.09,.16,length,trimMat,3.96,1.08,0,false,true);
+  addBox(worldGroup,13.5,.16,length,floorMat,0,-.08,0,false,true);
+  addBox(worldGroup,13.5,.12,length,ceilingMat,0,4.82,0,false,true);
+  addBox(worldGroup,.16,4.9,length,wallMat,-6.68,2.37,0,false,true);
+  addBox(worldGroup,.16,4.9,length,wallMat,6.68,2.37,0,false,true);
+  addBox(worldGroup,.09,.26,length,trimMat,-6.56,.24,0,false,true);addBox(worldGroup,.09,.26,length,trimMat,6.56,.24,0,false,true);
+  addBox(worldGroup,.09,.16,length,trimMat,-6.56,1.08,0,false,true);addBox(worldGroup,.09,.16,length,trimMat,6.56,1.08,0,false,true);
+
+  // The center island creates two chase routes that reconnect at both ends.
+  const forkLength=Math.min(34,Math.max(24,length*.22));
+  addBox(worldGroup,3.15,3.15,forkLength,wallMat,0,1.575,0,false,true);
+  addBox(worldGroup,3.36,.24,forkLength+.24,trimMat,0,3.16,0,false,true);
+  addBox(worldGroup,3.36,.28,forkLength+.24,trimMat,0,.18,0,false,true);
+  const leftFork=makeDoubleSidedPlaque('Left Way','Tag route',2.25,.58);leftFork.position.set(-1.69,2.25,forkLength/2+.35);leftFork.rotation.y=Math.PI/2;worldGroup.add(leftFork);
+  const rightFork=makeDoubleSidedPlaque('Right Way','Tag route',2.25,.58);rightFork.position.set(1.69,2.25,forkLength/2+.35);rightFork.rotation.y=-Math.PI/2;worldGroup.add(rightFork);
 
   for(let z=hallMinZ+6;z<hallMaxZ-4;z+=8.5){
     const panelMat=new THREE.MeshStandardMaterial({color:0xfff7dc,emissive:0xffe8aa,emissiveIntensity:1.45,roughness:.35});
@@ -545,7 +556,7 @@ function buildHallway(){
 }
 
 function addEndWall(z,flip,wallMat,trimMat){
-  addBox(worldGroup,8.25,4.9,.16,wallMat,0,2.37,z,false,true);
+  addBox(worldGroup,13.5,4.9,.16,wallMat,0,2.37,z,false,true);
   const inward=flip?-1:1; const zFront=z+inward*.10;
   const skyMat=new THREE.MeshStandardMaterial({color:0xaed6ef,emissive:0x9dcbe8,emissiveIntensity:.55,roughness:.35});
   addBox(worldGroup,3.35,2.42,.08,skyMat,0,2.43,zFront,false,false);
@@ -577,8 +588,8 @@ function addDirectoryStation(z,frameMat,corkMat){
 }
 
 function addDirectoryBoard(side,z,classLabel,names,frameMat,corkMat){
-  const x=side<0?-3.91:3.91,rot=side<0?Math.PI/2:-Math.PI/2;
-  const target={z,side,kind:'directory'};
+  const x=side<0?-6.51:6.51,rot=side<0?Math.PI/2:-Math.PI/2;
+  const target={z,side,approachX:side*(Math.abs(x)-1.25),kind:'directory'};
   const frame=new THREE.Mesh(new THREE.BoxGeometry(4.15,3.28,.14),frameMat);frame.position.set(x,2.46,z);frame.rotation.y=rot;frame.castShadow=true;frame.receiveShadow=true;frame.userData.navTarget=target;navigationMeshes.push(frame);worldGroup.add(frame);
   const cork=new THREE.Mesh(new THREE.BoxGeometry(3.84,2.98,.08),corkMat);cork.position.set(x+(side<0?.09:-.09),2.46,z);cork.rotation.y=rot;cork.userData.navTarget=target;navigationMeshes.push(cork);worldGroup.add(cork);
   const title=makeSmallBoardTitle(`Find a Student • ${classLabel}`,3.42,.34);title.position.set(x+(side<0?.18:-.18),3.72,z);title.rotation.y=rot;title.userData.navTarget=target;navigationMeshes.push(title);worldGroup.add(title);
@@ -601,9 +612,9 @@ function makeDirectoryNameLabel(name,w,h){
   const tex=makeTexture(c);return new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:.82,side:THREE.FrontSide,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3}));
 }
 
-function addBulletinBoard(side,z,boardPosts,title,studentName,frameMat,corkMat,wallX=3.91,targetExtra={}){
+function addBulletinBoard(side,z,boardPosts,title,studentName,frameMat,corkMat,wallX=6.51,targetExtra={}){
   const x=side<0?-wallX:wallX, rot=side<0?Math.PI/2:-Math.PI/2;
-  const target={z,side,kind:'board',...targetExtra};
+  const target={z,side,approachX:side*(wallX-1.25),kind:'board',...targetExtra};
   const frame=new THREE.Mesh(new THREE.BoxGeometry(3.72,2.48,.14),frameMat);frame.position.set(x,2.53,z);frame.rotation.y=rot;frame.castShadow=true;frame.receiveShadow=true;frame.userData.navTarget=target;navigationMeshes.push(frame);worldGroup.add(frame);
   const cork=new THREE.Mesh(new THREE.BoxGeometry(3.42,2.18,.08),corkMat);cork.position.set(x+(side<0?.09:-.09),2.53,z);cork.rotation.y=rot;cork.castShadow=true;cork.userData.navTarget=target;navigationMeshes.push(cork);worldGroup.add(cork);
   const titleMesh=makeSmallBoardTitle(title,3.0,.34);titleMesh.position.set(x+(side<0?.18:-.18),3.40,z);titleMesh.rotation.y=rot;titleMesh.userData.navTarget=target;navigationMeshes.push(titleMesh);worldGroup.add(titleMesh);
@@ -619,14 +630,14 @@ function addBulletinBoard(side,z,boardPosts,title,studentName,frameMat,corkMat,w
     card.position.set(x+(side<0?.22:-.22),2.35+yOff,z+zOff);
     card.rotation.y=rot;
     card.userData.postId=post.id;
-    card.userData.navTarget={z,side,kind:'project',...targetExtra};
+    card.userData.navTarget={z,side,approachX:side*(wallX-1.25),kind:'project',...targetExtra};
     worldGroup.add(card);projectMeshes.push(card);interactiveMeshes.push(card);navigationMeshes.push(card);
   });
 }
 
 function addDoor(side,z,woodMat,trimMat,label,roomId){
-  const x=side<0?-3.93:3.93;
-  const target={z,side,kind:'door',roomId};
+  const x=side<0?-6.53:6.53;
+  const target={z,side,approachX:side*(Math.abs(x)-1.05),kind:'door',roomId};
   const door=addBox(worldGroup,.13,3.28,1.58,woodMat,x,1.72,z,true,true);door.userData.navTarget=target;navigationMeshes.push(door);
   const panelMat=new THREE.MeshStandardMaterial({color:0x81502e,roughness:.65});
   [1.15,2.25].forEach(y=>{const p=addBox(worldGroup,.08,.76,1.12,panelMat,x+(side<0?.09:-.09),y,z,true,true);p.userData.navTarget=target;navigationMeshes.push(p);});
@@ -771,6 +782,7 @@ function addRoomExitDoor({label,exitKind,exitId},woodMat,trimMat){
 }
 
 function enterClassroom(roomId){
+  if(tagOptedIn){showTagPop('Leave Tag before entering a side room.');return;}
   if(!CLASSROOMS.some(r=>r.id===roomId))return;
   sceneMode='classroom';activeClassroomId=roomId;activeStudentName=null;navTween=null;viewYaw=0;
   buildScene();
@@ -778,6 +790,7 @@ function enterClassroom(roomId){
   snapCameraToAvatar();refreshRemoteAvatars();syncLivePresence(true);
 }
 function enterStudentGallery(studentName){
+  if(tagOptedIn){showTagPop('Leave Tag before entering a side room.');return;}
   if(!studentName)return;
   sceneMode='studentGallery';activeStudentName=studentName;activeClassroomId=null;navTween=null;viewYaw=0;
   buildScene();
@@ -904,19 +917,37 @@ function updateOnlineBadge(){
 function updateLivePresenceToggle(){
   const btn=document.getElementById('livePresenceToggleBtn');if(!btn)return;
   btn.textContent=livePresenceEnabled?'On':'Off';btn.classList.toggle('off',!livePresenceEnabled);btn.setAttribute('aria-pressed',String(livePresenceEnabled));
+  updateTagJoinControls();
 }
 function updateTagGameToggle(){
   const btn=document.getElementById('tagGameToggleBtn');if(btn){btn.textContent=tagGameEnabled?'On':'Off';btn.classList.toggle('off',!tagGameEnabled);btn.classList.toggle('tag-on',tagGameEnabled);btn.setAttribute('aria-pressed',String(tagGameEnabled));}
   const status=document.getElementById('teacherTagStatus');if(status)status.textContent=tagGameEnabled?'Tag is ON. Each class has its own game; the student marked IT can tag a nearby classmate.':'Students can chase and tag classmates who are in the same gallery space.';
+  if(!tagGameEnabled&&tagOptedIn)tagOptedIn=false;
+  updateTagJoinControls();
 }
-function currentTagStudentKey(){return presenceProfile?presenceStudentId:'';}
+function currentTagStudentKey(){return presenceProfile?presenceStudentId:(isTeacher?'simcha_cohen':'');}
+function updateTagJoinControls(){
+  const eligible=tagGameEnabled&&livePresenceEnabled&&(!!presenceProfile||isTeacher);
+  const btn=document.getElementById('tagJoinBtn');if(btn){btn.classList.toggle('show',eligible);btn.classList.toggle('playing',tagOptedIn);btn.textContent=tagOptedIn?'Leave Tag':'Play Tag';btn.setAttribute('aria-pressed',String(tagOptedIn));}
+  const teacherBtn=document.getElementById('teacherJoinTagBtn');if(teacherBtn){teacherBtn.textContent=tagOptedIn?'Leave':'Join';teacherBtn.classList.toggle('off',!tagOptedIn);teacherBtn.classList.toggle('tag-on',tagOptedIn);teacherBtn.setAttribute('aria-pressed',String(tagOptedIn));}
+  const teacherStatus=document.getElementById('teacherJoinTagStatus');if(teacherStatus)teacherStatus.textContent=tagOptedIn?'You are playing and can be tagged in the main hallway.':'Join only when you want your avatar to be part of the game.';
+}
+function setTagOptIn(next){
+  if(next&&(!tagGameEnabled||!livePresenceEnabled)){showTagPop('Tag is not available right now.');return;}
+  tagOptedIn=!!next;
+  if(isTeacher&&teacherPresenceViewer){stopLivePresence(true);startLivePresence();}
+  if(tagOptedIn&&sceneMode!=='hallway'){sceneMode='hallway';activeClassroomId=null;activeStudentName=null;navTween=null;avatarState.x=0;avatarState.z=hallMaxZ-8;avatarState.angle=Math.PI;buildScene();refreshRemoteAvatars();}
+  if(!tagOptedIn&&tagState.itStudentId===currentTagStudentKey()&&tagClassRef)tagClassRef.update({itStudentId:null,immunityUntil:0});
+  updateTagJoinControls();syncLivePresence(true);ensureTagItPlayer();refreshRemoteAvatars();updateTagHud();
+  showTagPop(tagOptedIn?'You joined Tag! Side rooms are closed while you play.':'You left Tag. You can visit every room again.');
+}
 function showTagPop(message){
   const el=document.getElementById('tagPop');if(!el||!message)return;el.textContent=message;el.classList.add('show');
   if(tagPopTimer)clearTimeout(tagPopTimer);tagPopTimer=setTimeout(()=>el.classList.remove('show'),2100);
 }
 function updateTagHud(){
   const hud=document.getElementById('tagHud'),txt=document.getElementById('tagHudText');if(!hud||!txt)return;
-  const active=tagGameEnabled&&livePresenceEnabled&&presenceProfile&&!teacherPresenceViewer;
+  const active=tagGameEnabled&&livePresenceEnabled&&tagOptedIn&&(!!presenceProfile||isTeacher);
   if(!active){hud.classList.remove('show','safe');return;}
   const itId=String(tagState.itStudentId||'');
   if(!itId){txt.textContent='Tag: waiting for another classmate';hud.classList.add('show','safe');return;}
@@ -930,6 +961,16 @@ function makeItSprite(){
   ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='900 48px Quicksand, sans-serif';ctx.fillStyle='#fff9ec';ctx.fillText('IT!',150,55);
   const tex=makeTexture(c),mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false});const sp=new THREE.Sprite(mat);sp.scale.set(1.35,.54,1);sp.position.set(0,2.86,0);sp.userData.tagMarker=true;return sp;
 }
+function makeTagPlayerSprite(){
+  const c=document.createElement('canvas');c.width=360;c.height=100;const ctx=c.getContext('2d');
+  ctx.fillStyle='rgba(53,87,62,.95)';roundedRect(ctx,55,10,250,72,30);ctx.fill();ctx.strokeStyle='rgba(255,255,255,.82)';ctx.lineWidth=4;ctx.stroke();
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='900 34px Quicksand, sans-serif';ctx.fillStyle='#fff9ec';ctx.fillText('PLAYING TAG',180,45);
+  const tex=makeTexture(c),mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false});const sp=new THREE.Sprite(mat);sp.scale.set(1.65,.46,1);sp.position.set(0,2.68,0);sp.userData.tagPlayerMarker=true;return sp;
+}
+function setRemoteTagPlayerMarker(entry,isPlaying){
+  if(!entry?.group)return;let marker=entry.group.children.find(ch=>ch.userData?.tagPlayerMarker);
+  if(isPlaying&&!marker)entry.group.add(makeTagPlayerSprite());else if(!isPlaying&&marker){entry.group.remove(marker);if(marker.material?.map)marker.material.map.dispose?.();marker.material?.dispose?.();}
+}
 function setRemoteItMarker(entry,isIt){
   if(!entry?.group)return;let marker=entry.group.children.find(ch=>ch.userData?.tagMarker);
   if(isIt&&!marker)entry.group.add(makeItSprite());else if(!isIt&&marker){entry.group.remove(marker);if(marker.material?.map)marker.material.map.dispose?.();marker.material?.dispose?.();}
@@ -938,34 +979,35 @@ function stopTagState(){
   if(tagClassRef&&tagStateHandler)tagClassRef.off('value',tagStateHandler);tagClassRef=null;tagStateHandler=null;tagState={};tagAttemptBusy=false;lastSeenTagEvent='';updateTagHud();
   remoteAvatars.forEach(entry=>setRemoteItMarker(entry,false));
 }
+function tagClassId(){return presenceProfile?.classId||(['et','wt'].includes(localStorage.getItem('b3Games_studentClass'))?localStorage.getItem('b3Games_studentClass'):'et');}
 function startTagState(){
-  if(!tagGameEnabled||!tagRoot||!presenceProfile||teacherPresenceViewer)return;
-  const wanted=tagRoot.child(presenceProfile.classId);if(tagClassRef&&tagClassRef.toString()===wanted.toString())return;
+  if(!tagGameEnabled||!tagRoot||(!presenceProfile&&!isTeacher))return;
+  const wanted=tagRoot.child(tagClassId());if(tagClassRef&&tagClassRef.toString()===wanted.toString())return;
   stopTagState();tagClassRef=wanted;tagStateHandler=snap=>{
     const prevEvent=lastSeenTagEvent;tagState=snap.val()||{};const evt=tagState.lastTag||{};const eventKey=`${evt.at||''}:${evt.from||''}:${evt.to||''}`;
-    if(eventKey&&eventKey!==prevEvent){lastSeenTagEvent=eventKey;if(evt.to===presenceStudentId)showTagPop('You were tagged — now YOU’RE IT!');else if(evt.from===presenceStudentId){const n=PRESENCE_STUDENTS[evt.to]?.name||'your classmate';showTagPop(`You tagged ${n}!`);}else if(evt.to&&evt.from){const a=PRESENCE_STUDENTS[evt.from]?.name||'Someone',b=PRESENCE_STUDENTS[evt.to]?.name||'a classmate';showTagPop(`${a} tagged ${b}!`);}}
+    const me=currentTagStudentKey();if(eventKey&&eventKey!==prevEvent){lastSeenTagEvent=eventKey;if(evt.to===me)showTagPop('You were tagged — now YOU’RE IT!');else if(evt.from===me){const n=PRESENCE_STUDENTS[evt.to]?.name||'your classmate';showTagPop(`You tagged ${n}!`);}else if(evt.to&&evt.from){const a=PRESENCE_STUDENTS[evt.from]?.name||'Someone',b=PRESENCE_STUDENTS[evt.to]?.name||'a classmate';showTagPop(`${a} tagged ${b}!`);}}
     ensureTagItPlayer();refreshRemoteAvatars();updateTagHud();
   };tagClassRef.on('value',tagStateHandler,err=>console.warn('Tag game unavailable',err));
 }
 function onlineTagCandidates(){
-  const candidates=[];if(presenceProfile)candidates.push(presenceStudentId);
-  latestPresenceStudents.forEach((data,id)=>{if(data.classId===presenceProfile?.classId)candidates.push(id);});
-  return [...new Set(candidates)].filter(id=>PRESENCE_STUDENTS[id]&&id!=='simcha_cohen').sort();
+  const candidates=[];if(tagOptedIn&&currentTagStudentKey())candidates.push(currentTagStudentKey());
+  latestPresenceStudents.forEach((data,id)=>{const cleanId=id.includes(':')?id.split(':').pop():id;if(data.classId===tagClassId()&&data.playingTag)candidates.push(cleanId);});
+  return [...new Set(candidates)].filter(id=>PRESENCE_STUDENTS[id]).sort();
 }
 function ensureTagItPlayer(){
   if(!tagGameEnabled||!tagClassRef||tagAttemptBusy)return;
   const candidates=onlineTagCandidates();if(candidates.length<2)return;
   const current=String(tagState.itStudentId||'');if(current&&candidates.includes(current))return;
-  const elected=candidates[0];if(presenceStudentId!==elected)return;
+  const elected=candidates[0];if(currentTagStudentKey()!==elected)return;
   tagAttemptBusy=true;tagClassRef.transaction(cur=>{cur=cur||{};const curIt=String(cur.itStudentId||'');if(curIt&&candidates.includes(curIt))return;return {...cur,itStudentId:elected,immunityUntil:Date.now()+1500,startedAt:firebase.database.ServerValue.TIMESTAMP,lastTag:null};},()=>{tagAttemptBusy=false;});
 }
 function maybeTagNearbyClassmate(){
-  if(!tagGameEnabled||!tagClassRef||tagAttemptBusy||tagState.itStudentId!==presenceStudentId)return;
+  const me=currentTagStudentKey();if(!tagGameEnabled||!tagOptedIn||!tagClassRef||tagAttemptBusy||tagState.itStudentId!==me)return;
   const now=Date.now();if(now<safePresenceNumber(tagState.immunityUntil,0)||now-lastTagAttemptAt<500)return;
   const space=currentPresenceSpace();let targetId=null,best=TAG_DISTANCE;
-  latestPresenceStudents.forEach((data,id)=>{if(data.space!==space)return;const entry=remoteAvatars.get(id);if(!entry?.group?.visible)return;const d=Math.hypot(entry.group.position.x-avatarState.x,entry.group.position.z-avatarState.z);if(d<best){best=d;targetId=id;}});
+  latestPresenceStudents.forEach((data,id)=>{if(!data.playingTag||data.space!==space)return;const cleanId=id.includes(':')?id.split(':').pop():id,entry=remoteAvatars.get(id);if(!entry?.group?.visible)return;const d=Math.hypot(entry.group.position.x-avatarState.x,entry.group.position.z-avatarState.z);if(d<best){best=d;targetId=cleanId;}});
   if(!targetId)return;lastTagAttemptAt=now;tagAttemptBusy=true;
-  tagClassRef.transaction(cur=>{cur=cur||{};if(cur.itStudentId!==presenceStudentId||Date.now()<safePresenceNumber(cur.immunityUntil,0))return;return {...cur,itStudentId:targetId,immunityUntil:Date.now()+TAG_GRACE_MS,lastTag:{from:presenceStudentId,to:targetId,at:firebase.database.ServerValue.TIMESTAMP}};},()=>{tagAttemptBusy=false;});
+  tagClassRef.transaction(cur=>{cur=cur||{};if(cur.itStudentId!==me||Date.now()<safePresenceNumber(cur.immunityUntil,0))return;return {...cur,itStudentId:targetId,immunityUntil:Date.now()+TAG_GRACE_MS,lastTag:{from:me,to:targetId,at:firebase.database.ServerValue.TIMESTAMP}};},()=>{tagAttemptBusy=false;});
 }
 function startTeacherPresenceMonitor(){
   if(!presenceRoot||teacherPresenceRef)return;
@@ -985,7 +1027,7 @@ function latestStudentSessions(raw){
   const result=new Map(),now=Date.now();
   const collect=(studentId,sessions,classId,key)=>{
     if(!teacherPresenceViewer&&studentId===presenceStudentId)return;
-    const known=PRESENCE_STUDENTS[studentId];if(!known||known.classId!==classId||studentId==='simcha_cohen')return;
+    const known=PRESENCE_STUDENTS[studentId];if(!known||known.classId!==classId)return;
     let latest=null;
     Object.values(sessions||{}).forEach(data=>{if(!data||typeof data!=='object')return;const updated=safePresenceNumber(data.updatedAt,0);if(updated&&now-updated>50000)return;if(!latest||updated>safePresenceNumber(latest.updatedAt,0))latest=data;});
     if(latest)result.set(key,{...latest,name:known.name,classId});
@@ -1015,7 +1057,8 @@ function refreshRemoteAvatars(){
     entry.targetX=Math.max(moveMinX,Math.min(moveMaxX,safePresenceNumber(data.x)));
     entry.targetZ=Math.max(hallMinZ+1.1,Math.min(hallMaxZ-1.1,safePresenceNumber(data.z)));
     entry.targetAngle=safePresenceNumber(data.angle,Math.PI);entry.walking=!!data.walking;
-    entry.group.visible=data.space===activeSpace;setRemoteItMarker(entry,tagGameEnabled&&tagState.itStudentId===studentId);
+    const cleanId=studentId.includes(':')?studentId.split(':').pop():studentId;
+    entry.group.visible=data.space===activeSpace;setRemoteTagPlayerMarker(entry,tagGameEnabled&&!!data.playingTag);setRemoteItMarker(entry,tagGameEnabled&&tagState.itStudentId===cleanId);
   });
   updateOnlineBadge();ensureTagItPlayer();updateTagHud();
 }
@@ -1023,7 +1066,7 @@ function handlePresenceSnapshot(snapshot){latestPresenceStudents=latestStudentSe
 function syncLivePresence(force=false){
   if(!presenceStarted||!presenceOwnRef||!livePresenceEnabled)return;
   const now=Date.now();if(!force&&now-lastPresenceWrite<120)return;
-  const core={x:Number(avatarState.x.toFixed(3)),z:Number(avatarState.z.toFixed(3)),angle:Number(avatarState.angle.toFixed(3)),space:currentPresenceSpace(),avatarId:selectedAvatarId,walking:!!localAvatarWalking};
+  const core={x:Number(avatarState.x.toFixed(3)),z:Number(avatarState.z.toFixed(3)),angle:Number(avatarState.angle.toFixed(3)),space:currentPresenceSpace(),avatarId:selectedAvatarId,walking:!!localAvatarWalking,playingTag:!!tagOptedIn};
   const serialized=JSON.stringify(core);if(!force&&serialized===lastPresencePayload)return;
   lastPresencePayload=serialized;lastPresenceWrite=now;
   presenceOwnRef.set({...core,updatedAt:firebase.database.ServerValue.TIMESTAMP}).catch(err=>console.warn('Live classmates update failed',err));
@@ -1038,11 +1081,11 @@ function stopLivePresence(removeOwn=true){
 function startLivePresence(){
   if(!scene||(!presenceProfile&&!teacherPresenceViewer)||!presenceRoot||!livePresenceEnabled||presenceStarted)return;
   presenceStarted=true;presenceClassRef=teacherPresenceViewer?presenceRoot:presenceRoot.child(presenceProfile.classId);
-  if(!teacherPresenceViewer){
-    presenceOwnRef=presenceClassRef.child(presenceStudentId).child(presenceSessionId);presenceOwnRef.onDisconnect().remove();
+  if(!teacherPresenceViewer||(isTeacher&&tagOptedIn)){
+    presenceOwnRef=(teacherPresenceViewer?presenceRoot.child(tagClassId()):presenceClassRef).child(currentTagStudentKey()).child(presenceSessionId);presenceOwnRef.onDisconnect().remove();
   }
   presenceValueHandler=handlePresenceSnapshot;presenceClassRef.on('value',presenceValueHandler,err=>console.warn('Live classmates unavailable',err));
-  if(!teacherPresenceViewer){syncLivePresence(true);presenceHeartbeat=setInterval(()=>syncLivePresence(true),15000);}updateOnlineBadge();
+  if(presenceOwnRef){syncLivePresence(true);presenceHeartbeat=setInterval(()=>syncLivePresence(true),15000);}updateOnlineBadge();
 }
 function enableTeacherPresenceView(){
   if(teacherPresenceViewer)return;
@@ -1064,13 +1107,14 @@ function smoothStep01(t){return t*t*(3-2*t);}
 function navigateTo(target,onArrive=null){
   if(!target)return;
   Object.keys(pressed).forEach(k=>pressed[k]=false);
-  const endX=Math.max(moveMinX+.25,Math.min(moveMaxX-.25,target.side?target.side*.62:0));
+  const endX=Math.max(moveMinX+.25,Math.min(moveMaxX-.25,targetApproachX(target)));
   const endZ=Math.max(hallMinZ+1.25,Math.min(hallMaxZ-1.25,target.z));
   const travelDirection=endZ<avatarState.z?Math.PI:0;
   const endAngle=target.side<0?-Math.PI/2:target.side>0?Math.PI/2:travelDirection;
   const distance=Math.hypot(endX-avatarState.x,endZ-avatarState.z);
   navTween={elapsed:0,duration:Math.min(1.2,Math.max(.42,distance*.022)),startX:avatarState.x,startZ:avatarState.z,startAngle:avatarState.angle,startViewYaw:viewYaw,endX,endZ,endAngle,onArrive};
 }
+function targetApproachX(target){return Number.isFinite(Number(target?.approachX))?Number(target.approachX):(target?.side?target.side*.62:0);}
 
 function cameraPoseForCurrentView(){
   const viewAngle=avatarState.angle+viewYaw;
@@ -1107,9 +1151,14 @@ function updateAvatar(dt){
     walking=raw<1;
     if(raw>=1){const done=navTween.onArrive;navTween=null;viewYaw=0;if(done)setTimeout(done,70);}
   }else{
+    const oldX=avatarState.x,oldZ=avatarState.z;
     const move=(pressed.forward?1:0)-(pressed.back?1:0);const turn=(pressed.left?1:0)-(pressed.right?1:0);
     avatarState.angle+=turn*dt*1.72;
     const speed=3.4;avatarState.x+=Math.sin(avatarState.angle)*move*speed*dt;avatarState.z+=Math.cos(avatarState.angle)*move*speed*dt;
+    if(sceneMode==='hallway'){
+      const forkHalfZ=Math.min(17,Math.max(12,(hallMaxZ-hallMinZ)*.11)),forkHalfX=1.78;
+      if(Math.abs(avatarState.z)<forkHalfZ&&Math.abs(avatarState.x)<forkHalfX){avatarState.x=oldX;avatarState.z=oldZ;}
+    }
     walking=Math.abs(move)>.01;
   }
   avatarState.x=Math.max(moveMinX,Math.min(moveMaxX,avatarState.x));avatarState.z=Math.max(hallMinZ+1.1,Math.min(hallMaxZ-1.1,avatarState.z));
@@ -1142,12 +1191,14 @@ function onPointerUp(e){
   const hits=raycaster.intersectObjects(targets,false);if(!hits[0])return;
   const obj=hits[0].object,target=obj.userData.navTarget,postId=obj.userData.postId;
   if(target?.kind==='door'){
-    const d=Math.hypot((target.side?target.side*.62:0)-avatarState.x,target.z-avatarState.z);
+    if(tagOptedIn){showTagPop('Leave Tag before entering a side room.');return;}
+    const d=Math.hypot(targetApproachX(target)-avatarState.x,target.z-avatarState.z);
     if(d<2.8)enterClassroom(target.roomId);else navigateTo(target,()=>enterClassroom(target.roomId));
     return;
   }
   if(target?.kind==='studentRoom'){
-    const d=Math.hypot((target.side?target.side*.62:0)-avatarState.x,target.z-avatarState.z);
+    if(tagOptedIn){showTagPop('Leave Tag before entering a side room.');return;}
+    const d=Math.hypot(targetApproachX(target)-avatarState.x,target.z-avatarState.z);
     if(d<3.0)enterStudentGallery(target.studentName);else navigateTo(target,()=>enterStudentGallery(target.studentName));
     return;
   }
@@ -1163,7 +1214,7 @@ function onPointerUp(e){
   }
   if(postId){
     const post=posts.find(p=>p.id===postId);
-    const endX=target?.side?target.side*.62:avatarState.x;
+    const endX=target?targetApproachX(target):avatarState.x;
     const distance=target?Math.hypot(endX-avatarState.x,target.z-avatarState.z):0;
     if(post&&distance<3.0){openLightbox(post);return;}
   }
@@ -1199,9 +1250,11 @@ document.getElementById('projectForm').addEventListener('submit',async e=>{
 
 /* ---------- review ---------- */
 const reviewOverlay=document.getElementById('reviewOverlay');document.getElementById('teacherReviewBtn').onclick=()=>{reviewOverlay.classList.add('show');isTeacher?showReviewList():(document.getElementById('reviewLoginArea').style.display='block',document.getElementById('reviewListArea').style.display='none')};document.getElementById('closeReviewBtn').onclick=()=>reviewOverlay.classList.remove('show');reviewOverlay.addEventListener('click',e=>{if(e.target===reviewOverlay)reviewOverlay.classList.remove('show')});
-document.getElementById('loginSubmitBtn').onclick=()=>{const val=document.getElementById('teacherPasscode').value,stat=document.getElementById('loginStatus');if(val===TEACHER_PASSCODE){isTeacher=true;enableTeacherPresenceView();document.getElementById('teacherPasscode').value='';stat.textContent='';showReviewList()}else{stat.textContent='Incorrect passcode.';stat.style.color='#b34e47'}};
+document.getElementById('loginSubmitBtn').onclick=()=>{const val=document.getElementById('teacherPasscode').value,stat=document.getElementById('loginStatus');if(val===TEACHER_PASSCODE){isTeacher=true;enableTeacherPresenceView();if(tagGameEnabled)startTagState();document.getElementById('teacherPasscode').value='';stat.textContent='';showReviewList()}else{stat.textContent='Incorrect passcode.';stat.style.color='#b34e47'}};
 document.getElementById('livePresenceToggleBtn').onclick=async()=>{if(!isTeacher||!presenceSettingsRef)return;const btn=document.getElementById('livePresenceToggleBtn');btn.disabled=true;try{await presenceSettingsRef.set(!livePresenceEnabled)}catch(err){alert('Could not change Live Classmates right now.');console.error(err)}finally{btn.disabled=false}};
 document.getElementById('tagGameToggleBtn').onclick=async()=>{if(!isTeacher||!tagSettingsRef)return;const btn=document.getElementById('tagGameToggleBtn'),next=!tagGameEnabled;btn.disabled=true;try{if(next&&tagRoot)await Promise.all(['et','wt'].map(c=>tagRoot.child(c).remove()));await tagSettingsRef.set(next)}catch(err){alert('Could not change Tag right now.');console.error(err)}finally{btn.disabled=false}};
+document.getElementById('tagJoinBtn').onclick=()=>setTagOptIn(!tagOptedIn);
+document.getElementById('teacherJoinTagBtn').onclick=()=>{if(isTeacher)setTagOptIn(!tagOptedIn)};
 function showReviewList(){document.getElementById('reviewLoginArea').style.display='none';document.getElementById('reviewListArea').style.display='block';updateLivePresenceToggle();updateTagGameToggle();startTeacherPresenceMonitor();renderReviewList();}
 function renderReviewList(){const pending=posts.filter(p=>p.status==='pending'),list=document.getElementById('reviewList');if(!pending.length){list.innerHTML='<div class="empty-review">No projects waiting for review.</div>';return;}list.innerHTML=pending.map(p=>`<div class="review-item">${p.image?`<img src="${p.image}" alt="">`:''}<div class="info"><h4>${escapeHtml(p.title)}</h4><p>${escapeHtml(p.description).slice(0,100)}</p><div class="meta">${escapeHtml(p.studentName)} · ${escapeHtml(p.category)} · ${escapeHtml(p.galleryRoom&&p.galleryRoom!=='hallway'?classroomLabel(p.galleryRoom)+' Classroom':'Main Hallway')}${p.audioUrl?' · 🎧':''}${p.videoUrl?' · 🎬':''}</div></div><div class="review-actions"><button class="btn-approve" data-action="approve" data-id="${p.id}">Approve</button><button class="btn-reject" data-action="reject" data-id="${p.id}">Reject</button></div></div>`).join('');list.querySelectorAll('button[data-action]').forEach(btn=>btn.onclick=async()=>{btn.disabled=true;try{btn.dataset.action==='approve'?await dbRef.child(btn.dataset.id).update({status:'approved'}):await dbRef.child(btn.dataset.id).remove()}catch(err){alert('Could not update that project.');btn.disabled=false}});}
 
@@ -1247,7 +1300,7 @@ function closePostsOverview(){postsOverviewOverlay.classList.remove('show');}
 function focusCurrentScenePost(post){
   const mesh=projectMeshes.find(m=>m.userData?.postId===post.id);if(!mesh)return false;
   const target=mesh.userData.navTarget;if(!target){openLightbox(post);return true;}
-  const endX=target.side?target.side*.62:avatarState.x,distance=Math.hypot(endX-avatarState.x,target.z-avatarState.z);
+  const endX=targetApproachX(target),distance=Math.hypot(endX-avatarState.x,target.z-avatarState.z);
   if(distance<3){openLightbox(post);}else navigateTo(target,()=>openLightbox(post));return true;
 }
 function jumpToOverviewPost(post){
