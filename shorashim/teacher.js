@@ -5,6 +5,46 @@ const TEACHER_PASSCODE="vayeira5786";
 // AI picture-choice helper. Deploy the matching generateShorashimArt Cloud Function.
 const GENERATE_SHORASHIM_ART_URL="https://us-central1-b3-games.cloudfunctions.net/generateShorashimArt";
 let state={catalog:{shorashim:[],prefix:[],suffix:[]},settings:{minReviewMs:500,studentSiteOpen:true},students:{},leaderboards:{}};let currentTrack='shorashim';
+
+/* ===== Perek 18 completion migration =====
+   The class list previously stopped in pasuk 24 at "אולי יש חמשים ... בתוך העיר".
+   These are the genuinely new root/word families that first appear AFTER that
+   point through the end of Perek 18.  The migration is teacher-only, runs once
+   safely, preserves every existing card/student record, and skips anything
+   already present. */
+const PEREK18_FINAL_SHORASHIM=[
+  {id:'p18-25-chalal',pasuk:'25',front:'חָלַל',hebrew:'חָלִלָה',english:'far be it / profane'},
+  {id:'p18-25-mut',pasuk:'25',front:'מוּת',hebrew:'לְהָמִית',english:'die / put to death'},
+  {id:'p18-27-anah',pasuk:'27',front:'עָנָה',hebrew:'וַיַּעַן',english:'answered'},
+  {id:'p18-27-yaal',pasuk:'27',front:'יָאַל',hebrew:'הוֹאַלְתִּי',english:'began / undertook'},
+  {id:'p18-27-afar',pasuk:'27',front:'עָפָר',hebrew:'עָפָר',english:'dust'},
+  {id:'p18-27-efer',pasuk:'27',front:'אֵפֶר',hebrew:'וָאֵפֶר',english:'ashes'},
+  {id:'p18-28-chasar',pasuk:'28',front:'חָסַר',hebrew:'יַחְסְרוּן',english:'lacked / were missing'},
+  {id:'p18-28-shachat',pasuk:'28',front:'שָׁחַת',hebrew:'הֲתַשְׁחִית',english:'destroyed / corrupted'},
+  {id:'p18-28-arba',pasuk:'28',front:'אַרְבַּע',hebrew:'אַרְבָּעִים',english:'four'},
+  {id:'p18-29-yasaf',pasuk:'29',front:'יָסַף',hebrew:'וַיֹּסֶף',english:'added / continued'},
+  {id:'p18-30-charah',pasuk:'30',front:'חָרָה',hebrew:'יִחַר',english:'became angry'},
+  {id:'p18-31-eser',pasuk:'31',front:'עֶשֶׂר',hebrew:'עֶשְׂרִים',english:'ten'},
+  {id:'p18-32-paam',pasuk:'32',front:'פַּעַם',hebrew:'הַפַּעַם',english:'time / occurrence'}
+];
+function hebrewKey(v){return String(v||'').normalize('NFD').replace(/[\u0591-\u05C7]/g,'').replace(/[^א-ת]/g,'')}
+function ensurePerek18FinalShorashim(){
+  state.catalog=state.catalog||{};
+  const list=state.catalog.shorashim=Array.isArray(state.catalog.shorashim)?state.catalog.shorashim:[];
+  const stopWords=new Set(['עיר','בתוך','חמישים','חמשים','יש','אולי']);
+  let anchor=[...list].reverse().find(i=>stopWords.has(hebrewKey(i.front))||stopWords.has(hebrewKey(i.hebrew)));
+  if(!anchor)anchor=list[list.length-1];
+  const targetListName=anchor?.listName||'Main List';
+  const added=[];
+  for(const src of PEREK18_FINAL_SHORASHIM){
+    const f=hebrewKey(src.front),w=hebrewKey(src.hebrew);
+    const exists=list.some(i=>i.id===src.id || hebrewKey(i.front)===f || (w&&hebrewKey(i.hebrew)===w));
+    if(exists)continue;
+    const item={...src,listName:targetListName,art:[],autoArt:true,hidden:false};
+    list.push(item);added.push(item);
+  }
+  return added;
+}
 const teacherArtStyle=document.createElement('style');
 teacherArtStyle.textContent=`
 .teacher-art-preview{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
@@ -236,17 +276,19 @@ async function loadAll(){
   state.settings={minReviewMs:500,studentSiteOpen:true,...(b.val()||{})};
   state.students=c.val()||{};
   state.leaderboards=d.val()||{};
+  const p18Added=ensurePerek18FinalShorashim();
   const needsArt=(state.catalog.shorashim||[]).filter(hasBadAutoArt);
   let repaired=0;
   if(needsArt.length){
     status(`☁️ Creating picture choices for ${needsArt.length} word${needsArt.length===1?'':'s'}…`,'syncing');
     repaired=await fillArtForShorashim(needsArt);
-    if(repaired) await db.ref(`${ROOT}/catalog`).set(state.catalog);
   }
+  if(repaired||p18Added.length) await db.ref(`${ROOT}/catalog`).set(state.catalog);
   $('teacherMinReview').value=String(state.settings.minReviewMs||500);
   renderStudentSiteControl();
   renderAll();
-  status(repaired?`☁️ Connected • ${repaired} picture set${repaired===1?'':'s'} created`:'☁️ Connected');
+  if(p18Added.length) status(`☁️ Connected • ${p18Added.length} Perek 18 word${p18Added.length===1?'':'s'} added${repaired?` • ${repaired} picture set${repaired===1?'':'s'} created`:''}`);
+  else status(repaired?`☁️ Connected • ${repaired} picture set${repaired===1?'':'s'} created`:'☁️ Connected');
 }
 function renderAll(){renderDashboard();renderCatalog();renderLeaderboard()}
 function renderDashboard(){const arr=Object.entries(state.students),total=arr.reduce((n,[,s])=>n+learned(s).length,0),done=arr.filter(([,s])=>reviewDone(s).complete).length,time=arr.reduce((n,[,s])=>n+(s.totalActiveSeconds||0),0);$('teacherStats').innerHTML=[['Students',arr.length],['Learned cards',total],['Class study time',fmtSec(time)],['Review complete today',`${done}/${arr.length}`]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('');const body=$('teacherStudentsBody');body.innerHTML='';arr.sort((a,b)=>(a[1].name||a[0]).localeCompare(b[1].name||b[0])).forEach(([id,s])=>{const r=reviewDone(s),tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(s.name||id)}</b></td><td>${learned(s,'shorashim').length}</td><td>${learned(s,'prefix').length+learned(s,'suffix').length}</td><td>${fmtSec(s.totalActiveSeconds)}</td><td>${r.total?`${r.seen}/${r.total}${r.complete?' ✓':''}`:'—'}</td><td>${dateLabel(s.lastActive)}</td>`;tr.onclick=()=>openStudent(id);body.appendChild(tr)})}
