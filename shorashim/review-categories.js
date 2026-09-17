@@ -33,13 +33,17 @@
     }
   }
 
-  function cardsForReviewTrack(track = reviewTrack, s = student()) {
-    return learnedCards(s, track, false).filter(c => !!getItem(c.itemKey));
+  function cardsForReviewTrack(track = reviewTrack, s = student(), applyPerekFilter = true) {
+    let cards = learnedCards(s, track, false).filter(c => !!getItem(c.itemKey));
+    if (track === 'shorashim' && applyPerekFilter && typeof reviewPerekFilter !== 'undefined' && reviewPerekFilter !== 'all') {
+      cards = cards.filter(c => itemPerek(getItem(c.itemKey)) === Number(reviewPerekFilter));
+    }
+    return cards;
   }
 
   function reviewTrackProgress(track, s = student()) {
     const dr = ensureDailyReview(s);
-    const keys = cardsForReviewTrack(track, s).map(c => c.itemKey);
+    const keys = cardsForReviewTrack(track, s, false).map(c => c.itemKey);
     const seen = keys.filter(k => dr.seen[k]).length;
     return { seen, total: keys.length, complete: keys.length > 0 && seen === keys.length };
   }
@@ -60,6 +64,12 @@
     });
   }
 
+  function updatePerekFilterVisibility() {
+    const filter = document.querySelector('.review-perek-filter');
+    if (!filter) return;
+    filter.classList.toggle('hidden', reviewTrack !== 'shorashim');
+  }
+
   function selectReviewTrack(track) {
     if (!TRACK_META[track]) return;
     reviewTrack = track;
@@ -71,6 +81,7 @@
     document.getElementById('reviewEmpty')?.classList.add('hidden');
     document.getElementById('reviewSetup')?.classList.remove('hidden');
     updateReviewTrackTabs();
+    updatePerekFilterVisibility();
     renderReviewPicker();
     window.scrollTo(0, 0);
   }
@@ -80,6 +91,7 @@
       btn.onclick = () => selectReviewTrack(btn.dataset.reviewTrack);
     });
     updateReviewTrackTabs();
+    updatePerekFilterVisibility();
   }
 
   const originalBindReview = bindReview;
@@ -122,7 +134,7 @@
       row.className = 'review-pick-row' + (manual ? ' manual-draggable' : '');
       row.dataset.key = c.itemKey;
       row.draggable = manual;
-      row.innerHTML = `<label><input class="review-pick-check" type="checkbox" data-key="${escapeHTML(c.itemKey)}" checked> <b class="hebrew">${escapeHTML(item.front)}</b><span>${escapeHTML(item.english)}</span>${manual ? '<span class="review-drag-hint">↕ Drag to reorder</span>' : ''}</label>`;
+      row.innerHTML = `<label><input class="review-pick-check" type="checkbox" data-key="${escapeHTML(c.itemKey)}" checked> <b class="hebrew">${escapeHTML(item.front)}</b><span>${escapeHTML(item.english)}${reviewTrack==='shorashim'?` <em class="perek-badge">${reviewFilterLabel(item)}</em>`:''}</span>${manual ? '<span class="review-drag-hint">↕ Drag to reorder</span>' : ''}</label>`;
       box.appendChild(row);
     });
 
