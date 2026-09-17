@@ -363,6 +363,9 @@ function namedLists(){
   return [...new Set(['Main List',...saved,...fromItems])].sort((a,b)=>a.localeCompare(b));
 }
 function refreshNamedLists(prefer){const sel=$('teacherListName');if(!sel)return;const names=namedLists();const wanted=prefer||sel.value||'Main List';sel.innerHTML=names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');sel.value=names.includes(wanted)?wanted:'Main List'}
+function commonnessOf(item){const n=Number(item?.commonness??item?.commonnessScore??item?.frequency);return Number.isFinite(n)?Math.max(1,Math.min(10,Math.round(n))):null;}
+function needsTeacherApproval(item){const n=commonnessOf(item);return currentTrack==='shorashim'&&n!==null&&n<=5;}
+async function toggleTeacherApproval(id){const item=(state.catalog[currentTrack]||[]).find(x=>x.id===id);if(!item)return;item.teacherApproved=item.teacherApproved!==true;renderCatalog();await saveCatalog();}
 function renderCatalog(){
   currentTrack=$('teacherTrack').value;
   refreshNamedLists();
@@ -374,6 +377,7 @@ function renderCatalog(){
 
   $('teacherCatalog').innerHTML=list.map((i,idx)=>{
     const art=(Array.isArray(i.art)?i.art:[]).map(a=>`<button type="button" class="teacher-art-chip" data-a="art" data-art="${esc(a)}" title="Click to remove this picture">${esc(a)}</button>`).join('');
+    const commonness=commonnessOf(i),approvalNeeded=needsTeacherApproval(i),approvalBlock=approvalNeeded?`<div class="approval-box ${i.teacherApproved===true?'approved':'pending'}"><b>Commonness ${commonness}/10</b> — ${i.teacherApproved===true?'Approved for students':'Waiting for your approval'}<button data-a="approve" class="${i.teacherApproved===true?'ghost':'primary'}">${i.teacherApproved===true?'Remove Approval':'✓ Approve Word'}</button></div>`:(commonness?`<div class="mini-note">Commonness ${commonness}/10 • Automatically included</div>`:'');
     const artBlock=currentTrack==='shorashim'
       ? `<div class="teacher-art-preview">${art||'<span class="mini-note">No pictures yet</span>'}</div>
          <div class="mini-actions">
@@ -387,6 +391,7 @@ function renderCatalog(){
       <div>
         <b>${esc(i.english)}</b>
         <div class="mini-note">${currentTrack==='shorashim'?`<span class="unit-pill">${perekLabel(i)}</span> • `:''}${i.pasuk?`Pasuk ${esc(i.pasuk)} • `:''}${i.hidden?'Hidden from future learning':'Active'} • ${esc(chosen)}</div>
+        ${approvalBlock}
         ${artBlock}
       </div>
       <div class="mini-actions">
@@ -404,6 +409,8 @@ function renderCatalog(){
     row.querySelector('[data-a=edit]').onclick=()=>openEdit(id);
     row.querySelector('[data-a=hide]').onclick=()=>toggleHide(id);
     row.querySelector('[data-a=delete]').onclick=()=>deleteCatalogItem(id);
+    const approve=row.querySelector('[data-a=approve]');
+    if(approve)approve.onclick=()=>toggleTeacherApproval(id);
     const regen=row.querySelector('[data-a=regen]');
     if(regen) regen.onclick=()=>regeneratePictures(id);
     row.querySelectorAll('[data-a=art]').forEach(btn=>{
