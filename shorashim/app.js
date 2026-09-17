@@ -105,23 +105,16 @@ function vocalizedItemKey(item){
   return String(item?.front||'').normalize('NFC');
 }
 function normalizeCatalogUnits(catalog){
+  // Firebase is the authority for which words exist.  This function may tag
+  // existing records, but it must NEVER recreate a word that the teacher deleted.
   catalog=catalog||clone(DEFAULT_CATALOG);
   catalog.shorashim=Array.isArray(catalog.shorashim)?catalog.shorashim:[];
   catalog.shorashim.forEach(item=>{
     if(!item.perek)item.perek=String(item.id||'').startsWith('19-')?19:18;
   });
-  const ids=new Set(catalog.shorashim.map(x=>String(x.id||'')));
-  const exact=new Set(catalog.shorashim.map(vocalizedItemKey));
-  PEREK_19_SHORASHIM.forEach(item=>{
-    if(ids.has(item.id)||exact.has(vocalizedItemKey(item)))return;
-    catalog.shorashim.push(clone(item));
-    ids.add(item.id);
-    exact.add(vocalizedItemKey(item));
-  });
   return catalog;
 }
 DEFAULT_CATALOG.shorashim.forEach(item=>{item.perek=18;});
-PEREK_19_SHORASHIM.forEach(item=>DEFAULT_CATALOG.shorashim.push(clone(item)));
 
 const DEFAULT_STUDENTS = ['Levik Bendet','Menachem Epstein','Binyomin Fischer','Levi Lefkowitz','Ari Leimdorfer','Moshe Marrus','Mendel Wilansky','Leibel Wilansky'];
 
