@@ -5,6 +5,7 @@ const TEACHER_PASSCODE="vayeira5786";
 // AI picture-choice helper. Deploy the matching generateShorashimArt Cloud Function.
 const GENERATE_SHORASHIM_ART_URL="https://us-central1-b3-games.cloudfunctions.net/generateShorashimArt";
 let state={catalog:{shorashim:[],prefix:[],suffix:[]},settings:{minReviewMs:500,studentSiteOpen:true},students:{},leaderboards:{}};let currentTrack='shorashim';
+const CATALOG_SEED_VERSION=1; // One-time unit/Perek seed. Firebase remains authoritative afterward.
 
 /* ===== Perek 18 completion migration =====
    The class list previously stopped in pasuk 24 at "אולי יש חמשים ... בתוך העיר".
@@ -316,8 +317,12 @@ async function loadAll(){
   state.settings={minReviewMs:500,studentSiteOpen:true,...(b.val()||{})};
   state.students=c.val()||{};
   state.leaderboards=d.val()||{};
-  const p18Added=ensurePerek18FinalShorashim();
-  const unitMigration=ensurePerekUnitsAnd19();
+  // Seed the Perek-unit catalog only once.  The version flag is stored in Firebase,
+  // so a word deleted later stays deleted even after page reloads or file updates.
+  const needsCatalogSeed=Number(state.settings.catalogSeedVersion||0)<CATALOG_SEED_VERSION;
+  const p18Added=needsCatalogSeed?ensurePerek18FinalShorashim():[];
+  const unitMigration=needsCatalogSeed?ensurePerekUnitsAnd19():{tagged:0,added:[]};
+  if(needsCatalogSeed)state.settings.catalogSeedVersion=CATALOG_SEED_VERSION;
   const needsArt=(state.catalog.shorashim||[]).filter(hasBadAutoArt);
   let repaired=0;
   if(needsArt.length){
@@ -325,6 +330,7 @@ async function loadAll(){
     repaired=await fillArtForShorashim(needsArt);
   }
   if(repaired||p18Added.length||unitMigration.tagged||unitMigration.added.length) await db.ref(`${ROOT}/catalog`).set(state.catalog);
+  if(needsCatalogSeed)await db.ref(`${ROOT}/settings/catalogSeedVersion`).set(CATALOG_SEED_VERSION);
   $('teacherMinReview').value=String(state.settings.minReviewMs||500);
   renderStudentSiteControl();
   renderAll();
@@ -423,7 +429,7 @@ async function toggleHide(id){const i=(state.catalog[currentTrack]||[]).find(x=>
 async function deleteCatalogItem(id){
   const list=state.catalog[currentTrack]||[],i=list.find(x=>x.id===id);
   if(!i)return;
-  if(!confirm(`Permanently delete “${i.front}”?\n\nThis removes the word from the learning list completely. This cannot be undone.`))return;
+  if(!confirm(`Permanently delete “${i.front}”?\n\nThis removes the word from Firebase. It will stay deleted after page reloads and future website-file updates. This cannot be undone.`))return;
   state.catalog[currentTrack]=list.filter(x=>x.id!==id);
   renderCatalog();
   await saveCatalog();
