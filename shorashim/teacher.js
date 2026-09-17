@@ -40,11 +40,51 @@ function ensurePerek18FinalShorashim(){
     const f=hebrewKey(src.front),w=hebrewKey(src.hebrew);
     const exists=list.some(i=>i.id===src.id || hebrewKey(i.front)===f || (w&&hebrewKey(i.hebrew)===w));
     if(exists)continue;
-    const item={...src,listName:targetListName,art:[],autoArt:true,hidden:false};
+    const item={...src,perek:18,listName:targetListName,art:[],autoArt:true,hidden:false};
     list.push(item);added.push(item);
   }
   return added;
 }
+
+const PEREK19_SHORASHIM=[[1, "shnayim", "שְׁנַיִם", "שְׁנֵי", "two"], [1, "malach", "מַלְאָךְ", "הַמַּלְאָכִים", "angel / messenger"], [1, "erev", "עֶרֶב", "בָּעֶרֶב", "evening"], [1, "shaar", "שַׁעַר", "שַׁעַר", "gate"], [2, "sur", "סוּר", "סוּרוּ", "turn aside"], [2, "lun", "לוּן", "וְלִינוּ", "stay overnight"], [2, "shechem", "שְׁכֶם", "וְהִשְׁכַּמְתֶּם", "get up early"], [2, "rechov", "רְחוֹב", "בָרְחוֹב", "street / open square"], [3, "patzar", "פָּצַר", "וַיִּפְצַר", "urge strongly"], [3, "mishteh", "מִשְׁתֶּה", "מִשְׁתֶּה", "feast"], [3, "matzah", "מַצָּה", "מַצּוֹת", "matzah"], [3, "afah", "אָפָה", "וַיֹּאפֶה", "bake"], [4, "terem", "טֶרֶם", "טֶרֶם", "before / not yet"], [4, "shachav", "שָׁכַב", "יִשְׁכָּבוּ", "lie down"], [4, "savav", "סָבַב", "נָסַבּוּ", "surround"], [4, "ad", "עַד", "עַד", "until"], [4, "katzeh", "קָצֶה", "מִקָּצֶה", "edge / end"], [5, "lailah", "לַיְלָה", "הַלַּיְלָה", "night"], [5, "yatza", "יָצָא", "הוֹצֵא", "go out / take out"], [6, "delet", "דֶּלֶת", "הַדֶּלֶת", "door"], [6, "sagar", "סָגַר", "סָגָרוּ", "close"], [7, "ach", "אָח", "אַחַי", "brother"], [7, "raa", "רָעַע", "תָּרֵעוּ", "do evil"], [8, "bat", "בַּת", "בָנוֹת", "daughter"], [8, "rak", "רַק", "רַק", "only"], [8, "tzel", "צֵל", "בְּצֵל", "shade"], [8, "korah", "קוֹרָה", "קֹרָתִי", "roof beam / roof"], [9, "echad", "אֶחָד", "הָאֶחָד", "one"], [9, "gur", "גּוּר", "לָגוּר", "dwell as a stranger"], [9, "halah", "הָלְאָה", "הָלְאָה", "farther / onward"], [9, "shavar", "שָׁבַר", "וַיִּשְׁבֹּר", "break"], [10, "yad", "יָד", "יָדְךָ", "hand"], [11, "nakah", "נָכָה", "הִכּוּ", "strike"], [11, "sanverim", "סַנְוֵרִים", "בַּסַּנְוֵרִים", "blindness"], [11, "katan", "קָטֹן", "מִקָּטֹן", "small"], [11, "laah", "לָאָה", "וַיִּלְאוּ", "become weary"], [12, "mi", "מִי", "מִי", "who"], [12, "poh", "פֹּה", "פֹה", "here"], [12, "chatan", "חָתָן", "חָתָן", "son-in-law / bridegroom"], [15, "boker", "בֹּקֶר", "הַבֹּקֶר", "morning"], [15, "shachar", "שַׁחַר", "הַשַּׁחַר", "dawn"], [15, "alah", "עָלָה", "עֲלֵה", "rise / go up"], [15, "utz", "אוּץ", "וַיָּאִיצוּ", "urge / hurry"], [15, "pen", "פֶּן", "פֶּן", "lest"], [15, "avon", "עָוֹן", "בַּעֲוֹן", "sin"], [16, "hitmahmah", "הִתְמַהְמֵהַּ", "וַיִּתְמַהְמָהּ", "linger"], [16, "chazak", "חָזַק", "וַיַּחֲזִקוּ", "hold strongly"], [16, "chamal", "חָמַל", "בְּחֶמְלַת", "have compassion"], [16, "nuach", "נוּחַ", "וַיַּנִּחֻהוּ", "place / set down"], [16, "chutz", "חוּץ", "מִחוּץ", "outside"], [17, "malat", "מָלַט", "הִמָּלֵט", "escape"], [17, "nefesh", "נֶפֶשׁ", "נַפְשֶׁךָ", "life / soul"], [17, "navat", "נָבַט", "תַּבִּיט", "look"], [17, "kikar", "כִּכָּר", "הַכִּכָּר", "plain / district"], [17, "har", "הַר", "הָהָרָה", "mountain"], [19, "chesed", "חֶסֶד", "חַסְדְּךָ", "kindness"], [19, "yachol", "יָכֹל", "אוּכַל", "be able"], [19, "davak", "דָּבַק", "תִּדְבָּקַנִי", "cling / catch up"], [20, "nus", "נוּס", "לָנוּס", "flee"], [20, "tzoar", "צָעִיר", "מִצְעָר", "small / little"], [21, "bilti", "בִּלְתִּי", "לְבִלְתִּי", "not"], [21, "hafach", "הָפַךְ", "הָפְכִּי", "overturn"], [21, "gam", "גַּם", "גַּם", "also"], [23, "shemesh", "שֶׁמֶשׁ", "הַשֶּׁמֶשׁ", "sun"], [24, "matar", "מָטַר", "הִמְטִיר", "rain down"], [24, "gafrit", "גׇּפְרִית", "גׇּפְרִית", "sulfur"], [24, "esh", "אֵשׁ", "וָאֵשׁ", "fire"], [24, "shamayim", "שָׁמַיִם", "הַשָּׁמָיִם", "heavens"], [25, "tzemach", "צֶמַח", "צֶמַח", "plant / growth"], [25, "adamah", "אֲדָמָה", "הָאֲדָמָה", "ground"], [26, "melach", "מֶלַח", "מֶלַח", "salt"], [28, "kitor", "קִיטוֹר", "קִיטֹר", "smoke"], [28, "kivshan", "כִּבְשָׁן", "הַכִּבְשָׁן", "furnace"], [29, "zachar", "זָכַר", "וַיִּזְכֹּר", "remember"], [30, "mearah", "מְעָרָה", "בַּמְּעָרָה", "cave"], [31, "bechor", "בְּכוֹר", "הַבְּכִירָה", "older / firstborn"], [31, "av", "אָב", "אָבִינוּ", "father"], [31, "ayin-none", "אַיִן", "אַיִן", "none / there is no"], [32, "shakah", "שָׁקָה", "וְנַשְׁקֶה", "give to drink"], [32, "yayin", "יַיִן", "יַיִן", "wine"], [32, "zera", "זֶרַע", "זֶרַע", "offspring / seed"], [34, "mochorat", "מָחֳרָת", "מִמָּחֳרָת", "next day"], [34, "emesh", "אֶמֶשׁ", "אֶמֶשׁ", "last night"], [36, "harah", "הָרָה", "וַתַּהֲרֶיןָ", "become pregnant"]].map(([pasuk,slug,front,hebrew,english])=>({
+  id:`19-${pasuk}-${slug}`,
+  perek:19,
+  listName:'Main List',
+  pasuk:String(pasuk),
+  front,
+  hebrew,
+  english,
+  art:[],
+  autoArt:true,
+  hidden:false
+}));
+function perekOf(i){return Number(i?.perek)||18}
+function perekLabel(i){return perekOf(i)===19?'Perek י״ט':'Perek י״ח'}
+function vocalizedCatalogKey(i){return String(i?.front||'').normalize('NFC')}
+function ensurePerekUnitsAnd19(){
+  state.catalog=state.catalog||{};
+  const list=state.catalog.shorashim=Array.isArray(state.catalog.shorashim)?state.catalog.shorashim:[];
+  let tagged=0;
+  for(const item of list){
+    if(!item.perek){
+      item.perek=String(item.id||'').startsWith('19-')?19:18;
+      tagged++;
+    }
+  }
+  const ids=new Set(list.map(i=>String(i.id||'')));
+  const exact=new Set(list.map(vocalizedCatalogKey));
+  const added=[];
+  for(const src of PEREK19_SHORASHIM){
+    if(ids.has(src.id)||exact.has(vocalizedCatalogKey(src)))continue;
+    const item={...src};
+    list.push(item);
+    ids.add(item.id);
+    exact.add(vocalizedCatalogKey(item));
+    added.push(item);
+  }
+  return {tagged,added};
+}
+
 const teacherArtStyle=document.createElement('style');
 teacherArtStyle.textContent=`
 .teacher-art-preview{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
@@ -277,23 +317,28 @@ async function loadAll(){
   state.students=c.val()||{};
   state.leaderboards=d.val()||{};
   const p18Added=ensurePerek18FinalShorashim();
+  const unitMigration=ensurePerekUnitsAnd19();
   const needsArt=(state.catalog.shorashim||[]).filter(hasBadAutoArt);
   let repaired=0;
   if(needsArt.length){
     status(`☁️ Creating picture choices for ${needsArt.length} word${needsArt.length===1?'':'s'}…`,'syncing');
     repaired=await fillArtForShorashim(needsArt);
   }
-  if(repaired||p18Added.length) await db.ref(`${ROOT}/catalog`).set(state.catalog);
+  if(repaired||p18Added.length||unitMigration.tagged||unitMigration.added.length) await db.ref(`${ROOT}/catalog`).set(state.catalog);
   $('teacherMinReview').value=String(state.settings.minReviewMs||500);
   renderStudentSiteControl();
   renderAll();
-  if(p18Added.length) status(`☁️ Connected • ${p18Added.length} Perek 18 word${p18Added.length===1?'':'s'} added${repaired?` • ${repaired} picture set${repaired===1?'':'s'} created`:''}`);
-  else status(repaired?`☁️ Connected • ${repaired} picture set${repaired===1?'':'s'} created`:'☁️ Connected');
+  const updates=[];
+  if(p18Added.length)updates.push(`${p18Added.length} Perek 18 word${p18Added.length===1?'':'s'} added`);
+  if(unitMigration.tagged)updates.push(`${unitMigration.tagged} existing word${unitMigration.tagged===1?'':'s'} tagged Perek 18`);
+  if(unitMigration.added.length)updates.push(`${unitMigration.added.length} Perek 19 word${unitMigration.added.length===1?'':'s'} added`);
+  if(repaired)updates.push(`${repaired} picture set${repaired===1?'':'s'} created`);
+  status(updates.length?`☁️ Connected • ${updates.join(' • ')}`:'☁️ Connected');
 }
 function renderAll(){renderDashboard();renderCatalog();renderLeaderboard()}
 function renderDashboard(){const arr=Object.entries(state.students),total=arr.reduce((n,[,s])=>n+learned(s).length,0),done=arr.filter(([,s])=>reviewDone(s).complete).length,time=arr.reduce((n,[,s])=>n+(s.totalActiveSeconds||0),0);$('teacherStats').innerHTML=[['Students',arr.length],['Learned cards',total],['Class study time',fmtSec(time)],['Review complete today',`${done}/${arr.length}`]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('');const body=$('teacherStudentsBody');body.innerHTML='';arr.sort((a,b)=>(a[1].name||a[0]).localeCompare(b[1].name||b[0])).forEach(([id,s])=>{const r=reviewDone(s),tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(s.name||id)}</b></td><td>${learned(s,'shorashim').length}</td><td>${learned(s,'prefix').length+learned(s,'suffix').length}</td><td>${fmtSec(s.totalActiveSeconds)}</td><td>${r.total?`${r.seen}/${r.total}${r.complete?' ✓':''}`:'—'}</td><td>${dateLabel(s.lastActive)}</td>`;tr.onclick=()=>openStudent(id);body.appendChild(tr)})}
-function openStudent(id){const s=state.students[id];if(!s)return;const cards=learned(s);$('studentDetail').classList.remove('hidden');$('studentDetail').innerHTML=`<div class="student-detail-head"><div><div class="eyebrow">Student details</div><h2>${esc(s.name||id)}</h2></div><button id="closeStudentCloud" class="ghost">Close</button></div><div class="teacher-grid">${[['Shorashim',learned(s,'shorashim').length],['Affixes',learned(s,'prefix').length+learned(s,'suffix').length],['Study time',fmtSec(s.totalActiveSeconds)],['Sessions',(s.sessions||[]).length+(s.activeSession?1:0)]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('')}</div><h3>Learning history</h3><div>${cards.slice().sort((a,b)=>b.learnedAt-a.learnedAt).map(c=>{const i=itemFor(c.itemKey);return`<div class="history-row-cloud"><b dir="rtl">${esc(i?.front||c.itemId)}</b><span>${esc(i?.english||'')}</span><span>${esc(c.itemType)}</span><span>${dateLabel(c.learnedAt)}</span></div>`}).join('')||'<p>No learned cards yet.</p>'}</div><h3>Card gallery</h3><div class="teacher-gallery">${cards.map(cardHTML).join('')}</div>`;$('closeStudentCloud').onclick=()=>$('studentDetail').classList.add('hidden');$('studentDetail').scrollIntoView({behavior:'smooth'})}
-function cardHTML(c){const i=itemFor(c.itemKey);if(!i)return'';const d=c.design||{},arts=(d.arts||[]).map(a=>a.kind==='illustration'?`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;width:${(a.size||84)*.55}px;height:${(a.size||84)*.4}px"><img src="${esc(a.value)}"></div>`:`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;font-size:${(a.size||84)*.55}px">${a.value||''}</div>`).join('');return`<div class="teacher-card-mini"><div class="teacher-card-face" style="background:${d.backgroundColor||'#fff9e8'}"><div class="term" style="left:${d.hebrewPos?.left||50}%;top:${d.hebrewPos?.top||28}%;font-size:${Math.min(34,(d.hebrewSize||58)*.55)}px;color:${d.hebrewColor||'#222'}">${esc(i.front)}</div>${arts}${d.drawing?`<img class="drawing" src="${esc(d.drawing)}">`:''}</div><div class="teacher-card-meta">${esc(i.english)} • ${dateLabel(c.learnedAt)}</div></div>`}
+function openStudent(id){const s=state.students[id];if(!s)return;const cards=learned(s);$('studentDetail').classList.remove('hidden');$('studentDetail').innerHTML=`<div class="student-detail-head"><div><div class="eyebrow">Student details</div><h2>${esc(s.name||id)}</h2></div><button id="closeStudentCloud" class="ghost">Close</button></div><div class="teacher-grid">${[['Shorashim',learned(s,'shorashim').length],['Affixes',learned(s,'prefix').length+learned(s,'suffix').length],['Study time',fmtSec(s.totalActiveSeconds)],['Sessions',(s.sessions||[]).length+(s.activeSession?1:0)]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('')}</div><h3>Learning history</h3><div>${cards.slice().sort((a,b)=>b.learnedAt-a.learnedAt).map(c=>{const i=itemFor(c.itemKey);return`<div class="history-row-cloud"><b dir="rtl">${esc(i?.front||c.itemId)}</b><span>${esc(i?.english||'')}</span><span>${esc(c.itemType)}${c.itemType==='shorashim'&&i?` • ${perekLabel(i)}`:''}</span><span>${dateLabel(c.learnedAt)}</span></div>`}).join('')||'<p>No learned cards yet.</p>'}</div><h3>Card gallery</h3><div class="teacher-gallery">${cards.map(cardHTML).join('')}</div>`;$('closeStudentCloud').onclick=()=>$('studentDetail').classList.add('hidden');$('studentDetail').scrollIntoView({behavior:'smooth'})}
+function cardHTML(c){const i=itemFor(c.itemKey);if(!i)return'';const d=c.design||{},arts=(d.arts||[]).map(a=>a.kind==='illustration'?`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;width:${(a.size||84)*.55}px;height:${(a.size||84)*.4}px"><img src="${esc(a.value)}"></div>`:`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;font-size:${(a.size||84)*.55}px">${a.value||''}</div>`).join('');return`<div class="teacher-card-mini"><div class="teacher-card-face" style="background:${d.backgroundColor||'#fff9e8'}"><div class="term" style="left:${d.hebrewPos?.left||50}%;top:${d.hebrewPos?.top||28}%;font-size:${Math.min(34,(d.hebrewSize||58)*.55)}px;color:${d.hebrewColor||'#222'}">${esc(i.front)}</div>${arts}${d.drawing?`<img class="drawing" src="${esc(d.drawing)}">`:''}</div><div class="teacher-card-meta">${esc(i.english)}${c.itemType==='shorashim'?` • ${perekLabel(i)}`:''} • ${dateLabel(c.learnedAt)}</div></div>`}
 function listNameOf(i){return i.listName||'Main List'}
 function namedLists(){
   state.settings.namedLists=state.settings.namedLists||{};
@@ -306,8 +351,10 @@ function renderCatalog(){
   currentTrack=$('teacherTrack').value;
   refreshNamedLists();
   const chosen=$('teacherListName')?.value||'Main List',
+        perekFilter=$('teacherPerekFilter')?.value||'all',
         all=state.catalog[currentTrack]||[],
-        list=all.filter(i=>listNameOf(i)===chosen);
+        list=all.filter(i=>listNameOf(i)===chosen).filter(i=>currentTrack!=='shorashim'||perekFilter==='all'||perekOf(i)===Number(perekFilter));
+  const perekWrap=$('teacherPerekWrap');if(perekWrap)perekWrap.classList.toggle('hidden',currentTrack!=='shorashim');
 
   $('teacherCatalog').innerHTML=list.map((i,idx)=>{
     const art=(Array.isArray(i.art)?i.art:[]).map(a=>`<button type="button" class="teacher-art-chip" data-a="art" data-art="${esc(a)}" title="Click to remove this picture">${esc(a)}</button>`).join('');
@@ -323,7 +370,7 @@ function renderCatalog(){
       <div class="hebrew">${esc(i.front)}</div>
       <div>
         <b>${esc(i.english)}</b>
-        <div class="mini-note">${i.pasuk?`Pasuk ${esc(i.pasuk)} • `:''}${i.hidden?'Hidden from future learning':'Active'} • ${esc(chosen)}</div>
+        <div class="mini-note">${currentTrack==='shorashim'?`<span class="unit-pill">${perekLabel(i)}</span> • `:''}${i.pasuk?`Pasuk ${esc(i.pasuk)} • `:''}${i.hidden?'Hidden from future learning':'Active'} • ${esc(chosen)}</div>
         ${artBlock}
       </div>
       <div class="mini-actions">
@@ -369,7 +416,7 @@ async function removePictureChoice(id,artValue){
   await saveCatalog();
 }
 
-async function moveNamed(id,dir){const all=state.catalog[currentTrack],chosen=$('teacherListName').value,list=all.filter(i=>listNameOf(i)===chosen),i=list.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=list.length)return;const ai=all.indexOf(list[i]),aj=all.indexOf(list[j]);[all[ai],all[aj]]=[all[aj],all[ai]];renderCatalog();await saveCatalog()}
+async function moveNamed(id,dir){const all=state.catalog[currentTrack],chosen=$('teacherListName').value,pf=$('teacherPerekFilter')?.value||'all',list=all.filter(i=>listNameOf(i)===chosen).filter(i=>currentTrack!=='shorashim'||pf==='all'||perekOf(i)===Number(pf)),i=list.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=list.length)return;const ai=all.indexOf(list[i]),aj=all.indexOf(list[j]);[all[ai],all[aj]]=[all[aj],all[ai]];renderCatalog();await saveCatalog()}
 async function saveCatalog(){status('☁️ Saving…','syncing');await db.ref(`${ROOT}/catalog`).set(state.catalog);status('☁️ Saved')}
 async function move(id,dir){const l=state.catalog[currentTrack],i=l.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=l.length)return;[l[i],l[j]]=[l[j],l[i]];renderCatalog();await saveCatalog()}
 async function toggleHide(id){const i=(state.catalog[currentTrack]||[]).find(x=>x.id===id);if(!i)return;if(!i.hidden&&!confirm(`Remove “${i.front}” from the student learning list?\n\nIt will no longer appear in future learning or review. Any existing student history will be kept, and you can Restore the item later.`))return;i.hidden=!i.hidden;renderCatalog();await saveCatalog()}
@@ -381,7 +428,23 @@ async function deleteCatalogItem(id){
   renderCatalog();
   await saveCatalog();
 }
-function openEdit(id=null){const i=id?(state.catalog[currentTrack]||[]).find(x=>x.id===id):null;$('tDialogTitle').textContent=i?'Edit Item':'Add Item';$('tEditId').value=i?.id||'';$('tListName').value=i?listNameOf(i):($('teacherListName')?.value||'Main List');$('tFront').value=i?.front||'';$('tEnglish').value=i?.english||'';$('tPasuk').value=i?.pasuk||'';$('tWord').value=i?.hebrew||'';$('tExamples').value=(i?.examples||[]).map(x=>`${x.hebrew} | ${x.english}`).join('\n');$('tWordWrap').classList.toggle('hidden',currentTrack!=='shorashim');$('tExamplesWrap').classList.toggle('hidden',currentTrack==='shorashim');$('teacherCatalogDialog').showModal()}
+function openEdit(id=null){
+  const i=id?(state.catalog[currentTrack]||[]).find(x=>x.id===id):null;
+  $('tDialogTitle').textContent=i?'Edit Item':'Add Item';
+  $('tEditId').value=i?.id||'';
+  $('tListName').value=i?listNameOf(i):($('teacherListName')?.value||'Main List');
+  const selectedPerek=$('teacherPerekFilter')?.value;
+  $('tPerek').value=String(i?perekOf(i):(selectedPerek&&selectedPerek!=='all'?selectedPerek:19));
+  $('tFront').value=i?.front||'';
+  $('tEnglish').value=i?.english||'';
+  $('tPasuk').value=i?.pasuk||'';
+  $('tWord').value=i?.hebrew||'';
+  $('tExamples').value=(i?.examples||[]).map(x=>`${x.hebrew} | ${x.english}`).join('\n');
+  $('tWordWrap').classList.toggle('hidden',currentTrack!=='shorashim');
+  $('tExamplesWrap').classList.toggle('hidden',currentTrack==='shorashim');
+  $('tPerekWrap').classList.toggle('hidden',currentTrack!=='shorashim');
+  $('teacherCatalogDialog').showModal();
+}
 async function saveEdit(e){
   e.preventDefault();
   const l=state.catalog[currentTrack],id=$('tEditId').value;
@@ -395,6 +458,7 @@ async function saveEdit(e){
   i.english=$('tEnglish').value.trim();
   i.pasuk=$('tPasuk').value.trim();
   if(currentTrack==='shorashim'){
+    i.perek=Number($('tPerek').value)||18;
     i.hebrew=$('tWord').value.trim();
     // New words and edited meanings get fresh AI-selected picture choices.
     i.autoArt=true;
@@ -437,6 +501,7 @@ $('teacherPasscode').addEventListener('keydown',e=>{if(e.key==='Enter')$('teache
 $('teacherLogout').onclick=()=>{sessionStorage.removeItem('shorashimTeacher');location.reload()};
 $('teacherTrack').onchange=()=>{refreshNamedLists();renderCatalog()};
 $('teacherListName').onchange=renderCatalog;
+$('teacherPerekFilter').onchange=renderCatalog;
 $('teacherNewList').onclick=async()=>{
   const n=prompt('Name the new learning list:');if(!n?.trim())return;
   const name=n.trim();state.settings.namedLists=state.settings.namedLists||{};
@@ -446,7 +511,14 @@ $('teacherNewList').onclick=async()=>{
   status('☁️ Saving…','syncing');await db.ref(`${ROOT}/settings`).set(state.settings);status('☁️ Saved');
   refreshNamedLists(name);renderCatalog();$('teacherListName').value=name;renderCatalog()
 };
-$('teacherBulkAdd').onclick=()=>{$('bulkListLabel').textContent=$('teacherListName').value||'Main List';$('bulkItems').value='';$('teacherBulkDialog').showModal()};
+$('teacherBulkAdd').onclick=()=>{
+  $('bulkListLabel').textContent=$('teacherListName').value||'Main List';
+  const pf=$('teacherPerekFilter')?.value||'all';
+  $('bulkPerekLabel').textContent=currentTrack==='shorashim'?(pf==='18'?'Perek י״ח':'Perek י״ט'):'';
+  $('bulkPerekLabel').style.display=currentTrack==='shorashim'?'inline-block':'none';
+  $('bulkItems').value='';
+  $('teacherBulkDialog').showModal();
+};
 $('saveBulkItems').onclick=async e=>{
   e.preventDefault();
   const name=$('teacherListName').value||'Main List',
@@ -467,6 +539,8 @@ $('saveBulkItems').onclick=async e=>{
       hidden:false
     };
     if(isShoreshim){
+      const pf=$('teacherPerekFilter')?.value||'all';
+      item.perek=pf==='18'?18:19;
       item.hebrew=parts[2]||parts[0];
       item.pasuk=parts[3]||'';
     }
