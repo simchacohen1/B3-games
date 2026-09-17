@@ -305,7 +305,7 @@
     [/\blittle\b|\bfew\b|small amount|morsel/,['🤏','1️⃣','🔹','🐜']],
     [/\bbig\b|\bgreat\b|\blarge\b/,['🐘','⬆️','🔷','💪']],
     [/\bsmall\b|\blittle\b/,['🐜','🤏','🔹','🐭']],
-    [/\bold\b|elder/,['👴','🕰️','📜','⌛']],
+    [/\bold\b|elder|elderly|aged/,['🦯','⌛','🕰️','📜']],
     [/\bnew\b/,['🆕','🌱','🎁','✨']],
     [/soft|tender/,['🧸','☁️','🪶','🤲']],
     [/\bgood\b|fine|excellent/,['👍','⭐','😊','✅']],
