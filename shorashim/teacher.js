@@ -126,10 +126,14 @@ function isClassSafeArtChoice(value){
   return true;
 }
 
-function sanitizeClassArt(art){
+function sanitizeClassArtPool(art){
   return [...new Set((Array.isArray(art)?art:[])
     .map(x=>String(x||'').trim())
-    .filter(isClassSafeArtChoice))].slice(0,4);
+    .filter(isClassSafeArtChoice))];
+}
+
+function sanitizeClassArt(art){
+  return sanitizeClassArtPool(art).slice(0,4);
 }
 
 const SMART_ART_RULES=[
@@ -196,7 +200,7 @@ const SMART_ART_RULES=[
   [/\bdown\b|\bbelow\b/,['⬇️','👇','🪜','📉']],
   [/\bbig\b|\bgreat\b|\blarge\b/,['🐘','⬆️','🔷','💪']],
   [/\bsmall\b|\blittle\b/,['🐜','🤏','🔹','🐭']],
-  [/\bold\b|elder/,['👴','🕰️','📜','⌛']],
+  [/\bold\b|elder|elderly|aged/,['🦯','⌛','🕰️','📜']],
   [/\bnew\b/,['✨','🆕','🌱','🎁']],
   [/\bnight\b/,['🌙','⭐','🌌','🛏️']],
   [/\bmorning\b/,['🌅','☀️','⏰','☕']],
@@ -227,13 +231,19 @@ const SMART_ART_FALLBACK=['🎯','💡','📖','🧩','🔎','🌟','📌','🧠
 function hasOnlyGenericArt(art){
   return !Array.isArray(art)||!art.length||art.every(x=>GENERIC_ART_CHOICES.has(x));
 }
-function smartArtFor(english='',front=''){
+function smartArtCandidatesFor(english='',front=''){
   const text=`${english} ${front}`.toLowerCase();
   const found=[];
   const add=v=>{if(v&&!found.includes(v))found.push(v)};
   SMART_ART_RULES.forEach(([re,choices])=>{if(re.test(text))choices.forEach(add)});
+  // Keep the full pool here so Regenerate Pictures can deliberately choose
+  // alternatives that are different from the pictures already on the word.
+  return sanitizeClassArtPool(found);
+}
+
+function smartArtFor(english='',front=''){
   // Offline fallback must never pad with unrelated brain/lightbulb/arrow icons.
-  return sanitizeClassArt(found);
+  return smartArtCandidatesFor(english,front).slice(0,4);
 }
 function hasBadAutoArt(item){
   const art=Array.isArray(item?.art)?item.art:[];
@@ -405,11 +415,45 @@ function renderCatalog(){
 async function regeneratePictures(id){
   const item=(state.catalog[currentTrack]||[]).find(x=>x.id===id);
   if(!item)return;
-  status('☁️ Regenerating pictures…','syncing');
-  item.autoArt=true;
-  await fillArtForShorashim([item],{force:true});
+
+  const before=sanitizeClassArt(item.art||[]);
+  status('☁️ Looking for different matching pictures…','syncing');
+
+  // First ask the AI picture helper for a fresh semantic set.
+  const ai=await generateAiArtForItems([item]);
+  const aiChoices=sanitizeClassArtPool(ai.get(String(item.id))||[]);
+
+  // Then add any locally-known semantic alternatives.  Most importantly,
+  // remove pictures already showing before deciding whether regeneration worked.
+  // This prevents the button from appearing to do nothing when AI repeats itself.
+  const localChoices=smartArtCandidatesFor(item.english,item.front);
+  const fresh=[];
+  const addFresh=value=>{
+    if(!value||before.includes(value)||fresh.includes(value))return;
+    fresh.push(value);
+  };
+  aiChoices.forEach(addFresh);
+  localChoices.forEach(addFresh);
+
+  if(!fresh.length){
+    item.autoArt=false;
+    status('☁️ No different matching pictures found');
+    alert(`No additional clear picture choices were found for “${item.front} — ${item.english}”.\n\nThe current pictures were kept.`);
+    return;
+  }
+
+  // Put genuinely new choices first. If there are fewer than four good new
+  // choices, keep the strongest existing choices at the end rather than padding
+  // the set with unrelated symbols.
+  const combined=[...fresh,...before.filter(x=>!fresh.includes(x))];
+  item.art=sanitizeClassArt(combined);
+  item.autoArt=false;
+  item.aiArtGenerated=true;
+  item.aiArtGeneratedAt=Date.now();
+
   renderCatalog();
   await saveCatalog();
+  status(`☁️ Saved • ${Math.min(fresh.length,4)} new picture choice${Math.min(fresh.length,4)===1?'':'s'}`);
 }
 
 async function removePictureChoice(id,artValue){
