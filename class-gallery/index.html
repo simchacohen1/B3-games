@@ -167,7 +167,7 @@ button,input,select,textarea{font:inherit}
     <button class="glass-btn" id="teacherReviewBtn">Teacher</button>
     <span class="pending-note" id="pendingNote"></span>
   </div>
-  <div class="start-help" id="startHelp">↑ ↓ walk &nbsp; • &nbsp; ← → turn &nbsp; • &nbsp; drag the hallway to look around &nbsp; • &nbsp; click a board, name, or far-away paper to go there</div>
+  <div class="start-help" id="startHelp">↑ ↓ move &nbsp; • &nbsp; ← → turn &nbsp; • &nbsp; drag to look around &nbsp; • &nbsp; click to visit (click-to-go is off during Tag)</div>
   <div class="touch-pad" aria-label="Touch movement controls">
     <button class="touch-btn up" data-move="forward">▲</button>
     <button class="touch-btn down" data-move="back">▼</button>
@@ -341,6 +341,7 @@ let scene,camera,renderer,clock,avatar,avatarParts={};
 let worldGroup,projectMeshes=[],interactiveMeshes=[],navigationMeshes=[];
 let hallMinZ=-70,hallMaxZ=70,moveMinX=-3.15,moveMaxX=3.15;
 let cameraMinX=-3.78,cameraMaxX=3.78,cameraMinZ=-69.5,cameraMaxZ=69.5;
+let hallCollisionObstacles=[];
 const pressed={forward:false,back:false,left:false,right:false};
 const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
 let dragging=false,dragStartX=0,dragLastX=0,dragMoved=0,pointerDownAt=0;
@@ -364,7 +365,7 @@ let avatarChooserFirstVisit=!localStorage.getItem(AVATAR_STORAGE_KEY);
 
 /* ---------- live classmates ----------
    Identity comes from the existing B3 Games login. Unknown IDs never enter
-   presence, and clients only listen to their own ET or WT roster branch. */
+   presence. Regular gallery presence stays track-specific; Tag temporarily combines ET + WT. */
 const PRESENCE_STUDENTS={
   chaim_chaikin:{name:'Mayer Chaim Chaikin',classId:'et'},mayer_chaim_chaikin:{name:'Mayer Chaim Chaikin',classId:'et'},
   yossi_gourarie:{name:'Yossi Gourarie',classId:'et'},sholom_huebner:{name:'Sholom DovBer Huebner',classId:'et'},sholom_dovber_huebner:{name:'Sholom DovBer Huebner',classId:'et'},
@@ -384,13 +385,14 @@ const presenceSettingsRef=window.firebase?firebase.database().ref('b3Games/class
 const tagSettingsRef=window.firebase?firebase.database().ref('b3Games/classGalleryPresenceSettings/tagEnabled'):null;
 const tagRoot=window.firebase?firebase.database().ref('b3Games/classGalleryTag'):null;
 let livePresenceEnabled=true,presenceStarted=false,presenceOwnRef=null,presenceClassRef=null,presenceValueHandler=null;
-let presenceHeartbeat=null,lastPresenceWrite=0,lastPresencePayload='';
+let presenceHeartbeat=null,presenceWatchdog=null,lastPresenceWrite=0,lastPresencePayload='',lastPresenceSnapshotAt=0;
 let remoteAvatarsGroup=null,remoteAvatars=new Map(),latestPresenceStudents=new Map();
 let teacherPresenceRef=null,teacherPresenceHandler=null;
 let teacherPresenceViewer=localStorage.getItem('b3TeacherBypass')==='1';
 let tagGameEnabled=false,tagOptedIn=false,tagClassRef=null,tagStateHandler=null,tagState={};
 let tagAttemptBusy=false,lastTagAttemptAt=0,lastSeenTagEvent='',tagPopTimer=null;
-const TAG_DISTANCE=1.18,TAG_GRACE_MS=3000;
+let tagActivityWriteAt=0,lastTagIdleCheckAt=0,tagIdleWarnKey='';
+const TAG_DISTANCE=1.18,TAG_GRACE_MS=3000,TAG_IDLE_WARN_MS=15000,TAG_IDLE_REASSIGN_MS=26000;
 
 if(presenceSettingsRef){
   presenceSettingsRef.on('value',snap=>{
@@ -421,6 +423,54 @@ function makeCorkTexture(){
   const c=document.createElement('canvas');c.width=c.height=512;const ctx=c.getContext('2d');ctx.fillStyle='#bd8550';ctx.fillRect(0,0,512,512);for(let i=0;i<7200;i++){const x=Math.random()*512,y=Math.random()*512,r=Math.random()*1.7+.4;ctx.fillStyle=Math.random()>.5?'rgba(91,52,25,.16)':'rgba(255,229,190,.16)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;return t;
 }
 function addBox(parent,w,h,d,mat,x,y,z,cast=true,receive=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=cast;m.receiveShadow=receive;parent.add(m);return m;}
+function addHallObstacleSegment(x,z,w,d,yaw,wallMat,trimMat){
+  const wall=addBox(worldGroup,w,3.15,d,wallMat,x,1.575,z,false,true);wall.rotation.y=yaw;
+  const top=addBox(worldGroup,w+.18,.24,d+.18,trimMat,x,3.16,z,false,true);top.rotation.y=yaw;
+  const base=addBox(worldGroup,w+.18,.28,d+.18,trimMat,x,.18,z,false,true);base.rotation.y=yaw;
+  hallCollisionObstacles.push({x,z,halfW:w/2,halfD:d/2,yaw});
+}
+function resolveHallCollision(oldX,oldZ){
+  if(sceneMode!=='hallway'||!hallCollisionObstacles.length)return false;
+  const radius=.43;let collided=false;
+  for(let pass=0;pass<3;pass++){
+    let changed=false;
+    for(const ob of hallCollisionObstacles){
+      const dx=avatarState.x-ob.x,dz=avatarState.z-ob.z,c=Math.cos(ob.yaw),sn=Math.sin(ob.yaw);
+      const lx=dx*c-dz*sn,lz=dx*sn+dz*c;
+      const limX=ob.halfW+radius,limZ=ob.halfD+radius;
+      if(Math.abs(lx)>=limX||Math.abs(lz)>=limZ)continue;
+      collided=changed=true;
+      const pushX=limX-Math.abs(lx),pushZ=limZ-Math.abs(lz);
+      let nx=lx,nz=lz;
+      if(pushX<pushZ)nx=(lx<0?-1:1)*limX;else nz=(lz<0?-1:1)*limZ;
+      const wx=nx*c+nz*sn,wz=-nx*sn+nz*c;
+      avatarState.x=ob.x+wx;avatarState.z=ob.z+wz;
+    }
+    if(!changed)break;
+  }
+  // If an old browser position somehow starts inside a divider, the push-out above
+  // ejects it to the nearest open route instead of freezing the student in the wall.
+  return collided;
+}
+
+
+function hallCameraSafeT(startX,startZ,endX,endZ){
+  if(sceneMode!=='hallway'||!hallCollisionObstacles.length)return 1;
+  let safe=1;
+  // Sample the short third-person camera segment so it stays on the player's
+  // side of the curved divider instead of clipping inside the wall.
+  for(let i=2;i<=24;i++){
+    const t=i/24,x=startX+(endX-startX)*t,z=startZ+(endZ-startZ)*t;
+    for(const ob of hallCollisionObstacles){
+      const dx=x-ob.x,dz=z-ob.z,c=Math.cos(ob.yaw),sn=Math.sin(ob.yaw);
+      const lx=dx*c-dz*sn,lz=dx*sn+dz*c;
+      if(Math.abs(lx)<ob.halfW+.12&&Math.abs(lz)<ob.halfD+.12){safe=Math.min(safe,Math.max(.12,(i-2)/24));break;}
+    }
+    if(safe<1)break;
+  }
+  return safe;
+}
+
 
 function createHallwayRenderer(){
   // A high-performance GPU request can be rejected even when ordinary WebGL works.
@@ -473,7 +523,7 @@ function buildScene(){
 function buildHallway(){
   resetWorld();
   moveMinX=-5.75;moveMaxX=5.75;
-  studentHallPositions={};hallDoorPositions={};
+  hallCollisionObstacles=[];studentHallPositions={};hallDoorPositions={};
 
   const approved=posts.filter(p=>p.status==='approved' && (!p.galleryRoom || p.galleryRoom==='hallway'));
   const byStudent={};approved.forEach(p=>(byStudent[p.studentName]=byStudent[p.studentName]||[]).push(p));
@@ -521,13 +571,18 @@ function buildHallway(){
   addBox(worldGroup,.09,.26,length,trimMat,-6.56,.24,0,false,true);addBox(worldGroup,.09,.26,length,trimMat,6.56,.24,0,false,true);
   addBox(worldGroup,.09,.16,length,trimMat,-6.56,1.08,0,false,true);addBox(worldGroup,.09,.16,length,trimMat,6.56,1.08,0,false,true);
 
-  // The center island creates two chase routes that reconnect at both ends.
-  const forkLength=Math.min(34,Math.max(24,length*.22));
-  addBox(worldGroup,3.15,3.15,forkLength,wallMat,0,1.575,0,false,true);
-  addBox(worldGroup,3.36,.24,forkLength+.24,trimMat,0,3.16,0,false,true);
-  addBox(worldGroup,3.36,.28,forkLength+.24,trimMat,0,.18,0,false,true);
-  const leftFork=makeDoubleSidedPlaque('Left Way','Tag route',2.25,.58);leftFork.position.set(-1.69,2.25,forkLength/2+.35);leftFork.rotation.y=Math.PI/2;worldGroup.add(leftFork);
-  const rightFork=makeDoubleSidedPlaque('Right Way','Tag route',2.25,.58);rightFork.position.set(1.69,2.25,forkLength/2+.35);rightFork.rotation.y=-Math.PI/2;worldGroup.add(rightFork);
+  // A gently curving S-shaped divider breaks the long line of sight for Tag.
+  // Both routes stay open and reconnect at the ends, so there are no dead-end hiding spots.
+  const forkLength=Math.min(38,Math.max(30,length*.24)),segments=9,step=forkLength/(segments-1),segmentDepth=step*1.34,segmentWidth=2.55;
+  for(let i=0;i<segments;i++){
+    const z=-forkLength/2+i*step;
+    const x=1.55*Math.sin((z/forkLength)*Math.PI*1.55);
+    const z2=Math.min(forkLength/2,z+.25),x2=1.55*Math.sin((z2/forkLength)*Math.PI*1.55);
+    const yaw=Math.atan2(x2-x,z2-z||.001);
+    addHallObstacleSegment(x,z,segmentWidth,segmentDepth,yaw,wallMat,trimMat);
+  }
+  const leftFork=makeDoubleSidedPlaque('Around the Bend','Tag route',2.35,.58);leftFork.position.set(-2.15,2.25,forkLength/2+.55);leftFork.rotation.y=Math.PI/2;worldGroup.add(leftFork);
+  const rightFork=makeDoubleSidedPlaque('Around the Bend','Tag route',2.35,.58);rightFork.position.set(2.15,2.25,forkLength/2+.55);rightFork.rotation.y=-Math.PI/2;worldGroup.add(rightFork);
 
   for(let z=hallMinZ+6;z<hallMaxZ-4;z+=8.5){
     const panelMat=new THREE.MeshStandardMaterial({color:0xfff7dc,emissive:0xffe8aa,emissiveIntensity:1.45,roughness:.35});
@@ -921,7 +976,7 @@ function updateLivePresenceToggle(){
 }
 function updateTagGameToggle(){
   const btn=document.getElementById('tagGameToggleBtn');if(btn){btn.textContent=tagGameEnabled?'On':'Off';btn.classList.toggle('off',!tagGameEnabled);btn.classList.toggle('tag-on',tagGameEnabled);btn.setAttribute('aria-pressed',String(tagGameEnabled));}
-  const status=document.getElementById('teacherTagStatus');if(status)status.textContent=tagGameEnabled?'Tag is ON. Each class has its own game; the student marked IT can tag a nearby classmate.':'Students can chase and tag classmates who are in the same gallery space.';
+  const status=document.getElementById('teacherTagStatus');if(status)status.textContent=tagGameEnabled?'Tag is ON. East Track and West Track play together; the student marked IT can tag any nearby player.':'Students can chase and tag classmates who are in the same gallery space.';
   if(!tagGameEnabled&&tagOptedIn)tagOptedIn=false;
   updateTagJoinControls();
 }
@@ -935,7 +990,8 @@ function updateTagJoinControls(){
 function setTagOptIn(next){
   if(next&&(!tagGameEnabled||!livePresenceEnabled)){showTagPop('Tag is not available right now.');return;}
   tagOptedIn=!!next;
-  if(isTeacher&&teacherPresenceViewer){stopLivePresence(true);startLivePresence();}
+  // Tag is one combined ET + WT game, so joining switches the listener to the combined presence tree.
+  stopLivePresence(true);startLivePresence();
   if(tagOptedIn&&sceneMode!=='hallway'){sceneMode='hallway';activeClassroomId=null;activeStudentName=null;navTween=null;avatarState.x=0;avatarState.z=hallMaxZ-8;avatarState.angle=Math.PI;buildScene();refreshRemoteAvatars();}
   if(!tagOptedIn&&tagState.itStudentId===currentTagStudentKey()&&tagClassRef)tagClassRef.update({itStudentId:null,immunityUntil:0});
   updateTagJoinControls();syncLivePresence(true);ensureTagItPlayer();refreshRemoteAvatars();updateTagHud();
@@ -979,7 +1035,7 @@ function stopTagState(){
   if(tagClassRef&&tagStateHandler)tagClassRef.off('value',tagStateHandler);tagClassRef=null;tagStateHandler=null;tagState={};tagAttemptBusy=false;lastSeenTagEvent='';updateTagHud();
   remoteAvatars.forEach(entry=>setRemoteItMarker(entry,false));
 }
-function tagClassId(){return presenceProfile?.classId||(['et','wt'].includes(localStorage.getItem('b3Games_studentClass'))?localStorage.getItem('b3Games_studentClass'):'et');}
+function tagClassId(){return 'all';}
 function startTagState(){
   if(!tagGameEnabled||!tagRoot||(!presenceProfile&&!isTeacher))return;
   const wanted=tagRoot.child(tagClassId());if(tagClassRef&&tagClassRef.toString()===wanted.toString())return;
@@ -991,15 +1047,14 @@ function startTagState(){
 }
 function onlineTagCandidates(){
   const candidates=[];if(tagOptedIn&&currentTagStudentKey())candidates.push(currentTagStudentKey());
-  latestPresenceStudents.forEach((data,id)=>{const cleanId=id.includes(':')?id.split(':').pop():id;if(data.classId===tagClassId()&&data.playingTag)candidates.push(cleanId);});
+  latestPresenceStudents.forEach((data,id)=>{const cleanId=id.includes(':')?id.split(':').pop():id;if(data.playingTag)candidates.push(cleanId);});
   return [...new Set(candidates)].filter(id=>PRESENCE_STUDENTS[id]).sort();
 }
 function ensureTagItPlayer(){
   if(!tagGameEnabled||!tagClassRef||tagAttemptBusy)return;
   const candidates=onlineTagCandidates();if(candidates.length<2)return;
-  const current=String(tagState.itStudentId||'');if(current&&candidates.includes(current))return;
-  const elected=candidates[0];if(currentTagStudentKey()!==elected)return;
-  tagAttemptBusy=true;tagClassRef.transaction(cur=>{cur=cur||{};const curIt=String(cur.itStudentId||'');if(curIt&&candidates.includes(curIt))return;return {...cur,itStudentId:elected,immunityUntil:Date.now()+1500,startedAt:firebase.database.ServerValue.TIMESTAMP,lastTag:null};},()=>{tagAttemptBusy=false;});
+  const current=String(tagState.itStudentId||'');if(current&&candidates.includes(current))return;  const elected=candidates[0];if(currentTagStudentKey()!==elected)return;
+  tagAttemptBusy=true;tagClassRef.transaction(cur=>{cur=cur||{};const curIt=String(cur.itStudentId||'');if(curIt&&candidates.includes(curIt))return;return {...cur,itStudentId:elected,immunityUntil:Date.now()+1500,startedAt:firebase.database.ServerValue.TIMESTAMP,itLastActiveAt:firebase.database.ServerValue.TIMESTAMP,lastTag:null};},()=>{tagAttemptBusy=false;});
 }
 function maybeTagNearbyClassmate(){
   const me=currentTagStudentKey();if(!tagGameEnabled||!tagOptedIn||!tagClassRef||tagAttemptBusy||tagState.itStudentId!==me)return;
@@ -1007,7 +1062,33 @@ function maybeTagNearbyClassmate(){
   const space=currentPresenceSpace();let targetId=null,best=TAG_DISTANCE;
   latestPresenceStudents.forEach((data,id)=>{if(!data.playingTag||data.space!==space)return;const cleanId=id.includes(':')?id.split(':').pop():id,entry=remoteAvatars.get(id);if(!entry?.group?.visible)return;const d=Math.hypot(entry.group.position.x-avatarState.x,entry.group.position.z-avatarState.z);if(d<best){best=d;targetId=cleanId;}});
   if(!targetId)return;lastTagAttemptAt=now;tagAttemptBusy=true;
-  tagClassRef.transaction(cur=>{cur=cur||{};if(cur.itStudentId!==me||Date.now()<safePresenceNumber(cur.immunityUntil,0))return;return {...cur,itStudentId:targetId,immunityUntil:Date.now()+TAG_GRACE_MS,lastTag:{from:me,to:targetId,at:firebase.database.ServerValue.TIMESTAMP}};},()=>{tagAttemptBusy=false;});
+  tagClassRef.transaction(cur=>{cur=cur||{};if(cur.itStudentId!==me||Date.now()<safePresenceNumber(cur.immunityUntil,0))return;return {...cur,itStudentId:targetId,immunityUntil:Date.now()+TAG_GRACE_MS,startedAt:firebase.database.ServerValue.TIMESTAMP,itLastActiveAt:firebase.database.ServerValue.TIMESTAMP,lastTag:{from:me,to:targetId,at:firebase.database.ServerValue.TIMESTAMP}};},()=>{tagAttemptBusy=false;});
+}
+function markItActivity(){
+  const me=currentTagStudentKey(),now=Date.now();
+  if(!tagGameEnabled||!tagOptedIn||!tagClassRef||tagState.itStudentId!==me||now-tagActivityWriteAt<1400)return;
+  tagActivityWriteAt=now;tagClassRef.update({itLastActiveAt:firebase.database.ServerValue.TIMESTAMP}).catch(()=>{});
+}
+function checkTagIdle(){
+  const now=Date.now();if(now-lastTagIdleCheckAt<900)return;lastTagIdleCheckAt=now;
+  if(!tagGameEnabled||!tagClassRef||!tagOptedIn)return;
+  const itId=String(tagState.itStudentId||'');if(!itId)return;
+  const last=safePresenceNumber(tagState.itLastActiveAt||tagState.startedAt,now),idle=now-last;
+  if(idle<TAG_IDLE_WARN_MS){tagIdleWarnKey='';return;}
+  const me=currentTagStudentKey();
+  if(me===itId&&idle<TAG_IDLE_REASSIGN_MS){
+    const key=itId+':'+String(last);if(tagIdleWarnKey!==key){tagIdleWarnKey=key;showTagPop('You’re IT — keep moving and chase someone!');}
+    return;
+  }
+  if(idle<TAG_IDLE_REASSIGN_MS)return;
+  const candidates=onlineTagCandidates();if(candidates.length<2||!candidates.includes(itId))return;
+  const controllers=candidates.filter(id=>id!==itId).sort();if(currentTagStudentKey()!==controllers[0])return;
+  const idx=candidates.indexOf(itId),next=candidates[(idx+1)%candidates.length];if(!next||next===itId)return;
+  tagClassRef.transaction(cur=>{
+    cur=cur||{};if(String(cur.itStudentId||'')!==itId)return;
+    const curLast=safePresenceNumber(cur.itLastActiveAt||cur.startedAt,0);if(curLast&&Date.now()-curLast<TAG_IDLE_REASSIGN_MS)return;
+    return {...cur,itStudentId:next,immunityUntil:Date.now()+TAG_GRACE_MS,startedAt:firebase.database.ServerValue.TIMESTAMP,itLastActiveAt:firebase.database.ServerValue.TIMESTAMP,lastReassign:{from:itId,to:next,at:firebase.database.ServerValue.TIMESTAMP}};
+  });
 }
 function startTeacherPresenceMonitor(){
   if(!presenceRoot||teacherPresenceRef)return;
@@ -1024,16 +1105,17 @@ function startTeacherPresenceMonitor(){
   teacherPresenceRef.on('value',teacherPresenceHandler,err=>console.warn('Teacher presence list unavailable',err));
 }
 function latestStudentSessions(raw){
-  const result=new Map(),now=Date.now();
+  const result=new Map(),now=Date.now(),combined=teacherPresenceViewer||tagOptedIn;
   const collect=(studentId,sessions,classId,key)=>{
     if(!teacherPresenceViewer&&studentId===presenceStudentId)return;
-    const known=PRESENCE_STUDENTS[studentId];if(!known||known.classId!==classId)return;
+    const known=PRESENCE_STUDENTS[studentId];if(!known)return;
+    if(studentId!=='simcha_cohen'&&known.classId!==classId)return;
     let latest=null;
     Object.values(sessions||{}).forEach(data=>{if(!data||typeof data!=='object')return;const updated=safePresenceNumber(data.updatedAt,0);if(updated&&now-updated>50000)return;if(!latest||updated>safePresenceNumber(latest.updatedAt,0))latest=data;});
     if(latest)result.set(key,{...latest,name:known.name,classId});
   };
-  if(teacherPresenceViewer){
-    ['et','wt'].forEach(classId=>Object.entries(raw?.[classId]||{}).forEach(([studentId,sessions])=>collect(studentId,sessions,classId,`${classId}:${studentId}`)));
+  if(combined){
+    ['et','wt','all'].forEach(classId=>Object.entries(raw?.[classId]||{}).forEach(([studentId,sessions])=>collect(studentId,sessions,classId,`${classId}:${studentId}`)));
   }else if(presenceProfile){
     Object.entries(raw||{}).forEach(([studentId,sessions])=>collect(studentId,sessions,presenceProfile.classId,studentId));
   }
@@ -1062,7 +1144,7 @@ function refreshRemoteAvatars(){
   });
   updateOnlineBadge();ensureTagItPlayer();updateTagHud();
 }
-function handlePresenceSnapshot(snapshot){latestPresenceStudents=latestStudentSessions(snapshot.val()||{});refreshRemoteAvatars();}
+function handlePresenceSnapshot(snapshot){lastPresenceSnapshotAt=Date.now();latestPresenceStudents=latestStudentSessions(snapshot.val()||{});refreshRemoteAvatars();}
 function syncLivePresence(force=false){
   if(!presenceStarted||!presenceOwnRef||!livePresenceEnabled)return;
   const now=Date.now();if(!force&&now-lastPresenceWrite<120)return;
@@ -1075,17 +1157,29 @@ function stopLivePresence(removeOwn=true){
   if(presenceClassRef&&presenceValueHandler)presenceClassRef.off('value',presenceValueHandler);
   presenceValueHandler=null;presenceClassRef=null;presenceStarted=false;
   if(presenceHeartbeat){clearInterval(presenceHeartbeat);presenceHeartbeat=null;}
+  if(presenceWatchdog){clearInterval(presenceWatchdog);presenceWatchdog=null;}
   if(removeOwn&&presenceOwnRef){const oldRef=presenceOwnRef;presenceOwnRef=null;oldRef.remove().catch(()=>{});oldRef.onDisconnect().cancel().catch(()=>{});}else presenceOwnRef=null;
   clearRemoteAvatars();updateOnlineBadge();
 }
+function restartPresenceListener(){
+  if(!presenceStarted||!presenceClassRef)return;
+  if(presenceValueHandler)presenceClassRef.off('value',presenceValueHandler);
+  lastPresenceSnapshotAt=Date.now();presenceValueHandler=handlePresenceSnapshot;
+  presenceClassRef.on('value',presenceValueHandler,err=>console.warn('Live classmates reconnect failed',err));
+}
 function startLivePresence(){
   if(!scene||(!presenceProfile&&!teacherPresenceViewer)||!presenceRoot||!livePresenceEnabled||presenceStarted)return;
-  presenceStarted=true;presenceClassRef=teacherPresenceViewer?presenceRoot:presenceRoot.child(presenceProfile.classId);
+  presenceStarted=true;
+  const combined=teacherPresenceViewer||tagOptedIn;
+  presenceClassRef=combined?presenceRoot:presenceRoot.child(presenceProfile.classId);
   if(!teacherPresenceViewer||(isTeacher&&tagOptedIn)){
-    presenceOwnRef=(teacherPresenceViewer?presenceRoot.child(tagClassId()):presenceClassRef).child(currentTagStudentKey()).child(presenceSessionId);presenceOwnRef.onDisconnect().remove();
+    const ownParent=teacherPresenceViewer?presenceRoot.child('all'):presenceRoot.child(presenceProfile.classId);
+    presenceOwnRef=ownParent.child(currentTagStudentKey()).child(presenceSessionId);presenceOwnRef.onDisconnect().remove();
   }
-  presenceValueHandler=handlePresenceSnapshot;presenceClassRef.on('value',presenceValueHandler,err=>console.warn('Live classmates unavailable',err));
-  if(presenceOwnRef){syncLivePresence(true);presenceHeartbeat=setInterval(()=>syncLivePresence(true),15000);}updateOnlineBadge();
+  lastPresenceSnapshotAt=Date.now();presenceValueHandler=handlePresenceSnapshot;presenceClassRef.on('value',presenceValueHandler,err=>console.warn('Live classmates unavailable',err));
+  if(presenceOwnRef){syncLivePresence(true);presenceHeartbeat=setInterval(()=>syncLivePresence(true),15000);}
+  presenceWatchdog=setInterval(()=>{if(presenceStarted&&Date.now()-lastPresenceSnapshotAt>35000)restartPresenceListener();},10000);
+  updateOnlineBadge();
 }
 function enableTeacherPresenceView(){
   if(teacherPresenceViewer)return;
@@ -1106,6 +1200,7 @@ function shortestAngleDelta(from,to){return Math.atan2(Math.sin(to-from),Math.co
 function smoothStep01(t){return t*t*(3-2*t);}
 function navigateTo(target,onArrive=null){
   if(!target)return;
+  if(tagOptedIn){showTagPop('Use the arrow keys or WASD while playing Tag.');return;}
   Object.keys(pressed).forEach(k=>pressed[k]=false);
   const endX=Math.max(moveMinX+.25,Math.min(moveMaxX-.25,targetApproachX(target)));
   const endZ=Math.max(hallMinZ+1.25,Math.min(hallMaxZ-1.25,target.z));
@@ -1131,6 +1226,8 @@ function cameraPoseForCurrentView(){
   const position=new THREE.Vector3(avatarState.x,2.25,avatarState.z).addScaledVector(back,distance);
   position.x=Math.max(cameraMinX+pad,Math.min(cameraMaxX-pad,position.x));
   position.z=Math.max(cameraMinZ+pad,Math.min(cameraMaxZ-pad,position.z));
+  const safeT=hallCameraSafeT(avatarState.x,avatarState.z,position.x,position.z);
+  if(safeT<1){position.x=THREE.MathUtils.lerp(avatarState.x,position.x,safeT);position.z=THREE.MathUtils.lerp(avatarState.z,position.z,safeT);}
   const look=new THREE.Vector3(avatarState.x,1.25,avatarState.z).addScaledVector(viewForward,2.35);
   return {position,look};
 }
@@ -1141,7 +1238,8 @@ function snapCameraToAvatar(){
 }
 
 function updateAvatar(dt){
-  let walking=false;
+  let walking=false,collided=false;
+  const oldX=avatarState.x,oldZ=avatarState.z;
   if(navTween){
     navTween.elapsed+=dt;const raw=Math.min(1,navTween.elapsed/navTween.duration),t=smoothStep01(raw);
     avatarState.x=THREE.MathUtils.lerp(navTween.startX,navTween.endX,t);
@@ -1149,16 +1247,19 @@ function updateAvatar(dt){
     avatarState.angle=navTween.startAngle+shortestAngleDelta(navTween.startAngle,navTween.endAngle)*t;
     viewYaw=navTween.startViewYaw*(1-t);
     walking=raw<1;
-    if(raw>=1){const done=navTween.onArrive;navTween=null;viewYaw=0;if(done)setTimeout(done,70);}
+    if(sceneMode==='hallway'&&resolveHallCollision(oldX,oldZ)){
+      // Click-to-go never forces a student through the divider. Stop safely outside it.
+      navTween=null;walking=false;
+    }else if(raw>=1){const done=navTween?.onArrive;navTween=null;viewYaw=0;if(done)setTimeout(done,70);}
   }else{
-    const oldX=avatarState.x,oldZ=avatarState.z;
-    const move=(pressed.forward?1:0)-(pressed.back?1:0);const turn=(pressed.left?1:0)-(pressed.right?1:0);
-    avatarState.angle+=turn*dt*1.72;
-    const speed=3.4;avatarState.x+=Math.sin(avatarState.angle)*move*speed*dt;avatarState.z+=Math.cos(avatarState.angle)*move*speed*dt;
-    if(sceneMode==='hallway'){
-      const forkHalfZ=Math.min(17,Math.max(12,(hallMaxZ-hallMinZ)*.11)),forkHalfX=1.78;
-      if(Math.abs(avatarState.z)<forkHalfZ&&Math.abs(avatarState.x)<forkHalfX){avatarState.x=oldX;avatarState.z=oldZ;}
-    }
+    const move=(pressed.forward?1:0)-(pressed.back?1:0),turn=(pressed.left?1:0)-(pressed.right?1:0);
+    // If the student has looked around with the mouse, the first movement adopts that view
+    // as the new forward direction. Up therefore always moves into the screen, never "backwards."
+    if(Math.abs(move)>.01&&Math.abs(viewYaw)>.001){avatarState.angle+=viewYaw;viewYaw=0;}
+    avatarState.angle+=turn*dt*1.92;
+    const speed=tagOptedIn?5.25:4.35;
+    avatarState.x+=Math.sin(avatarState.angle)*move*speed*dt;avatarState.z+=Math.cos(avatarState.angle)*move*speed*dt;
+    if(sceneMode==='hallway')collided=resolveHallCollision(oldX,oldZ);
     walking=Math.abs(move)>.01;
   }
   avatarState.x=Math.max(moveMinX,Math.min(moveMaxX,avatarState.x));avatarState.z=Math.max(hallMinZ+1.1,Math.min(hallMaxZ-1.1,avatarState.z));
@@ -1170,9 +1271,10 @@ function updateAvatar(dt){
   // instead of crossing through the wall and producing a blank beige screen.
   const pose=cameraPoseForCurrentView();
   camera.position.lerp(pose.position,1-Math.pow(.0002,dt));camera.lookAt(pose.look);
+  if(tagOptedIn&&walking&&Math.hypot(avatarState.x-oldX,avatarState.z-oldZ)>.002)markItActivity();
   syncLivePresence(false);
 }
-function animate(){requestAnimationFrame(animate);const dt=Math.min(.04,clock.getDelta());updateAvatar(dt);updateRemoteAvatars(dt);maybeTagNearbyClassmate();updateTagHud();renderer.render(scene,camera);}
+function animate(){requestAnimationFrame(animate);const dt=Math.min(.04,clock.getDelta());updateAvatar(dt);updateRemoteAvatars(dt);maybeTagNearbyClassmate();checkTagIdle();updateTagHud();renderer.render(scene,camera);}
 function onResize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);}
 
 function onPointerDown(e){dragging=true;dragStartX=dragLastX=e.clientX;dragMoved=0;pointerDownAt=performance.now();renderer.domElement.setPointerCapture?.(e.pointerId);}
@@ -1190,6 +1292,12 @@ function onPointerUp(e){
   const targets=[...new Set([...interactiveMeshes,...navigationMeshes])];
   const hits=raycaster.intersectObjects(targets,false);if(!hits[0])return;
   const obj=hits[0].object,target=obj.userData.navTarget,postId=obj.userData.postId;
+  if(tagOptedIn){
+    if(postId){const post=posts.find(p=>p.id===postId);const endX=target?targetApproachX(target):avatarState.x;const distance=target?Math.hypot(endX-avatarState.x,target.z-avatarState.z):0;if(post&&distance<3.0)openLightbox(post);else showTagPop('Run closer to view that post.');}
+    else if(target?.kind==='door'||target?.kind==='studentRoom')showTagPop('Leave Tag before entering a side room.');
+    else showTagPop('Use the arrow keys or WASD while playing Tag.');
+    return;
+  }
   if(target?.kind==='door'){
     if(tagOptedIn){showTagPop('Leave Tag before entering a side room.');return;}
     const d=Math.hypot(targetApproachX(target)-avatarState.x,target.z-avatarState.z);
