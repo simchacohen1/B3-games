@@ -116,6 +116,11 @@ function isClassSafeArtChoice(value){
   if(!v) return false;
   if(UNSUITABLE_ART_CHOICES.has(v)) return false;
 
+  // A simple boy/child icon is useful for literal vocabulary such as נַעַר.
+  // Keep these two explicit teaching icons available while continuing to block
+  // the broader automatic people/couple/family emoji pool below.
+  if(['👦','🧒'].includes(v)) return true;
+
   // Automatic Unicode people cannot reliably be shown with the required
   // modest clothing and Jewish head covering on every device, so reject
   // person/couple/family emoji and favor objects, symbols, scenery, etc.
@@ -172,7 +177,7 @@ const SMART_ART_RULES=[
   [/knead|kneaded/,['🤲','🍞','🥣','👨‍🍳']],
   [/\bcake\b|\bcakes\b/,['🍰','🧁','🥮','🎂']],
   [/cattle|cow|ox|bull/,['🐄','🐂','🐮','🌾']],
-  [/\bson\b|\bboy\b|\byouth\b|\blad\b/,['🧢','📘','🏃','🏠']],
+  [/\bson\b|\bboy\b|\byouth\b|\blad\b/,['👦','🎒','🧢','📘','👟']],
   [/soft|tender/,['🧸','☁️','🪶','🤲']],
   [/\bgood\b|fine|excellent/,['👍','⭐','😊','✅']],
   [/\bgive\b|\bgave\b|\bgiven\b/,['🎁','🤲','➡️','💝']],
@@ -191,7 +196,7 @@ const SMART_ART_RULES=[
   [/\bhand\b|\bhands\b/,['✋','🤲','🖐️','👋']],
   [/\bhead\b/,['👤','🧠','🎩','🙂']],
   [/\bmouth\b/,['👄','🗣️','💬','😮']],
-  [/\bchild\b|\bchildren\b/,['🧸','🏠','🎒','📘']],
+  [/\bchild\b|\bchildren\b/,['🧒','🎒','🧸','📘','🧩']],
   [/\bmother\b|\bwoman\b|\bwomen\b/,['🏠','❤️','🌷','📛']],
   [/\bfather\b/,['🏠','📘','👔','❤️']],
   [/\bwalk\b|\bgo\b|\bwent\b/,['🚶','👣','➡️','🛣️']],
@@ -378,6 +383,7 @@ function renderCatalog(){
   $('teacherCatalog').innerHTML=list.map((i,idx)=>{
     const art=(Array.isArray(i.art)?i.art:[]).map(a=>`<button type="button" class="teacher-art-chip" data-a="art" data-art="${esc(a)}" title="Click to remove this picture">${esc(a)}</button>`).join('');
     const commonness=commonnessOf(i),approvalNeeded=needsTeacherApproval(i),approvalBlock=approvalNeeded?`<div class="approval-box ${i.teacherApproved===true?'approved':'pending'}"><b>Commonness ${commonness}/10</b> — ${i.teacherApproved===true?'Approved for students':'Waiting for your approval'}<button data-a="approve" class="${i.teacherApproved===true?'ghost':'primary'}">${i.teacherApproved===true?'Remove Approval':'✓ Approve Word'}</button></div>`:(commonness?`<div class="mini-note">Commonness ${commonness}/10 • Automatically included</div>`:'');
+    const duplicateKeeper=duplicateKeeperFor(i),duplicateBlock=duplicateKeeper?`<div class="approval-box pending"><b>Duplicate word</b> — another ${esc(i.front)} is already in this list. <button data-a="merge-duplicate" class="danger">Merge Duplicate</button></div>`:'';
     const artBlock=currentTrack==='shorashim'
       ? `<div class="teacher-art-preview">${art||'<span class="mini-note">No pictures yet</span>'}</div>
          <div class="mini-actions">
@@ -392,6 +398,7 @@ function renderCatalog(){
         <b>${esc(i.english)}</b>
         <div class="mini-note">${currentTrack==='shorashim'?`<span class="unit-pill">${perekLabel(i)}</span> • `:''}${i.pasuk?`Pasuk ${esc(i.pasuk)} • `:''}${i.hidden?'Hidden from future learning':'Active'} • ${esc(chosen)}</div>
         ${approvalBlock}
+        ${duplicateBlock}
         ${artBlock}
       </div>
       <div class="mini-actions">
@@ -411,6 +418,8 @@ function renderCatalog(){
     row.querySelector('[data-a=delete]').onclick=()=>deleteCatalogItem(id);
     const approve=row.querySelector('[data-a=approve]');
     if(approve)approve.onclick=()=>toggleTeacherApproval(id);
+    const mergeDuplicate=row.querySelector('[data-a=merge-duplicate]');
+    if(mergeDuplicate)mergeDuplicate.onclick=()=>mergeDuplicateWord(id);
     const regen=row.querySelector('[data-a=regen]');
     if(regen) regen.onclick=()=>regeneratePictures(id);
     row.querySelectorAll('[data-a=art]').forEach(btn=>{
@@ -463,6 +472,52 @@ async function regeneratePictures(id){
   status(`☁️ Saved • ${Math.min(fresh.length,4)} new picture choice${Math.min(fresh.length,4)===1?'':'s'}`);
 }
 
+function duplicateKeeperFor(item){
+  if(currentTrack!=='shorashim'||!item)return null;
+  const list=state.catalog.shorashim||[], key=hebrewKey(item.front);
+  if(!key)return null;
+  return list.find(x=>x.id!==item.id && !x.hidden && listNameOf(x)===listNameOf(item) && hebrewKey(x.front)===key) || null;
+}
+
+async function mergeDuplicateWord(duplicateId){
+  const list=state.catalog.shorashim||[], duplicate=list.find(x=>x.id===duplicateId);
+  if(!duplicate)return;
+  const key=hebrewKey(duplicate.front);
+  const keeper=list.find(x=>x.id!==duplicate.id && listNameOf(x)===listNameOf(duplicate) && hebrewKey(x.front)===key);
+  if(!keeper)return alert('No matching duplicate was found.');
+  if(!confirm(`Merge duplicate “${duplicate.front}” into the first copy?\n\nThe duplicate entry will be removed. Student learning history will be moved to the remaining copy.`))return;
+
+  // Keep the strongest useful metadata from both copies.
+  keeper.art=sanitizeClassArt([...(keeper.art||[]),...(duplicate.art||[])]);
+  if(!keeper.english&&duplicate.english)keeper.english=duplicate.english;
+  if(!keeper.hebrew&&duplicate.hebrew)keeper.hebrew=duplicate.hebrew;
+  if(!keeper.pasuk&&duplicate.pasuk)keeper.pasuk=duplicate.pasuk;
+  if(!keeper.perek&&duplicate.perek)keeper.perek=duplicate.perek;
+  if(duplicate.teacherApproved===true)keeper.teacherApproved=true;
+  if(Number(duplicate.commonness||0)>Number(keeper.commonness||0))keeper.commonness=duplicate.commonness;
+
+  const oldKey=`shorashim:${duplicate.id}`, newKey=`shorashim:${keeper.id}`;
+  for(const student of Object.values(state.students||{})){
+    if(!student||!student.cards||!student.cards[oldKey])continue;
+    const oldCard=student.cards[oldKey], newCard=student.cards[newKey];
+    if(!newCard){
+      student.cards[newKey]={...oldCard,itemKey:newKey,itemId:keeper.id};
+    }else{
+      const times=[newCard.learnedAt,oldCard.learnedAt].filter(Boolean);
+      if(times.length)newCard.learnedAt=Math.min(...times);
+    }
+    delete student.cards[oldKey];
+  }
+  state.catalog.shorashim=list.filter(x=>x.id!==duplicate.id);
+  status('☁️ Merging duplicate…','syncing');
+  await Promise.all([
+    db.ref(`${ROOT}/catalog`).set(state.catalog),
+    db.ref(`${ROOT}/students`).set(state.students)
+  ]);
+  renderCatalog();
+  status(`☁️ Duplicate merged • ${duplicate.front}`);
+}
+
 async function removePictureChoice(id,artValue){
   const item=(state.catalog[currentTrack]||[]).find(x=>x.id===id);
   if(!item)return;
@@ -511,7 +566,12 @@ async function saveEdit(e){
     l.push(i);
   }
   i.listName=$('tListName').value.trim()||'Main List';
-  i.front=$('tFront').value.trim();
+  const proposedFront=$('tFront').value.trim();
+  if(currentTrack==='shorashim'){
+    const clash=l.find(x=>x.id!==i.id && listNameOf(x)===i.listName && hebrewKey(x.front)===hebrewKey(proposedFront));
+    if(clash){alert(`“${proposedFront}” is already in this list. Edit the existing copy instead of creating a duplicate.`);return;}
+  }
+  i.front=proposedFront;
   i.english=$('tEnglish').value.trim();
   i.pasuk=$('tPasuk').value.trim();
   if(currentTrack==='shorashim'){
@@ -586,6 +646,7 @@ $('saveBulkItems').onclick=async e=>{
     const parts=line.split('|').map(x=>x.trim());
     if(parts.length<2||!parts[0]||!parts[1])continue;
     const isShoreshim=currentTrack==='shorashim';
+    if(isShoreshim && l.some(x=>listNameOf(x)===name && hebrewKey(x.front)===hebrewKey(parts[0])))continue;
     const item={
       id:`bulk-${currentTrack}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
       listName:name,
