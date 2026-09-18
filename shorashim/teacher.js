@@ -383,7 +383,7 @@ function renderCatalog(){
   $('teacherCatalog').innerHTML=list.map((i,idx)=>{
     const art=(Array.isArray(i.art)?i.art:[]).map(a=>`<button type="button" class="teacher-art-chip" data-a="art" data-art="${esc(a)}" title="Click to remove this picture">${esc(a)}</button>`).join('');
     const commonness=commonnessOf(i),approvalNeeded=needsTeacherApproval(i),approvalBlock=approvalNeeded?`<div class="approval-box ${i.teacherApproved===true?'approved':'pending'}"><b>Commonness ${commonness}/10</b> — ${i.teacherApproved===true?'Approved for students':'Waiting for your approval'}<button data-a="approve" class="${i.teacherApproved===true?'ghost':'primary'}">${i.teacherApproved===true?'Remove Approval':'✓ Approve Word'}</button></div>`:(commonness?`<div class="mini-note">Commonness ${commonness}/10 • Automatically included</div>`:'');
-    const duplicateKeeper=duplicateKeeperFor(i),duplicateBlock=duplicateKeeper?`<div class="approval-box pending"><b>Duplicate word</b> — another ${esc(i.front)} is already in this list. <button data-a="merge-duplicate" class="danger">Merge Duplicate</button></div>`:'';
+    const duplicateKeeper=duplicateKeeperFor(i),duplicateBlock=duplicateKeeper?`<div class="approval-box pending"><b>Possible duplicate</b> — another ${esc(i.front)} with the same English meaning (${esc(i.english)}) is already in this list. <button data-a="merge-duplicate" class="danger">Merge Duplicate</button> <button data-a="dismiss-duplicate" class="ghost">Dismiss Suggestion</button></div>`:'';
     const artBlock=currentTrack==='shorashim'
       ? `<div class="teacher-art-preview">${art||'<span class="mini-note">No pictures yet</span>'}</div>
          <div class="mini-actions">
@@ -420,6 +420,8 @@ function renderCatalog(){
     if(approve)approve.onclick=()=>toggleTeacherApproval(id);
     const mergeDuplicate=row.querySelector('[data-a=merge-duplicate]');
     if(mergeDuplicate)mergeDuplicate.onclick=()=>mergeDuplicateWord(id);
+    const dismissDuplicate=row.querySelector('[data-a=dismiss-duplicate]');
+    if(dismissDuplicate)dismissDuplicate.onclick=()=>dismissDuplicateSuggestion(id);
     const regen=row.querySelector('[data-a=regen]');
     if(regen) regen.onclick=()=>regeneratePictures(id);
     row.querySelectorAll('[data-a=art]').forEach(btn=>{
@@ -472,26 +474,37 @@ async function regeneratePictures(id){
   status(`☁️ Saved • ${Math.min(fresh.length,4)} new picture choice${Math.min(fresh.length,4)===1?'':'s'}`);
 }
 
+function englishDuplicateKey(value){
+  return String(value||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+}
 function duplicateKeeperFor(item){
-  if(currentTrack!=='shorashim'||!item)return null;
-  const list=state.catalog.shorashim||[], key=hebrewKey(item.front);
-  if(!key)return null;
+  if(currentTrack!=='shorashim'||!item||item.duplicateSuggestionDismissed===true)return null;
+  const list=state.catalog.shorashim||[], key=hebrewKey(item.front), englishKey=englishDuplicateKey(item.english);
+  if(!key||!englishKey)return null;
   const itemIndex=list.findIndex(x=>x.id===item.id);
   if(itemIndex<=0)return null;
-  // Only flag later appearances. The first occurrence is the keeper and never shows a duplicate warning.
+  // A suggestion is shown only on later appearances when BOTH the Hebrew and English match.
   for(let n=0;n<itemIndex;n++){
     const x=list[n];
-    if(!x.hidden && listNameOf(x)===listNameOf(item) && hebrewKey(x.front)===key)return x;
+    if(!x.hidden && listNameOf(x)===listNameOf(item) && hebrewKey(x.front)===key && englishDuplicateKey(x.english)===englishKey)return x;
   }
   return null;
+}
+async function dismissDuplicateSuggestion(id){
+  const item=(state.catalog.shorashim||[]).find(x=>x.id===id);
+  if(!item)return;
+  item.duplicateSuggestionDismissed=true;
+  renderCatalog();
+  await saveCatalog();
+  status(`☁️ Duplicate suggestion dismissed • ${item.front}`);
 }
 
 async function mergeDuplicateWord(duplicateId){
   const list=state.catalog.shorashim||[], duplicate=list.find(x=>x.id===duplicateId);
   if(!duplicate)return;
-  const key=hebrewKey(duplicate.front);
+  const key=hebrewKey(duplicate.front), englishKey=englishDuplicateKey(duplicate.english);
   const duplicateIndex=list.findIndex(x=>x.id===duplicate.id);
-  const keeper=list.slice(0,duplicateIndex).find(x=>!x.hidden && listNameOf(x)===listNameOf(duplicate) && hebrewKey(x.front)===key);
+  const keeper=list.slice(0,duplicateIndex).find(x=>!x.hidden && listNameOf(x)===listNameOf(duplicate) && hebrewKey(x.front)===key && englishDuplicateKey(x.english)===englishKey);
   if(!keeper)return alert('No matching duplicate was found.');
   if(!confirm(`Merge duplicate “${duplicate.front}” into the first copy?\n\nThe duplicate entry will be removed. Student learning history will be moved to the remaining copy.`))return;
 
