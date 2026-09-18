@@ -6,9 +6,15 @@
   const LOGIN_URL=`${FUNCTIONS_BASE}/studentRewardsLogin`;
   const REDEEM_URL=`${FUNCTIONS_BASE}/studentRewardsRedeem`;
 
-  function ensureFirebase(){
+  function ensureFirebase(options={}){
     if(!window.firebase) throw new Error('Firebase libraries did not load.');
     if(!window.B3_FIREBASE_CONFIG) throw new Error('B3 Firebase config did not load.');
+    if(options.student===true){
+      const appName='StudentRewardsStudent';
+      let app;
+      try{app=firebase.app(appName)}catch{app=firebase.initializeApp(window.B3_FIREBASE_CONFIG,appName)}
+      return {db:app.database(),auth:app.auth()};
+    }
     if(!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG);
     return {db:firebase.database(),auth:firebase.auth()};
   }

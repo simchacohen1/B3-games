@@ -1,8 +1,71 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Student Rewards Teacher</title><link rel="stylesheet" href="styles.css">
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
-<script src="../firebase-config.js"></script><script src="common.js"></script></head><body>
-<div id="loginView" class="teacher-login"><section class="login-card"><div class="brand"><b>★</b><span>Student Rewards</span></div><p class="eyebrow">TEACHER</p><h1>Sign in</h1><p>Use the authorized Google account to manage B3 rewards.</p><button id="googleBtn" class="primary">Sign in with Google</button><p id="loginError" class="formerror"></p></section></div>
-<div id="appView" class="shell hidden"><aside class="side"><div class="brand"><b>★</b><span>Student Rewards</span></div><div class="school">B3 SCHOOL</div><nav id="nav"></nav><div class="sidefoot"><select id="classSelect"></select><div class="profile"><b id="teacherName"></b><span id="teacherEmail"></span></div><button id="signOutBtn" class="ghost">Sign out</button></div></aside><section class="content"><header class="topbar"><strong id="topTitle">Overview</strong><span id="saveState"></span></header><main id="page" class="page"></main></section></div>
-<script src="teacher.js"></script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>BrightPath — Student Rewards</title>
+  <link rel="stylesheet" href="brightpath.css">
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+  <script src="../firebase-config.js"></script>
+  <script src="common.js"></script>
+</head>
+<body>
+  <div id="loginView" class="bright-login">
+    <section>
+      <div class="brand"><b>★</b><span>BrightPath</span></div>
+      <p class="school">SHLUCHIM ONLINE SCHOOL</p>
+      <h1>Staff sign-in</h1>
+      <p>Sign in with the authorized Google account.</p>
+      <button id="googleBtn" class="primary">Sign in with Google</button>
+      <p id="loginError" class="loginerror"></p>
+    </section>
+  </div>
+
+  <main id="appView" class="shell hidden">
+    <aside class="side">
+      <div class="brand"><b>★</b><span>BrightPath</span></div>
+      <p class="school">SHLUCHIM ONLINE<br>SCHOOL</p>
+      <nav id="nav"></nav>
+      <div class="sidefoot">
+        <a class="portalshortcut" href="student.html">
+          <b>★</b>
+          <span><strong>Student portal</strong><small>B3 sign-in and reward store</small></span>
+          <i>→</i>
+        </a>
+        <label class="classpick">
+          <b id="classBadge">—</b>
+          <span><strong id="className">No class</strong><small id="classCount">0 students</small></span>
+          <select id="classSelect" aria-label="Choose class"></select>
+        </label>
+        <div class="profile">
+          <em id="profileInitials">SC</em>
+          <span><strong id="profileName">Simcha Cohen</strong><small>Administrator & Teacher</small></span>
+        </div>
+        <button id="signOutBtn" class="signout">Sign out</button>
+      </div>
+    </aside>
+
+    <section class="content">
+      <header>
+        <button class="mobile-brand">★ BrightPath</button>
+        <div class="date datepicker">
+          <button id="prevDate" aria-label="Previous day">‹</button>
+          <label>
+            <b id="dateLabel">TODAY</b>
+            <input id="topDate" aria-label="Daily Points date" type="date">
+            <span id="datePretty"></span>
+          </label>
+          <button id="nextDate" aria-label="Next day">›</button>
+        </div>
+        <div class="me"><small id="headerClass"></small><em id="headerInitials">SC</em></div>
+      </header>
+      <div id="page" class="page"></div>
+    </section>
+  </main>
+
+  <div id="globalToast" class="toast"></div>
+  <script src="teacher.js"></script>
+</body>
+</html>
