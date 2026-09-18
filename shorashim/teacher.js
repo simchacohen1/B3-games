@@ -476,14 +476,22 @@ function duplicateKeeperFor(item){
   if(currentTrack!=='shorashim'||!item)return null;
   const list=state.catalog.shorashim||[], key=hebrewKey(item.front);
   if(!key)return null;
-  return list.find(x=>x.id!==item.id && !x.hidden && listNameOf(x)===listNameOf(item) && hebrewKey(x.front)===key) || null;
+  const itemIndex=list.findIndex(x=>x.id===item.id);
+  if(itemIndex<=0)return null;
+  // Only flag later appearances. The first occurrence is the keeper and never shows a duplicate warning.
+  for(let n=0;n<itemIndex;n++){
+    const x=list[n];
+    if(!x.hidden && listNameOf(x)===listNameOf(item) && hebrewKey(x.front)===key)return x;
+  }
+  return null;
 }
 
 async function mergeDuplicateWord(duplicateId){
   const list=state.catalog.shorashim||[], duplicate=list.find(x=>x.id===duplicateId);
   if(!duplicate)return;
   const key=hebrewKey(duplicate.front);
-  const keeper=list.find(x=>x.id!==duplicate.id && listNameOf(x)===listNameOf(duplicate) && hebrewKey(x.front)===key);
+  const duplicateIndex=list.findIndex(x=>x.id===duplicate.id);
+  const keeper=list.slice(0,duplicateIndex).find(x=>!x.hidden && listNameOf(x)===listNameOf(duplicate) && hebrewKey(x.front)===key);
   if(!keeper)return alert('No matching duplicate was found.');
   if(!confirm(`Merge duplicate “${duplicate.front}” into the first copy?\n\nThe duplicate entry will be removed. Student learning history will be moved to the remaining copy.`))return;
 
