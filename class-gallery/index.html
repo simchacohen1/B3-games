@@ -242,6 +242,7 @@ button,input,select,textarea{font:inherit}
       <div class="teacher-live-controls"><div><strong>Live Classmates</strong><span id="teacherOnlineNames">No students online right now.</span></div><button type="button" id="livePresenceToggleBtn">On</button></div>
       <div class="teacher-live-controls"><div><strong>Tag Game</strong><span id="teacherTagStatus">Students can chase and tag classmates who are in the same gallery space.</span></div><button type="button" id="tagGameToggleBtn">Off</button></div>
       <div class="teacher-live-controls"><div><strong>Rabbi Cohen Plays</strong><span id="teacherJoinTagStatus">Join only when you want your avatar to be part of the game.</span></div><button type="button" id="teacherJoinTagBtn" class="off">Join</button></div>
+      <div class="teacher-live-controls" id="approveAllWrap" style="display:none;"><div><strong>Pending Projects</strong><span id="approveAllStatus">Approve every project currently waiting for review.</span></div><button type="button" id="approveAllBtn">Approve All</button></div>
       <div id="reviewList"></div>
     </div>
   </div>
@@ -1364,7 +1365,25 @@ document.getElementById('tagGameToggleBtn').onclick=async()=>{if(!isTeacher||!ta
 document.getElementById('tagJoinBtn').onclick=()=>setTagOptIn(!tagOptedIn);
 document.getElementById('teacherJoinTagBtn').onclick=()=>{if(isTeacher)setTagOptIn(!tagOptedIn)};
 function showReviewList(){document.getElementById('reviewLoginArea').style.display='none';document.getElementById('reviewListArea').style.display='block';updateLivePresenceToggle();updateTagGameToggle();startTeacherPresenceMonitor();renderReviewList();}
-function renderReviewList(){const pending=posts.filter(p=>p.status==='pending'),list=document.getElementById('reviewList');if(!pending.length){list.innerHTML='<div class="empty-review">No projects waiting for review.</div>';return;}list.innerHTML=pending.map(p=>`<div class="review-item">${p.image?`<img src="${p.image}" alt="">`:''}<div class="info"><h4>${escapeHtml(p.title)}</h4><p>${escapeHtml(p.description).slice(0,100)}</p><div class="meta">${escapeHtml(p.studentName)} · ${escapeHtml(p.category)} · ${escapeHtml(p.galleryRoom&&p.galleryRoom!=='hallway'?classroomLabel(p.galleryRoom)+' Classroom':'Main Hallway')}${p.audioUrl?' · 🎧':''}${p.videoUrl?' · 🎬':''}</div></div><div class="review-actions"><button class="btn-approve" data-action="approve" data-id="${p.id}">Approve</button><button class="btn-reject" data-action="reject" data-id="${p.id}">Reject</button></div></div>`).join('');list.querySelectorAll('button[data-action]').forEach(btn=>btn.onclick=async()=>{btn.disabled=true;try{btn.dataset.action==='approve'?await dbRef.child(btn.dataset.id).update({status:'approved'}):await dbRef.child(btn.dataset.id).remove()}catch(err){alert('Could not update that project.');btn.disabled=false}});}
+function renderReviewList(){const pending=posts.filter(p=>p.status==='pending'),list=document.getElementById('reviewList'),approveWrap=document.getElementById('approveAllWrap'),approveStatus=document.getElementById('approveAllStatus');if(approveWrap)approveWrap.style.display=pending.length?'flex':'none';if(approveStatus)approveStatus.textContent=pending.length===1?'Approve the 1 project currently waiting for review.':`Approve all ${pending.length} projects currently waiting for review.`;if(!pending.length){list.innerHTML='<div class="empty-review">No projects waiting for review.</div>';return;}list.innerHTML=pending.map(p=>`<div class="review-item">${p.image?`<img src="${p.image}" alt="">`:''}<div class="info"><h4>${escapeHtml(p.title)}</h4><p>${escapeHtml(p.description).slice(0,100)}</p><div class="meta">${escapeHtml(p.studentName)} · ${escapeHtml(p.category)} · ${escapeHtml(p.galleryRoom&&p.galleryRoom!=='hallway'?classroomLabel(p.galleryRoom)+' Classroom':'Main Hallway')}${p.audioUrl?' · 🎧':''}${p.videoUrl?' · 🎬':''}</div></div><div class="review-actions"><button class="btn-approve" data-action="approve" data-id="${p.id}">Approve</button><button class="btn-reject" data-action="reject" data-id="${p.id}">Reject</button></div></div>`).join('');list.querySelectorAll('button[data-action]').forEach(btn=>btn.onclick=async()=>{btn.disabled=true;try{btn.dataset.action==='approve'?await dbRef.child(btn.dataset.id).update({status:'approved'}):await dbRef.child(btn.dataset.id).remove()}catch(err){alert('Could not update that project.');btn.disabled=false}});}
+
+document.getElementById('approveAllBtn').onclick=async()=>{
+  if(!isTeacher||!dbRef)return;
+  const pending=posts.filter(p=>p.status==='pending');
+  if(!pending.length)return;
+  const count=pending.length;
+  if(!confirm(`Approve all ${count} pending project${count===1?'':'s'}?`))return;
+  const btn=document.getElementById('approveAllBtn');
+  btn.disabled=true;btn.textContent='Approving...';
+  try{
+    const updates={};pending.forEach(p=>updates[`${p.id}/status`]='approved');
+    await dbRef.update(updates);
+  }catch(err){
+    console.error(err);alert('Could not approve all projects right now.');
+  }finally{
+    btn.disabled=false;btn.textContent='Approve All';
+  }
+};
 
 
 /* ---------- fast all-posts overview ---------- */
