@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Student Rewards</title><link rel="stylesheet" href="styles.css">
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script src="../firebase-config.js"></script><script src="common.js"></script></head><body>
+<main id="blockedView" class="studentblocked hidden"><section><i>×</i><h1>Student Website Temporarily Unavailable</h1><p>Please wait for your teacher to reopen it.</p></section></main>
+<main id="loginView" class="studentlogin"><section class="login-card"><div class="brand"><b>★</b><span>Student Rewards</span></div><p class="eyebrow">STUDENT REWARDS</p><h1>Welcome back</h1><p>Sign in with the username and PIN your teacher gave you.</p><form id="loginForm" class="formgrid" style="display:grid"><label class="wide">Username<input id="username" required autocomplete="username"></label><label class="wide">PIN<input id="pin" required type="password" inputmode="numeric"></label><p id="loginError" class="formerror wide"></p><button id="loginBtn" class="primary wide">Sign in</button></form><p><a href="teacher.html">Staff sign-in →</a></p></section></main>
+<main id="portalView" class="studentportal hidden"><header><div class="brand"><b>★</b><span>Student Rewards</span></div><nav id="studentNav"></nav><button id="logoutBtn">Sign out</button></header><section id="studentMain" class="studentmain"></section></main>
+<script src="student.js"></script></body></html>
