@@ -15,7 +15,11 @@
   const kbd=document.createElement('div'); kbd.className='heb-kbd'; kbd.id='hebrewEditKeyboard';
   const key=(text,value,cls='',title='')=>`<button type="button" class="heb-key ${cls}" data-value="${value}" title="${title}">${text}</button>`;
   kbd.innerHTML=`<div class="heb-kbd-title">מקלדת עברית ונקודות</div><div class="heb-kbd-row">${LETTERS.map(x=>key(x,x)).join('')}</div><div class="heb-kbd-row">${NIKUD.map(([x,n])=>key(x,x,'nikud',n)).join('')}${key('Space',' ','action')}${key('⌫','BACKSPACE','action','Backspace')}</div>`;
-  document.body.appendChild(kbd);
+  // Keep the keyboard inside the <dialog>. A modal dialog lives in the browser's
+  // top layer, so an element appended to <body> can be hidden behind it even
+  // with a huge z-index.
+  const hostDialog=document.getElementById('teacherCatalogDialog');
+  (hostDialog || document.body).appendChild(kbd);
   function place(){
     if(!target||!kbd.classList.contains('open'))return;
     const r=target.getBoundingClientRect(), gap=6, margin=10;
@@ -41,7 +45,7 @@
   kbd.addEventListener('mousedown',e=>e.preventDefault());
   kbd.addEventListener('click',e=>{const b=e.target.closest('[data-value]');if(b)insertValue(b.dataset.value)});
   function attach(){
-    const dialog=document.getElementById('teacherCatalogDialog');
+    const dialog=hostDialog || document.getElementById('teacherCatalogDialog');
     ['tFront','tWord'].forEach(id=>{const el=document.getElementById(id);if(el){el.addEventListener('focus',()=>show(el));el.addEventListener('click',()=>show(el));el.addEventListener('keyup',place)}});
     if(dialog)dialog.addEventListener('close',()=>{kbd.classList.remove('open');target=null});
     window.addEventListener('resize',place);document.addEventListener('scroll',place,true);
