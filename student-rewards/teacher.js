@@ -2,105 +2,197 @@
 'use strict';
 const C=window.StudentRewardsCommon;
 const {db,auth}=C.ensureFirebase();
-const ROOT=C.ROOT;
-const navItems=['Overview','Daily Points','Students','Rewards','Class Incentives','Reports','Settings','Import Data'];
-let state={root:null,tab:'Overview',classId:'',date:C.schoolDateString(),user:null,draftRatings:{},absent:new Set(),importFile:null};
-const $=s=>document.querySelector(s);
-function path(p=''){return `${ROOT}${p?'/'+p:''}`}
-function e(s){return C.escapeHtml(s)}
-function uid(){return crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(16).slice(2)}`}
-function categories(){return C.activeCategories(state.root||{})}
-function roster(){return C.classRoster(state.root||{},state.classId)}
+const ROOT=C.ROOT, ADMIN=C.ADMIN_EMAIL;
+const NAV=["Overview","Daily Points","Students","Categories","Comments","Rewards","Reports","People & Classes","Settings"];
+const ICONS={"Overview":"⌂","Daily Points":"✓","Students":"♙","Categories":"☷","Comments":"✎","Rewards":"◇","Reports":"▤","People & Classes":"♧","Settings":"⚙"};
+let state={root:null,user:null,tab:"Overview",classId:"",date:C.schoolDateString(),draft:{},absent:new Set(),selectedId:""};
+const $=s=>document.querySelector(s), esc=C.escapeHtml;
+function vals(o){return o&&typeof o==="object"?Object.values(o):[]}
 function activeClasses(){return C.activeClasses(state.root||{})}
-function currentClass(){return state.root?.classes?.[state.classId]}
-function setTop(t){$('#topTitle').textContent=t}
-function toast(m,t){C.toast(m,t)}
-function adminOkay(user){return !!(user&&user.email&&user.email.toLowerCase()===C.ADMIN_EMAIL.toLowerCase())}
-async function signIn(){try{const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});await auth.signInWithPopup(p)}catch(err){$('#loginError').textContent=err.message||String(err)}}
-async function signOut(){await auth.signOut()}
-function buildNav(){const nav=$('#nav');nav.innerHTML=navItems.map(n=>`<button data-tab="${e(n)}">${e(n)}</button>`).join('');nav.onclick=ev=>{const b=ev.target.closest('button[data-tab]');if(!b)return;state.tab=b.dataset.tab;render()}}
-async function loadRoot(){const snap=await db.ref(ROOT).once('value');state.root=snap.val()||{};if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=activeClasses()[0]?.id||'';prepareDraft();renderClassSelect()}
-function subscribe(){db.ref(ROOT).on('value',snap=>{state.root=snap.val()||{};if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=activeClasses()[0]?.id||'';renderClassSelect();if(state.tab!=='Daily Points')render()})}
-function renderClassSelect(){const el=$('#classSelect');if(!el)return;const rows=activeClasses();el.innerHTML=rows.map(c=>`<option value="${e(c.id)}" ${c.id===state.classId?'selected':''}>${e(c.name)}</option>`).join('');el.onchange=()=>{state.classId=el.value;prepareDraft();render()}}
-function prepareDraft(){if(!state.root||!state.classId)return;state.draftRatings={};state.absent=new Set();const cats=categories();for(const s of roster()){
- const att=state.root.dailyAttendance?.[s.id]?.[state.classId]?.[state.date];if(att?.status==='absent')state.absent.add(s.id);
- const saved=state.root.dailyRatings?.[s.id]?.[state.classId]?.[state.date];const source=saved||C.latestRatings(state.root,s.id,state.classId,state.date).ratings||{};
- cats.forEach(cat=>{const found=Object.values(source).find(r=>r.category===cat.name);state.draftRatings[`${s.id}|${cat.name}`]=found?.rating||'Good'})
-}}
-function render(){if(!state.user||!state.root)return;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===state.tab));setTop(state.tab);const p=$('#page');
- if(state.tab==='Overview')p.innerHTML=renderOverview();
- if(state.tab==='Daily Points')p.innerHTML=renderDaily();
- if(state.tab==='Students')p.innerHTML=renderStudents();
- if(state.tab==='Rewards')p.innerHTML=renderRewards();
- if(state.tab==='Class Incentives')p.innerHTML=renderClassRewards();
- if(state.tab==='Reports')p.innerHTML=renderReports();
- if(state.tab==='Settings')p.innerHTML=renderSettings();
- if(state.tab==='Import Data')p.innerHTML=renderImport();
- bindPage();
-}
+function roster(){return C.classRoster(state.root||{},state.classId)}
+function categories(){return C.activeCategories(state.root||{})}
+function cls(){return state.root?.classes?.[state.classId]||null}
+function initials(name){return String(name||"SC").trim().split(/\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase()}
+function toast(msg,type="ok"){C.toast(msg,type)}
+function now(){return new Date().toISOString()}
 function scoreFor(s){return C.cumulativeProgress(C.allProgressRows(state.root,s.id,state.classId))??100}
-function renderOverview(){const rs=roster();const avg=rs.length?Math.round(rs.reduce((a,s)=>a+scoreFor(s),0)/rs.length):0;const total=rs.reduce((a,s)=>a+(Number(s.rewardBalance)||0),0);const pending=getRedemptions().filter(x=>x.item.status==='pending').length;return `<div class="pagehead"><div><p class="eyebrow">${e(currentClass()?.name||'CLASS')}</p><h1>Overview</h1><p>Daily effort, point balances and reward requests.</p></div></div><div class="cards"><article class="stat"><span>STUDENTS</span><strong>${rs.length}</strong></article><article class="stat"><span>CLASS PROGRESS</span><strong>${avg}%</strong></article><article class="stat"><span>POINTS IN CIRCULATION</span><strong>${total}</strong></article><article class="stat"><span>PENDING REQUESTS</span><strong>${pending}</strong></article></div><section class="panel"><h2>Student balances</h2><div class="roster">${rs.map(s=>`<article class="student-card"><div class="title"><em class="avatar" style="background:${e(s.color)}">${e(s.initials)}</em><span><h3>${e(s.name)}</h3><p>${scoreFor(s)}% overall progress</p></span></div><div class="balance">${Number(s.rewardBalance)||0} ★</div></article>`).join('')}</div></section>`}
-function renderDaily(){const cats=categories(),rs=roster();const saved=rs.some(s=>state.root.dailyAwards?.[s.id]?.[state.classId]?.[state.date]);return `<div class="pagehead"><div><p class="eyebrow">DAILY POINTS</p><h1>${e(currentClass()?.name||'Class')}</h1><p>${saved?'Editing a saved day':'Unsaved day — carried ratings are only a starting point.'}</p></div></div><section class="panel"><div class="toolbar"><label>Date<input id="dailyDate" type="date" value="${e(state.date)}"></label><button id="prevDay" class="ghost">← Previous</button><button id="nextDay" class="ghost">Next →</button><button id="saveDaily" class="primary">${saved?'Update day':'Save day'}</button></div><div class="ratings-table"><div class="ratings-row head" style="--cats:${cats.length}"><div>Student</div><div>Attendance</div>${cats.map(c=>`<div>${e(c.name)}</div>`).join('')}<div>Points</div></div>${rs.map(s=>dailyRow(s,cats)).join('')}</div></section>`}
-function dailyRow(s,cats){const absent=state.absent.has(s.id);const ratings=cats.map(c=>state.draftRatings[`${s.id}|${c.name}`]||'Good');const award=C.dailyAward(absent?[]:ratings);return `<div class="ratings-row ${absent?'absentrow':''}" style="--cats:${cats.length}" data-student="${e(s.id)}"><div class="studentcell"><em class="avatar" style="background:${e(s.color)}">${e(s.initials)}</em><b>${e(s.name)}</b></div><div><button class="attendance ${absent?'absent':''}" data-att="${e(s.id)}">${absent?'Absent':'Present'}</button></div>${cats.map(c=>`<div><select class="rating-select" data-rating-student="${e(s.id)}" data-category="${e(c.name)}" ${absent?'disabled':''}>${['Excellent','Good','Fair','Needs Improvement'].map(r=>`<option ${r===(state.draftRatings[`${s.id}|${c.name}`]||'Good')?'selected':''}>${r}</option>`).join('')}</select></div>`).join('')}<div class="points-pill">${award} ★</div></div>`}
-async function saveDaily(){
-  const updates={}, cats=categories(), rs=roster(), now=new Date().toISOString();
-  for(const s of rs){
-    const absent=state.absent.has(s.id);
-    const ratings={};
-    if(!absent){
-      for(const cat of cats){
-        const rating=state.draftRatings[`${s.id}|${cat.name}`]||'Good';
-        ratings[C.categoryKey(cat.name)]={
-          category:cat.name,
-          rating,
-          points:C.progressValue[rating]??100,
-          teacherEmail:state.user.email,
-          savedAt:now
-        };
-      }
-    }
-    const newAward=absent?0:C.dailyAward(cats.map(c=>state.draftRatings[`${s.id}|${c.name}`]||'Good'));
-    const oldAward=Number(state.root.dailyAwards?.[s.id]?.[state.classId]?.[state.date]?.points||0);
-    const delta=newAward-oldAward;
-    const balance=Math.max(0,Number(state.root.students[s.id].rewardBalance||0)+delta);
-    updates[`${ROOT}/dailyRatings/${s.id}/${state.classId}/${state.date}`]=absent?null:ratings;
-    updates[`${ROOT}/dailyAwards/${s.id}/${state.classId}/${state.date}`]={points:newAward,teacherEmail:state.user.email,savedAt:now};
-    updates[`${ROOT}/dailyAttendance/${s.id}/${state.classId}/${state.date}`]={status:absent?'absent':'present',teacherEmail:state.user.email,savedAt:now};
-    updates[`${ROOT}/students/${s.id}/rewardBalance`]=balance;
+function currentStudent(){const r=roster();return r.find(s=>s.id===state.selectedId)||r[0]||null}
+function getRedemptions(){const out=[];for(const [sid,rows] of Object.entries(state.root?.redemptionsByStudent||{}))for(const [key,item] of Object.entries(rows||{}))out.push({sid,key,item});return out.sort((a,b)=>String(b.item.requestedAt||"").localeCompare(String(a.item.requestedAt||"")))}
+function pendingCount(){return getRedemptions().filter(x=>x.item.status==="pending"||x.item.status==="ready").length}
+function savedTodayIds(){return new Set(roster().filter(s=>state.root?.dailyAwards?.[s.id]?.[state.classId]?.[state.date]).map(s=>s.id))}
+function classAverage(){const r=roster();return r.length?Math.round(r.reduce((a,s)=>a+scoreFor(s),0)/r.length):0}
+function safeColor(s){return s?.color||"#6849df"}
+function setHeader(){
+  const c=cls(), r=roster(), u=state.user;
+  $("#className").textContent=c?.name||"No class";$("#classCount").textContent=`${r.length} students`;$("#classBadge").textContent=(c?.name||"—").replace("Class ","").slice(0,4);
+  $("#headerClass").textContent=c?.name||"";$("#profileName").textContent=u?.displayName||"Simcha Cohen";
+  const ini=initials(u?.displayName||"Simcha Cohen");$("#profileInitials").textContent=ini;$("#headerInitials").textContent=ini;
+  $("#topDate").value=state.date;$("#dateLabel").textContent=state.date===C.schoolDateString()?"TODAY":"EDITING DATE";
+  $("#datePretty").textContent=new Date(`${state.date}T12:00:00`).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+}
+function buildNav(){
+  $("#nav").innerHTML=NAV.map(n=>`<button data-tab="${esc(n)}"><i>${ICONS[n]}</i><span>${esc(n)}</span>${n==="Rewards"&&pendingCount()?`<mark>${pendingCount()}</mark>`:""}</button>`).join("");
+  $("#nav").onclick=e=>{const b=e.target.closest("[data-tab]");if(!b)return;state.tab=b.dataset.tab;render()};
+}
+function renderClassSelect(){
+  const el=$("#classSelect"), rows=activeClasses();
+  el.innerHTML=rows.map(c=>`<option value="${esc(c.id)}" ${c.id===state.classId?"selected":""}>${esc(c.name)}</option>`).join("");
+  el.onchange=()=>{state.classId=el.value;state.selectedId="";prepareDraft();render()};
+}
+async function loadRoot(){
+  const snap=await db.ref(ROOT).once("value");state.root=snap.val()||{};
+  if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=activeClasses()[0]?.id||"";
+  prepareDraft();renderClassSelect();setHeader();buildNav();
+}
+function subscribe(){db.ref(ROOT).on("value",snap=>{state.root=snap.val()||{};if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=activeClasses()[0]?.id||"";renderClassSelect();if(state.tab!=="Daily Points"){setHeader();buildNav();render()}})}
+function prepareDraft(){
+  if(!state.root||!state.classId)return;state.draft={};state.absent=new Set();
+  for(const s of roster()){
+    const att=state.root.dailyAttendance?.[s.id]?.[state.classId]?.[state.date];if(att?.status==="absent")state.absent.add(s.id);
+    const saved=state.root.dailyRatings?.[s.id]?.[state.classId]?.[state.date];
+    const prior=C.latestRatings(state.root,s.id,state.classId,state.date);
+    const source=saved||prior.ratings||{};
+    for(const cat of categories()){const found=vals(source).find(r=>r.category===cat.name);state.draft[`${s.id}|${cat.name}`]=found?.rating||"Good"}
   }
-  const auditKey=db.ref(`${ROOT}/audit`).push().key;
-  updates[`${ROOT}/audit/${auditKey}`]={actorEmail:state.user.email,action:'daily.saved',details:JSON.stringify({classId:state.classId,date:state.date,count:rs.length}),createdAt:now};
-  await db.ref().update(updates);
-  toast(`Saved ${rs.length} students for ${state.date}`);
-  await loadRoot();
-  prepareDraft();
-  render();
 }
-function renderStudents(){const rs=roster();return `<div class="pagehead"><div><p class="eyebrow">STUDENTS</p><h1>${e(currentClass()?.name||'Class')} roster</h1><p>Manage balances and student sign-in.</p></div><button id="addStudentBtn" class="primary">+ Add student</button></div><div class="roster">${rs.map(s=>`<article class="student-card"><div class="title"><em class="avatar" style="background:${e(s.color)}">${e(s.initials)}</em><span><h3>${e(s.name)}</h3><p>Username: ${e(s.username||'not set')}</p></span></div><div class="balance">${Number(s.rewardBalance)||0} ★</div><div class="actions"><button class="secondary" data-addpoints="${e(s.id)}">Add points</button><button class="ghost" data-deduct="${e(s.id)}">Deduct</button><button class="ghost" data-login="${e(s.id)}">Set login</button><button class="danger" data-reset="${e(s.id)}">Reset</button></div></article>`).join('')}</div>`}
-async function addStudent(){const name=prompt('Student full name:');if(!name)return;const username=(prompt('Username (optional):')||'').trim().toLowerCase();const pin=username?(prompt('PIN (at least 6 characters):')||''):'';if(username&&pin.length<6)return toast('PIN must be at least 6 characters','error');const id=`student-${uid()}`,initials=name.split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase(),colors=['#7c3aed','#2563eb','#0891b2','#059669','#d97706','#dc2626','#9333ea','#4f46e5'],color=colors[Math.floor(Math.random()*colors.length)];const updates={};updates[`${ROOT}/students/${id}`]={id,classId:state.classId,name:name.trim(),initials,color,rewardBalance:0,active:true,username};updates[`${ROOT}/enrollments/${state.classId}/${id}`]=true;if(username){const uh=await C.sha256(username);const existing=state.root.privateAuth?.byUsername?.[uh];if(existing)return toast('That username is already in use','error');const ph=await C.sha256(pin);updates[`${ROOT}/privateAuth/byUsername/${uh}`]={studentId:id,username,pinHash:ph}}await db.ref().update(updates);toast('Student added')}
-async function setLogin(sid){const s=state.root.students[sid];const username=(prompt('Username:',s.username||'')||'').trim().toLowerCase();if(!username)return;const pin=prompt('New PIN (at least 6 characters):')||'';if(pin.length<6)return toast('PIN must be at least 6 characters','error');const existing=(state.root.privateAuth?.byUsername)||{};const uh=await C.sha256(username);if(existing[uh]&&existing[uh].studentId!==sid)return toast('That username is already in use','error');const updates={};for(const [k,v] of Object.entries(existing)){if(v.studentId===sid&&k!==uh)updates[`${ROOT}/privateAuth/byUsername/${k}`]=null}const ph=await C.sha256(pin);updates[`${ROOT}/students/${sid}/username`]=username;updates[`${ROOT}/privateAuth/byUsername/${uh}`]={studentId:sid,username,pinHash:ph};await db.ref().update(updates);toast('Student login updated')}
-async function adjust(sid,mode){const s=state.root.students[sid];let amount;if(mode==='reset'){if(!confirm(`Reset ${s.name}'s balance to 0?`))return;amount=-Number(s.rewardBalance||0)}else{amount=Number(prompt(mode==='add'?'How many points to add?':'How many points to deduct?','5'));if(!Number.isInteger(amount)||amount<=0)return; if(mode==='deduct')amount=-amount}const newBalance=Math.max(0,Number(s.rewardBalance||0)+amount),reason=prompt('Reason:')|| (mode==='reset'?'Reset':'Teacher adjustment'),key=db.ref(`${ROOT}/pointAdjustments`).push().key,now=new Date().toISOString();await db.ref().update({[`${ROOT}/students/${sid}/rewardBalance`]:newBalance,[`${ROOT}/pointAdjustments/${key}`]:{id:key,studentId:sid,classId:state.classId,amount:newBalance-Number(s.rewardBalance||0),action:mode,reason,teacherEmail:state.user.email,createdAt:now}});toast('Balance updated')}
-function getRedemptions(){const out=[];for(const [sid,rows] of Object.entries(state.root.redemptionsByStudent||{}))for(const [key,item] of Object.entries(rows||{}))out.push({sid,key,item});return out.sort((a,b)=>String(b.item.requestedAt).localeCompare(String(a.item.requestedAt)))}
-function renderRewards(){const rewards=Object.values(state.root.rewards||{}).sort((a,b)=>(a.cost||0)-(b.cost||0)),req=getRedemptions();return `<div class="pagehead"><div><p class="eyebrow">REWARDS</p><h1>Individual privileges</h1><p>These are what students can request with their live point balance.</p></div><button id="addRewardBtn" class="primary">+ Add reward</button></div><div class="rewardgrid">${rewards.map(r=>`<article class="reward-card"><div class="icon" style="background:${e(r.color||'#f3f1ff')}">${e(r.icon||'🎁')}</div><h3>${e(r.name)}</h3><div class="cost">${Number(r.cost)||0} ★</div><p>${r.active?'Active':'Hidden'} · ${r.quantity<0?'Unlimited':`${r.quantity} left`}</p><div class="actions" style="margin-top:12px"><button class="ghost" data-editreward="${e(r.id)}">Edit</button></div></article>`).join('')}</div><section class="panel"><h2>Reward requests</h2><div class="requests">${req.length?req.map(x=>requestRow(x)).join(''):'<p>No reward requests yet.</p>'}</div></section>`}
-function requestRow(x){const s=state.root.students?.[x.sid],r=state.root.rewards?.[x.item.rewardId];return `<article class="request"><em class="avatar" style="background:${e(s?.color||'#6849df')}">${e(s?.initials||'?')}</em><span><b>${e(s?.name||x.sid)} — ${e(r?.name||'Reward')}</b><small>${e(x.item.requestedAt||'')} · ${Number(x.item.cost)||0} points</small></span><mark class="badge ${e(x.item.status)}">${e(x.item.status)}</mark>${x.item.status==='pending'?`<button class="secondary" data-approve="${e(x.sid)}|${e(x.key)}">Approve</button><button class="danger" data-decline="${e(x.sid)}|${e(x.key)}">Decline</button>`:''}${x.item.status==='ready'?`<button class="secondary" data-collect="${e(x.sid)}|${e(x.key)}">Collected</button>`:''}</article>`}
-async function reviewRedemption(sid,key,decision){const item=state.root.redemptionsByStudent[sid][key],updates={},now=new Date().toISOString();let status=decision==='approve'?'ready':decision==='collect'?'collected':'declined';updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/status`]=status;updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/reviewedBy`]=state.user.email;updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/reviewedAt`]=now;if(decision==='decline')updates[`${ROOT}/students/${sid}/rewardBalance`]=Number(state.root.students[sid].rewardBalance||0)+Number(item.cost||0);await db.ref().update(updates);toast(`Request ${status}`)}
-async function editReward(id){const old=id?state.root.rewards[id]:null;const name=prompt('Reward name:',old?.name||'');if(!name)return;const cost=Number(prompt('Point cost:',String(old?.cost??25)));if(!Number.isFinite(cost)||cost<0)return;const icon=prompt('Emoji/icon:',old?.icon||'🎁')||'🎁',active=confirm('Should this reward be active/visible to students?');const rid=id||`reward-${uid()}`;await db.ref(`${ROOT}/rewards/${rid}`).set({id:rid,name:name.trim(),cost:Math.round(cost),icon,color:old?.color||'#ede9fe',active,quantity:old?.quantity??-1});toast(id?'Reward updated':'Reward added')}
-function renderClassRewards(){const rows=Object.values(state.root.classRewardCatalog||{}).filter(x=>x.active!==false);return `<div class="pagehead"><div><p class="eyebrow">CLASS INCENTIVES</p><h1>Whole-class rewards</h1><p>These do not spend an individual student's points. Use them when the class earns a group reward.</p></div></div><div class="classrewardgrid">${rows.map(r=>`<article class="classreward-card"><div class="icon">${e(r.icon)}</div><h3>${e(r.name)}</h3><p>Whole-class incentive</p></article>`).join('')}</div><section class="panel"><div class="notice">Current class reward catalog: Charades, Pictionary, Code Game, Copy Cat, BuddyBoardGames, Gimkit, Kahoot, Video, Create a New Game, Extra Game Time, Extra Recess, and Zoom Chat.</div></section>`}
-function reportRows(){const out=[];for(const s of roster()){const days=new Set([...Object.keys(state.root.dailyAwards?.[s.id]?.[state.classId]||{}),...Object.keys(state.root.dailyAttendance?.[s.id]?.[state.classId]||{})]);for(const date of [...days].sort().reverse()){const a=state.root.dailyAttendance?.[s.id]?.[state.classId]?.[date],aw=state.root.dailyAwards?.[s.id]?.[state.classId]?.[date];out.push({student:s.name,date,status:a?.status||'present',points:Number(aw?.points||0)})}}return out}
-function renderReports(){const rows=reportRows();return `<div class="pagehead"><div><p class="eyebrow">REPORTS</p><h1>Daily point history</h1><p>Export the visible class history to CSV, or print this page to PDF.</p></div><div class="actions"><button id="csvBtn" class="secondary">Export CSV</button><button id="printBtn" class="ghost">Print / PDF</button></div></div><section class="panel report-table"><table><thead><tr><th>Student</th><th>Date</th><th>Attendance</th><th>Points</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${e(r.student)}</td><td>${e(r.date)}</td><td>${e(r.status)}</td><td>${r.points}</td></tr>`).join('')}</tbody></table></section>`}
-function exportCSV(){const rows=reportRows(),q=v=>`"${String(v).replaceAll('"','""')}"`,csv=[['Student','Date','Attendance','Points'],...rows.map(r=>[r.student,r.date,r.status,r.points])].map(row=>row.map(q).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`student-rewards-${state.classId}-${C.schoolDateString()}.csv`;a.click();URL.revokeObjectURL(a.href)}
-function renderSettings(){const enabled=String(state.root.settings?.studentWebsiteEnabled)!=='false';return `<div class="pagehead"><div><p class="eyebrow">SETTINGS</p><h1>Student Rewards settings</h1></div></div><section class="panel"><div class="switchline"><div><h2>Student website access</h2><p>Block or reopen the student portal immediately.</p></div><div id="siteSwitch" class="switch ${enabled?'on':''}"><i></i></div></div></section><section class="panel"><h2>Daily scoring</h2><div class="notice">Excellent = 110% progress, Good = 100%, Fair = 80%, Needs Improvement = 50%. All Good earns 5 daily points; any Excellent with the rest Good/Excellent earns 6.</div></section>`}
-function renderImport(){return `<div class="pagehead"><div><p class="eyebrow">ONE-TIME MIGRATION</p><h1>Import old Student Rewards data</h1><p>Use this only for the private migration JSON. Never commit that file to GitHub.</p></div></div><section class="panel"><div class="warning notice">Importing replaces the entire <b>studentRewards</b> Firebase branch. Your old ChatGPT site is not changed.</div><div class="importbox"><input id="importFile" type="file" accept="application/json,.json"><button id="runImport" class="primary" disabled>Import into Firebase</button></div><pre id="importLog" class="importlog">Waiting for a file…</pre></section>`}
-async function runImport(){const f=state.importFile;if(!f)return;const log=$('#importLog');try{log.textContent='Reading file…\n';const json=JSON.parse(await f.text());if(!json.meta||!json.students||!json.privateAuth)throw new Error('This is not the Student Rewards migration JSON.');if(!confirm(`Import ${Object.keys(json.students).length} students and replace the current studentRewards branch?`))return;log.textContent+='Writing studentRewards branch…\n';await db.ref(ROOT).set(json);log.textContent+='DONE. Data imported successfully.\n';toast('Migration data imported');}catch(err){log.textContent+=`ERROR: ${err.message||err}\n`;toast('Import failed','error')}}
+function isSavedDay(){return roster().some(s=>state.root?.dailyAwards?.[s.id]?.[state.classId]?.[state.date])}
+function render(){if(!state.root||!state.user)return;setHeader();buildNav();document.querySelectorAll("#nav [data-tab]").forEach(b=>b.classList.toggle("active",b.dataset.tab===state.tab));const p=$("#page");
+  if(state.tab==="Overview")p.innerHTML=overview();
+  if(state.tab==="Daily Points")p.innerHTML=daily();
+  if(state.tab==="Students")p.innerHTML=students();
+  if(state.tab==="Categories")p.innerHTML=categoriesPage();
+  if(state.tab==="Comments")p.innerHTML=commentsPage();
+  if(state.tab==="Rewards")p.innerHTML=rewardsPage();
+  if(state.tab==="Reports")p.innerHTML=reportsPage();
+  if(state.tab==="People & Classes")p.innerHTML=peoplePage();
+  if(state.tab==="Settings")p.innerHTML=settingsPage();
+  bindPage();
+}
+function overview(){
+  const r=roster(), avg=classAverage(), scored=savedTodayIds().size, pending=pendingCount(), enabled=String(state.root.settings?.studentWebsiteEnabled)!=="false";
+  return `<div class="welcome"><div><p class="eyebrow">SIGNED IN AS ADMIN</p><h1>Good afternoon, ${esc(state.user.displayName||"Simcha Cohen")}</h1><p>Here’s how ${esc(cls()?.name||"your class")} is doing today.</p></div><button class="primary" data-go="Daily Points">+ Give today’s points</button></div>
+  <div class="stats">
+    <article class="stat purple"><i>↗</i><div><span>Class average</span><strong>${avg}%</strong><small class="up">Based on saved ratings</small></div><div class="bars"><b></b><b></b><b></b><b></b><b></b><b></b></div></article>
+    <article class="stat gold"><i>★</i><div><span>Students scored today</span><strong>${scored}</strong><small>of ${r.length} students</small></div><div class="ring" style="background:conic-gradient(#e7ae34 ${r.length?Math.round(scored/r.length*100):0}%,#f1f2f6 0)"><b>${r.length?Math.round(scored/r.length*100):0}%</b></div></article>
+    <article class="stat green click" data-go="Rewards"><i>◇</i><div><span>Reward requests</span><strong>${pending}</strong><small>${pending?"awaiting approval":"All caught up"}</small></div><button>→</button></article>
+  </div>
+  <div class="dash">
+    <section class="panel"><div class="panelhead"><div><h2>Student performance</h2><p>Today’s saved score</p></div><button data-go="Students">View all →</button></div><div class="list">${r.slice(0,6).map(s=>`<button class="studentrow" data-student="${esc(s.id)}"><em style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><span><strong>${esc(s.name)}</strong><small>${Number(s.rewardBalance)||0} reward points</small></span><u><i style="width:${Math.min(100,scoreFor(s))}%;background:${esc(safeColor(s))}"></i></u><b>${scoreFor(s)}%</b></button>`).join("")}</div></section>
+    <section class="panel"><div class="panelhead"><div><h2>Quick actions</h2><p>Common classroom tasks</p></div></div><div class="quick">
+      <button class="access-toggle ${enabled?"enabled":"blocked"}" id="accessToggle"><i>${enabled?"✓":"×"}</i><b>${enabled?"Student Website Enabled":"Student Website Blocked"}</b><small>${enabled?"Click to block student access":"Click to reopen student access"}</small></button>
+      <button data-go="Daily Points"><i class="q-purple">✓</i><b>Daily points</b><small>Score the whole class</small></button>
+      <button data-go="Rewards"><i class="q-gold">◇</i><b>Approve rewards</b><small>${pending} requests waiting</small></button>
+      <button data-go="Students"><i class="q-blue">±</i><b>Adjust points</b><small>Does not affect averages</small></button>
+      <button data-go="People & Classes"><i class="q-green">♧</i><b>Manage students</b><small>Classes and enrollment</small></button>
+    </div></section>
+  </div>`;
+}
+function carryDate(s){return C.latestRatings(state.root,s.id,state.classId,state.date).date||""}
+function daily(){
+  const cats=categories(), r=roster(), saved=isSavedDay(), carried=!saved&&r.some(s=>carryDate(s));
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">${esc((cls()?.name||"CLASS").toUpperCase())} · EDITING ${esc(state.date)}</p><h1>Daily Points</h1><p>Entering or reviewing points for <strong>${new Date(`${state.date}T12:00:00`).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})}</strong>.</p></div><div class="workcontrols"><label class="pagepicker"><span>Class</span><select id="dailyClass">${activeClasses().map(c=>`<option value="${esc(c.id)}" ${c.id===state.classId?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label><div class="savegroup">${saved?`<span class="savedday">✓ Already saved — changes will replace this day</span>`:`<span class="unsavedday">Draft only — no points awarded yet</span>`}<button id="saveDaily" class="primary">${saved?"Update saved day":"Save whole class"}</button></div></div></div>
+  ${carried?`<div class="carrynotice"><b>↶ Ratings carried forward — not yet saved</b><span>Each student starts with their most recent previously saved ratings in this class. Review or change them, then save to award points for this date.</span></div>`:""}
+  <div class="key"><span>● Excellent</span><span>● Good</span><span>● Fair</span><span>● Needs Improvement</span></div>
+  <div class="table">
+    <div class="row tablehead" style="grid-template-columns:minmax(170px,1.6fr) 110px repeat(${cats.length},minmax(125px,1fr)) 110px"><span>Student</span><span>Attendance</span>${cats.map(c=>`<span>${esc(c.name)}</span>`).join("")}<span>${saved?"Saved":"Unsaved Draft"}</span></div>
+    ${r.map(s=>dailyRow(s,cats,saved)).join("")}
+  </div></section>`;
+}
+function dailyRow(s,cats,saved){
+  const absent=state.absent.has(s.id), ratings=cats.map(c=>state.draft[`${s.id}|${c.name}`]||"Good"), prog=absent?0:(C.dailyProgress(ratings)||0), award=absent?0:C.dailyAward(ratings), cdate=carryDate(s);
+  return `<div class="row ${absent?"absentrow":""}" style="grid-template-columns:minmax(170px,1.6fr) 110px repeat(${cats.length},minmax(125px,1fr)) 110px">
+    <div class="person"><em style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><span><b>${esc(s.name)}</b>${!saved&&cdate?`<small class="carrysource">Started from ${new Date(`${cdate}T12:00:00`).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</small>`:""}</span></div>
+    <div class="attendance-wrap"><button class="attendance ${absent?"absent":""}" data-att="${esc(s.id)}">${absent?"Absent":"Present"}</button></div>
+    ${cats.map(c=>{const val=state.draft[`${s.id}|${c.name}`]||"Good";return `<div><select class="${ratingClass(val)}" data-rating="${esc(s.id)}" data-cat="${esc(c.name)}" ${absent?"disabled":""}>${["Excellent","Good","Fair","Needs Improvement"].map(x=>`<option ${x===val?"selected":""}>${x}</option>`).join("")}</select></div>`}).join("")}
+    <div class="today ${absent?"absentresult":""}"><strong>${absent?"Absent":`${prog}%`}</strong><small>${absent?"0 points":`${award} points if saved`}</small></div>
+  </div>`;
+}
+function ratingClass(v){return String(v).toLowerCase().replace(/\s+/g,"-").replace("fair","average")}
+async function saveDaily(){
+  const updates={}, cats=categories(), r=roster(), stamp=now();
+  for(const s of r){
+    const absent=state.absent.has(s.id), ratings={};
+    if(!absent)for(const cat of cats){const rating=state.draft[`${s.id}|${cat.name}`]||"Good";ratings[C.categoryKey(cat.name)]={category:cat.name,rating,points:C.progressValue[rating]??100,teacherEmail:state.user.email,savedAt:stamp}}
+    const newAward=absent?0:C.dailyAward(cats.map(c=>state.draft[`${s.id}|${c.name}`]||"Good"));
+    const oldAward=Number(state.root.dailyAwards?.[s.id]?.[state.classId]?.[state.date]?.points||0), oldBal=Number(state.root.students[s.id].rewardBalance||0);
+    updates[`${ROOT}/dailyRatings/${s.id}/${state.classId}/${state.date}`]=absent?null:ratings;
+    updates[`${ROOT}/dailyAwards/${s.id}/${state.classId}/${state.date}`]={points:newAward,teacherEmail:state.user.email,savedAt:stamp};
+    updates[`${ROOT}/dailyAttendance/${s.id}/${state.classId}/${state.date}`]={status:absent?"absent":"present",teacherEmail:state.user.email,savedAt:stamp};
+    updates[`${ROOT}/students/${s.id}/rewardBalance`]=Math.max(0,oldBal+newAward-oldAward);
+  }
+  await db.ref().update(updates);toast(`Saved ${r.length} students`);await loadRoot();render();
+}
+function studentHistory(s){const out=[];for(const [date,aw] of Object.entries(state.root.dailyAwards?.[s.id]?.[state.classId]||{})){const at=state.root.dailyAttendance?.[s.id]?.[state.classId]?.[date];out.push({date,points:Number(aw?.points||0),status:at?.status||"present"})}return out.sort((a,b)=>b.date.localeCompare(a.date))}
+function students(){
+  const r=roster(), s=currentStudent();if(s&&!state.selectedId)state.selectedId=s.id;
+  if(!s)return `<section class="workspace"><div class="empty"><h3>No students in this class</h3><p>Use People & Classes to add students.</p></div></section>`;
+  const rows=C.allProgressRows(state.root,s.id,state.classId), g={};for(const x of rows){g[x.category]??={e:0,p:0};g[x.category].e+=Number(x.points)||0;g[x.category].p+=100}
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">STUDENT PROGRESS</p><h1>Students</h1><p>Review growth, balances, and daily history.</p></div><select id="studentPicker" class="picker">${r.map(x=>`<option value="${esc(x.id)}" ${x.id===s.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select></div>
+    <div class="studenthero"><em class="huge" style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><div><h2>${esc(s.name)}</h2><p>${scoreFor(s)}% overall progress</p></div><button class="balance" id="adjustPoints"><span>CURRENT POINT BALANCE</span><b>${Number(s.rewardBalance)||0} ★</b><small>Click to adjust points</small></button></div>
+    <div class="categories">${Object.entries(g).map(([name,x])=>{const pct=x.p?Math.round(x.e/x.p*100):0;return `<article><span>${esc(name)}</span><b>${pct}%</b><u><i style="width:${Math.min(110,pct)}%;background:${esc(safeColor(s))}"></i></u><small>${x.e} of ${x.p} progress points</small></article>`}).join("")||`<article><span>Progress</span><b>—</b><small>No saved ratings yet</small></article>`}</div>
+    <section class="panel" style="margin-top:18px"><div class="panelhead"><div><h2>Daily History</h2><p>Saved points and attendance</p></div></div><div class="historytable"><table><thead><tr><th>Date</th><th>Attendance</th><th>Points</th></tr></thead><tbody>${studentHistory(s).map(x=>`<tr><td>${esc(C.formatDate(x.date))}</td><td>${esc(x.status)}</td><td>${x.points} ★</td></tr>`).join("")||`<tr><td colspan="3">No saved days yet.</td></tr>`}</tbody></table></div></section>
+  </section>`;
+}
+async function adjustPoints(){
+  const s=currentStudent();if(!s)return;const raw=prompt(`Adjust ${s.name}'s points. Use a positive number to add or a negative number to deduct:`,"5");if(raw===null)return;const amount=Number(raw);if(!Number.isInteger(amount)||amount===0)return toast("Enter a whole number","error");
+  const reason=prompt("Reason:","Teacher adjustment")||"Teacher adjustment", old=Number(s.rewardBalance||0), next=Math.max(0,old+amount), key=db.ref(`${ROOT}/pointAdjustments`).push().key;
+  await db.ref().update({[`${ROOT}/students/${s.id}/rewardBalance`]:next,[`${ROOT}/pointAdjustments/${key}`]:{id:key,studentId:s.id,classId:state.classId,amount:next-old,action:"teacher",reason,teacherEmail:state.user.email,createdAt:now()}});
+  toast("Balance updated");
+}
+function categoriesPage(){
+  const cats=categories();
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">DAILY SCORING</p><h1>Categories</h1><p>These are the areas scored on the Daily Points page.</p></div><button class="primary" id="addCategory">+ Add category</button></div><div class="category-grid">${cats.map((c,i)=>`<article class="category-card"><div class="catdot">${i+1}</div><h3>${esc(c.name)}</h3><p>Active · order ${Number(c.sortOrder||0)+1}</p><button data-catdelete="${esc(c.id)}">Remove</button></article>`).join("")}</div></section>`;
+}
+async function addCategory(){const name=prompt("Category name:");if(!name)return;const id=`cat-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;await db.ref(`${ROOT}/categories/${id}`).set({id,teacherEmail:state.user.email,name:name.trim(),points:1,sortOrder:categories().length,active:true});toast("Category added")}
+async function removeCategory(id){if(!confirm("Remove this category from future Daily Points screens? Old history will remain."))return;await db.ref(`${ROOT}/categories/${id}/active`).set(false);toast("Category removed")}
+function commentsPage(){
+  const s=currentStudent(), r=roster();if(s&&!state.selectedId)state.selectedId=s.id;const comments=s?vals(state.root.commentsByStudent?.[s.id]||{}).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))):[];
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">TEACHER NOTES</p><h1>Comments</h1><p>Write a private note or share encouragement with the student.</p></div><select id="commentPicker" class="picker">${r.map(x=>`<option value="${esc(x.id)}" ${s&&x.id===s.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select></div>${s?`<div class="admincolumns"><section><h2>${esc(s.name)}’s comments</h2><div class="commentlist">${comments.map(c=>`<article><p>${esc(c.body)}</p><small>${c.visibleToStudent===false?"Private teacher note":"Visible to student"} · ${c.createdAt?new Date(c.createdAt).toLocaleDateString():""}</small></article>`).join("")||`<div class="empty"><h3>No comments yet</h3><p>Add the first note for this student.</p></div>`}</div></section><section><h2>Add a comment</h2><form id="commentForm" class="adminform"><label>Comment<textarea id="commentText" required rows="5"></textarea></label><label class="check"><input id="commentVisible" type="checkbox" checked> Show this comment to the student</label><button class="primary">Save comment</button></form></section></div>`:`<div class="empty">No student selected.</div>`}</section>`;
+}
+async function addComment(e){e.preventDefault();const s=currentStudent(), body=$("#commentText").value.trim();if(!s||!body)return;const key=db.ref(`${ROOT}/commentsByStudent/${s.id}`).push().key;await db.ref(`${ROOT}/commentsByStudent/${s.id}/${key}`).set({id:key,studentId:s.id,body,visibleToStudent:$("#commentVisible").checked,teacherEmail:state.user.email,createdAt:now()});toast("Comment saved")}
+function rewardsPage(){
+  const rewards=vals(state.root.rewards||{}).filter(r=>r.active!==false).sort((a,b)=>(a.cost||0)-(b.cost||0)), req=getRedemptions(), classRewards=vals(state.root.classRewardCatalog||{}).filter(x=>x.active!==false);
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">${esc((cls()?.name||"CLASS").toUpperCase())}</p><h1>Rewards & Requests</h1><p>Students shop from their own portal; staff approve, decline, and mark items collected.</p></div><a class="primary linkbutton" href="student.html">Open student portal</a></div><div class="rewardlayout"><div><h2>Available rewards</h2><div class="rewardgrid">${rewards.map(r=>`<article><div class="rewardicon" style="background:${esc(r.color||"#ede9fe")}">${esc(r.icon||"🎁")}</div><h3>${esc(r.name)}</h3><p>${Number(r.cost)||0} ★ · ${Number(r.quantity)<0?"unlimited":`${r.quantity} left`}</p><div class="rewardactions"><button data-editreward="${esc(r.id)}">Edit</button></div></article>`).join("")}</div><button class="primary" id="addReward" style="margin-top:14px">+ Add a reward</button><div class="rewardclass"><h2>Class incentives</h2><div class="classchips">${classRewards.map(x=>`<span>${esc(x.icon||"⭐")} ${esc(x.name)}</span>`).join("")}</div></div></div><aside class="approvals"><div class="approvalhead"><span><h2>Request queue</h2><p>Pending, ready to collect, and completed history</p></span><b>${pendingCount()}</b></div>${req.length?req.map(requestRow).join(""):`<div class="empty"><h3>No requests yet</h3><p>Student purchases will appear here immediately.</p></div>`}</aside></div></section>`;
+}
+function requestRow(x){const s=state.root.students?.[x.sid],r=state.root.rewards?.[x.item.rewardId],status=x.item.status||"pending";return `<div class="request"><em style="background:${esc(safeColor(s))}">${esc(s?.initials||"?")}</em><span><strong>${esc(s?.name||x.sid)}</strong><small>${esc(r?.name||"Reward")} · ${Number(x.item.cost)||0} ★ · ${esc(status)}</small></span>${status==="pending"?`<button class="deny" data-decline="${esc(x.sid)}|${esc(x.key)}">×</button><button class="approve" data-approve="${esc(x.sid)}|${esc(x.key)}">✓</button>`:""}${status==="ready"?`<button class="approve" data-collect="${esc(x.sid)}|${esc(x.key)}">Given</button>`:""}</div>`}
+async function editReward(id=""){const old=id?state.root.rewards[id]:null,name=prompt("Reward name:",old?.name||"");if(!name)return;const cost=Number(prompt("Point cost:",String(old?.cost??25)));if(!Number.isFinite(cost)||cost<0)return;const icon=prompt("Emoji/icon:",old?.icon||"🎁")||"🎁",rid=id||`reward-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;await db.ref(`${ROOT}/rewards/${rid}`).set({id:rid,name:name.trim(),cost:Math.round(cost),icon,color:old?.color||"#ede9fe",active:true,quantity:old?.quantity??-1});toast(id?"Reward updated":"Reward added")}
+async function review(sid,key,decision){const item=state.root.redemptionsByStudent?.[sid]?.[key];if(!item)return;const updates={}, stamp=now();const status=decision==="approve"?"ready":decision==="collect"?"collected":"declined";updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/status`]=status;updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/reviewedBy`]=state.user.email;updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/reviewedAt`]=stamp;if(decision==="decline")updates[`${ROOT}/students/${sid}/rewardBalance`]=Number(state.root.students[sid].rewardBalance||0)+Number(item.cost||0);await db.ref().update(updates);toast(`Request ${status}`)}
+function reportRows(){const out=[];for(const s of roster()){const dates=new Set([...Object.keys(state.root.dailyAwards?.[s.id]?.[state.classId]||{}),...Object.keys(state.root.dailyAttendance?.[s.id]?.[state.classId]||{})]);for(const date of dates){const a=state.root.dailyAttendance?.[s.id]?.[state.classId]?.[date],aw=state.root.dailyAwards?.[s.id]?.[state.classId]?.[date];out.push({student:s.name,date,status:a?.status||"present",points:Number(aw?.points||0)})}}return out.sort((a,b)=>b.date.localeCompare(a.date)||a.student.localeCompare(b.student))}
+function reportsPage(){const rows=reportRows();return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">REPORTS</p><h1>Daily point history</h1><p>Review or export the saved class history.</p></div><div class="reportbuttons"><button id="csvBtn">Export CSV</button><button id="printBtn">Print / PDF</button></div></div><div class="historytable"><table><thead><tr><th>Student</th><th>Date</th><th>Attendance</th><th>Points</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.student)}</td><td>${esc(C.formatDate(r.date))}</td><td>${esc(r.status)}</td><td>${r.points} ★</td></tr>`).join("")}</tbody></table></div></section>`}
+function exportCSV(){const q=v=>`"${String(v).replaceAll('"','""')}"`;const csv=[["Student","Date","Attendance","Points"],...reportRows().map(r=>[r.student,r.date,r.status,r.points])].map(row=>row.map(q).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=`brightpath-${state.classId}-${C.schoolDateString()}.csv`;a.click();URL.revokeObjectURL(a.href)}
+function peoplePage(){
+  const classes=activeClasses(), allStudents=vals(state.root.students||{}).filter(s=>s.active!==false);
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">SCHOOL ROSTER TOOLS</p><h1>People & Classes</h1><p>Manage the active classes and Student Rewards roster.</p></div></div><div class="people-grid">${classes.map(c=>{const count=C.classRoster(state.root,c.id).length;return `<article class="people-card"><h3>${esc(c.name)}</h3><p>${count} active students · ${esc(c.schoolYear||"")}</p><button data-openclass="${esc(c.id)}">Open class</button></article>`}).join("")}</div><div class="admincolumns" style="margin-top:20px"><section><h2>Current class roster</h2><div class="teacherlist">${roster().map(s=>`<div><em>${esc(s.initials)}</em><span><b>${esc(s.name)}</b><small>${Number(s.rewardBalance)||0} reward points</small></span></div>`).join("")}</div></section><section><h2>Add a student to ${esc(cls()?.name||"class")}</h2><form id="addStudentForm" class="adminform"><label>Student full name<input id="newStudentName" required></label><p style="font-size:11px;color:#788398">The student must also be on the main B3 Games approved-student list to use the shared B3 login.</p><button class="primary">Create student</button></form><h2 style="margin-top:22px">Add a class</h2><form id="addClassForm" class="inlineform"><input id="newClassName" required placeholder="Class name"><button>Add class</button></form></section></div></section>`;
+}
+async function addStudent(e){e.preventDefault();const name=$("#newStudentName").value.trim();if(!name)return;const id=`student-${crypto.randomUUID?crypto.randomUUID():Date.now()}`,ini=initials(name),colors=["#7c3aed","#2563eb","#0891b2","#059669","#d97706","#dc2626","#9333ea","#4f46e5"],color=colors[Math.floor(Math.random()*colors.length)];await db.ref().update({[`${ROOT}/students/${id}`]:{id,classId:state.classId,name,initials:ini,color,rewardBalance:0,active:true},[`${ROOT}/enrollments/${state.classId}/${id}`]:true});toast("Student added")}
+async function addClass(e){e.preventDefault();const name=$("#newClassName").value.trim();if(!name)return;const id=`class-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;await db.ref(`${ROOT}/classes/${id}`).set({id,name,schoolYear:state.root.settings?.schoolYear||"2026–27",active:true});toast("Class added")}
+function settingsPage(){const enabled=String(state.root.settings?.studentWebsiteEnabled)!=="false";return `<section class="workspace settings"><div class="workhead"><div><p class="eyebrow">SCHOOL SETUP</p><h1>Settings</h1><p>BrightPath display and access settings.</p></div></div><article><h2>School</h2><label>Display name <input id="displayName" value="${esc(state.root.settings?.displayName||"BrightPath")}"></label><label>Active school year <input id="schoolYear" value="${esc(state.root.settings?.schoolYear||"2026–27")}"></label></article><article><h2>Student website access</h2><label>Current status <b>${enabled?"Enabled":"Blocked"}</b></label><button class="primary" id="settingsAccess">${enabled?"Block student website":"Enable student website"}</button></article><article><h2>Daily rating scale</h2><label>Excellent <b>110%</b></label><label>Good (default) <b>100%</b></label><label>Fair <b>80%</b></label><label>Needs Improvement <b>50%</b></label></article><button class="primary" id="saveSettings">Save settings</button></section>`}
+async function toggleAccess(){const enabled=String(state.root.settings?.studentWebsiteEnabled)!=="false";await db.ref(`${ROOT}/settings/studentWebsiteEnabled`).set(enabled?"false":"true");toast(enabled?"Student website blocked":"Student website enabled")}
+async function saveSettings(){await db.ref(`${ROOT}/settings`).update({displayName:$("#displayName").value.trim()||"BrightPath",schoolYear:$("#schoolYear").value.trim()||"2026–27"});toast("Settings saved")}
 function bindPage(){
- if(state.tab==='Daily Points'){$('#dailyDate').onchange=ev=>{state.date=ev.target.value;prepareDraft();render()};$('#prevDay').onclick=()=>shiftDate(-1);$('#nextDay').onclick=()=>shiftDate(1);$('#saveDaily').onclick=saveDaily;document.querySelectorAll('[data-att]').forEach(b=>b.onclick=()=>{const id=b.dataset.att;state.absent.has(id)?state.absent.delete(id):state.absent.add(id);render()});document.querySelectorAll('[data-rating-student]').forEach(sel=>sel.onchange=()=>{state.draftRatings[`${sel.dataset.ratingStudent}|${sel.dataset.category}`]=sel.value;render()})}
- if(state.tab==='Students'){$('#addStudentBtn').onclick=addStudent;document.querySelectorAll('[data-addpoints]').forEach(b=>b.onclick=()=>adjust(b.dataset.addpoints,'add'));document.querySelectorAll('[data-deduct]').forEach(b=>b.onclick=()=>adjust(b.dataset.deduct,'deduct'));document.querySelectorAll('[data-reset]').forEach(b=>b.onclick=()=>adjust(b.dataset.reset,'reset'));document.querySelectorAll('[data-login]').forEach(b=>b.onclick=()=>setLogin(b.dataset.login))}
- if(state.tab==='Rewards'){$('#addRewardBtn').onclick=()=>editReward(null);document.querySelectorAll('[data-editreward]').forEach(b=>b.onclick=()=>editReward(b.dataset.editreward));document.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>{const [sid,key]=b.dataset.approve.split('|');reviewRedemption(sid,key,'approve')});document.querySelectorAll('[data-decline]').forEach(b=>b.onclick=()=>{const [sid,key]=b.dataset.decline.split('|');reviewRedemption(sid,key,'decline')});document.querySelectorAll('[data-collect]').forEach(b=>b.onclick=()=>{const [sid,key]=b.dataset.collect.split('|');reviewRedemption(sid,key,'collect')})}
- if(state.tab==='Reports'){$('#csvBtn').onclick=exportCSV;$('#printBtn').onclick=()=>window.print()}
- if(state.tab==='Settings'){$('#siteSwitch').onclick=async()=>{const enabled=String(state.root.settings?.studentWebsiteEnabled)!=='false';await db.ref(`${ROOT}/settings/studentWebsiteEnabled`).set(enabled?'false':'true');toast(enabled?'Student site blocked':'Student site enabled')}}
- if(state.tab==='Import Data'){$('#importFile').onchange=ev=>{state.importFile=ev.target.files?.[0]||null;$('#runImport').disabled=!state.importFile;$('#importLog').textContent=state.importFile?`Ready: ${state.importFile.name}\n`:'Waiting for a file…'};$('#runImport').onclick=runImport}
+  document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{state.tab=b.dataset.go;render()});
+  document.querySelectorAll("[data-student]").forEach(b=>b.onclick=()=>{state.selectedId=b.dataset.student;state.tab="Students";render()});
+  if($("#accessToggle"))$("#accessToggle").onclick=toggleAccess;
+  if(state.tab==="Daily Points"){
+    $("#dailyClass").onchange=e=>{state.classId=e.target.value;state.selectedId="";prepareDraft();renderClassSelect();render()};
+    $("#saveDaily").onclick=saveDaily;document.querySelectorAll("[data-att]").forEach(b=>b.onclick=()=>{const id=b.dataset.att;state.absent.has(id)?state.absent.delete(id):state.absent.add(id);render()});
+    document.querySelectorAll("[data-rating]").forEach(s=>s.onchange=()=>{state.draft[`${s.dataset.rating}|${s.dataset.cat}`]=s.value;render()});
+  }
+  if(state.tab==="Students"){$("#studentPicker").onchange=e=>{state.selectedId=e.target.value;render()};$("#adjustPoints").onclick=adjustPoints}
+  if(state.tab==="Categories"){$("#addCategory").onclick=addCategory;document.querySelectorAll("[data-catdelete]").forEach(b=>b.onclick=()=>removeCategory(b.dataset.catdelete))}
+  if(state.tab==="Comments"){if($("#commentPicker"))$("#commentPicker").onchange=e=>{state.selectedId=e.target.value;render()};if($("#commentForm"))$("#commentForm").onsubmit=addComment}
+  if(state.tab==="Rewards"){$("#addReward").onclick=()=>editReward();document.querySelectorAll("[data-editreward]").forEach(b=>b.onclick=()=>editReward(b.dataset.editreward));document.querySelectorAll("[data-approve]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.approve.split("|");review(s,k,"approve")});document.querySelectorAll("[data-decline]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.decline.split("|");review(s,k,"decline")});document.querySelectorAll("[data-collect]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.collect.split("|");review(s,k,"collect")})}
+  if(state.tab==="Reports"){$("#csvBtn").onclick=exportCSV;$("#printBtn").onclick=()=>window.print()}
+  if(state.tab==="People & Classes"){document.querySelectorAll("[data-openclass]").forEach(b=>b.onclick=()=>{state.classId=b.dataset.openclass;renderClassSelect();prepareDraft();render()});$("#addStudentForm").onsubmit=addStudent;$("#addClassForm").onsubmit=addClass}
+  if(state.tab==="Settings"){$("#settingsAccess").onclick=toggleAccess;$("#saveSettings").onclick=saveSettings}
 }
-function shiftDate(days){const d=new Date(`${state.date}T12:00:00`);d.setDate(d.getDate()+days);state.date=d.toISOString().slice(0,10);prepareDraft();render()}
-$('#googleBtn').onclick=signIn;$('#signOutBtn').onclick=signOut;buildNav();
-auth.onAuthStateChanged(async user=>{if(!user){state.user=null;$('#loginView').classList.remove('hidden');$('#appView').classList.add('hidden');return}if(!adminOkay(user)){await auth.signOut();$('#loginError').textContent=`This page is only authorized for ${C.ADMIN_EMAIL}.`;return}state.user=user;$('#teacherName').textContent=user.displayName||'Rabbi Cohen';$('#teacherEmail').textContent=user.email;$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');await loadRoot();subscribe();render()});
+function shiftDate(n){const d=new Date(`${state.date}T12:00:00`);d.setDate(d.getDate()+n);state.date=d.toISOString().slice(0,10);prepareDraft();render()}
+$("#prevDate").onclick=()=>shiftDate(-1);$("#nextDate").onclick=()=>shiftDate(1);$("#topDate").onchange=e=>{state.date=e.target.value;prepareDraft();render()};
+$("#googleBtn").onclick=async()=>{try{const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:"select_account"});await auth.signInWithPopup(p)}catch(err){$("#loginError").textContent=err.message||String(err)}};
+$("#signOutBtn").onclick=()=>auth.signOut();
+auth.onAuthStateChanged(async user=>{
+  if(!user){state.user=null;$("#loginView").classList.remove("hidden");$("#appView").classList.add("hidden");return}
+  if(!user.email||user.email.toLowerCase()!==ADMIN.toLowerCase()){await auth.signOut();$("#loginError").textContent=`This page is only authorized for ${ADMIN}.`;return}
+  state.user=user;$("#loginView").classList.add("hidden");$("#appView").classList.remove("hidden");await loadRoot();subscribe();render();
+});
 })();
