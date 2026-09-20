@@ -113,6 +113,7 @@ button,input,select,textarea{font:inherit}
 .post-overview-media{position:absolute;right:8px;bottom:8px;padding:4px 7px;border-radius:999px;background:rgba(42,34,27,.75);color:#fff;font-size:.67rem;font-weight:800}
 .post-overview-body{padding:12px 13px 9px;display:flex;flex-direction:column;flex:1}.post-overview-category{font-size:.63rem;font-weight:900;color:#315576;text-transform:uppercase;letter-spacing:.5px}.post-overview-title{margin:4px 0 3px;font-family:'Caveat',cursive;font-size:1.45rem;line-height:1.05;color:#3c5267}.post-overview-student{font-size:.75rem;font-weight:800;color:#614f3e}.post-overview-meta{font-size:.66rem;color:#907d69;margin-top:4px;line-height:1.35}.post-overview-desc{font-size:.7rem;color:#665748;line-height:1.35;margin-top:7px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .post-overview-actions{display:flex;gap:7px;padding:0 13px 13px}.post-overview-actions button{flex:1;border:0;border-radius:9px;padding:8px 7px;font-size:.7rem;font-weight:900;cursor:pointer}.post-open-btn{background:#e9e0d3;color:#4d4034}.post-go-btn{background:#427250;color:#fff}.overview-empty{grid-column:1/-1;text-align:center;padding:45px 18px;color:#897764;font-weight:800}
+.posts-bulk-tools{display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid #eadfce}.posts-bulk-tools.show{display:flex}.posts-bulk-tools button{border:0;border-radius:9px;padding:8px 12px;font-size:.72rem;font-weight:900;cursor:pointer}.posts-bulk-tools .select-toggle{background:#315576;color:#fff}.posts-bulk-tools .select-all{background:#e7dfd2;color:#4d4034}.posts-bulk-tools .delete-selected{background:#b44f47;color:#fff}.posts-bulk-tools .delete-selected:disabled{opacity:.45;cursor:not-allowed}.posts-bulk-tools .cancel-select{background:#ebe3d7;color:#4c4034}.posts-bulk-count{font-size:.72rem;font-weight:900;color:#705c47;margin-left:auto}.post-overview-card.bulk-selecting{cursor:pointer}.post-overview-card.selected{box-shadow:0 0 0 3px rgba(180,79,71,.38),0 5px 15px rgba(67,48,30,.08)}.post-select-check{display:none;position:absolute;left:9px;top:9px;z-index:3;width:27px;height:27px;border-radius:50%;border:2px solid rgba(255,255,255,.95);background:rgba(45,36,27,.72);color:white;align-items:center;justify-content:center;font-size:17px;font-weight:900;box-shadow:0 2px 8px rgba(0,0,0,.24)}.bulk-selecting .post-select-check{display:flex}.selected .post-select-check{background:#b44f47}
 @media(max-width:760px){.posts-overview-tools{grid-template-columns:1fr 1fr}.posts-overview{max-height:calc(100vh - 24px)}.posts-grid-wrap{padding:12px}.posts-grid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}}
 @media(max-width:480px){.posts-overview-tools{grid-template-columns:1fr}.posts-grid{grid-template-columns:1fr 1fr}.post-overview-thumb{height:120px}.post-overview-card{min-height:270px}}
 
@@ -261,6 +262,13 @@ button,input,select,textarea{font:inherit}
         <select id="postsOverviewStudent"><option value="">All students</option></select>
         <select id="postsOverviewCategory"><option value="">All categories</option></select>
         <select id="postsOverviewSort"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="student">Student A–Z</option></select>
+      </div>
+      <div class="posts-bulk-tools" id="postsBulkTools">
+        <button type="button" class="select-toggle" id="postsSelectModeBtn">Select Posts</button>
+        <button type="button" class="select-all" id="postsSelectAllBtn" style="display:none;">Select All Shown</button>
+        <button type="button" class="delete-selected" id="postsDeleteSelectedBtn" style="display:none;" disabled>Delete Selected</button>
+        <button type="button" class="cancel-select" id="postsCancelSelectBtn" style="display:none;">Cancel</button>
+        <span class="posts-bulk-count" id="postsBulkCount"></span>
       </div>
     </div>
     <div class="posts-grid-wrap"><div class="posts-grid" id="postsOverviewGrid"></div></div>
@@ -1393,6 +1401,15 @@ const postsOverviewSearch=document.getElementById('postsOverviewSearch');
 const postsOverviewStudent=document.getElementById('postsOverviewStudent');
 const postsOverviewCategory=document.getElementById('postsOverviewCategory');
 const postsOverviewSort=document.getElementById('postsOverviewSort');
+const postsBulkTools=document.getElementById('postsBulkTools');
+const postsSelectModeBtn=document.getElementById('postsSelectModeBtn');
+const postsSelectAllBtn=document.getElementById('postsSelectAllBtn');
+const postsDeleteSelectedBtn=document.getElementById('postsDeleteSelectedBtn');
+const postsCancelSelectBtn=document.getElementById('postsCancelSelectBtn');
+const postsBulkCount=document.getElementById('postsBulkCount');
+let postsBulkSelecting=false;
+const selectedPostIds=new Set();
+let lastOverviewVisibleIds=[];
 function approvedCurrentPosts(){return posts.filter(p=>p.status==='approved');}
 function postDateLabel(value){if(!value)return '';const d=new Date(value);return Number.isNaN(d.getTime())?'':d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}
 function postLocationLabel(post){if(post.galleryRoom&&post.galleryRoom!=='hallway')return classroomLabel(post.galleryRoom)+' Classroom';return 'Main Hallway';}
@@ -1407,23 +1424,42 @@ function refreshOverviewFilters(){
   if(students.includes(currentStudent))postsOverviewStudent.value=currentStudent;
   if(categories.includes(currentCategory))postsOverviewCategory.value=currentCategory;
 }
+function updatePostsBulkControls(){
+  postsBulkTools?.classList.toggle('show',isTeacher);
+  if(!isTeacher){postsBulkSelecting=false;selectedPostIds.clear();}
+  if(!postsBulkTools)return;
+  postsSelectModeBtn.style.display=postsBulkSelecting?'none':'';
+  postsSelectAllBtn.style.display=postsBulkSelecting?'':'none';
+  postsDeleteSelectedBtn.style.display=postsBulkSelecting?'':'none';
+  postsCancelSelectBtn.style.display=postsBulkSelecting?'':'none';
+  const count=selectedPostIds.size;
+  postsDeleteSelectedBtn.disabled=count===0;
+  postsDeleteSelectedBtn.textContent=count?`Delete Selected (${count})`:'Delete Selected';
+  postsBulkCount.textContent=postsBulkSelecting?(count?`${count} selected`:'Click posts to select them'):'';
+}
+function exitPostsBulkSelect(){postsBulkSelecting=false;selectedPostIds.clear();updatePostsBulkControls();renderPostsOverview();}
 function renderPostsOverview(){
   refreshOverviewFilters();
+  updatePostsBulkControls();
   const q=postsOverviewSearch.value.trim().toLowerCase(),student=postsOverviewStudent.value,category=postsOverviewCategory.value,sort=postsOverviewSort.value;
   let visible=approvedCurrentPosts().filter(p=>{
     if(student&&p.studentName!==student)return false;if(category&&p.category!==category)return false;
     if(q){const hay=[p.studentName,p.title,p.category,p.description,p.className,postLocationLabel(p)].join(' ').toLowerCase();if(!hay.includes(q))return false;}return true;
   });
   visible.sort((a,b)=>sort==='oldest'?String(a.createdAt||'').localeCompare(String(b.createdAt||'')):sort==='student'?String(a.studentName||'').localeCompare(String(b.studentName||''))||String(b.createdAt||'').localeCompare(String(a.createdAt||'')):String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  lastOverviewVisibleIds=visible.map(p=>p.id);
+  for(const id of [...selectedPostIds])if(!posts.some(p=>p.id===id&&p.status==='approved'))selectedPostIds.delete(id);
+  updatePostsBulkControls();
   const total=approvedCurrentPosts().length;document.getElementById('postsOverviewCount').textContent=visible.length===total?`${total} current post${total===1?'':'s'}`:`Showing ${visible.length} of ${total} current posts`;
   if(!visible.length){postsOverviewGrid.innerHTML='<div class="overview-empty">No current posts match those filters.</div>';return;}
   postsOverviewGrid.innerHTML=visible.map(post=>{
     const media=[post.videoUrl?'🎬':'',post.audioUrl?'🎧':'',post.link?'🔗':''].filter(Boolean).join(' ');
-    return `<article class="post-overview-card" data-post-id="${escapeHtml(post.id)}"><div class="post-overview-thumb">${post.image?`<img src="${escapeHtml(post.image)}" alt="">`:`<div class="post-overview-placeholder">${overviewPlaceholder(post)}</div>`}${media?`<span class="post-overview-media">${media}</span>`:''}</div><div class="post-overview-body"><div class="post-overview-category">${escapeHtml(post.category||'Other')}</div><div class="post-overview-title">${escapeHtml(post.title||'Untitled')}</div><div class="post-overview-student">${escapeHtml(post.studentName||'')}</div><div class="post-overview-meta">${escapeHtml(postLocationLabel(post))}${postDateLabel(post.createdAt)?` · ${escapeHtml(postDateLabel(post.createdAt))}`:''}</div>${post.description?`<div class="post-overview-desc">${escapeHtml(post.description)}</div>`:''}</div><div class="post-overview-actions"><button type="button" class="post-open-btn" data-overview-action="open">Open</button><button type="button" class="post-go-btn" data-overview-action="go">Go There</button></div></article>`;
+    const selected=selectedPostIds.has(post.id);
+    return `<article class="post-overview-card${postsBulkSelecting?' bulk-selecting':''}${selected?' selected':''}" data-post-id="${escapeHtml(post.id)}"><div class="post-overview-thumb"><span class="post-select-check">${selected?'✓':''}</span>${post.image?`<img src="${escapeHtml(post.image)}" alt="">`:`<div class="post-overview-placeholder">${overviewPlaceholder(post)}</div>`}${media?`<span class="post-overview-media">${media}</span>`:''}</div><div class="post-overview-body"><div class="post-overview-category">${escapeHtml(post.category||'Other')}</div><div class="post-overview-title">${escapeHtml(post.title||'Untitled')}</div><div class="post-overview-student">${escapeHtml(post.studentName||'')}</div><div class="post-overview-meta">${escapeHtml(postLocationLabel(post))}${postDateLabel(post.createdAt)?` · ${escapeHtml(postDateLabel(post.createdAt))}`:''}</div>${post.description?`<div class="post-overview-desc">${escapeHtml(post.description)}</div>`:''}</div><div class="post-overview-actions"${postsBulkSelecting?' style="visibility:hidden"':''}><button type="button" class="post-open-btn" data-overview-action="open">Open</button><button type="button" class="post-go-btn" data-overview-action="go">Go There</button></div></article>`;
   }).join('');
 }
 function openPostsOverview(){renderPostsOverview();postsOverviewOverlay.classList.add('show');postsOverviewSearch.focus();}
-function closePostsOverview(){postsOverviewOverlay.classList.remove('show');}
+function closePostsOverview(){postsOverviewOverlay.classList.remove('show');if(postsBulkSelecting){postsBulkSelecting=false;selectedPostIds.clear();updatePostsBulkControls();}}
 function focusCurrentScenePost(post){
   const mesh=projectMeshes.find(m=>m.userData?.postId===post.id);if(!mesh)return false;
   const target=mesh.userData.navTarget;if(!target){openLightbox(post);return true;}
@@ -1443,7 +1479,26 @@ document.getElementById('allPostsBtn').onclick=openPostsOverview;
 document.getElementById('closePostsOverviewBtn').onclick=closePostsOverview;
 postsOverviewOverlay.addEventListener('click',e=>{if(e.target===postsOverviewOverlay)closePostsOverview();});
 [postsOverviewSearch,postsOverviewStudent,postsOverviewCategory,postsOverviewSort].forEach(el=>el.addEventListener(el.tagName==='INPUT'?'input':'change',renderPostsOverview));
-postsOverviewGrid.addEventListener('click',e=>{const btn=e.target.closest('button[data-overview-action]');if(!btn)return;const card=btn.closest('[data-post-id]'),post=posts.find(p=>p.id===card?.dataset.postId&&p.status==='approved');if(!post)return;if(btn.dataset.overviewAction==='open')openLightbox(post);else jumpToOverviewPost(post);});
+postsSelectModeBtn.onclick=()=>{if(!isTeacher)return;postsBulkSelecting=true;selectedPostIds.clear();renderPostsOverview();};
+postsCancelSelectBtn.onclick=exitPostsBulkSelect;
+postsSelectAllBtn.onclick=()=>{if(!isTeacher||!postsBulkSelecting)return;const allShownSelected=lastOverviewVisibleIds.length&&lastOverviewVisibleIds.every(id=>selectedPostIds.has(id));if(allShownSelected)lastOverviewVisibleIds.forEach(id=>selectedPostIds.delete(id));else lastOverviewVisibleIds.forEach(id=>selectedPostIds.add(id));renderPostsOverview();};
+postsDeleteSelectedBtn.onclick=async()=>{
+  if(!isTeacher||!dbRef||!selectedPostIds.size)return;
+  const ids=[...selectedPostIds].filter(id=>posts.some(p=>p.id===id&&p.status==='approved'));
+  if(!ids.length){exitPostsBulkSelect();return;}
+  const count=ids.length;
+  if(!confirm(`Permanently delete ${count} selected post${count===1?'':'s'}? This cannot be undone.`))return;
+  postsDeleteSelectedBtn.disabled=true;postsDeleteSelectedBtn.textContent='Deleting...';
+  try{const updates={};ids.forEach(id=>updates[id]=null);await dbRef.update(updates);selectedPostIds.clear();postsBulkSelecting=false;}
+  catch(err){console.error(err);alert('Could not delete the selected posts right now.');}
+  finally{updatePostsBulkControls();renderPostsOverview();}
+};
+postsOverviewGrid.addEventListener('click',e=>{
+  const card=e.target.closest('[data-post-id]');if(!card)return;
+  const post=posts.find(p=>p.id===card.dataset.postId&&p.status==='approved');if(!post)return;
+  if(postsBulkSelecting&&isTeacher){if(selectedPostIds.has(post.id))selectedPostIds.delete(post.id);else selectedPostIds.add(post.id);renderPostsOverview();return;}
+  const btn=e.target.closest('button[data-overview-action]');if(!btn)return;if(btn.dataset.overviewAction==='open')openLightbox(post);else jumpToOverviewPost(post);
+});
 
 /* ---------- lightbox ---------- */
 const lightbox=document.getElementById('lightbox');function openLightbox(post){const box=document.getElementById('lightboxContent');box.innerHTML=`<button class="close-x" id="lightboxClose">&times;</button>${post.image?`<img src="${post.image}" alt="${escapeHtml(post.title)}">`:''}${post.videoUrl?`<video controls src="${escapeHtml(post.videoUrl)}"></video>`:''}${post.audioUrl?`<audio controls src="${escapeHtml(post.audioUrl)}"></audio>`:''}<span class="category">${escapeHtml(post.category)}</span><h2>${escapeHtml(post.title)}</h2><div class="desc">${escapeHtml(post.description)}</div>${post.link?`<a href="${escapeHtml(post.link)}" target="_blank" rel="noopener">Open link →</a>`:''}<div class="by">${escapeHtml(post.studentName)}${post.className?` · ${escapeHtml(post.className)}`:''}</div>${isTeacher?`<div class="teacher-lightbox-actions"><button class="btn-danger" id="deleteProjectBtn">Remove from hallway</button></div>`:''}`;lightbox.classList.add('show');document.getElementById('lightboxClose').onclick=()=>lightbox.classList.remove('show');if(isTeacher)document.getElementById('deleteProjectBtn').onclick=async()=>{if(confirm(`Remove "${post.title}" by ${post.studentName}?`)){await dbRef.child(post.id).remove();lightbox.classList.remove('show')}};}
