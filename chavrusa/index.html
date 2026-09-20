@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B3 Chavrusa Calendar</title>
+<style>
+:root{
+  --bg:#f4f7fc; --card:#fff; --text:#17233f; --muted:#667085;
+  --blue:#3157d5; --purple:#7447dd; --green:#137a45; --greenbg:#e9f8f0;
+  --red:#b42318; --redbg:#fff1f0; --gold:#8a6400; --goldbg:#fff8df;
+  --border:#dce3ef; --shadow:0 10px 28px rgba(28,40,70,.12);
+}
+*{box-sizing:border-box}
+body{
+  margin:0; min-height:100vh; color:var(--text);
+  font-family:"Segoe UI",Arial,sans-serif;
+  background:
+    radial-gradient(circle at 8% 0%,rgba(116,71,221,.11),transparent 30%),
+    radial-gradient(circle at 93% 3%,rgba(49,87,213,.10),transparent 30%),
+    var(--bg);
+}
+.app{width:min(1240px,96vw);margin:auto;padding:20px 0 34px}
+.topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+h1{margin:0;font-size:clamp(31px,4vw,53px);letter-spacing:-1px}
+.subtitle{margin:5px 0 0;color:var(--muted)}
+.controls{display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end}
+.control{display:flex;flex-direction:column;gap:5px}
+.control label{font-size:11px;font-weight:800;text-transform:uppercase;color:var(--muted);letter-spacing:.6px}
+select,input,button{font:inherit}
+select,input[type=date]{
+  border:1px solid var(--border);background:white;color:var(--text);
+  border-radius:12px;padding:11px 12px;font-weight:750;max-width:315px
+}
+select.date-select{min-width:300px}
+button{
+  border:0;border-radius:12px;background:#fff;color:var(--text);
+  padding:11px 15px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.06)
+}
+button.primary{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff}
+button.danger{background:var(--redbg);color:var(--red);box-shadow:none;border:1px solid #f3c1bd}
+button:hover{transform:translateY(-1px)}
+.hero{
+  background:linear-gradient(135deg,#243f9f,#6b42d4);
+  color:#fff;border-radius:24px;padding:18px 22px;text-align:center;
+  box-shadow:var(--shadow);margin-bottom:14px
+}
+.hero .class-label{font-size:15px;font-weight:750;opacity:.86}
+.hero .greg-date{font-size:clamp(23px,3vw,39px);font-weight:850;line-height:1.15;margin-top:2px}
+.hero .heb-date{
+  direction:rtl;font-family:Arial,"Noto Sans Hebrew",sans-serif;
+  font-size:clamp(34px,5vw,64px);font-weight:900;line-height:1.12;margin-top:7px
+}
+.notice{
+  display:none;margin-bottom:14px;padding:12px 15px;border-radius:14px;
+  font-weight:750;text-align:center
+}
+.notice.show{display:block}
+.notice.backup{background:var(--goldbg);border:1px solid #f2da87;color:var(--gold)}
+.panel{
+  background:#fff;border:1px solid var(--border);border-radius:18px;
+  padding:13px 15px;margin-bottom:15px;box-shadow:0 5px 16px rgba(28,40,70,.06)
+}
+.panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.panel-title{font-weight:900;font-size:17px}
+.panel-help{color:var(--muted);font-size:13px;margin-top:2px}
+.absent-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}
+.absent-chip{
+  display:flex;align-items:center;gap:7px;border:1px solid var(--border);
+  border-radius:999px;padding:7px 10px;background:#f9fbff;cursor:pointer;
+  font-weight:700;font-size:14px;user-select:none
+}
+.absent-chip input{width:17px;height:17px;accent-color:var(--red)}
+.absent-chip.is-absent{background:var(--redbg);border-color:#f2b8b5;color:var(--red)}
+.pairs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.pair-card{
+  background:var(--card);border:1px solid var(--border);border-radius:22px;
+  box-shadow:var(--shadow);padding:15px;min-height:182px
+}
+.pair-title{
+  text-align:center;font-size:12px;font-weight:850;letter-spacing:.5px;
+  color:var(--muted);text-transform:uppercase;margin-bottom:12px
+}
+.members{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:stretch}
+.members.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.member{
+  min-width:0;border-radius:17px;background:#f8faff;border:1px solid #e3e9f4;
+  padding:12px 9px;text-align:center;display:flex;flex-direction:column;
+  justify-content:center;align-items:center;min-height:118px
+}
+.member.first{background:var(--greenbg);border-color:#b9e2c9}
+.num{
+  display:grid;place-items:center;width:37px;height:37px;border-radius:50%;
+  background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;
+  font-size:19px;font-weight:900;margin-bottom:7px
+}
+.member.first .num{background:var(--green)}
+.first-label{
+  color:var(--green);font-size:10px;font-weight:900;text-transform:uppercase;
+  letter-spacing:.4px;margin-bottom:5px
+}
+.name{font-size:clamp(19px,2vw,29px);font-weight:900;line-height:1.08;word-break:break-word}
+.settings{margin-top:17px}
+.settings summary{cursor:pointer;font-weight:850;color:#3d4a64;padding:3px}
+.settings-box{
+  margin-top:9px;background:white;border:1px solid var(--border);border-radius:18px;
+  padding:14px;box-shadow:0 5px 16px rgba(28,40,70,.05)
+}
+.add-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
+.holiday-list{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.holiday{
+  border-radius:999px;background:#f8faff;border:1px solid var(--border);
+  padding:6px 9px;font-size:12px;font-weight:700
+}
+.holiday.fixed{background:#f5f0ff;border-color:#ddd0ff}
+.holiday.custom{background:var(--redbg);border-color:#f3c1bd}
+.holiday .remove{border:0;background:none;color:var(--red);padding:0 0 0 6px;box-shadow:none}
+.footer{margin-top:15px;color:var(--muted);font-size:13px;text-align:center}
+.empty{background:white;border-radius:20px;padding:28px;text-align:center;font-size:24px;font-weight:850;border:1px solid var(--border)}
+@media(max-width:850px){
+  .pairs{grid-template-columns:1fr}
+  .controls{width:100%}
+  select.date-select{min-width:260px;max-width:100%}
+}
+@media(max-width:600px){
+  .members,.members.three{grid-template-columns:1fr}
+}
+@media print{
+  body{background:white}
+  .controls,.panel,.subtitle,.settings,.footer{display:none!important}
+  .app{width:100%;padding:0}
+  .pair-card,.hero{box-shadow:none}
+}
+body.fullscreen .app{width:min(1450px,98vw);padding-top:8px}
+body.fullscreen .subtitle,body.fullscreen .footer,body.fullscreen .settings{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div>
+      <h1>Chavrusa of the Day</h1>
+      <div class="subtitle">Monday–Thursday only • Hebrew dates • automatic backup for absences</div>
+    </div>
+    <div class="controls">
+      <div class="control">
+        <label>Class</label>
+        <select id="classSelect">
+          <option value="ET">ET — Morning</option>
+          <option value="WT">WT — Afternoon</option>
+        </select>
+      </div>
+      <div class="control">
+        <label>School Date</label>
+        <select id="dateSelect" class="date-select"></select>
+      </div>
+      <div class="control">
+        <label>Group Size</label>
+        <select id="groupSizeSelect">
+          <option value="3" selected>3 students</option>
+          <option value="2">2 students</option>
+        </select>
+      </div>
+      <button id="prevBtn">◀ Previous</button>
+      <button id="nextBtn" class="primary">Next ▶</button>
+      <button id="fullBtn">⛶ Fullscreen</button>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div id="classLabel" class="class-label"></div>
+    <div id="gregDate" class="greg-date"></div>
+    <div id="hebDate" class="heb-date"></div>
+  </div>
+
+  <div id="backupNotice" class="notice backup"></div>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">Absent Today</div>
+        <div class="panel-help">Check any boys who are missing. Backup pairings are made automatically.</div>
+      </div>
+      <button id="clearAbsent">Clear Absences</button>
+    </div>
+    <div id="absentList" class="absent-list"></div>
+  </section>
+
+  <main id="pairs" class="pairs"></main>
+
+  <details class="settings">
+    <summary>⚙ No-School Dates / Calendar Settings</summary>
+    <div class="settings-box">
+      <div class="panel-title">Additional No-School Dates</div>
+      <div class="panel-help">
+        Major 5787 Yom Tov school closures are already skipped. Add any school vacation,
+        special day, or other date you want removed. The chavrusa rotation will not advance on skipped dates.
+      </div>
+      <div class="add-row">
+        <input id="noSchoolInput" type="date" min="2026-08-25" max="2027-06-30">
+        <button id="addNoSchool" class="danger">Add No-School Date</button>
+      </div>
+      <div class="panel-title" style="font-size:14px">Skipped Dates</div>
+      <div id="holidayList" class="holiday-list"></div>
+    </div>
+  </details>
+
+  <div id="footer" class="footer"></div>
+</div>
+
+<script>
+const classes = {
+  ET: {
+    label: "ET — Morning",
+    students: [
+      "Mayer Chaim Chaikin",
+      "Yossi Gourarie",
+      "Sholom DovBer Huebner",
+      "Moshe Lapine",
+      "Kehos Notik",
+      "Yisroel Oirechman",
+      "Moshe Tuvia Raichman",
+      "Avrohom Rosenfeld",
+      "Levi Rozmarin",
+      "Arik Traxler"
+    ]
+  },
+  WT: {
+    label: "WT — Afternoon",
+    students: [
+      "Ari Greenberg",
+      "Zev Rosenfeld",
+      "Levi Schtroks",
+      "Yisroel Aryeh Simmonds",
+      "Leibel Vogel",
+      "Leib Wolf"
+    ]
+  }
+};
+
+const SCHOOL_START = "2026-08-25";
+const SCHOOL_END   = "2027-06-30";
+
+/*
+  Preloaded 5787 dates that land on Monday-Thursday and are commonly no-school
+  Yom Tov days/breaks in a Jewish school.
+  These can be supplemented with custom dates below.
+*/
+const FIXED_NO_SCHOOL = {
+  "2026-09-21":"Yom Kippur",
+  "2026-09-28":"Sukkos",
+  "2026-09-29":"Sukkos",
+  "2026-09-30":"Sukkos",
+  "2026-10-01":"Sukkos",
+  "2027-03-23":"Purim",
+  "2027-04-22":"Pesach",
+  "2027-04-26":"Pesach",
+  "2027-04-27":"Pesach",
+  "2027-04-28":"Pesach",
+  "2027-04-29":"Pesach"
+};
+
+const classSelect = document.getElementById("classSelect");
+const dateSelect = document.getElementById("dateSelect");
+const groupSizeSelect = document.getElementById("groupSizeSelect");
+const pairsEl = document.getElementById("pairs");
+const absentList = document.getElementById("absentList");
+const backupNotice = document.getElementById("backupNotice");
+const holidayList = document.getElementById("holidayList");
+
+function dateFromISO(s){ return new Date(s+"T12:00:00"); }
+function isoFromDate(d){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function isMonThu(d){ const w=d.getDay(); return w>=1 && w<=4; }
+
+function getCustomNoSchool(){
+  try{return JSON.parse(localStorage.getItem("chavrusaCustomNoSchool")||"[]")}
+  catch(e){return[]}
+}
+function setCustomNoSchool(list){
+  localStorage.setItem("chavrusaCustomNoSchool",JSON.stringify([...new Set(list)].sort()));
+}
+
+function hebrewNumeral(n){
+  // Hebrew numeral for 1-999. Special handling for 15 and 16.
+  const letters = [
+    [400,"ת"],[300,"ש"],[200,"ר"],[100,"ק"],
+    [90,"צ"],[80,"פ"],[70,"ע"],[60,"ס"],[50,"נ"],[40,"מ"],[30,"ל"],[20,"כ"],
+    [10,"י"],[9,"ט"],[8,"ח"],[7,"ז"],[6,"ו"],[5,"ה"],[4,"ד"],[3,"ג"],[2,"ב"],[1,"א"]
+  ];
+  let value=n, out="";
+  while(value>=400){out+="ת";value-=400}
+  if(value===15){out+="טו";value=0}
+  else if(value===16){out+="טז";value=0}
+  for(const [v,l] of letters){
+    if(v===400) continue;
+    while(value>=v){out+=l;value-=v}
+  }
+  if(out.length===1) return out+"׳";
+  return out.slice(0,-1)+"״"+out.slice(-1);
+}
+
+function hebrewDateParts(d){
+  const fmt = new Intl.DateTimeFormat("he-IL-u-ca-hebrew", {
+    day:"numeric", month:"long", year:"numeric"
+  });
+  const parts=fmt.formatToParts(d);
+  const day=Number(parts.find(p=>p.type==="day")?.value.replace(/\D/g,""));
+  const month=(parts.find(p=>p.type==="month")?.value||"").replace(/^ב/,"");
+  const year=Number(parts.find(p=>p.type==="year")?.value.replace(/\D/g,""));
+  return {day,month,year};
+}
+function hebrewDateText(d){
+  const p=hebrewDateParts(d);
+  const yearSmall=p.year%1000;
+  return `${hebrewNumeral(p.day)} ${p.month} ${hebrewNumeral(yearSmall)}`;
+}
+function gregDateText(d){
+  return new Intl.DateTimeFormat("en-US",{
+    weekday:"long", month:"long", day:"numeric", year:"numeric"
+  }).format(d);
+}
+function shortGreg(d){
+  return new Intl.DateTimeFormat("en-US",{
+    weekday:"short", month:"short", day:"numeric"
+  }).format(d);
+}
+
+function getSchoolDates(){
+  const custom=new Set(getCustomNoSchool());
+  const dates=[];
+  for(let d=dateFromISO(SCHOOL_START); d<=dateFromISO(SCHOOL_END); d=addDays(d,1)){
+    const iso=isoFromDate(d);
+    if(isMonThu(d) && !FIXED_NO_SCHOOL[iso] && !custom.has(iso)){
+      dates.push(iso);
+    }
+  }
+  return dates;
+}
+
+function populateDates(preferred){
+  const dates=getSchoolDates();
+  const old=preferred || dateSelect.value;
+  dateSelect.innerHTML="";
+  dates.forEach(iso=>{
+    const d=dateFromISO(iso);
+    const o=document.createElement("option");
+    o.value=iso;
+    o.textContent=`${shortGreg(d)} • ${hebrewDateText(d)}`;
+    dateSelect.appendChild(o);
+  });
+
+  if(old && dates.includes(old)){
+    dateSelect.value=old;
+  }else{
+    // Choose today's school date if available; otherwise nearest next school date.
+    const today=new Date();
+    const todayISO=isoFromDate(today);
+    const next=dates.find(x=>x>=todayISO) || dates[dates.length-1];
+    if(next) dateSelect.value=next;
+  }
+}
+
+function makeRoundRobin(names){
+  let a=[...names];
+  if(a.length%2) a.push(null);
+  const n=a.length, rounds=n-1, half=n/2, out=[];
+  let rot=[...a];
+  for(let r=0;r<rounds;r++){
+    const groups=[];
+    for(let i=0;i<half;i++){
+      let x=rot[i], y=rot[n-1-i];
+      if(x && y){
+        if(r%2===1) [x,y]=[y,x];
+        groups.push([x,y]);
+      }
+    }
+    out.push(groups);
+    const rest=rot.slice(1);
+    rest.unshift(rest.pop());
+    rot=[rot[0],...rest];
+  }
+  return out;
+}
+const schedules={
+  ET:makeRoundRobin(classes.ET.students),
+  WT:makeRoundRobin(classes.WT.students)
+};
+
+function seededShuffle(items,seed){
+  const out=[...items];
+  let state=(seed>>>0)||1;
+  for(let i=out.length-1;i>0;i--){
+    state=(Math.imul(state,1664525)+1013904223)>>>0;
+    const j=state%(i+1);
+    [out[i],out[j]]=[out[j],out[i]];
+  }
+  return out;
+}
+
+function balancedGroups(order,targetSize){
+  const groupCount=Math.ceil(order.length/targetSize);
+  const groups=Array.from({length:groupCount},()=>[]);
+  order.forEach((name,i)=>groups[i%groupCount].push(name));
+  return groups;
+}
+
+function pairKey(a,b){return [a,b].sort().join("||")}
+
+function keepTogether(groups,a,b,targetSize){
+  const out=groups.map(group=>[...group]);
+  const aIndex=out.findIndex(group=>group.includes(a));
+  const bIndex=out.findIndex(group=>group.includes(b));
+  if(aIndex<0||bIndex<0||aIndex===bIndex)return out;
+
+  const bPosition=out[bIndex].indexOf(b);
+  if(out[aIndex].length<targetSize){
+    out[bIndex].splice(bPosition,1);
+    out[aIndex].push(b);
+    return out.filter(group=>group.length);
+  }
+
+  const swapPosition=out[aIndex].findIndex(name=>name!==a);
+  const swapName=out[aIndex][swapPosition];
+  out[aIndex][swapPosition]=b;
+  out[bIndex][bPosition]=swapName;
+  return out;
+}
+
+function makeGroups(names,targetSize,schoolIndex){
+  if(!names.length)return [];
+  const pairCounts=new Map();
+  let previousPartners=new Map();
+  let chosen=[];
+
+  // Rebuild the rotation through the selected date. For each day, test many
+  // deterministic mixes and choose the one with the fewest repeated partners.
+  for(let day=0;day<=schoolIndex;day++){
+    let bestScore=Infinity, bestGroups=[];
+    for(let attempt=0;attempt<120;attempt++){
+      const order=seededShuffle(names,(day+1)*1009+(attempt+1)*9176+names.length*53);
+      const candidate=balancedGroups(order,targetSize);
+      let score=0;
+      candidate.forEach(group=>{
+        for(let i=0;i<group.length;i++)for(let j=i+1;j<group.length;j++){
+          const seen=pairCounts.get(pairKey(group[i],group[j]))||0;
+          const wereTogetherYesterday=previousPartners.get(group[i])?.has(group[j]);
+          // A consecutive-day repeat is overwhelmingly worse than an older
+          // repeat. This makes every boy switch whenever mathematically possible.
+          score+=(wereTogetherYesterday?100000:0)+seen*seen*20+seen*10;
+        }
+      });
+      if(score<bestScore){bestScore=score;bestGroups=candidate}
+    }
+    chosen=bestGroups;
+    const todaysPartners=new Map(names.map(name=>[name,new Set()]));
+    chosen.forEach(group=>{
+      for(let i=0;i<group.length;i++)for(let j=i+1;j<group.length;j++){
+        const key=pairKey(group[i],group[j]);
+        pairCounts.set(key,(pairCounts.get(key)||0)+1);
+        todaysPartners.get(group[i]).add(group[j]);
+        todaysPartners.get(group[j]).add(group[i]);
+      }
+    });
+    previousPartners=todaysPartners;
+  }
+  return chosen;
+}
+
+function absenceKey(){
+  return "chavrusaAbsent_"+classSelect.value+"_"+dateSelect.value;
+}
+function getAbsent(){
+  try{return JSON.parse(localStorage.getItem(absenceKey())||"[]")}catch(e){return[]}
+}
+function setAbsent(list){localStorage.setItem(absenceKey(),JSON.stringify(list))}
+
+function backupGroups(dayGroups,presentSet){
+  const intact=[], loose=[];
+  dayGroups.forEach(g=>{
+    const p=g.filter(n=>presentSet.has(n));
+    if(p.length===2) intact.push(p);
+    else if(p.length===1) loose.push(p[0]);
+  });
+  const represented=new Set([...intact.flat(),...loose]);
+  presentSet.forEach(n=>{if(!represented.has(n)) loose.push(n)});
+  const backup=[];
+  while(loose.length>=2) backup.push([loose.shift(),loose.shift()]);
+  if(loose.length===1){
+    const extra=loose.shift();
+    if(backup.length) backup[0].push(extra);
+    else if(intact.length) intact[0].push(extra);
+    else backup.push([extra]);
+  }
+  return [...intact,...backup];
+}
+
+function rotateFirstOrder(group,schoolIndex,groupIndex){
+  if(group.length<=1)return group;
+  const copy=[...group];
+  const shift=(schoolIndex+groupIndex)%copy.length;
+  return copy.slice(shift).concat(copy.slice(0,shift));
+}
+
+function renderAbsentControls(){
+  const cls=classes[classSelect.value];
+  const absent=new Set(getAbsent());
+  absentList.innerHTML="";
+  cls.students.forEach(name=>{
+    const label=document.createElement("label");
+    label.className="absent-chip"+(absent.has(name)?" is-absent":"");
+    const cb=document.createElement("input");
+    cb.type="checkbox"; cb.checked=absent.has(name);
+    cb.addEventListener("change",()=>{
+      let list=getAbsent();
+      if(cb.checked){if(!list.includes(name))list.push(name)}
+      else list=list.filter(x=>x!==name);
+      setAbsent(list);
+      renderAbsentControls();
+      renderPairs();
+    });
+    const span=document.createElement("span"); span.textContent=name;
+    label.append(cb,span); absentList.appendChild(label);
+  });
+}
+
+function renderPairs(){
+  const key=classSelect.value, cls=classes[key], iso=dateSelect.value;
+  const targetSize=Number(groupSizeSelect.value);
+  const schoolDates=getSchoolDates();
+  const schoolIndex=Math.max(0,schoolDates.indexOf(iso));
+  const normal=makeGroups(cls.students,targetSize,schoolIndex);
+  const absent=new Set(getAbsent());
+  const present=cls.students.filter(n=>!absent.has(n));
+  const presentSet=new Set(present);
+
+  document.getElementById("classLabel").textContent=cls.label;
+  const d=dateFromISO(iso);
+  document.getElementById("gregDate").textContent=gregDateText(d);
+  document.getElementById("hebDate").textContent=hebrewDateText(d);
+
+  let groups;
+  if(absent.size>0){
+    groups=makeGroups(present,targetSize,schoolIndex);
+    backupNotice.textContent=
+      `${absent.size} absent today — groups have been adjusted automatically.`;
+    backupNotice.classList.add("show");
+  }else{
+    groups=normal.map(g=>[...g]);
+    backupNotice.classList.remove("show");
+  }
+
+  // One-day teacher-requested exception. All other dates use the normal rotation.
+  if(key==="WT" && iso==="2026-09-16" &&
+     presentSet.has("Leib Wolf") && presentSet.has("Ari Greenberg")){
+    groups=keepTogether(groups,"Leib Wolf","Ari Greenberg",targetSize);
+  }
+
+  pairsEl.innerHTML="";
+  if(present.length<2){
+    const div=document.createElement("div"); div.className="empty";
+    div.textContent=present.length===1?present[0]+" is the only student marked present.":"No students are marked present.";
+    pairsEl.appendChild(div); return;
+  }
+
+  groups.forEach((rawGroup,idx)=>{
+    const group=rotateFirstOrder(rawGroup,schoolIndex,idx);
+    const card=document.createElement("section"); card.className="pair-card";
+    const title=document.createElement("div"); title.className="pair-title";
+    title.textContent=(targetSize===3?"Chavrusa Group ":"Chavrusa ")+(idx+1);
+    const members=document.createElement("div");
+    members.className="members"+(group.length===3?" three":"");
+
+    group.forEach((name,i)=>{
+      const member=document.createElement("div");
+      member.className="member"+(i===0?" first":"");
+      const num=document.createElement("div"); num.className="num"; num.textContent=i+1;
+      member.appendChild(num);
+      if(i===0){
+        const first=document.createElement("div"); first.className="first-label";
+        first.textContent="Goes First"; member.appendChild(first);
+      }
+      const nm=document.createElement("div"); nm.className="name"; nm.textContent=name;
+      member.appendChild(nm); members.appendChild(member);
+    });
+    card.append(title,members); pairsEl.appendChild(card);
+  });
+
+  document.getElementById("footer").textContent=
+    `${cls.label} • Pairing rotation advances only on listed Monday–Thursday school dates.`;
+}
+
+function renderHolidayList(){
+  holidayList.innerHTML="";
+  Object.entries(FIXED_NO_SCHOOL).forEach(([iso,reason])=>{
+    const d=dateFromISO(iso);
+    const chip=document.createElement("span"); chip.className="holiday fixed";
+    chip.textContent=`${shortGreg(d)} • ${hebrewDateText(d)} — ${reason}`;
+    holidayList.appendChild(chip);
+  });
+  getCustomNoSchool().forEach(iso=>{
+    const d=dateFromISO(iso);
+    const chip=document.createElement("span"); chip.className="holiday custom";
+    const txt=document.createElement("span");
+    txt.textContent=`${shortGreg(d)} • ${hebrewDateText(d)} — Custom`;
+    const btn=document.createElement("button"); btn.className="remove"; btn.textContent="✕";
+    btn.title="Remove this no-school date";
+    btn.addEventListener("click",()=>{
+      setCustomNoSchool(getCustomNoSchool().filter(x=>x!==iso));
+      const old=dateSelect.value;
+      populateDates(old);
+      renderHolidayList();
+      renderAll();
+    });
+    chip.append(txt,btn); holidayList.appendChild(chip);
+  });
+}
+
+function renderAll(){
+  if(!dateSelect.value)return;
+  renderAbsentControls(); renderPairs();
+  localStorage.setItem("chavrusaClass",classSelect.value);
+  localStorage.setItem("chavrusaDate",dateSelect.value);
+}
+
+classSelect.addEventListener("change",renderAll);
+dateSelect.addEventListener("change",renderAll);
+groupSizeSelect.addEventListener("change",renderPairs);
+
+document.getElementById("clearAbsent").addEventListener("click",()=>{
+  setAbsent([]); renderAll();
+});
+document.getElementById("prevBtn").addEventListener("click",()=>{
+  if(dateSelect.selectedIndex>0){dateSelect.selectedIndex--;renderAll()}
+});
+document.getElementById("nextBtn").addEventListener("click",()=>{
+  if(dateSelect.selectedIndex<dateSelect.options.length-1){dateSelect.selectedIndex++;renderAll()}
+});
+document.getElementById("addNoSchool").addEventListener("click",()=>{
+  const iso=document.getElementById("noSchoolInput").value;
+  if(!iso)return;
+  const d=dateFromISO(iso);
+  if(!isMonThu(d)){alert("That date is not Monday–Thursday, so it is already excluded.");return}
+  if(FIXED_NO_SCHOOL[iso]){alert("That date is already preloaded as a no-school date.");return}
+  const list=getCustomNoSchool();
+  if(!list.includes(iso))list.push(iso);
+  setCustomNoSchool(list);
+  document.getElementById("noSchoolInput").value="";
+  populateDates();
+  renderHolidayList();
+  renderAll();
+});
+document.getElementById("fullBtn").addEventListener("click",async()=>{
+  try{
+    if(!document.fullscreenElement){
+      await document.documentElement.requestFullscreen();
+      document.body.classList.add("fullscreen");
+    }else{
+      await document.exitFullscreen();
+      document.body.classList.remove("fullscreen");
+    }
+  }catch(e){document.body.classList.toggle("fullscreen")}
+});
+
+const savedClass=localStorage.getItem("chavrusaClass");
+if(savedClass&&classes[savedClass])classSelect.value=savedClass;
+
+// Always open to today's school date. If today is not a listed school day,
+// open to the next available school date instead.
+populateDates(null);
+renderHolidayList();
+renderAll();
+</script>
+</body>
+</html>
