@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B3 Class Dashboard — Nigri Shluchim Online School</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f766e'/%3E%3Ctext x='32' y='43' font-family='Arial, Helvetica, sans-serif' font-size='24' font-weight='700' fill='%23ffffff' text-anchor='middle'%3ECD%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --cream: #faf5ea;
+    --cream-deep: #f2e9d8;
+    --card-bg: #fffdf8;
+    --card-night-bg: #efe9db;
+    --ink: #3a2f22;
+    --ink-soft: #6b5d4a;
+    --gold: #b8912f;
+    --gold-deep: #9a7a24;
+    --whatsapp: #25D366;
+    --whatsapp-deep: #1da851;
+    --shadow: 0 4px 14px rgba(90, 70, 30, 0.12);
+    --shadow-hover: 0 8px 22px rgba(90, 70, 30, 0.18);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, .serif {
+    font-family: Georgia, "Palatino Linotype", Palatino, serif;
+  }
+
+  header {
+    background: linear-gradient(180deg, #fffef9 0%, var(--cream-deep) 100%);
+    border-bottom: 2px solid var(--gold);
+    padding: 18px 28px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .header-title h1 {
+    margin: 0;
+    font-size: 1.6rem;
+    color: var(--ink);
+  }
+  .header-title .sub {
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+
+  .clock-panel {
+    text-align: right;
+    min-width: 220px;
+  }
+  .clock-panel .big-clock {
+    font-family: Georgia, serif;
+    font-size: 2.1rem;
+    font-weight: 700;
+    color: var(--gold-deep);
+    line-height: 1.1;
+  }
+  .clock-panel .dates {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+
+  .controls-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 28px;
+    background: #fffef9;
+    border-bottom: 1px solid #e7dcc4;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .tab-btn {
+    border: 1px solid var(--gold);
+    background: transparent;
+    color: var(--gold-deep);
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    font-family: Georgia, serif;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+  .tab-btn.active {
+    background: var(--gold);
+    color: #fff;
+  }
+  .tab-btn:hover { box-shadow: var(--shadow); }
+
+  .search-wrap {
+    flex: 1;
+    min-width: 220px;
+    max-width: 380px;
+  }
+  #searchBox {
+    width: 100%;
+    padding: 9px 14px;
+    border-radius: 20px;
+    border: 1px solid #d9c9a3;
+    font-size: 0.95rem;
+    background: #fffdf8;
+    outline: none;
+  }
+  #searchBox:focus { border-color: var(--gold); }
+
+  .toggle-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  .toggle-wrap button {
+    border: 1px solid var(--gold);
+    background: #fffdf8;
+    color: var(--gold-deep);
+    padding: 6px 12px;
+    border-radius: 16px;
+    cursor: pointer;
+    font-size: 0.82rem;
+  }
+  .toggle-wrap button.active {
+    background: var(--gold);
+    color: #fff;
+  }
+
+  main {
+    padding: 22px 28px 60px 28px;
+  }
+
+  .grid {
+    display: none;
+    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+    gap: 20px;
+  }
+  .grid.active { display: grid; }
+
+  .card {
+    background: var(--card-bg);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+    border: 1px solid #eee0c2;
+  }
+  .card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+  }
+  .card.night {
+    background: var(--card-night-bg);
+  }
+
+  .card-name {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .card-location {
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+  }
+  .map-link {
+    text-decoration: none;
+    margin-left: 4px;
+    filter: grayscale(20%);
+    opacity: 0.85;
+    transition: opacity 0.15s ease;
+  }
+  .map-link:hover { opacity: 1; }
+
+  .card-birthday {
+    font-size: 0.88rem;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+
+  .card-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.88rem;
+  }
+
+  .local-clock {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--ink);
+    font-family: Georgia, serif;
+  }
+  .daynight-badge {
+    font-size: 0.75rem;
+    padding: 3px 9px;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+  .daynight-badge.day { background: #fff4d1; color: #8a6d10; }
+  .daynight-badge.night { background: #d8d3e6; color: #453a6b; }
+
+  .weather-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+  }
+  .weather-row .icon { font-size: 1.4rem; }
+
+  .zmanim-block {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    border: 1px solid var(--gold);
+    background: linear-gradient(180deg, #fffbef 0%, #fbf0d0 100%);
+    border-radius: 10px;
+    padding: 10px 12px;
+    transition: box-shadow 0.15s ease;
+  }
+  .zmanim-block:hover {
+    box-shadow: 0 0 0 2px var(--gold-deep) inset;
+  }
+  .zmanim-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gold-deep);
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .zmanim-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    text-align: center;
+  }
+  .zmanim-item { font-size: 0.78rem; }
+  .zmanim-item .lbl { display: block; color: var(--ink-soft); font-size: 0.68rem; }
+  .zmanim-item .val { display: block; font-weight: 700; color: var(--ink); font-size: 0.85rem; }
+  .shaah-note {
+    font-size: 0.68rem;
+    color: var(--ink-soft);
+    margin-top: 6px;
+    text-align: center;
+  }
+
+  .wa-buttons {
+    display: flex;
+    gap: 8px;
+  }
+  .wa-btn {
+    flex: 1;
+    background: var(--whatsapp);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    text-align: center;
+    transition: background 0.15s ease;
+  }
+  .wa-btn:hover { background: var(--whatsapp-deep); }
+
+  .group-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .group-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: none;
+    border-radius: 10px;
+    padding: 9px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: #fff;
+    cursor: pointer;
+    transition: filter 0.15s ease;
+  }
+  .group-btn:hover { filter: brightness(0.92); }
+  .group-btn.email-btn { background: #d64a3b; }
+  .group-btn.wa-group-btn { background: var(--whatsapp); }
+
+  .empty-msg {
+    color: var(--ink-soft);
+    font-style: italic;
+    padding: 40px;
+    text-align: center;
+    grid-column: 1 / -1;
+  }
+
+  footer {
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 0.78rem;
+    padding: 10px;
+  }
+
+  @media (max-width: 560px) {
+    header { padding: 14px 16px; }
+    .controls-bar { padding: 12px 16px; }
+    main { padding: 16px; }
+    .clock-panel { text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">
+    <h1>B3 Class Dashboard</h1>
+    <div class="sub">Nigri Shluchim Online School</div>
+  </div>
+  <div class="clock-panel">
+    <div class="big-clock" id="myClock">--:--:--</div>
+    <div class="dates" id="myDates">Loading dates…</div>
+  </div>
+</header>
+
+<div class="controls-bar">
+  <div class="tabs" id="tabs"></div>
+  <div class="group-actions" id="groupActions"></div>
+  <div class="search-wrap">
+    <input type="text" id="searchBox" placeholder="Search by name or city…">
+  </div>
+</div>
+
+<main id="main"></main>
+
+<footer>Built for Mr. Cohen's B3 classes · Weather via Open-Meteo</footer>
+
+<script>
+/* =========================================================
+   STUDENT DATA
+   Deduplicated from roster export. Each city geocoded with
+   lat/lon + IANA timezone embedded (no runtime geocoding).
+   ========================================================= */
+const TEACHER_TZ = "America/New_York";
+
+const STUDENTS = [
+  // ---------------- B3 WT ----------------
+  {
+    id: 24610, cls: "B3 WT", first: "Ari", last: "Greenberg",
+    age: 8, hebBday: "1 Tammuz",
+    street: "9530 E Horse Play Circle",
+    city: "Palmer", region: "Alaska", country: "United States", flag: "🇺🇸",
+    lat: 61.5997, lon: -149.1128, tz: "America/Anchorage",
+    father: "Mendy", fatherPhone: "907-350-1787",
+    mother: "Chaya", motherPhone: "347-415-5412",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/99645/locationType/2/jewish/Halachic-Times.htm"
+  },
+  {
+    id: 26298, cls: "B3 WT", first: "Zev", last: "Rosenfeld",
+    age: 8, hebBday: "19 Adar",
+    street: "912 W 37th Ave",
+    city: "Vancouver", region: "British Columbia", country: "Canada", flag: "🇨🇦",
+    lat: 49.2827, lon: -123.1207, tz: "America/Vancouver",
+    father: "Dovid", fatherPhone: "778-878-5310",
+    mother: "Chaya", motherPhone: "778-878-2025",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/557/locationType/1/jewish/Halachic-Times.htm"
+  },
+  {
+    id: 24428, cls: "B3 WT", first: "Levi", last: "Schtroks",
+    age: 8, hebBday: "7 Adar",
+    street: "1347 Fern St. Sw",
+    city: "Olympia", region: "Washington", country: "United States", flag: "🇺🇸",
+    lat: 47.0379, lon: -122.9007, tz: "America/Los_Angeles",
+    father: "Yosef", fatherPhone: "360 867 8804",
+    mother: "Rivka", motherPhone: "360-810-6504",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/98502/locationType/2/jewish/Halachic-Times.htm"
+  },
+  {
+    id: 24319, cls: "B3 WT", first: "Yisroel Aryeh", last: "Simmonds",
+    age: 8, hebBday: "6 Iyar",
+    street: "Box 1 Rowatt Rr3",
+    city: "Regina", region: "Saskatchewan", country: "Canada", flag: "🇨🇦",
+    lat: 50.4452, lon: -104.6189, tz: "America/Regina",
+    father: "Avrohom", fatherPhone: "306-351-5949",
+    mother: "Shterna", motherPhone: "306-515-0770",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/437/locationType/1/jewish/Halachic-Times.htm"
+  },
+  {
+    id: 24356, cls: "B3 WT", first: "Leibel", last: "Vogel",
+    age: 8, hebBday: "11 Elul",
+    street: "2101 Strand Avenue",
+    city: "Missoula", region: "Montana", country: "United States", flag: "🇺🇸",
+    lat: 46.8721, lon: -113.9940, tz: "America/Denver",
+    father: "Chezky", fatherPhone: "406-304-5848",
+    mother: "Rochi", motherPhone: "406-304-5853",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/59801/locationType/2/jewish/Halachic-Times.htm"
+  },
+  {
+    id: 24598, cls: "B3 WT", first: "Yisroel Arye Leib", last: "Wolf",
+    age: 8, hebBday: "6 Sivan",
+    street: "128 Moe's Run",
+    city: "Kalispell", region: "Montana", country: "United States", flag: "🇺🇸",
+    lat: 48.1958, lon: -114.3129, tz: "America/Denver",
+    father: "Shneur Zalman", fatherPhone: "406.885.2541",
+    mother: "Chana", motherPhone: "406-885-1682",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/59901/locationType/2/jewish/Halachic-Times.htm"
+  },
+
+  // ---------------- B3 ET ----------------
+  {
+    id: 21141, cls: "B3 ET", first: "Mayer Chaim", last: "Chaikin",
+    age: 8, hebBday: "9 Elul",
+    street: "40 Arica Dr.",
+    city: "Holetown", region: "", country: "Barbados", flag: "🇧🇧",
+    lat: 13.1861, lon: -59.6382, tz: "America/Barbados",
+    father: "Eli", fatherPhone: "2462307245",
+    mother: "Sterna", motherPhone: "2462307281",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/986/locationType/1/jewish/Halachic-Times.htm"
+  },
+  {
+    id: 24532, cls: "B3 ET", first: "Yossi", last: "Gourarie",
+    age: 8, hebBday: "12 Adar",
+    street: "410 E Hamilton Avenue",
+    city: "State College", region: "Pennsylvania", country: "United States", flag: "🇺🇸",
+    lat: 40.7934, lon: -77.8600, tz: "America/New_York",
+    father: "Hirschel", fatherPhone: "8144419985",
+    mother: "Miri", motherPhone: "8144098130",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/16801/locationType/2/jewish/Halachic-Times.htm"
+  },
+  {
+    id: 24385, cls: "B3 ET", first: "Sholom DovBer", last: "Huebner",
+    age: 8, hebBday: "25 Kislev",
+    street: "San Antonio Abad 14",
+    city: "San Miguel De Allende", region: "Guanajuato", country: "Mexico", flag: "🇲🇽",
+    lat: 20.9153, lon: -100.7436, tz: "America/Mexico_City",
+    father: "Daniel", fatherPhone: "7325478135",
+    mother: "Raizel", motherPhone: "+52-415-181-8091",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/1038/locationType/1/jewish/Halachic-Times.htm"
+  },
+  {
+    id: 26292, cls: "B3 ET", first: "Moshe", last: "Lapine",
+    age: 8, hebBday: "14 Elul",
+    street: "211 W Ridgeley Rd",
+    city: "Columbia", region: "Missouri", country: "United States", flag: "🇺🇸",
+    lat: 38.9517, lon: -92.3341, tz: "America/Chicago",
+    father: "Avremy", fatherPhone: "5738237703",
+    mother: "Chana", motherPhone: "7188409019",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/65203/locationType/2/jewish/Halachic-Times.htm"
+  },
+  {
+    id: 17440, cls: "B3 ET", first: "Kehos", last: "Notik",
+    age: 8, hebBday: "9 Iyar",
+    street: "2256 Northwest 4th Place",
+    city: "Gainesville", region: "Florida", country: "United States", flag: "🇺🇸",
+    lat: 29.6516, lon: -82.3248, tz: "America/New_York",
+    father: "Aharon", fatherPhone: "352-219-7621",
+    mother: "Pessie", motherPhone: "704-299-6927",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/32603/locationType/2/jewish/Halachic-Times.htm"
+  },
+  {
+    id: 17439, cls: "B3 ET", first: "Yisroel", last: "Oirechman",
+    age: 8, hebBday: "13 Iyar",
+    street: "232 Chapel Dr",
+    city: "Tallahassee", region: "Florida", country: "United States", flag: "🇺🇸",
+    lat: 30.4383, lon: -84.2807, tz: "America/New_York",
+    father: "Schneur Zalman", fatherPhone: "850-251-0207",
+    mother: "Chanie", motherPhone: "850-251-3058",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/32304/locationType/2/jewish/Halachic-Times.htm"
+  },
+  {
+    id: 24423, cls: "B3 ET", first: "Moshe Tuvia", last: "Raichman",
+    age: 8, hebBday: "25 Iyar",
+    street: "Rua Veronica Cristina 1",
+    city: "Manaus", region: "Amazonas", country: "Brazil", flag: "🇧🇷",
+    lat: -3.1190, lon: -60.0217, tz: "America/Manaus",
+    father: "Arieh", fatherPhone: "8326612121",
+    mother: "Dvorah Lea", motherPhone: "55-929-8114-2995",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/1013/locationType/1/jewish/Halachic-Times.htm"
+  },
+  {
+    id: 26284, cls: "B3 ET", first: "Avrohom", last: "Rosenfeld",
+    age: 8, hebBday: "29 Kislev",
+    street: "4821 Bethel Creek Dr",
+    city: "Vero Beach", region: "Florida", country: "United States", flag: "🇺🇸",
+    lat: 27.6386, lon: -80.3973, tz: "America/New_York",
+    father: "Motty", fatherPhone: "9174743257",
+    mother: "Raizy", motherPhone: "321-243-9240",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/32963/locationType/2/jewish/Halachic-Times.htm"
+  },
+  {
+    id: 21009, cls: "B3 ET", first: "Levi", last: "Rozmarin",
+    age: 8, hebBday: "28 Tammuz",
+    street: "Lighthouse Drive",
+    city: "St. George", region: "", country: "Grenada", flag: "🇬🇩",
+    lat: 12.0561, lon: -61.7488, tz: "America/Grenada",
+    father: "Boruch", fatherPhone: "3475784597",
+    mother: "Chaya Rochel", motherPhone: "4734577222",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/1055/locationType/1/jewish/Halachic-Times.htm"
+  },
+  {
+    id: 21227, cls: "B3 ET", first: "Arik", last: "Traxler",
+    age: 8, hebBday: "15 Iyar",
+    street: "7731 Vickijohn Drive",
+    city: "Houston", region: "Texas", country: "United States", flag: "🇺🇸",
+    lat: 29.7604, lon: -95.3698, tz: "America/Chicago",
+    father: "Mendel", fatherPhone: "713-259-0977",
+    mother: "Rachel", motherPhone: "713-874-7644",
+    chabad: "https://www.chabad.org/calendar/zmanim_cdo/locationId/77071/locationType/2/jewish/Halachic-Times.htm"
+  }
+];
+
+// Sort order: timezone (east to west by standard UTC offset), then last name.
+const TZ_OFFSET_RANK = {
+  "America/Grenada": -4, "America/Barbados": -4, "America/Manaus": -4,
+  "America/New_York": -5, "America/Mexico_City": -6, "America/Chicago": -6,
+  "America/Regina": -6, "America/Denver": -7, "America/Vancouver": -8,
+  "America/Los_Angeles": -8, "America/Anchorage": -9
+};
+STUDENTS.sort((a, b) => {
+  // East (less-negative offset, e.g. -4) should come before West (more-negative, e.g. -9)
+  const r = TZ_OFFSET_RANK[b.tz] - TZ_OFFSET_RANK[a.tz];
+  if (r !== 0) return r;
+  return a.last.localeCompare(b.last);
+});
+
+/* =========================================================
+   PHONE NORMALIZATION -> wa.me digits
+   ========================================================= */
+function normalizePhone(raw) {
+  if (!raw) return null;
+  let hasPlus = raw.trim().startsWith("+");
+  let digits = raw.replace(/[^\d]/g, "");
+  if (hasPlus) return digits;                       // already international
+  if (digits.length === 11 && digits.startsWith("1")) return digits; // NANP w/ leading 1
+  if (digits.length === 10) return "1" + digits;     // bare NANP 10-digit -> assume +1
+  if (digits.length >= 11) return digits;            // assume already has country code (e.g. Brazil)
+  return digits;
+}
+
+/* =========================================================
+   NOAA-STYLE SUNRISE EQUATION
+   Returns UTC decimal hours for the given LOCAL calendar date.
+   ========================================================= */
+function toRad(d) { return d * Math.PI / 180; }
+function toDeg(r) { return r * 180 / Math.PI; }
+
+function calcSunUTC(year, month, day, lat, lon, zenith, isSunrise) {
+  const N1 = Math.floor(275 * month / 9);
+  const N2 = Math.floor((month + 9) / 12);
+  const N3 = 1 + Math.floor((year - 4 * Math.floor(year / 4) + 2) / 3);
+  const N = N1 - (N2 * N3) + day - 30;
+
+  const lngHour = lon / 15;
+  const t = isSunrise ? N + ((6 - lngHour) / 24) : N + ((18 - lngHour) / 24);
+
+  const M = (0.9856 * t) - 3.289;
+  let L = M + (1.916 * Math.sin(toRad(M))) + (0.020 * Math.sin(2 * toRad(M))) + 282.634;
+  L = ((L % 360) + 360) % 360;
+
+  let RA = toDeg(Math.atan(0.91764 * Math.tan(toRad(L))));
+  RA = ((RA % 360) + 360) % 360;
+  const Lq = Math.floor(L / 90) * 90;
+  const RAq = Math.floor(RA / 90) * 90;
+  RA = (RA + (Lq - RAq)) / 15;
+
+  const sinDec = 0.39782 * Math.sin(toRad(L));
+  const cosDec = Math.cos(Math.asin(sinDec));
+  const cosH = (Math.cos(toRad(zenith)) - (sinDec * Math.sin(toRad(lat)))) / (cosDec * Math.cos(toRad(lat)));
+
+  if (cosH > 1 || cosH < -1) return null; // no rise/set (polar) — not expected for our cities
+
+  let H = isSunrise ? 360 - toDeg(Math.acos(cosH)) : toDeg(Math.acos(cosH));
+  H = H / 15;
+
+  const T = H + RA - (0.06571 * t) - 6.622;
+  let UT = T - lngHour;
+  UT = ((UT % 24) + 24) % 24;
+  return UT;
+}
+
+// Build a UTC Date instant from a local Y-M-D + decimal UT hours
+function utDecimalToDate(year, month, day, utDecimal) {
+  const h = Math.floor(utDecimal);
+  const remMin = (utDecimal - h) * 60;
+  const m = Math.floor(remMin);
+  const s = Math.round((remMin - m) * 60);
+  return new Date(Date.UTC(year, month - 1, day, h, m, s));
+}
+
+// Get {year, month, day} of "today" for a given IANA timezone
+function localYMD(tz, refDate) {
+  const fmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+  const parts = fmt.formatToParts(refDate || new Date());
+  const obj = {};
+  parts.forEach(p => { if (p.type !== "literal") obj[p.type] = parseInt(p.value, 10); });
+  return { year: obj.year, month: obj.month, day: obj.day };
+}
+
+/* Compute full zmanim set (local NOAA calc) for a student for "their today" */
+function computeLocalZmanim(student) {
+  const { year, month, day } = localYMD(student.tz);
+  const sunriseUT = calcSunUTC(year, month, day, student.lat, student.lon, 90.833, true);
+  const sunsetUT  = calcSunUTC(year, month, day, student.lat, student.lon, 90.833, false);
+  const altSunriseUT = calcSunUTC(year, month, day, student.lat, student.lon, 91.583, true);  // Baal HaTanya netz
+  const altSunsetUT  = calcSunUTC(year, month, day, student.lat, student.lon, 91.583, false); // Baal HaTanya shkia
+
+  if (sunriseUT === null || sunsetUT === null || altSunriseUT === null || altSunsetUT === null) {
+    return null;
+  }
+
+  const sunrise = utDecimalToDate(year, month, day, sunriseUT);
+  let sunset = utDecimalToDate(year, month, day, sunsetUT);
+  if (sunset <= sunrise) sunset = new Date(sunset.getTime() + 24 * 3600 * 1000);
+
+  const altSunrise = utDecimalToDate(year, month, day, altSunriseUT);
+  let altSunset = utDecimalToDate(year, month, day, altSunsetUT);
+  if (altSunset <= altSunrise) altSunset = new Date(altSunset.getTime() + 24 * 3600 * 1000);
+
+  const dayLenMs = sunset - sunrise;
+  const shaahZmanisMs = dayLenMs / 12;
+  const chatzos = new Date(sunrise.getTime() + dayLenMs / 2);
+
+  const altDayLenMs = altSunset - altSunrise;
+  const shema = new Date(altSunrise.getTime() + (altDayLenMs * 3 / 12));
+
+  return {
+    sunrise, sunset, chatzos, shema,
+    shaahZmanisMinutes: shaahZmanisMs / 60000,
+    source: "calc"
+  };
+}
+
+/* =========================================================
+   HEBCAL ZMANIM (sunrise/sunset/chatzos), cached per city+date,
+   silent NOAA fallback if unreachable.
+   ========================================================= */
+const hebcalCache = {};
+
+async function fetchHebcalZmanim(student) {
+  const { year, month, day } = localYMD(student.tz);
+  const dateStr = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+  const cacheKey = `${student.id}-${dateStr}`;
+  if (hebcalCache[cacheKey]) return hebcalCache[cacheKey];
+
+  const local = computeLocalZmanim(student); // always compute as fallback baseline (and for shema, always local)
+  if (!local) return null;
+
+  try {
+    const url = `https://www.hebcal.com/zmanim?cfg=json&latitude=${student.lat}&longitude=${student.lon}&tzid=${encodeURIComponent(student.tz)}&date=${dateStr}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    const t = data.times || {};
+    const result = {
+      sunrise: t.sunrise ? new Date(t.sunrise) : local.sunrise,
+      sunset: t.sunset ? new Date(t.sunset) : local.sunset,
+      chatzos: t.chatzot ? new Date(t.chatzot) : local.chatzos,
+      shema: local.shema, // Baal HaTanya shema always computed locally
+      shaahZmanisMinutes: local.shaahZmanisMinutes,
+      source: "hebcal"
+    };
+    hebcalCache[cacheKey] = result;
+    return result;
+  } catch (e) {
+    hebcalCache[cacheKey] = local; // silent fallback
+    return local;
+  }
+}
+
+/* =========================================================
+   WEATHER (Open-Meteo, batched)
+   ========================================================= */
+const WEATHER_ICONS = {
+  0: ["☀️", "Clear sky"], 1: ["🌤️", "Mainly clear"], 2: ["⛅", "Partly cloudy"], 3: ["☁️", "Overcast"],
+  45: ["🌫️", "Fog"], 48: ["🌫️", "Rime fog"],
+  51: ["🌦️", "Light drizzle"], 53: ["🌦️", "Drizzle"], 55: ["🌧️", "Dense drizzle"],
+  61: ["🌧️", "Light rain"], 63: ["🌧️", "Rain"], 65: ["🌧️", "Heavy rain"],
+  71: ["🌨️", "Light snow"], 73: ["🌨️", "Snow"], 75: ["❄️", "Heavy snow"],
+  80: ["🌦️", "Rain showers"], 81: ["🌧️", "Rain showers"], 82: ["⛈️", "Violent showers"],
+  95: ["⛈️", "Thunderstorm"], 96: ["⛈️", "Thunderstorm w/ hail"], 99: ["⛈️", "Severe thunderstorm"]
+};
+function weatherIcon(code) { return (WEATHER_ICONS[code] || ["🌡️", "—"]); }
+
+let weatherData = {}; // id -> {tempF, tempC, wind, code}
+
+async function fetchWeather() {
+  try {
+    const lats = STUDENTS.map(s => s.lat).join(",");
+    const lons = STUDENTS.map(s => s.lon).join(",");
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("weather fetch failed");
+    const data = await res.json();
+    const arr = Array.isArray(data) ? data : [data];
+    arr.forEach((entry, i) => {
+      const s = STUDENTS[i];
+      if (!s || !entry.current) return;
+      const tempF = entry.current.temperature_2m;
+      const tempC = (tempF - 32) * 5 / 9;
+      weatherData[s.id] = {
+        tempF: Math.round(tempF),
+        tempC: Math.round(tempC),
+        wind: Math.round(entry.current.wind_speed_10m),
+        code: entry.current.weather_code
+      };
+    });
+  } catch (e) {
+    // fail gracefully — cards show "Weather unavailable"
+  }
+  renderWeatherOnly();
+}
+
+/* =========================================================
+   RENDERING
+   ========================================================= */
+let currentTab = "B3 WT";
+let showMyTime = false;
+const zmanimCache = {}; // id -> zmanim result (refreshed once per load / per day change)
+const classCounts = {};
+STUDENTS.forEach(s => classCounts[s.cls] = (classCounts[s.cls] || 0) + 1);
+const CLASSES = ["B3 WT", "B3 ET"]; // fixed, stable order regardless of student sort
+
+// Group email label (matches the Google Contacts "Group Membership" label) and
+// WhatsApp group invite link for each class.
+const GROUP_INFO = {
+  "B3 WT": {
+    emailLabel: "* B3 WT Parents",
+    waLink: "https://chat.whatsapp.com/EIQFgJCe0BFEn9rpVlqxX9"
+  },
+  "B3 ET": {
+    emailLabel: "* B3 ET Parents",
+    waLink: "https://chat.whatsapp.com/G1x0WgiTGTS9PTqdnLzi1e"
+  }
+};
+
+function buildTabs() {
+  const tabsEl = document.getElementById("tabs");
+  tabsEl.innerHTML = "";
+  CLASSES.forEach(cls => {
+    const btn = document.createElement("button");
+    btn.className = "tab-btn" + (cls === currentTab ? " active" : "");
+    btn.textContent = `${cls} (${classCounts[cls]})`;
+    btn.onclick = () => { currentTab = cls; buildTabs(); renderGrid(); buildGroupActions(); };
+    tabsEl.appendChild(btn);
+  });
+}
+
+const SCHOOL_EMAIL = "rabbiscohen@shluchim.school";
+
+// Actual parent email addresses baked in directly (comma-separated), since Gmail
+// compose links can't auto-expand a Contacts group label from a URL -- that
+// autocomplete only works when a human clicks the suggestion inside Gmail itself.
+// rabbisteinberg@shluchimonlineschool.com is included as an additional Bcc recipient on both lists.
+const GROUP_BCC_EMAILS = {
+  "B3 WT": "chayalea@gmail.com,rabbi@matsujewishcenter.org,chayawine@gmail.com,dovidrosenfeld@gmail.com,rivky16@gmail.com,ydschtroks@gmail.com,Shterna@jewishregina.org,Rabbi@jewishregina.org,Rochi@jewishmissoula.com,rabbi@jewishmissoula.com,chanablocksa@gmail.com,rabbi@jewishflathead.com,rabbisteinberg@shluchimonlineschool.com",
+  "B3 ET": "sterna93@gmail.com,rabbi@chabadbarbados.com,mirigourarie@gmail.com,hirschelg@gmail.com,raizel@chabadsma.com,Rabbi@chabadsma.com,channylapine@gmail.com,lapine770@gmail.com,PessieNotik@gmail.com,RabbiA@JewishGator.com,chanie@chabadtallahassee.com,rabbi@chabadtallahassee.com,chabadmanaus@gmail.com,d3voice@gmail.com,raizyrosenfeld@gmail.com,rabbi@jewishvero.com,chayap19@gmail.com,brozmarin@gmail.com,Mendy@ChabadOutreach.org,racheltraxler@gmail.com,rabbisteinberg@shluchimonlineschool.com"
+};
+
+function buildGroupActions() {
+  const el = document.getElementById("groupActions");
+  const info = GROUP_INFO[currentTab];
+  if (!el || !info) { if (el) el.innerHTML = ""; return; }
+  const bccList = GROUP_BCC_EMAILS[currentTab] || "";
+  // authuser=<email> tells Gmail which signed-in account to compose from
+  // (works if that account is already signed into the browser; otherwise Gmail prompts to switch/sign in).
+  // to= is your own school address (Gmail requires a To); bcc= is every parent email,
+  // so parents can't see each other's addresses.
+  const gmailUrl = "https://mail.google.com/mail/?view=cm&fs=1"
+    + "&authuser=" + encodeURIComponent(SCHOOL_EMAIL)
+    + "&to=" + encodeURIComponent(SCHOOL_EMAIL)
+    + "&bcc=" + encodeURIComponent(bccList);
+  el.innerHTML = `
+    <a class="group-btn email-btn" href="${gmailUrl}" target="_blank" rel="noopener">✉️ Email ${currentTab} Parents</a>
+    <a class="group-btn wa-group-btn" href="${info.waLink}" target="_blank" rel="noopener">💬 WhatsApp ${currentTab} Group</a>
+  `;
+}
+
+function buildGridShells() {
+  const main = document.getElementById("main");
+  main.innerHTML = "";
+  CLASSES.forEach(cls => {
+    const grid = document.createElement("div");
+    grid.className = "grid" + (cls === currentTab ? " active" : "");
+    grid.id = "grid-" + cls.replace(/\s+/g, "");
+    main.appendChild(grid);
+  });
+}
+
+function fmtTimeInTz(date, tz) {
+  if (!date) return "--:--";
+  return new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(date);
+}
+
+function cardId(s) { return "card-" + s.id + "-" + s.cls.replace(/\s+/g,""); }
+
+function renderGrid() {
+  document.querySelectorAll(".grid").forEach(g => g.classList.remove("active"));
+  const activeGrid = document.getElementById("grid-" + currentTab.replace(/\s+/g, ""));
+  if (activeGrid) activeGrid.classList.add("active");
+  applySearchFilter();
+}
+
+function buildCardHTML(s) {
+  const waFatherNum = normalizePhone(s.fatherPhone);
+  const waMotherNum = normalizePhone(s.motherPhone);
+  const locationLabel = s.region ? `${s.city}, ${s.region}, ${s.country}` : `${s.city}, ${s.country}`;
+  const fullAddress = s.street ? `${s.street}, ${locationLabel}` : locationLabel;
+
+  return `
+    <div class="card" id="${cardId(s)}" data-name="${(s.first + ' ' + s.last).toLowerCase()}" data-city="${s.city.toLowerCase()}">
+      <div class="card-name">${s.first} ${s.last}</div>
+      <div class="card-location">
+        ${s.flag} ${locationLabel}
+        <a class="map-link" href="https://www.google.com/maps/place/${encodeURIComponent(fullAddress)}/@${s.lat},${s.lon},700m/data=!3m1!1e3" target="_blank" rel="noopener" title="View on Google Earth (satellite)">🌍</a>
+        <a class="map-link" href="https://www.google.com/maps?q=&layer=c&cbll=${s.lat},${s.lon}&cbp=0,0,0,0,0" target="_blank" rel="noopener" title="Street View (if available)">🧍</a>
+      </div>
+      <div class="card-birthday">🎂 Age ${s.age} &nbsp;·&nbsp; Hebrew Bday: ${s.hebBday}</div>
+
+      <div class="card-row">
+        <span class="local-clock" data-tz="${s.tz}">--:--</span>
+        <span class="daynight-badge" data-daynight>—</span>
+      </div>
+
+      <div class="weather-row" data-weather-id="${s.id}">🌡️ Loading weather…</div>
+
+      <div class="wa-buttons">
+        ${waFatherNum ? `<a class="wa-btn" href="https://wa.me/${waFatherNum}" target="_blank" rel="noopener">💬 ${s.father}</a>` : ""}
+        ${waMotherNum ? `<a class="wa-btn" href="https://wa.me/${waMotherNum}" target="_blank" rel="noopener">💬 ${s.mother}</a>` : ""}
+      </div>
+    </div>`;
+}
+
+function buildAllCards() {
+  CLASSES.forEach(cls => {
+    const grid = document.getElementById("grid-" + cls.replace(/\s+/g, ""));
+    const students = STUDENTS.filter(s => s.cls === cls);
+    grid.innerHTML = students.map(buildCardHTML).join("");
+  });
+}
+
+function renderWeatherOnly() {
+  STUDENTS.forEach(s => {
+    const el = document.querySelector(`[data-weather-id="${s.id}"]`);
+    if (!el) return;
+    const w = weatherData[s.id];
+    if (!w) {
+      el.innerHTML = `🌡️ Weather unavailable`;
+      return;
+    }
+    const [icon, desc] = weatherIcon(w.code);
+    el.innerHTML = `<span class="icon">${icon}</span> ${w.tempF}°F / ${w.tempC}°C · ${desc} · 💨 ${w.wind} mph`;
+  });
+}
+
+function refreshZmanimFor(s) {
+  // Only the day/night badge needs this now, so the local calc is all we need —
+  // no reason to call out to Hebcal for a value we no longer display.
+  const z = computeLocalZmanim(s);
+  zmanimCache[s.id] = z;
+  updateZmanimDisplay(s);
+}
+
+function updateZmanimDisplay(s) {
+  const card = document.getElementById(cardId(s));
+  if (!card) return;
+  const z = zmanimCache[s.id];
+  if (!z) return;
+
+  // day/night indicator based on real sunrise/sunset instants
+  const now = new Date();
+  const isDaytime = now >= z.sunrise && now <= z.sunset;
+  const badge = card.querySelector('[data-daynight]');
+  if (badge) {
+    badge.textContent = isDaytime ? "☀️ Daytime" : "🌙 Nighttime";
+    badge.className = "daynight-badge " + (isDaytime ? "day" : "night");
+  }
+  card.classList.toggle("night", !isDaytime);
+}
+
+function tickClocks() {
+  const now = new Date();
+  document.querySelectorAll(".local-clock").forEach(el => {
+    const tz = el.getAttribute("data-tz");
+    el.textContent = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, hour: "numeric", minute: "2-digit"
+    }).format(now);
+  });
+
+  // Header clock (teacher's time)
+  document.getElementById("myClock").textContent = new Intl.DateTimeFormat("en-US", {
+    timeZone: TEACHER_TZ, hour: "numeric", minute: "2-digit"
+  }).format(now);
+
+  const engDate = new Intl.DateTimeFormat("en-US", {
+    timeZone: TEACHER_TZ, weekday: "long", month: "long", day: "numeric", year: "numeric"
+  }).format(now);
+  let hebDate = "";
+  try {
+    hebDate = new Intl.DateTimeFormat("en-US-u-ca-hebrew", {
+      timeZone: TEACHER_TZ, day: "numeric", month: "long", year: "numeric"
+    }).format(now);
+  } catch (e) { hebDate = ""; }
+  document.getElementById("myDates").textContent = hebDate ? `${engDate} · ${hebDate}` : engDate;
+}
+
+function applySearchFilter() {
+  const q = document.getElementById("searchBox").value.trim().toLowerCase();
+  const activeGrid = document.getElementById("grid-" + currentTab.replace(/\s+/g, ""));
+  if (!activeGrid) return;
+  let anyVisible = false;
+  activeGrid.querySelectorAll(".card").forEach(card => {
+    const match = !q || card.dataset.name.includes(q) || card.dataset.city.includes(q);
+    card.style.display = match ? "" : "none";
+    if (match) anyVisible = true;
+  });
+  let emptyMsg = activeGrid.querySelector(".empty-msg");
+  if (!anyVisible) {
+    if (!emptyMsg) {
+      emptyMsg = document.createElement("div");
+      emptyMsg.className = "empty-msg";
+      emptyMsg.textContent = "No students match your search.";
+      activeGrid.appendChild(emptyMsg);
+    }
+  } else if (emptyMsg) {
+    emptyMsg.remove();
+  }
+}
+
+/* =========================================================
+   INIT
+   ========================================================= */
+function init() {
+  buildTabs();
+  buildGroupActions();
+  buildGridShells();
+  buildAllCards();
+  renderGrid();
+
+  document.getElementById("searchBox").addEventListener("input", applySearchFilter);
+
+  tickClocks();
+  setInterval(tickClocks, 1000);
+  // day/night + zmanim refresh needs the clock ticking too, so re-check badges each minute
+  setInterval(() => STUDENTS.forEach(s => zmanimCache[s.id] && updateZmanimDisplay(s)), 30000);
+
+  STUDENTS.forEach(refreshZmanimFor);
+  // refresh zmanim once a day is enough, but re-check every hour in case the page stays open across midnight
+  setInterval(() => STUDENTS.forEach(refreshZmanimFor), 60 * 60 * 1000);
+
+  fetchWeather();
+  setInterval(fetchWeather, 10 * 60 * 1000);
+}
+
+init();
+</script>
+</body>
+</html>
