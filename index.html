@@ -70,6 +70,14 @@
     }
     body.admin-panel-open .admin-panel{width:min(360px,calc(100vw - 24px))}
   }
+  .version-modal{position:fixed;inset:0;background:rgba(15,23,42,.48);z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px}
+  .version-modal-card{width:min(390px,100%);background:white;border-radius:20px;padding:22px;box-shadow:0 20px 55px rgba(0,0,0,.28);text-align:center}
+  .version-modal-card h2{margin:0 0 6px;color:#26364a}.version-modal-card p{margin:0 0 16px;color:#64748b}
+  .version-choice{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .version-choice a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-height:105px;border-radius:14px;text-decoration:none;font-weight:800;padding:14px}
+  .student-version-choice{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+  .teacher-version-choice{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+  .version-choice-icon{font-size:32px}.version-modal-close{margin-top:14px;border:0;background:#e5e7eb;color:#1f2937;border-radius:10px;padding:9px 16px;font-weight:700;cursor:pointer}
   @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 40px 1fr 18px 1fr}.admin-panel{top:54px}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
@@ -139,6 +147,18 @@
     </div>
   </div>
 
+  <div id="versionModal" class="version-modal hidden" role="dialog" aria-modal="true" aria-labelledby="versionModalTitle">
+    <div class="version-modal-card">
+      <h2 id="versionModalTitle">Open activity</h2>
+      <p>Which version would you like to open?</p>
+      <div class="version-choice">
+        <a id="versionStudentLink" class="student-version-choice" href="#"><span class="version-choice-icon">🎓</span><span>Student Version</span></a>
+        <a id="versionTeacherLink" class="teacher-version-choice" href="#"><span class="version-choice-icon">👨‍🏫</span><span>Teacher Version</span></a>
+      </div>
+      <button id="versionModalClose" class="version-modal-close" type="button">Cancel</button>
+    </div>
+  </div>
+
   <button id="adminAccessButton" class="admin-button">Admin</button>
   <div id="adminPanel" class="admin-panel hidden">
     <h2>B3 Access Controls</h2>
@@ -204,6 +224,36 @@
   const el=id=>document.getElementById(id);
   const gameCards=Array.from(document.querySelectorAll(".game-card"));
   const gameDefinitions=gameCards.map(card=>({id:card.dataset.gameId,name:(card.querySelector(".card-title")?.textContent||card.textContent).trim(),element:card}));
+  const teacherVersionByGame={
+    "posuk-practice-scroll":"record_pesukim/teacher.html",
+    "rashi-letters":"rashi-letters/teacher.html",
+    "shorashim":"shorashim/teacher.html?v=20260917-correct-dashboard",
+    "chazara":"chazara/teacher.html",
+    "game-show":"game-show/teacher.html",
+    "student-rewards":"student-rewards/teacher.html",
+    "weekly-quiz":"weekly-quiz/teacher.html"
+  };
+  const pairedTeacherHrefs=new Set(Object.values(teacherVersionByGame).map(h=>h.split("?")[0]));
+
+  function setTeacherToolPairVisibility(){
+    document.querySelectorAll(".teacher-tool-card").forEach(card=>{
+      const raw=card.getAttribute("href")||"";
+      const base=raw.split("?")[0];
+      card.classList.toggle("hidden",isAuthorizedAdmin&&pairedTeacherHrefs.has(base));
+    });
+  }
+
+  function closeVersionModal(){el("versionModal")?.classList.add("hidden");}
+  function openVersionModal(game){
+    const teacherHref=teacherVersionByGame[game.id];
+    if(!teacherHref)return false;
+    el("versionModalTitle").textContent=game.name;
+    el("versionStudentLink").href=game.element.getAttribute("href");
+    el("versionTeacherLink").href=teacherHref;
+    el("versionModal").classList.remove("hidden");
+    return true;
+  }
+
 
   let currentSettings=settingsApi.defaultSettings;
   let currentUser=null;
@@ -233,6 +283,7 @@
   }
 
   function renderStudentAccess(){
+    setTeacherToolPairVisibility();
     // The authorized teacher account is never treated as ET or WT.
     if(isAuthorizedAdmin){
       el("loginCard").classList.add("hidden");
