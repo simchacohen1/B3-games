@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sync to Nigri</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%236d28d9'/%3E%3Ctext x='32' y='43' font-family='Arial, Helvetica, sans-serif' font-size='24' font-weight='700' fill='%23ffffff' text-anchor='middle'%3ESN%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --ink: #1f2430;
+    --muted: #6b7280;
+    --accent: #3b5bfd;
+    --accent-dark: #2942c9;
+    --border: #e5e7eb;
+    --good: #1a9c5a;
+    --good-bg: #e8f8ef;
+    --bad-bg: #fdeaea;
+    --bad: #c0392b;
+    --exc-bg: #fff4e0;
+    --exc: #b8720a;
+    --late-bg: #ede4ff;
+    --late: #6b3fa0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 24px 16px 80px;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; }
+  h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  select, input[type="date"] {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    font-size: 16px;
+    background: #fff;
+    color: var(--ink);
+  }
+  .row-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .row-header h2 {
+    font-size: 15px;
+    margin: 0;
+  }
+  .bulk-btn {
+    font-size: 12px;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    padding: 4px 6px;
+  }
+  .period-labels {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 0 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+  .period-labels .student-name-spacer { flex: 1; }
+  .period-labels .period-label {
+    width: 62px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .period-labels .points-spacer { width: 56px; }
+  .student-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .student-row:last-child { border-bottom: none; }
+  .student-name {
+    flex: 1;
+    font-size: 14px;
+    padding-right: 4px;
+  }
+  .period-select-wrap {
+    width: 62px;
+  }
+  .period-select {
+    width: 100%;
+    padding: 5px 2px;
+    text-align: center;
+    text-align-last: center;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .period-select.p { background: var(--good-bg); color: var(--good); }
+  .period-select.a { background: var(--bad-bg); color: var(--bad); }
+  .period-select.e { background: var(--exc-bg); color: var(--exc); }
+  .period-select.l { background: var(--late-bg); color: var(--late); }
+  .points-input {
+    width: 56px;
+    padding: 8px 6px;
+    text-align: center;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 15px;
+  }
+  .points-input:disabled {
+    background: #f0f0f0;
+    color: #aaa;
+  }
+  .late-minutes-input {
+    width: 100%;
+    margin-top: 4px;
+    padding: 4px 2px;
+    text-align: center;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 11px;
+  }
+  .sync-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .sync-btn:disabled {
+    background: #9aa5f5;
+    cursor: default;
+  }
+  .sync-btn:active:not(:disabled) { background: var(--accent-dark); }
+  #status {
+    margin-top: 14px;
+    font-size: 14px;
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
+  #status.success { color: var(--good); }
+  #status.error { color: var(--bad); }
+  #status.pending { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Sync to Nigri</h1>
+  <div class="sub">Everyone starts Present for all 4 periods, with 5 points. Change any period to Absent, Excused, or Late as needed, then sync.</div>
+
+  <div class="card">
+    <label for="classSelect">Class</label>
+    <select id="classSelect"></select>
+    <div style="height:12px"></div>
+    <label for="dateInput">Date</label>
+    <input type="date" id="dateInput">
+  </div>
+
+  <div class="card">
+    <div class="row-header">
+      <h2>Students</h2>
+      <button class="bulk-btn" id="resetBtn" type="button">Reset all to Present / 5</button>
+    </div>
+    <div class="period-labels">
+      <div class="student-name-spacer"></div>
+      <div class="period-label">Dav</div>
+      <div class="period-label">Cl 1</div>
+      <div class="period-label">Cl 2</div>
+      <div class="period-label">Cl 3</div>
+      <div class="points-spacer"></div>
+    </div>
+    <div id="studentList"></div>
+  </div>
+
+  <button class="sync-btn" id="syncBtn" type="button">Sync to Nigri</button>
+  <div id="status"></div>
+</div>
+
+<script>
+const API_URL = "https://nigrisync.onrender.com/sync-points";
+const API_KEY = "1qaz2wsx";
+const DEFAULT_POINTS = 5;
+const PERIOD_KEYS = ["davening", "class1", "class2", "class3"];
+const STATUS_OPTIONS = [
+  { value: "present", label: "Present", cls: "p" },
+  { value: "absent", label: "Absent", cls: "a" },
+  { value: "excused", label: "Excused", cls: "e" },
+  { value: "late", label: "Late", cls: "l" }
+];
+
+// Statuses that do NOT count as the student having attended a period.
+// If every period lands in this set, no points are earned that day.
+const NON_ATTENDING_STATUSES = ["absent", "excused"];
+
+const ROSTERS = {
+  "B3 WT": [
+    "Greenberg Ari",
+    "Rosenfeld Zev",
+    "Schtroks Levi",
+    "Simmonds Yisroel Aryeh",
+    "Vogel Leibel",
+    "Wolf Yisroel Arye Leib"
+  ],
+  "B3 ET": [
+    "Chaikin Mayer Chaim",
+    "Gourarie Yossi",
+    "Huebner Sholom DovBer",
+    "Lapine Moshe",
+    "Notik Kehos",
+    "Oirechman Yisroel",
+    "Raichman Moshe Tuvia",
+    "Rosenfeld Avrohom",
+    "Rozmarin Levi",
+    "Traxler Arik"
+  ]
+};
+
+const classSelect = document.getElementById("classSelect");
+const dateInput = document.getElementById("dateInput");
+const studentList = document.getElementById("studentList");
+const syncBtn = document.getElementById("syncBtn");
+const statusEl = document.getElementById("status");
+const resetBtn = document.getElementById("resetBtn");
+
+// --- Draft autosave -------------------------------------------------
+// Every attendance/points change is saved to localStorage as you go, keyed
+// by class + date, so an accidental refresh (or closed tab) doesn't lose
+// whatever you'd already entered. Nothing here talks to Nigri — this is
+// purely a local, per-browser scratchpad; the actual submission still only
+// happens when "Sync to Nigri" is clicked.
+const DRAFTS_KEY = "syncToNigriDrafts";
+const LAST_CLASS_KEY = "syncToNigriLastClass";
+
+function loadAllDrafts() {
+  try {
+    const raw = localStorage.getItem(DRAFTS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveAllDrafts(drafts) {
+  try {
+    localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+  } catch (e) {
+    // Storage unavailable/full — fail silently, nothing else to do here.
+  }
+}
+
+function draftKey(section, date) {
+  return `${section}__${date}`;
+}
+
+function getCurrentDraft() {
+  const drafts = loadAllDrafts();
+  return drafts[draftKey(classSelect.value, dateInput.value)] || null;
+}
+
+function saveCurrentDraft() {
+  const section = classSelect.value;
+  const names = ROSTERS[section];
+  if (!names) return;
+  const date = dateInput.value;
+  const students = {};
+
+  names.forEach((name, i) => {
+    const pointsInput = studentList.querySelector(`.points-input[data-idx="${i}"]`);
+    const attendance = {};
+    const lateMinutes = {};
+    PERIOD_KEYS.forEach(key => {
+      const sel = studentList.querySelector(`.period-select[data-idx="${i}"][data-period="${key}"]`);
+      attendance[key] = sel ? sel.value : "present";
+      const minutesInput = studentList.querySelector(`.late-minutes-input[data-idx="${i}"][data-period="${key}"]`);
+      if (minutesInput && minutesInput.value.trim() !== "") {
+        lateMinutes[key] = minutesInput.value.trim();
+      }
+    });
+    students[name] = {
+      attendance,
+      lateMinutes,
+      points: pointsInput ? pointsInput.value : String(DEFAULT_POINTS)
+    };
+  });
+
+  const drafts = loadAllDrafts();
+  drafts[draftKey(section, date)] = { savedAt: Date.now(), students };
+  saveAllDrafts(drafts);
+}
+
+function clearCurrentDraft() {
+  const drafts = loadAllDrafts();
+  delete drafts[draftKey(classSelect.value, dateInput.value)];
+  saveAllDrafts(drafts);
+}
+
+function todayStr() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function init() {
+  Object.keys(ROSTERS).forEach(section => {
+    const opt = document.createElement("option");
+    opt.value = section;
+    opt.textContent = section;
+    classSelect.appendChild(opt);
+  });
+
+  const lastClass = localStorage.getItem(LAST_CLASS_KEY);
+  if (lastClass && ROSTERS[lastClass]) {
+    classSelect.value = lastClass;
+  }
+
+  dateInput.value = todayStr();
+  renderStudents();
+}
+
+function periodSelectHtml(idx, key) {
+  const opts = STATUS_OPTIONS.map(o => `<option value="${o.value}">${o.label}</option>`).join("");
+  return `
+    <div class="period-select-wrap">
+      <select class="period-select p" data-idx="${idx}" data-period="${key}">
+        ${opts}
+      </select>
+      <input type="number" class="late-minutes-input" data-idx="${idx}" data-period="${key}" placeholder="min" min="0" max="120" style="display:none;">
+    </div>
+  `;
+}
+
+// Look at a student's 4 period statuses and decide their points:
+//   - every period Absent/Excused  -> 0 points (nothing was attended)
+//   - at least one Present/Late    -> keep the (default or manually set)
+//     points value; it doesn't matter if the LAST period specifically is
+//     Absent/Excused, since the points reflect the period(s) they were
+//     actually present for, not just the final one.
+function computeAutoPoints(idx, currentValue) {
+  const statuses = PERIOD_KEYS.map(key => {
+    const sel = studentList.querySelector(`.period-select[data-idx="${idx}"][data-period="${key}"]`);
+    return sel ? sel.value : "present";
+  });
+  const allNonAttending = statuses.every(s => NON_ATTENDING_STATUSES.includes(s));
+
+  if (allNonAttending) {
+    return { points: 0, locked: true };
+  }
+
+  // Coming back from an all-absent/excused state (locked at 0) into a
+  // present period should restore the default rather than staying at 0.
+  const restored = currentValue > 0 ? currentValue : DEFAULT_POINTS;
+  return { points: restored, locked: false };
+}
+
+function updatePointsForStudent(idx) {
+  const pointsInput = studentList.querySelector(`.points-input[data-idx="${idx}"]`);
+  if (!pointsInput) return;
+
+  const currentValue = parseInt(pointsInput.value, 10) || 0;
+  const { points, locked } = computeAutoPoints(idx, currentValue);
+
+  pointsInput.value = points;
+  pointsInput.disabled = locked;
+}
+
+function renderStudents(options) {
+  const opts = options || {};
+  const section = classSelect.value;
+  const names = ROSTERS[section];
+  const draft = opts.skipDraft ? null : getCurrentDraft();
+
+  statusEl.className = "";
+  statusEl.textContent = "";
+
+  studentList.innerHTML = "";
+  names.forEach((name, i) => {
+    const row = document.createElement("div");
+    row.className = "student-row";
+    const selects = PERIOD_KEYS.map(key => periodSelectHtml(i, key)).join("");
+    row.innerHTML = `
+      <div class="student-name">${name}</div>
+      ${selects}
+      <input type="number" class="points-input" min="0" max="30" value="${DEFAULT_POINTS}" data-idx="${i}">
+    `;
+    studentList.appendChild(row);
+  });
+
+  // Restore any saved-but-not-yet-synced attendance for this class + date.
+  if (draft && draft.students) {
+    names.forEach((name, i) => {
+      const saved = draft.students[name];
+      if (!saved) return;
+
+      PERIOD_KEYS.forEach(key => {
+        const sel = studentList.querySelector(`.period-select[data-idx="${i}"][data-period="${key}"]`);
+        const value = saved.attendance && saved.attendance[key];
+        if (!sel || !value) return;
+
+        sel.value = value;
+        const opt = STATUS_OPTIONS.find(o => o.value === value);
+        if (opt) {
+          sel.classList.remove("p", "a", "e", "l");
+          sel.classList.add(opt.cls);
+        }
+
+        const wrap = sel.closest(".period-select-wrap");
+        const minutesInput = wrap.querySelector(".late-minutes-input");
+        if (value === "late") {
+          minutesInput.style.display = "block";
+          const savedMinutes = saved.lateMinutes && saved.lateMinutes[key];
+          if (savedMinutes) minutesInput.value = savedMinutes;
+        }
+      });
+
+      const pointsInput = studentList.querySelector(`.points-input[data-idx="${i}"]`);
+      if (pointsInput && saved.points !== undefined && saved.points !== null && saved.points !== "") {
+        pointsInput.value = saved.points;
+      }
+
+      // Re-derive the lock state from the restored attendance rather than
+      // trusting the saved points blindly.
+      updatePointsForStudent(i);
+    });
+
+    statusEl.className = "pending";
+    statusEl.textContent = "Restored your unsaved attendance for this class and date.";
+  }
+
+  studentList.querySelectorAll(".period-select").forEach(sel => {
+    sel.addEventListener("change", () => {
+      const opt = STATUS_OPTIONS.find(o => o.value === sel.value);
+      sel.classList.remove("p", "a", "e", "l");
+      sel.classList.add(opt.cls);
+
+      const wrap = sel.closest(".period-select-wrap");
+      const minutesInput = wrap.querySelector(".late-minutes-input");
+      if (sel.value === "late") {
+        minutesInput.style.display = "block";
+      } else {
+        minutesInput.style.display = "none";
+        minutesInput.value = "";
+      }
+
+      updatePointsForStudent(sel.dataset.idx);
+      saveCurrentDraft();
+    });
+  });
+
+  studentList.querySelectorAll(".late-minutes-input").forEach(inp => {
+    inp.addEventListener("input", saveCurrentDraft);
+  });
+
+  studentList.querySelectorAll(".points-input").forEach(inp => {
+    inp.addEventListener("input", saveCurrentDraft);
+  });
+}
+
+classSelect.addEventListener("change", () => {
+  localStorage.setItem(LAST_CLASS_KEY, classSelect.value);
+  renderStudents();
+});
+
+dateInput.addEventListener("change", () => renderStudents());
+
+resetBtn.addEventListener("click", () => {
+  clearCurrentDraft();
+  renderStudents({ skipDraft: true });
+});
+
+syncBtn.addEventListener("click", async () => {
+  const section = classSelect.value;
+  const names = ROSTERS[section];
+  const date = dateInput.value;
+
+  const students = names.map((name, i) => {
+    const pointsInput = studentList.querySelector(`.points-input[data-idx="${i}"]`);
+    const points = parseInt(pointsInput.value, 10) || 0;
+    const attendance = {};
+    const lateMinutes = {};
+    PERIOD_KEYS.forEach(key => {
+      const sel = studentList.querySelector(`.period-select[data-idx="${i}"][data-period="${key}"]`);
+      attendance[key] = sel.value; // "present" | "absent" | "excused" | "late"
+      if (sel.value === "late") {
+        const minutesInput = studentList.querySelector(`.late-minutes-input[data-idx="${i}"][data-period="${key}"]`);
+        if (minutesInput && minutesInput.value.trim() !== "") {
+          lateMinutes[key] = minutesInput.value.trim();
+        }
+      }
+    });
+    return { name, points, attendance, lateMinutes };
+  });
+
+  syncBtn.disabled = true;
+  syncBtn.textContent = "Syncing... (can take up to a minute)";
+  statusEl.className = "pending";
+  statusEl.textContent = "Connecting to Nigri and saving each period. Please wait...";
+
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Sync-Key": API_KEY
+      },
+      body: JSON.stringify({
+        class_section: section,
+        date: date,
+        students: students
+      })
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.status === "success") {
+      statusEl.className = "success";
+      statusEl.textContent = "✓ Synced successfully!\n\n" + (data.detail || []).join("\n");
+      // Submitted — clear the local draft so reopening this class/date
+      // later starts fresh instead of replaying already-synced values.
+      clearCurrentDraft();
+    } else {
+      statusEl.className = "error";
+      statusEl.textContent = "Sync failed:\n" + JSON.stringify(data, null, 2);
+    }
+  } catch (err) {
+    statusEl.className = "error";
+    statusEl.textContent = "Network error: " + err.message;
+  } finally {
+    syncBtn.disabled = false;
+    syncBtn.textContent = "Sync to Nigri";
+  }
+});
+
+init();
+</script>
+</body>
+</html>
