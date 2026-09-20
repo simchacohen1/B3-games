@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Name Picker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1B1235;
+    --surface:#251A47;
+    --surface2:#2F2158;
+    --accent:#F2B705;
+    --accent2:#FF6B4A;
+    --teal:#2FBF9F;
+    --text:#F5F0FF;
+    --muted:#B7A8DA;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Nunito',sans-serif;
+    min-height:100vh;
+  }
+  .app{max-width:760px;margin:0 auto;padding:18px 16px 56px;}
+  h1,h2,h3{font-family:'Baloo 2',sans-serif;margin:0;}
+  button{font-family:'Nunito',sans-serif;cursor:pointer;}
+  ::selection{background:var(--accent);color:#1B1235;}
+
+  /* ---- top tabs ---- */
+  .tabbar{
+    display:flex;gap:8px;margin-bottom:20px;
+    border-bottom:2px dashed rgba(255,255,255,0.18);
+    padding-bottom:12px;
+  }
+  .tabbar button{
+    flex:1;
+    background:transparent;
+    border:2px solid rgba(255,255,255,0.14);
+    color:var(--muted);
+    padding:10px 14px;
+    border-radius:8px;
+    font-weight:800;
+    font-size:15px;
+    letter-spacing:0.02em;
+    transition:border-color .15s, color .15s, background .15s;
+  }
+  .tabbar button.is-active{
+    border-color:var(--accent);
+    color:var(--bg);
+    background:var(--accent);
+  }
+
+  /* ---- panels (ticket-stub styling, not generic cards) ---- */
+  .panel{
+    background:var(--surface);
+    border-top:3px solid var(--accent);
+    border-radius:4px 4px 10px 10px;
+    padding:16px 16px 18px;
+    margin-bottom:16px;
+  }
+  .panel h2{font-size:19px;margin-bottom:10px;color:var(--text);}
+  .panel + .panel{margin-top:16px;}
+
+  .list-choice{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+  .list-choice button, .style-choice button{
+    background:var(--surface2);
+    border:2px solid transparent;
+    color:var(--text);
+    padding:8px 12px;
+    border-radius:7px;
+    font-weight:700;
+    font-size:14px;
+  }
+  .list-choice button.is-active, .style-choice button.is-active{
+    border-color:var(--accent2);
+    color:var(--accent2);
+  }
+
+  textarea, input[type=text]{
+    width:100%;
+    background:var(--surface2);
+    border:2px solid rgba(255,255,255,0.1);
+    color:var(--text);
+    border-radius:7px;
+    padding:10px 12px;
+    font-family:'Nunito',sans-serif;
+    font-size:15px;
+    resize:vertical;
+  }
+  textarea{min-height:110px;line-height:1.5;}
+  textarea:focus, input:focus, select:focus, button:focus-visible{
+    outline:2px solid var(--accent);outline-offset:1px;
+  }
+  .hint{color:var(--muted);font-size:13px;margin-top:6px;}
+
+  select{
+    background:var(--surface2);
+    color:var(--text);
+    border:2px solid rgba(255,255,255,0.1);
+    border-radius:7px;
+    padding:8px 10px;
+    font-size:15px;
+    font-family:'Nunito',sans-serif;
+  }
+  .purpose-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .ghost{
+    background:transparent;border:2px solid rgba(255,255,255,0.18);
+    color:var(--text);padding:7px 12px;border-radius:7px;font-weight:700;font-size:14px;
+  }
+  .fairness-status{color:var(--muted);font-size:13px;margin-top:10px;}
+
+  #statsTable{margin-top:12px;}
+  .stats-row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:7px 2px;border-bottom:1px dashed rgba(255,255,255,0.1);
+    font-size:14px;
+  }
+  .stats-row:last-child{border-bottom:none;}
+  .stats-row .name{font-weight:700;}
+  .stats-row .count{
+    background:var(--surface2);color:var(--accent);
+    font-family:'Baloo 2',sans-serif;font-weight:700;
+    padding:2px 10px;border-radius:20px;min-width:22px;text-align:center;
+  }
+  .stats-empty{color:var(--muted);font-size:13px;}
+
+  .notice{
+    background:rgba(255,107,74,0.14);
+    border:2px solid var(--accent2);
+    color:var(--text);
+    border-radius:8px;
+    padding:12px 14px;
+    font-size:14px;
+    font-weight:700;
+    margin-bottom:16px;
+  }
+
+  #purposeEditor{margin-top:14px;padding-top:14px;border-top:1px dashed rgba(255,255,255,0.16);}
+  #purposeEditor label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px;font-weight:700;}
+  .toggle-row{display:flex;align-items:center;gap:10px;margin-top:10px;}
+  .toggle-row input{width:18px;height:18px;}
+  .editor-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+
+  .theme-row{display:flex;gap:10px;margin:6px 0 14px;}
+  .theme-swatch{
+    width:34px;height:34px;border-radius:50%;border:3px solid transparent;
+    padding:0;
+  }
+  .theme-swatch.is-active{border-color:var(--text);}
+  .toggle-line{display:flex;align-items:center;gap:10px;margin-top:10px;font-weight:700;font-size:14px;}
+  .toggle-line input{width:18px;height:18px;}
+
+  .cta{
+    display:block;width:100%;
+    background:var(--accent2);
+    color:#1B1235;
+    border:none;
+    padding:14px;
+    border-radius:9px;
+    font-weight:800;
+    font-size:17px;
+    font-family:'Baloo 2',sans-serif;
+    letter-spacing:0.01em;
+  }
+  .cta:active{transform:translateY(1px);}
+  .cta.big{font-size:20px;padding:16px;}
+  .cta:disabled{opacity:0.4;}
+
+  /* ---- display tab ---- */
+  #displayTab{text-align:center;}
+  .display-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .display-top .ghost.small{padding:5px 10px;font-size:13px;}
+  #displayPurposeName{color:var(--muted);font-weight:700;font-size:13px;letter-spacing:.03em;margin-bottom:4px;}
+  #displayHeadline{font-size:clamp(24px,6vw,38px);margin:2px 0 20px;}
+
+  #wheelWrap{position:relative;width:min(84vw,420px);aspect-ratio:1/1;margin:0 auto 22px;}
+  #wheelCanvas{width:100%;height:100%;display:block;border-radius:50%;box-shadow:0 0 0 6px var(--surface2), 0 0 30px rgba(0,0,0,0.35);}
+  .pointer{
+    position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+    width:0;height:0;
+    border-left:14px solid transparent;
+    border-right:14px solid transparent;
+    border-top:22px solid var(--accent2);
+    filter:drop-shadow(0 2px 2px rgba(0,0,0,.4));
+    z-index:2;
+  }
+
+  #cardsWrap{
+    display:flex;flex-wrap:wrap;gap:10px;justify-content:center;
+    margin:0 auto 22px;max-width:600px;
+  }
+  .name-card{
+    background:var(--surface2);
+    border:2px solid rgba(255,255,255,0.12);
+    border-radius:8px;
+    padding:12px 16px;
+    font-family:'Baloo 2',sans-serif;
+    font-weight:700;
+    font-size:16px;
+    transition:transform .1s, border-color .1s, background .1s;
+  }
+  .name-card.is-picked{opacity:0.35;}
+  .name-card.is-active{
+    border-color:var(--accent);
+    background:var(--accent);
+    color:#1B1235;
+    transform:scale(1.08);
+  }
+  .name-card.is-winner{
+    border-color:var(--accent2);
+    background:var(--accent2);
+    color:#1B1235;
+    transform:scale(1.15);
+    box-shadow:0 0 22px rgba(255,107,74,0.6);
+  }
+
+  #winnerBanner{
+    font-family:'Baloo 2',sans-serif;
+    font-size:clamp(28px,7vw,44px);
+    color:var(--accent);
+    margin:6px 0 8px;
+  }
+  #displayFairnessNote{color:var(--muted);font-size:13px;margin-top:14px;}
+  #resetCycleBtn{margin-top:10px;font-size:12px;padding:5px 10px;}
+
+  #confettiCanvas{
+    position:fixed;inset:0;pointer-events:none;width:100vw;height:100vh;z-index:50;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    #wheelCanvas{transition:none !important;}
+    .name-card{transition:none !important;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="tabbar">
+    <button id="tabSetupBtn" class="is-active">Setup</button>
+    <button id="tabDisplayBtn">Display</button>
+  </div>
+
+  <!-- ===== SETUP TAB ===== -->
+  <section id="setupTab">
+
+    <div id="autosaveNotice" class="notice" hidden></div>
+
+    <div class="panel">
+      <h2>Class list</h2>
+      <div class="list-choice">
+        <button data-list="east">East Track</button>
+        <button data-list="west">West Track</button>
+        <button data-list="custom">Quick list</button>
+      </div>
+      <textarea id="rosterEditor" placeholder="One name per line"></textarea>
+      <div class="hint" id="rosterHint">One name per line.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Purpose</h2>
+      <div class="purpose-row">
+        <select id="purposeSelect"></select>
+        <button id="editPurposeBtn" class="ghost">Edit</button>
+        <button id="addPurposeBtn" class="ghost">+ New</button>
+      </div>
+      <div class="fairness-status" id="fairnessStatus"></div>
+
+      <div id="purposeEditor" hidden>
+        <label for="purposeNameInput">Purpose name</label>
+        <input type="text" id="purposeNameInput" placeholder="e.g. Answering Questions">
+        <label for="purposeHeadlineInput">What the display screen says</label>
+        <input type="text" id="purposeHeadlineInput" placeholder="e.g. Who's answering?">
+        <div class="toggle-row">
+          <input type="checkbox" id="purposeNoRepeatToggle" checked>
+          <label for="purposeNoRepeatToggle" style="margin:0;">Everyone gets a turn before anyone repeats</label>
+        </div>
+        <div class="editor-actions">
+          <button id="savePurposeBtn" class="ghost">Save</button>
+          <button id="cancelPurposeBtn" class="ghost">Cancel</button>
+          <button id="deletePurposeBtn" class="ghost" hidden>Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Backup</h2>
+      <div class="hint" style="margin-bottom:10px;">Save a backup file, or restore one, in case this page doesn't remember your data between visits.</div>
+      <div class="purpose-row">
+        <button id="downloadBackupBtn" class="ghost">Download backup</button>
+        <button id="restoreBackupBtn" class="ghost">Restore backup</button>
+        <input type="file" id="restoreFileInput" accept="application/json" hidden>
+      </div>
+      <div class="hint" id="backupStatus"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Pick history</h2>
+      <div class="purpose-row">
+        <select id="statsScope"></select>
+      </div>
+      <div id="statsTable"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Look &amp; feel</h2>
+      <div class="style-choice list-choice">
+        <button data-style="wheel">Wheel</button>
+        <button data-style="cards">Cards</button>
+      </div>
+      <div class="theme-row">
+        <button class="theme-swatch" data-theme="gold" style="background:#F2B705" title="Curtain Call"></button>
+        <button class="theme-swatch" data-theme="ocean" style="background:#4FD1C5" title="Deep Blue"></button>
+        <button class="theme-swatch" data-theme="sunset" style="background:#FF7A59" title="Sunset"></button>
+        <button class="theme-swatch" data-theme="forest" style="background:#8FD14F" title="Orchard"></button>
+      </div>
+      <div class="toggle-line">
+        <input type="checkbox" id="confettiToggle" checked>
+        <label for="confettiToggle" style="margin:0;">Confetti on pick</label>
+      </div>
+      <div class="toggle-line">
+        <input type="checkbox" id="soundToggle" checked>
+        <label for="soundToggle" style="margin:0;">Sound effects</label>
+      </div>
+    </div>
+
+    <button id="openDisplayBtn" class="cta">Open Display &rarr;</button>
+  </section>
+
+  <!-- ===== DISPLAY TAB ===== -->
+  <section id="displayTab" hidden>
+    <div class="display-top">
+      <button id="backToSetupBtn" class="ghost small">&larr; Setup</button>
+      <span></span>
+    </div>
+    <div id="displayPurposeName"></div>
+    <h1 id="displayHeadline"></h1>
+
+    <div id="wheelWrap">
+      <div class="pointer"></div>
+      <canvas id="wheelCanvas"></canvas>
+    </div>
+    <div id="cardsWrap" hidden></div>
+
+    <button id="spinBtn" class="cta big">Spin</button>
+    <div id="winnerBanner" hidden></div>
+    <div id="displayFairnessNote"></div>
+    <button id="resetCycleBtn" class="ghost" hidden>Reset this round</button>
+  </section>
+
+</div>
+<canvas id="confettiCanvas"></canvas>
+
+<script>
+// ---------- Themes ----------
+const THEMES = [
+  { id: 'gold',   name: 'Curtain Call', bg: '#1B1235', surface: '#251A47', surface2:'#2F2158', accent: '#F2B705', accent2: '#FF6B4A', teal:'#2FBF9F' },
+  { id: 'ocean',  name: 'Deep Blue',    bg: '#0B2545', surface: '#123A63', surface2:'#164A7A', accent: '#4FD1C5', accent2: '#F2B705', teal:'#7FE0D6' },
+  { id: 'sunset', name: 'Sunset',       bg: '#3B1249', surface: '#54186A', surface2:'#652080', accent: '#FF7A59', accent2: '#FFD166', teal:'#F2B705' },
+  { id: 'forest', name: 'Orchard',      bg: '#0F3D2E', surface: '#154B39', surface2:'#1B5B45', accent: '#F2B705', accent2: '#8FD14F', teal:'#6FC2A0' },
+];
+
+const DEFAULT_PURPOSES = [
+  { id: 'p_questions', name: 'Answering Questions', headline: 'Who\u2019s answering?', noRepeat: true },
+  { id: 'p_chazzan',   name: 'Chazzan',             headline: 'Today\u2019s Chazzan',  noRepeat: true },
+  { id: 'p_fun',       name: 'Just for Fun',        headline: 'Spinning for fun!',    noRepeat: false },
+];
+
+const FIXED_ROSTERS = {
+  east: [
+    'Mayer Chaim Chaikin',
+    'Yossi Gourarie',
+    'Sholom DovBer Huebner',
+    'Moshe Lapine',
+    'Kehos Notik',
+    'Yisroel Oirechman',
+    'Moshe Tuvia Raichman',
+    'Avrohom Rosenfeld',
+    'Levi Rozmarin',
+    'Arik Traxler'
+  ],
+  west: [
+    'Ari Greenberg',
+    'Zev Rosenfeld',
+    'Levi Schtroks',
+    'Yisroel Aryeh Simmonds',
+    'Leibel Vogel',
+    'Leib Wolf'
+  ]
+};
+
+let state = {
+  rosters: { east: FIXED_ROSTERS.east.slice(), west: FIXED_ROSTERS.west.slice() },
+  customNames: [],
+  activeList: 'east',
+  purposes: DEFAULT_PURPOSES.slice(),
+  activePurposeId: DEFAULT_PURPOSES[0].id,
+  history: {},
+  totalPicks: {}, // purposeId -> name -> count, kept forever
+  settings: { style: 'wheel', theme: 'gold', confetti: true, sound: true },
+};
+
+let rotationState = 0;
+let audioCtx = null;
+
+// ---------- Storage helpers ----------
+async function loadState() {
+  const keys = ['rosters', 'customNames', 'activeList', 'purposes', 'activePurposeId', 'history', 'totalPicks', 'settings'];
+  for (const key of keys) {
+    try {
+      const res = await window.storage.get(key, false);
+      if (res && res.value != null) {
+        state[key] = JSON.parse(res.value);
+      }
+    } catch (e) {
+      // key not found yet, keep default
+    }
+  }
+  // East and West rosters are built into this file permanently.
+  // Saved browser data can never overwrite them.
+  state.rosters = { east: FIXED_ROSTERS.east.slice(), west: FIXED_ROSTERS.west.slice() };
+  if (state.activeList !== 'east' && state.activeList !== 'west' && state.activeList !== 'custom') state.activeList = 'east';
+  if (!state.purposes || state.purposes.length === 0) state.purposes = DEFAULT_PURPOSES.slice();
+}
+
+async function persist(key) {
+  try {
+    await window.storage.set(key, JSON.stringify(state[key]), false);
+  } catch (e) {
+    console.error('storage save failed', key, e);
+  }
+}
+
+// ---------- Name list helpers ----------
+function parseNameBlock(text) {
+  return text
+    .split('\n')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .filter((name, idx, arr) => arr.indexOf(name) === idx);
+}
+
+function getActiveNames() {
+  if (state.activeList === 'east') return FIXED_ROSTERS.east;
+  if (state.activeList === 'west') return FIXED_ROSTERS.west;
+  return state.customNames || [];
+}
+
+function rosterKey(names) {
+  return names.slice().sort().join('|');
+}
+
+function getPurpose(id) {
+  return state.purposes.find(p => p.id === id) || state.purposes[0];
+}
+
+function getHistoryEntry(purposeId, names) {
+  const key = rosterKey(names);
+  if (!state.history[purposeId]) state.history[purposeId] = {};
+  if (!state.history[purposeId][key]) state.history[purposeId][key] = { picked: [] };
+  return state.history[purposeId][key];
+}
+
+function fairnessStatus(purpose, names) {
+  if (!purpose.noRepeat) return null;
+  if (names.length === 0) return null;
+  const entry = getHistoryEntry(purpose.id, names);
+  const remaining = names.filter(n => !entry.picked.includes(n));
+  return { remaining: remaining.length, total: names.length };
+}
+
+// ---------- Picking logic ----------
+function pickWinner(purpose, names) {
+  const entry = getHistoryEntry(purpose.id, names);
+  let eligible;
+  if (purpose.noRepeat) {
+    eligible = names.filter(n => !entry.picked.includes(n));
+    if (eligible.length === 0) {
+      entry.picked = [];
+      eligible = names.slice();
+    }
+  } else {
+    eligible = names.slice();
+  }
+  const winner = eligible[Math.floor(Math.random() * eligible.length)];
+  return { winner, entry };
+}
+
+function commitWinner(purpose, entry, winner) {
+  if (purpose.noRepeat) {
+    entry.picked.push(winner);
+    persist('history');
+  }
+  if (!state.totalPicks[purpose.id]) state.totalPicks[purpose.id] = {};
+  state.totalPicks[purpose.id][winner] = (state.totalPicks[purpose.id][winner] || 0) + 1;
+  persist('totalPicks');
+}
+
+// ---------- Audio ----------
+function ensureAudio() {
+  if (!state.settings.sound) return null;
+  if (!audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new Ctx();
+  }
+  return audioCtx;
+}
+
+function playTick() {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.value = 700;
+  gain.gain.setValueAtTime(0.06, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.05);
+}
+
+function playFanfare() {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const notes = [523.25, 659.25, 783.99, 1046.5];
+  notes.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const t0 = ctx.currentTime + i * 0.09;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.linearRampToValueAtTime(0.12, t0 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.35);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + 0.4);
+  });
+}
+
+// ---------- Confetti ----------
+function burstConfetti(canvas, theme) {
+  if (!state.settings.confetti) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.clientWidth;
+  const h = canvas.height = canvas.clientHeight;
+  const colors = [theme.accent, theme.accent2, theme.teal, '#ffffff'];
+  const particles = [];
+  for (let i = 0; i < 140; i++) {
+    particles.push({
+      x: Math.random() * w,
+      y: -20 - Math.random() * h * 0.3,
+      vx: (Math.random() - 0.5) * 4,
+      vy: 2 + Math.random() * 3,
+      size: 4 + Math.random() * 5,
+      color: colors[i % colors.length],
+      rot: Math.random() * Math.PI,
+      vrot: (Math.random() - 0.5) * 0.3,
+    });
+  }
+  const start = performance.now();
+  function frame(now) {
+    const elapsed = now - start;
+    ctx.clearRect(0, 0, w, h);
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.05;
+      p.rot += p.vrot;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+      ctx.restore();
+    });
+    if (elapsed < 2600) {
+      requestAnimationFrame(frame);
+    } else {
+      ctx.clearRect(0, 0, w, h);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+// ---------- Wheel rendering ----------
+function segmentColor(theme, idx, picked) {
+  if (picked) return 'rgba(255,255,255,0.12)';
+  const palette = [theme.accent, theme.accent2, theme.teal];
+  return palette[idx % palette.length];
+}
+
+function drawWheel(canvas, names, pickedSet, theme) {
+  const ctx = canvas.getContext('2d');
+  const size = canvas.width;
+  ctx.clearRect(0, 0, size, size);
+  const cx = size / 2, cy = size / 2, r = size / 2 - 8;
+  const n = names.length;
+  if (n === 0) {
+    ctx.fillStyle = theme.surface2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#F5F0FF';
+    ctx.font = '600 20px Nunito, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Add names in Setup', cx, cy);
+    return;
+  }
+  const anglePer = (Math.PI * 2) / n;
+  names.forEach((name, i) => {
+    const startA = i * anglePer;
+    const endA = startA + anglePer;
+    const picked = pickedSet.has(name);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startA, endA);
+    ctx.closePath();
+    ctx.fillStyle = segmentColor(theme, i, picked);
+    ctx.fill();
+    ctx.strokeStyle = theme.bg;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(startA + anglePer / 2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = picked ? 'rgba(255,255,255,0.45)' : '#1B1235';
+    const fontSize = n > 16 ? 12 : n > 10 ? 14 : 17;
+    ctx.font = `700 ${fontSize}px Baloo 2, sans-serif`;
+    ctx.fillText(name.length > 14 ? name.slice(0, 13) + '\u2026' : name, r - 14, 5);
+    ctx.restore();
+  });
+}
+
+function spinWheel(canvas, names, winnerIndex, onDone) {
+  const n = names.length;
+  const anglePer = 360 / n;
+  const segCenterDeg = winnerIndex * anglePer + anglePer / 2;
+  const jitter = (Math.random() - 0.5) * anglePer * 0.6;
+  const targetMod = ((270 - segCenterDeg - jitter) % 360 + 360) % 360;
+  const spins = 5;
+  const prevMod = ((rotationState % 360) + 360) % 360;
+  let delta = targetMod - prevMod;
+  if (delta < 0) delta += 360;
+  const totalRotation = rotationState + delta + spins * 360;
+  rotationState = totalRotation;
+
+  canvas.style.transition = 'transform 4.2s cubic-bezier(0.12,0.67,0.1,1)';
+  canvas.style.transform = `rotate(${totalRotation}deg)`;
+
+  let ticking = true;
+  let tickDelay = 90;
+  function tickLoop() {
+    if (!ticking) return;
+    playTick();
+    tickDelay *= 1.09;
+    setTimeout(tickLoop, tickDelay);
+    if (tickDelay > 380) ticking = false;
+  }
+  tickLoop();
+
+  setTimeout(() => {
+    onDone();
+  }, 4300);
+}
+
+// ---------- Cards mode ----------
+function renderCards(container, names, pickedSet) {
+  container.innerHTML = '';
+  names.forEach(name => {
+    const card = document.createElement('div');
+    card.className = 'name-card' + (pickedSet.has(name) ? ' is-picked' : '');
+    card.textContent = name;
+    card.dataset.name = name;
+    container.appendChild(card);
+  });
+}
+
+function spinCards(container, names, winner, onDone) {
+  const cards = Array.from(container.children);
+  if (cards.length === 0) { onDone(); return; }
+  let idx = 0;
+  let delay = 70;
+  const totalSteps = 22 + names.length;
+  let step = 0;
+  function clearHighlight() {
+    cards.forEach(c => c.classList.remove('is-active'));
+  }
+  function loop() {
+    clearHighlight();
+    cards[idx % cards.length].classList.add('is-active');
+    playTick();
+    idx++;
+    step++;
+    delay *= 1.06;
+    const winnerIdx = names.indexOf(winner);
+    if (step >= totalSteps && idx % cards.length === winnerIdx) {
+      clearHighlight();
+      cards[winnerIdx].classList.add('is-winner');
+      onDone();
+      return;
+    }
+    setTimeout(loop, Math.min(delay, 260));
+  }
+  loop();
+}
+
+// ---------- DOM refs ----------
+const el = sel => document.querySelector(sel);
+const els = sel => Array.from(document.querySelectorAll(sel));
+
+const setupTab = el('#setupTab');
+const displayTab = el('#displayTab');
+const tabSetupBtn = el('#tabSetupBtn');
+const tabDisplayBtn = el('#tabDisplayBtn');
+
+const listButtons = els('.list-choice button');
+const rosterEditor = el('#rosterEditor');
+const rosterHint = el('#rosterHint');
+
+const purposeSelect = el('#purposeSelect');
+const addPurposeBtn = el('#addPurposeBtn');
+const editPurposeBtn = el('#editPurposeBtn');
+const purposeEditor = el('#purposeEditor');
+const purposeNameInput = el('#purposeNameInput');
+const purposeHeadlineInput = el('#purposeHeadlineInput');
+const purposeNoRepeatToggle = el('#purposeNoRepeatToggle');
+const savePurposeBtn = el('#savePurposeBtn');
+const deletePurposeBtn = el('#deletePurposeBtn');
+const cancelPurposeBtn = el('#cancelPurposeBtn');
+const fairnessStatusEl = el('#fairnessStatus');
+const statsScope = el('#statsScope');
+const statsTable = el('#statsTable');
+const downloadBackupBtn = el('#downloadBackupBtn');
+const restoreBackupBtn = el('#restoreBackupBtn');
+const restoreFileInput = el('#restoreFileInput');
+const backupStatus = el('#backupStatus');
+const autosaveNotice = el('#autosaveNotice');
+
+const styleButtons = els('.style-choice button');
+const themeButtons = els('.theme-swatch');
+const confettiToggle = el('#confettiToggle');
+const soundToggle = el('#soundToggle');
+
+const openDisplayBtn = el('#openDisplayBtn');
+const backToSetupBtn = el('#backToSetupBtn');
+
+const displayHeadline = el('#displayHeadline');
+const displayPurposeName = el('#displayPurposeName');
+const wheelWrap = el('#wheelWrap');
+const wheelCanvas = el('#wheelCanvas');
+const cardsWrap = el('#cardsWrap');
+const spinBtn = el('#spinBtn');
+const winnerBanner = el('#winnerBanner');
+const displayFairnessNote = el('#displayFairnessNote');
+const confettiCanvas = el('#confettiCanvas');
+const resetCycleBtn = el('#resetCycleBtn');
+
+let editingPurposeId = null;
+
+// ---------- Theme application ----------
+function currentTheme() {
+  return THEMES.find(t => t.id === state.settings.theme) || THEMES[0];
+}
+
+function applyTheme() {
+  const t = currentTheme();
+  const root = document.documentElement.style;
+  root.setProperty('--bg', t.bg);
+  root.setProperty('--surface', t.surface);
+  root.setProperty('--surface2', t.surface2);
+  root.setProperty('--accent', t.accent);
+  root.setProperty('--accent2', t.accent2);
+  root.setProperty('--teal', t.teal);
+  themeButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.theme === t.id));
+}
+
+// ---------- Tab switching ----------
+function showTab(name) {
+  const isSetup = name === 'setup';
+  setupTab.hidden = !isSetup;
+  displayTab.hidden = isSetup;
+  tabSetupBtn.classList.toggle('is-active', isSetup);
+  tabDisplayBtn.classList.toggle('is-active', !isSetup);
+  if (!isSetup) {
+    sizeWheelCanvas();
+    renderDisplay();
+  }
+}
+
+// ---------- Roster editor ----------
+function loadRosterEditor() {
+  listButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.list === state.activeList));
+  let text = '';
+  if (state.activeList === 'east') text = FIXED_ROSTERS.east.join('\n');
+  else if (state.activeList === 'west') text = FIXED_ROSTERS.west.join('\n');
+  else text = (state.customNames || []).join('\n');
+  rosterEditor.value = text;
+  rosterEditor.readOnly = state.activeList !== 'custom';
+  rosterHint.textContent = state.activeList === 'custom'
+    ? (parseNameBlock(rosterEditor.value).length ? `${parseNameBlock(rosterEditor.value).length} names loaded.` : 'One name per line.')
+    : 'This class list is permanently built into the Name Picker.';
+}
+
+function updateRosterHint() {
+  const n = parseNameBlock(rosterEditor.value).length;
+  rosterHint.textContent = n === 0 ? 'One name per line.' : `${n} name${n === 1 ? '' : 's'} loaded.`;
+}
+
+function commitRosterEditor() {
+  if (state.activeList !== 'custom') return;
+  const names = parseNameBlock(rosterEditor.value);
+  state.customNames = names;
+  persist('customNames');
+  updateRosterHint();
+  renderFairnessStatus();
+}
+
+listButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.activeList = btn.dataset.list;
+    persist('activeList');
+    loadRosterEditor();
+    renderFairnessStatus();
+  });
+});
+rosterEditor.addEventListener('input', () => { updateRosterHint(); });
+rosterEditor.addEventListener('blur', commitRosterEditor);
+
+// ---------- Purpose selector ----------
+function renderPurposeSelect() {
+  purposeSelect.innerHTML = '';
+  state.purposes.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    purposeSelect.appendChild(opt);
+  });
+  purposeSelect.value = state.activePurposeId;
+}
+
+purposeSelect.addEventListener('change', () => {
+  state.activePurposeId = purposeSelect.value;
+  persist('activePurposeId');
+  renderFairnessStatus();
+});
+
+function openPurposeEditor(purpose) {
+  editingPurposeId = purpose ? purpose.id : null;
+  purposeNameInput.value = purpose ? purpose.name : '';
+  purposeHeadlineInput.value = purpose ? purpose.headline : '';
+  purposeNoRepeatToggle.checked = purpose ? purpose.noRepeat : true;
+  deletePurposeBtn.hidden = !purpose || state.purposes.length <= 1;
+  purposeEditor.hidden = false;
+}
+
+addPurposeBtn.addEventListener('click', () => openPurposeEditor(null));
+editPurposeBtn.addEventListener('click', () => openPurposeEditor(getPurpose(state.activePurposeId)));
+cancelPurposeBtn.addEventListener('click', () => { purposeEditor.hidden = true; });
+
+savePurposeBtn.addEventListener('click', () => {
+  const name = purposeNameInput.value.trim();
+  const headline = purposeHeadlineInput.value.trim() || `Picking for ${name}`;
+  if (!name) return;
+  if (editingPurposeId) {
+    const p = getPurpose(editingPurposeId);
+    p.name = name; p.headline = headline; p.noRepeat = purposeNoRepeatToggle.checked;
+  } else {
+    const id = 'p_' + Date.now();
+    state.purposes.push({ id, name, headline, noRepeat: purposeNoRepeatToggle.checked });
+    state.activePurposeId = id;
+  }
+  persist('purposes');
+  persist('activePurposeId');
+  purposeEditor.hidden = true;
+  renderPurposeSelect();
+  renderFairnessStatus();
+  renderStatsScopeOptions();
+  renderStats();
+});
+
+deletePurposeBtn.addEventListener('click', () => {
+  if (state.purposes.length <= 1) return;
+  state.purposes = state.purposes.filter(p => p.id !== editingPurposeId);
+  state.activePurposeId = state.purposes[0].id;
+  persist('purposes');
+  persist('activePurposeId');
+  purposeEditor.hidden = true;
+  renderPurposeSelect();
+  renderFairnessStatus();
+  renderStatsScopeOptions();
+  renderStats();
+});
+
+function renderFairnessStatus() {
+  const purpose = getPurpose(state.activePurposeId);
+  const names = getActiveNames();
+  const status = fairnessStatus(purpose, names);
+  if (!status) {
+    fairnessStatusEl.textContent = purpose.noRepeat
+      ? 'Everyone gets a turn before anyone repeats.'
+      : 'Fully random every time \u2014 repeats are allowed.';
+  } else {
+    fairnessStatusEl.textContent = `${status.remaining} of ${status.total} still need a turn this round.`;
+  }
+}
+
+// ---------- All-time pick stats ----------
+function renderStatsScopeOptions() {
+  const prev = statsScope.value;
+  statsScope.innerHTML = '';
+  state.purposes.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    statsScope.appendChild(opt);
+  });
+  const allOpt = document.createElement('option');
+  allOpt.value = '__all__';
+  allOpt.textContent = 'All purposes combined';
+  statsScope.appendChild(allOpt);
+  const stillValid = Array.from(statsScope.options).some(o => o.value === prev);
+  statsScope.value = stillValid ? prev : state.activePurposeId;
+}
+
+function renderStats() {
+  const scope = statsScope.value;
+  let counts = {};
+  if (scope === '__all__') {
+    Object.values(state.totalPicks).forEach(purposeCounts => {
+      Object.entries(purposeCounts).forEach(([name, c]) => {
+        counts[name] = (counts[name] || 0) + c;
+      });
+    });
+  } else {
+    counts = state.totalPicks[scope] || {};
+  }
+  const rows = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  if (rows.length === 0) {
+    statsTable.innerHTML = '<div class="stats-empty">No picks recorded yet.</div>';
+    return;
+  }
+  statsTable.innerHTML = rows.map(([name, count]) =>
+    `<div class="stats-row"><span class="name">${escapeHtml(name)}</span><span class="count">${count}</span></div>`
+  ).join('');
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+statsScope.addEventListener('change', renderStats);
+
+// ---------- Backup / restore ----------
+const BACKUP_KEYS = ['rosters', 'customNames', 'activeList', 'purposes', 'activePurposeId', 'history', 'totalPicks', 'settings'];
+
+function refreshAllUi() {
+  applyTheme();
+  styleButtons.forEach(b => b.classList.toggle('is-active', b.dataset.style === state.settings.style));
+  confettiToggle.checked = state.settings.confetti;
+  soundToggle.checked = state.settings.sound;
+  loadRosterEditor();
+  renderPurposeSelect();
+  renderFairnessStatus();
+  renderStatsScopeOptions();
+  renderStats();
+  if (!displayTab.hidden) renderDisplay();
+}
+
+downloadBackupBtn.addEventListener('click', () => {
+  const payload = {};
+  BACKUP_KEYS.forEach(k => { payload[k] = state[k]; });
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `name-picker-backup-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  backupStatus.textContent = 'Backup downloaded.';
+});
+
+restoreBackupBtn.addEventListener('click', () => restoreFileInput.click());
+
+restoreFileInput.addEventListener('change', () => {
+  const file = restoreFileInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      BACKUP_KEYS.forEach(k => {
+        if (data[k] !== undefined) {
+          state[k] = data[k];
+          persist(k);
+        }
+      });
+      state.rosters = { east: FIXED_ROSTERS.east.slice(), west: FIXED_ROSTERS.west.slice() };
+      refreshAllUi();
+      backupStatus.textContent = 'Backup restored.';
+    } catch (e) {
+      backupStatus.textContent = 'That file could not be read as a backup.';
+    }
+  };
+  reader.readAsText(file);
+  restoreFileInput.value = '';
+});
+
+// ---------- Style / theme / effects ----------
+styleButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.settings.style = btn.dataset.style;
+    persist('settings');
+    styleButtons.forEach(b => b.classList.toggle('is-active', b === btn));
+  });
+});
+
+themeButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.settings.theme = btn.dataset.theme;
+    persist('settings');
+    applyTheme();
+  });
+});
+
+confettiToggle.addEventListener('change', () => {
+  state.settings.confetti = confettiToggle.checked;
+  persist('settings');
+});
+soundToggle.addEventListener('change', () => {
+  state.settings.sound = soundToggle.checked;
+  persist('settings');
+});
+
+// ---------- Display tab ----------
+openDisplayBtn.addEventListener('click', () => showTab('display'));
+backToSetupBtn.addEventListener('click', () => showTab('setup'));
+tabSetupBtn.addEventListener('click', () => showTab('setup'));
+tabDisplayBtn.addEventListener('click', () => showTab('display'));
+
+function pickedSetFor(purpose, names) {
+  const entry = getHistoryEntry(purpose.id, names);
+  return new Set(purpose.noRepeat ? entry.picked : []);
+}
+
+function renderDisplay() {
+  const purpose = getPurpose(state.activePurposeId);
+  const names = getActiveNames();
+  const theme = currentTheme();
+  displayHeadline.textContent = purpose.headline;
+  displayPurposeName.textContent = purpose.name;
+  winnerBanner.hidden = true;
+  winnerBanner.textContent = '';
+
+  const isWheel = state.settings.style === 'wheel';
+  wheelWrap.hidden = !isWheel;
+  cardsWrap.hidden = isWheel;
+
+  const picked = pickedSetFor(purpose, names);
+  if (isWheel) {
+    drawWheel(wheelCanvas, names, picked, theme);
+  } else {
+    renderCards(cardsWrap, names, picked);
+  }
+
+  const status = fairnessStatus(purpose, names);
+  displayFairnessNote.textContent = status ? `${status.remaining} of ${status.total} still need a turn` : '';
+  spinBtn.disabled = names.length === 0;
+  resetCycleBtn.hidden = !purpose.noRepeat;
+}
+
+let spinning = false;
+spinBtn.addEventListener('click', () => {
+  if (spinning) return;
+  const purpose = getPurpose(state.activePurposeId);
+  const names = getActiveNames();
+  if (names.length === 0) return;
+  spinning = true;
+  spinBtn.disabled = true;
+  winnerBanner.hidden = true;
+
+  const { winner, entry } = pickWinner(purpose, names);
+  ensureAudio();
+
+  if (state.settings.style === 'wheel') {
+    const winnerIndex = names.indexOf(winner);
+    spinWheel(wheelCanvas, names, winnerIndex, () => finishSpin(purpose, entry, winner, names));
+  } else {
+    spinCards(cardsWrap, names, winner, () => finishSpin(purpose, entry, winner, names));
+  }
+});
+
+function finishSpin(purpose, entry, winner, names) {
+  commitWinner(purpose, entry, winner);
+  winnerBanner.hidden = false;
+  winnerBanner.textContent = winner;
+  playFanfare();
+  burstConfetti(confettiCanvas, currentTheme());
+  const picked = pickedSetFor(purpose, names);
+  if (state.settings.style === 'wheel') {
+    drawWheel(wheelCanvas, names, picked, currentTheme());
+  } else {
+    renderCards(cardsWrap, names, picked);
+  }
+  const status = fairnessStatus(purpose, names);
+  displayFairnessNote.textContent = status ? `${status.remaining} of ${status.total} still need a turn` : '';
+  spinBtn.disabled = false;
+  spinning = false;
+  renderStats();
+}
+
+resetCycleBtn.addEventListener('click', () => {
+  const purpose = getPurpose(state.activePurposeId);
+  const names = getActiveNames();
+  const entry = getHistoryEntry(purpose.id, names);
+  entry.picked = [];
+  persist('history');
+  renderDisplay();
+  renderFairnessStatus();
+});
+
+// ---------- Resize handling for wheel canvas ----------
+function sizeWheelCanvas() {
+  const size = Math.min(wheelWrap.clientWidth, wheelWrap.clientHeight, 520) || 300;
+  wheelCanvas.width = size;
+  wheelCanvas.height = size;
+}
+window.addEventListener('resize', () => {
+  if (!displayTab.hidden) {
+    sizeWheelCanvas();
+    renderDisplay();
+  }
+});
+
+// ---------- Autosave availability check ----------
+async function checkAutosave() {
+  try {
+    if (typeof window.storage === 'undefined') return false;
+    const probe = 'probe-' + Date.now();
+    const setRes = await window.storage.set('__autosave_probe__', probe, false);
+    if (!setRes) return false;
+    const getRes = await window.storage.get('__autosave_probe__', false);
+    return !!(getRes && getRes.value === probe);
+  } catch (e) {
+    return false;
+  }
+}
+
+// ---------- Init ----------
+async function init() {
+  const autosaveOk = await checkAutosave();
+  if (!autosaveOk) {
+    autosaveNotice.hidden = false;
+    autosaveNotice.textContent = 'Autosave isn\u2019t working on this page right now, so nothing will be remembered after a refresh. Use "Download backup" below before you close this, and "Restore backup" to load it back in next time.';
+  }
+  await loadState();
+  applyTheme();
+  styleButtons.forEach(b => b.classList.toggle('is-active', b.dataset.style === state.settings.style));
+  confettiToggle.checked = state.settings.confetti;
+  soundToggle.checked = state.settings.sound;
+  loadRosterEditor();
+  renderPurposeSelect();
+  renderFairnessStatus();
+  renderStatsScopeOptions();
+  renderStats();
+  showTab('setup');
+}
+
+init();
+</script>
+</body>
+</html>
