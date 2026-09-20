@@ -34,7 +34,7 @@
   .master-row{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;margin:12px 0}.master-row label{font-weight:800}
   .class-card{border:1px solid #dbe4ee;border-radius:15px;padding:13px;margin:12px 0;background:#f8fafc}.class-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.class-title{font-weight:900;font-size:18px}.status-pill{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:900}.status-open{background:#dcfce7;color:#166534}.status-closed{background:#fee2e2;color:#991b1b}.status-reason{font-size:12px;color:#64748b;margin-top:4px}
   .mode-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:12px 0}.mode-btn{border:1px solid #cbd5e1;background:white;border-radius:9px;padding:8px 5px;font-size:12px;font-weight:800;cursor:pointer}.mode-btn.active{background:#1f2937;color:white;border-color:#1f2937}
-  details{margin-top:8px}summary{cursor:pointer;font-weight:800;color:#334155}.schedule-grid{margin-top:9px}.schedule-help{font-size:11px;color:#64748b;margin:7px 0 10px;line-height:1.35}.schedule-day{border-top:1px solid #e5e7eb;padding:8px 0}.schedule-day:first-child{border-top:0}.schedule-day-name{font-weight:900;font-size:12px;margin-bottom:5px}.lock-range{display:grid;grid-template-columns:24px 44px 1fr 22px 1fr;align-items:center;gap:5px;margin:5px 0;font-size:11px}.lock-range input[type="time"]{width:100%;padding:5px;border:1px solid #cbd5e1;border-radius:8px;font-size:11px}.lock-range .to{text-align:center;color:#64748b}.game-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0;font-size:14px;padding-bottom:6px;border-bottom:1px solid #eef2f7}
+  details{margin-top:8px}summary{cursor:pointer;font-weight:800;color:#334155}.schedule-grid{margin-top:9px}.schedule-help{font-size:11px;color:#64748b;margin:7px 0 10px;line-height:1.35}.schedule-day{border-top:1px solid #e5e7eb;padding:8px 0}.schedule-day:first-child{border-top:0}.schedule-day-name{font-weight:900;font-size:12px;margin-bottom:5px}.lock-range{display:grid;grid-template-columns:24px 44px 1fr 22px 1fr;align-items:center;gap:5px;margin:5px 0;font-size:11px}.lock-range input[type="time"]{width:100%;padding:5px;border:1px solid #cbd5e1;border-radius:8px;font-size:11px}.lock-range .to{text-align:center;color:#64748b}.game-toggle-header,.game-toggle-row{display:grid;grid-template-columns:minmax(0,1fr) 38px 38px;align-items:center;gap:6px;font-size:13px}.game-toggle-header{font-weight:900;color:#475569;padding:0 0 6px;border-bottom:1px solid #cbd5e1}.game-toggle-header span:not(:first-child),.game-toggle-row input{text-align:center;justify-self:center}.game-toggle-row{margin:0;padding:7px 0;border-bottom:1px solid #eef2f7}.game-toggle-row label{min-width:0}
   .tz-note{font-size:11px;color:#64748b;margin-top:7px}
   .special-access-note{max-width:900px;margin:0 auto 16px;padding:11px 14px;border:1px solid #86efac;background:#f0fdf4;border-radius:12px;color:#166534;font-size:14px;font-weight:700;text-align:left}
   .override-box{border:1px solid #bfdbfe;background:#eff6ff;border-radius:14px;padding:12px;margin-top:10px}
@@ -173,6 +173,7 @@
       <div id="classControls"></div>
 
       <h3>Individual activity switches</h3>
+      <div class="game-toggle-header"><span>Activity</span><span>ET</span><span>WT</span></div>
       <div id="gameToggles"></div>
 
       <h3>Student access while locked</h3>
@@ -310,7 +311,9 @@
     const info=settingsApi.describeClassAccess(currentSettings,myClassId,new Date());
     let visible=0;
     gameDefinitions.forEach(game=>{
-      const activityEnabled=currentSettings.games?.[game.id]!==false;
+      const activityEnabled=typeof settingsApi.isGameEnabledForClass==="function"
+        ? settingsApi.isGameEnabledForClass(currentSettings,myClassId,game.id)
+        : currentSettings.games?.[game.id]!==false;
       const exceptionAllowed=studentHasOverride(game.id);
       const show=activityEnabled&&(info.open||exceptionAllowed);
       game.element.classList.toggle("hidden",!show);
@@ -449,8 +452,13 @@
     gameDefinitions.forEach(game=>{
       const row=document.createElement("label");row.className="override-game-row";
       const text=document.createElement("span");text.textContent=game.name;
-      if(currentSettings.games?.[game.id]===false){
-        const note=document.createElement("small");note.className="override-off-note";note.textContent="Activity switch is OFF";text.appendChild(note);
+      const selectedStudent=overrideRoster.find(s=>s.id===selectedOverrideStudentId);
+      const selectedClass=selectedStudent?.classId||"";
+      const classGameEnabled=selectedClass&&typeof settingsApi.isGameEnabledForClass==="function"
+        ? settingsApi.isGameEnabledForClass(currentSettings,selectedClass,game.id)
+        : currentSettings.games?.[game.id]!==false;
+      if(!classGameEnabled){
+        const note=document.createElement("small");note.className="override-off-note";note.textContent="Activity switch is OFF for "+(classLabels[selectedClass]||"this class");text.appendChild(note);
       }
       const input=document.createElement("input");input.type="checkbox";input.checked=studentHasOverride(game.id,selectedOverrideStudentId);
       input.addEventListener("change",async()=>{
@@ -510,12 +518,32 @@
     gameDefinitions.forEach(game=>{
       const row=document.createElement("div");row.className="game-toggle-row";
       const label=document.createElement("label");label.textContent=game.name;
-      const input=document.createElement("input");input.type="checkbox";input.checked=currentSettings.games[game.id]!==false;
-      input.addEventListener("change",async()=>{
-        const old=!input.checked;
-        try{currentSettings.games[game.id]=input.checked;renderStudentAccess();await settingsApi.updateGameEnabled(game.id,input.checked);}catch(e){input.checked=old;currentSettings.games[game.id]=old;alert("Could not save this activity setting.");console.error(e);}
+      row.appendChild(label);
+      ["et","wt"].forEach(classId=>{
+        const input=document.createElement("input");input.type="checkbox";
+        input.setAttribute("aria-label",`${game.name} ${classLabels[classId]}`);
+        input.checked=typeof settingsApi.isGameEnabledForClass==="function"
+          ? settingsApi.isGameEnabledForClass(currentSettings,classId,game.id)
+          : currentSettings.games[game.id]!==false;
+        input.addEventListener("change",async()=>{
+          const old=!input.checked;
+          currentSettings.classGames=currentSettings.classGames||{et:{},wt:{}};
+          currentSettings.classGames[classId]=currentSettings.classGames[classId]||{};
+          currentSettings.classGames[classId][game.id]=input.checked;
+          renderStudentAccess();
+          try{
+            await settingsApi.updateClassGameEnabled(classId,game.id,input.checked);
+          }catch(e){
+            input.checked=old;
+            currentSettings.classGames[classId][game.id]=old;
+            renderStudentAccess();
+            alert("Could not save this activity setting.");
+            console.error(e);
+          }
+        });
+        row.appendChild(input);
       });
-      row.append(label,input);el("gameToggles").appendChild(row);
+      el("gameToggles").appendChild(row);
     });
     renderStudentOverrideControls();
   }

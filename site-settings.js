@@ -52,6 +52,12 @@
   const defaultSettings = {
     siteEnabled: true,
     games: GAME_DEFAULTS,
+    // Per-class activity switches. Existing global game switches remain the master
+    // switch, while these let ET and WT be controlled independently.
+    classGames: {
+      et: Object.assign({}, GAME_DEFAULTS),
+      wt: Object.assign({}, GAME_DEFAULTS)
+    },
     // Per-student exceptions. A true value lets that student use only that
     // activity while the master/class lock is active. Individual activity
     // switches still win, so a game explicitly turned off stays off.
@@ -166,6 +172,7 @@
     const source = settings && typeof settings === "object" ? deepClone(settings) : {};
     const normalized = deepClone(source);
     const sourceGames = source.games && typeof source.games === "object" ? source.games : {};
+    const sourceClassGames = source.classGames && typeof source.classGames === "object" ? source.classGames : {};
     const sourceClassAccess = source.classAccess && typeof source.classAccess === "object" ? source.classAccess : {};
 
     normalized.siteEnabled = typeof source.siteEnabled === "boolean" ? source.siteEnabled : true;
@@ -173,6 +180,14 @@
     normalized.games = Object.assign({}, GAME_DEFAULTS);
     Object.keys(sourceGames).forEach(function (gameId) {
       if (typeof sourceGames[gameId] === "boolean") normalized.games[gameId] = sourceGames[gameId];
+    });
+
+    normalized.classGames = { et: Object.assign({}, GAME_DEFAULTS), wt: Object.assign({}, GAME_DEFAULTS) };
+    ["et","wt"].forEach(function(classId){
+      const raw = sourceClassGames[classId] && typeof sourceClassGames[classId] === "object" ? sourceClassGames[classId] : {};
+      Object.keys(raw).forEach(function(gameId){
+        if (typeof raw[gameId] === "boolean") normalized.classGames[classId][gameId] = raw[gameId];
+      });
     });
 
     normalized.studentGameOverrides = normalizeStudentGameOverrides(source.studentGameOverrides);
@@ -286,6 +301,23 @@
       settings.games[gameId] = Boolean(enabled);
       return save(settings);
     });
+  }
+
+  function updateClassGameEnabled(classId, gameId, enabled) {
+    if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
+    return readOnce().then(function (settings) {
+      settings.classGames = settings.classGames || { et: {}, wt: {} };
+      settings.classGames[classId] = settings.classGames[classId] || {};
+      settings.classGames[classId][gameId] = Boolean(enabled);
+      return save(settings);
+    });
+  }
+
+  function isGameEnabledForClass(settings, classId, gameId) {
+    const normalized = normalizeSettings(settings);
+    if (normalized.games && normalized.games[gameId] === false) return false;
+    if (!["et","wt"].includes(classId)) return false;
+    return normalized.classGames[classId][gameId] !== false;
   }
 
   function studentHasGameOverride(settings, studentId, gameId) {
@@ -459,6 +491,8 @@
     save: save,
     updateSiteEnabled: updateSiteEnabled,
     updateGameEnabled: updateGameEnabled,
+    updateClassGameEnabled: updateClassGameEnabled,
+    isGameEnabledForClass: isGameEnabledForClass,
     updateStudentGameOverride: updateStudentGameOverride,
     studentHasGameOverride: studentHasGameOverride,
     updateClassMode: updateClassMode,
