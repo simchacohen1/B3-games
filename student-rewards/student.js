@@ -73,9 +73,9 @@ async function load(){
     db.ref(`${ROOT}/rewards`).once('value'),
     own('redemptionsByStudent').once('value'),
     db.ref(`${ROOT}/categories`).once('value'),
-    db.ref(`${ROOT}/settings`).once('value')
+    db.ref(`${ROOT}/settings/rewardStoreEnabled`).once('value').catch(()=>({val:()=>false}))
   ]);
-  state.root={student:studentSnap.val(),ratings:ratingsSnap.val()||{},attendance:attendanceSnap.val()||{},awards:awardsSnap.val()||{},comments:commentsSnap.val()||{},rewards:rewardsSnap.val()||{},redemptions:redemptionsSnap.val()||{},categories:categoriesSnap.val()||{},settings:settingsSnap.val()||{}};
+  state.root={student:studentSnap.val(),ratings:ratingsSnap.val()||{},attendance:attendanceSnap.val()||{},awards:awardsSnap.val()||{},comments:commentsSnap.val()||{},rewards:rewardsSnap.val()||{},redemptions:redemptionsSnap.val()||{},categories:categoriesSnap.val()||{},settings:{rewardStoreEnabled:settingsSnap.val()}};
   state.student=state.root.student;
   render();
   subscribe();
@@ -83,7 +83,7 @@ async function load(){
 function subscribe(){
   db.ref(`${ROOT}/students/${state.studentId}`).on('value',s=>{if(state.root){state.root.student=s.val();state.student=s.val();render()}});
   db.ref(`${ROOT}/redemptionsByStudent/${state.studentId}`).on('value',s=>{if(state.root){state.root.redemptions=s.val()||{};render()}});
-  db.ref(`${ROOT}/settings/rewardStoreEnabled`).on('value',s=>{if(state.root){state.root.settings.rewardStoreEnabled=s.val();render()}});
+  db.ref(`${ROOT}/settings/rewardStoreEnabled`).on('value',s=>{if(state.root){state.root.settings.rewardStoreEnabled=s.val();render()}},()=>{});
 }
 function allRatingRows(){
   const out=[];
