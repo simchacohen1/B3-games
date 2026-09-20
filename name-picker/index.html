@@ -446,8 +446,8 @@ function parseNameBlock(text) {
 }
 
 function getActiveNames() {
-  if (state.activeList === 'east') return FIXED_ROSTERS.east;
-  if (state.activeList === 'west') return FIXED_ROSTERS.west;
+  if (state.activeList === 'east') return state.rosters.east || FIXED_ROSTERS.east;
+  if (state.activeList === 'west') return state.rosters.west || FIXED_ROSTERS.west;
   return state.customNames || [];
 }
 
@@ -800,26 +800,32 @@ function showTab(name) {
 function loadRosterEditor() {
   listButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.list === state.activeList));
   let text = '';
-  if (state.activeList === 'east') text = FIXED_ROSTERS.east.join('\n');
-  else if (state.activeList === 'west') text = FIXED_ROSTERS.west.join('\n');
+  if (state.activeList === 'east') text = (state.rosters.east || FIXED_ROSTERS.east).join('\n');
+  else if (state.activeList === 'west') text = (state.rosters.west || FIXED_ROSTERS.west).join('\n');
   else text = (state.customNames || []).join('\n');
   rosterEditor.value = text;
-  rosterEditor.readOnly = state.activeList !== 'custom';
-  rosterHint.textContent = state.activeList === 'custom'
-    ? (parseNameBlock(rosterEditor.value).length ? `${parseNameBlock(rosterEditor.value).length} names loaded.` : 'One name per line.')
-    : 'This class list is permanently built into the Name Picker.';
+  rosterEditor.readOnly = false;
+  updateRosterHint();
 }
 
 function updateRosterHint() {
   const n = parseNameBlock(rosterEditor.value).length;
-  rosterHint.textContent = n === 0 ? 'One name per line.' : `${n} name${n === 1 ? '' : 's'} loaded.`;
+  if (state.activeList === 'custom') {
+    rosterHint.textContent = n === 0 ? 'One name per line.' : `${n} name${n === 1 ? '' : 's'} loaded.`;
+  } else {
+    rosterHint.textContent = `${n} name${n === 1 ? '' : 's'} active. Temporary edits only — the full ${state.activeList === 'east' ? 'East' : 'West'} Track list returns when the page refreshes.`;
+  }
 }
 
 function commitRosterEditor() {
-  if (state.activeList !== 'custom') return;
   const names = parseNameBlock(rosterEditor.value);
-  state.customNames = names;
-  persist('customNames');
+  if (state.activeList === 'custom') {
+    state.customNames = names;
+    persist('customNames');
+  } else {
+    state.rosters[state.activeList] = names;
+    // East/West changes are intentionally session-only and are not persisted.
+  }
   updateRosterHint();
   renderFairnessStatus();
 }
@@ -832,7 +838,7 @@ listButtons.forEach(btn => {
     renderFairnessStatus();
   });
 });
-rosterEditor.addEventListener('input', () => { updateRosterHint(); });
+rosterEditor.addEventListener('input', commitRosterEditor);
 rosterEditor.addEventListener('blur', commitRosterEditor);
 
 // ---------- Purpose selector ----------
