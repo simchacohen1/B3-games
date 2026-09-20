@@ -575,6 +575,25 @@
     });
   }
 
+  gameDefinitions.forEach(game=>game.element.addEventListener("click",e=>{
+    if(!isAuthorizedAdmin||!teacherVersionByGame[game.id])return;
+    e.preventDefault();
+    openVersionModal(game);
+  }));
+  el("versionModalClose")?.addEventListener("click",closeVersionModal);
+  el("versionModal")?.addEventListener("click",e=>{if(e.target===el("versionModal"))closeVersionModal();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")closeVersionModal();});
+  function handleTeacherCombinedTile(e){
+    if(!isAuthorizedAdmin)return;
+    const card=e.target.closest(".game-card");
+    if(!card)return;
+    const game=gameDefinitions.find(g=>g.element===card);
+    if(!game||!teacherVersionByGame[game.id])return;
+    e.preventDefault();
+    e.stopPropagation();
+    openVersionModal(game);
+  }
+  document.querySelector(".game-container")?.addEventListener("click",handleTeacherCombinedTile,true);
   el("studentSignInBtn").addEventListener("click",studentSignIn);
   el("studentNameInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
   el("classPinInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
