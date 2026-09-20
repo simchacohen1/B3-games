@@ -64,7 +64,7 @@ async function trySharedB3Login(){
 
 async function load(){
   if(!state.studentId)return;
-  const [studentSnap,ratingsSnap,attendanceSnap,awardsSnap,commentsSnap,rewardsSnap,redemptionsSnap,categoriesSnap]=await Promise.all([
+  const [studentSnap,ratingsSnap,attendanceSnap,awardsSnap,commentsSnap,rewardsSnap,redemptionsSnap,categoriesSnap,settingsSnap]=await Promise.all([
     db.ref(`${ROOT}/students/${state.studentId}`).once('value'),
     own('dailyRatings').once('value'),
     own('dailyAttendance').once('value'),
@@ -72,9 +72,10 @@ async function load(){
     own('commentsByStudent').once('value'),
     db.ref(`${ROOT}/rewards`).once('value'),
     own('redemptionsByStudent').once('value'),
-    db.ref(`${ROOT}/categories`).once('value')
+    db.ref(`${ROOT}/categories`).once('value'),
+    db.ref(`${ROOT}/settings`).once('value')
   ]);
-  state.root={student:studentSnap.val(),ratings:ratingsSnap.val()||{},attendance:attendanceSnap.val()||{},awards:awardsSnap.val()||{},comments:commentsSnap.val()||{},rewards:rewardsSnap.val()||{},redemptions:redemptionsSnap.val()||{},categories:categoriesSnap.val()||{}};
+  state.root={student:studentSnap.val(),ratings:ratingsSnap.val()||{},attendance:attendanceSnap.val()||{},awards:awardsSnap.val()||{},comments:commentsSnap.val()||{},rewards:rewardsSnap.val()||{},redemptions:redemptionsSnap.val()||{},categories:categoriesSnap.val()||{},settings:settingsSnap.val()||{}};
   state.student=state.root.student;
   render();
   subscribe();
@@ -82,6 +83,7 @@ async function load(){
 function subscribe(){
   db.ref(`${ROOT}/students/${state.studentId}`).on('value',s=>{if(state.root){state.root.student=s.val();state.student=s.val();render()}});
   db.ref(`${ROOT}/redemptionsByStudent/${state.studentId}`).on('value',s=>{if(state.root){state.root.redemptions=s.val()||{};render()}});
+  db.ref(`${ROOT}/settings/rewardStoreEnabled`).on('value',s=>{if(state.root){state.root.settings.rewardStoreEnabled=s.val();render()}});
 }
 function allRatingRows(){
   const out=[];
@@ -134,12 +136,13 @@ function progressHTML(){
 }
 function rewardsHTML(){
   const balance=Number(state.student.rewardBalance)||0,
+        storeOpen=state.root.settings?.rewardStoreEnabled===true||String(state.root.settings?.rewardStoreEnabled)==='true',
         rewards=Object.values(state.root.rewards||{}).filter(r=>r.active).sort((a,b)=>(a.cost||0)-(b.cost||0)),
         byCost={};
   rewards.forEach(r=>(byCost[r.cost]??=[]).push(r));
-  const cards=Object.entries(byCost).map(([cost,list])=>`<h3 class="level-title">${cost}-Point Choices</h3>${list.map(r=>`<article class="reward-card"><div class="icon" style="background:${e(r.color||'#f3f1ff')}">${e(r.icon||'🎁')}</div><h3>${e(r.name)}</h3><div class="cost">${Number(r.cost)||0} ★</div><p>${balance>=Number(r.cost||0)?'You can choose this now':'Keep earning points'}</p><button class="primary" data-redeem="${e(r.id)}" ${state.busy||balance<Number(r.cost||0)||r.quantity===0?'disabled':''}>${r.quantity===0?'Unavailable':balance>=Number(r.cost||0)?'Request this':'Not enough points'}</button></article>`).join('')}`).join('');
+  const cards=Object.entries(byCost).map(([cost,list])=>`<h3 class="level-title">${cost}-Point Choices</h3>${list.map(r=>`<article class="reward-card"><div class="icon" style="background:${e(r.color||'#f3f1ff')}">${e(r.icon||'🎁')}</div><h3>${e(r.name)}</h3><div class="cost">${Number(r.cost)||0} ★</div><p>${balance>=Number(r.cost||0)?'You can choose this now':'Keep earning points'}</p><button class="primary" data-redeem="${e(r.id)}" ${state.busy||!storeOpen||balance<Number(r.cost||0)||r.quantity===0?'disabled':''}>${!storeOpen?'Store closed':r.quantity===0?'Unavailable':balance>=Number(r.cost||0)?'Request this':'Not enough points'}</button></article>`).join('')}`).join('');
   const purchases=Object.values(state.root.redemptions||{}).sort((a,b)=>String(b.requestedAt||'').localeCompare(String(a.requestedAt||'')));
-  return `<section class="panel"><h2>What can I get with ${balance} points?</h2><div class="notice">Anything with a cost at or below your current balance is available to request.</div><div class="rewardgrid studentrewards">${cards}</div></section><section class="panel"><h2>My requests</h2><div class="purchasehistory">${purchases.length?purchases.map(p=>`<article><b>${e(state.root.rewards?.[p.rewardId]?.name||'Reward')}</b><span>${Number(p.cost)||0} ★</span><mark class="badge ${e(p.status)}">${e(p.status)}</mark></article>`).join(''):'<p>No reward requests yet.</p>'}</div></section>`;
+  return `<section class="panel"><h2>What can I get with ${balance} points?</h2><div class="notice">${storeOpen?'Anything with a cost at or below your current balance is available to request.':'The Prize Store is not open for purchases yet. You can look at the rewards, but buying is turned off for now.'}</div><div class="rewardgrid studentrewards">${cards}</div></section><section class="panel"><h2>My requests</h2><div class="purchasehistory">${purchases.length?purchases.map(p=>`<article><b>${e(state.root.rewards?.[p.rewardId]?.name||'Reward')}</b><span>${Number(p.cost)||0} ★</span><mark class="badge ${e(p.status)}">${e(p.status)}</mark></article>`).join(''):'<p>No reward requests yet.</p>'}</div></section>`;
 }
 function commentsHTML(){
   const rows=Object.values(state.root.comments||{}).filter(c=>c.visibleToStudent!==false).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
@@ -147,6 +150,8 @@ function commentsHTML(){
 }
 function bindTab(){if(state.tab==='Rewards')document.querySelectorAll('[data-redeem]').forEach(b=>b.onclick=()=>redeem(b.dataset.redeem))}
 async function redeem(rewardId){
+  const storeOpen=state.root?.settings?.rewardStoreEnabled===true||String(state.root?.settings?.rewardStoreEnabled)==='true';
+  if(!storeOpen){C.toast('The Prize Store is closed for purchases right now.','error');return}
   if(state.busy)return;
   state.busy=true;renderTab();
   try{

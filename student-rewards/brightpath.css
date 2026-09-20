@@ -74,3 +74,5 @@ button,input,select,textarea{font:inherit}
 .toast{position:fixed;right:22px;bottom:22px;background:#17233c;color:#fff;padding:11px 15px;border-radius:9px;opacity:0;transform:translateY(8px);transition:.2s;z-index:100}.toast.show{opacity:1;transform:none}.toast.error{background:#a43743}
 @media(max-width:900px){.admincolumns,.people-grid{grid-template-columns:1fr}.category-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:680px){.category-grid{grid-template-columns:1fr}.workcontrols{width:100%;flex-wrap:wrap}.savegroup{justify-items:start}}
+
+.storecontrol{display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:20px}.storecontrol>div{display:grid;gap:4px}.storecontrol strong{font-size:13px}.storecontrol small{font-size:10px;color:var(--muted)}.storecontrol.closed{background:#fff7f0;border-color:#f1d4b8}.storecontrol.open{background:#eef9f4;border-color:#bfe4d5}@media(max-width:680px){.storecontrol{align-items:stretch;flex-direction:column}}
