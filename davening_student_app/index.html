@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Class Davening Player</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--text:#152033;--muted:#667085;--line:#dfe4ee;--accent:#315efb;--soft:#edf1ff;--danger:#b42318}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
+button,select,input{font:inherit}button{cursor:pointer}
+.app{min-height:100vh;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+.brand{font-size:22px;font-weight:900}.header-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:#fff;border-radius:13px;padding:10px 14px;font-weight:800;color:var(--text)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.soft{background:var(--soft);border-color:#cfd8ff;color:#2346c7}
+main{flex:1;padding:24px;display:grid;place-items:center}.card{width:min(980px,100%);background:var(--card);border-radius:28px;padding:32px;box-shadow:0 12px 36px rgba(20,30,60,.08);text-align:center}
+.small{font-size:20px;color:var(--muted);font-weight:700}.title{direction:rtl;font-size:clamp(44px,8vw,92px);line-height:1.05;font-weight:900;margin:10px 0 18px}
+.track-count{font-size:18px;color:var(--muted);font-weight:800;margin-bottom:8px}.page-number{direction:rtl;font-size:clamp(30px,5vw,54px);font-weight:900;color:var(--accent);margin:0 0 20px}
+.audio-progress{display:grid;grid-template-columns:58px 1fr 58px;gap:10px;align-items:center;max-width:800px;margin:0 auto 18px}.time{font-size:16px;color:var(--muted);font-weight:800;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.controls{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin:12px 0}.controls .big{font-size:24px;min-width:180px;padding:15px 24px}.controls .side{font-size:19px;min-width:130px;padding:13px 18px}
+.secondary{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;margin:18px 0 24px}.setting{display:flex;align-items:center;gap:7px;font-weight:800;color:var(--muted)}.setting select{border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:#fff}.setting input{width:20px;height:20px}
+.overall{max-width:800px;margin:0 auto}.overall-bar{height:22px;border-radius:999px;background:#e7eaf1;overflow:hidden}.overall-fill{height:100%;background:var(--accent);width:0;transition:width .25s}.overall-label{margin-top:8px;color:var(--muted);font-weight:800}
+.list{margin:28px auto 0;max-width:850px;text-align:left;border-top:1px solid var(--line);padding-top:20px}.list-title{text-align:center;font-size:18px;font-weight:900;margin-bottom:12px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:9px}.track-btn{direction:rtl;border:1px solid var(--line);background:#fff;border-radius:12px;padding:13px 10px;font-size:20px;font-weight:800}.track-btn.active{background:var(--soft);border:2px solid var(--accent);color:#1e40af}
+.status{min-height:24px;color:var(--muted);font-weight:700;margin-top:12px}.kbd{font-size:13px;color:var(--muted);margin-top:10px}.speed-flash{position:fixed;left:50%;top:22%;transform:translate(-50%,-50%) scale(.9);background:rgba(21,32,51,.94);color:#fff;border-radius:22px;padding:18px 30px;font-size:clamp(34px,7vw,72px);font-weight:900;z-index:100;opacity:0;pointer-events:none;transition:opacity .16s,transform .16s}.speed-flash.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+body.presentation header,.presentation .list{display:none}.presentation main{padding:10px}.presentation .card{width:100%;max-width:none;min-height:calc(100vh - 20px);box-shadow:none;display:flex;flex-direction:column;justify-content:center}
+@media(max-width:620px){main{padding:10px}.card{padding:24px 12px;border-radius:20px}.controls .big{min-width:150px}.controls .side{min-width:105px;font-size:17px}.audio-progress{grid-template-columns:50px 1fr 50px}.grid{grid-template-columns:1fr 1fr}.track-btn{font-size:18px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand">Class Davening Player</div>
+  <div class="header-actions">
+    <button class="btn" id="fullscreenBtn">Student View</button>
+    <button class="btn soft" id="startBtn">Start from Beginning</button>
+  </div>
+</header>
+<main>
+<section class="card">
+  <div class="small">We are up to:</div>
+  <div class="title" id="title">ברכות השחר</div>
+  <div class="track-count" id="trackCount">1 of 26</div>
+  <div class="page-number" id="pageNumber">עמוד 6</div>
+
+  <div class="audio-progress">
+    <div class="time" id="currentTime">0:00</div>
+    <input type="range" min="0" max="1000" value="0" id="seek" aria-label="Audio position">
+    <div class="time" id="duration">0:00</div>
+  </div>
+
+  <div class="controls">
+    <button class="btn side" id="prevBtn">← Previous</button>
+    <button class="btn primary big" id="playBtn">▶ Play</button>
+    <button class="btn side" id="nextBtn">Next →</button>
+  </div>
+  <div class="controls">
+    <button class="btn" id="back10Btn">↶ 10 sec</button>
+    <button class="btn" id="restartBtn">Restart</button>
+    <button class="btn" id="forward10Btn">10 sec ↷</button>
+  </div>
+
+  <div class="secondary">
+    <label class="setting"><input type="checkbox" id="autoNext" checked> Continue automatically</label>
+    <label class="setting">Speed
+      <select id="speed">
+        <option value="0.75">0.75×</option>
+        <option value="0.9">0.9×</option>
+        <option value="1" selected>1×</option>
+        <option value="1.1">1.1×</option>
+        <option value="1.25">1.25×</option>
+        <option value="1.5">1.5×</option>
+        <option value="1.75">1.75×</option>
+        <option value="2">2×</option>
+        <option value="2.25">2.25×</option>
+        <option value="2.5">2.5×</option>
+        <option value="2.75">2.75×</option>
+        <option value="3">3×</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="overall">
+    <div class="overall-bar"><div class="overall-fill" id="overallFill"></div></div>
+    <div class="overall-label" id="overallLabel">Davening progress: 1 of 18</div>
+  </div>
+  <div class="status" id="status">Ready</div>
+  <div class="kbd">Space = Play/Pause &nbsp; • &nbsp; ←/→ = Previous/Next &nbsp; • &nbsp; +/− = Speed up/down &nbsp; • &nbsp; 0 = 1×</div>
+
+  <div class="list">
+    <div class="list-title">Choose a tefillah</div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <audio id="audio" preload="metadata"></audio>
+</section>
+</main>
+</div>
+<div class="speed-flash" id="speedFlash">1×</div>
+<script>
+const tracks = [
+  {name:'ברכות השחר', file:'audio/01_birchos_hashachar.mp3', page:'6'},
+  {name:'ציצית', file:'audio/02_tzitzis.mp3', page:'6'},
+  {name:'הרי אני / מה טובו', file:'audio/03_hareini_ma_tovu.mp3', page:'12'},
+  {name:'אדון עולם', file:'audio/04_adon_olam.mp3', page:'13'},
+  {name:'שיבנה בית המקדש', file:'audio/05_sheyibaneh.mp3', page:'13'},
+  {name:'ה׳ מלך', file:'audio/06_hashem_melech.mp3', page:'27'},
+  {name:'ברוך שאמר', file:'audio/07_baruch_sheamar.mp3', page:'30'},
+  {name:'מזמור לתודה', file:'audio/08_mizmor_letodah.mp3', page:'30'},
+  {name:'יהי כבוד', file:'audio/09_yehi_chevod.mp3', page:'30'},
+  {name:'אשרי', file:'audio/10_ashrei.mp3', page:'30'},
+  {name:'הללויה / ברוך ה׳', file:'audio/11_halleluyah_baruch_hashem.mp3', page:'30'},
+  {name:'ויושע', file:'audio/12_vayosha.mp3', page:'30'},
+  {name:'אז ישיר', file:'audio/13_az_yashir.mp3', page:'30'},
+  {name:'ישתבח', file:'audio/14_yishtabach.mp3', page:'41'},
+  {name:'יוצר / תתברך', file:'audio/15_yotzer_tisbareich.mp3', page:'42'},
+  {name:'לאל ברוך', file:'audio/16_lel_baruch.mp3', page:'42'},
+  {name:'אהבת עולם', file:'audio/17_ahavas_olam.mp3', page:'42'},
+  {name:'קריאת שמע', file:'audio/18_shema.mp3', page:'46'},
+  {name:'ויציב', file:'audio/19_veyatziv.mp3', page:'48'},
+  {name:'מי כמוך', file:'audio/20_mi_chemocha.mp3', page:'48'},
+  {name:'שמונה עשרה — חורף', file:'audio/21_shemoneh_esrei_winter.mp3', page:'50'},
+  {name:'קוה אל ה׳', file:'audio/22_kavey.mp3', page:'81'},
+  {name:'עלינו לשבח', file:'audio/23_aleinu.mp3', page:'84'},
+  {name:'אל תירא', file:'audio/24_al_tira.mp3', page:'85'},
+  {name:'קאפיטל של הרבי', file:'audio/25_rebbe_kapitel.mp3', page:'N/A'},
+  {name:'י״ב הפסוקים', file:'audio/26_12_pesukim.mp3', page:'N/A'}
+];
+const audio=document.getElementById('audio'),title=document.getElementById('title'),playBtn=document.getElementById('playBtn'),seek=document.getElementById('seek'),status=document.getElementById('status'),speed=document.getElementById('speed'),autoNext=document.getElementById('autoNext');
+let index=Math.max(0,Math.min(Number(localStorage.getItem('daveningIndex')||0),tracks.length-1));
+function fmt(s){if(!Number.isFinite(s))return '0:00';s=Math.floor(Math.max(0,s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+function renderGrid(){const g=document.getElementById('grid');g.innerHTML='';tracks.forEach((t,i)=>{const b=document.createElement('button');b.className='track-btn'+(i===index?' active':'');b.textContent=t.name;b.onclick=()=>load(i,true);g.appendChild(b)})}
+function load(i,play=false){index=Math.max(0,Math.min(i,tracks.length-1));localStorage.setItem('daveningIndex',index);audio.pause();audio.src=tracks[index].file;audio.playbackRate=Number(speed.value);title.textContent=tracks[index].name;document.getElementById('pageNumber').textContent=tracks[index].page==='N/A'?'אין עמוד בסידור':`עמוד ${tracks[index].page}`;document.getElementById('trackCount').textContent=`${index+1} of ${tracks.length}`;document.getElementById('overallLabel').textContent=`Davening progress: ${index+1} of ${tracks.length}`;document.getElementById('overallFill').style.width=((index+1)/tracks.length*100)+'%';seek.value=0;document.getElementById('currentTime').textContent='0:00';document.getElementById('duration').textContent='0:00';playBtn.textContent='▶ Play';status.textContent='Ready';renderGrid();if(play){audio.play().then(()=>{playBtn.textContent='⏸ Pause';status.textContent='Playing'}).catch(()=>{status.textContent='Press Play to begin'})}}
+function toggle(){if(audio.paused){audio.play().then(()=>{playBtn.textContent='⏸ Pause';status.textContent='Playing'}).catch(()=>status.textContent='Unable to start audio')}else{audio.pause();playBtn.textContent='▶ Play';status.textContent='Paused'}}
+playBtn.onclick=toggle;document.getElementById('prevBtn').onclick=()=>load(index-1,false);document.getElementById('nextBtn').onclick=()=>load(index+1,false);document.getElementById('restartBtn').onclick=()=>{audio.currentTime=0;audio.play();playBtn.textContent='⏸ Pause';status.textContent='Playing'};document.getElementById('back10Btn').onclick=()=>audio.currentTime=Math.max(0,audio.currentTime-10);document.getElementById('forward10Btn').onclick=()=>audio.currentTime=Math.min(audio.duration||0,audio.currentTime+10);
+let speedFlashTimer=null;
+function flashSpeed(){const f=document.getElementById('speedFlash');f.textContent=Number(speed.value)+'×';f.classList.add('show');clearTimeout(speedFlashTimer);speedFlashTimer=setTimeout(()=>f.classList.remove('show'),800)}
+function applySpeed(showFlash=true){audio.playbackRate=Number(speed.value);localStorage.setItem('daveningSpeed',speed.value);if(showFlash)flashSpeed()}
+function changeSpeed(step){const options=[...speed.options];const current=Math.max(0,options.findIndex(o=>o.value===speed.value));const next=Math.max(0,Math.min(current+step,options.length-1));speed.value=options[next].value;applySpeed(true)}
+function resetSpeed(){speed.value='1';applySpeed(true)}
+speed.onchange=()=>applySpeed(true);const savedSpeed=localStorage.getItem('daveningSpeed');if(savedSpeed&&[...speed.options].some(o=>o.value===savedSpeed))speed.value=savedSpeed;
+audio.ontimeupdate=()=>{document.getElementById('currentTime').textContent=fmt(audio.currentTime);if(audio.duration)seek.value=Math.round(audio.currentTime/audio.duration*1000)};audio.onloadedmetadata=()=>{document.getElementById('duration').textContent=fmt(audio.duration);audio.playbackRate=Number(speed.value)};audio.onplay=()=>{playBtn.textContent='⏸ Pause';status.textContent='Playing'};audio.onpause=()=>{if(!audio.ended){playBtn.textContent='▶ Play';if(audio.currentTime>0)status.textContent='Paused'}};audio.onerror=()=>{status.textContent='Audio file could not be loaded'};
+seek.oninput=()=>{if(audio.duration)audio.currentTime=Number(seek.value)/1000*audio.duration};audio.onended=()=>{playBtn.textContent='▶ Play';if(autoNext.checked&&index<tracks.length-1){load(index+1,true)}else{status.textContent=index===tracks.length-1?'Finished':'Finished this section'}};
+document.getElementById('startBtn').onclick=()=>{if(confirm('Start from the first recording?'))load(0,false)};
+document.getElementById('fullscreenBtn').onclick=()=>{document.body.classList.toggle('presentation');if(document.body.classList.contains('presentation'))document.documentElement.requestFullscreen?.().catch(()=>{});else if(document.fullscreenElement)document.exitFullscreen?.()};
+document.addEventListener('keydown',e=>{
+  if(['INPUT','SELECT'].includes(document.activeElement.tagName))return;
+  if(e.key===' '){e.preventDefault();toggle()}
+  else if(e.key==='ArrowRight'){e.preventDefault();load(index+1,false)}
+  else if(e.key==='ArrowLeft'){e.preventDefault();load(index-1,false)}
+  else if(e.key==='+'||e.key==='='||e.code==='NumpadAdd'){e.preventDefault();changeSpeed(1)}
+  else if(e.key==='-'||e.key==='_'||e.code==='NumpadSubtract'){e.preventDefault();changeSpeed(-1)}
+  else if(e.key==='0'||e.code==='Numpad0'){e.preventDefault();resetSpeed()}
+});
+load(index,false);
+</script>
+</body>
+</html>
