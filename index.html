@@ -115,15 +115,15 @@
   <div id="gamesArea" class="hidden">
     <div id="specialAccessNote" class="special-access-note hidden">Special access from Rabbi Cohen: while B3 Games is locked, only the activity or activities shown below are available to you.</div>
         <div class="game-container">
-      <a class="game-card" data-game-id="kodesh-construct" href="kodesh-construct/index.html"><span class="card-icon">🔤</span><span class="card-title">Dikduk Arcade</span></a>
-      <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
-      <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
-      <a class="game-card" data-game-id="shorashim" href="shorashim/index.html"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span></a>
-      <a class="game-card" data-game-id="chazara" href="chazara/index.html"><span class="card-icon">🔁</span><span class="card-title">Chazara Chart</span></a>
-      <a class="game-card" data-game-id="class-gallery" href="class-gallery/index.html"><span class="card-icon">🖼️</span><span class="card-title">Class Gallery</span></a>
-      <a class="game-card" data-game-id="game-show" href="game-show/player.html"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a>
-      <a class="game-card" data-game-id="student-rewards" href="student-rewards/student.html"><span class="card-icon">🌟</span><span class="card-title">Student Rewards</span></a>
-      <a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz &amp; Practice</span></a>
+      <a class="game-card" data-game-id="kodesh-construct" href="kodesh-construct/index.html" target="_blank" rel="noopener"><span class="card-icon">🔤</span><span class="card-title">Dikduk Arcade</span></a>
+      <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html" target="_blank" rel="noopener"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
+      <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html" target="_blank" rel="noopener"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
+      <a class="game-card" data-game-id="shorashim" href="shorashim/index.html" target="_blank" rel="noopener"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span></a>
+      <a class="game-card" data-game-id="chazara" href="chazara/index.html" target="_blank" rel="noopener"><span class="card-icon">🔁</span><span class="card-title">Chazara Chart</span></a>
+      <a class="game-card" data-game-id="class-gallery" href="class-gallery/index.html" target="_blank" rel="noopener"><span class="card-icon">🖼️</span><span class="card-title">Class Gallery</span></a>
+      <a class="game-card" data-game-id="game-show" href="game-show/player.html" target="_blank" rel="noopener"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a>
+      <a class="game-card" data-game-id="student-rewards" href="student-rewards/student.html" target="_blank" rel="noopener"><span class="card-icon">🌟</span><span class="card-title">Student Rewards</span></a>
+      <a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html" target="_blank" rel="noopener"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz &amp; Practice</span></a>
     </div>
     <p id="disabledMessage" class="disabled-note hidden">No activities are available right now.</p>
   </div>
@@ -242,6 +242,13 @@
       const base=raw.split("?")[0];
       card.classList.toggle("hidden",isAuthorizedAdmin&&pairedTeacherHrefs.has(base));
     });
+  }
+
+  function openTeacherToolInBackground(url){
+    const w=window.open(url,"_blank","noopener");
+    // Browsers may still choose to focus the new tab; refocus B3 Games immediately after.
+    setTimeout(()=>{ try{ window.focus(); }catch(e){} },0);
+    return w;
   }
 
   function closeVersionModal(){el("versionModal")?.classList.add("hidden");}
@@ -594,6 +601,13 @@
     openVersionModal(game);
   }
   document.querySelector(".game-container")?.addEventListener("click",handleTeacherCombinedTile,true);
+  document.querySelectorAll(".teacher-tool-card").forEach(card=>card.addEventListener("click",e=>{
+    if(!isAuthorizedAdmin)return;
+    e.preventDefault();
+    const href=card.getAttribute("href");
+    if(href)openTeacherToolInBackground(href);
+  }));
+
   el("studentSignInBtn").addEventListener("click",studentSignIn);
   el("studentNameInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
   el("classPinInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
