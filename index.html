@@ -40,6 +40,36 @@
   .override-box{border:1px solid #bfdbfe;background:#eff6ff;border-radius:14px;padding:12px;margin-top:10px}
   .override-box label{font-size:13px;font-weight:800;color:#1e3a8a}.override-student-select{width:100%;margin:7px 0 9px;padding:9px;border:1px solid #93c5fd;border-radius:9px;background:white}
   .override-game-list{background:white;border:1px solid #dbeafe;border-radius:10px;padding:4px 10px}.override-game-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #eff6ff;font-size:13px}.override-game-row:last-child{border-bottom:0}.override-game-row span{min-width:0}.override-off-note{display:block;color:#9a3412;font-size:10px;margin-top:2px}.override-empty{font-size:12px;color:#64748b;padding:7px 0}.override-saving{font-size:11px;color:#64748b;min-height:16px;margin-top:6px}
+  /* When the fixed teacher access panel is open, reserve its space so it never covers tiles. */
+  body.admin-panel-open #gamesArea,
+  body.admin-panel-open #teacherToolsSection{
+    width:calc(100% - 470px);
+    max-width:900px;
+    margin-left:max(18px,calc((100vw - 900px - 470px)/2));
+    margin-right:470px;
+  }
+  body.admin-panel-open .game-container,
+  body.admin-panel-open .teacher-tools-container,
+  body.admin-panel-open .special-access-note{
+    max-width:100%;
+  }
+  @media(max-width:900px){
+    body.admin-panel-open #gamesArea,
+    body.admin-panel-open #teacherToolsSection{
+      width:calc(100% - 470px);
+      margin-left:0;
+      margin-right:470px;
+    }
+  }
+  @media(max-width:700px){
+    body.admin-panel-open #gamesArea,
+    body.admin-panel-open #teacherToolsSection{
+      width:100%;
+      margin-left:auto;
+      margin-right:auto;
+    }
+    body.admin-panel-open .admin-panel{width:min(360px,calc(100vw - 24px))}
+  }
   @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 40px 1fr 18px 1fr}.admin-panel{top:54px}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
@@ -401,7 +431,12 @@
     });
   }
 
+  function syncAdminPanelLayout(){
+    document.body.classList.toggle("admin-panel-open",!el("adminPanel").classList.contains("hidden"));
+  }
+
   function renderAdminPanel(){
+    syncAdminPanelLayout();
     const signedIn=Boolean(currentUser);
     if(isAuthorizedAdmin && !teacherToolsAutoOpened){
       el("adminPanel").classList.remove("hidden");
@@ -467,6 +502,7 @@
   el("switchStudentBtn").addEventListener("click",switchStudent);
   el("adminAccessButton").addEventListener("click",()=>{
     el("adminPanel").classList.toggle("hidden");
+    syncAdminPanelLayout();
     el("adminAccessButton").textContent=isAuthorizedAdmin ? (el("adminPanel").classList.contains("hidden") ? "Teacher Tools" : "Hide Teacher Tools") : "Admin";
     if(!el("adminPanel").classList.contains("hidden"))renderAdminPanel();
   });
