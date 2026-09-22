@@ -49,7 +49,9 @@
   .choice-row { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
   .choice-audio { min-width:50px; padding:12px 10px; background:#fff1a8; color:#5b4a00; border:2px solid #e7ca50; border-radius:12px; font-size:20px; }
   .review-listen { margin-left:7px; padding:4px 8px; font-size:14px; vertical-align:middle; }
-  .tts-hebrew { direction:rtl; unicode-bidi:isolate; display:inline; border-radius:5px; padding:0 2px; transition:background .15s, box-shadow .15s; }
+  .tts-hebrew { direction:rtl; unicode-bidi:isolate; display:inline-block; border-radius:5px; padding:0 2px; transition:background .15s, box-shadow .15s; }
+  .tts-english { direction:ltr; unicode-bidi:isolate; display:inline; }
+  .question-type-label { display:table; margin:0 auto 7px; padding:5px 10px; border-radius:999px; background:#eef2ff; font-size:16px; font-weight:800; direction:rtl; unicode-bidi:isolate; }
   .tts-hebrew.tts-highlight { background:#ffe66d; box-shadow:0 0 0 2px #ffe66d; }
   .submit-row { text-align:center; margin-top:16px; }
   .status { margin-top:14px; padding:12px; border-radius:10px; text-align:center; font-weight:700; background:#f1f5f7; }
@@ -216,17 +218,35 @@ function splitAudioSegments(text){
   }
   if(buf)out.push({kind,text:buf});return out;
 }
+function extractQuestionType(text){
+  const raw=String(text||'').trim();
+  const types=[['מי אמר אל מי','מי אמר אל מי'],['על מי נאמר','על מי נאמר']];
+  for(const [needle,label] of types){
+    if(raw.startsWith(needle)){
+      let rest=raw.slice(needle.length).replace(/^\s*[?:：—–-]*\s*/,'').trim();
+      return {label,text:rest||raw};
+    }
+  }
+  return {label:'',text:raw};
+}
 function renderAudioAwareText(el,text,prefix=''){
   if(!el)return;
-  el.innerHTML='';
-  el.dir=/[A-Za-z0-9]/.test(String(text||''))?'ltr':'rtl';
-  if(prefix)el.appendChild(document.createTextNode(prefix));
+  el.innerHTML='';el.dir='ltr';el.style.unicodeBidi='isolate';
+  if(prefix){const pre=document.createElement('span');pre.className='tts-english';pre.dir='ltr';pre.textContent=prefix;el.appendChild(pre);}
   let hi=0;
   splitAudioSegments(text).forEach(seg=>{
-    if(seg.kind==='hebrew'){
-      const span=document.createElement('span');span.className='tts-hebrew';span.dir='rtl';span.dataset.ttsHebrew=String(hi++);span.textContent=seg.text;el.appendChild(span);
-    }else el.appendChild(document.createTextNode(seg.text));
+    const span=document.createElement('span');
+    if(seg.kind==='hebrew'){span.className='tts-hebrew';span.dir='rtl';span.dataset.ttsHebrew=String(hi++);}
+    else {span.className='tts-english';span.dir='ltr';}
+    span.textContent=seg.text;el.appendChild(span);
   });
+}
+function renderStudentQuestion(el,text){
+  const parts=extractQuestionType(text),old=document.getElementById('studentQuestionTypeLabel');
+  if(old)old.remove();
+  if(parts.label){const lab=document.createElement('div');lab.id='studentQuestionTypeLabel';lab.className='question-type-label';lab.textContent=parts.label;el.parentNode.insertBefore(lab,el);}
+  renderAudioAwareText(el,parts.text);
+  return parts;
 }
 function waitMs(ms){return new Promise(r=>setTimeout(r,ms));}
 async function getStudentAudioUrl(text){
@@ -443,8 +463,8 @@ function render(){
   const retake=launchData.retakeOf?' • Retake '+(launchData.attemptNumber||2):'';
   document.getElementById('launchMeta').textContent=classLabel(launchData.classId)+retake;
   document.getElementById('qmeta').textContent='Question '+(displayedQuestion+1)+' of '+questions.length;
-  const questionTextEl=document.getElementById('questionText');renderAudioAwareText(questionTextEl,q.q||'');
-  document.getElementById('questionListenBtn').onclick=()=>speakStudentText(q.q||'',questionTextEl);
+  const questionTextEl=document.getElementById('questionText'),questionParts=renderStudentQuestion(questionTextEl,q.q||'');
+  document.getElementById('questionListenBtn').onclick=()=>speakStudentText(questionParts.text,questionTextEl);
   selectedChoice=resp?Number(resp.choiceIndex):null;
   renderChoices(q,resp,st);renderNav(mode,questions);
   document.getElementById('progressText').textContent=answeredCount+' of '+questions.length+' answered';
