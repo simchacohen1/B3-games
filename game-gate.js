@@ -261,6 +261,24 @@
     return Boolean(studentMap && studentMap[gameId] === true);
   }
 
+  // Match the B3 homepage's ET/WT activity switches.
+  // A class-specific switch is authoritative when it exists. Older/global
+  // settings.games values remain supported as a fallback for compatibility.
+  function gameIsEnabledForClass(settings, classId) {
+    if (!settings) return true;
+
+    var classMap = settings.classGames && classId ? settings.classGames[classId] : null;
+    if (classMap && Object.prototype.hasOwnProperty.call(classMap, gameId)) {
+      return classMap[gameId] !== false;
+    }
+
+    if (settings.games && Object.prototype.hasOwnProperty.call(settings.games, gameId)) {
+      return settings.games[gameId] !== false;
+    }
+
+    return true;
+  }
+
   // Shorashim also has its own internal master-site watcher. When this shared
   // gate grants a student-specific exception, keep that internal master check
   // open too. Its separate Shorashim-only lock still remains authoritative.
@@ -288,10 +306,24 @@
       return;
     }
 
-    // An individually disabled activity always stays disabled, even if this
-    // student has an exception for it.
-    if (lastSettings.games && lastSettings.games[gameId] === false) {
-      showClosed("This activity is turned off", "This individual activity is disabled in Teacher Tools. Student exceptions do not override an activity that is switched off.");
+    // An activity switched off for this student's ET/WT class always stays
+    // disabled, even if the class itself is unlocked and even if this student
+    // has a special exception for the activity.
+    if (studentClassId && !gameIsEnabledForClass(lastSettings, studentClassId)) {
+      showClosed(
+        "This activity is turned off",
+        "This activity is disabled for your class in Teacher Tools. Rabbi Cohen can turn it back on from B3 Games."
+      );
+      return;
+    }
+
+    // Keep supporting the old/global switch too when the student's class has
+    // not yet been resolved.
+    if (!studentClassId && lastSettings.games && lastSettings.games[gameId] === false) {
+      showClosed(
+        "This activity is turned off",
+        "This individual activity is disabled in Teacher Tools."
+      );
       return;
     }
 
