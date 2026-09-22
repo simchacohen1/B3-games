@@ -49,6 +49,8 @@
   .choice-row { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
   .choice-audio { min-width:50px; padding:12px 10px; background:#fff1a8; color:#5b4a00; border:2px solid #e7ca50; border-radius:12px; font-size:20px; }
   .review-listen { margin-left:7px; padding:4px 8px; font-size:14px; vertical-align:middle; }
+  .tts-hebrew { direction:rtl; unicode-bidi:isolate; display:inline; border-radius:5px; padding:0 2px; transition:background .15s, box-shadow .15s; }
+  .tts-hebrew.tts-highlight { background:#ffe66d; box-shadow:0 0 0 2px #ffe66d; }
   .submit-row { text-align:center; margin-top:16px; }
   .status { margin-top:14px; padding:12px; border-radius:10px; text-align:center; font-weight:700; background:#f1f5f7; }
   .status.good { background:#eaf7ef; color:#1f6b40; }
@@ -202,27 +204,59 @@ function slugify(name){return String(name||'').trim().toLowerCase().replace(/[^a
 const SYNTHESIZE_SPEECH_URL='https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech';
 const ttsAudioCache=new Map();
 let ttsAudioEl=null;
-async function speakStudentText(text){
+function splitAudioSegments(text){
+  const chars=Array.from(String(text||'')),isHeb=ch=>/[\u0590-\u05FF]/.test(ch),isEng=ch=>/[A-Za-z0-9]/.test(ch);
+  const strong=chars.map(ch=>isHeb(ch)?'hebrew':(isEng(ch)?'english':null));
+  const out=[];let buf='',kind=null;
+  for(let i=0;i<chars.length;i++){
+    let k=strong[i];
+    if(!k){let prev=null,next=null;for(let j=i-1;j>=0;j--){if(strong[j]){prev=strong[j];break;}}for(let j=i+1;j<chars.length;j++){if(strong[j]){next=strong[j];break;}}k=(prev==='hebrew'&&next==='hebrew')?'hebrew':'english';}
+    if(kind!==null&&k!==kind){if(buf)out.push({kind,text:buf});buf='';}
+    kind=k;buf+=chars[i];
+  }
+  if(buf)out.push({kind,text:buf});return out;
+}
+function renderAudioAwareText(el,text,prefix=''){
+  if(!el)return;
+  el.innerHTML='';
+  el.dir=/[A-Za-z0-9]/.test(String(text||''))?'ltr':'rtl';
+  if(prefix)el.appendChild(document.createTextNode(prefix));
+  let hi=0;
+  splitAudioSegments(text).forEach(seg=>{
+    if(seg.kind==='hebrew'){
+      const span=document.createElement('span');span.className='tts-hebrew';span.dir='rtl';span.dataset.ttsHebrew=String(hi++);span.textContent=seg.text;el.appendChild(span);
+    }else el.appendChild(document.createTextNode(seg.text));
+  });
+}
+function waitMs(ms){return new Promise(r=>setTimeout(r,ms));}
+async function getStudentAudioUrl(text){
+  let audioUrl=ttsAudioCache.get(text);
+  if(audioUrl)return audioUrl;
+  const res=await fetch(SYNTHESIZE_SPEECH_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:String(text)})});
+  if(!res.ok)throw new Error('Speech request failed');
+  const data=await res.json();if(!data.audioContent)throw new Error('No audio returned');
+  const bytes=atob(data.audioContent),nums=new Uint8Array(bytes.length);for(let i=0;i<bytes.length;i++)nums[i]=bytes.charCodeAt(i);
+  audioUrl=URL.createObjectURL(new Blob([nums],{type:'audio/mp3'}));ttsAudioCache.set(text,audioUrl);return audioUrl;
+}
+async function playStudentAudioChunk(text){
+  const clean=String(text||'').replace(/\s+/g,' ').trim();if(!clean)return;
+  if(!ttsAudioEl)ttsAudioEl=new Audio();ttsAudioEl.pause();ttsAudioEl.src=await getStudentAudioUrl(clean);
+  await new Promise((resolve,reject)=>{ttsAudioEl.onended=resolve;ttsAudioEl.onerror=reject;const p=ttsAudioEl.play();if(p&&p.catch)p.catch(reject);});
+}
+async function speakStudentText(text,rootEl){
   if(!text)return;
   try{
-    if(!ttsAudioEl)ttsAudioEl=new Audio();
-    ttsAudioEl.pause();
-    let audioUrl=ttsAudioCache.get(text);
-    if(!audioUrl){
-      const res=await fetch(SYNTHESIZE_SPEECH_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:String(text)})});
-      if(!res.ok)throw new Error('Speech request failed');
-      const data=await res.json();
-      if(!data.audioContent)throw new Error('No audio returned');
-      const bytes=atob(data.audioContent),nums=new Uint8Array(bytes.length);
-      for(let i=0;i<bytes.length;i++)nums[i]=bytes.charCodeAt(i);
-      audioUrl=URL.createObjectURL(new Blob([nums],{type:'audio/mp3'}));
-      ttsAudioCache.set(text,audioUrl);
+    if(ttsAudioEl)ttsAudioEl.pause();
+    const hebrewEls=rootEl?Array.from(rootEl.querySelectorAll('.tts-hebrew')):[];let hi=0;
+    for(const seg of splitAudioSegments(text)){
+      if(seg.kind==='hebrew'){
+        const el=hebrewEls[hi++];if(el){el.classList.add('tts-highlight');el.scrollIntoView({block:'nearest',inline:'nearest'});}
+        await waitMs(Math.max(650,Math.min(1400,seg.text.trim().length*110)));
+        if(el)el.classList.remove('tts-highlight');
+      }else if(/[A-Za-z0-9]/.test(seg.text)) await playStudentAudioChunk(seg.text);
     }
-    ttsAudioEl.src=audioUrl;
-    await ttsAudioEl.play();
   }catch(e){console.error('Natural voice playback failed:',e);alert('The voice could not play right now. Please try the speaker again.');}
 }
-
 function asArray(v){if(!v)return[];if(Array.isArray(v))return v;return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]);}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmtDate(ts){if(!ts)return'';try{return new Date(Number(ts)).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch(e){return'';}}
@@ -409,8 +443,8 @@ function render(){
   const retake=launchData.retakeOf?' • Retake '+(launchData.attemptNumber||2):'';
   document.getElementById('launchMeta').textContent=classLabel(launchData.classId)+retake;
   document.getElementById('qmeta').textContent='Question '+(displayedQuestion+1)+' of '+questions.length;
-  document.getElementById('questionText').textContent=q.q||'';
-  document.getElementById('questionListenBtn').onclick=()=>speakStudentText(q.q||'');
+  const questionTextEl=document.getElementById('questionText');renderAudioAwareText(questionTextEl,q.q||'');
+  document.getElementById('questionListenBtn').onclick=()=>speakStudentText(q.q||'',questionTextEl);
   selectedChoice=resp?Number(resp.choiceIndex):null;
   renderChoices(q,resp,st);renderNav(mode,questions);
   document.getElementById('progressText').textContent=answeredCount+' of '+questions.length+' answered';
@@ -441,12 +475,12 @@ function renderChoices(q,resp,st){
   const box=document.getElementById('choices');box.innerHTML='';const choices=asArray(q.choices);
   choices.forEach((choice,i)=>{
     const row=document.createElement('div');row.className='choice-row';
-    const b=document.createElement('button');b.className='choice';b.type='button';b.dir='auto';b.textContent=String.fromCharCode(65+i)+'. '+choice;
+    const b=document.createElement('button');b.className='choice';b.type='button';b.dir='auto';renderAudioAwareText(b,choice,String.fromCharCode(65+i)+'. ');
     if(selectedChoice===i)b.classList.add('selected');
     if(st.reveal){if(Number(q.correctIndex)===i)b.classList.add('correct-reveal');else if(resp&&Number(resp.choiceIndex)===i)b.classList.add('wrong-reveal');}
     b.disabled=!!resp||!st.open||!!st.reveal;
     b.onclick=()=>{selectedChoice=i;document.querySelectorAll('.choice').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');};
-    const sp=document.createElement('button');sp.className='choice-audio';sp.type='button';sp.textContent='🔊';sp.title='Hear this answer';sp.setAttribute('aria-label','Hear answer '+String.fromCharCode(65+i));sp.onclick=()=>speakStudentText(choice);
+    const sp=document.createElement('button');sp.className='choice-audio';sp.type='button';sp.textContent='🔊';sp.title='Hear this answer';sp.setAttribute('aria-label','Hear answer '+String.fromCharCode(65+i));sp.onclick=()=>speakStudentText(choice,b);
     row.appendChild(b);row.appendChild(sp);box.appendChild(row);
   });
   const submit=document.getElementById('submitBtn');submit.disabled=!!resp||!st.open||!!st.reveal;submit.classList.toggle('hidden',!!resp||!st.open||!!st.reveal);
@@ -522,9 +556,10 @@ async function openPastQuiz(launchId){
       const r=responses[i]||responses[String(i)]||null,choices=asArray(q.choices),chosen=r?choices[Number(r.choiceIndex)]:'No answer',correct=choices[Number(q.correctIndex)]||'';
       const cls=released&&r?(r.correct===true?' correct':' incorrect'):'';
       const result=released?(r?(r.correct===true?'✓ Correct':'✗ Incorrect'):'No answer'):'';
-      return '<div class="review-question'+cls+'"><div class="review-q">'+(i+1)+'. '+esc(q.q||'')+' <button type="button" class="listen-btn review-listen" data-speak="'+encodeURIComponent(q.q||'')+'">🔊</button></div><div class="review-answer"><b>Your answer:</b> '+esc(chosen||'')+' <button type="button" class="listen-btn review-listen" data-speak="'+encodeURIComponent(chosen||'')+'">🔊</button></div>'+(released?'<div class="review-answer"><b>Correct answer:</b> '+esc(correct)+' <button type="button" class="listen-btn review-listen" data-speak="'+encodeURIComponent(correct)+'">🔊</button></div><div class="review-result '+(r&&r.correct===true?'good':'bad')+'">'+esc(result)+'</div>':'')+'</div>';
+      return '<div class="review-question'+cls+'"><div class="review-q"><span id="rq_'+i+'"></span> <button type="button" class="listen-btn review-listen" data-speak="'+encodeURIComponent(q.q||'')+'" data-target="rq_'+i+'">🔊</button></div><div class="review-answer"><b>Your answer:</b> <span id="ra_'+i+'"></span> <button type="button" class="listen-btn review-listen" data-speak="'+encodeURIComponent(chosen||'')+'" data-target="ra_'+i+'">🔊</button></div>'+(released?'<div class="review-answer"><b>Correct answer:</b> <span id="rc_'+i+'"></span> <button type="button" class="listen-btn review-listen" data-speak="'+encodeURIComponent(correct)+'" data-target="rc_'+i+'">🔊</button></div><div class="review-result '+(r&&r.correct===true?'good':'bad')+'">'+esc(result)+'</div>':'')+'</div>';
     }).join('');
-    document.querySelectorAll('#reviewQuestions [data-speak]').forEach(btn=>{btn.onclick=()=>speakStudentText(decodeURIComponent(btn.dataset.speak||''));});
+    questions.forEach((q,i)=>{const r=rr[i]||rr[String(i)],choices=asArray(q.choices),chosen=r?choices[Number(r.choiceIndex)]||'No answer':'No answer',correct=choices[Number(q.correctIndex)]||'';renderAudioAwareText(document.getElementById('rq_'+i),q.q||'',(i+1)+'. ');renderAudioAwareText(document.getElementById('ra_'+i),chosen||'');const ce=document.getElementById('rc_'+i);if(ce)renderAudioAwareText(ce,correct);});
+    document.querySelectorAll('#reviewQuestions [data-speak]').forEach(btn=>{btn.onclick=()=>speakStudentText(decodeURIComponent(btn.dataset.speak||''),document.getElementById(btn.dataset.target));});
   }catch(e){console.error(e);document.getElementById('reviewQuestions').innerHTML='<div class="status bad">Could not load this review. Please try again.</div>';}
 }
 function closePastQuiz(){document.getElementById('reviewCard').classList.add('hidden');document.getElementById('pastQuizzesCard').scrollIntoView({behavior:'smooth',block:'start'});}
