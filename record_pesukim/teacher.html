@@ -532,11 +532,26 @@ function effTranslationScore(record){
   const correct = entries.filter(([,c]) => (c.finalVerdict || c.verdict) === 'correct').length;
   return Math.round((correct / total) * 100);
 }
+// A dispute only exists while its underlying recording still exists.
+// This also suppresses old orphaned disputes created before student-side
+// deletion began clearing dispute metadata.
+function hasReviewableHebrewDispute(record){
+  return !!record && !!record.hebrewAudioURL && record.hebrewDisputeStatus === 'pending';
+}
+function hasReviewableComprehensionDispute(record){
+  return !!record && !!record.comprehensionAudioURL && record.comprehensionDisputeStatus === 'pending';
+}
+function hasReviewableQuestionDispute(q){
+  return !!q && !!q.audioURL && q.disputeStatus === 'pending';
+}
+function hasReviewableTranslationDispute(c){
+  return !!c && !!c.audioURL && c.disputeStatus === 'pending';
+}
 function hasPendingDispute(record){
   if(!record) return false;
-  if(record.hebrewDisputeStatus === 'pending' || record.comprehensionDisputeStatus === 'pending') return true;
-  if(questionResultValues(record.questionResults).some(q => q.disputeStatus === 'pending')) return true;
-  return translationChunkValues(record.translationChunkResults).some(c => c.disputeStatus === 'pending');
+  if(hasReviewableHebrewDispute(record) || hasReviewableComprehensionDispute(record)) return true;
+  if(questionResultValues(record.questionResults).some(hasReviewableQuestionDispute)) return true;
+  return translationChunkValues(record.translationChunkResults).some(hasReviewableTranslationDispute);
 }
 
 document.getElementById('enterBtn').onclick = () => {
@@ -850,22 +865,22 @@ async function markStudentsWithPendingDisputes(){
       let firstTarget = null;
       Object.entries(posukMap).forEach(([posukKey, attemptMap]) => {
         Object.values(attemptMap).forEach(a => {
-          if(a.hebrewDisputeStatus === 'pending'){
+          if(hasReviewableHebrewDispute(a)){
             count++;
             if(!firstTarget) firstTarget = { posukKey, tab: 'reading' };
           }
-          if(a.comprehensionDisputeStatus === 'pending'){
+          if(hasReviewableComprehensionDispute(a)){
             count++;
             if(!firstTarget) firstTarget = { posukKey, tab: 'comprehension' };
           }
           questionResultValues(a.questionResults).forEach(q => {
-            if(q.disputeStatus === 'pending'){
+            if(hasReviewableQuestionDispute(q)){
               count++;
               if(!firstTarget) firstTarget = { posukKey, tab: 'comprehension' };
             }
           });
           translationChunkValues(a.translationChunkResults).forEach(c => {
-            if(c.disputeStatus === 'pending'){
+            if(hasReviewableTranslationDispute(c)){
               count++;
               if(!firstTarget) firstTarget = { posukKey, tab: 'translate' };
             }
@@ -2604,10 +2619,10 @@ function nextPendingDisputeTarget(){
   const keys = sortPosukKeys(Object.keys(studentPosukData));
   for(const posukKey of keys){
     for(const a of studentPosukData[posukKey].attempts){
-      if(a.hebrewDisputeStatus === 'pending') return { posukKey, tab: 'reading' };
-      if(questionResultValues(a.questionResults).some(q => q.disputeStatus === 'pending')) return { posukKey, tab: 'comprehension' };
-      if(a.comprehensionDisputeStatus === 'pending') return { posukKey, tab: 'comprehension' };
-      if(translationChunkValues(a.translationChunkResults).some(c => c.disputeStatus === 'pending')){
+      if(hasReviewableHebrewDispute(a)) return { posukKey, tab: 'reading' };
+      if(questionResultValues(a.questionResults).some(hasReviewableQuestionDispute)) return { posukKey, tab: 'comprehension' };
+      if(hasReviewableComprehensionDispute(a)) return { posukKey, tab: 'comprehension' };
+      if(translationChunkValues(a.translationChunkResults).some(hasReviewableTranslationDispute)){
         return { posukKey, tab: 'translate' };
       }
     }
@@ -2619,10 +2634,10 @@ function countPendingDisputesForStudent(){
   let count = 0;
   Object.values(studentPosukData).forEach(({ attempts }) => {
     attempts.forEach(a => {
-      if(a.hebrewDisputeStatus === 'pending') count++;
-      if(a.comprehensionDisputeStatus === 'pending') count++;
-      count += questionResultValues(a.questionResults).filter(q => q.disputeStatus === 'pending').length;
-      count += translationChunkValues(a.translationChunkResults).filter(c => c.disputeStatus === 'pending').length;
+      if(hasReviewableHebrewDispute(a)) count++;
+      if(hasReviewableComprehensionDispute(a)) count++;
+      count += questionResultValues(a.questionResults).filter(hasReviewableQuestionDispute).length;
+      count += translationChunkValues(a.translationChunkResults).filter(hasReviewableTranslationDispute).length;
     });
   });
   return count;
@@ -2787,18 +2802,18 @@ function renderPosukDetail(posukKey){
 
   // Only wire controls that are actually visible for the selected skill.
   relevantAttempts.forEach(a => {
-    if(studentActiveTab === 'reading' && a.hebrewDisputeStatus === 'pending'){
+    if(studentActiveTab === 'reading' && hasReviewableHebrewDispute(a)){
       wireFinalizeHebrew(a, posukKey);
     }
     if(studentActiveTab === 'comprehension'){
       questionResultEntries(a.questionResults).forEach(([questionIdx, q]) => {
-        if(q.disputeStatus === 'pending') wireFinalizeQuestion(a, posukKey, questionIdx, q);
+        if(hasReviewableQuestionDispute(q)) wireFinalizeQuestion(a, posukKey, questionIdx, q);
       });
-      if(a.comprehensionDisputeStatus === 'pending') wireFinalizeComprehension(a, posukKey);
+      if(hasReviewableComprehensionDispute(a)) wireFinalizeComprehension(a, posukKey);
     }
     if(studentActiveTab === 'translate'){
       translationChunkEntries(a.translationChunkResults).forEach(([chunkIdx, c]) => {
-        if(c.disputeStatus === 'pending' && c.audioURL){
+        if(hasReviewableTranslationDispute(c)){
           wireFinalizeTranslationChunk(a, posukKey, chunkIdx, c);
         }
       });
@@ -2811,7 +2826,8 @@ function renderPosukDetail(posukKey){
    resolved ones get a quiet confirmation note; no dispute means nothing. */
 function renderDisputeSection(a, posukKey, skill){
   if(skill === 'hebrew'){
-    if(a.hebrewDisputeStatus === 'pending'){
+    if(!a.hebrewAudioURL) return '';
+    if(hasReviewableHebrewDispute(a)){
       return `<div class="dispute-banner">⚠️ Student disputes this score — asked for ${a.hebrewDisputeRequested}%</div>
         <div class="finalize-row" id="finalizeHebrew_${a.attemptId}">
           <span>Final score:</span>
@@ -2830,8 +2846,9 @@ function renderDisputeSection(a, posukKey, skill){
     return '';
   }
   // comprehension
+  if(!a.comprehensionAudioURL) return '';
   const labelMap = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' };
-  if(a.comprehensionDisputeStatus === 'pending'){
+  if(hasReviewableComprehensionDispute(a)){
     const options = Object.entries(labelMap).map(([key,label]) =>
       `<option value="${key}" ${key === a.comprehensionDisputeRequested ? 'selected' : ''}>${label}</option>`).join('');
     return `<div class="dispute-banner">⚠️ Student disputes this grade — asked for ${labelMap[a.comprehensionDisputeRequested] || a.comprehensionDisputeRequested}</div>
@@ -2856,16 +2873,11 @@ function renderDisputeSection(a, posukKey, skill){
 // student's saved recording and the computer's original verdict above, then
 // let the teacher either mark the answer correct or keep the original result.
 function renderQuestionDisputeSection(a, posukKey, questionIdx, q){
-  if(q.disputeStatus === 'pending'){
+  // If the recording was deleted, the dispute goes with it. Do not show
+  // an orphaned pending/resolved dispute from older saved data.
+  if(!q || !q.audioURL) return '';
+  if(hasReviewableQuestionDispute(q)){
     const original = q.verdict === 'correct' ? '✅ Correct' : '💡 Try again';
-    if(!q.audioURL){
-      return `<div class="dispute-banner">⚠️ Student disputes this question — computer originally marked: ${original}</div>
-        <div class="finalize-row" id="finalizeQuestion_${a.attemptId}_${questionIdx}" style="border-color:var(--rimon);background:#F6E1E1;">
-          <strong>Recording is missing.</strong>
-          <span>You can resolve it by keeping the original result, or have the student redo the question.</span>
-          <button class="btn small" style="background:var(--ink-soft);box-shadow:none;" id="finalizeQuestionKeepBtn_${a.attemptId}_${questionIdx}">Keep original (${original})</button>
-        </div>`;
-    }
     return `<div class="dispute-banner">⚠️ Student disputes this question — computer originally marked: ${original}</div>
       <div class="finalize-row" id="finalizeQuestion_${a.attemptId}_${questionIdx}">
         <span>Teacher decision:</span>
@@ -2886,17 +2898,9 @@ function renderQuestionDisputeSection(a, posukKey, questionIdx, q){
 // dispute a single piece rather than the whole posuk (translation has no
 // single overall score to dispute).
 function renderTranslationChunkDisputeSection(a, posukKey, chunkIdx, c){
-  if(c.disputeStatus === 'pending'){
-    // Old/incomplete disputes may exist from before the student-side fix.
-    // Do not invite the teacher to rule on a translation when the recording
-    // evidence is missing; make the problem explicit instead.
-    if(!c.audioURL){
-      return `<div class="dispute-banner">⚠️ Student disputes this piece — but the recording is missing.</div>
-        <div class="finalize-row" style="border-color:var(--rimon);background:#F6E1E1;">
-          <strong>Cannot fairly review this dispute.</strong>
-          <span>The student must redo this translation piece so a recording is saved.</span>
-        </div>`;
-    }
+  // Same rule as question disputes: no recording means no dispute.
+  if(!c || !c.audioURL) return '';
+  if(hasReviewableTranslationDispute(c)){
     return `<div class="dispute-banner">⚠️ Student disputes this piece</div>
       <div class="finalize-row" id="finalizeChunk_${a.attemptId}_${chunkIdx}">
         <span>Final:</span>

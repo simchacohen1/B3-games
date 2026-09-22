@@ -3613,11 +3613,41 @@ async function removeSavedTask(task){
 
   if(!currentAttemptRef) return;
   try{
+    // Deleting a recording also deletes any dispute/review state that
+    // belonged to that recording. A dispute without its audio evidence must
+    // never stay behind on the teacher dashboard.
     const fieldsByTask = {
-      hebrew: { hebrewAudioURL: null, hebrewScore: null, hebrewTranscript: null },
-      translation: { translationChunkResults: null, translationScore: null },
-      comprehension: { comprehensionAudioURL: null, comprehensionTranscript: null, comprehensionVerdict: null,
-        comprehensionFeedback: null },
+      hebrew: {
+        hebrewAudioURL: null,
+        hebrewScore: null,
+        hebrewScoreIsPercent: null,
+        hebrewTranscript: null,
+        hebrewWords: null,
+        hebrewDisputeRequested: null,
+        hebrewDisputeStatus: null,
+        hebrewDisputeAt: null,
+        hebrewFinalScore: null,
+        hebrewDisputeResolvedAt: null
+      },
+      translation: {
+        // Every translation dispute lives inside its chunk record, so
+        // removing the chunk results removes those disputes too.
+        translationChunkResults: null,
+        translationScore: null,
+        translationTotal: null
+      },
+      comprehension: {
+        comprehensionAudioURL: null,
+        comprehensionTranscript: null,
+        comprehensionVerdict: null,
+        comprehensionScore: null,
+        comprehensionFeedback: null,
+        comprehensionDisputeRequested: null,
+        comprehensionDisputeStatus: null,
+        comprehensionDisputeAt: null,
+        comprehensionFinalVerdict: null,
+        comprehensionDisputeResolvedAt: null
+      },
     };
     await currentAttemptRef.update(fieldsByTask[task]);
 
