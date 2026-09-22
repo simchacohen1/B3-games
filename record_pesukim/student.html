@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Posuk Practice individual-delete fix v2 — 2026-09-22 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3179,24 +3180,116 @@ async function completeGeneratedComprehensionQuestions(loadToken){
   }
 }
 
+function savedResultEntries(value){
+  if(Array.isArray(value)){
+    return value.map((item, index) => [index, item]).filter(([,item]) => item && typeof item === 'object');
+  }
+  if(value && typeof value === 'object'){
+    return Object.keys(value)
+      .filter(k => /^\d+$/.test(k))
+      .sort((a,b) => Number(a) - Number(b))
+      .map(k => [Number(k), value[k]])
+      .filter(([,item]) => item && typeof item === 'object');
+  }
+  return [];
+}
+function questionResultEntriesStudent(value){ return savedResultEntries(value); }
+function translationChunkEntriesStudent(value){ return savedResultEntries(value); }
+
+function questionResultAudioSrc(result){
+  if(!result) return '';
+  if(result.audioURL){
+    if(result._objectURL){
+      try{ URL.revokeObjectURL(result._objectURL); }catch(_err){}
+      result._objectURL = null;
+    }
+    return result.audioURL;
+  }
+  if(result.blob){
+    if(!result._objectURL) result._objectURL = URL.createObjectURL(result.blob);
+    return result._objectURL;
+  }
+  return '';
+}
+
+function releaseQuestionObjectURL(result){
+  if(result && result._objectURL){
+    try{ URL.revokeObjectURL(result._objectURL); }catch(_err){}
+    result._objectURL = null;
+  }
+}
+
+async function deleteSavedQuestionAnswer(index, btnEl){
+  const r = comprehensionQResults[index];
+  if(!r) return;
+  if(r.saving){
+    alert('This answer is still saving. Please wait a moment, then delete it.');
+    return;
+  }
+  if(!confirm('Delete this answer and its recording? This cannot be undone.')) return;
+
+  const originalText = btnEl ? btnEl.textContent : '';
+  if(btnEl){
+    btnEl.disabled = true;
+    btnEl.textContent = 'Deleting…';
+  }
+
+  const attemptId = r.attemptId || currentAttemptId || null;
+  const savedIndex = Number.isInteger(r.savedQuestionIndex) ? r.savedQuestionIndex : index;
+
+  try{
+    if(r.audioURL){
+      await storage.refFromURL(r.audioURL).delete().catch(() => {});
+    }
+    releaseQuestionObjectURL(r);
+    delete comprehensionQResults[index];
+
+    if(attemptId){
+      const ref = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey + '/' + attemptId);
+      await ref.child('questionResults').child(String(savedIndex)).remove();
+
+      const total = Math.max(1, comprehensionQuestions.length || 0, Number(r.questionTotal) || 0);
+      const remaining = Object.values(comprehensionQResults).filter(Boolean);
+      const correct = remaining.filter(x => (x.finalVerdict || x.verdict) === 'correct').length;
+      await ref.update({
+        questionTotal: total,
+        questionScore: remaining.length ? Math.round((correct / total) * 100) + '%' : null
+      });
+      await pruneAttemptIfEmpty(ref);
+    }
+
+    if(index === comprehensionQIndex){
+      currentAudio.comprehension = null;
+      currentAudioExt.comprehension = 'webm';
+      resetComprehensionResult();
+    }
+
+    if(!Object.keys(comprehensionQResults).length && currentAttemptId && attemptId === currentAttemptId && attemptSaved.comprehension){
+      attemptSaved.comprehension = false;
+      document.getElementById('comprehensionCheck').classList.add('hidden');
+    }
+
+    renderComprehensionQuestionUI();
+    loadHistory();
+  }catch(err){
+    console.error('Could not delete this comprehension answer', err);
+    if(btnEl){
+      btnEl.disabled = false;
+      btnEl.textContent = originalText || '🗑️ Delete answer';
+    }
+    alert('Could not delete this answer. Please try again.');
+  }
+}
+
 function renderAnsweredQuestionHistory(){
   const host=document.getElementById('questionAnsweredHistory');
   if(!host) return;
-  // Newest-answered first, so the question the student JUST answered shows
-  // at the top of this list instead of at the bottom under everything else.
   const answered=Object.keys(comprehensionQResults).map(Number).sort((a,b)=>b-a);
   if(!answered.length){ host.innerHTML=''; return; }
   host.innerHTML='<div style="font-weight:800;margin-bottom:7px;color:var(--ink-soft);">Your answers so far</div>' +
     answered.map(i=>{
-      const r=comprehensionQResults[i], q=comprehensionQuestions[i], ok=r&&r.verdict==='correct';
-      // A multi-posuk range's questions are one continuous 1..N count, which
-      // reads as a confusing running tally once it crosses into a second
-      // posuk's questions — tagging which posuk each question belongs to
-      // makes that clear instead of just "question 6".
+      const r=comprehensionQResults[i], q=comprehensionQuestions[i], ok=r&&((r.finalVerdict || r.verdict)==='correct');
       const posukTag = (currentIsRange && q && q.posukNum) ? 'פסוק ' + hebrewNumeral(q.posukNum) + ' — ' : '';
-      // Wrong answers get the same dispute option here as the fresh result
-      // card does — a student reviewing past answers shouldn't have to
-      // scroll back up to a now-blank recording area to find it.
       let disputeHtml = '';
       if(!ok){
         if(r && r.disputeStatus === 'pending'){
@@ -3207,15 +3300,26 @@ function renderAnsweredQuestionHistory(){
           disputeHtml = '<button type="button" class="btn small ghost-delete history-dispute-btn" data-q-index="' + i + '" style="margin-top:6px;">⚠️ Dispute this answer</button>';
         }
       }
+      const audioSrc = questionResultAudioSrc(r);
+      const deleteLabel = r && r.saving ? 'Saving…' : '🗑️ Delete this answer';
+      const deleteDisabled = r && r.saving ? ' disabled' : '';
+      const audioHtml = audioSrc
+        ? '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px;"><audio controls src="' + audioSrc + '"></audio>' +
+          '<button type="button" class="btn small ghost-delete question-answer-delete-btn" data-q-index="' + i + '"' + deleteDisabled + '>' + deleteLabel + '</button></div>'
+        : '<button type="button" class="btn small ghost-delete question-answer-delete-btn" data-q-index="' + i + '" style="margin-top:7px;"' + deleteDisabled + '>' + deleteLabel + '</button>';
       return `<div style="padding:9px 11px;margin:5px 0;border-radius:12px;background:${ok?'#E4F4E4':'#F6E1E1'};border:1px solid ${ok?'#4C9A4C':'var(--rimon)'};">
         <strong>${ok?'✅':'❌'} ${posukTag}Question ${i+1}. ${q?q.question:''}</strong>
         ${r&&r.transcript?`<div style="font-size:.8rem;font-style:italic;margin-top:3px;">You said: “${r.transcript}”</div>`:''}
         ${r&&r.feedback?`<div style="font-size:.8rem;margin-top:2px;">${r.feedback}</div>`:''}
+        ${audioHtml}
         ${disputeHtml}
       </div>`;
     }).join('');
   host.querySelectorAll('.history-dispute-btn').forEach(btn => {
     btn.onclick = () => submitQuestionDispute(parseInt(btn.getAttribute('data-q-index'), 10));
+  });
+  host.querySelectorAll('.question-answer-delete-btn').forEach(btn => {
+    btn.onclick = () => deleteSavedQuestionAnswer(parseInt(btn.getAttribute('data-q-index'), 10), btn);
   });
 }
 function renderQuestionFinalScore(){
@@ -3233,13 +3337,33 @@ async function restoreSavedQuestionResults(){
   try{
     const snap=await db.ref('posukPractice/attempts/'+studentId+'/'+currentPosukKey).once('value'), val=snap.val();
     if(!val) return false;
-    const saved=Object.values(val).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0)).find(a=>Array.isArray(a.questionResults)&&a.questionResults.length);
+    const saved=Object.entries(val)
+      .map(([attemptId,a])=>({attemptId,...a}))
+      .sort((a,b)=>(b.timestamp||0)-(a.timestamp||0))
+      .find(a=>questionResultEntriesStudent(a.questionResults).length);
     if(!saved) return false;
     const restored={};
-    saved.questionResults.forEach((r,i)=>{
-      let idx=comprehensionQuestions.findIndex(q=>q.question===r.question);
-      if(idx<0&&i<comprehensionQuestions.length) idx=i;
-      if(idx>=0) restored[idx]={verdict:r.verdict,feedback:r.feedback||'',transcript:r.transcript||'',blob:null,ext:'webm',audioURL:r.audioURL||null,disputeStatus:r.disputeStatus||null,finalVerdict:r.finalVerdict||null};
+    questionResultEntriesStudent(saved.questionResults).forEach(([savedIndex,r])=>{
+      let idx = Number.isInteger(r.questionIndex) ? r.questionIndex : -1;
+      if(idx<0 || idx>=comprehensionQuestions.length){
+        idx=comprehensionQuestions.findIndex(q=>q.question===r.question);
+      }
+      if(idx<0 && savedIndex<comprehensionQuestions.length) idx=savedIndex;
+      if(idx>=0){
+        restored[idx]={
+          verdict:r.verdict,
+          feedback:r.feedback||'',
+          transcript:r.transcript||'',
+          blob:null,
+          ext:'webm',
+          audioURL:r.audioURL||null,
+          disputeStatus:r.disputeStatus||null,
+          finalVerdict:r.finalVerdict||null,
+          attemptId:saved.attemptId,
+          savedQuestionIndex:savedIndex,
+          questionTotal:Number(saved.questionTotal)||questionResultEntriesStudent(saved.questionResults).length
+        };
+      }
     });
     if(!Object.keys(restored).length) return false;
     comprehensionQResults=restored;
@@ -3354,7 +3478,9 @@ function renderComprehensionQuestionUI(){
     }else if(existing.audioURL){
       audioEl.src = existing.audioURL;
       audioEl.classList.remove('hidden');
-      deleteBtn.classList.add('hidden');
+      // A restored/saved question answer is still deletable from the
+      // current question view, not only from Past Tries.
+      deleteBtn.classList.remove('hidden');
     }
     statusEl.textContent = 'Recorded — listen above';
     retryBtn.classList.add('hidden');
@@ -3453,17 +3579,27 @@ function deleteRecording(type){
   } else if(type === 'comprehension'){
     resetComprehensionResult();
     if(comprehensionMode === 'questions'){
-      delete comprehensionQResults[comprehensionQIndex];
+      // If this question already has a saved result, the delete button is
+      // routed through deleteSavedQuestionAnswer() instead. Reaching here
+      // means this is only an unsaved/failed recording, so do not disturb
+      // the other questions that may already be saved.
       renderComprehensionQuestionUI();
+    }else if(attemptSaved.comprehension){
+      removeSavedTask('comprehension');
     }
-    if(attemptSaved.comprehension) removeSavedTask('comprehension');
   } else if(type === 'translation'){
     resetTranslationResult();
     if(attemptSaved.translation) removeSavedTask('translation');
   }
 }
 document.getElementById('hebrewDeleteBtn').onclick = () => deleteRecording('hebrew');
-document.getElementById('comprehensionDeleteBtn').onclick = () => deleteRecording('comprehension');
+document.getElementById('comprehensionDeleteBtn').onclick = () => {
+  if(comprehensionMode === 'questions' && comprehensionQResults[comprehensionQIndex]){
+    deleteSavedQuestionAnswer(comprehensionQIndex, document.getElementById('comprehensionDeleteBtn'));
+  }else{
+    deleteRecording('comprehension');
+  }
+};
 document.getElementById('translationDeleteBtn').onclick = () => deleteRecording('translation');
 
 /* If a student is embarrassed by an already-autosaved recording and
@@ -4126,7 +4262,8 @@ async function gradeCurrentQuestionAnswer(){
       feedback: data.feedback || '',
       transcript: data.transcript || '',
       blob: currentAudio.comprehension,
-      ext: currentAudioExt.comprehension
+      ext: currentAudioExt.comprehension,
+      saving: true
     };
     renderQuestionResult(idx, data.verdict, data.feedback || '', data.transcript || '');
     gradingMsg.textContent = '';
@@ -4231,7 +4368,7 @@ async function submitQuestionDispute(idx){
 // autosaveTranslation already uses for its per-chunk recordings), then
 // marks the comprehension task done.
 async function autosaveComprehensionQuestions(){
-  const idxs = Object.keys(comprehensionQResults).map(Number);
+  const idxs = Object.keys(comprehensionQResults).map(Number).sort((a,b)=>a-b);
   if(!idxs.length || !currentPosukKey) return;
   try{
     if(!currentAttemptRef){
@@ -4239,19 +4376,27 @@ async function autosaveComprehensionQuestions(){
       currentAttemptId = currentAttemptRef.key;
     }
     const correctCount = idxs.filter(i => comprehensionQResults[i].verdict === 'correct').length;
+    const questionResultsData = {};
 
-    const questionResultsData = await Promise.all(idxs.map(async i => {
+    for(const i of idxs){
       const r = comprehensionQResults[i];
-      const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_question_' + currentAttemptId + '_q' + i + '.' + r.ext;
+      const path = 'posukPractice/' + studentId + '/' + currentPosukKey + '_question_' + currentAttemptId + '_q' + i + '.' + (r.ext || 'webm');
       let url = r.audioURL || null;
-      if(r.blob){
+      if(r.blob && !url){
         try{
           await storage.ref(path).put(r.blob);
           url = await storage.ref(path).getDownloadURL();
         }catch(err){ console.error('Could not upload question answer audio', i, err); }
       }
-      return {
+
+      r.audioURL = url;
+      r.attemptId = currentAttemptId;
+      r.savedQuestionIndex = i;
+      r.questionTotal = comprehensionQuestions.length;
+
+      questionResultsData[i] = {
         question: comprehensionQuestions[i].question,
+        questionIndex: i,
         posukNum: comprehensionQuestions[i].posukNum,
         verdict: r.verdict,
         feedback: r.feedback,
@@ -4260,7 +4405,7 @@ async function autosaveComprehensionQuestions(){
         disputeStatus: r.disputeStatus || null,
         finalVerdict: r.finalVerdict || null
       };
-    }));
+    }
 
     await currentAttemptRef.update({
       timestamp: Date.now(),
@@ -4272,14 +4417,20 @@ async function autosaveComprehensionQuestions(){
       posukText: currentPosukText,
       posukTranslation: currentPosukTranslation,
       questionResults: questionResultsData,
+      questionTotal: comprehensionQuestions.length,
       questionScore: Math.round((correctCount / comprehensionQuestions.length) * 100) + '%'
     });
+
+    idxs.forEach(i => { if(comprehensionQResults[i]) comprehensionQResults[i].saving = false; });
     markTaskSaved('comprehension');
+    renderAnsweredQuestionHistory();
   }catch(err){
+    idxs.forEach(i => { if(comprehensionQResults[i]) comprehensionQResults[i].saving = false; });
     console.error('Autosave (comprehension questions) failed', err);
     const gradingMsg = document.getElementById('comprehensionGradingMsg');
     gradingMsg.textContent = (gradingMsg.textContent ? gradingMsg.textContent + ' ' : '') +
       "Couldn't save automatically — check your internet connection.";
+    renderAnsweredQuestionHistory();
   }
 }
 
@@ -5081,6 +5232,8 @@ function showTranslationSummary(level){
       '<button type="button" class="translation-action-btn redo chunk-fix-pill" data-chunk-index="' + i + '">' +
         '<span class="chunk-fix-status" data-status-index="' + i + '">🔁 Redo</span>' +
       '</button>';
+    const deleteBtn =
+      '<button type="button" class="translation-action-btn chunk-delete-btn" data-chunk-index="' + i + '">🗑️ Delete</button>';
 
     let helpHtml = '';
     if(!isCorrect){
@@ -5109,7 +5262,7 @@ function showTranslationSummary(level){
         '<div class="translation-piece-hebrew">' + chunk.hebrew + '</div>' +
       '</div>' +
       '<div class="translation-heard"><strong>I heard:</strong> “' + said + '”</div>' +
-      '<div class="translation-piece-actions">' + recordingBtn + feedbackBtn + redoBtn + '</div>' +
+      '<div class="translation-piece-actions">' + recordingBtn + feedbackBtn + redoBtn + deleteBtn + '</div>' +
       helpHtml +
     '</div>';
   }).join('') + '</div>';
@@ -5144,9 +5297,72 @@ function showTranslationSummary(level){
     btn.onclick = () => recordChunkFix(parseInt(btn.getAttribute('data-chunk-index'), 10), btn);
   });
 
+  resultEl.querySelectorAll('.chunk-delete-btn').forEach(btn => {
+    btn.onclick = () => deleteCurrentTranslationChunk(parseInt(btn.getAttribute('data-chunk-index'), 10), level, btn);
+  });
+
   resultEl.querySelectorAll('.chunk-dispute-btn').forEach(btn => {
     btn.onclick = () => submitChunkDispute(parseInt(btn.getAttribute('data-chunk-index'), 10), level, btn);
   });
+}
+
+async function deleteCurrentTranslationChunk(index, level, btnEl){
+  const r = translationGradedResults[index];
+  if(!r) return;
+  if(!confirm('Delete this translation recording? This cannot be undone.')) return;
+
+  const originalText = btnEl ? btnEl.textContent : '';
+  if(btnEl){
+    btnEl.disabled = true;
+    btnEl.textContent = 'Deleting…';
+  }
+
+  try{
+    if(r.audioURL){
+      await storage.refFromURL(r.audioURL).delete().catch(() => {});
+    }else if(r.audioStoragePath){
+      await storage.ref(r.audioStoragePath).delete().catch(() => {});
+    }
+
+    delete translationSegments[index];
+    delete translationGradedResults[index];
+    delete translationGradingPromises[index];
+
+    if(translationAudioUrls[index]){
+      try{ URL.revokeObjectURL(translationAudioUrls[index]); }catch(_err){}
+      delete translationAudioUrls[index];
+    }
+
+    if(currentAttemptRef){
+      await currentAttemptRef.child('translationChunkResults').child(String(index)).remove();
+      const remaining = Object.values(translationGradedResults).filter(Boolean);
+      const total = level && Array.isArray(level.chunks) ? level.chunks.length : Math.max(1, remaining.length);
+      const correct = remaining.filter(x => (x.finalVerdict || x.verdict) === 'correct').length;
+      await currentAttemptRef.update({
+        translationTotal: total,
+        translationScore: remaining.length ? Math.round((correct / total) * 100) + '%' : null
+      });
+      await pruneAttemptIfEmpty(currentAttemptRef);
+    }
+
+    if(!Object.keys(translationGradedResults).length){
+      attemptSaved.translation = false;
+      document.getElementById('translationCheck').classList.add('hidden');
+      resetTranslationResult();
+      document.getElementById('translationStatus').textContent = 'Ready';
+    }else{
+      showTranslationSummary(level);
+    }
+    renderCurrentChunk();
+    loadHistory();
+  }catch(err){
+    console.error('Could not delete translation piece', err);
+    if(btnEl){
+      btnEl.disabled = false;
+      btnEl.textContent = originalText || '🗑️ Delete';
+    }
+    alert('Could not delete this recording. Please try again.');
+  }
 }
 
 /* ---------- Per-chunk redo (Translation) ----------
@@ -5288,7 +5504,8 @@ async function saveTranslationChunkEvidence(index, level){
     posukEnd: currentPosukEndNum || currentPosukNum,
     isRange: currentIsRange,
     posukText: currentPosukText,
-    posukTranslation: currentPosukTranslation
+    posukTranslation: currentPosukTranslation,
+    translationTotal: level.chunks.length
   };
   const base = 'translationChunkResults/' + index + '/';
   updates[base + 'chunkHebrew'] = chunk.hebrew;
@@ -5341,11 +5558,14 @@ async function autosaveTranslation(level){
       translationScore: Math.round((correctCount / level.chunks.length) * 100) + '%'
     };
 
+    updateData.translationTotal = level.chunks.length;
     if(allDone){
-      updateData.translationChunkResults = idxs.map(i => {
+      updateData.translationChunkResults = {};
+      idxs.forEach(i => {
         const r = translationGradedResults[i];
         const chunk = level.chunks[i];
-        return {
+        updateData.translationChunkResults[i] = {
+          chunkIndex: i,
           chunkHebrew: chunk.hebrew,
           posukNum: chunk.posukNum || currentPosukNum,
           verdict: r.verdict,
@@ -5458,6 +5678,214 @@ async function submitComprehensionDispute(tier){
 }
 
 /* ---------- History ---------- */
+
+function resultCountForScore(entries, storedTotal){
+  const maxIndex = entries.length ? Math.max(...entries.map(([idx,item]) =>
+    Number.isInteger(item && item.questionIndex) ? item.questionIndex : idx
+  )) + 1 : 0;
+  return Math.max(Number(storedTotal) || 0, maxIndex, entries.length);
+}
+
+async function pruneAttemptIfEmpty(attemptRef){
+  try{
+    const snap = await attemptRef.once('value');
+    const d = snap.val();
+    if(!d) return;
+    const hasAnything =
+      !!d.hebrewAudioURL ||
+      !!d.comprehensionAudioURL ||
+      !!d.comprehensionClarifyAudioURL ||
+      translationChunkEntriesStudent(d.translationChunkResults).length > 0 ||
+      questionResultEntriesStudent(d.questionResults).length > 0;
+    if(!hasAnything) await attemptRef.remove();
+  }catch(err){
+    console.warn('Could not check whether attempt is empty', err);
+  }
+}
+
+function clearCurrentReadingUIAfterDelete(){
+  currentAudio.hebrew = null;
+  const audioEl = document.getElementById('hebrewAudioPlayback');
+  audioEl.removeAttribute('src');
+  audioEl.classList.add('hidden');
+  document.getElementById('hebrewDeleteBtn').classList.add('hidden');
+  document.getElementById('hebrewStatus').textContent = 'Not recorded yet';
+  resetHebrewResult();
+  attemptSaved.hebrew = false;
+  document.getElementById('readingCheck').classList.add('hidden');
+}
+
+function clearCurrentFreehandUIAfterDelete(){
+  currentAudio.comprehension = null;
+  const audioEl = document.getElementById('comprehensionAudioPlayback');
+  audioEl.removeAttribute('src');
+  audioEl.classList.add('hidden');
+  document.getElementById('comprehensionDeleteBtn').classList.add('hidden');
+  document.getElementById('comprehensionStatus').textContent = 'Not recorded yet';
+  resetComprehensionResult();
+  if(comprehensionMode !== 'questions'){
+    attemptSaved.comprehension = false;
+    document.getElementById('comprehensionCheck').classList.add('hidden');
+  }
+}
+
+async function deleteHistoryItem(attempt, kind, savedIndex, btnEl){
+  const labels = {
+    hebrew: 'this reading recording',
+    translation: 'this translation recording',
+    question: 'this answer and its recording',
+    comprehension: 'this comprehension recording',
+    clarify: 'this follow-up recording'
+  };
+  if(!confirm('Delete ' + (labels[kind] || 'this recording') + '? This cannot be undone.')) return;
+
+  const originalText = btnEl ? btnEl.textContent : '';
+  if(btnEl){
+    btnEl.disabled = true;
+    btnEl.textContent = 'Deleting…';
+  }
+
+  const ref = db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey + '/' + attempt.id);
+
+  try{
+    if(kind === 'hebrew'){
+      if(attempt.hebrewAudioURL){
+        await storage.refFromURL(attempt.hebrewAudioURL).delete().catch(() => {});
+      }
+      await ref.update({
+        hebrewAudioURL: null,
+        hebrewScore: null,
+        hebrewScoreIsPercent: null,
+        hebrewTranscript: null,
+        hebrewWords: null,
+        hebrewDisputeRequested: null,
+        hebrewDisputeStatus: null,
+        hebrewDisputeAt: null,
+        hebrewFinalScore: null,
+        hebrewDisputeResolvedAt: null
+      });
+      if(attempt.id === currentAttemptId) clearCurrentReadingUIAfterDelete();
+    }
+
+    if(kind === 'translation'){
+      const entries = translationChunkEntriesStudent(attempt.translationChunkResults);
+      const target = entries.find(([idx]) => idx === savedIndex);
+      const chunk = target ? target[1] : null;
+      if(chunk && chunk.audioURL){
+        await storage.refFromURL(chunk.audioURL).delete().catch(() => {});
+      }
+      await ref.child('translationChunkResults').child(String(savedIndex)).remove();
+      const remaining = entries.filter(([idx]) => idx !== savedIndex);
+      const total = Math.max(
+        1,
+        Number(attempt.translationTotal) || 0,
+        Array.isArray(attempt.translationChunkResults) ? attempt.translationChunkResults.length : 0,
+        entries.length ? Math.max(...entries.map(([idx]) => idx)) + 1 : 0
+      );
+      const correct = remaining.filter(([,c]) => (c.finalVerdict || c.verdict) === 'correct').length;
+      await ref.update({
+        translationTotal: total,
+        translationScore: remaining.length ? Math.round((correct / total) * 100) + '%' : null
+      });
+
+      if(attempt.id === currentAttemptId && translationGradedResults[savedIndex]){
+        if(translationAudioUrls[savedIndex]){
+          try{ URL.revokeObjectURL(translationAudioUrls[savedIndex]); }catch(_err){}
+          delete translationAudioUrls[savedIndex];
+        }
+        delete translationSegments[savedIndex];
+        delete translationGradedResults[savedIndex];
+        delete translationGradingPromises[savedIndex];
+        if(translationLevels && translationLevels[translationLevelIndex]){
+          const level = translationLevels[translationLevelIndex];
+          if(Object.keys(translationGradedResults).length) showTranslationSummary(level);
+          else resetTranslationResult();
+          renderCurrentChunk();
+        }
+      }
+    }
+
+    if(kind === 'question'){
+      const entries = questionResultEntriesStudent(attempt.questionResults);
+      const target = entries.find(([idx]) => idx === savedIndex);
+      const q = target ? target[1] : null;
+      if(q && q.audioURL){
+        await storage.refFromURL(q.audioURL).delete().catch(() => {});
+      }
+      await ref.child('questionResults').child(String(savedIndex)).remove();
+      const remaining = entries.filter(([idx]) => idx !== savedIndex);
+      const total = Math.max(
+        1,
+        Number(attempt.questionTotal) || 0,
+        Array.isArray(attempt.questionResults) ? attempt.questionResults.length : 0,
+        entries.length ? Math.max(...entries.map(([idx,item]) =>
+          Number.isInteger(item && item.questionIndex) ? item.questionIndex : idx
+        )) + 1 : 0
+      );
+      const correct = remaining.filter(([,r]) => (r.finalVerdict || r.verdict) === 'correct').length;
+      await ref.update({
+        questionTotal: total,
+        questionScore: remaining.length ? Math.round((correct / total) * 100) + '%' : null
+      });
+
+      const currentLocalIndex = Object.keys(comprehensionQResults).map(Number).find(i => {
+        const r = comprehensionQResults[i];
+        return r && (r.attemptId || currentAttemptId) === attempt.id &&
+          (Number.isInteger(r.savedQuestionIndex) ? r.savedQuestionIndex : i) === savedIndex;
+      });
+      if(currentLocalIndex !== undefined){
+        releaseQuestionObjectURL(comprehensionQResults[currentLocalIndex]);
+        delete comprehensionQResults[currentLocalIndex];
+        if(currentLocalIndex === comprehensionQIndex){
+          currentAudio.comprehension = null;
+          currentAudioExt.comprehension = 'webm';
+          resetComprehensionResult();
+        }
+        renderComprehensionQuestionUI();
+      }
+    }
+
+    if(kind === 'comprehension'){
+      if(attempt.comprehensionAudioURL){
+        await storage.refFromURL(attempt.comprehensionAudioURL).delete().catch(() => {});
+      }
+      await ref.update({
+        comprehensionAudioURL: null,
+        comprehensionTranscript: null,
+        comprehensionVerdict: null,
+        comprehensionScore: null,
+        comprehensionFeedback: null,
+        comprehensionDisputeRequested: null,
+        comprehensionDisputeStatus: null,
+        comprehensionDisputeAt: null,
+        comprehensionFinalVerdict: null,
+        comprehensionDisputeResolvedAt: null
+      });
+      if(attempt.id === currentAttemptId) clearCurrentFreehandUIAfterDelete();
+    }
+
+    if(kind === 'clarify'){
+      if(attempt.comprehensionClarifyAudioURL){
+        await storage.refFromURL(attempt.comprehensionClarifyAudioURL).delete().catch(() => {});
+      }
+      await ref.update({
+        comprehensionClarifyAudioURL: null,
+        comprehensionClarifyTranscript: null
+      });
+    }
+
+    await pruneAttemptIfEmpty(ref);
+    loadHistory();
+  }catch(err){
+    console.error('Could not delete saved recording', err);
+    if(btnEl){
+      btnEl.disabled = false;
+      btnEl.textContent = originalText || '🗑️ Delete';
+    }
+    alert('Could not delete this recording. Please try again.');
+  }
+}
+
 async function loadHistory(){
   const listEl = document.getElementById('historyList');
   listEl.innerHTML = '<div class="msg">Loading…</div>';
@@ -5468,53 +5896,34 @@ async function loadHistory(){
       listEl.innerHTML = '<div class="msg">No attempts yet — record above and save!</div>';
       return;
     }
-    // Keep each attempt's Firebase key (not just its data) so a saved
-    // attempt can be individually deleted later.
+
     const attempts = Object.entries(val)
       .map(([id, a]) => ({ id, ...a }))
-      .sort((a,b) => b.timestamp - a.timestamp);
-    // Only attempts with data matching the currently active tab are shown
-    // at all - one with only e.g. comprehensionAudioURL shouldn't leave a
-    // bare, content-less date/delete card sitting on the reading tab.
+      .sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
+
     const visibleAttempts = attempts.filter(a => {
       if(activeTab === 'reading') return !!a.hebrewAudioURL;
-      if(activeTab === 'translate') return Array.isArray(a.translationChunkResults) && a.translationChunkResults.length;
-      // An attempt that only answered the per-question comprehension set
-      // (no optional bonus freehand explanation) has no comprehensionAudioURL
-      // at all, so gating on that field alone hid its saved question audio
-      // from this history entirely.
-      return !!a.comprehensionAudioURL || (Array.isArray(a.questionResults) && a.questionResults.length);
+      if(activeTab === 'translate') return translationChunkEntriesStudent(a.translationChunkResults).length > 0;
+      return !!a.comprehensionAudioURL ||
+        !!a.comprehensionClarifyAudioURL ||
+        questionResultEntriesStudent(a.questionResults).length > 0;
     });
+
     if(!visibleAttempts.length){
       listEl.innerHTML = '<div class="msg">No attempts yet — record above and save!</div>';
       return;
     }
+
     listEl.innerHTML = '';
     visibleAttempts.forEach(a => {
       const div = document.createElement('div');
       div.className = 'attempt';
       const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
-      let rowsHtml = `<div class="row"><span>${dateStr}</span><button class="btn ghost-delete attempt-delete-btn">🗑️ Delete</button></div>`;
-      // Each tab should only show its own category of past attempts - a
-      // saved attempt record can hold both a hebrewAudioURL and a
-      // comprehensionAudioURL (since both tasks for the same posuk share
-      // one record), but rendering both regardless of which tab is open
-      // meant the "Show You Understand" tab was also displaying Hebrew
-      // reading cards and vice versa. Gate each block on activeTab so only
-      // the matching category renders.
+      let rowsHtml = `<div class="row"><span>${dateStr}</span><button class="btn ghost-delete attempt-delete-btn">🗑️ Delete entire try</button></div>`;
+
       if(activeTab === 'reading' && a.hebrewAudioURL){
-        // Older saved attempts used the 1-10 self-rating slider; newer ones
-        // use the automatic scorer's 0-100 percentage. Attempts saved going
-        // forward carry an explicit hebrewScoreIsPercent flag, so a
-        // genuinely low percent score (e.g. 9%, from a near-empty/garbled
-        // recording) can't be mistaken for a legacy "9/10" rating just
-        // because its value happens to be <=10. Only attempts saved before
-        // this flag existed fall back to the old magnitude-based guess.
         const isPercentScore = a.hebrewScoreIsPercent === true ||
           (typeof a.hebrewScore === 'number' && a.hebrewScore > 10);
-        // Once a teacher finalizes a disputed score, that decision IS the
-        // official grade — the badge itself should show it, not just a
-        // footnote below the original auto-graded score.
         const hasFinal = typeof a.hebrewFinalScore === 'number';
         const effScore = hasFinal ? a.hebrewFinalScore : a.hebrewScore;
         const hebrewScorePill = (isPercentScore || hasFinal)
@@ -5531,6 +5940,7 @@ async function loadHistory(){
             '</div>';
         }
         hebrewCardHtml += '<audio controls src="' + a.hebrewAudioURL + '"></audio>';
+        hebrewCardHtml += '<button class="btn small ghost-delete history-item-delete" data-kind="hebrew">🗑️ Delete this recording</button>';
         if(a.hebrewTranscript){
           hebrewCardHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + a.hebrewTranscript + '"</span>';
         }
@@ -5541,22 +5951,24 @@ async function loadHistory(){
           rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">✔️ Teacher reviewed — final score: ${a.hebrewFinalScore}%</div>`;
         }
       }
-      if(activeTab === 'translate' && Array.isArray(a.translationChunkResults) && a.translationChunkResults.length){
-        // Once a teacher finalizes a disputed chunk, that decision counts
-        // toward the score too — recompute from effective verdicts rather
-        // than trusting the score string saved at record time, which goes
-        // stale the moment a dispute is resolved. Shown as a percentage to
-        // match Hebrew reading and comprehension.
-        const effCorrectCount = a.translationChunkResults.filter(c => (c.finalVerdict || c.verdict) === 'correct').length;
-        const effScoreLabel = Math.round((effCorrectCount / a.translationChunkResults.length) * 100) + '%';
+
+      const translationEntries = translationChunkEntriesStudent(a.translationChunkResults);
+      if(activeTab === 'translate' && translationEntries.length){
+        const total = Math.max(
+          1,
+          Number(a.translationTotal) || 0,
+          Array.isArray(a.translationChunkResults) ? a.translationChunkResults.length : 0,
+          translationEntries.length ? Math.max(...translationEntries.map(([idx]) => idx)) + 1 : 0
+        );
+        const effCorrectCount = translationEntries.filter(([,c]) => (c.finalVerdict || c.verdict) === 'correct').length;
+        const effScoreLabel = Math.round((effCorrectCount / total) * 100) + '%';
         rowsHtml += `<div class="row"><span class="label">🌐 Translation</span><span class="score-pill">${effScoreLabel}</span></div>`;
-        a.translationChunkResults.forEach(c => {
-          // Same as Hebrew/comprehension: once a teacher finalizes a
-          // disputed chunk, that decision is the official verdict.
+        translationEntries.forEach(([chunkIndex,c]) => {
           const effVerdict = c.finalVerdict || c.verdict;
           let chunkHtml = '<span class="comp-badge">' + (effVerdict === 'correct' ? '✅' : '💡') + '</span>' +
             '<span dir="rtl" style="font-family:\'Noto Serif Hebrew\',serif;">' + c.chunkHebrew + '</span>';
           if(c.audioURL) chunkHtml += '<audio controls src="' + c.audioURL + '"></audio>';
+          chunkHtml += '<button class="btn small ghost-delete history-item-delete" data-kind="translation" data-index="' + chunkIndex + '">🗑️ Delete this recording</button>';
           if(c.transcript) chunkHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + c.transcript + '"</span>';
           rowsHtml += `<div class="comp-result ${effVerdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:2px;">${chunkHtml}</div>`;
           if(c.disputeStatus === 'pending'){
@@ -5566,14 +5978,27 @@ async function loadHistory(){
           }
         });
       }
-      if(activeTab === 'comprehension' && Array.isArray(a.questionResults) && a.questionResults.length){
-        rowsHtml += `<div class="row"><span class="label">🧠 Comprehension — Questions</span><span class="score-pill">${a.questionScore || ''}</span></div>`;
-        a.questionResults.forEach(q => {
+
+      const questionEntries = questionResultEntriesStudent(a.questionResults);
+      if(activeTab === 'comprehension' && questionEntries.length){
+        const total = Math.max(
+          1,
+          Number(a.questionTotal) || 0,
+          Array.isArray(a.questionResults) ? a.questionResults.length : 0,
+          questionEntries.length ? Math.max(...questionEntries.map(([idx,q]) =>
+            Number.isInteger(q && q.questionIndex) ? q.questionIndex : idx
+          )) + 1 : 0
+        );
+        const correct = questionEntries.filter(([,q]) => (q.finalVerdict || q.verdict) === 'correct').length;
+        const qScore = Math.round((correct / total) * 100) + '%';
+        rowsHtml += `<div class="row"><span class="label">🧠 Comprehension — Questions</span><span class="score-pill">${qScore}</span></div>`;
+        questionEntries.forEach(([questionIndex,q]) => {
           const qEffVerdict = q.finalVerdict || q.verdict;
           let qHtml = '<span class="comp-badge">' + (qEffVerdict === 'correct' ? '✅ Got it' : '💡 Try again') + '</span>' +
             '<span style="width:100%;">' + q.question + '</span>';
           if(q.feedback) qHtml += '<span>' + q.feedback + '</span>';
           if(q.audioURL) qHtml += '<audio controls src="' + q.audioURL + '"></audio>';
+          qHtml += '<button class="btn small ghost-delete history-item-delete" data-kind="question" data-index="' + questionIndex + '">🗑️ Delete this answer</button>';
           if(q.transcript) qHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + q.transcript + '"</span>';
           rowsHtml += `<div class="comp-result ${qEffVerdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:2px;">${qHtml}</div>`;
           if(q.disputeStatus === 'pending'){
@@ -5583,23 +6008,19 @@ async function loadHistory(){
           }
         });
       }
+
       if(activeTab === 'comprehension' && a.comprehensionAudioURL){
-        // Once a teacher finalizes a disputed grade, that decision IS the
-        // official grade \u2014 the badge itself (color + label) should show
-        // it, not just a footnote below the original auto-graded verdict.
         const effectiveVerdict = a.comprehensionFinalVerdict || a.comprehensionVerdict;
         const verdictLabel = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[effectiveVerdict] || effectiveVerdict || '';
         const scoreSuffix = (!a.comprehensionFinalVerdict && typeof a.comprehensionScore === 'number') ? ' (' + a.comprehensionScore + '%)' : '';
-        // If question results also exist for this attempt, this freehand
-        // explanation was the optional bonus step, not the primary grade —
-        // label it as such so it doesn't read as a second, competing score.
-        const hasQuestions = Array.isArray(a.questionResults) && a.questionResults.length;
+        const hasQuestions = questionEntries.length > 0;
         rowsHtml += `<div class="row"><span class="label">${hasQuestions ? '🌟 Bonus — Explain it yourself' : '🧠 Comprehension'}</span></div>`;
         let compCardHtml = '<span class="comp-badge">' + verdictLabel + scoreSuffix + '</span>';
         if(a.comprehensionFeedback){
           compCardHtml += '<span>' + a.comprehensionFeedback + '</span>';
         }
         compCardHtml += '<audio controls src="' + a.comprehensionAudioURL + '"></audio>';
+        compCardHtml += '<button class="btn small ghost-delete history-item-delete" data-kind="comprehension">🗑️ Delete this recording</button>';
         if(a.comprehensionTranscript){
           compCardHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + a.comprehensionTranscript + '"</span>';
         }
@@ -5611,20 +6032,31 @@ async function loadHistory(){
           const finalLabel = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' }[a.comprehensionFinalVerdict] || a.comprehensionFinalVerdict;
           rowsHtml += `<div class="row" style="font-size:0.8rem;color:var(--ink-soft);">✔️ Teacher reviewed — final grade: ${finalLabel}</div>`;
         }
-        if(a.comprehensionClarifyQuestion){
-          rowsHtml += `
-          <div class="row"><span class="label">🤔 Follow-up</span><span style="color:var(--ink-soft);">"${a.comprehensionClarifyQuestion}"</span></div>`;
-          if(a.comprehensionClarifyAudioURL){
-            rowsHtml += `<div class="row"><audio controls src="${a.comprehensionClarifyAudioURL}"></audio></div>`;
-          }
-          if(a.comprehensionClarifyTranscript){
-            rowsHtml += `<div class="row" style="font-style:italic;color:var(--ink-soft);">"${a.comprehensionClarifyTranscript}"</div>`;
-          }
-        }
       }
+
+      if(activeTab === 'comprehension' && a.comprehensionClarifyAudioURL){
+        if(a.comprehensionClarifyQuestion){
+          rowsHtml += `<div class="row"><span class="label">🤔 Follow-up</span><span style="color:var(--ink-soft);">"${a.comprehensionClarifyQuestion}"</span></div>`;
+        }
+        let clarifyHtml = '<audio controls src="' + a.comprehensionClarifyAudioURL + '"></audio>' +
+          '<button class="btn small ghost-delete history-item-delete" data-kind="clarify">🗑️ Delete this recording</button>';
+        if(a.comprehensionClarifyTranscript){
+          clarifyHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + a.comprehensionClarifyTranscript + '"</span>';
+        }
+        rowsHtml += `<div class="comp-result partial" style="margin-top:2px;">${clarifyHtml}</div>`;
+      }
+
       div.innerHTML = rowsHtml;
+
       const delBtn = div.querySelector('.attempt-delete-btn');
-      delBtn.onclick = () => deleteAttempt(a, delBtn);
+      if(delBtn) delBtn.onclick = () => deleteAttempt(a, delBtn);
+
+      div.querySelectorAll('.history-item-delete').forEach(btn => {
+        const idxAttr = btn.getAttribute('data-index');
+        const idx = idxAttr === null ? null : parseInt(idxAttr, 10);
+        btn.onclick = () => deleteHistoryItem(a, btn.getAttribute('data-kind'), idx, btn);
+      });
+
       listEl.appendChild(div);
     });
   }catch(err){
@@ -5641,26 +6073,52 @@ async function deleteAttempt(attempt, btnEl){
   btnEl.textContent = 'Deleting…';
   try{
     const fileDeletes = [];
+
     if(attempt.hebrewAudioURL){
       fileDeletes.push(storage.refFromURL(attempt.hebrewAudioURL).delete().catch(() => {}));
     }
-    if(Array.isArray(attempt.translationChunkResults)){
-      attempt.translationChunkResults.forEach(c => {
-        if(c.audioURL) fileDeletes.push(storage.refFromURL(c.audioURL).delete().catch(() => {}));
-      });
-    }
+
+    translationChunkEntriesStudent(attempt.translationChunkResults).forEach(([,c]) => {
+      if(c.audioURL) fileDeletes.push(storage.refFromURL(c.audioURL).delete().catch(() => {}));
+    });
+
+    questionResultEntriesStudent(attempt.questionResults).forEach(([,q]) => {
+      if(q.audioURL) fileDeletes.push(storage.refFromURL(q.audioURL).delete().catch(() => {}));
+    });
+
     if(attempt.comprehensionAudioURL){
       fileDeletes.push(storage.refFromURL(attempt.comprehensionAudioURL).delete().catch(() => {}));
     }
     if(attempt.comprehensionClarifyAudioURL){
       fileDeletes.push(storage.refFromURL(attempt.comprehensionClarifyAudioURL).delete().catch(() => {}));
     }
+
     await Promise.all(fileDeletes);
     await db.ref('posukPractice/attempts/' + studentId + '/' + currentPosukKey + '/' + attempt.id).remove();
+
+    if(attempt.id === currentAttemptId){
+      clearCurrentReadingUIAfterDelete();
+      clearCurrentFreehandUIAfterDelete();
+      Object.values(comprehensionQResults).forEach(releaseQuestionObjectURL);
+      comprehensionQResults = {};
+      translationSegments = {};
+      translationGradedResults = {};
+      translationGradingPromises = {};
+      currentAttemptRef = null;
+      currentAttemptId = null;
+      attemptSaved = { hebrew:false, translation:false, comprehension:false };
+      document.getElementById('translationCheck').classList.add('hidden');
+      if(comprehensionMode === 'questions') renderComprehensionQuestionUI();
+      if(translationLevels && translationLevels[translationLevelIndex]){
+        resetTranslationResult();
+        renderCurrentChunk();
+      }
+    }
+
     loadHistory();
   }catch(err){
     btnEl.disabled = false;
-    btnEl.textContent = '🗑️ Delete';
+    btnEl.textContent = '🗑️ Delete entire try';
     alert('Could not delete this attempt. Please try again.');
     console.error(err);
   }
