@@ -44,6 +44,11 @@
   .choice.selected { border-color:var(--blue); background:#e5f2fb; }
   .choice.correct-reveal { border-color:var(--good); background:#eaf7ef; }
   .choice.wrong-reveal { border-color:var(--bad); background:#fdecee; }
+  .question-audio { text-align:center; margin:-7px 0 13px; }
+  .listen-btn { background:#fff1a8; color:#5b4a00; border:2px solid #e7ca50; border-radius:999px; padding:8px 12px; font-size:16px; }
+  .choice-row { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
+  .choice-audio { min-width:50px; padding:12px 10px; background:#fff1a8; color:#5b4a00; border:2px solid #e7ca50; border-radius:12px; font-size:20px; }
+  .review-listen { margin-left:7px; padding:4px 8px; font-size:14px; vertical-align:middle; }
   .submit-row { text-align:center; margin-top:16px; }
   .status { margin-top:14px; padding:12px; border-radius:10px; text-align:center; font-weight:700; background:#f1f5f7; }
   .status.good { background:#eaf7ef; color:#1f6b40; }
@@ -129,6 +134,7 @@
       <div class="launch-meta" id="launchMeta"></div>
       <div class="qmeta" id="qmeta"></div>
       <div class="question" id="questionText" dir="auto"></div>
+      <div class="question-audio"><button id="questionListenBtn" class="listen-btn" type="button">🔊 Hear question</button></div>
       <div class="choices" id="choices"></div>
       <div class="submit-row"><button class="primary" id="submitBtn" onclick="submitAnswer()">Submit answer</button></div>
       <div id="answerStatus" class="status hidden"></div>
@@ -193,6 +199,30 @@ const CLASS_ROSTERS={
 };
 
 function slugify(name){return String(name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');}
+const SYNTHESIZE_SPEECH_URL='https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech';
+const ttsAudioCache=new Map();
+let ttsAudioEl=null;
+async function speakStudentText(text){
+  if(!text)return;
+  try{
+    if(!ttsAudioEl)ttsAudioEl=new Audio();
+    ttsAudioEl.pause();
+    let audioUrl=ttsAudioCache.get(text);
+    if(!audioUrl){
+      const res=await fetch(SYNTHESIZE_SPEECH_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:String(text)})});
+      if(!res.ok)throw new Error('Speech request failed');
+      const data=await res.json();
+      if(!data.audioContent)throw new Error('No audio returned');
+      const bytes=atob(data.audioContent),nums=new Uint8Array(bytes.length);
+      for(let i=0;i<bytes.length;i++)nums[i]=bytes.charCodeAt(i);
+      audioUrl=URL.createObjectURL(new Blob([nums],{type:'audio/mp3'}));
+      ttsAudioCache.set(text,audioUrl);
+    }
+    ttsAudioEl.src=audioUrl;
+    await ttsAudioEl.play();
+  }catch(e){console.error('Natural voice playback failed:',e);alert('The voice could not play right now. Please try the speaker again.');}
+}
+
 function asArray(v){if(!v)return[];if(Array.isArray(v))return v;return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]);}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmtDate(ts){if(!ts)return'';try{return new Date(Number(ts)).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch(e){return'';}}
@@ -380,6 +410,7 @@ function render(){
   document.getElementById('launchMeta').textContent=classLabel(launchData.classId)+retake;
   document.getElementById('qmeta').textContent='Question '+(displayedQuestion+1)+' of '+questions.length;
   document.getElementById('questionText').textContent=q.q||'';
+  document.getElementById('questionListenBtn').onclick=()=>speakStudentText(q.q||'');
   selectedChoice=resp?Number(resp.choiceIndex):null;
   renderChoices(q,resp,st);renderNav(mode,questions);
   document.getElementById('progressText').textContent=answeredCount+' of '+questions.length+' answered';
@@ -409,12 +440,14 @@ function renderCompletionCard(questions){
 function renderChoices(q,resp,st){
   const box=document.getElementById('choices');box.innerHTML='';const choices=asArray(q.choices);
   choices.forEach((choice,i)=>{
+    const row=document.createElement('div');row.className='choice-row';
     const b=document.createElement('button');b.className='choice';b.type='button';b.dir='auto';b.textContent=String.fromCharCode(65+i)+'. '+choice;
     if(selectedChoice===i)b.classList.add('selected');
     if(st.reveal){if(Number(q.correctIndex)===i)b.classList.add('correct-reveal');else if(resp&&Number(resp.choiceIndex)===i)b.classList.add('wrong-reveal');}
     b.disabled=!!resp||!st.open||!!st.reveal;
     b.onclick=()=>{selectedChoice=i;document.querySelectorAll('.choice').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');};
-    box.appendChild(b);
+    const sp=document.createElement('button');sp.className='choice-audio';sp.type='button';sp.textContent='🔊';sp.title='Hear this answer';sp.setAttribute('aria-label','Hear answer '+String.fromCharCode(65+i));sp.onclick=()=>speakStudentText(choice);
+    row.appendChild(b);row.appendChild(sp);box.appendChild(row);
   });
   const submit=document.getElementById('submitBtn');submit.disabled=!!resp||!st.open||!!st.reveal;submit.classList.toggle('hidden',!!resp||!st.open||!!st.reveal);
   const status=document.getElementById('answerStatus');status.className='status hidden';
@@ -489,8 +522,9 @@ async function openPastQuiz(launchId){
       const r=responses[i]||responses[String(i)]||null,choices=asArray(q.choices),chosen=r?choices[Number(r.choiceIndex)]:'No answer',correct=choices[Number(q.correctIndex)]||'';
       const cls=released&&r?(r.correct===true?' correct':' incorrect'):'';
       const result=released?(r?(r.correct===true?'✓ Correct':'✗ Incorrect'):'No answer'):'';
-      return '<div class="review-question'+cls+'"><div class="review-q">'+(i+1)+'. '+esc(q.q||'')+'</div><div class="review-answer"><b>Your answer:</b> '+esc(chosen||'')+'</div>'+(released?'<div class="review-answer"><b>Correct answer:</b> '+esc(correct)+'</div><div class="review-result '+(r&&r.correct===true?'good':'bad')+'">'+esc(result)+'</div>':'')+'</div>';
+      return '<div class="review-question'+cls+'"><div class="review-q">'+(i+1)+'. '+esc(q.q||'')+' <button type="button" class="listen-btn review-listen" data-speak="'+encodeURIComponent(q.q||'')+'">🔊</button></div><div class="review-answer"><b>Your answer:</b> '+esc(chosen||'')+' <button type="button" class="listen-btn review-listen" data-speak="'+encodeURIComponent(chosen||'')+'">🔊</button></div>'+(released?'<div class="review-answer"><b>Correct answer:</b> '+esc(correct)+' <button type="button" class="listen-btn review-listen" data-speak="'+encodeURIComponent(correct)+'">🔊</button></div><div class="review-result '+(r&&r.correct===true?'good':'bad')+'">'+esc(result)+'</div>':'')+'</div>';
     }).join('');
+    document.querySelectorAll('#reviewQuestions [data-speak]').forEach(btn=>{btn.onclick=()=>speakStudentText(decodeURIComponent(btn.dataset.speak||''));});
   }catch(e){console.error(e);document.getElementById('reviewQuestions').innerHTML='<div class="status bad">Could not load this review. Please try again.</div>';}
 }
 function closePastQuiz(){document.getElementById('reviewCard').classList.add('hidden');document.getElementById('pastQuizzesCard').scrollIntoView({behavior:'smooth',block:'start'});}
