@@ -246,7 +246,9 @@
     .class-picker { grid-template-columns:1fr; }
   }
 
-  .tts-hebrew { direction:rtl; unicode-bidi:isolate; display:inline; border-radius:5px; padding:0 2px; transition:background .15s, box-shadow .15s; }
+  .tts-hebrew { direction:rtl; unicode-bidi:isolate; display:inline-block; border-radius:5px; padding:0 2px; transition:background .15s, box-shadow .15s; }
+  .tts-english { direction:ltr; unicode-bidi:isolate; display:inline; }
+  .question-type-label { display:table; margin:0 auto 7px; padding:5px 10px; border-radius:999px; background:#eef2ff; font-size:16px; font-weight:800; direction:rtl; unicode-bidi:isolate; }
   .tts-hebrew.tts-highlight { background:#ffe66d; box-shadow:0 0 0 2px #ffe66d; }
 </style>
 </head>
@@ -1180,9 +1182,19 @@ function previewSplitAudioSegments(text){
   const strong=chars.map(ch=>isHeb(ch)?'hebrew':(isEng(ch)?'english':null)),out=[];let buf='',kind=null;
   for(let i=0;i<chars.length;i++){let k=strong[i];if(!k){let prev=null,next=null;for(let j=i-1;j>=0;j--){if(strong[j]){prev=strong[j];break;}}for(let j=i+1;j<chars.length;j++){if(strong[j]){next=strong[j];break;}}k=(prev==='hebrew'&&next==='hebrew')?'hebrew':'english';}if(kind!==null&&k!==kind){if(buf)out.push({kind,text:buf});buf='';}kind=k;buf+=chars[i];}if(buf)out.push({kind,text:buf});return out;
 }
+function previewExtractQuestionType(text){
+  const raw=String(text||'').trim(),types=[['מי אמר אל מי','מי אמר אל מי'],['על מי נאמר','על מי נאמר']];
+  for(const [needle,label] of types){if(raw.startsWith(needle)){const rest=raw.slice(needle.length).replace(/^\s*[?:：—–-]*\s*/,'').trim();return{label,text:rest||raw};}}
+  return{label:'',text:raw};
+}
 function renderPreviewAudioAwareText(el,text,prefix=''){
-  el.innerHTML='';el.dir=/[A-Za-z0-9]/.test(String(text||''))?'ltr':'rtl';if(prefix)el.appendChild(document.createTextNode(prefix));let hi=0;
-  previewSplitAudioSegments(text).forEach(seg=>{if(seg.kind==='hebrew'){const span=document.createElement('span');span.className='tts-hebrew';span.dir='rtl';span.dataset.ttsHebrew=String(hi++);span.textContent=seg.text;el.appendChild(span);}else el.appendChild(document.createTextNode(seg.text));});
+  el.innerHTML='';el.dir='ltr';el.style.unicodeBidi='isolate';if(prefix){const pre=document.createElement('span');pre.className='tts-english';pre.dir='ltr';pre.textContent=prefix;el.appendChild(pre);}let hi=0;
+  previewSplitAudioSegments(text).forEach(seg=>{const span=document.createElement('span');if(seg.kind==='hebrew'){span.className='tts-hebrew';span.dir='rtl';span.dataset.ttsHebrew=String(hi++);}else{span.className='tts-english';span.dir='ltr';}span.textContent=seg.text;el.appendChild(span);});
+}
+function renderPreviewQuestion(el,text){
+  const parts=previewExtractQuestionType(text),old=document.getElementById('previewQuestionTypeLabel');if(old)old.remove();
+  if(parts.label){const lab=document.createElement('div');lab.id='previewQuestionTypeLabel';lab.className='question-type-label';lab.textContent=parts.label;el.parentNode.insertBefore(lab,el);}
+  renderPreviewAudioAwareText(el,parts.text);return parts;
 }
 function previewWait(ms){return new Promise(r=>setTimeout(r,ms));}
 async function getPreviewAudio(text){
@@ -1213,10 +1225,10 @@ function renderQuizPreview(){
   previewIndex=Math.max(0,Math.min(previewQuestions.length-1,previewIndex));
   const q=previewQuestions[previewIndex],choices=asArray(q.choices);
   document.getElementById('previewQMeta').textContent='Question '+(previewIndex+1)+' of '+previewQuestions.length+(q.skillType?' • '+skillLabel(q.skillType):'');
-  const previewQuestionEl=document.getElementById('previewQuestion');renderPreviewAudioAwareText(previewQuestionEl,q.q||'');
+  const previewQuestionEl=document.getElementById('previewQuestion'),previewQuestionParts=renderPreviewQuestion(previewQuestionEl,q.q||'');
   let qAudio=document.getElementById('previewQuestionAudio');
   if(!qAudio){qAudio=document.createElement('div');qAudio.id='previewQuestionAudio';previewQuestionEl.insertAdjacentElement('afterend',qAudio);}
-  qAudio.innerHTML='';qAudio.appendChild(makePreviewAudioButton(q.q||'','Hear question',previewQuestionEl));
+  qAudio.innerHTML='';qAudio.appendChild(makePreviewAudioButton(previewQuestionParts.text,'Hear question',previewQuestionEl));
   const box=document.getElementById('previewChoices');box.innerHTML='';
   choices.forEach((choice,i)=>{
     const b=document.createElement('button');
