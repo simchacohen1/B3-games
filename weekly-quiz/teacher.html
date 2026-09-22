@@ -246,6 +246,8 @@
     .class-picker { grid-template-columns:1fr; }
   }
 
+  .tts-hebrew { direction:rtl; unicode-bidi:isolate; display:inline; border-radius:5px; padding:0 2px; transition:background .15s, box-shadow .15s; }
+  .tts-hebrew.tts-highlight { background:#ffe66d; box-shadow:0 0 0 2px #ffe66d; }
 </style>
 </head>
 <body>
@@ -1173,52 +1175,53 @@ function choosePreviewAnswer(i){
 const PREVIEW_TTS_URL='https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech';
 const previewAudioCache=new Map();
 let previewAudio=null;
-async function playPreviewAudio(text,btn){
-  text=String(text||'').trim();
-  if(!text)return;
-  const old=btn?btn.textContent:'';
-  if(btn){btn.disabled=true;btn.textContent='⏳';}
+function previewSplitAudioSegments(text){
+  const chars=Array.from(String(text||'')),isHeb=ch=>/[\u0590-\u05FF]/.test(ch),isEng=ch=>/[A-Za-z0-9]/.test(ch);
+  const strong=chars.map(ch=>isHeb(ch)?'hebrew':(isEng(ch)?'english':null)),out=[];let buf='',kind=null;
+  for(let i=0;i<chars.length;i++){let k=strong[i];if(!k){let prev=null,next=null;for(let j=i-1;j>=0;j--){if(strong[j]){prev=strong[j];break;}}for(let j=i+1;j<chars.length;j++){if(strong[j]){next=strong[j];break;}}k=(prev==='hebrew'&&next==='hebrew')?'hebrew':'english';}if(kind!==null&&k!==kind){if(buf)out.push({kind,text:buf});buf='';}kind=k;buf+=chars[i];}if(buf)out.push({kind,text:buf});return out;
+}
+function renderPreviewAudioAwareText(el,text,prefix=''){
+  el.innerHTML='';el.dir=/[A-Za-z0-9]/.test(String(text||''))?'ltr':'rtl';if(prefix)el.appendChild(document.createTextNode(prefix));let hi=0;
+  previewSplitAudioSegments(text).forEach(seg=>{if(seg.kind==='hebrew'){const span=document.createElement('span');span.className='tts-hebrew';span.dir='rtl';span.dataset.ttsHebrew=String(hi++);span.textContent=seg.text;el.appendChild(span);}else el.appendChild(document.createTextNode(seg.text));});
+}
+function previewWait(ms){return new Promise(r=>setTimeout(r,ms));}
+async function getPreviewAudio(text){
+  const clean=String(text||'').replace(/\s+/g,' ').trim();if(!clean)return null;let src=previewAudioCache.get(clean);if(src)return src;
+  const resp=await fetch(PREVIEW_TTS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:clean})});if(!resp.ok)throw new Error('Audio service error');
+  const data=await resp.json();if(data.audioContent)src='data:audio/mp3;base64,'+data.audioContent;else if(data.audioUrl)src=data.audioUrl;else if(data.url)src=data.url;else throw new Error('No audio returned');previewAudioCache.set(clean,src);return src;
+}
+async function playPreviewChunk(text){
+  const src=await getPreviewAudio(text);if(!src)return;if(previewAudio){try{previewAudio.pause();}catch(e){}}
+  previewAudio=new Audio(src);await new Promise((resolve,reject)=>{previewAudio.onended=resolve;previewAudio.onerror=reject;const p=previewAudio.play();if(p&&p.catch)p.catch(reject);});
+}
+async function playPreviewAudio(text,btn,rootEl){
+  text=String(text||'').trim();if(!text)return;const old=btn?btn.textContent:'';if(btn){btn.disabled=true;btn.textContent='⏳';}
   try{
-    let src=previewAudioCache.get(text);
-    if(!src){
-      const resp=await fetch(PREVIEW_TTS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
-      if(!resp.ok)throw new Error('Audio service error');
-      const data=await resp.json();
-      if(data.audioContent)src='data:audio/mp3;base64,'+data.audioContent;
-      else if(data.audioUrl)src=data.audioUrl;
-      else if(data.url)src=data.url;
-      else throw new Error('No audio returned');
-      previewAudioCache.set(text,src);
-    }
     if(previewAudio){try{previewAudio.pause();}catch(e){}}
-    previewAudio=new Audio(src);
-    await previewAudio.play();
-  }catch(e){console.error(e);alert('Audio could not play.');}
-  finally{if(btn){btn.disabled=false;btn.textContent=old;}}
+    const hebrewEls=rootEl?Array.from(rootEl.querySelectorAll('.tts-hebrew')):[];let hi=0;
+    for(const seg of previewSplitAudioSegments(text)){
+      if(seg.kind==='hebrew'){const el=hebrewEls[hi++];if(el)el.classList.add('tts-highlight');await previewWait(Math.max(650,Math.min(1400,seg.text.trim().length*110)));if(el)el.classList.remove('tts-highlight');}
+      else if(/[A-Za-z0-9]/.test(seg.text))await playPreviewChunk(seg.text);
+    }
+  }catch(e){console.error(e);alert('Audio could not play.');}finally{if(btn){btn.disabled=false;btn.textContent=old;}}
 }
-function makePreviewAudioButton(text,label){
-  const b=document.createElement('button');
-  b.type='button';b.className='secondary';
-  b.style.margin='6px 0';b.style.padding='7px 11px';
-  b.textContent='🔊 '+label;
-  b.onclick=(e)=>{e.stopPropagation();playPreviewAudio(text,b);};
-  return b;
+function makePreviewAudioButton(text,label,rootEl){
+  const b=document.createElement('button');b.type='button';b.className='secondary';b.style.margin='6px 0';b.style.padding='7px 11px';b.textContent='🔊 '+label;b.onclick=(e)=>{e.stopPropagation();playPreviewAudio(text,b,rootEl);};return b;
 }
-
 function renderQuizPreview(){
   if(!previewQuestions.length)return;
   previewIndex=Math.max(0,Math.min(previewQuestions.length-1,previewIndex));
   const q=previewQuestions[previewIndex],choices=asArray(q.choices);
   document.getElementById('previewQMeta').textContent='Question '+(previewIndex+1)+' of '+previewQuestions.length+(q.skillType?' • '+skillLabel(q.skillType):'');
-  const previewQuestionEl=document.getElementById('previewQuestion');previewQuestionEl.textContent=q.q||'';
+  const previewQuestionEl=document.getElementById('previewQuestion');renderPreviewAudioAwareText(previewQuestionEl,q.q||'');
   let qAudio=document.getElementById('previewQuestionAudio');
   if(!qAudio){qAudio=document.createElement('div');qAudio.id='previewQuestionAudio';previewQuestionEl.insertAdjacentElement('afterend',qAudio);}
-  qAudio.innerHTML='';qAudio.appendChild(makePreviewAudioButton(q.q||'','Hear question'));
+  qAudio.innerHTML='';qAudio.appendChild(makePreviewAudioButton(q.q||'','Hear question',previewQuestionEl));
   const box=document.getElementById('previewChoices');box.innerHTML='';
   choices.forEach((choice,i)=>{
     const b=document.createElement('button');
-    b.type='button';b.className='preview-choice';b.dir='auto';
-    b.textContent=String.fromCharCode(65+i)+'. '+choice;
+    b.type='button';b.className='preview-choice';
+    renderPreviewAudioAwareText(b,choice,String.fromCharCode(65+i)+'. ');
     if(previewSelected===i)b.classList.add('selected');
     if(previewChecked){
       if(i===Number(q.correctIndex))b.classList.add('correct');
@@ -1227,7 +1230,7 @@ function renderQuizPreview(){
     b.disabled=previewChecked;
     b.onclick=()=>choosePreviewAnswer(i);
     const row=document.createElement('div');row.style.display='grid';row.style.gridTemplateColumns='1fr auto';row.style.gap='8px';row.style.alignItems='center';
-    row.appendChild(b);row.appendChild(makePreviewAudioButton(choice,'Hear'));
+    row.appendChild(b);row.appendChild(makePreviewAudioButton(choice,'Hear',b));
     box.appendChild(row);
   });
   const status=document.getElementById('previewStatus');
