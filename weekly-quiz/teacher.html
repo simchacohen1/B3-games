@@ -1169,12 +1169,51 @@ function choosePreviewAnswer(i){
   previewSelected=i;
   renderQuizPreview();
 }
+// ---------- Audio for Teacher Try-Out Quiz ----------
+const PREVIEW_TTS_URL='https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech';
+const previewAudioCache=new Map();
+let previewAudio=null;
+async function playPreviewAudio(text,btn){
+  text=String(text||'').trim();
+  if(!text)return;
+  const old=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='⏳';}
+  try{
+    let src=previewAudioCache.get(text);
+    if(!src){
+      const resp=await fetch(PREVIEW_TTS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+      if(!resp.ok)throw new Error('Audio service error');
+      const data=await resp.json();
+      if(data.audioContent)src='data:audio/mp3;base64,'+data.audioContent;
+      else if(data.audioUrl)src=data.audioUrl;
+      else if(data.url)src=data.url;
+      else throw new Error('No audio returned');
+      previewAudioCache.set(text,src);
+    }
+    if(previewAudio){try{previewAudio.pause();}catch(e){}}
+    previewAudio=new Audio(src);
+    await previewAudio.play();
+  }catch(e){console.error(e);alert('Audio could not play.');}
+  finally{if(btn){btn.disabled=false;btn.textContent=old;}}
+}
+function makePreviewAudioButton(text,label){
+  const b=document.createElement('button');
+  b.type='button';b.className='secondary';
+  b.style.margin='6px 0';b.style.padding='7px 11px';
+  b.textContent='🔊 '+label;
+  b.onclick=(e)=>{e.stopPropagation();playPreviewAudio(text,b);};
+  return b;
+}
+
 function renderQuizPreview(){
   if(!previewQuestions.length)return;
   previewIndex=Math.max(0,Math.min(previewQuestions.length-1,previewIndex));
   const q=previewQuestions[previewIndex],choices=asArray(q.choices);
   document.getElementById('previewQMeta').textContent='Question '+(previewIndex+1)+' of '+previewQuestions.length+(q.skillType?' • '+skillLabel(q.skillType):'');
-  document.getElementById('previewQuestion').textContent=q.q||'';
+  const previewQuestionEl=document.getElementById('previewQuestion');previewQuestionEl.textContent=q.q||'';
+  let qAudio=document.getElementById('previewQuestionAudio');
+  if(!qAudio){qAudio=document.createElement('div');qAudio.id='previewQuestionAudio';previewQuestionEl.insertAdjacentElement('afterend',qAudio);}
+  qAudio.innerHTML='';qAudio.appendChild(makePreviewAudioButton(q.q||'','Hear question'));
   const box=document.getElementById('previewChoices');box.innerHTML='';
   choices.forEach((choice,i)=>{
     const b=document.createElement('button');
@@ -1187,7 +1226,9 @@ function renderQuizPreview(){
     }
     b.disabled=previewChecked;
     b.onclick=()=>choosePreviewAnswer(i);
-    box.appendChild(b);
+    const row=document.createElement('div');row.style.display='grid';row.style.gridTemplateColumns='1fr auto';row.style.gap='8px';row.style.alignItems='center';
+    row.appendChild(b);row.appendChild(makePreviewAudioButton(choice,'Hear'));
+    box.appendChild(row);
   });
   const status=document.getElementById('previewStatus');
   status.className='preview-status';
