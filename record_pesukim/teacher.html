@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Posuk Practice individual-delete fix v2 — 2026-09-22 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -429,10 +430,12 @@ function effComprehensionVerdict(record){
 }
 function effQuestionScore(record){
   if(!record) return null;
-  const questions = questionResultValues(record.questionResults);
-  if(questions.length){
-    const correct = questions.filter(q => (q.finalVerdict || q.verdict) === 'correct').length;
-    return Math.round((correct / questions.length) * 100);
+  const entries = questionResultEntries(record.questionResults);
+  if(entries.length){
+    const maxIndex = Math.max(...entries.map(([idx,q]) => Number.isInteger(q.questionIndex) ? q.questionIndex : idx)) + 1;
+    const total = Math.max(Number(record.questionTotal) || 0, maxIndex, entries.length);
+    const correct = entries.filter(([,q]) => (q.finalVerdict || q.verdict) === 'correct').length;
+    return Math.round((correct / total) * 100);
   }
 
   // Backward compatibility for a record that has only the stored aggregate.
@@ -520,12 +523,13 @@ function questionResultValues(results){
 // shown on the Translate tab itself in student.html.
 function effTranslationScore(record){
   if(!record) return null;
-  const chunks = translationChunkValues(record.translationChunkResults);
-  if(!chunks.length) return null;
-  const total = chunks.length;
+  const entries = translationChunkEntries(record.translationChunkResults);
+  if(!entries.length) return null;
+  const maxIndex = Math.max(...entries.map(([idx,c]) => Number.isInteger(c.chunkIndex) ? c.chunkIndex : idx)) + 1;
+  const total = Math.max(Number(record.translationTotal) || 0, maxIndex, entries.length);
   // Once a teacher finalizes a disputed chunk, that decision is the
   // official verdict for scoring purposes too — not just the badge.
-  const correct = chunks.filter(c => (c.finalVerdict || c.verdict) === 'correct').length;
+  const correct = entries.filter(([,c]) => (c.finalVerdict || c.verdict) === 'correct').length;
   return Math.round((correct / total) * 100);
 }
 function hasPendingDispute(record){
@@ -2991,7 +2995,8 @@ function wireFinalizeQuestion(a, posukKey, questionIdx, q){
   const finalize = async (finalVerdict) => {
     try{
       const entries = questionResultEntries(a.questionResults);
-      const total = entries.length;
+      const maxIndex = entries.length ? Math.max(...entries.map(([idx,item]) => Number.isInteger(item.questionIndex) ? item.questionIndex : idx)) + 1 : 0;
+      const total = Math.max(Number(a.questionTotal) || 0, maxIndex, entries.length);
       const correct = entries.filter(([idx, item]) => {
         const verdict = idx === questionIdx ? finalVerdict : (item.finalVerdict || item.verdict);
         return verdict === 'correct';
@@ -3295,7 +3300,7 @@ function renderClassPosukDetail(posukKey, bodyEl){
       const info = skillInfo(a, 'translate');
       let lines = `<div class="top-line"><strong>${entry.name}</strong><span class="summary-meta">${dateStr}</span></div>`;
       lines += `<div class="top-line"><span>${skillLabel} — <span class="score-pill">${info ? info.label : '—'}</span></span></div>`;
-      (a.translationChunkResults || []).forEach(c => {
+      translationChunkValues(a.translationChunkResults).forEach(c => {
         let chunkHtml = '<span class="comp-badge">' + (c.verdict === 'correct' ? '✅' : '💡') + '</span>' +
           '<span dir="rtl" style="font-family:\'Noto Serif Hebrew\',serif;">' + c.chunkHebrew + '</span>';
         if(c.audioURL) chunkHtml += '<audio controls src="' + c.audioURL + '"></audio>';
