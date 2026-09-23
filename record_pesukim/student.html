@@ -1462,9 +1462,9 @@ function wakeScorer(){
 const SYNTHESIZE_SPEECH_URL = "https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech";
 
 /* =========================================================
-   STUDENT REWARDS — teacher-approved activity point requests
-   Reaching 100% creates a pending request. It does NOT change the student's
-   reward balance until Rabbi Cohen approves it in Student Rewards.
+   STUDENT REWARDS — verified Posuk Practice rewards
+   Reaching 100% in Reading, Translation, or Understanding is verified by the
+   backend and awarded immediately. Each reward is paid only once per Posuk.
    ========================================================= */
 const STUDENT_REWARDS_AUTO_AWARD_URL = "https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
 
@@ -1477,7 +1477,7 @@ function showRewardToast(points){
     Object.assign(el.style,{position:'fixed',right:'18px',bottom:'18px',zIndex:'99999',background:'#24344A',color:'#fff',border:'3px solid #C9A227',borderRadius:'16px',padding:'13px 18px',fontFamily:"'Quicksand',sans-serif",fontWeight:'800',boxShadow:'0 8px 24px rgba(0,0,0,.25)',transition:'opacity .25s'});
     document.body.appendChild(el);
   }
-  el.textContent = '⭐ ' + points + ' point' + (points === 1 ? '' : 's') + ' sent to Rabbi Cohen for approval.';
+  el.textContent = '🎉 Great job! You earned ' + points + ' point' + (points === 1 ? '' : 's') + '!';
   el.style.opacity = '1';
   clearTimeout(showRewardToast._timer);
   showRewardToast._timer = setTimeout(()=>{ el.style.opacity='0'; }, 3500);
@@ -1493,12 +1493,12 @@ async function requestVerifiedAward(source, awardPosukKey, evidencePosukKey){
     });
     const data = await response.json().catch(()=>({}));
     if(!response.ok) throw new Error(data.error || ('Point request service returned ' + response.status));
-    return data.requested && data.status === 'pending' ? Number(data.amount || 0) : 0;
+    return data.awarded && data.status === 'approved' ? Number(data.amount || 0) : 0;
   }catch(err){
     // Practice itself must never fail just because the point-request service
     // is temporarily unavailable. A later 100% save safely retries the same
-    // one-time request.
-    console.warn('Could not create reward point request yet:', err);
+    // one-time reward without paying it twice.
+    console.warn('Could not add verified reward points yet:', err);
     return 0;
   }
 }
@@ -1508,11 +1508,11 @@ async function awardMilestoneForSelection(source){
   const parts = (currentSelectionParts && currentSelectionParts.length)
     ? currentSelectionParts
     : [{ key: currentPosukKey }];
-  let newlyRequested = 0;
+  let newlyAwarded = 0;
   for(const part of parts){
-    newlyRequested += await requestVerifiedAward(source, part.key || currentPosukKey, currentPosukKey);
+    newlyAwarded += await requestVerifiedAward(source, part.key || currentPosukKey, currentPosukKey);
   }
-  if(newlyRequested) showRewardToast(newlyRequested);
+  if(newlyAwarded) showRewardToast(newlyAwarded);
 }
 
 /* =========================================================
