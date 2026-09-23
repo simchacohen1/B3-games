@@ -140,18 +140,22 @@ function dailyRow(s,cats,saved){
 }
 function ratingClass(v){return String(v).toLowerCase().replace(/\s+/g,"-").replace("fair","average")}
 async function saveDaily(){
-  const updates={}, cats=categories(), r=roster(), stamp=now();
+  const updates={}, cats=categories(), r=roster(), stamp=now(), balanceDeltas=[];
   for(const s of r){
     const absent=state.absent.has(s.id), ratings={};
     if(!absent)for(const cat of cats){const rating=state.draft[`${s.id}|${cat.name}`]||"Good";ratings[C.categoryKey(cat.name)]={category:cat.name,rating,points:C.progressValue[rating]??100,teacherEmail:state.user.email,savedAt:stamp}}
     const newAward=absent?0:C.dailyAward(cats.map(c=>state.draft[`${s.id}|${c.name}`]||"Good"));
-    const oldAward=Number(state.root.dailyAwards?.[s.id]?.[state.classId]?.[state.date]?.points||0), oldBal=Number(state.root.students[s.id].rewardBalance||0);
+    const oldAward=Number(state.root.dailyAwards?.[s.id]?.[state.classId]?.[state.date]?.points||0);
     updates[`${ROOT}/dailyRatings/${s.id}/${state.classId}/${state.date}`]=absent?null:ratings;
     updates[`${ROOT}/dailyAwards/${s.id}/${state.classId}/${state.date}`]={points:newAward,teacherEmail:state.user.email,savedAt:stamp};
     updates[`${ROOT}/dailyAttendance/${s.id}/${state.classId}/${state.date}`]={status:absent?"absent":"present",teacherEmail:state.user.email,savedAt:stamp};
-    updates[`${ROOT}/students/${s.id}/rewardBalance`]=Math.max(0,oldBal+newAward-oldAward);
+    balanceDeltas.push({id:s.id,delta:newAward-oldAward});
   }
-  await db.ref().update(updates);toast(`Saved ${r.length} students`);await loadRoot();render();
+  await db.ref().update(updates);
+  // Use a transaction for the balance so Posuk Practice / Chazara points
+  // earned at the same time can never be overwritten by a stale teacher page.
+  await Promise.all(balanceDeltas.filter(x=>x.delta!==0).map(x=>db.ref(`${ROOT}/students/${x.id}/rewardBalance`).transaction(cur=>Math.max(0,Number(cur||0)+x.delta))));
+  toast(`Saved ${r.length} students`);await loadRoot();render();
 }
 function studentHistory(s){const out=[];for(const [date,aw] of Object.entries(state.root.dailyAwards?.[s.id]?.[state.classId]||{})){const at=state.root.dailyAttendance?.[s.id]?.[state.classId]?.[date];out.push({date,points:Number(aw?.points||0),status:at?.status||"present"})}return out.sort((a,b)=>b.date.localeCompare(a.date))}
 function students(){
@@ -166,8 +170,10 @@ function students(){
 }
 async function adjustPoints(){
   const s=currentStudent();if(!s)return;const raw=prompt(`Adjust ${s.name}'s points. Use a positive number to add or a negative number to deduct:`,"5");if(raw===null)return;const amount=Number(raw);if(!Number.isInteger(amount)||amount===0)return toast("Enter a whole number","error");
-  const reason=prompt("Reason:","Teacher adjustment")||"Teacher adjustment", old=Number(s.rewardBalance||0), next=Math.max(0,old+amount), key=db.ref(`${ROOT}/pointAdjustments`).push().key;
-  await db.ref().update({[`${ROOT}/students/${s.id}/rewardBalance`]:next,[`${ROOT}/pointAdjustments/${key}`]:{id:key,studentId:s.id,classId:state.classId,amount:next-old,action:"teacher",reason,teacherEmail:state.user.email,createdAt:now()}});
+  const reason=prompt("Reason:","Teacher adjustment")||"Teacher adjustment", key=db.ref(`${ROOT}/pointAdjustments`).push().key;
+  let applied=0;
+  await db.ref(`${ROOT}/students/${s.id}/rewardBalance`).transaction(cur=>{const old=Number(cur||0),next=Math.max(0,old+amount);applied=next-old;return next});
+  await db.ref(`${ROOT}/pointAdjustments/${key}`).set({id:key,studentId:s.id,classId:state.classId,amount:applied,action:"teacher",reason,teacherEmail:state.user.email,createdAt:now()});
   toast("Balance updated");
 }
 function categoriesPage(){

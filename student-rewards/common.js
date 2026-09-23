@@ -32,9 +32,11 @@
   function dailyAward(ratings){
     if(!ratings.length) return 0;
     const allGE=ratings.every(r=>r==='Good'||r==='Excellent');
-    if(allGE) return ratings.includes('Excellent')?6:5;
+    // Daily classroom points are now based on 10 for an all-Good day.
+    // Excellent keeps the same 20% bonus relationship as before: 12.
+    if(allGE) return ratings.includes('Excellent')?12:10;
     const avg=ratings.reduce((s,r)=>s+(progressValue[r]??0),0)/ratings.length;
-    return Math.max(0,Math.min(5,Math.round(5*avg/100)));
+    return Math.max(0,Math.min(10,Math.round(10*avg/100)));
   }
   function cumulativeProgress(dateRows){
     const days={};
