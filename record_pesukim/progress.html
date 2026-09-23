@@ -368,8 +368,8 @@ let studentId = localStorage.getItem('posukPractice_studentId');
 let studentName = localStorage.getItem('posukPractice_studentName');
 
 let activeTab = 'comprehension'; // 'comprehension' | 'reading' | 'translate'
-let perekData = {}; // perekNum -> { posukNum -> latestAttemptRecord }
-let rangeData = {}; // perekNum -> [{start,end,key,latest}] for multi-posuk practice
+let perekData = {}; // perekNum -> { posukNum -> {attempts,latest} }
+let rangeData = {}; // perekNum -> [{start,end,key,attempts,latest}] for multi-posuk practice
 let expandedState = {}; // perekNum -> bool
 
 window.addEventListener('load', () => {
@@ -424,13 +424,14 @@ async function loadProgress(){
           start: parseInt(rangeMatch[1]),
           end: parseInt(rangeMatch[2]),
           key: posukKey,
+          attempts,
           latest
         });
       }else{
         const posukNum = parseInt(posukPart);
         if(!posukNum) return;
         if(!perekData[perekNum]) perekData[perekNum] = {};
-        perekData[perekNum][posukNum] = latest;
+        perekData[perekNum][posukNum] = { attempts, latest };
       }
 
       if(!(perekNum in expandedState)) expandedState[perekNum] = true;
@@ -524,6 +525,36 @@ function effTranslationScore(record){
   return total ? Math.round((correct / total) * 100) : null;
 }
 
+// Progress is cumulative: once a student has earned a higher score on a
+// posuk, a later lower retry never makes the displayed score go backward.
+function bestNumeric(attempts, reader){
+  let best = null;
+  (attempts || []).forEach(record => {
+    const v = reader(record);
+    if(typeof v === 'number' && Number.isFinite(v) && (best === null || v > best)) best = v;
+  });
+  return best;
+}
+function verdictRank(v){
+  return ({ incorrect:1, partial:2, correct:3, excellent:4 })[v] || 0;
+}
+function bestComprehensionDisplay(attempts){
+  const numeric = bestNumeric(attempts, record => {
+    const q = effQuestionScore(record);
+    if(typeof q === 'number') return q;
+    return (record && typeof record.comprehensionScore === 'number') ? record.comprehensionScore : null;
+  });
+  if(typeof numeric === 'number') return { tier:pctTier(numeric), label:numeric + '%' };
+  let bestVerdict = null;
+  (attempts || []).forEach(record => {
+    const v = effComprehensionVerdict(record);
+    if(verdictRank(v) > verdictRank(bestVerdict)) bestVerdict = v;
+  });
+  return bestVerdict && VERDICT_INFO[bestVerdict]
+    ? { tier:VERDICT_INFO[bestVerdict].tier, label:VERDICT_INFO[bestVerdict].label }
+    : null;
+}
+
 function buildPerekSection(perekNum, range){
   const posukScores = perekData[perekNum] || {};
 
@@ -548,26 +579,27 @@ function buildPerekSection(perekNum, range){
   grid.className = 'posuk-grid';
 
   for(let posukNum = range.min; posukNum <= range.max; posukNum++){
-    const record = posukScores[posukNum];
+    const bundle = posukScores[posukNum];
+    const attempts = bundle ? bundle.attempts : [];
 
     let tier = null;
     let label = '—';
     if(activeTab === 'reading'){
-      const score = effHebrewScore(record);
+      const score = bestNumeric(attempts, effHebrewScore);
       if(typeof score === 'number'){
         tier = pctTier(score);
         label = score + '%';
         doneCount++;
       }
     }else if(activeTab === 'translate'){
-      const score = effTranslationScore(record);
+      const score = bestNumeric(attempts, effTranslationScore);
       if(typeof score === 'number'){
         tier = pctTier(score);
         label = score + '%';
         doneCount++;
       }
     }else{
-      const info = comprehensionDisplay(record);
+      const info = bestComprehensionDisplay(attempts);
       if(info){
         tier = info.tier;
         label = info.label;
@@ -595,16 +627,16 @@ function buildPerekSection(perekNum, range){
     rangeWrap.style.marginTop = '14px';
     rangeWrap.innerHTML = '<div style="font-weight:800;color:var(--ink-soft);margin-bottom:8px;">Several פסוקים together</div>';
     ranges.forEach(r => {
-      const record = r.latest;
+      const attempts = r.attempts || [];
       let tier = null, label = '—';
       if(activeTab === 'reading'){
-        const score = effHebrewScore(record);
+        const score = bestNumeric(attempts, effHebrewScore);
         if(typeof score === 'number'){ tier = pctTier(score); label = score + '%'; }
       }else if(activeTab === 'translate'){
-        const score = effTranslationScore(record);
+        const score = bestNumeric(attempts, effTranslationScore);
         if(typeof score === 'number'){ tier = pctTier(score); label = score + '%'; }
       }else{
-        const info = comprehensionDisplay(record);
+        const info = bestComprehensionDisplay(attempts);
         if(info){ tier = info.tier; label = info.label; }
       }
       const a = document.createElement('a');

@@ -181,13 +181,22 @@
   .empty-msg{ color: var(--ink-soft); text-align:center; padding: 40px 0; }
   .loading{ color: var(--ink-soft); text-align:center; padding:20px 0; }
 
-  .tab-bar{ display:flex; gap:8px; margin-bottom:16px; }
+  .tab-bar{ display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
   .tab-btn{
     font-family:'Quicksand', sans-serif; font-weight:700; font-size:0.85rem;
     border: 2px solid var(--ink-soft); background:#fff; color: var(--ink-soft);
     border-radius: 999px; padding: 8px 18px; cursor:pointer;
   }
   .tab-btn.active{ background: var(--rimon); border-color: var(--rimon); color:#fff; }
+
+  /* ---------- Chazara Recordings ---------- */
+  .chazara-recording-card{background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);}
+  .chazara-recording-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;margin-bottom:8px;}
+  .chazara-recording-head strong{color:var(--ink);font-size:.96rem;}
+  .chazara-meta{font-size:.76rem;color:var(--ink-soft);}
+  .chazara-waveform{height:54px;display:flex;align-items:center;gap:2px;padding:6px 8px;border-radius:10px;background:#eef2f7;margin:8px 0;}
+  .chazara-waveform span{display:block;flex:1;min-width:2px;max-width:7px;background:var(--navy);border-radius:999px;}
+  .chazara-points{display:inline-block;border-radius:999px;background:#E4F4E4;color:#33511E;font-weight:800;font-size:.76rem;padding:4px 10px;}
 
   .summary-row{
     background:#fff; border-radius:12px; padding:14px 16px; margin-bottom:12px;
@@ -378,6 +387,7 @@
           <button class="tab-btn" id="rosterTabBtn">📋 Class Roster</button>
           <button class="tab-btn" id="summaryTabBtn">📊 Class Stats</button>
           <button class="tab-btn" id="reportsTabBtn">🧾 Reports</button>
+          <button class="tab-btn" id="chazaraRecordingsTabBtn">🎧 Chazara Recordings</button>
           <button class="tab-btn" id="accessTabBtn">🔑 Manage Access</button>
         </div>
         <div id="mainContent" class="empty-msg">Select a student to view their practice history.</div>
@@ -531,6 +541,34 @@ function effTranslationScore(record){
   // official verdict for scoring purposes too — not just the badge.
   const correct = entries.filter(([,c]) => (c.finalVerdict || c.verdict) === 'correct').length;
   return Math.round((correct / total) * 100);
+}
+
+// Cumulative mastery: dashboards always show the student's best result ever
+// for that posuk/skill. A lower retry never erases a higher earlier score.
+function bestNumericScore(attempts, reader){
+  let best = null;
+  (attempts || []).forEach(a => {
+    const v = reader(a);
+    if(typeof v === 'number' && Number.isFinite(v) && (best === null || v > best)) best = v;
+  });
+  return best;
+}
+function verdictRank(v){ return ({incorrect:1,partial:2,correct:3,excellent:4})[v] || 0; }
+function bestAttemptForSkill(attempts, skill){
+  let best = null, bestValue = -1;
+  (attempts || []).forEach(a => {
+    let value = -1;
+    if(skill === 'reading'){
+      const v = effHebrewScore(a); value = typeof v === 'number' ? v : -1;
+    }else if(skill === 'translate'){
+      const v = effTranslationScore(a); value = typeof v === 'number' ? v : -1;
+    }else{
+      const v = effComprehensionScore(a);
+      value = typeof v === 'number' ? 1000 + v : verdictRank(effComprehensionVerdict(a));
+    }
+    if(value > bestValue){ bestValue = value; best = a; }
+  });
+  return bestValue >= 0 ? best : null;
 }
 // A dispute only exists while its underlying recording still exists.
 // This also suppresses old orphaned disputes created before student-side
@@ -723,10 +761,30 @@ function getAudioDuration(url){
   });
 }
 
+const STUDENT_REWARDS_AUTO_AWARD_URL = 'https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
+function awardKeysForEvidence(posukKey){
+  const parts = String(posukKey || '').split('_');
+  if(parts.length < 3) return [];
+  const last = parts.pop(), perek = parts.pop(), prefix = parts.join('_');
+  const m = /^(\d+)-(\d+)$/.exec(last);
+  if(!m) return [posukKey];
+  const out=[];
+  for(let n=Number(m[1]); n<=Number(m[2]); n++) out.push(prefix + '_' + perek + '_' + n);
+  return out;
+}
+async function requestTeacherMilestoneAward(studentId, source, evidencePosukKey){
+  for(const awardPosukKey of awardKeysForEvidence(evidencePosukKey)){
+    try{
+      await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId,source,awardPosukKey,evidencePosukKey})});
+    }catch(err){ console.warn('Could not apply verified reward yet', err); }
+  }
+}
+
 document.getElementById('studentTabBtn').onclick = () => setTab('student');
 document.getElementById('rosterTabBtn').onclick = () => setTab('roster');
 document.getElementById('summaryTabBtn').onclick = () => setTab('summary');
 document.getElementById('reportsTabBtn').onclick = () => setTab('reports');
+document.getElementById('chazaraRecordingsTabBtn').onclick = () => setTab('chazaraRecordings');
 document.getElementById('accessTabBtn').onclick = () => setTab('access');
 
 function setTab(tab){
@@ -734,6 +792,7 @@ function setTab(tab){
   document.getElementById('rosterTabBtn').classList.toggle('active', tab === 'roster');
   document.getElementById('summaryTabBtn').classList.toggle('active', tab === 'summary');
   document.getElementById('reportsTabBtn').classList.toggle('active', tab === 'reports');
+  document.getElementById('chazaraRecordingsTabBtn').classList.toggle('active', tab === 'chazaraRecordings');
   document.getElementById('accessTabBtn').classList.toggle('active', tab === 'access');
   if(tab === 'summary'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
@@ -744,6 +803,9 @@ function setTab(tab){
   }else if(tab === 'reports'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
     loadReportsTab();
+  }else if(tab === 'chazaraRecordings'){
+    [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
+    loadChazaraRecordings();
   }else if(tab === 'access'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
     loadAccessTab();
@@ -936,27 +998,72 @@ function computeStudentStats(posukMap){
   let verdictCounts = { excellent: 0, correct: 0, partial: 0, incorrect: 0 };
   let posukCount = 0;
   Object.values(posukMap || {}).forEach(attemptMap => {
-    const attempts = Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp);
-    const latest = attempts[0];
+    const attempts = Object.values(attemptMap).sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
     posukCount++;
-    const hScore = effHebrewScore(latest);
+    const hScore = bestNumericScore(attempts, effHebrewScore);
     if(typeof hScore === 'number') hebrewScores.push(hScore);
-    const tScore = effTranslationScore(latest);
+    const tScore = bestNumericScore(attempts, effTranslationScore);
     if(typeof tScore === 'number') translationScores.push(tScore);
-    const cScore = effComprehensionScore(latest);
+    const cScore = bestNumericScore(attempts, effComprehensionScore);
     if(typeof cScore === 'number') comprehensionScores.push(cScore);
 
-    // Keep counting old freehand verdicts separately for historical context,
-    // but question-mode percentages are now the primary comprehension grade.
-    const cVerdict = effComprehensionVerdict(latest);
-    if(cVerdict && verdictCounts.hasOwnProperty(cVerdict)){
-      verdictCounts[cVerdict]++;
-    }
+    const bestComp = bestAttemptForSkill(attempts, 'comprehension');
+    const cVerdict = bestComp ? effComprehensionVerdict(bestComp) : null;
+    if(cVerdict && verdictCounts.hasOwnProperty(cVerdict)) verdictCounts[cVerdict]++;
   });
   const avg = hebrewScores.length ? hebrewScores.reduce((a,b) => a+b, 0) / hebrewScores.length : null;
   const avgTranslation = translationScores.length ? translationScores.reduce((a,b) => a+b, 0) / translationScores.length : null;
   const avgComprehension = comprehensionScores.length ? comprehensionScores.reduce((a,b) => a+b, 0) / comprehensionScores.length : null;
   return { posukCount, avg, avgTranslation, avgComprehension, verdictCounts };
+}
+
+/* ---------- Chazara Recordings ---------- */
+function waveformHtml(samples){
+  const vals = Array.isArray(samples) ? samples.map(Number).filter(Number.isFinite) : [];
+  if(!vals.length) return '<div class="chazara-waveform"><span style="height:4px"></span></div>';
+  const speechScale = 0.12; // fixed scale: quiet recordings stay visibly quiet
+  return '<div class="chazara-waveform">' + vals.map(v => {
+    const h = Math.max(4, Math.min(100, Math.round((v/speechScale)*100)));
+    return '<span style="height:' + h + '%"></span>';
+  }).join('') + '</div>';
+}
+async function loadChazaraRecordings(){
+  const mainEl = document.getElementById('mainContent');
+  mainEl.innerHTML = '<div class="loading">Loading Chazara recordings…</div>';
+  try{
+    const snap = await db.ref('posukPractice/chazara/events').once('value');
+    const root = snap.val() || {};
+    const rows=[];
+    Object.entries(root).forEach(([sid,events]) => {
+      Object.entries(events || {}).forEach(([eventId,e]) => {
+        if(!e || e.recorded !== true || !e.audioURL) return;
+        rows.push({sid,eventId,...e});
+      });
+    });
+    rows.sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0));
+    let html = '<h2>🎧 Chazara Recordings</h2><p style="color:var(--ink-soft);margin-top:-4px;">Newest recorded Chazaras are shown first. The waveform lets you quickly see whether there was real speaking before you listen.</p>';
+    if(!rows.length){
+      mainEl.innerHTML = html + '<div class="empty-msg">No recorded Chazara yet.</div>';
+      return;
+    }
+    html += rows.map(e => {
+      const name = e.studentName || studentsMap[e.sid] || e.sid;
+      const perek = Number(e.perek), posuk = Number(e.posuk);
+      const ref = (perek && posuk) ? ('פרק ' + hebrewNumeral(perek) + ' · פסוק ' + hebrewNumeral(posuk)) : (e.posukKey || 'Posuk');
+      const when = e.createdAt ? new Date(Number(e.createdAt)).toLocaleString() : '';
+      const seconds = Number(e.durationMs || 0) / 1000;
+      return `<div class="chazara-recording-card">
+        <div class="chazara-recording-head"><strong>${name} · ${ref}</strong><span class="chazara-points">2 ★ awarded</span></div>
+        <div class="chazara-meta">${when}${seconds ? ' · ' + formatDuration(seconds) : ''} · Review #${Number(e.reviewNumber)||'—'}</div>
+        ${waveformHtml(e.waveform)}
+        <audio controls preload="metadata" src="${e.audioURL}"></audio>
+      </div>`;
+    }).join('');
+    mainEl.innerHTML = html;
+  }catch(err){
+    console.error(err);
+    mainEl.innerHTML = '<div class="empty-msg">Could not load Chazara recordings.</div>';
+  }
 }
 
 /* ---------- Class Roster ---------- */
@@ -1104,10 +1211,10 @@ function buildReportRows(allAttempts){
         rangeEnd,
         posukLabel: isRange ? `${rangeStart}–${rangeEnd}` : String(posukNum),
         timestamp: latest ? latest.timestamp : null,
-        hebrewScore: effHebrewScore(latest),
-        translationScore: effTranslationScore(latest),
-        comprehensionVerdict: effComprehensionVerdict(latest),
-        comprehensionScore: effComprehensionScore(latest)
+        hebrewScore: bestNumericScore(attempts, effHebrewScore),
+        translationScore: bestNumericScore(attempts, effTranslationScore),
+        comprehensionVerdict: (() => { const b=bestAttemptForSkill(attempts,'comprehension'); return b ? effComprehensionVerdict(b) : null; })(),
+        comprehensionScore: bestNumericScore(attempts, effComprehensionScore)
       });
     });
   });
@@ -1141,10 +1248,11 @@ async function buildPosukGridData(perekNum, posukNums, studentIds, allAttempts){
     const parshaName = Object.keys(PARSHA_CONFIG).find(n => n.replace(/\s+/g,'') === slug) || slug;
     const students = ids.map(id => {
       const attemptMap = allAttempts[id] && allAttempts[id][posukKey];
-      const latest = attemptMap ? Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp)[0] : null;
-      const reading = effHebrewScore(latest);
-      const translation = effTranslationScore(latest);
-      const comprehension = effComprehensionScore(latest);
+      const attempts = attemptMap ? Object.values(attemptMap).sort((a,b) => (b.timestamp||0) - (a.timestamp||0)) : [];
+      const latest = attempts[0] || null;
+      const reading = bestNumericScore(attempts, effHebrewScore);
+      const translation = bestNumericScore(attempts, effTranslationScore);
+      const comprehension = bestNumericScore(attempts, effComprehensionScore);
       return {
         id, name: studentsMap[id],
         reading, translation, comprehension,
@@ -2511,7 +2619,8 @@ async function renderStudentGrid(){
 
     for(let posukNum = range.min; posukNum <= range.max; posukNum++){
       const posukKey = posuksThisPerek[posukNum];
-      const record = posukKey ? studentPosukData[posukKey].latest : null;
+      const attemptsForTile = posukKey ? studentPosukData[posukKey].attempts : [];
+      const record = bestAttemptForSkill(attemptsForTile, studentActiveTab);
 
       let tier = null;
       let tileLabel = '—';
@@ -2581,14 +2690,16 @@ async function renderStudentGrid(){
     studentRangeData.forEach(r => {
       let rangeTier = null;
       let rangeLabel = '—';
+      const rangeAttempts = studentPosukData[r.posukKey].attempts || [];
+      const bestRange = bestAttemptForSkill(rangeAttempts, studentActiveTab);
       if(studentActiveTab === 'reading'){
-        const score = r.latest ? effHebrewScore(r.latest) : null;
+        const score = bestRange ? effHebrewScore(bestRange) : null;
         if(typeof score === 'number'){ rangeTier = pctTier(score); rangeLabel = score + '%'; }
       }else if(studentActiveTab === 'translate'){
-        const score = r.latest ? effTranslationScore(r.latest) : null;
+        const score = bestRange ? effTranslationScore(bestRange) : null;
         if(typeof score === 'number'){ rangeTier = pctTier(score); rangeLabel = score + '%'; }
       }else{
-        const info = r.latest ? comprehensionSkillInfo(r.latest) : null;
+        const info = bestRange ? comprehensionSkillInfo(bestRange) : null;
         if(info){ rangeTier = info.tier; rangeLabel = info.label; }
       }
       const pending = studentPosukData[r.posukKey].attempts.some(hasPendingDispute);
@@ -2944,6 +3055,7 @@ function wireFinalizeHebrew(a, posukKey){
       // DB and rebuilding the whole student view — that's what was
       // snapping the scroll position back to the top.
       Object.assign(a, updates);
+      if(finalScore >= 100) requestTeacherMilestoneAward(activeStudentId, 'reading100', posukKey);
       allAttemptsCache = null; // Reports/Class Stats/sidebar recompute fresh next load
       await renderStudentGrid();
       renderPosukDetail(posukKey);
@@ -2976,6 +3088,7 @@ function wireFinalizeComprehension(a, posukKey){
       };
       await attemptRef(posukKey, a.attemptId).update(updates);
       Object.assign(a, updates);
+      if(effComprehensionScore(a) >= 100) requestTeacherMilestoneAward(activeStudentId, 'understand100', posukKey);
       allAttemptsCache = null;
       await renderStudentGrid();
       renderPosukDetail(posukKey);
@@ -3016,6 +3129,7 @@ function wireFinalizeQuestion(a, posukKey, questionIdx, q){
       await attemptRef(posukKey, a.attemptId).update(updates);
       Object.assign(q, { finalVerdict, disputeStatus:'resolved', disputeResolvedAt:resolvedAt });
       a.questionScore = questionScore;
+      if(parseFloat(questionScore) >= 100) requestTeacherMilestoneAward(activeStudentId, 'understand100', posukKey);
       allAttemptsCache = null;
       await renderStudentGrid();
       renderPosukDetail(posukKey);
@@ -3044,6 +3158,7 @@ function wireFinalizeTranslationChunk(a, posukKey, chunkIdx, c){
       };
       await attemptRef(posukKey, a.attemptId).child('translationChunkResults').child(String(chunkIdx)).update(updates);
       Object.assign(c, updates); // c is a.translationChunkResults[chunkIdx] itself
+      if(effTranslationScore(a) >= 100) requestTeacherMilestoneAward(activeStudentId, 'translation100', posukKey);
       allAttemptsCache = null;
       await renderStudentGrid();
       renderPosukDetail(posukKey);
@@ -3213,7 +3328,7 @@ async function renderClassPosukGrid(val){
           const attemptMap = val[studentId] && val[studentId][posukKey];
           if(attemptMap){
             const attempts = Object.values(attemptMap).sort((a,b) => b.timestamp - a.timestamp);
-            const latest = attempts.find(a => skillInfo(a, classActiveSkill)) || null;
+            const latest = bestAttemptForSkill(attempts, classActiveSkill);
             if(latest){
               doneList.push({ studentId, name, latest });
               if(!posukText && latest.posukText) posukText = latest.posukText;

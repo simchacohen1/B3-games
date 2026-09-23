@@ -1462,6 +1462,61 @@ function wakeScorer(){
 const SYNTHESIZE_SPEECH_URL = "https://us-central1-b3-games.cloudfunctions.net/synthesizeSpeech";
 
 /* =========================================================
+   STUDENT REWARDS — verified automatic awards
+   The server decides the point value and verifies the saved Posuk Practice
+   evidence before changing a balance, so refreshing/retrying cannot duplicate
+   a one-time 100% reward for the same posuk.
+   ========================================================= */
+const STUDENT_REWARDS_AUTO_AWARD_URL = "https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
+
+function showRewardToast(points){
+  if(!points) return;
+  let el = document.getElementById('rewardPointsToast');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'rewardPointsToast';
+    Object.assign(el.style,{position:'fixed',right:'18px',bottom:'18px',zIndex:'99999',background:'#24344A',color:'#fff',border:'3px solid #C9A227',borderRadius:'16px',padding:'13px 18px',fontFamily:"'Quicksand',sans-serif",fontWeight:'800',boxShadow:'0 8px 24px rgba(0,0,0,.25)',transition:'opacity .25s'});
+    document.body.appendChild(el);
+  }
+  el.textContent = '⭐ +' + points + ' reward point' + (points === 1 ? '' : 's') + '!';
+  el.style.opacity = '1';
+  clearTimeout(showRewardToast._timer);
+  showRewardToast._timer = setTimeout(()=>{ el.style.opacity='0'; }, 3500);
+}
+
+async function requestVerifiedAward(source, awardPosukKey, evidencePosukKey){
+  if(!studentId || !awardPosukKey || !evidencePosukKey) return 0;
+  try{
+    const response = await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ studentId, source, awardPosukKey, evidencePosukKey })
+    });
+    const data = await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(data.error || ('Award service returned ' + response.status));
+    return data.awarded ? Number(data.points || 0) : 0;
+  }catch(err){
+    // Practice itself must never fail just because the reward service is
+    // temporarily unavailable. A later 100% save safely retries the same
+    // idempotent award.
+    console.warn('Could not apply reward points yet:', err);
+    return 0;
+  }
+}
+
+async function awardMilestoneForSelection(source){
+  if(!currentPosukKey) return;
+  const parts = (currentSelectionParts && currentSelectionParts.length)
+    ? currentSelectionParts
+    : [{ key: currentPosukKey }];
+  let newlyAwarded = 0;
+  for(const part of parts){
+    newlyAwarded += await requestVerifiedAward(source, part.key || currentPosukKey, currentPosukKey);
+  }
+  if(newlyAwarded) showRewardToast(newlyAwarded);
+}
+
+/* =========================================================
    TRANSLATION CHUNKING & GRADING — Cloud Function URLs
    PASTE YOUR CLOUD FUNCTION URLs HERE once you deploy them:
      firebase deploy --only functions:generateTranslationChunks,functions:gradeTranslationChunk
@@ -3714,6 +3769,7 @@ async function autosaveHebrew(){
     });
     hebrewSavedStoragePath = path;
     markTaskSaved('hebrew');
+    if(Number(hebrewScore) >= 100) await awardMilestoneForSelection('reading100');
   }catch(err){
     console.error('Autosave (hebrew) failed', err);
     const gradingMsg = document.getElementById('hebrewGradingMsg');
@@ -3750,6 +3806,7 @@ async function autosaveComprehension(){
       comprehensionFeedback: comprehensionFeedback
     });
     markTaskSaved('comprehension');
+    if(Number(comprehensionScore) >= 100) await awardMilestoneForSelection('understand100');
   }catch(err){
     console.error('Autosave (comprehension) failed', err);
     const gradingMsg = document.getElementById('comprehensionGradingMsg');
@@ -4437,6 +4494,7 @@ async function autosaveComprehensionQuestions(){
       };
     }
 
+    const savedQuestionPercent = Math.round((correctCount / comprehensionQuestions.length) * 100);
     await currentAttemptRef.update({
       timestamp: Date.now(),
       parsha: currentParshaName || null,
@@ -4448,11 +4506,12 @@ async function autosaveComprehensionQuestions(){
       posukTranslation: currentPosukTranslation,
       questionResults: questionResultsData,
       questionTotal: comprehensionQuestions.length,
-      questionScore: Math.round((correctCount / comprehensionQuestions.length) * 100) + '%'
+      questionScore: savedQuestionPercent + '%'
     });
 
     idxs.forEach(i => { if(comprehensionQResults[i]) comprehensionQResults[i].saving = false; });
     markTaskSaved('comprehension');
+    if(savedQuestionPercent >= 100) await awardMilestoneForSelection('understand100');
     renderAnsweredQuestionHistory();
   }catch(err){
     idxs.forEach(i => { if(comprehensionQResults[i]) comprehensionQResults[i].saving = false; });
@@ -5609,7 +5668,10 @@ async function autosaveTranslation(level){
     }
 
     await currentAttemptRef.update(updateData);
-    if(allDone) markTaskSaved('translation');
+    if(allDone){
+      markTaskSaved('translation');
+      if(correctCount === level.chunks.length) await awardMilestoneForSelection('translation100');
+    }
     showTranslationSummary(level);
   }catch(err){
     console.error('Autosave (translation) failed', err);
