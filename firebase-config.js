@@ -9,18 +9,21 @@ window.B3_FIREBASE_CONFIG = {
 };
 
 /*
- * B3 Admin password gate
- * This gate keeps students from reaching the Google sign-in screen.
- * Google/Firebase authentication remains the real admin security.
+ * B3 Admin password gate.
+ *
+ * Pressing Admin first asks for the admin password.
+ * Only after the correct password is entered does the normal Admin panel open,
+ * where Google sign-in still verifies the authorized teacher account.
+ *
+ * The password itself is not stored in plain text here.
  */
 (function () {
   "use strict";
 
-  const ADMIN_PASSWORD_HASH =
-    "57532c1bb37dcc8f1f9c86501590f50bcae0825fdd22a6a88605a046be7d43e3";
+  const ADMIN_PASSWORD_HASH = "57532c1bb37dcc8f1f9c86501590f50bcae0825fdd22a6a88605a046be7d43e3";
   const SESSION_KEY = "b3AdminPasswordUnlocked";
 
-  function unlocked() {
+  function isUnlocked() {
     try {
       return sessionStorage.getItem(SESSION_KEY) === "1";
     } catch (e) {
@@ -28,27 +31,26 @@ window.B3_FIREBASE_CONFIG = {
     }
   }
 
-  function setUnlocked(value) {
+  function unlock() {
     try {
-      if (value) sessionStorage.setItem(SESSION_KEY, "1");
-      else sessionStorage.removeItem(SESSION_KEY);
+      sessionStorage.setItem(SESSION_KEY, "1");
     } catch (e) {}
   }
 
-  async function sha256Hex(value) {
-    const bytes = new TextEncoder().encode(String(value || ""));
-    const digest = await crypto.subtle.digest("SHA-256", bytes);
-    return Array.from(new Uint8Array(digest))
-      .map(b => b.toString(16).padStart(2, "0"))
-      .join("");
+  function lock() {
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch (e) {}
   }
 
-  function authorizedTeacherSignedIn() {
+  function authorizedTeacherAlreadySignedIn() {
     try {
-      const user = window.firebase &&
-                   window.firebase.auth &&
-                   window.firebase.auth().currentUser;
-      return !!(
+      const user =
+        window.firebase &&
+        window.firebase.auth &&
+        window.firebase.auth().currentUser;
+
+      return Boolean(
         user &&
         user.email &&
         user.email.toLowerCase() === "simcha5770@gmail.com"
@@ -58,139 +60,71 @@ window.B3_FIREBASE_CONFIG = {
     }
   }
 
-  function installGate() {
-    const panel = document.getElementById("adminPanel");
-    const signInButton = document.getElementById("signInButton");
-    const signOutButton = document.getElementById("signOutButton");
-    const adminStatus = document.getElementById("adminStatus");
+  async function sha256Hex(value) {
+    const bytes = new TextEncoder().encode(String(value || ""));
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest))
+      .map(function (b) { return b.toString(16).padStart(2, "0"); })
+      .join("");
+  }
 
-    if (!panel || !signInButton || document.getElementById("adminPasswordGate")) {
-      return;
-    }
+  function installAdminPasswordGate() {
+    const adminButton = document.getElementById("adminAccessButton");
+    if (!adminButton || adminButton.dataset.passwordGateInstalled === "1") return;
 
-    const gate = document.createElement("div");
-    gate.id = "adminPasswordGate";
-    gate.innerHTML = `
-      <label for="adminPasswordInput"
-             style="display:block;font-weight:800;margin:10px 0 6px;">
-        Admin password
-      </label>
-      <input id="adminPasswordInput"
-             type="password"
-             autocomplete="current-password"
-             placeholder="Enter admin password"
-             style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;
-                    border-radius:10px;font-size:15px;">
-      <button id="adminPasswordButton"
-              type="button"
-              class="admin-action">
-        Continue
-      </button>
-      <div id="adminPasswordMsg"
-           style="min-height:18px;margin-top:8px;color:#b91c1c;
-                  font-size:13px;"></div>
-    `;
+    adminButton.dataset.passwordGateInstalled = "1";
 
-    signInButton.parentNode.insertBefore(gate, signInButton);
-
-    const input = document.getElementById("adminPasswordInput");
-    const continueButton = document.getElementById("adminPasswordButton");
-    const message = document.getElementById("adminPasswordMsg");
-
-    function applyGateState() {
-      const teacherSignedIn = authorizedTeacherSignedIn();
-      const allowGoogle = unlocked() || teacherSignedIn;
-
-      if (teacherSignedIn) {
-        gate.style.display = "none";
+    /*
+     * Capture phase is intentional: it runs before the existing Admin click
+     * handler in index.html. Until the password is accepted, the existing
+     * handler never runs, so students cannot reach the Google sign-in button.
+     */
+    adminButton.addEventListener("click", async function (event) {
+      if (isUnlocked() || authorizedTeacherAlreadySignedIn()) {
         return;
       }
 
-      gate.style.display = allowGoogle ? "none" : "";
-
-      if (!allowGoogle) {
-        signInButton.classList.add("hidden");
-        if (adminStatus) {
-          adminStatus.textContent = "Enter the admin password to continue.";
-        }
-      } else {
-        signInButton.classList.remove("hidden");
-        if (adminStatus) {
-          adminStatus.textContent =
-            "Password accepted. Now sign in with simcha5770@gmail.com.";
-        }
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === "function") {
+        event.stopImmediatePropagation();
       }
-    }
 
-    async function submitPassword() {
-      message.textContent = "";
-      continueButton.disabled = true;
+      const entered = window.prompt("Enter admin password:");
+      if (entered === null) return;
 
       try {
-        const hash = await sha256Hex(input.value);
+        const enteredHash = await sha256Hex(entered);
 
-        if (hash !== ADMIN_PASSWORD_HASH) {
-          message.textContent = "Incorrect password.";
-          input.select();
-          input.focus();
+        if (enteredHash !== ADMIN_PASSWORD_HASH) {
+          window.alert("Incorrect admin password.");
           return;
         }
 
-        setUnlocked(true);
-        input.value = "";
-        applyGateState();
-        setTimeout(() => signInButton.focus(), 0);
-      } catch (err) {
-        console.error("Admin password check failed:", err);
-        message.textContent = "Could not check the password. Please try again.";
-      } finally {
-        continueButton.disabled = false;
+        unlock();
+
+        /*
+         * Run a fresh click. This time the gate sees the unlocked session and
+         * allows the site's normal Admin click handler to open the panel.
+         */
+        adminButton.click();
+      } catch (error) {
+        console.error("Could not verify admin password:", error);
+        window.alert("Could not verify the admin password. Please try again.");
       }
-    }
+    }, true);
 
-    continueButton.addEventListener("click", submitPassword);
-    input.addEventListener("keydown", function (event) {
-      if (event.key === "Enter") submitPassword();
-    });
-
-    // Existing B3 code can re-render this button. Keep it hidden until
-    // the password gate has been passed.
-    const observer = new MutationObserver(function () {
-      if (!unlocked() && !authorizedTeacherSignedIn()) {
-        signInButton.classList.add("hidden");
-        gate.style.display = "";
-      }
-    });
-
-    observer.observe(signInButton, {
-      attributes: true,
-      attributeFilter: ["class", "style"]
-    });
-
+    const signOutButton = document.getElementById("signOutButton");
     if (signOutButton) {
       signOutButton.addEventListener("click", function () {
-        setUnlocked(false);
-        setTimeout(applyGateState, 50);
+        lock();
       }, true);
     }
-
-    try {
-      if (window.firebase && window.firebase.auth) {
-        window.firebase.auth().onAuthStateChanged(function (user) {
-          if (!user) setUnlocked(false);
-          setTimeout(applyGateState, 0);
-        });
-      }
-    } catch (e) {}
-
-    applyGateState();
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () {
-      setTimeout(installGate, 0);
-    });
+    document.addEventListener("DOMContentLoaded", installAdminPasswordGate);
   } else {
-    setTimeout(installGate, 0);
+    installAdminPasswordGate();
   }
 })();
