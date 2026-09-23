@@ -162,8 +162,17 @@
   <button id="adminAccessButton" class="admin-button">Admin</button>
   <div id="adminPanel" class="admin-panel hidden">
     <h2>B3 Access Controls</h2>
-    <p id="adminStatus" class="admin-message">Checking sign-in…</p>
-    <button id="signInButton" class="admin-action">Sign in with Google</button>
+    <p id="adminStatus" class="admin-message">Enter the admin password to continue.</p>
+
+    <div id="adminPasswordGate">
+      <label for="adminPasswordInput" style="display:block;font-weight:800;margin:10px 0 6px;">Admin password</label>
+      <input id="adminPasswordInput" type="password" autocomplete="current-password" placeholder="Enter admin password"
+             style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;">
+      <button id="adminPasswordButton" class="admin-action" type="button">Continue</button>
+      <div id="adminPasswordMsg" class="admin-message" style="min-height:18px;margin-top:8px;color:#b91c1c;"></div>
+    </div>
+
+    <button id="signInButton" class="admin-action hidden">Sign in with Google</button>
     <button id="signOutButton" class="admin-action secondary hidden">Sign out</button>
 
     <div id="adminControls" class="hidden">
@@ -272,6 +281,46 @@
   let myClassId="";
   let overrideRoster=[];
   let selectedOverrideStudentId="";
+
+  // Password gate only keeps students from reaching the Google sign-in screen.
+  // Google/Firebase authentication remains the real administrator security.
+  const ADMIN_PASSWORD_HASH="57532c1bb37dcc8f1f9c86501590f50bcae0825fdd22a6a88605a046be7d43e3";
+  const ADMIN_PASSWORD_SESSION_KEY="b3AdminPasswordUnlocked";
+
+  function adminPasswordUnlocked(){
+    try{return sessionStorage.getItem(ADMIN_PASSWORD_SESSION_KEY)==="1";}catch(e){return false;}
+  }
+
+  async function sha256Hex(value){
+    const bytes=new TextEncoder().encode(String(value||""));
+    const digest=await crypto.subtle.digest("SHA-256",bytes);
+    return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");
+  }
+
+  async function unlockAdminPassword(){
+    const input=el("adminPasswordInput");
+    const msg=el("adminPasswordMsg");
+    const btn=el("adminPasswordButton");
+    if(msg)msg.textContent="";
+    if(btn)btn.disabled=true;
+    try{
+      const hash=await sha256Hex(input?input.value:"");
+      if(hash!==ADMIN_PASSWORD_HASH){
+        if(msg)msg.textContent="Incorrect password.";
+        if(input){input.select();input.focus();}
+        return;
+      }
+      try{sessionStorage.setItem(ADMIN_PASSWORD_SESSION_KEY,"1");}catch(e){}
+      if(input)input.value="";
+      renderAdminPanel();
+      setTimeout(()=>el("signInButton")?.focus(),0);
+    }catch(e){
+      console.error("Admin password check failed:",e);
+      if(msg)msg.textContent="Could not check the password. Please try again.";
+    }finally{
+      if(btn)btn.disabled=false;
+    }
+  }
 
   function slugify(name){return String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");}
   function setLoginMsg(t){el("loginMsg").textContent=t||"";}
@@ -509,10 +558,18 @@
       teacherToolsAutoOpened=true;
     }
     el("adminAccessButton").textContent=isAuthorizedAdmin ? (el("adminPanel").classList.contains("hidden") ? "Teacher Tools" : "Hide Teacher Tools") : "Admin";
-    el("signInButton").classList.toggle("hidden",signedIn);
-    el("signOutButton").classList.toggle("hidden",!signedIn);
+
+    const passwordUnlocked=isAuthorizedAdmin||adminPasswordUnlocked();
+    el("adminPasswordGate").classList.toggle("hidden",passwordUnlocked);
+    el("signInButton").classList.toggle("hidden",!passwordUnlocked||signedIn);
+    el("signOutButton").classList.toggle("hidden",!passwordUnlocked||!signedIn);
     el("adminControls").classList.toggle("hidden",!isAuthorizedAdmin);
-    if(!signedIn){el("adminStatus").textContent="Sign in with simcha5770@gmail.com to change access.";return;}
+
+    if(!passwordUnlocked){
+      el("adminStatus").textContent="Enter the admin password to continue.";
+      return;
+    }
+    if(!signedIn){el("adminStatus").textContent="Password accepted. Now sign in with simcha5770@gmail.com.";return;}
     if(!isAuthorizedAdmin){el("adminStatus").textContent=`Signed in as ${currentUser.email||"an unauthorized account"}. This account cannot edit settings.`;return;}
     el("adminStatus").textContent=`Signed in as ${currentUser.email}. Your teacher access bypasses all student locks; ET and WT can be controlled separately.`;
     el("siteEnabledToggle").checked=currentSettings.siteEnabled;
@@ -618,13 +675,18 @@
     el("adminAccessButton").textContent=isAuthorizedAdmin ? (el("adminPanel").classList.contains("hidden") ? "Teacher Tools" : "Hide Teacher Tools") : "Admin";
     if(!el("adminPanel").classList.contains("hidden"))renderAdminPanel();
   });
+  el("adminPasswordButton").addEventListener("click",unlockAdminPassword);
+  el("adminPasswordInput").addEventListener("keydown",e=>{if(e.key==="Enter")unlockAdminPassword();});
   el("signInButton").addEventListener("click",()=>settingsApi.signInWithGoogle().catch(e=>{
     const detail=(e&&e.code)?e.code:(e&&e.message)?e.message:"Unknown error";
     el("adminStatus").textContent="Google sign-in failed: "+detail;
     alert("Google sign-in failed. The Admin panel now shows the exact error.");
     console.error(e);
   }));
-  el("signOutButton").addEventListener("click",()=>settingsApi.signOut().catch(e=>{alert("Could not sign out.");console.error(e);}));
+  el("signOutButton").addEventListener("click",()=>{
+    try{sessionStorage.removeItem(ADMIN_PASSWORD_SESSION_KEY);}catch(e){}
+    settingsApi.signOut().catch(e=>{alert("Could not sign out.");console.error(e);});
+  });
   el("siteEnabledToggle").addEventListener("change",async()=>{
     const old=!el("siteEnabledToggle").checked;
     try{currentSettings.siteEnabled=el("siteEnabledToggle").checked;renderStudentAccess();await settingsApi.updateSiteEnabled(el("siteEnabledToggle").checked);}catch(e){currentSettings.siteEnabled=old;el("siteEnabledToggle").checked=old;alert("Could not save the master setting.");console.error(e);}
