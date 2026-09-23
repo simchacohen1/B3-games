@@ -3,13 +3,23 @@
 const C=window.StudentRewardsCommon;
 const {db,auth}=C.ensureFirebase({student:true});
 const ROOT=C.ROOT;
-let state={studentId:'',student:null,tab:'Progress',root:null,busy:false};
+let state={studentId:'',student:null,tab:'Progress',root:null,busy:false,activityPointHistory:[]};
 const $=s=>document.querySelector(s);
 const e=C.escapeHtml;
+const POINTS_API='https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
 
 function slugify(name){return String(name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')}
 async function websiteEnabled(){const snap=await db.ref(`${ROOT}/settings/studentWebsiteEnabled`).once('value');return String(snap.val())!=='false'}
 function own(path){return db.ref(`${ROOT}/${path}/${state.studentId}`)}
+async function loadActivityPointHistory(){
+  const user=auth.currentUser;
+  if(!user)return [];
+  const token=await user.getIdToken();
+  const r=await fetch(POINTS_API,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({action:'student-point-history'})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error||'Could not load point history');
+  return Array.isArray(j.history)?j.history:[];
+}
 function nav(){const tabs=['Progress','Rewards','Comments'];$('#studentNav').innerHTML=tabs.map(t=>`<button data-tab="${t}" class="${state.tab===t?'active':''}">${t}</button>`).join('');$('#studentNav').onclick=ev=>{const b=ev.target.closest('[data-tab]');if(!b)return;state.tab=b.dataset.tab;render()}}
 
 async function signInB3(name,pin,idHint=''){
@@ -64,7 +74,7 @@ async function trySharedB3Login(){
 
 async function load(){
   if(!state.studentId)return;
-  const [studentSnap,ratingsSnap,attendanceSnap,awardsSnap,commentsSnap,rewardsSnap,redemptionsSnap,categoriesSnap,settingsSnap]=await Promise.all([
+  const [studentSnap,ratingsSnap,attendanceSnap,awardsSnap,commentsSnap,rewardsSnap,redemptionsSnap,categoriesSnap,settingsSnap,activityPointHistory]=await Promise.all([
     db.ref(`${ROOT}/students/${state.studentId}`).once('value'),
     own('dailyRatings').once('value'),
     own('dailyAttendance').once('value'),
@@ -73,15 +83,26 @@ async function load(){
     db.ref(`${ROOT}/rewards`).once('value'),
     own('redemptionsByStudent').once('value'),
     db.ref(`${ROOT}/categories`).once('value'),
-    db.ref(`${ROOT}/settings/rewardStoreEnabled`).once('value').catch(()=>({val:()=>false}))
+    db.ref(`${ROOT}/settings/rewardStoreEnabled`).once('value').catch(()=>({val:()=>false})),
+    loadActivityPointHistory().catch(err=>{console.warn('Could not load activity point history',err);return []})
   ]);
+  state.activityPointHistory=activityPointHistory;
   state.root={student:studentSnap.val(),ratings:ratingsSnap.val()||{},attendance:attendanceSnap.val()||{},awards:awardsSnap.val()||{},comments:commentsSnap.val()||{},rewards:rewardsSnap.val()||{},redemptions:redemptionsSnap.val()||{},categories:categoriesSnap.val()||{},settings:{rewardStoreEnabled:settingsSnap.val()}};
   state.student=state.root.student;
   render();
   subscribe();
 }
 function subscribe(){
-  db.ref(`${ROOT}/students/${state.studentId}`).on('value',s=>{if(state.root){state.root.student=s.val();state.student=s.val();render()}});
+  let lastBalance=Number(state.student?.rewardBalance||0);
+  db.ref(`${ROOT}/students/${state.studentId}`).on('value',async s=>{
+    if(!state.root)return;
+    const next=s.val(),nextBalance=Number(next?.rewardBalance||0),balanceChanged=nextBalance!==lastBalance;
+    state.root.student=next;state.student=next;lastBalance=nextBalance;
+    if(balanceChanged){
+      try{state.activityPointHistory=await loadActivityPointHistory()}catch(err){console.warn('Could not refresh point history',err)}
+    }
+    render();
+  });
   db.ref(`${ROOT}/redemptionsByStudent/${state.studentId}`).on('value',s=>{if(state.root){state.root.redemptions=s.val()||{};render()}});
   db.ref(`${ROOT}/settings/rewardStoreEnabled`).on('value',s=>{if(state.root){state.root.settings.rewardStoreEnabled=s.val();render()}},()=>{});
 }
@@ -130,9 +151,39 @@ function renderTab(){
   if(state.tab==='Comments')box.innerHTML=commentsHTML();
   bindTab();
 }
+function pointHistoryRows(){
+  const rows=[];
+  for(const item of state.activityPointHistory||[]){
+    const amount=Number(item.actualAmount??item.amount??0);
+    if(!amount)continue;
+    const labels={reading100:'Posuk Practice · Reading 100%',translation100:'Posuk Practice · Translation 100%',understand100:'Posuk Practice · Understanding 100%',chazara:'Chazara approved','chazara-recording':'Recorded Chazara approved','chazara-remove':'Chazara adjustment'};
+    rows.push({amount,title:item.reason||'Activity points',detail:labels[item.source]||item.source||'',when:Number(item.reviewedAt||item.createdAt||0)});
+  }
+  for(const [cid,dates] of Object.entries(state.root.awards||{})){
+    for(const [date,award] of Object.entries(dates||{})){
+      const amount=Number(award?.points||0);if(!amount)continue;
+      rows.push({amount,title:'Daily class points',detail:'Saved school day',when:new Date(`${date}T12:00:00`).getTime()});
+    }
+  }
+  for(const p of Object.values(state.root.redemptions||{})){
+    const cost=Number(p?.cost||0);if(!cost)continue;
+    const rewardName=state.root.rewards?.[p.rewardId]?.name||'Reward';
+    const requested=typeof p.requestedAt==='number'?p.requestedAt:(Date.parse(p.requestedAt||'')||0);
+    if(requested)rows.push({amount:-cost,title:`Reward requested — ${rewardName}`,detail:p.status||'requested',when:requested});
+    if(p.status==='declined'){
+      const reviewed=typeof p.reviewedAt==='number'?p.reviewedAt:(Date.parse(p.reviewedAt||'')||0);
+      if(reviewed)rows.push({amount:cost,title:`Points returned — ${rewardName}`,detail:'Request declined',when:reviewed});
+    }
+  }
+  return rows.sort((a,b)=>b.when-a.when);
+}
+function pointHistoryHTML(){
+  const rows=pointHistoryRows();
+  return `<section class="panel points-history-panel"><div class="points-history-head"><div><h2>⭐ Points History</h2><p>See exactly where your reward points came from.</p></div><strong>${Number(state.student?.rewardBalance)||0} ★</strong></div>${rows.length?`<div class="points-history-list">${rows.map(r=>`<article class="points-history-row"><div><b>${e(r.title)}</b>${r.detail?`<small>${e(r.detail)}</small>`:''}<small>${r.when?e(new Date(r.when).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})):''}</small></div><strong class="points-history-amount ${r.amount<0?'negative':'positive'}">${r.amount>0?'+':''}${r.amount} ★</strong></article>`).join('')}</div>`:'<p>No point activity yet.</p>'}</section>`;
+}
 function progressHTML(){
   const rows=allRatingRows(),pct=C.cumulativeProgress(rows)??0,g=grouped(),hist=history(),cats=['Davening','Learning','Participation'];
-  return `<div class="student-score"><strong>${pct}%</strong><span>Your overall progress</span></div><div class="categories">${Object.entries(g).map(([name,x])=>{const p=x.possible?Math.round(x.earned/x.possible*100):0;return `<article><span>${e(name)}</span><b>${p}%</b><u><i style="width:${Math.min(110,p)}%;background:${e(state.student.color)}"></i></u><small>${x.earned} of ${x.possible} progress points</small></article>`}).join('')}</div><section class="panel"><h2>Daily History</h2>${hist.length?`<div class="historytable"><div class="historyrow historyhead"><span>Date</span>${cats.map(c=>`<span>${c}</span>`).join('')}<span>Points earned</span></div>${hist.map(d=>`<div class="historyrow ${d.status==='absent'?'absentrow':''}"><strong>${e(C.formatDate(d.date))}</strong>${d.status==='absent'?`<span>Absent</span><span>—</span><span>—</span><span>0 ★</span>`:cats.map(c=>{const r=d.ratings[c]||'—';return `<span><b class="ratingpill ${C.ratingClass(r)}">${e(r)}</b></span>`}).join('')+`<span class="points-pill">${d.points} ★</span>`}</div>`).join('')}</div>`:'<p>No saved school days yet.</p>'}</section>`;
+  return `<div class="student-score"><strong>${pct}%</strong><span>Your overall progress</span></div><div class="categories">${Object.entries(g).map(([name,x])=>{const p=x.possible?Math.round(x.earned/x.possible*100):0;return `<article><span>${e(name)}</span><b>${p}%</b><u><i style="width:${Math.min(110,p)}%;background:${e(state.student.color)}"></i></u><small>${x.earned} of ${x.possible} progress points</small></article>`}).join('')}</div>${pointHistoryHTML()}<section class="panel"><h2>Daily History</h2>${hist.length?`<div class="historytable"><div class="historyrow historyhead"><span>Date</span>${cats.map(c=>`<span>${c}</span>`).join('')}<span>Points earned</span></div>${hist.map(d=>`<div class="historyrow ${d.status==='absent'?'absentrow':''}"><strong>${e(C.formatDate(d.date))}</strong>${d.status==='absent'?`<span>Absent</span><span>—</span><span>—</span><span>0 ★</span>`:cats.map(c=>{const r=d.ratings[c]||'—';return `<span><b class="ratingpill ${C.ratingClass(r)}">${e(r)}</b></span>`}).join('')+`<span class="points-pill">${d.points} ★</span>`}</div>`).join('')}</div>`:'<p>No saved school days yet.</p>'}</section>`;
 }
 function rewardsHTML(){
   const balance=Number(state.student.rewardBalance)||0,
