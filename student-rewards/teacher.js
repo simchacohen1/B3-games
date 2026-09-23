@@ -15,7 +15,7 @@ const CLASS_1000_REWARDS=[
   {key:"extra-recess",name:"Extra Recess",icon:"🏃"},
   {key:"chat-in-zoom",name:"Chat in Zoom",icon:"💬"}
 ];
-let state={root:null,user:null,tab:"Overview",classId:"",date:C.schoolDateString(),draft:{},absent:new Set(),selectedId:""};
+let state={root:null,user:null,tab:"Overview",classId:"",date:C.schoolDateString(),draft:{},awardDraft:{},absent:new Set(),selectedId:""};
 const $=s=>document.querySelector(s), esc=C.escapeHtml;
 function vals(o){return o&&typeof o==="object"?Object.values(o):[]}
 function activeClasses(){return C.activeClasses(state.root||{})}
@@ -28,7 +28,14 @@ function now(){return new Date().toISOString()}
 function scoreFor(s){return C.cumulativeProgress(C.allProgressRows(state.root,s.id,state.classId))??100}
 function currentStudent(){const r=roster();return r.find(s=>s.id===state.selectedId)||r[0]||null}
 function getRedemptions(){const out=[];for(const [sid,rows] of Object.entries(state.root?.redemptionsByStudent||{}))for(const [key,item] of Object.entries(rows||{}))out.push({sid,key,item});return out.sort((a,b)=>String(b.item.requestedAt||"").localeCompare(String(a.item.requestedAt||"")))}
-function pendingCount(){return getRedemptions().filter(x=>x.item.status==="pending"||x.item.status==="ready").length}
+function getActivityPointRequests(){
+  return Object.entries(state.root?.pointRequests||{})
+    .map(([id,item])=>({id,item:item||{}}))
+    .filter(x=>!state.classId || !x.item.classId || x.item.classId===state.classId)
+    .sort((a,b)=>(Number(b.item.createdAt)||0)-(Number(a.item.createdAt)||0));
+}
+function pendingActivityPointRequests(){return getActivityPointRequests().filter(x=>x.item.status==="pending")}
+function pendingCount(){return getRedemptions().filter(x=>x.item.status==="pending"||x.item.status==="ready").length+pendingActivityPointRequests().length}
 function savedTodayIds(){return new Set(roster().filter(s=>state.root?.dailyAwards?.[s.id]?.[state.classId]?.[state.date]).map(s=>s.id))}
 function classAverage(){const r=roster();return r.length?Math.round(r.reduce((a,s)=>a+scoreFor(s),0)/r.length):0}
 function safeColor(s){return s?.color||"#6849df"}
@@ -77,10 +84,12 @@ async function ensureClass1000Rewards(){
 }
 function subscribe(){db.ref(ROOT).on("value",snap=>{state.root=snap.val()||{};if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=activeClasses()[0]?.id||"";renderClassSelect();if(state.tab!=="Daily Points"){setHeader();buildNav();render()}})}
 function prepareDraft(){
-  if(!state.root||!state.classId)return;state.draft={};state.absent=new Set();
+  if(!state.root||!state.classId)return;state.draft={};state.awardDraft={};state.absent=new Set();
   for(const s of roster()){
     const att=state.root.dailyAttendance?.[s.id]?.[state.classId]?.[state.date];if(att?.status==="absent")state.absent.add(s.id);
     const saved=state.root.dailyRatings?.[s.id]?.[state.classId]?.[state.date];
+    const savedAward=state.root.dailyAwards?.[s.id]?.[state.classId]?.[state.date];
+    state.awardDraft[s.id]=savedAward&&Number.isFinite(Number(savedAward.points))?Number(savedAward.points):10;
     const prior=C.latestRatings(state.root,s.id,state.classId,state.date);
     const source=saved||prior.ratings||{};
     for(const cat of categories()){const found=vals(source).find(r=>r.category===cat.name);state.draft[`${s.id}|${cat.name}`]=found?.rating||"Good"}
@@ -130,12 +139,12 @@ function daily(){
   </div></section>`;
 }
 function dailyRow(s,cats,saved){
-  const absent=state.absent.has(s.id), ratings=cats.map(c=>state.draft[`${s.id}|${c.name}`]||"Good"), prog=absent?0:(C.dailyProgress(ratings)||0), award=absent?0:C.dailyAward(ratings), cdate=carryDate(s);
+  const absent=state.absent.has(s.id), ratings=cats.map(c=>state.draft[`${s.id}|${c.name}`]||"Good"), prog=absent?0:(C.dailyProgress(ratings)||0), award=absent?0:Number(state.awardDraft[s.id]??10), cdate=carryDate(s);
   return `<div class="row ${absent?"absentrow":""}" style="grid-template-columns:minmax(170px,1.6fr) 110px repeat(${cats.length},minmax(125px,1fr)) 110px">
     <div class="person"><em style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><span><b>${esc(s.name)}</b>${!saved&&cdate?`<small class="carrysource">Started from ${new Date(`${cdate}T12:00:00`).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</small>`:""}</span></div>
     <div class="attendance-wrap"><button class="attendance ${absent?"absent":""}" data-att="${esc(s.id)}">${absent?"Absent":"Present"}</button></div>
     ${cats.map(c=>{const val=state.draft[`${s.id}|${c.name}`]||"Good";return `<div><select class="${ratingClass(val)}" data-rating="${esc(s.id)}" data-cat="${esc(c.name)}" ${absent?"disabled":""}>${["Excellent","Good","Fair","Needs Improvement"].map(x=>`<option ${x===val?"selected":""}>${x}</option>`).join("")}</select></div>`}).join("")}
-    <div class="today ${absent?"absentresult":""}"><strong>${absent?"Absent":`${prog}%`}</strong><small>${absent?"0 points":`${award} points if saved`}</small></div>
+    <div class="today ${absent?"absentresult":""}"><strong>${absent?"Absent":`${prog}%`}</strong><small>${absent?"0 points":`<input class="daily-award-input" data-award="${esc(s.id)}" type="number" min="0" step="1" value="${award}" aria-label="Reward points for ${esc(s.name)}"> points if saved`}</small></div>
   </div>`;
 }
 function ratingClass(v){return String(v).toLowerCase().replace(/\s+/g,"-").replace("fair","average")}
@@ -144,7 +153,7 @@ async function saveDaily(){
   for(const s of r){
     const absent=state.absent.has(s.id), ratings={};
     if(!absent)for(const cat of cats){const rating=state.draft[`${s.id}|${cat.name}`]||"Good";ratings[C.categoryKey(cat.name)]={category:cat.name,rating,points:C.progressValue[rating]??100,teacherEmail:state.user.email,savedAt:stamp}}
-    const newAward=absent?0:C.dailyAward(cats.map(c=>state.draft[`${s.id}|${c.name}`]||"Good"));
+    const newAward=absent?0:Math.max(0,Math.round(Number(state.awardDraft[s.id]??10)||0));
     const oldAward=Number(state.root.dailyAwards?.[s.id]?.[state.classId]?.[state.date]?.points||0);
     updates[`${ROOT}/dailyRatings/${s.id}/${state.classId}/${state.date}`]=absent?null:ratings;
     updates[`${ROOT}/dailyAwards/${s.id}/${state.classId}/${state.date}`]={points:newAward,teacherEmail:state.user.email,savedAt:stamp};
@@ -188,11 +197,62 @@ function commentsPage(){
 }
 async function addComment(e){e.preventDefault();const s=currentStudent(), body=$("#commentText").value.trim();if(!s||!body)return;const key=db.ref(`${ROOT}/commentsByStudent/${s.id}`).push().key;await db.ref(`${ROOT}/commentsByStudent/${s.id}/${key}`).set({id:key,studentId:s.id,body,visibleToStudent:$("#commentVisible").checked,teacherEmail:state.user.email,createdAt:now()});toast("Comment saved")}
 function rewardsPage(){
-  const rewards=vals(state.root.rewards||{}).filter(r=>r.active!==false).sort((a,b)=>(a.cost||0)-(b.cost||0)), req=getRedemptions(), classRewards=vals(state.root.classRewardCatalog||{}).filter(x=>x.active!==false);
+  const rewards=vals(state.root.rewards||{}).filter(r=>r.active!==false).sort((a,b)=>(a.cost||0)-(b.cost||0)), req=getRedemptions(), classRewards=vals(state.root.classRewardCatalog||{}).filter(x=>x.active!==false), pointReq=pendingActivityPointRequests();
   const storeOpen=state.root.settings?.rewardStoreEnabled===true||String(state.root.settings?.rewardStoreEnabled)==="true";
-  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">${esc((cls()?.name||"CLASS").toUpperCase())}</p><h1>Rewards & Requests</h1><p>Students can browse the prize store; purchasing is controlled by you.</p></div><a class="primary linkbutton" href="student.html">Open student portal</a></div><div class="storecontrol ${storeOpen?"open":"closed"}"><div><strong>Prize Store Purchasing: ${storeOpen?"OPEN":"CLOSED"}</strong><small>${storeOpen?"Students can submit reward requests.":"Students can browse prizes, but cannot buy anything."}</small></div><button class="primary" id="storeToggle">${storeOpen?"Close Prize Store":"Open Prize Store"}</button></div><div class="rewardlayout"><div><h2>Available rewards</h2><div class="rewardgrid">${rewards.map(r=>`<article><div class="rewardicon" style="background:${esc(r.color||"#ede9fe")}">${esc(r.icon||"🎁")}</div><h3>${esc(r.name)}</h3><p>${Number(r.cost)||0} ★ · ${Number(r.quantity)<0?"unlimited":`${r.quantity} left`}</p><div class="rewardactions"><button data-editreward="${esc(r.id)}">Edit</button><button class="rewarddelete" data-deletereward="${esc(r.id)}">Delete</button></div></article>`).join("")}</div><button class="primary" id="addReward" style="margin-top:14px">+ Add a reward</button><div class="rewardclass"><h2>Class incentives</h2><div class="classchips">${classRewards.map(x=>`<span>${esc(x.icon||"⭐")} ${esc(x.name)}${Number.isFinite(Number(x.cost))?` · ${Number(x.cost)} ★`:""}</span>`).join("")}</div></div></div><aside class="approvals"><div class="approvalhead"><span><h2>Request queue</h2><p>Pending, ready to collect, and completed history</p></span><b>${pendingCount()}</b></div>${req.length?req.map(requestRow).join(""):`<div class="empty"><h3>No requests yet</h3><p>Student purchases will appear here immediately.</p></div>`}</aside></div></section>`;
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">${esc((cls()?.name||"CLASS").toUpperCase())}</p><h1>Rewards & Requests</h1><p>Activity points wait for your approval before changing a student's balance.</p></div><a class="primary linkbutton" href="student.html">Open student portal</a></div>
+  <section class="activity-queue"><div class="activity-head"><div><h2>Activity points awaiting approval</h2><p>Posuk Practice and Chazara requests. Nothing below has been added yet.</p></div><div class="activity-head-actions"><b>${pointReq.length}</b>${pointReq.length?`<button class="primary" id="approveAllActivity">Approve all</button>`:""}</div></div>${pointReq.length?pointReq.map(activityPointRow).join(""):`<div class="empty"><h3>No activity points waiting</h3><p>New 100% scores and Chazara points will appear here.</p></div>`}</section>
+  <div class="storecontrol ${storeOpen?"open":"closed"}"><div><strong>Prize Store Purchasing: ${storeOpen?"OPEN":"CLOSED"}</strong><small>${storeOpen?"Students can submit reward requests.":"Students can browse prizes, but cannot buy anything."}</small></div><button class="primary" id="storeToggle">${storeOpen?"Close Prize Store":"Open Prize Store"}</button></div><div class="rewardlayout"><div><h2>Available rewards</h2><div class="rewardgrid">${rewards.map(r=>`<article><div class="rewardicon" style="background:${esc(r.color||"#ede9fe")}">${esc(r.icon||"🎁")}</div><h3>${esc(r.name)}</h3><p>${Number(r.cost)||0} ★ · ${Number(r.quantity)<0?"unlimited":`${r.quantity} left`}</p><div class="rewardactions"><button data-editreward="${esc(r.id)}">Edit</button><button class="rewarddelete" data-deletereward="${esc(r.id)}">Delete</button></div></article>`).join("")}</div><button class="primary" id="addReward" style="margin-top:14px">+ Add a reward</button><div class="rewardclass"><h2>Class incentives</h2><div class="classchips">${classRewards.map(x=>`<span>${esc(x.icon||"⭐")} ${esc(x.name)}${Number.isFinite(Number(x.cost))?` · ${Number(x.cost)} ★`:""}</span>`).join("")}</div></div></div><aside class="approvals"><div class="approvalhead"><span><h2>Prize request queue</h2><p>Pending, ready to collect, and completed history</p></span><b>${getRedemptions().filter(x=>x.item.status==="pending"||x.item.status==="ready").length}</b></div>${req.length?req.map(requestRow).join(""):`<div class="empty"><h3>No prize requests yet</h3><p>Student purchases will appear here immediately.</p></div>`}</aside></div></section>`;
+}
+function activityPointRow(x){
+  const item=x.item||{}, s=state.root.students?.[item.rewardStudentId]||{}, amount=Number(item.amount||0), sign=amount>0?"+":"";
+  const when=item.createdAt?new Date(Number(item.createdAt)).toLocaleString():"";
+  return `<div class="activity-request"><em style="background:${esc(safeColor(s))}">${esc(s.initials||initials(item.studentName||"?"))}</em><span><strong>${esc(item.studentName||s.name||item.rewardStudentId||"Student")}</strong><small>${esc(item.reason||item.source||"Activity points")}${when?` · ${esc(when)}`:""}</small></span><b class="activity-amount ${amount<0?"deduct":""}">${sign}${amount} ★</b><button class="deny" data-point-reject="${esc(x.id)}" title="Reject">×</button><button class="approve" data-point-approve="${esc(x.id)}" title="Approve">✓</button></div>`;
 }
 function requestRow(x){const s=state.root.students?.[x.sid],r=state.root.rewards?.[x.item.rewardId],status=x.item.status||"pending";return `<div class="request"><em style="background:${esc(safeColor(s))}">${esc(s?.initials||"?")}</em><span><strong>${esc(s?.name||x.sid)}</strong><small>${esc(r?.name||"Reward")} · ${Number(x.item.cost)||0} ★ · ${esc(status)}</small></span>${status==="pending"?`<button class="deny" data-decline="${esc(x.sid)}|${esc(x.key)}">×</button><button class="approve" data-approve="${esc(x.sid)}|${esc(x.key)}">✓</button>`:""}${status==="ready"?`<button class="approve" data-collect="${esc(x.sid)}|${esc(x.key)}">Given</button>`:""}</div>`}
+async function setChazaraPointStatus(item,status){
+  if(!item?.eventId||!item?.practiceStudentId)return;
+  const path=`posukPractice/chazara/events/${item.practiceStudentId}/${item.eventId}`;
+  const field=Number(item.amount||0)<0?"removalPointRequestStatus":"pointRequestStatus";
+  try{await db.ref(path+'/'+field).set(status)}catch(e){console.warn('Could not mirror Chazara point status',e)}
+}
+async function approveActivityPoint(id,quiet=false){
+  const live=(await db.ref(`${ROOT}/pointRequests/${id}`).once("value")).val();
+  if(!live||live.status!=="pending")return false;
+  const reqRef=db.ref(`${ROOT}/pointRequests/${id}`), stamp=now();
+  const lock=await reqRef.transaction(cur=>cur&&cur.status==="pending"?{...cur,status:"processing",reviewedBy:state.user.email,reviewStartedAt:stamp}:undefined);
+  if(!lock.committed)return false;
+  const item=lock.snapshot.val()||live, sid=item.rewardStudentId, amount=Number(item.amount||0);
+  let applied=0,balanceAfter=0;
+  try{
+    const bal=await db.ref(`${ROOT}/students/${sid}/rewardBalance`).transaction(cur=>{const old=Number(cur||0),next=Math.max(0,old+amount);applied=next-old;return next});
+    if(!bal.committed)throw new Error('Balance update did not commit');
+    balanceAfter=Number(bal.snapshot.val()||0);
+    await reqRef.update({status:"approved",actualAmount:applied,balanceAfter,reviewedBy:state.user.email,reviewedAt:now()});
+    await setChazaraPointStatus(item,"approved");
+    if(!quiet)toast(`${item.studentName||"Student"}: ${applied>=0?"+":""}${applied} points approved`);
+    return true;
+  }catch(err){
+    console.error(err);
+    await reqRef.update({status:"pending",lastError:String(err?.message||err),reviewStartedAt:null}).catch(()=>{});
+    if(!quiet)toast("Could not approve points","error");
+    return false;
+  }
+}
+async function rejectActivityPoint(id,quiet=false){
+  const snap=await db.ref(`${ROOT}/pointRequests/${id}`).once("value"), item=snap.val();
+  if(!item||item.status!=="pending")return false;
+  await db.ref(`${ROOT}/pointRequests/${id}`).update({status:"rejected",reviewedBy:state.user.email,reviewedAt:now()});
+  await setChazaraPointStatus(item,"rejected");
+  if(!quiet)toast("Point request rejected");
+  return true;
+}
+async function approveAllActivityPoints(){
+  const ids=pendingActivityPointRequests().map(x=>x.id);
+  if(!ids.length)return;
+  if(!confirm(`Approve all ${ids.length} pending activity point request${ids.length===1?"":"s"} for ${cls()?.name||"this class"}?`))return;
+  let done=0;for(const id of ids)if(await approveActivityPoint(id,true))done++;
+  toast(`${done} activity point request${done===1?"":"s"} approved`);
+}
 async function editReward(id=""){const old=id?state.root.rewards[id]:null,name=prompt("Reward name:",old?.name||"");if(!name)return;const cost=Number(prompt("Point cost:",String(old?.cost??25)));if(!Number.isFinite(cost)||cost<0)return;const icon=prompt("Emoji/icon:",old?.icon||"🎁")||"🎁",rid=id||`reward-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;await db.ref(`${ROOT}/rewards/${rid}`).set({id:rid,name:name.trim(),cost:Math.round(cost),icon,color:old?.color||"#ede9fe",active:true,quantity:old?.quantity??-1});toast(id?"Reward updated":"Reward added")}
 async function deleteReward(id){const r=state.root.rewards?.[id];if(!r||!confirm(`Delete “${r.name}” from the Prize Store? Past request history will be kept.`))return;await db.ref(`${ROOT}/rewards/${id}/active`).set(false);toast("Reward deleted")}
 async function toggleRewardStore(){const open=state.root.settings?.rewardStoreEnabled===true||String(state.root.settings?.rewardStoreEnabled)==="true";await db.ref(`${ROOT}/settings/rewardStoreEnabled`).set(!open);toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened")}
@@ -217,11 +277,12 @@ function bindPage(){
     $("#dailyClass").onchange=e=>{state.classId=e.target.value;state.selectedId="";prepareDraft();renderClassSelect();render()};
     $("#saveDaily").onclick=saveDaily;document.querySelectorAll("[data-att]").forEach(b=>b.onclick=()=>{const id=b.dataset.att;state.absent.has(id)?state.absent.delete(id):state.absent.add(id);render()});
     document.querySelectorAll("[data-rating]").forEach(s=>s.onchange=()=>{state.draft[`${s.dataset.rating}|${s.dataset.cat}`]=s.value;render()});
+    document.querySelectorAll("[data-award]").forEach(inp=>inp.onchange=()=>{state.awardDraft[inp.dataset.award]=Math.max(0,Math.round(Number(inp.value)||0));inp.value=state.awardDraft[inp.dataset.award]});
   }
   if(state.tab==="Students"){$("#studentPicker").onchange=e=>{state.selectedId=e.target.value;render()};$("#adjustPoints").onclick=adjustPoints}
   if(state.tab==="Categories"){$("#addCategory").onclick=addCategory;document.querySelectorAll("[data-catdelete]").forEach(b=>b.onclick=()=>removeCategory(b.dataset.catdelete))}
   if(state.tab==="Comments"){if($("#commentPicker"))$("#commentPicker").onchange=e=>{state.selectedId=e.target.value;render()};if($("#commentForm"))$("#commentForm").onsubmit=addComment}
-  if(state.tab==="Rewards"){$("#addReward").onclick=()=>editReward();$("#storeToggle").onclick=toggleRewardStore;document.querySelectorAll("[data-editreward]").forEach(b=>b.onclick=()=>editReward(b.dataset.editreward));document.querySelectorAll("[data-deletereward]").forEach(b=>b.onclick=()=>deleteReward(b.dataset.deletereward));document.querySelectorAll("[data-approve]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.approve.split("|");review(s,k,"approve")});document.querySelectorAll("[data-decline]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.decline.split("|");review(s,k,"decline")});document.querySelectorAll("[data-collect]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.collect.split("|");review(s,k,"collect")})}
+  if(state.tab==="Rewards"){$("#addReward").onclick=()=>editReward();$("#storeToggle").onclick=toggleRewardStore;if($("#approveAllActivity"))$("#approveAllActivity").onclick=approveAllActivityPoints;document.querySelectorAll("[data-point-approve]").forEach(b=>b.onclick=()=>approveActivityPoint(b.dataset.pointApprove));document.querySelectorAll("[data-point-reject]").forEach(b=>b.onclick=()=>rejectActivityPoint(b.dataset.pointReject));document.querySelectorAll("[data-editreward]").forEach(b=>b.onclick=()=>editReward(b.dataset.editreward));document.querySelectorAll("[data-deletereward]").forEach(b=>b.onclick=()=>deleteReward(b.dataset.deletereward));document.querySelectorAll("[data-approve]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.approve.split("|");review(s,k,"approve")});document.querySelectorAll("[data-decline]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.decline.split("|");review(s,k,"decline")});document.querySelectorAll("[data-collect]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.collect.split("|");review(s,k,"collect")})}
   if(state.tab==="Reports"){$("#csvBtn").onclick=exportCSV;$("#printBtn").onclick=()=>window.print()}
   if(state.tab==="People & Classes"){document.querySelectorAll("[data-openclass]").forEach(b=>b.onclick=()=>{state.classId=b.dataset.openclass;renderClassSelect();prepareDraft();render()});$("#addStudentForm").onsubmit=addStudent;$("#addClassForm").onsubmit=addClass}
   if(state.tab==="Settings"){$("#settingsAccess").onclick=toggleAccess;$("#saveSettings").onclick=saveSettings}

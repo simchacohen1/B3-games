@@ -1031,12 +1031,20 @@ async function loadChazaraRecordings(){
   const mainEl = document.getElementById('mainContent');
   mainEl.innerHTML = '<div class="loading">Loading Chazara recordings…</div>';
   try{
-    const snap = await db.ref('posukPractice/chazara/events').once('value');
+    const [snap, pointSnap] = await Promise.all([
+      db.ref('posukPractice/chazara/events').once('value'),
+      db.ref('studentRewards/pointRequests').once('value')
+    ]);
     const root = snap.val() || {};
+    const pointRequests = pointSnap.val() || {};
+    const pointStatusByEvent = {};
+    Object.values(pointRequests).forEach(r => {
+      if(r && r.eventId && Number(r.amount||0) > 0) pointStatusByEvent[r.eventId] = r.status || 'pending';
+    });
     const rows=[];
     Object.entries(root).forEach(([sid,events]) => {
       Object.entries(events || {}).forEach(([eventId,e]) => {
-        if(!e || e.recorded !== true || !e.audioURL) return;
+        if(!e || e.recorded !== true || !e.audioURL || e.removed === true) return;
         rows.push({sid,eventId,...e});
       });
     });
@@ -1052,8 +1060,10 @@ async function loadChazaraRecordings(){
       const ref = (perek && posuk) ? ('פרק ' + hebrewNumeral(perek) + ' · פסוק ' + hebrewNumeral(posuk)) : (e.posukKey || 'Posuk');
       const when = e.createdAt ? new Date(Number(e.createdAt)).toLocaleString() : '';
       const seconds = Number(e.durationMs || 0) / 1000;
+      const pointStatus = pointStatusByEvent[e.eventId] || e.pointRequestStatus || 'pending';
+      const pointLabel = pointStatus === 'approved' ? '2 ★ approved' : pointStatus === 'rejected' ? '2 ★ rejected' : pointStatus === 'cancelled' ? '2 ★ cancelled' : '2 ★ pending approval';
       return `<div class="chazara-recording-card">
-        <div class="chazara-recording-head"><strong>${name} · ${ref}</strong><span class="chazara-points">2 ★ awarded</span></div>
+        <div class="chazara-recording-head"><strong>${name} · ${ref}</strong><span class="chazara-points">${pointLabel}</span></div>
         <div class="chazara-meta">${when}${seconds ? ' · ' + formatDuration(seconds) : ''} · Review #${Number(e.reviewNumber)||'—'}</div>
         ${waveformHtml(e.waveform)}
         <audio controls preload="metadata" src="${e.audioURL}"></audio>
