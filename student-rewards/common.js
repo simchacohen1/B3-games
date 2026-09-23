@@ -30,13 +30,9 @@
     return Math.round(values.reduce((s,v)=>s+(typeof v==='number'?v:(progressValue[v]??100)),0)/values.length);
   }
   function dailyAward(ratings){
-    if(!ratings.length) return 0;
-    const allGE=ratings.every(r=>r==='Good'||r==='Excellent');
-    // Daily classroom points are now based on 10 for an all-Good day.
-    // Excellent keeps the same 20% bonus relationship as before: 12.
-    if(allGE) return ratings.includes('Excellent')?12:10;
-    const avg=ratings.reduce((s,r)=>s+(progressValue[r]??0),0)/ratings.length;
-    return Math.max(0,Math.min(10,Math.round(10*avg/100)));
+    // Daily reward points are teacher-controlled. The default is 10 for a
+    // present saved day; the Daily Points screen lets the teacher change it.
+    return ratings.length ? 10 : 0;
   }
   function cumulativeProgress(dateRows){
     const days={};
