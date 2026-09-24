@@ -40,7 +40,29 @@
     "ari_greenberg", "zev_rosenfeld", "levi_schtroks", "yisroel_aryeh_simmonds", "leibel_vogel", "leib_wolf"
   ];
 
+  // Master Schedule 5787 / 2026-2027.
+  // B3 Games is open by default and is automatically locked during class time.
+  // ET opens 2 minutes after each 10-minute recess starts; WT opens immediately.
   var DEFAULT_LOCKS = {
+    et: {
+      mon: [{start:"08:45",end:"10:17"},{start:"10:25",end:"11:07"},{start:"11:15",end:"12:00"},{start:"12:45",end:"13:32"},{start:"13:40",end:"14:27"},{start:"14:35",end:"15:15"}],
+      tue: [{start:"08:45",end:"10:17"},{start:"10:25",end:"11:07"},{start:"11:15",end:"12:00"},{start:"12:45",end:"13:32"},{start:"13:40",end:"14:27"},{start:"14:35",end:"15:15"}],
+      wed: [{start:"08:45",end:"10:17"},{start:"10:25",end:"11:07"},{start:"11:15",end:"12:00"},{start:"12:45",end:"13:32"},{start:"13:40",end:"14:27"},{start:"14:35",end:"15:15"}],
+      thu: [{start:"08:45",end:"10:17"},{start:"10:25",end:"11:07"},{start:"11:15",end:"12:00"},{start:"12:45",end:"13:32"},{start:"13:40",end:"14:27"},{start:"14:35",end:"15:15"}],
+      fri: [{start:"08:45",end:"10:17"},{start:"10:25",end:"11:07"},{start:"11:15",end:"12:00"}], sat: [], sun: []
+    },
+    wt: {
+      mon: [{start:"12:20",end:"13:50"},{start:"14:00",end:"14:45"},{start:"14:55",end:"15:35"},{start:"16:15",end:"17:00"},{start:"17:10",end:"17:55"},{start:"18:05",end:"18:45"}],
+      tue: [{start:"12:20",end:"13:50"},{start:"14:00",end:"14:45"},{start:"14:55",end:"15:35"},{start:"16:15",end:"17:00"},{start:"17:10",end:"17:55"},{start:"18:05",end:"18:45"}],
+      wed: [{start:"12:20",end:"13:50"},{start:"14:00",end:"14:45"},{start:"14:55",end:"15:35"},{start:"16:15",end:"17:00"},{start:"17:10",end:"17:55"},{start:"18:05",end:"18:45"}],
+      thu: [{start:"12:20",end:"13:50"},{start:"14:00",end:"14:45"},{start:"14:55",end:"15:35"},{start:"16:15",end:"17:00"},{start:"17:10",end:"17:55"},{start:"18:05",end:"18:45"}],
+      fri: [{start:"11:00",end:"12:30"},{start:"12:40",end:"13:25"},{start:"13:35",end:"14:15"}], sat: [], sun: []
+    }
+  };
+
+  // Previous untouched defaults, used only for automatic migration. If the
+  // teacher customized the old schedule, those custom times remain respected.
+  var PREVIOUS_DEFAULT_LOCKS = {
     et: {
       mon: [{start:"08:45",end:"12:00"},{start:"12:45",end:"15:15"}],
       tue: [{start:"08:45",end:"12:00"},{start:"12:45",end:"15:15"}],
@@ -56,6 +78,19 @@
       fri: [], sat: [], sun: []
     }
   };
+
+  function lockSchedulesEqual(a, b) {
+    var days = ["sun","mon","tue","wed","thu","fri","sat"];
+    return days.every(function (day) {
+      var aa = a && Array.isArray(a[day]) ? a[day] : [];
+      var bb = b && Array.isArray(b[day]) ? b[day] : [];
+      if (aa.length !== bb.length) return false;
+      return aa.every(function (r, i) {
+        return r && bb[i] && r.start === bb[i].start && r.end === bb[i].end;
+      });
+    });
+  }
+
 
   var hideStyle = document.createElement("style");
   hideStyle.id = "b3-gate-hide-style";
@@ -248,6 +283,9 @@
     if (mode === "locked") return { open:false, reason:"Manual override: LOCKED" };
 
     var locks = access && access.lockWindows ? access.lockWindows : DEFAULT_LOCKS[classId];
+    if (lockSchedulesEqual(locks, PREVIOUS_DEFAULT_LOCKS[classId])) {
+      locks = DEFAULT_LOCKS[classId];
+    }
     var now = nyNow();
     var ranges = locks && Array.isArray(locks[now.day]) ? locks[now.day] : [];
     var locked = ranges.some(function (r) { return inRange(now.minutes, r); });
