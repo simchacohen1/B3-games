@@ -34,7 +34,7 @@
   .master-row{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;margin:12px 0}.master-row label{font-weight:800}
   .class-card{border:1px solid #dbe4ee;border-radius:15px;padding:13px;margin:12px 0;background:#f8fafc}.class-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.class-title{font-weight:900;font-size:18px}.status-pill{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:900}.status-open{background:#dcfce7;color:#166534}.status-closed{background:#fee2e2;color:#991b1b}.status-reason{font-size:12px;color:#64748b;margin-top:4px}
   .mode-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:12px 0}.mode-btn{border:1px solid #cbd5e1;background:white;border-radius:9px;padding:8px 5px;font-size:12px;font-weight:800;cursor:pointer}.mode-btn.active{background:#1f2937;color:white;border-color:#1f2937}
-  details{margin-top:8px}summary{cursor:pointer;font-weight:800;color:#334155}.schedule-grid{margin-top:9px}.schedule-help{font-size:11px;color:#64748b;margin:7px 0 10px;line-height:1.35}.schedule-day{border-top:1px solid #e5e7eb;padding:8px 0}.schedule-day:first-child{border-top:0}.schedule-day-name{font-weight:900;font-size:12px;margin-bottom:5px}.lock-range{display:grid;grid-template-columns:24px 44px 1fr 22px 1fr;align-items:center;gap:5px;margin:5px 0;font-size:11px}.lock-range input[type="time"]{width:100%;padding:5px;border:1px solid #cbd5e1;border-radius:8px;font-size:11px}.lock-range .to{text-align:center;color:#64748b}.schedule-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.schedule-reset{border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:8px 10px;font-size:12px;font-weight:800;cursor:pointer}.schedule-reset:hover{background:#f1f5f9}.game-toggle-header,.game-toggle-row{display:grid;grid-template-columns:minmax(0,1fr) 38px 38px;align-items:center;gap:6px;font-size:13px}.game-toggle-header{font-weight:900;color:#475569;padding:0 0 6px;border-bottom:1px solid #cbd5e1}.game-toggle-header span:not(:first-child),.game-toggle-row input{text-align:center;justify-self:center}.game-toggle-row{margin:0;padding:7px 0;border-bottom:1px solid #eef2f7}.game-toggle-row label{min-width:0}
+  details{margin-top:8px}summary{cursor:pointer;font-weight:800;color:#334155}.schedule-grid{margin-top:9px}.schedule-help{font-size:12px;color:#475569;margin:7px 0 10px;line-height:1.45;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:9px}.schedule-day{border-top:1px solid #e5e7eb;padding:10px 0}.schedule-day:first-child{border-top:0}.schedule-day-name{font-weight:900;font-size:13px;margin-bottom:6px}.lock-range{display:grid;grid-template-columns:24px 64px minmax(220px,1fr);align-items:center;gap:7px;margin:7px 0;font-size:11px}.lock-range.is-unused .time-span{display:none}.lock-range.is-unused .closed-label{color:#94a3b8}.closed-label{font-weight:800;color:#334155}.time-span{display:flex;align-items:center;gap:6px;min-width:0}.friendly-time{display:flex;align-items:center;gap:3px;border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:3px 4px;white-space:nowrap}.friendly-time select{border:0;background:transparent;padding:4px 2px;font-size:12px;font-weight:700;color:#1f2937;outline:none;cursor:pointer}.friendly-time select[data-time-hour]{width:40px}.friendly-time select[data-time-minute]{width:45px}.friendly-time select[data-time-ampm]{width:48px}.friendly-time.disabled{background:#f1f5f9;opacity:.6}.friendly-time select:disabled{cursor:not-allowed}.time-colon{font-weight:900;color:#64748b}.lock-range .to{text-align:center;color:#64748b;font-weight:700}.schedule-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}.schedule-save,.schedule-reset{border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:9px 12px;font-size:12px;font-weight:900;cursor:pointer}.schedule-save{background:#2563eb;color:#fff;border-color:#2563eb}.schedule-save:disabled{opacity:.45;cursor:default}.schedule-reset:hover{background:#f1f5f9}.schedule-save-status{font-size:12px;font-weight:800;color:#64748b}.schedule-save-status.dirty{color:#b45309}.schedule-save-status.saved{color:#15803d}.game-toggle-header,.game-toggle-row{display:grid;grid-template-columns:minmax(0,1fr) 38px 38px;align-items:center;gap:6px;font-size:13px}.game-toggle-header{font-weight:900;color:#475569;padding:0 0 6px;border-bottom:1px solid #cbd5e1}.game-toggle-header span:not(:first-child),.game-toggle-row input{text-align:center;justify-self:center}.game-toggle-row{margin:0;padding:7px 0;border-bottom:1px solid #eef2f7}.game-toggle-row label{min-width:0}
   .tz-note{font-size:11px;color:#64748b;margin-top:7px}
   .special-access-note{max-width:900px;margin:0 auto 16px;padding:11px 14px;border:1px solid #86efac;background:#f0fdf4;border-radius:12px;color:#166534;font-size:14px;font-weight:700;text-align:left}
   .override-box{border:1px solid #bfdbfe;background:#eff6ff;border-radius:14px;padding:12px;margin-top:10px}
@@ -78,7 +78,7 @@
   .student-version-choice{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
   .teacher-version-choice{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
   .version-choice-icon{font-size:32px}.version-modal-close{margin-top:14px;border:0;background:#e5e7eb;color:#1f2937;border-radius:10px;padding:9px 16px;font-weight:700;cursor:pointer}
-  @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 40px 1fr 18px 1fr}.admin-panel{top:54px}}
+  @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 64px 1fr}.time-span{flex-wrap:wrap}.admin-panel{top:54px}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
@@ -462,6 +462,28 @@
     el("studentNameInput").value="";el("classPinInput").value="";setLoginMsg("");showLogin();
   }
 
+  function timeParts(value){
+    const match=/^(\d{2}):(\d{2})$/.exec(String(value||""));
+    let h=match?Number(match[1]):0;
+    const minute=match?Number(match[2]):0;
+    const ampm=h>=12?"PM":"AM";
+    let hour=h%12;if(hour===0)hour=12;
+    return {hour:String(hour),minute:String(minute).padStart(2,"0"),ampm};
+  }
+
+  function timePickerHtml(classId,day,i,which,value,enabled){
+    const p=timeParts(value||"00:00");
+    const key=`${classId}:${day}:${i}`;
+    const hours=Array.from({length:12},(_,n)=>n+1).map(h=>`<option value="${h}" ${String(h)===p.hour?"selected":""}>${h}</option>`).join("");
+    const minutes=Array.from({length:60},(_,n)=>String(n).padStart(2,"0")).map(m=>`<option value="${m}" ${m===p.minute?"selected":""}>${m}</option>`).join("");
+    return `<div class="friendly-time ${enabled?"":"disabled"}" data-time-box="${which}:${key}">
+      <select aria-label="${which} hour" data-time-${which}-hour="${key}" ${enabled?"":"disabled"}>${hours}</select>
+      <span class="time-colon">:</span>
+      <select aria-label="${which} minute" data-time-${which}-minute="${key}" ${enabled?"":"disabled"}>${minutes}</select>
+      <select aria-label="${which} AM or PM" data-time-${which}-ampm="${key}" ${enabled?"":"disabled"}><option value="AM" ${p.ampm==="AM"?"selected":""}>AM</option><option value="PM" ${p.ampm==="PM"?"selected":""}>PM</option></select>
+    </div>`;
+  }
+
   function classCardHtml(classId){
     const access=currentSettings.classAccess[classId];
     const info=settingsApi.describeClassAccess(currentSettings,classId,new Date());
@@ -470,7 +492,18 @@
       const ranges=Array.isArray(access.lockWindows[day])?access.lockWindows[day]:[];
       const rangeRows=[0,1,2,3,4,5].map(i=>{
         const r=ranges[i]||null;
-        return `<div class="lock-range"><input type="checkbox" data-lock-enabled="${classId}:${day}:${i}" ${r?"checked":""}><span>Closed ${i+1}</span><input type="time" data-lock-start="${classId}:${day}:${i}" value="${r?r.start:"00:00"}"><span class="to">to</span><input type="time" data-lock-end="${classId}:${day}:${i}" value="${r?r.end:"00:00"}"></div>`;
+        const enabled=Boolean(r);
+        const startValue=r?r.start:"00:00";
+        const endValue=r?r.end:"00:00";
+        return `<div class="lock-range ${enabled?"":"is-unused"}" data-lock-row="${classId}:${day}:${i}">
+          <input type="checkbox" aria-label="Use closed period ${i+1}" data-lock-enabled="${classId}:${day}:${i}" ${enabled?"checked":""}>
+          <span class="closed-label">${enabled?`Closed ${i+1}`:"Add period"}</span>
+          <div class="time-span">
+            ${timePickerHtml(classId,day,i,"start",startValue,enabled)}
+            <span class="to">to</span>
+            ${timePickerHtml(classId,day,i,"end",endValue,enabled)}
+          </div>
+        </div>`;
       }).join("");
       return `<div class="schedule-day"><div class="schedule-day-name">${dayLabels[day]}</div>${rangeRows}</div>`;
     }).join("");
@@ -482,7 +515,7 @@
         <button class="mode-btn ${access.mode==="open"?"active":""}" data-class-mode="${classId}:open">Unlock Now</button>
         <button class="mode-btn ${access.mode==="locked"?"active":""}" data-class-mode="${classId}:locked">Lock Now</button>
       </div>
-      <details><summary>Recess Access Schedule</summary><div class="schedule-grid"><div class="schedule-help">B3 Games is OPEN by default. The checked rows are the school/class periods when it is CLOSED, so the gaps between them are recess/lunch access.${delayNote} Edit any time below if the school schedule changes.</div>${rows}<div class="schedule-actions"><button type="button" class="schedule-reset" data-reset-schedule="${classId}">Reset to Master Schedule</button></div></div></details>
+      <details><summary>Recess Access Schedule</summary><div class="schedule-grid"><div class="schedule-help">B3 Games is OPEN by default. These are the periods when it is CLOSED. Use the simple hour / minute / AM-PM menus below. Nothing changes until you press <b>Save Schedule</b>, so the times will not jump around while you are editing.${delayNote}</div>${rows}<div class="schedule-actions"><button type="button" class="schedule-save" data-save-schedule="${classId}" disabled>Save Schedule</button><button type="button" class="schedule-reset" data-reset-schedule="${classId}">Reset to Master Schedule</button><span class="schedule-save-status" data-schedule-status="${classId}">No unsaved changes</span></div></div></details>
     </div>`;
   }
 
@@ -620,24 +653,92 @@
       try{await settingsApi.updateClassMode(classId,mode);}catch(e){alert("Could not save the class access setting.");console.error(e);}
     }));
 
-    function saveLockWindowsFromDom(classId){
+    function readFriendlyTime(classId,day,i,which){
+      const key=`${classId}:${day}:${i}`;
+      const hourEl=document.querySelector(`[data-time-${which}-hour="${key}"]`);
+      const minuteEl=document.querySelector(`[data-time-${which}-minute="${key}"]`);
+      const ampmEl=document.querySelector(`[data-time-${which}-ampm="${key}"]`);
+      if(!hourEl||!minuteEl||!ampmEl)return "00:00";
+      let hour=Number(hourEl.value)||12;
+      const minute=String(minuteEl.value||"00").padStart(2,"0");
+      if(ampmEl.value==="AM"){if(hour===12)hour=0;}else if(hour!==12){hour+=12;}
+      return `${String(hour).padStart(2,"0")}:${minute}`;
+    }
+
+    function setRowEnabled(classId,day,i,enabled){
+      const key=`${classId}:${day}:${i}`;
+      const row=document.querySelector(`[data-lock-row="${key}"]`);
+      if(row){
+        row.classList.toggle("is-unused",!enabled);
+        const label=row.querySelector(".closed-label");
+        if(label)label.textContent=enabled?`Closed ${i+1}`:"Add period";
+      }
+      ["start","end"].forEach(which=>{
+        const box=document.querySelector(`[data-time-box="${which}:${key}"]`);
+        if(box)box.classList.toggle("disabled",!enabled);
+        ["hour","minute","ampm"].forEach(part=>{
+          const el=document.querySelector(`[data-time-${which}-${part}="${key}"]`);
+          if(el)el.disabled=!enabled;
+        });
+      });
+    }
+
+    function markScheduleDirty(classId){
+      const save=document.querySelector(`[data-save-schedule="${classId}"]`);
+      const status=document.querySelector(`[data-schedule-status="${classId}"]`);
+      if(save)save.disabled=false;
+      if(status){status.textContent="Unsaved changes";status.className="schedule-save-status dirty";}
+    }
+
+    function markScheduleSaved(classId,text){
+      const save=document.querySelector(`[data-save-schedule="${classId}"]`);
+      const status=document.querySelector(`[data-schedule-status="${classId}"]`);
+      if(save)save.disabled=true;
+      if(status){status.textContent=text||"Saved";status.className="schedule-save-status saved";}
+    }
+
+    function collectLockWindowsFromDom(classId){
       const lockWindows={};
       settingsApi.dayKeys.forEach(day=>{
         lockWindows[day]=[];
         [0,1,2,3,4,5].forEach(i=>{
           const enabled=document.querySelector(`[data-lock-enabled="${classId}:${day}:${i}"]`);
-          const start=document.querySelector(`[data-lock-start="${classId}:${day}:${i}"]`);
-          const end=document.querySelector(`[data-lock-end="${classId}:${day}:${i}"]`);
-          if(enabled&&enabled.checked&&start&&end){
-            lockWindows[day].push({start:start.value||"00:00",end:end.value||"00:00"});
+          if(enabled&&enabled.checked){
+            lockWindows[day].push({
+              start:readFriendlyTime(classId,day,i,"start"),
+              end:readFriendlyTime(classId,day,i,"end")
+            });
           }
         });
       });
-      return settingsApi.updateClassLockWindows(classId,lockWindows);
+      return lockWindows;
     }
 
     ["et","wt"].forEach(classId=>{
-      document.querySelectorAll(`[data-lock-enabled^="${classId}:"] , [data-lock-start^="${classId}:"] , [data-lock-end^="${classId}:"]`).forEach(input=>input.addEventListener("change",()=>saveLockWindowsFromDom(classId).catch(e=>{alert("Could not save the locked times.");console.error(e);}))); 
+      document.querySelectorAll(`[data-lock-enabled^="${classId}:"]`).forEach(input=>input.addEventListener("change",()=>{
+        const [,day,iText]=input.dataset.lockEnabled.split(":");
+        setRowEnabled(classId,day,Number(iText),input.checked);
+        markScheduleDirty(classId);
+      }));
+
+      document.querySelectorAll(`[data-time-start-hour^="${classId}:"] , [data-time-start-minute^="${classId}:"] , [data-time-start-ampm^="${classId}:"] , [data-time-end-hour^="${classId}:"] , [data-time-end-minute^="${classId}:"] , [data-time-end-ampm^="${classId}:"]`).forEach(input=>input.addEventListener("change",()=>markScheduleDirty(classId)));
+
+      document.querySelector(`[data-save-schedule="${classId}"]`)?.addEventListener("click",async()=>{
+        const save=document.querySelector(`[data-save-schedule="${classId}"]`);
+        const status=document.querySelector(`[data-schedule-status="${classId}"]`);
+        if(save)save.disabled=true;
+        if(status){status.textContent="Saving…";status.className="schedule-save-status";}
+        try{
+          await settingsApi.updateClassLockWindows(classId,collectLockWindowsFromDom(classId));
+          markScheduleSaved(classId,"Saved");
+        }catch(e){
+          if(save)save.disabled=false;
+          if(status){status.textContent="Could not save";status.className="schedule-save-status dirty";}
+          alert("Could not save the locked times.");
+          console.error(e);
+        }
+      });
+
       document.querySelector(`[data-reset-schedule="${classId}"]`)?.addEventListener("click",async()=>{
         if(!confirm(`Reset ${classLabels[classId]} to the Master Schedule recess times?`))return;
         try{
