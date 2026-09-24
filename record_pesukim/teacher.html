@@ -2170,6 +2170,7 @@ function printReport(){
 // under their own "No Class" group in Manage Access and aren't included
 // when a Reports filter narrows down to one specific class.
 const CLASS_SECTIONS = ['B3 EastTrack', 'B3 WestTrack'];
+const DEFAULT_STUDENT_PASSCODE = '5770';
 
 // Renders the Approved Students list grouped into a section per class
 // (in CLASS_SECTIONS order), with a final "No Class" section for anyone
@@ -2183,12 +2184,20 @@ function renderApprovedGroups(approvedNames){
     <div style="margin-bottom:16px;">
       <div style="font-weight:700;color:var(--rimon);margin-bottom:6px;">${g.label} (${g.students.length})</div>
       <table class="roster-table">
-        <thead><tr><th>Name</th><th style="width:170px;">Class</th><th style="width:90px;"></th></tr></thead>
+        <thead><tr><th>Name</th><th style="width:230px;">Passcode</th><th style="width:170px;">Class</th><th style="width:90px;"></th></tr></thead>
         <tbody>
           ${g.students.length === 0
-            ? '<tr><td colspan="3" class="empty-msg">No students here.</td></tr>'
+            ? '<tr><td colspan="4" class="empty-msg">No students here.</td></tr>'
             : g.students.map(a => `<tr data-slug="${a.slug}">
                 <td>${a.name}</td>
+                <td>
+                  <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                    <input class="approved-passcode-input" data-slug="${a.slug}" type="text" inputmode="numeric" maxlength="20" value="${a.passcode}"
+                      style="padding:6px 8px;border-radius:8px;border:2px solid var(--gold);font-family:'Quicksand',sans-serif;width:90px;">
+                    <button class="btn small gold save-passcode-btn" data-slug="${a.slug}" style="padding:6px 12px;">Save</button>
+                    <span class="passcode-save-msg" data-slug="${a.slug}" style="font-size:0.75rem;"></span>
+                  </div>
+                </td>
                 <td>
                   <select class="approved-class-select" data-slug="${a.slug}" style="padding:6px 8px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;width:100%;">
                     <option value="" ${a.classSection ? '' : 'selected'}>No Class</option>
@@ -2208,38 +2217,35 @@ function slugify(name){
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
 }
 
-// "Manage Access" tab: lets the teacher set/change the class PIN and
-// maintain the list of approved student names. student.html checks both
-// of these (posukPractice/settings/classPin and posukPractice/allowedStudents)
-// before letting anyone past the name gate, so random people with the link
-// can't show up as "students" without the teacher adding them first.
+// "Manage Access" tab: lets the teacher set/change each student's
+// individual passcode and maintain the approved student list. student.html
+// checks the selected student's approved record and that student's passcode
+// before letting anyone past the name gate. Existing records that do not yet
+// have a passcode use 5770 until the teacher changes them.
 async function loadAccessTab(){
   const mainEl = document.getElementById('mainContent');
   mainEl.innerHTML = '<div class="loading">Loading access settings…</div>';
   try{
-    const [pinSnap, allowedSnap, practiceLimitSnap] = await Promise.all([
-      db.ref('posukPractice/settings/classPin').once('value'),
+    const [allowedSnap, practiceLimitSnap] = await Promise.all([
       db.ref('posukPractice/allowedStudents').once('value'),
       db.ref('posukPractice/settings/practiceLimit').once('value')
     ]);
-    const currentPin = pinSnap.val() || '';
     const allowedVal = allowedSnap.val() || {};
     const practiceLimit = practiceLimitSnap.val() || null;
     const approvedNames = Object.entries(allowedVal)
-      .map(([slug, info]) => ({ slug, name: (info && info.name) || slug, classSection: (info && info.classSection) || '' }))
+      .map(([slug, info]) => ({
+        slug,
+        name: (info && info.name) || slug,
+        classSection: (info && info.classSection) || '',
+        passcode: (info && info.passcode !== undefined && info.passcode !== null && String(info.passcode).trim())
+          ? String(info.passcode).trim()
+          : DEFAULT_STUDENT_PASSCODE
+      }))
       .sort((a,b) => a.name.localeCompare(b.name));
 
     let html = `<h2>🔑 Manage Access</h2>
       <div class="empty-msg" style="text-align:left;margin-bottom:18px;">
-        Students need BOTH the class PIN and an approved name to get into the app.
-        Add a name here before sharing the link with a new student.
-      </div>
-      <div style="margin-bottom:24px;">
-        <div style="font-weight:700;margin-bottom:6px;">Class PIN</div>
-        <input id="pinInput" type="text" value="${currentPin}" placeholder="e.g. 1234"
-          style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:160px;">
-        <button class="btn small gold" id="savePinBtn" style="margin-left:8px;">Save PIN</button>
-        <span id="pinSaveMsg" style="margin-left:10px;font-size:0.85rem;"></span>
+        Each student needs an approved name and his own passcode. Existing students use <strong>${DEFAULT_STUDENT_PASSCODE}</strong> until you change their individual passcode below.
       </div>
 
       <div style="margin-bottom:26px;padding:16px;border-radius:12px;background:#fff;border:2px solid var(--gold);">
@@ -2278,6 +2284,8 @@ async function loadAccessTab(){
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
           <input id="newApprovedName" type="text" placeholder="Student's name" maxlength="30"
             style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:220px;">
+          <input id="newApprovedPasscode" type="text" inputmode="numeric" maxlength="20" value="${DEFAULT_STUDENT_PASSCODE}" placeholder="Passcode"
+            style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:120px;">
           <select id="newApprovedClass" style="padding:8px 10px;border-radius:8px;border:2px solid var(--gold);font-family:'Quicksand',sans-serif;">
             <option value="">No Class</option>
             ${CLASS_SECTIONS.map(c => `<option value="${c}">${c}</option>`).join('')}
@@ -2288,20 +2296,6 @@ async function loadAccessTab(){
         <div id="approvedListWrap">${renderApprovedGroups(approvedNames)}</div>
       </div>`;
     mainEl.innerHTML = html;
-
-    document.getElementById('savePinBtn').onclick = async () => {
-      const val = document.getElementById('pinInput').value.trim();
-      const msgEl = document.getElementById('pinSaveMsg');
-      try{
-        await db.ref('posukPractice/settings/classPin').set(val);
-        msgEl.style.color = '#8fd694';
-        msgEl.textContent = 'Saved!';
-      }catch(e){
-        msgEl.style.color = '#ffb3b3';
-        msgEl.textContent = 'Could not save.';
-        console.error(e);
-      }
-    };
 
     // Practice window: exact first and last posuk visible to the class.
     const practiceStartPerek = document.getElementById('practiceStartPerek');
@@ -2370,6 +2364,7 @@ async function loadAccessTab(){
 
     document.getElementById('addApprovedBtn').onclick = async () => {
       const nameVal = document.getElementById('newApprovedName').value.trim();
+      const passcodeVal = document.getElementById('newApprovedPasscode').value.trim() || DEFAULT_STUDENT_PASSCODE;
       const classVal = document.getElementById('newApprovedClass').value;
       const msgEl = document.getElementById('addApprovedMsg');
       if(!nameVal){ return; }
@@ -2382,10 +2377,13 @@ async function loadAccessTab(){
       try{
         await db.ref('posukPractice/allowedStudents/' + slug).set({
           name: nameVal,
+          passcode: passcodeVal,
+          passcodeUpdatedAt: firebase.database.ServerValue.TIMESTAMP,
           classSection: classVal,
           addedAt: firebase.database.ServerValue.TIMESTAMP
         });
         document.getElementById('newApprovedName').value = '';
+        document.getElementById('newApprovedPasscode').value = DEFAULT_STUDENT_PASSCODE;
         msgEl.style.color = '#8fd694';
         msgEl.textContent = 'Added!';
         loadAccessTab();
@@ -2396,8 +2394,44 @@ async function loadAccessTab(){
       }
     };
 
+    // Save each student's individual passcode. Changing it also changes
+    // passcodeUpdatedAt so a browser that had previously remembered this
+    // student will be asked for the new passcode on its next page load.
+    mainEl.querySelectorAll('.save-passcode-btn').forEach(btn => {
+      btn.onclick = async () => {
+        const slug = btn.dataset.slug;
+        const input = mainEl.querySelector(`.approved-passcode-input[data-slug="${slug}"]`);
+        const msgEl = mainEl.querySelector(`.passcode-save-msg[data-slug="${slug}"]`);
+        const val = input ? input.value.trim() : '';
+        if(!val){
+          if(msgEl){ msgEl.style.color = '#8a3a3a'; msgEl.textContent = 'Required'; }
+          return;
+        }
+        try{
+          await db.ref('posukPractice/allowedStudents/' + slug).update({
+            passcode: val,
+            passcodeUpdatedAt: firebase.database.ServerValue.TIMESTAMP
+          });
+          if(msgEl){ msgEl.style.color = '#397839'; msgEl.textContent = 'Saved!'; }
+        }catch(e){
+          if(msgEl){ msgEl.style.color = '#8a3a3a'; msgEl.textContent = 'Could not save'; }
+          console.error(e);
+        }
+      };
+    });
+
+    mainEl.querySelectorAll('.approved-passcode-input').forEach(input => {
+      input.onkeydown = (ev) => {
+        if(ev.key === 'Enter'){
+          ev.preventDefault();
+          const btn = mainEl.querySelector(`.save-passcode-btn[data-slug="${input.dataset.slug}"]`);
+          if(btn) btn.click();
+        }
+      };
+    });
+
     // Changing a student's class here only updates the classSection field —
-    // it never touches their name, PIN approval, or any recorded progress.
+    // it never touches their name, passcode, or any recorded progress.
     mainEl.querySelectorAll('.approved-class-select').forEach(sel => {
       sel.onchange = async () => {
         const slug = sel.dataset.slug;
