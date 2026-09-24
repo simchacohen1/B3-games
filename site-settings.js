@@ -31,22 +31,71 @@
     return result;
   }
 
+  // Automatic access follows the B3 master schedule.
+  // The site is OPEN by default; these are the periods when it is LOCKED.
+  // ET gets the first 2 minutes of each 10-minute recess for non-game break time.
+  // WT can open immediately when each 10-minute recess starts.
   function defaultLockWindows(classId) {
     const result = blankLockWindows();
+
+    if (classId === "et") {
+      ["mon", "tue", "wed", "thu"].forEach(function (day) {
+        result[day] = [
+          { start: "08:45", end: "10:17" },
+          { start: "10:25", end: "11:07" },
+          { start: "11:15", end: "12:00" },
+          { start: "12:45", end: "13:32" },
+          { start: "13:40", end: "14:27" },
+          { start: "14:35", end: "15:15" }
+        ];
+      });
+      result.fri = [
+        { start: "08:45", end: "10:17" },
+        { start: "10:25", end: "11:07" },
+        { start: "11:15", end: "12:00" }
+      ];
+    } else {
+      ["mon", "tue", "wed", "thu"].forEach(function (day) {
+        result[day] = [
+          { start: "12:20", end: "13:50" },
+          { start: "14:00", end: "14:45" },
+          { start: "14:55", end: "15:35" },
+          { start: "16:15", end: "17:00" },
+          { start: "17:10", end: "17:55" },
+          { start: "18:05", end: "18:45" }
+        ];
+      });
+      result.fri = [
+        { start: "11:00", end: "12:30" },
+        { start: "12:40", end: "13:25" },
+        { start: "13:35", end: "14:15" }
+      ];
+    }
+    return result;
+  }
+
+  // This is the previous automatic schedule. Detect it so an existing Firebase
+  // record that was never customized automatically upgrades to the new recess
+  // schedule instead of continuing to lock the entire class block.
+  function previousDefaultLockWindows(classId) {
+    const result = blankLockWindows();
     ["mon", "tue", "wed", "thu"].forEach(function (day) {
-      if (classId === "et") {
-        result[day] = [
-          { start: "08:45", end: "12:00" },
-          { start: "12:45", end: "15:15" }
-        ];
-      } else {
-        result[day] = [
-          { start: "12:20", end: "15:35" },
-          { start: "16:15", end: "18:45" }
-        ];
-      }
+      result[day] = classId === "et"
+        ? [{ start: "08:45", end: "12:00" }, { start: "12:45", end: "15:15" }]
+        : [{ start: "12:20", end: "15:35" }, { start: "16:15", end: "18:45" }];
     });
     return result;
+  }
+
+  function lockWindowsEqual(a, b) {
+    return DAY_KEYS.every(function (day) {
+      const aa = Array.isArray(a && a[day]) ? a[day] : [];
+      const bb = Array.isArray(b && b[day]) ? b[day] : [];
+      if (aa.length !== bb.length) return false;
+      return aa.every(function (r, i) {
+        return r && bb[i] && r.start === bb[i].start && r.end === bb[i].end;
+      });
+    });
   }
 
   const defaultSettings = {
@@ -133,7 +182,7 @@
     return result;
   }
 
-  function normalizeClassAccess(value, fallback) {
+  function normalizeClassAccess(value, fallback, classId) {
     const source = value && typeof value === "object" ? value : {};
     const mode = ["auto", "open", "locked"].includes(source.mode) ? source.mode : fallback.mode;
     let lockWindows;
@@ -143,6 +192,9 @@
       DAY_KEYS.forEach(function (day) {
         lockWindows[day] = normalizeDayLockWindows(source.lockWindows[day], fallback.lockWindows[day]);
       });
+      if (classId && lockWindowsEqual(lockWindows, previousDefaultLockWindows(classId))) {
+        lockWindows = deepClone(fallback.lockWindows);
+      }
     } else if (source.schedule && typeof source.schedule === "object") {
       lockWindows = legacyOpenScheduleToLockWindows(source.schedule, fallback.lockWindows);
     } else {
@@ -194,8 +246,8 @@
 
     const fallbackAccess = cloneDefaultSettings().classAccess;
     normalized.classAccess = {
-      et: normalizeClassAccess(sourceClassAccess.et, fallbackAccess.et),
-      wt: normalizeClassAccess(sourceClassAccess.wt, fallbackAccess.wt)
+      et: normalizeClassAccess(sourceClassAccess.et, fallbackAccess.et, "et"),
+      wt: normalizeClassAccess(sourceClassAccess.wt, fallbackAccess.wt, "wt")
     };
 
     return normalized;
@@ -497,6 +549,10 @@
     studentHasGameOverride: studentHasGameOverride,
     updateClassMode: updateClassMode,
     updateClassLockWindows: updateClassLockWindows,
+    getDefaultClassLockWindows: function (classId) {
+      if (!["et", "wt"].includes(classId)) return blankLockWindows();
+      return deepClone(defaultLockWindows(classId));
+    },
     isClassOpen: isClassOpen,
     describeClassAccess: describeClassAccess,
     signInWithGoogle: signInWithGoogle,

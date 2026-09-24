@@ -34,7 +34,7 @@
   .master-row{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;margin:12px 0}.master-row label{font-weight:800}
   .class-card{border:1px solid #dbe4ee;border-radius:15px;padding:13px;margin:12px 0;background:#f8fafc}.class-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.class-title{font-weight:900;font-size:18px}.status-pill{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:900}.status-open{background:#dcfce7;color:#166534}.status-closed{background:#fee2e2;color:#991b1b}.status-reason{font-size:12px;color:#64748b;margin-top:4px}
   .mode-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:12px 0}.mode-btn{border:1px solid #cbd5e1;background:white;border-radius:9px;padding:8px 5px;font-size:12px;font-weight:800;cursor:pointer}.mode-btn.active{background:#1f2937;color:white;border-color:#1f2937}
-  details{margin-top:8px}summary{cursor:pointer;font-weight:800;color:#334155}.schedule-grid{margin-top:9px}.schedule-help{font-size:11px;color:#64748b;margin:7px 0 10px;line-height:1.35}.schedule-day{border-top:1px solid #e5e7eb;padding:8px 0}.schedule-day:first-child{border-top:0}.schedule-day-name{font-weight:900;font-size:12px;margin-bottom:5px}.lock-range{display:grid;grid-template-columns:24px 44px 1fr 22px 1fr;align-items:center;gap:5px;margin:5px 0;font-size:11px}.lock-range input[type="time"]{width:100%;padding:5px;border:1px solid #cbd5e1;border-radius:8px;font-size:11px}.lock-range .to{text-align:center;color:#64748b}.game-toggle-header,.game-toggle-row{display:grid;grid-template-columns:minmax(0,1fr) 38px 38px;align-items:center;gap:6px;font-size:13px}.game-toggle-header{font-weight:900;color:#475569;padding:0 0 6px;border-bottom:1px solid #cbd5e1}.game-toggle-header span:not(:first-child),.game-toggle-row input{text-align:center;justify-self:center}.game-toggle-row{margin:0;padding:7px 0;border-bottom:1px solid #eef2f7}.game-toggle-row label{min-width:0}
+  details{margin-top:8px}summary{cursor:pointer;font-weight:800;color:#334155}.schedule-grid{margin-top:9px}.schedule-help{font-size:11px;color:#64748b;margin:7px 0 10px;line-height:1.35}.schedule-day{border-top:1px solid #e5e7eb;padding:8px 0}.schedule-day:first-child{border-top:0}.schedule-day-name{font-weight:900;font-size:12px;margin-bottom:5px}.lock-range{display:grid;grid-template-columns:24px 44px 1fr 22px 1fr;align-items:center;gap:5px;margin:5px 0;font-size:11px}.lock-range input[type="time"]{width:100%;padding:5px;border:1px solid #cbd5e1;border-radius:8px;font-size:11px}.lock-range .to{text-align:center;color:#64748b}.schedule-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.schedule-reset{border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:8px 10px;font-size:12px;font-weight:800;cursor:pointer}.schedule-reset:hover{background:#f1f5f9}.game-toggle-header,.game-toggle-row{display:grid;grid-template-columns:minmax(0,1fr) 38px 38px;align-items:center;gap:6px;font-size:13px}.game-toggle-header{font-weight:900;color:#475569;padding:0 0 6px;border-bottom:1px solid #cbd5e1}.game-toggle-header span:not(:first-child),.game-toggle-row input{text-align:center;justify-self:center}.game-toggle-row{margin:0;padding:7px 0;border-bottom:1px solid #eef2f7}.game-toggle-row label{min-width:0}
   .tz-note{font-size:11px;color:#64748b;margin-top:7px}
   .special-access-note{max-width:900px;margin:0 auto 16px;padding:11px 14px;border:1px solid #86efac;background:#f0fdf4;border-radius:12px;color:#166534;font-size:14px;font-weight:700;text-align:left}
   .override-box{border:1px solid #bfdbfe;background:#eff6ff;border-radius:14px;padding:12px;margin-top:10px}
@@ -97,9 +97,9 @@
 
   <div id="loginCard" class="login-card">
     <h2>Student Sign In</h2>
-    <p>Use your name and your individual passcode.</p>
-    <label for="classPinInput">Passcode</label>
-    <input id="classPinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="Passcode">
+    <p>Use the same name and Class PIN you use for the other B3 tools.</p>
+    <label for="classPinInput">Class PIN</label>
+    <input id="classPinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="Class PIN">
     <label for="studentNameInput">Your name</label>
     <input id="studentNameInput" type="text" autocomplete="name" placeholder="First and last name">
     <button id="studentSignInBtn" type="button">Open B3 Games</button>
@@ -324,7 +324,6 @@
 
   function slugify(name){return String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");}
   function setLoginMsg(t){el("loginMsg").textContent=t||"";}
-  const DEFAULT_STUDENT_PASSCODE="5770";
 
   function showLogin(){
     el("loginCard").classList.remove("hidden");
@@ -406,41 +405,28 @@
   async function checkStudentAccess(name,pin){
     const slug=slugify(name);
     if(!slug)return{ok:false,reason:"Please type your name."};
-
-    const allowedSnap=await db.ref("posukPractice/allowedStudents/"+slug).once("value");
+    const [pinSnap,allowedSnap]=await Promise.all([
+      db.ref("posukPractice/settings/classPin").once("value"),
+      db.ref("posukPractice/allowedStudents/"+slug).once("value")
+    ]);
+    const realPin=pinSnap.val();
+    if(realPin&&String(pin).trim()!==String(realPin).trim())return{ok:false,reason:"Incorrect PIN. Ask Rabbi Cohen."};
     if(!allowedSnap.exists())return{ok:false,reason:"Your name is not on the B3 student list."};
-
     const d=allowedSnap.val()||{};
-    const realPin=(d.passcode!==undefined&&d.passcode!==null&&String(d.passcode).trim())
-      ? String(d.passcode).trim()
-      : DEFAULT_STUDENT_PASSCODE;
-
-    if(String(pin).trim()!==realPin)return{ok:false,reason:"Incorrect passcode. Ask Rabbi Cohen."};
-
     // Use the Firebase classId when present; for older approved-student rows
     // that do not have one yet, fall back to the known B3 ET/WT roster.
     const classId=resolvedStudentClass(slug,d);
     if(!["et","wt"].includes(classId))return{ok:false,reason:"Your ET/WT class is not assigned yet. Ask Rabbi Cohen."};
-
-    return{
-      ok:true,
-      id:slug,
-      name:(d&&d.name)?String(d.name):name.trim(),
-      classId,
-      accessVersion:Number(d.passcodeUpdatedAt)||0
-    };
+    return{ok:true,id:slug,name:(d&&d.name)?String(d.name):name.trim(),classId};
   }
 
   function enterStudent(r){
     myStudentId=r.id;myStudentName=r.name;myClassId=r.classId;
-    const accessVersion=String(Number(r.accessVersion)||0);
     localStorage.setItem("b3Games_studentId",myStudentId);
     localStorage.setItem("b3Games_studentName",myStudentName);
     localStorage.setItem("b3Games_studentClass",myClassId);
-    localStorage.setItem("b3Games_studentAccessVersion",accessVersion);
     localStorage.setItem("posukPractice_studentId",myStudentId);
     localStorage.setItem("posukPractice_studentName",myStudentName);
-    localStorage.setItem("posukPractice_studentAccessVersion",accessVersion);
     localStorage.setItem("weeklyQuiz_classId",myClassId);
     renderStudentAccess();
   }
@@ -460,48 +446,18 @@
   async function restoreStudent(){
     const id=localStorage.getItem("b3Games_studentId")||localStorage.getItem("posukPractice_studentId");
     if(!id){showLogin();return;}
-
-    const savedAccessVersion=localStorage.getItem("b3Games_studentAccessVersion")
-      || localStorage.getItem("posukPractice_studentAccessVersion")
-      || "0";
-
     try{
       const snap=await db.ref("posukPractice/allowedStudents/"+id).once("value");
-      if(!snap.exists()){
-        ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_studentAccessVersion","b3Games_classPin",
-         "posukPractice_studentId","posukPractice_studentName","posukPractice_studentAccessVersion","weeklyQuiz_classId"]
-          .forEach(k=>localStorage.removeItem(k));
-        showLogin();
-        return;
-      }
-
+      if(!snap.exists()){showLogin();return;}
       const d=snap.val()||{};
-      const currentAccessVersion=String(Number(d.passcodeUpdatedAt)||0);
-      if(String(savedAccessVersion)!==currentAccessVersion){
-        ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_studentAccessVersion","b3Games_classPin",
-         "posukPractice_studentId","posukPractice_studentName","posukPractice_studentAccessVersion","weeklyQuiz_classId"]
-          .forEach(k=>localStorage.removeItem(k));
-        setLoginMsg("Please enter your new passcode.");
-        showLogin();
-        return;
-      }
-
       const restoredClassId=resolvedStudentClass(id,d);
       if(!["et","wt"].includes(restoredClassId)){showLogin();return;}
-
-      enterStudent({
-        id:id,
-        name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),
-        classId:restoredClassId,
-        accessVersion:Number(d.passcodeUpdatedAt)||0
-      });
+      enterStudent({id:id,name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
     }catch(e){console.warn(e);showLogin();}
   }
 
   function switchStudent(){
-    ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_studentAccessVersion","b3Games_classPin",
-     "posukPractice_studentId","posukPractice_studentName","posukPractice_studentAccessVersion","weeklyQuiz_classId"]
-      .forEach(k=>localStorage.removeItem(k));
+    ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_classPin","posukPractice_studentId","posukPractice_studentName","weeklyQuiz_classId"].forEach(k=>localStorage.removeItem(k));
     myStudentId=myStudentName=myClassId="";
     el("studentNameInput").value="";el("classPinInput").value="";setLoginMsg("");showLogin();
   }
@@ -509,14 +465,16 @@
   function classCardHtml(classId){
     const access=currentSettings.classAccess[classId];
     const info=settingsApi.describeClassAccess(currentSettings,classId,new Date());
-    const rows=settingsApi.dayKeys.map(day=>{
+    const editableDays=["mon","tue","wed","thu","fri"];
+    const rows=editableDays.map(day=>{
       const ranges=Array.isArray(access.lockWindows[day])?access.lockWindows[day]:[];
-      const rangeRows=[0,1].map(i=>{
+      const rangeRows=[0,1,2,3,4,5].map(i=>{
         const r=ranges[i]||null;
-        return `<div class="lock-range"><input type="checkbox" data-lock-enabled="${classId}:${day}:${i}" ${r?"checked":""}><span>Lock ${i+1}</span><input type="time" data-lock-start="${classId}:${day}:${i}" value="${r?r.start:"00:00"}"><span class="to">to</span><input type="time" data-lock-end="${classId}:${day}:${i}" value="${r?r.end:"00:00"}"></div>`;
+        return `<div class="lock-range"><input type="checkbox" data-lock-enabled="${classId}:${day}:${i}" ${r?"checked":""}><span>Closed ${i+1}</span><input type="time" data-lock-start="${classId}:${day}:${i}" value="${r?r.start:"00:00"}"><span class="to">to</span><input type="time" data-lock-end="${classId}:${day}:${i}" value="${r?r.end:"00:00"}"></div>`;
       }).join("");
       return `<div class="schedule-day"><div class="schedule-day-name">${dayLabels[day]}</div>${rangeRows}</div>`;
     }).join("");
+    const delayNote=classId==="et"?" ET defaults include the 2-minute wait at the start of each 10-minute recess.":" WT defaults open immediately when recess begins.";
     return `<div class="class-card" data-class-card="${classId}">
       <div class="class-top"><div><div class="class-title">${classLabels[classId]}</div><div class="status-reason">${info.reason}</div></div><span class="status-pill ${info.open?"status-open":"status-closed"}">${info.open?"OPEN":"LOCKED"}</span></div>
       <div class="mode-buttons">
@@ -524,7 +482,7 @@
         <button class="mode-btn ${access.mode==="open"?"active":""}" data-class-mode="${classId}:open">Unlock Now</button>
         <button class="mode-btn ${access.mode==="locked"?"active":""}" data-class-mode="${classId}:locked">Lock Now</button>
       </div>
-      <details><summary>Edit automatic locked times</summary><div class="schedule-grid"><div class="schedule-help">The class is OPEN by default. Check only the periods when it should automatically LOCK. Times use New York time.</div>${rows}</div></details>
+      <details><summary>Recess Access Schedule</summary><div class="schedule-grid"><div class="schedule-help">B3 Games is OPEN by default. The checked rows are the school/class periods when it is CLOSED, so the gaps between them are recess/lunch access.${delayNote} Edit any time below if the school schedule changes.</div>${rows}<div class="schedule-actions"><button type="button" class="schedule-reset" data-reset-schedule="${classId}">Reset to Master Schedule</button></div></div></details>
     </div>`;
   }
 
@@ -666,7 +624,7 @@
       const lockWindows={};
       settingsApi.dayKeys.forEach(day=>{
         lockWindows[day]=[];
-        [0,1].forEach(i=>{
+        [0,1,2,3,4,5].forEach(i=>{
           const enabled=document.querySelector(`[data-lock-enabled="${classId}:${day}:${i}"]`);
           const start=document.querySelector(`[data-lock-start="${classId}:${day}:${i}"]`);
           const end=document.querySelector(`[data-lock-end="${classId}:${day}:${i}"]`);
@@ -680,6 +638,15 @@
 
     ["et","wt"].forEach(classId=>{
       document.querySelectorAll(`[data-lock-enabled^="${classId}:"] , [data-lock-start^="${classId}:"] , [data-lock-end^="${classId}:"]`).forEach(input=>input.addEventListener("change",()=>saveLockWindowsFromDom(classId).catch(e=>{alert("Could not save the locked times.");console.error(e);}))); 
+      document.querySelector(`[data-reset-schedule="${classId}"]`)?.addEventListener("click",async()=>{
+        if(!confirm(`Reset ${classLabels[classId]} to the Master Schedule recess times?`))return;
+        try{
+          const defaults=typeof settingsApi.getDefaultClassLockWindows==="function"
+            ? settingsApi.getDefaultClassLockWindows(classId)
+            : settingsApi.defaultSettings.classAccess[classId].lockWindows;
+          await settingsApi.updateClassLockWindows(classId,defaults);
+        }catch(e){alert("Could not reset the schedule.");console.error(e);}
+      });
     });
   }
 
