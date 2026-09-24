@@ -4,8 +4,8 @@
 const C=window.StudentRewardsCommon;
 const {db,auth}=C.ensureFirebase();
 const ROOT=C.ROOT, ADMIN=C.ADMIN_EMAIL;
-const NAV=["Overview","Daily Points","Students","Categories","Comments","Rewards","Reports","People & Classes","Settings"];
-const ICONS={"Overview":"⌂","Daily Points":"✓","Students":"♙","Categories":"☷","Comments":"✎","Rewards":"◇","Reports":"▤","People & Classes":"♧","Settings":"⚙"};
+const NAV=["Overview","Points Dashboard","Daily Points","Students","Categories","Comments","Rewards","Reports","People & Classes","Settings"];
+const ICONS={"Overview":"⌂","Points Dashboard":"★","Daily Points":"✓","Students":"♙","Categories":"☷","Comments":"✎","Rewards":"◇","Reports":"▤","People & Classes":"♧","Settings":"⚙"};
 const CLASS_1000_REWARDS=[
   {key:"gimkit",name:"Gimkit",icon:"🎯"},
   {key:"kahoot",name:"Kahoot",icon:"❓"},
@@ -15,7 +15,7 @@ const CLASS_1000_REWARDS=[
   {key:"extra-recess",name:"Extra Recess",icon:"🏃"},
   {key:"chat-in-zoom",name:"Chat in Zoom",icon:"💬"}
 ];
-let state={root:null,user:null,tab:"Overview",classId:"",date:C.schoolDateString(),draft:{},awardDraft:{},absent:new Set(),selectedId:""};
+let state={root:null,user:null,tab:"Overview",classId:"",date:C.schoolDateString(),draft:{},awardDraft:{},absent:new Set(),selectedId:"",pointStudent:"all",pointRange:"30",pointType:"all",pointStatus:"all",pointSearch:""};
 const $=s=>document.querySelector(s), esc=C.escapeHtml;
 function vals(o){return o&&typeof o==="object"?Object.values(o):[]}
 function activeClasses(){return C.activeClasses(state.root||{})}
@@ -98,6 +98,7 @@ function prepareDraft(){
 function isSavedDay(){return roster().some(s=>state.root?.dailyAwards?.[s.id]?.[state.classId]?.[state.date])}
 function render(){if(!state.root||!state.user)return;setHeader();buildNav();document.querySelectorAll("#nav [data-tab]").forEach(b=>b.classList.toggle("active",b.dataset.tab===state.tab));const p=$("#page");
   if(state.tab==="Overview")p.innerHTML=overview();
+  if(state.tab==="Points Dashboard")p.innerHTML=pointsDashboard();
   if(state.tab==="Daily Points")p.innerHTML=daily();
   if(state.tab==="Students")p.innerHTML=students();
   if(state.tab==="Categories")p.innerHTML=categoriesPage();
@@ -120,13 +121,161 @@ function overview(){
     <section class="panel"><div class="panelhead"><div><h2>Student performance</h2><p>Today’s saved score</p></div><button data-go="Students">View all →</button></div><div class="list">${r.slice(0,6).map(s=>`<button class="studentrow" data-student="${esc(s.id)}"><em style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><span><strong>${esc(s.name)}</strong><small>${Number(s.rewardBalance)||0} reward points</small></span><u><i style="width:${Math.min(100,scoreFor(s))}%;background:${esc(safeColor(s))}"></i></u><b>${scoreFor(s)}%</b></button>`).join("")}</div></section>
     <section class="panel"><div class="panelhead"><div><h2>Quick actions</h2><p>Common classroom tasks</p></div></div><div class="quick">
       <button class="access-toggle ${enabled?"enabled":"blocked"}" id="accessToggle"><i>${enabled?"✓":"×"}</i><b>${enabled?"Student Website Enabled":"Student Website Blocked"}</b><small>${enabled?"Click to block student access":"Click to reopen student access"}</small></button>
+      <button data-go="Points Dashboard"><i class="q-gold">★</i><b>Points dashboard</b><small>See every point and reason</small></button>
       <button data-go="Daily Points"><i class="q-purple">✓</i><b>Daily points</b><small>Score the whole class</small></button>
-      <button data-go="Rewards"><i class="q-gold">◇</i><b>Approve rewards</b><small>${pending} requests waiting</small></button>
+      <button data-go="Rewards"><i class="q-green">◇</i><b>Approve rewards</b><small>${pending} requests waiting</small></button>
       <button data-go="Students"><i class="q-blue">±</i><b>Adjust points</b><small>Does not affect averages</small></button>
       <button data-go="People & Classes"><i class="q-green">♧</i><b>Manage students</b><small>Classes and enrollment</small></button>
     </div></section>
   </div>`;
 }
+
+function pointTime(value){
+  if(typeof value==="number"&&Number.isFinite(value))return value;
+  const n=Number(value);if(Number.isFinite(n)&&n>0)return n;
+  const p=Date.parse(String(value||""));return Number.isFinite(p)?p:0;
+}
+function pointDateFromSchoolDate(date){const p=Date.parse(`${date}T12:00:00`);return Number.isFinite(p)?p:0}
+function pointClassName(classId){return state.root?.classes?.[classId]?.name||classId||""}
+function pointSourceGroup(source){
+  const s=String(source||"");
+  if(["reading100","translation100","understand100"].includes(s))return "posuk";
+  if(["chazara","chazara-recording","chazara-remove"].includes(s))return "chazara";
+  if(s==="teacher-adjustment")return "teacher";
+  return "activity";
+}
+function pointSourceLabel(source){
+  const labels={reading100:"Posuk Practice · Reading 100%",translation100:"Posuk Practice · Translation 100%",understand100:"Posuk Practice · Understanding 100%",chazara:"Chazara",'chazara-recording':"Recorded Chazara",'chazara-remove':"Chazara removal",'teacher-adjustment':"Teacher adjustment"};
+  return labels[source]||String(source||"Activity points");
+}
+function allPointLedger(includeGaps=true){
+  const r=roster(), rosterMap=new Map(r.map(s=>[s.id,s])), rows=[];
+  const add=row=>{if(!row?.sid||!rosterMap.has(row.sid))return;const s=rosterMap.get(row.sid);rows.push({...row,studentName:row.studentName||s.name||row.sid,studentInitials:s.initials||initials(s.name),studentColor:safeColor(s)})};
+
+  // Daily points. Read every class bucket for each current student so the ledger
+  // can reconcile with the student's current point balance even after class moves.
+  for(const s of r){
+    for(const [cid,dates] of Object.entries(state.root?.dailyAwards?.[s.id]||{})){
+      for(const [date,award] of Object.entries(dates||{})){
+        const amount=Number(award?.points||0);if(!amount)continue;
+        add({id:`daily:${s.id}:${cid}:${date}`,sid:s.id,amount,when:pointTime(award?.savedAt)||pointDateFromSchoolDate(date),source:"daily",sourceGroup:"daily",sourceLabel:"Daily Points",reason:`Daily Points — ${C.formatDate(date)}`,detail:pointClassName(cid),status:"posted",counts:true,classId:cid});
+      }
+    }
+  }
+
+  // Posuk Practice, Chazara, and any other activity point requests.
+  for(const [id,item0] of Object.entries(state.root?.pointRequests||{})){
+    const item=item0||{}, sid=String(item.rewardStudentId||"");if(!rosterMap.has(sid))continue;
+    const rawStatus=String(item.status||"pending"), approved=rawStatus==="approved", amount=Number(approved?(item.actualAmount??item.amount??0):(item.amount??0));
+    const group=pointSourceGroup(item.source), when=pointTime(approved?(item.reviewedAt||item.createdAt):item.createdAt);
+    const status=approved?"posted":rawStatus;
+    add({id:`request:${id}`,sid,amount,when,source:item.source||"activity",sourceGroup:group,sourceLabel:pointSourceLabel(item.source),reason:item.reason||pointSourceLabel(item.source),detail:item.classId?pointClassName(item.classId):"",status,counts:approved,classId:item.classId||"",balanceAfter:approved?item.balanceAfter:null});
+  }
+
+  // Teacher-entered manual adjustments.
+  for(const [id,item0] of Object.entries(state.root?.pointAdjustments||{})){
+    const item=item0||{}, sid=String(item.studentId||"");if(!rosterMap.has(sid))continue;
+    const amount=Number(item.amount||0);if(!amount)continue;
+    add({id:`adjust:${id}`,sid,amount,when:pointTime(item.createdAt),source:"teacher-adjustment",sourceGroup:"teacher",sourceLabel:"Teacher adjustment",reason:item.reason||"Teacher adjustment",detail:item.classId?pointClassName(item.classId):"",status:"posted",counts:true,classId:item.classId||""});
+  }
+
+  // Prize Store purchases: points leave when the request is submitted. A declined
+  // request creates a matching return so the visible ledger mirrors the real balance.
+  for(const s of r){
+    for(const [key,item0] of Object.entries(state.root?.redemptionsByStudent?.[s.id]||{})){
+      const item=item0||{}, cost=Number(item.cost||0);if(!cost)continue;
+      const rewardName=state.root?.rewards?.[item.rewardId]?.name||"Reward";
+      const requested=pointTime(item.requestedAt);
+      if(requested)add({id:`redeem:${s.id}:${key}:request`,sid:s.id,amount:-cost,when:requested,source:"reward-store",sourceGroup:"store",sourceLabel:"Prize Store",reason:`Reward requested — ${rewardName}`,detail:`${String(item.status||"requested")} · ${cost} ★`,status:"posted",counts:true});
+      if(String(item.status||"")==="declined"){
+        const reviewed=pointTime(item.reviewedAt);
+        if(reviewed)add({id:`redeem:${s.id}:${key}:return`,sid:s.id,amount:cost,when:reviewed,source:"reward-return",sourceGroup:"store",sourceLabel:"Prize Store",reason:`Points returned — ${rewardName}`,detail:"Request declined",status:"posted",counts:true});
+      }
+    }
+  }
+
+  // Older balances may predate the permanent history records. Show the difference
+  // instead of hiding it so the teacher can immediately see why a balance does not reconcile.
+  if(includeGaps){
+    const sums={};for(const row of rows)if(row.counts)sums[row.sid]=(sums[row.sid]||0)+Number(row.amount||0);
+    for(const s of r){
+      const current=Number(s.rewardBalance||0), accounted=Number(sums[s.id]||0), gap=current-accounted;
+      if(gap)add({id:`gap:${s.id}`,sid:s.id,amount:gap,when:0,source:"history-gap",sourceGroup:"gap",sourceLabel:"History gap",reason:"Balance not linked to a saved history record",detail:`Current balance ${current} ★ · saved ledger ${accounted} ★`,status:"needs-review",counts:true,isGap:true});
+    }
+  }
+  // Calculate a running balance for each student. History gaps are treated as the
+  // older opening balance, so the newest calculated balance lands on the live total.
+  for(const s of r){
+    let running=0;
+    const posted=rows.filter(x=>x.sid===s.id&&x.counts).sort((a,b)=>(a.when||0)-(b.when||0)||String(a.id).localeCompare(String(b.id)));
+    for(const row of posted){running+=Number(row.amount||0);row.runningBalance=running}
+  }
+  return rows.sort((a,b)=>(b.when||0)-(a.when||0)||String(a.studentName).localeCompare(String(b.studentName)));
+}
+function pointRangeStart(){
+  if(state.pointRange==="all")return 0;
+  const days=Math.max(1,Number(state.pointRange)||30), d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-(days-1));return d.getTime();
+}
+function filteredPointLedger(){
+  const q=String(state.pointSearch||"").trim().toLowerCase(), start=pointRangeStart();
+  return allPointLedger(true).filter(row=>{
+    if(state.pointStudent!=="all"&&row.sid!==state.pointStudent)return false;
+    if(state.pointType!=="all"&&row.sourceGroup!==state.pointType)return false;
+    if(state.pointStatus!=="all"&&row.status!==state.pointStatus)return false;
+    if(start&&row.when&&row.when<start&&!row.isGap)return false;
+    if(q&&!`${row.studentName} ${row.reason} ${row.sourceLabel} ${row.detail||""} ${row.status}`.toLowerCase().includes(q))return false;
+    return true;
+  });
+}
+function formatPointWhen(row){
+  if(row.isGap)return "Older / unknown";
+  if(!row.when)return "Unknown";
+  return new Date(row.when).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"});
+}
+function pointsDashboard(){
+  const r=roster(), ledger=allPointLedger(true), visible=filteredPointLedger();
+  const posted=ledger.filter(x=>x.counts&&!x.isGap), additions=posted.filter(x=>x.amount>0).reduce((a,x)=>a+x.amount,0), deductions=Math.abs(posted.filter(x=>x.amount<0).reduce((a,x)=>a+x.amount,0));
+  const totalBalance=r.reduce((a,s)=>a+Number(s.rewardBalance||0),0), pending=ledger.filter(x=>x.status==="pending"||x.status==="processing").length, gaps=ledger.filter(x=>x.isGap);
+  const byStudent=r.map(s=>{
+    const rows=ledger.filter(x=>x.sid===s.id), savedNet=rows.filter(x=>x.counts&&!x.isGap).reduce((a,x)=>a+Number(x.amount||0),0), gap=Number(s.rewardBalance||0)-savedNet;
+    const earned=rows.filter(x=>x.counts&&!x.isGap&&x.amount>0).reduce((a,x)=>a+x.amount,0), spent=Math.abs(rows.filter(x=>x.counts&&!x.isGap&&x.amount<0).reduce((a,x)=>a+x.amount,0));
+    const recent=rows.find(x=>!x.isGap&&x.when);
+    return {s,savedNet,gap,earned,spent,recent};
+  });
+  const typeOptions=[["all","All sources"],["daily","Daily Points"],["posuk","Posuk Practice"],["chazara","Chazara"],["teacher","Teacher adjustments"],["store","Prize Store"],["activity","Other activity"],["gap","History gaps"]];
+  const statusOptions=[["all","All statuses"],["posted","Posted to balance"],["pending","Pending"],["rejected","Rejected"],["needs-review","Needs review"]];
+  return `<section class="workspace points-dashboard">
+    <div class="workhead points-title"><div><p class="eyebrow">${esc((cls()?.name||"CLASS").toUpperCase())} · COMPLETE LEDGER</p><h1>All Student Points</h1><p>See each student's current balance and every saved reason points were added, deducted, spent, returned, pending, or missing from older history.</p></div><div class="reportbuttons"><button id="pointsReset">Reset filters</button><button id="pointsCsv">Export points CSV</button></div></div>
+    ${gaps.length?`<div class="points-alert"><b>⚠ ${gaps.length} balance${gaps.length===1?"":"s"} contain older points without a saved reason.</b><span>I am showing those as “History gap” instead of pretending the old reason is known.</span></div>`:""}
+    <div class="points-summary">
+      <article><span>Current class balance</span><strong>${totalBalance} ★</strong><small>Across ${r.length} students</small></article>
+      <article class="earned"><span>Saved additions</span><strong>+${additions} ★</strong><small>Daily, practice, Chazara & adjustments</small></article>
+      <article class="spent"><span>Saved deductions / spending</span><strong>−${deductions} ★</strong><small>Prize Store & negative adjustments</small></article>
+      <article class="pending"><span>Waiting now</span><strong>${pending}</strong><small>Pending point requests</small></article>
+    </div>
+
+    <section class="points-section"><div class="points-section-head"><div><h2>Student balances</h2><p>Click a student to show only that student's ledger below.</p></div><button class="points-all-students ${state.pointStudent==="all"?"active":""}" data-points-student="all">Show all students</button></div>
+      <div class="points-student-grid">${byStudent.map(x=>`<button class="points-student-card ${state.pointStudent===x.s.id?"selected":""} ${x.gap?"has-gap":""}" data-points-student="${esc(x.s.id)}"><span class="points-student-top"><em style="background:${esc(safeColor(x.s))}">${esc(x.s.initials||initials(x.s.name))}</em><span><b>${esc(x.s.name)}</b><small>${x.recent?`Latest: ${esc(x.recent.reason)}`:"No saved activity yet"}</small></span></span><strong>${Number(x.s.rewardBalance)||0} ★</strong><span class="points-mini"><i>+${x.earned}</i><i>−${x.spent}</i>${x.gap?`<i class="gap">Gap ${x.gap>0?"+":""}${x.gap}</i>`:`<i class="ok">✓ Reconciled</i>`}</span></button>`).join("")}</div>
+    </section>
+
+    <section class="points-section points-ledger"><div class="points-section-head"><div><h2>Point activity</h2><p><b>Posted</b> rows changed the balance. Pending and rejected requests are shown for clarity but are not counted.</p></div><strong class="points-result-count">${visible.length} row${visible.length===1?"":"s"}</strong></div>
+      <div class="points-filters">
+        <label><span>Student</span><select id="pointsStudent"><option value="all">All students</option>${r.map(s=>`<option value="${esc(s.id)}" ${state.pointStudent===s.id?"selected":""}>${esc(s.name)}</option>`).join("")}</select></label>
+        <label><span>Time</span><select id="pointsRange"><option value="7" ${state.pointRange==="7"?"selected":""}>Last 7 days</option><option value="30" ${state.pointRange==="30"?"selected":""}>Last 30 days</option><option value="90" ${state.pointRange==="90"?"selected":""}>Last 90 days</option><option value="all" ${state.pointRange==="all"?"selected":""}>All time</option></select></label>
+        <label><span>Source</span><select id="pointsType">${typeOptions.map(([v,l])=>`<option value="${v}" ${state.pointType===v?"selected":""}>${l}</option>`).join("")}</select></label>
+        <label><span>Status</span><select id="pointsStatus">${statusOptions.map(([v,l])=>`<option value="${v}" ${state.pointStatus===v?"selected":""}>${l}</option>`).join("")}</select></label>
+        <label class="points-search"><span>Search reason</span><input id="pointsSearch" value="${esc(state.pointSearch)}" placeholder="e.g. Chazara, Reading, Gimkit..."></label>
+      </div>
+      <div class="points-table"><table><thead><tr><th>Date & time</th><th>Student</th><th>Change</th><th>What it was for</th><th>Source</th><th>Status</th><th>Balance after</th></tr></thead><tbody>${visible.length?visible.map(row=>`<tr class="${row.isGap?"gap-row":""}"><td class="points-date">${esc(formatPointWhen(row))}</td><td><span class="points-person"><em style="background:${esc(row.studentColor)}">${esc(row.studentInitials)}</em><b>${esc(row.studentName)}</b></span></td><td><strong class="points-amount ${row.amount<0?"negative":row.amount>0?"positive":"zero"} ${row.counts?"":"not-posted"}">${row.amount>0?"+":""}${Number(row.amount)||0} ★</strong></td><td><b>${esc(row.reason)}</b>${row.detail?`<small>${esc(row.detail)}</small>`:""}</td><td><span class="source-pill ${esc(row.sourceGroup)}">${esc(row.sourceLabel)}</span></td><td><span class="status-pill ${esc(String(row.status).replace(/[^a-z0-9-]/gi,"-"))}">${esc(row.status==="posted"?"Posted":row.status==="needs-review"?"Needs review":row.status)}</span></td><td><b class="points-running">${row.counts&&Number.isFinite(Number(row.runningBalance))?`${Number(row.runningBalance)} ★`:"—"}</b></td></tr>`).join(""):`<tr><td colspan="7"><div class="empty"><h3>No matching point activity</h3><p>Try changing the filters or search.</p></div></td></tr>`}</tbody></table></div>
+    </section>
+  </section>`;
+}
+function exportPointsCSV(){
+  const rows=filteredPointLedger(), q=v=>`"${String(v??"").replaceAll('"','""')}"`;
+  const csv=[["Date/Time","Student","Amount","Reason","Source","Status","Class","Balance After"],...rows.map(r=>[r.isGap?"Older / unknown":r.when?new Date(r.when).toISOString():"",r.studentName,r.amount,r.reason,r.sourceLabel,r.status,r.classId?pointClassName(r.classId):"",r.counts&&Number.isFinite(Number(r.runningBalance))?Number(r.runningBalance):""])].map(row=>row.map(q).join(",")).join("\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=`brightpath-all-points-${state.classId}-${C.schoolDateString()}.csv`;a.click();URL.revokeObjectURL(a.href);
+}
+
 function carryDate(s){return C.latestRatings(state.root,s.id,state.classId,state.date).date||""}
 function daily(){
   const cats=categories(), r=roster(), saved=isSavedDay(), carried=!saved&&r.some(s=>carryDate(s));
@@ -273,6 +422,17 @@ function bindPage(){
   document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{state.tab=b.dataset.go;render()});
   document.querySelectorAll("[data-student]").forEach(b=>b.onclick=()=>{state.selectedId=b.dataset.student;state.tab="Students";render()});
   if($("#accessToggle"))$("#accessToggle").onclick=toggleAccess;
+  if(state.tab==="Points Dashboard"){
+    const rerender=()=>render();
+    if($("#pointsStudent"))$("#pointsStudent").onchange=e=>{state.pointStudent=e.target.value;rerender()};
+    if($("#pointsRange"))$("#pointsRange").onchange=e=>{state.pointRange=e.target.value;rerender()};
+    if($("#pointsType"))$("#pointsType").onchange=e=>{state.pointType=e.target.value;rerender()};
+    if($("#pointsStatus"))$("#pointsStatus").onchange=e=>{state.pointStatus=e.target.value;rerender()};
+    if($("#pointsSearch")){$("#pointsSearch").oninput=e=>{state.pointSearch=e.target.value;const pos=e.target.selectionStart;render();requestAnimationFrame(()=>{const n=$("#pointsSearch");if(n){n.focus();n.setSelectionRange(pos,pos)}})}}
+    document.querySelectorAll("[data-points-student]").forEach(b=>b.onclick=()=>{state.pointStudent=b.dataset.pointsStudent;render()});
+    if($("#pointsReset"))$("#pointsReset").onclick=()=>{state.pointStudent="all";state.pointRange="30";state.pointType="all";state.pointStatus="all";state.pointSearch="";render()};
+    if($("#pointsCsv"))$("#pointsCsv").onclick=exportPointsCSV;
+  }
   if(state.tab==="Daily Points"){
     $("#dailyClass").onchange=e=>{state.classId=e.target.value;state.selectedId="";prepareDraft();renderClassSelect();render()};
     $("#saveDaily").onclick=saveDaily;document.querySelectorAll("[data-att]").forEach(b=>b.onclick=()=>{const id=b.dataset.att;state.absent.has(id)?state.absent.delete(id):state.absent.add(id);render()});
