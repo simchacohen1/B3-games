@@ -544,6 +544,18 @@
     border-top: 1px dashed rgba(59,42,30,0.2);
   }
 
+  .range-dispute-note{
+    margin:8px 0 12px;
+    padding:9px 12px;
+    border-radius:12px;
+    background:#FFF4D6;
+    border:1px solid rgba(201,162,39,.55);
+    color:var(--ink-soft);
+    font-size:.82rem;
+    font-weight:800;
+    text-align:center;
+  }
+
   .save-row{ text-align:center; margin: 20px 0; }
   /* Arrows are pulled out of normal flow (see .nav-arrow), so this row
      no longer needs to reserve space for them. */
@@ -1219,6 +1231,10 @@
     <div class="selection-summary hidden" id="selectionSummary">
       <div class="selection-summary-text" id="selectionSummaryText"></div>
       <button type="button" class="change-selection-btn" id="changeSelectionBtn">✏️ Change</button>
+    </div>
+
+    <div id="rangeDisputeNote" class="range-dispute-note hidden">
+      ⚠️ Disputes are only available when practicing one פסוק at a time.
     </div>
 
     <div class="scroll" id="scrollBox">
@@ -2518,6 +2534,7 @@ function syncModeButtons(){
   modeSingleBtn.classList.toggle('active', !range);
   modeRangeBtn.classList.toggle('active', range);
   selectorsRow.classList.toggle('range-active', range);
+  document.getElementById('rangeDisputeNote').classList.toggle('hidden', !range);
   document.getElementById('contentPickerTitle').textContent = range
     ? 'Choose a פרק, first פסוק, and last פסוק'
     : 'Choose a פרק and פסוק';
@@ -2561,6 +2578,14 @@ rebuildPerekOptionsForClassLimit();
 
 function rangeModeOn(){
   return selectionModeSelect.value === 'range';
+}
+
+function disputesAllowedForCurrentSelection(){
+  return !currentIsRange && !rangeModeOn();
+}
+
+function rangeDisputeBlockedMessage(){
+  return 'Disputes are only available when practicing one פסוק at a time.';
 }
 
 function allowedEndForStart(perekNum, startPosuk){
@@ -3367,7 +3392,7 @@ function renderAnsweredQuestionHistory(){
           disputeHtml = '<div style="font-size:0.8rem;color:var(--ink-soft);margin-top:5px;">⚠️ Dispute pending — your teacher will review it.</div>';
         }else if(r && r.disputeStatus === 'resolved' && r.finalVerdict){
           disputeHtml = '<div style="font-size:0.8rem;color:var(--ink-soft);margin-top:5px;">✔️ Teacher reviewed — final: ' + (r.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</div>';
-        }else{
+        }else if(disputesAllowedForCurrentSelection()){
           disputeHtml = '<button type="button" class="btn small ghost-delete history-dispute-btn" data-q-index="' + i + '" style="margin-top:6px;">⚠️ Dispute this answer</button>';
         }
       }
@@ -4005,8 +4030,9 @@ function showHebrewResult(data){
   }
 
   resultEl.className = 'comp-result ' + tier;
-  // A perfect score has nothing to dispute, so skip the dispute row entirely.
-  const disputeRowHtml = data.score >= 100 ? '' :
+  // A perfect score has nothing to dispute. Disputes are also intentionally
+  // unavailable while the student is practicing several pesukim at once.
+  const disputeRowHtml = (data.score >= 100 || !disputesAllowedForCurrentSelection()) ? '' :
     '<div class="dispute-row" id="hebrewDisputeRow"><button class="btn small ghost-delete" id="hebrewDisputeBtn">⚠️ Dispute this score</button></div>';
   const missedWords = Array.isArray(data.words) ? data.words.filter(w => !w.match).length : 0;
   const hebrewFeedbackText = data.score >= 100
@@ -4181,6 +4207,10 @@ async function applyHebrewWordFix(){
    Keeps the system's own score and recording untouched — just adds a
    pending-review request the teacher sees and can act on later. */
 async function submitHebrewDispute(){
+  if(!disputesAllowedForCurrentSelection()){
+    alert(rangeDisputeBlockedMessage());
+    return;
+  }
   const val = 100;
   const row = document.getElementById('hebrewDisputeRow');
   row.innerHTML = '<span style="font-size:0.85rem;color:var(--ink-soft);">Saving…</span>';
@@ -4293,16 +4323,20 @@ async function showComprehensionResult(verdict, score, feedback, transcript){
   if(transcript){
     transcriptHtml = '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + transcript + '"</span>';
   }
+  const comprehensionDisputeHtml = disputesAllowedForCurrentSelection()
+    ? '<div class="dispute-row" id="comprehensionDisputeRow"><button class="btn small ghost-delete" id="comprehensionDisputeBtn">⚠️ Dispute this grade</button></div>'
+    : '';
   resultEl.className = 'comp-result ' + verdict;
   resultEl.innerHTML =
     '<span class="comp-badge">' + badgeText + scoreText + '</span>' +
     '<span>' + comprehensionFeedback + '</span>' +
     transcriptHtml +
     '<button class="speak-btn" id="compReplayBtn" title="Hear this read aloud">🔊 Hear feedback</button>' +
-    '<div class="dispute-row" id="comprehensionDisputeRow"><button class="btn small ghost-delete" id="comprehensionDisputeBtn">⚠️ Dispute this grade</button></div>';
+    comprehensionDisputeHtml;
   resultEl.classList.remove('hidden');
   document.getElementById('compReplayBtn').onclick = () => speakText(comprehensionFeedback);
-  document.getElementById('comprehensionDisputeBtn').onclick = openComprehensionDisputeForm;
+  const comprehensionDisputeBtn = document.getElementById('comprehensionDisputeBtn');
+  if(comprehensionDisputeBtn) comprehensionDisputeBtn.onclick = openComprehensionDisputeForm;
   gradingMsg.textContent = '';
   document.getElementById('comprehensionStatus').textContent = 'Recorded — listen above';
   await autosaveComprehension();
@@ -4423,7 +4457,7 @@ function renderQuestionResult(idx, verdict, feedback, transcript, disputeStatus,
       disputeRowHtml = '<div class="dispute-row" style="font-size:0.85rem;color:var(--ink-soft);">⚠️ Dispute pending — your teacher will review it.</div>';
     }else if(disputeStatus === 'resolved' && finalVerdict){
       disputeRowHtml = '<div class="dispute-row" style="font-size:0.85rem;color:var(--ink-soft);">✔️ Teacher reviewed — final: ' + (finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</div>';
-    }else{
+    }else if(disputesAllowedForCurrentSelection()){
       disputeRowHtml = '<div class="dispute-row" id="questionDisputeRow"><button class="btn small ghost-delete" id="questionDisputeBtn">⚠️ Dispute this answer</button></div>';
     }
   }
@@ -4445,6 +4479,10 @@ function renderQuestionResult(idx, verdict, feedback, transcript, disputeStatus,
    the computer's incorrect verdict was wrong, so there's nothing to pick —
    one tap marks it pending for the teacher to review. */
 async function submitQuestionDispute(idx){
+  if(!disputesAllowedForCurrentSelection()){
+    alert(rangeDisputeBlockedMessage());
+    return;
+  }
   if(!comprehensionQResults[idx]) return;
   comprehensionQResults[idx].disputeStatus = 'pending';
   renderAnsweredQuestionHistory();
@@ -5348,16 +5386,18 @@ function showTranslationSummary(level){
       }else if(dStatus === 'resolved'){
         helpHtml = '<div class="translation-review-note">✔️ Teacher reviewed — final: ' +
           (r.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</div>';
-      }else if(r.evidenceSaved){
-        // Only offer a dispute once the recording + transcript + grade for
-        // this exact piece are safely in Firebase. That guarantees the
-        // teacher has evidence to review.
-        helpHtml =
-          '<div class="translation-help-body">' +
-            '<button type="button" class="btn small ghost-delete chunk-dispute-btn" data-chunk-index="' + i + '">⚠️ Dispute this piece</button>' +
-          '</div>';
-      }else{
-        helpHtml = '<div class="translation-review-note">⚠️ This recording has not finished saving yet, so a dispute cannot be sent. Check your internet or redo this piece.</div>';
+      }else if(disputesAllowedForCurrentSelection()){
+        if(r.evidenceSaved){
+          // Only offer a dispute once the recording + transcript + grade for
+          // this exact piece are safely in Firebase. That guarantees the
+          // teacher has evidence to review.
+          helpHtml =
+            '<div class="translation-help-body">' +
+              '<button type="button" class="btn small ghost-delete chunk-dispute-btn" data-chunk-index="' + i + '">⚠️ Dispute this piece</button>' +
+            '</div>';
+        }else{
+          helpHtml = '<div class="translation-review-note">⚠️ This recording has not finished saving yet, so a dispute cannot be sent. Check your internet or redo this piece.</div>';
+        }
       }
     }
 
@@ -5705,6 +5745,10 @@ async function autosaveTranslation(level){
    summary immediately, then patches just that chunk's fields in Firebase
    (not a full autosave, so we don't re-upload every chunk's audio again). */
 async function submitChunkDispute(index, level, btnEl){
+  if(!disputesAllowedForCurrentSelection()){
+    alert(rangeDisputeBlockedMessage());
+    return;
+  }
   const r = translationGradedResults[index];
   if(!r) return;
 
@@ -5749,6 +5793,10 @@ async function submitChunkDispute(index, level, btnEl){
    in verdict tiers (excellent/correct/partial/incorrect) rather than a
    0-100 score — tapping a tier keeps this just as writing-free. */
 function openComprehensionDisputeForm(){
+  if(!disputesAllowedForCurrentSelection()){
+    alert(rangeDisputeBlockedMessage());
+    return;
+  }
   const row = document.getElementById('comprehensionDisputeRow');
   const tiers = [['excellent','🌟 Excellent'],['correct','✅ Got it'],['partial','🤔 Almost'],['incorrect','💡 Try again']];
   row.innerHTML =
@@ -5760,6 +5808,10 @@ function openComprehensionDisputeForm(){
 }
 
 async function submitComprehensionDispute(tier){
+  if(!disputesAllowedForCurrentSelection()){
+    alert(rangeDisputeBlockedMessage());
+    return;
+  }
   const row = document.getElementById('comprehensionDisputeRow');
   row.innerHTML = '<span style="font-size:0.85rem;color:var(--ink-soft);">Saving…</span>';
   let tries = 0;
