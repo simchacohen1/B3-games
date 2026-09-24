@@ -237,12 +237,16 @@
       if (classId && lockWindowsEqual(lockWindows, previousDefaultLockWindows(classId))) {
         lockWindows = deepClone(fallback.lockWindows);
       } else if (classId) {
-        // Upgrade only days that are still untouched from the immediately
-        // previous master schedule. This is especially useful when Monday was
-        // edited manually and Tue/Wed/Thu should now inherit the new default.
+        // Upgrade each Mon-Thu day independently if it is still using either
+        // of the two older master schedules. This preserves any day Rabbi Cohen
+        // already edited manually (such as the new Monday schedule).
+        const veryOldMaster = previousDefaultLockWindows(classId);
         const oldMaster = immediatelyPreviousDefaultLockWindows(classId);
         ["mon", "tue", "wed", "thu"].forEach(function (day) {
-          if (dayLockWindowsEqual(lockWindows[day], oldMaster[day])) {
+          if (
+            dayLockWindowsEqual(lockWindows[day], veryOldMaster[day]) ||
+            dayLockWindowsEqual(lockWindows[day], oldMaster[day])
+          ) {
             lockWindows[day] = deepClone(fallback.lockWindows[day]);
           }
         });
