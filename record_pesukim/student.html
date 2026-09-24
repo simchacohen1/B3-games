@@ -1174,9 +1174,9 @@
     <p>Read the posuk. Explain what it means. See how you did!</p>
   </header>
 
-  <!-- STEP 0: Name entry (gated by class PIN + teacher-approved name list) -->
+  <!-- STEP 0: Name entry (gated by individual passcode + teacher-approved name list) -->
   <div id="nameGate" class="name-gate">
-    <div>Class PIN</div>
+    <div>Your Passcode</div>
     <input id="classPinInput" type="password" placeholder="Ask your teacher" maxlength="20" inputmode="numeric">
     <div>What's your name?</div>
     <input id="studentNameInput" type="text" placeholder="Type your name here" maxlength="30">
@@ -2250,29 +2250,33 @@ function setNameGateMsg(text){
   document.getElementById('nameGateMsg').textContent = text || '';
 }
 
-// Checks the entered PIN against posukPractice/settings/classPin, and the
-// entered name (slugified) against the teacher-approved list at
-// posukPractice/allowedStudents. Both must pass before a student can get in.
-// This exists so anyone who has the link can't just type in any name and
-// show up as "a student" in the teacher dashboard - the teacher has to add
-// the name first, and know the class PIN.
+const DEFAULT_STUDENT_PASSCODE = '5770';
+
+// Checks the entered name (slugified) against the teacher-approved list and
+// then checks that student's own passcode. Older approved-student records that
+// do not yet have a passcode use 5770 so the change is backward-compatible.
 async function checkAccess(name, pin){
   const slug = slugify(name);
   if(!slug){ return { ok:false, reason:'Please type your name.' }; }
 
-  const [pinSnap, allowedSnap] = await Promise.all([
-    db.ref('posukPractice/settings/classPin').once('value'),
-    db.ref('posukPractice/allowedStudents/' + slug).once('value')
-  ]);
-
-  const realPin = pinSnap.val();
-  if(realPin && String(pin).trim() !== String(realPin).trim()){
-    return { ok:false, reason:'Incorrect PIN. Ask your teacher.' };
-  }
+  const allowedSnap = await db.ref('posukPractice/allowedStudents/' + slug).once('value');
   if(!allowedSnap.exists()){
     return { ok:false, reason:'Ask your teacher to add your name first.' };
   }
-  return { ok:true, slug };
+
+  const allowedInfo = allowedSnap.val() || {};
+  const realPin = (allowedInfo.passcode !== undefined && allowedInfo.passcode !== null && String(allowedInfo.passcode).trim())
+    ? String(allowedInfo.passcode).trim()
+    : DEFAULT_STUDENT_PASSCODE;
+  if(String(pin).trim() !== realPin){
+    return { ok:false, reason:'Incorrect passcode. Ask your teacher.' };
+  }
+
+  return {
+    ok:true,
+    slug,
+    accessVersion: Number(allowedInfo.passcodeUpdatedAt) || 0
+  };
 }
 
 document.getElementById('startBtn').onclick = async () => {
@@ -2295,6 +2299,7 @@ document.getElementById('startBtn').onclick = async () => {
     studentId = result.slug;
     localStorage.setItem('posukPractice_studentName', studentName);
     localStorage.setItem('posukPractice_studentId', studentId);
+    localStorage.setItem('posukPractice_studentAccessVersion', String(result.accessVersion || 0));
     enterApp();
   }catch(e){
     console.error('Access check failed:', e);
@@ -2307,6 +2312,7 @@ document.getElementById('startBtn').onclick = async () => {
 document.getElementById('switchStudentBtn').onclick = () => {
   localStorage.removeItem('posukPractice_studentName');
   localStorage.removeItem('posukPractice_studentId');
+  localStorage.removeItem('posukPractice_studentAccessVersion');
   location.reload();
 };
 
@@ -2375,21 +2381,32 @@ function applyDeepLinkFromURL(){
 window.addEventListener('load', async () => {
   const savedId = localStorage.getItem('posukPractice_studentId');
   const savedName = localStorage.getItem('posukPractice_studentName');
+  const savedAccessVersion = localStorage.getItem('posukPractice_studentAccessVersion') || '0';
   if(savedId && savedName){
-    // Still re-check the roster (not the PIN) on every visit, in case the
-    // teacher has since removed this name - a saved browser shouldn't be
-    // able to bypass that.
+    // Re-check both roster membership and the passcode version on every visit.
+    // If the teacher changed this student's passcode, an old remembered login
+    // is cleared and the student must enter the new passcode.
     try{
       const allowedSnap = await db.ref('posukPractice/allowedStudents/' + savedId).once('value');
       if(!allowedSnap.exists()){
         localStorage.removeItem('posukPractice_studentName');
         localStorage.removeItem('posukPractice_studentId');
+        localStorage.removeItem('posukPractice_studentAccessVersion');
+        return;
+      }
+      const allowedInfo = allowedSnap.val() || {};
+      const currentAccessVersion = String(Number(allowedInfo.passcodeUpdatedAt) || 0);
+      if(savedAccessVersion !== currentAccessVersion){
+        localStorage.removeItem('posukPractice_studentName');
+        localStorage.removeItem('posukPractice_studentId');
+        localStorage.removeItem('posukPractice_studentAccessVersion');
+        setNameGateMsg('Please enter your passcode.');
         return;
       }
     }catch(e){
-      console.error('Roster re-check failed:', e);
-      // If we can't reach Firebase, fail open rather than locking out a
-      // returning student over a network hiccup.
+      console.error('Access re-check failed:', e);
+      // If Firebase is temporarily unreachable, keep the existing behavior and
+      // do not lock out a returning student solely because of a network hiccup.
     }
     studentId = savedId;
     studentName = savedName;
