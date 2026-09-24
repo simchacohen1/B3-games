@@ -151,13 +151,18 @@ function renderTab(){
   if(state.tab==='Comments')box.innerHTML=commentsHTML();
   bindTab();
 }
+function historyTime(value){
+  if(typeof value==='number'&&Number.isFinite(value))return value;
+  const n=Number(value);if(Number.isFinite(n)&&n>0)return n;
+  const p=Date.parse(String(value||''));return Number.isFinite(p)?p:0;
+}
 function pointHistoryRows(){
   const rows=[];
   for(const item of state.activityPointHistory||[]){
     const amount=Number(item.actualAmount??item.amount??0);
     if(!amount)continue;
-    const labels={reading100:'Posuk Practice · Reading 100%',translation100:'Posuk Practice · Translation 100%',understand100:'Posuk Practice · Understanding 100%',chazara:'Chazara approved','chazara-recording':'Recorded Chazara approved','chazara-remove':'Chazara adjustment'};
-    rows.push({amount,title:item.reason||'Activity points',detail:labels[item.source]||item.source||'',when:Number(item.reviewedAt||item.createdAt||0)});
+    const labels={reading100:'Posuk Practice · Reading 100%',translation100:'Posuk Practice · Translation 100%',understand100:'Posuk Practice · Understanding 100%',chazara:'Chazara approved','chazara-recording':'Recorded Chazara approved','chazara-remove':'Chazara adjustment','teacher-adjustment':'Teacher adjustment'};
+    rows.push({amount,title:item.reason||'Activity points',detail:labels[item.source]||item.source||'',when:historyTime(item.reviewedAt||item.createdAt)});
   }
   for(const [cid,dates] of Object.entries(state.root.awards||{})){
     for(const [date,award] of Object.entries(dates||{})){
