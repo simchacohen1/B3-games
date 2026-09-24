@@ -104,6 +104,51 @@
     letter-spacing: 0.02em;
   }
   .period-labels .points-spacer { width: 56px; }
+
+  .sync-hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin: -2px 0 10px;
+  }
+
+  .sync-col-label {
+    width: 100%;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+  }
+
+  .sync-col-label input {
+    width: 17px;
+    height: 17px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--accent);
+  }
+
+  .sync-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .sync-actions button {
+    font-size: 12px;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    padding: 0;
+  }
   .student-row {
     display: flex;
     align-items: center;
@@ -201,18 +246,23 @@
       <h2>Students</h2>
       <button class="bulk-btn" id="resetBtn" type="button">Reset all to Present / 5</button>
     </div>
+    <div class="sync-hint">Check only the columns you want to send to Nigri.</div>
+    <div class="sync-actions">
+      <button id="selectAllSyncBtn" type="button">Select all</button>
+      <button id="clearAllSyncBtn" type="button">Clear all</button>
+    </div>
     <div class="period-labels">
       <div class="student-name-spacer"></div>
-      <div class="period-label">Dav</div>
-      <div class="period-label">Cl 1</div>
-      <div class="period-label">Cl 2</div>
-      <div class="period-label">Cl 3</div>
-      <div class="points-spacer"></div>
+      <div class="period-label"><label class="sync-col-label"><input type="checkbox" class="sync-field" data-sync-key="davening" checked><span>Dav</span></label></div>
+      <div class="period-label"><label class="sync-col-label"><input type="checkbox" class="sync-field" data-sync-key="class1" checked><span>Cl 1</span></label></div>
+      <div class="period-label"><label class="sync-col-label"><input type="checkbox" class="sync-field" data-sync-key="class2" checked><span>Cl 2</span></label></div>
+      <div class="period-label"><label class="sync-col-label"><input type="checkbox" class="sync-field" data-sync-key="class3" checked><span>Cl 3</span></label></div>
+      <div class="points-spacer"><label class="sync-col-label"><input type="checkbox" class="sync-field" data-sync-key="points" checked><span>Pts</span></label></div>
     </div>
     <div id="studentList"></div>
   </div>
 
-  <button class="sync-btn" id="syncBtn" type="button">Sync to Nigri</button>
+  <button class="sync-btn" id="syncBtn" type="button">Sync Selected to Nigri</button>
   <div id="status"></div>
 </div>
 
@@ -261,6 +311,8 @@ const studentList = document.getElementById("studentList");
 const syncBtn = document.getElementById("syncBtn");
 const statusEl = document.getElementById("status");
 const resetBtn = document.getElementById("resetBtn");
+const selectAllSyncBtn = document.getElementById("selectAllSyncBtn");
+const clearAllSyncBtn = document.getElementById("clearAllSyncBtn");
 
 // --- Draft autosave -------------------------------------------------
 // Every attendance/points change is saved to localStorage as you go, keyed
@@ -497,6 +549,31 @@ function renderStudents(options) {
   });
 }
 
+function getSelectedSyncFields() {
+  return Array.from(document.querySelectorAll(".sync-field:checked"))
+    .map(cb => cb.dataset.syncKey);
+}
+
+function updateSyncButtonState() {
+  const selected = getSelectedSyncFields();
+  syncBtn.disabled = selected.length === 0;
+  syncBtn.textContent = selected.length === 0 ? "Select something to sync" : "Sync Selected to Nigri";
+}
+
+document.querySelectorAll(".sync-field").forEach(cb => {
+  cb.addEventListener("change", updateSyncButtonState);
+});
+
+selectAllSyncBtn.addEventListener("click", () => {
+  document.querySelectorAll(".sync-field").forEach(cb => cb.checked = true);
+  updateSyncButtonState();
+});
+
+clearAllSyncBtn.addEventListener("click", () => {
+  document.querySelectorAll(".sync-field").forEach(cb => cb.checked = false);
+  updateSyncButtonState();
+});
+
 classSelect.addEventListener("change", () => {
   localStorage.setItem(LAST_CLASS_KEY, classSelect.value);
   renderStudents();
@@ -514,28 +591,47 @@ syncBtn.addEventListener("click", async () => {
   const names = ROSTERS[section];
   const date = dateInput.value;
 
+  const selectedFields = getSelectedSyncFields();
+  if (selectedFields.length === 0) {
+    statusEl.className = "error";
+    statusEl.textContent = "Choose at least one period or Points to sync.";
+    return;
+  }
+
+  const selectedPeriods = new Set(selectedFields.filter(key => PERIOD_KEYS.includes(key)));
+  const syncPoints = selectedFields.includes("points");
+
   const students = names.map((name, i) => {
-    const pointsInput = studentList.querySelector(`.points-input[data-idx="${i}"]`);
-    const points = parseInt(pointsInput.value, 10) || 0;
-    const attendance = {};
-    const lateMinutes = {};
+    const student = { name, attendance: {}, lateMinutes: {} };
+
     PERIOD_KEYS.forEach(key => {
+      if (!selectedPeriods.has(key)) return;
+
       const sel = studentList.querySelector(`.period-select[data-idx="${i}"][data-period="${key}"]`);
-      attendance[key] = sel.value; // "present" | "absent" | "excused" | "late"
+      student.attendance[key] = sel.value; // "present" | "absent" | "excused" | "late"
       if (sel.value === "late") {
         const minutesInput = studentList.querySelector(`.late-minutes-input[data-idx="${i}"][data-period="${key}"]`);
         if (minutesInput && minutesInput.value.trim() !== "") {
-          lateMinutes[key] = minutesInput.value.trim();
+          student.lateMinutes[key] = minutesInput.value.trim();
         }
       }
     });
-    return { name, points, attendance, lateMinutes };
+
+    if (syncPoints) {
+      const pointsInput = studentList.querySelector(`.points-input[data-idx="${i}"]`);
+      student.points = parseInt(pointsInput.value, 10) || 0;
+    }
+
+    return student;
   });
 
+  const labels = { davening: "Davening", class1: "Class 1", class2: "Class 2", class3: "Class 3", points: "Points" };
+  const selectedLabel = selectedFields.map(key => labels[key]).join(", ");
+
   syncBtn.disabled = true;
-  syncBtn.textContent = "Syncing... (can take up to a minute)";
+  syncBtn.textContent = "Syncing selected items...";
   statusEl.className = "pending";
-  statusEl.textContent = "Connecting to Nigri and saving each period. Please wait...";
+  statusEl.textContent = `Connecting to Nigri. Syncing only: ${selectedLabel}`;
 
   try {
     const res = await fetch(API_URL, {
@@ -555,7 +651,7 @@ syncBtn.addEventListener("click", async () => {
 
     if (res.ok && data.status === "success") {
       statusEl.className = "success";
-      statusEl.textContent = "✓ Synced successfully!\n\n" + (data.detail || []).join("\n");
+      statusEl.textContent = `✓ Synced successfully: ${selectedLabel}\n\n` + (data.detail || []).join("\n");
       // Submitted — clear the local draft so reopening this class/date
       // later starts fresh instead of replaying already-synced values.
       clearCurrentDraft();
@@ -567,12 +663,12 @@ syncBtn.addEventListener("click", async () => {
     statusEl.className = "error";
     statusEl.textContent = "Network error: " + err.message;
   } finally {
-    syncBtn.disabled = false;
-    syncBtn.textContent = "Sync to Nigri";
+    updateSyncButtonState();
   }
 });
 
 init();
+updateSyncButtonState();
 </script>
 </body>
 </html>
