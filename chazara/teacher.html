@@ -20,36 +20,112 @@ function hn(n){let o=['','א','ב','ג','ד','ה','ו','ז','ח','ט'],t=['','י
 function render(){let q=$("q").value.toLowerCase(),f=$("f").value,A=Object.entries(D).map(([id,d])=>({id,d,s:stats(d)}));$("ns").textContent=A.length;$("nt").textContent=A.reduce((n,x)=>n+x.s.total,0);let day=new Date();day.setHours(0,0,0,0);$("na").textContent=A.filter(x=>x.s.last>=day.getTime()).length;$("nd").textContent=A.reduce((n,x)=>n+x.s.dn,0);let V=A.filter(x=>(!q||(x.d.name||x.id).toLowerCase().includes(q))&&(!f||cls(x.id)===f)).sort((a,b)=>(a.d.name||a.id).localeCompare(b.d.name||b.id));$("rows").innerHTML="";V.forEach(x=>{let tr=document.createElement("tr");tr.innerHTML=`<td class=name>${x.d.name||R[x.id]?.name||x.id}</td><td>${cls(x.id).toUpperCase()||"—"}</td><td>${x.s.total}</td><td>${x.s.a.length}</td><td>${x.s.at}</td><td><span class="pill ${x.s.dn?"bad":"good"}">${x.s.dn}</span></td><td>${fmt(x.s.last)}</td>`;tr.onclick=()=>show(x.id);$("rows").appendChild(tr)})}
 function show(id){let d=D[id],s=stats(d),box=$("detail"),G={};s.a.sort((a,b)=>{let A=a.split("_").map(Number),B=b.split("_").map(Number);return A[0]-B[0]||A[1]-B[1]}).forEach(k=>{let p=k.split("_")[0];(G[p]||(G[p]=[])).push(k)});box.innerHTML=`<button id=x style="float:right">Close</button><h2>${d.name||R[id]?.name||id}</h2><div class=sub>${cls(id).toUpperCase()} · ${s.total} total Chazaras · ${s.dn} due</div><div id=g></div>`;let g=box.querySelector("#g");Object.keys(G).sort((a,b)=>+a-+b).forEach(p=>{let sec=document.createElement("div");sec.className="perek";sec.innerHTML=`<h3>פרק ${hn(p)}</h3><div class=grid></div>`;let gg=sec.querySelector(".grid");G[p].forEach(k=>{let v=k.split("_")[1],r=d.reviews?.[k]||{},c=+r.count||0,t=document.createElement("div");t.className="tile";t.style.background=col(c,+d.goal||10);t.style.color=c/(+d.goal||10)<.45?"white":"#12351d";t.innerHTML=`<div class=ref>פסוק ${hn(v)}</div><div class=count>${c}</div><div class=last>${r.lastAt?"Last: "+fmt(r.lastAt):"Not reviewed yet"}${due(d,k)?" · DUE":""}</div>`;gg.appendChild(t)});g.appendChild(sec)});box.classList.remove("hidden");box.querySelector("#x").onclick=()=>box.classList.add("hidden");box.scrollIntoView({behavior:"smooth"})}
 
-const POINTS_API="https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";let pendingPointRequests={};
+const SR_ROOT="studentRewards";let pendingPointRequests={};
 function escHtml(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function requestWhen(t){return t?new Date(Number(t)).toLocaleString():""}
+function requestWhen(t){const n=Number(t);const d=Number.isFinite(n)&&n>0?new Date(n):new Date(String(t||""));return Number.isNaN(d.getTime())?"":d.toLocaleString()}
 function setApprovalStatus(msg,bad=false){const el=$("approvalStatus");el.textContent=msg||"";el.style.color=bad?"#991b1b":"#64748b"}
+function isChazaraPointRequest(item){return ["chazara","chazara-recording","chazara-remove"].includes(String(item?.source||""))}
 function renderApprovals(){
   const rows=Object.entries(pendingPointRequests||{}).map(([id,item])=>({id,item:item||{}})).sort((a,b)=>(Number(b.item.createdAt)||0)-(Number(a.item.createdAt)||0));
   $("approvalCount").textContent=rows.length?`${rows.length} pending`:"0";$("approveAllBtn").classList.toggle("hidden",!rows.length);
   if(!rows.length){$("approvalList").innerHTML='<div class="approval-empty"><b>No Chazara points waiting.</b><br>When a boy completes a normal or recorded Chazara, it will appear here for approval.</div>';return}
   $("approvalList").innerHTML=rows.map(({id,item})=>{const amount=Number(item.amount||0),sign=amount>0?"+":"",kind=amount<0?"Removed Chazara":item.recorded===true?"🎙️ Recorded Chazara":"Normal Chazara",when=item.createdAt?requestWhen(item.createdAt):"";return `<div class="request-row" data-request="${escHtml(id)}"><div class="request-main"><strong>${escHtml(item.studentName||item.practiceStudentId||item.rewardStudentId||"Student")}</strong><div class="request-reason">${escHtml(item.reason||"Chazara points")}</div><div class="request-meta">${escHtml(kind)}${when?" · "+escHtml(when):""}</div></div><div class="request-amount ${amount<0?"negative":""}">${sign}${amount} point${Math.abs(amount)===1?"":"s"}</div><div class="req-buttons"><button class="req-approve" data-approve="${escHtml(id)}">Approve</button><button class="req-reject" data-reject="${escHtml(id)}">Reject</button></div></div>`}).join("");
 }
-async function teacherApi(action,extra={}){
-  const user=auth.currentUser;
-  if(!user) throw new Error("Teacher sign-in required.");
-  const token=await user.getIdToken();
-  const response=await fetch(POINTS_API,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({action,...extra})});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok) throw new Error(data.error||("HTTP "+response.status));
-  return data;
+async function setChazaraPointStatus(item,status){
+  if(!item?.practiceStudentId||!item?.eventId)return;
+  const field=Number(item.amount||0)<0?"removalPointRequestStatus":"pointRequestStatus";
+  try{await db.ref(`posukPractice/chazara/events/${item.practiceStudentId}/${item.eventId}/${field}`).set(status)}
+  catch(err){console.warn("Could not mirror Chazara point status",err)}
 }
 async function loadApprovals(){
   const btn=$("approvalSignInBtn");
   if(!auth.currentUser){pendingPointRequests={};renderApprovals();$("approvalList").innerHTML='<div class="approval-empty">Sign in with your teacher Google account to load Chazara point requests.</div>';btn.classList.remove("hidden");setApprovalStatus("");return}
   btn.classList.add("hidden");setApprovalStatus("Loading…");
-  try{const data=await teacherApi("list-chazara-pending");pendingPointRequests={};for(const item of (data.requests||[]))pendingPointRequests[item.id]=item;renderApprovals();setApprovalStatus("")}
-  catch(err){console.error(err);pendingPointRequests={};renderApprovals();$("approvalList").innerHTML='<div class="approval-empty">Could not load pending point requests.</div>';setApprovalStatus(String(err?.message||err),true)}
+  try{
+    const snap=await db.ref(`${SR_ROOT}/pointRequests`).once("value");
+    pendingPointRequests={};
+    snap.forEach(child=>{const item=child.val()||{};if(item.status==="pending"&&isChazaraPointRequest(item))pendingPointRequests[child.key]=item});
+    renderApprovals();setApprovalStatus("");
+  }catch(err){
+    console.error(err);pendingPointRequests={};renderApprovals();
+    $("approvalList").innerHTML='<div class="approval-empty">Could not load pending point requests.</div>';
+    setApprovalStatus("Could not read Student Rewards point requests: "+String(err?.message||err),true);
+  }
 }
-async function approvePointRequest(id,quiet=false){try{const data=await teacherApi("approve-point-request",{requestId:id});if(!quiet)setApprovalStatus(`${data.studentName||"Student"}: ${Number(data.actualAmount||0)>=0?"+":""}${Number(data.actualAmount||0)} points approved.`);await loadApprovals();return true}catch(err){console.error(err);if(!quiet)setApprovalStatus(String(err?.message||err),true);return false}}
-async function rejectPointRequest(id,quiet=false){try{await teacherApi("reject-point-request",{requestId:id});if(!quiet)setApprovalStatus("Point request rejected.");await loadApprovals();return true}catch(err){console.error(err);if(!quiet)setApprovalStatus(String(err?.message||err),true);return false}}
-$("approvalList").onclick=async e=>{const a=e.target.closest("[data-approve]"),r=e.target.closest("[data-reject]");if(!a&&!r)return;const b=a||r,id=b.dataset.approve||b.dataset.reject;b.disabled=true;try{if(a)await approvePointRequest(id);else await rejectPointRequest(id)}finally{b.disabled=false}};
-$("approveAllBtn").onclick=async()=>{const ids=Object.keys(pendingPointRequests||{});if(!ids.length)return;if(!confirm(`Approve all ${ids.length} pending Chazara point request${ids.length===1?"":"s"}?`))return;$("approveAllBtn").disabled=true;let done=0;for(const id of ids){try{await teacherApi("approve-point-request",{requestId:id});done++}catch(err){console.error(err)}}$("approveAllBtn").disabled=false;setApprovalStatus(`${done} Chazara point request${done===1?"":"s"} approved.`);await loadApprovals()};
+async function approvePointRequest(id,quiet=false,refresh=true){
+  const user=auth.currentUser;
+  if(!user){if(!quiet)setApprovalStatus("Teacher sign-in required.",true);return false}
+  const reqRef=db.ref(`${SR_ROOT}/pointRequests/${id}`);
+  try{
+    const snap=await reqRef.once("value"),live=snap.val();
+    if(!live){if(!quiet)setApprovalStatus("Point request not found.",true);if(refresh)await loadApprovals();return false}
+    if(live.status!=="pending"){if(!quiet)setApprovalStatus(`This request is already ${live.status}.`);if(refresh)await loadApprovals();return true}
+    if(!isChazaraPointRequest(live)){if(!quiet)setApprovalStatus("This is not a Chazara point request.",true);return false}
+    const stamp=Date.now(),reviewedBy=user.email||user.uid||"teacher";
+    const lock=await reqRef.transaction(cur=>cur&&cur.status==="pending"?{...cur,status:"processing",reviewedBy,reviewStartedAt:stamp}:undefined);
+    if(!lock.committed){if(!quiet)setApprovalStatus("That request was already handled.");if(refresh)await loadApprovals();return true}
+    const item=lock.snapshot.val()||live,sid=String(item.rewardStudentId||""),amount=Number(item.amount||0);
+    if(!sid)throw new Error("Missing reward student ID.");
+    let applied=0;
+    const balRef=db.ref(`${SR_ROOT}/students/${sid}/rewardBalance`);
+    const bal=await balRef.transaction(cur=>{const old=Number(cur||0),next=Math.max(0,old+amount);applied=next-old;return next});
+    if(!bal.committed)throw new Error("Balance update did not commit.");
+    const balanceAfter=Number(bal.snapshot.val()||0);
+    await reqRef.update({status:"approved",actualAmount:applied,balanceAfter,reviewedBy,reviewedAt:Date.now(),reviewStartedAt:null,lastError:null});
+    await setChazaraPointStatus(item,"approved");
+    delete pendingPointRequests[id];renderApprovals();
+    if(!quiet)setApprovalStatus(`${item.studentName||"Student"}: ${applied>=0?"+":""}${applied} point${Math.abs(applied)===1?"":"s"} approved.`);
+    if(refresh)await loadApprovals();
+    return true;
+  }catch(err){
+    console.error(err);
+    try{await reqRef.update({status:"pending",lastError:String(err?.message||err),reviewStartedAt:null})}catch{}
+    if(!quiet)setApprovalStatus("Could not approve points: "+String(err?.message||err),true);
+    if(refresh)await loadApprovals();
+    return false;
+  }
+}
+async function rejectPointRequest(id,quiet=false,refresh=true){
+  const user=auth.currentUser;
+  if(!user){if(!quiet)setApprovalStatus("Teacher sign-in required.",true);return false}
+  const reqRef=db.ref(`${SR_ROOT}/pointRequests/${id}`);
+  try{
+    const snap=await reqRef.once("value"),item=snap.val();
+    if(!item){if(!quiet)setApprovalStatus("Point request not found.",true);if(refresh)await loadApprovals();return false}
+    if(item.status!=="pending"){if(!quiet)setApprovalStatus(`This request is already ${item.status}.`);if(refresh)await loadApprovals();return true}
+    await reqRef.update({status:"rejected",reviewedBy:user.email||user.uid||"teacher",reviewedAt:Date.now(),lastError:null});
+    await setChazaraPointStatus(item,"rejected");
+    delete pendingPointRequests[id];renderApprovals();
+    if(!quiet)setApprovalStatus("Point request rejected.");
+    if(refresh)await loadApprovals();
+    return true;
+  }catch(err){
+    console.error(err);
+    if(!quiet)setApprovalStatus("Could not reject points: "+String(err?.message||err),true);
+    if(refresh)await loadApprovals();
+    return false;
+  }
+}
+$("approvalList").onclick=async e=>{
+  const a=e.target.closest("[data-approve]"),r=e.target.closest("[data-reject]");
+  if(!a&&!r)return;
+  const b=a||r,id=b.dataset.approve||b.dataset.reject,row=b.closest(".request-row");
+  row?.querySelectorAll("button").forEach(x=>x.disabled=true);
+  setApprovalStatus(a?"Approving…":"Rejecting…");
+  try{if(a)await approvePointRequest(id);else await rejectPointRequest(id)}
+  finally{row?.querySelectorAll("button").forEach(x=>x.disabled=false)}
+};
+$("approveAllBtn").onclick=async()=>{
+  const ids=Object.keys(pendingPointRequests||{});
+  if(!ids.length)return;
+  if(!confirm(`Approve all ${ids.length} pending Chazara point request${ids.length===1?"":"s"}?`))return;
+  $("approveAllBtn").disabled=true;setApprovalStatus("Approving…");
+  let done=0,failed=0;
+  for(const id of ids){if(await approvePointRequest(id,true,false))done++;else failed++}
+  $("approveAllBtn").disabled=false;
+  await loadApprovals();
+  setApprovalStatus(`${done} Chazara point request${done===1?"":"s"} approved${failed?`; ${failed} failed`:""}.`,failed>0);
+};
 $("approvalSignInBtn").onclick=async()=>{try{const provider=new firebase.auth.GoogleAuthProvider();await auth.signInWithPopup(provider)}catch(err){console.error(err);setApprovalStatus("Google sign-in did not complete.",true)}};
 auth.onAuthStateChanged(()=>loadApprovals());
 setInterval(()=>{if(auth.currentUser)loadApprovals()},30000);
