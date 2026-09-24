@@ -97,9 +97,9 @@
 
   <div id="loginCard" class="login-card">
     <h2>Student Sign In</h2>
-    <p>Use the same name and Class PIN you use for the other B3 tools.</p>
-    <label for="classPinInput">Class PIN</label>
-    <input id="classPinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="Class PIN">
+    <p>Use your name and your individual passcode.</p>
+    <label for="classPinInput">Passcode</label>
+    <input id="classPinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="Passcode">
     <label for="studentNameInput">Your name</label>
     <input id="studentNameInput" type="text" autocomplete="name" placeholder="First and last name">
     <button id="studentSignInBtn" type="button">Open B3 Games</button>
@@ -324,6 +324,7 @@
 
   function slugify(name){return String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");}
   function setLoginMsg(t){el("loginMsg").textContent=t||"";}
+  const DEFAULT_STUDENT_PASSCODE="5770";
 
   function showLogin(){
     el("loginCard").classList.remove("hidden");
@@ -405,28 +406,41 @@
   async function checkStudentAccess(name,pin){
     const slug=slugify(name);
     if(!slug)return{ok:false,reason:"Please type your name."};
-    const [pinSnap,allowedSnap]=await Promise.all([
-      db.ref("posukPractice/settings/classPin").once("value"),
-      db.ref("posukPractice/allowedStudents/"+slug).once("value")
-    ]);
-    const realPin=pinSnap.val();
-    if(realPin&&String(pin).trim()!==String(realPin).trim())return{ok:false,reason:"Incorrect PIN. Ask Rabbi Cohen."};
+
+    const allowedSnap=await db.ref("posukPractice/allowedStudents/"+slug).once("value");
     if(!allowedSnap.exists())return{ok:false,reason:"Your name is not on the B3 student list."};
+
     const d=allowedSnap.val()||{};
+    const realPin=(d.passcode!==undefined&&d.passcode!==null&&String(d.passcode).trim())
+      ? String(d.passcode).trim()
+      : DEFAULT_STUDENT_PASSCODE;
+
+    if(String(pin).trim()!==realPin)return{ok:false,reason:"Incorrect passcode. Ask Rabbi Cohen."};
+
     // Use the Firebase classId when present; for older approved-student rows
     // that do not have one yet, fall back to the known B3 ET/WT roster.
     const classId=resolvedStudentClass(slug,d);
     if(!["et","wt"].includes(classId))return{ok:false,reason:"Your ET/WT class is not assigned yet. Ask Rabbi Cohen."};
-    return{ok:true,id:slug,name:(d&&d.name)?String(d.name):name.trim(),classId};
+
+    return{
+      ok:true,
+      id:slug,
+      name:(d&&d.name)?String(d.name):name.trim(),
+      classId,
+      accessVersion:Number(d.passcodeUpdatedAt)||0
+    };
   }
 
   function enterStudent(r){
     myStudentId=r.id;myStudentName=r.name;myClassId=r.classId;
+    const accessVersion=String(Number(r.accessVersion)||0);
     localStorage.setItem("b3Games_studentId",myStudentId);
     localStorage.setItem("b3Games_studentName",myStudentName);
     localStorage.setItem("b3Games_studentClass",myClassId);
+    localStorage.setItem("b3Games_studentAccessVersion",accessVersion);
     localStorage.setItem("posukPractice_studentId",myStudentId);
     localStorage.setItem("posukPractice_studentName",myStudentName);
+    localStorage.setItem("posukPractice_studentAccessVersion",accessVersion);
     localStorage.setItem("weeklyQuiz_classId",myClassId);
     renderStudentAccess();
   }
@@ -446,18 +460,48 @@
   async function restoreStudent(){
     const id=localStorage.getItem("b3Games_studentId")||localStorage.getItem("posukPractice_studentId");
     if(!id){showLogin();return;}
+
+    const savedAccessVersion=localStorage.getItem("b3Games_studentAccessVersion")
+      || localStorage.getItem("posukPractice_studentAccessVersion")
+      || "0";
+
     try{
       const snap=await db.ref("posukPractice/allowedStudents/"+id).once("value");
-      if(!snap.exists()){showLogin();return;}
+      if(!snap.exists()){
+        ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_studentAccessVersion","b3Games_classPin",
+         "posukPractice_studentId","posukPractice_studentName","posukPractice_studentAccessVersion","weeklyQuiz_classId"]
+          .forEach(k=>localStorage.removeItem(k));
+        showLogin();
+        return;
+      }
+
       const d=snap.val()||{};
+      const currentAccessVersion=String(Number(d.passcodeUpdatedAt)||0);
+      if(String(savedAccessVersion)!==currentAccessVersion){
+        ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_studentAccessVersion","b3Games_classPin",
+         "posukPractice_studentId","posukPractice_studentName","posukPractice_studentAccessVersion","weeklyQuiz_classId"]
+          .forEach(k=>localStorage.removeItem(k));
+        setLoginMsg("Please enter your new passcode.");
+        showLogin();
+        return;
+      }
+
       const restoredClassId=resolvedStudentClass(id,d);
       if(!["et","wt"].includes(restoredClassId)){showLogin();return;}
-      enterStudent({id:id,name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
+
+      enterStudent({
+        id:id,
+        name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),
+        classId:restoredClassId,
+        accessVersion:Number(d.passcodeUpdatedAt)||0
+      });
     }catch(e){console.warn(e);showLogin();}
   }
 
   function switchStudent(){
-    ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_classPin","posukPractice_studentId","posukPractice_studentName","weeklyQuiz_classId"].forEach(k=>localStorage.removeItem(k));
+    ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_studentAccessVersion","b3Games_classPin",
+     "posukPractice_studentId","posukPractice_studentName","posukPractice_studentAccessVersion","weeklyQuiz_classId"]
+      .forEach(k=>localStorage.removeItem(k));
     myStudentId=myStudentName=myClassId="";
     el("studentNameInput").value="";el("classPinInput").value="";setLoginMsg("");showLogin();
   }
