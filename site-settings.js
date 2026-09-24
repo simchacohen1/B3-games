@@ -44,8 +44,8 @@
           { start: "08:45", end: "10:17" },
           { start: "10:25", end: "11:07" },
           { start: "11:15", end: "12:00" },
-          { start: "12:45", end: "13:32" },
-          { start: "13:40", end: "14:27" },
+          { start: "12:45", end: "13:30" },
+          { start: "13:40", end: "14:25" },
           { start: "14:35", end: "15:15" }
         ];
       });
@@ -57,8 +57,8 @@
     } else {
       ["mon", "tue", "wed", "thu"].forEach(function (day) {
         result[day] = [
-          { start: "12:20", end: "13:50" },
-          { start: "14:00", end: "14:45" },
+          { start: "12:20", end: "13:52" },
+          { start: "14:00", end: "14:47" },
           { start: "14:55", end: "15:35" },
           { start: "16:15", end: "17:00" },
           { start: "17:10", end: "17:55" },
@@ -85,6 +85,48 @@
         : [{ start: "12:20", end: "15:35" }, { start: "16:15", end: "18:45" }];
     });
     return result;
+  }
+
+  // Master schedule used immediately before the September 24 update.
+  // If an existing Firebase day still exactly matches one of these old defaults,
+  // upgrade that day to the new master schedule. Custom-edited days are preserved.
+  function immediatelyPreviousDefaultLockWindows(classId) {
+    const result = blankLockWindows();
+
+    if (classId === "et") {
+      ["mon", "tue", "wed", "thu"].forEach(function (day) {
+        result[day] = [
+          { start: "08:45", end: "10:17" },
+          { start: "10:25", end: "11:07" },
+          { start: "11:15", end: "12:00" },
+          { start: "12:45", end: "13:32" },
+          { start: "13:40", end: "14:27" },
+          { start: "14:35", end: "15:15" }
+        ];
+      });
+    } else {
+      ["mon", "tue", "wed", "thu"].forEach(function (day) {
+        result[day] = [
+          { start: "12:20", end: "13:50" },
+          { start: "14:00", end: "14:45" },
+          { start: "14:55", end: "15:35" },
+          { start: "16:15", end: "17:00" },
+          { start: "17:10", end: "17:55" },
+          { start: "18:05", end: "18:45" }
+        ];
+      });
+    }
+
+    return result;
+  }
+
+  function dayLockWindowsEqual(a, b) {
+    const aa = Array.isArray(a) ? a : [];
+    const bb = Array.isArray(b) ? b : [];
+    if (aa.length !== bb.length) return false;
+    return aa.every(function (r, i) {
+      return r && bb[i] && r.start === bb[i].start && r.end === bb[i].end;
+    });
   }
 
   function lockWindowsEqual(a, b) {
@@ -194,6 +236,16 @@
       });
       if (classId && lockWindowsEqual(lockWindows, previousDefaultLockWindows(classId))) {
         lockWindows = deepClone(fallback.lockWindows);
+      } else if (classId) {
+        // Upgrade only days that are still untouched from the immediately
+        // previous master schedule. This is especially useful when Monday was
+        // edited manually and Tue/Wed/Thu should now inherit the new default.
+        const oldMaster = immediatelyPreviousDefaultLockWindows(classId);
+        ["mon", "tue", "wed", "thu"].forEach(function (day) {
+          if (dayLockWindowsEqual(lockWindows[day], oldMaster[day])) {
+            lockWindows[day] = deepClone(fallback.lockWindows[day]);
+          }
+        });
       }
     } else if (source.schedule && typeof source.schedule === "object") {
       lockWindows = legacyOpenScheduleToLockWindows(source.schedule, fallback.lockWindows);
