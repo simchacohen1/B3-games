@@ -1028,7 +1028,7 @@ function updateTagGameToggle(){
   if(!tagGameEnabled&&tagOptedIn)tagOptedIn=false;
   updateTagJoinControls();
 }
-function currentTagStudentKey(){return presenceProfile?presenceStudentId:(isTeacher?'simcha_cohen':'');}
+function currentTagStudentKey(){return isTeacher?'simcha_cohen':(presenceProfile?presenceStudentId:'');}
 function updateTagJoinControls(){
   const eligible=tagGameEnabled&&livePresenceEnabled&&(!!presenceProfile||isTeacher);
   const btn=document.getElementById('tagJoinBtn');if(btn){btn.classList.toggle('show',eligible);btn.classList.toggle('playing',tagOptedIn);btn.textContent=tagOptedIn?'Leave Tag':'Play Tag';btn.setAttribute('aria-pressed',String(tagOptedIn));}
@@ -1272,7 +1272,10 @@ function startTeacherPresenceMonitor(){
 function latestStudentSessions(raw){
   const result=new Map(),now=Date.now(),combined=teacherPresenceViewer||tagOptedIn;
   const collect=(studentId,sessions,classId,key)=>{
-    if(!teacherPresenceViewer&&studentId===presenceStudentId)return;
+    // Never render this browser's own player as a remote avatar. In teacher mode,
+    // the teacher identity is always simcha_cohen even if a student ID is still
+    // stored in localStorage from an earlier student session on this computer.
+    if((isTeacher&&studentId==='simcha_cohen')||(!teacherPresenceViewer&&studentId===presenceStudentId))return;
     const known=PRESENCE_STUDENTS[studentId];if(!known)return;
     if(studentId!=='simcha_cohen'&&known.classId!==classId)return;
     let latest=null;
