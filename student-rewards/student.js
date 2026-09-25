@@ -133,14 +133,26 @@ function history(){
     return {cid,date,status:att?.status||'present',points:Number(award?.points||0),ratings:Object.fromEntries(Object.values(ratings).map(r=>[r.category,r.rating]))};
   }).sort((a,b)=>b.date.localeCompare(a.date));
 }
+function redeemedPoints(){
+  let redeemed=0;
+  for(const item0 of Object.values(state.root?.redemptions||{})){
+    const item=item0||{}, cost=Number(item.cost||0), status=String(item.status||'requested').toLowerCase();
+    if(cost>0&&status!=='declined')redeemed+=cost;
+  }
+  return redeemed;
+}
+function pointAccountTotals(){
+  const currentBalance=Number(state.student?.rewardBalance||0), redeemed=redeemedPoints();
+  return {totalPoints:currentBalance+redeemed,redeemed,currentBalance};
+}
 function render(){
   if(!state.student||!state.root)return;
   $('#loginView').classList.add('hidden');
   $('#blockedView').classList.add('hidden');
   $('#portalView').classList.remove('hidden');
   nav();
-  const s=state.student,main=$('#studentMain');
-  main.innerHTML=`<div class="studentwelcome"><em class="avatar" style="background:${e(s.color)}">${e(s.initials)}</em><div><p class="eyebrow">HELLO</p><h1>${e(s.name)}</h1><p>Keep up the great work!</p></div><button class="studentbalance" id="openRewards"><span>CURRENT POINT BALANCE</span><strong>${Number(s.rewardBalance)||0}</strong><b>★ REWARD POINTS</b><small>Tap to see what you can choose →</small></button></div><div id="studentTab"></div>`;
+  const s=state.student,main=$('#studentMain'),acct=pointAccountTotals();
+  main.innerHTML=`<div class="studentwelcome"><em class="avatar" style="background:${e(s.color)}">${e(s.initials)}</em><div><p class="eyebrow">HELLO</p><h1>${e(s.name)}</h1><p>Keep up the great work!</p></div><button class="studentbalance studentbalance-breakdown" id="openRewards"><span class="student-point-metrics"><span><small>TOTAL POINTS</small><strong>${acct.totalPoints}</strong></span><span><small>REDEEMED</small><strong>${acct.redeemed}</strong></span><span class="current"><small>CURRENT BALANCE</small><strong>${acct.currentBalance}</strong></span></span><b>★ REWARD POINTS</b><small class="student-balance-link">Tap to see what you can choose →</small></button></div><div id="studentTab"></div>`;
   $('#openRewards').onclick=()=>{state.tab='Rewards';render()};
   renderTab();
 }
@@ -151,13 +163,18 @@ function renderTab(){
   if(state.tab==='Comments')box.innerHTML=commentsHTML();
   bindTab();
 }
+function historyTime(value){
+  if(typeof value==='number'&&Number.isFinite(value))return value;
+  const n=Number(value);if(Number.isFinite(n)&&n>0)return n;
+  const p=Date.parse(String(value||''));return Number.isFinite(p)?p:0;
+}
 function pointHistoryRows(){
   const rows=[];
   for(const item of state.activityPointHistory||[]){
     const amount=Number(item.actualAmount??item.amount??0);
     if(!amount)continue;
     const labels={reading100:'Posuk Practice · Reading 100%',translation100:'Posuk Practice · Translation 100%',understand100:'Posuk Practice · Understanding 100%',chazara:'Chazara approved','chazara-recording':'Recorded Chazara approved','chazara-remove':'Chazara adjustment','teacher-adjustment':'Teacher adjustment'};
-    rows.push({amount,title:item.reason||'Activity points',detail:labels[item.source]||item.source||'',when:Number(item.reviewedAt||item.createdAt||0)});
+    rows.push({amount,title:item.reason||'Activity points',detail:labels[item.source]||item.source||'',when:historyTime(item.reviewedAt||item.createdAt)});
   }
   for(const [cid,dates] of Object.entries(state.root.awards||{})){
     for(const [date,award] of Object.entries(dates||{})){
@@ -178,8 +195,8 @@ function pointHistoryRows(){
   return rows.sort((a,b)=>b.when-a.when);
 }
 function pointHistoryHTML(){
-  const rows=pointHistoryRows();
-  return `<section class="panel points-history-panel"><div class="points-history-head"><div><h2>⭐ Points History</h2><p>See exactly where your reward points came from.</p></div><strong>${Number(state.student?.rewardBalance)||0} ★</strong></div>${rows.length?`<div class="points-history-list">${rows.map(r=>`<article class="points-history-row"><div><b>${e(r.title)}</b>${r.detail?`<small>${e(r.detail)}</small>`:''}<small>${r.when?e(new Date(r.when).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})):''}</small></div><strong class="points-history-amount ${r.amount<0?'negative':'positive'}">${r.amount>0?'+':''}${r.amount} ★</strong></article>`).join('')}</div>`:'<p>No point activity yet.</p>'}</section>`;
+  const rows=pointHistoryRows(),acct=pointAccountTotals();
+  return `<section class="panel points-history-panel"><div class="points-history-head"><div><h2>⭐ Points History</h2><p>Total Points ${acct.totalPoints} ★ · Redeemed ${acct.redeemed} ★ · Current Balance ${acct.currentBalance} ★</p></div><strong>${acct.currentBalance} ★</strong></div>${rows.length?`<div class="points-history-list">${rows.map(r=>`<article class="points-history-row"><div><b>${e(r.title)}</b>${r.detail?`<small>${e(r.detail)}</small>`:''}<small>${r.when?e(new Date(r.when).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})):''}</small></div><strong class="points-history-amount ${r.amount<0?'negative':'positive'}">${r.amount>0?'+':''}${r.amount} ★</strong></article>`).join('')}</div>`:'<p>No point activity yet.</p>'}</section>`;
 }
 function progressHTML(){
   const rows=allRatingRows(),pct=C.cumulativeProgress(rows)??0,g=grouped(),hist=history(),cats=['Davening','Learning','Participation'];
