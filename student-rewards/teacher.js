@@ -1,4 +1,4 @@
-// CLASS 1000-POINT REWARDS UPDATE - 2026-09-23
+// PERSONAL + CLASS REWARDS MODEL - 2026-09-25
 (function(){
 'use strict';
 const C=window.StudentRewardsCommon;
@@ -6,15 +6,14 @@ const {db,auth}=C.ensureFirebase();
 const ROOT=C.ROOT, ADMIN=C.ADMIN_EMAIL;
 const NAV=["Overview","Points Dashboard","Daily Points","Students","Categories","Comments","Rewards","Reports","People & Classes","Settings"];
 const ICONS={"Overview":"⌂","Points Dashboard":"★","Daily Points":"✓","Students":"♙","Categories":"☷","Comments":"✎","Rewards":"◇","Reports":"▤","People & Classes":"♧","Settings":"⚙"};
-const CLASS_1000_REWARDS=[
+const CLASS_REWARD_PRESETS=[
   {key:"gimkit",name:"Gimkit",icon:"🎯"},
   {key:"kahoot",name:"Kahoot",icon:"❓"},
   {key:"video",name:"Video",icon:"🎬"},
   {key:"create-new-game",name:"Create a New Game",icon:"🎮"},
   {key:"extra-class-game-time",name:"Extra Class Time for a Game",icon:"⏰"},
-  {key:"extra-recess",name:"Extra Recess",icon:"🏃"},
-  {key:"chat-in-zoom",name:"Chat in Zoom",icon:"💬"}
-];
+  {key:"extra-recess",name:"Extra Recess",icon:"🏃"}
+]
 let state={root:null,user:null,tab:"Overview",classId:"",date:C.schoolDateString(),draft:{},awardDraft:{},absent:new Set(),selectedId:"",pointClassId:"all",pointStudent:"all",pointRange:"30",pointType:"all",pointStatus:"all",pointSearch:""};
 const $=s=>document.querySelector(s), esc=C.escapeHtml;
 function vals(o){return o&&typeof o==="object"?Object.values(o):[]}
@@ -75,24 +74,29 @@ async function loadRoot(){
   if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=activeClasses()[0]?.id||"";
   prepareDraft();renderClassSelect();setHeader();buildNav();
 }
-async function ensureClass1000Rewards(){
-  if(state.root?.settings?.class1000RewardsSeededV1===true)return false;
-  const updates={};
-  const norm=v=>String(v||"").trim().toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
-  const existingRewards=Object.entries(state.root?.rewards||{});
-  const existingClass=Object.entries(state.root?.classRewardCatalog||{});
-  for(const preset of CLASS_1000_REWARDS){
-    const rewardMatch=existingRewards.find(([,r])=>norm(r?.name)===norm(preset.name));
-    const rid=rewardMatch?.[0]||`class-1000-${preset.key}`;
-    const oldReward=rewardMatch?.[1]||{};
-    updates[`${ROOT}/rewards/${rid}`]={...oldReward,id:rid,name:preset.name,cost:1000,icon:preset.icon,color:oldReward.color||"#ede9fe",active:true,quantity:oldReward.quantity??-1};
-
+async function ensureRewardModelV2(){
+  if(state.root?.settings?.rewardModelV2Seeded===true)return false;
+  const updates={}, norm=v=>String(v||"").trim().toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  const existingRewards=Object.entries(state.root?.rewards||{}), existingClass=Object.entries(state.root?.classRewardCatalog||{});
+  const classNames=new Set(CLASS_REWARD_PRESETS.map(x=>norm(x.name)));
+  for(const preset of CLASS_REWARD_PRESETS){
     const classMatch=existingClass.find(([,r])=>norm(r?.name)===norm(preset.name));
-    const cid=classMatch?.[0]||`class-incentive-${preset.key}`;
-    const oldClass=classMatch?.[1]||{};
-    updates[`${ROOT}/classRewardCatalog/${cid}`]={...oldClass,id:cid,name:preset.name,icon:preset.icon,cost:1000,active:true};
+    const cid=classMatch?.[0]||`class-incentive-${preset.key}`, oldClass=classMatch?.[1]||{};
+    const oldCost=Number(oldClass.cost||0), perStudent=Number(oldClass.costPerStudent||0)||((oldCost===1000||!oldCost)?100:Math.max(1,Math.round(oldCost/10)));
+    updates[`${ROOT}/classRewardCatalog/${cid}`]={...oldClass,id:cid,name:preset.name,icon:preset.icon,costPerStudent:perStudent,active:true};
   }
-  updates[`${ROOT}/settings/class1000RewardsSeededV1`]=true;
+  for(const [rid,reward] of existingRewards){
+    if(classNames.has(norm(reward?.name))){
+      updates[`${ROOT}/rewards/${rid}/active`]=false;
+      updates[`${ROOT}/rewards/${rid}/rewardType`]="class-migrated";
+    }else if(!reward?.rewardType){
+      updates[`${ROOT}/rewards/${rid}/rewardType`]="personal";
+    }
+  }
+  for(const [cid,item] of existingClass){
+    if(norm(item?.name)==="chat in zoom")updates[`${ROOT}/classRewardCatalog/${cid}/active`]=false;
+  }
+  updates[`${ROOT}/settings/rewardModelV2Seeded`]=true;
   await db.ref().update(updates);
   return true;
 }
@@ -208,6 +212,14 @@ function allPointLedger(includeGaps=true){
     }
   }
 
+  // Class reward contributions: points are spent immediately into a shared class goal.
+  for(const s of r){
+    for(const [key,item0] of Object.entries(state.root?.classRewardContributionsByStudent?.[s.id]||{})){
+      const item=item0||{}, amount=Math.abs(Number(item.amount||0));if(!amount)continue;
+      add({id:`class-contribution:${s.id}:${key}`,sid:s.id,amount:-amount,when:pointTime(item.createdAt),source:"class-reward-contribution",sourceGroup:"class",sourceLabel:"Class Reward",reason:`Class contribution — ${item.rewardName||"Class Reward"}`,detail:`${item.className||pointClassName(item.classId)} · ${amount} ★ contributed`,status:"posted",counts:true,classId:item.classId||"",balanceAfter:item.balanceAfter});
+    }
+  }
+
   // Older balances may predate the permanent history records. Show the difference
   // instead of hiding it so the teacher can immediately see why a balance does not reconcile.
   if(includeGaps){
@@ -264,7 +276,7 @@ function pointsDashboard(){
     const recent=rows.find(x=>!x.isGap&&x.when), classLabel=pointsStudentClassLabel(s.id);
     return {s,savedNet,gap,currentBalance,recent,classLabel};
   });
-  const typeOptions=[["all","All sources"],["daily","Daily Points"],["posuk","Posuk Practice"],["chazara","Chazara"],["teacher","Teacher adjustments"],["store","Prize Store"],["activity","Other activity"],["gap","History gaps"]];
+  const typeOptions=[["all","All sources"],["daily","Daily Points"],["posuk","Posuk Practice"],["chazara","Chazara"],["teacher","Teacher adjustments"],["store","Personal Rewards"],["class","Class Rewards"],["activity","Other activity"],["gap","History gaps"]];
   const statusOptions=[["all","All statuses"],["posted","Posted to balance"],["pending","Pending"],["rejected","Rejected"],["needs-review","Needs review"]];
   const classLabel=pointsClassLabel(), allClasses=state.pointClassId==="all";
 
@@ -275,7 +287,8 @@ function pointsDashboard(){
     {id:"posuk",label:"Posuk Practice",icon:"📖",hint:"Reading, translation & understanding"},
     {id:"chazara",label:"Chazara",icon:"↻",hint:"Regular and recorded Chazara"},
     {id:"teacher",label:"Teacher adjustments",icon:"±",hint:"Manual additions or deductions"},
-    {id:"store",label:"Prize Store",icon:"🎁",hint:"Points spent or returned"},
+    {id:"store",label:"Personal Rewards",icon:"🎁",hint:"Points spent or returned on personal rewards"},
+    {id:"class",label:"Class Rewards",icon:"👥",hint:"Points contributed toward class goals"},
     {id:"activity",label:"Other activity",icon:"★",hint:"Other saved activity points"},
     {id:"gap",label:"Older points",icon:"…",hint:"Balance from before full history was saved"}
   ].map(group=>{
@@ -441,12 +454,22 @@ function commentsPage(){
   return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">TEACHER NOTES</p><h1>Comments</h1><p>Write a private note or share encouragement with the student.</p></div><select id="commentPicker" class="picker">${r.map(x=>`<option value="${esc(x.id)}" ${s&&x.id===s.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select></div>${s?`<div class="admincolumns"><section><h2>${esc(s.name)}’s comments</h2><div class="commentlist">${comments.map(c=>`<article><p>${esc(c.body)}</p><small>${c.visibleToStudent===false?"Private teacher note":"Visible to student"} · ${c.createdAt?new Date(c.createdAt).toLocaleDateString():""}</small></article>`).join("")||`<div class="empty"><h3>No comments yet</h3><p>Add the first note for this student.</p></div>`}</div></section><section><h2>Add a comment</h2><form id="commentForm" class="adminform"><label>Comment<textarea id="commentText" required rows="5"></textarea></label><label class="check"><input id="commentVisible" type="checkbox" checked> Show this comment to the student</label><button class="primary">Save comment</button></form></section></div>`:`<div class="empty">No student selected.</div>`}</section>`;
 }
 async function addComment(e){e.preventDefault();const s=currentStudent(), body=$("#commentText").value.trim();if(!s||!body)return;const key=db.ref(`${ROOT}/commentsByStudent/${s.id}`).push().key;await db.ref(`${ROOT}/commentsByStudent/${s.id}/${key}`).set({id:key,studentId:s.id,body,visibleToStudent:$("#commentVisible").checked,teacherEmail:state.user.email,createdAt:now()});toast("Comment saved")}
+function classRewardSnapshot(item,classId=state.classId){
+  const count=Math.max(1,C.classRoster(state.root||{},classId).length), live=state.root?.classRewardRounds?.[classId]?.[item.id]||null, perStudent=Math.max(1,Number(live?.perStudentCost)||Number(item.costPerStudent||100));
+  const goal=Number(live?.goalPoints)||perStudent*count, total=Number(live?.totalContributed)||0, cap=Number(live?.maxPerStudent)||Math.min(goal,Math.ceil((goal/count)*2)), pct=Math.max(0,Math.min(100,Math.round(total/Math.max(1,goal)*100))), contributors=Object.keys(live?.byStudent||{}).filter(k=>Number(live.byStudent[k])>0).length;
+  return {count,perStudent,live,goal,total,cap,pct,contributors,status:live?.status||"not-started"};
+}
 function rewardsPage(){
-  const rewards=vals(state.root.rewards||{}).filter(r=>r.active!==false).sort((a,b)=>(a.cost||0)-(b.cost||0)), req=getRedemptions(), classRewards=vals(state.root.classRewardCatalog||{}).filter(x=>x.active!==false), pointReq=pendingActivityPointRequests();
+  const rewards=vals(state.root.rewards||{}).filter(r=>r.active!==false&&String(r.rewardType||"personal")!=="class"&&String(r.rewardType||"personal")!=="class-migrated").sort((a,b)=>(a.cost||0)-(b.cost||0)), req=getRedemptions(), classRewards=vals(state.root.classRewardCatalog||{}).filter(x=>x.active!==false).sort((a,b)=>(a.costPerStudent||0)-(b.costPerStudent||0)||(a.name||"").localeCompare(b.name||"")), pointReq=pendingActivityPointRequests();
   const storeOpen=state.root.settings?.rewardStoreEnabled===true||String(state.root.settings?.rewardStoreEnabled)==="true";
-  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">${esc((cls()?.name||"CLASS").toUpperCase())}</p><h1>Rewards & Requests</h1><p>Activity points wait for your approval before changing a student's balance.</p></div><a class="primary linkbutton" href="student.html">Open student portal</a></div>
-  <section class="activity-queue"><div class="activity-head"><div><h2>Activity points awaiting approval</h2><p>Posuk Practice and Chazara requests. Nothing below has been added yet.</p></div><div class="activity-head-actions"><b>${pointReq.length}</b>${pointReq.length?`<button class="primary" id="approveAllActivity">Approve all</button>`:""}</div></div>${pointReq.length?pointReq.map(activityPointRow).join(""):`<div class="empty"><h3>No activity points waiting</h3><p>New 100% scores and Chazara points will appear here.</p></div>`}</section>
-  <div class="storecontrol ${storeOpen?"open":"closed"}"><div><strong>Prize Store Purchasing: ${storeOpen?"OPEN":"CLOSED"}</strong><small>${storeOpen?"Students can submit reward requests.":"Students can browse prizes, but cannot buy anything."}</small></div><button class="primary" id="storeToggle">${storeOpen?"Close Prize Store":"Open Prize Store"}</button></div><div class="rewardlayout"><div><h2>Available rewards</h2><div class="rewardgrid">${rewards.map(r=>`<article><div class="rewardicon" style="background:${esc(r.color||"#ede9fe")}">${esc(r.icon||"🎁")}</div><h3>${esc(r.name)}</h3><p>${Number(r.cost)||0} ★ · ${Number(r.quantity)<0?"unlimited":`${r.quantity} left`}</p><div class="rewardactions"><button data-editreward="${esc(r.id)}">Edit</button><button class="rewarddelete" data-deletereward="${esc(r.id)}">Delete</button></div></article>`).join("")}</div><button class="primary" id="addReward" style="margin-top:14px">+ Add a reward</button><div class="rewardclass"><h2>Class incentives</h2><div class="classchips">${classRewards.map(x=>`<span>${esc(x.icon||"⭐")} ${esc(x.name)}${Number.isFinite(Number(x.cost))?` · ${Number(x.cost)} ★`:""}</span>`).join("")}</div></div></div><aside class="approvals"><div class="approvalhead"><span><h2>Prize request queue</h2><p>Pending, ready to collect, and completed history</p></span><b>${getRedemptions().filter(x=>x.item.status==="pending"||x.item.status==="ready").length}</b></div>${req.length?req.map(requestRow).join(""):`<div class="empty"><h3>No prize requests yet</h3><p>Student purchases will appear here immediately.</p></div>`}</aside></div></section>`;
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">REWARDS</p><h1>Reward Store</h1><p>Personal rewards are bought by one student. Class rewards are shared goals funded by contributions.</p></div><a class="primary linkbutton" href="student.html">Open student portal</a></div>
+  <div class="storecontrol ${storeOpen?"open":"closed"}"><div><strong>Prize Store Purchasing: ${storeOpen?"OPEN":"CLOSED"}</strong><small>${storeOpen?"Students can buy personal rewards and contribute to class goals.":"Students can browse rewards and progress, but cannot spend points."}</small></div><button class="primary" id="storeToggle">${storeOpen?"Close Prize Store":"Open Prize Store"}</button></div>
+  ${pointReq.length?`<section class="activity-queue"><div class="activity-head"><div><h2>Activity points awaiting approval</h2><p>Posuk Practice and Chazara requests. Nothing below has been added yet.</p></div><div class="activity-head-actions"><b>${pointReq.length}</b><button class="primary" id="approveAllActivity">Approve all</button></div></div>${pointReq.map(activityPointRow).join("")}</section>`:""}
+  <div class="reward-type-stack">
+    <section class="teacher-reward-section personal-rewards"><div class="teacher-reward-heading"><span>👤</span><div><h2>Personal Rewards</h2><p>One boy spends his points and receives this reward himself.</p></div><button class="primary" id="addReward">+ Add personal reward</button></div><div class="rewardgrid">${rewards.length?rewards.map(r=>`<article><div class="rewardicon" style="background:${esc(r.color||"#ede9fe")}">${esc(r.icon||"🎁")}</div><h3>${esc(r.name)}</h3><p>${Number(r.cost)||0} ★ · ${Number(r.quantity)<0?"unlimited":`${r.quantity} left`}</p><div class="rewardactions"><button data-editreward="${esc(r.id)}">Edit</button><button class="rewarddelete" data-deletereward="${esc(r.id)}">Delete</button></div></article>`).join(""):`<div class="empty"><h3>No personal rewards</h3></div>`}</div></section>
+    <section class="teacher-reward-section class-rewards"><div class="teacher-reward-heading"><span>👥</span><div><h2>Class Rewards — ${esc(cls()?.name||"Class")}</h2><p>Prices are set per student, so ET and WT goals scale automatically. Each boy may contribute at most twice his equal share.</p></div><button class="primary" id="addClassReward">+ Add class reward</button></div><div class="teacher-class-goal-grid">${classRewards.length?classRewards.map(x=>{const g=classRewardSnapshot(x);return `<article class="teacher-class-goal ${g.status==="completed"?"complete":""}"><div class="teacher-class-goal-top"><span>${esc(x.icon||"⭐")}</span><div><h3>${esc(x.name)}</h3><p>${g.perStudent} ★ per student · ${g.count} students · goal ${g.goal} ★</p></div><strong>${g.total} / ${g.goal} ★</strong></div><div class="teacher-class-progress"><i style="width:${g.pct}%"></i></div><div class="teacher-class-meta"><span>${g.contributors} contributor${g.contributors===1?"":"s"}</span><span>Max per boy: ${g.cap} ★</span><span>${g.status==="completed"?"✓ Goal reached":`${Math.max(0,g.goal-g.total)} ★ still needed`}</span></div><div class="rewardactions"><button data-editclassreward="${esc(x.id)}">Edit</button>${g.live?`<button data-resetclassreward="${esc(x.id)}">Reset goal</button>`:""}<button class="rewarddelete" data-deleteclassreward="${esc(x.id)}">Delete</button></div></article>`}).join(""):`<div class="empty"><h3>No class rewards</h3></div>`}</div></section>
+    <section class="teacher-reward-section"><div class="teacher-reward-heading"><span>📬</span><div><h2>Personal reward request queue</h2><p>Pending, ready to collect, and completed history</p></div><b class="queue-count">${getRedemptions().filter(x=>x.item.status==="pending"||x.item.status==="ready").length}</b></div><div class="approvals-inline">${req.length?req.map(requestRow).join(""):`<div class="empty"><h3>No personal reward requests yet</h3><p>Student purchases will appear here immediately.</p></div>`}</div></section>
+  </div></section>`;
 }
 function activityPointRow(x){
   const item=x.item||{}, s=state.root.students?.[item.rewardStudentId]||{}, amount=Number(item.amount||0), sign=amount>0?"+":"";
@@ -498,7 +521,11 @@ async function approveAllActivityPoints(){
   let done=0;for(const id of ids)if(await approveActivityPoint(id,true))done++;
   toast(`${done} activity point request${done===1?"":"s"} approved`);
 }
-async function editReward(id=""){const old=id?state.root.rewards[id]:null,name=prompt("Reward name:",old?.name||"");if(!name)return;const cost=Number(prompt("Point cost:",String(old?.cost??25)));if(!Number.isFinite(cost)||cost<0)return;const icon=prompt("Emoji/icon:",old?.icon||"🎁")||"🎁",rid=id||`reward-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;await db.ref(`${ROOT}/rewards/${rid}`).set({id:rid,name:name.trim(),cost:Math.round(cost),icon,color:old?.color||"#ede9fe",active:true,quantity:old?.quantity??-1});toast(id?"Reward updated":"Reward added")}
+async function editReward(id=""){const old=id?state.root.rewards[id]:null,name=prompt("Personal reward name:",old?.name||"");if(!name)return;const cost=Number(prompt("Point cost:",String(old?.cost??25)));if(!Number.isFinite(cost)||cost<0)return;const icon=prompt("Emoji/icon:",old?.icon||"🎁")||"🎁",rid=id||`reward-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;await db.ref(`${ROOT}/rewards/${rid}`).set({id:rid,name:name.trim(),cost:Math.round(cost),icon,color:old?.color||"#ede9fe",active:true,quantity:old?.quantity??-1,rewardType:"personal"});toast(id?"Personal reward updated":"Personal reward added")}
+async function editClassReward(id=""){const old=id?state.root.classRewardCatalog?.[id]:null,name=prompt("Class reward name:",old?.name||"");if(!name)return;const cost=Number(prompt("Points needed PER STUDENT (the site multiplies this by the class size):",String(old?.costPerStudent??100)));if(!Number.isFinite(cost)||cost<1)return;const icon=prompt("Emoji/icon:",old?.icon||"⭐")||"⭐",rid=id||`class-reward-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;await db.ref(`${ROOT}/classRewardCatalog/${rid}`).set({id:rid,name:name.trim(),costPerStudent:Math.round(cost),icon,active:true});toast(id?"Class reward updated":"Class reward added")}
+async function deleteClassReward(id){const r=state.root.classRewardCatalog?.[id];if(!r||!confirm(`Delete “${r.name}” from Class Rewards? Existing contribution history will be kept.`))return;await db.ref(`${ROOT}/classRewardCatalog/${id}/active`).set(false);toast("Class reward deleted")}
+async function resetClassReward(id){const r=state.root.classRewardCatalog?.[id];if(!r||!confirm(`Start a fresh “${r.name}” class goal for ${cls()?.name||"this class"}? Previous contributions will stay in point history.`))return;await db.ref(`${ROOT}/classRewardRounds/${state.classId}/${id}`).remove();toast("Class goal reset")}
+
 async function deleteReward(id){const r=state.root.rewards?.[id];if(!r||!confirm(`Delete “${r.name}” from the Prize Store? Past request history will be kept.`))return;await db.ref(`${ROOT}/rewards/${id}/active`).set(false);toast("Reward deleted")}
 async function toggleRewardStore(){const open=state.root.settings?.rewardStoreEnabled===true||String(state.root.settings?.rewardStoreEnabled)==="true";await db.ref(`${ROOT}/settings/rewardStoreEnabled`).set(!open);toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened")}
 async function review(sid,key,decision){const item=state.root.redemptionsByStudent?.[sid]?.[key];if(!item)return;const updates={}, stamp=now();const status=decision==="approve"?"ready":decision==="collect"?"collected":"declined";updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/status`]=status;updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/reviewedBy`]=state.user.email;updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/reviewedAt`]=stamp;if(decision==="decline")updates[`${ROOT}/students/${sid}/rewardBalance`]=Number(state.root.students[sid].rewardBalance||0)+Number(item.cost||0);await db.ref().update(updates);toast(`Request ${status}`)}
@@ -547,7 +574,7 @@ function bindPage(){
   if(state.tab==="Students"){$("#studentPicker").onchange=e=>{state.selectedId=e.target.value;render()};$("#adjustPoints").onclick=adjustPoints}
   if(state.tab==="Categories"){$("#addCategory").onclick=addCategory;document.querySelectorAll("[data-catdelete]").forEach(b=>b.onclick=()=>removeCategory(b.dataset.catdelete))}
   if(state.tab==="Comments"){if($("#commentPicker"))$("#commentPicker").onchange=e=>{state.selectedId=e.target.value;render()};if($("#commentForm"))$("#commentForm").onsubmit=addComment}
-  if(state.tab==="Rewards"){$("#addReward").onclick=()=>editReward();$("#storeToggle").onclick=toggleRewardStore;if($("#approveAllActivity"))$("#approveAllActivity").onclick=approveAllActivityPoints;document.querySelectorAll("[data-point-approve]").forEach(b=>b.onclick=()=>approveActivityPoint(b.dataset.pointApprove));document.querySelectorAll("[data-point-reject]").forEach(b=>b.onclick=()=>rejectActivityPoint(b.dataset.pointReject));document.querySelectorAll("[data-editreward]").forEach(b=>b.onclick=()=>editReward(b.dataset.editreward));document.querySelectorAll("[data-deletereward]").forEach(b=>b.onclick=()=>deleteReward(b.dataset.deletereward));document.querySelectorAll("[data-approve]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.approve.split("|");review(s,k,"approve")});document.querySelectorAll("[data-decline]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.decline.split("|");review(s,k,"decline")});document.querySelectorAll("[data-collect]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.collect.split("|");review(s,k,"collect")})}
+  if(state.tab==="Rewards"){$("#addReward").onclick=()=>editReward();if($("#addClassReward"))$("#addClassReward").onclick=()=>editClassReward();$("#storeToggle").onclick=toggleRewardStore;if($("#approveAllActivity"))$("#approveAllActivity").onclick=approveAllActivityPoints;document.querySelectorAll("[data-point-approve]").forEach(b=>b.onclick=()=>approveActivityPoint(b.dataset.pointApprove));document.querySelectorAll("[data-point-reject]").forEach(b=>b.onclick=()=>rejectActivityPoint(b.dataset.pointReject));document.querySelectorAll("[data-editreward]").forEach(b=>b.onclick=()=>editReward(b.dataset.editreward));document.querySelectorAll("[data-deletereward]").forEach(b=>b.onclick=()=>deleteReward(b.dataset.deletereward));document.querySelectorAll("[data-editclassreward]").forEach(b=>b.onclick=()=>editClassReward(b.dataset.editclassreward));document.querySelectorAll("[data-deleteclassreward]").forEach(b=>b.onclick=()=>deleteClassReward(b.dataset.deleteclassreward));document.querySelectorAll("[data-resetclassreward]").forEach(b=>b.onclick=()=>resetClassReward(b.dataset.resetclassreward));document.querySelectorAll("[data-approve]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.approve.split("|");review(s,k,"approve")});document.querySelectorAll("[data-decline]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.decline.split("|");review(s,k,"decline")});document.querySelectorAll("[data-collect]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.collect.split("|");review(s,k,"collect")})}
   if(state.tab==="Reports"){$("#csvBtn").onclick=exportCSV;$("#printBtn").onclick=()=>window.print()}
   if(state.tab==="People & Classes"){document.querySelectorAll("[data-openclass]").forEach(b=>b.onclick=()=>{state.classId=b.dataset.openclass;renderClassSelect();prepareDraft();render()});$("#addStudentForm").onsubmit=addStudent;$("#addClassForm").onsubmit=addClass}
   if(state.tab==="Settings"){$("#settingsAccess").onclick=toggleAccess;$("#saveSettings").onclick=saveSettings}
@@ -559,6 +586,6 @@ $("#signOutBtn").onclick=()=>auth.signOut();
 auth.onAuthStateChanged(async user=>{
   if(!user){state.user=null;$("#loginView").classList.remove("hidden");$("#appView").classList.add("hidden");return}
   if(!user.email||user.email.toLowerCase()!==ADMIN.toLowerCase()){await auth.signOut();$("#loginError").textContent=`This page is only authorized for ${ADMIN}.`;return}
-  state.user=user;$("#loginView").classList.add("hidden");$("#appView").classList.remove("hidden");await loadRoot();const seeded=await ensureClass1000Rewards();if(seeded)await loadRoot();subscribe();render();
+  state.user=user;$("#loginView").classList.add("hidden");$("#appView").classList.remove("hidden");await loadRoot();const seeded=await ensureRewardModelV2();if(seeded)await loadRoot();subscribe();render();
 });
 })();
