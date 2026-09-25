@@ -94,7 +94,7 @@ async function trySharedB3Login(){
 
 async function load(){
   if(!state.studentId)return;
-  const [studentSnap,ratingsSnap,attendanceSnap,awardsSnap,commentsSnap,rewardsSnap,redemptionsSnap,categoriesSnap,settingsSnap,activityPointHistory,classGoals]=await Promise.all([
+  const [studentSnap,ratingsSnap,attendanceSnap,awardsSnap,commentsSnap,rewardsSnap,redemptionsSnap,categoriesSnap,settingsSnap,activityPointHistory,classGoals,classRewardAvailabilitySnap]=await Promise.all([
     db.ref(`${ROOT}/students/${state.studentId}`).once('value'),
     own('dailyRatings').once('value'),
     own('dailyAttendance').once('value'),
@@ -105,11 +105,13 @@ async function load(){
     db.ref(`${ROOT}/categories`).once('value'),
     db.ref(`${ROOT}/settings/rewardStoreEnabled`).once('value').catch(()=>({val:()=>false})),
     loadActivityPointHistory().catch(err=>{console.warn('Could not load activity point history',err);return []}),
-    loadClassRewardStatus().catch(err=>{console.warn('Could not load class reward goals',err);return []})
+    loadClassRewardStatus().catch(err=>{console.warn('Could not load class reward goals',err);return []}),
+    db.ref(`${ROOT}/settings/classRewardAvailability`).once('value').catch(()=>({val:()=>({})}))
   ]);
   state.activityPointHistory=activityPointHistory;
-  state.classGoals=classGoals;
-  state.root={student:studentSnap.val(),ratings:ratingsSnap.val()||{},attendance:attendanceSnap.val()||{},awards:awardsSnap.val()||{},comments:commentsSnap.val()||{},rewards:rewardsSnap.val()||{},redemptions:redemptionsSnap.val()||{},categories:categoriesSnap.val()||{},settings:{rewardStoreEnabled:settingsSnap.val()}};
+  const classRewardAvailability=classRewardAvailabilitySnap.val()||{};
+  state.classGoals=classGoals.map(g=>({...g,available:Object.prototype.hasOwnProperty.call(classRewardAvailability,g.rewardId)?classRewardAvailability[g.rewardId]!==false:g.available!==false}));
+  state.root={student:studentSnap.val(),ratings:ratingsSnap.val()||{},attendance:attendanceSnap.val()||{},awards:awardsSnap.val()||{},comments:commentsSnap.val()||{},rewards:rewardsSnap.val()||{},redemptions:redemptionsSnap.val()||{},categories:categoriesSnap.val()||{},settings:{rewardStoreEnabled:settingsSnap.val(),classRewardAvailability}};
   state.student=state.root.student;
   render();
   subscribe();
@@ -127,7 +129,9 @@ function subscribe(){
     render();
   });
   db.ref(`${ROOT}/redemptionsByStudent/${state.studentId}`).on('value',s=>{if(state.root){state.root.redemptions=s.val()||{};render()}});
+  db.ref(`${ROOT}/rewards`).on('value',s=>{if(state.root){state.root.rewards=s.val()||{};render()}},()=>{});
   db.ref(`${ROOT}/settings/rewardStoreEnabled`).on('value',s=>{if(state.root){state.root.settings.rewardStoreEnabled=s.val();render()}},()=>{});
+  db.ref(`${ROOT}/settings/classRewardAvailability`).on('value',s=>{if(!state.root)return;const map=s.val()||{};state.root.settings.classRewardAvailability=map;state.classGoals=(state.classGoals||[]).map(g=>({...g,available:Object.prototype.hasOwnProperty.call(map,g.rewardId)?map[g.rewardId]!==false:g.available!==false}));render()},()=>{});
 }
 function allRatingRows(){
   const out=[];
@@ -173,9 +177,11 @@ function pointAccountTotals(){
 }
 function classGoalProgress(g){return Math.max(0,Math.min(100,Math.round((Number(g.totalContributed||0)/Math.max(1,Number(g.goalPoints||1)))*100)))}
 function classGoalCard(g,{compact=false}={}){
-  const balance=Number(state.student?.rewardBalance||0), goal=Number(g.goalPoints||0), total=Number(g.totalContributed||0), remaining=Math.max(0,Number(g.remainingGoal??(goal-total))), mine=Number(g.studentContributed||0), cap=Number(g.studentCap||0), mineLeft=Math.max(0,Number(g.remainingStudentCap??(cap-mine))), maxGive=Math.max(0,Math.min(balance,mineLeft,remaining)), pct=classGoalProgress(g), complete=String(g.status||'')==='completed'||remaining<=0, storeOpen=state.root?.settings?.rewardStoreEnabled===true||String(state.root?.settings?.rewardStoreEnabled)==='true';
+  const balance=Number(state.student?.rewardBalance||0), goal=Number(g.goalPoints||0), total=Number(g.totalContributed||0), remaining=Math.max(0,Number(g.remainingGoal??(goal-total))), mine=Number(g.studentContributed||0), cap=Number(g.studentCap||0), mineLeft=Math.max(0,Number(g.remainingStudentCap??(cap-mine))), maxGive=Math.max(0,Math.min(balance,mineLeft,remaining)), pct=classGoalProgress(g), complete=String(g.status||'')==='completed'||remaining<=0, storeOpen=state.root?.settings?.rewardStoreEnabled===true||String(state.root?.settings?.rewardStoreEnabled)==='true', rewardOpen=g.available!==false;
   const inputId=`classGive-${String(g.rewardId||'').replace(/[^A-Za-z0-9_-]/g,'-')}-${compact?'top':'store'}`;
-  return `<article class="class-goal-card ${complete?'complete':''} ${compact?'compact':''}"><div class="class-goal-top"><div class="class-goal-icon">${e(g.icon||'⭐')}</div><div><small>CLASS REWARD</small><h3>${e(g.name||'Class Reward')}</h3></div><strong>${total} / ${goal} ★</strong></div><div class="class-goal-progress"><i style="width:${pct}%"></i></div><div class="class-goal-numbers"><span><b>${remaining}</b> still needed</span><span>You gave <b>${mine}</b></span><span>You can still give <b>${mineLeft}</b></span></div>${complete?`<div class="class-goal-complete">✓ Goal reached!</div>`:`<div class="class-contribute"><input id="${e(inputId)}" type="number" inputmode="numeric" min="1" max="${maxGive}" placeholder="Points" ${!storeOpen||maxGive<1?'disabled':''}><button class="primary" data-class-contribute="${e(g.rewardId)}" data-input="${e(inputId)}" ${state.busy||!storeOpen||maxGive<1?'disabled':''}>${storeOpen?'Contribute':'Store closed'}</button></div>`}</article>`;
+  const disabled=!storeOpen||!rewardOpen||maxGive<1;
+  const buttonText=!storeOpen?'Store closed':!rewardOpen?'Closed':maxGive<1?'No points available':'Contribute';
+  return `<article class="class-goal-card ${complete?'complete':''} ${compact?'compact':''} ${rewardOpen?'reward-open':'reward-closed'}"><div class="class-goal-top"><div class="class-goal-icon">${e(g.icon||'⭐')}</div><div><small>CLASS REWARD${rewardOpen?'':' · CLOSED'}</small><h3>${e(g.name||'Class Reward')}</h3></div><strong>${total} / ${goal} ★</strong></div><div class="class-goal-progress"><i style="width:${pct}%"></i></div><div class="class-goal-numbers"><span><b>${remaining}</b> still needed</span><span>You gave <b>${mine}</b></span><span>You can still give <b>${mineLeft}</b></span></div>${complete?`<div class="class-goal-complete">✓ Goal reached!</div>`:`<div class="class-contribute"><input id="${e(inputId)}" type="number" inputmode="numeric" min="1" max="${maxGive}" placeholder="Points" ${disabled?'disabled':''}><button class="primary" data-class-contribute="${e(g.rewardId)}" data-input="${e(inputId)}" ${state.busy||disabled?'disabled':''}>${buttonText}</button></div>`}</article>`;
 }
 function activeClassGoalsHTML(){
   const active=(state.classGoals||[]).filter(g=>Number(g.totalContributed||0)>0||String(g.status||'')==='completed');
@@ -248,10 +254,10 @@ function rewardsHTML(){
         goals=(state.classGoals||[]).filter(g=>g.active!==false).sort((a,b)=>(a.perStudentCost||0)-(b.perStudentCost||0)||(a.name||'').localeCompare(b.name||'')),
         byCost={};
   personalRewards.forEach(r=>(byCost[r.cost]??=[]).push(r));
-  const personalCards=Object.entries(byCost).map(([cost,list])=>`<h3 class="level-title">${cost}-Point Choices</h3>${list.map(r=>`<article class="reward-card"><div class="icon" style="background:${e(r.color||'#f3f1ff')}">${e(r.icon||'🎁')}</div><h3>${e(r.name)}</h3><div class="cost">${Number(r.cost)||0} ★</div><p>${balance>=Number(r.cost||0)?'You can choose this now':'Keep earning points'}</p><button class="primary" data-redeem="${e(r.id)}" ${state.busy||!storeOpen||balance<Number(r.cost||0)||r.quantity===0?'disabled':''}>${!storeOpen?'Store closed':r.quantity===0?'Unavailable':balance>=Number(r.cost||0)?'Request this':'Not enough points'}</button></article>`).join('')}`).join('');
+  const personalCards=Object.entries(byCost).map(([cost,list])=>`<h3 class="level-title">${cost}-Point Choices</h3>${list.map(r=>{const rewardOpen=r.available!==false,canAfford=balance>=Number(r.cost||0),disabled=state.busy||!storeOpen||!rewardOpen||!canAfford||r.quantity===0,buttonText=!storeOpen?'Store closed':!rewardOpen?'Closed':r.quantity===0?'Unavailable':canAfford?'Request this':'Not enough points';return `<article class="reward-card ${rewardOpen?'reward-open':'reward-closed'}"><div class="icon" style="background:${e(r.color||'#f3f1ff')}">${e(r.icon||'🎁')}</div><h3>${e(r.name)}</h3><div class="cost">${Number(r.cost)||0} ★</div><p>${!rewardOpen?'Not available right now':canAfford?'You can choose this now':'Keep earning points'}</p><button class="primary" data-redeem="${e(r.id)}" ${disabled?'disabled':''}>${buttonText}</button></article>`}).join('')}`).join('');
   const classCards=goals.length?goals.map(g=>classGoalCard(g)).join(''):'<div class="class-goals-empty">No class rewards are available yet.</div>';
   const purchases=Object.values(state.root.redemptions||{}).sort((a,b)=>String(b.requestedAt||'').localeCompare(String(a.requestedAt||'')));
-  return `<section class="panel rewards-intro"><div><p class="eyebrow">PRIZE STORE</p><h2>You have ${balance} points to use</h2><p>Personal rewards are just for you. Class rewards are shared goals that everyone can help reach.</p></div><div class="notice">${storeOpen?'The store is open. You can request personal rewards or contribute to a class goal.':'The Prize Store is closed right now. You can still see the rewards and class progress.'}</div></section>
+  return `<section class="panel rewards-intro"><div><p class="eyebrow">PRIZE STORE</p><h2>You have ${balance} points to use</h2><p>Personal rewards are just for you. Class rewards are shared goals that everyone can help reach.</p></div></section>
   <section class="reward-store-section personal-store"><div class="reward-store-heading"><span class="store-kind-icon">👤</span><div><p class="eyebrow">JUST FOR YOU</p><h2>Personal Rewards</h2><p>Spend your own points on something for yourself.</p></div></div><div class="rewardgrid studentrewards">${personalCards||'<p>No personal rewards are available right now.</p>'}</div></section>
   <section class="reward-store-section class-store"><div class="reward-store-heading"><span class="store-kind-icon">👥</span><div><p class="eyebrow">WORK TOGETHER</p><h2>Class Rewards</h2><p>Give any amount you choose, up to your personal contribution limit. No one student can fund a class prize by himself.</p></div></div><div class="class-goal-store-grid">${classCards}</div></section>
   <section class="panel"><h2>My personal reward requests</h2><div class="purchasehistory">${purchases.length?purchases.map(p=>`<article><b>${e(state.root.rewards?.[p.rewardId]?.name||'Reward')}</b><span>${Number(p.cost)||0} ★</span><mark class="badge ${e(p.status)}">${e(p.status)}</mark></article>`).join(''):'<p>No personal reward requests yet.</p>'}</div></section>`;
@@ -266,9 +272,12 @@ function bindClassContributionButtons(){
 function bindTab(){if(state.tab==='Rewards'){document.querySelectorAll('[data-redeem]').forEach(b=>b.onclick=()=>redeem(b.dataset.redeem));bindClassContributionButtons()}}
 async function contributeClassReward(rewardId,inputId){
   if(state.busy)return;
+  const storeOpen=state.root?.settings?.rewardStoreEnabled===true||String(state.root?.settings?.rewardStoreEnabled)==='true';
+  if(!storeOpen){C.toast('The Prize Store is closed right now.','error');return}
+  const goal=(state.classGoals||[]).find(g=>g.rewardId===rewardId);
+  if(goal?.available===false){C.toast('That class reward is closed right now.','error');return}
   const input=document.getElementById(inputId), amount=Math.floor(Number(input?.value||0));
   if(!Number.isFinite(amount)||amount<1){C.toast('Enter how many points you want to contribute.','error');return}
-  const goal=(state.classGoals||[]).find(g=>g.rewardId===rewardId);
   const allowed=Math.max(0,Math.min(Number(state.student?.rewardBalance||0),Number(goal?.remainingStudentCap||0),Number(goal?.remainingGoal||0)));
   if(amount>allowed){C.toast(`You can contribute up to ${allowed} points to this goal right now.`,'error');return}
   state.busy=true;render();
@@ -285,6 +294,8 @@ async function contributeClassReward(rewardId,inputId){
 async function redeem(rewardId){
   const storeOpen=state.root?.settings?.rewardStoreEnabled===true||String(state.root?.settings?.rewardStoreEnabled)==='true';
   if(!storeOpen){C.toast('The Prize Store is closed for purchases right now.','error');return}
+  const reward=state.root?.rewards?.[rewardId];
+  if(reward?.available===false){C.toast('That reward is closed right now.','error');return}
   if(state.busy)return;
   state.busy=true;renderTab();
   try{
