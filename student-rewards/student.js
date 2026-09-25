@@ -3,7 +3,7 @@
 const C=window.StudentRewardsCommon;
 const {db,auth}=C.ensureFirebase({student:true});
 const ROOT=C.ROOT;
-let state={studentId:'',student:null,tab:'Progress',root:null,busy:false,activityPointHistory:[],classGoals:[],classGoalTimer:null};
+let state={studentId:'',student:null,tab:'Progress',root:null,busy:false,activityPointHistory:[],classGoals:[],classGoalTimer:null,storeOpen:null};
 const $=s=>document.querySelector(s);
 const e=C.escapeHtml;
 const POINTS_API='https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
@@ -31,14 +31,19 @@ async function classRewardsApi(action,payload={}){
 }
 async function loadClassRewardStatus(){
   const j=await classRewardsApi('class-reward-status');
-  return Array.isArray(j.goals)?j.goals:[];
+  return {goals:Array.isArray(j.goals)?j.goals:[],storeOpen:j.storeOpen===true||String(j.storeOpen)==='true'};
+}
+function isStoreOpen(){
+  if(state.storeOpen!==null)return state.storeOpen===true;
+  const v=state.root?.settings?.rewardStoreEnabled;
+  return v===true||String(v)==='true';
 }
 function startClassGoalPolling(){
   if(state.classGoalTimer)return;
   state.classGoalTimer=setInterval(async()=>{
     if(!auth.currentUser||document.hidden)return;
-    try{state.classGoals=await loadClassRewardStatus();render()}catch(err){console.warn('Could not refresh class reward goals',err)}
-  },20000);
+    try{const status=await loadClassRewardStatus();state.classGoals=status.goals;state.storeOpen=status.storeOpen;render()}catch(err){console.warn('Could not refresh class reward goals',err)}
+  },5000);
 }
 function nav(){const tabs=['Progress','Rewards','Comments'];$('#studentNav').innerHTML=tabs.map(t=>`<button data-tab="${t}" class="${state.tab===t?'active':''}">${t}</button>`).join('');$('#studentNav').onclick=ev=>{const b=ev.target.closest('[data-tab]');if(!b)return;state.tab=b.dataset.tab;render()}}
 
@@ -94,7 +99,7 @@ async function trySharedB3Login(){
 
 async function load(){
   if(!state.studentId)return;
-  const [studentSnap,ratingsSnap,attendanceSnap,awardsSnap,commentsSnap,rewardsSnap,redemptionsSnap,categoriesSnap,settingsSnap,activityPointHistory,classGoals,classRewardAvailabilitySnap]=await Promise.all([
+  const [studentSnap,ratingsSnap,attendanceSnap,awardsSnap,commentsSnap,rewardsSnap,redemptionsSnap,categoriesSnap,settingsSnap,activityPointHistory,classRewardStatus]=await Promise.all([
     db.ref(`${ROOT}/students/${state.studentId}`).once('value'),
     own('dailyRatings').once('value'),
     own('dailyAttendance').once('value'),
@@ -103,15 +108,14 @@ async function load(){
     db.ref(`${ROOT}/rewards`).once('value'),
     own('redemptionsByStudent').once('value'),
     db.ref(`${ROOT}/categories`).once('value'),
-    db.ref(`${ROOT}/settings/rewardStoreEnabled`).once('value').catch(()=>({val:()=>false})),
+    db.ref(`${ROOT}/settings/rewardStoreEnabled`).once('value').catch(()=>({val:()=>null})),
     loadActivityPointHistory().catch(err=>{console.warn('Could not load activity point history',err);return []}),
-    loadClassRewardStatus().catch(err=>{console.warn('Could not load class reward goals',err);return []}),
-    db.ref(`${ROOT}/settings/classRewardAvailability`).once('value').catch(()=>({val:()=>({})}))
+    loadClassRewardStatus().catch(err=>{console.warn('Could not load class reward goals',err);return {goals:[],storeOpen:null}})
   ]);
   state.activityPointHistory=activityPointHistory;
-  const classRewardAvailability=classRewardAvailabilitySnap.val()||{};
-  state.classGoals=classGoals.map(g=>({...g,available:Object.prototype.hasOwnProperty.call(classRewardAvailability,g.rewardId)?classRewardAvailability[g.rewardId]!==false:g.available!==false}));
-  state.root={student:studentSnap.val(),ratings:ratingsSnap.val()||{},attendance:attendanceSnap.val()||{},awards:awardsSnap.val()||{},comments:commentsSnap.val()||{},rewards:rewardsSnap.val()||{},redemptions:redemptionsSnap.val()||{},categories:categoriesSnap.val()||{},settings:{rewardStoreEnabled:settingsSnap.val(),classRewardAvailability}};
+  state.classGoals=classRewardStatus.goals||[];
+  if(classRewardStatus.storeOpen!==null)state.storeOpen=classRewardStatus.storeOpen;
+  state.root={student:studentSnap.val(),ratings:ratingsSnap.val()||{},attendance:attendanceSnap.val()||{},awards:awardsSnap.val()||{},comments:commentsSnap.val()||{},rewards:rewardsSnap.val()||{},redemptions:redemptionsSnap.val()||{},categories:categoriesSnap.val()||{},settings:{rewardStoreEnabled:settingsSnap.val()}};
   state.student=state.root.student;
   render();
   subscribe();
@@ -130,8 +134,7 @@ function subscribe(){
   });
   db.ref(`${ROOT}/redemptionsByStudent/${state.studentId}`).on('value',s=>{if(state.root){state.root.redemptions=s.val()||{};render()}});
   db.ref(`${ROOT}/rewards`).on('value',s=>{if(state.root){state.root.rewards=s.val()||{};render()}},()=>{});
-  db.ref(`${ROOT}/settings/rewardStoreEnabled`).on('value',s=>{if(state.root){state.root.settings.rewardStoreEnabled=s.val();render()}},()=>{});
-  db.ref(`${ROOT}/settings/classRewardAvailability`).on('value',s=>{if(!state.root)return;const map=s.val()||{};state.root.settings.classRewardAvailability=map;state.classGoals=(state.classGoals||[]).map(g=>({...g,available:Object.prototype.hasOwnProperty.call(map,g.rewardId)?map[g.rewardId]!==false:g.available!==false}));render()},()=>{});
+  db.ref(`${ROOT}/settings/rewardStoreEnabled`).on('value',s=>{if(state.root){state.root.settings.rewardStoreEnabled=s.val();state.storeOpen=s.val()===true||String(s.val())==='true';render()}},()=>{});
 }
 function allRatingRows(){
   const out=[];
@@ -177,7 +180,7 @@ function pointAccountTotals(){
 }
 function classGoalProgress(g){return Math.max(0,Math.min(100,Math.round((Number(g.totalContributed||0)/Math.max(1,Number(g.goalPoints||1)))*100)))}
 function classGoalCard(g,{compact=false}={}){
-  const balance=Number(state.student?.rewardBalance||0), goal=Number(g.goalPoints||0), total=Number(g.totalContributed||0), remaining=Math.max(0,Number(g.remainingGoal??(goal-total))), mine=Number(g.studentContributed||0), cap=Number(g.studentCap||0), mineLeft=Math.max(0,Number(g.remainingStudentCap??(cap-mine))), maxGive=Math.max(0,Math.min(balance,mineLeft,remaining)), pct=classGoalProgress(g), complete=String(g.status||'')==='completed'||remaining<=0, storeOpen=state.root?.settings?.rewardStoreEnabled===true||String(state.root?.settings?.rewardStoreEnabled)==='true', rewardOpen=g.available!==false;
+  const balance=Number(state.student?.rewardBalance||0), goal=Number(g.goalPoints||0), total=Number(g.totalContributed||0), remaining=Math.max(0,Number(g.remainingGoal??(goal-total))), mine=Number(g.studentContributed||0), cap=Number(g.studentCap||0), mineLeft=Math.max(0,Number(g.remainingStudentCap??(cap-mine))), maxGive=Math.max(0,Math.min(balance,mineLeft,remaining)), pct=classGoalProgress(g), complete=String(g.status||'')==='completed'||remaining<=0, storeOpen=isStoreOpen(), rewardOpen=g.available!==false;
   const inputId=`classGive-${String(g.rewardId||'').replace(/[^A-Za-z0-9_-]/g,'-')}-${compact?'top':'store'}`;
   const disabled=!storeOpen||!rewardOpen||maxGive<1;
   const buttonText=!storeOpen?'Store closed':!rewardOpen?'Closed':maxGive<1?'No points available':'Contribute';
@@ -249,7 +252,7 @@ function progressHTML(){
 }
 function rewardsHTML(){
   const balance=Number(state.student.rewardBalance)||0,
-        storeOpen=state.root.settings?.rewardStoreEnabled===true||String(state.root.settings?.rewardStoreEnabled)==='true',
+        storeOpen=isStoreOpen(),
         personalRewards=Object.values(state.root.rewards||{}).filter(r=>r.active!==false&&String(r.rewardType||'personal')!=='class'&&String(r.rewardType||'personal')!=='class-migrated').sort((a,b)=>(a.cost||0)-(b.cost||0)),
         goals=(state.classGoals||[]).filter(g=>g.active!==false).sort((a,b)=>(a.perStudentCost||0)-(b.perStudentCost||0)||(a.name||'').localeCompare(b.name||'')),
         byCost={};
@@ -272,7 +275,7 @@ function bindClassContributionButtons(){
 function bindTab(){if(state.tab==='Rewards'){document.querySelectorAll('[data-redeem]').forEach(b=>b.onclick=()=>redeem(b.dataset.redeem));bindClassContributionButtons()}}
 async function contributeClassReward(rewardId,inputId){
   if(state.busy)return;
-  const storeOpen=state.root?.settings?.rewardStoreEnabled===true||String(state.root?.settings?.rewardStoreEnabled)==='true';
+  const storeOpen=isStoreOpen();
   if(!storeOpen){C.toast('The Prize Store is closed right now.','error');return}
   const goal=(state.classGoals||[]).find(g=>g.rewardId===rewardId);
   if(goal?.available===false){C.toast('That class reward is closed right now.','error');return}
@@ -284,7 +287,7 @@ async function contributeClassReward(rewardId,inputId){
   try{
     const j=await classRewardsApi('contribute-class-reward',{classRewardId:rewardId,amount});
     if(j.goal)state.classGoals=(state.classGoals||[]).map(g=>g.rewardId===rewardId?j.goal:g);
-    else state.classGoals=await loadClassRewardStatus();
+    else {const status=await loadClassRewardStatus();state.classGoals=status.goals;state.storeOpen=status.storeOpen;}
     if(Number.isFinite(Number(j.balance))){state.student.rewardBalance=Number(j.balance);if(state.root?.student)state.root.student.rewardBalance=Number(j.balance)}
     state.activityPointHistory=await loadActivityPointHistory().catch(()=>state.activityPointHistory);
     C.toast(`${amount} points added to ${goal?.name||'the class goal'}!`);
@@ -292,7 +295,7 @@ async function contributeClassReward(rewardId,inputId){
   finally{state.busy=false;render()}
 }
 async function redeem(rewardId){
-  const storeOpen=state.root?.settings?.rewardStoreEnabled===true||String(state.root?.settings?.rewardStoreEnabled)==='true';
+  const storeOpen=isStoreOpen();
   if(!storeOpen){C.toast('The Prize Store is closed for purchases right now.','error');return}
   const reward=state.root?.rewards?.[rewardId];
   if(reward?.available===false){C.toast('That reward is closed right now.','error');return}
