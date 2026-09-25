@@ -47,7 +47,7 @@ const R=k=>{const [p,v]=k.split('_');return 'פרק '+hebNum(p)+' · פסוק '+
 function norm(v){return{goal:GOAL,reviews:v?.reviews||{},reviewDays:v?.reviewDays||{}}}
 function resultEntries(v){if(Array.isArray(v))return v.map((x,i)=>[i,x]).filter(([,x])=>x&&typeof x==='object');if(v&&typeof v==='object')return Object.keys(v).filter(k=>/^\d+$/.test(k)).map(k=>[Number(k),v[k]]).filter(([,x])=>x&&typeof x==='object');return[]}
 function readingScore(a){return a&&typeof a.hebrewFinalScore==='number'?a.hebrewFinalScore:(a&&typeof a.hebrewScore==='number'?a.hebrewScore:null)}
-function translationScore(a){if(!a)return null;const e=resultEntries(a.translationChunkResults);if(!e.length){const n=parseFloat(String(a.translationScore||'').replace('%',''));return Number.isFinite(n)?n:null}const max=Math.max(...e.map(([i,c])=>Number.isInteger(c.chunkIndex)?c.chunkIndex:i))+1,total=Math.max(Number(a.translationTotal)||0,max,e.length),correct=e.filter(([,c])=>(c.finalVerdict||c.verdict)==='correct').length;return total?Math.round(correct/total*100):null}
+function translationScore(a){if(!a)return null;const e=resultEntries(a.translationChunkResults);if(!e.length)return null;const max=Math.max(...e.map(([i,c])=>Number.isInteger(c.chunkIndex)?c.chunkIndex:i))+1,total=Math.max(Number(a.translationTotal)||0,max,e.length),correct=e.filter(([,c])=>(c.finalVerdict||c.verdict)==='correct').length;return total?Math.round(correct/total*100):null}
 function understandScore(a){if(!a)return null;const e=resultEntries(a.questionResults);if(e.length){const max=Math.max(...e.map(([i,q])=>Number.isInteger(q.questionIndex)?q.questionIndex:i))+1,total=Math.max(Number(a.questionTotal)||0,max,e.length),correct=e.filter(([,q])=>(q.finalVerdict||q.verdict)==='correct').length;return total?Math.round(correct/total*100):null}if(typeof a.comprehensionScore==='number')return a.comprehensionScore;const n=parseFloat(String(a.questionScore||'').replace('%',''));return Number.isFinite(n)?n:null}
 function maxScore(attempts,reader){let b=null;attempts.forEach(a=>{const v=reader(a);if(typeof v==='number'&&(b===null||v>b))b=v});return b}
 function parsePracticeKey(key){const parts=String(key).split('_');if(parts.length<3)return null;const part=parts.pop(),perek=Number(parts.pop()),prefix=parts.join('_');const m=/^(\d+)(?:-(\d+))?$/.exec(part);if(!perek||!m)return null;return{prefix,perek,start:Number(m[1]),end:Number(m[2]||m[1])}}
@@ -57,8 +57,8 @@ function col(c,g){const x=Math.min(1,c/g);return `hsl(${52+68*x} ${95-10*x}% ${8
 function dayKey(t=Date.now()){const x=new Date(Number(t)||Date.now()),y=x.getFullYear(),m=String(x.getMonth()+1).padStart(2,'0'),day=String(x.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
 function streak(){const s=new Set(Object.keys(d.reviewDays||{})),x=new Date();x.setHours(0,0,0,0);if(!s.has(dayKey(x.getTime())))x.setDate(x.getDate()-1);let n=0;while(s.has(dayKey(x.getTime()))){n++;x.setDate(x.getDate()-1)}return n}
 function showNotice(message){let e=document.getElementById('rewardToast');if(!e){e=document.createElement('div');e.id='rewardToast';e.className='reward-toast';document.body.appendChild(e)}e.textContent=message;e.style.opacity='1';clearTimeout(showNotice.t);showNotice.t=setTimeout(()=>e.style.opacity='0',3000)}
-function baseCanReview(key){const c=Number(d.reviews[key]?.count)||0;return c<GOAL||Number(unlocked[key]?.understand)>=100}
-function activeChazaraKeys(){return Array.from(new Set([...Object.keys(unlocked),...Object.keys(d.reviews||{}).filter(k=>Number(d.reviews[k]?.count)>0)])).filter(isChazaraUnlocked).sort((a,b)=>{const A=a.split('_').map(Number),B=b.split('_').map(Number);return A[0]-B[0]||A[1]-B[1]})}
+function baseCanReview(key){if(!unlocked[key])return false;const c=Number(d.reviews[key]?.count)||0;return c<GOAL||Number(unlocked[key]?.understand)>=100}
+function activeChazaraKeys(){return Object.keys(unlocked).sort((a,b)=>{const A=a.split('_').map(Number),B=b.split('_').map(Number);return A[0]-B[0]||A[1]-B[1]})}
 function eventDay(e){return String(e?.chazaraDate||'').trim()||dayKey(Number(e?.createdAt)||Date.now())}
 function todayCounts(){const today=dayKey(),counts={};Object.values(chazaraEvents||{}).forEach(e=>{if(!e||e.reviewApplied!==true||e.removed===true||eventDay(e)!==today)return;const key=K(Number(e.perek),Number(e.posuk));counts[key]=(counts[key]||0)+1});return counts}
 function dailyRotationPool(){return activeChazaraKeys().filter(baseCanReview)}
@@ -145,13 +145,14 @@ function displayPlan(){
   Object.keys(d.reviews||{}).forEach(remember);
   return Object.keys(perakim).map(Number).sort((a,b)=>a-b).map(p=>({p,min:perakim[p].min,max:perakim[p].max}));
 }
-function isChazaraUnlocked(key){return !!unlocked[key]||Number(d.reviews[key]?.count)>0}
+function isChazaraUnlocked(key){return !!unlocked[key]}
 function render(){
   if(!sid)return;
   $('studentNameTop').textContent=sname;
   const activeKs=activeChazaraKeys();
+  const reviewedKs=Object.keys(d.reviews||{}).filter(k=>Number(d.reviews[k]?.count)>0);
   let tot=0,done=0;
-  activeKs.forEach(k=>{const c=Number(d.reviews[k]?.count)||0;tot+=c;if(c>=GOAL)done++});
+  reviewedKs.forEach(k=>{const c=Number(d.reviews[k]?.count)||0;tot+=c;if(c>=GOAL)done++});
   $('total').textContent=tot;$('learned').textContent=Object.keys(unlocked).length;$('goalDone').textContent=done;$('streak').textContent=streak();
   const g=$('grid'),plan=displayPlan();
   g.innerHTML=plan.length?'':'<div class="empty">No Posuk has been reached yet. Start in Posuk Practice first.</div>';
@@ -161,7 +162,11 @@ function render(){
       const k=K(p,v),isUnlocked=isChazaraUnlocked(k),r=d.reviews[k]||{},c=Number(r.count)||0,wrap=document.createElement('div');wrap.className='pasuk-wrap';
       const b=document.createElement('button');b.className='pasuk';
       if(!isUnlocked){
-        b.classList.add('locked-gap');b.disabled=true;b.innerHTML=`<div class="ref">פסוק ${hebNum(v)}</div><div class="count">—</div><div class="last">Not unlocked yet</div>`;wrap.appendChild(b);
+        b.classList.add('locked-gap');b.disabled=true;
+        const savedCount=Number(r.count)||0;
+        b.innerHTML=`<div class="ref">פסוק ${hebNum(v)}</div><div class="count">${savedCount||'—'}</div><div class="last">${savedCount?'Saved Chazaras · locked until mastery':'Not unlocked yet'}</div>`;
+        wrap.appendChild(b);
+        if(savedCount>0){const minus=document.createElement('button');minus.className='undo-btn';minus.type='button';minus.title='Remove most recent saved Chazara';minus.textContent='−';minus.onclick=ev=>{ev.stopPropagation();removeLatestReview(k)};wrap.appendChild(minus)}
         const gap=document.createElement('div');gap.className='gap-bar';gap.textContent='🔒 Finish Reading + Translation';wrap.appendChild(gap);pg.appendChild(wrap);continue;
       }
       const allowed=canReview(k);b.style.background=col(c,GOAL);b.style.color='#12351d';b.disabled=!allowed;b.innerHTML=`<div class="ref">פסוק ${hebNum(v)}</div><div class="count">${c}</div><div class="last">${r.lastAt?'Last: '+new Date(r.lastAt).toLocaleDateString():'Not reviewed yet'}</div>`;b.onclick=()=>normalReview(k);wrap.appendChild(b);
