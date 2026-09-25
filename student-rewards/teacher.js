@@ -267,6 +267,46 @@ function pointsDashboard(){
   const typeOptions=[["all","All sources"],["daily","Daily Points"],["posuk","Posuk Practice"],["chazara","Chazara"],["teacher","Teacher adjustments"],["store","Prize Store"],["activity","Other activity"],["gap","History gaps"]];
   const statusOptions=[["all","All statuses"],["posted","Posted to balance"],["pending","Pending"],["rejected","Rejected"],["needs-review","Needs review"]];
   const classLabel=pointsClassLabel(), allClasses=state.pointClassId==="all";
+
+  const selectedStudent=state.pointStudent==="all"?null:r.find(s=>s.id===state.pointStudent)||null;
+  const selectedRows=selectedStudent?ledger.filter(row=>row.sid===selectedStudent.id&&row.counts):[];
+  const reasonGroups=[
+    {id:"daily",label:"Daily Points",icon:"✓",hint:"Saved daily class points"},
+    {id:"posuk",label:"Posuk Practice",icon:"📖",hint:"Reading, translation & understanding"},
+    {id:"chazara",label:"Chazara",icon:"↻",hint:"Regular and recorded Chazara"},
+    {id:"teacher",label:"Teacher adjustments",icon:"±",hint:"Manual additions or deductions"},
+    {id:"store",label:"Prize Store",icon:"🎁",hint:"Points spent or returned"},
+    {id:"activity",label:"Other activity",icon:"★",hint:"Other saved activity points"},
+    {id:"gap",label:"Older points",icon:"…",hint:"Balance from before full history was saved"}
+  ].map(group=>{
+    const rows=selectedRows.filter(row=>row.sourceGroup===group.id);
+    const amount=rows.reduce((sum,row)=>sum+Number(row.amount||0),0);
+    return {...group,rows,amount,count:rows.length};
+  }).filter(group=>group.count||group.amount);
+
+  const reasonOverview=selectedStudent?`
+    <section class="points-section points-reason-overview">
+      <div class="points-reason-head">
+        <div class="points-reason-student">
+          <em style="background:${esc(safeColor(selectedStudent))}">${esc(selectedStudent.initials||initials(selectedStudent.name))}</em>
+          <span><small>STUDENT POINT OVERVIEW</small><h2>${esc(selectedStudent.name)}</h2><p>All-time posted points, grouped by reason. Click a reason to see the individual entries.</p></span>
+        </div>
+        <div class="points-reason-balance"><span>Current balance</span><strong>${Number(selectedStudent.rewardBalance)||0} ★</strong></div>
+      </div>
+      <div class="points-reason-grid">
+        ${reasonGroups.length?reasonGroups.map(group=>`<button class="points-reason-card ${state.pointType===group.id?"selected":""} ${group.amount<0?"negative":group.amount>0?"positive":"zero"}" data-points-source="${esc(group.id)}">
+          <span class="points-reason-icon">${group.icon}</span>
+          <span class="points-reason-copy"><b>${esc(group.label)}</b><small>${esc(group.hint)}</small><i>${group.count} ${group.count===1?"entry":"entries"}</i></span>
+          <strong>${group.amount>0?"+":""}${group.amount} ★</strong>
+          <span class="points-reason-arrow">›</span>
+        </button>`).join(""):`<div class="points-reason-empty">No saved point activity yet for this student.</div>`}
+      </div>
+      <div class="points-reason-actions">
+        <button class="points-all-activity ${state.pointType==="all"?"active":""}" data-points-source="all">View all activity for ${esc(selectedStudent.name)}</button>
+        ${state.pointType!=="all"?`<span>Showing <b>${esc(typeOptions.find(x=>x[0]===state.pointType)?.[1]||"selected reason")}</b> below.</span>`:""}
+      </div>
+    </section>`:"";
+
   return `<section class="workspace points-dashboard">
     <div class="workhead points-title"><div><p class="eyebrow">${esc(classLabel.toUpperCase())} · POINTS DASHBOARD</p><h1>All Student Points</h1><p>See each student's current balance and the point activity behind it.</p></div><div class="workcontrols"><label class="pagepicker"><span>Class</span><select id="pointsClass"><option value="all" ${allClasses?"selected":""}>All Classes</option>${activeClasses().map(c=>`<option value="${esc(c.id)}" ${c.id===state.pointClassId?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label><div class="reportbuttons"><button id="pointsReset">Reset filters</button><button id="pointsCsv">Export points CSV</button></div></div></div>
     ${gaps.length?`<div class="points-alert"><b>⚠ ${gaps.length} balance${gaps.length===1?"":"s"} contain older points without a saved reason.</b><span>I am showing those as “History gap” instead of pretending the old reason is known.</span></div>`:""}
@@ -274,11 +314,13 @@ function pointsDashboard(){
       <article><span>${allClasses?"Current all-classes balance":"Current class balance"}</span><strong>${totalBalance} ★</strong><small>Total points currently available for ${r.length} student${r.length===1?"":"s"}${allClasses?" across all classes":` in ${esc(classLabel)}`}</small></article>
     </div>
 
-    <section class="points-section"><div class="points-section-head"><div><h2>Student balances</h2><p>Each card shows the student's current balance — the amount available to spend now.</p></div><button class="points-all-students ${state.pointStudent==="all"?"active":""}" data-points-student="all">Show all students</button></div>
+    <section class="points-section"><div class="points-section-head"><div><h2>Student balances</h2><p>Click a student to see an overview of where that student's points came from.</p></div><button class="points-all-students ${state.pointStudent==="all"?"active":""}" data-points-student="all">Show all students</button></div>
       <div class="points-student-grid">${byStudent.map(x=>`<button class="points-student-card ${state.pointStudent===x.s.id?"selected":""}" data-points-student="${esc(x.s.id)}"><span class="points-student-top"><em style="background:${esc(safeColor(x.s))}">${esc(x.s.initials||initials(x.s.name))}</em><span><b>${esc(x.s.name)}</b><small>${allClasses&&x.classLabel?`${esc(x.classLabel)} · `:""}${x.recent?`Latest: ${esc(x.recent.reason)}`:"No saved activity yet"}</small></span></span><strong>${x.currentBalance} ★</strong></button>`).join("")}</div>
     </section>
 
-    <section class="points-section points-ledger"><div class="points-section-head"><div><h2>Point activity</h2><p><b>Posted</b> rows changed the balance. Pending and rejected requests are shown for clarity but are not counted.</p></div><strong class="points-result-count">${visible.length} row${visible.length===1?"":"s"}</strong></div>
+    ${reasonOverview}
+
+    <section class="points-section points-ledger"><div class="points-section-head"><div><h2>${selectedStudent?`${esc(selectedStudent.name)} — individual activity`:"Point activity"}</h2><p>${selectedStudent?"Use the overview above to filter by reason, or use the filters here for a custom view.":"Select a student above for a reason-by-reason overview, or use these filters to browse the full ledger."}</p></div><strong class="points-result-count">${visible.length} row${visible.length===1?"":"s"}</strong></div>
       <div class="points-filters">
         <label><span>Student</span><select id="pointsStudent"><option value="all">All students</option>${r.map(s=>`<option value="${esc(s.id)}" ${state.pointStudent===s.id?"selected":""}>${esc(s.name)}</option>`).join("")}</select></label>
         <label><span>Time</span><select id="pointsRange"><option value="7" ${state.pointRange==="7"?"selected":""}>Last 7 days</option><option value="30" ${state.pointRange==="30"?"selected":""}>Last 30 days</option><option value="90" ${state.pointRange==="90"?"selected":""}>Last 90 days</option><option value="all" ${state.pointRange==="all"?"selected":""}>All time</option></select></label>
@@ -444,13 +486,21 @@ function bindPage(){
   if($("#accessToggle"))$("#accessToggle").onclick=toggleAccess;
   if(state.tab==="Points Dashboard"){
     const rerender=()=>render();
-    if($("#pointsClass"))$("#pointsClass").onchange=e=>{state.pointClassId=e.target.value;state.pointStudent="all";rerender()};
-    if($("#pointsStudent"))$("#pointsStudent").onchange=e=>{state.pointStudent=e.target.value;rerender()};
+    if($("#pointsClass"))$("#pointsClass").onchange=e=>{state.pointClassId=e.target.value;state.pointStudent="all";state.pointType="all";state.pointStatus="all";state.pointSearch="";rerender()};
+    if($("#pointsStudent"))$("#pointsStudent").onchange=e=>{state.pointStudent=e.target.value;state.pointType="all";state.pointStatus="all";state.pointSearch="";rerender()};
     if($("#pointsRange"))$("#pointsRange").onchange=e=>{state.pointRange=e.target.value;rerender()};
     if($("#pointsType"))$("#pointsType").onchange=e=>{state.pointType=e.target.value;rerender()};
     if($("#pointsStatus"))$("#pointsStatus").onchange=e=>{state.pointStatus=e.target.value;rerender()};
     if($("#pointsSearch")){$("#pointsSearch").oninput=e=>{state.pointSearch=e.target.value;const pos=e.target.selectionStart;render();requestAnimationFrame(()=>{const n=$("#pointsSearch");if(n){n.focus();n.setSelectionRange(pos,pos)}})}}
-    document.querySelectorAll("[data-points-student]").forEach(b=>b.onclick=()=>{state.pointStudent=b.dataset.pointsStudent;render()});
+    document.querySelectorAll("[data-points-student]").forEach(b=>b.onclick=()=>{state.pointStudent=b.dataset.pointsStudent;state.pointType="all";state.pointStatus="all";state.pointSearch="";render()});
+    document.querySelectorAll("[data-points-source]").forEach(b=>b.onclick=()=>{
+      state.pointType=b.dataset.pointsSource;
+      state.pointRange="all";
+      state.pointStatus=state.pointType==="gap"?"all":"posted";
+      state.pointSearch="";
+      render();
+      requestAnimationFrame(()=>document.querySelector(".points-ledger")?.scrollIntoView({behavior:"smooth",block:"start"}));
+    });
     if($("#pointsReset"))$("#pointsReset").onclick=()=>{state.pointStudent="all";state.pointRange="30";state.pointType="all";state.pointStatus="all";state.pointSearch="";render()};
     if($("#pointsCsv"))$("#pointsCsv").onclick=exportPointsCSV;
   }
