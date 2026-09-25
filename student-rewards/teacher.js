@@ -308,7 +308,7 @@ function pointsDashboard(){
     </section>`:"";
 
   return `<section class="workspace points-dashboard">
-    <div class="workhead points-title"><div><p class="eyebrow">${esc(classLabel.toUpperCase())} · POINTS DASHBOARD</p><h1>All Student Points</h1><p>See each student's current balance and the point activity behind it.</p></div><div class="workcontrols"><label class="pagepicker"><span>Class</span><select id="pointsClass"><option value="all" ${allClasses?"selected":""}>All Classes</option>${activeClasses().map(c=>`<option value="${esc(c.id)}" ${c.id===state.pointClassId?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label><div class="reportbuttons"><button id="pointsReset">Reset filters</button><button id="pointsCsv">Export points CSV</button></div></div></div>
+    <div class="workhead points-title"><div><p class="eyebrow">${esc(classLabel.toUpperCase())} · POINTS DASHBOARD</p><h1>All Student Points</h1><p>See each student's current balance and the point activity behind it.</p></div><div class="workcontrols"><label class="pagepicker"><span>Class</span><select id="pointsClass"><option value="all" ${allClasses?"selected":""}>All Classes</option>${activeClasses().map(c=>`<option value="${esc(c.id)}" ${c.id===state.pointClassId?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label><div class="reportbuttons"><button id="pointsReset">Reset filters</button><button id="pointsCsv">Export ALL points</button></div></div></div>
     ${gaps.length?`<div class="points-alert"><b>⚠ ${gaps.length} balance${gaps.length===1?"":"s"} contain older points without a saved reason.</b><span>I am showing those as “History gap” instead of pretending the old reason is known.</span></div>`:""}
     <div class="points-summary single">
       <article><span>${allClasses?"Current all-classes balance":"Current class balance"}</span><strong>${totalBalance} ★</strong><small>Total points currently available for ${r.length} student${r.length===1?"":"s"}${allClasses?" across all classes":` in ${esc(classLabel)}`}</small></article>
@@ -333,9 +333,43 @@ function pointsDashboard(){
   </section>`;
 }
 function exportPointsCSV(){
-  const rows=filteredPointLedger(), q=v=>`"${String(v??"").replaceAll('"','""')}"`;
-  const csv=[["Date/Time","Student","Amount","Reason","Source","Status","Class","Balance After"],...rows.map(r=>[r.isGap?"Older / unknown":r.when?new Date(r.when).toISOString():"",r.studentName,r.amount,r.reason,r.sourceLabel,r.status,r.classId?pointClassName(r.classId):"",r.counts&&Number.isFinite(Number(r.runningBalance))?Number(r.runningBalance):""])].map(row=>row.map(q).join(",")).join("\n");
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=`brightpath-all-points-${state.pointClassId==="all"?"all-classes":state.pointClassId}-${C.schoolDateString()}.csv`;a.click();URL.revokeObjectURL(a.href);
+  // Always export the complete ledger for every active student in every active class.
+  // The on-screen student/date/source/status/search filters do not limit this file.
+  const previousClassId=state.pointClassId;
+  state.pointClassId="all";
+  const rows=allPointLedger(true);
+  const rosterById=new Map(pointsRoster().map(s=>[s.id,s]));
+  state.pointClassId=previousClassId;
+
+  const q=v=>`"${String(v??"").replaceAll('"','""')}"`;
+  const header=["Date/Time","Student","Student ID","Amount","Reason","Details","Source","Source Group","Status","Counts in Balance","Class","Balance After","Current Balance"];
+  const body=rows.map(r=>{
+    const student=rosterById.get(r.sid)||{};
+    return [
+      r.isGap?"Older / unknown":r.when?new Date(r.when).toISOString():"",
+      r.studentName,
+      r.sid,
+      Number(r.amount)||0,
+      r.reason,
+      r.detail||"",
+      r.sourceLabel,
+      r.sourceGroup,
+      r.status,
+      r.counts?"Yes":"No",
+      r.classId?pointClassName(r.classId):"",
+      r.counts&&Number.isFinite(Number(r.runningBalance))?Number(r.runningBalance):"",
+      Number(student.rewardBalance)||0
+    ];
+  });
+  const csv="\uFEFF"+[header,...body].map(row=>row.map(q).join(",")).join("\r\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download=`brightpath-COMPLETE-points-history-${C.schoolDateString()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),0);
+  toast(`Exported ${rows.length} point history row${rows.length===1?"":"s"} for all students.`);
 }
 
 function carryDate(s){return C.latestRatings(state.root,s.id,state.classId,state.date).date||""}
