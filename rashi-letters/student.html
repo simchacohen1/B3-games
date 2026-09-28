@@ -134,30 +134,34 @@
     background:none; border:none; color:var(--ink-soft); font-size:0.78rem;
     text-decoration:underline; cursor:pointer; padding:0; font-family:'Quicksand', sans-serif;
   }
+
+:root{--parchment:#fff;--parchment-dark:#e5eafa;--ink:#172547;--ink-soft:#475675;--rimon:#6553d6;--rimon-dark:#3f3099;--gold:#b8c4e7;--gold-light:#ede9ff;--shadow:#283f7520}
+body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial-gradient(ellipse at 95% 60%,#ccf5ed,transparent 45%),#f3f6ff;font-family:'Quicksand',Arial,sans-serif}
+.wrap{max-width:1000px;padding:26px 24px 60px}header.top{text-align:left;display:flex;align-items:center;gap:18px;margin-bottom:24px}header.top h1{font:800 34px 'Quicksand',Arial,sans-serif;letter-spacing:-1px;color:var(--ink)}header.top p{font-size:16px;font-weight:600}.brand-icon{display:grid;place-items:center;width:68px;height:68px;background:#6553d6;color:white;border-radius:22px;box-shadow:0 6px 0 #4938ae;font-family:'Mekorot Rashi';font-size:48px}.eyebrow{font-size:12px;letter-spacing:2px;font-weight:700;color:#6553d6;text-transform:uppercase;margin-bottom:10px}.card{border:1px solid #dce3f4;border-radius:28px;padding:30px;box-shadow:0 12px 40px #243e7010}.name-gate{max-width:590px;margin:30px auto;text-align:center}.name-gate h2{font-size:30px;margin:12px 0}.name-gate input{width:100%;max-width:400px;background:#f6f8ff;border:2px solid #d9e0f1;padding:15px;font-size:18px;margin-bottom:18px}.btn{border-radius:16px;background:#6553d6;box-shadow:0 5px 0 #4433a1;padding:16px 26px;font-size:18px}.intro-copy{font-size:17px;line-height:1.7;color:var(--ink-soft)}.mode-gate-section h3{font-size:19px;color:var(--ink);margin:24px 0 14px}.continue-btn{text-align:left;padding:24px;font-size:23px;background:#6553d6}.letter-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}.letter-pick-btn{position:relative;background:#f8f9ff;border:2px solid #e0e5f3;border-bottom-width:5px;border-radius:20px;font-size:43px;min-height:115px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}.letter-pick-btn small{font:700 12px 'Quicksand',Arial,sans-serif;color:#536180}.letter-pick-btn:nth-child(3n+2){background:#edfaf6}.letter-pick-btn:nth-child(3n){background:#fff7e5}.letter-pick-btn.selected{border-color:#6553d6;background:#ede9ff}.mode-type-btn{font-size:16px;padding:16px}.phase-row{margin-bottom:20px}.unit-label{font-size:17px;font-weight:700}.phase-pill{font-size:13px;padding:8px 12px}.menu-link{font-size:15px;text-decoration:none;border:1px solid #d8dff0;border-radius:10px;padding:10px}.letter-box{position:relative;background:linear-gradient(135deg,#f0edff,#edf6ff);border:0;border-radius:22px;min-height:235px;margin-bottom:20px}.letter-box:before{content:'RASHI SCRIPT';position:absolute;top:18px;left:22px;font:700 11px 'Quicksand',sans-serif;letter-spacing:2px;color:#605592}#rashiLetter{font-size:150px;color:#342773;direction:rtl}#rashiLetter.word-mode{font-size:83px}.prompt{font-size:21px;font-weight:700;color:var(--ink)}.choices{gap:16px}.choice-btn{height:100px;font-size:54px;border:2px solid #dbe2f1;border-bottom:6px solid #c9d3e9;border-radius:19px;background:white}.choice-btn.word-btn{font-size:36px;min-height:100px}.choice-btn:hover:not(:disabled){border-color:#8877e6;background:#f6f3ff;transform:translateY(-2px)}.choice-btn.correct{background:#d9f9e8;border-color:#249665;color:#125e3f}.choice-btn.incorrect{background:#fff0e3;border-color:#d78737}.choice-btn:disabled{color:var(--ink);opacity:1}#feedback{font-size:19px;min-height:30px;line-height:1.5}.progress-track{height:13px;border-radius:20px}#progFill{background:linear-gradient(90deg,#7160e6,#36bda3)}.streak-star{font-size:32px;color:#dfa900;opacity:.22}.streak-star.lit{opacity:1}.hud{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid #dce3f4;padding:14px 20px;border-radius:18px;margin-bottom:18px;font-weight:700}.hud button{background:#eef0fc;border:0;padding:10px;border-radius:10px;color:#3f3099;font:inherit;cursor:pointer}.help-row{display:flex;justify-content:center;gap:12px;margin-bottom:18px}.helper{border:0;background:#ece9ff;color:#443694;padding:12px 18px;border-radius:12px;font:700 15px 'Quicksand',sans-serif;cursor:pointer}.study{background:#f1f7ff;border:2px solid #d5e2fa;border-radius:18px;padding:20px;margin:16px 0;text-align:center}.compare{display:flex;justify-content:center;gap:50px;align-items:center;margin:15px}.compare span{font:80px Arial;direction:rtl}.compare .rashi{font-family:'Mekorot Rashi'}.compare small{display:block;font:700 13px 'Quicksand',sans-serif;color:#536180;margin-top:15px}.star-note{text-align:center;font-size:14px;color:#536180}.finish-icon{font-size:70px}button:focus-visible,input:focus-visible{outline:4px solid #f0b93a;outline-offset:4px}#completeScreen h2{font-size:32px}#completeScreen p{font-size:20px}.pop-banner{animation:pop .4s ease}
+@media(min-width:800px){#app{max-width:760px;margin:auto}}
+@media(max-width:600px){.wrap{padding:18px 12px}.card{padding:20px;border-radius:22px}header.top h1{font-size:27px}.brand-icon{width:54px;height:54px}.letter-grid{grid-template-columns:repeat(3,1fr)}.unit-label{font-size:14px}.phase-row{gap:8px}.phase-pill{display:none}#rashiLetter.word-mode{font-size:62px}.choice-btn.word-btn{font-size:29px}.hud{font-size:13px;padding:10px}.letter-box{min-height:205px}.compare{gap:25px}.compare span{font-size:65px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header class="top">
-    <h1>אותיות רש"י</h1>
-    <p>Rashi Letters Practice</p>
-  </header>
-
+  <header class="top"><div class="brand-icon" aria-hidden="true">א</div><div><div class="eyebrow">Discover • Practice • Master</div><h1>Rashi Quest</h1><p>Little letters. Big discoveries. <span lang="he" dir="rtl">אותיות רש״י</span></p></div></header>
+<div class="hud"><span id="welcome">Your letter adventure starts here</span><span id="sessionStars">★ 0 stars this visit</span><button id="soundBtn" aria-pressed="true">Sound on</button></div>
   <div class="card name-gate" id="nameGate">
-    <div>Your name</div>
+    <div class="finish-icon" aria-hidden="true">🔎</div><h2>Become a Rashi detective!</h2><p class="intro-copy">Discover the letters. Crack the words.<br>One small step at a time!</p><label for="studentNameInput">Your name</label>
     <input id="studentNameInput" type="text" placeholder="Type your name here" maxlength="30">
-    <div>Class PIN</div>
+    <label for="classPinInput">Class PIN</label>
     <input id="classPinInput" type="password" placeholder="Ask your teacher" maxlength="20" inputmode="numeric">
-    <div><button class="btn" id="startBtn">Start</button></div>
+    <div><button class="btn" id="startBtn">Let’s explore →</button></div>
     <div id="gateMsg"></div>
   </div>
 
   <div class="card" id="modeGate" style="display:none;">
     <div class="mode-gate-section">
-      <button class="btn continue-btn" id="continueBtn">📚 Continue My Progress</button>
+      <button class="btn continue-btn" id="continueBtn">▶ Continue my quest</button>
     </div>
     <div class="mode-gate-section">
-      <h3>Or practice one letter:</h3>
+      <h3>Choose a mission to practice:</h3>
       <div class="letter-grid" id="letterGrid"></div>
     </div>
     <div class="mode-gate-section hidden" id="modeTypeSection">
@@ -181,18 +185,18 @@
         <div class="phase-pill" id="phasePill">Letter</div>
       </div>
     </div>
-    <div class="letter-box"><span id="rashiLetter"></span></div>
+    <div class="letter-box" lang="he" dir="rtl"><span id="rashiLetter"></span></div>
     <div class="prompt" id="promptText">Which letter is this?</div>
-    <div class="choices" id="choicesRow"></div>
-    <div id="feedback"></div>
+    <div class="help-row"><button class="helper" id="learnBtn">🔎 Show me how</button></div><div id="studyPanel" class="study hidden"></div><div class="choices" id="choicesRow"></div>
+    <div id="feedback" role="status" aria-live="polite"></div>
     <div class="progress-track"><div id="progFill" style="width:0%"></div></div>
-    <div class="streak-row" id="streakRow"></div>
+    <div class="streak-row" id="streakRow"></div><div class="star-note">Get 3 correct in a row to complete this step.</div><button class="btn hidden" id="nextBtn" style="display:block;margin:18px auto 0">Next question →</button>
   </div>
 
   <div class="card" id="completeScreen">
     <div class="confetti-row">🎉🎊🎉</div>
     <div style="font-family:'Frank Ruhl Libre', serif; font-size:1.5rem; color:var(--rimon-dark); margin-bottom:8px;">כל הכבוד!</div>
-    <p>You finished all the Rashi letters and words. Great work!</p>
+    <h2>Quest complete!</h2><p>You finished all 9 missions. Keep your Rashi skills strong with more practice!</p><button class="btn" onclick="showModeGate()">Choose a practice mission</button>
   </div>
 
   <div class="card" id="closedScreen">
@@ -318,6 +322,7 @@ const UNITS = [
 ];
 const NEEDED_IN_A_ROW = 3;
 
+let soundOn = true, starsThisVisit = 0, guidedIndex = 0, guidedPhase = 'letter', questionTimer = null, viewVersion = 0;
 let studentName = null;
 let studentId = null;
 let unitIndex = 0;
@@ -344,6 +349,7 @@ function shuffle(arr){
 }
 
 function beep(kind){
+  if(!soundOn) return;
   try{
     if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
     const o = audioCtx.createOscillator();
@@ -426,9 +432,9 @@ async function loadProgress(){
   const snap = await db.ref('rashiLetters/progress/' + studentId).once('value');
   const rec = snap.val() || {};
   const savedIndex = rec.currentUnitIndex;
-  unitIndex = (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex < UNITS.length) ? savedIndex : 0;
+  unitIndex = (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex <= UNITS.length) ? savedIndex : 0;
   phase = (rec.currentPhase === 'word') ? 'word' : 'letter';
-  streak = 0;
+  streak = 0; guidedIndex = unitIndex; guidedPhase = phase;
 }
 
 function renderLetterGrid(){
@@ -438,7 +444,8 @@ function renderLetterGrid(){
   UNITS.forEach(u => {
     const b = document.createElement('button');
     b.className = 'letter-pick-btn';
-    b.textContent = u.label;
+    b.innerHTML = '<span dir="rtl">' + (u.id === 'finalreview' ? 'שׁ / שׂ' : u.label) + '</span><small>' + (u.id === 'finalreview' ? 'Final review' : 'Mission ' + (UNITS.indexOf(u)+1)) + '</small>';
+    b.setAttribute('aria-label', 'Practice mission ' + (UNITS.indexOf(u)+1));
     b.onclick = () => selectPracticeLetter(u.id, b);
     grid.appendChild(b);
   });
@@ -453,6 +460,10 @@ function selectPracticeLetter(unitId, btnEl){
 }
 
 function showModeGate(){
+  clearTimeout(questionTimer); viewVersion++;
+  document.getElementById('welcome').textContent = 'Let’s learn, ' + studentName + '!';
+  document.getElementById('continueBtn').textContent = guidedIndex >= UNITS.length ? '★ Quest complete — choose a practice mission below' : '▶ Continue my quest · Mission ' + (guidedIndex+1) + ' of 9';
+  document.getElementById('continueBtn').disabled = guidedIndex >= UNITS.length;
   document.getElementById('app').style.display = 'none';
   document.getElementById('completeScreen').classList.remove('show');
   document.getElementById('modeGate').style.display = 'block';
@@ -460,7 +471,7 @@ function showModeGate(){
 }
 
 document.getElementById('continueBtn').onclick = () => {
-  mode = 'continue';
+  mode = 'continue'; unitIndex = guidedIndex; phase = guidedPhase; streak = 0;
   document.getElementById('modeGate').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   renderQuestion();
@@ -518,6 +529,10 @@ function updateStreakStars(){
 }
 
 function renderQuestion(){
+  viewVersion++;
+  document.getElementById('studyPanel').classList.add('hidden');
+  document.getElementById('nextBtn').classList.add('hidden');
+  document.getElementById('learnBtn').disabled = false;
   if(mode === 'continue' && unitIndex >= UNITS.length){
     document.getElementById('app').style.display = 'none';
     document.getElementById('completeScreen').classList.add('show');
@@ -590,49 +605,57 @@ function renderQuestion(){
   answering = false;
 }
 
+function showComparison(){
+  const panel = document.getElementById('studyPanel');
+  panel.replaceChildren();
+  const title = document.createElement('strong'); title.textContent = 'Look closely: the same ' + (phase === 'word' ? 'word' : 'letter') + ', two styles.';
+  const pair = document.createElement('div'); pair.className = 'compare';
+  ['Rashi','Regular print'].forEach((label,i)=>{ const item=document.createElement('span'); item.className=i===0?'rashi':''; item.textContent=currentTarget; const caption=document.createElement('small');caption.textContent=label;item.appendChild(caption);pair.appendChild(item); });
+  panel.append(title,pair); panel.classList.remove('hidden');
+}
+document.getElementById('learnBtn').onclick=showComparison;
+document.getElementById('soundBtn').onclick=()=>{soundOn=!soundOn;const b=document.getElementById('soundBtn');b.textContent=soundOn?'Sound on':'Sound off';b.setAttribute('aria-pressed',String(soundOn));};
+document.getElementById('nextBtn').onclick=renderQuestion;
 async function handleAnswer(letter, btnEl){
   if(answering) return;
   answering = true;
+  const version = viewVersion;
   const unit = getActiveUnit();
-  const isCorrect = (letter === currentTarget);
+  const answeredPhase = phase;
+  const isCorrect = letter === currentTarget;
+  const assisted = !document.getElementById('studyPanel').classList.contains('hidden');
   const fb = document.getElementById('feedback');
-  const allBtns = document.querySelectorAll('.choice-btn');
-  allBtns.forEach(b => b.disabled = true);
+  document.querySelectorAll('.choice-btn').forEach(b => b.disabled = true);
+  document.getElementById('learnBtn').disabled = true;
   if(isCorrect){
     btnEl.classList.add('correct');
-    fb.style.color = 'var(--rimon-dark)';
-    fb.textContent = 'Correct!';
-    streak += 1;
+    starsThisVisit++;
+    document.getElementById('sessionStars').textContent='★ '+starsThisVisit+' stars this visit';
+    fb.style.color='#176447';
+    fb.textContent=assisted?'Good learning! Now try the next one on your own.':['You cracked it!','Great detective work!','You found the match!'][Math.floor(Math.random()*3)];
+    if(!assisted) streak++;
     beep('correct');
   }else{
     btnEl.classList.add('incorrect');
-    fb.style.color = 'var(--rimon)';
-    fb.textContent = 'Not quite. Try again next time.';
-    streak = 0;
-    beep('incorrect');
+    document.querySelectorAll('.choice-btn').forEach(b=>{if(b.textContent===currentTarget)b.classList.add('correct');});
+    fb.style.color='#865014';fb.textContent='Let’s take a closer look. The green answer is the match.';
+    streak=0;showComparison();
   }
   updateStreakStars();
-  await logAttempt(unit.id, phase, isCorrect);
-
+  const writes=[logAttempt(unit.id,answeredPhase,isCorrect)];
   if(streak >= NEEDED_IN_A_ROW){
-    streak = 0;
-    if(mode === 'continue'){
-      if(phase === 'letter'){
-        phase = 'word';
-      } else {
-        phase = 'letter';
-        unitIndex += 1;
-      }
-      await db.ref('rashiLetters/progress/' + studentId + '/currentUnitIndex').set(unitIndex);
-      await db.ref('rashiLetters/progress/' + studentId + '/currentPhase').set(phase);
-    } else if(practiceModeType === 'mixed'){
-      // Focused practice on one letter: alternate letter/word forever,
-      // never touching the student's saved main-progression position.
-      phase = (phase === 'letter') ? 'word' : 'letter';
-    }
-    // Letters-only or Words-only practice just loops the same phase.
+    fb.textContent='★ Three in a row! Step complete!';
+    streak=0;
+    if(mode==='continue'){
+      if(phase==='letter') phase='word'; else {phase='letter';unitIndex++;}
+      guidedIndex=unitIndex;guidedPhase=phase;
+      writes.push(db.ref('rashiLetters/progress/'+studentId).update({currentUnitIndex:unitIndex,currentPhase:phase}));
+    }else if(practiceModeType==='mixed'){phase=phase==='letter'?'word':'letter';}
   }
-  setTimeout(renderQuestion, 900);
+  try{await Promise.all(writes);}catch(e){if(version===viewVersion)fb.textContent+=' Progress could not save. Check your connection.';}
+  if(version!==viewVersion) return;
+  if(isCorrect){questionTimer=setTimeout(renderQuestion,1400);}
+  else document.getElementById('nextBtn').classList.remove('hidden');
 }
 
 async function logAttempt(unitId, ph, correct){
