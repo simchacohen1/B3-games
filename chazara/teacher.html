@@ -67,7 +67,7 @@ function recordingName(e){return String(e.studentName||R[e.studentId]?.name||e.s
 function fillRecordingSelect(select,items,allLabel){if(!select)return;const old=select.value;select.innerHTML='';const first=document.createElement('option');first.value='';first.textContent=allLabel;select.appendChild(first);items.forEach(item=>{const o=document.createElement('option');o.value=String(item.value);o.textContent=String(item.label);select.appendChild(o)});if(Array.from(select.options).some(o=>o.value===old))select.value=old;else select.value=''}
 function recordingFilters(){return{student:$('recordingStudentFilter')?.value||'',perek:$('recordingPerekFilter')?.value||'',pasuk:$('recordingPasukFilter')?.value||'',review:$('recordingReviewFilter')?.value||''}}
 function syncRecordingFilters(rows){const student=$('recordingStudentFilter'),perek=$('recordingPerekFilter'),pasuk=$('recordingPasukFilter');if(!student||!perek||!pasuk)return;const students=[...new Map(rows.map(e=>[String(e.studentId),recordingName(e)])).entries()].map(([value,label])=>({value,label})).sort((a,b)=>a.label.localeCompare(b.label));fillRecordingSelect(student,students,'All students');const studentVal=student.value;const studentRows=studentVal?rows.filter(e=>String(e.studentId)===studentVal):rows;const perakim=[...new Set(studentRows.map(e=>Number(e.perek)).filter(Number.isFinite))].sort((a,b)=>a-b).map(n=>({value:n,label:'Perek '+n}));fillRecordingSelect(perek,perakim,'All perakim');const perekVal=perek.value;const pasukRows=perekVal?studentRows.filter(e=>String(e.perek)===perekVal):[];const pesukim=[...new Set(pasukRows.map(e=>Number(e.posuk)).filter(Number.isFinite))].sort((a,b)=>a-b).map(n=>({value:n,label:'Pasuk '+n}));fillRecordingSelect(pasuk,pesukim,'All pesukim');pasuk.disabled=!perek.value;if(!perek.value)pasuk.value=''}
-function recordingMatches(e,f){const checked=e.teacherFullyChecked===true;return(!f.student||String(e.studentId)===f.student)&&(!f.perek||String(e.perek)===f.perek)&&(!f.pasuk||String(e.posuk)===f.pasuk)&&(!f.review||(f.review==='checked'?checked:!checked))}
+function recordingMatches(e,f){const status=recordingStatus(e),checked=e.teacherFullyChecked===true,rejected=status==='rejected';const reviewMatch=!f.review||(!rejected&&(f.review==='checked'?checked:!checked));return(!f.student||String(e.studentId)===f.student)&&(!f.perek||String(e.perek)===f.perek)&&(!f.pasuk||String(e.posuk)===f.pasuk)&&reviewMatch}
 function applyRecordingFilters(rows){const f=recordingFilters(),box=$('recordingsList');if(!box)return;let shown=0;rows.forEach(e=>{const row=Array.from(box.children).find(x=>x.classList?.contains('recording-row')&&x.dataset.eventKey===recordingKey(e));if(!row)return;const show=recordingMatches(e,f);row.classList.toggle('recording-filtered-out',!show);if(show)shown++;else{const a=row.querySelector('audio');if(a&&!a.paused)a.pause()}});const active=!!(f.student||f.perek||f.pasuk||f.review);$('recordingCount').textContent=active?`${shown} / ${rows.length}`:String(rows.length);const summary=$('recordingFilterSummary');if(summary)summary.textContent=active?`Showing ${shown} of ${rows.length} recordings`:`${rows.length} recording${rows.length===1?'':'s'}`}
 function recordingStatus(e){return (e?.teacherRejected===true||e?.pointRequestStatus==='rejected')?'rejected':String(e?.pointRequestStatus||'pending')}
 function formatAudioLength(ms){const total=Math.max(0,Math.round(Number(ms||0)/1000)),m=Math.floor(total/60),sec=String(total%60).padStart(2,'0');return `${m}:${sec}`}
@@ -79,14 +79,25 @@ function updateRecordingRow(row,e){
   if(reason)reason.textContent=`Perek ${e.perek||'?'} · Posuk ${e.posuk||'?'}`;
   if(meta)meta.textContent=e.createdAt?requestWhen(e.createdAt):'';
   if(statusEl){statusEl.className='point-status '+status;statusEl.textContent=status==='approved'?'✓ Points approved':status==='rejected'?'✕ Rejected':status==='cancelled'?'Points cancelled':'Awaiting approval'}
-  if(reviewEl){reviewEl.className='review-status '+(checked?'checked':'needs-review');reviewEl.textContent=checked?'✓ Fully checked':'Needs full review';reviewEl.title=checked&&e.teacherFullyCheckedAt?'Fully checked '+requestWhen(e.teacherFullyCheckedAt):''}
+  const rejected=status==='rejected';
+  if(reviewEl){
+    reviewEl.hidden=rejected;
+    if(!rejected){
+      reviewEl.className='review-status '+(checked?'checked':'needs-review');
+      reviewEl.textContent=checked?'✓ Fully checked':'Needs full review';
+      reviewEl.title=checked&&e.teacherFullyCheckedAt?'Fully checked '+requestWhen(e.teacherFullyCheckedAt):'';
+    }
+  }
   if(checkedBtn){
-    checkedBtn.dataset.recordingStudent=String(e.studentId||'');
-    checkedBtn.dataset.recordingEvent=String(e.id||'');
-    checkedBtn.dataset.recordingChecked=checked?'true':'false';
-    checkedBtn.className='recording-checked'+(checked?' is-checked':'');
-    checkedBtn.textContent=checked?'Undo Fully Checked':'✓ Mark Fully Checked';
-    checkedBtn.title=checked?'Mark this recording as needing a full review again.':'Use this after you have listened carefully and do not need to review this recording again.';
+    checkedBtn.hidden=rejected;
+    if(!rejected){
+      checkedBtn.dataset.recordingStudent=String(e.studentId||'');
+      checkedBtn.dataset.recordingEvent=String(e.id||'');
+      checkedBtn.dataset.recordingChecked=checked?'true':'false';
+      checkedBtn.className='recording-checked'+(checked?' is-checked':'');
+      checkedBtn.textContent=checked?'Undo Fully Checked':'✓ Mark Fully Checked';
+      checkedBtn.title=checked?'Mark this recording as needing a full review again.':'Use this after you have listened carefully and do not need to review this recording again.';
+    }
   }
   if(rejectBtn){
     rejectBtn.dataset.recordingStudent=String(e.studentId||'');
