@@ -118,6 +118,7 @@
       <a class="game-card" data-game-id="kodesh-construct" href="kodesh-construct/index.html" target="_blank" rel="noopener"><span class="card-icon">🔤</span><span class="card-title">Dikduk Arcade</span></a>
       <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html" target="_blank" rel="noopener"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
       <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html" target="_blank" rel="noopener"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
+      <a class="game-card" data-game-id="yiddish" href="yiddish/index.html" target="_blank" rel="noopener"><span class="card-icon">🗣️</span><span class="card-title">Yiddish</span></a>
       <a class="game-card" data-game-id="shorashim" href="shorashim/index.html" target="_blank" rel="noopener"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span></a>
       <a class="game-card" data-game-id="chazara" href="chazara/index.html" target="_blank" rel="noopener"><span class="card-icon">🔁</span><span class="card-title">Chazara Chart</span></a>
       <a class="game-card" data-game-id="class-gallery" href="class-gallery/index.html" target="_blank" rel="noopener"><span class="card-icon">🖼️</span><span class="card-title">Class Gallery</span></a>
@@ -235,6 +236,7 @@
   const gameCards=Array.from(document.querySelectorAll(".game-card"));
   const gameDefinitions=gameCards.map(card=>({id:card.dataset.gameId,name:(card.querySelector(".card-title")?.textContent||card.textContent).trim(),element:card}));
   const teacherVersionByGame={
+    "yiddish":"yiddish/teacher.html",
     "posuk-practice-scroll":"record_pesukim/teacher.html",
     "rashi-letters":"rashi-letters/teacher.html",
     "shorashim":"shorashim/teacher.html?v=20260917-correct-dashboard",
