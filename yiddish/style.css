@@ -19,3 +19,15 @@
 .flash-not-yet{background:#e8ecea;color:#40515a}
 .flash-not-yet:hover{background:#d8ddda}
 @media(max-width:600px){.flash-face{font-size:28px}}
+
+
+/* Story Detective — paragraph comprehension */
+#storyquiz{background:#fff;border:3px solid #315f86;border-radius:22px;padding:26px;text-align:center;margin:20px 0}
+.story-para{max-width:850px;margin:18px auto 22px;background:#f8fbfd;border:2px solid #c6d8e8;border-radius:18px;padding:22px 26px;font:25px/1.85 Georgia,serif;text-align:right}
+.story-answers{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:860px;margin:20px auto}
+.story-answers button{background:#315f86;text-align:left;line-height:1.35;min-height:78px}
+.story-answers button:hover{background:#244b6d}
+.story-clue{max-width:620px;margin:16px auto;padding:12px 16px;background:#fff1c7;border-radius:12px;font-weight:800}
+.story-next{margin-top:12px;background:#165748}
+.story-link{display:inline-block;background:#e9f1ed;border-radius:999px;padding:8px 12px}
+@media(max-width:650px){.story-answers{grid-template-columns:1fr}.story-para{font-size:22px;padding:18px}}
