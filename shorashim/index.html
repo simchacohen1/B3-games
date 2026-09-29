@@ -1015,6 +1015,7 @@ body.shorashim-review-active #chooseReviewCardsBtn {
 .perek-badge{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;background:#eef2ff;color:#4338ca;font-size:11px;font-style:normal;font-weight:900;white-space:nowrap}
 .review-perek-filter.hidden{display:none!important}
 </style>
+<style id="shorashim-recording-points-v1">.shorashim-challenge-box{margin:12px 0 16px;padding:14px 16px;border:2px solid #f59e0b;border-radius:16px;background:#fffbeb}.shorashim-challenge-box label{display:block;font-size:16px}.shorashim-challenge-box input{transform:scale(1.35);margin-right:8px}.shorashim-record-box{max-width:760px;margin:14px auto 0;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding:12px;border:1px solid #c7d2fe;border-radius:16px;background:#eef2ff}.shorashim-record-box .mini-note{max-width:520px}</style>
 </head>
 <body>
   <section id="studentSiteClosed" class="login-gate hidden">
@@ -1261,6 +1262,7 @@ body.shorashim-review-active #chooseReviewCardsBtn {
             <div class="review-perek-filter" aria-label="Filter Shorashim by Perek"><b>Shorashim unit:</b><button type="button" class="perek-filter-btn active" data-review-perek="all">All Learned</button><button type="button" class="perek-filter-btn" data-review-perek="18">Perek י״ח</button><button type="button" class="perek-filter-btn" data-review-perek="19">Perek י״ט</button></div>
             <div class="review-setup-top"><label>List view <select id="reviewSort"><option value="learned">Order learned</option><option value="alpha">Alphabetical</option><option value="manual">My custom order</option></select></label><span id="reviewSelectionCount" class="pill"></span></div>
             <div class="button-row"><button id="selectAllReview" class="ghost small">Select all</button><button id="clearReviewSelection" class="ghost small">Clear selection</button></div>
+            <div class="shorashim-challenge-box"><label><input type="checkbox" id="reviewNoHints"> <b>🏆 No Hints Challenge</b> — hide all pictures and drawings for this Chazara round. Approved recording = <b>3 points</b>.</label><div class="mini-note">Leave this unchecked to review with your pictures. Approved recording = 2 points. Only one Shorashim points award can be submitted per day.</div></div>
             <div id="reviewPicker" class="review-picker"></div>
             <div class="review-start-row"><div><b>Review order:</b> <label><input type="radio" name="reviewOrderMode" value="order" checked> In order</label> <label><input type="radio" name="reviewOrderMode" value="shuffle"> Shuffle</label></div><button id="startReviewBtn" class="primary">Review Selected</button></div>
           </div>
@@ -1291,6 +1293,7 @@ body.shorashim-review-active #chooseReviewCardsBtn {
               <button id="editReviewBtn" class="ghost">✏️ Edit Card</button>
               <button id="nextReviewBtn" class="ghost">Next →</button>
             </div>
+            <div class="shorashim-record-box"><button id="shorashimRecordBtn" class="primary" type="button">🎙️ Record Shorashim Chazara</button><span id="shorashimRecordStatus" class="mini-note">Read and translate the Shorashim aloud. Points are added only after Rabbi Cohen approves the recording.</span></div>
             <div class="keyboard-hint">Keyboard: <kbd>←</kbd> previous · <kbd>↑</kbd> flip · <kbd>→</kbd> next</div>
           </div>
         </section>
