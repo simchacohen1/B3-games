@@ -24,7 +24,7 @@ function render(){
   if(round&&open(round.group))question();
   if(flash&&open(flash.group))flashRender();else if(flash){flash=null}
 }
-async function refresh(){const s=await API.call('status');student=s.student;config=s.config;progress=s.progress;if(!open(group))group=Math.max(0,config.unlocked[student.classId]-1);if(round&&round.group>=config.unlocked[student.classId])round=null;render()}
+async function refresh(){const s=await API.call('status');student=s.student;config=s.config;progress=s.progress;if(!open(group))group=Math.max(0,config.unlocked[student.classId]-1);round=(s.round&&open(s.round.group))?s.round:null;if(round)group=round.group;render()}
 async function login(id,pin){const s=await API.call('login',{studentId:id,pin:pin.trim()});sessionStorage.setItem('yiddishSession',s.token);await refresh();message('Progress connected ✓')}
 $('loginForm').onsubmit=async e=>{e.preventDefault();$('signIn').disabled=true;try{await login($('name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''),$('pin').value);$('pin').value=''}catch(e){message(e.message)}finally{$('signIn').disabled=false}};
 $('all').onclick=()=>{if(busy||pending)return;clearAdvance();showAll=!showAll;round=null;flash=null;$('practice').hidden=true;$('flashcards').hidden=true;render()};
@@ -98,7 +98,13 @@ async function submit(answer,answers,feedback){
   }catch(e){
     feedback.textContent=e.message;
     if(e.status===401||e.status===403){block(e.message);$('login').hidden=false}
-    else if(e.status===409){pending=null;round=null;block(e.message);await refresh().catch(()=>{})}
+    else if(e.status===409){
+      pending=null;round=null;
+      try{
+        await refresh();
+        message(round?'Your teacher updated this lesson — picked up your practice where it left off.':e.message);
+      }catch(err){block(err.message);$('login').hidden=false}
+    }
     else retry($('practice'),answers,feedback)
   }finally{busy=false}
 }
