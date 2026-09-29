@@ -1072,20 +1072,15 @@ body.shorashim-review-active #chooseReviewCardsBtn {
 
         <section id="studentHome" class="screen active">
           <div class="hero-grid">
+            <button class="feature-card review review-main" data-go="reviewScreen">
+              <span class="feature-icon">🔁</span>
+              <strong>Review Shorashim</strong>
+              <span>Review what you learned — and record your Chazara for points!</span>
+            </button>
             <button class="feature-card learn" data-go="learnScreen" data-track="shorashim">
               <span class="feature-icon">✏️</span>
               <strong>Learn New Shorashim</strong>
-              <span>New roots unlock one by one, in teacher order.</span>
-            </button>
-            <button class="feature-card affix" data-go="affixHomeScreen">
-              <span class="feature-icon">🧩</span>
-              <strong>Learn Prefixes & Suffixes</strong>
-              <span>Learn each affix with clear Hebrew examples.</span>
-            </button>
-            <button class="feature-card review" data-go="reviewScreen">
-              <span class="feature-icon">🔁</span>
-              <strong>Flashcard Review</strong>
-              <span>Daily full review comes before games.</span>
+              <span>Learn new roots and make picture clues.</span>
             </button>
             <button id="gamesHomeCard" class="feature-card games locked" data-go="gamesScreen">
               <span class="feature-icon">🎮</span>
@@ -1096,6 +1091,11 @@ body.shorashim-review-active #chooseReviewCardsBtn {
               <span class="feature-icon">🖼️</span>
               <strong>My Card Gallery</strong>
               <span>See the cards you created.</span>
+            </button>
+            <button class="feature-card affix" data-go="affixHomeScreen">
+              <span class="feature-icon">🧩</span>
+              <strong>Learn Prefixes & Suffixes</strong>
+              <span>Learn prefixes and suffixes with examples.</span>
             </button>
           </div>
           <div class="stats-grid" id="studentStats"></div>
@@ -1241,31 +1241,48 @@ body.shorashim-review-active #chooseReviewCardsBtn {
         <section id="reviewScreen" class="screen">
           <div class="section-head">
             <button class="backBtn ghost">← Home</button>
-            <div><div class="eyebrow">Flashcard mode</div><h2>Review Learned Cards</h2></div>
+            <div><div class="eyebrow">Daily Chazara</div><h2>Review Shorashim</h2></div>
             <div id="dailyReviewBadge" class="session-status"></div>
           </div>
 
-          <div class="review-rule card-panel">
-            <b>Games unlock after every currently learned card has had a real review today.</b>
-            <span>You do <b>not</b> have to flip a card if you know it. Say the Hebrew and translation aloud, then go Next. Going too fast will not count.</span>
+          <div class="review-choice-panel">
+            <div class="review-choice-title">Choose how you want to review:</div>
+            <div class="review-choice-grid">
+              <button type="button" id="regularChazaraChoice" class="review-choice points-choice active">
+                <span class="choice-icon">🎙️</span><strong>Record Chazara</strong><span>Pictures allowed</span><b>2 points</b>
+              </button>
+              <button type="button" id="noHintsChazaraChoice" class="review-choice challenge-choice">
+                <span class="choice-icon">🏆</span><strong>No Hints Challenge</strong><span>No pictures or drawings</span><b>3 points</b>
+              </button>
+              <button type="button" id="practiceOnlyChoice" class="review-choice practice-choice">
+                <span class="choice-icon">🔁</span><strong>Practice Only</strong><span>No recording needed</span><b>No points</b>
+              </button>
+            </div>
+            <div id="pointsReminder" class="points-reminder">⭐ To earn points, start your recording before you review.</div>
+            <div class="record-action-row">
+              <button id="shorashimRecordBtn" class="primary record-pulse" type="button">🎙️ Start Recording — 2 Points</button>
+              <button id="shorashimPauseBtn" class="ghost hidden" type="button">⏸ Pause</button>
+              <span id="shorashimRecordStatus" class="mini-note">Rabbi Cohen will listen before points are added.</span>
+            </div>
           </div>
 
-          <div id="reviewSetup" class="card-panel review-setup">
-            <div class="review-track-intro">
-              <div><b>What do you want to review?</b><div class="mini-note">Choose one group. Your daily progress is shown separately for each group.</div></div>
+          <details class="review-options card-panel">
+            <summary>Choose cards & review options</summary>
+            <div id="reviewSetup" class="review-setup">
+              <div class="review-track-intro"><div><b>What do you want to review?</b></div></div>
+              <div class="review-track-tabs" role="group" aria-label="Choose flashcard category">
+                <button type="button" class="review-track-btn active" data-review-track="shorashim" aria-pressed="true"><span class="track-title">🌱 Shorashim</span><span class="track-progress">No learned cards yet</span></button>
+                <button type="button" class="review-track-btn" data-review-track="prefix" aria-pressed="false"><span class="track-title">➡️ Prefixes</span><span class="track-progress">No learned cards yet</span></button>
+                <button type="button" class="review-track-btn" data-review-track="suffix" aria-pressed="false"><span class="track-title">🔚 Suffixes</span><span class="track-progress">No learned cards yet</span></button>
+              </div>
+              <div class="review-perek-filter" aria-label="Filter Shorashim by Perek"><b>Shorashim unit:</b><button type="button" class="perek-filter-btn active" data-review-perek="all">All Learned</button><button type="button" class="perek-filter-btn" data-review-perek="18">Perek י״ח</button><button type="button" class="perek-filter-btn" data-review-perek="19">Perek י״ט</button></div>
+              <div class="review-setup-top"><label>List view <select id="reviewSort"><option value="learned">Order learned</option><option value="alpha">Alphabetical</option><option value="manual">My custom order</option></select></label><span id="reviewSelectionCount" class="pill"></span></div>
+              <div class="button-row"><button id="selectAllReview" class="ghost small">Select all</button><button id="clearReviewSelection" class="ghost small">Clear selection</button></div>
+              <input type="checkbox" id="reviewNoHints" class="hidden" aria-hidden="true">
+              <div id="reviewPicker" class="review-picker"></div>
+              <div class="review-start-row"><div><b>Review order:</b> <label><input type="radio" name="reviewOrderMode" value="order" checked> In order</label> <label><input type="radio" name="reviewOrderMode" value="shuffle"> Shuffle</label></div><button id="startReviewBtn" class="primary">Start Review</button></div>
             </div>
-            <div class="review-track-tabs" role="group" aria-label="Choose flashcard category">
-              <button type="button" class="review-track-btn active" data-review-track="shorashim" aria-pressed="true"><span class="track-title">ðŸŒ± Shorashim</span><span class="track-progress">No learned cards yet</span></button>
-              <button type="button" class="review-track-btn" data-review-track="prefix" aria-pressed="false"><span class="track-title">âž¡ï¸ Prefixes</span><span class="track-progress">No learned cards yet</span></button>
-              <button type="button" class="review-track-btn" data-review-track="suffix" aria-pressed="false"><span class="track-title">ðŸ”š Suffixes</span><span class="track-progress">No learned cards yet</span></button>
-            </div>
-            <div class="review-perek-filter" aria-label="Filter Shorashim by Perek"><b>Shorashim unit:</b><button type="button" class="perek-filter-btn active" data-review-perek="all">All Learned</button><button type="button" class="perek-filter-btn" data-review-perek="18">Perek י״ח</button><button type="button" class="perek-filter-btn" data-review-perek="19">Perek י״ט</button></div>
-            <div class="review-setup-top"><label>List view <select id="reviewSort"><option value="learned">Order learned</option><option value="alpha">Alphabetical</option><option value="manual">My custom order</option></select></label><span id="reviewSelectionCount" class="pill"></span></div>
-            <div class="button-row"><button id="selectAllReview" class="ghost small">Select all</button><button id="clearReviewSelection" class="ghost small">Clear selection</button></div>
-            <div class="shorashim-challenge-box"><label><input type="checkbox" id="reviewNoHints"> <b>🏆 No Hints Challenge</b> — hide all pictures and drawings for this Chazara round. Approved recording = <b>3 points</b>.</label><div class="mini-note">Leave this unchecked to review with your pictures. Approved recording = 2 points. Only one Shorashim points award can be submitted per day.</div></div>
-            <div id="reviewPicker" class="review-picker"></div>
-            <div class="review-start-row"><div><b>Review order:</b> <label><input type="radio" name="reviewOrderMode" value="order" checked> In order</label> <label><input type="radio" name="reviewOrderMode" value="shuffle"> Shuffle</label></div><button id="startReviewBtn" class="primary">Review Selected</button></div>
-          </div>
+          </details>
 
           <div id="reviewEmpty" class="card-panel empty-state">No learned cards yet. Learn your first card, then come back to review.</div>
           <div id="reviewArea" class="hidden">
@@ -1293,7 +1310,6 @@ body.shorashim-review-active #chooseReviewCardsBtn {
               <button id="editReviewBtn" class="ghost">✏️ Edit Card</button>
               <button id="nextReviewBtn" class="ghost">Next →</button>
             </div>
-            <div class="shorashim-record-box"><button id="shorashimRecordBtn" class="primary" type="button">🎙️ Record Shorashim Chazara</button><span id="shorashimRecordStatus" class="mini-note">Read and translate the Shorashim aloud. Points are added only after Rabbi Cohen approves the recording.</span></div>
             <div class="keyboard-hint">Keyboard: <kbd>←</kbd> previous · <kbd>↑</kbd> flip · <kbd>→</kbd> next</div>
           </div>
         </section>
