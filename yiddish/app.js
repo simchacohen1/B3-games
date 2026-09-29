@@ -27,13 +27,13 @@ async function refresh(){const s=await API.call('status');student=s.student;conf
 async function login(id,pin){const s=await API.call('login',{studentId:id,pin:pin.trim()});sessionStorage.setItem('yiddishSession',s.token);await refresh();message('Progress connected ✓')}
 $('loginForm').onsubmit=async e=>{e.preventDefault();$('signIn').disabled=true;try{await login($('name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''),$('pin').value);$('pin').value=''}catch(e){message(e.message)}finally{$('signIn').disabled=false}};
 $('all').onclick=()=>{if(busy||pending)return;clearAdvance();showAll=!showAll;round=null;$('practice').hidden=true;render()};
-$('start').onclick=async()=>{if(busy)return;clearAdvance();busy=true;$('start').disabled=true;try{const s=await API.call('start',{group});round=s.round;pending=null;$('practice').hidden=false;question();focusPractice()}catch(e){message(e.message)}finally{busy=false;$('start').disabled=!open(group)}};
+$('start').onclick=async()=>{if(busy)return;clearAdvance();busy=true;$('start').disabled=true;try{message('');const s=await API.call('start',{group,forceNew:true});round=s.round;pending=null;$('practice').hidden=false;question();focusPractice()}catch(e){message(e.message)}finally{busy=false;$('start').disabled=!open(group)}};
 function question(){
   clearAdvance();
   const box=$('practice');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
   if(round.finished){
     box.append(node('div','✓','round-check'),node('h2','Round complete!'),node('p',`You practiced all ${round.total} words in this section.`),node('p','Your progress is saved. A word becomes “Learned” after two first-try correct rounds.'));
-    const again=node('button','Practice this section again');again.type='button';again.onclick=async()=>{if(busy)return;busy=true;again.disabled=true;try{round=null;const s=await API.call('start',{group});round=s.round;pending=null;question();focusPractice()}catch(e){message(e.message)}finally{busy=false}};
+    const again=node('button','Practice this section again');again.type='button';again.onclick=async()=>{if(busy)return;busy=true;again.disabled=true;try{round=null;message('');const s=await API.call('start',{group,forceNew:true});round=s.round;pending=null;question();focusPractice()}catch(e){message(e.message)}finally{busy=false}};
     const back=node('button','Back to my words');back.type='button';back.style.marginLeft='10px';back.onclick=async()=>{round=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;try{await refresh()}catch(e){message(e.message)}window.scrollTo({top:0,behavior:'smooth'})};
     box.append(again,back);focusPractice();return;
   }
@@ -53,7 +53,7 @@ async function submit(answer,answers,feedback){
   if(busy)return;busy=true;answers.querySelectorAll('button').forEach(b=>b.disabled=true);
   pending=pending||{roundId:round.id,index:round.index,answer,requestId:crypto.randomUUID()};
   try{
-    const r=await API.call('answer',pending);pending=null;progress=r.progress;
+    const r=await API.call('answer',pending);pending=null;progress=r.progress;message('');
     if(!r.correct){
       feedback.textContent='Not that one — try again.';feedback.className='feedback-wrong';
       answers.querySelectorAll('button').forEach(b=>{b.disabled=b.dataset.answer===answer});return;
