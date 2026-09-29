@@ -126,7 +126,7 @@ let selectedItemKey = null;
 let selectedArtEl = null;
 let canvas, ctx, drawing = false, erasing = false, drawHistory = [];
 let reviewDeck = [], reviewIndex = 0, reviewFlipped = false, reviewShownAt = 0;
-let reviewNoHints = false, shorashimRecorder = null, shorashimRecordingChunks = [], shorashimRecordingStartedAt = 0;
+let reviewNoHints = false, reviewPointsMode='regular', shorashimRecorder = null, shorashimRecordingChunks = [], shorashimRecordingStartedAt = 0, shorashimPausedAt=0, shorashimPausedMs=0;
 let activeScreenId = 'studentHome';
 let lastInteraction = Date.now();
 let ticker = null;
@@ -411,7 +411,13 @@ function bindReview(){
   });
   document.getElementById('startReviewBtn').onclick=startReview;
   const noHints=document.getElementById('reviewNoHints'); if(noHints) noHints.onchange=()=>{reviewNoHints=!!noHints.checked;};
+  const setMode=(mode)=>{reviewPointsMode=mode;reviewNoHints=mode==='no-hints';if(noHints)noHints.checked=reviewNoHints;document.querySelectorAll('.review-choice').forEach(x=>x.classList.toggle('active',x.id===(mode==='regular'?'regularChazaraChoice':mode==='no-hints'?'noHintsChazaraChoice':'practiceOnlyChoice')));const rec=document.getElementById('shorashimRecordBtn'),rem=document.getElementById('pointsReminder');if(rec){rec.classList.toggle('hidden',mode==='practice');rec.textContent=mode==='no-hints'?'🎙️ Start Recording — 3 Points':'🎙️ Start Recording — 2 Points';}if(rem)rem.textContent=mode==='practice'?'Practice mode: review without recording. No points are earned.':'⭐ To earn points, start your recording before you review.';};
+  document.getElementById('regularChazaraChoice')?.addEventListener('click',()=>setMode('regular'));
+  document.getElementById('noHintsChazaraChoice')?.addEventListener('click',()=>setMode('no-hints'));
+  document.getElementById('practiceOnlyChoice')?.addEventListener('click',()=>setMode('practice'));
   const rec=document.getElementById('shorashimRecordBtn'); if(rec) rec.onclick=toggleShorashimRecording;
+  const pause=document.getElementById('shorashimPauseBtn'); if(pause) pause.onclick=toggleShorashimPause;
+  setMode('regular');
   document.getElementById('chooseReviewCardsBtn').onclick=chooseDifferentReviewCards;document.getElementById('flipReviewBtn').onclick=flipReview;document.getElementById('reviewFlipCard').onclick=flipReview;document.getElementById('prevReviewBtn').onclick=()=>moveReview(-1);document.getElementById('nextReviewBtn').onclick=()=>moveReview(1);document.getElementById('editReviewBtn').onclick=()=>{const c=reviewDeck[reviewIndex];if(c)openRedesignCard(c.itemKey);};
   document.getElementById('reviewSort').onchange=renderReviewPicker;document.getElementById('selectAllReview').onclick=()=>{document.querySelectorAll('.review-pick-check').forEach(x=>x.checked=true);updateReviewSelectionCount();};document.getElementById('clearReviewSelection').onclick=()=>{document.querySelectorAll('.review-pick-check').forEach(x=>x.checked=false);updateReviewSelectionCount();};
   document.addEventListener('keydown',e=>{if(activeScreenId!=='reviewScreen'||document.getElementById('reviewArea').classList.contains('hidden')||!reviewDeck.length)return;if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;if(e.key==='ArrowRight'){e.preventDefault();moveReview(1);}else if(e.key==='ArrowLeft'){e.preventDefault();moveReview(-1);}else if(e.key==='ArrowUp'){e.preventDefault();flipReview();}});
@@ -421,7 +427,7 @@ function renderReviewPicker(){const box=document.getElementById('reviewPicker'),
 function bindReviewDragDrop(box){let dragged=null;box.querySelectorAll('.review-pick-row').forEach(row=>{row.addEventListener('dragstart',e=>{if(e.target.closest('input')){e.preventDefault();return}dragged=row;row.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',row.dataset.key)});row.addEventListener('dragend',()=>{row.classList.remove('dragging');box.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));dragged=null});row.addEventListener('dragover',e=>{if(!dragged||dragged===row)return;e.preventDefault();row.classList.add('drag-over')});row.addEventListener('dragleave',()=>row.classList.remove('drag-over'));row.addEventListener('drop',e=>{e.preventDefault();row.classList.remove('drag-over');if(!dragged||dragged===row)return;const rows=[...box.querySelectorAll('.review-pick-row')],from=rows.indexOf(dragged),to=rows.indexOf(row);if(from<to)row.after(dragged);else row.before(dragged);saveManualReviewOrderFromGrid(box)});});}
 function saveManualReviewOrderFromGrid(box){[...box.querySelectorAll('.review-pick-row')].forEach((row,n)=>{const c=student().cards[row.dataset.key];if(c)c.reviewOrder=n});saveDB();}
 function moveManualReviewCard(key,dir){const arr=reviewSortedCards(),i=arr.findIndex(c=>c.itemKey===key),j=i+dir;if(i<0||j<0||j>=arr.length)return;arr.forEach((c,n)=>c.reviewOrder=n);[arr[i].reviewOrder,arr[j].reviewOrder]=[arr[j].reviewOrder,arr[i].reviewOrder];saveDB();renderReviewPicker();}
-function updateReviewSelectionCount(){const n=document.querySelectorAll('.review-pick-check:checked').length;document.getElementById('reviewSelectionCount').textContent=`${n} selected`;const btn=document.getElementById('startReviewBtn');btn.disabled=!n;btn.textContent=n?`Review ${n} Selected`:'Review Selected';}
+function updateReviewSelectionCount(){const n=document.querySelectorAll('.review-pick-check:checked').length;document.getElementById('reviewSelectionCount').textContent=`${n} selected`;const btn=document.getElementById('startReviewBtn');btn.disabled=!n;btn.textContent=n?`Start Review (${n} cards)`:'Start Review';}
 function renderReviewAvailability(){const has=eligibleLearnedCards().length>0;document.getElementById('reviewEmpty').classList.toggle('hidden',has);document.getElementById('reviewSetup').classList.toggle('hidden',!has);if(!has)document.getElementById('reviewArea').classList.add('hidden');else renderReviewPicker();}
 function startReview(){reviewNoHints=!!document.getElementById('reviewNoHints')?.checked;const keys=[...document.querySelectorAll('.review-pick-check:checked')].map(x=>x.dataset.key),map=new Map(eligibleLearnedCards().map(c=>[c.itemKey,c]));let arr=keys.map(k=>map.get(k)).filter(Boolean);if(!arr.length){alert('Select at least one card to review.');return;}if(document.querySelector('input[name="reviewOrderMode"]:checked')?.value==='shuffle')arr=shuffle(arr.slice());reviewDeck=arr;reviewIndex=0;reviewFlipped=false;document.getElementById('reviewEmpty').classList.add('hidden');document.getElementById('reviewSetup').classList.add('hidden');document.body.classList.add('shorashim-review-active');document.getElementById('reviewArea').classList.remove('hidden');renderReviewCard();}
 
@@ -440,20 +446,27 @@ function chooseDifferentReviewCards(){
 
 
 
+function toggleShorashimPause(){
+  const pause=document.getElementById('shorashimPauseBtn'),status=document.getElementById('shorashimRecordStatus');
+  if(!shorashimRecorder)return;
+  if(shorashimRecorder.state==='recording'){shorashimRecorder.pause();shorashimPausedAt=Date.now();if(pause)pause.textContent='▶ Resume';if(status)status.textContent='Recording paused — press Resume when you are ready.';}
+  else if(shorashimRecorder.state==='paused'){shorashimPausedMs+=Date.now()-shorashimPausedAt;shorashimRecorder.resume();if(pause)pause.textContent='⏸ Pause';if(status)status.textContent=reviewNoHints?'Recording No Hints Challenge — 3 points after approval.':'Recording with pictures — 2 points after approval.';}
+}
+
 async function toggleShorashimRecording(){
   const btn=document.getElementById('shorashimRecordBtn'), status=document.getElementById('shorashimRecordStatus');
   if(!cloudEnabled||!cloudStudentId){if(status)status.textContent='Please sign in first.';return;}
-  if(shorashimRecorder&&shorashimRecorder.state==='recording'){shorashimRecorder.stop();return;}
+  if(shorashimRecorder&&['recording','paused'].includes(shorashimRecorder.state)){if(shorashimRecorder.state==='paused')shorashimPausedMs+=Date.now()-shorashimPausedAt;shorashimRecorder.stop();return;}
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
     shorashimRecordingChunks=[];
     const mime=['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(x=>MediaRecorder.isTypeSupported?.(x))||'';
     shorashimRecorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
-    shorashimRecordingStartedAt=Date.now();
+    shorashimRecordingStartedAt=Date.now(); shorashimPausedAt=0; shorashimPausedMs=0;
     shorashimRecorder.ondataavailable=e=>{if(e.data?.size)shorashimRecordingChunks.push(e.data)};
     shorashimRecorder.onstop=async()=>{
       stream.getTracks().forEach(t=>t.stop());
-      const durationMs=Date.now()-shorashimRecordingStartedAt;
+      const durationMs=Math.max(0,Date.now()-shorashimRecordingStartedAt-shorashimPausedMs);
       if(btn){btn.disabled=true;btn.textContent='Uploading…';}
       if(status)status.textContent='Saving your recording…';
       try{
@@ -476,9 +489,9 @@ async function toggleShorashimRecording(){
         await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${eventId}`).update({pointRequestId:awardData.requestId||null,pointRequestStatus:awardData.status||'pending'});
         if(status)status.textContent=`Sent to Rabbi Cohen for approval — ${points} points if approved.`;
       }catch(err){console.error(err);if(status)status.textContent=err?.message||'Could not save the recording.';}
-      finally{if(btn){btn.disabled=false;btn.textContent='🎙️ Record Shorashim Chazara';}shorashimRecorder=null;shorashimRecordingChunks=[];}
+      finally{if(btn){btn.disabled=false;btn.textContent=reviewNoHints?'🎙️ Start Recording — 3 Points':'🎙️ Start Recording — 2 Points';}const pause=document.getElementById('shorashimPauseBtn');if(pause){pause.classList.add('hidden');pause.textContent='⏸ Pause';}shorashimRecorder=null;shorashimRecordingChunks=[];shorashimPausedMs=0;}
     };
-    shorashimRecorder.start(500); if(btn)btn.textContent='⏹ Stop & Submit'; if(status)status.textContent=reviewNoHints?'Recording No Hints Challenge — worth 3 points after approval.':'Recording with pictures — worth 2 points after approval.';
+    shorashimRecorder.start(500); if(btn){btn.textContent='⏹ Finish & Submit';btn.classList.remove('record-pulse');}const pause=document.getElementById('shorashimPauseBtn');if(pause)pause.classList.remove('hidden'); if(status)status.textContent=reviewNoHints?'Recording No Hints Challenge — worth 3 points after approval.':'Recording with pictures — worth 2 points after approval.';
   }catch(err){console.error(err);if(status)status.textContent='Microphone permission is needed to record.';}
 }
 
@@ -572,9 +585,9 @@ function bindActivityTracking(){['pointerdown','keydown','mousemove','touchstart
 function startTicker(){clearInterval(ticker);ticker=setInterval(()=>{const s=student(),studying=['learnScreen','reviewScreen','gamesScreen'].includes(activeScreenId)&&!document.getElementById('studentView').classList.contains('hidden');if(studying&&document.visibilityState==='visible'&&Date.now()-lastInteraction<30000){s.totalActiveSeconds++;s.lastActive=Date.now();if(s.totalActiveSeconds%10===0)saveDB();}},1000);}
 function updateReviewGameCopy(){
   const reviewHome=document.querySelector('.feature-card.review span:last-child');
-  if(reviewHome)reviewHome.textContent='Review your learned cards whenever you want.';
+  if(reviewHome)reviewHome.textContent='Review what you learned — and record your Chazara for points!';
   const reviewRule=document.querySelector('#reviewScreen .review-rule');
-  if(reviewRule)reviewRule.innerHTML='<b>Flashcard review is optional practice.</b><span>Say the Hebrew and translation aloud as you review. Going too fast will not count toward today’s review progress.</span>';
+  if(reviewRule)reviewRule.remove();
   const gamesEyebrow=document.querySelector('#gamesScreen .section-head .eyebrow');
   if(gamesEyebrow)gamesEyebrow.textContent='Practice with your learned cards';
 }
