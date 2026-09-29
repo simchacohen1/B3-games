@@ -1,10 +1,46 @@
 'use strict';
-const APP_BUILD='2026-09-29-rev3-no-force-new';
+const APP_BUILD='2026-09-29-story-detective-v1';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
-let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null;
+let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null;
 const word=id=>C.words.find(w=>w.id===id),node=(tag,text,cls)=>{const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n};
 const status=p=>!p?'New':p.credits>=2?'Learned':'Practicing';
+const STORY_SUMMARIES={
+  2:'The story begins in Prague, where the great Rav Rabbi Yechezkel Landau lived.',
+  3:'Reb Pesach was a good teacher, but his school did not pay him very much.',
+  4:'Reb Pesach needed money for his daughter Gitl’s wedding, so he decided to travel for work.',
+  5:'He planned to work in Hungary for two years, earn money, and then come back home.',
+  6:'In Hungary he worked very hard for two years and saved his money in a small bag.',
+  7:'Before Pesach, Reb Pesach decided it was time to go back home.',
+  8:'A wine merchant named Mr. Weinman was also traveling back with a wagon full of wine.',
+  9:'Reb Pesach offered to guard the kosher wine as the mashgiach in exchange for a free ride.',
+  10:'Reb Pesach took his bag of money and was excited to see his family again after two years.',
+  11:'Before Shabbos, Reb Pesach hid his money bag between the wine barrels, but someone saw him.',
+  12:'After Shabbos, Reb Pesach searched for his money and discovered that it was gone.',
+  13:'Reb Pesach suspected Mr. Weinman and decided to speak to him calmly about the missing money.',
+  14:'Mr. Weinman denied taking the money, so Reb Pesach decided to ask the Rav for help in Prague.',
+  15:'Reb Pesach came home with no money and told his family that someone had stolen it.',
+  16:'Reb Pesach went to the Rav and told him the whole story about the missing bag of money.',
+  17:'The Rav promised to help, and the next day Mr. Weinman came to ask for a hechsher on his wine.',
+  18:'Mr. Weinman asked the Rav to certify the wine as kosher and offered money for maos chitim.',
+  19:'Mr. Weinman said Reb Pesach had guarded the wine carefully as his mashgiach.',
+  20:'The Rav told Mr. Weinman there was a problem: Reb Pesach’s bag of money had disappeared.',
+  21:'The Rav said that if Mr. Weinman did not take the money, perhaps somebody else had.',
+  22:'The Rav suggested that maybe a non-Jew entered the wagon, which could create a kashrus problem for the wine.',
+  23:'Mr. Weinman admitted that he took the money, returned the bag, and asked the Rav for the hechsher.',
+  24:'The Rav said there was still a problem: perhaps the money had been stolen on Shabbos.',
+  25:'Mr. Weinman insisted it was not on Shabbos, begged the Rav to believe him, and began to cry.',
+  26:'The Rav saw that Mr. Weinman truly regretted what he had done and proposed a deal.',
+  27:'The Rav told Mr. Weinman to pay for Gitl’s entire wedding as part of making things right.',
+  28:'Mr. Weinman wrote a large check for Reb Pesach, and the Rav called Reb Pesach on the telephone.',
+  29:'The Rav told Reb Pesach that he had very good news for him.',
+  30:'The Rav told Reb Pesach that yesterday he had a problem, but today the problem was solved.',
+  31:'The Rav said he had both the money bag and a large check, and Reb Pesach said he would come right away.',
+  32:'Reb Pesach said his daughter would now be able to have a beautiful wedding after Pesach.',
+  33:'Reb Pesach happily told his wife that they had good news and there would be a big wedding.',
+  34:'Reb Pesach received the money, had a wonderful Pesach, and Gitl later found a fine chosson.',
+  35:'The whole town came to Gitl’s wedding, including Mr. Weinman, and everyone celebrated.'
+};
 function message(s){$('notice').textContent=s}
 function clearAdvance(){if(advanceTimer){clearTimeout(advanceTimer);advanceTimer=null}}
 function focusPractice(){requestAnimationFrame(()=>$('practice')?.scrollIntoView({behavior:'smooth',block:'start'}))}
@@ -12,26 +48,97 @@ function block(s){clearAdvance();$('lesson').hidden=true;$('practice').hidden=tr
 function open(g){return config&&g<config.unlocked[student.classId]&&config.sections[g].verified}
 function render(){
   if(!student||!config)return;
-  if(!round&&!flash){$('words').hidden=false;$('toolbar').hidden=false;}
+  if(!round&&!flash&&!storyQuiz){$('words').hidden=false;$('toolbar').hidden=false;}
   $('login').hidden=true;$('lesson').hidden=false;$('who').textContent=student.name+' · '+student.classId.toUpperCase();
   const ids=[...new Set(config.sections.flatMap(s=>s.words))];
   $('stats').textContent=`${ids.filter(id=>status(progress[id])==='Learned').length} learned · ${ids.filter(id=>status(progress[id])==='Practicing').length} practicing`;
   $('segments').replaceChildren();
-  config.sections.forEach((s,i)=>{const b=node('button',`${open(i)?'':'🔒 '}Section ${i+1}`,i===group?'active':'');b.type='button';b.disabled=!open(i);b.onclick=()=>{if(busy||pending)return;clearAdvance();group=i;showAll=false;round=null;flash=null;$('practice').hidden=true;$('flashcards').hidden=true;render()};$('segments').append(b)});
-  $('words').replaceChildren();$('start').disabled=!open(group);$('flashStart').disabled=!open(group);$('readStory').hidden=!open(group);$('readStory').href='story.html?section='+group;$('readStory').textContent='📖 Read the illustrated story — Section '+(group+1);
+  config.sections.forEach((s,i)=>{const b=node('button',`${open(i)?'':'🔒 '}Section ${i+1}`,i===group?'active':'');b.type='button';b.disabled=!open(i);b.onclick=()=>{if(busy||pending)return;clearAdvance();group=i;showAll=false;round=null;flash=null;storyQuiz=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;render()};$('segments').append(b)});
+  $('words').replaceChildren();$('start').disabled=!open(group);$('flashStart').disabled=!open(group);$('storyQuizStart').disabled=!open(group);$('readStory').hidden=!open(group);$('readStory').href='story.html?section='+group;$('readStory').textContent='📖 Read the illustrated story — Section '+(group+1);
   $('title').textContent=showAll?'My vocabulary':`Section ${group+1} words`;
   const visible=showAll?config.sections.flatMap((s,i)=>open(i)?s.words:[]):open(group)?config.sections[group].words:[];
   for(const id of visible){const w=word(id);if(!w)continue;const card=node('article','','word'),st=status(progress[id]);card.append(node('span',st,'status '+st.toLowerCase()));const yi=node('div',w.yi,'yi');yi.lang='yi';card.append(yi,node('div',w.en));$('words').append(card)}
   if(!visible.length)$('words').append(node('p','Your teacher will open your next section soon.'));
   if(round&&open(round.group))question();
   if(flash&&open(flash.group))flashRender();else if(flash){flash=null}
+  if(storyQuiz&&open(storyQuiz.group))storyQuizRender();else if(storyQuiz){storyQuiz=null}
 }
 async function refresh(){const s=await API.call('status');student=s.student;config=s.config;progress=s.progress;if(!open(group))group=Math.max(0,config.unlocked[student.classId]-1);round=(s.round&&open(s.round.group))?s.round:null;if(round)group=round.group;render()}
 async function login(id,pin){const s=await API.call('login',{studentId:id,pin:pin.trim()});sessionStorage.setItem('yiddishSession',s.token);await refresh();message('Progress connected ✓')}
 $('loginForm').onsubmit=async e=>{e.preventDefault();$('signIn').disabled=true;try{await login($('name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''),$('pin').value);$('pin').value=''}catch(e){message(e.message)}finally{$('signIn').disabled=false}};
-$('all').onclick=()=>{if(busy||pending)return;clearAdvance();showAll=!showAll;round=null;flash=null;$('practice').hidden=true;$('flashcards').hidden=true;render()};
+$('all').onclick=()=>{if(busy||pending)return;clearAdvance();showAll=!showAll;round=null;flash=null;storyQuiz=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;render()};
 function shuffleClient(a){const b=a.slice();for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
 function focusFlash(){requestAnimationFrame(()=>$('flashcards')?.scrollIntoView({behavior:'smooth',block:'start'}))}
+
+function focusStoryQuiz(){requestAnimationFrame(()=>$('storyquiz')?.scrollIntoView({behavior:'smooth',block:'start'}))}
+function storyParagraphs(g){
+  const sec=config.sections[g],out=[];
+  for(let i=Math.max(2,Number(sec.first)||0);i<=Math.min(C.paras.length-1,Number(sec.last));i++){
+    if(C.paras[i]&&STORY_SUMMARIES[i])out.push(i);
+  }
+  return out;
+}
+$('storyQuizStart').onclick=()=>{
+  if(busy||pending||!open(group))return;
+  clearAdvance();round=null;flash=null;$('practice').hidden=true;$('flashcards').hidden=true;
+  const ids=shuffleClient(storyParagraphs(group));
+  storyQuiz={group,ids,idx:0,score:0,answered:false,wrong:new Set(),choices:null,choiceFor:null};
+  storyQuizRender();focusStoryQuiz();
+};
+function storyChoices(correctIndex){
+  const correct=STORY_SUMMARIES[correctIndex];
+  const pool=Object.entries(STORY_SUMMARIES)
+    .filter(([k,v])=>Number(k)!==correctIndex&&v!==correct)
+    .map(([k,v])=>({index:Number(k),text:v}));
+  const near=pool.filter(x=>Math.abs(x.index-correctIndex)<=7);
+  const chosen=[];
+  for(const x of shuffleClient(near)){if(chosen.length<3)chosen.push(x.text)}
+  for(const x of shuffleClient(pool)){if(chosen.length>=3)break;if(!chosen.includes(x.text))chosen.push(x.text)}
+  return shuffleClient([correct,...chosen.slice(0,3)]);
+}
+function storyQuizRender(){
+  const box=$('storyquiz');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
+  if(!storyQuiz.ids.length){
+    box.append(node('h2','Story Detective'),node('p','There are no story paragraphs set for this section yet.'));
+    const back=node('button','Back to my words');back.type='button';back.onclick=()=>{storyQuiz=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;render()};
+    box.append(back);return;
+  }
+  if(storyQuiz.idx>=storyQuiz.ids.length){
+    box.append(node('div','🔎','round-check'),node('h2','Story Detective complete!'),node('p',`You figured out ${storyQuiz.score} of ${storyQuiz.ids.length} paragraphs on the first try.`));
+    const again=node('button','Play again');again.type='button';again.onclick=()=>{storyQuiz={group,ids:shuffleClient(storyParagraphs(group)),idx:0,score:0,answered:false,wrong:new Set(),choices:null,choiceFor:null};storyQuizRender();focusStoryQuiz()};
+    const back=node('button','Back to my words');back.type='button';back.style.marginLeft='10px';back.onclick=()=>{storyQuiz=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;render();window.scrollTo({top:0,behavior:'smooth'})};
+    box.append(again,back);focusStoryQuiz();return;
+  }
+  const pIndex=storyQuiz.ids[storyQuiz.idx],para=C.paras[pIndex];
+  box.append(node('div',`Story part ${storyQuiz.idx+1} of ${storyQuiz.ids.length}`,'practice-progress'),node('h2','What is happening in this paragraph?'));
+  const text=node('div',para,'story-para');text.lang='yi';text.dir='rtl';box.append(text);
+  const answers=node('div','','story-answers'),feedback=node('p','','story-feedback');feedback.setAttribute('role','status');
+  const choices=storyQuiz.choices&&storyQuiz.choiceFor===pIndex?storyQuiz.choices:storyChoices(pIndex);
+  storyQuiz.choices=choices;storyQuiz.choiceFor=pIndex;
+  for(const choice of choices){
+    const b=node('button',choice);b.type='button';b.onclick=()=>{
+      if(storyQuiz.answered)return;
+      const correct=choice===STORY_SUMMARIES[pIndex];
+      if(correct){
+        storyQuiz.answered=true;if(storyQuiz.wrong.size===0)storyQuiz.score++;
+        feedback.textContent='✓ Yes — that is what this paragraph is saying.';feedback.className='feedback-correct';
+        answers.querySelectorAll('button').forEach(x=>x.disabled=true);
+        const next=node('button',storyQuiz.idx===storyQuiz.ids.length-1?'See my score →':'Next paragraph →','story-next');next.type='button';
+        next.onclick=()=>{storyQuiz.idx++;storyQuiz.answered=false;storyQuiz.wrong=new Set();storyQuiz.choices=null;storyQuizRender();focusStoryQuiz()};
+        box.append(next);
+      }else{
+        storyQuiz.wrong.add(choice);b.disabled=true;feedback.textContent='Not this one. Look for one Yiddish clue and try again.';feedback.className='feedback-wrong';
+        const clue=C.words.find(w=>w.paragraph===pIndex);
+        if(clue&&!box.querySelector('.story-clue')){
+          const c=node('p',`Clue: ${clue.yi} = ${clue.en}`,'story-clue');c.dir='ltr';box.append(c);
+        }
+      }
+    };
+    answers.append(b);
+  }
+  box.append(answers,feedback);focusStoryQuiz();
+}
+
 $('flashStart').onclick=()=>{
   if(busy||pending||!open(group))return;
   clearAdvance();round=null;$('practice').hidden=true;
