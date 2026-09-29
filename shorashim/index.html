@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="../game-gate.js" data-game-id="shorashim"></script>
   <title>Shorashim Learning Lab</title>
-  <link rel="stylesheet" href="style.css">
   <style>
 :root{
   --bg:#f6f7fb;--panel:#fff;--ink:#172033;--muted:#6b7280;--line:#e5e7eb;
@@ -1017,6 +1016,13 @@ body.shorashim-review-active #chooseReviewCardsBtn {
 .review-perek-filter.hidden{display:none!important}
 </style>
 <style id="shorashim-recording-points-v1">.shorashim-challenge-box{margin:12px 0 16px;padding:14px 16px;border:2px solid #f59e0b;border-radius:16px;background:#fffbeb}.shorashim-challenge-box label{display:block;font-size:16px}.shorashim-challenge-box input{transform:scale(1.35);margin-right:8px}.shorashim-record-box{max-width:760px;margin:14px auto 0;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding:12px;border:1px solid #c7d2fe;border-radius:16px;background:#eef2ff}.shorashim-record-box .mini-note{max-width:520px}</style>
+<style id="review-record-flow-fix">
+#activeReviewRecording{align-items:center;justify-content:center;margin:4px 0 10px;gap:10px}
+#activeReviewRecording .mini-note{max-width:430px}
+body.shorashim-review-active #reviewScreen .review-choice-panel,
+body.shorashim-review-active #reviewScreen .review-options{display:none!important}
+body.shorashim-review-active #activeReviewRecording{display:flex!important}
+</style>
 </head>
 <body>
   <section id="studentSiteClosed" class="login-gate hidden">
@@ -1259,24 +1265,11 @@ body.shorashim-review-active #chooseReviewCardsBtn {
                 <span class="choice-icon">🔁</span><strong>Practice Only</strong><span>No recording needed</span><b>No points</b>
               </button>
             </div>
-            <div id="pointsReminder" class="points-reminder">⭐ To earn points, start your recording before you review.</div>
-            <div class="record-action-row">
-              <button id="shorashimRecordBtn" class="primary record-pulse" type="button">🎙️ Start Recording — 2 Points</button>
-              <button id="shorashimPauseBtn" class="ghost hidden" type="button">⏸ Pause</button>
-              <span id="shorashimRecordStatus" class="mini-note">Rabbi Cohen will listen before points are added.</span>
-            </div>
-          </div>
-
-          <div id="reviewQuickStart" class="review-quick-start">
-            <div>
-              <strong id="reviewReadyTitle">Your Shorashim are ready!</strong>
-              <span id="reviewReadyText">All of your learned Shorashim are selected.</span>
-            </div>
-            <button id="quickStartReviewBtn" class="primary big" type="button">▶ Start Reviewing Shorashim</button>
+            <div id="pointsReminder" class="points-reminder">Choose a review mode, then press Start Review. Recording controls will appear with the cards.</div>
           </div>
 
           <details class="review-options card-panel">
-            <summary>⚙️ Change which Shorashim I review</summary>
+            <summary>Choose cards & review options</summary>
             <div id="reviewSetup" class="review-setup">
               <div class="review-track-intro"><div><b>What do you want to review?</b></div></div>
               <div class="review-track-tabs" role="group" aria-label="Choose flashcard category">
@@ -1301,6 +1294,11 @@ body.shorashim-review-active #chooseReviewCardsBtn {
               <span id="reviewPasuk" class="muted"></span>
             </div>
             <div id="tooFastMessage" class="too-fast hidden">Give yourself a moment to say the word and meaning.</div>
+            <div id="activeReviewRecording" class="record-action-row">
+              <button id="shorashimRecordBtn" class="primary" type="button">🎙️ Start Recording — 2 Points</button>
+              <button id="shorashimPauseBtn" class="ghost hidden" type="button">⏸ Pause</button>
+              <span id="shorashimRecordStatus" class="mini-note">Start recording when the first card is visible. Rabbi Cohen will listen before points are added.</span>
+            </div>
             <div class="review-card-wrap">
               <button id="reviewFlipCard" class="flashcard review-card" aria-label="Flip flashcard">
                 <div id="reviewSideLabel" class="card-label">FRONT</div>
