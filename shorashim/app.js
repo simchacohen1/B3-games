@@ -698,3 +698,34 @@ window.addEventListener('beforeunload',saveDB);
 startStudentSiteWatcher();
 startMasterToggleWatcher();
 bindCloudLogin();
+
+
+/* Third-grade quick review controls */
+(function(){
+  function speakReviewHelp(){
+    const mode=(typeof reviewPointsMode!=='undefined'?reviewPointsMode:'regular');
+    let words='Pick how you want to review. Then press Show My Cards.';
+    if(mode==='regular') words+=' When your cards show, press Start Recording. Pictures are allowed.';
+    if(mode==='no-hints') words+=' This is the No Hints Challenge. Your pictures will be hidden. When your cards show, press Start Recording.';
+    if(mode==='practice') words+=' This is practice only. You do not need to record.';
+    try{
+      speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(words);
+      u.rate=.88; u.pitch=1.02;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }
+  function quickStart(){
+    const checks=[...document.querySelectorAll('.review-pick-check')];
+    if(!checks.some(x=>x.checked)){
+      checks.forEach(x=>x.checked=true);
+      if(typeof updateReviewSelectionCount==='function')updateReviewSelectionCount();
+    }
+    if(typeof startReview==='function')startReview();
+  }
+  window.addEventListener('DOMContentLoaded',()=>{
+    document.getElementById('quickStartReviewBtn')?.addEventListener('click',quickStart);
+    document.getElementById('reviewHelpAudioBtn')?.addEventListener('click',speakReviewHelp);
+  });
+})();
+

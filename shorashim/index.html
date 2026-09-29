@@ -1023,6 +1023,112 @@ body.shorashim-review-active #reviewScreen .review-choice-panel,
 body.shorashim-review-active #reviewScreen .review-options{display:none!important}
 body.shorashim-review-active #activeReviewRecording{display:flex!important}
 </style>
+
+<style id="third-grade-review-ui-v1">
+/* Third-grade review: large, visual, one obvious action at a time */
+#reviewScreen{max-width:1100px;margin:0 auto}
+#reviewScreen .section-head{margin-bottom:18px}
+#reviewScreen .section-head h2{font-size:clamp(32px,5vw,52px);margin:0}
+#reviewScreen .section-head .eyebrow{display:none}
+
+.review-choice-panel{
+  max-width:1000px;margin:0 auto 20px;padding:24px;
+  border:0;border-radius:30px;background:#fff;
+  box-shadow:0 18px 50px rgba(23,32,51,.12)
+}
+.review-choice-title{
+  text-align:center;font-size:clamp(25px,3vw,36px);font-weight:950;
+  margin:0 0 20px;color:#172033
+}
+.review-choice-grid{
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:20px!important
+}
+.review-choice{
+  min-height:235px!important;border:4px solid transparent!important;border-radius:28px!important;
+  padding:22px 16px!important;display:flex!important;flex-direction:column!important;
+  align-items:center!important;justify-content:center!important;gap:10px!important;
+  text-align:center!important;box-shadow:0 10px 24px rgba(23,32,51,.10)!important;
+  transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease!important
+}
+.review-choice:hover{transform:translateY(-4px)}
+.review-choice .choice-icon{font-size:64px!important;line-height:1!important}
+.review-choice strong{font-size:clamp(24px,2.5vw,32px)!important;line-height:1.05!important}
+.review-choice span:not(.choice-icon){font-size:20px!important;font-weight:800!important}
+.review-choice b{font-size:25px!important;padding:7px 14px;border-radius:999px;background:#fff!important}
+.review-choice.points-choice{background:linear-gradient(145deg,#dbeafe,#eff6ff)!important}
+.review-choice.challenge-choice{background:linear-gradient(145deg,#fef3c7,#fff7ed)!important}
+.review-choice.practice-choice{background:linear-gradient(145deg,#dcfce7,#f0fdf4)!important}
+.review-choice.active{
+  border-color:#4f46e5!important;box-shadow:0 0 0 6px rgba(79,70,229,.13),0 16px 35px rgba(23,32,51,.16)!important;
+  transform:translateY(-3px)
+}
+.review-choice.active::after{content:"✓";position:absolute;margin-top:-185px;margin-left:190px;
+  width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#4f46e5;color:white;
+  font-size:28px;font-weight:950}
+.review-choice{position:relative}
+
+.kid-review-actions{display:flex;justify-content:center;align-items:center;gap:14px;flex-wrap:wrap;margin-top:24px}
+.kid-start-review{
+  border:0;border-radius:22px;padding:20px 34px;min-width:330px;
+  font-size:clamp(24px,3vw,34px);font-weight:950;background:#4f46e5;color:#fff;
+  box-shadow:0 12px 28px rgba(79,70,229,.30);cursor:pointer
+}
+.kid-audio-help{
+  border:3px solid #cbd5e1;border-radius:20px;padding:17px 22px;background:#fff;
+  font-size:19px;font-weight:900;color:#334155;cursor:pointer
+}
+.kid-short-reminder{text-align:center!important;font-size:18px!important;font-weight:850!important;margin:14px 0 0!important;color:#475569!important}
+
+.review-options{max-width:760px!important;margin:16px auto!important;padding:0!important;box-shadow:none!important;background:transparent!important;border:0!important}
+.review-options>summary{
+  list-style:none;text-align:center;cursor:pointer;font-size:18px!important;font-weight:850!important;
+  color:#64748b;padding:10px
+}
+.review-options>summary::-webkit-details-marker{display:none}
+.review-options[open]{background:#fff!important;border:1px solid #e2e8f0!important;padding:16px!important}
+
+body.shorashim-review-active #reviewScreen .section-head{margin-bottom:8px}
+body.shorashim-review-active #reviewScreen .section-head>div:nth-child(2){display:none}
+body.shorashim-review-active #reviewScreen .review-choice-panel,
+body.shorashim-review-active #reviewScreen .review-options{display:none!important}
+body.shorashim-review-active #reviewArea{display:block!important;max-width:980px;margin:0 auto}
+body.shorashim-review-active #activeReviewRecording{
+  display:flex!important;max-width:900px!important;margin:0 auto 14px!important;
+  padding:14px!important;border:0!important;background:transparent!important
+}
+body.shorashim-review-active #shorashimRecordBtn{
+  min-height:66px!important;border-radius:20px!important;padding:15px 26px!important;
+  font-size:clamp(21px,2.4vw,29px)!important;font-weight:950!important;
+  box-shadow:0 10px 25px rgba(79,70,229,.24)
+}
+body.shorashim-review-active #shorashimPauseBtn{
+  min-height:60px!important;border-radius:18px!important;padding:14px 22px!important;
+  font-size:21px!important;font-weight:900!important
+}
+body.shorashim-review-active .kid-record-note{font-size:17px!important;font-weight:800!important;text-align:center}
+body.shorashim-review-active .review-meta{justify-content:center!important;font-size:18px!important}
+body.shorashim-review-active .review-card-wrap{max-width:820px!important;margin:0 auto!important}
+body.shorashim-review-active .review-card{border-radius:32px!important;box-shadow:0 20px 55px rgba(23,32,51,.16)!important}
+body.shorashim-review-active .review-hebrew{font-size:clamp(58px,9vw,100px)!important}
+body.shorashim-review-active .review-english{font-size:clamp(34px,5vw,58px)!important}
+body.shorashim-review-active .review-nav{
+  max-width:820px!important;margin:16px auto 0!important;display:flex!important;
+  justify-content:center!important;gap:12px!important;flex-wrap:wrap!important
+}
+body.shorashim-review-active .review-nav button{min-height:56px!important;font-size:19px!important;border-radius:17px!important;font-weight:900!important}
+body.shorashim-review-active .keyboard-hint{display:none!important}
+body.shorashim-review-active #editReviewBtn{display:none!important}
+
+@media(max-width:760px){
+  .review-choice-grid{grid-template-columns:1fr!important}
+  .review-choice{min-height:160px!important}
+  .review-choice.active::after{margin-top:-112px;margin-left:75%}
+  .kid-start-review{width:100%;min-width:0}
+  .kid-audio-help{width:100%}
+}
+</style>
+
 </head>
 <body>
   <section id="studentSiteClosed" class="login-gate hidden">
@@ -1265,11 +1371,15 @@ body.shorashim-review-active #activeReviewRecording{display:flex!important}
                 <span class="choice-icon">🔁</span><strong>Practice Only</strong><span>No recording needed</span><b>No points</b>
               </button>
             </div>
-            <div id="pointsReminder" class="points-reminder">Choose a review mode, then press Start Review. Recording controls will appear with the cards.</div>
+            <div class="kid-review-actions">
+  <button type="button" id="quickStartReviewBtn" class="kid-start-review">▶ SHOW MY CARDS</button>
+  <button type="button" id="reviewHelpAudioBtn" class="kid-audio-help" aria-label="Hear what to do">🔊 HEAR WHAT TO DO</button>
+</div>
+<div id="pointsReminder" class="points-reminder kid-short-reminder">Pick one. Then show your cards!</div>
           </div>
 
           <details class="review-options card-panel">
-            <summary>Choose cards & review options</summary>
+            <summary>⚙️ Change My Cards</summary>
             <div id="reviewSetup" class="review-setup">
               <div class="review-track-intro"><div><b>What do you want to review?</b></div></div>
               <div class="review-track-tabs" role="group" aria-label="Choose flashcard category">
@@ -1297,7 +1407,7 @@ body.shorashim-review-active #activeReviewRecording{display:flex!important}
             <div id="activeReviewRecording" class="record-action-row">
               <button id="shorashimRecordBtn" class="primary" type="button">🎙️ Start Recording — 2 Points</button>
               <button id="shorashimPauseBtn" class="ghost hidden" type="button">⏸ Pause</button>
-              <span id="shorashimRecordStatus" class="mini-note">Start recording when the first card is visible. Rabbi Cohen will listen before points are added.</span>
+              <span id="shorashimRecordStatus" class="mini-note kid-record-note">🎙️ Record your Shorashim. Rabbi Cohen will check it.</span>
             </div>
             <div class="review-card-wrap">
               <button id="reviewFlipCard" class="flashcard review-card" aria-label="Flip flashcard">
