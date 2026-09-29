@@ -1477,8 +1477,10 @@ function onPointerUp(e){
   }
   if(target?.kind==='studentRoom'){
     if(tagOptedIn){showTagPop('Leave Tag before entering a side room.');return;}
-    const d=Math.hypot(targetApproachX(target)-avatarState.x,target.z-avatarState.z);
-    if(d<3.0)enterStudentGallery(target.studentName);else navigateTo(target,()=>enterStudentGallery(target.studentName));
+    // Names are direct gallery links, not walking destinations. A walking
+    // approach can hit the hallway divider and cancel the room-opening callback.
+    Object.keys(pressed).forEach(k=>pressed[k]=false);
+    enterStudentGallery(target.studentName);
     return;
   }
   if(target?.kind==='exitDoor'){
