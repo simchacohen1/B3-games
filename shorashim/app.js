@@ -700,6 +700,55 @@ startMasterToggleWatcher();
 bindCloudLogin();
 
 
+/* Shared: pick the best-sounding available system voice for spoken instructions,
+   so the fallback "computer voice" is as natural as the browser/OS allows. */
+(function(){
+  let voiceCache=[];
+  function refreshVoices(){ try{ voiceCache=speechSynthesis.getVoices()||[]; }catch(e){} }
+  refreshVoices();
+  try{ if('onvoiceschanged' in speechSynthesis) speechSynthesis.onvoiceschanged=refreshVoices; }catch(e){}
+
+  // Known higher-quality / natural-sounding voices across common browsers & OSes.
+  const PREFERRED=[
+    'Google US English',
+    'Microsoft Aria Online (Natural) - English (United States)',
+    'Microsoft Jenny Online (Natural) - English (United States)',
+    'Microsoft Ana Online (Natural) - English (United States)',
+    'Microsoft Guy Online (Natural) - English (United States)',
+    'Samantha',
+    'Karen',
+    'Moira'
+  ];
+
+  function pickBestVoice(){
+    if(!voiceCache.length) refreshVoices();
+    for(const name of PREFERRED){
+      const v=voiceCache.find(v=>v.name===name);
+      if(v) return v;
+    }
+    const enVoices=voiceCache.filter(v=>/^en/i.test(v.lang));
+    const natural=enVoices.find(v=>/natural|neural|enhanced|premium/i.test(v.name));
+    if(natural) return natural;
+    const nonCompact=enVoices.find(v=>!/compact/i.test(v.name));
+    return nonCompact||enVoices[0]||voiceCache[0]||null;
+  }
+
+  window.__speakNatural=function(text,opts){
+    opts=opts||{};
+    const rate=typeof opts.rate==='number'?opts.rate:.92;
+    const pitch=typeof opts.pitch==='number'?opts.pitch:1.0;
+    try{
+      speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(text);
+      const v=pickBestVoice();
+      if(v) u.voice=v;
+      u.rate=rate; u.pitch=pitch;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  };
+})();
+
+
 /* Third-grade quick review controls */
 (function(){
   function speakReviewHelp(){
@@ -708,12 +757,7 @@ bindCloudLogin();
     if(mode==='regular') words+=' When your cards show, press Start Recording. Pictures are allowed.';
     if(mode==='no-hints') words+=' This is the No Hints Challenge. Your pictures will be hidden. When your cards show, press Start Recording.';
     if(mode==='practice') words+=' This is practice only. You do not need to record.';
-    try{
-      speechSynthesis.cancel();
-      const u=new SpeechSynthesisUtterance(words);
-      u.rate=.88; u.pitch=1.02;
-      speechSynthesis.speak(u);
-    }catch(e){}
+    window.__speakNatural(words,{rate:.92,pitch:1.02});
   }
   function quickStart(){
     const checks=[...document.querySelectorAll('.review-pick-check')];
@@ -736,7 +780,7 @@ bindCloudLogin();
  const files={regular:"audio/review-record-chazara.mp3","no-hints":"audio/review-no-hints.mp3",practice:"audio/review-practice.mp3"};
  function fallback(m){
   const t=m==="no-hints"?"No Hints Challenge! Your pictures will be hidden. Press Show My Cards. Then press Start Recording and begin.":m==="practice"?"Practice time! Press Show My Cards and practice your Shorashim. You do not need to record.":"Record Chazara! Pictures are allowed. Press Show My Cards. Then press Start Recording and begin.";
-  try{speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(t);u.rate=.88;speechSynthesis.speak(u)}catch(e){}
+  window.__speakNatural(t,{rate:.92});
  }
  function play(){
   const m=(typeof reviewPointsMode!=="undefined"&&reviewPointsMode)||"regular";
