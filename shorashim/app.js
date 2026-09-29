@@ -729,3 +729,25 @@ bindCloudLogin();
   });
 })();
 
+
+
+/* Recorded review instructions override */
+(function(){
+ const files={regular:"audio/review-record-chazara.mp3","no-hints":"audio/review-no-hints.mp3",practice:"audio/review-practice.mp3"};
+ function fallback(m){
+  const t=m==="no-hints"?"No Hints Challenge! Your pictures will be hidden. Press Show My Cards. Then press Start Recording and begin.":m==="practice"?"Practice time! Press Show My Cards and practice your Shorashim. You do not need to record.":"Record Chazara! Pictures are allowed. Press Show My Cards. Then press Start Recording and begin.";
+  try{speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(t);u.rate=.88;speechSynthesis.speak(u)}catch(e){}
+ }
+ function play(){
+  const m=(typeof reviewPointsMode!=="undefined"&&reviewPointsMode)||"regular";
+  const a=new Audio(files[m]||files.regular); let failed=false;
+  const fail=()=>{if(!failed){failed=true;fallback(m)}};
+  a.addEventListener("error",fail,{once:true}); a.play().catch(fail);
+ }
+ window.addEventListener("DOMContentLoaded",()=>{
+  const old=document.getElementById("reviewHelpAudioBtn");
+  if(!old)return;
+  const fresh=old.cloneNode(true); old.parentNode.replaceChild(fresh,old);
+  fresh.addEventListener("click",play);
+ });
+})();

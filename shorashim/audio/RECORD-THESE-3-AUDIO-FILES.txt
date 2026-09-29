@@ -1,0 +1,13 @@
+ADD THESE 3 MP3 FILES HERE
+
+review-record-chazara.mp3
+Record Chazara! Pictures are allowed. Press Show My Cards. Then press Start Recording and begin.
+
+review-no-hints.mp3
+No Hints Challenge! Your pictures will be hidden. Press Show My Cards. Then press Start Recording and begin.
+
+review-practice.mp3
+Practice time! Press Show My Cards and practice your Shorashim. You do not need to record.
+
+The Hear What To Do button automatically plays the correct file.
+If a recording is missing, the computer voice is used as a fallback.
