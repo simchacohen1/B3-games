@@ -1129,6 +1129,18 @@ body.shorashim-review-active #editReviewBtn{display:none!important}
 }
 </style>
 
+
+<style id="progress-pause-fix-v2">
+body.shorashim-review-active #reviewMeta,body.shorashim-review-active .review-meta{font-size:clamp(25px,3vw,36px)!important;line-height:1.2!important;font-weight:950!important;color:#172033!important;gap:20px!important;margin:8px auto 16px!important;text-align:center!important}
+body.shorashim-review-active #reviewMeta *,body.shorashim-review-active .review-meta *{font-size:inherit!important;font-weight:inherit!important}
+body.shorashim-review-active #activeReviewRecording{display:grid!important;grid-template-columns:repeat(2,minmax(260px,1fr))!important;align-items:stretch!important;gap:18px!important;max-width:860px!important}
+body.shorashim-review-active #shorashimRecordBtn,body.shorashim-review-active #shorashimPauseBtn{width:100%!important;min-height:80px!important;margin:0!important;padding:17px 22px!important;border-radius:22px!important;font-size:clamp(24px,2.5vw,32px)!important;line-height:1.1!important;font-weight:950!important;box-shadow:0 10px 24px rgba(23,32,51,.18)!important}
+body.shorashim-review-active #shorashimPauseBtn{background:#fff!important;color:#172033!important;border:4px solid #4f46e5!important}
+body.shorashim-review-active #shorashimRecordBtn{border:4px solid transparent!important}
+body.shorashim-review-active #activeReviewRecording .kid-record-note{grid-column:1/-1!important;font-size:18px!important;margin-top:-4px!important}
+body.shorashim-review-active .review-card-wrap{max-width:880px!important}
+@media(max-width:680px){body.shorashim-review-active #activeReviewRecording{grid-template-columns:1fr!important}body.shorashim-review-active #activeReviewRecording .kid-record-note{grid-column:1!important}}
+</style>
 </head>
 <body>
   <section id="studentSiteClosed" class="login-gate hidden">
