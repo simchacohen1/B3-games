@@ -1,6 +1,6 @@
 'use strict';
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
-let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null;
+let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null;
 const word=id=>C.words.find(w=>w.id===id),node=(tag,text,cls)=>{const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n};
 const status=p=>!p?'New':p.credits>=2?'Learned':'Practicing';
 function message(s){$('notice').textContent=s}
@@ -10,23 +10,56 @@ function block(s){clearAdvance();$('lesson').hidden=true;$('practice').hidden=tr
 function open(g){return config&&g<config.unlocked[student.classId]&&config.sections[g].verified}
 function render(){
   if(!student||!config)return;
-  if(!round){$('words').hidden=false;$('toolbar').hidden=false;}
+  if(!round&&!flash){$('words').hidden=false;$('toolbar').hidden=false;}
   $('login').hidden=true;$('lesson').hidden=false;$('who').textContent=student.name+' · '+student.classId.toUpperCase();
   const ids=[...new Set(config.sections.flatMap(s=>s.words))];
   $('stats').textContent=`${ids.filter(id=>status(progress[id])==='Learned').length} learned · ${ids.filter(id=>status(progress[id])==='Practicing').length} practicing`;
   $('segments').replaceChildren();
-  config.sections.forEach((s,i)=>{const b=node('button',`${open(i)?'':'🔒 '}Section ${i+1}`,i===group?'active':'');b.type='button';b.disabled=!open(i);b.onclick=()=>{if(busy||pending)return;clearAdvance();group=i;showAll=false;round=null;$('practice').hidden=true;render()};$('segments').append(b)});
-  $('words').replaceChildren();$('start').disabled=!open(group);$('readStory').hidden=!open(group);$('readStory').href='story.html?section='+group;
+  config.sections.forEach((s,i)=>{const b=node('button',`${open(i)?'':'🔒 '}Section ${i+1}`,i===group?'active':'');b.type='button';b.disabled=!open(i);b.onclick=()=>{if(busy||pending)return;clearAdvance();group=i;showAll=false;round=null;flash=null;$('practice').hidden=true;$('flashcards').hidden=true;render()};$('segments').append(b)});
+  $('words').replaceChildren();$('start').disabled=!open(group);$('flashStart').disabled=!open(group);$('readStory').hidden=!open(group);$('readStory').href='story.html?section='+group;
   $('title').textContent=showAll?'My vocabulary':`Section ${group+1} words`;
   const visible=showAll?config.sections.flatMap((s,i)=>open(i)?s.words:[]):open(group)?config.sections[group].words:[];
   for(const id of visible){const w=word(id);if(!w)continue;const card=node('article','','word'),st=status(progress[id]);card.append(node('span',st,'status '+st.toLowerCase()));const yi=node('div',w.yi,'yi');yi.lang='yi';card.append(yi,node('div',w.en));$('words').append(card)}
   if(!visible.length)$('words').append(node('p','Your teacher will open your next section soon.'));
   if(round&&open(round.group))question();
+  if(flash&&open(flash.group))flashRender();else if(flash){flash=null}
 }
 async function refresh(){const s=await API.call('status');student=s.student;config=s.config;progress=s.progress;if(!open(group))group=Math.max(0,config.unlocked[student.classId]-1);if(round&&round.group>=config.unlocked[student.classId])round=null;render()}
 async function login(id,pin){const s=await API.call('login',{studentId:id,pin:pin.trim()});sessionStorage.setItem('yiddishSession',s.token);await refresh();message('Progress connected ✓')}
 $('loginForm').onsubmit=async e=>{e.preventDefault();$('signIn').disabled=true;try{await login($('name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''),$('pin').value);$('pin').value=''}catch(e){message(e.message)}finally{$('signIn').disabled=false}};
-$('all').onclick=()=>{if(busy||pending)return;clearAdvance();showAll=!showAll;round=null;$('practice').hidden=true;render()};
+$('all').onclick=()=>{if(busy||pending)return;clearAdvance();showAll=!showAll;round=null;flash=null;$('practice').hidden=true;$('flashcards').hidden=true;render()};
+function shuffleClient(a){const b=a.slice();for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
+function focusFlash(){requestAnimationFrame(()=>$('flashcards')?.scrollIntoView({behavior:'smooth',block:'start'}))}
+$('flashStart').onclick=()=>{
+  if(busy||pending||!open(group))return;
+  clearAdvance();round=null;$('practice').hidden=true;
+  flash={group,ids:shuffleClient(config.sections[group].words),idx:0,flipped:false};
+  flashRender();focusFlash();
+};
+function flashRender(){
+  const box=$('flashcards');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
+  if(flash.idx>=flash.ids.length){
+    box.append(node('div','✓','round-check'),node('h2','Nice work!'),node('p',`You went through all ${flash.ids.length} flashcards in this section.`));
+    const again=node('button','Go again');again.type='button';again.onclick=()=>{flash={group,ids:shuffleClient(config.sections[group].words),idx:0,flipped:false};flashRender();focusFlash()};
+    const back=node('button','Back to my words');back.type='button';back.style.marginLeft='10px';back.onclick=()=>{flash=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
+    box.append(again,back);focusFlash();return;
+  }
+  const id=flash.ids[flash.idx],w=word(id);
+  box.append(node('div',`Card ${flash.idx+1} of ${flash.ids.length}`,'practice-progress'));
+  const card=node('article','','word flash-card');
+  const face=node('div',flash.flipped?w.en:w.yi,'yi flash-face');
+  if(!flash.flipped)face.lang='yi';
+  card.append(face);
+  card.onclick=()=>{flash.flipped=!flash.flipped;flashRender()};
+  box.append(card,node('p',flash.flipped?'Tap to see the word again':'Tap the card to see what it means','note'));
+  const actions=node('div','','toolbar');
+  const dontKnow=node('button','Still learning');dontKnow.type='button';dontKnow.className='flash-not-yet';
+  const know=node('button','I knew it ✓');know.type='button';
+  dontKnow.onclick=()=>{flash.idx++;flash.flipped=false;flashRender();focusFlash()};
+  know.onclick=()=>{flash.idx++;flash.flipped=false;flashRender();focusFlash()};
+  actions.append(dontKnow,know);
+  box.append(actions);
+}
 $('start').onclick=async()=>{if(busy)return;clearAdvance();busy=true;$('start').disabled=true;try{message('');const s=await API.call('start',{group,forceNew:true});round=s.round;pending=null;$('practice').hidden=false;question();focusPractice()}catch(e){message(e.message)}finally{busy=false;$('start').disabled=!open(group)}};
 function question(){
   clearAdvance();

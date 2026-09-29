@@ -125,7 +125,7 @@ let currentTrack = 'shorashim';
 let selectedItemKey = null;
 let selectedArtEl = null;
 let canvas, ctx, drawing = false, erasing = false, drawHistory = [];
-let reviewDeck = [], reviewIndex = 0, reviewFlipped = false, reviewShownAt = 0;
+let reviewDeck = [], reviewIndex = 0, reviewFlipped = false, reviewShownAt = 0, reviewSessionSeen = new Set();
 let reviewNoHints = false, reviewPointsMode='regular', shorashimRecorder = null, shorashimRecordingChunks = [], shorashimRecordingStartedAt = 0, shorashimPausedAt=0, shorashimPausedMs=0;
 let activeScreenId = 'studentHome';
 let lastInteraction = Date.now();
@@ -429,7 +429,7 @@ function saveManualReviewOrderFromGrid(box){[...box.querySelectorAll('.review-pi
 function moveManualReviewCard(key,dir){const arr=reviewSortedCards(),i=arr.findIndex(c=>c.itemKey===key),j=i+dir;if(i<0||j<0||j>=arr.length)return;arr.forEach((c,n)=>c.reviewOrder=n);[arr[i].reviewOrder,arr[j].reviewOrder]=[arr[j].reviewOrder,arr[i].reviewOrder];saveDB();renderReviewPicker();}
 function updateReviewSelectionCount(){const n=document.querySelectorAll('.review-pick-check:checked').length;document.getElementById('reviewSelectionCount').textContent=`${n} selected`;const btn=document.getElementById('startReviewBtn');btn.disabled=!n;btn.textContent=n?`Start Review (${n} cards)`:'Start Review';}
 function renderReviewAvailability(){const has=eligibleLearnedCards().length>0;document.getElementById('reviewEmpty').classList.toggle('hidden',has);document.getElementById('reviewSetup').classList.toggle('hidden',!has);if(!has)document.getElementById('reviewArea').classList.add('hidden');else renderReviewPicker();}
-function startReview(){reviewNoHints=!!document.getElementById('reviewNoHints')?.checked;const keys=[...document.querySelectorAll('.review-pick-check:checked')].map(x=>x.dataset.key),map=new Map(eligibleLearnedCards().map(c=>[c.itemKey,c]));let arr=keys.map(k=>map.get(k)).filter(Boolean);if(!arr.length){alert('Select at least one card to review.');return;}if(document.querySelector('input[name="reviewOrderMode"]:checked')?.value==='shuffle')arr=shuffle(arr.slice());reviewDeck=arr;reviewIndex=0;reviewFlipped=false;document.getElementById('reviewEmpty').classList.add('hidden');document.getElementById('reviewSetup').classList.add('hidden');document.body.classList.add('shorashim-review-active');document.getElementById('reviewArea').classList.remove('hidden');const activeRec=document.getElementById('activeReviewRecording');if(activeRec)activeRec.classList.toggle('hidden',reviewPointsMode==='practice');renderReviewCard();}
+function startReview(){reviewNoHints=!!document.getElementById('reviewNoHints')?.checked;const keys=[...document.querySelectorAll('.review-pick-check:checked')].map(x=>x.dataset.key),map=new Map(eligibleLearnedCards().map(c=>[c.itemKey,c]));let arr=keys.map(k=>map.get(k)).filter(Boolean);if(!arr.length){alert('Select at least one card to review.');return;}if(document.querySelector('input[name="reviewOrderMode"]:checked')?.value==='shuffle')arr=shuffle(arr.slice());reviewDeck=arr;reviewIndex=0;reviewFlipped=false;reviewSessionSeen=new Set();document.getElementById('reviewEmpty').classList.add('hidden');document.getElementById('reviewSetup').classList.add('hidden');document.body.classList.add('shorashim-review-active');document.getElementById('reviewArea').classList.remove('hidden');const activeRec=document.getElementById('activeReviewRecording');if(activeRec)activeRec.classList.toggle('hidden',reviewPointsMode==='practice');renderReviewCard();}
 
 
 function chooseDifferentReviewCards(){
@@ -456,7 +456,16 @@ function toggleShorashimPause(){
 async function toggleShorashimRecording(){
   const btn=document.getElementById('shorashimRecordBtn'), status=document.getElementById('shorashimRecordStatus');
   if(!cloudEnabled||!cloudStudentId){if(status)status.textContent='Please sign in first.';return;}
-  if(shorashimRecorder&&['recording','paused'].includes(shorashimRecorder.state)){if(shorashimRecorder.state==='paused')shorashimPausedMs+=Date.now()-shorashimPausedAt;shorashimRecorder.stop();return;}
+  if(shorashimRecorder&&['recording','paused'].includes(shorashimRecorder.state)){
+    if(!qualifyCurrentCard())return;
+    const missing=reviewDeck.filter(c=>!reviewSessionSeen.has(c.itemKey)).length;
+    if(missing>0){
+      if(status)status.textContent=`Keep going! ${missing} card${missing===1?'':'s'} left before you can submit.`;
+      return;
+    }
+    if(shorashimRecorder.state==='paused')shorashimPausedMs+=Date.now()-shorashimPausedAt;
+    shorashimRecorder.stop();return;
+  }
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
     shorashimRecordingChunks=[];
@@ -474,19 +483,30 @@ async function toggleShorashimRecording(){
         const blob=new Blob(shorashimRecordingChunks,{type:shorashimRecorder.mimeType||'audio/webm'});
         if(blob.size<1000)throw new Error('The recording was too short. Please try again.');
         const date=todayKey(), mode=reviewNoHints?'no-hints':'pictures', points=reviewNoHints?3:2;
-        const existing=await cloudDb.ref(`${CLOUD_ROOT}/recordings/${cloudStudentId}/${date}`).once('value');
-        if(existing.exists())throw new Error('You already sent today’s Shorashim recording.');
+        const existingRef=cloudDb.ref(`${CLOUD_ROOT}/recordings/${cloudStudentId}/${date}`);
+        const existing=await existingRef.once('value');
+        if(existing.exists()){
+          const oldDaily=existing.val()||{};
+          const oldEventId=oldDaily.eventId||'';
+          const oldEvent=oldEventId?await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${oldEventId}`).once('value'):null;
+          const oldData=oldEvent?.val?.()||{};
+          if(oldData.pointRequestId || ['pending','approved'].includes(String(oldData.pointRequestStatus||''))){
+            throw new Error('You already sent today’s Shorashim recording.');
+          }
+          await existingRef.remove();
+        }
         const eventId=cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}`).push().key;
         const storagePath=`shorashim-recordings/${cloudStudentId}/${date}/${eventId}.webm`;
         const ref=cloudStorage.ref(storagePath); await ref.put(blob,{contentType:blob.type||'audio/webm'}); const audioURL=await ref.getDownloadURL();
         const record={id:eventId,studentId:cloudStudentId,studentName:cloudStudentName||currentStudent,date,mode,noHints:reviewNoHints,points,durationMs,audioURL,storagePath,status:'pending',createdAt:firebase.database.ServerValue.TIMESTAMP};
         await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${eventId}`).set(record);
-        await cloudDb.ref(`${CLOUD_ROOT}/recordings/${cloudStudentId}/${date}`).set({eventId,mode,points,status:'pending',createdAt:firebase.database.ServerValue.TIMESTAMP});
+        
         const source=reviewNoHints?'shorashim-no-hints':'shorashim-recording';
         const awardResp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:cloudStudentId,source,eventId})});
         const awardData=await awardResp.json().catch(()=>({}));
         if(!awardResp.ok)throw new Error(awardData.error||'Recording saved, but the points request could not be sent. Please tell Rabbi Cohen.');
         await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${eventId}`).update({pointRequestId:awardData.requestId||null,pointRequestStatus:awardData.status||'pending'});
+        await cloudDb.ref(`${CLOUD_ROOT}/recordings/${cloudStudentId}/${date}`).set({eventId,mode,points,status:awardData.status||'pending',createdAt:firebase.database.ServerValue.TIMESTAMP});
         if(status)status.textContent=`Sent to Rabbi Cohen for approval — ${points} points if approved.`;
       }catch(err){console.error(err);if(status)status.textContent=err?.message||'Could not save the recording.';}
       finally{if(btn){btn.disabled=false;btn.textContent=reviewNoHints?'🎙️ Start Recording — 3 Points':'🎙️ Start Recording — 2 Points';}const pause=document.getElementById('shorashimPauseBtn');if(pause){pause.classList.add('hidden');pause.textContent='⏸ Pause';}shorashimRecorder=null;shorashimRecordingChunks=[];shorashimPausedMs=0;}
@@ -497,7 +517,24 @@ async function toggleShorashimRecording(){
 
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function flipReview(){if(!reviewDeck.length)return;reviewFlipped=!reviewFlipped;renderReviewCard(false);}
-function qualifyCurrentCard(){if(!reviewDeck.length)return true;const c=reviewDeck[reviewIndex],dr=ensureDailyReview(),already=!!dr.seen[c.itemKey];if(already)return true;const elapsed=performance.now()-reviewShownAt,min=db.settings.minReviewMs||500;if(elapsed<min){const msg=document.getElementById('tooFastMessage');msg.textContent=`Give yourself a moment to say the word and meaning. (${(min/1000).toFixed(1)}s minimum)`;msg.classList.remove('hidden');setTimeout(()=>msg.classList.add('hidden'),1200);return false;}dr.seen[c.itemKey]=Date.now();const p=dailyProgress();saveDB();renderDailyStatus();if(p.complete){const msg=document.getElementById('tooFastMessage');msg.textContent='✅ Today’s full review is complete!';msg.classList.remove('hidden');setTimeout(()=>msg.classList.add('hidden'),2600);}return true;}
+function qualifyCurrentCard(){
+  if(!reviewDeck.length)return true;
+  const c=reviewDeck[reviewIndex],dr=ensureDailyReview(),already=!!dr.seen[c.itemKey];
+  if(!already){
+    const elapsed=performance.now()-reviewShownAt,min=db.settings.minReviewMs||500;
+    if(elapsed<min){
+      const msg=document.getElementById('tooFastMessage');
+      msg.textContent='Say the Shoresh and meaning first!';
+      msg.classList.remove('hidden');
+      setTimeout(()=>msg.classList.add('hidden'),1400);
+      return false;
+    }
+    dr.seen[c.itemKey]=Date.now();
+    saveDB();renderDailyStatus();
+  }
+  reviewSessionSeen.add(c.itemKey);
+  return true;
+}
 function moveReview(dir){if(!reviewDeck.length||!qualifyCurrentCard())return;reviewIndex=(reviewIndex+dir+reviewDeck.length)%reviewDeck.length;reviewFlipped=false;renderReviewCard();}
 function renderReviewCard(resetTimer=true){const c=reviewDeck[reviewIndex],item=getItem(c.itemKey);if(!item)return;const d=normalizeDesign(c.design),card=document.getElementById('reviewFlipCard'),h=document.getElementById('reviewHebrew'),e=document.getElementById('reviewEnglish'),ex=document.getElementById('reviewExamples'),bex=document.getElementById('reviewBackExamples'),layer=document.getElementById('reviewArtLayer'),img=document.getElementById('reviewDrawing');document.getElementById('reviewCounter').textContent=`${reviewIndex+1} of ${reviewDeck.length}`;document.getElementById('reviewPasuk').textContent=`${singularTrack(c.itemType)}${c.itemType==='shorashim'?` • ${reviewFilterLabel(item)}`:''}${item.pasuk?` • Pasuk ${item.pasuk}`:''} • learned ${fmtDate(c.learnedAt)}`;card.style.background=d.backgroundColor;const scale=cardDisplayScale(card),fontStyle=hebrewFontVisualStyle(d.hebrewFont);h.textContent=item.front;h.style.fontSize=(d.hebrewSize*scale)+'px';h.style.fontFamily=d.hebrewFont;h.style.fontWeight=fontStyle.weight;h.style.letterSpacing=fontStyle.letterSpacing;h.style.color=d.hebrewColor;h.style.left=d.hebrewPos.left+'%';h.style.top=d.hebrewPos.top+'%';e.textContent=item.english;e.style.fontSize=(d.englishSize*scale)+'px';e.style.fontFamily=d.englishFont;e.style.fontWeight='800';e.style.color=d.englishColor;e.style.left=d.englishPos.left+'%';e.style.top=d.englishPos.top+'%';ex.innerHTML=(item.examples||[]).slice(0,3).map(x=>`<div class="heb-example">${highlightExample(x)}</div>`).join('');ex.querySelectorAll('.heb-example').forEach(x=>x.style.fontSize=(22*scale)+'px');bex.innerHTML=(item.examples||[]).slice(0,3).map(x=>`<div>${escapeHTML(x.english)}</div>`).join('');bex.style.fontSize=(14*scale)+'px';renderReadOnlyArts(layer,d.arts,scale);img.src=d.drawing||'';layer.classList.toggle('hidden',reviewFlipped||reviewNoHints);img.classList.toggle('hidden',!d.drawing||reviewFlipped||reviewNoHints);h.classList.toggle('hidden',reviewFlipped);ex.classList.toggle('hidden',reviewFlipped||!(item.examples||[]).length);layer.classList.toggle('hidden',reviewFlipped);e.classList.toggle('hidden',!reviewFlipped);bex.classList.toggle('hidden',!reviewFlipped||!(item.examples||[]).length);document.getElementById('reviewSideLabel').textContent=reviewFlipped?'BACK':'FRONT';if(resetTimer)reviewShownAt=performance.now();renderDailyStatus();}
 function renderReadOnlyArts(layer,arts,scale=1){layer.innerHTML='';(arts||[]).forEach(a=>{const el=document.createElement('div');el.className='art-item '+(a.kind||'emoji');el.style.left=(a.left??50)+'%';el.style.top=(a.top??66)+'%';const size=(a.size||84)*scale;if(a.kind==='illustration'){el.style.width=size+'px';el.style.height=Math.round(size*.68)+'px';const im=document.createElement('img');im.src=a.value;im.alt=a.label||'illustration';el.appendChild(im);}else{el.style.fontSize=size+'px';el.textContent=a.value||'';}layer.appendChild(el);});}
