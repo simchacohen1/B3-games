@@ -60,7 +60,7 @@ function flashRender(){
   actions.append(dontKnow,know);
   box.append(actions);
 }
-$('start').onclick=async()=>{if(busy)return;clearAdvance();busy=true;$('start').disabled=true;try{message('');const s=await API.call('start',{group,forceNew:true});round=s.round;pending=null;$('practice').hidden=false;question();focusPractice()}catch(e){message(e.message)}finally{busy=false;$('start').disabled=!open(group)}};
+$('start').onclick=async()=>{if(busy)return;clearAdvance();busy=true;$('start').disabled=true;try{message('');const s=await API.call('start',{group});round=s.round;pending=null;$('practice').hidden=false;question();focusPractice()}catch(e){message(e.message)}finally{busy=false;$('start').disabled=!open(group)}};
 function question(){
   clearAdvance();
   const box=$('practice');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
