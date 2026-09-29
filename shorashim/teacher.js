@@ -349,6 +349,7 @@ async function loadAll(){
   $('teacherMinReview').value=String(state.settings.minReviewMs||500);
   renderStudentSiteControl();
   renderAll();
+  loadShorashimRecordings();
   const updates=[];
   if(p18Added.length)updates.push(`${p18Added.length} Perek 18 word${p18Added.length===1?'':'s'} added`);
   if(unitMigration.tagged)updates.push(`${unitMigration.tagged} existing word${unitMigration.tagged===1?'':'s'} tagged Perek 18`);
@@ -632,7 +633,7 @@ async function loadAccess(){const[p,a]=await Promise.all([db.ref('posukPractice/
 function renderRoster(v){const rows=Object.entries(v).map(([id,x])=>({id,name:x?.name||id})).sort((a,b)=>a.name.localeCompare(b.name));$('rosterList').innerHTML=rows.map(r=>`<div class="roster-row"><span>${esc(r.name)}</span><button class="danger small" data-remove="${esc(r.id)}">Remove</button></div>`).join('')||'<p>No approved students yet.</p>';[...$('rosterList').querySelectorAll('[data-remove]')].forEach(b=>b.onclick=async()=>{if(!confirm('Remove this student from approved access?'))return;await db.ref('posukPractice/allowedStudents/'+b.dataset.remove).remove();loadAccess()})}
 function slug(n){return n.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')}
 function renderLeaderboard(){const match=state.leaderboards.match||{};$('leaderboardTeacher').innerHTML=Object.keys(match).sort((a,b)=>Number(a)-Number(b)).map(k=>{const rows=Object.entries(match[k]||{}).map(([id,x])=>({id,...x})).filter(x=>Number.isFinite(Number(x.time))).sort((a,b)=>a.time-b.time);return`<h3>${esc(k)}-pair Match</h3>${rows.length?`<table class="teacher-table"><thead><tr><th>#</th><th>Student</th><th>Time</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name||r.id)}</td><td>${(r.time/1000).toFixed(2)}s</td></tr>`).join('')}</tbody></table>`:'<p class="mini-note">No scores yet.</p>'}`}).join('')||'<p>No leaderboard scores yet.</p>'}
-function bindTabs(){document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.teacher-tab').forEach(x=>x.classList.add('hidden'));$('tab-'+b.dataset.tab).classList.remove('hidden');if(b.dataset.tab==='access'){loadAccess();renderStudentSiteControl()}})}
+function bindTabs(){document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.teacher-tab').forEach(x=>x.classList.add('hidden'));$('tab-'+b.dataset.tab).classList.remove('hidden');if(b.dataset.tab==='access'){loadAccess();renderStudentSiteControl()}if(b.dataset.tab==='recordings'){loadShorashimRecordings()}})}
 
 $('teacherEnter').onclick=()=>{if($('teacherPasscode').value!==TEACHER_PASSCODE){$('teacherGateMsg').textContent='Incorrect passcode.';return}$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');sessionStorage.setItem('shorashimTeacher','1');loadAll()};
 $('teacherPasscode').addEventListener('keydown',e=>{if(e.key==='Enter')$('teacherEnter').click()});
@@ -714,3 +715,87 @@ db.ref(ROOT).on('value',snap=>{
   if(v.leaderboards)state.leaderboards=v.leaderboards;
   renderAll()
 });
+
+
+/* ===== Shorashim recording approvals ===== */
+const STUDENT_REWARDS_AUTO_AWARD_URL="https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
+let shorashimRecordingRows=[];
+
+function recordingTime(v){
+  const n=Number(v||0); if(!n)return "";
+  try{return new Date(n).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}catch(e){return "";}
+}
+function recordingModeLabel(r){
+  return (r.noHints===true||r.mode==="no-hints") ? "🏆 No Hints Challenge" : "🎙️ Record Chazara";
+}
+function recordingPoints(r){return Number(r.points||((r.noHints===true||r.mode==="no-hints")?3:2));}
+async function loadShorashimRecordings(){
+  const box=$('shorashimRecordingsList'); if(!box)return;
+  try{
+    const snap=await db.ref(`${ROOT}/recordingEvents`).once('value');
+    const rows=[];
+    snap.forEach(studentSnap=>studentSnap.forEach(eventSnap=>{
+      const r=eventSnap.val()||{};
+      rows.push({studentId:studentSnap.key,eventId:eventSnap.key,...r});
+    }));
+    rows.sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
+    shorashimRecordingRows=rows;
+    renderShorashimRecordings();
+  }catch(e){
+    console.error(e); box.innerHTML='<p class="mini-note">Could not load recordings.</p>';
+  }
+}
+function renderShorashimRecordings(){
+  const box=$('shorashimRecordingsList'); if(!box)return;
+  const pending=shorashimRecordingRows.filter(r=>String(r.pointRequestStatus||r.status||"pending")==="pending" && r.pointRequestId);
+  const badge=$('recordingsBadge');
+  if(badge){badge.textContent=String(pending.length);badge.classList.toggle('hidden',pending.length===0);}
+  if(!shorashimRecordingRows.length){box.innerHTML='<p class="mini-note">No Shorashim recordings have been submitted yet.</p>';return;}
+  box.innerHTML=shorashimRecordingRows.map(r=>{
+    const st=String(r.pointRequestStatus||r.status||"pending");
+    const pendingReady=st==="pending"&&!!r.pointRequestId;
+    const statusLabel=st==="approved"?"✅ Approved":st==="rejected"?"❌ Rejected":r.pointRequestId?"⏳ Waiting for approval":"⚠️ Points request not connected";
+    return `<div class="teacher-panel" style="margin:12px 0;padding:16px">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+        <div><div style="font-size:1.25rem;font-weight:900">${esc(r.studentName||r.studentId)}</div>
+        <div class="mini-note">${recordingModeLabel(r)} • <b>${recordingPoints(r)} points</b> • ${esc(recordingTime(r.createdAt))}</div></div>
+        <b>${statusLabel}</b>
+      </div>
+      ${r.audioURL?`<audio controls preload="none" src="${esc(r.audioURL)}" style="width:100%;margin:12px 0"></audio>`:'<p class="mini-note">Audio file unavailable.</p>'}
+      ${pendingReady?`<div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="primary" onclick="reviewShorashimRecording('${esc(r.pointRequestId)}','approve')">✓ Approve ${recordingPoints(r)} Points</button>
+        <button class="ghost" style="border-color:#dc2626;color:#b91c1c" onclick="reviewShorashimRecording('${esc(r.pointRequestId)}','reject')">✕ Reject</button>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+async function teacherRewardsToken(){
+  let user=firebase.auth().currentUser;
+  if(!user){
+    const provider=new firebase.auth.GoogleAuthProvider();
+    const result=await firebase.auth().signInWithPopup(provider); user=result.user;
+  }
+  if(String(user?.email||"").toLowerCase()!=="simcha5770@gmail.com")throw new Error("Please sign in with simcha5770@gmail.com.");
+  return user.getIdToken(true);
+}
+async function reviewShorashimRecording(requestId,action){
+  try{
+    const token=await teacherRewardsToken();
+    const resp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({action:action==="approve"?"approve-point-request":"reject-point-request",requestId})});
+    const data=await resp.json().catch(()=>({}));
+    if(!resp.ok)throw new Error(data.error||"Could not update this recording.");
+    const row=shorashimRecordingRows.find(x=>x.pointRequestId===requestId);
+    if(row)row.pointRequestStatus=action==="approve"?"approved":"rejected";
+    renderShorashimRecordings();
+  }catch(e){alert(e.message||"Could not update this recording.");}
+}
+window.reviewShorashimRecording=reviewShorashimRecording;
+window.addEventListener("DOMContentLoaded",()=>{
+  const sign=$('recordingsGoogleSignIn');
+  if(sign)sign.onclick=async()=>{try{const token=await teacherRewardsToken();$('recordingsAuthStatus').textContent="✓ Signed in — approvals are ready.";sign.textContent="✓ Google Signed In";}catch(e){$('recordingsAuthStatus').textContent=e.message||"Sign-in failed.";}};
+  firebase.auth().onAuthStateChanged(u=>{
+    const s=$('recordingsAuthStatus');
+    if(s)s.textContent=u&&String(u.email||"").toLowerCase()==="simcha5770@gmail.com"?"✓ Signed in — approvals are ready.":"Sign in when you are ready to approve or reject.";
+  });
+});
+
