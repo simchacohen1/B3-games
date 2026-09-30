@@ -27,6 +27,8 @@
 .story-exit{background:#e8eef3;color:#244b6d;padding:10px 14px;font-size:15px}
 .story-exit:hover{background:#d8e4ed}
 .story-hint{font-weight:800;color:#52616a;margin:4px auto 10px}
+.story-directions{background:#e8eef3;color:#244b6d;padding:9px 13px;font-size:15px;margin:2px 0 6px}
+.story-directions:hover{background:#d8e4ed}
 .story-para{max-width:850px;margin:14px auto 22px;background:#f8fbfd;border:2px solid #c6d8e8;border-radius:18px;padding:22px 26px;font:25px/1.9 Georgia,serif;text-align:right}
 .story-key{background:#ffe58a;color:#17344a;border-radius:7px;padding:1px 4px;font-weight:900}
 .story-answers{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:900px;margin:20px auto}
