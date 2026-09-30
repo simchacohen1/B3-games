@@ -29,8 +29,17 @@
 .story-hint{font-weight:800;color:#52616a;margin:4px auto 10px}
 .story-directions{background:#e8eef3;color:#244b6d;padding:9px 13px;font-size:15px;margin:2px 0 6px}
 .story-directions:hover{background:#d8e4ed}
-.story-para{max-width:850px;margin:14px auto 22px;background:#f8fbfd;border:2px solid #c6d8e8;border-radius:18px;padding:22px 26px;font:25px/1.9 Georgia,serif;text-align:right}
-.story-key{background:#ffe58a;color:#17344a;border-radius:7px;padding:1px 4px;font-weight:900}
+.story-reading-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start;max-width:1000px;margin:14px auto 22px}
+.story-para{margin:0;background:#f8fbfd;border:2px solid #c6d8e8;border-radius:18px;padding:22px 26px;font:25px/1.9 Georgia,serif;text-align:right}
+.story-key{background:#ffe58a;color:#17344a;border-radius:7px;padding:1px 4px;font-weight:900;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.story-glossary{margin:0;background:#fff8d8;border:2px solid #e5c95b;border-radius:18px;padding:16px;text-align:left;color:#17344a;font-size:16px;line-height:1.3}
+.story-glossary h3{margin:0 0 10px;text-align:center;font-size:21px;color:#17344a}
+.story-glossary-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #eadc9a}
+.story-glossary-row:last-child{border-bottom:0}
+.story-glossary-yi{font:bold 20px Georgia,serif;direction:rtl;text-align:right}
+.story-glossary-en{font-weight:800;color:#40515a}
+.story-glossary-speak{min-width:38px;padding:7px 8px;background:#fff;color:#244b6d;border:1px solid #d9c86e;font-size:17px}
+.story-glossary-speak:hover{background:#fff3b2}
 .story-answers{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:900px;margin:20px auto}
 .story-answer-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:stretch}
 .story-answer{background:#315f86;text-align:left;line-height:1.35;min-height:78px;width:100%}
@@ -41,7 +50,8 @@
 .story-feedback{min-height:32px;font-weight:800}
 .story-next{margin-top:12px;background:#165748}
 .story-link{display:inline-block;background:#e9f1ed;border-radius:999px;padding:8px 12px}
-@media(max-width:650px){.story-answers{grid-template-columns:1fr}.story-para{font-size:22px;padding:18px}.story-answer{min-height:68px}}
+@media(max-width:800px){.story-reading-layout{grid-template-columns:1fr}.story-glossary{order:2}.story-para{order:1}}
+@media(max-width:650px){.story-answers{grid-template-columns:1fr}.story-para{font-size:22px;padding:18px}.story-answer{min-height:68px}.story-glossary-row{grid-template-columns:1fr 1fr auto}}
 
 /* Teacher Story Detective analytics */
 .story-teacher-detail{margin:18px 0 28px;padding:18px;background:#eef5f9;border:2px solid #c6d8e8;border-radius:18px}
