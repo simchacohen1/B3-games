@@ -356,6 +356,7 @@ async function loadAll(){
   if(unitMigration.added.length)updates.push(`${unitMigration.added.length} Perek 19 word${unitMigration.added.length===1?'':'s'} added`);
   if(repaired)updates.push(`${repaired} picture set${repaired===1?'':'s'} created`);
   status(updates.length?`☁️ Connected • ${updates.join(' • ')}`:'☁️ Connected');
+  applyRequestedTeacherView();
 }
 function renderAll(){renderDashboard();renderCatalog();renderLeaderboard()}
 function renderDashboard(){const arr=Object.entries(state.students),total=arr.reduce((n,[,s])=>n+learned(s).length,0),done=arr.filter(([,s])=>reviewDone(s).complete).length,time=arr.reduce((n,[,s])=>n+(s.totalActiveSeconds||0),0);$('teacherStats').innerHTML=[['Students',arr.length],['Learned cards',total],['Class study time',fmtSec(time)],['Review complete today',`${done}/${arr.length}`]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('');const body=$('teacherStudentsBody');body.innerHTML='';arr.sort((a,b)=>(a[1].name||a[0]).localeCompare(b[1].name||b[0])).forEach(([id,s])=>{const r=reviewDone(s),tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(s.name||id)}</b></td><td>${learned(s,'shorashim').length}</td><td>${learned(s,'prefix').length+learned(s,'suffix').length}</td><td>${fmtSec(s.totalActiveSeconds)}</td><td>${r.total?`${r.seen}/${r.total}${r.complete?' ✓':''}`:'—'}</td><td>${dateLabel(s.lastActive)}</td>`;tr.onclick=()=>openStudent(id);body.appendChild(tr)})}
@@ -634,6 +635,33 @@ function renderRoster(v){const rows=Object.entries(v).map(([id,x])=>({id,name:x?
 function slug(n){return n.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')}
 function renderLeaderboard(){const match=state.leaderboards.match||{};$('leaderboardTeacher').innerHTML=Object.keys(match).sort((a,b)=>Number(a)-Number(b)).map(k=>{const rows=Object.entries(match[k]||{}).map(([id,x])=>({id,...x})).filter(x=>Number.isFinite(Number(x.time))).sort((a,b)=>a.time-b.time);return`<h3>${esc(k)}-pair Match</h3>${rows.length?`<table class="teacher-table"><thead><tr><th>#</th><th>Student</th><th>Time</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name||r.id)}</td><td>${(r.time/1000).toFixed(2)}s</td></tr>`).join('')}</tbody></table>`:'<p class="mini-note">No scores yet.</p>'}`}).join('')||'<p>No leaderboard scores yet.</p>'}
 function bindTabs(){document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.teacher-tab').forEach(x=>x.classList.add('hidden'));$('tab-'+b.dataset.tab).classList.remove('hidden');if(b.dataset.tab==='access'){loadAccess();renderStudentSiteControl()}if(b.dataset.tab==='recordings'){loadShorashimRecordings()}})}
+function applyRequestedTeacherView(){
+  const params=new URLSearchParams(window.location.search);
+  const tab=params.get('tab');
+  if(!['dashboard','lists','access','recordings','leaderboard'].includes(tab||''))return;
+  const btn=document.querySelector('[data-tab="'+tab+'"]');
+  if(btn)btn.click();
+  if(tab==='lists'&&params.get('approval')==='pending'){
+    const pending=(state.catalog.shorashim||[]).find(function(item){
+      const n=commonnessOf(item);
+      return item&&item.hidden!==true&&item.teacherApproved!==true&&n!==null&&n<=5;
+    });
+    if(pending){
+      if($('teacherTrack'))$('teacherTrack').value='shorashim';
+      currentTrack='shorashim';
+      refreshNamedLists(listNameOf(pending));
+      if($('teacherPerekFilter'))$('teacherPerekFilter').value='all';
+      renderCatalog();
+      setTimeout(function(){
+        const approve=$('#teacherCatalog [data-a=approve]');
+        if(approve){
+          const box=approve.closest('.approval-box');
+          if(box)box.scrollIntoView({behavior:'smooth',block:'center'});
+        }
+      },80);
+    }
+  }
+}
 
 $('teacherEnter').onclick=()=>{if($('teacherPasscode').value!==TEACHER_PASSCODE){$('teacherGateMsg').textContent='Incorrect passcode.';return}$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');sessionStorage.setItem('shorashimTeacher','1');loadAll()};
 $('teacherPasscode').addEventListener('keydown',e=>{if(e.key==='Enter')$('teacherEnter').click()});
