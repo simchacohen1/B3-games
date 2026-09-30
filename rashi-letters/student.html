@@ -190,13 +190,21 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
     <div class="help-row"><button class="helper" id="learnBtn">🔎 Show me how</button></div><div id="studyPanel" class="study hidden"></div><div class="choices" id="choicesRow"></div>
     <div id="feedback" role="status" aria-live="polite"></div>
     <div class="progress-track"><div id="progFill" style="width:0%"></div></div>
-    <div class="streak-row" id="streakRow"></div><div class="star-note">Get 3 correct in a row to complete this step.</div><button class="btn hidden" id="nextBtn" style="display:block;margin:18px auto 0">Next question →</button>
+    <div class="streak-row" id="streakRow"></div><div class="star-note">Get 3 correct to complete this step. A mistake does not erase your stars.</div><button class="btn hidden" id="nextBtn" style="display:block;margin:18px auto 0">Next question →</button>
   </div>
 
   <div class="card" id="completeScreen">
     <div class="confetti-row">🎉🎊🎉</div>
     <div style="font-family:'Frank Ruhl Libre', serif; font-size:1.5rem; color:var(--rimon-dark); margin-bottom:8px;">כל הכבוד!</div>
     <h2>Quest complete!</h2><p>You finished all 9 missions. Keep your Rashi skills strong with more practice!</p><button class="btn" onclick="showModeGate()">Choose a practice mission</button>
+  </div>
+
+  <div class="card" id="practiceCompleteScreen" style="display:none;text-align:center;">
+    <div class="confetti-row">⭐🎉⭐</div>
+    <div style="font-family:'Frank Ruhl Libre', serif; font-size:1.5rem; color:var(--rimon-dark); margin-bottom:8px;">כל הכבוד!</div>
+    <h2 id="practiceCompleteTitle">Practice complete!</h2>
+    <p id="practiceCompleteText">You finished this practice mission.</p>
+    <button class="btn" id="practiceDoneBtn">Choose another mission</button>
   </div>
 
   <div class="card" id="closedScreen">
@@ -320,14 +328,17 @@ const UNITS = [
       {w:'שֶׂה', decoys:['שֶׁה', 'סֶה', 'שֶׂד']}
     ]}
 ];
-const NEEDED_IN_A_ROW = 3;
+const NEEDED_CORRECT = 3;
+const MAX_QUESTIONS_PER_STEP = 5;
 
 let soundOn = true, starsThisVisit = 0, guidedIndex = 0, guidedPhase = 'letter', questionTimer = null, viewVersion = 0;
 let studentName = null;
 let studentId = null;
 let unitIndex = 0;
 let phase = 'letter'; // 'letter' | 'word'
-let streak = 0;
+let streak = 0; // correct answers earned in the current step; mistakes do not erase them
+let attemptsThisStep = 0;
+let retryQuestion = null;
 let currentTarget = null;
 let currentWord = null;
 let answering = false;
@@ -434,7 +445,7 @@ async function loadProgress(){
   const savedIndex = rec.currentUnitIndex;
   unitIndex = (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex <= UNITS.length) ? savedIndex : 0;
   phase = (rec.currentPhase === 'word') ? 'word' : 'letter';
-  streak = 0; guidedIndex = unitIndex; guidedPhase = phase;
+  streak = 0; attemptsThisStep = 0; retryQuestion = null; guidedIndex = unitIndex; guidedPhase = phase;
 }
 
 function renderLetterGrid(){
@@ -466,12 +477,13 @@ function showModeGate(){
   document.getElementById('continueBtn').disabled = guidedIndex >= UNITS.length;
   document.getElementById('app').style.display = 'none';
   document.getElementById('completeScreen').classList.remove('show');
+  document.getElementById('practiceCompleteScreen').style.display = 'none';
   document.getElementById('modeGate').style.display = 'block';
   renderLetterGrid();
 }
 
 document.getElementById('continueBtn').onclick = () => {
-  mode = 'continue'; unitIndex = guidedIndex; phase = guidedPhase; streak = 0;
+  mode = 'continue'; unitIndex = guidedIndex; phase = guidedPhase; streak = 0; attemptsThisStep = 0; retryQuestion = null;
   document.getElementById('modeGate').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   renderQuestion();
@@ -488,7 +500,7 @@ document.querySelectorAll('.mode-type-btn').forEach(b => {
 document.getElementById('startPracticeBtn').onclick = () => {
   if(!practiceUnitId) return;
   mode = 'practice';
-  streak = 0;
+  streak = 0; attemptsThisStep = 0; retryQuestion = null;
   phase = (practiceModeType === 'word') ? 'word' : 'letter';
   document.getElementById('modeGate').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -498,6 +510,18 @@ document.getElementById('startPracticeBtn').onclick = () => {
 document.getElementById('menuLinkBtn').onclick = () => {
   showModeGate();
 };
+document.getElementById('practiceDoneBtn').onclick = () => {
+  showModeGate();
+};
+
+function finishPracticeMission(unit){
+  clearTimeout(questionTimer); viewVersion++;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('modeGate').style.display = 'none';
+  document.getElementById('practiceCompleteScreen').style.display = 'block';
+  document.getElementById('practiceCompleteTitle').textContent = '★ Practice complete!';
+  document.getElementById('practiceCompleteText').textContent = 'You finished ' + unit.label + '. Nice work — choose another mission when you’re ready.';
+}
 
 function getActiveUnit(){
   if(mode === 'practice'){
@@ -520,7 +544,7 @@ function choicesFor(unit){
 function updateStreakStars(){
   const row = document.getElementById('streakRow');
   row.innerHTML = '';
-  for(let i=0;i<NEEDED_IN_A_ROW;i++){
+  for(let i=0;i<NEEDED_CORRECT;i++){
     const s = document.createElement('span');
     s.className = 'streak-star' + (i < streak ? ' lit' : '');
     s.textContent = '★';
@@ -549,17 +573,19 @@ function renderQuestion(){
   const promptEl = document.getElementById('promptText');
 
   if(phase === 'letter'){
-    currentTarget = pickTarget(unit);
+    currentTarget = (retryQuestion && retryQuestion.phase === 'letter') ? retryQuestion.target : pickTarget(unit);
     currentWord = null;
+    retryQuestion = null;
     rashiEl.classList.remove('word-mode');
     rashiEl.textContent = currentTarget;
     promptEl.textContent = 'Which letter is this?';
     pill.textContent = 'Letter';
     pill.classList.remove('word');
   } else {
-    const wordEntry = unit.words[Math.floor(Math.random()*unit.words.length)];
+    const wordEntry = (retryQuestion && retryQuestion.phase === 'word') ? retryQuestion.word : unit.words[Math.floor(Math.random()*unit.words.length)];
     currentWord = wordEntry;
     currentTarget = wordEntry.w;
+    retryQuestion = null;
     rashiEl.classList.add('word-mode');
     rashiEl.textContent = wordEntry.w;
     promptEl.textContent = 'Which word below matches this word exactly?';
@@ -595,10 +621,13 @@ function renderQuestion(){
   }
   let pct;
   if(mode === 'continue'){
-    const phaseFrac = (phase === 'word' ? 1 : 0) + (streak/NEEDED_IN_A_ROW);
+    const phaseFrac = (phase === 'word' ? 1 : 0) + (streak/NEEDED_CORRECT);
     pct = Math.round(((unitIndex*2 + phaseFrac) / (UNITS.length*2)) * 100);
+  } else if(practiceModeType === 'mixed'){
+    const phaseFrac = (phase === 'word' ? 1 : 0) + (streak/NEEDED_CORRECT);
+    pct = Math.round((phaseFrac / 2) * 100);
   } else {
-    pct = Math.round((streak/NEEDED_IN_A_ROW) * 100);
+    pct = Math.round((streak/NEEDED_CORRECT) * 100);
   }
   document.getElementById('progFill').style.width = Math.min(pct,100) + '%';
   updateStreakStars();
@@ -627,6 +656,8 @@ async function handleAnswer(letter, btnEl){
   const fb = document.getElementById('feedback');
   document.querySelectorAll('.choice-btn').forEach(b => b.disabled = true);
   document.getElementById('learnBtn').disabled = true;
+  attemptsThisStep++;
+
   if(isCorrect){
     btnEl.classList.add('correct');
     starsThisVisit++;
@@ -638,24 +669,55 @@ async function handleAnswer(letter, btnEl){
   }else{
     btnEl.classList.add('incorrect');
     document.querySelectorAll('.choice-btn').forEach(b=>{if(b.textContent===currentTarget)b.classList.add('correct');});
-    fb.style.color='#865014';fb.textContent='Let’s take a closer look. The green answer is the match.';
-    streak=0;showComparison();
+    fb.style.color='#865014';
+    fb.textContent='Good try. The green answer is the match — you’ll see this one once more.';
+    // Keep stars already earned. Repeat this exact item once on the next question.
+    retryQuestion = answeredPhase === 'word'
+      ? { phase:'word', word:currentWord }
+      : { phase:'letter', target:currentTarget };
+    showComparison();
   }
   updateStreakStars();
+
   const writes=[logAttempt(unit.id,answeredPhase,isCorrect)];
-  if(streak >= NEEDED_IN_A_ROW){
-    fb.textContent='★ Three in a row! Step complete!';
-    streak=0;
+  const stepComplete = streak >= NEEDED_CORRECT || (attemptsThisStep >= MAX_QUESTIONS_PER_STEP && isCorrect) || attemptsThisStep > MAX_QUESTIONS_PER_STEP;
+  let practiceFinished = false;
+
+  if(stepComplete){
+    const mastered = streak >= NEEDED_CORRECT;
+    fb.style.color = mastered ? '#176447' : '#5b4a20';
+    fb.textContent = mastered
+      ? '★ Great! You completed this step!'
+      : '★ Step complete! Keep practicing this one again later.';
+    streak = 0;
+    attemptsThisStep = 0;
+    retryQuestion = null;
+
     if(mode==='continue'){
-      if(phase==='letter') phase='word'; else {phase='letter';unitIndex++;}
-      guidedIndex=unitIndex;guidedPhase=phase;
+      if(phase==='letter') phase='word';
+      else { phase='letter'; unitIndex++; }
+      guidedIndex=unitIndex; guidedPhase=phase;
       writes.push(db.ref('rashiLetters/progress/'+studentId).update({currentUnitIndex:unitIndex,currentPhase:phase}));
-    }else if(practiceModeType==='mixed'){phase=phase==='letter'?'word':'letter';}
+    } else if(practiceModeType==='mixed'){
+      if(phase==='letter') phase='word';
+      else practiceFinished = true;
+    } else {
+      practiceFinished = true;
+    }
   }
+
   try{await Promise.all(writes);}catch(e){if(version===viewVersion)fb.textContent+=' Progress could not save. Check your connection.';}
   if(version!==viewVersion) return;
-  if(isCorrect){questionTimer=setTimeout(renderQuestion,1400);}
-  else document.getElementById('nextBtn').classList.remove('hidden');
+
+  if(practiceFinished){
+    questionTimer=setTimeout(()=>finishPracticeMission(unit),1500);
+  } else if(stepComplete){
+    questionTimer=setTimeout(renderQuestion,1400);
+  } else if(isCorrect){
+    questionTimer=setTimeout(renderQuestion,1200);
+  } else {
+    document.getElementById('nextBtn').classList.remove('hidden');
+  }
 }
 
 async function logAttempt(unitId, ph, correct){
