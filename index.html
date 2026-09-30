@@ -70,6 +70,29 @@
     }
     body.admin-panel-open .admin-panel{width:min(360px,calc(100vw - 24px))}
   }
+  /* Friendly student nudges for important daily practice tools. */
+  .game-card{position:relative;overflow:visible}
+  .student-nudge{
+    position:absolute;z-index:20;top:-16px;right:-12px;
+    width:max-content;max-width:180px;padding:9px 11px;
+    border:2px solid #93c5fd;border-radius:14px;
+    background:#fff;color:#1e3a8a;font-size:13px;font-weight:800;line-height:1.25;
+    text-align:left;box-shadow:0 8px 20px rgba(15,23,42,.16);
+    pointer-events:none;animation:nudgeHello .5s cubic-bezier(.2,.8,.2,1) both,nudgeFloat 2.8s ease-in-out .55s infinite;
+  }
+  .student-nudge::after{
+    content:"";position:absolute;right:26px;bottom:-8px;width:14px;height:14px;
+    background:#fff;border-right:2px solid #93c5fd;border-bottom:2px solid #93c5fd;
+    transform:rotate(45deg);
+  }
+  .student-nudge-wave{display:inline-block;margin-right:3px;animation:nudgeWave 1.4s ease-in-out 2;transform-origin:70% 70%}
+  @keyframes nudgeHello{from{opacity:0;transform:translateY(8px) scale(.88)}to{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes nudgeFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  @keyframes nudgeWave{0%,100%{transform:rotate(0)}25%{transform:rotate(18deg)}50%{transform:rotate(-10deg)}75%{transform:rotate(14deg)}}
+  @media(max-width:560px){
+    .student-nudge{top:-12px;right:2px;max-width:150px;font-size:12px;padding:8px 9px}
+  }
+
   .version-modal{position:fixed;inset:0;background:rgba(15,23,42,.48);z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px}
   .version-modal-card{width:min(390px,100%);background:white;border-radius:20px;padding:22px;box-shadow:0 20px 55px rgba(0,0,0,.28);text-align:center}
   .version-modal-card h2{margin:0 0 6px;color:#26364a}.version-modal-card p{margin:0 0 16px;color:#64748b}
@@ -311,6 +334,34 @@
   let approvalCenterLoading=false;
   let approvalCounts={};
 
+  const STUDENT_NUDGE_DAY_MS=24*60*60*1000;
+  const studentNudgeMessages={
+    "posuk-practice-scroll":[
+      "Hi {name}! Ready for today’s pesukim? Come on in!",
+      "Hey {name}! Your Posuk Practice is waiting for you!",
+      "Come on in, {name} — let’s get those pesukim strong!",
+      "Hi {name}! A little Posuk Practice goes a long way!"
+    ],
+    "chazara":[
+      "Hi {name}! Time for a quick Chazara — come on in!",
+      "Hey {name}! Let’s keep yesterday’s learning fresh!",
+      "Come on in, {name}! Your Chazara is waiting!",
+      "Hi {name}! Ready to review and remember?"
+    ],
+    "class-gallery":[
+      "Hi {name}! Come see what’s happening in the Class Gallery!",
+      "Hey {name}! Come on in and see what the class has been sharing!",
+      "The Class Gallery is calling you, {name}!",
+      "Hi {name}! There may be something new to see in the Gallery!"
+    ],
+    "shorashim":[
+      "Hi {name}! Ready to grow your Shorashim?",
+      "Come on in, {name} — let’s make those Shorashim stronger!",
+      "Hey {name}! Your Shorashim practice is waiting!",
+      "Hi {name}! Let’s grow some word-power today!"
+    ]
+  };
+
   const approvalDefinitions=[
     {key:"posukDisputes",icon:"📜",title:"Posuk Practice disputes",detail:"Student reading, translation, or understanding disputes waiting for you.",href:"record_pesukim/teacher.html?review=disputes"},
     {key:"posukPoints",icon:"⭐",title:"Posuk Practice points",detail:"100% milestone point requests waiting for approval.",href:"student-rewards/teacher.html?tab=Rewards"},
@@ -482,6 +533,7 @@
   function setLoginMsg(t){el("loginMsg").textContent=t||"";}
 
   function showLogin(){
+    document.querySelectorAll(".student-nudge").forEach(n=>n.remove());
     el("loginCard").classList.remove("hidden");
     el("studentBar").classList.add("hidden");
     el("lockedCard").classList.add("hidden");
@@ -495,7 +547,53 @@
     return Boolean(currentSettings.studentGameOverrides?.[studentId]?.[gameId]===true);
   }
 
+  function studentNudgeVisitKey(gameId){
+    return "b3Games_lastVisit_"+myStudentId+"_"+gameId;
+  }
+  function studentNudgeName(){
+    const raw=String(myStudentName||"").trim();
+    if(!raw)return "there";
+    return raw.split(/\s+/)[0];
+  }
+  function studentNudgeMessage(gameId){
+    const messages=studentNudgeMessages[gameId]||[];
+    if(!messages.length)return "";
+    const day=Math.floor(Date.now()/STUDENT_NUDGE_DAY_MS);
+    const seed=String(myStudentId||"student")+"|"+gameId+"|"+day;
+    let hash=0;
+    for(let i=0;i<seed.length;i++)hash=((hash<<5)-hash+seed.charCodeAt(i))|0;
+    const message=messages[Math.abs(hash)%messages.length];
+    return message.replaceAll("{name}",studentNudgeName());
+  }
+  function studentNeedsNudge(gameId){
+    if(!myStudentId||!studentNudgeMessages[gameId])return false;
+    const last=Number(localStorage.getItem(studentNudgeVisitKey(gameId))||0);
+    return !last||(Date.now()-last)>=STUDENT_NUDGE_DAY_MS;
+  }
+  function markStudentToolVisited(gameId){
+    if(!myStudentId||!studentNudgeMessages[gameId])return;
+    try{localStorage.setItem(studentNudgeVisitKey(gameId),String(Date.now()));}catch(e){}
+    const card=gameDefinitions.find(g=>g.id===gameId)?.element;
+    card?.querySelector(".student-nudge")?.remove();
+  }
+  function renderStudentNudges(){
+    document.querySelectorAll(".student-nudge").forEach(n=>n.remove());
+    if(isAuthorizedAdmin||!myStudentId||!myClassId)return;
+    let order=0;
+    gameDefinitions.forEach(game=>{
+      if(!studentNudgeMessages[game.id]||game.element.classList.contains("hidden")||!studentNeedsNudge(game.id))return;
+      const bubble=document.createElement("span");
+      bubble.className="student-nudge";
+      bubble.setAttribute("aria-hidden","true");
+      bubble.style.animationDelay=(order*0.12)+"s,"+(0.55+order*0.12)+"s";
+      bubble.innerHTML='<span class="student-nudge-wave">👋</span>'+studentNudgeMessage(game.id);
+      game.element.appendChild(bubble);
+      order++;
+    });
+  }
+
   function renderStudentAccess(){
+    queueMicrotask(renderStudentNudges);
     setTeacherToolPairVisibility();
     // The authorized teacher account is never treated as ET or WT.
     if(isAuthorizedAdmin){
@@ -908,6 +1006,7 @@
   }
 
   gameDefinitions.forEach(game=>game.element.addEventListener("click",e=>{
+    if(!isAuthorizedAdmin)markStudentToolVisited(game.id);
     if(!isAuthorizedAdmin||!teacherVersionByGame[game.id])return;
     e.preventDefault();
     openVersionModal(game);
