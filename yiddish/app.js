@@ -1,5 +1,5 @@
 'use strict';
-const APP_BUILD='2026-09-30-sound-builder-v3-steady-choices';
+const APP_BUILD='2026-09-30-sound-builder-v4-two-yud-vowels';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
 let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null,soundGame=null;
@@ -270,7 +270,7 @@ const SOUND_PROFILES={
   ],
   'קליין':[
     {raw:'קל'},
-    {raw:'יי',answer:'ײַ',choices:['ײַ','יי','יִ','י']},
+    {raw:'יי',answer:'יַי',choices:['יַי','יֵי','יִי','יי']},
     {raw:'ן'}
   ],
   'שטוב':[
@@ -327,7 +327,7 @@ const SOUND_PROFILES={
   'שרייבן':[
     {raw:'ש',answer:'שׁ',choices:['שׁ','שׂ','שָ','שְ']},
     {raw:'ר'},
-    {raw:'יי',answer:'ײַ',choices:['ײַ','יי','יִ','י']},
+    {raw:'יי',answer:'יַי',choices:['יַי','יֵי','יִי','יי']},
     {raw:'ב',answer:'בּ',choices:['בּ','ב','בָ','בְ']},
     {raw:'ען'}
   ],
@@ -370,17 +370,17 @@ const SOUND_PROFILES={
   ],
   'נייעס':[
     {raw:'נ'},
-    {raw:'יי',answer:'ײַ',choices:['ײַ','יי','יִ','י']},
+    {raw:'יי',answer:'יַי',choices:['יַי','יֵי','יִי','יי']},
     {raw:'עס',answer:'עֶס',choices:['עֶס','עַס','עָס','עְס']}
   ],
   'היינט':[
     {raw:'ה'},
-    {raw:'יי',answer:'ײַ',choices:['ײַ','יי','יִ','י']},
+    {raw:'יי',answer:'יַי',choices:['יַי','יֵי','יִי','יי']},
     {raw:'נט'}
   ],
   'גלייך':[
     {raw:'גל'},
-    {raw:'יי',answer:'ײַ',choices:['ײַ','יי','יִ','י']},
+    {raw:'יי',answer:'יַי',choices:['יַי','יֵי','יִי','יי']},
     {raw:'כ',answer:'כ',choices:['כ','כּ']}
   ],
   'קומען':[
@@ -465,7 +465,7 @@ function soundGameRender(){
   }
 
   const part=profile[activePart];
-  box.append(node('p','Choose the correct version for the highlighted part. For this learning activity, ע that makes an “e” sound gets a segol underneath.','sound-hint'));
+  box.append(node('p','Choose the correct version for the highlighted part. In this learning activity, ע with an “e” sound gets a segol; two yuds get patach for “ay” and tzere for “ey.”','sound-hint'));
   const opts=node('div','','sound-options');
   for(const choice of part.choices){
     const b=node('button',choice,'sound-option'+(soundGame.wrongChoice===choice?' wrong':''));
