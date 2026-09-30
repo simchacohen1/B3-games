@@ -216,7 +216,7 @@
 }
 .activity-grid{
   display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
+  grid-template-columns:repeat(5,minmax(0,1fr));
   gap:12px;
 }
 .student-page .activity-card{
@@ -241,6 +241,7 @@
 .student-page .activity-card:disabled{filter:grayscale(.35)}
 .activity-practice{background:linear-gradient(135deg,#e66c2c,#f39b38)}
 .activity-flash{background:linear-gradient(135deg,#7855c7,#a16ad7)}
+.activity-sentence{background:linear-gradient(135deg,#b34d79,#d96a8d)}
 .activity-detective{background:linear-gradient(135deg,#276ca3,#3b8fc1)}
 .activity-words{background:linear-gradient(135deg,#198069,#32a182)}
 .activity-icon{
@@ -304,3 +305,27 @@
   .activity-sparkles{display:none}
   .story-adventure{padding:13px 14px}
 }
+
+
+/* Missing Word — four sentences + eight-word drag bank */
+#sentencegame{background:#fff;border:3px solid #b34d79;border-radius:22px;padding:26px;text-align:center;margin:20px 0}
+.sentence-topbar{display:flex;justify-content:flex-start;margin-bottom:8px}
+.sentence-exit{background:#f5e6ed;color:#7f3154;padding:10px 14px;font-size:15px}
+.sentence-exit:hover{background:#edd7e1}
+.sentence-hint{margin:6px auto 14px;color:#52616a;font-weight:800}
+.sentence-bank{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:16px auto 24px;padding:16px;border-radius:18px;background:#fbf2f6;border:2px solid #efd2df;direction:rtl}
+.sentence-word{min-width:105px;background:#7d4364;color:#fff;border:2px solid transparent;border-radius:14px;padding:12px 16px;font:bold 27px Georgia,serif;cursor:grab;box-shadow:0 5px 12px rgba(58,29,47,.12)}
+.sentence-word:hover:not(:disabled){background:#945377;transform:translateY(-2px)}
+.sentence-word.selected{outline:4px solid #f0b33a;outline-offset:2px}
+.sentence-word.used{background:#d9e8df;color:#245541;opacity:.72;cursor:default}
+.sentence-board{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:980px;margin:0 auto}
+.sentence-card{position:relative;background:#f9fbfa;border:2px solid #dce5e1;border-radius:18px;padding:24px 20px;min-height:126px;display:flex;align-items:center;justify-content:center}
+.sentence-number{position:absolute;top:10px;left:12px;width:29px;height:29px;border-radius:50%;display:grid;place-items:center;background:#173d4d;color:#fff;font-size:14px;font-weight:900}
+.sentence-line{width:100%;font:bold 27px/1.8 Georgia,serif;text-align:right;color:#17344a}
+.sentence-blank{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;min-width:132px;min-height:50px;margin:0 7px;padding:5px 10px;background:#fff8d8;color:#714f00;border:3px dashed #d7b84d;border-radius:12px;font:bold 27px Georgia,serif}
+.sentence-blank:hover:not(:disabled),.sentence-blank.drag-over{background:#fff0ad;border-color:#b98a10;transform:scale(1.03)}
+.sentence-blank.solved{background:#dff2e6;color:#155431;border:3px solid #73b58a}
+.sentence-feedback{min-height:34px;margin:16px 0 8px;font-weight:900}
+.sentence-next{margin-top:4px;background:#7d4364}
+.sentence-next:hover{background:#945377}
+@media(max-width:760px){.sentence-board{grid-template-columns:1fr}.sentence-card{min-height:108px}.sentence-line{font-size:23px}.sentence-word{font-size:24px;min-width:92px}.sentence-blank{font-size:23px;min-width:110px}}
