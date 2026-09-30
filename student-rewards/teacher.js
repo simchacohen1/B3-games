@@ -14,6 +14,17 @@ const CLASS_REWARD_PRESETS=[
   {key:"create-new-game",name:"Create a New Game",icon:"🎮"},
   {key:"extra-class-game-time",name:"Extra Class Time for a Game",icon:"⏰"},
   {key:"extra-recess",name:"Extra Recess",icon:"🏃"}
+];
+const GIMKIT_MODE_PRESETS=[
+  {id:"fishtopia",name:"Fishtopia"},
+  {id:"tag-domination",name:"Tag: Domination"},
+  {id:"capture-the-flag",name:"Capture the Flag"},
+  {id:"farmchain",name:"Farmchain"},
+  {id:"snowbrawl",name:"Snowbrawl"},
+  {id:"snowy-survival",name:"Snowy Survival"},
+  {id:"one-way-out",name:"One Way Out"},
+  {id:"dont-look-down",name:"Don't Look Down"},
+  {id:"blastball",name:"Blastball"}
 ]
 let state={root:null,user:null,tab:NAV.includes(REQUESTED_TAB)?REQUESTED_TAB:"Overview",classId:"",date:C.schoolDateString(),draft:{},awardDraft:{},absent:new Set(),selectedId:"",pointClassId:"all",pointStudent:"all",pointRange:"30",pointType:"all",pointStatus:"all",pointSearch:""};
 const $=s=>document.querySelector(s), esc=C.escapeHtml;
@@ -56,6 +67,21 @@ function cooldownText(until){
 function personalCooldownInfo(item){
   const days=cooldownDaysValue(item?.cooldownDays),until=timeMs(item?.cooldownUntil),cooling=days>0&&until>Date.now();
   return {days,until,cooling,label:cooling?`Available again in ${cooldownText(until)}`:(days?`Cooldown: ${days} day${days===1?"":"s"}`:"No cooldown")};
+}
+function isGimkitClassReward(item){const id=String(item?.id||"").toLowerCase(),name=String(item?.name||"").trim().toLowerCase();return item?.modeVotingEnabled===true||id.includes("gimkit")||name==="gimkit"}
+function gimkitModeId(name){return String(name||"mode").trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")||"mode"}
+function gimkitModesForItem(item){
+  const raw=item?.modes;let modes=[];
+  if(Array.isArray(raw))modes=raw.map((m,i)=>({id:String(m?.id||gimkitModeId(m?.name||`mode-${i+1}`)),name:String(m?.name||"").trim(),active:m?.active!==false}));
+  else if(raw&&typeof raw==="object")modes=Object.entries(raw).map(([key,m])=>({id:String(m?.id||key),name:String(m?.name||key).trim(),active:m?.active!==false}));
+  modes=modes.filter(m=>m.active!==false&&m.name);
+  if(!modes.length)modes=GIMKIT_MODE_PRESETS.map(m=>({...m,active:true}));
+  const seen=new Set();return modes.filter(m=>{if(seen.has(m.id))return false;seen.add(m.id);return true});
+}
+function modePoints(n){const x=Number(n)||0;return Number.isInteger(x)?String(x):x.toFixed(1).replace(/\.0$/,"")}
+function gimkitTeacherModesHTML(g){
+  if(!g?.modeVoting)return "";
+  return `<div class="gimkit-mode-race"><div class="gimkit-mode-race-head"><b>🎮 Gimkit Mode Race</b><span>First bar to ${g.goal} ★ wins</span></div>${(g.modes||[]).map(m=>`<div class="gimkit-mode-row"><div><strong>${esc(m.name)}</strong><small>${m.voters} voter${m.voters===1?"":"s"}</small></div><div class="gimkit-mode-bar"><i style="width:${m.pct}%"></i></div><b>${modePoints(m.total)} / ${g.goal} ★</b></div>`).join("")}${g.lastWinner?`<p class="gimkit-last-winner">Last winner: <strong>${esc(g.lastWinner.name||g.lastWinner.id||"Gimkit mode")}</strong></p>`:""}</div>`;
 }
 function scoreFor(s){return C.cumulativeProgress(C.allProgressRows(state.root,s.id,state.classId))??100}
 function currentStudent(){const r=roster();return r.find(s=>s.id===state.selectedId)||r[0]||null}
@@ -474,12 +500,14 @@ function commentsPage(){
 }
 async function addComment(e){e.preventDefault();const s=currentStudent(), body=$("#commentText").value.trim();if(!s||!body)return;const key=db.ref(`${ROOT}/commentsByStudent/${s.id}`).push().key;await db.ref(`${ROOT}/commentsByStudent/${s.id}/${key}`).set({id:key,studentId:s.id,body,visibleToStudent:$("#commentVisible").checked,teacherEmail:state.user.email,createdAt:now()});toast("Comment saved")}
 function classRewardSnapshot(item,classId=state.classId){
-  const count=Math.max(1,C.classRoster(state.root||{},classId).length), rawLive=state.root?.classRewardRounds?.[classId]?.[item.id]||null, cooldownDays=cooldownDaysValue(item?.cooldownDays);
-  const raw=rawLive||{}, basePerStudent=Math.max(1,Number(raw.perStudentCost)||Number(item.costPerStudent||100)), baseGoal=Math.max(1,Number(raw.goalPoints)||basePerStudent*count), rawTotal=Math.max(0,Number(raw.totalContributed)||0), completedAt=timeMs(raw.completedAt);
-  const cooldownUntil=cooldownDays>0&&completedAt?completedAt+cooldownDays*DAY_MS:0, cooling=rawTotal>=baseGoal&&cooldownUntil>Date.now(), expired=rawTotal>=baseGoal&&cooldownDays>0&&cooldownUntil>0&&cooldownUntil<=Date.now();
-  const live=expired?null:rawLive, perStudent=basePerStudent, goal=baseGoal, total=expired?0:rawTotal, byStudent=expired?{}:(raw.byStudent||{}), cap=Number(expired?0:raw.maxPerStudent)||Math.min(goal,Math.ceil((goal/count)*2)), pct=Math.max(0,Math.min(100,Math.round(total/Math.max(1,goal)*100))), contributors=Object.keys(byStudent).filter(k=>Number(byStudent[k])>0).length;
-  const status=cooling?"cooldown":expired?"not-started":(total>=goal?"completed":String(raw.status||"not-started"));
-  return {count,perStudent,live,goal,total,cap,pct,contributors,status,cooldownDays,cooldownUntil,cooling,expired};
+  const count=Math.max(1,C.classRoster(state.root||{},classId).length),rawLive=state.root?.classRewardRounds?.[classId]?.[item.id]||null,raw=rawLive||{},cooldownDays=cooldownDaysValue(item?.cooldownDays);
+  const perStudent=Math.max(1,Number(raw.perStudentCost)||Number(item.costPerStudent||100)),goal=Math.max(1,Number(raw.goalPoints)||perStudent*count),cap=Number(raw.maxPerStudent)||Math.min(goal,Math.ceil((goal/count)*2));
+  if(isGimkitClassReward(item)){
+    const modes=gimkitModesForItem(item).map(m=>{const total=Math.max(0,Number(raw.modeTotals?.[m.id])||0),voters=Object.values(raw.modeVoters?.[m.id]||{}).filter(Boolean).length;return {...m,total,voters,pct:Math.max(0,Math.min(100,Math.round(total/goal*100)))}}),leader=Math.max(0,...modes.map(m=>m.total)),cooldownUntil=timeMs(raw.cooldownUntil)||(cooldownDays>0&&timeMs(raw.completedAt)?timeMs(raw.completedAt)+cooldownDays*DAY_MS:0),cooling=cooldownDays>0&&cooldownUntil>Date.now(),pct=Math.max(0,Math.min(100,Math.round(leader/goal*100))),contributors=Object.keys(raw.byStudent||{}).filter(k=>Number(raw.byStudent[k])>0).length,status=cooling?"cooldown":(leader>0||raw.startedAt?"active":"not-started");
+    return {count,perStudent,live:rawLive,goal,total:leader,cap,pct,contributors,status,cooldownDays,cooldownUntil,cooling,expired:false,modeVoting:true,modes,lastWinner:raw.lastWinner||null};
+  }
+  const rawTotal=Math.max(0,Number(raw.totalContributed)||0),completedAt=timeMs(raw.completedAt),cooldownUntil=cooldownDays>0&&completedAt?completedAt+cooldownDays*DAY_MS:0,cooling=rawTotal>=goal&&cooldownUntil>Date.now(),expired=rawTotal>=goal&&cooldownDays>0&&cooldownUntil>0&&cooldownUntil<=Date.now(),live=expired?null:rawLive,total=expired?0:rawTotal,byStudent=expired?{}:(raw.byStudent||{}),pct=Math.max(0,Math.min(100,Math.round(total/Math.max(1,goal)*100))),contributors=Object.keys(byStudent).filter(k=>Number(byStudent[k])>0).length,status=cooling?"cooldown":expired?"not-started":(total>=goal?"completed":String(raw.status||"not-started"));
+  return {count,perStudent,live,goal,total,cap,pct,contributors,status,cooldownDays,cooldownUntil,cooling,expired,modeVoting:false};
 }
 function rewardsPage(){
   const rewards=vals(state.root.rewards||{}).filter(r=>r.active!==false&&String(r.rewardType||"personal")!=="class"&&String(r.rewardType||"personal")!=="class-migrated").sort((a,b)=>(a.cost||0)-(b.cost||0)), req=getRedemptions(), classRewards=vals(state.root.classRewardCatalog||{}).filter(x=>x.active!==false).sort((a,b)=>(a.costPerStudent||0)-(b.costPerStudent||0)||(a.name||"").localeCompare(b.name||"")), pointReq=pendingActivityPointRequests();
@@ -489,7 +517,7 @@ function rewardsPage(){
   ${pointReq.length?`<section class="activity-queue"><div class="activity-head"><div><h2>Activity points awaiting approval</h2><p>Posuk Practice and Chazara requests. Nothing below has been added yet.</p></div><div class="activity-head-actions"><b>${pointReq.length}</b><button class="primary" id="approveAllActivity">Approve all</button></div></div>${pointReq.map(activityPointRow).join("")}</section>`:""}
   <div class="reward-type-stack">
     <section class="teacher-reward-section personal-rewards"><div class="teacher-reward-heading"><span>👤</span><div><h2>Personal Rewards</h2><p>One boy spends his points and receives this reward himself. Each reward can also have its own time cooldown.</p></div><button class="primary" id="addReward">+ Add personal reward</button></div><div class="rewardgrid">${rewards.length?rewards.map(r=>{const available=r.available!==false,cd=personalCooldownInfo(r);return `<article class="${available?"reward-open":"reward-closed"}"><div class="reward-availability ${available?"open":"closed"}">${available?"OPEN":"CLOSED"}</div><div class="rewardicon" style="background:${esc(r.color||"#ede9fe")}">${esc(r.icon||"🎁")}</div><h3>${esc(r.name)}</h3><p>${Number(r.cost)||0} ★ · ${Number(r.quantity)<0?"unlimited":`${r.quantity} left`}</p><p><strong>${esc(cd.label)}</strong></p><div class="rewardactions"><button class="reward-toggle ${available?"close":"open"}" data-toggle-reward="${esc(r.id)}">${available?"Close":"Open"}</button><button data-editreward="${esc(r.id)}">Edit</button><button class="rewarddelete" data-deletereward="${esc(r.id)}">Delete</button></div></article>`}).join(""):`<div class="empty"><h3>No personal rewards</h3></div>`}</div></section>
-    <section class="teacher-reward-section class-rewards"><div class="teacher-reward-heading"><span>👥</span><div><h2>Class Rewards — ${esc(cls()?.name||"Class")}</h2><p>Prices are set per student, so ET and WT goals scale automatically. You can set a cooldown (for example 14 days) after the class earns each prize.</p></div><button class="primary" id="addClassReward">+ Add class reward</button></div><div class="teacher-class-goal-grid">${classRewards.length?classRewards.map(x=>{const g=classRewardSnapshot(x),available=x.available!==false,cdLabel=g.cooling?`Available again in ${cooldownText(g.cooldownUntil)}`:(g.cooldownDays?`Cooldown: ${g.cooldownDays} day${g.cooldownDays===1?"":"s"}`:"No cooldown");return `<article class="teacher-class-goal ${g.status==="completed"||g.status==="cooldown"?"complete":""} ${available?"reward-open":"reward-closed"}"><div class="reward-availability ${available?"open":"closed"}">${available?"OPEN":"CLOSED"}</div><div class="teacher-class-goal-top"><span>${esc(x.icon||"⭐")}</span><div><h3>${esc(x.name)}</h3><p>${g.perStudent} ★ per student · ${g.count} students · goal ${g.goal} ★</p><p><strong>${esc(cdLabel)}</strong></p></div><strong>${g.total} / ${g.goal} ★</strong></div><div class="teacher-class-progress"><i style="width:${g.pct}%"></i></div><div class="teacher-class-meta"><span>${g.contributors} contributor${g.contributors===1?"":"s"}</span><span>Max per boy: ${g.cap} ★</span><span>${g.status==="cooldown"?`⏳ ${esc(cdLabel)}`:g.status==="completed"?"✓ Goal reached":`${Math.max(0,g.goal-g.total)} ★ still needed`}</span></div><div class="rewardactions"><button class="reward-toggle ${available?"close":"open"}" data-toggle-class-reward="${esc(x.id)}">${available?"Close":"Open"}</button><button data-editclassreward="${esc(x.id)}">Edit</button>${g.live?`<button data-resetclassreward="${esc(x.id)}">${g.cooling?"End cooldown / start new goal":"Reset goal"}</button>`:""}<button class="rewarddelete" data-deleteclassreward="${esc(x.id)}">Delete</button></div></article>`}).join(""):`<div class="empty"><h3>No class rewards</h3></div>`}</div></section>
+    <section class="teacher-reward-section class-rewards"><div class="teacher-reward-heading"><span>👥</span><div><h2>Class Rewards — ${esc(cls()?.name||"Class")}</h2><p>Prices are set per student, so ET and WT goals scale automatically. You can set a cooldown (for example 14 days) after the class earns each prize.</p></div><button class="primary" id="addClassReward">+ Add class reward</button></div><div class="teacher-class-goal-grid">${classRewards.length?classRewards.map(x=>{const g=classRewardSnapshot(x),available=x.available!==false,cdLabel=g.cooling?`Available again in ${cooldownText(g.cooldownUntil)}`:(g.cooldownDays?`Cooldown: ${g.cooldownDays} day${g.cooldownDays===1?"":"s"}`:"No cooldown");return `<article class="teacher-class-goal ${g.status==="completed"||g.status==="cooldown"?"complete":""} ${available?"reward-open":"reward-closed"}"><div class="reward-availability ${available?"open":"closed"}">${available?"OPEN":"CLOSED"}</div><div class="teacher-class-goal-top"><span>${esc(x.icon||"⭐")}</span><div><h3>${esc(x.name)}</h3><p>${g.perStudent} ★ per student · ${g.count} students · goal ${g.goal} ★</p><p><strong>${esc(cdLabel)}</strong></p></div><strong>${g.total} / ${g.goal} ★</strong></div><div class="teacher-class-progress"><i style="width:${g.pct}%"></i></div>${gimkitTeacherModesHTML(g)}<div class="teacher-class-meta"><span>${g.contributors} contributor${g.contributors===1?"":"s"}</span><span>Max per boy: ${g.cap} ★</span><span>${g.status==="cooldown"?`⏳ ${esc(cdLabel)}`:g.status==="completed"?"✓ Goal reached":`${Math.max(0,g.goal-g.total)} ★ still needed`}</span></div><div class="rewardactions"><button class="reward-toggle ${available?"close":"open"}" data-toggle-class-reward="${esc(x.id)}">${available?"Close":"Open"}</button><button data-editclassreward="${esc(x.id)}">Edit</button>${g.live?`<button data-resetclassreward="${esc(x.id)}">${isGimkitClassReward(x)?(g.cooling?"End cooldown":"Reset all mode bars"):(g.cooling?"End cooldown / start new goal":"Reset goal")}</button>`:""}<button class="rewarddelete" data-deleteclassreward="${esc(x.id)}">Delete</button></div></article>`}).join(""):`<div class="empty"><h3>No class rewards</h3></div>`}</div></section>
     <section class="teacher-reward-section"><div class="teacher-reward-heading"><span>📬</span><div><h2>Personal reward request queue</h2><p>Pending, ready to collect, and completed history</p></div><b class="queue-count">${getRedemptions().filter(x=>x.item.status==="pending"||x.item.status==="ready").length}</b></div><div class="approvals-inline">${req.length?req.map(requestRow).join(""):`<div class="empty"><h3>No personal reward requests yet</h3><p>Student purchases will appear here immediately.</p></div>`}</div></section>
   </div></section>`;
 }
@@ -601,30 +629,42 @@ function editReward(id=""){
   requestAnimationFrame(()=>overlay.querySelector("#rewardEditName")?.focus());
 }
 function editClassReward(id=""){
-  const old=id?state.root.classRewardCatalog?.[id]:null;
+  const old=id?state.root.classRewardCatalog?.[id]:null,isGimkit=isGimkitClassReward(old)||(!id&&false),startingModes=gimkitModesForItem(old||{id,name:"Gimkit"});
+  const modeSection=isGimkit?`<div class="gimkit-mode-editor wide"><div class="gimkit-mode-editor-head"><div><b>Gimkit mode choices</b><small>Boys can choose one or several modes. Their contribution is split among the modes they check. Losing bars carry over to the next Gimkit.</small></div><button type="button" id="addGimkitMode">+ Add mode</button></div><div id="gimkitModeRows"></div></div>`:"";
   const overlay=rewardEditorBackdrop(id?"Edit class reward":"Add class reward","Change every class reward setting here, then save once.",`
     <form class="reward-editor-form" id="classRewardEditor">
       <label class="wide">Class reward name<input id="classRewardEditName" required value="${esc(old?.name||"")}"></label>
       <label>Points needed per student<input id="classRewardEditCost" required type="number" min="1" step="1" value="${Number(old?.costPerStudent??100)}"></label>
       <label>Emoji / icon<input id="classRewardEditIcon" value="${esc(old?.icon||"⭐")}" maxlength="12"></label>
       <label class="wide">Cooldown after class earns it (days)<input id="classRewardEditCooldown" required type="number" min="0" step="0.25" value="${cooldownDaysValue(old?.cooldownDays)}"><small>Use 0 to keep the manual-reset behavior.</small></label>
+      ${modeSection}
       <label class="reward-editor-check wide"><input id="classRewardEditAvailable" type="checkbox" ${old?.available!==false?"checked":""}> Reward is open for students</label>
       <div class="reward-editor-actions wide"><button type="button" class="reward-editor-cancel">Cancel</button><button class="primary" type="submit">${id?"Save changes":"Add reward"}</button></div>
       <p class="reward-editor-error wide" aria-live="polite"></p>
     </form>`);
   const form=overlay.querySelector("#classRewardEditor");
+  const modeRows=overlay.querySelector("#gimkitModeRows");
+  const modeDraft=startingModes.map(m=>({...m}));
+  const drawModes=()=>{if(!modeRows)return;modeRows.innerHTML=modeDraft.map((m,i)=>`<div class="gimkit-mode-edit-row"><input data-gimkit-mode-name="${i}" value="${esc(m.name)}" aria-label="Gimkit mode name"><label><input type="checkbox" data-gimkit-mode-active="${i}" ${m.active!==false?"checked":""}> Active</label><button type="button" data-remove-gimkit-mode="${i}">×</button></div>`).join("");modeRows.querySelectorAll("[data-gimkit-mode-name]").forEach(inp=>inp.oninput=()=>{modeDraft[Number(inp.dataset.gimkitModeName)].name=inp.value});modeRows.querySelectorAll("[data-gimkit-mode-active]").forEach(inp=>inp.onchange=()=>{modeDraft[Number(inp.dataset.gimkitModeActive)].active=inp.checked});modeRows.querySelectorAll("[data-remove-gimkit-mode]").forEach(btn=>btn.onclick=()=>{modeDraft.splice(Number(btn.dataset.removeGimkitMode),1);drawModes()})};
+  drawModes();
+  if(overlay.querySelector("#addGimkitMode"))overlay.querySelector("#addGimkitMode").onclick=()=>{modeDraft.push({id:`mode-${Date.now()}-${modeDraft.length}`,name:"New mode",active:true});drawModes();requestAnimationFrame(()=>modeRows?.querySelector("[data-gimkit-mode-name]:last-of-type")?.focus())};
   overlay.querySelector(".reward-editor-cancel").onclick=closeRewardEditor;
   form.onsubmit=async e=>{
     e.preventDefault();
-    const error=overlay.querySelector(".reward-editor-error"), save=form.querySelector("button[type=submit]");
+    const error=overlay.querySelector(".reward-editor-error"),save=form.querySelector("button[type=submit]");
     const name=overlay.querySelector("#classRewardEditName").value.trim(),cost=Number(overlay.querySelector("#classRewardEditCost").value),cooldownDays=Number(overlay.querySelector("#classRewardEditCooldown").value),icon=overlay.querySelector("#classRewardEditIcon").value.trim()||"⭐",available=overlay.querySelector("#classRewardEditAvailable").checked;
     if(!name){error.textContent="Enter a reward name.";return}
     if(!Number.isFinite(cost)||cost<1){error.textContent="Points per student must be at least 1.";return}
     if(!Number.isFinite(cooldownDays)||cooldownDays<0){error.textContent="Cooldown must be 0 or more.";return}
+    const savingGimkit=isGimkitClassReward({...old,id:id||"",name});
+    const cleanedModes=modeDraft.map(m=>({id:String(m.id||gimkitModeId(m.name)),name:String(m.name||"").trim(),active:m.active!==false})).filter(m=>m.name);
+    if(savingGimkit&&!cleanedModes.some(m=>m.active!==false)){error.textContent="Keep at least one Gimkit mode active.";return}
     save.disabled=true;error.textContent="";
     try{
       const rid=id||`class-reward-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;
-      const updates={[`${ROOT}/classRewardCatalog/${rid}`]:{id:rid,name,costPerStudent:Math.round(cost),icon,active:true,available,cooldownDays}};
+      const record={id:rid,name,costPerStudent:Math.round(cost),icon,active:true,available,cooldownDays};
+      if(savingGimkit){record.modeVotingEnabled=true;record.modes=Object.fromEntries(cleanedModes.map(m=>[m.id,m]))}
+      const updates={[`${ROOT}/classRewardCatalog/${rid}`]:record};
       if(!id)updates[`${ROOT}/settings/classRewardAvailability/${rid}`]=available;
       await db.ref().update(updates);closeRewardEditor();toast(id?"Class reward updated":"Class reward added");
     }catch(err){console.error(err);save.disabled=false;error.textContent="Could not save this reward. Please try again."}
@@ -634,7 +674,17 @@ function editClassReward(id=""){
 async function toggleRewardAvailability(id){const r=state.root.rewards?.[id];if(!r)return;const next=r.available===false;await db.ref(`${ROOT}/rewards/${id}/available`).set(next);toast(`${r.name||"Reward"} ${next?"opened":"closed"}`)}
 async function toggleClassRewardAvailability(id){const r=state.root.classRewardCatalog?.[id];if(!r)return;const next=r.available===false;await db.ref().update({[`${ROOT}/classRewardCatalog/${id}/available`]:next,[`${ROOT}/settings/classRewardAvailability/${id}`]:next});toast(`${r.name||"Class reward"} ${next?"opened":"closed"}`)}
 async function deleteClassReward(id){const r=state.root.classRewardCatalog?.[id];if(!r||!confirm(`Delete “${r.name}” from Class Rewards? Existing contribution history will be kept.`))return;await db.ref(`${ROOT}/classRewardCatalog/${id}/active`).set(false);toast("Class reward deleted")}
-async function resetClassReward(id){const r=state.root.classRewardCatalog?.[id];if(!r||!confirm(`Start a fresh “${r.name}” class goal for ${cls()?.name||"this class"}? Previous contributions will stay in point history.`))return;await db.ref(`${ROOT}/classRewardRounds/${state.classId}/${id}`).remove();toast("Class goal reset")}
+async function resetClassReward(id){
+  const r=state.root.classRewardCatalog?.[id];if(!r)return;
+  const round=state.root?.classRewardRounds?.[state.classId]?.[id]||null,g=classRewardSnapshot(r);
+  if(isGimkitClassReward(r)&&round&&g.cooling){
+    if(!confirm(`End the Gimkit cooldown now? The losing mode bars will keep all of their points.`))return;
+    await db.ref(`${ROOT}/classRewardRounds/${state.classId}/${id}`).update({status:"active",cooldownUntil:null,byStudent:{},updatedAt:Date.now()});toast("Gimkit cooldown ended");return;
+  }
+  const msg=isGimkitClassReward(r)?`Reset every Gimkit mode bar for ${cls()?.name||"this class"}? This clears the carried-over mode totals.`:`Start a fresh “${r.name}” class goal for ${cls()?.name||"this class"}? Previous contributions will stay in point history.`;
+  if(!confirm(msg))return;
+  await db.ref(`${ROOT}/classRewardRounds/${state.classId}/${id}`).remove();toast(isGimkitClassReward(r)?"Gimkit mode bars reset":"Class goal reset");
+}
 
 async function deleteReward(id){const r=state.root.rewards?.[id];if(!r||!confirm(`Delete “${r.name}” from the Prize Store? Past request history will be kept.`))return;await db.ref(`${ROOT}/rewards/${id}/active`).set(false);toast("Reward deleted")}
 async function toggleRewardStore(){const open=state.root.settings?.rewardStoreEnabled===true||String(state.root.settings?.rewardStoreEnabled)==="true",next=!open;await db.ref(`${ROOT}/settings/rewardStoreEnabled`).set(next);state.root.settings=state.root.settings||{};state.root.settings.rewardStoreEnabled=next;render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened")}
