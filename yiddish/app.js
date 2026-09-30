@@ -1,5 +1,5 @@
 'use strict';
-const APP_BUILD='2026-09-29-story-detective-v4-glossary';
+const APP_BUILD='2026-09-29-story-detective-v5-short-excerpts';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
 let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null;
@@ -127,6 +127,21 @@ function storyClues(pIndex,para,g){
   }
   return out.slice(0,8);
 }
+function storyExcerpt(para,clues,maxWords=30){
+  const words=String(para||'').trim().split(/\s+/).filter(Boolean);
+  if(words.length<=maxWords)return String(para||'').trim();
+  let bestStart=0,bestScore=-1;
+  for(let start=0;start<=words.length-maxWords;start++){
+    const sample=words.slice(start,start+maxWords).join(' ');
+    let score=0;
+    for(const clue of clues){
+      if(sample.includes(clue.yi))score+=1+Math.min(2,clue.yi.split(/\s+/).length*.25);
+    }
+    if(score>bestScore){bestScore=score;bestStart=start}
+  }
+  const chosen=words.slice(bestStart,bestStart+maxWords).join(' ');
+  return (bestStart>0?'… ':'')+chosen+(bestStart+maxWords<words.length?' …':'');
+}
 function appendHighlightedText(el,text,terms){
   let pos=0;
   while(pos<text.length){
@@ -183,12 +198,12 @@ function storyQuizRender(){
     const again=node('button','Play again');again.type='button';again.onclick=()=>{storyQuiz={group,ids:shuffleClient(storyParagraphs(group)),idx:0,score:0,answered:false,wrong:new Set(),choices:null,choiceFor:null};storyQuizRender();focusStoryQuiz()};
     box.append(again);focusStoryQuiz();return;
   }
-  const pIndex=storyQuiz.ids[storyQuiz.idx],para=C.paras[pIndex],clues=storyClues(pIndex,para,storyQuiz.group),keys=clues.map(c=>c.yi);
+  const pIndex=storyQuiz.ids[storyQuiz.idx],para=C.paras[pIndex],allClues=storyClues(pIndex,para,storyQuiz.group),excerpt=storyExcerpt(para,allClues),clues=allClues.filter(c=>excerpt.includes(c.yi)),keys=clues.map(c=>c.yi);
   box.append(node('div',`Story part ${storyQuiz.idx+1} of ${storyQuiz.ids.length}`,'practice-progress'),node('h2','What mainly happened here?'));
-  const directions=storySpeaker('What mainly happened here? Use the highlighted Yiddish clues and the clue words box, then choose the answer that tells the main idea.','Hear the directions');directions.textContent='🔊 Hear directions';directions.className='story-directions';
-  const hint=node('p','Use the highlighted words and the clue-word glossary.','story-hint');box.append(directions,hint);
+  const directions=storySpeaker('What mainly happened here? Read just this short Yiddish piece. Use the highlighted clues and the clue words box, then choose the main idea.','Hear the directions');directions.textContent='🔊 Hear directions';directions.className='story-directions';
+  const hint=node('p','Read this short piece. Use the highlighted words and clue-word glossary.','story-hint');box.append(directions,hint);
   const reading=node('div','','story-reading-layout');
-  const text=node('div','','story-para');text.lang='yi';text.dir='rtl';appendHighlightedText(text,para,keys);
+  const text=node('div','','story-para');text.lang='yi';text.dir='rtl';appendHighlightedText(text,excerpt,keys);
   const glossary=node('aside','','story-glossary');glossary.append(node('h3','Clue words'));
   for(const clue of clues){
     const row=node('div','','story-glossary-row'),yi=node('span',clue.yi,'story-glossary-yi'),en=node('span',clue.en,'story-glossary-en'),listen=storySpeaker(clue.en,'Hear '+clue.yi+' in English');
