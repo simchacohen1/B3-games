@@ -1,5 +1,5 @@
 'use strict';
-const APP_BUILD='2026-09-30-sound-builder-v5-all-ey-tzere';
+const APP_BUILD='2026-09-30-story-detective-v6-progress-fix';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
 let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null,soundGame=null;
@@ -217,6 +217,7 @@ function storyQuizRender(){
   storyQuiz.choices=choices;storyQuiz.choiceFor=pIndex;
   for(const choice of choices){
     const row=node('div','','story-answer-row'),b=node('button',choice,'story-answer');b.type='button';
+    if(storyQuiz.wrong.has(choice))b.disabled=true;
     b.onclick=()=>{
       if(storyQuiz.answered)return;
       const correct=choice===STORY_SUMMARIES[pIndex];
@@ -225,7 +226,7 @@ function storyQuizRender(){
         feedback.textContent='✓ Yes — that is the main point.';feedback.className='feedback-correct';
         answers.querySelectorAll('button').forEach(x=>x.disabled=true);recordStoryAnswer(pIndex,wrongCount);
         const next=node('button',storyQuiz.idx===storyQuiz.ids.length-1?'See my score →':'Next paragraph →','story-next');next.type='button';
-        next.onclick=()=>{storyQuiz.idx++;storyQuiz.answered=false;storyQuiz.wrong=new Set();storyQuiz.choices=null;storyQuizRender();focusStoryQuiz()};
+        next.onclick=()=>{storyQuiz.idx++;storyQuiz.answered=false;storyQuiz.wrong=new Set();storyQuiz.choices=null;storyQuiz.choiceFor=null;storyQuizRender();focusStoryQuiz()};
         box.append(next);
       }else{
         storyQuiz.wrong.add(choice);b.disabled=true;feedback.textContent='Not this one. Use the highlighted Yiddish clues and try again.';feedback.className='feedback-wrong';
@@ -233,7 +234,16 @@ function storyQuizRender(){
     };
     row.append(b,storySpeaker(choice));answers.append(row);
   }
-  box.append(answers,feedback);focusStoryQuiz();
+  box.append(answers,feedback);
+  if(storyQuiz.answered){
+    answers.querySelectorAll('button').forEach(x=>x.disabled=true);
+    feedback.textContent='✓ Yes — that is the main point.';
+    feedback.className='feedback-correct';
+    const next=node('button',storyQuiz.idx===storyQuiz.ids.length-1?'See my score →':'Next paragraph →','story-next');next.type='button';
+    next.onclick=()=>{storyQuiz.idx++;storyQuiz.answered=false;storyQuiz.wrong=new Set();storyQuiz.choices=null;storyQuiz.choiceFor=null;storyQuizRender();focusStoryQuiz()};
+    box.append(next);
+  }
+  focusStoryQuiz();
 }
 
 
