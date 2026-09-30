@@ -543,23 +543,93 @@ async function approveAllActivityPoints(){
   let done=0;for(const id of ids)if(await approveActivityPoint(id,true))done++;
   toast(`${done} activity point request${done===1?"":"s"} approved`);
 }
-async function editReward(id=""){
-  const old=id?state.root.rewards[id]:null,name=prompt("Personal reward name:",old?.name||"");if(!name)return;
-  const cost=Number(prompt("Point cost:",String(old?.cost??25)));if(!Number.isFinite(cost)||cost<0)return;
-  const cooldownDays=Number(prompt("Cooldown after somebody buys it, in days (0 = no cooldown):",String(old?.cooldownDays??0)));if(!Number.isFinite(cooldownDays)||cooldownDays<0)return;
-  const icon=prompt("Emoji/icon:",old?.icon||"🎁")||"🎁",rid=id||`reward-${crypto.randomUUID?crypto.randomUUID():Date.now()}`,lastRedeemedAt=timeMs(old?.lastRedeemedAt);
-  const cooldownUntil=cooldownDays>0&&lastRedeemedAt?lastRedeemedAt+cooldownDays*DAY_MS:null;
-  await db.ref(`${ROOT}/rewards/${rid}`).set({id:rid,name:name.trim(),cost:Math.round(cost),icon,color:old?.color||"#ede9fe",active:true,available:old?.available!==false,quantity:old?.quantity??-1,rewardType:"personal",cooldownDays,lastRedeemedAt:lastRedeemedAt||null,cooldownUntil});
-  toast(id?"Personal reward updated":"Personal reward added")
+function closeRewardEditor(){document.querySelector(".reward-editor-backdrop")?.remove()}
+function rewardEditorBackdrop(title,subtitle,bodyHtml){
+  closeRewardEditor();
+  const overlay=document.createElement("div");
+  overlay.className="reward-editor-backdrop";
+  overlay.innerHTML=`<section class="reward-editor-dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="reward-editor-head"><div><p class="eyebrow">REWARD STORE</p><h2>${esc(title)}</h2><p>${esc(subtitle)}</p></div><button type="button" class="reward-editor-x" aria-label="Close">×</button></div>${bodyHtml}</section>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector(".reward-editor-x").onclick=closeRewardEditor;
+  overlay.onclick=e=>{if(e.target===overlay)closeRewardEditor()};
+  const onKey=e=>{if(e.key==="Escape"){document.removeEventListener("keydown",onKey);closeRewardEditor()}};
+  document.addEventListener("keydown",onKey);
+  overlay.addEventListener("remove",()=>document.removeEventListener("keydown",onKey),{once:true});
+  return overlay;
 }
-async function editClassReward(id=""){
-  const old=id?state.root.classRewardCatalog?.[id]:null,name=prompt("Class reward name:",old?.name||"");if(!name)return;
-  const cost=Number(prompt("Points needed PER STUDENT (the site multiplies this by the class size):",String(old?.costPerStudent??100)));if(!Number.isFinite(cost)||cost<1)return;
-  const cooldownDays=Number(prompt("Cooldown after the class earns it, in days (for example 14; 0 keeps the current manual-reset behavior):",String(old?.cooldownDays??0)));if(!Number.isFinite(cooldownDays)||cooldownDays<0)return;
-  const icon=prompt("Emoji/icon:",old?.icon||"⭐")||"⭐",rid=id||`class-reward-${crypto.randomUUID?crypto.randomUUID():Date.now()}`,available=old?.available!==false;
-  const updates={[`${ROOT}/classRewardCatalog/${rid}`]:{id:rid,name:name.trim(),costPerStudent:Math.round(cost),icon,active:true,available,cooldownDays}};
-  if(!id)updates[`${ROOT}/settings/classRewardAvailability/${rid}`]=available;
-  await db.ref().update(updates);toast(id?"Class reward updated":"Class reward added")
+function editReward(id=""){
+  const old=id?state.root.rewards?.[id]:null;
+  const quantity=Number(old?.quantity??-1), unlimited=quantity<0, color=/^#[0-9a-f]{6}$/i.test(String(old?.color||""))?old.color:"#ede9fe";
+  const overlay=rewardEditorBackdrop(id?"Edit personal reward":"Add personal reward","Change every reward setting here, then save once.",`
+    <form class="reward-editor-form" id="personalRewardEditor">
+      <label class="wide">Reward name<input id="rewardEditName" required value="${esc(old?.name||"")}" placeholder="Virtual Background"></label>
+      <label>Point cost<input id="rewardEditCost" required type="number" min="0" step="1" value="${Number(old?.cost??25)}"></label>
+      <label>Emoji / icon<input id="rewardEditIcon" value="${esc(old?.icon||"🎁")}" maxlength="12"></label>
+      <label>Cooldown after purchase (days)<input id="rewardEditCooldown" required type="number" min="0" step="0.25" value="${cooldownDaysValue(old?.cooldownDays)}"><small>Use 0 for no cooldown.</small></label>
+      <label>Card color<input id="rewardEditColor" type="color" value="${esc(color)}"></label>
+      <label>Quantity<input id="rewardEditQuantity" type="number" min="0" step="1" value="${unlimited?1:Math.max(0,quantity)}" ${unlimited?"disabled":""}><small>How many are available.</small></label>
+      <label class="reward-editor-check"><input id="rewardEditUnlimited" type="checkbox" ${unlimited?"checked":""}> Unlimited quantity</label>
+      <label class="reward-editor-check"><input id="rewardEditAvailable" type="checkbox" ${old?.available!==false?"checked":""}> Reward is open for students</label>
+      <div class="reward-editor-actions wide"><button type="button" class="reward-editor-cancel">Cancel</button><button class="primary" type="submit">${id?"Save changes":"Add reward"}</button></div>
+      <p class="reward-editor-error wide" aria-live="polite"></p>
+    </form>`);
+  const form=overlay.querySelector("#personalRewardEditor"), unlimitedBox=overlay.querySelector("#rewardEditUnlimited"), quantityInput=overlay.querySelector("#rewardEditQuantity");
+  unlimitedBox.onchange=()=>{quantityInput.disabled=unlimitedBox.checked};
+  overlay.querySelector(".reward-editor-cancel").onclick=closeRewardEditor;
+  form.onsubmit=async e=>{
+    e.preventDefault();
+    const error=overlay.querySelector(".reward-editor-error"), save=form.querySelector("button[type=submit]");
+    const name=overlay.querySelector("#rewardEditName").value.trim();
+    const cost=Number(overlay.querySelector("#rewardEditCost").value);
+    const cooldownDays=Number(overlay.querySelector("#rewardEditCooldown").value);
+    const icon=overlay.querySelector("#rewardEditIcon").value.trim()||"🎁";
+    const selectedColor=overlay.querySelector("#rewardEditColor").value||"#ede9fe";
+    const quantityValue=unlimitedBox.checked?-1:Number(quantityInput.value);
+    const available=overlay.querySelector("#rewardEditAvailable").checked;
+    if(!name){error.textContent="Enter a reward name.";return}
+    if(!Number.isFinite(cost)||cost<0){error.textContent="Point cost must be 0 or more.";return}
+    if(!Number.isFinite(cooldownDays)||cooldownDays<0){error.textContent="Cooldown must be 0 or more.";return}
+    if(!unlimitedBox.checked&&(!Number.isFinite(quantityValue)||quantityValue<0)){error.textContent="Quantity must be 0 or more, or choose Unlimited.";return}
+    save.disabled=true;error.textContent="";
+    try{
+      const rid=id||`reward-${crypto.randomUUID?crypto.randomUUID():Date.now()}`,lastRedeemedAt=timeMs(old?.lastRedeemedAt);
+      const cooldownUntil=cooldownDays>0&&lastRedeemedAt?lastRedeemedAt+cooldownDays*DAY_MS:null;
+      await db.ref(`${ROOT}/rewards/${rid}`).set({id:rid,name,cost:Math.round(cost),icon,color:selectedColor,active:true,available,quantity:unlimitedBox.checked?-1:Math.round(quantityValue),rewardType:"personal",cooldownDays,lastRedeemedAt:lastRedeemedAt||null,cooldownUntil});
+      closeRewardEditor();toast(id?"Personal reward updated":"Personal reward added");
+    }catch(err){console.error(err);save.disabled=false;error.textContent="Could not save this reward. Please try again."}
+  };
+  requestAnimationFrame(()=>overlay.querySelector("#rewardEditName")?.focus());
+}
+function editClassReward(id=""){
+  const old=id?state.root.classRewardCatalog?.[id]:null;
+  const overlay=rewardEditorBackdrop(id?"Edit class reward":"Add class reward","Change every class reward setting here, then save once.",`
+    <form class="reward-editor-form" id="classRewardEditor">
+      <label class="wide">Class reward name<input id="classRewardEditName" required value="${esc(old?.name||"")}"></label>
+      <label>Points needed per student<input id="classRewardEditCost" required type="number" min="1" step="1" value="${Number(old?.costPerStudent??100)}"></label>
+      <label>Emoji / icon<input id="classRewardEditIcon" value="${esc(old?.icon||"⭐")}" maxlength="12"></label>
+      <label class="wide">Cooldown after class earns it (days)<input id="classRewardEditCooldown" required type="number" min="0" step="0.25" value="${cooldownDaysValue(old?.cooldownDays)}"><small>Use 0 to keep the manual-reset behavior.</small></label>
+      <label class="reward-editor-check wide"><input id="classRewardEditAvailable" type="checkbox" ${old?.available!==false?"checked":""}> Reward is open for students</label>
+      <div class="reward-editor-actions wide"><button type="button" class="reward-editor-cancel">Cancel</button><button class="primary" type="submit">${id?"Save changes":"Add reward"}</button></div>
+      <p class="reward-editor-error wide" aria-live="polite"></p>
+    </form>`);
+  const form=overlay.querySelector("#classRewardEditor");
+  overlay.querySelector(".reward-editor-cancel").onclick=closeRewardEditor;
+  form.onsubmit=async e=>{
+    e.preventDefault();
+    const error=overlay.querySelector(".reward-editor-error"), save=form.querySelector("button[type=submit]");
+    const name=overlay.querySelector("#classRewardEditName").value.trim(),cost=Number(overlay.querySelector("#classRewardEditCost").value),cooldownDays=Number(overlay.querySelector("#classRewardEditCooldown").value),icon=overlay.querySelector("#classRewardEditIcon").value.trim()||"⭐",available=overlay.querySelector("#classRewardEditAvailable").checked;
+    if(!name){error.textContent="Enter a reward name.";return}
+    if(!Number.isFinite(cost)||cost<1){error.textContent="Points per student must be at least 1.";return}
+    if(!Number.isFinite(cooldownDays)||cooldownDays<0){error.textContent="Cooldown must be 0 or more.";return}
+    save.disabled=true;error.textContent="";
+    try{
+      const rid=id||`class-reward-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;
+      const updates={[`${ROOT}/classRewardCatalog/${rid}`]:{id:rid,name,costPerStudent:Math.round(cost),icon,active:true,available,cooldownDays}};
+      if(!id)updates[`${ROOT}/settings/classRewardAvailability/${rid}`]=available;
+      await db.ref().update(updates);closeRewardEditor();toast(id?"Class reward updated":"Class reward added");
+    }catch(err){console.error(err);save.disabled=false;error.textContent="Could not save this reward. Please try again."}
+  };
+  requestAnimationFrame(()=>overlay.querySelector("#classRewardEditName")?.focus());
 }
 async function toggleRewardAvailability(id){const r=state.root.rewards?.[id];if(!r)return;const next=r.available===false;await db.ref(`${ROOT}/rewards/${id}/available`).set(next);toast(`${r.name||"Reward"} ${next?"opened":"closed"}`)}
 async function toggleClassRewardAvailability(id){const r=state.root.classRewardCatalog?.[id];if(!r)return;const next=r.available===false;await db.ref().update({[`${ROOT}/classRewardCatalog/${id}/available`]:next,[`${ROOT}/settings/classRewardAvailability/${id}`]:next});toast(`${r.name||"Class reward"} ${next?"opened":"closed"}`)}
