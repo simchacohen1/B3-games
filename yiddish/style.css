@@ -40,3 +40,11 @@
 .story-next{margin-top:12px;background:#165748}
 .story-link{display:inline-block;background:#e9f1ed;border-radius:999px;padding:8px 12px}
 @media(max-width:650px){.story-answers{grid-template-columns:1fr}.story-para{font-size:22px;padding:18px}.story-answer{min-height:68px}}
+
+/* Teacher Story Detective analytics */
+.story-teacher-detail{margin:18px 0 28px;padding:18px;background:#eef5f9;border:2px solid #c6d8e8;border-radius:18px}
+.story-teacher-detail h3{margin:0 0 12px;font-size:24px}
+.story-teacher-card{background:#fff;border:1px solid #c6d8e8;border-radius:14px;padding:14px 16px;margin:10px 0}
+.story-teacher-card h4{margin:0 0 6px;font-size:19px}.story-teacher-card p{margin:6px 0}
+.story-paragraph-stats{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.story-paragraph-stats span{background:#e8eef3;color:#244b6d;border-radius:999px;padding:6px 9px;font-size:14px;font-weight:800}
