@@ -170,3 +170,19 @@ button,input,select,textarea{font:inherit}
 .reward-editor-check{display:flex!important;grid-auto-flow:column;justify-content:start;align-items:center;gap:9px!important;min-height:44px;padding:10px 12px;border:1px solid #e1e3e9;border-radius:10px;background:#fafbfc;color:#344054!important}.reward-editor-check input{width:17px!important;height:17px;margin:0;accent-color:#6849df}
 .reward-editor-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:4px}.reward-editor-actions button{border:1px solid var(--line);border-radius:10px;padding:11px 16px;font-weight:800;cursor:pointer}.reward-editor-actions .reward-editor-cancel{background:#fff;color:#596579}.reward-editor-actions button:disabled{opacity:.6;cursor:wait}.reward-editor-error{margin:0;color:#a43743;font-size:11px;font-weight:800;min-height:15px}
 @media(max-width:620px){.reward-editor-backdrop{padding:10px;align-items:start}.reward-editor-dialog{margin-top:10px;max-height:calc(100vh - 20px);padding:17px}.reward-editor-form{grid-template-columns:1fr}.reward-editor-form label.wide,.reward-editor-form .wide{grid-column:auto}.reward-editor-actions{flex-direction:column-reverse}.reward-editor-actions button{width:100%}}
+
+/* ===== Gimkit mode voting — 2026-09-30 ===== */
+.gimkit-mode-race{margin:14px 0;padding:14px;border:1px solid #d8cffb;border-radius:14px;background:#faf9ff}
+.gimkit-mode-race-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.gimkit-mode-race-head b{font-size:13px;color:#44349d}.gimkit-mode-race-head span{font-size:10px;font-weight:800;color:#7b6fc0}
+.gimkit-mode-row{display:grid;grid-template-columns:minmax(125px,1fr) minmax(180px,2fr) auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid #ece8fa}
+.gimkit-mode-row:first-of-type{border-top:0}.gimkit-mode-row>div:first-child strong,.gimkit-mode-row>div:first-child small{display:block}.gimkit-mode-row>div:first-child strong{font-size:12px}.gimkit-mode-row>div:first-child small{font-size:9px;color:#7b8493;margin-top:2px}
+.gimkit-mode-bar{height:10px;background:#e7e3f7;border-radius:999px;overflow:hidden}.gimkit-mode-bar i{display:block;height:100%;background:linear-gradient(90deg,#6849df,#9c84f4);border-radius:999px}
+.gimkit-mode-row>b{font-size:11px;color:#5139bd;white-space:nowrap}.gimkit-last-winner{margin:10px 0 0;font-size:11px;color:#42644f}
+.gimkit-mode-editor{border:1px solid #d9d2f5;border-radius:14px;background:#faf9ff;padding:14px}
+.gimkit-mode-editor-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}.gimkit-mode-editor-head b,.gimkit-mode-editor-head small{display:block}.gimkit-mode-editor-head small{margin-top:4px;color:#69758b;line-height:1.4}
+.gimkit-mode-editor-head button{border:1px solid #bfb5ed;background:#fff;color:#533fc0;border-radius:9px;padding:8px 10px;font-weight:800;cursor:pointer}
+#gimkitModeRows{display:grid;gap:8px}.gimkit-mode-edit-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center}
+.gimkit-mode-edit-row>input{width:100%;border:1px solid #cbc6df;border-radius:9px;padding:9px 10px;font:inherit}.gimkit-mode-edit-row label{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:#57657a}
+.gimkit-mode-edit-row button{width:34px;height:34px;border:0;border-radius:9px;background:#fff0f1;color:#a43743;font-size:18px;cursor:pointer}
+@media(max-width:760px){.gimkit-mode-row{grid-template-columns:1fr auto}.gimkit-mode-row .gimkit-mode-bar{grid-column:1/-1;order:3}.gimkit-mode-editor-head{flex-direction:column}.gimkit-mode-edit-row{grid-template-columns:1fr auto}.gimkit-mode-edit-row button{grid-column:2}}
