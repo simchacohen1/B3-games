@@ -5,6 +5,7 @@ const C=window.StudentRewardsCommon;
 const {db,auth}=C.ensureFirebase();
 const ROOT=C.ROOT, ADMIN=C.ADMIN_EMAIL;
 const NAV=["Overview","Points Dashboard","Daily Points","Students","Categories","Comments","Rewards","Reports","People & Classes","Settings"];
+const REQUESTED_TAB=new URLSearchParams(window.location.search).get("tab");
 const ICONS={"Overview":"⌂","Points Dashboard":"★","Daily Points":"✓","Students":"♙","Categories":"☷","Comments":"✎","Rewards":"◇","Reports":"▤","People & Classes":"♧","Settings":"⚙"};
 const CLASS_REWARD_PRESETS=[
   {key:"gimkit",name:"Gimkit",icon:"🎯"},
@@ -14,7 +15,7 @@ const CLASS_REWARD_PRESETS=[
   {key:"extra-class-game-time",name:"Extra Class Time for a Game",icon:"⏰"},
   {key:"extra-recess",name:"Extra Recess",icon:"🏃"}
 ]
-let state={root:null,user:null,tab:"Overview",classId:"",date:C.schoolDateString(),draft:{},awardDraft:{},absent:new Set(),selectedId:"",pointClassId:"all",pointStudent:"all",pointRange:"30",pointType:"all",pointStatus:"all",pointSearch:""};
+let state={root:null,user:null,tab:NAV.includes(REQUESTED_TAB)?REQUESTED_TAB:"Overview",classId:"",date:C.schoolDateString(),draft:{},awardDraft:{},absent:new Set(),selectedId:"",pointClassId:"all",pointStudent:"all",pointRange:"30",pointType:"all",pointStatus:"all",pointSearch:""};
 const $=s=>document.querySelector(s), esc=C.escapeHtml;
 function vals(o){return o&&typeof o==="object"?Object.values(o):[]}
 function activeClasses(){return C.activeClasses(state.root||{})}
