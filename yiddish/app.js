@@ -1,5 +1,5 @@
 'use strict';
-const APP_BUILD='2026-09-30-sound-builder-v4-two-yud-vowels';
+const APP_BUILD='2026-09-30-sound-builder-v5-all-ey-tzere';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
 let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null,soundGame=null;
@@ -270,7 +270,7 @@ const SOUND_PROFILES={
   ],
   'קליין':[
     {raw:'קל'},
-    {raw:'יי',answer:'יַי',choices:['יַי','יֵי','יִי','יי']},
+    {raw:'יי',answer:'יֵי',choices:['יֵי','יַי','יִי','יי']},
     {raw:'ן'}
   ],
   'שטוב':[
