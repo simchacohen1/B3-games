@@ -1,5 +1,5 @@
 'use strict';
-const APP_BUILD='2026-09-29-story-detective-v1';
+const APP_BUILD='2026-09-29-story-detective-v2-back-fix';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
 let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null;
@@ -63,7 +63,7 @@ function render(){
   if(flash&&open(flash.group))flashRender();else if(flash){flash=null}
   if(storyQuiz&&open(storyQuiz.group))storyQuizRender();else if(storyQuiz){storyQuiz=null}
 }
-async function refresh(){const s=await API.call('status');student=s.student;config=s.config;progress=s.progress;if(!open(group))group=Math.max(0,config.unlocked[student.classId]-1);round=(s.round&&open(s.round.group))?s.round:null;if(round)group=round.group;render()}
+async function refresh(){const s=await API.call('status');student=s.student;config=s.config;progress=s.progress;if(!open(group))group=Math.max(0,config.unlocked[student.classId]-1);round=(s.round&&!s.round.finished&&open(s.round.group))?s.round:null;if(round)group=round.group;render()}
 async function login(id,pin){const s=await API.call('login',{studentId:id,pin:pin.trim()});sessionStorage.setItem('yiddishSession',s.token);await refresh();message('Progress connected ✓')}
 $('loginForm').onsubmit=async e=>{e.preventDefault();$('signIn').disabled=true;try{await login($('name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''),$('pin').value);$('pin').value=''}catch(e){message(e.message)}finally{$('signIn').disabled=false}};
 $('all').onclick=()=>{if(busy||pending)return;clearAdvance();showAll=!showAll;round=null;flash=null;storyQuiz=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;render()};
