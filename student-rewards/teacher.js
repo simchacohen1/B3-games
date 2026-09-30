@@ -543,7 +543,7 @@ async function approveAllActivityPoints(){
   let done=0;for(const id of ids)if(await approveActivityPoint(id,true))done++;
   toast(`${done} activity point request${done===1?"":"s"} approved`);
 }
-function closeRewardEditor(){document.querySelector(".reward-editor-backdrop")?.remove()}
+function closeRewardEditor(){const overlay=document.querySelector(".reward-editor-backdrop");if(!overlay)return;if(overlay._rewardEditorKeyHandler)document.removeEventListener("keydown",overlay._rewardEditorKeyHandler);overlay.remove()}
 function rewardEditorBackdrop(title,subtitle,bodyHtml){
   closeRewardEditor();
   const overlay=document.createElement("div");
@@ -553,8 +553,8 @@ function rewardEditorBackdrop(title,subtitle,bodyHtml){
   overlay.querySelector(".reward-editor-x").onclick=closeRewardEditor;
   overlay.onclick=e=>{if(e.target===overlay)closeRewardEditor()};
   const onKey=e=>{if(e.key==="Escape"){document.removeEventListener("keydown",onKey);closeRewardEditor()}};
+  overlay._rewardEditorKeyHandler=onKey;
   document.addEventListener("keydown",onKey);
-  overlay.addEventListener("remove",()=>document.removeEventListener("keydown",onKey),{once:true});
   return overlay;
 }
 function editReward(id=""){
