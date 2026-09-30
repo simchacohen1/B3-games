@@ -96,3 +96,14 @@
 .reward-card.reward-closed h3,.class-goal-card.reward-closed h3{color:#667085}
 .reward-card.reward-closed button,.class-goal-card.reward-closed button{background:#cfd3da!important;color:#5b6472!important;box-shadow:none!important;cursor:not-allowed}
 .reward-card.reward-closed .cost{color:#7b8493}
+
+/* ===== Gimkit mode voting — 2026-09-30 ===== */
+.gimkit-voting-card{grid-column:1/-1}
+.gimkit-mode-race.student{margin:14px 0;padding:14px;border:2px solid #d8cffb;border-radius:15px;background:linear-gradient(135deg,#fbfaff,#f5f2ff)}
+.gimkit-mode-race-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.gimkit-mode-race-head b{font-size:14px;color:#4f39b8}.gimkit-mode-race-head span{font-size:10px;font-weight:900;color:#786ab9}
+.gimkit-mode-choice{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 8px;border-top:1px solid #e8e4f6;cursor:pointer}.gimkit-mode-choice:first-of-type{border-top:0}
+.gimkit-mode-choice>input{width:18px;height:18px;accent-color:#6849df}.gimkit-mode-choice-main{min-width:0;display:grid;grid-template-columns:minmax(120px,.9fr) minmax(120px,1.5fr);gap:10px;align-items:center}
+.gimkit-mode-choice-main>span:first-child strong,.gimkit-mode-choice-main>span:first-child small{display:block}.gimkit-mode-choice-main>span:first-child strong{font-size:12px;color:#17233c}.gimkit-mode-choice-main>span:first-child small{font-size:9px;color:#7b8493;margin-top:2px}
+.gimkit-mode-bar{height:11px;background:#e5e1f4;border-radius:999px;overflow:hidden}.gimkit-mode-bar i{display:block;height:100%;background:linear-gradient(90deg,#6849df,#9a82f0);border-radius:999px}
+.gimkit-mode-choice>b{font-size:11px;color:#5139bd;white-space:nowrap}.gimkit-mode-note{margin:10px 0 0;font-size:10px;line-height:1.45;color:#667085}.gimkit-last-winner{margin:8px 0 0;font-size:11px;color:#0f7657}
+@media(max-width:700px){.gimkit-mode-choice{grid-template-columns:24px 1fr}.gimkit-mode-choice>b{grid-column:2}.gimkit-mode-choice-main{grid-template-columns:1fr}.gimkit-mode-race-head{align-items:flex-start;flex-direction:column}}
