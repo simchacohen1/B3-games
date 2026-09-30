@@ -160,6 +160,14 @@ button,input,select,textarea{font:inherit}
 .power-modal{width:min(760px,100%)}.power-head-row{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:-3px 0 14px}.power-balance{padding:8px 12px;border-radius:999px;background:#f0e8ff;color:#4f3a7d;font-weight:900;font-size:.82rem;white-space:nowrap}.power-sub{margin:0 0 14px;color:#725f4f;line-height:1.45;font-size:.84rem}.power-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.power-card{border:2px solid #e4d8c7;border-radius:15px;background:#fffaf2;padding:14px;display:grid;grid-template-columns:auto 1fr;gap:10px 12px;align-items:start;box-shadow:0 4px 13px rgba(68,47,30,.06)}.power-icon{font-size:2rem;line-height:1}.power-card h3{margin:0 0 3px;font-size:1rem;color:#46384f}.power-card p{margin:0;color:#745f4c;font-size:.74rem;line-height:1.35}.power-card .power-meta{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:3px}.power-cost{font-size:.75rem;font-weight:900;color:#5b4766}.power-buy{border:0;border-radius:9px;padding:8px 12px;background:#674f9a;color:#fff;font-weight:900;font-size:.73rem;cursor:pointer}.power-buy:disabled{opacity:.46;cursor:not-allowed}.power-shop-note{min-height:20px;margin-top:13px;font-size:.78rem;font-weight:800;color:#725f4f}.power-spend-meter{margin-top:12px;padding:10px 12px;border-radius:11px;background:#f3ecdf;font-size:.73rem;font-weight:800;color:#655342}.power-spend-bar{height:7px;border-radius:999px;background:#dfd4c4;overflow:hidden;margin-top:7px}.power-spend-fill{height:100%;width:0;background:#7458a5;transition:width .2s ease}.power-card.cooling{opacity:.72}
 @media(max-width:650px){.power-grid{grid-template-columns:1fr}.power-status-hud{left:10px;top:104px;max-width:calc(100vw - 20px)}.power-head-row{align-items:flex-start;flex-direction:column}.power-balance{align-self:flex-start}}
 
+
+/* Regular Tag + Manhunt mode chooser */
+.glass-btn.manhunt-join{background:rgba(88,60,137,.92)}
+.glass-btn.manhunt-join.playing{background:rgba(126,57,93,.96)}
+.tag-hud.manhunt{background:rgba(92,55,133,.94)}
+.tag-hud.manhunt.safe{background:rgba(45,88,118,.92)}
+.teacher-mode-buttons{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.teacher-mode-buttons button{min-width:82px}
 </style>
 </head>
 <body>
@@ -170,7 +178,8 @@ button,input,select,textarea{font:inherit}
     <span class="online-note" id="onlineNote"><span class="online-dot"></span><span id="onlineText">Just you online</span></span>
     <span class="tag-hud" id="tagHud"><span class="tag-icon">🏷️</span><span id="tagHudText">Tag game</span></span>
     <span class="tag-pop" id="tagPop"></span>
-    <button class="glass-btn tag-join" id="tagJoinBtn" aria-pressed="false">Play Tag</button>
+    <button class="glass-btn tag-join" id="tagJoinBtn" aria-pressed="false">Regular Tag</button>
+    <button class="glass-btn tag-join manhunt-join" id="manhuntJoinBtn" aria-pressed="false">Manhunt</button>
     <button class="glass-btn power-shop-btn" id="powerShopBtn" aria-haspopup="dialog">⚡ Powers</button>
     <button class="glass-btn primary" id="openModalBtn">＋ Pin Work</button>
     <button class="glass-btn" id="avatarBtn">Avatar</button>
@@ -179,7 +188,7 @@ button,input,select,textarea{font:inherit}
     <span class="pending-note" id="pendingNote"></span>
   </div>
   <div class="power-status-hud" id="powerStatusHud"><div class="power-status-title">Tag powers</div><div class="power-status-line" id="powerStatusLine"></div></div>
-  <div class="start-help" id="startHelp">↑ ↓ move &nbsp; • &nbsp; ← → turn &nbsp; • &nbsp; drag to look around &nbsp; • &nbsp; click to visit (click-to-go is off during Tag)</div>
+  <div class="start-help" id="startHelp">↑ ↓ move &nbsp; • &nbsp; ← → turn &nbsp; • &nbsp; drag to look around &nbsp; • &nbsp; click to visit (click-to-go is off while you are playing a game)</div>
   <div class="touch-pad" aria-label="Touch movement controls">
     <button class="touch-btn up" data-move="forward">▲</button>
     <button class="touch-btn down" data-move="back">▼</button>
@@ -203,8 +212,8 @@ button,input,select,textarea{font:inherit}
 <div class="overlay" id="powerOverlay">
   <div class="modal power-modal">
     <button class="close-x" id="closePowerBtn">&times;</button>
-    <h2>Tag Power Shop</h2>
-    <div class="power-head-row"><p class="power-sub">Spend a few class points for a short advantage. Powers only work while you are playing Tag.</p><div class="power-balance" id="powerBalance">Points: —</div></div>
+    <h2>Regular Tag Power Shop</h2>
+    <div class="power-head-row"><p class="power-sub">Spend a few class points for a short advantage. Powers only work while you are playing Regular Tag.</p><div class="power-balance" id="powerBalance">Points: —</div></div>
     <div class="power-grid" id="powerGrid"></div>
     <div class="power-spend-meter"><span id="powerSpendText">Game spending: —</span><div class="power-spend-bar"><div class="power-spend-fill" id="powerSpendFill"></div></div></div>
     <div class="power-shop-note" id="powerShopNote"></div>
@@ -264,8 +273,8 @@ button,input,select,textarea{font:inherit}
     </div>
     <div id="reviewListArea" style="display:none;">
       <div class="teacher-live-controls"><div><strong>Live Classmates</strong><span id="teacherOnlineNames">No students online right now.</span></div><button type="button" id="livePresenceToggleBtn">On</button></div>
-      <div class="teacher-live-controls"><div><strong>Tag Game</strong><span id="teacherTagStatus">Students can chase and tag classmates who are in the same gallery space.</span></div><button type="button" id="tagGameToggleBtn">Off</button></div>
-      <div class="teacher-live-controls"><div><strong>Rabbi Cohen Plays</strong><span id="teacherJoinTagStatus">Join only when you want your avatar to be part of the game.</span></div><button type="button" id="teacherJoinTagBtn" class="off">Join</button></div>
+      <div class="teacher-live-controls"><div><strong>Tag Games</strong><span id="teacherTagStatus">Students can choose Regular Tag or Manhunt.</span></div><button type="button" id="tagGameToggleBtn">Off</button></div>
+      <div class="teacher-live-controls"><div><strong>Rabbi Cohen Plays</strong><span id="teacherJoinTagStatus">Choose a mode only when you want your avatar to join the game.</span></div><div class="teacher-mode-buttons"><button type="button" id="teacherJoinTagBtn" class="off">Regular Tag</button><button type="button" id="teacherJoinManhuntBtn" class="off">Manhunt</button></div></div>
       <div class="teacher-live-controls" id="approveAllWrap" style="display:none;"><div><strong>Pending Projects</strong><span id="approveAllStatus">Approve every project currently waiting for review.</span></div><button type="button" id="approveAllBtn">Approve All</button></div>
       <div id="reviewList"></div>
     </div>
@@ -421,10 +430,10 @@ let presenceHeartbeat=null,presenceWatchdog=null,lastPresenceWrite=0,lastPresenc
 let remoteAvatarsGroup=null,remoteAvatars=new Map(),latestPresenceStudents=new Map();
 let teacherPresenceRef=null,teacherPresenceHandler=null;
 let teacherPresenceViewer=localStorage.getItem('b3TeacherBypass')==='1';
-let tagGameEnabled=false,tagOptedIn=false,tagClassRef=null,tagStateHandler=null,tagState={};
+let tagGameEnabled=false,tagOptedIn=false,tagMode='regular',tagClassRef=null,tagStateHandler=null,tagState={};
 let tagAttemptBusy=false,lastTagAttemptAt=0,lastSeenTagEvent='',tagPopTimer=null;
 let tagActivityWriteAt=0,lastTagIdleCheckAt=0,tagIdleWarnKey='';
-const TAG_DISTANCE=1.18,TAG_GRACE_MS=3000,TAG_IDLE_WARN_MS=15000,TAG_IDLE_REASSIGN_MS=26000;
+const TAG_DISTANCE=1.18,TAG_GRACE_MS=3000,TAG_IDLE_WARN_MS=15000,TAG_IDLE_REASSIGN_MS=26000,MANHUNT_RESTART_MS=5500,MANHUNT_NEW_HUNTER_GRACE_MS=1200;
 
 /* ---------- Tag powers ---------- */
 const TAG_POWER_API='https://us-central1-b3-games.cloudfunctions.net/classGalleryPowerPurchase';
@@ -450,9 +459,23 @@ if(presenceSettingsRef){
 }
 if(tagSettingsRef){
   tagSettingsRef.on('value',snap=>{
-    tagGameEnabled=snap.val()===true;updateTagGameToggle();
-    if(tagGameEnabled)startTagState();else stopTagState();
-    refreshRemoteAvatars();updateTagHud();
+    const wasPlaying=tagOptedIn;
+    tagGameEnabled=snap.val()===true;
+    if(!tagGameEnabled&&wasPlaying){
+      tagOptedIn=false;
+      stopTagState();
+      closePowerShop();
+      stopLivePresence(true);
+      startLivePresence();
+      syncLivePresence(true);
+    }else if(tagGameEnabled&&tagOptedIn){
+      startTagState();
+    }else if(!tagGameEnabled){
+      stopTagState();
+    }
+    updateTagGameToggle();
+    refreshRemoteAvatars();
+    updateTagHud();
   },err=>console.warn('Could not read Tag setting',err));
 }
 window.addEventListener('pagehide',()=>{if(presenceOwnRef)presenceOwnRef.remove().catch(()=>{});});
@@ -885,7 +908,7 @@ function addRoomExitDoor({label,exitKind,exitId},woodMat,trimMat){
 }
 
 function enterClassroom(roomId){
-  if(tagOptedIn){showTagPop('Leave Tag before entering a side room.');return;}
+  if(tagOptedIn){showTagPop('Leave the game before entering a side room.');return;}
   if(!CLASSROOMS.some(r=>r.id===roomId))return;
   sceneMode='classroom';activeClassroomId=roomId;activeStudentName=null;navTween=null;viewYaw=0;
   buildScene();
@@ -893,7 +916,7 @@ function enterClassroom(roomId){
   snapCameraToAvatar();refreshRemoteAvatars();syncLivePresence(true);
 }
 function enterStudentGallery(studentName){
-  if(tagOptedIn){showTagPop('Leave Tag before entering a side room.');return;}
+  if(tagOptedIn){showTagPop('Leave the game before entering a side room.');return;}
   if(!studentName)return;
   sceneMode='studentGallery';activeStudentName=studentName;activeClassroomId=null;navTween=null;viewYaw=0;
   buildScene();
@@ -1023,64 +1046,226 @@ function updateLivePresenceToggle(){
   updateTagJoinControls();
 }
 function updateTagGameToggle(){
-  const btn=document.getElementById('tagGameToggleBtn');if(btn){btn.textContent=tagGameEnabled?'On':'Off';btn.classList.toggle('off',!tagGameEnabled);btn.classList.toggle('tag-on',tagGameEnabled);btn.setAttribute('aria-pressed',String(tagGameEnabled));}
-  const status=document.getElementById('teacherTagStatus');if(status)status.textContent=tagGameEnabled?'Tag is ON. East Track and West Track play together; the student marked IT can tag any nearby player.':'Students can chase and tag classmates who are in the same gallery space.';
-  if(!tagGameEnabled&&tagOptedIn)tagOptedIn=false;
+  const btn=document.getElementById('tagGameToggleBtn');
+  if(btn){
+    btn.textContent=tagGameEnabled?'On':'Off';
+    btn.classList.toggle('off',!tagGameEnabled);
+    btn.classList.toggle('tag-on',tagGameEnabled);
+    btn.setAttribute('aria-pressed',String(tagGameEnabled));
+  }
+  const status=document.getElementById('teacherTagStatus');
+  if(status)status.textContent=tagGameEnabled
+    ?'Tag games are ON. Students choose Regular Tag or Manhunt; East Track and West Track can play together.'
+    :'Students can choose Regular Tag or Manhunt when tag games are turned on.';
   updateTagJoinControls();
 }
 function currentTagStudentKey(){return isTeacher?'simcha_cohen':(presenceProfile?presenceStudentId:'');}
+function currentGameLabel(){return tagMode==='manhunt'?'Manhunt':'Regular Tag';}
 function updateTagJoinControls(){
   const eligible=tagGameEnabled&&livePresenceEnabled&&(!!presenceProfile||isTeacher);
-  const btn=document.getElementById('tagJoinBtn');if(btn){btn.classList.toggle('show',eligible);btn.classList.toggle('playing',tagOptedIn);btn.textContent=tagOptedIn?'Leave Tag':'Play Tag';btn.setAttribute('aria-pressed',String(tagOptedIn));}
-  const teacherBtn=document.getElementById('teacherJoinTagBtn');if(teacherBtn){teacherBtn.textContent=tagOptedIn?'Leave':'Join';teacherBtn.classList.toggle('off',!tagOptedIn);teacherBtn.classList.toggle('tag-on',tagOptedIn);teacherBtn.setAttribute('aria-pressed',String(tagOptedIn));}
-  const teacherStatus=document.getElementById('teacherJoinTagStatus');if(teacherStatus)teacherStatus.textContent=tagOptedIn?'You are playing and can be tagged in the main hallway.':'Join only when you want your avatar to be part of the game.';
-  const powerBtn=document.getElementById('powerShopBtn');if(powerBtn){const show=eligible&&tagOptedIn;powerBtn.classList.toggle('show',show);powerBtn.classList.toggle('active',show&&activePowerLabels().length>0);}
-  if(!tagOptedIn)closePowerShop();
+  const regularSelected=tagOptedIn&&tagMode==='regular';
+  const manhuntSelected=tagOptedIn&&tagMode==='manhunt';
+
+  const regularBtn=document.getElementById('tagJoinBtn');
+  if(regularBtn){
+    regularBtn.classList.toggle('show',eligible);
+    regularBtn.classList.toggle('playing',regularSelected);
+    regularBtn.textContent=regularSelected?'Leave Regular Tag':'Regular Tag';
+    regularBtn.setAttribute('aria-pressed',String(regularSelected));
+  }
+  const manhuntBtn=document.getElementById('manhuntJoinBtn');
+  if(manhuntBtn){
+    manhuntBtn.classList.toggle('show',eligible);
+    manhuntBtn.classList.toggle('playing',manhuntSelected);
+    manhuntBtn.textContent=manhuntSelected?'Leave Manhunt':'Manhunt';
+    manhuntBtn.setAttribute('aria-pressed',String(manhuntSelected));
+  }
+
+  const teacherRegular=document.getElementById('teacherJoinTagBtn');
+  if(teacherRegular){
+    teacherRegular.textContent=regularSelected?'Leave Tag':'Regular Tag';
+    teacherRegular.classList.toggle('off',!regularSelected);
+    teacherRegular.classList.toggle('tag-on',regularSelected);
+    teacherRegular.setAttribute('aria-pressed',String(regularSelected));
+  }
+  const teacherManhunt=document.getElementById('teacherJoinManhuntBtn');
+  if(teacherManhunt){
+    teacherManhunt.textContent=manhuntSelected?'Leave Manhunt':'Manhunt';
+    teacherManhunt.classList.toggle('off',!manhuntSelected);
+    teacherManhunt.classList.toggle('tag-on',manhuntSelected);
+    teacherManhunt.setAttribute('aria-pressed',String(manhuntSelected));
+  }
+  const teacherStatus=document.getElementById('teacherJoinTagStatus');
+  if(teacherStatus)teacherStatus.textContent=tagOptedIn
+    ?'You are playing '+currentGameLabel()+' in the main hallway.'
+    :'Choose a mode only when you want your avatar to be part of the game.';
+
+  const powerBtn=document.getElementById('powerShopBtn');
+  if(powerBtn){
+    const show=eligible&&regularSelected;
+    powerBtn.classList.toggle('show',show);
+    powerBtn.classList.toggle('active',show&&activePowerLabels().length>0);
+  }
+  if(!regularSelected)closePowerShop();
 }
-function setTagOptIn(next){
-  if(next&&(!tagGameEnabled||!livePresenceEnabled)){showTagPop('Tag is not available right now.');return;}
-  tagOptedIn=!!next;if(tagOptedIn){powerSpent=0;powerCooldownUntil=0;}else{closePowerShop();}
-  // Tag is one combined ET + WT game, so joining switches the listener to the combined presence tree.
-  stopLivePresence(true);startLivePresence();
-  if(tagOptedIn&&sceneMode!=='hallway'){sceneMode='hallway';activeClassroomId=null;activeStudentName=null;navTween=null;avatarState.x=0;avatarState.z=hallMaxZ-8;avatarState.angle=Math.PI;buildScene();refreshRemoteAvatars();}
-  if(!tagOptedIn&&tagState.itStudentId===currentTagStudentKey()&&tagClassRef)tagClassRef.update({itStudentId:null,immunityUntil:0});
-  updateTagJoinControls();syncLivePresence(true);ensureTagItPlayer();refreshRemoteAvatars();updateTagHud();
-  showTagPop(tagOptedIn?'You joined Tag! Side rooms are closed while you play.':'You left Tag. You can visit every room again.');
+function setTagOptIn(next,mode){
+  const requestedMode=mode==='manhunt'?'manhunt':'regular';
+  if(next&&(!tagGameEnabled||!livePresenceEnabled)){
+    showTagPop('Tag games are not available right now.');
+    return;
+  }
+
+  const me=currentTagStudentKey();
+  const oldRef=tagClassRef;
+  const oldState=tagState||{};
+  const oldMode=tagMode;
+  const wasPlaying=tagOptedIn;
+
+  if(wasPlaying&&oldMode==='regular'&&oldState.itStudentId===me&&oldRef){
+    oldRef.update({itStudentId:null,immunityUntil:0}).catch(()=>{});
+  }
+
+  tagOptedIn=!!next;
+  if(tagOptedIn)tagMode=requestedMode;
+
+  stopTagState();
+  if(tagOptedIn&&tagMode==='regular'){
+    powerSpent=0;
+    powerCooldownUntil=0;
+  }else{
+    closePowerShop();
+  }
+
+  // Both modes are one combined ET + WT hallway, but each mode has its own players and game state.
+  stopLivePresence(true);
+  startLivePresence();
+
+  if(tagOptedIn&&sceneMode!=='hallway'){
+    sceneMode='hallway';
+    activeClassroomId=null;
+    activeStudentName=null;
+    navTween=null;
+    avatarState.x=0;
+    avatarState.z=hallMaxZ-8;
+    avatarState.angle=Math.PI;
+    buildScene();
+  }
+
+  updateTagJoinControls();
+  syncLivePresence(true);
+  if(tagOptedIn)startTagState();
+  refreshRemoteAvatars();
+  updateTagHud();
+  updatePowerStatusHud();
+
+  if(tagOptedIn){
+    showTagPop('You joined '+currentGameLabel()+'! Side rooms are closed while you play.');
+  }else if(wasPlaying){
+    showTagPop('You left '+(oldMode==='manhunt'?'Manhunt':'Regular Tag')+'. You can visit every room again.');
+  }
 }
 function showTagPop(message){
   const el=document.getElementById('tagPop');if(!el||!message)return;el.textContent=message;el.classList.add('show');
   if(tagPopTimer)clearTimeout(tagPopTimer);tagPopTimer=setTimeout(()=>el.classList.remove('show'),2100);
 }
 function updateTagHud(){
-  const hud=document.getElementById('tagHud'),txt=document.getElementById('tagHudText');if(!hud||!txt)return;
+  const hud=document.getElementById('tagHud'),txt=document.getElementById('tagHudText');
+  if(!hud||!txt)return;
   const active=tagGameEnabled&&livePresenceEnabled&&tagOptedIn&&(!!presenceProfile||isTeacher);
-  if(!active){hud.classList.remove('show','safe');return;}
+  if(!active){hud.classList.remove('show','safe','manhunt');return;}
+
+  hud.classList.add('show');
+  hud.classList.toggle('manhunt',tagMode==='manhunt');
+
+  if(tagMode==='manhunt'){
+    const candidates=onlineTagCandidates('manhunt');
+    if(candidates.length<2){
+      txt.textContent='Manhunt: waiting for another player';
+      hud.classList.add('safe');
+      return;
+    }
+    if(tagState.finished){
+      const restartAt=safePresenceNumber(tagState.restartAt,Date.now()+MANHUNT_RESTART_MS);
+      const seconds=Math.max(1,Math.ceil((restartAt-Date.now())/1000));
+      txt.textContent='MANHUNT: Everyone was caught! New hunt in '+seconds+'…';
+      hud.classList.add('safe');
+      return;
+    }
+    const me=currentTagStudentKey();
+    const hunter=isManhuntHunter(me);
+    const hunterCount=candidates.filter(id=>isManhuntHunter(id)).length;
+    const runnerCount=Math.max(0,candidates.length-hunterCount);
+    hud.classList.toggle('safe',!hunter);
+    if(hunter){
+      const readyAt=safePresenceNumber(tagState.hunterReadyAt?.[me],0);
+      txt.textContent=Date.now()<readyAt?'CAUGHT! You’re joining the hunters…':'MANHUNT: YOU’RE A HUNTER — catch '+runnerCount+' runner'+(runnerCount===1?'':'s')+'!';
+    }else{
+      txt.textContent='MANHUNT: RUN! '+hunterCount+' hunter'+(hunterCount===1?' is':'s are')+' looking for you';
+    }
+    return;
+  }
+
+  hud.classList.remove('manhunt');
   const itId=String(tagState.itStudentId||'');
-  if(!itId){txt.textContent='Tag: waiting for another classmate';hud.classList.add('show','safe');return;}
-  const iAmIt=itId===currentTagStudentKey();hud.classList.add('show');hud.classList.toggle('safe',!iAmIt);
-  if(iAmIt){const immuneUntil=safePresenceNumber(tagState.immunityUntil,0),remain=Math.max(0,immuneUntil-Date.now());txt.textContent=remain>0?'YOU’RE IT! Get ready…':'YOU’RE IT! Chase a classmate!';}
-  else{const known=PRESENCE_STUDENTS[itId];txt.textContent=`Tag: ${known?.name||'A classmate'} is IT`;}
+  if(!itId){txt.textContent='Regular Tag: waiting for another classmate';hud.classList.add('safe');return;}
+  const iAmIt=itId===currentTagStudentKey();
+  hud.classList.toggle('safe',!iAmIt);
+  if(iAmIt){
+    const immuneUntil=safePresenceNumber(tagState.immunityUntil,0),remain=Math.max(0,immuneUntil-Date.now());
+    txt.textContent=remain>0?'YOU’RE IT! Get ready…':'YOU’RE IT! Chase a classmate!';
+  }else{
+    const known=PRESENCE_STUDENTS[itId];
+    txt.textContent='Regular Tag: '+(known?.name||'A classmate')+' is IT';
+  }
 }
+
 function makeItSprite(){
   const c=document.createElement('canvas');c.width=300;c.height=120;const ctx=c.getContext('2d');
   ctx.fillStyle='rgba(164,67,48,.97)';roundedRect(ctx,45,12,210,86,34);ctx.fill();ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=5;ctx.stroke();
   ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='900 48px Quicksand, sans-serif';ctx.fillStyle='#fff9ec';ctx.fillText('IT!',150,55);
   const tex=makeTexture(c),mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false});const sp=new THREE.Sprite(mat);sp.scale.set(1.35,.54,1);sp.position.set(0,2.86,0);sp.userData.tagMarker=true;return sp;
 }
-function makeTagPlayerSprite(){
+function makeTagPlayerSprite(mode){
+  const isManhunt=mode==='manhunt';
   const c=document.createElement('canvas');c.width=360;c.height=100;const ctx=c.getContext('2d');
-  ctx.fillStyle='rgba(53,87,62,.95)';roundedRect(ctx,55,10,250,72,30);ctx.fill();ctx.strokeStyle='rgba(255,255,255,.82)';ctx.lineWidth=4;ctx.stroke();
-  ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='900 34px Quicksand, sans-serif';ctx.fillStyle='#fff9ec';ctx.fillText('PLAYING TAG',180,45);
-  const tex=makeTexture(c),mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false});const sp=new THREE.Sprite(mat);sp.scale.set(1.65,.46,1);sp.position.set(0,2.68,0);sp.userData.tagPlayerMarker=true;return sp;
+  ctx.fillStyle=isManhunt?'rgba(91,55,132,.95)':'rgba(53,87,62,.95)';
+  roundedRect(ctx,55,10,250,72,30);ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.82)';ctx.lineWidth=4;ctx.stroke();
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='900 34px Quicksand, sans-serif';ctx.fillStyle='#fff9ec';
+  ctx.fillText(isManhunt?'MANHUNT':'PLAYING TAG',180,45);
+  const tex=makeTexture(c),mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false});
+  const sp=new THREE.Sprite(mat);sp.scale.set(1.65,.46,1);sp.position.set(0,2.68,0);sp.userData.tagPlayerMarker=true;sp.userData.tagMode=mode;return sp;
 }
-function setRemoteTagPlayerMarker(entry,isPlaying){
-  if(!entry?.group)return;let marker=entry.group.children.find(ch=>ch.userData?.tagPlayerMarker);
-  if(isPlaying&&!marker)entry.group.add(makeTagPlayerSprite());else if(!isPlaying&&marker){entry.group.remove(marker);if(marker.material?.map)marker.material.map.dispose?.();marker.material?.dispose?.();}
+function setRemoteTagPlayerMarker(entry,isPlaying,mode){
+  if(!entry?.group)return;
+  let marker=entry.group.children.find(ch=>ch.userData?.tagPlayerMarker);
+  if(marker&&(!isPlaying||marker.userData.tagMode!==mode)){
+    entry.group.remove(marker);
+    if(marker.material?.map)marker.material.map.dispose?.();
+    marker.material?.dispose?.();
+    marker=null;
+  }
+  if(isPlaying&&!marker)entry.group.add(makeTagPlayerSprite(mode));
 }
 function setRemoteItMarker(entry,isIt){
   if(!entry?.group)return;let marker=entry.group.children.find(ch=>ch.userData?.tagMarker);
-  if(isIt&&!marker)entry.group.add(makeItSprite());else if(!isIt&&marker){entry.group.remove(marker);if(marker.material?.map)marker.material.map.dispose?.();marker.material?.dispose?.();}
+  if(isIt&&!marker)entry.group.add(makeItSprite());
+  else if(!isIt&&marker){entry.group.remove(marker);if(marker.material?.map)marker.material.map.dispose?.();marker.material?.dispose?.();}
 }
+function makeHunterSprite(){
+  const c=document.createElement('canvas');c.width=360;c.height=120;const ctx=c.getContext('2d');
+  ctx.fillStyle='rgba(126,57,93,.97)';roundedRect(ctx,38,12,284,86,34);ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.88)';ctx.lineWidth=5;ctx.stroke();
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='900 43px Quicksand, sans-serif';ctx.fillStyle='#fff9ec';ctx.fillText('HUNTER',180,55);
+  const tex=makeTexture(c),mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false});
+  const sp=new THREE.Sprite(mat);sp.scale.set(1.7,.56,1);sp.position.set(0,2.98,0);sp.userData.hunterMarker=true;return sp;
+}
+function setRemoteHunterMarker(entry,isHunter){
+  if(!entry?.group)return;let marker=entry.group.children.find(ch=>ch.userData?.hunterMarker);
+  if(isHunter&&!marker)entry.group.add(makeHunterSprite());
+  else if(!isHunter&&marker){entry.group.remove(marker);if(marker.material?.map)marker.material.map.dispose?.();marker.material?.dispose?.();}
+}
+
 function currentTagEffects(studentId=currentTagStudentKey()){return (tagState&&tagState.effects&&tagState.effects[studentId])||{};}
 function effectUntil(studentId,field){return safePresenceNumber(currentTagEffects(studentId)?.[field],0);}
 function isEffectActive(studentId,field,now=Date.now()){return now<effectUntil(studentId,field);}
@@ -1104,14 +1289,14 @@ function pointInsideHallObstacle(x,z,r=.58){
   return false;
 }
 function performPowerDash(){
-  if(!tagOptedIn||sceneMode!=='hallway')return;
+  if(!tagOptedIn||tagMode!=='regular'||sceneMode!=='hallway')return;
   const oldX=avatarState.x,oldZ=avatarState.z,dist=3.65;
   avatarState.x+=Math.sin(avatarState.angle)*dist;avatarState.z+=Math.cos(avatarState.angle)*dist;
   avatarState.x=Math.max(moveMinX,Math.min(moveMaxX,avatarState.x));avatarState.z=Math.max(hallMinZ+1.1,Math.min(hallMaxZ-1.1,avatarState.z));
   resolveHallCollision(oldX,oldZ);snapCameraToAvatar();syncLivePresence(true);showTagPop('💨 DASH!');
 }
 function performPowerTeleport(){
-  if(!tagOptedIn||sceneMode!=='hallway')return;
+  if(!tagOptedIn||tagMode!=='regular'||sceneMode!=='hallway')return;
   const oldX=avatarState.x,oldZ=avatarState.z;let chosen=null;
   for(let i=0;i<70;i++){
     const x=moveMinX+.7+Math.random()*Math.max(.2,(moveMaxX-moveMinX)-1.4);
@@ -1122,12 +1307,12 @@ function performPowerTeleport(){
   avatarState.x=chosen.x;avatarState.z=chosen.z;navTween=null;viewYaw=0;snapCameraToAvatar();syncLivePresence(true);showTagPop('🌀 TELEPORT!');
 }
 function applyLocalTagPowerEvents(){
-  if(!tagOptedIn)return;const eff=currentTagEffects(),now=Date.now();
+  if(!tagOptedIn||tagMode!=='regular')return;const eff=currentTagEffects(),now=Date.now();
   const dashToken=String(eff.dashToken||'');if(dashToken&&dashToken!==lastConsumedDashToken&&now-safePresenceNumber(eff.dashAt,0)<6000){lastConsumedDashToken=dashToken;performPowerDash();}
   const teleportToken=String(eff.teleportToken||'');if(teleportToken&&teleportToken!==lastConsumedTeleportToken&&now-safePresenceNumber(eff.teleportAt,0)<6000){lastConsumedTeleportToken=teleportToken;performPowerTeleport();}
 }
 function activePowerLabels(){
-  if(!tagOptedIn)return[];const me=currentTagStudentKey(),now=Date.now(),out=[];
+  if(!tagOptedIn||tagMode!=='regular')return[];const me=currentTagStudentKey(),now=Date.now(),out=[];
   const add=(field,icon,label)=>{const until=effectUntil(me,field);if(until>now)out.push(`${icon} ${label} ${Math.max(1,Math.ceil((until-now)/1000))}s`);};
   add('speedUntil','⚡','Speed');add('invisibleUntil','👻','Invisible');add('shieldUntil','🛡️','Shield');add('frozenUntil','❄️','FROZEN');return out;
 }
@@ -1175,7 +1360,7 @@ function renderPowerShop(){
   if(cooling&&!powerBusy)note.textContent=`Power shop cooldown: ${Math.max(1,Math.ceil((powerCooldownUntil-now)/1000))}s`;else if(!powerBusy&&note.textContent.startsWith('Power shop cooldown:'))note.textContent='';
 }
 async function teacherTestPower(powerId){
-  if(!tagClassRef)throw new Error('Join Tag first.');const now=Date.now(),me=currentTagStudentKey(),ref=tagClassRef.child('effects');
+  if(!tagClassRef||tagMode!=='regular')throw new Error('Join Regular Tag first.');const now=Date.now(),me=currentTagStudentKey(),ref=tagClassRef.child('effects');
   if(powerId==='speed')await ref.child(me).update({speedUntil:now+7000});
   else if(powerId==='invisible')await ref.child(me).update({invisibleUntil:now+6000});
   else if(powerId==='shield')await ref.child(me).update({shieldUntil:now+5000});
@@ -1184,7 +1369,7 @@ async function teacherTestPower(powerId){
   else if(powerId==='freeze'){const target=nearestTagOpponent(5.5);if(!target)throw new Error('Get closer to another player first.');await ref.child(target.id).update({frozenUntil:now+3000,frozenBy:me});}
 }
 async function buyTagPower(powerId){
-  const p=TAG_POWERS[powerId];if(!p||powerBusy||!tagOptedIn)return;const note=document.getElementById('powerShopNote');let target=null;
+  const p=TAG_POWERS[powerId];if(!p||powerBusy||!tagOptedIn||tagMode!=='regular')return;const note=document.getElementById('powerShopNote');let target=null;
   if(powerId==='freeze'){target=nearestTagOpponent(5.5);if(!target){note.textContent='Get closer to another player before buying Freeze.';return;}}
   powerBusy=true;note.textContent=isTeacher?`Testing ${p.name}…`:`Buying ${p.name}…`;renderPowerShop();
   try{
@@ -1193,68 +1378,258 @@ async function buyTagPower(powerId){
   }catch(err){note.textContent=err.message||String(err);}
   finally{powerBusy=false;renderPowerShop();}
 }
-function openPowerShop(){if(!tagOptedIn){showTagPop('Join Tag first.');return;}document.getElementById('powerOverlay').classList.add('show');document.getElementById('powerShopNote').textContent='';renderPowerShop();refreshPowerAccount();}
+function openPowerShop(){if(!tagOptedIn||tagMode!=='regular'){showTagPop('Join Regular Tag to use powers.');return;}document.getElementById('powerOverlay').classList.add('show');document.getElementById('powerShopNote').textContent='';renderPowerShop();refreshPowerAccount();}
 function closePowerShop(){document.getElementById('powerOverlay').classList.remove('show');}
 
 function stopTagState(){
-  if(tagClassRef&&tagStateHandler)tagClassRef.off('value',tagStateHandler);tagClassRef=null;tagStateHandler=null;tagState={};tagAttemptBusy=false;lastSeenTagEvent='';updateTagHud();
-  remoteAvatars.forEach(entry=>setRemoteItMarker(entry,false));
+  if(tagClassRef&&tagStateHandler)tagClassRef.off('value',tagStateHandler);
+  tagClassRef=null;tagStateHandler=null;tagState={};tagAttemptBusy=false;lastSeenTagEvent='';updateTagHud();
+  remoteAvatars.forEach(entry=>{setRemoteItMarker(entry,false);setRemoteHunterMarker(entry,false);});
 }
-function tagClassId(){return 'all';}
+function tagClassId(){return tagMode==='manhunt'?'manhunt':'all';}
+function normalizedTagMode(data){return data&&data.tagMode==='manhunt'?'manhunt':'regular';}
+function studentInTagMode(data,mode=tagMode){return !!data?.playingTag&&normalizedTagMode(data)===mode;}
+function isManhuntHunter(studentId,state=tagState){return !!(state&&state.hunters&&state.hunters[studentId]);}
 function startTagState(){
-  if(!tagGameEnabled||!tagRoot||(!presenceProfile&&!isTeacher))return;
-  const wanted=tagRoot.child(tagClassId());if(tagClassRef&&tagClassRef.toString()===wanted.toString())return;
-  stopTagState();tagClassRef=wanted;tagStateHandler=snap=>{
-    const prevEvent=lastSeenTagEvent;tagState=snap.val()||{};const evt=tagState.lastTag||{};const eventKey=`${evt.at||''}:${evt.from||''}:${evt.to||''}`;
-    const me=currentTagStudentKey();if(eventKey&&eventKey!==prevEvent){lastSeenTagEvent=eventKey;if(evt.to===me)showTagPop('You were tagged — now YOU’RE IT!');else if(evt.from===me){const n=PRESENCE_STUDENTS[evt.to]?.name||'your classmate';showTagPop(`You tagged ${n}!`);}else if(evt.to&&evt.from){const a=PRESENCE_STUDENTS[evt.from]?.name||'Someone',b=PRESENCE_STUDENTS[evt.to]?.name||'a classmate';showTagPop(`${a} tagged ${b}!`);}}
-    ensureTagItPlayer();applyLocalTagPowerEvents();refreshRemoteAvatars();updateTagHud();updatePowerStatusHud();if(document.getElementById('powerOverlay')?.classList.contains('show'))renderPowerShop();
-  };tagClassRef.on('value',tagStateHandler,err=>console.warn('Tag game unavailable',err));
+  if(!tagGameEnabled||!tagOptedIn||!tagRoot||(!presenceProfile&&!isTeacher))return;
+  const wanted=tagRoot.child(tagClassId());
+  if(tagClassRef&&tagClassRef.toString()===wanted.toString())return;
+  stopTagState();
+  tagClassRef=wanted;
+  tagStateHandler=snap=>{
+    const prevEvent=lastSeenTagEvent;
+    tagState=snap.val()||{};
+    const evt=tagState.lastTag||{};
+    const eventKey=String(evt.at||'')+':'+String(evt.from||'')+':'+String(evt.to||'');
+    const me=currentTagStudentKey();
+
+    if(eventKey&&eventKey!==prevEvent){
+      lastSeenTagEvent=eventKey;
+      const fromName=PRESENCE_STUDENTS[evt.from]?.name||'Someone';
+      const toName=PRESENCE_STUDENTS[evt.to]?.name||'a classmate';
+      if(tagMode==='manhunt'){
+        if(evt.to===me)showTagPop('You were caught — now you are a HUNTER!');
+        else if(evt.from===me)showTagPop('You caught '+toName+' — they joined the hunters!');
+        else if(evt.to&&evt.from)showTagPop(fromName+' caught '+toName+'!');
+      }else{
+        if(evt.to===me)showTagPop('You were tagged — now YOU’RE IT!');
+        else if(evt.from===me)showTagPop('You tagged '+toName+'!');
+        else if(evt.to&&evt.from)showTagPop(fromName+' tagged '+toName+'!');
+      }
+    }
+
+    if(tagMode==='manhunt'){
+      ensureManhuntRound();
+    }else{
+      ensureTagItPlayer();
+      applyLocalTagPowerEvents();
+    }
+    refreshRemoteAvatars();
+    updateTagHud();
+    updatePowerStatusHud();
+    if(document.getElementById('powerOverlay')?.classList.contains('show'))renderPowerShop();
+  };
+  tagClassRef.on('value',tagStateHandler,err=>console.warn(currentGameLabel()+' unavailable',err));
 }
-function onlineTagCandidates(){
-  const candidates=[];if(tagOptedIn&&currentTagStudentKey())candidates.push(currentTagStudentKey());
-  latestPresenceStudents.forEach((data,id)=>{const cleanId=id.includes(':')?id.split(':').pop():id;if(data.playingTag)candidates.push(cleanId);});
+function onlineTagCandidates(mode=tagMode){
+  const candidates=[];
+  if(tagOptedIn&&tagMode===mode&&currentTagStudentKey())candidates.push(currentTagStudentKey());
+  latestPresenceStudents.forEach((data,id)=>{
+    if(!studentInTagMode(data,mode))return;
+    const cleanId=id.includes(':')?id.split(':').pop():id;
+    candidates.push(cleanId);
+  });
   return [...new Set(candidates)].filter(id=>PRESENCE_STUDENTS[id]).sort();
 }
 function ensureTagItPlayer(){
-  if(!tagGameEnabled||!tagClassRef||tagAttemptBusy)return;
-  const candidates=onlineTagCandidates();if(candidates.length<2)return;
-  const current=String(tagState.itStudentId||'');if(current&&candidates.includes(current))return;  const elected=candidates[0];if(currentTagStudentKey()!==elected)return;
-  tagAttemptBusy=true;tagClassRef.transaction(cur=>{cur=cur||{};const curIt=String(cur.itStudentId||'');if(curIt&&candidates.includes(curIt))return;return {...cur,itStudentId:elected,immunityUntil:Date.now()+1500,startedAt:firebase.database.ServerValue.TIMESTAMP,itLastActiveAt:firebase.database.ServerValue.TIMESTAMP,lastTag:null};},()=>{tagAttemptBusy=false;});
+  if(tagMode!=='regular'||!tagGameEnabled||!tagClassRef||tagAttemptBusy)return;
+  const candidates=onlineTagCandidates('regular');
+  if(candidates.length<2)return;
+  const current=String(tagState.itStudentId||'');
+  if(current&&candidates.includes(current))return;
+  const elected=candidates[0];
+  if(currentTagStudentKey()!==elected)return;
+  tagAttemptBusy=true;
+  tagClassRef.transaction(cur=>{
+    cur=cur||{};
+    const curIt=String(cur.itStudentId||'');
+    if(curIt&&candidates.includes(curIt))return;
+    return {...cur,itStudentId:elected,immunityUntil:Date.now()+1500,startedAt:firebase.database.ServerValue.TIMESTAMP,itLastActiveAt:firebase.database.ServerValue.TIMESTAMP,lastTag:null};
+  },()=>{tagAttemptBusy=false;});
+}
+function manhuntNewRoundState(cur,candidates){
+  const previous=String(cur?.initialHunterId||'');
+  const previousIndex=candidates.indexOf(previous);
+  const seed=Math.floor(Date.now()/10000);
+  const nextHunter=previousIndex>=0?candidates[(previousIndex+1)%candidates.length]:candidates[seed%candidates.length];
+  const hunters={};hunters[nextHunter]=true;
+  const ready={};ready[nextHunter]=Date.now();
+  return {
+    roundNumber:safePresenceNumber(cur?.roundNumber,0)+1,
+    initialHunterId:nextHunter,
+    hunters,
+    hunterReadyAt:ready,
+    startedAt:firebase.database.ServerValue.TIMESTAMP,
+    finished:false,
+    endedAt:null,
+    restartAt:null,
+    lastCaughtId:null,
+    lastTag:null
+  };
+}
+function ensureManhuntRound(){
+  if(tagMode!=='manhunt'||!tagGameEnabled||!tagClassRef||tagAttemptBusy)return;
+  const candidates=onlineTagCandidates('manhunt');
+  if(candidates.length<2)return;
+  const me=currentTagStudentKey();
+  const controller=candidates[0];
+  if(me!==controller)return;
+
+  const hunters=tagState.hunters||{};
+  const activeHunters=candidates.filter(id=>hunters[id]);
+  const allCaught=candidates.every(id=>hunters[id]);
+  const now=Date.now();
+
+  if(!tagState.startedAt||!Object.keys(hunters).length||!activeHunters.length){
+    tagAttemptBusy=true;
+    tagClassRef.transaction(cur=>{
+      cur=cur||{};
+      const currentHunters=cur.hunters||{};
+      const hasActive=candidates.some(id=>currentHunters[id]);
+      if(cur.startedAt&&Object.keys(currentHunters).length&&hasActive)return;
+      return manhuntNewRoundState(cur,candidates);
+    },()=>{tagAttemptBusy=false;});
+    return;
+  }
+
+  if(!tagState.finished&&allCaught){
+    tagAttemptBusy=true;
+    tagClassRef.transaction(cur=>{
+      cur=cur||{};
+      if(cur.finished)return;
+      const curHunters=cur.hunters||{};
+      if(!candidates.every(id=>curHunters[id]))return;
+      return {...cur,finished:true,endedAt:firebase.database.ServerValue.TIMESTAMP,restartAt:Date.now()+MANHUNT_RESTART_MS};
+    },()=>{tagAttemptBusy=false;});
+    return;
+  }
+
+  if(tagState.finished){
+    const restartAt=safePresenceNumber(tagState.restartAt,safePresenceNumber(tagState.endedAt,now)+MANHUNT_RESTART_MS);
+    if(now<restartAt)return;
+    tagAttemptBusy=true;
+    tagClassRef.transaction(cur=>{
+      cur=cur||{};
+      if(!cur.finished)return;
+      const curRestart=safePresenceNumber(cur.restartAt,safePresenceNumber(cur.endedAt,Date.now())+MANHUNT_RESTART_MS);
+      if(Date.now()<curRestart)return;
+      return manhuntNewRoundState(cur,candidates);
+    },()=>{tagAttemptBusy=false;});
+  }
 }
 function maybeTagNearbyClassmate(){
-  const me=currentTagStudentKey();if(!tagGameEnabled||!tagOptedIn||!tagClassRef||tagAttemptBusy||tagState.itStudentId!==me)return;
-  const now=Date.now();if(now<safePresenceNumber(tagState.immunityUntil,0)||now-lastTagAttemptAt<500)return;
-  const space=currentPresenceSpace();let targetId=null,best=TAG_DISTANCE;
-  latestPresenceStudents.forEach((data,id)=>{if(!data.playingTag||data.space!==space)return;const cleanId=id.includes(':')?id.split(':').pop():id,entry=remoteAvatars.get(id);if(!entry?.group?.visible||isEffectActive(cleanId,'shieldUntil',now))return;const d=Math.hypot(entry.group.position.x-avatarState.x,entry.group.position.z-avatarState.z);if(d<best){best=d;targetId=cleanId;}});
-  if(!targetId)return;lastTagAttemptAt=now;tagAttemptBusy=true;
-  tagClassRef.transaction(cur=>{cur=cur||{};if(cur.itStudentId!==me||Date.now()<safePresenceNumber(cur.immunityUntil,0))return;return {...cur,itStudentId:targetId,immunityUntil:Date.now()+TAG_GRACE_MS,startedAt:firebase.database.ServerValue.TIMESTAMP,itLastActiveAt:firebase.database.ServerValue.TIMESTAMP,lastTag:{from:me,to:targetId,at:firebase.database.ServerValue.TIMESTAMP}};},()=>{tagAttemptBusy=false;});
+  const me=currentTagStudentKey();
+  if(!tagGameEnabled||!tagOptedIn||!tagClassRef||tagAttemptBusy)return;
+  const now=Date.now();
+  if(now-lastTagAttemptAt<500)return;
+  const space=currentPresenceSpace();
+
+  if(tagMode==='manhunt'){
+    if(tagState.finished||!isManhuntHunter(me))return;
+    const readyAt=safePresenceNumber(tagState.hunterReadyAt?.[me],0);
+    if(now<readyAt)return;
+
+    let targetId=null,best=TAG_DISTANCE;
+    latestPresenceStudents.forEach((data,id)=>{
+      if(!studentInTagMode(data,'manhunt')||data.space!==space)return;
+      const cleanId=id.includes(':')?id.split(':').pop():id;
+      if(cleanId===me||isManhuntHunter(cleanId))return;
+      const entry=remoteAvatars.get(id);
+      if(!entry?.group?.visible)return;
+      const d=Math.hypot(entry.group.position.x-avatarState.x,entry.group.position.z-avatarState.z);
+      if(d<best){best=d;targetId=cleanId;}
+    });
+    if(!targetId)return;
+
+    const candidates=onlineTagCandidates('manhunt');
+    lastTagAttemptAt=now;tagAttemptBusy=true;
+    tagClassRef.transaction(cur=>{
+      cur=cur||{};
+      if(cur.finished)return;
+      const curHunters={...(cur.hunters||{})};
+      if(!curHunters[me]||curHunters[targetId])return;
+      const curReady=safePresenceNumber(cur.hunterReadyAt?.[me],0);
+      if(Date.now()<curReady)return;
+      curHunters[targetId]=true;
+      const ready={...(cur.hunterReadyAt||{})};ready[targetId]=Date.now()+MANHUNT_NEW_HUNTER_GRACE_MS;
+      const finished=candidates.length>=2&&candidates.every(id=>curHunters[id]);
+      return {...cur,hunters:curHunters,hunterReadyAt:ready,lastCaughtId:targetId,lastTag:{from:me,to:targetId,at:firebase.database.ServerValue.TIMESTAMP},finished,endedAt:finished?firebase.database.ServerValue.TIMESTAMP:null,restartAt:finished?Date.now()+MANHUNT_RESTART_MS:null};
+    },()=>{tagAttemptBusy=false;});
+    return;
+  }
+
+  if(tagState.itStudentId!==me)return;
+  if(now<safePresenceNumber(tagState.immunityUntil,0))return;
+  let targetId=null,best=TAG_DISTANCE;
+  latestPresenceStudents.forEach((data,id)=>{
+    if(!studentInTagMode(data,'regular')||data.space!==space)return;
+    const cleanId=id.includes(':')?id.split(':').pop():id;
+    const entry=remoteAvatars.get(id);
+    if(!entry?.group?.visible||isEffectActive(cleanId,'shieldUntil',now))return;
+    const d=Math.hypot(entry.group.position.x-avatarState.x,entry.group.position.z-avatarState.z);
+    if(d<best){best=d;targetId=cleanId;}
+  });
+  if(!targetId)return;
+  lastTagAttemptAt=now;tagAttemptBusy=true;
+  tagClassRef.transaction(cur=>{
+    cur=cur||{};
+    if(cur.itStudentId!==me||Date.now()<safePresenceNumber(cur.immunityUntil,0))return;
+    return {...cur,itStudentId:targetId,immunityUntil:Date.now()+TAG_GRACE_MS,startedAt:firebase.database.ServerValue.TIMESTAMP,itLastActiveAt:firebase.database.ServerValue.TIMESTAMP,lastTag:{from:me,to:targetId,at:firebase.database.ServerValue.TIMESTAMP}};
+  },()=>{tagAttemptBusy=false;});
 }
 function markItActivity(){
   const me=currentTagStudentKey(),now=Date.now();
-  if(!tagGameEnabled||!tagOptedIn||!tagClassRef||tagState.itStudentId!==me||now-tagActivityWriteAt<1400)return;
-  tagActivityWriteAt=now;tagClassRef.update({itLastActiveAt:firebase.database.ServerValue.TIMESTAMP}).catch(()=>{});
+  if(tagMode!=='regular'||!tagGameEnabled||!tagOptedIn||!tagClassRef||tagState.itStudentId!==me||now-tagActivityWriteAt<1400)return;
+  tagActivityWriteAt=now;
+  tagClassRef.update({itLastActiveAt:firebase.database.ServerValue.TIMESTAMP}).catch(()=>{});
 }
 function checkTagIdle(){
-  const now=Date.now();if(now-lastTagIdleCheckAt<900)return;lastTagIdleCheckAt=now;
+  const now=Date.now();
+  if(now-lastTagIdleCheckAt<900)return;
+  lastTagIdleCheckAt=now;
   if(!tagGameEnabled||!tagClassRef||!tagOptedIn)return;
-  const itId=String(tagState.itStudentId||'');if(!itId)return;
+
+  if(tagMode==='manhunt'){
+    ensureManhuntRound();
+    return;
+  }
+
+  const itId=String(tagState.itStudentId||'');
+  if(!itId)return;
   const last=safePresenceNumber(tagState.itLastActiveAt||tagState.startedAt,now),idle=now-last;
   if(idle<TAG_IDLE_WARN_MS){tagIdleWarnKey='';return;}
   const me=currentTagStudentKey();
   if(me===itId&&idle<TAG_IDLE_REASSIGN_MS){
-    const key=itId+':'+String(last);if(tagIdleWarnKey!==key){tagIdleWarnKey=key;showTagPop('You’re IT — keep moving and chase someone!');}
+    const key=itId+':'+String(last);
+    if(tagIdleWarnKey!==key){tagIdleWarnKey=key;showTagPop('You’re IT — keep moving and chase someone!');}
     return;
   }
   if(idle<TAG_IDLE_REASSIGN_MS)return;
-  const candidates=onlineTagCandidates();if(candidates.length<2||!candidates.includes(itId))return;
-  const controllers=candidates.filter(id=>id!==itId).sort();if(currentTagStudentKey()!==controllers[0])return;
-  const idx=candidates.indexOf(itId),next=candidates[(idx+1)%candidates.length];if(!next||next===itId)return;
+  const candidates=onlineTagCandidates('regular');
+  if(candidates.length<2||!candidates.includes(itId))return;
+  const controllers=candidates.filter(id=>id!==itId).sort();
+  if(currentTagStudentKey()!==controllers[0])return;
+  const idx=candidates.indexOf(itId),next=candidates[(idx+1)%candidates.length];
+  if(!next||next===itId)return;
   tagClassRef.transaction(cur=>{
-    cur=cur||{};if(String(cur.itStudentId||'')!==itId)return;
-    const curLast=safePresenceNumber(cur.itLastActiveAt||cur.startedAt,0);if(curLast&&Date.now()-curLast<TAG_IDLE_REASSIGN_MS)return;
+    cur=cur||{};
+    if(String(cur.itStudentId||'')!==itId)return;
+    const curLast=safePresenceNumber(cur.itLastActiveAt||cur.startedAt,0);
+    if(curLast&&Date.now()-curLast<TAG_IDLE_REASSIGN_MS)return;
     return {...cur,itStudentId:next,immunityUntil:Date.now()+TAG_GRACE_MS,startedAt:firebase.database.ServerValue.TIMESTAMP,itLastActiveAt:firebase.database.ServerValue.TIMESTAMP,lastReassign:{from:itId,to:next,at:firebase.database.ServerValue.TIMESTAMP}};
   });
 }
+
 function startTeacherPresenceMonitor(){
   if(!presenceRoot||teacherPresenceRef)return;
   teacherPresenceRef=presenceRoot;teacherPresenceHandler=snapshot=>{
@@ -1307,17 +1682,29 @@ function refreshRemoteAvatars(){
     entry.targetX=Math.max(moveMinX,Math.min(moveMaxX,safePresenceNumber(data.x)));
     entry.targetZ=Math.max(hallMinZ+1.1,Math.min(hallMaxZ-1.1,safePresenceNumber(data.z)));
     entry.targetAngle=safePresenceNumber(data.angle,Math.PI);entry.walking=!!data.walking;
+
     const cleanId=studentId.includes(':')?studentId.split(':').pop():studentId;
-    const hiddenByPower=tagGameEnabled&&!!data.playingTag&&isEffectActive(cleanId,'invisibleUntil')&&!(isTeacher&&!tagOptedIn);
-    entry.group.visible=data.space===activeSpace&&!hiddenByPower;setRemoteTagPlayerMarker(entry,tagGameEnabled&&!!data.playingTag);setRemoteItMarker(entry,tagGameEnabled&&tagState.itStudentId===cleanId);setRemotePowerStateMarker(entry,cleanId);
+    const remoteMode=normalizedTagMode(data);
+    const sameSelectedGame=!tagOptedIn||(!!data.playingTag&&remoteMode===tagMode);
+    const regularPowerView=tagOptedIn&&tagMode==='regular'&&!!data.playingTag&&remoteMode==='regular';
+    const hiddenByPower=regularPowerView&&isEffectActive(cleanId,'invisibleUntil')&&!(isTeacher&&!tagOptedIn);
+    entry.group.visible=data.space===activeSpace&&sameSelectedGame&&!hiddenByPower;
+
+    setRemoteTagPlayerMarker(entry,tagGameEnabled&&!!data.playingTag,remoteMode);
+    setRemoteItMarker(entry,tagGameEnabled&&tagOptedIn&&tagMode==='regular'&&remoteMode==='regular'&&tagState.itStudentId===cleanId);
+    setRemoteHunterMarker(entry,tagGameEnabled&&tagOptedIn&&tagMode==='manhunt'&&remoteMode==='manhunt'&&isManhuntHunter(cleanId));
+    setRemotePowerStateMarker(entry,regularPowerView?cleanId:'');
   });
-  updateOnlineBadge();ensureTagItPlayer();updateTagHud();
+  updateOnlineBadge();
+  if(tagMode==='manhunt')ensureManhuntRound();else ensureTagItPlayer();
+  updateTagHud();
 }
+
 function handlePresenceSnapshot(snapshot){lastPresenceSnapshotAt=Date.now();latestPresenceStudents=latestStudentSessions(snapshot.val()||{});refreshRemoteAvatars();}
 function syncLivePresence(force=false){
   if(!presenceStarted||!presenceOwnRef||!livePresenceEnabled)return;
   const now=Date.now();if(!force&&now-lastPresenceWrite<120)return;
-  const core={x:Number(avatarState.x.toFixed(3)),z:Number(avatarState.z.toFixed(3)),angle:Number(avatarState.angle.toFixed(3)),space:currentPresenceSpace(),avatarId:selectedAvatarId,walking:!!localAvatarWalking,playingTag:!!tagOptedIn};
+  const core={x:Number(avatarState.x.toFixed(3)),z:Number(avatarState.z.toFixed(3)),angle:Number(avatarState.angle.toFixed(3)),space:currentPresenceSpace(),avatarId:selectedAvatarId,walking:!!localAvatarWalking,playingTag:!!tagOptedIn,tagMode:tagOptedIn?tagMode:''};
   const serialized=JSON.stringify(core);if(!force&&serialized===lastPresencePayload)return;
   lastPresencePayload=serialized;lastPresenceWrite=now;
   presenceOwnRef.set({...core,updatedAt:firebase.database.ServerValue.TIMESTAMP}).catch(err=>console.warn('Live classmates update failed',err));
@@ -1369,7 +1756,7 @@ function shortestAngleDelta(from,to){return Math.atan2(Math.sin(to-from),Math.co
 function smoothStep01(t){return t*t*(3-2*t);}
 function navigateTo(target,onArrive=null){
   if(!target)return;
-  if(tagOptedIn){showTagPop('Use the arrow keys or WASD while playing Tag.');return;}
+  if(tagOptedIn){showTagPop('Use the arrow keys or WASD while playing the game.');return;}
   Object.keys(pressed).forEach(k=>pressed[k]=false);
   const endX=Math.max(moveMinX+.25,Math.min(moveMaxX-.25,targetApproachX(target)));
   const endZ=Math.max(hallMinZ+1.25,Math.min(hallMaxZ-1.25,target.z));
@@ -1409,7 +1796,7 @@ function snapCameraToAvatar(){
 function updateAvatar(dt){
   let walking=false,collided=false;
   const oldX=avatarState.x,oldZ=avatarState.z,now=Date.now();
-  const frozen=tagOptedIn&&isEffectActive(currentTagStudentKey(),'frozenUntil',now);
+  const frozen=tagOptedIn&&tagMode==='regular'&&isEffectActive(currentTagStudentKey(),'frozenUntil',now);
   if(frozen){navTween=null;Object.keys(pressed).forEach(k=>pressed[k]=false);}
   if(navTween&&!frozen){
     navTween.elapsed+=dt;const raw=Math.min(1,navTween.elapsed/navTween.duration),t=smoothStep01(raw);
@@ -1428,7 +1815,7 @@ function updateAvatar(dt){
     // as the new forward direction. Up therefore always moves into the screen, never "backwards."
     if(Math.abs(move)>.01&&Math.abs(viewYaw)>.001){avatarState.angle+=viewYaw;viewYaw=0;}
     avatarState.angle+=turn*dt*1.92;
-    const baseSpeed=tagOptedIn?5.25:4.35,speedBoost=(tagOptedIn&&isEffectActive(currentTagStudentKey(),'speedUntil',now))?1.55:1,speed=baseSpeed*speedBoost;
+    const baseSpeed=tagOptedIn?5.25:4.35,speedBoost=(tagOptedIn&&tagMode==='regular'&&isEffectActive(currentTagStudentKey(),'speedUntil',now))?1.55:1,speed=baseSpeed*speedBoost;
     avatarState.x+=Math.sin(avatarState.angle)*move*speed*dt;avatarState.z+=Math.cos(avatarState.angle)*move*speed*dt;
     if(sceneMode==='hallway')collided=resolveHallCollision(oldX,oldZ);
     walking=Math.abs(move)>.01;
@@ -1465,18 +1852,18 @@ function onPointerUp(e){
   const obj=hits[0].object,target=obj.userData.navTarget,postId=obj.userData.postId;
   if(tagOptedIn){
     if(postId){const post=posts.find(p=>p.id===postId);const endX=target?targetApproachX(target):avatarState.x;const distance=target?Math.hypot(endX-avatarState.x,target.z-avatarState.z):0;if(post&&distance<3.0)openLightbox(post);else showTagPop('Run closer to view that post.');}
-    else if(target?.kind==='door'||target?.kind==='studentRoom')showTagPop('Leave Tag before entering a side room.');
-    else showTagPop('Use the arrow keys or WASD while playing Tag.');
+    else if(target?.kind==='door'||target?.kind==='studentRoom')showTagPop('Leave the game before entering a side room.');
+    else showTagPop('Use the arrow keys or WASD while playing the game.');
     return;
   }
   if(target?.kind==='door'){
-    if(tagOptedIn){showTagPop('Leave Tag before entering a side room.');return;}
+    if(tagOptedIn){showTagPop('Leave the game before entering a side room.');return;}
     const d=Math.hypot(targetApproachX(target)-avatarState.x,target.z-avatarState.z);
     if(d<2.8)enterClassroom(target.roomId);else navigateTo(target,()=>enterClassroom(target.roomId));
     return;
   }
   if(target?.kind==='studentRoom'){
-    if(tagOptedIn){showTagPop('Leave Tag before entering a side room.');return;}
+    if(tagOptedIn){showTagPop('Leave the game before entering a side room.');return;}
     // Names are direct gallery links, not walking destinations. A walking
     // approach can hit the hallway divider and cancel the room-opening callback.
     Object.keys(pressed).forEach(k=>pressed[k]=false);
@@ -1534,9 +1921,11 @@ const reviewOverlay=document.getElementById('reviewOverlay');document.getElement
 if(new URLSearchParams(window.location.search).get('review')==='pending'){setTimeout(()=>{const btn=document.getElementById('teacherReviewBtn');if(btn)btn.click()},0)}
 document.getElementById('loginSubmitBtn').onclick=()=>{const val=document.getElementById('teacherPasscode').value,stat=document.getElementById('loginStatus');if(val===TEACHER_PASSCODE){isTeacher=true;enableTeacherPresenceView();if(tagGameEnabled)startTagState();document.getElementById('teacherPasscode').value='';stat.textContent='';showReviewList()}else{stat.textContent='Incorrect passcode.';stat.style.color='#b34e47'}};
 document.getElementById('livePresenceToggleBtn').onclick=async()=>{if(!isTeacher||!presenceSettingsRef)return;const btn=document.getElementById('livePresenceToggleBtn');btn.disabled=true;try{await presenceSettingsRef.set(!livePresenceEnabled)}catch(err){alert('Could not change Live Classmates right now.');console.error(err)}finally{btn.disabled=false}};
-document.getElementById('tagGameToggleBtn').onclick=async()=>{if(!isTeacher||!tagSettingsRef)return;const btn=document.getElementById('tagGameToggleBtn'),next=!tagGameEnabled;btn.disabled=true;try{if(next&&tagRoot)await Promise.all(['et','wt','all'].map(c=>tagRoot.child(c).remove()));await tagSettingsRef.set(next)}catch(err){alert('Could not change Tag right now.');console.error(err)}finally{btn.disabled=false}};
-document.getElementById('tagJoinBtn').onclick=()=>setTagOptIn(!tagOptedIn);
-document.getElementById('teacherJoinTagBtn').onclick=()=>{if(isTeacher)setTagOptIn(!tagOptedIn)};
+document.getElementById('tagGameToggleBtn').onclick=async()=>{if(!isTeacher||!tagSettingsRef)return;const btn=document.getElementById('tagGameToggleBtn'),next=!tagGameEnabled;btn.disabled=true;try{if(next&&tagRoot)await Promise.all(['et','wt','all','manhunt'].map(c=>tagRoot.child(c).remove()));await tagSettingsRef.set(next)}catch(err){alert('Could not change Tag right now.');console.error(err)}finally{btn.disabled=false}};
+document.getElementById('tagJoinBtn').onclick=()=>setTagOptIn(!(tagOptedIn&&tagMode==='regular'),'regular');
+document.getElementById('manhuntJoinBtn').onclick=()=>setTagOptIn(!(tagOptedIn&&tagMode==='manhunt'),'manhunt');
+document.getElementById('teacherJoinTagBtn').onclick=()=>{if(isTeacher)setTagOptIn(!(tagOptedIn&&tagMode==='regular'),'regular')};
+document.getElementById('teacherJoinManhuntBtn').onclick=()=>{if(isTeacher)setTagOptIn(!(tagOptedIn&&tagMode==='manhunt'),'manhunt')};
 document.getElementById('powerShopBtn').onclick=openPowerShop;
 document.getElementById('closePowerBtn').onclick=closePowerShop;
 document.getElementById('powerOverlay').addEventListener('click',e=>{if(e.target.id==='powerOverlay')closePowerShop();});
