@@ -212,8 +212,8 @@ button,input,select,textarea{font:inherit}
 <div class="overlay" id="powerOverlay">
   <div class="modal power-modal">
     <button class="close-x" id="closePowerBtn">&times;</button>
-    <h2>Regular Tag Power Shop</h2>
-    <div class="power-head-row"><p class="power-sub">Spend a few class points for a short advantage. Powers only work while you are playing Regular Tag.</p><div class="power-balance" id="powerBalance">Points: —</div></div>
+    <h2 id="powerShopTitle">Regular Tag Power Shop</h2>
+    <div class="power-head-row"><p class="power-sub" id="powerShopSub">Spend a few class points for a short advantage.</p><div class="power-balance" id="powerBalance">Points: —</div></div>
     <div class="power-grid" id="powerGrid"></div>
     <div class="power-spend-meter"><span id="powerSpendText">Game spending: —</span><div class="power-spend-bar"><div class="power-spend-fill" id="powerSpendFill"></div></div></div>
     <div class="power-shop-note" id="powerShopNote"></div>
@@ -1102,11 +1102,11 @@ function updateTagJoinControls(){
 
   const powerBtn=document.getElementById('powerShopBtn');
   if(powerBtn){
-    const show=eligible&&regularSelected;
+    const show=eligible&&tagOptedIn;
     powerBtn.classList.toggle('show',show);
     powerBtn.classList.toggle('active',show&&activePowerLabels().length>0);
   }
-  if(!regularSelected)closePowerShop();
+  if(!tagOptedIn)closePowerShop();
 }
 function setTagOptIn(next,mode){
   const requestedMode=mode==='manhunt'?'manhunt':'regular';
@@ -1289,7 +1289,7 @@ function pointInsideHallObstacle(x,z,r=.58){
   return false;
 }
 function performPowerDash(){
-  if(!tagOptedIn||tagMode!=='regular'||sceneMode!=='hallway')return;
+  if(!tagOptedIn||sceneMode!=='hallway')return;
   const oldX=avatarState.x,oldZ=avatarState.z,dist=3.65;
   avatarState.x+=Math.sin(avatarState.angle)*dist;avatarState.z+=Math.cos(avatarState.angle)*dist;
   avatarState.x=Math.max(moveMinX,Math.min(moveMaxX,avatarState.x));avatarState.z=Math.max(hallMinZ+1.1,Math.min(hallMaxZ-1.1,avatarState.z));
@@ -1422,8 +1422,8 @@ function startTagState(){
       ensureManhuntRound();
     }else{
       ensureTagItPlayer();
-      applyLocalTagPowerEvents();
     }
+    applyLocalTagPowerEvents();
     refreshRemoteAvatars();
     updateTagHud();
     updatePowerStatusHud();
@@ -1686,14 +1686,14 @@ function refreshRemoteAvatars(){
     const cleanId=studentId.includes(':')?studentId.split(':').pop():studentId;
     const remoteMode=normalizedTagMode(data);
     const sameSelectedGame=!tagOptedIn||(!!data.playingTag&&remoteMode===tagMode);
-    const regularPowerView=tagOptedIn&&tagMode==='regular'&&!!data.playingTag&&remoteMode==='regular';
-    const hiddenByPower=regularPowerView&&isEffectActive(cleanId,'invisibleUntil')&&!(isTeacher&&!tagOptedIn);
+    const gamePowerView=tagOptedIn&&!!data.playingTag&&remoteMode===tagMode;
+    const hiddenByPower=gamePowerView&&isEffectActive(cleanId,'invisibleUntil')&&!(isTeacher&&!tagOptedIn);
     entry.group.visible=data.space===activeSpace&&sameSelectedGame&&!hiddenByPower;
 
     setRemoteTagPlayerMarker(entry,tagGameEnabled&&!!data.playingTag,remoteMode);
     setRemoteItMarker(entry,tagGameEnabled&&tagOptedIn&&tagMode==='regular'&&remoteMode==='regular'&&tagState.itStudentId===cleanId);
     setRemoteHunterMarker(entry,tagGameEnabled&&tagOptedIn&&tagMode==='manhunt'&&remoteMode==='manhunt'&&isManhuntHunter(cleanId));
-    setRemotePowerStateMarker(entry,regularPowerView?cleanId:'');
+    setRemotePowerStateMarker(entry,gamePowerView?cleanId:'');
   });
   updateOnlineBadge();
   if(tagMode==='manhunt')ensureManhuntRound();else ensureTagItPlayer();
@@ -1796,7 +1796,7 @@ function snapCameraToAvatar(){
 function updateAvatar(dt){
   let walking=false,collided=false;
   const oldX=avatarState.x,oldZ=avatarState.z,now=Date.now();
-  const frozen=tagOptedIn&&tagMode==='regular'&&isEffectActive(currentTagStudentKey(),'frozenUntil',now);
+  const frozen=tagOptedIn&&isEffectActive(currentTagStudentKey(),'frozenUntil',now);
   if(frozen){navTween=null;Object.keys(pressed).forEach(k=>pressed[k]=false);}
   if(navTween&&!frozen){
     navTween.elapsed+=dt;const raw=Math.min(1,navTween.elapsed/navTween.duration),t=smoothStep01(raw);
@@ -1815,7 +1815,7 @@ function updateAvatar(dt){
     // as the new forward direction. Up therefore always moves into the screen, never "backwards."
     if(Math.abs(move)>.01&&Math.abs(viewYaw)>.001){avatarState.angle+=viewYaw;viewYaw=0;}
     avatarState.angle+=turn*dt*1.92;
-    const baseSpeed=tagOptedIn?5.25:4.35,speedBoost=(tagOptedIn&&tagMode==='regular'&&isEffectActive(currentTagStudentKey(),'speedUntil',now))?1.55:1,speed=baseSpeed*speedBoost;
+    const baseSpeed=tagOptedIn?5.25:4.35,speedBoost=(tagOptedIn&&isEffectActive(currentTagStudentKey(),'speedUntil',now))?1.55:1,speed=baseSpeed*speedBoost;
     avatarState.x+=Math.sin(avatarState.angle)*move*speed*dt;avatarState.z+=Math.cos(avatarState.angle)*move*speed*dt;
     if(sceneMode==='hallway')collided=resolveHallCollision(oldX,oldZ);
     walking=Math.abs(move)>.01;
@@ -2072,6 +2072,163 @@ if(window.THREE){
     );
   }
 }
+</script>
+<script>
+/* Manhunt power compatibility layer */
+function powerAllowedInCurrentMode(powerId){
+  if(tagMode==='regular')return !!TAG_POWERS[powerId];
+  if(tagMode!=='manhunt')return false;
+  const hunter=isManhuntHunter(currentTagStudentKey());
+  return (hunter?['speed','dash','freeze']:['speed','dash','invisible']).includes(powerId);
+}
+function powerCurrentlyActive(powerId){
+  const now=Date.now(),me=currentTagStudentKey();
+  if(powerId==='speed')return isEffectActive(me,'speedUntil',now);
+  if(powerId==='invisible')return isEffectActive(me,'invisibleUntil',now);
+  if(powerId==='shield')return isEffectActive(me,'shieldUntil',now);
+  return false;
+}
+nearestTagOpponent=function(maxDistance=Infinity){
+  let best=null,bestD=maxDistance;
+  latestPresenceStudents.forEach((data,id)=>{
+    if(!studentInTagMode(data,tagMode)||data.space!==currentPresenceSpace())return;
+    const cleanId=id.includes(':')?id.split(':').pop():id;
+    if(cleanId===currentTagStudentKey())return;
+    if(tagMode==='manhunt'&&isManhuntHunter(cleanId))return;
+    const entry=remoteAvatars.get(id);
+    if(!entry?.group?.visible)return;
+    const d=Math.hypot(entry.group.position.x-avatarState.x,entry.group.position.z-avatarState.z);
+    if(d<bestD){bestD=d;best={id:cleanId,name:data.name||PRESENCE_STUDENTS[cleanId]?.name||'classmate',distance:d};}
+  });
+  return best;
+};
+applyLocalTagPowerEvents=function(){
+  if(!tagOptedIn)return;
+  const eff=currentTagEffects(),now=Date.now();
+  const dashToken=String(eff.dashToken||'');
+  if(dashToken&&dashToken!==lastConsumedDashToken&&now-safePresenceNumber(eff.dashAt,0)<6000){
+    lastConsumedDashToken=dashToken;
+    performPowerDash();
+  }
+  if(tagMode==='regular'){
+    const teleportToken=String(eff.teleportToken||'');
+    if(teleportToken&&teleportToken!==lastConsumedTeleportToken&&now-safePresenceNumber(eff.teleportAt,0)<6000){
+      lastConsumedTeleportToken=teleportToken;
+      performPowerTeleport();
+    }
+  }
+};
+activePowerLabels=function(){
+  if(!tagOptedIn)return [];
+  const me=currentTagStudentKey(),now=Date.now(),out=[];
+  const add=(field,icon,label)=>{
+    const until=effectUntil(me,field);
+    if(until>now)out.push(icon+' '+label+' '+Math.max(1,Math.ceil((until-now)/1000))+'s');
+  };
+  add('speedUntil','⚡','Speed');
+  add('invisibleUntil','👻','Invisible');
+  add('shieldUntil','🛡️','Shield');
+  add('frozenUntil','❄️','FROZEN');
+  return out;
+};
+function buildPowerEffectUpdates(powerId,targetStudentId,tokenPrefix){
+  const now=Date.now(),me=currentTagStudentKey(),u={};
+  if(powerId==='speed')u['effects/'+me+'/speedUntil']=now+7000;
+  else if(powerId==='invisible')u['effects/'+me+'/invisibleUntil']=now+6000;
+  else if(powerId==='shield')u['effects/'+me+'/shieldUntil']=now+5000;
+  else if(powerId==='dash'){u['effects/'+me+'/dashToken']=tokenPrefix+'-'+now;u['effects/'+me+'/dashAt']=now;}
+  else if(powerId==='teleport'){u['effects/'+me+'/teleportToken']=tokenPrefix+'-'+now;u['effects/'+me+'/teleportAt']=now;}
+  else if(powerId==='freeze'&&targetStudentId){u['effects/'+targetStudentId+'/frozenUntil']=now+3000;u['effects/'+targetStudentId+'/frozenBy']=me;}
+  return u;
+}
+function buildRegularCleanupUpdates(powerId,targetStudentId){
+  const me=currentTagStudentKey(),u={};
+  if(powerId==='speed')u['effects/'+me+'/speedUntil']=null;
+  else if(powerId==='invisible')u['effects/'+me+'/invisibleUntil']=null;
+  else if(powerId==='shield')u['effects/'+me+'/shieldUntil']=null;
+  else if(powerId==='dash'){u['effects/'+me+'/dashToken']=null;u['effects/'+me+'/dashAt']=null;}
+  else if(powerId==='teleport'){u['effects/'+me+'/teleportToken']=null;u['effects/'+me+'/teleportAt']=null;}
+  else if(powerId==='freeze'&&targetStudentId){u['effects/'+targetStudentId+'/frozenUntil']=null;u['effects/'+targetStudentId+'/frozenBy']=null;}
+  return u;
+}
+async function activateManhuntPowerAfterCharge(powerId,targetStudentId){
+  if(tagMode!=='manhunt'||!tagClassRef)return;
+  await tagClassRef.update(buildPowerEffectUpdates(powerId,targetStudentId,'manhunt'));
+  if(tagRoot){
+    const cleanup=buildRegularCleanupUpdates(powerId,targetStudentId);
+    if(Object.keys(cleanup).length)await tagRoot.child('all').update(cleanup).catch(()=>{});
+  }
+}
+renderPowerShop=function(){
+  const grid=document.getElementById('powerGrid'),bal=document.getElementById('powerBalance'),spend=document.getElementById('powerSpendText'),fill=document.getElementById('powerSpendFill'),note=document.getElementById('powerShopNote');
+  const title=document.getElementById('powerShopTitle'),sub=document.getElementById('powerShopSub');
+  if(!grid)return;
+  const now=Date.now(),cooling=powerCooldownUntil>now,teacherMode=isTeacher;
+  const hunter=tagMode==='manhunt'&&isManhuntHunter(currentTagStudentKey());
+  if(title)title.textContent=tagMode==='manhunt'?'Manhunt Power Shop':'Regular Tag Power Shop';
+  if(sub)sub.textContent=tagMode==='manhunt'?(hunter?'You are a hunter: use Speed, Dash, or Freeze to catch the runners.':'You are a runner: use Speed, Dash, or Invisible to escape.'):'Spend a few class points for a short advantage.';
+  bal.textContent=teacherMode?'Teacher test mode — free':'Points: '+(powerBalance===null?'—':powerBalance);
+  spend.textContent=teacherMode?'Teacher testing does not spend points.':'Game spending: '+powerSpent+'/'+TAG_POWER_SPEND_CAP+' points';
+  fill.style.width=teacherMode?'0%':Math.min(100,powerSpent/TAG_POWER_SPEND_CAP*100)+'%';
+  const entries=Object.entries(TAG_POWERS).filter(([id])=>powerAllowedInCurrentMode(id));
+  grid.innerHTML=entries.map(([id,p])=>{
+    const canAfford=teacherMode||(powerBalance!==null&&powerBalance>=p.cost);
+    const capOk=teacherMode||powerSpent+p.cost<=TAG_POWER_SPEND_CAP;
+    const active=powerCurrentlyActive(id);
+    const disabled=powerBusy||cooling||active||!canAfford||!capOk;
+    const label=active?'ACTIVE':(teacherMode?'Test':'Buy '+p.cost);
+    return `<div class='power-card${cooling?' cooling':''}'><div class='power-icon'>${p.icon}</div><div><h3>${p.name}</h3><p>${p.detail}</p></div><div class='power-meta'><span class='power-cost'>${teacherMode?'Free test':p.cost+' point'+(p.cost===1?'':'s')+' · '+p.duration}</span><button class='power-buy' data-power='${id}' ${disabled?'disabled':''}>${label}</button></div></div>`;
+  }).join('');
+  grid.querySelectorAll('[data-power]').forEach(btn=>btn.onclick=()=>buyTagPower(btn.dataset.power));
+  if(cooling&&!powerBusy)note.textContent='Power shop cooldown: '+Math.max(1,Math.ceil((powerCooldownUntil-now)/1000))+'s';
+  else if(!powerBusy&&note.textContent.startsWith('Power shop cooldown:'))note.textContent='';
+};
+teacherTestPower=async function(powerId,targetStudentId){
+  if(!tagClassRef||!tagOptedIn)throw new Error('Join a game first.');
+  if(!powerAllowedInCurrentMode(powerId))throw new Error('That power is not available for your current role.');
+  if(powerId==='freeze'&&!targetStudentId)throw new Error('Get closer to a runner first.');
+  await tagClassRef.update(buildPowerEffectUpdates(powerId,targetStudentId||'','teacher'));
+};
+buyTagPower=async function(powerId){
+  const p=TAG_POWERS[powerId];
+  if(!p||powerBusy||!tagOptedIn||!powerAllowedInCurrentMode(powerId))return;
+  const note=document.getElementById('powerShopNote');
+  if(powerCurrentlyActive(powerId)){note.textContent=p.name+' is already active.';return;}
+  let target=null;
+  if(powerId==='freeze'){
+    target=nearestTagOpponent(5.5);
+    if(!target){note.textContent=tagMode==='manhunt'?'Get closer to a runner before buying Freeze.':'Get closer to another player before buying Freeze.';return;}
+  }
+  powerBusy=true;
+  note.textContent=isTeacher?'Testing '+p.name+'…':'Buying '+p.name+'…';
+  renderPowerShop();
+  try{
+    if(isTeacher){
+      await teacherTestPower(powerId,target?.id||'');
+    }else{
+      const j=await callPowerApi({action:'purchase',powerId:powerId,targetStudentId:target?.id||'',mode:tagMode,manhuntRole:tagMode==='manhunt'?(isManhuntHunter(currentTagStudentKey())?'hunter':'runner'):''});
+      powerBalance=Number(j.balance||0);
+      powerSpent=Number(j.spent||0);
+      powerCooldownUntil=Number(j.cooldownUntil||0);
+      if(tagMode==='manhunt')await activateManhuntPowerAfterCharge(powerId,target?.id||'');
+    }
+    note.textContent=p.icon+' '+p.name+' activated!';
+    showTagPop(p.icon+' '+p.name+'!');
+  }catch(err){
+    note.textContent=err.message||String(err);
+  }finally{
+    powerBusy=false;
+    renderPowerShop();
+  }
+};
+openPowerShop=function(){
+  if(!tagOptedIn){showTagPop('Join Regular Tag or Manhunt first.');return;}
+  document.getElementById('powerOverlay').classList.add('show');
+  document.getElementById('powerShopNote').textContent='';
+  renderPowerShop();
+  refreshPowerAccount();
+};
+document.getElementById('powerShopBtn').onclick=openPowerShop;
 </script>
 </body>
 </html>
