@@ -916,6 +916,7 @@ function renderStudentList(){
    skill tab) so clicking the badge can jump straight to it instead of
    just opening the student's default grid. */
 let pendingDisputeTargets = {}; // studentId -> { posukKey, tab }
+let pendingDisputeAutoOpened = false;
 async function markStudentsWithPendingDisputes(){
   try{
     const allAttempts = await loadAllAttempts();
@@ -973,6 +974,16 @@ async function markStudentsWithPendingDisputes(){
         delete pendingDisputeTargets[id];
       }
     });
+    if(!pendingDisputeAutoOpened && new URLSearchParams(window.location.search).get('review') === 'disputes'){
+      const firstStudentId = Object.keys(pendingDisputeTargets)[0];
+      if(firstStudentId){
+        pendingDisputeAutoOpened = true;
+        const target = pendingDisputeTargets[firstStudentId];
+        const rowEl = document.querySelector('.student-item[data-id="' + firstStudentId + '"]');
+        if(target) studentActiveTab = target.tab;
+        selectStudent(firstStudentId, studentsMap[firstStudentId], rowEl || document.createElement('div'), target ? target.posukKey : null);
+      }
+    }
   }catch(err){
     console.error('Could not check for pending disputes', err);
   }
