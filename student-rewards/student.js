@@ -192,17 +192,23 @@ function pointAccountTotals(){
   const currentBalance=Number(state.student?.rewardBalance||0), redeemed=redeemedPoints();
   return {totalPoints:currentBalance+redeemed,redeemed,currentBalance};
 }
-function classGoalProgress(g){return Math.max(0,Math.min(100,Math.round((Number(g.totalContributed||0)/Math.max(1,Number(g.goalPoints||1)))*100)))}
+function classGoalProgress(g){
+  const goal=Math.max(1,Number(g.goalPoints||1));
+  const total=g?.modeVoting?Math.max(0,...(g.modes||[]).map(m=>Number(m.total)||0)):Number(g.totalContributed||0);
+  return Math.max(0,Math.min(100,Math.round(total/goal*100)));
+}
+function modePoints(n){const x=Number(n)||0;return Number.isInteger(x)?String(x):x.toFixed(1).replace(/\.0$/,'')}
 function classGoalCard(g,{compact=false}={}){
-  const balance=Number(state.student?.rewardBalance||0), goal=Number(g.goalPoints||0), total=Number(g.totalContributed||0), remaining=Math.max(0,Number(g.remainingGoal??(goal-total))), mine=Number(g.studentContributed||0), cap=Number(g.studentCap||0), mineLeft=Math.max(0,Number(g.remainingStudentCap??(cap-mine))), maxGive=Math.max(0,Math.min(balance,mineLeft,remaining)), pct=classGoalProgress(g), cooling=String(g.status||'')==='cooldown'||timeMs(g.cooldownUntil)>Date.now(), complete=!cooling&&(String(g.status||'')==='completed'||remaining<=0), storeOpen=isStoreOpen(), rewardOpen=g.available!==false;
+  const balance=Number(state.student?.rewardBalance||0),goal=Number(g.goalPoints||0),total=Number(g.totalContributed||0),remaining=Math.max(0,Number(g.remainingGoal??(goal-total))),mine=Number(g.studentContributed||0),cap=Number(g.studentCap||0),mineLeft=Math.max(0,Number(g.remainingStudentCap??(cap-mine))),maxGive=Math.max(0,Math.min(balance,mineLeft,g.modeVoting?Number.MAX_SAFE_INTEGER:remaining)),pct=classGoalProgress(g),cooling=String(g.status||'')==='cooldown'||timeMs(g.cooldownUntil)>Date.now(),complete=!g.modeVoting&&!cooling&&(String(g.status||'')==='completed'||remaining<=0),storeOpen=isStoreOpen(),rewardOpen=g.available!==false;
   const inputId=`classGive-${String(g.rewardId||'').replace(/[^A-Za-z0-9_-]/g,'-')}-${compact?'top':'store'}`;
   const disabled=!storeOpen||!rewardOpen||cooling||maxGive<1;
   const buttonText=!storeOpen?'Store closed':!rewardOpen?'Closed':cooling?`Available in ${cooldownText(g.cooldownUntil)}`:maxGive<1?'No points available':'Contribute';
   const cooldownLine=cooling?`<div class="class-goal-complete">⏳ Available again in ${e(cooldownText(g.cooldownUntil))}</div>`:'';
-  return `<article class="class-goal-card ${complete||cooling?'complete':''} ${compact?'compact':''} ${rewardOpen?'reward-open':'reward-closed'}"><div class="class-goal-top"><div class="class-goal-icon">${e(g.icon||'⭐')}</div><div><small>CLASS REWARD${rewardOpen?'':' · CLOSED'}</small><h3>${e(g.name||'Class Reward')}</h3>${Number(g.cooldownDays)>0?`<small>Cooldown: ${Number(g.cooldownDays)} day${Number(g.cooldownDays)===1?'':'s'}</small>`:''}</div><strong>${total} / ${goal} ★</strong></div><div class="class-goal-progress"><i style="width:${pct}%"></i></div><div class="class-goal-numbers"><span><b>${remaining}</b> still needed</span><span>You gave <b>${mine}</b></span><span>You can still give <b>${mineLeft}</b></span></div>${cooldownLine||(complete?`<div class="class-goal-complete">✓ Goal reached!</div>`:`<div class="class-contribute"><input id="${e(inputId)}" type="number" inputmode="numeric" min="1" max="${maxGive}" placeholder="Points" ${disabled?'disabled':''}><button class="primary" data-class-contribute="${e(g.rewardId)}" data-input="${e(inputId)}" ${state.busy||disabled?'disabled':''}>${buttonText}</button></div>`)}</article>`;
+  const modeRace=g.modeVoting?`<div class="gimkit-mode-race student"><div class="gimkit-mode-race-head"><b>Choose your Gimkit mode${compact?'s':''}</b><span>First bar to ${goal} ★ wins</span></div>${(g.modes||[]).map(m=>`<label class="gimkit-mode-choice"><input type="checkbox" data-gimkit-mode="${e(m.id)}" ${disabled?'disabled':''}><span class="gimkit-mode-choice-main"><span><strong>${e(m.name)}</strong><small>${m.voters} voter${m.voters===1?'':'s'}</small></span><span class="gimkit-mode-bar"><i style="width:${Math.max(0,Math.min(100,Number(m.pct)||0))}%"></i></span></span><b>${modePoints(m.total)} / ${goal} ★</b></label>`).join('')}<p class="gimkit-mode-note">Choose one or more. Your contribution is split between the modes you check. When one wins, only that bar resets; the others keep their points for next time.</p>${g.lastWinner?`<p class="gimkit-last-winner">Last winner: <strong>${e(g.lastWinner.name||g.lastWinner.id||'Gimkit mode')}</strong></p>`:''}</div>`:'';
+  return `<article class="class-goal-card ${complete||cooling?'complete':''} ${compact?'compact':''} ${rewardOpen?'reward-open':'reward-closed'} ${g.modeVoting?'gimkit-voting-card':''}"><div class="class-goal-top"><div class="class-goal-icon">${e(g.icon||'⭐')}</div><div><small>${g.modeVoting?'GIMKIT MODE RACE':'CLASS REWARD'}${rewardOpen?'':' · CLOSED'}</small><h3>${e(g.name||'Class Reward')}</h3>${Number(g.cooldownDays)>0?`<small>Cooldown: ${Number(g.cooldownDays)} day${Number(g.cooldownDays)===1?'':'s'}</small>`:''}</div><strong>${g.modeVoting?`${modePoints(Math.max(0,...(g.modes||[]).map(m=>Number(m.total)||0)))} / ${goal} ★`:`${total} / ${goal} ★`}</strong></div><div class="class-goal-progress"><i style="width:${pct}%"></i></div>${modeRace}<div class="class-goal-numbers"><span>You gave <b>${mine}</b> this round</span><span>You can still give <b>${mineLeft}</b></span>${g.modeVoting?'<span>Losing bars carry over</span>':`<span><b>${remaining}</b> still needed</span>`}</div>${cooldownLine||(complete?`<div class="class-goal-complete">✓ Goal reached!</div>`:`<div class="class-contribute"><input id="${e(inputId)}" type="number" inputmode="numeric" min="1" max="${maxGive}" placeholder="Points" ${disabled?'disabled':''}><button class="primary" data-class-contribute="${e(g.rewardId)}" data-input="${e(inputId)}" ${g.modeVoting?'data-mode-voting="1"':''} ${state.busy||disabled?'disabled':''}>${buttonText}</button></div>`)}</article>`;
 }
 function activeClassGoalsHTML(){
-  const active=(state.classGoals||[]).filter(g=>Number(g.totalContributed||0)>0||String(g.status||'')==='completed');
+  const active=(state.classGoals||[]).filter(g=>g.modeVoting?(g.modes||[]).some(m=>Number(m.total||0)>0)||String(g.status||'')==='cooldown':Number(g.totalContributed||0)>0||String(g.status||'')==='completed'||String(g.status||'')==='cooldown');
   if(!active.length)return '';
   return `<section class="active-class-goals"><div class="active-class-goals-head"><div><p class="eyebrow">YOUR CLASS IS WORKING TOWARD</p><h2>Class Reward Goals</h2><p>Add some of your points if you want to help the class reach a goal.</p></div><button class="secondary" id="openClassRewards">See all class rewards →</button></div><div class="active-class-goal-grid">${active.map(g=>classGoalCard(g,{compact:true})).join('')}</div></section>`;
 }
@@ -285,27 +291,35 @@ function commentsHTML(){
   return `<section class="panel"><h2>Teacher comments</h2><div class="commentlist">${rows.length?rows.map(c=>`<article><p>${e(c.body)}</p><small>${e(C.formatDate((c.createdAt||'').slice(0,10)))}</small></article>`).join(''):'<p>No comments yet.</p>'}</div></section>`;
 }
 function bindClassContributionButtons(){
-  document.querySelectorAll('[data-class-contribute]').forEach(b=>b.onclick=()=>contributeClassReward(b.dataset.classContribute,b.dataset.input));
+  document.querySelectorAll('[data-class-contribute]').forEach(b=>b.onclick=()=>contributeClassReward(b.dataset.classContribute,b.dataset.input,b));
 }
 function bindTab(){if(state.tab==='Rewards'){document.querySelectorAll('[data-redeem]').forEach(b=>b.onclick=()=>redeem(b.dataset.redeem));bindClassContributionButtons()}}
-async function contributeClassReward(rewardId,inputId){
+async function contributeClassReward(rewardId,inputId,buttonEl){
   if(state.busy)return;
   const storeOpen=isStoreOpen();
   if(!storeOpen){C.toast('The Prize Store is closed right now.','error');return}
   const goal=(state.classGoals||[]).find(g=>g.rewardId===rewardId);
   if(goal?.available===false){C.toast('That class reward is closed right now.','error');return}
-  const input=document.getElementById(inputId), amount=Math.floor(Number(input?.value||0));
+  if(String(goal?.status||'')==='cooldown'||timeMs(goal?.cooldownUntil)>Date.now()){C.toast(`Gimkit is available again in ${cooldownText(goal.cooldownUntil)}.`,'error');return}
+  const input=document.getElementById(inputId),amount=Math.floor(Number(input?.value||0));
   if(!Number.isFinite(amount)||amount<1){C.toast('Enter how many points you want to contribute.','error');return}
-  const allowed=Math.max(0,Math.min(Number(state.student?.rewardBalance||0),Number(goal?.remainingStudentCap||0),Number(goal?.remainingGoal||0)));
+  const allowed=Math.max(0,Math.min(Number(state.student?.rewardBalance||0),Number(goal?.remainingStudentCap||0),goal?.modeVoting?Number.MAX_SAFE_INTEGER:Number(goal?.remainingGoal||0)));
   if(amount>allowed){C.toast(`You can contribute up to ${allowed} points to this goal right now.`,'error');return}
+  let modeIds=[];
+  if(goal?.modeVoting){
+    const card=buttonEl?.closest('.class-goal-card');
+    modeIds=[...(card?.querySelectorAll('[data-gimkit-mode]:checked')||[])].map(x=>x.dataset.gimkitMode);
+    if(!modeIds.length){C.toast('Choose at least one Gimkit mode first.','error');return}
+  }
   state.busy=true;render();
   try{
-    const j=await classRewardsApi('contribute-class-reward',{classRewardId:rewardId,amount});
+    const j=await classRewardsApi('contribute-class-reward',{classRewardId:rewardId,amount,modeIds});
     if(j.goal)state.classGoals=(state.classGoals||[]).map(g=>g.rewardId===rewardId?j.goal:g);
     else {const status=await loadClassRewardStatus();state.classGoals=status.goals;state.storeOpen=status.storeOpen;}
     if(Number.isFinite(Number(j.balance))){state.student.rewardBalance=Number(j.balance);if(state.root?.student)state.root.student.rewardBalance=Number(j.balance)}
     state.activityPointHistory=await loadActivityPointHistory().catch(()=>state.activityPointHistory);
-    C.toast(`${amount} points added to ${goal?.name||'the class goal'}!`);
+    if(j.winner)C.toast(`🎉 ${j.winner.name||'A Gimkit mode'} won! The other mode bars will carry over.`);
+    else C.toast(goal?.modeVoting?`${amount} points added to your Gimkit choices!`:`${amount} points added to ${goal?.name||'the class goal'}!`);
   }catch(err){C.toast(err.message||String(err),'error')}
   finally{state.busy=false;render()}
 }
