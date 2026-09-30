@@ -1,5 +1,5 @@
 'use strict';
-const APP_BUILD='2026-09-30-sound-builder-v1';
+const APP_BUILD='2026-09-30-sound-builder-v2-ayin-segol';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
 let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null,soundGame=null;
@@ -241,13 +241,13 @@ function storyQuizRender(){
 function focusSoundGame(){requestAnimationFrame(()=>$('soundgame')?.scrollIntoView({behavior:'smooth',block:'start'}))}
 const SOUND_PROFILES={
   'געלט':[
-    {raw:'גע',answer:'גע',choices:['גע','גאַ','גאָ','גוּ']},
+    {raw:'גע',answer:'געֶ',choices:['געֶ','געַ','געָ','געְ']},
     {raw:'לט'}
   ],
   'טאכטער':[
     {raw:'טא',answer:'טאָ',choices:['טאָ','טאַ','טע','טוּ']},
     {raw:'כ',answer:'כ',choices:['כ','כּ','כָ','כְ']},
-    {raw:'טע',answer:'טע',choices:['טע','טאַ','טאָ','טי']},
+    {raw:'טע',answer:'טעֶ',choices:['טעֶ','טעַ','טעָ','טעְ']},
     {raw:'ר'}
   ],
   'גיין':[
@@ -280,12 +280,12 @@ const SOUND_PROFILES={
     {raw:'ב',answer:'בּ',choices:['בּ','ב','בָ','בְ']}
   ],
   'נעמען':[
-    {raw:'נע',answer:'נע',choices:['נע','נאַ','נאָ','נוּ']},
-    {raw:'מע',answer:'מע',choices:['מע','מאַ','מאָ','מוּ']},
+    {raw:'נע',answer:'נעֶ',choices:['נעֶ','נעַ','נעָ','נעְ']},
+    {raw:'מע',answer:'מעֶ',choices:['מעֶ','מעַ','מעָ','מעְ']},
     {raw:'ן'}
   ],
   'זען':[
-    {raw:'זע',answer:'זע',choices:['זע','זאַ','זאָ','זוּ']},
+    {raw:'זע',answer:'זעֶ',choices:['זעֶ','זעַ','זעָ','זעְ']},
     {raw:'ן'}
   ],
   'צווישן':[
@@ -296,27 +296,27 @@ const SOUND_PROFILES={
     {raw:'ן'}
   ],
   'געזוכט':[
-    {raw:'גע',answer:'גע',choices:['גע','גאַ','גאָ','גוּ']},
+    {raw:'גע',answer:'געֶ',choices:['געֶ','געַ','געָ','געְ']},
     {raw:'זו',answer:'זוּ',choices:['זוּ','זוֹ','זוַ','זוְ']},
     {raw:'כ',answer:'כ',choices:['כ','כּ','כָ','כְ']},
     {raw:'ט'}
   ],
   'געבן':[
-    {raw:'גע',answer:'גע',choices:['גע','גאַ','גאָ','גוּ']},
+    {raw:'גע',answer:'געֶ',choices:['געֶ','געַ','געָ','געְ']},
     {raw:'ב',answer:'בּ',choices:['בּ','ב','בָ','בְ']},
-    {raw:'ען'}
+    {raw:'ען',answer:'עֶן',choices:['עֶן','עַן','עָן','עְן']}
   ],
   'שווער':[
     {raw:'ש',answer:'שׁ',choices:['שׁ','שׂ','שָ','שְ']},
     {raw:'וו',answer:'וו',choices:['וו','וּ','וֹ','ו']},
-    {raw:'ער'}
+    {raw:'ער',answer:'עֶר',choices:['עֶר','עַר','עָר','עְר']}
   ],
   'רעדן':[
-    {raw:'רע',answer:'רע',choices:['רע','ראַ','ראָ','רוּ']},
+    {raw:'רע',answer:'רעֶ',choices:['רעֶ','רעַ','רעָ','רעְ']},
     {raw:'דן'}
   ],
   'העלפן':[
-    {raw:'הע',answer:'הע',choices:['הע','האַ','האָ','הוּ']},
+    {raw:'הע',answer:'העֶ',choices:['העֶ','העַ','העָ','העְ']},
     {raw:'ל'},
     {raw:'פ',answer:'פ',choices:['פ','פּ','פָ','פְ']},
     {raw:'ן'}
@@ -333,13 +333,13 @@ const SOUND_PROFILES={
     {raw:'ען'}
   ],
   'נעכטן':[
-    {raw:'נע',answer:'נע',choices:['נע','נאַ','נאָ','נוּ']},
+    {raw:'נע',answer:'נעֶ',choices:['נעֶ','נעַ','נעָ','נעְ']},
     {raw:'כ',answer:'כ',choices:['כ','כּ','כָ','כְ']},
     {raw:'טן'}
   ],
   'ווער':[
     {raw:'וו',answer:'וו',choices:['וו','וּ','וֹ','ו']},
-    {raw:'ער'}
+    {raw:'ער',answer:'עֶר',choices:['עֶר','עַר','עָר','עְר']}
   ],
   'אנדערש':[
     {raw:'א',answer:'אַ',choices:['אַ','אָ','א','אְ']},
@@ -348,7 +348,7 @@ const SOUND_PROFILES={
   ],
   'יעצט':[
     {raw:'י',answer:'י',choices:['י','יִ','יי','ײַ']},
-    {raw:'עצט'}
+    {raw:'עצט',answer:'עֶצט',choices:['עֶצט','עַצט','עָצט','עְצט']}
   ],
   'קלוג':[
     {raw:'ק'},
@@ -358,7 +358,7 @@ const SOUND_PROFILES={
   'וויינען':[
     {raw:'וו',answer:'וו',choices:['וו','וּ','וֹ','ו']},
     {raw:'יי',answer:'יי',choices:['יי','ײַ','יִ','י']},
-    {raw:'נע',answer:'נע',choices:['נע','נאַ','נאָ','נוּ']},
+    {raw:'נע',answer:'נעֶ',choices:['נעֶ','נעַ','נעָ','נעְ']},
     {raw:'ן'}
   ],
   'צאלן':[
@@ -367,12 +367,12 @@ const SOUND_PROFILES={
   ],
   'גוטע':[
     {raw:'גו',answer:'גוּ',choices:['גוּ','גוֹ','גוַ','גוְ']},
-    {raw:'טע',answer:'טע',choices:['טע','טאַ','טאָ','טי']}
+    {raw:'טע',answer:'טעֶ',choices:['טעֶ','טעַ','טעָ','טעְ']}
   ],
   'נייעס':[
     {raw:'נ'},
     {raw:'יי',answer:'ײַ',choices:['ײַ','יי','יִ','י']},
-    {raw:'עס'}
+    {raw:'עס',answer:'עֶס',choices:['עֶס','עַס','עָס','עְס']}
   ],
   'היינט':[
     {raw:'ה'},
@@ -386,16 +386,16 @@ const SOUND_PROFILES={
   ],
   'קומען':[
     {raw:'קו',answer:'קוּ',choices:['קוּ','קוֹ','קוַ','קוְ']},
-    {raw:'מע',answer:'מע',choices:['מע','מאַ','מאָ','מוּ']},
+    {raw:'מע',answer:'מעֶ',choices:['מעֶ','מעַ','מעָ','מעְ']},
     {raw:'ן'}
   ],
   'שיינע':[
     {raw:'ש',answer:'שׁ',choices:['שׁ','שׂ','שָ','שְ']},
     {raw:'יי',answer:'יי',choices:['יי','ײַ','יִ','י']},
-    {raw:'נע',answer:'נע',choices:['נע','נאַ','נאָ','נוּ']}
+    {raw:'נע',answer:'נעֶ',choices:['נעֶ','נעַ','נעָ','נעְ']}
   ],
   'מענטשן':[
-    {raw:'מע',answer:'מע',choices:['מע','מאַ','מאָ','מוּ']},
+    {raw:'מע',answer:'מעֶ',choices:['מעֶ','מעַ','מעָ','מעְ']},
     {raw:'נ'},
     {raw:'טש',answer:'טש',choices:['טש','זש','דזש','ש']},
     {raw:'ן'}
@@ -466,7 +466,7 @@ function soundGameRender(){
   }
 
   const part=profile[activePart];
-  box.append(node('p','Choose the correct version for the highlighted part.','sound-hint'));
+  box.append(node('p','Choose the correct version for the highlighted part. For this learning activity, ע that makes an “e” sound gets a segol underneath.','sound-hint'));
   const opts=node('div','','sound-options');
   for(const choice of shuffleClient(part.choices)){
     const b=node('button',choice,'sound-option'+(soundGame.wrongChoice===choice?' wrong':''));
