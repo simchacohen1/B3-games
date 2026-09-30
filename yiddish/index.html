@@ -1,5 +1,69 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>B3 Yiddish • Word Explorer</title><link rel="stylesheet" href="style.css"><body><script src="../access-guard.js" data-b3-tool-id="yiddish"></script>
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>B3 Yiddish • Word Explorer</title><link rel="stylesheet" href="style.css"><body class="student-page"><script src="../access-guard.js" data-b3-tool-id="yiddish"></script>
 <header><a href="../index.html">← B3 Games</a><span>ייִדיש • YIDDISH</span><a href="teacher.html">Teacher</a></header>
-<main><div class="eyebrow">WORD EXPLORER</div><h1>A little Yiddish.<br>A whole new story.</h1><p class="intro">Listen. Discover words. Make them yours.</p><p id="who"></p><p id="notice" role="status"></p><section id="login"><h2>Join your Yiddish lesson</h2><form id="loginForm"><label>Your B3 name <input id="name" autocomplete="name" required></label><label>Class PIN <input id="pin" type="password" required></label><button id="signIn">Sign in</button></form></section><div id="lesson" hidden>
+<main>
+  <section class="student-hero">
+    <div class="eyebrow">WORD EXPLORER</div>
+    <h1>A little Yiddish.<br>A whole new story.</h1>
+    <p class="intro">Listen. Discover words. Make them yours.</p>
+    <div class="student-meta"><p id="who"></p><p id="notice" role="status"></p></div>
+  </section>
 
-<nav id="segments" aria-label="Story sections"></nav><p class="story-link"><a id="readStory" href="story.html?section=0">📖 Read the illustrated story for this section</a></p><div id="stats" class="stats"></div><section id="practice" hidden></section><section id="flashcards" hidden></section><section id="storyquiz" hidden></section><div id="toolbar" class="toolbar"><h2 id="title">Your words</h2><button id="start">Practice this section →</button><button id="flashStart">Flashcards →</button><button id="storyQuizStart">🔎 Story Detective →</button><button id="all">All my words</button></div><div id="words" class="grid"></div></div></main><script src="content.js"></script><script src="api.js"></script><script src="app.js"></script></body></html>
+  <section id="login"><h2>Join your Yiddish lesson</h2><form id="loginForm"><label>Your B3 name <input id="name" autocomplete="name" required></label><label>Class PIN <input id="pin" type="password" required></label><button id="signIn">Sign in</button></form></section>
+
+  <div id="lesson" hidden>
+    <div class="section-map">
+      <div class="section-map-label">YOUR STORY JOURNEY</div>
+      <nav id="segments" aria-label="Story sections"></nav>
+    </div>
+
+    <a id="readStory" class="story-adventure" href="story.html?section=0">
+      <span class="story-adventure-icon">📖</span>
+      <span class="story-adventure-copy">
+        <strong>Read the illustrated story</strong>
+        <small>See this section come alive</small>
+      </span>
+      <span class="story-adventure-arrow">→</span>
+    </a>
+
+    <div id="stats" class="stats"></div>
+    <section id="practice" hidden></section>
+    <section id="flashcards" hidden></section>
+    <section id="storyquiz" hidden></section>
+
+    <section id="toolbar" class="activity-zone">
+      <div class="activity-heading">
+        <div>
+          <div class="activity-kicker">CHOOSE AN ACTIVITY</div>
+          <h2 id="title">Your words</h2>
+        </div>
+        <div class="activity-sparkles" aria-hidden="true">✦ ✧ ✦</div>
+      </div>
+
+      <div class="activity-grid">
+        <button id="start" class="activity-card activity-practice">
+          <span class="activity-icon">⚡</span>
+          <span class="activity-text"><strong>Practice</strong><small>Quick word challenge</small></span>
+          <span class="activity-arrow">→</span>
+        </button>
+        <button id="flashStart" class="activity-card activity-flash">
+          <span class="activity-icon">🃏</span>
+          <span class="activity-text"><strong>Flashcards</strong><small>Flip, think, remember</small></span>
+          <span class="activity-arrow">→</span>
+        </button>
+        <button id="storyQuizStart" class="activity-card activity-detective">
+          <span class="activity-icon">🔎</span>
+          <span class="activity-text"><strong>Story Detective</strong><small>Use clues to solve the story</small></span>
+          <span class="activity-arrow">→</span>
+        </button>
+        <button id="all" class="activity-card activity-words">
+          <span class="activity-icon">📚</span>
+          <span class="activity-text"><strong>All my words</strong><small>Explore your word collection</small></span>
+          <span class="activity-arrow">→</span>
+        </button>
+      </div>
+    </section>
+
+    <div id="words" class="grid"></div>
+  </div>
+</main>
+<script src="content.js"></script><script src="api.js"></script><script src="app.js"></script></body></html>
