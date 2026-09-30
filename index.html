@@ -78,7 +78,17 @@
   .student-version-choice{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
   .teacher-version-choice{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
   .version-choice-icon{font-size:32px}.version-modal-close{margin-top:14px;border:0;background:#e5e7eb;color:#1f2937;border-radius:10px;padding:9px 16px;font-weight:700;cursor:pointer}
-  @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 64px 1fr}.time-span{flex-wrap:wrap}.admin-panel{top:54px}}
+
+  .approval-button{position:fixed;top:12px;left:12px;z-index:9998;border:0;border-radius:999px;padding:10px 14px;background:#7c3aed;color:white;font-weight:900;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.16);display:flex;align-items:center;gap:7px}
+  .approval-button:hover{background:#6d28d9}.approval-button-badge{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:#fff;color:#6d28d9;font-size:12px;font-weight:900}
+  .approval-center-modal{position:fixed;inset:0;background:rgba(15,23,42,.56);z-index:11000;display:flex;align-items:center;justify-content:center;padding:18px}
+  .approval-center-card{width:min(620px,100%);max-height:86vh;overflow:auto;background:#fff;border-radius:22px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.32);text-align:left}
+  .approval-center-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}.approval-center-head h2{margin:0 0 5px;color:#26364a;font-size:26px}.approval-center-head p{margin:0;color:#64748b;line-height:1.4}
+  .approval-center-x{border:0;background:#eef2f7;color:#334155;border-radius:999px;width:36px;height:36px;font-size:22px;font-weight:900;cursor:pointer;flex:0 0 auto}
+  .approval-center-list{display:grid;gap:10px}.approval-center-item{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 14px;border:1px solid #e2e8f0;border-radius:15px;background:#fbfdff;text-decoration:none;color:#1f2937;transition:transform .12s,box-shadow .12s,border-color .12s}.approval-center-item:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.08);border-color:#c4b5fd}.approval-center-icon{font-size:28px;text-align:center}.approval-center-item strong{display:block;font-size:16px}.approval-center-item small{display:block;margin-top:3px;color:#64748b;line-height:1.35}.approval-center-count{min-width:38px;height:34px;border-radius:999px;background:#ede9fe;color:#6d28d9;display:inline-flex;align-items:center;justify-content:center;padding:0 10px;font-weight:900}
+  .approval-center-empty{padding:22px;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;text-align:center;color:#475569;font-weight:800}.approval-center-warning{margin-top:10px;padding:9px 11px;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:12px;font-weight:700}
+  .approval-center-footer{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}.approval-center-footer button{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}.approval-center-refresh{background:#e2e8f0;color:#1f2937}.approval-center-done{background:#26364a;color:#fff}
+  @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 64px 1fr}.time-span{flex-wrap:wrap}.admin-panel{top:54px}.approval-button{top:58px;left:10px}.approval-center-card{padding:17px}.approval-center-item{grid-template-columns:36px minmax(0,1fr) auto;padding:11px}.approval-center-icon{font-size:24px}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
@@ -157,6 +167,19 @@
         <a id="versionTeacherLink" class="teacher-version-choice" href="#" target="_blank" rel="noopener"><span class="version-choice-icon">👨‍🏫</span><span>Teacher Version</span></a>
       </div>
       <button id="versionModalClose" class="version-modal-close" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <button id="approvalCenterButton" class="approval-button hidden" type="button">🔔 Approvals <span id="approvalCenterBadge" class="approval-button-badge">0</span></button>
+  <div id="approvalCenterModal" class="approval-center-modal hidden" role="dialog" aria-modal="true" aria-labelledby="approvalCenterTitle">
+    <div class="approval-center-card">
+      <div class="approval-center-head">
+        <div><h2 id="approvalCenterTitle">🔔 Teacher Approval Center</h2><p id="approvalCenterSummary">Checking what needs your attention…</p></div>
+        <button id="approvalCenterClose" class="approval-center-x" type="button" aria-label="Close">×</button>
+      </div>
+      <div id="approvalCenterList" class="approval-center-list"><div class="approval-center-empty">Checking approvals…</div></div>
+      <div id="approvalCenterWarning" class="approval-center-warning hidden"></div>
+      <div class="approval-center-footer"><button id="approvalCenterRefresh" class="approval-center-refresh" type="button">Refresh</button><button id="approvalCenterDone" class="approval-center-done" type="button">Close</button></div>
     </div>
   </div>
 
@@ -283,6 +306,137 @@
   let myClassId="";
   let overrideRoster=[];
   let selectedOverrideStudentId="";
+  let approvalCenterTimer=null;
+  let approvalCenterAutoShown=false;
+  let approvalCenterLoading=false;
+  let approvalCounts={};
+
+  const approvalDefinitions=[
+    {key:"posukDisputes",icon:"📜",title:"Posuk Practice disputes",detail:"Student reading, translation, or understanding disputes waiting for you.",href:"record_pesukim/teacher.html?review=disputes"},
+    {key:"posukPoints",icon:"⭐",title:"Posuk Practice points",detail:"100% milestone point requests waiting for approval.",href:"student-rewards/teacher.html?tab=Rewards"},
+    {key:"chazara",icon:"🔁",title:"Chazara approvals",detail:"Chazara points waiting for approval.",href:"chazara/teacher.html#approvalPanel"},
+    {key:"shorashimRecordings",icon:"🎙️",title:"Shorashim recordings",detail:"Recorded Shorashim waiting for point approval.",href:"shorashim/teacher.html?tab=recordings"},
+    {key:"shorashimWords",icon:"🌳",title:"Shorashim word approvals",detail:"Lower-commonness words waiting for your approval.",href:"shorashim/teacher.html?tab=lists&approval=pending"},
+    {key:"gallery",icon:"🖼️",title:"Class Gallery projects",detail:"Student projects waiting to be approved for the gallery.",href:"class-gallery/index.html?review=pending"},
+    {key:"prizeStore",icon:"🎁",title:"Prize Store requests",detail:"Student reward purchases waiting for approval.",href:"student-rewards/teacher.html?tab=Rewards"}
+  ];
+
+  function approvalValues(v){return v&&typeof v==="object"?Object.values(v):[];}
+  function countPosukDisputes(allAttempts){
+    let count=0;
+    approvalValues(allAttempts).forEach(function(posukMap){
+      approvalValues(posukMap).forEach(function(attemptMap){
+        approvalValues(attemptMap).forEach(function(a){
+          if(!a||typeof a!=="object")return;
+          if(a.hebrewAudioURL&&a.hebrewDisputeStatus==="pending")count++;
+          if(a.comprehensionAudioURL&&a.comprehensionDisputeStatus==="pending")count++;
+          approvalValues(a.questionResults).forEach(function(q){if(q&&q.audioURL&&q.disputeStatus==="pending")count++;});
+          approvalValues(a.translationChunkResults).forEach(function(x){if(x&&x.audioURL&&x.disputeStatus==="pending")count++;});
+        });
+      });
+    });
+    return count;
+  }
+  function countNested(root,predicate){
+    let count=0;
+    approvalValues(root).forEach(function(group){
+      approvalValues(group).forEach(function(item){if(predicate(item||{}))count++;});
+    });
+    return count;
+  }
+  function countPendingShorashimWords(catalog){
+    return approvalValues(catalog).filter(function(item){
+      if(!item||item.hidden===true||item.teacherApproved===true)return false;
+      const raw=item.commonness!==undefined?item.commonness:(item.commonnessScore!==undefined?item.commonnessScore:item.frequency);
+      const n=Number(raw);
+      return Number.isFinite(n)&&n<=5;
+    }).length;
+  }
+  function renderApprovalCenter(){
+    const list=el("approvalCenterList");
+    const active=approvalDefinitions.filter(function(item){return Number(approvalCounts[item.key]||0)>0;});
+    const total=active.reduce(function(n,item){return n+Number(approvalCounts[item.key]||0);},0);
+    el("approvalCenterBadge").textContent=String(total);
+    el("approvalCenterBadge").classList.toggle("hidden",total===0);
+    if(approvalCenterLoading){
+      el("approvalCenterSummary").textContent="Checking what needs your attention…";
+    }else if(total){
+      el("approvalCenterSummary").textContent=String(total)+" item"+(total===1?"":"s")+" waiting for you. Click any section to go straight there.";
+    }else{
+      el("approvalCenterSummary").textContent="Nothing is waiting for approval right now.";
+    }
+    if(approvalCenterLoading&&!active.length){
+      list.innerHTML='<div class="approval-center-empty">Checking approvals…</div>';
+      return total;
+    }
+    if(!active.length){
+      list.innerHTML='<div class="approval-center-empty">✅ All caught up — no approvals are waiting.</div>';
+      return 0;
+    }
+    list.innerHTML=active.map(function(item){
+      const count=Number(approvalCounts[item.key]||0);
+      return '<a class="approval-center-item" href="'+item.href+'" target="_blank" rel="noopener"><span class="approval-center-icon">'+item.icon+'</span><span><strong>'+item.title+'</strong><small>'+item.detail+'</small></span><span class="approval-center-count">'+count+'</span></a>';
+    }).join("");
+    return total;
+  }
+  function openApprovalCenter(){if(isAuthorizedAdmin)el("approvalCenterModal").classList.remove("hidden");}
+  function closeApprovalCenter(){el("approvalCenterModal").classList.add("hidden");}
+  async function loadApprovalCenter(autoOpen){
+    if(!isAuthorizedAdmin||approvalCenterLoading)return;
+    approvalCenterLoading=true;
+    renderApprovalCenter();
+    const reads=[
+      ["attempts",db.ref("posukPractice/attempts").once("value")],
+      ["pointRequests",db.ref("studentRewards/pointRequests").once("value")],
+      ["shorashimRecordings",db.ref("posukPractice/shorashimLearning/recordingEvents").once("value")],
+      ["shorashimWords",db.ref("posukPractice/shorashimLearning/catalog/shorashim").once("value")],
+      ["gallery",db.ref("classGallery/posts").once("value")],
+      ["redemptions",db.ref("studentRewards/redemptionsByStudent").once("value")]
+    ];
+    const settled=await Promise.allSettled(reads.map(function(x){return x[1];}));
+    const data={};const failed=[];
+    settled.forEach(function(result,i){
+      const key=reads[i][0];
+      if(result.status==="fulfilled")data[key]=result.value.val()||{};
+      else failed.push(key);
+    });
+    const pointRequests=approvalValues(data.pointRequests).filter(function(x){return x&&String(x.status||"pending")==="pending";});
+    approvalCounts={
+      posukDisputes:data.attempts?countPosukDisputes(data.attempts):0,
+      posukPoints:data.pointRequests?pointRequests.filter(function(x){return ["reading100","translation100","understand100"].includes(String(x.source||""));}).length:0,
+      chazara:data.pointRequests?pointRequests.filter(function(x){return ["chazara","chazara-recording","chazara-remove"].includes(String(x.source||""));}).length:0,
+      shorashimRecordings:data.shorashimRecordings?countNested(data.shorashimRecordings,function(x){return String(x.pointRequestStatus||x.status||"pending")==="pending"&&!!x.pointRequestId;}):0,
+      shorashimWords:data.shorashimWords?countPendingShorashimWords(data.shorashimWords):0,
+      gallery:data.gallery?approvalValues(data.gallery).filter(function(x){return x&&x.status==="pending";}).length:0,
+      prizeStore:data.redemptions?countNested(data.redemptions,function(x){return String(x.status||"pending")==="pending";}):0
+    };
+    approvalCenterLoading=false;
+    const total=renderApprovalCenter();
+    const warning=el("approvalCenterWarning");
+    if(failed.length){
+      warning.textContent="Some approval sources could not be checked right now. The counts shown are for the sources that loaded successfully.";
+      warning.classList.remove("hidden");
+    }else{
+      warning.classList.add("hidden");
+    }
+    if(autoOpen&&!approvalCenterAutoShown&&total>0){
+      approvalCenterAutoShown=true;
+      openApprovalCenter();
+    }
+  }
+  function startApprovalCenter(){
+    el("approvalCenterButton").classList.remove("hidden");
+    if(approvalCenterTimer)clearInterval(approvalCenterTimer);
+    loadApprovalCenter(true);
+    approvalCenterTimer=setInterval(function(){loadApprovalCenter(false);},30000);
+  }
+  function stopApprovalCenter(){
+    if(approvalCenterTimer){clearInterval(approvalCenterTimer);approvalCenterTimer=null;}
+    el("approvalCenterButton").classList.add("hidden");
+    closeApprovalCenter();
+    approvalCounts={};
+    approvalCenterAutoShown=false;
+  }
 
   // Password gate only keeps students from reaching the Google sign-in screen.
   // Google/Firebase authentication remains the real administrator security.
@@ -760,7 +914,12 @@
   }));
   el("versionModalClose")?.addEventListener("click",closeVersionModal);
   el("versionModal")?.addEventListener("click",e=>{if(e.target===el("versionModal"))closeVersionModal();});
-  document.addEventListener("keydown",e=>{if(e.key==="Escape")closeVersionModal();});
+  el("approvalCenterButton")?.addEventListener("click",()=>{openApprovalCenter();loadApprovalCenter(false);});
+  el("approvalCenterClose")?.addEventListener("click",closeApprovalCenter);
+  el("approvalCenterDone")?.addEventListener("click",closeApprovalCenter);
+  el("approvalCenterRefresh")?.addEventListener("click",()=>loadApprovalCenter(false));
+  el("approvalCenterModal")?.addEventListener("click",e=>{if(e.target===el("approvalCenterModal"))closeApprovalCenter();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeVersionModal();closeApprovalCenter();}});
   function handleTeacherCombinedTile(e){
     if(!isAuthorizedAdmin)return;
     const card=e.target.closest(".game-card");
@@ -812,7 +971,7 @@
     if(isAuthorizedAdmin)renderStudentOverrideControls();
   },err=>console.warn("Could not load student override roster",err));
 
-  settingsApi.onAuthStateChanged((user,authorized)=>{currentUser=user;isAuthorizedAdmin=authorized;try{if(authorized)localStorage.setItem("b3TeacherBypass","1");else localStorage.removeItem("b3TeacherBypass");}catch(e){}renderStudentAccess();renderAdminPanel();});
+  settingsApi.onAuthStateChanged((user,authorized)=>{currentUser=user;isAuthorizedAdmin=authorized;try{if(authorized)localStorage.setItem("b3TeacherBypass","1");else localStorage.removeItem("b3TeacherBypass");}catch(e){}renderStudentAccess();renderAdminPanel();if(authorized)startApprovalCenter();else stopApprovalCenter();});
   settingsApi.subscribe(settings=>{currentSettings=settings;renderStudentAccess();renderAdminPanel();});
   setInterval(()=>{renderStudentAccess();},15000);
   restoreStudent();
