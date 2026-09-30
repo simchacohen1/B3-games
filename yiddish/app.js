@@ -110,8 +110,8 @@ function speakEnglish(text){
   window.speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(text);u.lang='en-US';u.rate=.88;window.speechSynthesis.speak(u);
 }
-function storySpeaker(text){
-  const b=node('button','🔊','story-speak');b.type='button';b.title='Listen';b.setAttribute('aria-label','Listen to this answer');
+function storySpeaker(text,label='Listen to this answer'){
+  const b=node('button','🔊','story-speak');b.type='button';b.title='Listen';b.setAttribute('aria-label',label);
   b.onclick=e=>{e.stopPropagation();speakEnglish(text)};return b;
 }
 function storyExit(box){
@@ -150,7 +150,8 @@ function storyQuizRender(){
   }
   const pIndex=storyQuiz.ids[storyQuiz.idx],para=C.paras[pIndex],keys=storyKeyTerms(pIndex,para,storyQuiz.group);
   box.append(node('div',`Story part ${storyQuiz.idx+1} of ${storyQuiz.ids.length}`,'practice-progress'),node('h2','What mainly happened here?'));
-  const hint=node('p','Look for the highlighted Yiddish clues.','story-hint');box.append(hint);
+  const directions=storySpeaker('What mainly happened here? Look for the highlighted Yiddish clues, then choose the answer that tells the main idea.','Hear the directions');directions.textContent='🔊 Hear directions';directions.className='story-directions';
+  const hint=node('p','Look for the highlighted Yiddish clues.','story-hint');box.append(directions,hint);
   const text=node('div','','story-para');text.lang='yi';text.dir='rtl';appendHighlightedText(text,para,keys);box.append(text);
   const answers=node('div','','story-answers'),feedback=node('p','','story-feedback');feedback.setAttribute('role','status');
   const choices=storyQuiz.choices&&storyQuiz.choiceFor===pIndex?storyQuiz.choices:storyChoices(pIndex,storyQuiz.group);
