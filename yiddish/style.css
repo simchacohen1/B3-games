@@ -60,3 +60,247 @@
 .story-teacher-card h4{margin:0 0 6px;font-size:19px}.story-teacher-card p{margin:6px 0}
 .story-paragraph-stats{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
 .story-paragraph-stats span{background:#e8eef3;color:#244b6d;border-radius:999px;padding:6px 9px;font-size:14px;font-weight:800}
+
+
+/* 2026-09-29 student visual refresh */
+.student-page{
+  background:
+    radial-gradient(circle at 8% 13%,rgba(255,209,102,.20) 0 110px,transparent 111px),
+    radial-gradient(circle at 92% 22%,rgba(120,100,220,.10) 0 145px,transparent 146px),
+    #f8f6ed;
+}
+.student-page header{
+  padding:16px 5%;
+  box-shadow:0 3px 14px rgba(20,46,62,.12);
+}
+.student-page main{padding-top:28px}
+.student-hero{
+  position:relative;
+  padding:26px 30px 24px;
+  border-radius:28px;
+  background:linear-gradient(135deg,#fffdf6 0%,#f1f8f5 100%);
+  border:1px solid #e3e4d7;
+  box-shadow:0 12px 32px rgba(20,46,62,.08);
+  overflow:hidden;
+}
+.student-hero:after{
+  content:"א ב ג";
+  position:absolute;
+  right:28px;
+  top:18px;
+  font:bold 52px Georgia,serif;
+  letter-spacing:12px;
+  color:rgba(38,119,102,.09);
+  transform:rotate(-4deg);
+  pointer-events:none;
+}
+.student-page h1{
+  font-size:clamp(36px,5vw,56px);
+  margin:10px 0 8px;
+}
+.student-page .intro{margin:0 0 12px}
+.student-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.student-meta #who{margin:4px 0;font-weight:800;color:#52616a}
+.student-page #notice{
+  display:inline-block;
+  margin:4px 0;
+  padding:8px 12px;
+  border-radius:999px;
+  background:#fff0bd;
+  color:#6b5000;
+  font-size:15px;
+  font-weight:800;
+}
+.student-page #notice:empty{display:none}
+
+.section-map{
+  margin-top:24px;
+  padding:16px 18px 10px;
+  border-radius:22px;
+  background:#fff;
+  border:1px solid #e2e4df;
+  box-shadow:0 7px 20px rgba(20,46,62,.06);
+}
+.section-map-label,.activity-kicker{
+  font-size:12px;
+  letter-spacing:2.4px;
+  font-weight:900;
+  color:#71808a;
+}
+.student-page #segments{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(120px,1fr));
+  gap:10px;
+  margin:10px 0 4px;
+}
+.student-page #segments button{
+  position:relative;
+  padding:14px 12px;
+  border:0;
+  border-radius:15px;
+  background:#f1f3f1;
+  color:#65747b;
+  box-shadow:inset 0 0 0 1px #dce2de;
+  transition:transform .15s ease,box-shadow .15s ease;
+}
+.student-page #segments button:not(:disabled):hover{
+  transform:translateY(-2px);
+  box-shadow:0 6px 14px rgba(20,46,62,.10);
+}
+.student-page #segments button.active{
+  background:linear-gradient(135deg,#173d4d,#245c67);
+  color:#fff;
+  box-shadow:0 7px 15px rgba(20,61,75,.20);
+}
+.student-page #segments button:disabled{opacity:.72}
+
+.story-adventure{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin:16px 0 4px;
+  padding:15px 18px;
+  text-decoration:none;
+  color:#153c48;
+  border-radius:20px;
+  border:2px solid #bfe2d5;
+  background:linear-gradient(90deg,#e8f7ef,#fff9db);
+  box-shadow:0 7px 18px rgba(20,46,62,.07);
+  transition:transform .15s ease,box-shadow .15s ease;
+}
+.story-adventure:hover{
+  transform:translateY(-2px);
+  box-shadow:0 10px 22px rgba(20,46,62,.11);
+}
+.story-adventure-icon{font-size:32px}
+.story-adventure-copy{display:flex;flex-direction:column;gap:2px}
+.story-adventure-copy strong{font-size:18px}
+.story-adventure-copy small{font-size:14px;color:#5d6c74}
+.story-adventure-arrow{margin-left:auto;font-size:24px;font-weight:900}
+.student-page .stats{
+  width:max-content;
+  max-width:100%;
+  margin:14px 0 0;
+  padding:9px 14px;
+  border-radius:999px;
+  background:#173d4d;
+  color:#fff;
+  font-size:16px;
+  box-shadow:0 6px 14px rgba(20,61,75,.14);
+}
+
+.activity-zone{
+  margin:20px 0 18px;
+  padding:20px;
+  border-radius:24px;
+  background:#fff;
+  border:1px solid #e1e4df;
+  box-shadow:0 9px 25px rgba(20,46,62,.07);
+}
+.activity-heading{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:14px;
+}
+.activity-heading h2{
+  margin:4px 0 0;
+  font-size:28px;
+}
+.activity-sparkles{
+  color:#e2ad25;
+  font-size:28px;
+  letter-spacing:6px;
+  white-space:nowrap;
+}
+.activity-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+}
+.student-page .activity-card{
+  min-height:136px;
+  padding:17px;
+  border-radius:20px;
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  grid-template-rows:auto;
+  gap:12px;
+  align-items:center;
+  text-align:left;
+  color:#fff;
+  box-shadow:0 8px 16px rgba(20,46,62,.15);
+  transition:transform .16s ease,box-shadow .16s ease,filter .16s ease;
+}
+.student-page .activity-card:hover:not(:disabled){
+  transform:translateY(-4px) rotate(-.3deg);
+  box-shadow:0 13px 24px rgba(20,46,62,.20);
+  filter:saturate(1.06);
+}
+.student-page .activity-card:disabled{filter:grayscale(.35)}
+.activity-practice{background:linear-gradient(135deg,#e66c2c,#f39b38)}
+.activity-flash{background:linear-gradient(135deg,#7855c7,#a16ad7)}
+.activity-detective{background:linear-gradient(135deg,#276ca3,#3b8fc1)}
+.activity-words{background:linear-gradient(135deg,#198069,#32a182)}
+.activity-icon{
+  width:48px;
+  height:48px;
+  display:grid;
+  place-items:center;
+  border-radius:15px;
+  background:rgba(255,255,255,.18);
+  font-size:28px;
+}
+.activity-text{display:flex;flex-direction:column;gap:5px;min-width:0}
+.activity-text strong{font-size:20px;line-height:1.05}
+.activity-text small{
+  font-size:13px;
+  line-height:1.25;
+  color:rgba(255,255,255,.88);
+}
+.activity-arrow{font-size:25px;font-weight:900}
+.student-page .grid{
+  gap:18px;
+  padding-bottom:30px;
+}
+.student-page .word{
+  position:relative;
+  overflow:hidden;
+  border:0;
+  border-radius:22px;
+  box-shadow:0 8px 20px rgba(20,46,62,.08);
+  transition:transform .15s ease,box-shadow .15s ease;
+}
+.student-page .word:before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  right:0;
+  height:5px;
+  background:linear-gradient(90deg,#f0b33a,#42a389,#6b78d6);
+}
+.student-page .word:hover{
+  transform:translateY(-3px);
+  box-shadow:0 12px 25px rgba(20,46,62,.12);
+}
+.student-page .word .status{
+  font-size:12px;
+  font-weight:900;
+}
+.student-page .word .yi{margin:18px 0 12px}
+
+@media(max-width:900px){
+  .activity-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:650px){
+  .student-hero{padding:22px 18px}
+  .student-hero:after{font-size:34px;right:12px}
+  .student-page #segments{grid-template-columns:1fr 1fr}
+  .activity-zone{padding:16px}
+  .activity-grid{grid-template-columns:1fr}
+  .student-page .activity-card{min-height:102px}
+  .activity-sparkles{display:none}
+  .story-adventure{padding:13px 14px}
+}
