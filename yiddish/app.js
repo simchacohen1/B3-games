@@ -1,8 +1,8 @@
 'use strict';
-const APP_BUILD='2026-09-30-missing-word-v1';
+const APP_BUILD='2026-09-30-sound-builder-v1';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
-let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null;
+let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null,soundGame=null;
 const word=id=>C.words.find(w=>w.id===id),node=(tag,text,cls)=>{const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n};
 const status=p=>!p?'New':p.credits>=2?'Learned':'Practicing';
 const STORY_SUMMARIES={
@@ -48,13 +48,13 @@ function block(s){clearAdvance();$('lesson').hidden=true;$('practice').hidden=tr
 function open(g){return config&&g<config.unlocked[student.classId]&&config.sections[g].verified}
 function render(){
   if(!student||!config)return;
-  if(!round&&!flash&&!storyQuiz&&!sentenceGame){$('words').hidden=false;$('toolbar').hidden=false;}
+  if(!round&&!flash&&!storyQuiz&&!sentenceGame&&!soundGame){$('words').hidden=false;$('toolbar').hidden=false;}
   $('login').hidden=true;$('lesson').hidden=false;$('who').textContent=student.name+' · '+student.classId.toUpperCase();
   const ids=[...new Set(config.sections.flatMap(s=>s.words))];
   $('stats').textContent=`${ids.filter(id=>status(progress[id])==='Learned').length} learned · ${ids.filter(id=>status(progress[id])==='Practicing').length} practicing`;
   $('segments').replaceChildren();
-  config.sections.forEach((s,i)=>{const b=node('button',`${open(i)?'':'🔒 '}Section ${i+1}`,i===group?'active':'');b.type='button';b.disabled=!open(i);b.onclick=()=>{if(busy||pending)return;clearAdvance();group=i;showAll=false;round=null;flash=null;storyQuiz=null;sentenceGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;render()};$('segments').append(b)});
-  $('words').replaceChildren();$('start').disabled=!open(group);$('flashStart').disabled=!open(group);$('sentenceStart').disabled=!open(group);$('storyQuizStart').disabled=!open(group);$('readStory').hidden=!open(group);$('readStory').href='story.html?section='+group;$('readStory').textContent='📖 Read the illustrated story — Section '+(group+1);
+  config.sections.forEach((s,i)=>{const b=node('button',`${open(i)?'':'🔒 '}Section ${i+1}`,i===group?'active':'');b.type='button';b.disabled=!open(i);b.onclick=()=>{if(busy||pending)return;clearAdvance();group=i;showAll=false;round=null;flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;render()};$('segments').append(b)});
+  $('words').replaceChildren();$('start').disabled=!open(group);$('flashStart').disabled=!open(group);$('sentenceStart').disabled=!open(group);$('soundStart').disabled=!open(group);$('storyQuizStart').disabled=!open(group);$('readStory').hidden=!open(group);$('readStory').href='story.html?section='+group;$('readStory').textContent='📖 Read the illustrated story — Section '+(group+1);
   $('title').textContent=showAll?'My vocabulary':`Section ${group+1} words`;
   const visible=showAll?config.sections.flatMap((s,i)=>open(i)?s.words:[]):open(group)?config.sections[group].words:[];
   for(const id of visible){const w=word(id);if(!w)continue;const card=node('article','','word'),st=status(progress[id]);card.append(node('span',st,'status '+st.toLowerCase()));const yi=node('div',w.yi,'yi');yi.lang='yi';card.append(yi,node('div',w.en));$('words').append(card)}
@@ -63,11 +63,12 @@ function render(){
   if(flash&&open(flash.group))flashRender();else if(flash){flash=null}
   if(storyQuiz&&open(storyQuiz.group))storyQuizRender();else if(storyQuiz){storyQuiz=null}
   if(sentenceGame&&open(sentenceGame.group))sentenceGameRender();else if(sentenceGame){sentenceGame=null}
+  if(soundGame&&open(soundGame.group))soundGameRender();else if(soundGame){soundGame=null}
 }
 async function refresh(){const s=await API.call('status');student=s.student;config=s.config;progress=s.progress;if(!open(group))group=Math.max(0,config.unlocked[student.classId]-1);round=(s.round&&!s.round.finished&&open(s.round.group))?s.round:null;if(round)group=round.group;render()}
 async function login(id,pin){const s=await API.call('login',{studentId:id,pin:pin.trim()});sessionStorage.setItem('yiddishSession',s.token);await refresh();message('Progress connected ✓')}
 $('loginForm').onsubmit=async e=>{e.preventDefault();$('signIn').disabled=true;try{await login($('name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''),$('pin').value);$('pin').value=''}catch(e){message(e.message)}finally{$('signIn').disabled=false}};
-$('all').onclick=()=>{if(busy||pending)return;clearAdvance();showAll=!showAll;round=null;flash=null;storyQuiz=null;sentenceGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;render()};
+$('all').onclick=()=>{if(busy||pending)return;clearAdvance();showAll=!showAll;round=null;flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;render()};
 function shuffleClient(a){const b=a.slice();for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
 function focusFlash(){requestAnimationFrame(()=>$('flashcards')?.scrollIntoView({behavior:'smooth',block:'start'}))}
 
@@ -176,7 +177,7 @@ function recordStoryAnswer(pIndex,wrongCount){
 }
 $('storyQuizStart').onclick=()=>{
   if(busy||pending||!open(group))return;
-  clearAdvance();round=null;flash=null;sentenceGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('sentencegame').hidden=true;
+  clearAdvance();round=null;flash=null;sentenceGame=null;soundGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;
   const ids=shuffleClient(storyParagraphs(group));
   storyQuiz={group,ids,idx:0,score:0,answered:false,wrong:new Set(),choices:null,choiceFor:null};
   storyQuizRender();focusStoryQuiz();
@@ -236,6 +237,245 @@ function storyQuizRender(){
 }
 
 
+
+function focusSoundGame(){requestAnimationFrame(()=>$('soundgame')?.scrollIntoView({behavior:'smooth',block:'start'}))}
+const SOUND_PROFILES={
+  'געלט':[
+    {raw:'גע',answer:'גע',choices:['גע','גאַ','גאָ','גוּ']},
+    {raw:'לט'}
+  ],
+  'טאכטער':[
+    {raw:'טא',answer:'טאָ',choices:['טאָ','טאַ','טע','טוּ']},
+    {raw:'כ',answer:'כ',choices:['כ','כּ','כָ','כְ']},
+    {raw:'טע',answer:'טע',choices:['טע','טאַ','טאָ','טי']},
+    {raw:'ר'}
+  ],
+  'גיין':[
+    {raw:'ג'},
+    {raw:'יי',answer:'יי',choices:['יי','ײַ','יִ','י']},
+    {raw:'ן'}
+  ],
+  'צוויי':[
+    {raw:'צ'},
+    {raw:'וו',answer:'וו',choices:['וו','וּ','וֹ','ו']},
+    {raw:'יי',answer:'יי',choices:['יי','ײַ','יִ','י']}
+  ],
+  'יאר':[
+    {raw:'יא',answer:'יאָ',choices:['יאָ','יאַ','יאֵ','יאְ']},
+    {raw:'ר'}
+  ],
+  'צוריק':[
+    {raw:'צו',answer:'צוּ',choices:['צוּ','צוֹ','צוַ','צוְ']},
+    {raw:'רי',answer:'רִי',choices:['רִי','רֵי','רַי','רָי']},
+    {raw:'ק'}
+  ],
+  'קליין':[
+    {raw:'קל'},
+    {raw:'יי',answer:'ײַ',choices:['ײַ','יי','יִ','י']},
+    {raw:'ן'}
+  ],
+  'שטוב':[
+    {raw:'ש',answer:'שׁ',choices:['שׁ','שׂ','שָ','שְ']},
+    {raw:'טו',answer:'טוּ',choices:['טוּ','טוֹ','טוַ','טוְ']},
+    {raw:'ב',answer:'בּ',choices:['בּ','ב','בָ','בְ']}
+  ],
+  'נעמען':[
+    {raw:'נע',answer:'נע',choices:['נע','נאַ','נאָ','נוּ']},
+    {raw:'מע',answer:'מע',choices:['מע','מאַ','מאָ','מוּ']},
+    {raw:'ן'}
+  ],
+  'זען':[
+    {raw:'זע',answer:'זע',choices:['זע','זאַ','זאָ','זוּ']},
+    {raw:'ן'}
+  ],
+  'צווישן':[
+    {raw:'צ'},
+    {raw:'וו',answer:'וו',choices:['וו','וּ','וֹ','ו']},
+    {raw:'י',answer:'יִ',choices:['יִ','י','יי','ײַ']},
+    {raw:'ש',answer:'שׁ',choices:['שׁ','שׂ','שָ','שְ']},
+    {raw:'ן'}
+  ],
+  'געזוכט':[
+    {raw:'גע',answer:'גע',choices:['גע','גאַ','גאָ','גוּ']},
+    {raw:'זו',answer:'זוּ',choices:['זוּ','זוֹ','זוַ','זוְ']},
+    {raw:'כ',answer:'כ',choices:['כ','כּ','כָ','כְ']},
+    {raw:'ט'}
+  ],
+  'געבן':[
+    {raw:'גע',answer:'גע',choices:['גע','גאַ','גאָ','גוּ']},
+    {raw:'ב',answer:'בּ',choices:['בּ','ב','בָ','בְ']},
+    {raw:'ען'}
+  ],
+  'שווער':[
+    {raw:'ש',answer:'שׁ',choices:['שׁ','שׂ','שָ','שְ']},
+    {raw:'וו',answer:'וו',choices:['וו','וּ','וֹ','ו']},
+    {raw:'ער'}
+  ],
+  'רעדן':[
+    {raw:'רע',answer:'רע',choices:['רע','ראַ','ראָ','רוּ']},
+    {raw:'דן'}
+  ],
+  'העלפן':[
+    {raw:'הע',answer:'הע',choices:['הע','האַ','האָ','הוּ']},
+    {raw:'ל'},
+    {raw:'פ',answer:'פ',choices:['פ','פּ','פָ','פְ']},
+    {raw:'ן'}
+  ],
+  'טיר':[
+    {raw:'טי',answer:'טִי',choices:['טִי','טֵי','טַי','טָי']},
+    {raw:'ר'}
+  ],
+  'שרייבן':[
+    {raw:'ש',answer:'שׁ',choices:['שׁ','שׂ','שָ','שְ']},
+    {raw:'ר'},
+    {raw:'יי',answer:'ײַ',choices:['ײַ','יי','יִ','י']},
+    {raw:'ב',answer:'בּ',choices:['בּ','ב','בָ','בְ']},
+    {raw:'ען'}
+  ],
+  'נעכטן':[
+    {raw:'נע',answer:'נע',choices:['נע','נאַ','נאָ','נוּ']},
+    {raw:'כ',answer:'כ',choices:['כ','כּ','כָ','כְ']},
+    {raw:'טן'}
+  ],
+  'ווער':[
+    {raw:'וו',answer:'וו',choices:['וו','וּ','וֹ','ו']},
+    {raw:'ער'}
+  ],
+  'אנדערש':[
+    {raw:'א',answer:'אַ',choices:['אַ','אָ','א','אְ']},
+    {raw:'נדער'},
+    {raw:'ש',answer:'שׁ',choices:['שׁ','שׂ','שָ','שְ']}
+  ],
+  'יעצט':[
+    {raw:'י',answer:'י',choices:['י','יִ','יי','ײַ']},
+    {raw:'עצט'}
+  ],
+  'קלוג':[
+    {raw:'ק'},
+    {raw:'לו',answer:'לוּ',choices:['לוּ','לוֹ','לוַ','לוְ']},
+    {raw:'ג'}
+  ],
+  'וויינען':[
+    {raw:'וו',answer:'וו',choices:['וו','וּ','וֹ','ו']},
+    {raw:'יי',answer:'יי',choices:['יי','ײַ','יִ','י']},
+    {raw:'נע',answer:'נע',choices:['נע','נאַ','נאָ','נוּ']},
+    {raw:'ן'}
+  ],
+  'צאלן':[
+    {raw:'צא',answer:'צאָ',choices:['צאָ','צאַ','צע','צוּ']},
+    {raw:'לן'}
+  ],
+  'גוטע':[
+    {raw:'גו',answer:'גוּ',choices:['גוּ','גוֹ','גוַ','גוְ']},
+    {raw:'טע',answer:'טע',choices:['טע','טאַ','טאָ','טי']}
+  ],
+  'נייעס':[
+    {raw:'נ'},
+    {raw:'יי',answer:'ײַ',choices:['ײַ','יי','יִ','י']},
+    {raw:'עס'}
+  ],
+  'היינט':[
+    {raw:'ה'},
+    {raw:'יי',answer:'ײַ',choices:['ײַ','יי','יִ','י']},
+    {raw:'נט'}
+  ],
+  'גלייך':[
+    {raw:'גל'},
+    {raw:'יי',answer:'ײַ',choices:['ײַ','יי','יִ','י']},
+    {raw:'כ',answer:'כ',choices:['כ','כּ','כָ','כְ']}
+  ],
+  'קומען':[
+    {raw:'קו',answer:'קוּ',choices:['קוּ','קוֹ','קוַ','קוְ']},
+    {raw:'מע',answer:'מע',choices:['מע','מאַ','מאָ','מוּ']},
+    {raw:'ן'}
+  ],
+  'שיינע':[
+    {raw:'ש',answer:'שׁ',choices:['שׁ','שׂ','שָ','שְ']},
+    {raw:'יי',answer:'יי',choices:['יי','ײַ','יִ','י']},
+    {raw:'נע',answer:'נע',choices:['נע','נאַ','נאָ','נוּ']}
+  ],
+  'מענטשן':[
+    {raw:'מע',answer:'מע',choices:['מע','מאַ','מאָ','מוּ']},
+    {raw:'נ'},
+    {raw:'טש',answer:'טש',choices:['טש','זש','דזש','ש']},
+    {raw:'ן'}
+  ]
+};
+function soundProfile(w){
+  return SOUND_PROFILES[w.yi]||[{raw:w.yi,answer:w.yi,choices:[w.yi]}];
+}
+function soundChallengeIndexes(profile){
+  const out=[];
+  profile.forEach((part,i)=>{if(part.choices&&part.choices.length)out.push(i)});
+  return out;
+}
+function soundResetWord(){
+  soundGame.cursor=0;soundGame.placed=new Set();soundGame.transitioning=false;soundGame.lastCorrect=null;soundGame.feedback='';soundGame.wrongChoice=null;
+}
+$('soundStart').onclick=()=>{
+  if(busy||pending||!open(group))return;
+  clearAdvance();round=null;flash=null;storyQuiz=null;sentenceGame=null;
+  $('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;
+  const ids=shuffleClient(config.sections[group].words.slice(0,8));
+  soundGame={group:group,ids:ids,wordIndex:0,cursor:0,placed:new Set(),transitioning:false,lastCorrect:null,feedback:'',wrongChoice:null};
+  soundGameRender();focusSoundGame();
+};
+function soundChoose(choice){
+  if(!soundGame||soundGame.transitioning)return;
+  const w=word(soundGame.ids[soundGame.wordIndex]),profile=soundProfile(w),steps=soundChallengeIndexes(profile),partIndex=steps[soundGame.cursor],part=profile[partIndex];
+  if(!part)return;
+  if(choice===part.answer){
+    soundGame.placed.add(partIndex);soundGame.lastCorrect=partIndex;soundGame.transitioning=true;soundGame.feedback='✓ Right sound!';soundGame.wrongChoice=null;soundGameRender();
+    setTimeout(()=>{
+      if(!soundGame)return;
+      soundGame.cursor++;soundGame.transitioning=false;soundGame.lastCorrect=null;soundGame.feedback='';soundGameRender();focusSoundGame();
+    },480);
+  }else{
+    soundGame.wrongChoice=choice;soundGame.feedback='Not that sound — try again.';soundGameRender();
+  }
+}
+function soundGameRender(){
+  const box=$('soundgame');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
+  if(soundGame.wordIndex>=soundGame.ids.length){
+    box.append(node('div','🔤','round-check'),node('h2','Sound Builder complete!'),node('p','You built all 8 Yiddish words in this section.'));
+    const again=node('button','Build them again');again.type='button';again.onclick=()=>{soundGame.ids=shuffleClient(config.sections[group].words.slice(0,8));soundGame.wordIndex=0;soundResetWord();soundGameRender();focusSoundGame()};
+    const back=node('button','Back to my words');back.type='button';back.style.marginLeft='10px';back.onclick=()=>{soundGame=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
+    box.append(again,back);focusSoundGame();return;
+  }
+
+  const w=word(soundGame.ids[soundGame.wordIndex]),profile=soundProfile(w),steps=soundChallengeIndexes(profile),activePart=steps[soundGame.cursor];
+  const top=node('div','','sound-topbar'),back=node('button','← Back to my words','sound-exit');back.type='button';
+  back.onclick=()=>{soundGame=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
+  top.append(back);box.append(top);
+  box.append(node('div','Word '+(soundGame.wordIndex+1)+' of '+soundGame.ids.length,'practice-progress'),node('h2','Build the sound of the word'));
+  const meaning=node('div',w.en,'sound-meaning');box.append(meaning);
+
+  const wordLine=node('div','','sound-word');wordLine.lang='yi';wordLine.dir='rtl';
+  profile.forEach((part,i)=>{
+    let shown=soundGame.placed.has(i)?part.answer:part.raw;
+    const cls='sound-part'+(i===activePart?' active':'')+(soundGame.placed.has(i)?' placed':'')+(i===soundGame.lastCorrect?' pop':'');
+    const span=node('span',shown,cls);span.lang='yi';span.dir='rtl';wordLine.append(span);
+  });
+  box.append(wordLine);
+
+  if(soundGame.cursor>=steps.length){
+    box.append(node('p','✓ You built the whole word!','sound-complete'));
+    const next=node('button',soundGame.wordIndex===soundGame.ids.length-1?'Finish →':'Next word →','sound-next');next.type='button';
+    next.onclick=()=>{soundGame.wordIndex++;soundResetWord();soundGameRender();focusSoundGame()};
+    box.append(next);return;
+  }
+
+  const part=profile[activePart];
+  box.append(node('p','Choose the correct version for the highlighted part.','sound-hint'));
+  const opts=node('div','','sound-options');
+  for(const choice of shuffleClient(part.choices)){
+    const b=node('button',choice,'sound-option'+(soundGame.wrongChoice===choice?' wrong':''));
+    b.type='button';b.lang='yi';b.dir='rtl';b.disabled=soundGame.transitioning;b.onclick=()=>soundChoose(choice);opts.append(b);
+  }
+  box.append(opts);
+  const feedback=node('p',soundGame.feedback||'','sound-feedback '+(soundGame.feedback.startsWith('✓')?'feedback-correct':soundGame.feedback?'feedback-wrong':''));feedback.setAttribute('role','status');box.append(feedback);
+}
+
 function focusSentenceGame(){requestAnimationFrame(()=>$('sentencegame')?.scrollIntoView({behavior:'smooth',block:'start'}))}
 const SENTENCE_TEMPLATES={
   'געלט':'ער האט אסאך ___ אין דעם זעקל.',
@@ -294,8 +534,8 @@ function sentenceAttempt(targetId,answerId){
 }
 $('sentenceStart').onclick=()=>{
   if(busy||pending||!open(group))return;
-  clearAdvance();round=null;flash=null;storyQuiz=null;
-  $('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;
+  clearAdvance();round=null;flash=null;storyQuiz=null;soundGame=null;
+  $('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('soundgame').hidden=true;
   const ids=shuffleClient(config.sections[group].words.slice(0,8));
   sentenceGame={group:group,ids:ids,setIndex:0,solved:new Set(),selected:null,feedback:'',feedbackKind:''};
   sentenceGameRender();focusSentenceGame();
@@ -357,7 +597,7 @@ function sentenceGameRender(){
 
 $('flashStart').onclick=()=>{
   if(busy||pending||!open(group))return;
-  clearAdvance();round=null;storyQuiz=null;sentenceGame=null;$('practice').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;
+  clearAdvance();round=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('practice').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;
   flash={group,ids:shuffleClient(config.sections[group].words),idx:0,flipped:false};
   flashRender();focusFlash();
 };
@@ -385,7 +625,7 @@ function flashRender(){
   actions.append(dontKnow,know);
   box.append(actions);
 }
-$('start').onclick=async()=>{if(busy)return;clearAdvance();flash=null;storyQuiz=null;sentenceGame=null;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;busy=true;$('start').disabled=true;try{message('');const s=await API.call('start',{group});round=s.round;pending=null;$('practice').hidden=false;question();focusPractice()}catch(e){message(e.message)}finally{busy=false;$('start').disabled=!open(group)}};
+$('start').onclick=async()=>{if(busy)return;clearAdvance();flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;busy=true;$('start').disabled=true;try{message('');const s=await API.call('start',{group});round=s.round;pending=null;$('practice').hidden=false;question();focusPractice()}catch(e){message(e.message)}finally{busy=false;$('start').disabled=!open(group)}};
 function question(){
   clearAdvance();
   const box=$('practice');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
