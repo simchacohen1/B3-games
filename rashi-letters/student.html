@@ -138,6 +138,53 @@
 :root{--parchment:#fff;--parchment-dark:#e5eafa;--ink:#172547;--ink-soft:#475675;--rimon:#6553d6;--rimon-dark:#3f3099;--gold:#b8c4e7;--gold-light:#ede9ff;--shadow:#283f7520}
 body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial-gradient(ellipse at 95% 60%,#ccf5ed,transparent 45%),#f3f6ff;font-family:'Quicksand',Arial,sans-serif}
 .wrap{max-width:1000px;padding:26px 24px 60px}header.top{text-align:left;display:flex;align-items:center;gap:18px;margin-bottom:24px}header.top h1{font:800 34px 'Quicksand',Arial,sans-serif;letter-spacing:-1px;color:var(--ink)}header.top p{font-size:16px;font-weight:600}.brand-icon{display:grid;place-items:center;width:68px;height:68px;background:#6553d6;color:white;border-radius:22px;box-shadow:0 6px 0 #4938ae;font-family:'Mekorot Rashi';font-size:48px}.eyebrow{font-size:12px;letter-spacing:2px;font-weight:700;color:#6553d6;text-transform:uppercase;margin-bottom:10px}.card{border:1px solid #dce3f4;border-radius:28px;padding:30px;box-shadow:0 12px 40px #243e7010}.name-gate{max-width:590px;margin:30px auto;text-align:center}.name-gate h2{font-size:30px;margin:12px 0}.name-gate input{width:100%;max-width:400px;background:#f6f8ff;border:2px solid #d9e0f1;padding:15px;font-size:18px;margin-bottom:18px}.btn{border-radius:16px;background:#6553d6;box-shadow:0 5px 0 #4433a1;padding:16px 26px;font-size:18px}.intro-copy{font-size:17px;line-height:1.7;color:var(--ink-soft)}.mode-gate-section h3{font-size:19px;color:var(--ink);margin:24px 0 14px}.continue-btn{text-align:left;padding:24px;font-size:23px;background:#6553d6}.letter-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}.letter-pick-btn{position:relative;background:#f8f9ff;border:2px solid #e0e5f3;border-bottom-width:5px;border-radius:20px;font-size:43px;min-height:115px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}.letter-pick-btn small{font:700 12px 'Quicksand',Arial,sans-serif;color:#536180}.letter-pick-btn:nth-child(3n+2){background:#edfaf6}.letter-pick-btn:nth-child(3n){background:#fff7e5}.letter-pick-btn.selected{border-color:#6553d6;background:#ede9ff}.mode-type-btn{font-size:16px;padding:16px}.phase-row{margin-bottom:20px}.unit-label{font-size:17px;font-weight:700}.phase-pill{font-size:13px;padding:8px 12px}.menu-link{font-size:15px;text-decoration:none;border:1px solid #d8dff0;border-radius:10px;padding:10px}.letter-box{position:relative;background:linear-gradient(135deg,#f0edff,#edf6ff);border:0;border-radius:22px;min-height:235px;margin-bottom:20px}.letter-box:before{content:'RASHI SCRIPT';position:absolute;top:18px;left:22px;font:700 11px 'Quicksand',sans-serif;letter-spacing:2px;color:#605592}#rashiLetter{font-size:150px;color:#342773;direction:rtl}#rashiLetter.word-mode{font-size:83px}.prompt{font-size:21px;font-weight:700;color:var(--ink)}.choices{gap:16px}.choice-btn{height:100px;font-size:54px;border:2px solid #dbe2f1;border-bottom:6px solid #c9d3e9;border-radius:19px;background:white}.choice-btn.word-btn{font-size:36px;min-height:100px}.choice-btn:hover:not(:disabled){border-color:#8877e6;background:#f6f3ff;transform:translateY(-2px)}.choice-btn.correct{background:#d9f9e8;border-color:#249665;color:#125e3f}.choice-btn.incorrect{background:#fff0e3;border-color:#d78737}.choice-btn:disabled{color:var(--ink);opacity:1}#feedback{font-size:19px;min-height:30px;line-height:1.5}.progress-track{height:13px;border-radius:20px}#progFill{background:linear-gradient(90deg,#7160e6,#36bda3)}.streak-star{font-size:32px;color:#dfa900;opacity:.22}.streak-star.lit{opacity:1}.hud{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid #dce3f4;padding:14px 20px;border-radius:18px;margin-bottom:18px;font-weight:700}.hud button{background:#eef0fc;border:0;padding:10px;border-radius:10px;color:#3f3099;font:inherit;cursor:pointer}.help-row{display:flex;justify-content:center;gap:12px;margin-bottom:18px}.helper{border:0;background:#ece9ff;color:#443694;padding:12px 18px;border-radius:12px;font:700 15px 'Quicksand',sans-serif;cursor:pointer}.study{background:#f1f7ff;border:2px solid #d5e2fa;border-radius:18px;padding:20px;margin:16px 0;text-align:center}.compare{display:flex;justify-content:center;gap:50px;align-items:center;margin:15px}.compare span{font:80px Arial;direction:rtl}.compare .rashi{font-family:'Mekorot Rashi'}.compare small{display:block;font:700 13px 'Quicksand',sans-serif;color:#536180;margin-top:15px}.star-note{text-align:center;font-size:14px;color:#536180}.finish-icon{font-size:70px}button:focus-visible,input:focus-visible{outline:4px solid #f0b93a;outline-offset:4px}#completeScreen h2{font-size:32px}#completeScreen p{font-size:20px}.pop-banner{animation:pop .4s ease}
+
+/* Adventure layer */
+.quest-scene{
+  position:relative; overflow:hidden; min-height:118px; margin:-4px 0 22px;
+  border-radius:22px; border:2px solid #dfe5f6;
+  background:linear-gradient(#cfeeff 0 58%,#dff5d3 58% 100%);
+  box-shadow:inset 0 -5px 0 rgba(70,113,76,.08);
+}
+.quest-scene:before,.quest-scene:after{
+  content:''; position:absolute; border-radius:999px; background:#fff; opacity:.82;
+  width:72px; height:22px; top:18px; box-shadow:24px 7px 0 4px #fff,-19px 8px 0 0 #fff;
+  animation:cloudDrift 12s linear infinite;
+}
+.quest-scene:before{left:8%;}
+.quest-scene:after{left:68%;top:30px;transform:scale(.72);animation-duration:16s;}
+@keyframes cloudDrift{50%{transform:translateX(20px)}}
+.quest-hills{position:absolute;left:-5%;right:-5%;bottom:25px;height:45px;background:linear-gradient(135deg,#9fd28e,#75bb83);clip-path:polygon(0 70%,14% 30%,28% 70%,43% 18%,57% 70%,73% 36%,100% 72%,100% 100%,0 100%)}
+.quest-path{position:absolute;left:8%;right:8%;bottom:19px;height:12px;border-radius:999px;background:#c89d61;box-shadow:inset 0 2px 0 rgba(255,255,255,.45)}
+.journey-fill{position:absolute;left:0;top:0;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#f2be32,#ffdf66);transition:width .45s ease}
+.explorer{position:absolute;left:7%;bottom:24px;font-size:42px;z-index:4;filter:drop-shadow(0 4px 2px rgba(0,0,0,.16));transition:left .45s cubic-bezier(.2,.8,.2,1)}
+.explorer.hop{animation:explorerHop .55s ease}
+@keyframes explorerHop{0%,100%{transform:translateY(0) rotate(0)}35%{transform:translateY(-24px) rotate(-8deg)}70%{transform:translateY(-6px) rotate(5deg)}}
+.treasure-chest{position:absolute;right:4%;bottom:27px;font-size:46px;z-index:4;filter:drop-shadow(0 4px 2px rgba(0,0,0,.15));transform-origin:bottom center}
+.treasure-chest.rattle{animation:chestRattle .7s ease}
+@keyframes chestRattle{0%,100%{transform:rotate(0) scale(1)}20%{transform:rotate(-9deg) scale(1.08)}40%{transform:rotate(9deg) scale(1.12)}65%{transform:rotate(-5deg) scale(1.09)}80%{transform:rotate(3deg) scale(1.04)}}
+.quest-badge{position:absolute;left:14px;top:10px;z-index:5;background:rgba(255,255,255,.9);border:1px solid #dce3f4;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800;color:#3f3099;box-shadow:0 3px 8px rgba(38,53,93,.08)}
+.quest-coins{position:absolute;right:13px;top:10px;z-index:5;background:rgba(255,255,255,.92);border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800;color:#755400;border:1px solid #ead99b}
+.reward-particle{position:fixed;z-index:9999;pointer-events:none;font-size:22px;animation:rewardFly .85s ease-out forwards}
+@keyframes rewardFly{0%{opacity:1;transform:translate(-50%,-50%) scale(.45)}65%{opacity:1;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.25) rotate(var(--rot))}100%{opacity:0;transform:translate(calc(-50% + var(--dx2)),calc(-50% + var(--dy2))) scale(.8) rotate(var(--rot))}}
+.letter-box.reward-glow{animation:rewardGlow .65s ease}
+@keyframes rewardGlow{0%{box-shadow:0 0 0 0 rgba(91,83,214,0)}45%{box-shadow:0 0 0 9px rgba(91,83,214,.14),0 0 35px rgba(242,190,50,.55)}100%{box-shadow:0 0 0 0 rgba(91,83,214,0)}}
+.quest-toast{position:fixed;z-index:10001;left:50%;top:18%;transform:translate(-50%,-20px) scale(.9);opacity:0;background:#fff;border:3px solid #f2be32;border-radius:18px;padding:14px 22px;box-shadow:0 14px 45px rgba(35,45,84,.25);font-weight:900;font-size:20px;color:#3f3099;pointer-events:none}
+.quest-toast.show{animation:toastPop 1.15s ease forwards}
+@keyframes toastPop{0%{opacity:0;transform:translate(-50%,-20px) scale(.82)}18%,72%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-8px) scale(.94)}}
+.mini-overlay{position:fixed;inset:0;z-index:10000;background:rgba(23,37,71,.72);display:grid;place-items:center;padding:18px;backdrop-filter:blur(4px)}
+.mini-card{width:min(620px,96vw);background:linear-gradient(160deg,#fff,#f5f2ff);border:4px solid #f2be32;border-radius:28px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.32);text-align:center;overflow:hidden;position:relative}
+.mini-kicker{font-weight:900;letter-spacing:2px;color:#d88800;font-size:13px}.mini-card h2{margin:7px 0 4px;font-size:30px;color:#2d266f}.mini-card p{margin:4px 0 14px;color:#536180;font-weight:700}.mini-target{font-family:'Mekorot Rashi';font-size:82px;line-height:1;margin:12px auto;color:#342773;background:#ece9ff;width:118px;height:105px;border-radius:24px;display:grid;place-items:center;box-shadow:inset 0 -5px 0 #d8d1ff}
+.mini-arena{position:relative;height:200px;border-radius:22px;background:linear-gradient(#d9f3ff,#e8fadf);border:2px solid #d8e5f0;overflow:hidden;margin-top:12px}
+.mini-choice{position:absolute;width:76px;height:76px;border-radius:50%;border:3px solid #fff;background:#6553d6;color:#fff;font:700 38px 'Frank Ruhl Libre',serif;box-shadow:0 7px 0 #4433a1,0 9px 20px rgba(42,46,90,.18);cursor:pointer;animation:floatChoice 2.1s ease-in-out infinite;transition:transform .12s ease,background .12s ease}
+.mini-choice:nth-child(2){animation-delay:-.45s}.mini-choice:nth-child(3){animation-delay:-.9s}.mini-choice:nth-child(4){animation-delay:-1.35s}
+@keyframes floatChoice{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-18px) rotate(3deg)}}
+.mini-choice.good{background:#23a66d;box-shadow:0 7px 0 #157b4d}.mini-choice.miss{animation:miniMiss .35s ease}
+@keyframes miniMiss{25%{transform:translateX(-8px)}50%{transform:translateX(8px)}75%{transform:translateX(-5px)}}
+.mini-feedback{min-height:30px;margin-top:12px;font-size:18px;font-weight:900;color:#3f3099}
+.mini-skip{border:0;background:transparent;color:#64708d;text-decoration:underline;font:700 13px 'Quicksand',sans-serif;cursor:pointer;margin-top:4px}
+@media(max-width:600px){.quest-scene{min-height:105px}.explorer{font-size:35px}.treasure-chest{font-size:38px}.quest-badge,.quest-coins{font-size:10px;padding:6px 8px}.mini-card{padding:18px}.mini-target{font-size:68px;width:102px;height:90px}.mini-arena{height:180px}.mini-choice{width:64px;height:64px;font-size:32px}}
+
 @media(min-width:800px){#app{max-width:760px;margin:auto}}
 @media(max-width:600px){.wrap{padding:18px 12px}.card{padding:20px;border-radius:22px}header.top h1{font-size:27px}.brand-icon{width:54px;height:54px}.letter-grid{grid-template-columns:repeat(3,1fr)}.unit-label{font-size:14px}.phase-row{gap:8px}.phase-pill{display:none}#rashiLetter.word-mode{font-size:62px}.choice-btn.word-btn{font-size:29px}.hud{font-size:13px;padding:10px}.letter-box{min-height:205px}.compare{gap:25px}.compare span{font-size:65px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
@@ -185,6 +232,14 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
         <div class="phase-pill" id="phasePill">Letter</div>
       </div>
     </div>
+    <div class="quest-scene" id="questScene" aria-label="Rashi Quest treasure journey">
+      <div class="quest-hills"></div>
+      <div class="quest-badge" id="journeyLabel">Treasure trail</div>
+      <div class="quest-coins" id="coinHud">🪙 0</div>
+      <div class="quest-path"><div class="journey-fill" id="journeyFill"></div></div>
+      <div class="explorer" id="explorer" aria-hidden="true">🕵️</div>
+      <div class="treasure-chest" id="treasureChest" aria-hidden="true">🎁</div>
+    </div>
     <div class="letter-box" lang="he" dir="rtl"><span id="rashiLetter"></span></div>
     <div class="prompt" id="promptText">Which letter is this?</div>
     <div class="help-row"><button class="helper" id="learnBtn">🔎 Show me how</button></div><div id="studyPanel" class="study hidden"></div><div class="choices" id="choicesRow"></div>
@@ -209,6 +264,19 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 
   <div class="card" id="closedScreen">
     <p>Practice is closed right now. Ask your teacher.</p>
+  </div>
+</div>
+
+<div class="quest-toast" id="questToast" role="status" aria-live="polite"></div>
+<div class="mini-overlay hidden" id="miniGame" role="dialog" aria-modal="true" aria-labelledby="miniTitle">
+  <div class="mini-card">
+    <div class="mini-kicker">⚡ SURPRISE ROUND ⚡</div>
+    <h2 id="miniTitle">Catch the matching letter!</h2>
+    <p>Tap the regular letter that matches the Rashi letter.</p>
+    <div class="mini-target" id="miniTarget" dir="rtl"></div>
+    <div class="mini-arena" id="miniArena"></div>
+    <div class="mini-feedback" id="miniFeedback"></div>
+    <button class="mini-skip" id="miniSkip">Skip bonus round</button>
   </div>
 </div>
 
@@ -331,7 +399,7 @@ const UNITS = [
 const NEEDED_CORRECT = 3;
 const MAX_QUESTIONS_PER_STEP = 5;
 
-let soundOn = true, starsThisVisit = 0, guidedIndex = 0, guidedPhase = 'letter', questionTimer = null, viewVersion = 0;
+let soundOn = true, starsThisVisit = 0, coinsThisVisit = 0, guidedIndex = 0, guidedPhase = 'letter', questionTimer = null, viewVersion = 0;
 let studentName = null;
 let studentId = null;
 let unitIndex = 0;
@@ -358,6 +426,113 @@ function shuffle(arr){
   }
   return a;
 }
+
+function updateRewardHud(){
+  document.getElementById('sessionStars').textContent = '★ ' + starsThisVisit + '  ·  🪙 ' + coinsThisVisit;
+  const coinHud = document.getElementById('coinHud');
+  if(coinHud) coinHud.textContent = '🪙 ' + coinsThisVisit;
+}
+
+function adventurePercent(){
+  if(mode === 'continue'){
+    const safeIndex = Math.min(unitIndex, UNITS.length);
+    const phasePart = safeIndex >= UNITS.length ? 2 : ((phase === 'word' ? 1 : 0) + Math.min(streak,NEEDED_CORRECT)/NEEDED_CORRECT);
+    return safeIndex >= UNITS.length ? 100 : ((safeIndex*2 + phasePart)/(UNITS.length*2))*100;
+  }
+  const phaseBase = (practiceModeType === 'mixed' && phase === 'word') ? 1 : 0;
+  const denom = practiceModeType === 'mixed' ? 2 : 1;
+  return Math.min(100,((phaseBase + Math.min(streak,NEEDED_CORRECT)/NEEDED_CORRECT)/denom)*100);
+}
+
+function updateAdventure(){
+  const pct = Math.max(0,Math.min(100,adventurePercent()));
+  const fill = document.getElementById('journeyFill');
+  const explorer = document.getElementById('explorer');
+  const label = document.getElementById('journeyLabel');
+  if(fill) fill.style.width = pct + '%';
+  if(explorer) explorer.style.left = (7 + pct*0.78) + '%';
+  if(label){
+    const left = Math.max(0,NEEDED_CORRECT-streak);
+    label.textContent = left === 0 ? 'Treasure reached!' : left + ' treasure star' + (left===1?'':'s') + ' to the next checkpoint';
+  }
+}
+
+function animateExplorer(){
+  const el = document.getElementById('explorer');
+  const box = document.querySelector('.letter-box');
+  if(el){el.classList.remove('hop'); void el.offsetWidth; el.classList.add('hop');}
+  if(box){box.classList.remove('reward-glow'); void box.offsetWidth; box.classList.add('reward-glow');}
+}
+
+function rewardBurst(originEl, big=false){
+  const rect = originEl && originEl.getBoundingClientRect ? originEl.getBoundingClientRect() : {left:innerWidth/2,top:innerHeight/2,width:0,height:0};
+  const x = rect.left + rect.width/2, y = rect.top + rect.height/2;
+  const glyphs = big ? ['⭐','✨','🪙','🌟','🪙','✨','⭐','🎉','🪙','🌟','✨','⭐','🪙','🎉'] : ['⭐','✨','🪙','⭐','✨','🪙','🌟','✨'];
+  glyphs.forEach((g,i)=>{
+    const p=document.createElement('span'); p.className='reward-particle'; p.textContent=g;
+    const a=(Math.PI*2*i/glyphs.length)+(Math.random()-.5)*.35, d=(big?95:70)+Math.random()*(big?80:55);
+    p.style.left=x+'px'; p.style.top=y+'px';
+    p.style.setProperty('--dx',(Math.cos(a)*d)+'px'); p.style.setProperty('--dy',(Math.sin(a)*d)+'px');
+    p.style.setProperty('--dx2',(Math.cos(a)*d*1.25)+'px'); p.style.setProperty('--dy2',(Math.sin(a)*d*1.25+24)+'px');
+    p.style.setProperty('--rot',((Math.random()*180)-90)+'deg');
+    document.body.appendChild(p); setTimeout(()=>p.remove(),950);
+  });
+}
+
+function showQuestToast(text){
+  const t=document.getElementById('questToast');
+  if(!t) return;
+  t.textContent=text; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+}
+
+function celebrateCheckpoint(){
+  const chest=document.getElementById('treasureChest');
+  if(chest){chest.classList.remove('rattle'); void chest.offsetWidth; chest.classList.add('rattle'); rewardBurst(chest,true);}
+  showQuestToast('🎁 Checkpoint treasure unlocked!');
+}
+
+let miniGameTarget = null;
+let miniGameUnit = null;
+let miniGameReturn = null;
+function startMiniGame(unit, returnFn){
+  miniGameUnit = unit;
+  miniGameReturn = returnFn || renderQuestion;
+  miniGameTarget = pickTarget(unit);
+  const overlay=document.getElementById('miniGame');
+  const target=document.getElementById('miniTarget');
+  const arena=document.getElementById('miniArena');
+  const fb=document.getElementById('miniFeedback');
+  target.textContent=miniGameTarget; fb.textContent=''; arena.innerHTML='';
+  const opts=choicesFor(unit);
+  const spots=[[8,18],[56,14],[24,57],[68,57]];
+  opts.forEach((letter,i)=>{
+    const b=document.createElement('button'); b.className='mini-choice'; b.textContent=letter;
+    b.style.left=spots[i][0]+'%'; b.style.top=spots[i][1]+'%';
+    b.onclick=()=>handleMiniChoice(letter,b);
+    arena.appendChild(b);
+  });
+  overlay.classList.remove('hidden');
+  setTimeout(()=>{const first=arena.querySelector('button'); if(first) first.focus();},30);
+}
+
+function closeMiniGame(){
+  document.getElementById('miniGame').classList.add('hidden');
+  const fn=miniGameReturn || renderQuestion; miniGameReturn=null; miniGameTarget=null; miniGameUnit=null;
+  setTimeout(fn,180);
+}
+
+function handleMiniChoice(letter,btn){
+  if(letter===miniGameTarget){
+    btn.classList.add('good'); coinsThisVisit += 3; updateRewardHud(); rewardBurst(btn,true); beep('correct');
+    document.getElementById('miniFeedback').textContent='BONUS TREASURE! +3 coins 🪙';
+    document.querySelectorAll('.mini-choice').forEach(x=>x.disabled=true);
+    setTimeout(closeMiniGame,950);
+  }else{
+    btn.classList.remove('miss'); void btn.offsetWidth; btn.classList.add('miss'); beep('wrong');
+    document.getElementById('miniFeedback').textContent='Not that one — keep hunting!';
+  }
+}
+document.getElementById('miniSkip').onclick=closeMiniGame;
 
 function beep(kind){
   if(!soundOn) return;
@@ -430,6 +605,7 @@ document.getElementById('startBtn').onclick = async () => {
     studentName = val;
     studentId = result.slug;
     await loadProgress();
+    updateRewardHud();
     document.getElementById('nameGate').style.display = 'none';
     showModeGate();
   }catch(e){
@@ -631,6 +807,7 @@ function renderQuestion(){
   }
   document.getElementById('progFill').style.width = Math.min(pct,100) + '%';
   updateStreakStars();
+  updateAdventure();
   answering = false;
 }
 
@@ -660,8 +837,10 @@ async function handleAnswer(letter, btnEl){
 
   if(isCorrect){
     btnEl.classList.add('correct');
-    starsThisVisit++;
-    document.getElementById('sessionStars').textContent='★ '+starsThisVisit+' stars this visit';
+    starsThisVisit++; coinsThisVisit++;
+    updateRewardHud();
+    animateExplorer();
+    rewardBurst(btnEl);
     fb.style.color='#176447';
     fb.textContent=assisted?'Good learning! Now try the next one on your own.':['You cracked it!','Great detective work!','You found the match!'][Math.floor(Math.random()*3)];
     if(!assisted) streak++;
@@ -678,10 +857,12 @@ async function handleAnswer(letter, btnEl){
     showComparison();
   }
   updateStreakStars();
+  updateAdventure();
 
   const writes=[logAttempt(unit.id,answeredPhase,isCorrect)];
   const stepComplete = streak >= NEEDED_CORRECT || (attemptsThisStep >= MAX_QUESTIONS_PER_STEP && isCorrect) || attemptsThisStep > MAX_QUESTIONS_PER_STEP;
   let practiceFinished = false;
+  const miniGamePending = isCorrect && !assisted && starsThisVisit > 0 && starsThisVisit % 4 === 0;
 
   if(stepComplete){
     const mastered = streak >= NEEDED_CORRECT;
@@ -692,6 +873,7 @@ async function handleAnswer(letter, btnEl){
     streak = 0;
     attemptsThisStep = 0;
     retryQuestion = null;
+    celebrateCheckpoint();
 
     if(mode==='continue'){
       if(phase==='letter') phase='word';
@@ -711,10 +893,13 @@ async function handleAnswer(letter, btnEl){
 
   if(practiceFinished){
     questionTimer=setTimeout(()=>finishPracticeMission(unit),1500);
+  } else if(miniGamePending){
+    const delay = stepComplete ? 1250 : 900;
+    questionTimer=setTimeout(()=>startMiniGame(unit, renderQuestion),delay);
   } else if(stepComplete){
     questionTimer=setTimeout(renderQuestion,1400);
   } else if(isCorrect){
-    questionTimer=setTimeout(renderQuestion,1200);
+    questionTimer=setTimeout(renderQuestion,1050);
   } else {
     document.getElementById('nextBtn').classList.remove('hidden');
   }
