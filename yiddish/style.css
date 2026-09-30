@@ -216,7 +216,7 @@
 }
 .activity-grid{
   display:grid;
-  grid-template-columns:repeat(5,minmax(0,1fr));
+  grid-template-columns:repeat(3,minmax(0,1fr));
   gap:12px;
 }
 .student-page .activity-card{
@@ -242,6 +242,7 @@
 .activity-practice{background:linear-gradient(135deg,#e66c2c,#f39b38)}
 .activity-flash{background:linear-gradient(135deg,#7855c7,#a16ad7)}
 .activity-sentence{background:linear-gradient(135deg,#b34d79,#d96a8d)}
+.activity-sound{background:linear-gradient(135deg,#a05a17,#d08a24)}
 .activity-detective{background:linear-gradient(135deg,#276ca3,#3b8fc1)}
 .activity-words{background:linear-gradient(135deg,#198069,#32a182)}
 .activity-icon{
@@ -329,3 +330,28 @@
 .sentence-next{margin-top:4px;background:#7d4364}
 .sentence-next:hover{background:#945377}
 @media(max-width:760px){.sentence-board{grid-template-columns:1fr}.sentence-card{min-height:108px}.sentence-line{font-size:23px}.sentence-word{font-size:24px;min-width:92px}.sentence-blank{font-size:23px;min-width:110px}}
+
+
+/* Sound Builder — pedagogical Yiddish pronunciation/nekudos */
+#soundgame{background:#fff;border:3px solid #b77524;border-radius:22px;padding:26px;text-align:center;margin:20px 0}
+.sound-topbar{display:flex;justify-content:flex-start;margin-bottom:8px}
+.sound-exit{background:#f7ead7;color:#70420c;padding:10px 14px;font-size:15px}
+.sound-exit:hover{background:#f0dcc0}
+.sound-meaning{display:inline-block;margin:2px auto 14px;padding:7px 14px;border-radius:999px;background:#eef5f2;color:#35584e;font-weight:900;font-size:18px}
+.sound-word{direction:rtl;unicode-bidi:isolate;display:flex;flex-direction:row;justify-content:center;align-items:center;gap:4px;min-height:116px;margin:12px auto 18px;padding:16px 20px;border-radius:20px;background:#fbfaf4;border:2px solid #e6dfc9;font:900 58px/1.3 Georgia,serif}
+.sound-part{display:inline-block;padding:4px 5px;border-radius:10px;transition:transform .16s ease,background .16s ease,box-shadow .16s ease}
+.sound-part.active{background:#fff0a8;box-shadow:0 0 0 3px #d8aa22 inset,0 4px 12px rgba(112,66,12,.12);transform:translateY(-2px)}
+.sound-part.placed{background:#e2f3e8;color:#155431}
+.sound-part.pop{animation:soundPop .42s ease}
+@keyframes soundPop{0%{transform:scale(.88)}55%{transform:scale(1.16)}100%{transform:scale(1)}}
+.sound-hint{font-weight:800;color:#52616a;margin:4px 0 12px}
+.sound-options{display:grid;grid-template-columns:repeat(4,minmax(105px,1fr));gap:12px;max-width:760px;margin:0 auto}
+.sound-option{min-height:78px;background:#173d4d;color:#fff;border-radius:17px;font:900 36px Georgia,serif;box-shadow:0 7px 14px rgba(20,46,62,.13);transition:transform .12s ease,box-shadow .12s ease}
+.sound-option:hover:not(:disabled){background:#245c67;transform:translateY(-3px);box-shadow:0 10px 18px rgba(20,46,62,.18)}
+.sound-option.wrong{background:#a14a38;animation:soundShake .22s linear}
+@keyframes soundShake{0%,100%{transform:translateX(0)}33%{transform:translateX(-5px)}66%{transform:translateX(5px)}}
+.sound-feedback{min-height:34px;margin:14px 0 4px;font-weight:900}
+.sound-complete{font-size:22px;font-weight:900;color:#155431;margin:8px 0 14px}
+.sound-next{background:#a05a17}
+.sound-next:hover{background:#b86b1b}
+@media(max-width:760px){.sound-word{font-size:46px;min-height:96px}.sound-options{grid-template-columns:1fr 1fr}.sound-option{font-size:31px;min-height:68px}}
