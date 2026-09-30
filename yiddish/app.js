@@ -1,5 +1,5 @@
 'use strict';
-const APP_BUILD='2026-09-29-story-detective-v3-classroom';
+const APP_BUILD='2026-09-29-story-detective-v4-glossary';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
 let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null;
@@ -77,20 +77,55 @@ const STORY_SECTION_PARAS=[
   [17,18,19,20,21,22,23,24,25],
   [26,27,28,29,30,31,32,33,34,35]
 ];
-const STORY_KEY_TERMS=[
-  'רבי יחזקאל לאנדאו','מיסטער וויינמאן','זעקל פון געלט','צוועלף טויזנט דאלער',
-  'גוטע נייעס','שיינע חתונה','רעב פסח','רב פסח','גיטל','חתונה','געלט','משגיח',
-  'וויין','וואגן','שבת','הכשר','טשעק','שטוב','פראג','האנגערי','וויינען'
-];
+const STORY_CLUES={
+  2:[['פראג','Prague'],['גרויסער רב','a great Rav'],['רבי יחזקאל לאנדאו','Rabbi Yechezkel Landau']],
+  3:[['רב פסח','Reb Pesach'],['רבי','teacher'],['גוטער רבי','good teacher'],['געלט','money']],
+  4:[['טאכטער','daughter'],['גיטל','Gitl'],['חתונה','wedding'],['גענוג געלט','enough money'],['גיין','go']],
+  5:[['אנדערע קאנטרי','another country'],['צוויי יאר','two years'],['געלט','money'],['צוריק','back']],
+  6:[['האנגערי','Hungary'],['ארבעט','work'],['צוויי יאר','two years'],['געלט','money'],['קליין','small']],
+  7:[['פאר פסח','before Pesach'],['גיין אהיים','go home'],['שטוב','home'],['געלט','money']],
+  8:[['מענטש','man'],['צוריק','back'],['מיסטער וויינמאן','Mr. Weinman'],['וויין','wine']],
+  9:[['מיסטער וויינמאן','Mr. Weinman'],['וואגן','wagon'],['משגיח','mashgiach'],['וויין','wine'],['נעמען','take']],
+  10:[['זעקל מיט געלט','bag of money'],['צוויי יאר','two years'],['טאכטער','daughter'],['חתונה','wedding'],['זען','see'],['משפחה','family']],
+  11:[['האטעל','hotel'],['געלט','money'],['קיינער','nobody'],['זעקל','bag'],['צווישן','between'],['וויין','wine']],
+  12:[['שבת','Shabbos'],['צוריק','back'],['געזוכט','looked for'],['געלט','money']],
+  13:[['מיסטער וויימאן','Mr. Weinman'],["געגנב'עט",'stolen'],['רעדן','speak'],['געלט','money']],
+  14:[['נישט גענומען','did not take'],['ווער','who'],['רב','Rav'],['העלפן','help']],
+  15:[['גארנישט קיין געלט','no money at all'],['משפחה','family'],["געגנב'עט",'stolen']],
+  16:[['רב','Rav'],['גאנצע מעשה','whole story'],['געארבעט','worked'],['געלט','money'],['האנגערי','Hungary']],
+  17:[['רב','Rav'],['העלפן','help'],['נעקסטע טאג','next day'],['טיר','door'],['מיסטער וויינמאן','Mr. Weinman']],
+  18:[['הכשר','kosher certification'],['וויין','wine'],['כשר','kosher'],['שרייבן','write'],['רב','Rav']],
+  19:[['משגיח','mashgiach'],['האנגערי','Hungary'],['וואגן','wagon'],['טריפ צוריק','trip back'],['גאנצע צייט','the whole time'],['רב פסח','Reb Pesach']],
+  20:[['פראבלעם','problem'],['משגיח','mashgiach'],['נעכטן','yesterday'],['געלט','money']],
+  21:[['נישט גענומען','did not take'],['ווער','who'],['עמיצער אנדערש','someone else'],['גענומען','took'],['אמת','truth']],
+  22:[['גוי','non-Jew'],['עמיצער אנדערש','someone else'],['אריינגעקומען','came in'],['וואגן','wagon'],['געטשעפעט','touched'],['וויין','wine']],
+  23:[['גענומען','took'],['זעקל פון געלט','bag of money'],['הכשר','kosher certification'],['קלוג','clever']],
+  24:[['נישט אזוי סימפל','not so simple'],['יעצט','now'],['זעקל פון געלט','bag of money'],['גענומען','took'],['שבת','Shabbos']],
+  25:[['שבת','Shabbos'],['גענומען די געלט','took the money'],['גלייבן','believe'],['משגיח','mashgiach'],['וויינען','cry']],
+  26:[['תשובה','teshuvah'],['אמת','truth'],['רב','Rav'],['מיסטער וויינמאן','Mr. Weinman'],['דיעל','deal'],['געלט','money']],
+  27:[['גוטן פלאן','good plan'],['גרויסע מצוה','big mitzvah'],['צאלן','pay'],['גאנצע חתונה','whole wedding'],['גיטל','Gitl']],
+  28:[['טשעקבוק','checkbook'],['צוועלף טויזנט דאלער','twelve thousand dollars'],['טשעק','check'],['רב','Rav'],['רעב פסח','Reb Pesach'],['געקלונגען','called']],
+  29:[['גוטע נייעס','good news'],['זייער גוטע נייעס','very good news'],['רבי יחזקאל לאנדא','Rabbi Yechezkel Landau'],['רב','Rav'],['פראג','Prague']],
+  30:[['נעכטן','yesterday'],['פראבלעם','problem'],['גוטע נייעס','good news'],['היינט','today'],['קיין פראבלעם','no problem']],
+  31:[['טשעק','check'],['צוועלף טויזנט דאלער','twelve thousand dollars'],['זעקל פון געלט','bag of money'],['גלייך','right away'],['פסח','Pesach']],
+  32:[['טאכטער','daughter'],['שיינע חתונה','beautiful wedding'],['נאך פסח','after Pesach'],['חתן','chosson'],['גלייך','right away']],
+  33:[['צופרידן','happy'],['מיר האבן גוטע נייעס','we have good news'],['גוטע נייעס','good news'],['גרויסע חתונה','big wedding'],['זלאטע דבורה','Zlata Devorah']],
+  34:[['צוועלף טויזנט דאלער','twelve thousand dollars'],['טשעק','check'],['גאנצע מעשה','whole story'],['זעקל פון געלט','bag of money'],['שענסטן פסח','best Pesach'],['גיטל','Gitl'],['תלמיד חכם','Torah scholar'],['חתונה','wedding']],
+  35:[['מענטשן','people'],['חתונה','wedding'],['מיסטער וויינמאן','Mr. Weinman'],['רב','Rav'],['מסדר קידושין','officiated the wedding'],['מזל טוב','Mazel tov']]
+};
 function storyParagraphs(g){
   const sec=config.sections[g],canonical=STORY_SECTION_PARAS[g]||[];
   const first=Number(sec?.first),last=Number(sec?.last);
   return canonical.filter(i=>i>=first&&i<=last&&C.paras[i]&&STORY_SUMMARIES[i]);
 }
-function storyKeyTerms(pIndex,para,g){
-  const vocab=C.words.filter(w=>w.paragraph===pIndex&&w.group===g).map(w=>w.yi);
-  const extra=STORY_KEY_TERMS.filter(t=>para.includes(t));
-  return [...new Set([...vocab,...extra])].sort((a,b)=>b.length-a.length).slice(0,4);
+function storyClues(pIndex,para,g){
+  const base=(STORY_CLUES[pIndex]||[]).filter(([yi])=>para.includes(yi)).map(([yi,en])=>({yi,en}));
+  const learned=C.words.filter(w=>w.paragraph===pIndex&&w.group===g&&para.includes(w.yi)).map(w=>({yi:w.yi,en:w.en}));
+  const out=[];
+  for(const clue of [...base,...learned]){
+    if(!out.some(x=>x.yi===clue.yi))out.push(clue);
+  }
+  return out.slice(0,8);
 }
 function appendHighlightedText(el,text,terms){
   let pos=0;
@@ -148,11 +183,18 @@ function storyQuizRender(){
     const again=node('button','Play again');again.type='button';again.onclick=()=>{storyQuiz={group,ids:shuffleClient(storyParagraphs(group)),idx:0,score:0,answered:false,wrong:new Set(),choices:null,choiceFor:null};storyQuizRender();focusStoryQuiz()};
     box.append(again);focusStoryQuiz();return;
   }
-  const pIndex=storyQuiz.ids[storyQuiz.idx],para=C.paras[pIndex],keys=storyKeyTerms(pIndex,para,storyQuiz.group);
+  const pIndex=storyQuiz.ids[storyQuiz.idx],para=C.paras[pIndex],clues=storyClues(pIndex,para,storyQuiz.group),keys=clues.map(c=>c.yi);
   box.append(node('div',`Story part ${storyQuiz.idx+1} of ${storyQuiz.ids.length}`,'practice-progress'),node('h2','What mainly happened here?'));
-  const directions=storySpeaker('What mainly happened here? Look for the highlighted Yiddish clues, then choose the answer that tells the main idea.','Hear the directions');directions.textContent='🔊 Hear directions';directions.className='story-directions';
-  const hint=node('p','Look for the highlighted Yiddish clues.','story-hint');box.append(directions,hint);
-  const text=node('div','','story-para');text.lang='yi';text.dir='rtl';appendHighlightedText(text,para,keys);box.append(text);
+  const directions=storySpeaker('What mainly happened here? Use the highlighted Yiddish clues and the clue words box, then choose the answer that tells the main idea.','Hear the directions');directions.textContent='🔊 Hear directions';directions.className='story-directions';
+  const hint=node('p','Use the highlighted words and the clue-word glossary.','story-hint');box.append(directions,hint);
+  const reading=node('div','','story-reading-layout');
+  const text=node('div','','story-para');text.lang='yi';text.dir='rtl';appendHighlightedText(text,para,keys);
+  const glossary=node('aside','','story-glossary');glossary.append(node('h3','Clue words'));
+  for(const clue of clues){
+    const row=node('div','','story-glossary-row'),yi=node('span',clue.yi,'story-glossary-yi'),en=node('span',clue.en,'story-glossary-en'),listen=storySpeaker(clue.en,'Hear '+clue.yi+' in English');
+    yi.lang='yi';yi.dir='rtl';listen.className='story-glossary-speak';row.append(yi,en,listen);glossary.append(row);
+  }
+  reading.append(text,glossary);box.append(reading);
   const answers=node('div','','story-answers'),feedback=node('p','','story-feedback');feedback.setAttribute('role','status');
   const choices=storyQuiz.choices&&storyQuiz.choiceFor===pIndex?storyQuiz.choices:storyChoices(pIndex,storyQuiz.group);
   storyQuiz.choices=choices;storyQuiz.choiceFor=pIndex;
