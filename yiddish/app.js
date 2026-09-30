@@ -1,8 +1,8 @@
 'use strict';
-const APP_BUILD='2026-09-29-story-detective-v5-short-excerpts';
+const APP_BUILD='2026-09-30-missing-word-v1';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
-let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null;
+let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null;
 const word=id=>C.words.find(w=>w.id===id),node=(tag,text,cls)=>{const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n};
 const status=p=>!p?'New':p.credits>=2?'Learned':'Practicing';
 const STORY_SUMMARIES={
@@ -48,13 +48,13 @@ function block(s){clearAdvance();$('lesson').hidden=true;$('practice').hidden=tr
 function open(g){return config&&g<config.unlocked[student.classId]&&config.sections[g].verified}
 function render(){
   if(!student||!config)return;
-  if(!round&&!flash&&!storyQuiz){$('words').hidden=false;$('toolbar').hidden=false;}
+  if(!round&&!flash&&!storyQuiz&&!sentenceGame){$('words').hidden=false;$('toolbar').hidden=false;}
   $('login').hidden=true;$('lesson').hidden=false;$('who').textContent=student.name+' · '+student.classId.toUpperCase();
   const ids=[...new Set(config.sections.flatMap(s=>s.words))];
   $('stats').textContent=`${ids.filter(id=>status(progress[id])==='Learned').length} learned · ${ids.filter(id=>status(progress[id])==='Practicing').length} practicing`;
   $('segments').replaceChildren();
-  config.sections.forEach((s,i)=>{const b=node('button',`${open(i)?'':'🔒 '}Section ${i+1}`,i===group?'active':'');b.type='button';b.disabled=!open(i);b.onclick=()=>{if(busy||pending)return;clearAdvance();group=i;showAll=false;round=null;flash=null;storyQuiz=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;render()};$('segments').append(b)});
-  $('words').replaceChildren();$('start').disabled=!open(group);$('flashStart').disabled=!open(group);$('storyQuizStart').disabled=!open(group);$('readStory').hidden=!open(group);$('readStory').href='story.html?section='+group;$('readStory').textContent='📖 Read the illustrated story — Section '+(group+1);
+  config.sections.forEach((s,i)=>{const b=node('button',`${open(i)?'':'🔒 '}Section ${i+1}`,i===group?'active':'');b.type='button';b.disabled=!open(i);b.onclick=()=>{if(busy||pending)return;clearAdvance();group=i;showAll=false;round=null;flash=null;storyQuiz=null;sentenceGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;render()};$('segments').append(b)});
+  $('words').replaceChildren();$('start').disabled=!open(group);$('flashStart').disabled=!open(group);$('sentenceStart').disabled=!open(group);$('storyQuizStart').disabled=!open(group);$('readStory').hidden=!open(group);$('readStory').href='story.html?section='+group;$('readStory').textContent='📖 Read the illustrated story — Section '+(group+1);
   $('title').textContent=showAll?'My vocabulary':`Section ${group+1} words`;
   const visible=showAll?config.sections.flatMap((s,i)=>open(i)?s.words:[]):open(group)?config.sections[group].words:[];
   for(const id of visible){const w=word(id);if(!w)continue;const card=node('article','','word'),st=status(progress[id]);card.append(node('span',st,'status '+st.toLowerCase()));const yi=node('div',w.yi,'yi');yi.lang='yi';card.append(yi,node('div',w.en));$('words').append(card)}
@@ -62,11 +62,12 @@ function render(){
   if(round&&open(round.group))question();
   if(flash&&open(flash.group))flashRender();else if(flash){flash=null}
   if(storyQuiz&&open(storyQuiz.group))storyQuizRender();else if(storyQuiz){storyQuiz=null}
+  if(sentenceGame&&open(sentenceGame.group))sentenceGameRender();else if(sentenceGame){sentenceGame=null}
 }
 async function refresh(){const s=await API.call('status');student=s.student;config=s.config;progress=s.progress;if(!open(group))group=Math.max(0,config.unlocked[student.classId]-1);round=(s.round&&!s.round.finished&&open(s.round.group))?s.round:null;if(round)group=round.group;render()}
 async function login(id,pin){const s=await API.call('login',{studentId:id,pin:pin.trim()});sessionStorage.setItem('yiddishSession',s.token);await refresh();message('Progress connected ✓')}
 $('loginForm').onsubmit=async e=>{e.preventDefault();$('signIn').disabled=true;try{await login($('name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''),$('pin').value);$('pin').value=''}catch(e){message(e.message)}finally{$('signIn').disabled=false}};
-$('all').onclick=()=>{if(busy||pending)return;clearAdvance();showAll=!showAll;round=null;flash=null;storyQuiz=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;render()};
+$('all').onclick=()=>{if(busy||pending)return;clearAdvance();showAll=!showAll;round=null;flash=null;storyQuiz=null;sentenceGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;render()};
 function shuffleClient(a){const b=a.slice();for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
 function focusFlash(){requestAnimationFrame(()=>$('flashcards')?.scrollIntoView({behavior:'smooth',block:'start'}))}
 
@@ -175,7 +176,7 @@ function recordStoryAnswer(pIndex,wrongCount){
 }
 $('storyQuizStart').onclick=()=>{
   if(busy||pending||!open(group))return;
-  clearAdvance();round=null;flash=null;$('practice').hidden=true;$('flashcards').hidden=true;
+  clearAdvance();round=null;flash=null;sentenceGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('sentencegame').hidden=true;
   const ids=shuffleClient(storyParagraphs(group));
   storyQuiz={group,ids,idx:0,score:0,answered:false,wrong:new Set(),choices:null,choiceFor:null};
   storyQuizRender();focusStoryQuiz();
@@ -234,9 +235,129 @@ function storyQuizRender(){
   box.append(answers,feedback);focusStoryQuiz();
 }
 
+
+function focusSentenceGame(){requestAnimationFrame(()=>$('sentencegame')?.scrollIntoView({behavior:'smooth',block:'start'}))}
+const SENTENCE_TEMPLATES={
+  'געלט':'ער האט אסאך ___ אין דעם זעקל.',
+  'טאכטער':'רב פסח האט א ___ מיטן נאמען גיטל.',
+  'גיין':'איך וויל ___ אהיים.',
+  'צוויי':'ער האט געארבעט ___ יאר.',
+  'יאר':'א ___ האט צוועלף חדשים.',
+  'צוריק':'נאך צוויי יאר איז ער געקומען ___.',
+  'קליין':'ער האט געהאט א ___ זעקל.',
+  'שטוב':'פאר פסח וויל ער גיין צו זיין ___.',
+  'נעמען':'איך וויל ___ דעם זעקל מיט מיר.',
+  'זען':'ער וויל ___ זיין משפחה.',
+  'צווישן':'דער זעקל ליגט ___ די פעסער.',
+  'געזוכט':'נאך שבת האט ער ___ זיין געלט.',
+  'געבן':'איך וויל ___ דיר די געלט.',
+  'שווער':'ער האט געארבעט זייער ___.',
+  'רעדן':'איך וויל ___ מיטן רב.',
+  'העלפן':'דער רב וועט אים ___.',
+  'טיר':'עמיצער קלאפט אויף די ___.',
+  'שרייבן':'דער רב וועט ___ א בריוו.',
+  'נעכטן':'___ איז ער געווען ביים רב.',
+  'ווער':'___ האט גענומען די געלט?',
+  'אנדערש':'אפשר האט עמיצער ___ עס גענומען.',
+  'יעצט':'___ האב איך א פראבלעם.',
+  'קלוג':'דער רב איז געווען זייער ___.',
+  'וויינען':'ער האט אנגעהויבן צו ___.',
+  'צאלן':'ער וועט ___ פאר די גאנצע חתונה.',
+  'גוטע':'איך האב ___ נייעס פאר דיר.',
+  'נייעס':'איך האב גוטע ___ פאר דיר.',
+  'היינט':'___ איז אלץ גוט.',
+  'גלייך':'איך וועל ___ קומען.',
+  'קומען':'איך וועל ___ צום רב.',
+  'שיינע':'גיטל וועט האבן א ___ חתונה.',
+  'מענטשן':'אסאך ___ זענען געקומען צו דער חתונה.'
+};
+function sentenceTemplate(w){
+  if(SENTENCE_TEMPLATES[w.yi])return SENTENCE_TEMPLATES[w.yi];
+  const para=String(C.paras[w.paragraph]||'');
+  const tokens=para.split(/\s+/).filter(Boolean),hit=tokens.findIndex(t=>t.includes(w.yi));
+  if(hit>=0){
+    const start=Math.max(0,hit-5),end=Math.min(tokens.length,hit+6);
+    let sample=tokens.slice(start,end).join(' ');
+    sample=sample.replace(w.yi,'___');
+    return (start>0?'… ':'')+sample+(end<tokens.length?' …':'');
+  }
+  return 'וועלכע ווארט פעלט דא? ___';
+}
+function sentenceAttempt(targetId,answerId){
+  if(!sentenceGame||sentenceGame.solved.has(targetId))return;
+  if(answerId===targetId){
+    sentenceGame.solved.add(targetId);sentenceGame.selected=null;sentenceGame.feedback='✓ גוט!';sentenceGame.feedbackKind='good';
+  }else{
+    sentenceGame.feedback='נישט דאס ווארט — פרוביר נאכאמאל.';sentenceGame.feedbackKind='bad';
+  }
+  sentenceGameRender();
+}
+$('sentenceStart').onclick=()=>{
+  if(busy||pending||!open(group))return;
+  clearAdvance();round=null;flash=null;storyQuiz=null;
+  $('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;
+  const ids=shuffleClient(config.sections[group].words.slice(0,8));
+  sentenceGame={group:group,ids:ids,setIndex:0,solved:new Set(),selected:null,feedback:'',feedbackKind:''};
+  sentenceGameRender();focusSentenceGame();
+};
+function sentenceGameRender(){
+  const box=$('sentencegame');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
+  const ids=sentenceGame.ids,sets=Math.max(1,Math.ceil(ids.length/4)),start=sentenceGame.setIndex*4,targets=ids.slice(start,start+4);
+  if(start>=ids.length){
+    box.append(node('div','🧩','round-check'),node('h2','Missing Word complete!'),node('p','You filled in all '+ids.length+' words.'));
+    const again=node('button','Play again');again.type='button';again.onclick=()=>{const nextIds=shuffleClient(config.sections[group].words.slice(0,8));sentenceGame={group:group,ids:nextIds,setIndex:0,solved:new Set(),selected:null,feedback:'',feedbackKind:''};sentenceGameRender();focusSentenceGame()};
+    const back=node('button','Back to my words');back.type='button';back.style.marginLeft='10px';back.onclick=()=>{sentenceGame=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
+    box.append(again,back);focusSentenceGame();return;
+  }
+
+  const top=node('div','','sentence-topbar'),back=node('button','← Back to my words','sentence-exit');back.type='button';
+  back.onclick=()=>{sentenceGame=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
+  top.append(back);box.append(top);
+  box.append(node('div','Set '+(sentenceGame.setIndex+1)+' of '+sets,'practice-progress'),node('h2','Put in the missing word'));
+  box.append(node('p','Drag the correct Yiddish word into each blank. All 8 section words are in the word bank.','sentence-hint'));
+
+  const bank=node('div','','sentence-bank');
+  bank.setAttribute('aria-label','Word bank');
+  for(const id of shuffleClient(ids)){
+    const w=word(id);if(!w)continue;
+    const used=sentenceGame.solved.has(id)&&targets.includes(id);
+    const b=node('button',w.yi,'sentence-word'+(sentenceGame.selected===id?' selected':'')+(used?' used':''));b.type='button';b.lang='yi';b.dir='rtl';b.draggable=!used;b.disabled=used;
+    b.dataset.wordId=id;
+    b.onclick=()=>{if(used)return;sentenceGame.selected=sentenceGame.selected===id?null:id;sentenceGame.feedback=sentenceGame.selected?'Now click a blank, or drag the word.':'';sentenceGame.feedbackKind='';sentenceGameRender()};
+    b.ondragstart=e=>{if(used){e.preventDefault();return}sentenceGame.selected=id;e.dataTransfer.setData('text/plain',id);e.dataTransfer.effectAllowed='copy'};
+    bank.append(b);
+  }
+  box.append(bank);
+
+  const board=node('div','','sentence-board');
+  targets.forEach((targetId,i)=>{
+    const w=word(targetId);if(!w)return;
+    const card=node('article','','sentence-card'),num=node('span',String(i+1),'sentence-number'),line=node('div','','sentence-line');line.lang='yi';line.dir='rtl';
+    const template=sentenceTemplate(w),parts=template.split('___'),solved=sentenceGame.solved.has(targetId);
+    line.append(document.createTextNode(parts[0]||''));
+    const blank=node('button',solved?w.yi:'________','sentence-blank'+(solved?' solved':''));blank.type='button';blank.lang='yi';blank.dir='rtl';blank.disabled=solved;
+    blank.setAttribute('aria-label',solved?'Correct word: '+w.yi:'Missing word');
+    blank.ondragover=e=>{if(!solved){e.preventDefault();blank.classList.add('drag-over')}};
+    blank.ondragleave=()=>blank.classList.remove('drag-over');
+    blank.ondrop=e=>{e.preventDefault();blank.classList.remove('drag-over');sentenceAttempt(targetId,e.dataTransfer.getData('text/plain'))};
+    blank.onclick=()=>{if(sentenceGame.selected)sentenceAttempt(targetId,sentenceGame.selected)};
+    line.append(blank,document.createTextNode(parts.slice(1).join('___')||''));
+    card.append(num,line);board.append(card);
+  });
+  box.append(board);
+
+  const feedback=node('p',sentenceGame.feedback||'','sentence-feedback '+(sentenceGame.feedbackKind==='good'?'feedback-correct':sentenceGame.feedbackKind==='bad'?'feedback-wrong':''));feedback.setAttribute('role','status');box.append(feedback);
+  const allDone=targets.length>0&&targets.every(id=>sentenceGame.solved.has(id));
+  if(allDone){
+    const next=node('button',sentenceGame.setIndex+1>=sets?'Finish →':'Next 4 sentences →','sentence-next');next.type='button';
+    next.onclick=()=>{sentenceGame.setIndex++;sentenceGame.solved=new Set();sentenceGame.selected=null;sentenceGame.feedback='';sentenceGame.feedbackKind='';sentenceGameRender();focusSentenceGame()};
+    box.append(next);
+  }
+}
+
 $('flashStart').onclick=()=>{
   if(busy||pending||!open(group))return;
-  clearAdvance();round=null;$('practice').hidden=true;
+  clearAdvance();round=null;storyQuiz=null;sentenceGame=null;$('practice').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;
   flash={group,ids:shuffleClient(config.sections[group].words),idx:0,flipped:false};
   flashRender();focusFlash();
 };
@@ -264,7 +385,7 @@ function flashRender(){
   actions.append(dontKnow,know);
   box.append(actions);
 }
-$('start').onclick=async()=>{if(busy)return;clearAdvance();busy=true;$('start').disabled=true;try{message('');const s=await API.call('start',{group});round=s.round;pending=null;$('practice').hidden=false;question();focusPractice()}catch(e){message(e.message)}finally{busy=false;$('start').disabled=!open(group)}};
+$('start').onclick=async()=>{if(busy)return;clearAdvance();flash=null;storyQuiz=null;sentenceGame=null;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;busy=true;$('start').disabled=true;try{message('');const s=await API.call('start',{group});round=s.round;pending=null;$('practice').hidden=false;question();focusPractice()}catch(e){message(e.message)}finally{busy=false;$('start').disabled=!open(group)}};
 function question(){
   clearAdvance();
   const box=$('practice');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
