@@ -46,8 +46,8 @@
 
 <div class="name-box" id="nameBox">
   <h2>Student Login</h2>
-  <p class="login-note">Use the same student name and Class PIN as Posuk Practice and Shorashim.</p>
-  <label for="classPinInput">Class PIN</label>
+  <p class="login-note">Use the same student name and passcode as Fun Torah Tools.</p>
+  <label for="classPinInput">Passcode</label>
   <input type="password" id="classPinInput" placeholder="Ask your teacher" maxlength="20" inputmode="numeric" autocomplete="off" />
   <label for="studentNameInput">Your name</label>
   <input type="text" id="studentNameInput" placeholder="Type your name" maxlength="30" autocomplete="name" />
@@ -155,28 +155,17 @@ db.ref('b3Games/siteSettings').on('value', snap => {
 // This is the exact same student-access source used by Posuk Practice and
 // Shorashim: one shared Class PIN plus the teacher-approved student roster.
 async function checkStudentAccess(name, pin) {
-  const slug = slugify(name);
-  if (!slug) return { ok: false, reason: 'Please type your name.' };
-
-  const [pinSnap, allowedSnap] = await Promise.all([
-    db.ref('posukPractice/settings/classPin').once('value'),
-    db.ref('posukPractice/allowedStudents/' + slug).once('value')
-  ]);
-
-  const realPin = pinSnap.val();
-  if (realPin && String(pin).trim() !== String(realPin).trim()) {
-    return { ok: false, reason: 'Incorrect PIN. Ask your teacher.' };
+  const slug=slugify(name);if(!slug)return {ok:false,reason:'Please type your name.'};
+  const profileSnap=await db.ref('b3Games/students/'+slug+'/profile').once('value');
+  let profile=profileSnap.val();
+  if(!profile){
+    const legacySnap=await db.ref('posukPractice/allowedStudents/'+slug).once('value');
+    if(!legacySnap.exists())return {ok:false,reason:'Ask your teacher to add your name first.'};
+    const legacy=legacySnap.val()||{};profile={name:legacy.name||name,passcode:String(legacy.passcode||'5770'),active:legacy.active!==false};
   }
-  if (!allowedSnap.exists()) {
-    return { ok: false, reason: 'Ask your teacher to add your name first.' };
-  }
-
-  const allowedData = allowedSnap.val();
-  const displayName = allowedData && typeof allowedData === 'object' && allowedData.name
-    ? String(allowedData.name)
-    : name.trim();
-
-  return { ok: true, slug, displayName };
+  if(profile.active===false)return {ok:false,reason:'Your student access is turned off. Ask your teacher.'};
+  if(String(profile.passcode||'').trim()!==String(pin).trim())return {ok:false,reason:'Incorrect passcode. Ask your teacher.'};
+  return {ok:true,slug,displayName:String(profile.name||name.trim())};
 }
 
 function enterGame(displayName, studentId) {
@@ -228,26 +217,20 @@ async function joinGame() {
 }
 
 async function restoreSharedStudentLogin() {
-  const savedId = localStorage.getItem('posukPractice_studentId');
-  const savedName = localStorage.getItem('posukPractice_studentName');
-  if (!savedId || !savedName) return;
-
-  try {
-    const allowedSnap = await db.ref('posukPractice/allowedStudents/' + savedId).once('value');
-    if (!allowedSnap.exists()) {
-      localStorage.removeItem('posukPractice_studentId');
-      localStorage.removeItem('posukPractice_studentName');
-      return;
+  const savedId=localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId');
+  const savedName=localStorage.getItem('b3Games_studentName')||localStorage.getItem('posukPractice_studentName');
+  if(!savedId||!savedName)return;
+  try{
+    const profileSnap=await db.ref('b3Games/students/'+savedId+'/profile').once('value');
+    let profile=profileSnap.val();
+    if(!profile){
+      const legacySnap=await db.ref('posukPractice/allowedStudents/'+savedId).once('value');
+      if(!legacySnap.exists())return;
+      profile=legacySnap.val()||{};
     }
-
-    const allowedData = allowedSnap.val();
-    const displayName = allowedData && typeof allowedData === 'object' && allowedData.name
-      ? String(allowedData.name)
-      : savedName;
-    enterGame(displayName, savedId);
-  } catch (error) {
-    console.warn('Could not restore shared student login:', error);
-  }
+    if(profile.active===false)return;
+    enterGame(profile.name?String(profile.name):savedName,savedId);
+  }catch(error){console.warn('Could not restore shared student login:',error);}
 }
 
 document.getElementById('switchStudentBtn').addEventListener('click', () => {
