@@ -83,8 +83,8 @@
   /* Friendly student nudges for important daily practice tools. */
   .game-card{position:relative;overflow:visible}
   .student-nudge{
-    position:relative;z-index:20;order:-1;align-self:center;
-    width:max-content;max-width:180px;margin:0 0 12px;padding:9px 11px;
+    position:absolute;z-index:20;left:50%;bottom:calc(100% + 10px);transform:translateX(-50%);
+    width:max-content;max-width:180px;margin:0;padding:9px 11px;
     border:2px solid #93c5fd;border-radius:14px;
     background:#fff;color:#1e3a8a;font-size:13px;font-weight:800;line-height:1.25;
     text-align:left;box-shadow:0 8px 20px rgba(15,23,42,.16);
@@ -96,8 +96,8 @@
     transform:rotate(45deg);
   }
   .student-nudge-wave{display:inline-block;margin-right:3px;animation:nudgeWave 1.4s ease-in-out 2;transform-origin:70% 70%}
-  @keyframes nudgeHello{from{opacity:0;transform:translateY(8px) scale(.88)}to{opacity:1;transform:translateY(0) scale(1)}}
-  @keyframes nudgeFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  @keyframes nudgeHello{from{opacity:0;transform:translate(-50%,8px) scale(.88)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+  @keyframes nudgeFloat{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-3px)}}
   @keyframes nudgeWave{0%,100%{transform:rotate(0)}25%{transform:rotate(18deg)}50%{transform:rotate(-10deg)}75%{transform:rotate(14deg)}}
   @media(max-width:560px){
     .student-nudge{max-width:150px;font-size:12px;padding:8px 9px}
