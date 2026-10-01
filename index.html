@@ -320,7 +320,21 @@
       if(match)return String(match.classId).toLowerCase();
     }catch(e){}
     const stored=(data&&typeof data==="object")?String(data.classId||"").toLowerCase():"";
-    return ["et","wt"].includes(stored)?stored:"";
+    if(["et","wt"].includes(stored))return stored;
+
+    // Compatibility repair for older approved-student rows that predate
+    // classId. Infer membership from the teacher's existing ET/WT student
+    // settings in Firebase, never from a roster embedded in source code.
+    try{
+      const settingsSnap=await db.ref("b3Games/siteSettings").once("value");
+      const settings=settingsSnap.val()||{};
+      for(const classId of ["et","wt"]){
+        const bucket=settings.classes?.[classId]||{};
+        const overrides=bucket.studentOverrides||bucket.students||{};
+        if(overrides&&Object.prototype.hasOwnProperty.call(overrides,studentId))return classId;
+      }
+    }catch(e){}
+    return "";
   }
 
   const el=id=>document.getElementById(id);
@@ -810,7 +824,7 @@
       const snap=await db.ref("posukPractice/allowedStudents/"+id).once("value");
       if(!snap.exists()){showLogin();return;}
       const d=snap.val()||{};
-      const restoredClassId=resolvedStudentClass(id,d);
+      const restoredClassId=await resolvedStudentClass(id,d);
       if(!["et","wt"].includes(restoredClassId)){showLogin();return;}
       enterStudent({id:id,name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
     }catch(e){console.warn(e);showLogin();}
