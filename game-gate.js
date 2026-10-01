@@ -153,13 +153,13 @@
           '<div style="font-size:58px;margin-bottom:14px">🔒</div>' +
           '<h1 id="b3GateTitle" style="margin:0 0 12px;font-size:32px"></h1>' +
           '<p id="b3GateMessage" style="margin:0 0 24px;font-size:18px;line-height:1.5;color:#4b5563"></p>' +
-          '<a href="' + String(backHref).replace(/&/g,"&amp;").replace(/"/g,"&quot;") + '" style="display:inline-block;padding:12px 20px;border-radius:12px;background:#1f2937;color:white;text-decoration:none;font-weight:700">Back to B3 Games</a>' +
+          '<a href="' + String(backHref).replace(/&/g,"&amp;").replace(/"/g,"&quot;") + '" style="display:inline-block;padding:12px 20px;border-radius:12px;background:#1f2937;color:white;text-decoration:none;font-weight:700">Back to Fun Torah Tools</a>' +
         '</div>';
       (document.body || document.documentElement).appendChild(overlay);
     }
     var t = overlay.querySelector("#b3GateTitle");
     var m = overlay.querySelector("#b3GateMessage");
-    if (t) t.textContent = title || "B3 Games is locked";
+    if (t) t.textContent = title || "Fun Torah Tools is locked";
     if (m) m.textContent = message || "Your class cannot use this activity right now.";
   }
 
@@ -173,7 +173,7 @@
 
   function getStoredClass() {
     var c = localStorage.getItem("b3Games_studentClass") || localStorage.getItem("weeklyQuiz_classId") || "";
-    return c === "et" || c === "wt" ? c : "";
+    return String(c || "").trim();
   }
 
   function fetchJson(url) {
@@ -228,15 +228,15 @@
       var c = "";
       Object.keys(memberships || {}).some(function (key) {
         var m = memberships[key] || {};
-        if (m.active !== false && m.workspaceId === WORKSPACE_ID && (m.classId === "et" || m.classId === "wt")) {
-          c = m.classId;
+        if (m.active !== false && m.workspaceId === WORKSPACE_ID && String(m.classId || "").trim()) {
+          c = String(m.classId).trim();
           return true;
         }
         return false;
       });
       if (c) return c;
       return fetchJson(legacyUrl).then(function (data) {
-        return data && (data.classId === "et" || data.classId === "wt") ? data.classId : "";
+        return data && data.classId ? String(data.classId).trim() : "";
       });
     }).then(function (c) {
       studentClassId = c || "";
@@ -353,7 +353,7 @@
     if (studentClassId && !gameIsEnabledForClass(lastSettings, studentClassId)) {
       showClosed(
         "This activity is turned off",
-        "This activity is disabled for your class in Teacher Tools. Rabbi Cohen can turn it back on from B3 Games."
+        "This activity is disabled for your class in Teacher Tools. Your teacher can turn it back on from Fun Torah Tools."
       );
       return;
     }
@@ -376,21 +376,25 @@
       return;
     }
 
-    if (lastSettings.siteEnabled === false) {
-      showClosed("B3 Games is closed", "B3 Games is locked right now. Rabbi Cohen can give you access to a specific activity.");
+    if (lastSettings.siteEnabled === false && (studentClassId === "et" || studentClassId === "wt")) {
+      showClosed("B3 Games is closed", "B3 Games is locked right now. Your teacher can give you access to a specific activity.");
       return;
     }
 
     if (!studentClassId) {
-      showClosed("Please sign in first", "Go back to B3 Games and sign in with your name and Class PIN so the site knows whether you are in ET or WT.");
+      showClosed("Please sign in first", "Go back to Fun Torah Tools and sign in again so the site can verify your class.");
       return;
     }
 
+    if (studentClassId !== "et" && studentClassId !== "wt") {
+      showOpen();
+      return;
+    }
     var info = classIsOpen(lastSettings, studentClassId);
     if (info.open) {
       showOpen();
     } else {
-      showClosed((studentClassId === "et" ? "ET" : "WT") + " is locked right now", "Rabbi Cohen can press Unlock Now for your class. This page checks again every few seconds.");
+      showClosed((studentClassId === "et" ? "ET" : "WT") + " is locked right now", "Your teacher can press Unlock Now for your class. This page checks again every few seconds.");
     }
   }
 
@@ -412,7 +416,7 @@
         // controls. Show a useful message and retry automatically.
         showClosed(
           "Having trouble checking access",
-          "We could not reach the B3 access settings yet. This page will try again automatically in a few seconds."
+          "We could not reach the Fun Torah Tools access settings yet. This page will try again automatically in a few seconds."
         );
       }
     }).finally(function () {
