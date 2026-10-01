@@ -112,7 +112,7 @@ function scaleStudentPreview(){
   previewFrame.style.width=desktopWidth+"px";
   previewFrame.style.height=desktopHeight+"px";
 }
-previewFrame.addEventListener("load",scaleStudentPreview);
+previewFrame.addEventListener("load",()=>{\n  try{\n    const d=previewFrame.contentDocument;\n    const style=d.createElement("style");\n    style.textContent=`#adminAccessButton,#adminPanel,#teacherToolsSection,#approvalCenterButton,.version-modal,.approval-center-modal{display:none!important}`;\n    d.head.appendChild(style);\n    const panel=d.getElementById("adminPanel"); if(panel) panel.classList.add("hidden");\n    const tools=d.getElementById("teacherToolsSection"); if(tools) tools.classList.add("hidden");\n    d.body.classList.remove("admin-panel-open");\n  }catch(e){console.warn("Could not apply student preview mode",e);}\n  scaleStudentPreview();\n});
 window.addEventListener("resize",scaleStudentPreview);
 document.getElementById("refreshPreview").addEventListener("click",()=>previewFrame.contentWindow.location.reload());
 frame.addEventListener("load",()=>{
