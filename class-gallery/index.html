@@ -330,7 +330,7 @@ if(window.__galleryBootIssue){
 if(!window.THREE){
   setTimeout(()=>showGalleryStartupError(
     'The 3D hallway could not load',
-    'This device or school network blocked the 3D library. Please press Try Again. If it continues, tell Rabbi Cohen.'
+    'This device or school network blocked the 3D library. Please press Try Again. If it continues, tell your teacher.'
   ),0);
 }
 
@@ -418,7 +418,13 @@ const PRESENCE_STUDENTS={
   simcha_cohen:{name:'Rabbi Cohen',classId:(['et','wt'].includes(localStorage.getItem('b3Games_studentClass'))?localStorage.getItem('b3Games_studentClass'):'et')}
 };
 const presenceStudentId=localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId')||'';
+const storedPresenceClass=String(localStorage.getItem('b3Games_studentClass')||'').trim();
+const storedPresenceName=String(localStorage.getItem('b3Games_studentName')||localStorage.getItem('posukPractice_studentName')||'').trim();
+if(presenceStudentId&&!PRESENCE_STUDENTS[presenceStudentId]&&storedPresenceClass){
+  PRESENCE_STUDENTS[presenceStudentId]={name:storedPresenceName||presenceStudentId,classId:storedPresenceClass};
+}
 const presenceProfile=PRESENCE_STUDENTS[presenceStudentId]||null;
+const isLegacyB3Class=!!presenceProfile&&['et','wt'].includes(String(presenceProfile.classId||'').toLowerCase());
 const presenceSessionId=sessionStorage.getItem('classGalleryPresenceSession')||(((window.crypto&&window.crypto.randomUUID?window.crypto.randomUUID():('s'+Date.now()+Math.random().toString(36).slice(2)))).replace(/[^a-zA-Z0-9_-]/g,''));
 sessionStorage.setItem('classGalleryPresenceSession',presenceSessionId);
 const presenceRoot=window.firebase?firebase.database().ref('b3Games/classGalleryPresence'):null;
@@ -557,7 +563,7 @@ function createHallwayRenderer(){
     catch(err){lastError=err;console.warn('Hallway WebGL attempt failed:',option,err)}
   }
   throw new Error('This browser could not create a WebGL context after three attempts. '+
-    'Please close other 3D tabs and press Try Again. If it still fails, tell Rabbi Cohen.'+
+    'Please close other 3D tabs and press Try Again. If it still fails, tell your teacher.'+
     (lastError?.message?' ('+lastError.message+')':''));
 }
 
@@ -1336,7 +1342,7 @@ function ensureRewardsClient(){
 async function ensureRewardsSignedIn(){
   const auth=ensureRewardsClient();if(auth.currentUser)return auth.currentUser;
   const id=presenceStudentId,name=presenceProfile?.name||localStorage.getItem('b3Games_studentName')||'',pin=localStorage.getItem('b3Games_classPin')||'';
-  if(!id||!name||!pin)throw new Error('Sign in through the B3 Games homepage first so your points can be connected.');
+  if(!id||!name||!pin)throw new Error('Sign in through Fun Torah Tools first so your points can be connected.');
   const r=await fetch(TAG_REWARDS_LOGIN_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({b3StudentId:id,name,pin})});
   const j=await r.json().catch(()=>({}));if(!r.ok||!j.customToken)throw new Error(j.error||'Could not connect your points.');
   await auth.signInWithCustomToken(j.customToken);return auth.currentUser;
@@ -1386,7 +1392,11 @@ function stopTagState(){
   tagClassRef=null;tagStateHandler=null;tagState={};tagAttemptBusy=false;lastSeenTagEvent='';updateTagHud();
   remoteAvatars.forEach(entry=>{setRemoteItMarker(entry,false);setRemoteHunterMarker(entry,false);});
 }
-function tagClassId(){return tagMode==='manhunt'?'manhunt':'all';}
+function tagClassId(){
+  if(isLegacyB3Class||teacherPresenceViewer)return tagMode==='manhunt'?'manhunt':'all';
+  const classId=String(presenceProfile?.classId||'').trim();
+  return (tagMode==='manhunt'?'manhunt_':'class_')+classId.replace(/[^a-zA-Z0-9_-]/g,'_');
+}
 function normalizedTagMode(data){return data&&data.tagMode==='manhunt'?'manhunt':'regular';}
 function studentInTagMode(data,mode=tagMode){return !!data?.playingTag&&normalizedTagMode(data)===mode;}
 function isManhuntHunter(studentId,state=tagState){return !!(state&&state.hunters&&state.hunters[studentId]);}
@@ -1726,7 +1736,7 @@ function restartPresenceListener(){
 function startLivePresence(){
   if(!scene||(!presenceProfile&&!teacherPresenceViewer)||!presenceRoot||!livePresenceEnabled||presenceStarted)return;
   presenceStarted=true;
-  const combined=teacherPresenceViewer||tagOptedIn;
+  const combined=teacherPresenceViewer||(tagOptedIn&&isLegacyB3Class);
   presenceClassRef=combined?presenceRoot:presenceRoot.child(presenceProfile.classId);
   if(!teacherPresenceViewer||(isTeacher&&tagOptedIn)){
     const ownParent=teacherPresenceViewer?presenceRoot.child('all'):presenceRoot.child(presenceProfile.classId);
@@ -2068,7 +2078,7 @@ if(window.THREE){
     console.error('3D gallery startup failed:',err);
     showGalleryStartupError(
       'The 3D hallway could not start',
-      (err && err.message ? err.message + ' — ' : '') + 'Please press Try Again. If this keeps happening, tell Rabbi Cohen.'
+      (err && err.message ? err.message + ' — ' : '') + 'Please press Try Again. If this keeps happening, tell your teacher.'
     );
   }
 }
