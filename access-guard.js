@@ -269,6 +269,14 @@
         throw new Error("B3 site settings did not load.");
       }
 
+      // Carry the whole-class workspace identity even when a student opens a
+      // tool directly. This is separate from the existing ET/WT classId.
+      try {
+        if (window.B3SiteSettings.workspaceId) {
+          localStorage.setItem("b3Games_workspaceId", window.B3SiteSettings.workspaceId);
+        }
+      } catch (error) {}
+
       await beginTeacherBypassWatch();
       await resolveStudentClass();
 
