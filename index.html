@@ -265,28 +265,33 @@
       <div id="classControls"></div>
 
       <h3>Class management</h3>
-      <p class="admin-message">Create classes and manage which students belong to each class. Students may belong to more than one class.</p>
+      <p class="admin-message">Choose a class to see its students. Passcodes and access can be managed right from the list.</p>
       <div class="override-box" id="classManagementBox">
-        <label for="manageClassSelect">Class</label>
-        <select id="manageClassSelect" class="override-student-select"></select>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-          <input id="newClassName" type="text" placeholder="New class name" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
-          <button id="addClassButton" class="admin-action" type="button" style="margin:0">Add class</button>
+        <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+          <div style="flex:1;min-width:180px"><label for="manageClassSelect">Class</label><select id="manageClassSelect" class="override-student-select"></select></div>
+          <button id="showAddStudentButton" class="admin-action" type="button" style="margin:0">+ Add Student</button>
+          <button id="showClassToolsButton" class="admin-action secondary" type="button" style="margin:0">Class Options</button>
         </div>
-        <label style="display:block;margin-top:12px">Create / manage B3 student</label>
-        <div style="display:grid;grid-template-columns:1fr 110px;gap:8px;margin-top:7px">
-          <input id="managedStudentName" type="text" placeholder="Student name" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
-          <input id="managedStudentPasscode" type="text" inputmode="numeric" placeholder="Passcode" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
+        <div id="classToolsArea" class="hidden" style="margin-top:12px;padding-top:12px;border-top:1px solid #e5e7eb">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <input id="newClassName" type="text" placeholder="New class name" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
+            <button id="addClassButton" class="admin-action" type="button" style="margin:0">Add class</button>
+          </div>
         </div>
-        <button id="createManagedStudentButton" class="admin-action secondary" type="button">Create B3 student</button>
-        <label for="classStudentSelect" style="display:block;margin-top:12px">Existing student</label>
-        <select id="classStudentSelect" class="override-student-select"></select>
-        <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
-          <input id="editManagedStudentPasscode" type="text" inputmode="numeric" placeholder="Student passcode" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
-          <button id="saveManagedStudentPasscodeButton" class="admin-action secondary" type="button" style="margin:0">Save passcode</button>
+        <div id="addStudentArea" class="hidden" style="margin-top:12px;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px">
+          <strong>Add a student</strong>
+          <div style="display:grid;grid-template-columns:1fr 110px;gap:8px;margin-top:9px">
+            <input id="managedStudentName" type="text" placeholder="Student name" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
+            <input id="managedStudentPasscode" type="text" inputmode="numeric" placeholder="Passcode" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
+          </div>
+          <button id="createManagedStudentButton" class="admin-action secondary" type="button">Create Student</button>
+          <div style="margin:10px 0;text-align:center;color:#64748b;font-size:12px;font-weight:700">OR ADD AN EXISTING STUDENT</div>
+          <select id="classStudentSelect" class="override-student-select"></select>
+          <button id="addStudentToClassButton" class="admin-action secondary" type="button">Add Existing Student to Class</button>
         </div>
-        <button id="addStudentToClassButton" class="admin-action secondary" type="button">Add student to selected class</button>
-        <div id="classMemberList" style="margin-top:10px"></div>
+        <div id="studentListHeading" style="display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px;gap:8px;padding:14px 10px 7px;margin-top:12px;color:#64748b;font-size:12px;font-weight:900;text-transform:uppercase"><span>Name</span><span>Passcode</span><span>Access</span><span></span></div>
+        <div id="classMemberList"></div>
+        <div style="display:none"><input id="editManagedStudentPasscode"><button id="saveManagedStudentPasscodeButton" type="button"></button></div>
         <div id="classManagementStatus" class="override-saving" aria-live="polite"></div>
       </div>
 
@@ -445,7 +450,10 @@
     studentSel.innerHTML=Object.keys(students).sort((a,b)=>String(students[a]?.profile?.name||a).localeCompare(String(students[b]?.profile?.name||b))).map(id=>'<option value="'+id+'">'+(students[id]?.profile?.name||id)+'</option>').join("");
     if(priorStudent&&students[priorStudent])studentSel.value=priorStudent;
     const selected=classSel.value, members=(classes[selected]&&classes[selected].members)||{};
-    el("classMemberList").innerHTML=Object.keys(members).length?Object.keys(members).map(id=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #e5e7eb"><span>'+(members[id].name||students[id]?.profile?.name||id)+'</span><button type="button" data-remove-member="'+id+'" style="border:0;background:none;color:#b91c1c;cursor:pointer">Remove</button></div>').join(""):'<div class="admin-message">No students in this class yet.</div>';
+    el("classMemberList").innerHTML=Object.keys(members).length?Object.keys(members).sort((a,b)=>String(members[a]?.name||students[a]?.profile?.name||a).localeCompare(String(members[b]?.name||students[b]?.profile?.name||b))).map(id=>{
+      const profile=students[id]?.profile||{}, name=members[id]?.name||profile.name||id, passcode=String(profile.passcode||""), active=profile.active!==false;
+      return '<div style="display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px;gap:8px;align-items:center;padding:10px;border-top:1px solid #e5e7eb"><strong>'+name+'</strong><input data-student-passcode="'+id+'" value="'+passcode.replace(/"/g,"&quot;")+'" inputmode="numeric" style="width:100%;padding:7px 8px;border:1px solid #cbd5e1;border-radius:8px"><button type="button" data-toggle-student="'+id+'" data-active="'+active+'" style="border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer;background:'+(active?'#dcfce7':'#fee2e2')+';color:'+(active?'#166534':'#991b1b')+'">'+(active?'Enabled':'Blocked')+'</button><button type="button" data-save-student="'+id+'" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer">Save</button></div>';
+    }).join(""):'<div class="admin-message" style="padding:14px 10px">No students in this class yet. Use “Add Student” above.</div>';
     const selectedStudent=studentSel.value;
     if(el("editManagedStudentPasscode"))el("editManagedStudentPasscode").value=String(students[selectedStudent]?.profile?.passcode||"");
     el("teacherList").innerHTML=Object.keys(teachers).map(uid=>'<div style="padding:5px 0;border-bottom:1px solid #e5e7eb">'+(teachers[uid].email||uid)+' <strong>('+(teachers[uid].role||"teacher")+')</strong></div>').join("")||'<div class="admin-message">No teachers yet.</div>';
@@ -1401,7 +1409,23 @@
   el("addClassButton").addEventListener("click",addManagedClass);
   el("addStudentToClassButton").addEventListener("click",addStudentToManagedClass);
   el("addTeacherButton").addEventListener("click",addManagedTeacher);
-  el("classMemberList").addEventListener("click",e=>{const b=e.target.closest("[data-remove-member]");if(b)removeStudentFromManagedClass(b.dataset.removeMember);});
+  el("showAddStudentButton").addEventListener("click",()=>el("addStudentArea").classList.toggle("hidden"));
+  el("showClassToolsButton").addEventListener("click",()=>el("classToolsArea").classList.toggle("hidden"));
+  el("classMemberList").addEventListener("click",async e=>{
+    const save=e.target.closest("[data-save-student]");
+    const toggle=e.target.closest("[data-toggle-student]");
+    if(save){
+      const id=save.dataset.saveStudent, input=el("classMemberList").querySelector('[data-student-passcode="'+id+'"]'), passcode=input?input.value.trim():"";
+      if(!passcode){el("classManagementStatus").textContent="Passcode cannot be blank.";return;}
+      await db.ref("b3Games/students/"+id+"/profile").update({passcode,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP});
+      el("classManagementStatus").textContent="Passcode saved."; await loadClassManagement();
+    }
+    if(toggle){
+      const id=toggle.dataset.toggleStudent, active=toggle.dataset.active!=="true";
+      await db.ref("b3Games/students/"+id+"/profile/active").set(active);
+      el("classManagementStatus").textContent=active?"Student access enabled.":"Student access blocked."; await loadClassManagement();
+    }
+  });
   el("adminPasswordInput").addEventListener("keydown",e=>{if(e.key==="Enter")unlockAdminPassword();});
   el("signInButton").addEventListener("click",()=>settingsApi.signInWithGoogle().catch(e=>{
     const detail=(e&&e.code)?e.code:(e&&e.message)?e.message:"Unknown error";
