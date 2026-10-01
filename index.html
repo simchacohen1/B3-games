@@ -1110,7 +1110,9 @@
   function renderAdminPanel(){
     syncAdminPanelLayout();
     const signedIn=Boolean(currentUser);
-    el("adminPanel").classList.add("hidden");
+    const dedicatedAdminPage=new URLSearchParams(window.location.search).get("adminPage")==="1";
+    if(!dedicatedAdminPage)el("adminPanel").classList.add("hidden");
+    else el("adminPanel").classList.remove("hidden");
     syncAdminPanelLayout();
     el("adminAccessButton").textContent=isAuthorizedAdmin ? "Teacher Tools" : "Admin";
 
