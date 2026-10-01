@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fun Torah Tools — Owner Admin</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#1f2937}header{background:#172033;color:#fff;padding:22px 28px;display:flex;justify-content:space-between;align-items:center;gap:18px}h1{margin:0;font-size:25px}.sub{color:#b9c6da;font-size:13px;margin-top:5px}.back{color:#fff;text-decoration:none;font-weight:800;background:#2b3953;padding:10px 14px;border-radius:10px}main{max-width:1050px;margin:28px auto;padding:0 18px}.notice{background:#eef2ff;border:1px solid #c7d2fe;border-radius:15px;padding:15px 17px;margin-bottom:20px;line-height:1.45}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:18px}.card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:20px;box-shadow:0 5px 16px rgba(15,23,42,.06)}.icon{font-size:34px}.card h2{font-size:19px;margin:10px 0 6px}.card p{color:#64748b;line-height:1.45;margin:0}.status{margin-top:13px;font-size:12px;font-weight:900;color:#6d28d9;background:#f5f3ff;border-radius:999px;display:inline-block;padding:6px 9px}.gate{max-width:520px;margin:70px auto;background:#fff;border-radius:20px;padding:28px;box-shadow:0 10px 30px rgba(15,23,42,.12);text-align:center}.gate button{border:0;border-radius:10px;padding:11px 15px;background:#2563eb;color:#fff;font-weight:900;cursor:pointer}.hidden{display:none!important}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script src="firebase-config.js?v=20261001-teacherauth"></script>
+</head><body>
+<header><div><h1>Fun Torah Tools — Owner Admin</h1><div class="sub">Platform-wide management</div></div><a class="back" href="index.html">← Back to B3</a></header>
+<main>
+<div id="gate" class="gate"><h2>Owner access</h2><p id="gateMsg">Checking your signed-in Google account…</p><button id="signIn" class="hidden" type="button">Sign in with Google</button></div>
+<div id="ownerArea" class="hidden">
+<div class="notice"><strong>Owner level:</strong> this area is separate from the B3 Teacher Center. B3 remains your first class/workspace while Fun Torah Tools grows to support additional teachers and classes.</div>
+<div class="grid">
+<div class="card"><div class="icon">👨‍🏫</div><h2>Teachers</h2><p>Create and manage Fun Torah Tools teacher accounts and decide which platform tools each teacher may use.</p><span class="status">Next to build</span></div>
+<div class="card"><div class="icon">🏫</div><h2>Classes & Workspaces</h2><p>Create independent classroom spaces. Each teacher manages students and settings inside the classes assigned to them.</p><span class="status">B3 is the first workspace</span></div>
+<div class="card"><div class="icon">🧰</div><h2>Tool Library</h2><p>Manage the master collection of games and learning tools, then make selected tools available to teachers.</p><span class="status">Foundation planned</span></div>
+</div></div></main>
+<script>
+(function(){const OWNER="simcha5770@gmail.com";if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);const auth=firebase.auth(),gate=document.getElementById("gate"),area=document.getElementById("ownerArea"),msg=document.getElementById("gateMsg"),btn=document.getElementById("signIn");btn.onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());auth.onAuthStateChanged(user=>{const owner=user&&String(user.email||"").toLowerCase()===OWNER;if(owner){gate.classList.add("hidden");area.classList.remove("hidden");return}area.classList.add("hidden");gate.classList.remove("hidden");btn.classList.remove("hidden");msg.textContent=user?"This Google account is not the Fun Torah Tools owner.":"Sign in with the Fun Torah Tools owner Google account.";});})();
+</script></body></html>
