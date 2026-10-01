@@ -478,11 +478,23 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(user)await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id+"/teacherIds/"+user.uid).set(true);
     el("newClassName").value=""; await loadClassManagement(); el("manageClassSelect").value=id; await loadClassManagement();
   }
+  async function trustedStudentAction(action,data={}){
+    try{
+      const user=firebase.auth().currentUser;
+      const response=await fetch("https://us-central1-b3-games.cloudfunctions.net/funTorahManageStudents",{
+        method:"POST",signal:AbortSignal.timeout(15000),headers:{"Content-Type":"application/json","Authorization":"Bearer "+await user.getIdToken()},
+        body:JSON.stringify({action,classId:el("manageClassSelect").value,...data})
+      });
+      if(response.status===404)throw new Error("Teacher student management is awaiting backend deployment. Your invitation and class assignment are saved.");
+      const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not save the student.");return result;
+    }catch(error){el("classManagementStatus").textContent=error.message;return null;}
+  }
   async function createManagedStudent(){
     const name=el("managedStudentName").value.trim(), passcode=el("managedStudentPasscode").value.trim();
     const id="student_"+crypto.randomUUID().replaceAll("-","");
     if(!name||!passcode){el("classManagementStatus").textContent="Enter a student name and passcode.";return;}
     const classId=el("manageClassSelect").value;
+    if(!isAuthorizedAdmin){const result=await trustedStudentAction("create",{name,passcode});if(!result)return;el("managedStudentName").value="";el("managedStudentPasscode").value="";await loadClassManagement();el("classManagementStatus").textContent="Student created in this class.";return;}
     const updates={};
     updates["b3Games/students/"+id+"/profile"]={id,name,passcode,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP,active:true};
     if(classId){
@@ -497,6 +509,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   async function saveManagedStudentPasscode(){
     const studentId=el("classStudentSelect").value, passcode=el("editManagedStudentPasscode").value.trim();
     if(!studentId||!passcode)return;
+    if(!isAuthorizedAdmin){if(await trustedStudentAction("passcode",{studentId,passcode})){el("classManagementStatus").textContent="Passcode saved.";await loadClassManagement();}return;}
     await db.ref("b3Games/students/"+studentId+"/profile").update({passcode,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP});
     const classId=el("manageClassSelect").value;
     if(classId)await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId).update({passcode});
@@ -506,6 +519,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   async function addStudentToManagedClass(){
     const classId=el("manageClassSelect").value, studentId=el("classStudentSelect").value;
     if(!classId||!studentId)return;
+    if(!isAuthorizedAdmin){if(await trustedStudentAction("add",{studentId}))await loadClassManagement();return;}
     const s=(await db.ref("b3Games/students/"+studentId+"/profile").once("value")).val()||{};
     const updates={};
     updates["b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId]={studentId,name:s.name||studentId,passcode:String(s.passcode||""),active:true};
@@ -514,6 +528,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
   async function removeStudentFromManagedClass(studentId){
     const classId=el("manageClassSelect").value;if(!classId||!studentId)return;
+    if(!isAuthorizedAdmin){if(await trustedStudentAction("remove",{studentId}))await loadClassManagement();return;}
     const updates={};
     updates["b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId]=null;
     updates["b3Games/students/"+studentId+"/memberships/"+workspaceId+"_"+classId]=null;
@@ -1524,11 +1539,13 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(save){
       const id=save.dataset.saveStudent, input=el("classMemberList").querySelector('[data-student-passcode="'+id+'"]'), passcode=input?input.value.trim():"";
       if(!passcode){el("classManagementStatus").textContent="Passcode cannot be blank.";return;}
+      if(!isAuthorizedAdmin){if(await trustedStudentAction("passcode",{studentId:id,passcode})){el("classManagementStatus").textContent="Passcode saved.";await loadClassManagement();}return;}
       await db.ref("b3Games/students/"+id+"/profile").update({passcode,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP});
       el("classManagementStatus").textContent="Passcode saved."; await loadClassManagement();
     }
     if(toggle){
       const id=toggle.dataset.toggleStudent, active=toggle.dataset.active!=="true";
+      if(!isAuthorizedAdmin){if(await trustedStudentAction("active",{studentId:id,active}))await loadClassManagement();return;}
       await db.ref("b3Games/students/"+id+"/profile/active").set(active);
       el("classManagementStatus").textContent=active?"Student access enabled.":"Student access blocked."; await loadClassManagement();
     }
