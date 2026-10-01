@@ -115,8 +115,8 @@
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=20261001-multiclass"></script>
-<script src="site-settings.js?v=20261001-multiclass"></script>
+<script src="firebase-config.js?v=20261001-teacherauth"></script>
+<script src="site-settings.js?v=20261001-teacherauth"></script>
 </head>
 <body>
   <h1>B3 Games</h1>
@@ -421,6 +421,7 @@
   let currentUser=null;
   let isAuthorizedAdmin=false;
   let teacherToolsAutoOpened=false;
+  let currentAccess={authorized:false,role:"",classIds:[]};
   let myStudentId="";
   let myStudentName="";
   let myClassId="";
@@ -1180,7 +1181,7 @@
     if(isAuthorizedAdmin)renderStudentOverrideControls();
   },err=>console.warn("Could not load student override roster",err));
 
-  settingsApi.onAuthStateChanged((user,authorized)=>{currentUser=user;isAuthorizedAdmin=authorized;try{if(authorized)localStorage.setItem("b3TeacherBypass","1");else localStorage.removeItem("b3TeacherBypass");}catch(e){}renderStudentAccess();renderAdminPanel();if(authorized){startApprovalCenter();loadClassManagement().catch(console.warn);}else stopApprovalCenter();});
+  settingsApi.onAuthStateChanged((user,authorized,access)=>{currentUser=user;currentAccess=access||{authorized,role:authorized?"admin":"",classIds:[]};isAuthorizedAdmin=authorized;try{if(authorized)localStorage.setItem("b3TeacherBypass","1");else localStorage.removeItem("b3TeacherBypass");}catch(e){}renderStudentAccess();renderAdminPanel();if(authorized){startApprovalCenter();loadClassManagement().catch(console.warn);}else stopApprovalCenter();});
   settingsApi.subscribe(settings=>{currentSettings=settings;renderStudentAccess();renderAdminPanel();});
   setInterval(()=>{renderStudentAccess();},15000);
   restoreStudent();
