@@ -13,7 +13,10 @@
   const WORKSPACE_SETTINGS_KEY = WORKSPACE_ROOT_KEY + "/siteSettings";
   const SETTINGS_KEY = LEGACY_SETTINGS_KEY;
   const LOCAL_FALLBACK_KEY = "b3SiteSettingsFallback";
-  const AUTHORIZED_ADMIN_EMAIL = "simcha5770@gmail.com";
+  // Bootstrap owner only. After sign-in, authorization is read from Firebase.
+  // Keeping this one bootstrap identity prevents a rules migration from locking
+  // the existing owner out before the admin record exists.
+  const BOOTSTRAP_ADMIN_EMAIL = "simcha5770@gmail.com";
   const TIME_ZONE = "America/New_York";
 
   function workspacePath(relativePath) {
@@ -361,16 +364,44 @@
     localStorage.setItem(LOCAL_FALLBACK_KEY, JSON.stringify(normalizeSettings(settings)));
   }
 
+  let currentAccess = { authorized: false, role: "", classIds: [] };
+
+  function isBootstrapAdmin(user) {
+    return Boolean(user && user.email && user.email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase());
+  }
+
+  function readUserAccess(user) {
+    const services = ensureFirebase();
+    if (!services || !services.db || !user) return Promise.resolve({ authorized:false, role:"", classIds:[] });
+    if (isBootstrapAdmin(user)) return Promise.resolve({ authorized:true, role:"admin", classIds:["*"] });
+    return Promise.all([
+      services.db.ref("b3Games/admins/" + user.uid).once("value"),
+      services.db.ref(WORKSPACE_ROOT_KEY + "/teachers/" + user.uid).once("value")
+    ]).then(function (snaps) {
+      const admin = snaps[0].val();
+      const teacher = snaps[1].val();
+      if (admin && admin.active !== false) return { authorized:true, role:"admin", classIds:["*"] };
+      if (teacher && teacher.active !== false) {
+        const classIds = teacher.classIds ? Object.keys(teacher.classIds).filter(function(k){return teacher.classIds[k];}) : [];
+        return { authorized:true, role:teacher.role || "teacher", classIds:classIds };
+      }
+      return { authorized:false, role:"", classIds:[] };
+    }).catch(function(){ return { authorized:false, role:"", classIds:[] }; });
+  }
+
   function isAuthorizedUser(user) {
-    return Boolean(user && user.email && user.email.toLowerCase() === AUTHORIZED_ADMIN_EMAIL.toLowerCase());
+    return Boolean(user && (isBootstrapAdmin(user) || currentAccess.authorized));
   }
 
   function requireAuthorizedUser() {
     const services = ensureFirebase();
     if (!services || !services.auth) return Promise.resolve();
     const user = services.auth.currentUser;
-    if (!isAuthorizedUser(user)) return Promise.reject(new Error("You are not signed in with the authorized administrator account."));
-    return user.getIdToken(true).then(function () { return undefined; });
+    return readUserAccess(user).then(function(access){
+      currentAccess = access;
+      if (!access.authorized) throw new Error("This account is not authorized for this B3 workspace.");
+      return user.getIdToken(true).then(function () { return undefined; });
+    });
   }
 
   function readOnce() {
@@ -654,14 +685,17 @@
       // Redirect sign-in leaves this page and returns later, so there is no
       // immediate result object in that branch. onAuthStateChanged will finish it.
       if (!result) return null;
-      if (!isAuthorizedUser(result.user)) {
-        return services.auth.signOut().then(function () {
-          const error = new Error("This Google account is not authorized. Please use simcha5770@gmail.com.");
-          error.code = "b3/unauthorized-admin";
-          throw error;
-        });
-      }
-      return result.user;
+      return readUserAccess(result.user).then(function(access){
+        currentAccess = access;
+        if (!access.authorized) {
+          return services.auth.signOut().then(function () {
+            const error = new Error("This Google account is not authorized for this B3 workspace.");
+            error.code = "b3/unauthorized-user";
+            throw error;
+          });
+        }
+        return result.user;
+      });
     });
   }
 
@@ -678,20 +712,24 @@
       return function unsubscribe() {};
     }
     return services.auth.onAuthStateChanged(function (user) {
-      const authorized = isAuthorizedUser(user);
-      callback(user, authorized);
-
-      // Seed/refresh the Class 1 workspace whenever the authorized teacher
-      // signs in. Students still read the legacy path during this first phase.
-      if (authorized) {
-        services.db.ref(SETTINGS_KEY).once("value").then(function (snapshot) {
-          return mirrorWorkspaceSettings(services, normalizeSettings(snapshot.val())).then(function () {
-            return migrateWorkspaceData(services, user);
-          });
-        }).catch(function (error) {
-          console.warn("Could not seed B3 workspace " + WORKSPACE_ID + ":", error);
-        });
+      if (!user) {
+        currentAccess = { authorized:false, role:"", classIds:[] };
+        callback(null, false, currentAccess);
+        return;
       }
+      readUserAccess(user).then(function(access){
+        currentAccess = access;
+        callback(user, access.authorized, access);
+        if (access.authorized && access.role === "admin") {
+          services.db.ref(SETTINGS_KEY).once("value").then(function (snapshot) {
+            return mirrorWorkspaceSettings(services, normalizeSettings(snapshot.val())).then(function () {
+              return migrateWorkspaceData(services, user);
+            });
+          }).catch(function (error) {
+            console.warn("Could not seed B3 workspace " + WORKSPACE_ID + ":", error);
+          });
+        }
+      });
     });
   }
 
@@ -719,6 +757,8 @@
     signOut: signOut,
     onAuthStateChanged: onAuthStateChanged,
     isAuthorizedUser: isAuthorizedUser,
+    getCurrentAccess: function(){ return {authorized:currentAccess.authorized,role:currentAccess.role,classIds:currentAccess.classIds.slice()}; },
+    workspaceId: WORKSPACE_ID,
     timeZone: TIME_ZONE,
     dayKeys: DAY_KEYS.slice(),
     getMode: function () { ensureFirebase(); return activeMode; }
