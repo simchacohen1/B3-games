@@ -47,7 +47,9 @@ const tabs={
   activities:["Activities","Choose which activities each class can use."],
   special:["Special Access","Give an individual student access while the class is locked."]
 };
-let currentTab="access";
+const adminParams=new URLSearchParams(location.search);
+const requestedClassId=String(adminParams.get("class")||"").trim();
+let currentTab=String(adminParams.get("tab")||"access").trim()||"access";
 const frame=document.getElementById("adminFrame");
 const backToTools=document.getElementById("backToTools");
 backToTools.addEventListener("click",e=>{
@@ -102,6 +104,13 @@ function organize(){
     const sh=findHeading(d,"Student access while locked");if(sh)moveRange(sh,4,special);
   }
   applyRoleView();
+  if(requestedClassId){
+    const select=d.getElementById("manageClassSelect");
+    if(select&&[...select.options].some(o=>o.value===requestedClassId)&&select.value!==requestedClassId){
+      select.value=requestedClassId;
+      select.dispatchEvent(new Event("change",{bubbles:true}));
+    }
+  }
   showTab(currentTab);
 }
 function showTab(tab){
