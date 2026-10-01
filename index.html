@@ -333,6 +333,9 @@
   "use strict";
   const settingsApi=window.B3SiteSettings;
   const workspaceId=settingsApi.workspaceId||"b3-2026";
+  const pageParams=new URLSearchParams(window.location.search);
+  const previewStudentId=String(pageParams.get("previewStudent")||"").trim();
+  const isStudentPreview=pageParams.get("preview")==="1"&&Boolean(previewStudentId);
   // Keep the whole B3 classroom identity available to every mini-app.
   // ET/WT are still the student's within-class track, not this workspace ID.
   try{localStorage.setItem("b3Games_workspaceId",workspaceId);}catch(e){}
@@ -946,12 +949,14 @@
 
   function enterStudent(r){
     myStudentId=r.id;myStudentName=r.name;myClassId=r.classId;
-    localStorage.setItem("b3Games_studentId",myStudentId);
-    localStorage.setItem("b3Games_studentName",myStudentName);
-    localStorage.setItem("b3Games_studentClass",myClassId);
-    localStorage.setItem("posukPractice_studentId",myStudentId);
-    localStorage.setItem("posukPractice_studentName",myStudentName);
-    localStorage.setItem("weeklyQuiz_classId",myClassId);
+    if(!isStudentPreview){
+      localStorage.setItem("b3Games_studentId",myStudentId);
+      localStorage.setItem("b3Games_studentName",myStudentName);
+      localStorage.setItem("b3Games_studentClass",myClassId);
+      localStorage.setItem("posukPractice_studentId",myStudentId);
+      localStorage.setItem("posukPractice_studentName",myStudentName);
+      localStorage.setItem("weeklyQuiz_classId",myClassId);
+    }
     renderStudentAccess();
   }
 
@@ -968,7 +973,7 @@
   }
 
   async function restoreStudent(){
-    const id=localStorage.getItem("b3Games_studentId")||localStorage.getItem("posukPractice_studentId");
+    const id=isStudentPreview?previewStudentId:(localStorage.getItem("b3Games_studentId")||localStorage.getItem("posukPractice_studentId"));
     if(!id){showLogin();return;}
     try{
       let snap=await db.ref("b3Games/students/"+id+"/profile").once("value");
@@ -1449,7 +1454,21 @@
     if(isAuthorizedAdmin)renderStudentOverrideControls();
   },err=>console.warn("Could not load student override roster",err));
 
-  settingsApi.onAuthStateChanged((user,authorized,access)=>{currentUser=user;currentAccess=access||{authorized,role:authorized?"admin":"",classIds:[]};isAuthorizedAdmin=authorized;try{if(authorized)localStorage.setItem("b3TeacherBypass","1");else localStorage.removeItem("b3TeacherBypass");}catch(e){}renderStudentAccess();renderAdminPanel();if(authorized){startApprovalCenter();loadClassManagement().catch(console.warn);}else stopApprovalCenter();});
+  settingsApi.onAuthStateChanged((user,authorized,access)=>{
+    currentUser=user;
+    if(isStudentPreview){
+      currentAccess={authorized:false,role:"",classIds:[]};
+      isAuthorizedAdmin=false;
+      stopApprovalCenter();
+      restoreStudent();
+      return;
+    }
+    currentAccess=access||{authorized,role:authorized?"admin":"",classIds:[]};
+    isAuthorizedAdmin=authorized;
+    try{if(authorized)localStorage.setItem("b3TeacherBypass","1");else localStorage.removeItem("b3TeacherBypass");}catch(e){}
+    renderStudentAccess();renderAdminPanel();
+    if(authorized){startApprovalCenter();loadClassManagement().catch(console.warn);}else stopApprovalCenter();
+  });
   settingsApi.subscribe(settings=>{currentSettings=settings;renderStudentAccess();renderAdminPanel();});
   setInterval(()=>{renderStudentAccess();},15000);
   restoreStudent();
