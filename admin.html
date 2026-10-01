@@ -100,8 +100,11 @@ frame.addEventListener("load",()=>{
   `;
   d.head.appendChild(style);
   organize();
+  // Do not observe/rewrite the panel class here. The embedded page legitimately
+  // changes it during login/auth rendering; forcing it back synchronously caused
+  // a MutationObserver loop that froze the entire Teacher Center.
   const panel=d.getElementById("adminPanel");
-  new MutationObserver(()=>{if(panel.classList.contains("hidden"))panel.classList.remove("hidden");organize()}).observe(panel,{attributes:true,attributeFilter:["class"]});
+  if(panel) panel.classList.remove("hidden");
 });
 </script>
 </body>
