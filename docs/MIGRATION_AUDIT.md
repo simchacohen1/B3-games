@@ -22,7 +22,7 @@ The repository was fetched from GitHub before editing. The handoff commit `f8522
 | Actual path | Finding / next work |
 | --- | --- |
 | `firebase-rules.json` | `b3Games/.read` is public, including central profile passcodes. Workspace `.write` grants whole-workspace writes to an active teacher. These are transitional and not production-safe. Current deployed rules were not accessible through authenticated Firebase tooling here; no rules were relaxed or deployed. Migrate every student tool to trusted authentication/custom tokens before closing these reads, then test with the emulator and deploy narrowly. |
-| `backend/README.md` | Recovered install files identify `C:\B3-Games-Backend` as the real Firebase project. No Firebase deployment credentials are available in this workspace. Targeted deployment and real endpoint verification are necessary for Yiddish and teacher claiming. |
+| `backend/README.md` | Recovered install files identify `C:\B3-Games-Backend` as the real Firebase project. No Firebase deployment credentials are available in this workspace. Targeted deployment and real endpoint verification are necessary for Yiddish, teacher claiming, and teacher student management. |
 | `shorashim/teacher.js`, `shorashim/teacher.html` | The teacher editor still uses its legacy password and global `posukPractice/shorashimLearning` data. It also has shared-PIN management and owner-specific approval authentication. Student login migration alone does not make teacher resources class-scoped. |
 | `game-show/teacher.html`, `game-show/player.html` | The teacher password and global `tentTrailTrivia` / `questionSets` resources remain. Migrate both sides together, with explicit resource sharing if intended. |
 | `weekly-quiz/teacher.html`, `weekly-quiz/B3SchoolMarksBridge.html` | Teacher password and global `b3Quiz` quiz/launch trees remain. Launch class IDs help routing but do not constitute resource ACLs. The school-marks bridge is B3-specific compatibility. |
@@ -34,3 +34,5 @@ The repository was fetched from GitHub before editing. The handoff commit `f8522
 | `index.html` | Name/passcode lookup still reads the central directory under transitional rules. Replace with a trusted login endpoint before making profiles private. Existing same-name/same-passcode profiles require teacher reassignment of passcodes, not silent selection. |
 
 Do not describe the migration, database security, or undeployed backend changes as fully live. A GitHub Pages deployment deploys frontend files, not Firebase Cloud Functions or database rules.
+
+The prepared `funTorahManageStudents` endpoint adds assigned-class authorization for regular-teacher creation, passcode changes, membership changes, and blocking. The frontend reports missing backend deployment instead of attempting a broad database-rule workaround. Class blocking leaves other memberships active.

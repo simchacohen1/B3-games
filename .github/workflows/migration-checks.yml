@@ -24,3 +24,4 @@ jobs:
           node --check yiddish/teacher.js
           node --check backend/functions/yiddish-service/core.cjs
           node --check backend/functions/teacher-claim.js
+          node --check backend/functions/student-management.js
