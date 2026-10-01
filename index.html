@@ -312,6 +312,26 @@
 
   // Student-to-class assignment is data-driven. New memberships live under
   // the workspace; legacy allowedStudents.classId remains a temporary fallback.
+  // Temporary migration bridge only. These names are used to write the old
+  // B3 roster into Firebase memberships; all normal access uses Firebase data.
+  const LEGACY_MIGRATION_CLASSES={
+    et:new Set(["chaim_chaikin","mayer_chaim_chaikin","yossi_gourarie","sholom_huebner","sholom_dovber_huebner","moshe_lapine","kehos_notik","yisroel_oirechman","moshe_raichman","moshe_tuvia_raichman","avrohom_rosenfeld","levi_rozmarin","arik_traxler","simcha_cohen"]),
+    wt:new Set(["ari_greenberg","zev_rosenfeld","levi_schtroks","yisroel_aryeh_simmonds","leibel_vogel","leib_wolf"])
+  };
+  function legacyMigrationClass(studentId){
+    if(LEGACY_MIGRATION_CLASSES.et.has(studentId))return "et";
+    if(LEGACY_MIGRATION_CLASSES.wt.has(studentId))return "wt";
+    return "";
+  }
+  async function persistStudentMembership(studentId,classId,data){
+    if(!["et","wt"].includes(classId))return;
+    const name=(data&&data.name)?String(data.name):studentId;
+    const updates={};
+    updates["b3Games/students/"+studentId+"/profile"]={id:studentId,name,active:!data||data.active!==false};
+    updates["b3Games/students/"+studentId+"/memberships/"+workspaceId+"_"+classId]={workspaceId,classId,active:true};
+    updates["b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId]={studentId,name,active:!data||data.active!==false};
+    try{await db.ref().update(updates);}catch(e){console.warn("Could not persist student membership",e);}
+  }
   async function resolvedStudentClass(studentId,data){
     try{
       const memberships=await db.ref("b3Games/students/"+studentId+"/memberships").once("value");
@@ -319,32 +339,22 @@
       const match=Object.values(rows).find(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&["et","wt"].includes(String(m.classId||"").toLowerCase()));
       if(match)return String(match.classId).toLowerCase();
     }catch(e){}
-
-    // The workspace class member list is the second side of the same
-    // membership relationship. Accept it too, so admin-managed classes and
-    // student sign-in cannot disagree while old data is being normalized.
     try{
       for(const classId of ["et","wt"]){
         const member=await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId).once("value");
         if(member.exists()&&member.val()?.active!==false)return classId;
       }
     }catch(e){}
-
     const stored=(data&&typeof data==="object")?String(data.classId||"").toLowerCase():"";
-    if(["et","wt"].includes(stored))return stored;
-
-    // Compatibility repair for older approved-student rows that predate
-    // classId. Infer membership from the teacher's existing ET/WT student
-    // settings in Firebase, never from a roster embedded in source code.
-    try{
-      const settingsSnap=await db.ref("b3Games/siteSettings").once("value");
-      const settings=settingsSnap.val()||{};
-      for(const classId of ["et","wt"]){
-        const bucket=settings.classes?.[classId]||{};
-        const overrides=bucket.studentOverrides||bucket.students||{};
-        if(overrides&&Object.prototype.hasOwnProperty.call(overrides,studentId))return classId;
-      }
-    }catch(e){}
+    if(["et","wt"].includes(stored)){
+      await persistStudentMembership(studentId,stored,data);
+      return stored;
+    }
+    const legacy=legacyMigrationClass(studentId);
+    if(legacy){
+      await persistStudentMembership(studentId,legacy,data);
+      return legacy;
+    }
     return "";
   }
 
