@@ -97,8 +97,8 @@
 
   <div id="loginCard" class="card">
     <h2 style="text-align:center;margin-top:0;">Student Login</h2>
-    <p style="text-align:center;color:var(--muted);">Use the same name and Class PIN as Posuk Practice and Shorashim.</p>
-    <label for="classPinInput">Class PIN</label>
+    <p style="text-align:center;color:var(--muted);">Use the same name and passcode as Fun Torah Tools.</p>
+    <label for="classPinInput">Passcode</label>
     <input type="password" id="classPinInput" maxlength="20" inputmode="numeric" autocomplete="off" placeholder="Ask your teacher">
     <label for="studentNameInput">Your name</label>
     <input type="text" id="studentNameInput" maxlength="40" autocomplete="name" placeholder="Type your name">
@@ -309,17 +309,28 @@ db.ref('b3Games/siteSettings/games/weekly-quiz').on('value',snap=>{
 
 async function checkStudentAccess(name,pin){
   const slug=slugify(name);if(!slug)return{ok:false,reason:'Please type your name.'};
-  const [pinSnap,allowedSnap]=await Promise.all([
-    db.ref('posukPractice/settings/classPin').once('value'),
-    db.ref('posukPractice/allowedStudents/'+slug).once('value')
-  ]);
-  const realPin=pinSnap.val();
-  if(realPin&&String(pin).trim()!==String(realPin).trim())return{ok:false,reason:'Incorrect PIN. Ask your teacher.'};
-  if(!allowedSnap.exists())return{ok:false,reason:'Ask your teacher to add your name first.'};
-  const d=allowedSnap.val(),displayName=d&&typeof d==='object'&&d.name?String(d.name):name.trim();
-  const classId=(d&&typeof d==='object'&&['et','wt'].includes(d.classId))?d.classId:studentClass(slug);
+  const profileSnap=await db.ref('b3Games/students/'+slug+'/profile').once('value');
+  let d=profileSnap.val();
+  if(!d){
+    const legacySnap=await db.ref('posukPractice/allowedStudents/'+slug).once('value');
+    if(!legacySnap.exists())return{ok:false,reason:'Ask your teacher to add your name first.'};
+    const legacy=legacySnap.val()||{};
+    d={id:slug,name:String(legacy.name||name.trim()),passcode:String(legacy.passcode||'5770'),active:legacy.active!==false};
+  }
+  if(d.active===false)return{ok:false,reason:'Your student access is turned off. Ask your teacher.'};
+  const realPin=String(d.passcode||'').trim();
+  if(!realPin)return{ok:false,reason:'Your passcode is not set yet. Ask your teacher.'};
+  if(String(pin).trim()!==realPin)return{ok:false,reason:'Incorrect passcode. Ask your teacher.'};
+
+  let classId='';
+  const workspaceId=(window.B3_APP_CONTEXT&&window.B3_APP_CONTEXT.workspaceId)||'b3-2026';
+  const memberships=await db.ref('b3Games/students/'+slug+'/memberships').once('value');
+  const rows=memberships.val()||{};
+  const membership=Object.values(rows).find(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&String(m.classId||'').trim());
+  if(membership)classId=String(membership.classId).trim();
+  if(!classId)classId=String(d.classId||localStorage.getItem('b3Games_studentClass')||studentClass(slug)||'').trim();
   if(!classId)return{ok:false,reason:'Your class is not assigned yet. Ask your teacher.'};
-  return{ok:true,slug,displayName,classId};
+  return{ok:true,slug,displayName:String(d.name||name.trim()),classId};
 }
 
 async function joinQuiz(){
@@ -344,12 +355,23 @@ function enterStudent(displayName,studentId,classId){
 }
 
 async function restoreLogin(){
-  const id=localStorage.getItem('posukPractice_studentId'),name=localStorage.getItem('posukPractice_studentName');
+  const id=localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId');
+  const name=localStorage.getItem('b3Games_studentName')||localStorage.getItem('posukPractice_studentName');
   if(!id||!name)return;
   try{
-    const snap=await db.ref('posukPractice/allowedStudents/'+id).once('value');
-    if(!snap.exists())return switchStudent(false);
-    const d=snap.val(),classId=(d&&['et','wt'].includes(d.classId))?d.classId:(localStorage.getItem('weeklyQuiz_classId')||studentClass(id));
+    const profileSnap=await db.ref('b3Games/students/'+id+'/profile').once('value');
+    let d=profileSnap.val();
+    if(!d){
+      const legacySnap=await db.ref('posukPractice/allowedStudents/'+id).once('value');
+      if(!legacySnap.exists())return switchStudent(false);
+      d=legacySnap.val()||{};
+    }
+    if(d.active===false)return switchStudent(false);
+    const workspaceId=(window.B3_APP_CONTEXT&&window.B3_APP_CONTEXT.workspaceId)||'b3-2026';
+    const memberships=await db.ref('b3Games/students/'+id+'/memberships').once('value');
+    const rows=memberships.val()||{};
+    const membership=Object.values(rows).find(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&String(m.classId||'').trim());
+    const classId=membership?String(membership.classId).trim():String(localStorage.getItem('b3Games_studentClass')||d.classId||localStorage.getItem('weeklyQuiz_classId')||studentClass(id)||'').trim();
     if(!classId)return switchStudent(false);
     enterStudent(d&&d.name?String(d.name):name,id,classId);
   }catch(e){console.warn(e);}
