@@ -93,7 +93,7 @@
   <div class="subtitle">Shoreshim • Words & Phrases • Comprehension</div>
 </header>
 <div class="wrap">
-  <div id="masterBlocked" class="card blocked hidden">The weekly quiz is turned off right now. Please wait for Rabbi Cohen.</div>
+  <div id="masterBlocked" class="card blocked hidden">The weekly quiz is turned off right now. Please wait for your teacher.</div>
 
   <div id="loginCard" class="card">
     <h2 style="text-align:center;margin-top:0;">Student Login</h2>
@@ -119,7 +119,7 @@
 
     <div id="noQuizCard" class="card waiting hidden">
       <div class="big">No quiz is active for your class.</div>
-      <div style="margin-top:8px;color:var(--muted);">Please wait for Rabbi Cohen.</div>
+      <div style="margin-top:8px;color:var(--muted);">Please wait for your teacher.</div>
     </div>
 
     <div id="waitingCard" class="card waiting hidden">
@@ -318,7 +318,7 @@ async function checkStudentAccess(name,pin){
   if(!allowedSnap.exists())return{ok:false,reason:'Ask your teacher to add your name first.'};
   const d=allowedSnap.val(),displayName=d&&typeof d==='object'&&d.name?String(d.name):name.trim();
   const classId=(d&&typeof d==='object'&&['et','wt'].includes(d.classId))?d.classId:studentClass(slug);
-  if(!classId)return{ok:false,reason:'Your class is not assigned yet. Ask Rabbi Cohen.'};
+  if(!classId)return{ok:false,reason:'Your class is not assigned yet. Ask your teacher.'};
   return{ok:true,slug,displayName,classId};
 }
 
@@ -428,7 +428,7 @@ function render(){
   if(!launchData.started){
     document.getElementById('waitingCard').classList.remove('hidden');
     document.getElementById('waitingTitle').textContent='Quiz not started yet';
-    document.getElementById('waitingText').textContent='Please wait for Rabbi Cohen.';
+    document.getElementById('waitingText').textContent='Please wait for your teacher.';
     renderPastQuizzes();
     return;
   }
@@ -454,7 +454,7 @@ function render(){
   if(!st.open&&!resp&&!st.reveal){
     document.getElementById('waitingCard').classList.remove('hidden');
     document.getElementById('waitingTitle').textContent='Waiting for Question '+(displayedQuestion+1)+'…';
-    document.getElementById('waitingText').textContent='Rabbi Cohen will open it when the class is ready.';
+    document.getElementById('waitingText').textContent='Your teacher will open it when the class is ready.';
     renderPastQuizzes();
     return;
   }
@@ -487,7 +487,7 @@ function renderCompletionCard(questions){
     btn.classList.remove('hidden');
   }else{
     scoreEl.textContent='';scoreEl.classList.add('hidden');
-    msg.textContent='All of your answers are recorded. Your score and right/wrong review will appear here as soon as Rabbi Cohen releases them.';
+    msg.textContent='All of your answers are recorded. Your score and right/wrong review will appear here as soon as your teacher releases them.';
     btn.classList.add('hidden');
   }
 }
@@ -572,7 +572,7 @@ async function openPastQuiz(launchId){
     const rs=await db.ref('b3Quiz/responses/'+launchId+'/'+myStudentId).once('value'),responses=rs.val()||{},score=scoreFromResponses(questions,responses),released=launch.showScore===true;
     const scoreEl=document.getElementById('reviewScore'),notice=document.getElementById('reviewNotice');
     if(released){scoreEl.textContent=score.correct+' / '+score.total+' — '+score.pct+'%';scoreEl.classList.remove('hidden');notice.textContent='This review is read-only. Green answers were correct; red answers were incorrect.';notice.className='status good';}
-    else{scoreEl.textContent='';scoreEl.classList.add('hidden');notice.textContent='Your answers are saved. Rabbi Cohen has not released the score/right-wrong review yet.';notice.className='status';}
+    else{scoreEl.textContent='';scoreEl.classList.add('hidden');notice.textContent='Your answers are saved. Your teacher has not released the score/right-wrong review yet.';notice.className='status';}
     document.getElementById('reviewQuestions').innerHTML=questions.map((q,i)=>{
       const r=responses[i]||responses[String(i)]||null,choices=asArray(q.choices),chosen=r?choices[Number(r.choiceIndex)]:'No answer',correct=choices[Number(q.correctIndex)]||'';
       const cls=released&&r?(r.correct===true?' correct':' incorrect'):'';
