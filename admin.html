@@ -27,7 +27,6 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}.student
     <button class="nav-btn" data-tab="students">👥 Students &amp; Classes</button>
     <button class="nav-btn" data-tab="activities">🎮 Activities</button>
     <button class="nav-btn" data-tab="special">⭐ Special Access</button>
-    <button class="nav-btn" data-tab="teachers">👨‍🏫 Teacher Accounts</button>
   </nav>
   <a class="back" href="index.html">← Back to B3 Games</a>
 </aside>
@@ -46,8 +45,7 @@ const tabs={
   access:["Class Access","Open, close, and schedule your classes."],
   students:["Students & Classes","Add students, change passcodes, and choose class memberships."],
   activities:["Activities","Choose which B3 activities each class can use."],
-  special:["Special Access","Give an individual student access while the class is locked."],
-  teachers:["Teacher Accounts","Manage the teachers connected to this workspace."]
+  special:["Special Access","Give an individual student access while the class is locked."]
 };
 let currentTab="access";
 const frame=document.getElementById("adminFrame");
@@ -67,11 +65,10 @@ function organize(){
   panel.classList.remove("hidden");
 
   if(!d.getElementById("admin-section-access")){
-    const access=makeSection(d,"access"),students=makeSection(d,"students"),activities=makeSection(d,"activities"),special=makeSection(d,"special"),teachers=makeSection(d,"teachers");
+    const access=makeSection(d,"access"),students=makeSection(d,"students"),activities=makeSection(d,"activities"),special=makeSection(d,"special");
     const master=controls.querySelector(".master-row");if(master){access.appendChild(master);const p=master.nextElementSibling;if(p&&p.classList.contains("admin-message"))access.appendChild(p)}
     const classControls=d.getElementById("classControls");if(classControls)access.appendChild(classControls);
     const ch=findHeading(d,"Class management");if(ch)moveRange(ch,3,students);
-    const th=findHeading(d,"Teacher accounts");if(th)moveRange(th,3,teachers);
     const ah=findHeading(d,"Student activities");if(ah)moveRange(ah,3,activities);
     const sh=findHeading(d,"Student access while locked");if(sh)moveRange(sh,4,special);
   }
