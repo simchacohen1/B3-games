@@ -116,7 +116,7 @@
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
 <script src="firebase-config.js?v=20261001-teacherauth"></script>
-<script src="site-settings.js?v=20261001-teacherauth"></script>
+<script src="site-settings.js?v=20261001-membershipfix"></script>
 </head>
 <body>
   <h1>B3 Games</h1>
@@ -319,6 +319,17 @@
       const match=Object.values(rows).find(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&["et","wt"].includes(String(m.classId||"").toLowerCase()));
       if(match)return String(match.classId).toLowerCase();
     }catch(e){}
+
+    // The workspace class member list is the second side of the same
+    // membership relationship. Accept it too, so admin-managed classes and
+    // student sign-in cannot disagree while old data is being normalized.
+    try{
+      for(const classId of ["et","wt"]){
+        const member=await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId).once("value");
+        if(member.exists()&&member.val()?.active!==false)return classId;
+      }
+    }catch(e){}
+
     const stored=(data&&typeof data==="object")?String(data.classId||"").toLowerCase():"";
     if(["et","wt"].includes(stored))return stored;
 
