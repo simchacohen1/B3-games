@@ -105,6 +105,20 @@ previewResizer.addEventListener("pointerdown",e=>{resizingPreview=true;previewRe
 previewResizer.addEventListener("pointermove",e=>{if(!resizingPreview)return;const rect=workspaceEl.getBoundingClientRect();setPreviewWidth(rect.right-e.clientX-18);});
 previewResizer.addEventListener("pointerup",()=>{resizingPreview=false;document.body.style.userSelect="";});
 setPreviewWidth(Math.min(430,workspaceEl.clientWidth*.38));
+function syncStudentPreview(){
+  try{
+    const adminDoc=frame.contentDocument, studentDoc=previewFrame.contentDocument;
+    if(!adminDoc||!studentDoc)return;
+    const inactive=new Set([...adminDoc.querySelectorAll("#inactiveActivityList [data-activity-id]")].map(row=>row.dataset.activityId));
+    studentDoc.querySelectorAll(".game-card[data-game-id]").forEach(card=>{
+      card.classList.toggle("hidden",inactive.has(card.dataset.gameId));
+    });
+    studentDoc.querySelectorAll(".game-group").forEach(group=>{
+      const any=[...group.querySelectorAll(".game-card")].some(card=>!card.classList.contains("hidden"));
+      group.classList.toggle("hidden",!any);
+    });
+  }catch(e){console.warn("Could not sync student preview",e);}
+}
 function scaleStudentPreview(){
   const desktopWidth=1280, desktopHeight=900;
   const scale=Math.min(previewViewport.clientWidth/desktopWidth,previewViewport.clientHeight/desktopHeight);
@@ -122,6 +136,7 @@ previewFrame.addEventListener("load",()=>{
     const tools=d.getElementById("teacherToolsSection"); if(tools) tools.classList.add("hidden");
     d.body.classList.remove("admin-panel-open");
   }catch(e){console.warn("Could not apply student preview mode",e);}
+  syncStudentPreview();
   scaleStudentPreview();
 });
 window.addEventListener("resize",scaleStudentPreview);
@@ -145,6 +160,12 @@ frame.addEventListener("load",()=>{
   `;
   d.head.appendChild(style);
   organize();
+  const activityLists=d.querySelectorAll("#activeActivityList,#inactiveActivityList");
+  if(activityLists.length){
+    const activityObserver=new MutationObserver(()=>syncStudentPreview());
+    activityLists.forEach(list=>activityObserver.observe(list,{childList:true,subtree:true}));
+  }
+  syncStudentPreview();
   // Do not observe/rewrite the panel class here. The embedded page legitimately
   // changes it during login/auth rendering; forcing it back synchronously caused
   // a MutationObserver loop that froze the entire Teacher Center.
