@@ -1209,6 +1209,7 @@
   }
 
   function activityRow(game,active){
+    const ownerAccess=currentAccess.role==="admin"||currentAccess.classIds.includes("*");
     const row=document.createElement("div");
     row.className="activity-manage-row"+(active?"":" activity-inactive-row");
     row.draggable=true;
@@ -1219,7 +1220,7 @@
     text.querySelector(".activity-manage-name").textContent=game.name;
     row.appendChild(text);
 
-    if(active){
+    if(active&&ownerAccess){
       const controls=document.createElement("div");
       controls.className="activity-class-controls";
       ["et","wt"].forEach(classId=>{
@@ -1251,14 +1252,35 @@
     return row;
   }
 
+  let teacherClassToolGrants={};
+  async function loadTeacherToolGrants(){
+    teacherClassToolGrants={};
+    const ownerAccess=currentAccess.role==="admin"||currentAccess.classIds.includes("*");
+    if(ownerAccess)return;
+    await Promise.all((currentAccess.classIds||[]).map(async classId=>{
+      const snap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/toolGrants").once("value");
+      teacherClassToolGrants[classId]=snap.val()||{};
+    }));
+  }
+
   function renderActivityManager(){
     const activeList=el("activeActivityList"),inactiveList=el("inactiveActivityList");
     if(!activeList||!inactiveList)return;
     activeList.innerHTML="";
     inactiveList.innerHTML="";
     let activeCount=0,inactiveCount=0;
+    const ownerAccess=currentAccess.role==="admin"||currentAccess.classIds.includes("*");
+    const assignedClassIds=ownerAccess?[]:(currentAccess.classIds||[]);
+    const grantedToolIds=new Set();
+    if(!ownerAccess){
+      assignedClassIds.forEach(classId=>{
+        const grants=teacherClassToolGrants[classId]||{};
+        Object.entries(grants).forEach(([gameId,allowed])=>{if(allowed===true)grantedToolIds.add(gameId);});
+      });
+    }
     gameDefinitions.forEach(game=>{
-      const active=activityIsActive(game.id);
+      if(!ownerAccess&&!grantedToolIds.has(game.id))return;
+      const active=ownerAccess?activityIsActive(game.id):true;
       (active?activeList:inactiveList).appendChild(activityRow(game,active));
       if(active)activeCount++;else inactiveCount++;
     });
@@ -1497,7 +1519,10 @@
     el("ownerAdminButton").classList.toggle("hidden",!(user&&String(user.email||"").toLowerCase()==="simcha5770@gmail.com"));
     try{if(authorized)localStorage.setItem("b3TeacherBypass","1");else localStorage.removeItem("b3TeacherBypass");}catch(e){}
     renderStudentAccess();renderAdminPanel();
-    if(authorized){startApprovalCenter();loadClassManagement().catch(console.warn);}else stopApprovalCenter();
+    if(authorized){
+      startApprovalCenter();
+      Promise.all([loadClassManagement(),loadTeacherToolGrants()]).then(()=>renderAdminPanel()).catch(console.warn);
+    }else stopApprovalCenter();
   });
   settingsApi.subscribe(settings=>{currentSettings=settings;renderStudentAccess();renderAdminPanel();});
   setInterval(()=>{renderStudentAccess();},15000);
