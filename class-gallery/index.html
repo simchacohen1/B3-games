@@ -274,7 +274,7 @@ button,input,select,textarea{font:inherit}
     <div id="reviewListArea" style="display:none;">
       <div class="teacher-live-controls"><div><strong>Live Classmates</strong><span id="teacherOnlineNames">No students online right now.</span></div><button type="button" id="livePresenceToggleBtn">On</button></div>
       <div class="teacher-live-controls"><div><strong>Tag Games</strong><span id="teacherTagStatus">Students can choose Regular Tag or Manhunt.</span></div><button type="button" id="tagGameToggleBtn">Off</button></div>
-      <div class="teacher-live-controls"><div><strong>Rabbi Cohen Plays</strong><span id="teacherJoinTagStatus">Choose a mode only when you want your avatar to join the game.</span></div><div class="teacher-mode-buttons"><button type="button" id="teacherJoinTagBtn" class="off">Regular Tag</button><button type="button" id="teacherJoinManhuntBtn" class="off">Manhunt</button></div></div>
+      <div class="teacher-live-controls"><div><strong id="teacherPlaysLabel">Teacher Plays</strong><span id="teacherJoinTagStatus">Choose a mode only when you want your avatar to join the game.</span></div><div class="teacher-mode-buttons"><button type="button" id="teacherJoinTagBtn" class="off">Regular Tag</button><button type="button" id="teacherJoinManhuntBtn" class="off">Manhunt</button></div></div>
       <div class="teacher-live-controls" id="approveAllWrap" style="display:none;"><div><strong>Pending Projects</strong><span id="approveAllStatus">Approve every project currently waiting for review.</span></div><button type="button" id="approveAllBtn">Approve All</button></div>
       <div id="reviewList"></div>
     </div>
@@ -405,7 +405,7 @@ let selectedAvatarId=localStorage.getItem(AVATAR_STORAGE_KEY)||'sprout';
 let avatarChooserFirstVisit=!localStorage.getItem(AVATAR_STORAGE_KEY);
 
 /* ---------- live classmates ----------
-   Identity comes from the existing B3 Games login. Unknown IDs never enter
+   Identity comes from the existing Fun Torah Tools login. Unknown IDs never enter
    presence. Regular gallery presence stays track-specific; Tag temporarily combines ET + WT. */
 const PRESENCE_STUDENTS={
   chaim_chaikin:{name:'Mayer Chaim Chaikin',classId:'et'},mayer_chaim_chaikin:{name:'Mayer Chaim Chaikin',classId:'et'},
@@ -425,6 +425,18 @@ if(presenceStudentId&&!PRESENCE_STUDENTS[presenceStudentId]&&storedPresenceClass
 }
 const presenceProfile=PRESENCE_STUDENTS[presenceStudentId]||null;
 const isLegacyB3Class=!!presenceProfile&&['et','wt'].includes(String(presenceProfile.classId||'').toLowerCase());
+async function loadGenericPresenceRoster(){
+  if(!window.firebase||!storedPresenceClass||isLegacyB3Class)return;
+  try{
+    const workspaceId=(window.B3_APP_CONTEXT&&window.B3_APP_CONTEXT.workspaceId)||'b3-2026';
+    const snap=await firebase.database().ref('b3Games/workspaces/'+workspaceId+'/classes/'+storedPresenceClass+'/members').once('value');
+    const members=snap.val()||{};
+    Object.entries(members).forEach(([id,m])=>{
+      if(!m||m.active===false)return;
+      PRESENCE_STUDENTS[id]={name:String(m.name||id),classId:storedPresenceClass};
+    });
+  }catch(err){console.warn('Could not load class roster for live classmates',err);}
+}
 const presenceSessionId=sessionStorage.getItem('classGalleryPresenceSession')||(((window.crypto&&window.crypto.randomUUID?window.crypto.randomUUID():('s'+Date.now()+Math.random().toString(36).slice(2)))).replace(/[^a-zA-Z0-9_-]/g,''));
 sessionStorage.setItem('classGalleryPresenceSession',presenceSessionId);
 const presenceRoot=window.firebase?firebase.database().ref('b3Games/classGalleryPresence'):null;
@@ -456,6 +468,8 @@ const TAG_POWERS={
 let rewardsApp=null,rewardsAuth=null,powerBalance=null,powerSpent=0,powerCooldownUntil=0,powerBusy=false;
 let lastPowerUiAt=0,lastConsumedDashToken='',lastConsumedTeleportToken='';
 
+
+loadGenericPresenceRoster().then(()=>{ if(livePresenceEnabled)startLivePresence(); });
 
 if(presenceSettingsRef){
   presenceSettingsRef.on('value',snap=>{
