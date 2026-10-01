@@ -682,4 +682,11 @@ async function submit(answer,answers,feedback){
     else retry($('practice'),answers,feedback)
   }finally{busy=false}
 }
-(async()=>{try{if(sessionStorage.getItem('yiddishSession')){await refresh();message('Progress connected ✓')}else{const id=localStorage.getItem('b3Games_studentId'),pin=localStorage.getItem('b3Games_classPin');if(id&&pin)await login(id,pin)}}catch(e){block(e.message);$('login').hidden=false}setInterval(async()=>{if(!student||busy||pending)return;try{const s=await API.call('status');config=s.config;student=s.student;if(round&&!open(round.group)){round=null;block('Your teacher closed this section.')}else if(!round){progress=s.progress;render()}}catch(e){block(e.message)}},15000)})();
+(async()=>{try{
+  if(sessionStorage.getItem('yiddishSession')){await refresh();message('Progress connected ✓')}
+  else{
+    const id=localStorage.getItem('b3Games_studentId');
+    const pin=localStorage.getItem('b3Games_classPin');
+    if(id&&pin) await login(id,pin);
+  }
+}catch(e){block(e.message);$('login').hidden=false}setInterval(async()=>{if(!student||busy||pending)return;try{const s=await API.call('status');config=s.config;student=s.student;if(round&&!open(round.group)){round=null;block('Your teacher closed this section.')}else if(!round){progress=s.progress;render()}}catch(e){block(e.message)}},15000)})();
