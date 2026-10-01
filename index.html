@@ -871,7 +871,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(isAuthorizedTeacher){
       el("loginCard").classList.add("hidden");
       el("studentBar").classList.remove("hidden");
-      el("studentNameLabel").textContent="Rabbi Cohen";
+      el("studentNameLabel").textContent=currentUser?.displayName||currentUser?.email||"Teacher";
       el("studentClassLabel").textContent="Teacher access · ET/WT locks do not apply";
       el("switchStudentBtn").classList.add("hidden");
       el("lockedCard").classList.add("hidden");

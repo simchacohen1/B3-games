@@ -12,6 +12,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="../firebase-config.js"></script>
+<script src="../site-settings.js?v=20261001-role-scope"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.min.js"></script>
 <script>
   /* School networks sometimes block one CDN. Try two independent fallbacks
@@ -266,8 +267,7 @@ button,input,select,textarea{font:inherit}
     <button class="close-x" id="closeReviewBtn">&times;</button>
     <h2>Teacher Review</h2>
     <div id="reviewLoginArea">
-      <label for="teacherPasscode">Enter passcode</label>
-      <input type="text" id="teacherPasscode" placeholder="Passcode">
+      <p>Sign in with the Google account assigned to this class.</p>
       <div class="status-msg" id="loginStatus"></div>
       <div class="modal-actions"><button type="button" class="btn-primary" id="loginSubmitBtn">Log in</button></div>
     </div>
@@ -339,13 +339,17 @@ const ROSTERS = {
   'B3 ET': ['Mayer Chaim Chaikin','Yossi Gourarie','Sholom DovBer Huebner','Moshe Lapine','Kehos Notik','Yisroel Oirechman','Moshe Tuvia Raichman','Avrohom Rosenfeld','Levi Rozmarin','Arik Traxler']
 };
 let ALL_STUDENTS = [...ROSTERS['B3 WT'], ...ROSTERS['B3 ET']];
-const TEACHER_PASSCODE = 'class123';
+const galleryWorkspaceId=window.B3_APP_CONTEXT?.workspaceId||'b3-2026';
+const galleryClassId=String(new URLSearchParams(location.search).get('class')||localStorage.getItem('b3Games_studentClass')||'et').trim();
+const legacyGallery=['et','wt'].includes(galleryClassId);
+const galleryResourcePath='b3Games/workspaces/'+galleryWorkspaceId+'/classes/'+galleryClassId+'/resources/gallery';
+let teacherUser=null;
 const CLASSROOMS = [
   {id:'perek18', label:'Perek Yud Ches', subtitle:'Chumash • Perek 18'},
   {id:'parsha', label:'Parsha', subtitle:'Weekly Parsha'},
   {id:'halacha', label:'Halacha', subtitle:'Halacha & Yahadus'}
 ];
-const dbRef = window.firebase ? firebase.database().ref('classGallery/posts') : null;
+const dbRef = window.firebase ? firebase.database().ref(legacyGallery?'classGallery/posts':galleryResourcePath+'/posts') : null;
 let posts = [];
 let isTeacher = false;
 let sceneMode = 'hallway';
@@ -418,13 +422,13 @@ const PRESENCE_STUDENTS={
   simcha_cohen:{name:'Rabbi Cohen',classId:(['et','wt'].includes(localStorage.getItem('b3Games_studentClass'))?localStorage.getItem('b3Games_studentClass'):'et')}
 };
 const presenceStudentId=localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId')||'';
-const storedPresenceClass=String(localStorage.getItem('b3Games_studentClass')||'').trim();
+const storedPresenceClass=galleryClassId;
 const storedPresenceName=String(localStorage.getItem('b3Games_studentName')||localStorage.getItem('posukPractice_studentName')||'').trim();
-if(presenceStudentId&&!PRESENCE_STUDENTS[presenceStudentId]&&storedPresenceClass){
+if(presenceStudentId&&storedPresenceClass){
   PRESENCE_STUDENTS[presenceStudentId]={name:storedPresenceName||presenceStudentId,classId:storedPresenceClass};
 }
-const presenceProfile=PRESENCE_STUDENTS[presenceStudentId]||null;
-const isLegacyB3Class=!!presenceProfile&&['et','wt'].includes(String(presenceProfile.classId||'').toLowerCase());
+let presenceProfile=PRESENCE_STUDENTS[presenceStudentId]||null;
+const isLegacyB3Class=legacyGallery;
 async function loadGenericPresenceRoster(){
   if(!window.firebase||!storedPresenceClass||isLegacyB3Class)return;
   try{
@@ -440,25 +444,26 @@ async function loadGenericPresenceRoster(){
     });
     if(genericNames.length){
       ROSTERS[storedPresenceClass]=genericNames.sort((a,b)=>a.localeCompare(b));
-      ALL_STUDENTS=[...new Set([...ALL_STUDENTS,...genericNames])];
+      ALL_STUDENTS=[...genericNames];
       const classSelect=document.getElementById('classSelect');
-      if(classSelect&&!Array.from(classSelect.options).some(o=>o.value===storedPresenceClass)){
-        const opt=document.createElement('option');opt.value=storedPresenceClass;opt.textContent='My Class';classSelect.appendChild(opt);
+      if(classSelect){
+        const opt=document.createElement('option');opt.value=storedPresenceClass;opt.textContent='My Class';classSelect.replaceChildren(opt);
+        document.getElementById('studentName').innerHTML='<option value="">Choose your name...</option>'+genericNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
       }
     }
   }catch(err){console.warn('Could not load class roster for live classmates',err);}
 }
 const presenceSessionId=sessionStorage.getItem('classGalleryPresenceSession')||(((window.crypto&&window.crypto.randomUUID?window.crypto.randomUUID():('s'+Date.now()+Math.random().toString(36).slice(2)))).replace(/[^a-zA-Z0-9_-]/g,''));
 sessionStorage.setItem('classGalleryPresenceSession',presenceSessionId);
-const presenceRoot=window.firebase?firebase.database().ref('b3Games/classGalleryPresence'):null;
-const presenceSettingsRef=window.firebase?firebase.database().ref('b3Games/classGalleryPresenceSettings/liveEnabled'):null;
-const tagSettingsRef=window.firebase?firebase.database().ref('b3Games/classGalleryPresenceSettings/tagEnabled'):null;
-const tagRoot=window.firebase?firebase.database().ref('b3Games/classGalleryTag'):null;
+const presenceRoot=window.firebase?firebase.database().ref(legacyGallery?'b3Games/classGalleryPresence':galleryResourcePath+'/presence'):null;
+const presenceSettingsRef=window.firebase?firebase.database().ref(legacyGallery?'b3Games/classGalleryPresenceSettings/liveEnabled':galleryResourcePath+'/settings/liveEnabled'):null;
+const tagSettingsRef=window.firebase?firebase.database().ref(legacyGallery?'b3Games/classGalleryPresenceSettings/tagEnabled':galleryResourcePath+'/settings/tagEnabled'):null;
+const tagRoot=window.firebase?firebase.database().ref(legacyGallery?'b3Games/classGalleryTag':galleryResourcePath+'/tag'):null;
 let livePresenceEnabled=true,presenceStarted=false,presenceOwnRef=null,presenceClassRef=null,presenceValueHandler=null;
 let presenceHeartbeat=null,presenceWatchdog=null,lastPresenceWrite=0,lastPresencePayload='',lastPresenceSnapshotAt=0;
 let remoteAvatarsGroup=null,remoteAvatars=new Map(),latestPresenceStudents=new Map();
 let teacherPresenceRef=null,teacherPresenceHandler=null;
-let teacherPresenceViewer=localStorage.getItem('b3TeacherBypass')==='1';
+let teacherPresenceViewer=false;
 let tagGameEnabled=false,tagOptedIn=false,tagMode='regular',tagClassRef=null,tagStateHandler=null,tagState={};
 let tagAttemptBusy=false,lastTagAttemptAt=0,lastSeenTagEvent='',tagPopTimer=null;
 let tagActivityWriteAt=0,lastTagIdleCheckAt=0,tagIdleWarnKey='';
@@ -1096,7 +1101,7 @@ function updateTagGameToggle(){
     :'Students can choose Regular Tag or Manhunt when tag games are turned on.';
   updateTagJoinControls();
 }
-function currentTagStudentKey(){return isTeacher?'simcha_cohen':(presenceProfile?presenceStudentId:'');}
+function currentTagStudentKey(){return isTeacher&&teacherUser?'teacher_'+teacherUser.uid:(presenceProfile?presenceStudentId:'');}
 function currentGameLabel(){return tagMode==='manhunt'?'Manhunt':'Regular Tag';}
 function updateTagJoinControls(){
   const eligible=tagGameEnabled&&livePresenceEnabled&&(!!presenceProfile||isTeacher);
@@ -1424,7 +1429,7 @@ function stopTagState(){
   remoteAvatars.forEach(entry=>{setRemoteItMarker(entry,false);setRemoteHunterMarker(entry,false);});
 }
 function tagClassId(){
-  if(isLegacyB3Class||teacherPresenceViewer)return tagMode==='manhunt'?'manhunt':'all';
+  if(isLegacyB3Class)return tagMode==='manhunt'?'manhunt':'all';
   const classId=String(presenceProfile?.classId||'').trim();
   return (tagMode==='manhunt'?'manhunt_':'class_')+classId.replace(/[^a-zA-Z0-9_-]/g,'_');
 }
@@ -1675,8 +1680,8 @@ function startTeacherPresenceMonitor(){
   if(!presenceRoot||teacherPresenceRef)return;
   teacherPresenceRef=presenceRoot;teacherPresenceHandler=snapshot=>{
     const raw=snapshot.val()||{},now=Date.now(),online=[];
-    ['et','wt'].forEach(classId=>Object.entries(raw[classId]||{}).forEach(([studentId,sessions])=>{
-      const known=PRESENCE_STUDENTS[studentId];if(!known||known.classId!==classId||studentId==='simcha_cohen')return;
+    (legacyGallery?['et','wt']:[galleryClassId]).forEach(classId=>Object.entries(raw[classId]||{}).forEach(([studentId,sessions])=>{
+      const known=PRESENCE_STUDENTS[studentId];if(!known||known.classId!==classId||studentId===currentTagStudentKey())return;
       const active=Object.values(sessions||{}).some(data=>{const updated=safePresenceNumber(data?.updatedAt,0);return data&&(!updated||now-updated<=50000);});
       if(active)online.push(`${known.name} (${classId.toUpperCase()})`);
     }));
@@ -1686,14 +1691,14 @@ function startTeacherPresenceMonitor(){
   teacherPresenceRef.on('value',teacherPresenceHandler,err=>console.warn('Teacher presence list unavailable',err));
 }
 function latestStudentSessions(raw){
-  const result=new Map(),now=Date.now(),combined=teacherPresenceViewer||tagOptedIn;
+  const result=new Map(),now=Date.now(),combined=isLegacyB3Class&&(teacherPresenceViewer||tagOptedIn);
   const collect=(studentId,sessions,classId,key)=>{
     // Never render this browser's own player as a remote avatar. In teacher mode,
-    // the teacher identity is always simcha_cohen even if a student ID is still
+    // teacher avatars use the signed-in Firebase UID even if a student ID is still
     // stored in localStorage from an earlier student session on this computer.
-    if((isTeacher&&studentId==='simcha_cohen')||(!teacherPresenceViewer&&studentId===presenceStudentId))return;
-    const known=PRESENCE_STUDENTS[studentId];if(!known)return;
-    if(studentId!=='simcha_cohen'&&known.classId!==classId)return;
+    if((isTeacher&&studentId===currentTagStudentKey())||(!teacherPresenceViewer&&studentId===presenceStudentId))return;
+    const known=PRESENCE_STUDENTS[studentId]||(studentId.startsWith('teacher_')?{name:Object.values(sessions||{})[0]?.name||'Teacher',classId}:null);if(!known)return;
+    if(!studentId.startsWith('teacher_')&&known.classId!==classId)return;
     let latest=null;
     Object.values(sessions||{}).forEach(data=>{if(!data||typeof data!=='object')return;const updated=safePresenceNumber(data.updatedAt,0);if(updated&&now-updated>50000)return;if(!latest||updated>safePresenceNumber(latest.updatedAt,0))latest=data;});
     if(latest)result.set(key,{...latest,name:known.name,classId});
@@ -1748,7 +1753,7 @@ function syncLivePresence(force=false){
   const core={x:Number(avatarState.x.toFixed(3)),z:Number(avatarState.z.toFixed(3)),angle:Number(avatarState.angle.toFixed(3)),space:currentPresenceSpace(),avatarId:selectedAvatarId,walking:!!localAvatarWalking,playingTag:!!tagOptedIn,tagMode:tagOptedIn?tagMode:''};
   const serialized=JSON.stringify(core);if(!force&&serialized===lastPresencePayload)return;
   lastPresencePayload=serialized;lastPresenceWrite=now;
-  presenceOwnRef.set({...core,updatedAt:firebase.database.ServerValue.TIMESTAMP}).catch(err=>console.warn('Live classmates update failed',err));
+  presenceOwnRef.set({...core,name:isTeacher?(teacherUser?.displayName||teacherUser?.email||'Teacher'):presenceProfile?.name,updatedAt:firebase.database.ServerValue.TIMESTAMP}).catch(err=>console.warn('Live classmates update failed',err));
 }
 function stopLivePresence(removeOwn=true){
   if(presenceClassRef&&presenceValueHandler)presenceClassRef.off('value',presenceValueHandler);
@@ -1767,10 +1772,10 @@ function restartPresenceListener(){
 function startLivePresence(){
   if(!scene||(!presenceProfile&&!teacherPresenceViewer)||!presenceRoot||!livePresenceEnabled||presenceStarted)return;
   presenceStarted=true;
-  const combined=teacherPresenceViewer||(tagOptedIn&&isLegacyB3Class);
+  const combined=isLegacyB3Class&&(teacherPresenceViewer||tagOptedIn);
   presenceClassRef=combined?presenceRoot:presenceRoot.child(presenceProfile.classId);
   if(!teacherPresenceViewer||(isTeacher&&tagOptedIn)){
-    const ownParent=teacherPresenceViewer?presenceRoot.child('all'):presenceRoot.child(presenceProfile.classId);
+    const ownParent=teacherPresenceViewer&&legacyGallery?presenceRoot.child('all'):presenceRoot.child(galleryClassId);
     presenceOwnRef=ownParent.child(currentTagStudentKey()).child(presenceSessionId);presenceOwnRef.onDisconnect().remove();
   }
   lastPresenceSnapshotAt=Date.now();presenceValueHandler=handlePresenceSnapshot;presenceClassRef.on('value',presenceValueHandler,err=>console.warn('Live classmates unavailable',err));
@@ -1954,15 +1959,31 @@ const overlay=document.getElementById('overlay');document.getElementById('openMo
 document.getElementById('projectForm').addEventListener('submit',async e=>{
   e.preventDefault();const submit=document.getElementById('submitBtn'),status=document.getElementById('statusMsg');submit.disabled=true;status.textContent='Pinning...';status.style.color='#5b4632';
   const className=document.getElementById('classSelect').value,studentName=document.getElementById('studentName').value.trim(),title=document.getElementById('title').value.trim(),category=document.getElementById('category').value,galleryRoom=document.getElementById('galleryRoom').value||'hallway',description=document.getElementById('description').value.trim(),link=document.getElementById('link').value.trim(),photo=document.getElementById('photo').files[0],audio=document.getElementById('audio').files[0],video=document.getElementById('video').files[0];
-  try{let image=null;if(photo)image=await resizeImage(photo,800);const newRef=dbRef.push(),id=newRef.key;let audioUrl=null,videoUrl=null;if(audio){status.textContent='Uploading audio... 0%';audioUrl=await uploadToStorage(audio,`classGallery/${id}/audio-${audio.name}`,p=>status.textContent=`Uploading audio... ${p}%`)}if(video){status.textContent='Uploading video... 0%';videoUrl=await uploadToStorage(video,`classGallery/${id}/video-${video.name}`,p=>status.textContent=`Uploading video... ${p}%`)}await newRef.set({studentName,className,title,category,galleryRoom,description,link,image,audioUrl,videoUrl,status:'pending',createdAt:new Date().toISOString()});status.textContent='Sent to your teacher for approval!';status.style.color='#427250';setTimeout(()=>{document.getElementById('projectForm').reset();document.getElementById('studentName').innerHTML='<option value="">Choose your class first...</option>';status.textContent='';overlay.classList.remove('show');submit.disabled=false},650);}catch(err){console.error(err);status.textContent='Save failed: '+(err?.message||'unknown error');status.style.color='#b34e47';submit.disabled=false;}
+  try{let image=null;if(photo)image=await resizeImage(photo,800);const newRef=dbRef.push(),id=newRef.key;let audioUrl=null,videoUrl=null;if(audio){status.textContent='Uploading audio... 0%';audioUrl=await uploadToStorage(audio,`classGallery/${id}/audio-${audio.name}`,p=>status.textContent=`Uploading audio... ${p}%`)}if(video){status.textContent='Uploading video... 0%';videoUrl=await uploadToStorage(video,`classGallery/${id}/video-${video.name}`,p=>status.textContent=`Uploading video... ${p}%`)}await newRef.set({studentId:presenceStudentId,workspaceId:galleryWorkspaceId,classId:galleryClassId,studentName,className,title,category,galleryRoom,description,link,image,audioUrl,videoUrl,status:'pending',createdAt:new Date().toISOString()});status.textContent='Sent to your teacher for approval!';status.style.color='#427250';setTimeout(()=>{document.getElementById('projectForm').reset();document.getElementById('studentName').innerHTML='<option value="">Choose your class first...</option>';status.textContent='';overlay.classList.remove('show');submit.disabled=false},650);}catch(err){console.error(err);status.textContent='Save failed: '+(err?.message||'unknown error');status.style.color='#b34e47';submit.disabled=false;}
 });
 
 /* ---------- review ---------- */
 const reviewOverlay=document.getElementById('reviewOverlay');document.getElementById('teacherReviewBtn').onclick=()=>{reviewOverlay.classList.add('show');isTeacher?showReviewList():(document.getElementById('reviewLoginArea').style.display='block',document.getElementById('reviewListArea').style.display='none')};document.getElementById('closeReviewBtn').onclick=()=>reviewOverlay.classList.remove('show');reviewOverlay.addEventListener('click',e=>{if(e.target===reviewOverlay)reviewOverlay.classList.remove('show')});
 if(new URLSearchParams(window.location.search).get('review')==='pending'){setTimeout(()=>{const btn=document.getElementById('teacherReviewBtn');if(btn)btn.click()},0)}
-document.getElementById('loginSubmitBtn').onclick=()=>{const val=document.getElementById('teacherPasscode').value,stat=document.getElementById('loginStatus');if(val===TEACHER_PASSCODE){isTeacher=true;enableTeacherPresenceView();if(tagGameEnabled)startTagState();document.getElementById('teacherPasscode').value='';stat.textContent='';showReviewList()}else{stat.textContent='Incorrect passcode.';stat.style.color='#b34e47'}};
+document.getElementById('loginSubmitBtn').textContent='Sign in with Google';
+document.getElementById('loginSubmitBtn').onclick=async()=>{
+  const stat=document.getElementById('loginStatus');
+  try{await B3SiteSettings.signInWithGoogle();if(isTeacher)showReviewList();else stat.textContent='This account is not assigned to this class.';}
+  catch(error){stat.textContent=error.message;}
+};
+B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
+  const allowed=authorized&&(access?.role==='admin'||(access?.classIds||[]).includes(galleryClassId));
+  teacherUser=allowed?user:null;isTeacher=!!allowed;teacherPresenceViewer=!!allowed;
+  if(allowed){
+    PRESENCE_STUDENTS[currentTagStudentKey()]={name:user.displayName||user.email||'Teacher',classId:galleryClassId};
+    if(!legacyGallery)presenceProfile={name:user.displayName||'Teacher',classId:galleryClassId};
+    await loadGenericPresenceRoster();
+  }else{document.getElementById('reviewListArea').style.display='none';document.getElementById('reviewLoginArea').style.display='block';}
+  stopLivePresence(true);startLivePresence();
+});
+
 document.getElementById('livePresenceToggleBtn').onclick=async()=>{if(!isTeacher||!presenceSettingsRef)return;const btn=document.getElementById('livePresenceToggleBtn');btn.disabled=true;try{await presenceSettingsRef.set(!livePresenceEnabled)}catch(err){alert('Could not change Live Classmates right now.');console.error(err)}finally{btn.disabled=false}};
-document.getElementById('tagGameToggleBtn').onclick=async()=>{if(!isTeacher||!tagSettingsRef)return;const btn=document.getElementById('tagGameToggleBtn'),next=!tagGameEnabled;btn.disabled=true;try{if(next&&tagRoot)await Promise.all(['et','wt','all','manhunt'].map(c=>tagRoot.child(c).remove()));await tagSettingsRef.set(next)}catch(err){alert('Could not change Tag right now.');console.error(err)}finally{btn.disabled=false}};
+document.getElementById('tagGameToggleBtn').onclick=async()=>{if(!isTeacher||!tagSettingsRef)return;const btn=document.getElementById('tagGameToggleBtn'),next=!tagGameEnabled;btn.disabled=true;try{if(next&&tagRoot)await Promise.all((legacyGallery?['et','wt','all','manhunt']:[tagClassId()]).map(c=>tagRoot.child(c).remove()));await tagSettingsRef.set(next)}catch(err){alert('Could not change Tag right now.');console.error(err)}finally{btn.disabled=false}};
 document.getElementById('tagJoinBtn').onclick=()=>setTagOptIn(!(tagOptedIn&&tagMode==='regular'),'regular');
 document.getElementById('manhuntJoinBtn').onclick=()=>setTagOptIn(!(tagOptedIn&&tagMode==='manhunt'),'manhunt');
 document.getElementById('teacherJoinTagBtn').onclick=()=>{if(isTeacher)setTagOptIn(!(tagOptedIn&&tagMode==='regular'),'regular')};

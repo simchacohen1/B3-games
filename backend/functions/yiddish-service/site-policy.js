@@ -399,21 +399,10 @@
         return entry.value.active !== false &&
           String(entry.value.email || "").trim().toLowerCase() === email;
       });
-      if (inviteEntry && user.emailVerified === true) {
+      if (inviteEntry) {
         const invite = inviteEntry.value;
         const classIds = invite.classIds ? Object.keys(invite.classIds).filter(function(k){return k !== "*" && invite.classIds[k] === true;}) : [];
-        return user.getIdToken().then(function(token){
-          return fetch("https://us-central1-b3-games.cloudfunctions.net/funTorahTeacherClaim",{
-            method:"POST",signal:AbortSignal.timeout(10000),headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:"{}"
-          });
-        }).then(async function(response){
-          if(!response.ok){const error=new Error("Teacher account linking is awaiting backend deployment.");error.status=response.status;throw error;}
-          const claimed=await response.json();
-          return {authorized:claimed.authorized===true,role:"teacher",classIds:(claimed.classIds||[]).filter(id=>id!=="*"),inviteId:inviteEntry.id};
-        }).catch(function(error){
-          if(error.status&&error.status!==404&&error.status!==503)return {authorized:false,role:"",classIds:[]};
-          return {authorized:true,role:"teacher",classIds:classIds,inviteId:inviteEntry.id,claimPending:true,claimError:error.message};
-        });
+        return { authorized:true, role:"teacher", classIds:classIds, inviteId:inviteEntry.id };
       }
       return { authorized:false, role:"", classIds:[] };
     }).catch(function(){ return { authorized:false, role:"", classIds:[] }; });
@@ -496,14 +485,10 @@
     if (!services || !services.db || !user || !isBootstrapAdmin(user)) return Promise.resolve();
     return Promise.all([
       services.db.ref("posukPractice/allowedStudents").once("value"),
-      services.db.ref("posukPractice/settings/classPin").once("value"),
-      services.db.ref("b3Games/students").once("value"),
-      services.db.ref(WORKSPACE_ROOT_KEY+"/classes").once("value")
+      services.db.ref("posukPractice/settings/classPin").once("value")
     ]).then(function (snapshots) {
       const students = snapshots[0].val() || {};
       const legacyPin = snapshots[1].val();
-      const centralStudents = snapshots[2].val() || {};
-      const existingClasses = snapshots[3].val() || {};
       const updates = {};
       const now = new Date().toISOString();
 
@@ -532,11 +517,11 @@
         if (classId !== "et" && classId !== "wt") classId = legacyMigrationClass(studentId);
         if (classId !== "et" && classId !== "wt") return;
         const profile = { id: studentId, name: row.name || studentId, active: row.active !== false };
-        if(!centralStudents[studentId]?.profile)updates["b3Games/students/" + studentId + "/profile"] = profile;
-        if(!centralStudents[studentId]?.memberships?.[WORKSPACE_ID+"_"+classId])updates["b3Games/students/" + studentId + "/memberships/" + WORKSPACE_ID + "_" + classId] = {
+        updates["b3Games/students/" + studentId + "/profile"] = profile;
+        updates["b3Games/students/" + studentId + "/memberships/" + WORKSPACE_ID + "_" + classId] = {
           workspaceId: WORKSPACE_ID, classId: classId, active: true
         };
-        if(!existingClasses[classId]?.members?.[studentId])updates[WORKSPACE_ROOT_KEY + "/classes/" + classId + "/members/" + studentId] = {
+        updates[WORKSPACE_ROOT_KEY + "/classes/" + classId + "/members/" + studentId] = {
           studentId: studentId, name: row.name || studentId, active: row.active !== false
         };
       });
