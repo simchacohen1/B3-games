@@ -494,7 +494,7 @@
     const studentId=el("classStudentSelect").value, passcode=el("editManagedStudentPasscode").value.trim();
     if(!studentId||!passcode)return;
     await db.ref("b3Games/students/"+studentId+"/profile").update({passcode,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP});
-    el("classManagementStatus").textContent="Student passcode saved in B3.";
+    el("classManagementStatus").textContent="Student passcode saved.";
     await loadClassManagement();
   }
   async function addStudentToManagedClass(){
