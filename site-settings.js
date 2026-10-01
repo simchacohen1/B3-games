@@ -8,7 +8,6 @@
   const APP_CONTEXT = window.B3_APP_CONTEXT || {};
   const WORKSPACE_ID = String(APP_CONTEXT.workspaceId || "b3-2026");
   const WORKSPACE_NAME = String(APP_CONTEXT.workspaceName || "B3 2026-27");
-  const TEACHER_ID = String(APP_CONTEXT.teacherId || "simcha-cohen");
   const LEGACY_SETTINGS_KEY = "b3Games/siteSettings";
   const WORKSPACE_ROOT_KEY = "b3Games/workspaces/" + WORKSPACE_ID;
   const WORKSPACE_SETTINGS_KEY = WORKSPACE_ROOT_KEY + "/siteSettings";
