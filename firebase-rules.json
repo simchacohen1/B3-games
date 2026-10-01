@@ -2,11 +2,31 @@
   "rules": {
     "b3Games": {
       ".read": true,
-      ".write": "auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true"
+      ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' || root.child('b3Games/admins').child(auth.uid).child('active').val() == true)",
+      "workspaces": {
+        "$workspaceId": {
+          ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' || root.child('b3Games/admins').child(auth.uid).child('active').val() == true || data.child('teachers').child(auth.uid).child('active').val() == true)"
+        }
+      },
+      "students": {
+        "$studentId": {
+          ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' || root.child('b3Games/admins').child(auth.uid).child('active').val() == true)"
+        }
+      },
+      "teachers": {
+        "$teacherId": {
+          ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' || root.child('b3Games/admins').child(auth.uid).child('active').val() == true)"
+        }
+      },
+      "admins": {
+        "$adminId": {
+          ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' || root.child('b3Games/admins').child(auth.uid).child('active').val() == true)"
+        }
+      }
     },
     "tentTrailTrivia": {
       ".read": true,
-      ".write": "auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true"
+      ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' || root.child('b3Games/admins').child(auth.uid).child('active').val() == true)"
     },
     ".read": false,
     ".write": false
