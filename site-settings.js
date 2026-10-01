@@ -382,9 +382,10 @@
       const admin = snaps[0].val();
       const teacher = snaps[1].val();
       if (admin && admin.active !== false) return { authorized:true, role:"admin", classIds:["*"] };
+      if (teacher && teacher.active === false) return { authorized:false, role:"", classIds:[] };
       if (teacher && teacher.active !== false) {
-        const classIds = teacher.classIds ? Object.keys(teacher.classIds).filter(function(k){return teacher.classIds[k];}) : [];
-        return { authorized:true, role:teacher.role || "teacher", classIds:classIds };
+        const classIds = teacher.classIds ? Object.keys(teacher.classIds).filter(function(k){return k !== "*" && teacher.classIds[k] === true;}) : [];
+        return { authorized:true, role:"teacher", classIds:classIds };
       }
 
       // Owner-created teacher accounts begin as email invitations because the
@@ -400,8 +401,8 @@
       });
       if (inviteEntry) {
         const invite = inviteEntry.value;
-        const classIds = invite.classIds ? Object.keys(invite.classIds).filter(function(k){return invite.classIds[k];}) : [];
-        return { authorized:true, role:invite.role || "teacher", classIds:classIds, inviteId:inviteEntry.id };
+        const classIds = invite.classIds ? Object.keys(invite.classIds).filter(function(k){return k !== "*" && invite.classIds[k] === true;}) : [];
+        return { authorized:true, role:"teacher", classIds:classIds, inviteId:inviteEntry.id };
       }
       return { authorized:false, role:"", classIds:[] };
     }).catch(function(){ return { authorized:false, role:"", classIds:[] }; });
@@ -481,7 +482,7 @@
   // embedded in source code. Legacy records remain in place until every app has
   // switched to the new paths.
   function migrateWorkspaceData(services, user) {
-    if (!services || !services.db || !user || !isAuthorizedUser(user)) return Promise.resolve();
+    if (!services || !services.db || !user || !isBootstrapAdmin(user)) return Promise.resolve();
     return Promise.all([
       services.db.ref("posukPractice/allowedStudents").once("value"),
       services.db.ref("posukPractice/settings/classPin").once("value")
@@ -543,6 +544,7 @@
 
     return requireAuthorizedUser()
       .then(function () {
+        if(currentAccess.role !== "admin") throw new Error("Only an administrator can change global site settings.");
         return services.db.ref(SETTINGS_KEY).set(normalized).then(function () {
           return mirrorWorkspaceSettings(services, normalized);
         });

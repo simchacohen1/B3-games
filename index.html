@@ -291,8 +291,8 @@
           <select id="classStudentSelect" class="override-student-select"></select>
           <button id="addStudentToClassButton" class="admin-action secondary" type="button">Add Existing Student to Class</button>
         </div>
-        <div id="studentListHeading" style="display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px;gap:8px;padding:14px 10px 7px;margin-top:12px;color:#64748b;font-size:12px;font-weight:900;text-transform:uppercase"><span>Name</span><span>Passcode</span><span>Access</span><span></span></div>
-        <div id="classMemberList"></div>
+        <div style="overflow-x:auto"><div id="studentListHeading" style="min-width:480px;display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px;gap:8px;padding:14px 10px 7px;margin-top:12px;color:#64748b;font-size:12px;font-weight:900;text-transform:uppercase"><span>Name</span><span>Passcode</span><span>Access</span><span></span></div>
+        <div id="classMemberList" style="min-width:480px"></div></div>
         <div style="display:none"><input id="editManagedStudentPasscode"><button id="saveManagedStudentPasscodeButton" type="button"></button></div>
         <div id="classManagementStatus" class="override-saving" aria-live="polite"></div>
       </div>
@@ -367,37 +367,25 @@
     if(!["et","wt"].includes(classId))return;
     const name=(data&&data.name)?String(data.name):studentId;
     const updates={};
-    updates["b3Games/students/"+studentId+"/profile"]={id:studentId,name,active:!data||data.active!==false};
+    updates["b3Games/students/"+studentId+"/profile/name"]=name;
     updates["b3Games/students/"+studentId+"/memberships/"+workspaceId+"_"+classId]={workspaceId,classId,active:true};
     updates["b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId]={studentId,name,active:!data||data.active!==false};
     try{await db.ref().update(updates);}catch(e){console.warn("Could not persist student membership",e);}
   }
+  let studentClassChoices=[];
   async function resolvedStudentClass(studentId,data){
-    try{
-      const memberships=await db.ref("b3Games/students/"+studentId+"/memberships").once("value");
-      const rows=memberships.val()||{};
-      // Prefer the student's active workspace membership. New Fun Torah Tools
-      // classes are valid class IDs; they are not required to be ET or WT.
-      const match=Object.values(rows).find(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&String(m.classId||"").trim());
-      if(match)return String(match.classId).trim();
-    }catch(e){}
-    try{
-      const classesSnap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");
-      const classes=classesSnap.val()||{};
-      const match=Object.entries(classes).find(([classId,row])=>row&&row.active!==false&&row.members&&row.members[studentId]&&row.members[studentId].active!==false);
-      if(match)return match[0];
-    }catch(e){}
-    // Legacy B3 migration remains ET/WT-only.
-    const stored=(data&&typeof data==="object")?String(data.classId||"").toLowerCase():"";
-    if(["et","wt"].includes(stored)){
-      await persistStudentMembership(studentId,stored,data);
-      return stored;
-    }
-    const legacy=legacyMigrationClass(studentId);
-    if(legacy){
-      await persistStudentMembership(studentId,legacy,data);
-      return legacy;
-    }
+    const memberships=(await db.ref("b3Games/students/"+studentId+"/memberships").once("value")).val()||{};
+    const ids=[...new Set(Object.values(memberships).filter(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&m.classId).map(m=>String(m.classId)))];
+    studentClassChoices=(await Promise.all(ids.map(async id=>{
+      const row=(await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id).once("value")).val();
+      return row&&row.active!==false&&row.members?.[studentId]?.active!==false&&row.members?.[studentId]?{id,name:String(row.name||id)}:null;
+    }))).filter(Boolean);
+    const stored=localStorage.getItem("b3Games_studentId")===studentId?localStorage.getItem("b3Games_studentClass"):"";
+    if(studentClassChoices.length)return (studentClassChoices.find(c=>c.id===stored)||studentClassChoices[0]).id;
+    if(Object.keys(memberships).length)return "";
+    // Compatibility for an unmigrated B3 record only; revoked memberships never fall back.
+    const legacy=["et","wt"].includes(data?.classId)?data.classId:legacyMigrationClass(studentId);
+    if(legacy){studentClassChoices=[{id:legacy,name:legacy.toUpperCase()}];return legacy;}
     return "";
   }
 
@@ -426,8 +414,8 @@
     return String(value||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,48);
   }
   async function loadClassManagement(){
-    if(!isAuthorizedAdmin)return;
-    const isOwner=currentAccess.role==="admin"||currentAccess.classIds.includes("*");
+    if(!isAuthorizedTeacher)return;
+    const isOwner=currentAccess.role==="admin";
     const allowedClassIds=new Set(isOwner?[]:(currentAccess.classIds||[]));
     const classesSnap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");
     const allClasses=classesSnap.val()||{};
@@ -482,6 +470,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(el("teacherList"))el("teacherList").innerHTML="";
   }
   async function addManagedClass(){
+    if(!isAuthorizedAdmin)throw new Error("Only an administrator can create classes.");
     const name=el("newClassName").value.trim(), id=slugId(name);
     if(!name||!id)return;
     const user=window.firebase.auth().currentUser, now=new Date().toISOString();
@@ -491,10 +480,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
   async function createManagedStudent(){
     const name=el("managedStudentName").value.trim(), passcode=el("managedStudentPasscode").value.trim();
-    const id=slugify(name);
-    if(!name||!id||!passcode){el("classManagementStatus").textContent="Enter a student name and passcode.";return;}
-    const existing=await db.ref("b3Games/students/"+id+"/profile").once("value");
-    if(existing.exists()&&!confirm("That student already exists. Update the name and passcode?"))return;
+    const id="student_"+crypto.randomUUID().replaceAll("-","");
+    if(!name||!passcode){el("classManagementStatus").textContent="Enter a student name and passcode.";return;}
     const classId=el("manageClassSelect").value;
     const updates={};
     updates["b3Games/students/"+id+"/profile"]={id,name,passcode,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP,active:true};
@@ -533,6 +520,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     await db.ref().update(updates); await loadClassManagement();
   }
   async function addManagedTeacher(){
+    if(!isAuthorizedAdmin)throw new Error("Only an administrator can invite teachers.");
     const email=el("teacherEmailInput").value.trim().toLowerCase();if(!email)return;
     const key=slugId(email.replace("@","-at-")), now=new Date().toISOString();
     await db.ref("b3Games/workspaces/"+workspaceId+"/teacherInvites/"+key).set({email,role:"teacher",active:true,createdAt:now});
@@ -544,7 +532,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     document.querySelectorAll(".teacher-tool-card").forEach(card=>{
       const raw=card.getAttribute("href")||"";
       const base=raw.split("?")[0];
-      card.classList.toggle("hidden",isAuthorizedAdmin&&pairedTeacherHrefs.has(base));
+      card.classList.toggle("hidden",isAuthorizedTeacher&&pairedTeacherHrefs.has(base));
     });
   }
 
@@ -569,6 +557,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 
   let currentSettings=settingsApi.defaultSettings;
   let currentUser=null;
+  let isAuthorizedTeacher=false;
   let isAuthorizedAdmin=false;
   let teacherToolsAutoOpened=false;
   let currentAccess={authorized:false,role:"",classIds:[]};
@@ -839,7 +828,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       studentNudgeRotationTimer=null;
     }
     document.querySelectorAll(".student-nudge").forEach(n=>n.remove());
-    if(isAuthorizedAdmin||!myStudentId||!myClassId)return;
+    if(isAuthorizedTeacher||!myStudentId||!myClassId)return;
 
     const eligibleGames=gameDefinitions.filter(game=>
       studentNudgeMessages[game.id] &&
@@ -851,7 +840,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     let index=0;
     const showNext=()=>{
       document.querySelectorAll(".student-nudge").forEach(n=>n.remove());
-      if(isAuthorizedAdmin||!myStudentId||!myClassId)return;
+      if(isAuthorizedTeacher||!myStudentId||!myClassId)return;
 
       const stillEligible=eligibleGames.filter(game=>
         !game.element.classList.contains("hidden") &&
@@ -879,7 +868,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     queueMicrotask(renderStudentNudges);
     setTeacherToolPairVisibility();
     // The authorized teacher account is never treated as ET or WT.
-    if(isAuthorizedAdmin){
+    if(isAuthorizedTeacher){
       el("loginCard").classList.add("hidden");
       el("studentBar").classList.remove("hidden");
       el("studentNameLabel").textContent="Rabbi Cohen";
@@ -899,7 +888,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     }
 
     el("teacherToolsSection").classList.add("hidden");
-    if(!myStudentId||!myClassId){showLogin();return;}
+    if(studentAccessRevoked||!myStudentId||!myClassId){showLogin();return;}
     el("loginCard").classList.add("hidden");
     el("studentBar").classList.remove("hidden");
     el("switchStudentBtn").classList.remove("hidden");
@@ -907,6 +896,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 
     const legacyB3Class=["et","wt"].includes(myClassId);
     if(!legacyB3Class){
+      if(myClassRecord?.active===false||myClassRecord?.siteEnabled===false||myClassRecord?.access?.mode==="locked"){
+        el("gamesArea").classList.add("hidden");el("lockedCard").classList.remove("hidden");el("lockedTitle").textContent="Your class is locked";el("lockedMessage").textContent="Your teacher can reopen your class.";return;
+      }
       const grants=myClassRecord?.toolGrants||{};
       let visible=0;
       gameDefinitions.forEach(game=>{
@@ -977,27 +969,36 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   async function checkStudentAccess(name,pin){
-    const slug=slugify(name);
+    const slug=slugify(name), enteredPin=String(pin||"").trim();
     if(!slug)return{ok:false,reason:"Please type your name."};
-    let profileSnap=await db.ref("b3Games/students/"+slug+"/profile").once("value");
-    let d=profileSnap.val()||{};
-    if(!profileSnap.exists()){
+    const snap=await db.ref("b3Games/students").once("value");
+    const matches=Object.entries(snap.val()||{}).filter(([id,row])=>
+      row?.profile&&(id===String(name).trim()||slugify(row.profile.name)===slug)&&
+      String(row.profile.passcode||"").trim()===enteredPin);
+    if(matches.length>1)return{ok:false,reason:"More than one student has this name and passcode. Ask your teacher for a different passcode."};
+    let id,d;
+    if(matches.length){id=matches[0][0];d=matches[0][1].profile;}
+    else{
+      const central=await db.ref("b3Games/students/"+slug+"/profile").once("value");
+      if(central.exists())return{ok:false,reason:"Check your name and passcode."};
       const legacySnap=await db.ref("posukPractice/allowedStudents/"+slug).once("value");
-      if(!legacySnap.exists())return{ok:false,reason:"Your name is not on the B3 student list."};
-      const legacy=legacySnap.val()||{};
-      d={id:slug,name:String(legacy.name||name.trim()),passcode:String(legacy.passcode||"5770"),passcodeUpdatedAt:Number(legacy.passcodeUpdatedAt)||Date.now(),active:true};
-      try{await db.ref("b3Games/students/"+slug+"/profile").set(d);}catch(e){}
+      const legacy=legacySnap.val();
+      if(!legacy||String(legacy.passcode||"5770").trim()!==enteredPin)return{ok:false,reason:"Check your name and passcode."};
+      id=slug;d={id,name:String(legacy.name||name.trim()),active:legacy.active!==false};
     }
-    if(d.active===false)return{ok:false,reason:"Your B3 access is turned off. Ask your teacher."};
-    const realPin=String(d.passcode||"").trim();
-    if(!realPin)return{ok:false,reason:"Your B3 passcode is not set yet. Ask your teacher."};
-    if(String(pin).trim()!==realPin)return{ok:false,reason:"Incorrect passcode. Ask your teacher."};
-    const classId=await resolvedStudentClass(slug,d);
+    if(d.active===false)return{ok:false,reason:"Your access is turned off. Ask your teacher."};
+    const classId=await resolvedStudentClass(id,d);
     if(!classId)return{ok:false,reason:"Your class is not assigned yet. Ask your teacher."};
-    return{ok:true,id:slug,name:d.name?String(d.name):name.trim(),classId};
+    return{ok:true,id,name:String(d.name||name.trim()),classId};
   }
 
+  let studentClassWatch=null,studentProfileWatch=null,studentMembershipWatch=null;
+  let studentAccessRevoked=false;
   async function enterStudent(r){
+    if(studentClassWatch)studentClassWatch.off();
+    if(studentProfileWatch)studentProfileWatch.off();
+    if(studentMembershipWatch)studentMembershipWatch.off();
+    studentAccessRevoked=false;
     myStudentId=r.id;myStudentName=r.name;myClassId=r.classId;myClassRecord=null;
     try{myClassRecord=(await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId).once("value")).val()||null;}catch(e){}
     if(!isStudentPreview){
@@ -1008,6 +1009,17 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       localStorage.setItem("posukPractice_studentName",myStudentName);
       localStorage.setItem("weeklyQuiz_classId",myClassId);
     }
+    let chooser=el("activeStudentClass");
+    if(!chooser){chooser=document.createElement("select");chooser.id="activeStudentClass";chooser.setAttribute("aria-label","Active class");el("studentBar").appendChild(chooser);}
+    chooser.replaceChildren(...studentClassChoices.map(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;return o;}));
+    chooser.value=myClassId;chooser.classList.toggle("hidden",studentClassChoices.length<2);
+    chooser.onchange=()=>enterStudent({id:myStudentId,name:myStudentName,classId:chooser.value});
+    studentClassWatch=db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId);
+    studentClassWatch.on("value",snap=>{myClassRecord=snap.val();if(!myClassRecord||myClassRecord.active===false||!myClassRecord.members?.[myStudentId]||myClassRecord.members?.[myStudentId]?.active===false){studentAccessRevoked=true;showLogin();return;}renderStudentAccess();});
+    studentProfileWatch=db.ref("b3Games/students/"+myStudentId+"/profile");
+    studentProfileWatch.on("value",snap=>{if(snap.val()?.active===false){studentAccessRevoked=true;showLogin();}});
+    studentMembershipWatch=db.ref("b3Games/students/"+myStudentId+"/memberships");
+    studentMembershipWatch.on("value",snap=>{const rows=snap.val()||{};if(Object.keys(rows).length&&!Object.values(rows).some(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&m.classId===myClassId)){studentAccessRevoked=true;showLogin();}});
     renderStudentAccess();
   }
 
@@ -1044,6 +1056,10 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   function switchStudent(){
+    studentAccessRevoked=false;
+    if(studentMembershipWatch)studentMembershipWatch.off();
+    if(studentClassWatch)studentClassWatch.off();
+    if(studentProfileWatch)studentProfileWatch.off();
     ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_classPin","posukPractice_studentId","posukPractice_studentName","weeklyQuiz_classId"].forEach(k=>localStorage.removeItem(k));
     myStudentId=myStudentName=myClassId="";
     el("studentNameInput").value="";el("classPinInput").value="";setLoginMsg("");showLogin();
@@ -1179,21 +1195,21 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(!dedicatedAdminPage)el("adminPanel").classList.add("hidden");
     else el("adminPanel").classList.remove("hidden");
     syncAdminPanelLayout();
-    el("adminAccessButton").textContent=isAuthorizedAdmin ? "Teacher Tools" : "Admin";
+    el("adminAccessButton").textContent=isAuthorizedTeacher ? "Teacher Tools" : "Admin";
 
-    const passwordUnlocked=isAuthorizedAdmin||adminPasswordUnlocked();
+    const passwordUnlocked=isAuthorizedTeacher||adminPasswordUnlocked();
     el("adminPasswordGate").classList.toggle("hidden",passwordUnlocked);
     el("signInButton").classList.toggle("hidden",!passwordUnlocked||signedIn);
     el("signOutButton").classList.toggle("hidden",!passwordUnlocked||!signedIn);
-    el("adminControls").classList.toggle("hidden",!isAuthorizedAdmin);
+    el("adminControls").classList.toggle("hidden",!isAuthorizedTeacher);
 
     if(!passwordUnlocked){
       el("adminStatus").textContent="Enter the admin password to continue.";
       return;
     }
     if(!signedIn){el("adminStatus").textContent="Password accepted. Now sign in with simcha5770@gmail.com.";return;}
-    if(!isAuthorizedAdmin){el("adminStatus").textContent=`Signed in as ${currentUser.email||"an unauthorized account"}. This account cannot edit settings.`;return;}
-    const ownerAccess=currentAccess.role==="admin"||currentAccess.classIds.includes("*");
+    if(!isAuthorizedTeacher){el("adminStatus").textContent=`Signed in as ${currentUser.email||"an unauthorized account"}. This account cannot edit settings.`;return;}
+    const ownerAccess=currentAccess.role==="admin";
     el("adminStatus").textContent=ownerAccess
       ? `Signed in as ${currentUser.email}. Owner access.`
       : `Signed in as ${currentUser.email}. Managing only your assigned class${currentAccess.classIds.length===1?"":"es"}.`;
@@ -1216,6 +1232,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   async function setActivityActive(gameId,active){
+    if(!isAuthorizedAdmin){el("classManagementStatus").textContent="Tool grants are managed by the owner.";return;}
     currentSettings.games=currentSettings.games||{};
     const old=currentSettings.games[gameId]!==false;
     currentSettings.games[gameId]=Boolean(active);
@@ -1251,10 +1268,10 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   function activityRow(game,active){
-    const ownerAccess=currentAccess.role==="admin"||currentAccess.classIds.includes("*");
+    const ownerAccess=currentAccess.role==="admin";
     const row=document.createElement("div");
     row.className="activity-manage-row"+(active?"":" activity-inactive-row");
-    row.draggable=true;
+    row.draggable=ownerAccess;
     row.dataset.activityId=game.id;
 
     const text=document.createElement("div");
@@ -1297,7 +1314,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   let teacherClassToolGrants={};
   async function loadTeacherToolGrants(){
     teacherClassToolGrants={};
-    const ownerAccess=currentAccess.role==="admin"||currentAccess.classIds.includes("*");
+    const ownerAccess=currentAccess.role==="admin";
     if(ownerAccess)return;
     await Promise.all((currentAccess.classIds||[]).map(async classId=>{
       const snap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/toolGrants").once("value");
@@ -1311,7 +1328,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     activeList.innerHTML="";
     inactiveList.innerHTML="";
     let activeCount=0,inactiveCount=0;
-    const ownerAccess=currentAccess.role==="admin"||currentAccess.classIds.includes("*");
+    const ownerAccess=currentAccess.role==="admin";
     const assignedClassIds=ownerAccess?[]:(currentAccess.classIds||[]);
     const grantedToolIds=new Set();
     if(!ownerAccess){
@@ -1332,6 +1349,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     el("inactiveActivityCount").textContent=String(inactiveCount);
 
     document.querySelectorAll(".activity-zone").forEach(zone=>{
+      if(!ownerAccess){zone.ondragover=null;zone.ondragleave=null;zone.ondrop=null;return;}
       zone.ondragover=event=>{event.preventDefault();zone.classList.add("drag-over");event.dataTransfer.dropEffect="move";};
       zone.ondragleave=()=>zone.classList.remove("drag-over");
       zone.ondrop=event=>{
@@ -1449,8 +1467,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   gameDefinitions.forEach(game=>game.element.addEventListener("click",e=>{
-    if(!isAuthorizedAdmin)markStudentToolVisited(game.id);
-    if(!isAuthorizedAdmin||!teacherVersionByGame[game.id])return;
+    if(!isAuthorizedTeacher)markStudentToolVisited(game.id);
+    if(!isAuthorizedTeacher||!teacherVersionByGame[game.id])return;
     e.preventDefault();
     openVersionModal(game);
   }));
@@ -1463,7 +1481,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   el("approvalCenterModal")?.addEventListener("click",e=>{if(e.target===el("approvalCenterModal"))closeApprovalCenter();});
   document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeVersionModal();closeApprovalCenter();}});
   function handleTeacherCombinedTile(e){
-    if(!isAuthorizedAdmin)return;
+    if(!isAuthorizedTeacher)return;
     const card=e.target.closest(".game-card");
     if(!card)return;
     const game=gameDefinitions.find(g=>g.element===card);
@@ -1474,7 +1492,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
   document.querySelector(".game-container")?.addEventListener("click",handleTeacherCombinedTile,true);
   document.querySelectorAll(".teacher-tool-card").forEach(card=>card.addEventListener("click",e=>{
-    if(!isAuthorizedAdmin)return;
+    if(!isAuthorizedTeacher)return;
     e.preventDefault();
     const href=card.getAttribute("href");
     if(href)openTeacherToolInBackground(href);
@@ -1532,8 +1550,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   });
 
   async function loadSpecialAccessRoster(){
-    if(!isAuthorizedAdmin){overrideRoster=[];renderStudentOverrideControls();return;}
-    const ownerAccess=currentAccess.role==="admin"||currentAccess.classIds.includes("*");
+    if(!isAuthorizedTeacher){overrideRoster=[];renderStudentOverrideControls();return;}
+    const ownerAccess=currentAccess.role==="admin";
     if(ownerAccess){
       const snap=await db.ref("posukPractice/allowedStudents").once("value");
       const data=snap.val()||{};
@@ -1559,18 +1577,20 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     currentUser=user;
     if(isStudentPreview){
       currentAccess={authorized:false,role:"",classIds:[]};
+      isAuthorizedTeacher=false;
       isAuthorizedAdmin=false;
       stopApprovalCenter();
       restoreStudent();
       return;
     }
-    currentAccess=access||{authorized,role:authorized?"admin":"",classIds:[]};
-    isAuthorizedAdmin=authorized;
+    currentAccess=access||{authorized:false,role:"",classIds:[]};
+    isAuthorizedTeacher=Boolean(authorized&&currentAccess.authorized);
+    isAuthorizedAdmin=isAuthorizedTeacher&&currentAccess.role==="admin";
     el("ownerAdminButton").classList.toggle("hidden",!(user&&String(user.email||"").toLowerCase()==="simcha5770@gmail.com"));
     try{if(authorized)localStorage.setItem("b3TeacherBypass","1");else localStorage.removeItem("b3TeacherBypass");}catch(e){}
     renderStudentAccess();renderAdminPanel();
     if(authorized){
-      startApprovalCenter();
+      if(isAuthorizedAdmin)startApprovalCenter();else stopApprovalCenter();
       Promise.all([loadClassManagement(),loadTeacherToolGrants(),loadSpecialAccessRoster()]).then(()=>renderAdminPanel()).catch(console.warn);
     }else{overrideRoster=[];renderStudentOverrideControls();stopApprovalCenter();}
   });

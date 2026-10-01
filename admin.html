@@ -59,7 +59,7 @@ backToTools.addEventListener("click",e=>{
     // The owner keeps the existing B3 home. A regular teacher should never
     // land on the owner's B3 dashboard; keep them in their scoped Teacher Center
     // until the generic teacher home is available.
-    if(access.role==="admin"||(access.classIds||[]).includes("*")) location.href="index.html";
+    if(access.role==="admin") location.href="index.html";
     else location.href="teacher-home.html";
   }catch(err){location.href="teacher-home.html";}
 });
@@ -77,7 +77,7 @@ function applyRoleView(){
   try{
     const w=frame.contentWindow,d=frame.contentDocument;
     const access=w?.B3SiteSettings?.getCurrentAccess?.()||{};
-    const owner=access.role==="admin"||(access.classIds||[]).includes("*");
+    const owner=access.role==="admin";
     const accessNav=document.getElementById("classAccessNav");
     if(accessNav)accessNav.style.display=owner?"":"none";
     // Teacher-account creation is platform-owner administration only.
@@ -155,7 +155,7 @@ async function populatePreviewStudents(){
     if(!access.authorized)throw new Error("Teacher access is not ready");
 
     let studentIds=new Set();
-    if(access.role==="admin"||access.classIds.includes("*")){
+    if(access.role==="admin"){
       // Owner/admin using the B3 center may preview the current B3 workspace roster.
       const classesSnap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");
       const classes=classesSnap.val()||{};
