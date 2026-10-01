@@ -10,12 +10,33 @@
 <main>
 <div id="gate" class="gate"><h2>Owner access</h2><p id="gateMsg">Checking your signed-in Google account…</p><button id="signIn" class="hidden" type="button">Sign in with Google</button></div>
 <div id="ownerArea" class="hidden">
-<div class="notice"><strong>Owner level:</strong> this area is separate from the B3 Teacher Center. B3 remains your first class/workspace while Fun Torah Tools grows to support additional teachers and classes.</div>
+<div class="notice"><strong>Owner level:</strong> Manage the Fun Torah Tools platform here. B3 is your first classroom.</div>
 <div class="grid">
-<div class="card"><div class="icon">👨‍🏫</div><h2>Teachers</h2><p>Create and manage Fun Torah Tools teacher accounts and decide which platform tools each teacher may use.</p><span class="status">Next to build</span></div>
-<div class="card"><div class="icon">🏫</div><h2>Classes & Workspaces</h2><p>Create independent classroom spaces. Each teacher manages students and settings inside the classes assigned to them.</p><span class="status">B3 is the first workspace</span></div>
-<div class="card"><div class="icon">🧰</div><h2>Tool Library</h2><p>Manage the master collection of games and learning tools, then make selected tools available to teachers.</p><span class="status">Foundation planned</span></div>
+<section class="card"><div class="icon">👨‍🏫</div><h2>Teachers</h2><input id="teacherEmail" placeholder="Teacher Gmail"><input id="teacherName" placeholder="Teacher name"><button id="addTeacher">Add teacher</button><div id="teachers"></div></section>
+<section class="card"><div class="icon">🏫</div><h2>Classes</h2><input id="className" placeholder="New class name"><button id="addClass">Add class</button><div id="classes"></div></section>
+<section class="card"><div class="icon">🔗</div><h2>Teacher → Class</h2><select id="teacherSelect"><option value="">Choose teacher</option></select><select id="classSelect"><option value="">Choose class</option></select><button id="assign">Assign</button><p id="status"></p></section>
 </div></div></main>
+<style>
+.card input,.card select{width:100%;padding:11px;margin:6px 0;border:1px solid #cbd5e1;border-radius:9px}.card button{border:0;border-radius:9px;padding:10px 13px;background:#2563eb;color:#fff;font-weight:800;cursor:pointer}.entry{padding:9px 0;border-bottom:1px solid #e2e8f0}.entry small{display:block;color:#64748b}
+</style>
 <script>
-(function(){const OWNER="simcha5770@gmail.com";if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);const auth=firebase.auth(),gate=document.getElementById("gate"),area=document.getElementById("ownerArea"),msg=document.getElementById("gateMsg"),btn=document.getElementById("signIn");btn.onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());auth.onAuthStateChanged(user=>{const owner=user&&String(user.email||"").toLowerCase()===OWNER;if(owner){gate.classList.add("hidden");area.classList.remove("hidden");return}area.classList.add("hidden");gate.classList.remove("hidden");btn.classList.remove("hidden");msg.textContent=user?"This Google account is not the Fun Torah Tools owner.":"Sign in with the Fun Torah Tools owner Google account.";});})();
+(function(){
+const OWNER="simcha5770@gmail.com",WS=(window.B3_APP_CONTEXT&&window.B3_APP_CONTEXT.workspaceId)||"b3-2026";
+if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+const auth=firebase.auth(),db=firebase.database(),q=id=>document.getElementById(id);let teacherData={},classData={};
+function key(s){return String(s||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"")}
+function safe(s){const d=document.createElement("div");d.textContent=String(s||"");return d.innerHTML}
+async function load(){
+ const ts=await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value"),cs=await db.ref("b3Games/workspaces/"+WS+"/classes").once("value");teacherData=ts.val()||{};classData=cs.val()||{};
+ q("teachers").innerHTML="";q("teacherSelect").innerHTML='<option value="">Choose teacher</option>';
+ Object.entries(teacherData).forEach(([id,v])=>{q("teachers").insertAdjacentHTML("beforeend",'<div class="entry"><b>'+safe(v.name||v.email)+'</b><small>'+safe(v.email)+'</small></div>');q("teacherSelect").insertAdjacentHTML("beforeend",'<option value="'+id+'">'+safe(v.name||v.email)+'</option>')});
+ q("classes").innerHTML="";q("classSelect").innerHTML='<option value="">Choose class</option>';
+ Object.entries(classData).forEach(([id,v])=>{q("classes").insertAdjacentHTML("beforeend",'<div class="entry"><b>'+safe(v.name||id)+'</b></div>');q("classSelect").insertAdjacentHTML("beforeend",'<option value="'+id+'">'+safe(v.name||id)+'</option>')});
+}
+q("addTeacher").onclick=async()=>{const email=q("teacherEmail").value.trim().toLowerCase(),name=q("teacherName").value.trim();if(!email.includes("@"))return;await db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+key(email)).set({email:email,name:name||email,role:"teacher",active:true});q("teacherEmail").value="";q("teacherName").value="";await load()};
+q("addClass").onclick=async()=>{const name=q("className").value.trim();if(!name)return;let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true});q("className").value="";await load()};
+q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=q("classSelect").value;if(!t||!c){q("status").textContent="Choose a teacher and class.";return}await db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+t+"/classIds/"+c).set(true);q("status").textContent="Assigned."};
+q("signIn").onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+auth.onAuthStateChanged(async user=>{const owner=user&&String(user.email||"").toLowerCase()===OWNER;if(owner){q("gate").classList.add("hidden");q("ownerArea").classList.remove("hidden");await load();return}q("ownerArea").classList.add("hidden");q("gate").classList.remove("hidden");q("signIn").classList.remove("hidden");q("gateMsg").textContent=user?"This Google account is not the Fun Torah Tools owner.":"Sign in with the Fun Torah Tools owner Google account."});
+})();
 </script></body></html>
