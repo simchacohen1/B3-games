@@ -429,7 +429,13 @@
     const classesSnap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");
     const allClasses=classesSnap.val()||{};
     const classes={};
-    Object.entries(allClasses).forEach(([id,row])=>{if(isOwner||allowedClassIds.has(id))classes[id]=row||{};});
+    Object.entries(allClasses).forEach(([id,row])=>{
+      // The owner's B3 Teacher Center is only the legacy B3 ET/WT classroom.
+      // Platform classes created in Owner Admin belong to Fun Torah Tools and
+      // must not bleed into Rabbi Cohen's personal B3 class selector.
+      const ownerB3Class=isOwner&&["et","wt"].includes(id);
+      if(ownerB3Class||(!isOwner&&allowedClassIds.has(id)))classes[id]=row||{};
+    });
 
     const classSel=el("manageClassSelect"), studentSel=el("classStudentSelect");
     const prior=classSel.value, priorStudent=studentSel.value;
