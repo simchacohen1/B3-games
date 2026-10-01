@@ -28,7 +28,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}.student
     <button class="nav-btn" data-tab="activities">🎮 Activities</button>
     <button class="nav-btn" data-tab="special">⭐ Special Access</button>
   </nav>
-  <a class="back" href="index.html">← Back to B3 Games</a>
+  <a class="back" href="index.html">← Back to Fun Torah Tools</a>
 </aside>
 <main>
   <div class="topbar"><div><h1 id="pageTitle">Class Access</h1><p id="pageSub">Open, close, and schedule your classes.</p></div></div>
@@ -44,7 +44,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}.student
 const tabs={
   access:["Class Access","Open, close, and schedule your classes."],
   students:["Students & Classes","Add students, change passcodes, and choose class memberships."],
-  activities:["Activities","Choose which B3 activities each class can use."],
+  activities:["Activities","Choose which activities each class can use."],
   special:["Special Access","Give an individual student access while the class is locked."]
 };
 let currentTab="access";
@@ -79,7 +79,7 @@ function showTab(tab){
   const preview=document.getElementById("studentPreview"),workspace=document.getElementById("workspace");
   const showing=tab==="activities";
   preview.classList.toggle("visible",showing);workspace.classList.toggle("preview-open",showing);
-  if(showing){ document.getElementById("studentPreviewFrame").contentWindow.location.reload(); setTimeout(scaleStudentPreview,0); }
+  if(showing){ populatePreviewStudents(); setTimeout(scaleStudentPreview,0); }
   const d=frame.contentDocument;if(!d)return;
   d.querySelectorAll(".admin-dashboard-section").forEach(s=>s.style.display=s.id==="admin-section-"+tab?"block":"none");
   document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
@@ -110,20 +110,42 @@ async function populatePreviewStudents(){
   try{
     const w=frame.contentWindow;
     const db=w?.firebase?.database?.();
+    const access=w?.B3SiteSettings?.getCurrentAccess?.()||{authorized:false,role:"",classIds:[]};
+    const workspaceId=w?.B3SiteSettings?.workspaceId||"b3-2026";
     if(!db)throw new Error("Firebase is not ready");
-    const snap=await db.ref("b3Games/students").once("value");
-    const all=snap.val()||{};
-    const unique=Object.entries(all).map(([id,record])=>{
-      const profile=record&&record.profile?record.profile:record||{};
-      return {id,name:String(profile.name||id),active:profile.active!==false};
+    if(!access.authorized)throw new Error("Teacher access is not ready");
+
+    let studentIds=new Set();
+    if(access.role==="admin"||access.classIds.includes("*")){
+      // Owner/admin using the B3 center may preview the current B3 workspace roster.
+      const classesSnap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");
+      const classes=classesSnap.val()||{};
+      Object.values(classes).forEach(cls=>Object.keys((cls&&cls.members)||{}).forEach(id=>studentIds.add(id)));
+    }else{
+      // Regular teachers may preview only students in classes assigned to them.
+      const classIds=(access.classIds||[]).filter(Boolean);
+      const snaps=await Promise.all(classIds.map(id=>db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id+"/members").once("value")));
+      snaps.forEach(snap=>Object.keys(snap.val()||{}).forEach(id=>studentIds.add(id)));
+    }
+
+    const ids=[...studentIds];
+    const records=await Promise.all(ids.map(id=>db.ref("b3Games/students/"+id).once("value")));
+    const unique=records.map((snap,i)=>{
+      const record=snap.val()||{},profile=record.profile||record||{};
+      return {id:ids[i],name:String(profile.name||ids[i]),active:profile.active!==false};
     }).filter(x=>x.active).sort((x,y)=>x.name.localeCompare(y.name));
+
     select.innerHTML='<option value="">Choose student…</option>'+unique.map(x=>'<option value="'+x.id+'">'+x.name+'</option>').join("");
     if(previous&&unique.some(x=>x.id===previous))select.value=previous;
     else if(unique.length)select.value=unique[0].id;
-    loadSelectedStudentPreview();
+    if(unique.length)loadSelectedStudentPreview();
+    else{
+      previewFrame.src="about:blank";
+      select.innerHTML='<option value="">No students in your class yet</option>';
+    }
   }catch(e){
     console.warn("Could not load preview students",e);
-    select.innerHTML='<option value="">Could not load students</option>';
+    select.innerHTML='<option value="">No class students available</option>';
     previewFrame.src="about:blank";
   }
 }
@@ -131,20 +153,7 @@ function loadSelectedStudentPreview(){
   const id=document.getElementById("previewStudentSelect").value;
   previewFrame.src=id?"index.html?preview=1&previewStudent="+encodeURIComponent(id):"about:blank";
 }
-function syncStudentPreview(){
-  try{
-    const adminDoc=frame.contentDocument, studentDoc=previewFrame.contentDocument;
-    if(!adminDoc||!studentDoc)return;
-    const inactive=new Set([...adminDoc.querySelectorAll("#inactiveActivityList [data-activity-id]")].map(row=>row.dataset.activityId));
-    studentDoc.querySelectorAll(".game-card[data-game-id]").forEach(card=>{
-      card.classList.toggle("hidden",inactive.has(card.dataset.gameId));
-    });
-    studentDoc.querySelectorAll(".game-group").forEach(group=>{
-      const any=[...group.querySelectorAll(".game-card")].some(card=>!card.classList.contains("hidden"));
-      group.classList.toggle("hidden",!any);
-    });
-  }catch(e){console.warn("Could not sync student preview",e);}
-}
+function syncStudentPreview(){ /* Preview renders its own class/student permissions. */ }
 function scaleStudentPreview(){
   const desktopWidth=1280, desktopHeight=900;
   const scale=Math.min(previewViewport.clientWidth/desktopWidth,previewViewport.clientHeight/desktopHeight);
@@ -198,11 +207,6 @@ frame.addEventListener("load",()=>{
   `;
   d.head.appendChild(style);
   organize();
-  const activityLists=d.querySelectorAll("#activeActivityList,#inactiveActivityList");
-  if(activityLists.length){
-    const activityObserver=new MutationObserver(()=>syncStudentPreview());
-    activityLists.forEach(list=>activityObserver.observe(list,{childList:true,subtree:true}));
-  }
   populatePreviewStudents();
   syncStudentPreview();
   // Do not observe/rewrite the panel class here. The embedded page legitimately
