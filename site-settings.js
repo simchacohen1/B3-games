@@ -376,7 +376,8 @@
     if (isBootstrapAdmin(user)) return Promise.resolve({ authorized:true, role:"admin", classIds:["*"] });
     return Promise.all([
       services.db.ref("b3Games/admins/" + user.uid).once("value"),
-      services.db.ref(WORKSPACE_ROOT_KEY + "/teachers/" + user.uid).once("value")
+      services.db.ref(WORKSPACE_ROOT_KEY + "/teachers/" + user.uid).once("value"),
+      services.db.ref(WORKSPACE_ROOT_KEY + "/teacherInvites").once("value")
     ]).then(function (snaps) {
       const admin = snaps[0].val();
       const teacher = snaps[1].val();
@@ -384,6 +385,23 @@
       if (teacher && teacher.active !== false) {
         const classIds = teacher.classIds ? Object.keys(teacher.classIds).filter(function(k){return teacher.classIds[k];}) : [];
         return { authorized:true, role:teacher.role || "teacher", classIds:classIds };
+      }
+
+      // Owner-created teacher accounts begin as email invitations because the
+      // teacher's Firebase UID is not known until that teacher first signs in.
+      // Recognize the invitation by the verified Google-account email.
+      const email = String(user.email || "").trim().toLowerCase();
+      const invites = snaps[2].val() || {};
+      const inviteEntry = Object.keys(invites).map(function (id) {
+        return { id:id, value:invites[id] || {} };
+      }).find(function (entry) {
+        return entry.value.active !== false &&
+          String(entry.value.email || "").trim().toLowerCase() === email;
+      });
+      if (inviteEntry) {
+        const invite = inviteEntry.value;
+        const classIds = invite.classIds ? Object.keys(invite.classIds).filter(function(k){return invite.classIds[k];}) : [];
+        return { authorized:true, role:invite.role || "teacher", classIds:classIds, inviteId:inviteEntry.id };
       }
       return { authorized:false, role:"", classIds:[] };
     }).catch(function(){ return { authorized:false, role:"", classIds:[] }; });
@@ -399,7 +417,7 @@
     const user = services.auth.currentUser;
     return readUserAccess(user).then(function(access){
       currentAccess = access;
-      if (!access.authorized) throw new Error("This account is not authorized for this B3 workspace.");
+      if (!access.authorized) throw new Error("This account is not authorized for Fun Torah Tools.");
       return user.getIdToken(true).then(function () { return undefined; });
     });
   }
@@ -702,7 +720,7 @@
         currentAccess = access;
         if (!access.authorized) {
           return services.auth.signOut().then(function () {
-            const error = new Error("This Google account is not authorized for this B3 workspace.");
+            const error = new Error("This Google account is not authorized for Fun Torah Tools.");
             error.code = "b3/unauthorized-user";
             throw error;
           });
