@@ -248,6 +248,10 @@
 (function(){
   "use strict";
   const settingsApi=window.B3SiteSettings;
+  const workspaceId=settingsApi.workspaceId||"b3-2026";
+  // Keep the whole B3 classroom identity available to every mini-app.
+  // ET/WT are still the student's within-class track, not this workspace ID.
+  try{localStorage.setItem("b3Games_workspaceId",workspaceId);}catch(e){}
   // Initialize Firebase before using Database/Auth. Without this, the script
   // stops here and the Admin button never receives its click handler.
   if (!window.firebase.apps.length) {

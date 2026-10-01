@@ -1,10 +1,26 @@
 (function () {
   "use strict";
 
-  const SETTINGS_KEY = "b3Games/siteSettings";
+  // Phase 1 multi-class foundation:
+  // keep the existing live settings path authoritative while mirroring the
+  // same settings into this class workspace. This lets the current B3 site
+  // keep working unchanged while we build the future multi-teacher structure.
+  const APP_CONTEXT = window.B3_APP_CONTEXT || {};
+  const WORKSPACE_ID = String(APP_CONTEXT.workspaceId || "b3-2026");
+  const WORKSPACE_NAME = String(APP_CONTEXT.workspaceName || "B3 2026-27");
+  const TEACHER_ID = String(APP_CONTEXT.teacherId || "simcha-cohen");
+  const LEGACY_SETTINGS_KEY = "b3Games/siteSettings";
+  const WORKSPACE_ROOT_KEY = "b3Games/workspaces/" + WORKSPACE_ID;
+  const WORKSPACE_SETTINGS_KEY = WORKSPACE_ROOT_KEY + "/siteSettings";
+  const SETTINGS_KEY = LEGACY_SETTINGS_KEY;
   const LOCAL_FALLBACK_KEY = "b3SiteSettingsFallback";
   const AUTHORIZED_ADMIN_EMAIL = "simcha5770@gmail.com";
   const TIME_ZONE = "America/New_York";
+
+  function workspacePath(relativePath) {
+    const clean = String(relativePath || "").replace(/^\/+/, "");
+    return clean ? WORKSPACE_ROOT_KEY + "/" + clean : WORKSPACE_ROOT_KEY;
+  }
 
   const GAME_DEFAULTS = {
     "tzitzis-game": true,
@@ -383,6 +399,26 @@
     return function unsubscribe() { ref.off("value", handler); };
   }
 
+  function mirrorWorkspaceSettings(services, settings) {
+    if (!services || !services.db) return Promise.resolve();
+    const payload = {
+      meta: {
+        workspaceId: WORKSPACE_ID,
+        name: WORKSPACE_NAME,
+        teacherId: TEACHER_ID,
+        migrationPhase: 1,
+        legacyCompatibility: true,
+        legacySettingsPath: LEGACY_SETTINGS_KEY
+      },
+      siteSettings: normalizeSettings(settings)
+    };
+    return services.db.ref(WORKSPACE_ROOT_KEY).update(payload).catch(function (error) {
+      // The legacy path remains authoritative during Phase 1. A mirror failure
+      // must never lock students out or make a teacher setting look unsaved.
+      console.warn("Could not mirror B3 settings into workspace " + WORKSPACE_ID + ":", error);
+    });
+  }
+
   function save(settings) {
     const normalized = normalizeSettings(settings);
     const services = ensureFirebase();
@@ -393,7 +429,11 @@
     }
 
     return requireAuthorizedUser()
-      .then(function () { return services.db.ref(SETTINGS_KEY).set(normalized); })
+      .then(function () {
+        return services.db.ref(SETTINGS_KEY).set(normalized).then(function () {
+          return mirrorWorkspaceSettings(services, normalized);
+        });
+      })
       .then(function () { return normalized; });
   }
 
@@ -587,7 +627,18 @@
       return function unsubscribe() {};
     }
     return services.auth.onAuthStateChanged(function (user) {
-      callback(user, isAuthorizedUser(user));
+      const authorized = isAuthorizedUser(user);
+      callback(user, authorized);
+
+      // Seed/refresh the Class 1 workspace whenever the authorized teacher
+      // signs in. Students still read the legacy path during this first phase.
+      if (authorized) {
+        services.db.ref(SETTINGS_KEY).once("value").then(function (snapshot) {
+          return mirrorWorkspaceSettings(services, normalizeSettings(snapshot.val()));
+        }).catch(function (error) {
+          console.warn("Could not seed B3 workspace " + WORKSPACE_ID + ":", error);
+        });
+      }
     });
   }
 

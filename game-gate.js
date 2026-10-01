@@ -16,6 +16,14 @@
 
   var DATABASE_URL = "https://b3-games-default-rtdb.firebaseio.com";
   var SETTINGS_PATH = "b3Games/siteSettings";
+  // Phase 1: identify the whole B3 classroom without changing the live
+  // settings path yet. Existing ET/WT values remain the within-class tracks.
+  var WORKSPACE_ID = "b3-2026";
+  try {
+    WORKSPACE_ID = localStorage.getItem("b3Games_workspaceId") || WORKSPACE_ID;
+    localStorage.setItem("b3Games_workspaceId", WORKSPACE_ID);
+  } catch (error) {}
+  window.B3_WORKSPACE_ID = WORKSPACE_ID;
   var TIME_ZONE = "America/New_York";
   var POLL_INTERVAL_MS = 5000;
   var FETCH_TIMEOUT_MS = 4500;
