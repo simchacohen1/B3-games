@@ -105,24 +105,30 @@ previewResizer.addEventListener("pointerdown",e=>{resizingPreview=true;previewRe
 previewResizer.addEventListener("pointermove",e=>{if(!resizingPreview)return;const rect=workspaceEl.getBoundingClientRect();setPreviewWidth(rect.right-e.clientX-18);});
 previewResizer.addEventListener("pointerup",()=>{resizingPreview=false;document.body.style.userSelect="";});
 setPreviewWidth(Math.min(430,workspaceEl.clientWidth*.38));
-function populatePreviewStudents(){
+async function populatePreviewStudents(){
+  const select=document.getElementById("previewStudentSelect");
+  if(!select)return;
+  const previous=select.value;
+  select.innerHTML='<option value="">Loading students…</option>';
   try{
-    const d=frame.contentDocument, select=document.getElementById("previewStudentSelect");
-    if(!d||!select)return;
-    const previous=select.value;
-    const rows=[...d.querySelectorAll("#classMemberList [data-save-student]")].map(btn=>{
-      const id=btn.dataset.saveStudent;
-      const row=btn.closest("div");
-      const name=row?.querySelector("strong")?.textContent?.trim()||id;
-      return {id,name};
-    });
-    const seen=new Set();
-    const unique=rows.filter(x=>x.id&&!seen.has(x.id)&&(seen.add(x.id),true)).sort((x,y)=>x.name.localeCompare(y.name));
+    const w=frame.contentWindow;
+    const db=w?.firebase?.database?.();
+    if(!db)throw new Error("Firebase is not ready");
+    const snap=await db.ref("b3Games/students").once("value");
+    const all=snap.val()||{};
+    const unique=Object.entries(all).map(([id,record])=>{
+      const profile=record&&record.profile?record.profile:record||{};
+      return {id,name:String(profile.name||id),active:profile.active!==false};
+    }).filter(x=>x.active).sort((x,y)=>x.name.localeCompare(y.name));
     select.innerHTML='<option value="">Choose student…</option>'+unique.map(x=>'<option value="'+x.id+'">'+x.name+'</option>').join("");
     if(previous&&unique.some(x=>x.id===previous))select.value=previous;
     else if(unique.length)select.value=unique[0].id;
     loadSelectedStudentPreview();
-  }catch(e){console.warn("Could not populate preview students",e);}
+  }catch(e){
+    console.warn("Could not load preview students",e);
+    select.innerHTML='<option value="">Could not load students</option>';
+    previewFrame.src="about:blank";
+  }
 }
 function loadSelectedStudentPreview(){
   const id=document.getElementById("previewStudentSelect").value;
