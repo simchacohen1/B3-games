@@ -61,10 +61,10 @@
     blocker.innerHTML =
       '<div style="max-width:560px;background:white;border-radius:22px;padding:38px 32px;box-shadow:0 18px 45px rgba(0,0,0,.16)">' +
         '<div style="font-size:58px;margin-bottom:14px">🔒</div>' +
-        '<h1 style="margin:0 0 12px;font-size:34px">B3 Games is locked</h1>' +
+        '<h1 id="b3BlockTitle" style="margin:0 0 12px;font-size:34px">Fun Torah Tools is locked</h1>' +
         '<p id="b3BlockMessage" style="margin:0 0 24px;font-size:18px;line-height:1.5;color:#4b5563"></p>' +
         '<a id="b3BackToTools" href="' + toolsHomeUrl.replace(/&/g, "&amp;").replace(/"/g, "&quot;") + '" ' +
-           'style="display:inline-block;padding:12px 20px;border-radius:12px;background:#1f2937;color:white;text-decoration:none;font-weight:700">Back to B3 Games</a>' +
+           'style="display:inline-block;padding:12px 20px;border-radius:12px;background:#1f2937;color:white;text-decoration:none;font-weight:700">Back to Fun Torah Tools</a>' +
       '</div>';
 
     (document.body || document.documentElement).appendChild(blocker);
@@ -78,7 +78,7 @@
     pausePageActivity();
     const panel = ensureBlocker();
     const messageNode = panel.querySelector("#b3BlockMessage");
-    if (messageNode) messageNode.textContent = message || "Your class cannot use B3 Games right now.";
+    if (messageNode) messageNode.textContent = message || "Your class cannot use Fun Torah Tools right now.";
     document.documentElement.style.visibility = previousVisibility || "";
   }
 
@@ -120,15 +120,16 @@
     }
 
     try {
-      const snap = await window.firebase.database().ref("posukPractice/allowedStudents/" + studentId).once("value");
-      if (!snap.exists()) {
+      const profileSnap = await window.firebase.database().ref("b3Games/students/" + studentId + "/profile").once("value");
+      const legacySnap = await window.firebase.database().ref("posukPractice/allowedStudents/" + studentId).once("value");
+      const profile = profileSnap.val() || {};
+      const data = legacySnap.val() || {};
+      if (!profileSnap.exists() && !legacySnap.exists()) {
         studentClassId = "";
         studentDisplayName = "";
         return;
       }
-
-      const data = snap.val() || {};
-      studentDisplayName = data && data.name ? String(data.name) : "";
+      studentDisplayName = profile.name ? String(profile.name) : (data.name ? String(data.name) : "");
       let classId = "";
       const workspaceId = (window.B3SiteSettings && window.B3SiteSettings.workspaceId) ||
         localStorage.getItem("b3Games_workspaceId") || "b3-2026";
@@ -137,8 +138,8 @@
         const memberships = membershipSnap.val() || {};
         Object.keys(memberships).some(function (key) {
           const m = memberships[key] || {};
-          if (m.active !== false && m.workspaceId === workspaceId && ['et', 'wt'].includes(String(m.classId || '').toLowerCase())) {
-            classId = String(m.classId).toLowerCase();
+          if (m.active !== false && m.workspaceId === workspaceId && String(m.classId || "").trim()) {
+            classId = String(m.classId).trim();
             return true;
           }
           return false;
@@ -147,16 +148,16 @@
 
       // Temporary compatibility while migration completes. This is data from
       // Firebase, not a roster embedded in the application.
-      if (!['et', 'wt'].includes(classId)) {
-        classId = data && typeof data === "object" ? String(data.classId || "").toLowerCase() : "";
+      if (!classId) {
+        classId = data && typeof data === "object" ? String(data.classId || "").trim() : "";
       }
-      if (!['et', 'wt'].includes(classId)) {
+      if (!classId) {
         const storedId = localStorage.getItem("b3Games_studentId") || "";
-        const storedClass = String(localStorage.getItem("b3Games_studentClass") || "").toLowerCase();
-        if (storedId === studentId && ['et', 'wt'].includes(storedClass)) classId = storedClass;
+        const storedClass = String(localStorage.getItem("b3Games_studentClass") || "").trim();
+        if (storedId === studentId && storedClass) classId = storedClass;
       }
 
-      if (!['et', 'wt'].includes(classId)) {
+      if (!classId) {
         studentClassId = "";
         return;
       }
@@ -184,7 +185,8 @@
     }
 
     if (currentSettings.siteEnabled === false) {
-      showBlocked("B3 Games is closed for everyone right now.");
+      if (studentClassId === "et" || studentClassId === "wt") showBlocked("B3 Games is closed for everyone right now.");
+      else showBlocked("Fun Torah Tools is closed for your class right now.");
       return;
     }
 
@@ -194,16 +196,20 @@
     }
 
     if (!studentClassId) {
-      showBlocked("Please go back to B3 Games and sign in so I know whether you are in ET or WT.");
+      showBlocked("Please go back to Fun Torah Tools and sign in again so your class can be verified.");
       return;
     }
 
+    if (studentClassId !== "et" && studentClassId !== "wt") {
+      showAllowed();
+      return;
+    }
     const info = window.B3SiteSettings.describeClassAccess(currentSettings, studentClassId, new Date());
     if (info.open) {
       showAllowed();
     } else {
       const className = studentClassId === "et" ? "ET" : "WT";
-      showBlocked(className + " is locked right now. Please ask Rabbi Cohen if you think it should be open.");
+      showBlocked(className + " is locked right now. Please ask your teacher if you think it should be open.");
     }
   }
 
@@ -280,12 +286,12 @@
 
       window.setTimeout(function () {
         if (!firstDecisionMade) {
-          showBlocked("Access could not be verified. Please return to B3 Games and try again.");
+          showBlocked("Access could not be verified. Please return to Fun Torah Tools and try again.");
         }
       }, 8000);
     } catch (error) {
       console.error("B3 access guard failed:", error);
-      showBlocked("Access could not be verified. Please return to B3 Games and try again.");
+      showBlocked("Access could not be verified. Please return to Fun Torah Tools and try again.");
     }
   }
 
