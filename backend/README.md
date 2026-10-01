@@ -4,6 +4,8 @@ The current project was supplied in `B3-Games-Backend.zip` on October 1, 2026. T
 
 These are source changes, **not evidence of a deployed fix**. GitHub Pages does not deploy Firebase functions.
 
+For the existing Windows project, [install-migration.ps1](install-migration.ps1) downloads the eight tested migration modules from a pinned commit, backs up replaced files, and adds missing exports without replacing the rest of `index.js`. Run it in PowerShell; it installs source only and prints the targeted deployment command.
+
 To deploy from a checkout, open PowerShell in the repository's `backend` directory:
 
 ```powershell
