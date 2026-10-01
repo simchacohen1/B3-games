@@ -35,6 +35,7 @@
   .teacher-tool-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#fffbeb;border:1px solid #fde68a;box-shadow:0 4px 10px rgba(0,0,0,.08);padding:22px 12px;border-radius:16px;text-decoration:none;transition:transform .15s,box-shadow .15s;min-height:125px}
   .teacher-tool-card:hover{transform:translateY(-4px);box-shadow:0 8px 18px rgba(0,0,0,.15)}
   .teacher-tool-card .card-title{color:#92400e}
+  .owner-admin-button{position:fixed;top:12px;right:128px;z-index:9999;border:0;border-radius:999px;padding:10px 16px;background:#7c3aed;color:white;font-weight:bold;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.15)}
   .admin-button{position:fixed;top:12px;right:12px;z-index:9999;border:0;border-radius:999px;padding:10px 16px;background:#1f2937;color:white;font-weight:bold;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.15)}
   .admin-panel{position:fixed;top:58px;right:12px;width:min(440px,calc(100vw - 24px));background:white;border-radius:18px;box-shadow:0 14px 38px rgba(0,0,0,.22);padding:18px;text-align:left;z-index:9999;max-height:86vh;overflow-y:auto}
   .admin-panel h2{margin:0 0 4px}.admin-panel h3{font-size:16px;margin:18px 0 8px}.admin-message{font-size:13px;line-height:1.4;color:#64748b;margin:0 0 12px}.admin-action{width:100%;border:0;border-radius:10px;padding:10px 12px;margin-top:8px;background:#1f2937;color:white;font-weight:bold;cursor:pointer}.admin-action.secondary{background:#e5e7eb;color:#111827}
@@ -242,6 +243,7 @@
     </div>
   </div>
 
+  <button id="ownerAdminButton" class="owner-admin-button hidden" type="button">Owner Admin</button>
   <button id="adminAccessButton" class="admin-button">Admin</button>
   <div id="adminPanel" class="admin-panel hidden">
     <h2>B3 Access Controls</h2>
@@ -1407,6 +1409,9 @@
   el("adminAccessButton").addEventListener("click",()=>{
     window.location.href="admin.html";
   });
+  el("ownerAdminButton").addEventListener("click",()=>{
+    window.location.href="owner-admin.html";
+  });
   el("adminPasswordButton").addEventListener("click",unlockAdminPassword);
   el("manageClassSelect").addEventListener("change",loadClassManagement);
   el("classStudentSelect").addEventListener("change",loadClassManagement);
@@ -1465,6 +1470,7 @@
     }
     currentAccess=access||{authorized,role:authorized?"admin":"",classIds:[]};
     isAuthorizedAdmin=authorized;
+    el("ownerAdminButton").classList.toggle("hidden",!(user&&String(user.email||"").toLowerCase()==="simcha5770@gmail.com"));
     try{if(authorized)localStorage.setItem("b3TeacherBypass","1");else localStorage.removeItem("b3TeacherBypass");}catch(e){}
     renderStudentAccess();renderAdminPanel();
     if(authorized){startApprovalCenter();loadClassManagement().catch(console.warn);}else stopApprovalCenter();
