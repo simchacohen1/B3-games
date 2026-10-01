@@ -1151,12 +1151,19 @@
     }
     if(!signedIn){el("adminStatus").textContent="Password accepted. Now sign in with simcha5770@gmail.com.";return;}
     if(!isAuthorizedAdmin){el("adminStatus").textContent=`Signed in as ${currentUser.email||"an unauthorized account"}. This account cannot edit settings.`;return;}
-    el("adminStatus").textContent=`Signed in as ${currentUser.email}. Your teacher access bypasses all student locks; ET and WT can be controlled separately.`;
+    const ownerAccess=currentAccess.role==="admin"||currentAccess.classIds.includes("*");
+    el("adminStatus").textContent=ownerAccess
+      ? `Signed in as ${currentUser.email}. Owner access.`
+      : `Signed in as ${currentUser.email}. Managing only your assigned class${currentAccess.classIds.length===1?"":"es"}.`;
     el("siteEnabledToggle").checked=currentSettings.siteEnabled;
+    const masterRow=el("siteEnabledToggle").closest(".master-row");
+    if(masterRow)masterRow.style.display=ownerAccess?"":"none";
     const openScheduleEditors=Array.from(el("classControls").querySelectorAll(".class-card details[open]")).map(details=>details.closest(".class-card")?.dataset.classCard).filter(Boolean);
-    el("classControls").innerHTML=classCardHtml("et")+classCardHtml("wt");
+    const legacyClassIds=ownerAccess?["et","wt"]:(currentAccess.classIds||[]).filter(id=>id==="et"||id==="wt");
+    el("classControls").innerHTML=legacyClassIds.map(classCardHtml).join("") ||
+      '<div class="admin-message" style="padding:14px">This teacher is not assigned to either of the legacy B3 ET/WT groups. Class access for the teacher\'s own class is managed from that class, not from B3 ET/WT.</div>';
     openScheduleEditors.forEach(classId=>{const details=el("classControls").querySelector(`[data-class-card="${classId}"] details`);if(details)details.open=true;});
-    bindClassControls();
+    if(legacyClassIds.length)bindClassControls();
 
     renderActivityManager();
     renderStudentOverrideControls();
@@ -1460,9 +1467,19 @@
     try{currentSettings.siteEnabled=el("siteEnabledToggle").checked;renderStudentAccess();await settingsApi.updateSiteEnabled(el("siteEnabledToggle").checked);}catch(e){currentSettings.siteEnabled=old;el("siteEnabledToggle").checked=old;alert("Could not save the master setting.");console.error(e);}
   });
 
-  db.ref("posukPractice/allowedStudents").on("value",snap=>{
+  db.ref("posukPractice/allowedStudents").on("value",async snap=>{
     const data=snap.val()||{};
-    overrideRoster=Object.entries(data).map(([id,info])=>({id,name:(info&&info.name)?String(info.name):id,classId:(info&&info.classId)||""})).sort((a,b)=>a.name.localeCompare(b.name));
+    const ownerAccess=currentAccess.role==="admin"||currentAccess.classIds.includes("*");
+    if(ownerAccess){
+      overrideRoster=Object.entries(data).map(([id,info])=>({id,name:(info&&info.name)?String(info.name):id,classId:(info&&info.classId)||""})).sort((a,b)=>a.name.localeCompare(b.name));
+    }else if(isAuthorizedAdmin){
+      const ids=new Set();
+      await Promise.all((currentAccess.classIds||[]).map(async classId=>{
+        const members=await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members").once("value");
+        Object.keys(members.val()||{}).forEach(id=>ids.add(id));
+      }));
+      overrideRoster=[...ids].map(id=>({id,name:(data[id]&&data[id].name)?String(data[id].name):id,classId:""})).sort((a,b)=>a.name.localeCompare(b.name));
+    }else overrideRoster=[];
     if(isAuthorizedAdmin)renderStudentOverrideControls();
   },err=>console.warn("Could not load student override roster",err));
 
