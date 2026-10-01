@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B3 Teacher Administration</title>
+<style>
+html,body{margin:0;height:100%;background:#f1f5f9;font-family:Arial,sans-serif}
+header{height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:#fff;border-bottom:1px solid #e2e8f0;box-sizing:border-box}
+header div{text-align:left}h1{font-size:24px;margin:0;color:#26364a}p{margin:4px 0 0;color:#64748b;font-size:13px}
+a{background:#e2e8f0;color:#334155;text-decoration:none;border-radius:10px;padding:10px 14px;font-weight:800}
+iframe{display:block;width:100%;height:calc(100% - 72px);border:0;background:#f1f5f9}
+</style>
+</head>
+<body>
+<header><div><h1>B3 Teacher Administration</h1><p>Students, classes, passcodes, access, schedules, teachers, and activities</p></div><a href="index.html">← B3 Games</a></header>
+<iframe id="adminFrame" src="index.html" title="B3 administration"></iframe>
+<script>
+const frame=document.getElementById("adminFrame");
+frame.addEventListener("load",()=>{
+  try{
+    const d=frame.contentDocument,w=frame.contentWindow;
+    const style=d.createElement("style");
+    style.textContent="body{padding:22px 18px 50px!important;background:#f1f5f9!important;text-align:left!important}body>h1,body>.subtitle,#studentBar,#loginCard,#lockedCard,#gamesArea,#teacherToolsSection,#approvalCenterButton{display:none!important}.admin-button{display:none!important}.admin-panel{position:static!important;display:block!important;width:min(1100px,100%)!important;max-height:none!important;overflow:visible!important;margin:0 auto!important;padding:26px!important;border-radius:20px!important;box-shadow:0 8px 28px rgba(15,23,42,.10)!important}.admin-panel h2{font-size:28px!important}.admin-panel h3{font-size:20px!important;margin-top:28px!important;padding-top:18px!important;border-top:1px solid #e2e8f0}.class-card{padding:18px!important}body.admin-panel-open #gamesArea,body.admin-panel-open #teacherToolsSection{width:auto!important;margin:0!important}";
+    d.head.appendChild(style);
+    const panel=d.getElementById("adminPanel");
+    if(panel)panel.classList.remove("hidden");
+    if(typeof w.renderAdminPanel==="function")w.renderAdminPanel();
+  }catch(e){console.error(e)}
+});
+</script>
+</body>
+</html>
