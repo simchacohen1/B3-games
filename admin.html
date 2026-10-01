@@ -135,6 +135,17 @@ previewFrame.addEventListener("load",()=>{
     const panel=d.getElementById("adminPanel"); if(panel) panel.classList.add("hidden");
     const tools=d.getElementById("teacherToolsSection"); if(tools) tools.classList.add("hidden");
     d.body.classList.remove("admin-panel-open");
+    // Preview is display-only: never let the teacher session navigate into an activity.
+    d.addEventListener("click",(e)=>{
+      const card=e.target.closest(".game-card");
+      if(card){e.preventDefault();e.stopImmediatePropagation();}
+    },true);
+    d.addEventListener("submit",(e)=>{e.preventDefault();e.stopImmediatePropagation();},true);
+    d.querySelectorAll(".game-card").forEach(card=>{
+      card.style.cursor="default";
+      card.setAttribute("aria-disabled","true");
+      card.querySelectorAll("a,button").forEach(el=>el.setAttribute("tabindex","-1"));
+    });
   }catch(e){console.warn("Could not apply student preview mode",e);}
   syncStudentPreview();
   scaleStudentPreview();
