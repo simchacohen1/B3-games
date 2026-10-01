@@ -23,7 +23,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}.student
   <div class="brand">B3 Teacher Center</div>
   <div class="brand-sub">Everything for your class, organized in one place.</div>
   <nav>
-    <button class="nav-btn active" data-tab="access">🔐 Class Access</button>
+    <button class="nav-btn active" data-tab="access" id="classAccessNav">🔐 Class Access</button>
     <button class="nav-btn" data-tab="students">👥 Students &amp; Classes</button>
     <button class="nav-btn" data-tab="activities">🎮 Activities</button>
     <button class="nav-btn" data-tab="special">⭐ Special Access</button>
@@ -58,8 +58,8 @@ backToTools.addEventListener("click",e=>{
     // land on the owner's B3 dashboard; keep them in their scoped Teacher Center
     // until the generic teacher home is available.
     if(access.role==="admin"||(access.classIds||[]).includes("*")) location.href="index.html";
-    else location.href="admin.html";
-  }catch(err){location.href="admin.html";}
+    else location.href="teacher-home.html";
+  }catch(err){location.href="teacher-home.html";}
 });
 
 function findHeading(d,text){
