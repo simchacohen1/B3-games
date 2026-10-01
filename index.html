@@ -439,10 +439,11 @@
       });
     }
     const classSel=el("manageClassSelect"), studentSel=el("classStudentSelect");
-    const prior=classSel.value;
+    const prior=classSel.value, priorStudent=studentSel.value;
     classSel.innerHTML=Object.keys(classes).sort().map(id=>'<option value="'+id+'">'+((classes[id]&&classes[id].name)||id)+'</option>').join("");
     if(prior&&classes[prior])classSel.value=prior;
     studentSel.innerHTML=Object.keys(students).sort((a,b)=>String(students[a]?.profile?.name||a).localeCompare(String(students[b]?.profile?.name||b))).map(id=>'<option value="'+id+'">'+(students[id]?.profile?.name||id)+'</option>').join("");
+    if(priorStudent&&students[priorStudent])studentSel.value=priorStudent;
     const selected=classSel.value, members=(classes[selected]&&classes[selected].members)||{};
     el("classMemberList").innerHTML=Object.keys(members).length?Object.keys(members).map(id=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #e5e7eb"><span>'+(members[id].name||students[id]?.profile?.name||id)+'</span><button type="button" data-remove-member="'+id+'" style="border:0;background:none;color:#b91c1c;cursor:pointer">Remove</button></div>').join(""):'<div class="admin-message">No students in this class yet.</div>';
     const selectedStudent=studentSel.value;
