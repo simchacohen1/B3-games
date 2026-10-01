@@ -16,7 +16,7 @@
 <body>
 <div class="wrap">
   <div class="top"><div><h1>🔁 Chazara Chart</h1><div class="sub">Tap the Posuk after you <b>read and translate</b> it. Record it for double points.</div><div class="student-row"><div class="student-banner">👤 <span id="studentNameTop">Student</span></div><button type="button" class="switch-student" id="switchStudentBtn">🔄 Switch Student</button></div></div><a href="../index.html">← B3 Games</a></div>
-  <div id="noStudent" class="panel hidden"><h2>Sign in</h2><p class="note">Choose another student right here.</p><div class="signin-box"><label>Student name<input id="studentNameInput" type="text" autocomplete="name" placeholder="Type the student name"></label><label>Class PIN<input id="classPinInput" type="password" inputmode="numeric" placeholder="Class PIN"></label><div class="signin-actions"><button id="studentSignInBtn" class="signin-btn" type="button">Sign In</button><a href="../index.html" style="font-weight:800;color:#475569;text-decoration:none;">← B3 Games</a></div><div id="studentSignInMsg" class="signin-msg"></div></div></div>
+  <div id="noStudent" class="panel hidden"><h2>Sign in</h2><p class="note">Choose another student right here.</p><div class="signin-box"><label>Student name<input id="studentNameInput" type="text" autocomplete="name" placeholder="Type the student name"></label><label>Passcode<input id="classPinInput" type="password" inputmode="numeric" placeholder="Class PIN"></label><div class="signin-actions"><button id="studentSignInBtn" class="signin-btn" type="button">Sign In</button><a href="../index.html" style="font-weight:800;color:#475569;text-decoration:none;">← B3 Games</a></div><div id="studentSignInMsg" class="signin-msg"></div></div></div>
   <div id="app" class="hidden">
     <div class="stats"><div class="stat"><b id="total">0</b><span>Total Chazaras</span></div><div class="stat"><b id="learned">0</b><span>Pesukim Unlocked</span></div><div class="stat"><b id="goalDone">0</b><span>At 10+ Chazaras</span></div><div class="stat"><b id="streak">0</b><span>Day Streak 🔥</span></div></div>
     <div class="record-help"><b>🎙️ Recorded Chazara = 2 points.</b> A normal Chazara = 1 point. Points are sent to Rabbi Cohen for approval before they are added.</div>
@@ -214,20 +214,25 @@ function slugifyStudentName(name){return String(name||'').trim().toLowerCase().r
 async function signInStudentHere(){
   const btn=$('studentSignInBtn'),msg=$('studentSignInMsg'),typed=$('studentNameInput').value.trim(),pin=$('classPinInput').value.trim();
   if(!typed){msg.textContent='Please type the student name.';return}
-  const id=slugifyStudentName(typed);
-  btn.disabled=true;msg.textContent='Checking…';
+  const id=slugifyStudentName(typed);btn.disabled=true;msg.textContent='Checking…';
   try{
-    const [pinSnap,allowedSnap]=await Promise.all([db.ref('posukPractice/settings/classPin').once('value'),db.ref('posukPractice/allowedStudents/'+id).once('value')]);
-    const realPin=pinSnap.val();
-    if(realPin && String(realPin).trim()!==String(pin).trim()){msg.textContent='Incorrect PIN.';return}
-    if(!allowedSnap.exists()){msg.textContent='That student is not on the approved list.';return}
-    const allowed=allowedSnap.val()||{},name=(allowed&&allowed.name)||typed;
-    localStorage.setItem('b3Games_studentId',id);localStorage.setItem('b3Games_studentName',name);
+    const profileSnap=await db.ref('b3Games/students/'+id+'/profile').once('value');
+    let profile=profileSnap.val();
+    if(!profile){
+      const legacySnap=await db.ref('posukPractice/allowedStudents/'+id).once('value');
+      if(!legacySnap.exists()){msg.textContent='Ask your teacher to add your name first.';return}
+      const legacy=legacySnap.val()||{};profile={name:legacy.name||typed,passcode:String(legacy.passcode||'5770'),active:legacy.active!==false};
+    }
+    if(profile.active===false){msg.textContent='Your student access is turned off. Ask your teacher.';return}
+    if(String(profile.passcode||'').trim()!==String(pin).trim()){msg.textContent='Incorrect passcode.';return}
+    const name=String(profile.name||typed);
+    localStorage.setItem('b3Games_studentId',id);localStorage.setItem('b3Games_studentName',name);localStorage.setItem('b3Games_classPin',String(pin).trim());
     localStorage.setItem('posukPractice_studentId',id);localStorage.setItem('posukPractice_studentName',name);
     location.reload();
   }catch(e){console.error(e);msg.textContent='Could not sign in. Please try again.'}
   finally{btn.disabled=false}
 }
+
 if($('studentSignInBtn'))$('studentSignInBtn').onclick=signInStudentHere;
 if($('classPinInput'))$('classPinInput').addEventListener('keydown',e=>{if(e.key==='Enter')signInStudentHere()});
 setInterval(()=>{if(sid)render()},60000);
