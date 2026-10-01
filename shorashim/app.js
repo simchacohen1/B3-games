@@ -206,21 +206,25 @@ function slugifyStudent(name){return name.trim().toLowerCase().replace(/[^a-z0-9
 function setLoginMsg(text){const el=document.getElementById('loginMsg');if(el)el.textContent=text||'';}
 async function checkStudentAccess(name,pin){
   const slug=slugifyStudent(name);if(!slug)return {ok:false,reason:'Please type your name.'};
-  const [siteSnap,pinSnap,allowedSnap,masterSnap]=await Promise.all([
+  const [siteSnap,profileSnap,masterSnap]=await Promise.all([
     cloudDb.ref(`${CLOUD_ROOT}/settings/studentSiteOpen`).once('value'),
-    cloudDb.ref('posukPractice/settings/classPin').once('value'),
-    cloudDb.ref('posukPractice/allowedStudents/'+slug).once('value'),
+    cloudDb.ref('b3Games/students/'+slug+'/profile').once('value'),
     cloudDb.ref('b3Games/siteSettings').once('value')
   ]);
-  const masterSettings=masterSnap.val()||{};
-  const masterGames=masterSettings.games||{};
+  const masterSettings=masterSnap.val()||{},masterGames=masterSettings.games||{};
   if(masterSettings.siteEnabled===false||masterGames['shorashim']===false)return {ok:false,reason:'This game is currently turned off. Ask your teacher.'};
   if(siteSnap.exists()&&siteSnap.val()===false)return {ok:false,reason:'Shorashim practice is closed right now. Ask your teacher.'};
-  const realPin=pinSnap.val();
-  if(realPin&&String(pin).trim()!==String(realPin).trim())return {ok:false,reason:'Incorrect PIN. Ask your teacher.'};
-  if(!allowedSnap.exists())return {ok:false,reason:'Ask your teacher to add your name first.'};
-  return {ok:true,slug};
+  let profile=profileSnap.val();
+  if(!profile){
+    const legacySnap=await cloudDb.ref('posukPractice/allowedStudents/'+slug).once('value');
+    if(!legacySnap.exists())return {ok:false,reason:'Ask your teacher to add your name first.'};
+    const legacy=legacySnap.val()||{};profile={name:legacy.name||name,passcode:String(legacy.passcode||'5770'),active:legacy.active!==false};
+  }
+  if(profile.active===false)return {ok:false,reason:'Your student access is turned off. Ask your teacher.'};
+  if(String(profile.passcode||'').trim()!==String(pin).trim())return {ok:false,reason:'Incorrect passcode. Ask your teacher.'};
+  return {ok:true,slug,displayName:String(profile.name||name)};
 }
+
 async function loadClassLeaderboard(){
   try{const snap=await cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match`).once('value');classMatchLeaderboard=snap.val()||{};}catch(err){console.warn('Could not load leaderboard',err);classMatchLeaderboard={};}
 }
@@ -247,12 +251,22 @@ async function enterCloudStudent(name,studentId){
   showMode('student');setCloudStatus('☁️ Saved');scheduleCloudStudentSave();startCloudListeners();await loadClassLeaderboard();renderGamesLock();
 }
 async function trySavedStudent(){
-  const savedId=localStorage.getItem('posukPractice_studentId'),savedName=localStorage.getItem('posukPractice_studentName');if(!savedId||!savedName)return;
-  try{const allowed=await cloudDb.ref('posukPractice/allowedStudents/'+savedId).once('value');if(!allowed.exists()){localStorage.removeItem('posukPractice_studentId');localStorage.removeItem('posukPractice_studentName');return;}await enterCloudStudent(savedName,savedId);}catch(err){console.warn('Could not restore student automatically',err);}
+  const savedId=localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId');
+  const savedName=localStorage.getItem('b3Games_studentName')||localStorage.getItem('posukPractice_studentName');
+  if(!savedId||!savedName)return;
+  try{
+    const profile=await cloudDb.ref('b3Games/students/'+savedId+'/profile').once('value');
+    if(!profile.exists()){
+      const allowed=await cloudDb.ref('posukPractice/allowedStudents/'+savedId).once('value');
+      if(!allowed.exists()){localStorage.removeItem('posukPractice_studentId');localStorage.removeItem('posukPractice_studentName');return;}
+    }else if(profile.val()?.active===false)return;
+    await enterCloudStudent(savedName,savedId);
+  }catch(err){console.warn('Could not restore student automatically',err);}
 }
+
 function bindCloudLogin(){
   const btn=document.getElementById('loginBtn'),nameEl=document.getElementById('studentNameInput'),pinEl=document.getElementById('classPinInput');
-  const submit=async()=>{const name=nameEl.value.trim(),pin=pinEl.value.trim();if(!name){setLoginMsg('Please type your name.');return;}btn.disabled=true;setLoginMsg('Checking…');try{const result=await checkStudentAccess(name,pin);if(!result.ok){setLoginMsg(result.reason);return;}localStorage.setItem('posukPractice_studentName',name);localStorage.setItem('posukPractice_studentId',result.slug);await enterCloudStudent(name,result.slug);setLoginMsg('');}catch(err){if(err&&err.message==='STUDENT_SITE_CLOSED'){applyStudentSiteOpen(false);setLoginMsg('');}else{console.error('Login failed',err);setLoginMsg('Could not connect. Check the internet and try again.');}}finally{btn.disabled=false;}};
+  const submit=async()=>{const name=nameEl.value.trim(),pin=pinEl.value.trim();if(!name){setLoginMsg('Please type your name.');return;}btn.disabled=true;setLoginMsg('Checking…');try{const result=await checkStudentAccess(name,pin);if(!result.ok){setLoginMsg(result.reason);return;}const displayName=result.displayName||name;localStorage.setItem('b3Games_studentId',result.slug);localStorage.setItem('b3Games_studentName',displayName);localStorage.setItem('b3Games_classPin',pin);localStorage.setItem('posukPractice_studentName',displayName);localStorage.setItem('posukPractice_studentId',result.slug);await enterCloudStudent(displayName,result.slug);setLoginMsg('');}catch(err){if(err&&err.message==='STUDENT_SITE_CLOSED'){applyStudentSiteOpen(false);setLoginMsg('');}else{console.error('Login failed',err);setLoginMsg('Could not connect. Check the internet and try again.');}}finally{btn.disabled=false;}};
   btn.onclick=submit;[nameEl,pinEl].forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();submit();}}));
   document.getElementById('switchStudentBtn').onclick=()=>{localStorage.removeItem('posukPractice_studentName');localStorage.removeItem('posukPractice_studentId');location.reload();};
   trySavedStudent();
