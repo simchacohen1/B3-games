@@ -237,7 +237,7 @@ async function login(){
   try{
     const [p,a]=await Promise.all([db.ref('posukPractice/settings/classPin').once('value'),db.ref('posukPractice/allowedStudents/'+id).once('value')]);
     if(p.val()&&String(p.val()).trim()!==pin){setLoginMsg('That PIN is not correct.');return;}
-    if(!a.exists()){setLoginMsg('Ask Rabbi Cohen to add your name first.');return;}
+    if(!a.exists()){setLoginMsg('Ask your teacher to add your name first.');return;}
     const d=a.val();studentId=id;studentName=d&&d.name?String(d.name):name;
     localStorage.setItem('posukPractice_studentId',studentId);localStorage.setItem('posukPractice_studentName',studentName);
     enterApp();
