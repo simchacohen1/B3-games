@@ -424,45 +424,52 @@
   }
   async function loadClassManagement(){
     if(!isAuthorizedAdmin)return;
-    const [classesSnap,studentsSnap,teachersSnap,legacyStudentsSnap]=await Promise.all([
-      db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value"),
-      db.ref("b3Games/students").once("value"),
-      db.ref("b3Games/workspaces/"+workspaceId+"/teachers").once("value"),
-      db.ref("posukPractice/allowedStudents").once("value")
-    ]);
-    const classes=classesSnap.val()||{}, students=studentsSnap.val()||{}, teachers=teachersSnap.val()||{};
-    const legacyStudents=legacyStudentsSnap.val()||{};
-    const migrationUpdates={};
-    Object.entries(legacyStudents).forEach(([id,info])=>{
-      if(students[id]&&students[id].profile)return;
-      const row=info||{};
-      migrationUpdates["b3Games/students/"+id+"/profile"]={
-        id,name:String(row.name||id),passcode:String(row.passcode||"5770"),
-        passcodeUpdatedAt:Number(row.passcodeUpdatedAt)||Date.now(),active:true
-      };
-    });
-    if(Object.keys(migrationUpdates).length){
-      await db.ref().update(migrationUpdates);
-      Object.entries(legacyStudents).forEach(([id,info])=>{
-        if(!students[id])students[id]={};
-        if(!students[id].profile)students[id].profile=migrationUpdates["b3Games/students/"+id+"/profile"];
-      });
-    }
+    const isOwner=currentAccess.role==="admin"||currentAccess.classIds.includes("*");
+    const allowedClassIds=new Set(isOwner?[]:(currentAccess.classIds||[]));
+    const classesSnap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");
+    const allClasses=classesSnap.val()||{};
+    const classes={};
+    Object.entries(allClasses).forEach(([id,row])=>{if(isOwner||allowedClassIds.has(id))classes[id]=row||{};});
+
     const classSel=el("manageClassSelect"), studentSel=el("classStudentSelect");
     const prior=classSel.value, priorStudent=studentSel.value;
-    classSel.innerHTML=Object.keys(classes).sort().map(id=>'<option value="'+id+'">'+((classes[id]&&classes[id].name)||id)+'</option>').join("");
+    const classIds=Object.keys(classes).sort();
+    classSel.innerHTML=classIds.map(id=>'<option value="'+id+'">'+((classes[id]&&classes[id].name)||id)+'</option>').join("");
     if(prior&&classes[prior])classSel.value=prior;
-    studentSel.innerHTML=Object.keys(students).sort((a,b)=>String(students[a]?.profile?.name||a).localeCompare(String(students[b]?.profile?.name||b))).map(id=>'<option value="'+id+'">'+(students[id]?.profile?.name||id)+'</option>').join("");
+    if(!classSel.value&&classIds.length)classSel.value=classIds[0];
+
+    // Teachers only load students who are members of classes assigned to them.
+    // The owner can still manage the complete B3 student directory.
+    let studentIds=[];
+    if(isOwner){
+      const studentsIndex=await db.ref("b3Games/students").once("value");
+      studentIds=Object.keys(studentsIndex.val()||{});
+    }else{
+      const ids=new Set();
+      Object.values(classes).forEach(row=>Object.keys((row&&row.members)||{}).forEach(id=>ids.add(id)));
+      studentIds=[...ids];
+    }
+    const studentRows=await Promise.all(studentIds.map(async id=>{
+      const snap=await db.ref("b3Games/students/"+id+"/profile").once("value");
+      return [id,snap.val()||{}];
+    }));
+    const students={};
+    studentRows.forEach(([id,profile])=>{students[id]={profile};});
+
+    studentSel.innerHTML=studentIds.sort((a,b)=>String(students[a]?.profile?.name||a).localeCompare(String(students[b]?.profile?.name||b))).map(id=>'<option value="'+id+'">'+(students[id]?.profile?.name||id)+'</option>').join("");
     if(priorStudent&&students[priorStudent])studentSel.value=priorStudent;
+
     const selected=classSel.value, members=(classes[selected]&&classes[selected].members)||{};
     el("classMemberList").innerHTML=Object.keys(members).length?Object.keys(members).sort((a,b)=>String(members[a]?.name||students[a]?.profile?.name||a).localeCompare(String(members[b]?.name||students[b]?.profile?.name||b))).map(id=>{
-      const profile=students[id]?.profile||{}, legacy=legacyStudents[id]||{}, name=members[id]?.name||profile.name||legacy.name||id;
-      const passcode=String(profile.passcode??legacy.passcode??"5770"), active=profile.active!==false;
-      return '<div style="display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px;gap:8px;align-items:center;padding:10px;border-top:1px solid #e5e7eb"><strong>'+name+'</strong><input data-student-passcode="'+id+'" value="'+passcode.replace(/"/g,"&quot;")+'" inputmode="numeric" aria-label="Current passcode for '+name.replace(/"/g,"&quot;")+'" title="Current saved B3 passcode" style="width:100%;padding:7px 8px;border:1px solid #94a3b8;border-radius:8px;background:#fff;font-weight:800;color:#0f172a"><button type="button" data-toggle-student="'+id+'" data-active="'+active+'" style="border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer;background:'+(active?'#dcfce7':'#fee2e2')+';color:'+(active?'#166534':'#991b1b')+'">'+(active?'Enabled':'Blocked')+'</button><button type="button" data-save-student="'+id+'" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer">Save</button></div>';
+      const profile=students[id]?.profile||{}, name=members[id]?.name||profile.name||id;
+      const passcode=String(profile.passcode??""), active=profile.active!==false;
+      return '<div style="display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px;gap:8px;align-items:center;padding:10px;border-top:1px solid #e5e7eb"><strong>'+name+'</strong><input data-student-passcode="'+id+'" value="'+passcode.replace(/"/g,"&quot;")+'" inputmode="numeric" aria-label="Current passcode for '+name.replace(/"/g,"&quot;")+'" title="Current saved passcode" style="width:100%;padding:7px 8px;border:1px solid #94a3b8;border-radius:8px;background:#fff;font-weight:800;color:#0f172a"><button type="button" data-toggle-student="'+id+'" data-active="'+active+'" style="border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer;background:'+(active?'#dcfce7':'#fee2e2')+';color:'+(active?'#166534':'#991b1b')+'">'+(active?'Enabled':'Blocked')+'</button><button type="button" data-save-student="'+id+'" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer">Save</button></div>';
     }).join(""):'<div class="admin-message" style="padding:14px 10px">No students in this class yet. Use “Add Student” above.</div>';
+
     const selectedStudent=studentSel.value;
     if(el("editManagedStudentPasscode"))el("editManagedStudentPasscode").value=String(students[selectedStudent]?.profile?.passcode||"");
-    el("teacherList").innerHTML=Object.keys(teachers).map(uid=>'<div style="padding:5px 0;border-bottom:1px solid #e5e7eb">'+(teachers[uid].email||uid)+' <strong>('+(teachers[uid].role||"teacher")+')</strong></div>').join("")||'<div class="admin-message">No teachers yet.</div>';
+    // Teacher-account administration belongs only in Owner Admin.
+    if(el("teacherList"))el("teacherList").innerHTML="";
   }
   async function addManagedClass(){
     const name=el("newClassName").value.trim(), id=slugId(name);
