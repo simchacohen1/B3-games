@@ -228,6 +228,30 @@
 
       <div id="classControls"></div>
 
+      <h3>Class management</h3>
+      <p class="admin-message">Create classes and manage which students belong to each class. Students may belong to more than one class.</p>
+      <div class="override-box" id="classManagementBox">
+        <label for="manageClassSelect">Class</label>
+        <select id="manageClassSelect" class="override-student-select"></select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <input id="newClassName" type="text" placeholder="New class name" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
+          <button id="addClassButton" class="admin-action" type="button" style="margin:0">Add class</button>
+        </div>
+        <label for="classStudentSelect" style="display:block;margin-top:12px">Add student</label>
+        <select id="classStudentSelect" class="override-student-select"></select>
+        <button id="addStudentToClassButton" class="admin-action secondary" type="button">Add student to selected class</button>
+        <div id="classMemberList" style="margin-top:10px"></div>
+        <div id="classManagementStatus" class="override-saving" aria-live="polite"></div>
+      </div>
+
+      <h3>Teacher accounts</h3>
+      <p class="admin-message">Add a teacher's Google email and assign that teacher to one or more classes. The account becomes active after the teacher signs in.</p>
+      <div class="override-box">
+        <input id="teacherEmailInput" type="email" placeholder="teacher@example.com" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid #cbd5e1;border-radius:9px">
+        <button id="addTeacherButton" class="admin-action secondary" type="button">Add teacher</button>
+        <div id="teacherList" style="margin-top:10px"></div>
+      </div>
+
       <h3>Individual activity switches</h3>
       <div class="game-toggle-header"><span>Activity</span><span>ET</span><span>WT</span></div>
       <div id="gameToggles"></div>
@@ -288,6 +312,58 @@
     "weekly-quiz":"weekly-quiz/teacher.html"
   };
   const pairedTeacherHrefs=new Set(Object.values(teacherVersionByGame).map(h=>h.split("?")[0]));
+
+  function slugId(value){
+    return String(value||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,48);
+  }
+  async function loadClassManagement(){
+    if(!isAuthorizedAdmin)return;
+    const [classesSnap,studentsSnap,teachersSnap]=await Promise.all([
+      db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value"),
+      db.ref("b3Games/students").once("value"),
+      db.ref("b3Games/workspaces/"+workspaceId+"/teachers").once("value")
+    ]);
+    const classes=classesSnap.val()||{}, students=studentsSnap.val()||{}, teachers=teachersSnap.val()||{};
+    const classSel=el("manageClassSelect"), studentSel=el("classStudentSelect");
+    const prior=classSel.value;
+    classSel.innerHTML=Object.keys(classes).sort().map(id=>'<option value="'+id+'">'+((classes[id]&&classes[id].name)||id)+'</option>').join("");
+    if(prior&&classes[prior])classSel.value=prior;
+    studentSel.innerHTML=Object.keys(students).sort((a,b)=>String(students[a]?.profile?.name||a).localeCompare(String(students[b]?.profile?.name||b))).map(id=>'<option value="'+id+'">'+(students[id]?.profile?.name||id)+'</option>').join("");
+    const selected=classSel.value, members=(classes[selected]&&classes[selected].members)||{};
+    el("classMemberList").innerHTML=Object.keys(members).length?Object.keys(members).map(id=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #e5e7eb"><span>'+(members[id].name||students[id]?.profile?.name||id)+'</span><button type="button" data-remove-member="'+id+'" style="border:0;background:none;color:#b91c1c;cursor:pointer">Remove</button></div>').join(""):'<div class="admin-message">No students in this class yet.</div>';
+    el("teacherList").innerHTML=Object.keys(teachers).map(uid=>'<div style="padding:5px 0;border-bottom:1px solid #e5e7eb">'+(teachers[uid].email||uid)+' <strong>('+(teachers[uid].role||"teacher")+')</strong></div>').join("")||'<div class="admin-message">No teachers yet.</div>';
+  }
+  async function addManagedClass(){
+    const name=el("newClassName").value.trim(), id=slugId(name);
+    if(!name||!id)return;
+    const user=window.firebase.auth().currentUser, now=new Date().toISOString();
+    await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id).update({id,name,active:true,createdAt:now});
+    if(user)await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id+"/teacherIds/"+user.uid).set(true);
+    el("newClassName").value=""; await loadClassManagement(); el("manageClassSelect").value=id; await loadClassManagement();
+  }
+  async function addStudentToManagedClass(){
+    const classId=el("manageClassSelect").value, studentId=el("classStudentSelect").value;
+    if(!classId||!studentId)return;
+    const s=(await db.ref("b3Games/students/"+studentId+"/profile").once("value")).val()||{};
+    const updates={};
+    updates["b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId]={studentId,name:s.name||studentId,active:true};
+    updates["b3Games/students/"+studentId+"/memberships/"+workspaceId+"_"+classId]={workspaceId,classId,active:true};
+    await db.ref().update(updates); await loadClassManagement();
+  }
+  async function removeStudentFromManagedClass(studentId){
+    const classId=el("manageClassSelect").value;if(!classId||!studentId)return;
+    const updates={};
+    updates["b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId]=null;
+    updates["b3Games/students/"+studentId+"/memberships/"+workspaceId+"_"+classId]=null;
+    await db.ref().update(updates); await loadClassManagement();
+  }
+  async function addManagedTeacher(){
+    const email=el("teacherEmailInput").value.trim().toLowerCase();if(!email)return;
+    const key=slugId(email.replace("@","-at-")), now=new Date().toISOString();
+    await db.ref("b3Games/workspaces/"+workspaceId+"/teacherInvites/"+key).set({email,role:"teacher",active:true,createdAt:now});
+    el("teacherEmailInput").value="";
+    el("classManagementStatus").textContent="Teacher invitation saved. Account will link when teacher sign-in is enabled.";
+  }
 
   function setTeacherToolPairVisibility(){
     document.querySelectorAll(".teacher-tool-card").forEach(card=>{
@@ -1043,6 +1119,11 @@
     if(!el("adminPanel").classList.contains("hidden"))renderAdminPanel();
   });
   el("adminPasswordButton").addEventListener("click",unlockAdminPassword);
+  el("manageClassSelect").addEventListener("change",loadClassManagement);
+  el("addClassButton").addEventListener("click",addManagedClass);
+  el("addStudentToClassButton").addEventListener("click",addStudentToManagedClass);
+  el("addTeacherButton").addEventListener("click",addManagedTeacher);
+  el("classMemberList").addEventListener("click",e=>{const b=e.target.closest("[data-remove-member]");if(b)removeStudentFromManagedClass(b.dataset.removeMember);});
   el("adminPasswordInput").addEventListener("keydown",e=>{if(e.key==="Enter")unlockAdminPassword();});
   el("signInButton").addEventListener("click",()=>settingsApi.signInWithGoogle().catch(e=>{
     const detail=(e&&e.code)?e.code:(e&&e.message)?e.message:"Unknown error";
@@ -1065,7 +1146,7 @@
     if(isAuthorizedAdmin)renderStudentOverrideControls();
   },err=>console.warn("Could not load student override roster",err));
 
-  settingsApi.onAuthStateChanged((user,authorized)=>{currentUser=user;isAuthorizedAdmin=authorized;try{if(authorized)localStorage.setItem("b3TeacherBypass","1");else localStorage.removeItem("b3TeacherBypass");}catch(e){}renderStudentAccess();renderAdminPanel();if(authorized)startApprovalCenter();else stopApprovalCenter();});
+  settingsApi.onAuthStateChanged((user,authorized)=>{currentUser=user;isAuthorizedAdmin=authorized;try{if(authorized)localStorage.setItem("b3TeacherBypass","1");else localStorage.removeItem("b3TeacherBypass");}catch(e){}renderStudentAccess();renderAdminPanel();if(authorized){startApprovalCenter();loadClassManagement().catch(console.warn);}else stopApprovalCenter();});
   settingsApi.subscribe(settings=>{currentSettings=settings;renderStudentAccess();renderAdminPanel();});
   setInterval(()=>{renderStudentAccess();},15000);
   restoreStudent();
