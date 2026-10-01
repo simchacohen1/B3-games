@@ -2275,15 +2275,23 @@ async function checkAccess(name, pin){
   const slug = slugify(name);
   if(!slug){ return { ok:false, reason:'Please type your name.' }; }
 
-  const allowedSnap = await db.ref('posukPractice/allowedStudents/' + slug).once('value');
+  let allowedSnap = await db.ref('b3Games/students/' + slug + '/profile').once('value');
+  let allowedInfo = allowedSnap.val() || {};
   if(!allowedSnap.exists()){
-    return { ok:false, reason:'Ask your teacher to add your name first.' };
+    const legacySnap = await db.ref('posukPractice/allowedStudents/' + slug).once('value');
+    if(!legacySnap.exists()) return { ok:false, reason:'Ask your teacher to add your name first.' };
+    const legacy = legacySnap.val() || {};
+    allowedInfo = {
+      id: slug,
+      name: String(legacy.name || name.trim()),
+      passcode: String(legacy.passcode || DEFAULT_STUDENT_PASSCODE),
+      passcodeUpdatedAt: Number(legacy.passcodeUpdatedAt) || Date.now(),
+      active: true
+    };
+    try{ await db.ref('b3Games/students/' + slug + '/profile').set(allowedInfo); }catch(e){}
   }
-
-  const allowedInfo = allowedSnap.val() || {};
-  const realPin = (allowedInfo.passcode !== undefined && allowedInfo.passcode !== null && String(allowedInfo.passcode).trim())
-    ? String(allowedInfo.passcode).trim()
-    : DEFAULT_STUDENT_PASSCODE;
+  if(allowedInfo.active === false) return { ok:false, reason:'Your B3 access is turned off. Ask your teacher.' };
+  const realPin = String(allowedInfo.passcode || '').trim();
   if(String(pin).trim() !== realPin){
     return { ok:false, reason:'Incorrect passcode. Ask your teacher.' };
   }
@@ -2403,7 +2411,8 @@ window.addEventListener('load', async () => {
     // If the teacher changed this student's passcode, an old remembered login
     // is cleared and the student must enter the new passcode.
     try{
-      const allowedSnap = await db.ref('posukPractice/allowedStudents/' + savedId).once('value');
+      let allowedSnap = await db.ref('b3Games/students/' + savedId + '/profile').once('value');
+      if(!allowedSnap.exists()) allowedSnap = await db.ref('posukPractice/allowedStudents/' + savedId).once('value');
       if(!allowedSnap.exists()){
         localStorage.removeItem('posukPractice_studentName');
         localStorage.removeItem('posukPractice_studentId');
@@ -2411,6 +2420,12 @@ window.addEventListener('load', async () => {
         return;
       }
       const allowedInfo = allowedSnap.val() || {};
+      if(allowedInfo.active === false){
+        localStorage.removeItem('posukPractice_studentName');
+        localStorage.removeItem('posukPractice_studentId');
+        localStorage.removeItem('posukPractice_studentAccessVersion');
+        return;
+      }
       const currentAccessVersion = String(Number(allowedInfo.passcodeUpdatedAt) || 0);
       if(savedAccessVersion !== currentAccessVersion){
         localStorage.removeItem('posukPractice_studentName');
