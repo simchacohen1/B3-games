@@ -197,7 +197,7 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
   <div class="card name-gate" id="nameGate">
     <div class="finish-icon" aria-hidden="true">🔎</div><h2>Become a Rashi detective!</h2><p class="intro-copy">Discover the letters. Crack the words.<br>One small step at a time!</p><label for="studentNameInput">Your name</label>
     <input id="studentNameInput" type="text" placeholder="Type your name here" maxlength="30">
-    <label for="classPinInput">Class PIN</label>
+    <label for="classPinInput">Passcode</label>
     <input id="classPinInput" type="password" placeholder="Ask your teacher" maxlength="20" inputmode="numeric">
     <div><button class="btn" id="startBtn">Let’s explore →</button></div>
     <div id="gateMsg"></div>
@@ -558,32 +558,24 @@ function beep(kind){
 }
 
 async function checkAccess(name, pin){
-  const slug = slugify(name);
-  if(!slug){ return { ok:false, reason:'Please type your name.' }; }
-  const [lockSnap, pinSnap, allowedSnap, siteSettingsSnap] = await Promise.all([
+  const slug=slugify(name);if(!slug)return {ok:false,reason:'Please type your name.'};
+  const [lockSnap,profileSnap,siteSettingsSnap]=await Promise.all([
     db.ref('rashiLetters/settings/accessLocked').once('value'),
-    db.ref('posukPractice/settings/classPin').once('value'),
-    db.ref('posukPractice/allowedStudents/' + slug).once('value'),
+    db.ref('b3Games/students/'+slug+'/profile').once('value'),
     db.ref('b3Games/siteSettings').once('value')
   ]);
-  const siteSettings = siteSettingsSnap.val() || {};
-  const gamesMap = siteSettings.games || {};
-  const siteWideOff = siteSettings.siteEnabled === false;
-  const gameSpecificOff = gamesMap['rashi-letters'] === false;
-  if(siteWideOff || gameSpecificOff){
-    return { ok:false, reason:'This game is currently turned off. Ask your teacher.' };
+  const siteSettings=siteSettingsSnap.val()||{},gamesMap=siteSettings.games||{};
+  if(siteSettings.siteEnabled===false||gamesMap['rashi-letters']===false)return {ok:false,reason:'This game is currently turned off. Ask your teacher.'};
+  if(lockSnap.val()===true)return {ok:false,reason:'Practice is closed right now. Ask your teacher.'};
+  let profile=profileSnap.val();
+  if(!profile){
+    const legacySnap=await db.ref('posukPractice/allowedStudents/'+slug).once('value');
+    if(!legacySnap.exists())return {ok:false,reason:'Ask your teacher to add your name first.'};
+    const legacy=legacySnap.val()||{};profile={name:legacy.name||name,passcode:String(legacy.passcode||'5770'),active:legacy.active!==false};
   }
-  if(lockSnap.val() === true){
-    return { ok:false, reason:'Practice is closed right now. Ask your teacher.' };
-  }
-  const realPin = pinSnap.val();
-  if(realPin && String(pin).trim() !== String(realPin).trim()){
-    return { ok:false, reason:'Incorrect PIN. Ask your teacher.' };
-  }
-  if(!allowedSnap.exists()){
-    return { ok:false, reason:'Ask your teacher to add your name first.' };
-  }
-  return { ok:true, slug };
+  if(profile.active===false)return {ok:false,reason:'Your student access is turned off. Ask your teacher.'};
+  if(String(profile.passcode||'').trim()!==String(pin).trim())return {ok:false,reason:'Incorrect passcode. Ask your teacher.'};
+  return {ok:true,slug,displayName:String(profile.name||name)};
 }
 
 document.getElementById('startBtn').onclick = async () => {
@@ -602,8 +594,11 @@ document.getElementById('startBtn').onclick = async () => {
       return;
     }
     msg.textContent = '';
-    studentName = val;
+    studentName = result.displayName || val;
     studentId = result.slug;
+    localStorage.setItem('b3Games_studentId',studentId);
+    localStorage.setItem('b3Games_studentName',studentName);
+    localStorage.setItem('b3Games_classPin',pin);
     await loadProgress();
     updateRewardHud();
     document.getElementById('nameGate').style.display = 'none';
