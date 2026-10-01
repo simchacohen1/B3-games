@@ -446,6 +446,18 @@
     });
   }
 
+  // One-time bridge for legacy B3 students whose allowedStudents rows predate classId.
+  // This exists only to seed Firebase memberships; normal access never depends on it.
+  const LEGACY_CLASS_MIGRATION = {
+    et: ["chaim_chaikin","mayer_chaim_chaikin","yossi_gourarie","sholom_huebner","sholom_dovber_huebner","moshe_lapine","kehos_notik","yisroel_oirechman","moshe_raichman","moshe_tuvia_raichman","avrohom_rosenfeld","levi_rozmarin","arik_traxler","simcha_cohen"],
+    wt: ["ari_greenberg","zev_rosenfeld","levi_schtroks","yisroel_aryeh_simmonds","leibel_vogel","leib_wolf"]
+  };
+  function legacyMigrationClass(studentId) {
+    if (LEGACY_CLASS_MIGRATION.et.indexOf(studentId) !== -1) return "et";
+    if (LEGACY_CLASS_MIGRATION.wt.indexOf(studentId) !== -1) return "wt";
+    return "";
+  }
+
   // Safe, repeatable migration: copy existing Firebase student/class data into
   // the new teacher -> class -> membership model. No student names or PINs are
   // embedded in source code. Legacy records remain in place until every app has
@@ -482,7 +494,8 @@
 
       Object.keys(students).forEach(function (studentId) {
         const row = students[studentId] || {};
-        const classId = String(row.classId || "").toLowerCase();
+        let classId = String(row.classId || "").toLowerCase();
+        if (classId !== "et" && classId !== "wt") classId = legacyMigrationClass(studentId);
         if (classId !== "et" && classId !== "wt") return;
         const profile = { id: studentId, name: row.name || studentId, active: row.active !== false };
         updates["b3Games/students/" + studentId + "/profile"] = profile;
