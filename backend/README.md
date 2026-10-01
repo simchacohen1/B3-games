@@ -1,21 +1,18 @@
 # Firebase backend migration — deployment required
 
-These files were recovered from the September 29–30 project attachments and updated for Fun Torah Tools. They are source code, **not evidence of a deployed fix**. No Firebase credentials are present in this repository/session.
+The current project was supplied in `B3-Games-Backend.zip` on October 1, 2026. This directory now contains its active function entrypoint, dependencies, Firebase configuration, and supporting function modules, with the Fun Torah Tools changes integrated. Historical backups and `node_modules` are excluded. Existing grading, speech, rewards, Gallery powers, and parent-dashboard exports are preserved.
 
-The recovered installation instructions identify the existing Windows project as `C:\B3-Games-Backend`. Preserve that project's other functions and package dependencies.
+These are source changes, **not evidence of a deployed fix**. GitHub Pages does not deploy Firebase functions.
 
-Copy the contents of `backend/functions/` into that project's `functions/` directory, retaining all other files. The existing `index.js` already exports `yiddishApi` from `./yiddish`; add:
-
-```js
-exports.funTorahTeacherClaim = require('./teacher-claim').funTorahTeacherClaim;
-exports.funTorahManageStudents = require('./student-management').funTorahManageStudents;
-```
-
-From `C:\B3-Games-Backend`, deploy only these functions:
+To deploy from a checkout, open PowerShell in the repository's `backend` directory:
 
 ```powershell
+npm --prefix functions ci
+firebase login
 firebase deploy --only functions:yiddishApi,functions:funTorahTeacherClaim,functions:funTorahManageStudents --project b3-games
 ```
+
+Alternatively copy `backend/functions/` into `C:\B3-Games-Backend\functions`, retaining other project files, and run the same targeted deployment from `C:\B3-Games-Backend`. The new function exports are already wired into `functions/index.js`. Existing deployed secrets remain in Firebase; no secret values belong in this repository.
 
 Verify all three endpoints after deployment with a real invited Google teacher and real central student passcode. Do not change database rules as a shortcut. The Yiddish service uses the Admin SDK and never returns raw passcodes.
 
