@@ -102,6 +102,10 @@
   var lastSettings = null;
   var studentClassId = "";
   var classResolved = false;
+  var studentActive = false;
+  var assignedClass = null;
+  var verifiedTeacherAccess = null;
+  var teacherClassRecord = null;
   var requestInFlight = false;
   var firstDecisionMade = false;
   var firstLoadFailsafe = setTimeout(function () {
@@ -139,6 +143,7 @@
   }
 
   function showClosed(title, message) {
+    document.querySelectorAll("audio,video").forEach(function(media){try{media.pause();}catch(error){}});
     markFirstDecision();
     reveal();
     if (!overlay) {
@@ -164,7 +169,29 @@
   }
 
   function storedTeacherBypass() {
-    return localStorage.getItem("b3TeacherBypass") === "1";
+    return Boolean(verifiedTeacherAccess && verifiedTeacherAccess.authorized &&
+      verifiedTeacherAccess.role === "admin");
+  }
+
+  function loadAuthScript(url) {
+    return new Promise(function(resolve,reject){
+      var script=document.createElement("script");script.src=url;
+      script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
+    });
+  }
+  async function watchTeacherAccess() {
+    try {
+      // Let the page's own Firebase scripts finish before supplying missing ones.
+      if(document.readyState === "loading") await new Promise(function(resolve){document.addEventListener("DOMContentLoaded",resolve,{once:true});});
+      if(!window.firebase) await loadAuthScript("https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js");
+      if(!window.firebase.auth) await loadAuthScript("https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js");
+      if(!window.firebase.database) await loadAuthScript("https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js");
+      if(!window.B3_FIREBASE_CONFIG) await loadAuthScript(new URL("firebase-config.js",rootBase).href);
+      if(!window.B3SiteSettings) await loadAuthScript(new URL("site-settings.js?v=20261001-role-scope",rootBase).href);
+      window.B3SiteSettings.onAuthStateChanged(function(user,authorized,access){
+        verifiedTeacherAccess=authorized?access:null;checkNow();
+      });
+    } catch(error){console.warn("Teacher access could not be verified",error);}
   }
 
   function getStoredStudentId() {
@@ -207,49 +234,29 @@
     });
   }
 
-  function resolveStudentClass() {
-    if (classResolved) return Promise.resolve(studentClassId);
-
-    studentClassId = getStoredClass();
-    if (studentClassId) {
-      classResolved = true;
-      return Promise.resolve(studentClassId);
+  async function resolveStudentClass() {
+    var studentId=getStoredStudentId(), storedClass=getStoredClass();
+    studentActive=false;assignedClass=null;studentClassId="";
+    if(!studentId)return "";
+    var rows=await Promise.all([
+      fetchJson(DATABASE_URL+"/b3Games/students/"+encodeURIComponent(studentId)+"/profile.json"),
+      fetchJson(DATABASE_URL+"/b3Games/students/"+encodeURIComponent(studentId)+"/memberships.json")
+    ]);
+    var profile=rows[0],memberships=rows[1]||{};
+    if(profile && profile.active===false)return "";
+    var valid=Object.values(memberships).filter(function(m){return m&&m.active!==false&&m.workspaceId===WORKSPACE_ID&&m.classId;});
+    var match=valid.find(function(m){return m.classId===storedClass;})||(valid.length===1?valid[0]:null);
+    if(match)studentClassId=String(match.classId);
+    else if(!Object.keys(memberships).length){
+      var legacy=await fetchJson(DATABASE_URL+"/posukPractice/allowedStudents/"+encodeURIComponent(studentId)+".json");
+      if(legacy&&legacy.active!==false&&["et","wt"].includes(legacy.classId))studentClassId=legacy.classId;
     }
-
-    var studentId = getStoredStudentId();
-    if (!studentId) {
-      classResolved = true;
-      return Promise.resolve("");
-    }
-
-    var membershipUrl = DATABASE_URL + "/b3Games/students/" + encodeURIComponent(studentId) + "/memberships.json";
-    var legacyUrl = DATABASE_URL + "/posukPractice/allowedStudents/" + encodeURIComponent(studentId) + ".json";
-    return fetchJson(membershipUrl).then(function (memberships) {
-      var c = "";
-      Object.keys(memberships || {}).some(function (key) {
-        var m = memberships[key] || {};
-        if (m.active !== false && m.workspaceId === WORKSPACE_ID && String(m.classId || "").trim()) {
-          c = String(m.classId).trim();
-          return true;
-        }
-        return false;
-      });
-      if (c) return c;
-      return fetchJson(legacyUrl).then(function (data) {
-        return data && data.classId ? String(data.classId).trim() : "";
-      });
-    }).then(function (c) {
-      studentClassId = c || "";
-      if (studentClassId) {
-        localStorage.setItem("b3Games_studentClass", studentClassId);
-        localStorage.setItem("weeklyQuiz_classId", studentClassId);
-      }
-      classResolved = true;
-      return studentClassId;
-    }).catch(function () {
-      classResolved = true;
-      return "";
-    });
+    if(!studentClassId)return "";
+    assignedClass=await fetchJson(DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(studentClassId)+".json");
+    var member=assignedClass&&assignedClass.members&&assignedClass.members[studentId];
+    if(!assignedClass||assignedClass.active===false||!member||member.active===false){studentClassId="";return "";}
+    studentActive=true;
+    return studentClassId;
   }
 
   function timeToMinutes(value) {
@@ -347,6 +354,24 @@
       return;
     }
 
+    if(verifiedTeacherAccess&&verifiedTeacherAccess.authorized){
+      var selected=new URLSearchParams(location.search).get("class")||getStoredClass();
+      if(!(verifiedTeacherAccess.classIds||[]).includes(selected)){
+        showClosed("Choose an assigned class", "Open this tool from your Teacher Center.");return;
+      }
+      // Tool grants are checked against the selected class, never another teacher's class.
+      var teacherGrantId=gameId==="class-gallery"?"gallery":gameId;
+      if(!teacherClassRecord||teacherClassRecord.active===false||teacherClassRecord.toolGrants?.[teacherGrantId]!==true){showClosed("Teacher class access", "This tool is not enabled for your assigned class.");return;}
+      showOpen();return;
+    }
+    if(!studentActive){showClosed("Please sign in again", "Your student access or class membership could not be verified.");return;}
+    if(studentClassId!=="et"&&studentClassId!=="wt"){
+      var grantId=gameId==="class-gallery"?"gallery":gameId;
+      if(!assignedClass||assignedClass.toolGrants?.[grantId]!==true){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
+      if(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked"){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
+      showOpen();return;
+    }
+
     // An activity switched off for this student's ET/WT class always stays
     // disabled, even if the class itself is unlocked and even if this student
     // has a special exception for the activity.
@@ -402,7 +427,15 @@
     if (requestInFlight) return;
     requestInFlight = true;
 
-    resolveStudentClass().then(function () {
+    Promise.resolve().then(async function () {
+      if(storedTeacherBypass())return;
+      if(verifiedTeacherAccess?.authorized){
+        var selected=new URLSearchParams(location.search).get("class")||getStoredClass();
+        teacherClassRecord=(verifiedTeacherAccess.classIds||[]).includes(selected)?await fetchJson(DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(selected)+".json"):null;
+        return;
+      }
+      await resolveStudentClass();
+    }).then(function () {
       return fetchJson(DATABASE_URL + "/" + SETTINGS_PATH + ".json");
     }).then(function (settings) {
       decide(settings || {});
@@ -410,7 +443,7 @@
       console.warn("B3 game gate could not refresh settings:", err);
       // If we have already successfully read settings, keep the last known
       // decision instead of suddenly changing access on a brief network error.
-      if (lastSettings) decide(lastSettings);
+      if (lastSettings && studentActive) decide(lastSettings);
       else {
         // Do not leave the page blank and do not bypass the teacher's access
         // controls. Show a useful message and retry automatically.
@@ -424,6 +457,13 @@
     });
   }
 
+  ["click","pointerdown","keydown","submit"].forEach(function(type){
+    document.addEventListener(type,function(event){
+      if(!overlay||overlay.contains(event.target))return;
+      event.preventDefault();event.stopImmediatePropagation();
+    },true);
+  });
+  watchTeacherAccess();
   checkNow();
   setInterval(checkNow, POLL_INTERVAL_MS);
   document.addEventListener("visibilitychange", function () {

@@ -19,10 +19,10 @@ const TOOLS={
 function esc(s){const d=document.createElement("div");d.textContent=String(s||"");return d.innerHTML}
 async function render(user,access){
  if(!access?.authorized){q("gate").innerHTML='This Google account is not assigned as a Fun Torah Tools teacher. <br><button class="sign" id="login" style="margin-top:14px">Sign in with Google</button>';q("login").onclick=()=>api.signInWithGoogle();return}
- if(access.role==="admin"||(access.classIds||[]).includes("*")){location.replace("index.html");return}
+ if(access.role==="admin"){location.replace("index.html");return}
  q("gate").classList.add("hidden");q("app").classList.remove("hidden");q("signOut").classList.remove("hidden");q("who").textContent=user?.email||"Teacher";
  const ids=access.classIds||[],snaps=await Promise.all(ids.map(id=>db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value")));
- q("classes").innerHTML=snaps.map((s,i)=>{const id=ids[i],row=s.val()||{},grants=row.toolGrants||{},tools=Object.entries(grants).filter(x=>x[1]===true&&TOOLS[x[0]]).map(([tool])=>'<a class="tool" href="'+TOOLS[tool][1]+'">'+esc(TOOLS[tool][0])+'</a>').join("");
+ q("classes").innerHTML=snaps.map((s,i)=>{const id=ids[i],row=s.val()||{},grants=row.toolGrants||{},tools=Object.entries(grants).filter(x=>x[1]===true&&TOOLS[x[0]]).map(([tool])=>'<a class="tool" href="'+TOOLS[tool][1]+(TOOLS[tool][1].includes("?")?"&":"?")+"class="+encodeURIComponent(id)+'">'+esc(TOOLS[tool][0])+'</a>').join("");
  return '<section class="class-card"><div class="class-head"><h2>'+esc(row.name||id)+'</h2><a class="manage" href="admin.html?tab=students&class='+encodeURIComponent(id)+'">Manage Class</a></div><div class="tools">'+(tools||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div></section>'
  }).join("")||'<div class="welcome">No classes are assigned to this teacher yet.</div>';
 }
