@@ -26,26 +26,30 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate all-pages.html
-        run: python3 generate_page_list.py
-
-      - name: Commit updated list
+      - name: Regenerate and publish all-pages.html
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add all-pages.html
-          if git diff --cached --quiet; then
-            echo "No changes needed."
-          else
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            python3 generate_page_list.py
+            git add all-pages.html
+
+            if git diff --cached --quiet; then
+              echo "No changes needed."
+              exit 0
+            fi
+
             git commit -m "Automatically update page list"
-            for attempt in 1 2 3; do
-              git fetch origin main
-              if git rebase origin/main && git push origin HEAD:main; then
-                exit 0
-              fi
-              git rebase --abort 2>/dev/null || true
-              sleep $((attempt * 2))
-            done
-            echo "Could not push the generated page list after 3 attempts."
-            exit 1
-          fi
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+
+            echo "Main changed while generating; regenerating from the new main."
+            sleep $((attempt * 2))
+          done
+
+          echo "Could not publish the generated page list after 3 attempts."
+          exit 1
