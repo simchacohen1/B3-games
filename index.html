@@ -1109,11 +1109,9 @@
   function renderAdminPanel(){
     syncAdminPanelLayout();
     const signedIn=Boolean(currentUser);
-    if(isAuthorizedAdmin && !teacherToolsAutoOpened){
-      el("adminPanel").classList.remove("hidden");
-      teacherToolsAutoOpened=true;
-    }
-    el("adminAccessButton").textContent=isAuthorizedAdmin ? (el("adminPanel").classList.contains("hidden") ? "Teacher Tools" : "Hide Teacher Tools") : "Admin";
+    el("adminPanel").classList.add("hidden");
+    syncAdminPanelLayout();
+    el("adminAccessButton").textContent=isAuthorizedAdmin ? "Teacher Tools" : "Admin";
 
     const passwordUnlocked=isAuthorizedAdmin||adminPasswordUnlocked();
     el("adminPasswordGate").classList.toggle("hidden",passwordUnlocked);
