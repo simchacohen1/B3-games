@@ -361,13 +361,13 @@
       }
       // Tool grants are checked against the selected class, never another teacher's class.
       var teacherGrantId=gameId==="class-gallery"?"gallery":gameId;
-      if(!teacherClassRecord||teacherClassRecord.active===false||teacherClassRecord.toolGrants?.[teacherGrantId]!==true){showClosed("Teacher class access", "This tool is not enabled for your assigned class.");return;}
+      if(!teacherClassRecord||teacherClassRecord.active===false||(teacherClassRecord.toolGrants?.[teacherGrantId]!==true&&!(gameId==="class-gallery"&&(teacherClassRecord.toolGrants?.tag===true||teacherClassRecord.toolGrants?.["class-gallery"]===true)))){showClosed("Teacher class access", "This tool is not enabled for your assigned class.");return;}
       showOpen();return;
     }
     if(!studentActive){showClosed("Please sign in again", "Your student access or class membership could not be verified.");return;}
     if(studentClassId!=="et"&&studentClassId!=="wt"){
       var grantId=gameId==="class-gallery"?"gallery":gameId;
-      if(!assignedClass||assignedClass.toolGrants?.[grantId]!==true){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
+      if(!assignedClass||(assignedClass.toolGrants?.[grantId]!==true&&!(gameId==="class-gallery"&&(assignedClass.toolGrants?.tag===true||assignedClass.toolGrants?.["class-gallery"]===true)))){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
       if(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked"){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
       showOpen();return;
     }

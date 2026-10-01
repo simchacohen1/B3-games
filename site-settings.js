@@ -533,6 +533,15 @@
         if (classId !== "et" && classId !== "wt") return;
         const profile = { id: studentId, name: row.name || studentId, active: row.active !== false };
         if(!centralStudents[studentId]?.profile)updates["b3Games/students/" + studentId + "/profile"] = profile;
+        // Repair only when an earlier seed erased the profile passcode and all
+        // surviving saved class-member passcodes agree. Never invent/reset a code.
+        if(centralStudents[studentId]?.profile&&!String(centralStudents[studentId].profile.passcode||"").trim()){
+          const savedCodes=[...new Set(Object.values(existingClasses).map(c=>String(c?.members?.[studentId]?.passcode||"").trim()).filter(Boolean))];
+          if(savedCodes.length===1){
+            updates["b3Games/students/"+studentId+"/profile/passcode"]=savedCodes[0];
+            updates["b3Games/students/"+studentId+"/profile/passcodeRecoveredAt"]=now;
+          }
+        }
         if(!centralStudents[studentId]?.memberships?.[WORKSPACE_ID+"_"+classId])updates["b3Games/students/" + studentId + "/memberships/" + WORKSPACE_ID + "_" + classId] = {
           workspaceId: WORKSPACE_ID, classId: classId, active: true
         };
