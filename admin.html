@@ -36,7 +36,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}.student
   <div class="workspace" id="workspace">
     <iframe id="adminFrame" src="index.html?adminPage=1" title="B3 administration"></iframe>
     <div class="preview-resizer" id="previewResizer" title="Drag to resize preview"></div><aside class="student-preview" id="studentPreview">
-      <div class="preview-head"><span>👀 Student Preview</span><button id="refreshPreview" type="button">Refresh</button></div>
+      <div class="preview-head"><span>👀 Student Preview</span><span style="display:flex;gap:7px;align-items:center"><select id="previewStudentSelect" aria-label="Student to preview" style="max-width:190px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-weight:700"><option value="">Choose student…</option></select><button id="refreshPreview" type="button">Refresh</button></span></div>
       <div class="preview-viewport" id="previewViewport"><iframe id="studentPreviewFrame" src="index.html?preview=1" title="Student view preview"></iframe></div>
     </aside>
   </div>
@@ -105,6 +105,29 @@ previewResizer.addEventListener("pointerdown",e=>{resizingPreview=true;previewRe
 previewResizer.addEventListener("pointermove",e=>{if(!resizingPreview)return;const rect=workspaceEl.getBoundingClientRect();setPreviewWidth(rect.right-e.clientX-18);});
 previewResizer.addEventListener("pointerup",()=>{resizingPreview=false;document.body.style.userSelect="";});
 setPreviewWidth(Math.min(430,workspaceEl.clientWidth*.38));
+function populatePreviewStudents(){
+  try{
+    const d=frame.contentDocument, select=document.getElementById("previewStudentSelect");
+    if(!d||!select)return;
+    const previous=select.value;
+    const rows=[...d.querySelectorAll("#classMemberList [data-save-student]")].map(btn=>{
+      const id=btn.dataset.saveStudent;
+      const row=btn.closest("div");
+      const name=row?.querySelector("strong")?.textContent?.trim()||id;
+      return {id,name};
+    });
+    const seen=new Set();
+    const unique=rows.filter(x=>x.id&&!seen.has(x.id)&&(seen.add(x.id),true)).sort((x,y)=>x.name.localeCompare(y.name));
+    select.innerHTML='<option value="">Choose student…</option>'+unique.map(x=>'<option value="'+x.id+'">'+x.name+'</option>').join("");
+    if(previous&&unique.some(x=>x.id===previous))select.value=previous;
+    else if(unique.length)select.value=unique[0].id;
+    loadSelectedStudentPreview();
+  }catch(e){console.warn("Could not populate preview students",e);}
+}
+function loadSelectedStudentPreview(){
+  const id=document.getElementById("previewStudentSelect").value;
+  previewFrame.src=id?"index.html?preview=1&previewStudent="+encodeURIComponent(id):"about:blank";
+}
 function syncStudentPreview(){
   try{
     const adminDoc=frame.contentDocument, studentDoc=previewFrame.contentDocument;
@@ -151,7 +174,8 @@ previewFrame.addEventListener("load",()=>{
   scaleStudentPreview();
 });
 window.addEventListener("resize",scaleStudentPreview);
-document.getElementById("refreshPreview").addEventListener("click",()=>previewFrame.contentWindow.location.reload());
+document.getElementById("previewStudentSelect").addEventListener("change",loadSelectedStudentPreview);
+document.getElementById("refreshPreview").addEventListener("click",loadSelectedStudentPreview);
 frame.addEventListener("load",()=>{
   const d=frame.contentDocument;
   const style=d.createElement("style");
@@ -176,6 +200,7 @@ frame.addEventListener("load",()=>{
     const activityObserver=new MutationObserver(()=>syncStudentPreview());
     activityLists.forEach(list=>activityObserver.observe(list,{childList:true,subtree:true}));
   }
+  populatePreviewStudents();
   syncStudentPreview();
   // Do not observe/rewrite the panel class here. The embedded page legitimately
   // changes it during login/auth rendering; forcing it back synchronously caused
