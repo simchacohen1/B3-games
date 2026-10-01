@@ -484,11 +484,18 @@
     const id=slugify(name);
     if(!name||!id||!passcode){el("classManagementStatus").textContent="Enter a student name and passcode.";return;}
     const existing=await db.ref("b3Games/students/"+id+"/profile").once("value");
-    if(existing.exists()&&!confirm("That B3 student already exists. Update the name and passcode?"))return;
-    await db.ref("b3Games/students/"+id+"/profile").set({id,name,passcode,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP,active:true});
+    if(existing.exists()&&!confirm("That student already exists. Update the name and passcode?"))return;
+    const classId=el("manageClassSelect").value;
+    const updates={};
+    updates["b3Games/students/"+id+"/profile"]={id,name,passcode,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP,active:true};
+    if(classId){
+      updates["b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+id]={studentId:id,name,active:true};
+      updates["b3Games/students/"+id+"/memberships/"+workspaceId+"_"+classId]={workspaceId,classId,active:true};
+    }
+    await db.ref().update(updates);
     el("managedStudentName").value="";el("managedStudentPasscode").value="";
-    el("classManagementStatus").textContent="B3 student saved.";
-    await loadClassManagement();el("classStudentSelect").value=id;await loadClassManagement();
+    el("classManagementStatus").textContent=classId?"Student saved and added to this class.":"Student saved.";
+    await loadClassManagement();el("classStudentSelect").value=id;
   }
   async function saveManagedStudentPasscode(){
     const studentId=el("classStudentSelect").value, passcode=el("editManagedStudentPasscode").value.trim();
