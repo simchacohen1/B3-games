@@ -1489,21 +1489,29 @@
     try{currentSettings.siteEnabled=el("siteEnabledToggle").checked;renderStudentAccess();await settingsApi.updateSiteEnabled(el("siteEnabledToggle").checked);}catch(e){currentSettings.siteEnabled=old;el("siteEnabledToggle").checked=old;alert("Could not save the master setting.");console.error(e);}
   });
 
-  db.ref("posukPractice/allowedStudents").on("value",async snap=>{
-    const data=snap.val()||{};
+  async function loadSpecialAccessRoster(){
+    if(!isAuthorizedAdmin){overrideRoster=[];renderStudentOverrideControls();return;}
     const ownerAccess=currentAccess.role==="admin"||currentAccess.classIds.includes("*");
     if(ownerAccess){
+      const snap=await db.ref("posukPractice/allowedStudents").once("value");
+      const data=snap.val()||{};
       overrideRoster=Object.entries(data).map(([id,info])=>({id,name:(info&&info.name)?String(info.name):id,classId:(info&&info.classId)||""})).sort((a,b)=>a.name.localeCompare(b.name));
-    }else if(isAuthorizedAdmin){
-      const ids=new Set();
+    }else{
+      const rows=[];
       await Promise.all((currentAccess.classIds||[]).map(async classId=>{
         const members=await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members").once("value");
-        Object.keys(members.val()||{}).forEach(id=>ids.add(id));
+        Object.entries(members.val()||{}).forEach(([id,member])=>{
+          if(member&&member.active===false)return;
+          rows.push({id,name:String((member&&member.name)||id),classId});
+        });
       }));
-      overrideRoster=[...ids].map(id=>({id,name:(data[id]&&data[id].name)?String(data[id].name):id,classId:""})).sort((a,b)=>a.name.localeCompare(b.name));
-    }else overrideRoster=[];
-    if(isAuthorizedAdmin)renderStudentOverrideControls();
-  },err=>console.warn("Could not load student override roster",err));
+      const unique=new Map();
+      rows.forEach(row=>{if(!unique.has(row.id))unique.set(row.id,row);});
+      overrideRoster=[...unique.values()].sort((a,b)=>a.name.localeCompare(b.name));
+    }
+    if(selectedOverrideStudentId&&!overrideRoster.some(s=>s.id===selectedOverrideStudentId))selectedOverrideStudentId="";
+    renderStudentOverrideControls();
+  }
 
   settingsApi.onAuthStateChanged((user,authorized,access)=>{
     currentUser=user;
@@ -1521,8 +1529,8 @@
     renderStudentAccess();renderAdminPanel();
     if(authorized){
       startApprovalCenter();
-      Promise.all([loadClassManagement(),loadTeacherToolGrants()]).then(()=>renderAdminPanel()).catch(console.warn);
-    }else stopApprovalCenter();
+      Promise.all([loadClassManagement(),loadTeacherToolGrants(),loadSpecialAccessRoster()]).then(()=>renderAdminPanel()).catch(console.warn);
+    }else{overrideRoster=[];renderStudentOverrideControls();stopApprovalCenter();}
   });
   settingsApi.subscribe(settings=>{currentSettings=settings;renderStudentAccess();renderAdminPanel();});
   setInterval(()=>{renderStudentAccess();},15000);
