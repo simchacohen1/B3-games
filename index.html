@@ -902,7 +902,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       const grants=myClassRecord?.toolGrants||{};
       let visible=0;
       gameDefinitions.forEach(game=>{
-        const show=grants[game.id]===true;
+        const show=grants[game.id]===true||(game.id==="class-gallery"&&(grants.gallery===true||grants.tag===true));
         game.element.classList.toggle("hidden",!show);
         game.element.classList.remove("activity-closed");
         game.element.querySelector(".activity-closed-badge")?.remove();
@@ -1334,7 +1334,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(!ownerAccess){
       assignedClassIds.forEach(classId=>{
         const grants=teacherClassToolGrants[classId]||{};
-        Object.entries(grants).forEach(([gameId,allowed])=>{if(allowed===true)grantedToolIds.add(gameId);});
+        Object.entries(grants).forEach(([gameId,allowed])=>{if(allowed===true){grantedToolIds.add(gameId);if(gameId==="gallery"||gameId==="tag")grantedToolIds.add("class-gallery");}});
       });
     }
     gameDefinitions.forEach(game=>{
