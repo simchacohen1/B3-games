@@ -24,13 +24,10 @@ window.B3_FIREBASE_CONFIG = {
  * behavior continues to work while data is moved into the new model.
  */
 window.B3_APP_CONTEXT = Object.freeze({
+  // This identifies the current legacy workspace only. Teachers, classes,
+  // students and PINs are loaded from Firebase rather than embedded here.
   workspaceId: "b3-2026",
-  workspaceName: "B3 2026-27",
-  teacherId: "simcha-cohen",
-  classes: Object.freeze({
-    et: Object.freeze({ id: "et", name: "ET", teacherIds: Object.freeze(["simcha-cohen"]) }),
-    wt: Object.freeze({ id: "wt", name: "WT", teacherIds: Object.freeze(["simcha-cohen"]) })
-  })
+  workspaceName: "B3 2026-27"
 });
 
 /*
