@@ -260,10 +260,10 @@
         await loadScript("https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js");
       }
       if (!window.B3_FIREBASE_CONFIG) {
-        await loadScript(new URL("firebase-config.js", rootBase).href);
+        await loadScript(new URL("firebase-config.js?v=20261001-phase1", rootBase).href);
       }
       if (!window.B3SiteSettings) {
-        await loadScript(new URL("site-settings.js", rootBase).href);
+        await loadScript(new URL("site-settings.js?v=20261001-phase1", rootBase).href);
       }
       if (!window.B3SiteSettings || typeof window.B3SiteSettings.subscribe !== "function") {
         throw new Error("B3 site settings did not load.");
