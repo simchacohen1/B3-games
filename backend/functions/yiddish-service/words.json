@@ -1,0 +1,226 @@
+[
+  {
+    "id": "yi_274a5343a26bb014",
+    "yi": "געלט",
+    "en": "money",
+    "group": 0,
+    "paragraph": 3
+  },
+  {
+    "id": "yi_836d8fb8ff98f83c",
+    "yi": "טאכטער",
+    "en": "daughter",
+    "group": 0,
+    "paragraph": 4
+  },
+  {
+    "id": "yi_406215c83945d11f",
+    "yi": "גיין",
+    "en": "go",
+    "group": 0,
+    "paragraph": 4
+  },
+  {
+    "id": "yi_c402c12e16ff5bff",
+    "yi": "צוויי",
+    "en": "two",
+    "group": 0,
+    "paragraph": 5
+  },
+  {
+    "id": "yi_1c3ed1a887659d96",
+    "yi": "יאר",
+    "en": "year",
+    "group": 0,
+    "paragraph": 5
+  },
+  {
+    "id": "yi_7f72d8ee3255205f",
+    "yi": "צוריק",
+    "en": "back",
+    "group": 0,
+    "paragraph": 5
+  },
+  {
+    "id": "yi_313ad65b2d831dd1",
+    "yi": "קליין",
+    "en": "small",
+    "group": 0,
+    "paragraph": 6
+  },
+  {
+    "id": "yi_0d9c7a6c9d7a7d07",
+    "yi": "שטוב",
+    "en": "home",
+    "group": 0,
+    "paragraph": 7
+  },
+  {
+    "id": "yi_a0be6bbc132fdf73",
+    "yi": "נעמען",
+    "en": "take",
+    "group": 1,
+    "paragraph": 9
+  },
+  {
+    "id": "yi_c0130ce214ab8d39",
+    "yi": "זען",
+    "en": "see",
+    "group": 1,
+    "paragraph": 10
+  },
+  {
+    "id": "yi_41bea5ae86543744",
+    "yi": "צווישן",
+    "en": "between",
+    "group": 1,
+    "paragraph": 11
+  },
+  {
+    "id": "yi_174980e6db3b2641",
+    "yi": "געזוכט",
+    "en": "looked for",
+    "group": 1,
+    "paragraph": 12
+  },
+  {
+    "id": "yi_0363167c4dc51d9a",
+    "yi": "געבן",
+    "en": "give",
+    "group": 1,
+    "paragraph": 13
+  },
+  {
+    "id": "yi_39ce7e61d756e0db",
+    "yi": "שווער",
+    "en": "hard / difficult",
+    "group": 1,
+    "paragraph": 6
+  },
+  {
+    "id": "yi_5604c2180648e65c",
+    "yi": "רעדן",
+    "en": "speak",
+    "group": 1,
+    "paragraph": 13
+  },
+  {
+    "id": "yi_6a46e7b4249902f5",
+    "yi": "העלפן",
+    "en": "help",
+    "group": 1,
+    "paragraph": 14
+  },
+  {
+    "id": "yi_99807b22917f37cc",
+    "yi": "טיר",
+    "en": "door",
+    "group": 2,
+    "paragraph": 17
+  },
+  {
+    "id": "yi_7d9c5e942bf1ed62",
+    "yi": "שרייבן",
+    "en": "write",
+    "group": 2,
+    "paragraph": 18
+  },
+  {
+    "id": "yi_46a8709f79fe2d38",
+    "yi": "נעכטן",
+    "en": "yesterday",
+    "group": 2,
+    "paragraph": 20
+  },
+  {
+    "id": "yi_1d3a3a7641d5615e",
+    "yi": "ווער",
+    "en": "who",
+    "group": 2,
+    "paragraph": 6
+  },
+  {
+    "id": "yi_e2abad496251d983",
+    "yi": "אנדערש",
+    "en": "different / else",
+    "group": 2,
+    "paragraph": 21
+  },
+  {
+    "id": "yi_6d3e7d5853e8783a",
+    "yi": "יעצט",
+    "en": "now",
+    "group": 2,
+    "paragraph": 10
+  },
+  {
+    "id": "yi_515d495200b0a29a",
+    "yi": "קלוג",
+    "en": "clever",
+    "group": 2,
+    "paragraph": 23
+  },
+  {
+    "id": "yi_682740c2578b9a0e",
+    "yi": "וויינען",
+    "en": "cry",
+    "group": 2,
+    "paragraph": 25
+  },
+  {
+    "id": "yi_0f19b9f635bab621",
+    "yi": "צאלן",
+    "en": "pay",
+    "group": 3,
+    "paragraph": 6
+  },
+  {
+    "id": "yi_07a61ceb225d2209",
+    "yi": "גוטע",
+    "en": "good",
+    "group": 3,
+    "paragraph": 3
+  },
+  {
+    "id": "yi_9c5c082a6f7a4f58",
+    "yi": "נייעס",
+    "en": "news",
+    "group": 3,
+    "paragraph": 29
+  },
+  {
+    "id": "yi_2cb0163e8e1b239f",
+    "yi": "היינט",
+    "en": "today",
+    "group": 3,
+    "paragraph": 30
+  },
+  {
+    "id": "yi_ac5b4ffcebed021f",
+    "yi": "גלייך",
+    "en": "right away",
+    "group": 3,
+    "paragraph": 31
+  },
+  {
+    "id": "yi_17345089c0260d49",
+    "yi": "קומען",
+    "en": "come",
+    "group": 3,
+    "paragraph": 5
+  },
+  {
+    "id": "yi_88d6685c9ed0ec87",
+    "yi": "שיינע",
+    "en": "beautiful",
+    "group": 3,
+    "paragraph": 12
+  },
+  {
+    "id": "yi_d5e7e5ac3c2cd232",
+    "yi": "מענטשן",
+    "en": "people",
+    "group": 3,
+    "paragraph": 5
+  }
+]

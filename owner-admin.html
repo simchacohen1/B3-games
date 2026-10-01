@@ -42,9 +42,9 @@ async function load(){
  q("assignments").innerHTML=assignmentLines.join("")||'<small>No class assignments yet.</small>';
  await renderToolGrants();
 }
-q("addTeacher").onclick=async()=>{const email=q("teacherEmail").value.trim().toLowerCase(),name=q("teacherName").value.trim();if(!email.includes("@"))return;await db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+key(email)).set({email:email,name:name||email,role:"teacher",active:true});q("teacherEmail").value="";q("teacherName").value="";await load()};
+q("addTeacher").onclick=async()=>{const email=q("teacherEmail").value.trim().toLowerCase(),name=q("teacherName").value.trim();if(!email.includes("@"))return;await db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+key(email)).update({email:email,name:name||email,role:"teacher",active:true,updatedAt:firebase.database.ServerValue.TIMESTAMP});q("teacherEmail").value="";q("teacherName").value="";q("status").textContent="Teacher invitation saved. Assign a class below; the teacher can then sign in with Google.";await load()};
 q("addClass").onclick=async()=>{const name=q("className").value.trim();if(!name)return;let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true});q("className").value="";await load()};
-q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=q("classSelect").value;if(!t||!c){q("status").textContent="Choose a teacher and class.";return}await db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+t+"/classIds/"+c).set(true);q("status").textContent="Assigned.";await load()};
+q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=q("classSelect").value;if(!t||!c){q("status").textContent="Choose a teacher and class.";return}const root="b3Games/workspaces/"+WS,updates={[root+"/teacherInvites/"+t+"/classIds/"+c]:true},uid=teacherData[t]?.claimedUid;if(uid){updates[root+"/teachers/"+uid+"/classIds/"+c]=true;updates[root+"/classes/"+c+"/teacherIds/"+uid]=true;}await db.ref().update(updates);q("status").textContent="Assigned.";await load()};
 async function renderToolGrants(){
  const classId=q("toolClassSelect").value;
  if(!classId){q("toolList").innerHTML='<small>Choose a class to manage its tools.</small>';return}

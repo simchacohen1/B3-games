@@ -359,8 +359,8 @@
 <div class="wrap">
 
   <div id="gate" class="gate">
-    <div>Teacher Passcode</div>
-    <input id="passcodeInput" type="password" placeholder="Enter passcode">
+    <div>Teacher Google account</div>
+    <input id="passcodeInput" type="hidden">
     <button class="btn gold" id="enterBtn">Enter Dashboard</button>
     <div id="gateMsg" style="font-size:0.8rem;margin-top:8px;color:#ffb3b3;"></div>
   </div>
@@ -399,6 +399,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="../firebase-config.js"></script>
+<script src="../site-settings.js?v=20261001-role-scope"></script>
 
 <script>
 /* Paste the SAME firebaseConfig used in student.html and your other B3 Games files */
@@ -411,12 +414,33 @@ const firebaseConfig = {
   messagingSenderId: "568530046190",
   appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
 };
-firebase.initializeApp(firebaseConfig);
+if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-/* Simple client-side passcode gate — NOT real security, just keeps casual visitors out.
-   Change this to whatever you'd like. */
-const TEACHER_PASSCODE = "vayeira5786";
+let teacherAccess={authorized:false,role:'',classIds:[]};
+const teacherWorkspace=window.B3SiteSettings.workspaceId;
+const requestedTeacherClass=new URLSearchParams(location.search).get('class')||'';
+async function scopedRosterSnapshot(){
+  if(!teacherAccess.authorized)throw new Error('Teacher sign-in required.');
+  const owner=teacherAccess.role==='admin';
+  const ids=requestedTeacherClass?[requestedTeacherClass]:(owner?['et','wt']:teacherAccess.classIds);
+  if(!owner&&ids.some(id=>!teacherAccess.classIds.includes(id)))throw new Error('This class is not assigned to you.');
+  const roster={};
+  for(const id of ids){
+    const row=(await db.ref('b3Games/workspaces/'+teacherWorkspace+'/classes/'+id).once('value')).val();
+    if(!row||row.active===false||(!owner&&row.toolGrants?.['posuk-practice-scroll']!==true))continue;
+    Object.entries(row.members||{}).forEach(([sid,m])=>{if(m&&m.active!==false)roster[sid]={...m,classId:id,classSection:row.name||id};});
+  }
+  return {val:()=>roster};
+}
+async function scopedStudentData(path,ids=Object.keys(studentsMap)){
+  const entries=await Promise.all(ids.map(async id=>[id,(await db.ref(path+'/'+id).once('value')).val()||{}]));
+  return {val:()=>Object.fromEntries(entries)};
+}
+async function scopedPointRequests(){
+  const snaps=await Promise.all(Object.keys(studentsMap).map(id=>db.ref('studentRewards/pointRequests').orderByChild('studentId').equalTo(id).once('value')));
+  return {val:()=>Object.assign({},...snaps.map(s=>s.val()||{}))};
+}
 
 /* Comprehension is graded as a category, not a 1-10 rating. */
 const VERDICT_INFO = {
@@ -592,16 +616,15 @@ function hasPendingDispute(record){
   return translationChunkValues(record.translationChunkResults).some(hasReviewableTranslationDispute);
 }
 
-document.getElementById('enterBtn').onclick = () => {
-  const val = document.getElementById('passcodeInput').value;
-  if(val === TEACHER_PASSCODE){
-    document.getElementById('gate').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'block';
-    loadStudents();
-  }else{
-    document.getElementById('gateMsg').textContent = 'Incorrect passcode.';
-  }
-};
+document.getElementById('enterBtn').textContent='Sign in with Google';
+document.getElementById('enterBtn').onclick=()=>B3SiteSettings.signInWithGoogle().catch(error=>document.getElementById('gateMsg').textContent=error.message);
+B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
+  teacherAccess=access||{authorized:false,role:'',classIds:[]};
+  const allowed=authorized&&(access.role==='admin'||!requestedTeacherClass||access.classIds.includes(requestedTeacherClass));
+  document.getElementById('gate').style.display=allowed?'none':'block';
+  document.getElementById('dashboard').style.display=allowed?'block':'none';
+  if(allowed){allAttemptsCache=null;await loadStudents();}
+});
 
 let activeStudentId = null;
 let studentsMap = {}; // id -> name
@@ -831,10 +854,8 @@ async function loadStudents(){
   const listEl = document.getElementById('studentList');
   const countEl = document.getElementById('studentCount');
   try{
-    const [allowedSnap, activeSnap] = await Promise.all([
-      db.ref('posukPractice/allowedStudents').once('value'),
-      db.ref('posukPractice/students').once('value')
-    ]);
+    const allowedSnap=await scopedRosterSnapshot();
+    const activeSnap=await scopedStudentData('posukPractice/students',Object.keys(allowedSnap.val()||{}));
     const allowedVal = allowedSnap.val();
     const activeVal = activeSnap.val() || {};
     studentsMap = {};
@@ -995,7 +1016,7 @@ async function markStudentsWithPendingDisputes(){
 let allAttemptsCache = null;
 async function loadAllAttempts(forceRefresh){
   if(allAttemptsCache && !forceRefresh) return allAttemptsCache;
-  const snap = await db.ref('posukPractice/attempts').once('value');
+  const snap = await scopedStudentData('posukPractice/attempts');
   allAttemptsCache = snap.val() || {};
   return allAttemptsCache;
 }
@@ -1043,8 +1064,8 @@ async function loadChazaraRecordings(){
   mainEl.innerHTML = '<div class="loading">Loading Chazara recordings…</div>';
   try{
     const [snap, pointSnap] = await Promise.all([
-      db.ref('posukPractice/chazara/events').once('value'),
-      db.ref('studentRewards/pointRequests').once('value')
+      scopedStudentData('posukPractice/chazara/events'),
+      scopedPointRequests()
     ]);
     const root = snap.val() || {};
     const pointRequests = pointSnap.val() || {};
@@ -1341,7 +1362,7 @@ async function loadReportsTab(){
   try{
     const [, allowedSnap] = await Promise.all([
       loadAllAttempts(), // warms allAttemptsCache
-      db.ref('posukPractice/allowedStudents').once('value')
+      scopedRosterSnapshot()
     ]);
     // Maps a student's id (== their allowedStudents slug) to their assigned
     // class, so the Class filter below can narrow the Student(s) box without
@@ -2234,11 +2255,18 @@ function slugify(name){
 // before letting anyone past the name gate. Existing records that do not yet
 // have a passcode use 5770 until the teacher changes them.
 async function loadAccessTab(){
+  const mainEl=document.getElementById('mainContent');
+  const classId=requestedTeacherClass||teacherAccess.classIds.find(id=>id!=='*')||'et';
+  mainEl.innerHTML='<h2>Students &amp; Classes</h2><p>Names, individual passcodes, and memberships are managed centrally in Teacher Center.</p><a class="btn gold" href="../admin.html?tab=students&class='+encodeURIComponent(classId)+'" target="_blank" rel="noopener">Open Class Management</a>';
+  if(teacherAccess.role==='admin'){const button=document.createElement('button');button.className='btn';button.textContent='B3 legacy lesson controls';button.onclick=loadLegacyAccessTab;mainEl.appendChild(button);}
+}
+async function loadLegacyAccessTab(){
+  if(teacherAccess.role!=='admin')throw new Error('Owner access required for legacy B3 settings.');
   const mainEl = document.getElementById('mainContent');
   mainEl.innerHTML = '<div class="loading">Loading access settings…</div>';
   try{
     const [allowedSnap, practiceLimitSnap] = await Promise.all([
-      db.ref('posukPractice/allowedStudents').once('value'),
+      scopedRosterSnapshot(),
       db.ref('posukPractice/settings/practiceLimit').once('value')
     ]);
     const allowedVal = allowedSnap.val() || {};

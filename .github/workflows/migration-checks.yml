@@ -1,0 +1,26 @@
+name: Migration access checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  access-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run class, teacher role, and backend regression tests
+        run: node --test tests/*.test.cjs
+      - name: Validate migrated frontend and backend JavaScript
+        run: |
+          node --check site-settings.js
+          node --check game-gate.js
+          node --check access-guard.js
+          node --check yiddish/app.js
+          node --check yiddish/teacher.js
+          node --check backend/functions/yiddish-service/core.cjs
+          node --check backend/functions/teacher-claim.js

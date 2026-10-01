@@ -1,0 +1,36 @@
+# Fun Torah Tools migration audit — October 1, 2026
+
+The repository was fetched from GitHub before editing. The handoff commit `f8522804` had successful page-list and Pages runs. First batch `8e31977` had a successful page-list run; Pages completed successfully on generated commit `d01db575` (the original Pages run was superseded/cancelled). Always follow generated commits when checking the actual deployment.
+
+## Implemented in this development session
+
+| Area | Files | Behavior |
+| --- | --- | --- |
+| Role separation | `index.html`, `site-settings.js`, `admin.html`, `teacher-home.html` | Teacher access has a separate name/flag; teacher records/invites cannot supply an admin role or wildcard admin access. Global site writes require an administrator. Regular teachers cannot drag a tool into a global disabled state. |
+| Student IDs | `index.html` | New profiles use random stable IDs. Homepage login matches display name plus individual passcode; same-name students with different passcodes do not overwrite each other. Ambiguous same-name/same-passcode logins are refused. Existing IDs remain unchanged. |
+| Multiple memberships | `index.html`, `game-gate.js` | Homepage offers a class selector and remembers the chosen active membership. Gates validate that membership rather than blindly trusting the saved class. Disabled memberships do not fall back to B3 data. |
+| Open/direct-page access | `game-gate.js`, `access-guard.js` | One shared gate validates profiles, memberships, class members, and class grants periodically. A localStorage teacher flag is not teacher authorization. New classes do not inherit B3's global tool switches. B3 manual locks/schedules/exceptions retain their paths. |
+| Central passcodes | `site-settings.js`, `index.html` | Repeated owner seeding does not overwrite an existing central profile, passcode, blocked membership, or blocked class member. The management table scrolls at narrow widths. A real signed-in regular-teacher browser check is still required. |
+| Gallery | `class-gallery/index.html` | Review uses Google authorization. Teacher avatars use Firebase UID. New classes have separate post, presence, settings, and Tag paths. Legacy ET/WT keep their intentional combined B3 Tag paths. New-class directory/submission options use the assigned roster. |
+| Posuk Practice teacher | `record_pesukim/teacher.html` | Google sign-in replaces the client password. Teacher rosters come from assigned central classes; attempts and Chazara recordings are read for those student IDs. Manage Access links to central Teacher Center. The old lesson/access editor is retained as an explicit owner-only B3 compatibility control. |
+| Teacher claim | `backend/functions/teacher-claim.js`, `teacher-claim-core.cjs`, `site-settings.js`, `owner-admin.html` | Trusted backend claim preserves assigned classes and writes UID/claim metadata. Owner assignment updates a claimed teacher UID. Frontend reports pending backend setup if the endpoint is absent. **Backend deployment remains required.** |
+| Yiddish | `backend/functions/yiddish.js`, `yiddish-service/core.cjs`, `yiddish/app.js`, `yiddish/teacher.js` | Recovered actual service source now checks individual central passcodes, active membership, class grants, and passcode changes; new classes get private config/progress. Retry-safe practice rounds are retained. **Backend deployment remains required.** |
+| Regression checks | `tests/*.test.cjs`, `.github/workflows/migration-checks.yml` | Tests cover teacher role boundaries, revocations, B3 compatibility, duplicate answer retries, Yiddish passcodes, and invitation claims. |
+
+## Remaining audit findings and dependencies
+
+| Actual path | Finding / next work |
+| --- | --- |
+| `firebase-rules.json` | `b3Games/.read` is public, including central profile passcodes. Workspace `.write` grants whole-workspace writes to an active teacher. These are transitional and not production-safe. Current deployed rules were not accessible through authenticated Firebase tooling here; no rules were relaxed or deployed. Migrate every student tool to trusted authentication/custom tokens before closing these reads, then test with the emulator and deploy narrowly. |
+| `backend/README.md` | Recovered install files identify `C:\B3-Games-Backend` as the real Firebase project. No Firebase deployment credentials are available in this workspace. Targeted deployment and real endpoint verification are necessary for Yiddish and teacher claiming. |
+| `shorashim/teacher.js`, `shorashim/teacher.html` | The teacher editor still uses its legacy password and global `posukPractice/shorashimLearning` data. It also has shared-PIN management and owner-specific approval authentication. Student login migration alone does not make teacher resources class-scoped. |
+| `game-show/teacher.html`, `game-show/player.html` | The teacher password and global `tentTrailTrivia` / `questionSets` resources remain. Migrate both sides together, with explicit resource sharing if intended. |
+| `weekly-quiz/teacher.html`, `weekly-quiz/B3SchoolMarksBridge.html` | Teacher password and global `b3Quiz` quiz/launch trees remain. Launch class IDs help routing but do not constitute resource ACLs. The school-marks bridge is B3-specific compatibility. |
+| `student-rewards/common.js`, `student-rewards/teacher.js` | Owner-specific teacher authorization/backend actions still need a multi-teacher audit. Existing B3 approval flows must remain functional while endpoint authorization changes. |
+| `chazara/teacher.html`, `rashi-letters/teacher.html` | Complete teacher resource/approval audit remains; individual student login does not establish teacher class ACLs. |
+| `record_pesukim/teacher.html` | Owner-only legacy access controls still contain `allowedStudents`, default `5770`, and B3 class labels. Global practice-limit settings and reward-approval backend actions need class-specific migration. Do not remove these fallbacks before verifying the existing B3 settings/data. |
+| `record_pesukim/student.html`, `weekly-quiz/index.html`, `shorashim/app.js`, `rashi-letters/student.html`, `chazara/index.html` | Local saved `b3Games_classPin` now usually contains an individual passcode but the legacy key name remains. Some manual per-tool name lookups still slugify names; opening from the homepage supplies stable IDs. Complete a shared trusted-login migration before removing public profile reads. |
+| `class-gallery/index.html` | ET/WT roster and `simcha_cohen` remain as explicit legacy B3 compatibility entries. Generic-class isolation is implemented in frontend paths, not a replacement for deployed database/storage ACLs. Shared generic galleries are not enabled accidentally; an explicit shared-resource ACL model remains to be implemented. |
+| `index.html` | Name/passcode lookup still reads the central directory under transitional rules. Replace with a trusted login endpoint before making profiles private. Existing same-name/same-passcode profiles require teacher reassignment of passcodes, not silent selection. |
+
+Do not describe the migration, database security, or undeployed backend changes as fully live. A GitHub Pages deployment deploys frontend files, not Firebase Cloud Functions or database rules.

@@ -78,6 +78,7 @@ function applyRoleView(){
     const w=frame.contentWindow,d=frame.contentDocument;
     const access=w?.B3SiteSettings?.getCurrentAccess?.()||{};
     const owner=access.role==="admin";
+    document.querySelector(".brand").textContent=owner?"B3 Teacher Center":"Fun Torah Tools Teacher Center";
     const accessNav=document.getElementById("classAccessNav");
     if(accessNav)accessNav.style.display=owner?"":"none";
     // Teacher-account creation is platform-owner administration only.
