@@ -273,8 +273,18 @@
           <input id="newClassName" type="text" placeholder="New class name" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
           <button id="addClassButton" class="admin-action" type="button" style="margin:0">Add class</button>
         </div>
-        <label for="classStudentSelect" style="display:block;margin-top:12px">Add student</label>
+        <label style="display:block;margin-top:12px">Create / manage B3 student</label>
+        <div style="display:grid;grid-template-columns:1fr 110px;gap:8px;margin-top:7px">
+          <input id="managedStudentName" type="text" placeholder="Student name" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
+          <input id="managedStudentPasscode" type="text" inputmode="numeric" placeholder="Passcode" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
+        </div>
+        <button id="createManagedStudentButton" class="admin-action secondary" type="button">Create B3 student</button>
+        <label for="classStudentSelect" style="display:block;margin-top:12px">Existing student</label>
         <select id="classStudentSelect" class="override-student-select"></select>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+          <input id="editManagedStudentPasscode" type="text" inputmode="numeric" placeholder="Student passcode" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
+          <button id="saveManagedStudentPasscodeButton" class="admin-action secondary" type="button" style="margin:0">Save passcode</button>
+        </div>
         <button id="addStudentToClassButton" class="admin-action secondary" type="button">Add student to selected class</button>
         <div id="classMemberList" style="margin-top:10px"></div>
         <div id="classManagementStatus" class="override-saving" aria-live="polite"></div>
@@ -404,12 +414,30 @@
   }
   async function loadClassManagement(){
     if(!isAuthorizedAdmin)return;
-    const [classesSnap,studentsSnap,teachersSnap]=await Promise.all([
+    const [classesSnap,studentsSnap,teachersSnap,legacyStudentsSnap]=await Promise.all([
       db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value"),
       db.ref("b3Games/students").once("value"),
-      db.ref("b3Games/workspaces/"+workspaceId+"/teachers").once("value")
+      db.ref("b3Games/workspaces/"+workspaceId+"/teachers").once("value"),
+      db.ref("posukPractice/allowedStudents").once("value")
     ]);
     const classes=classesSnap.val()||{}, students=studentsSnap.val()||{}, teachers=teachersSnap.val()||{};
+    const legacyStudents=legacyStudentsSnap.val()||{};
+    const migrationUpdates={};
+    Object.entries(legacyStudents).forEach(([id,info])=>{
+      if(students[id]&&students[id].profile)return;
+      const row=info||{};
+      migrationUpdates["b3Games/students/"+id+"/profile"]={
+        id,name:String(row.name||id),passcode:String(row.passcode||"5770"),
+        passcodeUpdatedAt:Number(row.passcodeUpdatedAt)||Date.now(),active:true
+      };
+    });
+    if(Object.keys(migrationUpdates).length){
+      await db.ref().update(migrationUpdates);
+      Object.entries(legacyStudents).forEach(([id,info])=>{
+        if(!students[id])students[id]={};
+        if(!students[id].profile)students[id].profile=migrationUpdates["b3Games/students/"+id+"/profile"];
+      });
+    }
     const classSel=el("manageClassSelect"), studentSel=el("classStudentSelect");
     const prior=classSel.value;
     classSel.innerHTML=Object.keys(classes).sort().map(id=>'<option value="'+id+'">'+((classes[id]&&classes[id].name)||id)+'</option>').join("");
@@ -417,6 +445,8 @@
     studentSel.innerHTML=Object.keys(students).sort((a,b)=>String(students[a]?.profile?.name||a).localeCompare(String(students[b]?.profile?.name||b))).map(id=>'<option value="'+id+'">'+(students[id]?.profile?.name||id)+'</option>').join("");
     const selected=classSel.value, members=(classes[selected]&&classes[selected].members)||{};
     el("classMemberList").innerHTML=Object.keys(members).length?Object.keys(members).map(id=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #e5e7eb"><span>'+(members[id].name||students[id]?.profile?.name||id)+'</span><button type="button" data-remove-member="'+id+'" style="border:0;background:none;color:#b91c1c;cursor:pointer">Remove</button></div>').join(""):'<div class="admin-message">No students in this class yet.</div>';
+    const selectedStudent=studentSel.value;
+    if(el("editManagedStudentPasscode"))el("editManagedStudentPasscode").value=String(students[selectedStudent]?.profile?.passcode||"");
     el("teacherList").innerHTML=Object.keys(teachers).map(uid=>'<div style="padding:5px 0;border-bottom:1px solid #e5e7eb">'+(teachers[uid].email||uid)+' <strong>('+(teachers[uid].role||"teacher")+')</strong></div>').join("")||'<div class="admin-message">No teachers yet.</div>';
   }
   async function addManagedClass(){
@@ -426,6 +456,24 @@
     await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id).update({id,name,active:true,createdAt:now});
     if(user)await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id+"/teacherIds/"+user.uid).set(true);
     el("newClassName").value=""; await loadClassManagement(); el("manageClassSelect").value=id; await loadClassManagement();
+  }
+  async function createManagedStudent(){
+    const name=el("managedStudentName").value.trim(), passcode=el("managedStudentPasscode").value.trim();
+    const id=slugify(name);
+    if(!name||!id||!passcode){el("classManagementStatus").textContent="Enter a student name and passcode.";return;}
+    const existing=await db.ref("b3Games/students/"+id+"/profile").once("value");
+    if(existing.exists()&&!confirm("That B3 student already exists. Update the name and passcode?"))return;
+    await db.ref("b3Games/students/"+id+"/profile").set({id,name,passcode,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP,active:true});
+    el("managedStudentName").value="";el("managedStudentPasscode").value="";
+    el("classManagementStatus").textContent="B3 student saved.";
+    await loadClassManagement();el("classStudentSelect").value=id;await loadClassManagement();
+  }
+  async function saveManagedStudentPasscode(){
+    const studentId=el("classStudentSelect").value, passcode=el("editManagedStudentPasscode").value.trim();
+    if(!studentId||!passcode)return;
+    await db.ref("b3Games/students/"+studentId+"/profile").update({passcode,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP});
+    el("classManagementStatus").textContent="Student passcode saved in B3.";
+    await loadClassManagement();
   }
   async function addStudentToManagedClass(){
     const classId=el("manageClassSelect").value, studentId=el("classStudentSelect").value;
@@ -868,18 +916,22 @@
   async function checkStudentAccess(name,pin){
     const slug=slugify(name);
     if(!slug)return{ok:false,reason:"Please type your name."};
-    const allowedSnap=await db.ref("posukPractice/allowedStudents/"+slug).once("value");
-    if(!allowedSnap.exists())return{ok:false,reason:"Your name is not on the B3 student list."};
-    const d=allowedSnap.val()||{};
+    let profileSnap=await db.ref("b3Games/students/"+slug+"/profile").once("value");
+    let d=profileSnap.val()||{};
+    if(!profileSnap.exists()){
+      const legacySnap=await db.ref("posukPractice/allowedStudents/"+slug).once("value");
+      if(!legacySnap.exists())return{ok:false,reason:"Your name is not on the B3 student list."};
+      const legacy=legacySnap.val()||{};
+      d={id:slug,name:String(legacy.name||name.trim()),passcode:String(legacy.passcode||"5770"),passcodeUpdatedAt:Number(legacy.passcodeUpdatedAt)||Date.now(),active:true};
+      try{await db.ref("b3Games/students/"+slug+"/profile").set(d);}catch(e){}
+    }
+    if(d.active===false)return{ok:false,reason:"Your B3 access is turned off. Ask your teacher."};
+    const realPin=String(d.passcode||"").trim();
+    if(!realPin)return{ok:false,reason:"Your B3 passcode is not set yet. Ask your teacher."};
+    if(String(pin).trim()!==realPin)return{ok:false,reason:"Incorrect passcode. Ask your teacher."};
     const classId=await resolvedStudentClass(slug,d);
     if(!["et","wt"].includes(classId))return{ok:false,reason:"Your class is not assigned yet. Ask your teacher."};
-    const [classPinSnap,legacyPinSnap]=await Promise.all([
-      db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/classPin").once("value"),
-      db.ref("posukPractice/settings/classPin").once("value")
-    ]);
-    const realPin=classPinSnap.exists()?classPinSnap.val():legacyPinSnap.val();
-    if(realPin&&String(pin).trim()!==String(realPin).trim())return{ok:false,reason:"Incorrect PIN. Ask your teacher."};
-    return{ok:true,id:slug,name:(d&&d.name)?String(d.name):name.trim(),classId};
+    return{ok:true,id:slug,name:d.name?String(d.name):name.trim(),classId};
   }
 
   function enterStudent(r){
@@ -909,9 +961,16 @@
     const id=localStorage.getItem("b3Games_studentId")||localStorage.getItem("posukPractice_studentId");
     if(!id){showLogin();return;}
     try{
-      const snap=await db.ref("posukPractice/allowedStudents/"+id).once("value");
-      if(!snap.exists()){showLogin();return;}
-      const d=snap.val()||{};
+      let snap=await db.ref("b3Games/students/"+id+"/profile").once("value");
+      let d=snap.val()||{};
+      if(!snap.exists()){
+        const legacy=await db.ref("posukPractice/allowedStudents/"+id).once("value");
+        if(!legacy.exists()){showLogin();return;}
+        const old=legacy.val()||{};
+        d={id,name:String(old.name||id),passcode:String(old.passcode||"5770"),passcodeUpdatedAt:Number(old.passcodeUpdatedAt)||Date.now(),active:true};
+        try{await db.ref("b3Games/students/"+id+"/profile").set(d);}catch(e){}
+      }
+      if(d.active===false){showLogin();return;}
       const restoredClassId=await resolvedStudentClass(id,d);
       if(!["et","wt"].includes(restoredClassId)){showLogin();return;}
       enterStudent({id:id,name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
@@ -1338,6 +1397,9 @@
   });
   el("adminPasswordButton").addEventListener("click",unlockAdminPassword);
   el("manageClassSelect").addEventListener("change",loadClassManagement);
+  el("classStudentSelect").addEventListener("change",loadClassManagement);
+  el("createManagedStudentButton").addEventListener("click",createManagedStudent);
+  el("saveManagedStudentPasscodeButton").addEventListener("click",saveManagedStudentPasscode);
   el("addClassButton").addEventListener("click",addManagedClass);
   el("addStudentToClassButton").addEventListener("click",addStudentToManagedClass);
   el("addTeacherButton").addEventListener("click",addManagedTeacher);
