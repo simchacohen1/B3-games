@@ -724,20 +724,47 @@
     });
   }
 
+  let studentNudgeRotationTimer=null;
   function renderStudentNudges(){
+    if(studentNudgeRotationTimer){
+      clearTimeout(studentNudgeRotationTimer);
+      studentNudgeRotationTimer=null;
+    }
     document.querySelectorAll(".student-nudge").forEach(n=>n.remove());
     if(isAuthorizedAdmin||!myStudentId||!myClassId)return;
-    let order=0;
-    gameDefinitions.forEach(game=>{
-      if(!studentNudgeMessages[game.id]||game.element.classList.contains("hidden")||!studentNeedsNudge(game.id))return;
+
+    const eligibleGames=gameDefinitions.filter(game=>
+      studentNudgeMessages[game.id] &&
+      !game.element.classList.contains("hidden") &&
+      studentNeedsNudge(game.id)
+    );
+    if(!eligibleGames.length)return;
+
+    let index=0;
+    const showNext=()=>{
+      document.querySelectorAll(".student-nudge").forEach(n=>n.remove());
+      if(isAuthorizedAdmin||!myStudentId||!myClassId)return;
+
+      const stillEligible=eligibleGames.filter(game=>
+        !game.element.classList.contains("hidden") &&
+        studentNeedsNudge(game.id)
+      );
+      if(!stillEligible.length)return;
+      if(index>=stillEligible.length)index=0;
+
+      const game=stillEligible[index++];
       const bubble=document.createElement("span");
       bubble.className="student-nudge";
       bubble.setAttribute("aria-hidden","true");
-      bubble.style.animationDelay=(order*0.12)+"s,"+(0.55+order*0.12)+"s";
       bubble.innerHTML='<span class="student-nudge-wave">👋</span>'+studentNudgeMessage(game.id);
       game.element.appendChild(bubble);
-      order++;
-    });
+
+      studentNudgeRotationTimer=setTimeout(()=>{
+        bubble.remove();
+        studentNudgeRotationTimer=setTimeout(showNext,700);
+      },4500);
+    };
+    showNext();
   }
 
   function renderStudentAccess(){
