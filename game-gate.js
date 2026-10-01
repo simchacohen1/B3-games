@@ -39,14 +39,7 @@
   var rootBase = new URL("./", scriptEl.src);
   var backHref = (scriptEl && scriptEl.getAttribute("data-back-href")) || new URL("index.html", rootBase).href;
 
-  var ET_ROSTER = [
-    "chaim_chaikin", "mayer_chaim_chaikin", "yossi_gourarie", "sholom_huebner", "sholom_dovber_huebner",
-    "moshe_lapine", "kehos_notik", "yisroel_oirechman", "moshe_raichman", "moshe_tuvia_raichman",
-    "avrohom_rosenfeld", "levi_rozmarin", "arik_traxler", "simcha_cohen"
-  ];
-  var WT_ROSTER = [
-    "ari_greenberg", "zev_rosenfeld", "levi_schtroks", "yisroel_aryeh_simmonds", "leibel_vogel", "leib_wolf"
-  ];
+  // Student rosters are intentionally not embedded in application code.
 
   // Master Schedule 5787 / 2026-2027.
   // B3 Games is open by default and is automatically locked during class time.
@@ -183,12 +176,6 @@
     return c === "et" || c === "wt" ? c : "";
   }
 
-  function rosterClass(studentId) {
-    if (ET_ROSTER.indexOf(studentId) !== -1) return "et";
-    if (WT_ROSTER.indexOf(studentId) !== -1) return "wt";
-    return "";
-  }
-
   function fetchJson(url) {
     var sep = url.indexOf("?") >= 0 ? "&" : "?";
     var target = url + sep + "_=" + Date.now();
@@ -235,10 +222,23 @@
       return Promise.resolve("");
     }
 
-    var fallback = rosterClass(studentId);
-    var url = DATABASE_URL + "/posukPractice/allowedStudents/" + encodeURIComponent(studentId) + ".json";
-    return fetchJson(url).then(function (data) {
-      var c = data && (data.classId === "et" || data.classId === "wt") ? data.classId : fallback;
+    var membershipUrl = DATABASE_URL + "/b3Games/students/" + encodeURIComponent(studentId) + "/memberships.json";
+    var legacyUrl = DATABASE_URL + "/posukPractice/allowedStudents/" + encodeURIComponent(studentId) + ".json";
+    return fetchJson(membershipUrl).then(function (memberships) {
+      var c = "";
+      Object.keys(memberships || {}).some(function (key) {
+        var m = memberships[key] || {};
+        if (m.active !== false && m.workspaceId === WORKSPACE_ID && (m.classId === "et" || m.classId === "wt")) {
+          c = m.classId;
+          return true;
+        }
+        return false;
+      });
+      if (c) return c;
+      return fetchJson(legacyUrl).then(function (data) {
+        return data && (data.classId === "et" || data.classId === "wt") ? data.classId : "";
+      });
+    }).then(function (c) {
       studentClassId = c || "";
       if (studentClassId) {
         localStorage.setItem("b3Games_studentClass", studentClassId);
@@ -247,13 +247,8 @@
       classResolved = true;
       return studentClassId;
     }).catch(function () {
-      studentClassId = fallback;
-      if (studentClassId) {
-        localStorage.setItem("b3Games_studentClass", studentClassId);
-        localStorage.setItem("weeklyQuiz_classId", studentClassId);
-      }
       classResolved = true;
-      return studentClassId;
+      return "";
     });
   }
 
