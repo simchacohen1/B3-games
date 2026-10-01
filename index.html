@@ -1389,7 +1389,10 @@
   el("studentNameInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
   el("classPinInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
   el("switchStudentBtn").addEventListener("click",switchStudent);
-  el("adminAccessButton").addEventListener("click",()=>{\n    window.location.href="admin.html";\n  });\n  el("adminPasswordButton").addEventListener("click",unlockAdminPassword);
+  el("adminAccessButton").addEventListener("click",()=>{
+    window.location.href="admin.html";
+  });
+  el("adminPasswordButton").addEventListener("click",unlockAdminPassword);
   el("manageClassSelect").addEventListener("change",loadClassManagement);
   el("classStudentSelect").addEventListener("change",loadClassManagement);
   el("createManagedStudentButton").addEventListener("click",createManagedStudent);
