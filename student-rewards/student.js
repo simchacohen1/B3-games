@@ -66,7 +66,7 @@ async function signInB3(name,pin,idHint=''){
   const studentName=String(name||'').trim();
   const b3StudentId=String(idHint||slugify(studentName));
   const classPin=String(pin||'').trim();
-  if(!studentName||!b3StudentId||!classPin) throw new Error('Enter your full name and Class PIN.');
+  if(!studentName||!b3StudentId||!classPin) throw new Error('Enter your full name and passcode.');
   const r=await fetch(C.LOGIN_URL,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -105,7 +105,7 @@ async function trySharedB3Login(){
   if(name&&$('#studentName')) $('#studentName').value=name;
   if(pin&&$('#pin')) $('#pin').value=pin;
   if(!auth.currentUser&&id&&name&&pin){
-    $('#loginError').textContent='Signing you in with your B3 Games login…';
+    $('#loginError').textContent='Signing you in with your Fun Torah Tools login…';
     try{await signInB3(name,pin,id);$('#loginError').textContent=''}
     catch(err){$('#loginError').textContent=err.message||String(err)}
   }
