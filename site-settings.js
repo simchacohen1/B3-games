@@ -405,17 +405,69 @@
       meta: {
         workspaceId: WORKSPACE_ID,
         name: WORKSPACE_NAME,
-        teacherId: TEACHER_ID,
-        migrationPhase: 1,
+        migrationPhase: 2,
         legacyCompatibility: true,
         legacySettingsPath: LEGACY_SETTINGS_KEY
       },
       siteSettings: normalizeSettings(settings)
     };
     return services.db.ref(WORKSPACE_ROOT_KEY).update(payload).catch(function (error) {
-      // The legacy path remains authoritative during Phase 1. A mirror failure
-      // must never lock students out or make a teacher setting look unsaved.
       console.warn("Could not mirror B3 settings into workspace " + WORKSPACE_ID + ":", error);
+    });
+  }
+
+  // Safe, repeatable migration: copy existing Firebase student/class data into
+  // the new teacher -> class -> membership model. No student names or PINs are
+  // embedded in source code. Legacy records remain in place until every app has
+  // switched to the new paths.
+  function migrateWorkspaceData(services, user) {
+    if (!services || !services.db || !user || !isAuthorizedUser(user)) return Promise.resolve();
+    return Promise.all([
+      services.db.ref("posukPractice/allowedStudents").once("value"),
+      services.db.ref("posukPractice/settings/classPin").once("value")
+    ]).then(function (snapshots) {
+      const students = snapshots[0].val() || {};
+      const legacyPin = snapshots[1].val();
+      const updates = {};
+      const now = new Date().toISOString();
+
+      updates["b3Games/admins/" + user.uid] = {
+        uid: user.uid, email: user.email || "", displayName: user.displayName || "Administrator",
+        role: "admin", active: true, updatedAt: now
+      };
+      updates["b3Games/teachers/" + user.uid] = {
+        uid: user.uid, email: user.email || "", displayName: user.displayName || "Teacher",
+        role: "teacher", active: true, updatedAt: now
+      };
+      updates[WORKSPACE_ROOT_KEY + "/teachers/" + user.uid] = { role: "owner", active: true };
+
+      ["et", "wt"].forEach(function (classId) {
+        updates[WORKSPACE_ROOT_KEY + "/classes/" + classId + "/id"] = classId;
+        updates[WORKSPACE_ROOT_KEY + "/classes/" + classId + "/name"] = classId.toUpperCase();
+        updates[WORKSPACE_ROOT_KEY + "/classes/" + classId + "/teacherIds/" + user.uid] = true;
+        if (legacyPin !== null && legacyPin !== undefined && legacyPin !== "") {
+          updates[WORKSPACE_ROOT_KEY + "/classes/" + classId + "/classPin"] = String(legacyPin);
+        }
+      });
+
+      Object.keys(students).forEach(function (studentId) {
+        const row = students[studentId] || {};
+        const classId = String(row.classId || "").toLowerCase();
+        if (classId !== "et" && classId !== "wt") return;
+        const profile = { id: studentId, name: row.name || studentId, active: row.active !== false };
+        updates["b3Games/students/" + studentId + "/profile"] = profile;
+        updates["b3Games/students/" + studentId + "/memberships/" + WORKSPACE_ID + "_" + classId] = {
+          workspaceId: WORKSPACE_ID, classId: classId, active: true
+        };
+        updates[WORKSPACE_ROOT_KEY + "/classes/" + classId + "/members/" + studentId] = {
+          studentId: studentId, name: row.name || studentId, active: row.active !== false
+        };
+      });
+
+      updates[WORKSPACE_ROOT_KEY + "/meta/membershipMigrationAt"] = now;
+      return services.db.ref().update(updates);
+    }).catch(function (error) {
+      console.warn("Could not migrate B3 class memberships:", error);
     });
   }
 
@@ -634,7 +686,9 @@
       // signs in. Students still read the legacy path during this first phase.
       if (authorized) {
         services.db.ref(SETTINGS_KEY).once("value").then(function (snapshot) {
-          return mirrorWorkspaceSettings(services, normalizeSettings(snapshot.val()));
+          return mirrorWorkspaceSettings(services, normalizeSettings(snapshot.val())).then(function () {
+            return migrateWorkspaceData(services, user);
+          });
         }).catch(function (error) {
           console.warn("Could not seed B3 workspace " + WORKSPACE_ID + ":", error);
         });
