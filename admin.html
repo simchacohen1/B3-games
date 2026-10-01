@@ -71,6 +71,23 @@ function makeSection(d,id){
   return s;
 }
 function moveRange(start,count,target){let n=start;for(let i=0;i<count&&n;i++){const next=n.nextElementSibling;target.appendChild(n);n=next}}
+function applyRoleView(){
+  try{
+    const w=frame.contentWindow,d=frame.contentDocument;
+    const access=w?.B3SiteSettings?.getCurrentAccess?.()||{};
+    const owner=access.role==="admin"||(access.classIds||[]).includes("*");
+    const accessNav=document.getElementById("classAccessNav");
+    if(accessNav)accessNav.style.display=owner?"":"none";
+    // Teacher-account creation is platform-owner administration only.
+    const teacherHeading=[...d.querySelectorAll("#adminControls > h3")].find(h=>h.textContent.trim()==="Teacher accounts");
+    if(teacherHeading){
+      teacherHeading.style.display=owner?"":"none";
+      let n=teacherHeading.nextElementSibling;
+      for(let i=0;i<2&&n;i++){const next=n.nextElementSibling;n.style.display=owner?"":"none";n=next;}
+    }
+    if(!owner&&currentTab==="access")showTab("students");
+  }catch(e){console.warn("Could not apply teacher role view",e);}
+}
 function organize(){
   const d=frame.contentDocument;if(!d)return;
   const panel=d.getElementById("adminPanel"),controls=d.getElementById("adminControls");if(!panel||!controls)return;
@@ -84,6 +101,7 @@ function organize(){
     const ah=findHeading(d,"Student activities");if(ah)moveRange(ah,3,activities);
     const sh=findHeading(d,"Student access while locked");if(sh)moveRange(sh,4,special);
   }
+  applyRoleView();
   showTab(currentTab);
 }
 function showTab(tab){
@@ -226,6 +244,8 @@ frame.addEventListener("load",()=>{
   // a MutationObserver loop that froze the entire Teacher Center.
   const panel=d.getElementById("adminPanel");
   if(panel) panel.classList.remove("hidden");
+  setTimeout(()=>{applyRoleView();populatePreviewStudents();},700);
+  setTimeout(applyRoleView,1800);
 });
 </script>
 </body>
