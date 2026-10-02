@@ -578,7 +578,7 @@ async function checkAccess(name, pin){
   return {ok:true,slug,displayName:String(profile.name||name)};
 }
 
-document.getElementById('startBtn').onclick = async () => {
+document.getElementById('startBtn').onclick = async () => {location.href='../index.html';return;
   const val = document.getElementById('studentNameInput').value.trim();
   const pin = document.getElementById('classPinInput').value.trim();
   if(!val){ return; }

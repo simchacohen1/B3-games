@@ -279,6 +279,7 @@
             <input id="newClassName" type="text" placeholder="New class name" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
             <button id="addClassButton" class="admin-action" type="button" style="margin:0">Add class</button>
           </div>
+          <button id="securePasscodesButton" class="admin-action secondary" type="button" style="margin-top:10px">Make all passcodes private</button>
         </div>
         <div id="addStudentArea" class="hidden" style="margin-top:12px;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px">
           <strong>Add a student</strong>
@@ -454,15 +455,13 @@
     }
     const studentRows=await Promise.all(studentIds.map(async id=>{
       const snap=await db.ref("b3Games/students/"+id+"/profile").once("value");
-      const profile=snap.val()||{};
-      if(isOwner&&!String(profile.passcode||'').trim()){
-        const legacy=(await db.ref('posukPractice/allowedStudents/'+id).once('value')).val();
-        if(legacy&&legacy.active!==false)profile.passcode=String(legacy.passcode||'5770');
-      }
-      return [id,profile];
+      return [id,snap.val()||{}];
     }));
     const students={};
     studentRows.forEach(([id,profile])=>{students[id]={profile};});
+    // Passcodes are private; teachers see them only through the backend.
+    const passcodeList=await trustedStudentAction("list",isOwner?{all:true}:{});
+    Object.entries(passcodeList?.passcodes||{}).forEach(([id,code])=>{if(students[id])students[id].profile={...students[id].profile,passcode:code};});
 
     studentSel.innerHTML=studentIds.sort((a,b)=>String(students[a]?.profile?.name||a).localeCompare(String(students[b]?.profile?.name||b))).map(id=>'<option value="'+id+'">'+(students[id]?.profile?.name||id)+'</option>').join("");
     if(priorStudent&&students[priorStudent])studentSel.value=priorStudent;
@@ -470,7 +469,7 @@
     const selected=classSel.value, members=(classes[selected]&&classes[selected].members)||{};
     el("classMemberList").innerHTML=Object.keys(members).length?Object.keys(members).sort((a,b)=>String(members[a]?.name||students[a]?.profile?.name||a).localeCompare(String(members[b]?.name||students[b]?.profile?.name||b))).map(id=>{
       const profile=students[id]?.profile||{}, name=members[id]?.name||profile.name||id;
-      const passcode=String(profile.passcode||members[id]?.passcode||"");
+      const passcode=String(profile.passcode||"");
 const active=(members[id]?.active!==false&&profile.active!==false);
       return '<div style="display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px;gap:8px;align-items:center;padding:10px;border-top:1px solid #e5e7eb"><strong>'+name+'</strong><input data-student-passcode="'+id+'" value="'+passcode.replace(/"/g,"&quot;")+'" inputmode="numeric" aria-label="Current passcode for '+name.replace(/"/g,"&quot;")+'" title="Current saved passcode" style="width:100%;padding:7px 8px;border:1px solid #94a3b8;border-radius:8px;background:#fff;font-weight:800;color:#0f172a"><button type="button" data-toggle-student="'+id+'" data-active="'+active+'" style="border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer;background:'+(active?'#dcfce7':'#fee2e2')+';color:'+(active?'#166534':'#991b1b')+'">'+(active?'Enabled':'Blocked')+'</button><button type="button" data-save-student="'+id+'" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer">Save</button></div>';
     }).join(""):'<div class="admin-message" style="padding:14px 10px">No students in this class yet. Use “Add Student” above.</div>';
@@ -502,30 +501,13 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
   async function createManagedStudent(){
     const name=el("managedStudentName").value.trim(), passcode=el("managedStudentPasscode").value.trim();
-    const id="student_"+crypto.randomUUID().replaceAll("-","");
     if(!name||!passcode){el("classManagementStatus").textContent="Enter a student name and passcode.";return;}
-    const classId=el("manageClassSelect").value;
-    if(!isAuthorizedAdmin){const result=await trustedStudentAction("create",{name,passcode});if(!result)return;el("managedStudentName").value="";el("managedStudentPasscode").value="";await loadClassManagement();el("classManagementStatus").textContent="Student created in this class.";return;}
-    const updates={};
-    updates["b3Games/students/"+id+"/profile"]={id,name,passcode,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP,active:true};
-    if(classId){
-      updates["b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+id]={studentId:id,name,passcode,active:true};
-      updates["b3Games/students/"+id+"/memberships/"+workspaceId+"_"+classId]={workspaceId,classId,active:true};
-    }
-    await db.ref().update(updates);
-    el("managedStudentName").value="";el("managedStudentPasscode").value="";
-    el("classManagementStatus").textContent=classId?"Student saved and added to this class.":"Student saved.";
-    await loadClassManagement();el("classStudentSelect").value=id;
+    {const result=await trustedStudentAction("create",{name,passcode});if(!result)return;el("managedStudentName").value="";el("managedStudentPasscode").value="";await loadClassManagement();el("classManagementStatus").textContent="Student created in this class.";return;}
   }
   async function saveManagedStudentPasscode(){
     const studentId=el("classStudentSelect").value, passcode=el("editManagedStudentPasscode").value.trim();
     if(!studentId||!passcode)return;
-    if(!isAuthorizedAdmin){if(await trustedStudentAction("passcode",{studentId,passcode})){el("classManagementStatus").textContent="Passcode saved.";await loadClassManagement();}return;}
-    await db.ref("b3Games/students/"+studentId+"/profile").update({passcode,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP});
-    const classId=el("manageClassSelect").value;
-    if(classId)await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId).update({passcode});
-    el("classManagementStatus").textContent="Student passcode saved.";
-    await loadClassManagement();
+    {if(await trustedStudentAction("passcode",{studentId,passcode})){el("classManagementStatus").textContent="Passcode saved.";await loadClassManagement();}return;}
   }
   async function addStudentToManagedClass(){
     const classId=el("manageClassSelect").value, studentId=el("classStudentSelect").value;
@@ -533,7 +515,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(!isAuthorizedAdmin){if(await trustedStudentAction("add",{studentId}))await loadClassManagement();return;}
     const s=(await db.ref("b3Games/students/"+studentId+"/profile").once("value")).val()||{};
     const updates={};
-    updates["b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId]={studentId,name:s.name||studentId,passcode:String(s.passcode||""),active:true};
+    updates["b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId]={studentId,name:s.name||studentId,active:true};
     updates["b3Games/students/"+studentId+"/memberships/"+workspaceId+"_"+classId]={workspaceId,classId,active:true};
     await db.ref().update(updates); await loadClassManagement();
   }
@@ -994,62 +976,24 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     el("lockedMessage").textContent=currentSettings.siteEnabled===false?"B3 Games is closed right now. Rabbi Cohen can give you access to a specific activity.":"Your class cannot use B3 Games right now. Rabbi Cohen can give you access to a specific activity.";
   }
 
+  // Student sign-in is checked on the server; passcodes never reach the browser.
+  const STUDENT_AUTH_URL="https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
+  async function studentAuthCall(body){
+    const response=await fetch(STUDENT_AUTH_URL,{method:"POST",signal:AbortSignal.timeout(15000),headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw Object.assign(new Error(data.error||"Could not check your login. Try again."),{status:response.status});
+    return data;
+  }
   async function checkStudentAccess(name,pin){
     const typed=String(name||"").trim(),enteredPin=String(pin||"").trim();
-    const normalize=value=>String(value||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"");
-    if(!normalize(typed))return{ok:false,reason:"Please type your name."};
+    if(!typed.replace(/[^a-z0-9]/gi,""))return{ok:false,reason:"Please type your name."};
     if(!enteredPin)return{ok:false,reason:"Please enter your passcode."};
-
-    const [centralSnap,legacySnap]=await Promise.all([
-      db.ref("b3Games/students").once("value"),
-      db.ref("posukPractice/allowedStudents").once("value")
-    ]);
-    const central=centralSnap.val()||{},legacyRows=legacySnap.val()||{};
-    const sameName=(id,profile)=>normalize(profile?.name)===normalize(typed)||normalize(id)===normalize(typed);
-
-    // Find the student's canonical B3 account by name first. A stale passcode
-    // in the new profile must not override the valid legacy passcode during
-    // this migration; when legacy succeeds we repair the new profile.
-    const namedCentral=Object.entries(central).filter(([id,row])=>row?.profile&&row.profile.active!==false&&sameName(id,row.profile));
-    const validCentral=namedCentral.filter(([,row])=>String(row.profile.passcode||"").trim()===enteredPin);
-    let id="",d=null,legacy=null;
-
-    if(validCentral.length>1)return{ok:false,reason:"More than one student has this name and passcode. Ask your teacher for a different passcode."};
-    if(validCentral.length===1){
-      id=validCentral[0][0];d=validCentral[0][1].profile;
-      legacy=legacyRows[id]||null;
-    }else{
-      // If the central profile exists but its PIN is stale, accept the same
-      // student's valid legacy PIN and immediately synchronize the profile.
-      const repaired=namedCentral.filter(([sid])=>{
-        const old=legacyRows[sid];
-        return old&&old.active!==false&&String(old.passcode||"5770").trim()===enteredPin;
-      });
-      if(repaired.length>1)return{ok:false,reason:"More than one student has this name and passcode. Ask your teacher for a different passcode."};
-      if(repaired.length===1){
-        id=repaired[0][0];d={...repaired[0][1].profile,passcode:enteredPin};legacy=legacyRows[id];
-        try{await db.ref("b3Games/students/"+id+"/profile").update({passcode:enteredPin,name:String(d.name||legacy?.name||typed),active:true,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP});}catch(e){console.warn("Could not repair student passcode",e);}
-      }
-    }
-
-    if(!id){
-      const legacyMatches=Object.entries(legacyRows).filter(([sid,row])=>
-        row&&row.active!==false&&sameName(sid,row)&&String(row.passcode||"5770").trim()===enteredPin);
-      if(legacyMatches.length>1)return{ok:false,reason:"More than one student has this name and passcode. Ask your teacher for a different passcode."};
-      if(legacyMatches.length===1){
-        id=legacyMatches[0][0];legacy=legacyMatches[0][1]||{};
-        d={id,name:String(legacy.name||typed),passcode:enteredPin,active:true,classId:legacy.classId||legacyMigrationClass(id)};
-        try{await db.ref("b3Games/students/"+id+"/profile").update({name:d.name,passcode:enteredPin,active:true,classId:d.classId||null,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP});}catch(e){console.warn("Could not migrate student profile",e);}
-      }
-    }
-
-    if(!id||!d)return{ok:false,reason:"Check your name and passcode."};
-    if(d.active===false)return{ok:false,reason:"Your access is turned off. Ask your teacher."};
-    if(normalize(d.name)!==normalize(typed)&&normalize(id)!==normalize(typed))return{ok:false,reason:"Check your name and passcode."};
-
-    const classId=await resolvedStudentClass(id,{...d,classId:d.classId||legacy?.classId||legacyMigrationClass(id)});
+    let r;
+    try{r=await studentAuthCall({action:"login",name:typed,pin:enteredPin});}
+    catch(e){return{ok:false,reason:e.message}}
+    const classId=await resolvedStudentClass(r.id,{id:r.id,name:r.name,active:true,classId:r.classId||legacyMigrationClass(r.id)});
     if(!classId)return{ok:false,reason:"Your class is not assigned yet. Ask your teacher."};
-    return{ok:true,id,name:String(d.name||legacy?.name||typed),classId};
+    return{ok:true,id:r.id,name:r.name,classId};
   }
 
   let studentClassWatch=null,studentProfileWatch=null,studentMembershipWatch=null;
@@ -1077,7 +1021,11 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     studentClassWatch=db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId);
     studentClassWatch.on("value",snap=>{myClassRecord=snap.val();if(!myClassRecord||myClassRecord.active===false||!myClassRecord.members?.[myStudentId]||myClassRecord.members?.[myStudentId]?.active===false){studentAccessRevoked=true;showLogin();return;}renderStudentAccess();});
     studentProfileWatch=db.ref("b3Games/students/"+myStudentId+"/profile");
-    studentProfileWatch.on("value",snap=>{const v=snap.val();if(v?.active===false){studentAccessRevoked=true;showLogin();return;}if(!isStudentPreview&&String(v?.passcode||"").trim()&&String(v.passcode).trim()!==String(localStorage.getItem("b3Games_classPin")||"").trim()){studentAccessRevoked=true;localStorage.removeItem("b3Games_classPin");showLogin();setLoginMsg("Your passcode changed. Please sign in again.");}});
+    let seenPasscodeUpdate;
+    studentProfileWatch.on("value",async snap=>{const v=snap.val();if(v?.active===false){studentAccessRevoked=true;showLogin();return;}
+      const stamp=v?.passcodeUpdatedAt??null;if(seenPasscodeUpdate===undefined){seenPasscodeUpdate=stamp;return;}if(stamp===seenPasscodeUpdate||isStudentPreview)return;seenPasscodeUpdate=stamp;
+      try{await studentAuthCall({action:"verify",studentId:myStudentId,pin:String(localStorage.getItem("b3Games_classPin")||"")});}
+      catch(e){if(e.status===401||e.status===403){studentAccessRevoked=true;localStorage.removeItem("b3Games_classPin");showLogin();setLoginMsg("Your passcode changed. Please sign in again.");}}});
     studentMembershipWatch=db.ref("b3Games/students/"+myStudentId+"/memberships");
     studentMembershipWatch.on("value",snap=>{const rows=snap.val()||{};if(Object.keys(rows).length&&!Object.values(rows).some(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&m.classId===myClassId)){studentAccessRevoked=true;showLogin();}});
     renderStudentAccess();
@@ -1105,7 +1053,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
         const legacy=await db.ref("posukPractice/allowedStudents/"+id).once("value");
         if(!legacy.exists()){showLogin();return;}
         const old=legacy.val()||{};
-        d={id,name:String(old.name||id),passcode:String(old.passcode||"5770"),passcodeUpdatedAt:Number(old.passcodeUpdatedAt)||Date.now(),active:true};
+        d={id,name:String(old.name||id),active:true};
         try{await db.ref("b3Games/students/"+id+"/profile").set(d);}catch(e){}
       }
       if(d.active===false){showLogin();return;}
@@ -1113,9 +1061,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       // missing or out of date, ask once here instead of inside each activity.
       if(!isStudentPreview){
         const saved=String(localStorage.getItem("b3Games_classPin")||"").trim();
-        let expected=String(d.passcode||"").trim();
-        if(!expected){try{const lg=(await db.ref("posukPractice/allowedStudents/"+id).once("value")).val();expected=String(lg?.passcode||"").trim();}catch(e){}}
-        if(!saved||(expected&&saved!==expected)){
+        let stale=!saved;
+        if(saved){try{await studentAuthCall({action:"verify",studentId:id,pin:saved});}catch(e){stale=e.status===401||e.status===403;}}
+        if(stale){
           localStorage.removeItem("b3Games_classPin");
           el("studentNameInput").value=d.name?String(d.name):"";
           showLogin();setLoginMsg("Please sign in once more so all your activities open automatically.");return;
@@ -1585,6 +1533,11 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   el("classStudentSelect").addEventListener("change",loadClassManagement);
   el("createManagedStudentButton").addEventListener("click",createManagedStudent);
   el("saveManagedStudentPasscodeButton").addEventListener("click",saveManagedStudentPasscode);
+  el("securePasscodesButton").addEventListener("click",async()=>{
+    el("classManagementStatus").textContent="Securing passcodes…";
+    const r=await trustedStudentAction("migratePasscodes",{deletePublic:true});
+    if(r)el("classManagementStatus").textContent="Done: "+r.copied+" passcodes moved to private storage, "+r.cleared+" public copies removed.";
+  });
   el("addClassButton").addEventListener("click",addManagedClass);
   el("addStudentToClassButton").addEventListener("click",addStudentToManagedClass);
   el("addTeacherButton").addEventListener("click",addManagedTeacher);
@@ -1596,9 +1549,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(save){
       const id=save.dataset.saveStudent, input=el("classMemberList").querySelector('[data-student-passcode="'+id+'"]'), passcode=input?input.value.trim():"";
       if(!passcode){el("classManagementStatus").textContent="Passcode cannot be blank.";return;}
-      if(!isAuthorizedAdmin){if(await trustedStudentAction("passcode",{studentId:id,passcode})){el("classManagementStatus").textContent="Passcode saved.";await loadClassManagement();}return;}
-      await db.ref("b3Games/students/"+id+"/profile").update({passcode,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP});
-      el("classManagementStatus").textContent="Passcode saved."; await loadClassManagement();
+      {if(await trustedStudentAction("passcode",{studentId:id,passcode})){el("classManagementStatus").textContent="Passcode saved.";await loadClassManagement();}return;}
     }
     if(toggle){
       const id=toggle.dataset.toggleStudent, active=toggle.dataset.active!=="true";

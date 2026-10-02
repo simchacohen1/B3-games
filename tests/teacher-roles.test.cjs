@@ -23,8 +23,8 @@ test('repeated owner migration does not erase passcodes or reactivate blocked me
  const updates=t.writes[0][1];assert.equal(updates['b3Games/students/child/profile'],undefined);assert.equal(updates['b3Games/students/child/memberships/b3-2026_et'],undefined);assert.equal(updates['b3Games/workspaces/b3-2026/classes/et/members/child'],undefined);
 });
 
-test('erased passcode recovery requires surviving saved codes to agree',async()=>{
- for(const [codes,expected] of [[['4321','4321'],'4321'],[['4321','9999'],undefined]]){
+test('owner seeding never writes passcodes into public profiles',async()=>{
+ for(const [codes,expected] of [[['4321','4321'],undefined],[['4321','9999'],undefined]]){
   const owner={...teacher,uid:'owner',email:'simcha5770@gmail.com'};
   const t=settings({'posukPractice/allowedStudents':{child:{classId:'et',name:'Child'}},'b3Games/students':{child:{profile:{name:'Child',active:false}}},'b3Games/workspaces/b3-2026/classes':{et:{members:{child:{passcode:codes[0]}}},wt:{members:{child:{passcode:codes[1]}}}}},owner);
   await t.window.migrateForTest({db:t.db},owner);

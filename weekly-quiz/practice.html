@@ -230,7 +230,7 @@ let studentId='',studentName='',selected=new Set(),quizType='shorashim',difficul
 
 function slugify(s){return String(s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');}
 function setLoginMsg(t){document.getElementById('loginMsg').textContent=t||'';}
-async function login(){
+async function login(){location.href='../index.html';return;
   const name=document.getElementById('studentName').value.trim(),pin=document.getElementById('classPin').value.trim(),id=slugify(name);
   if(!id){setLoginMsg('Type your name first.');return;}
   setLoginMsg('Checking…');

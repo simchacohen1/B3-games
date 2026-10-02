@@ -266,7 +266,7 @@ async function finishRecording(st){
 }
 
 function slugifyStudentName(name){return String(name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')}
-async function signInStudentHere(){
+async function signInStudentHere(){location.href='../index.html';return;
   const btn=$('studentSignInBtn'),msg=$('studentSignInMsg'),typed=$('studentNameInput').value.trim(),pin=$('classPinInput').value.trim();
   const normalize=value=>String(value||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'');
   if(!typed){msg.textContent='Please type the student name.';return}

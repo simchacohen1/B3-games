@@ -185,6 +185,7 @@ function enterGame(displayName, studentId) {
 }
 
 async function joinGame() {
+  location.href='../index.html';return;
   if (masterBlocked) return;
 
   const name = document.getElementById('studentNameInput').value.trim();
