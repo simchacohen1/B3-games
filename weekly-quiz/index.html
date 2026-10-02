@@ -334,6 +334,7 @@ async function checkStudentAccess(name,pin){
 }
 
 async function joinQuiz(){
+  location.href='../index.html';return;
   if(masterBlocked)return;
   const name=document.getElementById('studentNameInput').value.trim(),pin=document.getElementById('classPinInput').value.trim(),btn=document.getElementById('joinBtn');
   if(!name){setLoginMsg('Please type your name.');return;}

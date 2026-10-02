@@ -19,7 +19,7 @@ const configPath=c=>!c||legacy(c)?'yiddishPrivate/config':'yiddishPrivate/classe
 const studentPath=(c,id)=>legacy(c)?'yiddishPrivate/students/'+id:'yiddishPrivate/classes/'+WORKSPACE+'/'+c+'/students/'+id;
 // Migration bridge: ET/WT students who have no central passcode yet may use the
 // individual passcode from the private legacy list (never the shared 5770 default).
-async function passcodeFor(id,profile,classId){const central=String(profile?.passcode||'').trim();if(central)return central;if(!legacy(classId))return '';const old=await get('posukPractice/allowedStudents/'+id);const p=String(old?.passcode||'').trim();return old&&old.active!==false&&p&&p!=='5770'?p:''}
+async function passcodeFor(id,profile,classId){const priv=String((await get('b3Private/passcodes/'+id))?.passcode||'').trim();if(priv)return priv;const central=String(profile?.passcode||'').trim();if(central)return central;if(!legacy(classId))return '';const old=await get('posukPractice/allowedStudents/'+id);const p=String(old?.passcode||'').trim();return old&&old.active!==false&&p&&p!=='5770'?p:''}
 const cfg=async c=>{const saved=await get(configPath(c));if(saved)return saved;const d=defaults();if(c&&!legacy(c))d.unlocked={[c]:0};return d};
 async function teacher(token,classId){
  const t=await verifyTeacher(token).catch(()=>null);
