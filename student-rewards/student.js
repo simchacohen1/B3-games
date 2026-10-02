@@ -23,7 +23,7 @@ function cooldownText(until){
 function personalCooldown(r){const until=timeMs(r?.cooldownUntil),active=until>Date.now();return {until,active,label:active?`Available again in ${cooldownText(until)}`:''}}
 
 function slugify(name){return String(name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')}
-async function websiteEnabled(){const snap=await db.ref(`${ROOT}/settings/studentWebsiteEnabled`).once('value');return String(snap.val())!=='false'}
+async function websiteEnabled(){const r=await fetch(window.B3_FIREBASE_CONFIG.databaseURL+'/'+ROOT+'/settings/studentWebsiteEnabled.json',{cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)throw new Error('Could not check Student Rewards access.');return String(await r.json())!=='false'}
 function own(path){return db.ref(`${ROOT}/${path}/${state.studentId}`)}
 async function loadActivityPointHistory(){
   const user=auth.currentUser;
@@ -64,13 +64,14 @@ function nav(){const tabs=['Progress','Rewards','Comments'];$('#studentNav').inn
 async function signInB3(name,pin,idHint=''){
   if(!await websiteEnabled()){showBlocked();return}
   const studentName=String(name||'').trim();
-  const b3StudentId=String(idHint||slugify(studentName));
+  const b3StudentId=String(idHint||'');
   const classPin=String(pin||'').trim();
-  if(!studentName||!b3StudentId||!classPin) throw new Error('Enter your full name and passcode.');
+  if(!studentName||!classPin) throw new Error('Enter your full name and passcode.');
   const r=await fetch(C.LOGIN_URL,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({b3StudentId,name:studentName,pin:classPin})
+    signal:AbortSignal.timeout(15000),
+    body:JSON.stringify({b3StudentId,name:studentName,pin:classPin,classId:localStorage.getItem('b3Games_studentClass')||''})
   });
   const j=await r.json();
   if(!r.ok) throw new Error(j.error||'Could not sign in');
@@ -104,7 +105,7 @@ async function trySharedB3Login(){
   const pin=localStorage.getItem('b3Games_classPin')||'';
   if(name&&$('#studentName')) $('#studentName').value=name;
   if(pin&&$('#pin')) $('#pin').value=pin;
-  if(!auth.currentUser&&id&&name&&pin){
+  if(id&&name&&pin){
     $('#loginError').textContent='Signing you in with your Fun Torah Tools login…';
     try{await signInB3(name,pin,id);$('#loginError').textContent=''}
     catch(err){$('#loginError').textContent=err.message||String(err)}
@@ -354,6 +355,7 @@ $('#logoutBtn').onclick=async()=>{
 };
 
 auth.onAuthStateChanged(async user=>{
+  try{
   if(!await websiteEnabled()){showBlocked();if(user)await auth.signOut();return}
   if(!user){
     state.studentId='';state.student=null;
@@ -363,12 +365,15 @@ auth.onAuthStateChanged(async user=>{
     return;
   }
   const token=await user.getIdTokenResult();
+  const sharedId=localStorage.getItem('b3Games_studentId');
+  if(sharedId&&token.claims.b3StudentId!==sharedId){$('#portalView').classList.add('hidden');return;}
   const sid=token.claims.studentRewardsStudentId;
   if(!sid){await auth.signOut();return}
   state.studentId=String(sid);
   await load();
+  }catch(error){$('#loginView').classList.remove('hidden');$('#loginError').textContent=error.message||'Could not load Student Rewards. Refresh and try again.';}
 });
 setTimeout(trySharedB3Login,0);
-setInterval(async()=>{if(!await websiteEnabled())showBlocked()},5000);
+setInterval(async()=>{try{if(!await websiteEnabled())showBlocked()}catch(error){console.warn('Rewards access check failed',error)}},15000);
 setInterval(()=>{if(state.tab==='Rewards'&&state.root&&!state.busy)renderTab()},60000);
 })();
