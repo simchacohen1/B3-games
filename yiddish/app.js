@@ -625,7 +625,10 @@ function flashRender(){
     box.append(again,back);focusFlash();return;
   }
   const id=flash.ids[flash.idx],w=word(id);
-  box.append(node('div',`Card ${flash.idx+1} of ${flash.ids.length}`,'practice-progress'));
+  const flashTop=node('div','','sentence-topbar'),flashBackBtn=node('button','← Back to my words','sentence-exit');flashBackBtn.type='button';
+  flashBackBtn.onclick=()=>{flash=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
+  flashTop.append(flashBackBtn);
+  box.append(flashTop,node('div',`Card ${flash.idx+1} of ${flash.ids.length}`,'practice-progress'));
   const card=node('article','','word flash-card');
   const face=node('div',flash.flipped?w.en:w.yi,'yi flash-face');
   if(!flash.flipped)face.lang='yi';
@@ -653,7 +656,10 @@ function question(){
   const q=round.question,w=word(q.wordId);
   const progressText=node('div',`Word ${round.index+1} of ${round.total}`,'practice-progress');
   const bar=node('div','','practice-bar');const fill=node('div','','practice-bar-fill');fill.style.width=`${Math.max(4,((round.index)/round.total)*100)}%`;bar.append(fill);
-  box.append(progressText,bar,node('h2','What does this word mean?'));
+  const topBack=node('div','','sentence-topbar'),backBtn=node('button','← Back to my words','sentence-exit');backBtn.type='button';
+  backBtn.onclick=async()=>{if(busy)return;clearAdvance();pending=null;round=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;try{await refresh()}catch(e){message(e.message)}window.scrollTo({top:0,behavior:'smooth'})};
+  topBack.append(backBtn);
+  box.append(topBack,progressText,bar,node('h2','What does this word mean?'));
   const yi=node('div',w.yi,'yi');yi.lang='yi';box.append(yi);
   const answers=node('div','');answers.id='answers';const feedback=node('p','');feedback.id='feedback';feedback.setAttribute('role','status');
   q.choices.forEach(id=>{const b=node('button',word(id).en);b.type='button';b.dataset.answer=id;b.onclick=()=>submit(id,answers,feedback);answers.append(b)});
