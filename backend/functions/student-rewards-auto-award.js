@@ -736,15 +736,36 @@ async function verifyChazara(studentId, source, eventId){
     if(e.recorded === true) return {ok:false,error:"Recorded Chazara must use the recorded request."};
     return {ok:true,event:e,eventRef:ref};
   }
-  if(e.recorded !== true || Number(e.durationMs||0) < 5000 || e.soundDetected !== true || !e.audioURL || !e.storagePath){
+  if(e.recorded !== true || Number(e.durationMs||0) < 5000 || e.soundDetected !== true){
     return {ok:false,error:"The recording did not pass the recorded-Chazara checks."};
   }
-  try{
-    const [meta] = await admin.storage().bucket().file(String(e.storagePath)).getMetadata();
-    if(Number(meta.size || 0) < 1000) return {ok:false,error:"The recording file is empty."};
-  }catch(err){
-    console.error("Could not verify Chazara storage object", err);
-    return {ok:false,error:"The recording file could not be verified."};
+
+  // New reliable Chazara save path: some student browsers cannot finish a
+  // Firebase Storage upload, so the frontend can preserve the audio directly
+  // in RTDB as a data:audio URL. Accept either a verified Storage object OR a
+  // validated database audio payload. This keeps teacher approval working for
+  // both old and new recordings.
+  if(e.audioURL && e.storagePath){
+    try{
+      const [meta] = await admin.storage().bucket().file(String(e.storagePath)).getMetadata();
+      if(Number(meta.size || 0) < 1000) return {ok:false,error:"The recording file is empty."};
+    }catch(err){
+      console.error("Could not verify Chazara storage object", err);
+      return {ok:false,error:"The recording file could not be verified."};
+    }
+  }else{
+    const dataUrl=String(e.audioDataURL||"");
+    const declaredSize=Number(e.sizeBytes||0);
+    if(!/^data:audio\/[a-z0-9.+-]+;base64,/i.test(dataUrl) || declaredSize < 1000){
+      return {ok:false,error:"The recording audio could not be verified."};
+    }
+    // Sanity-check that the encoded payload is consistent with a real audio
+    // recording and not just an empty/placeholder data URL.
+    const comma=dataUrl.indexOf(",");
+    const encoded=comma>=0?dataUrl.slice(comma+1):"";
+    if(encoded.length < 1200){
+      return {ok:false,error:"The recording audio is empty."};
+    }
   }
   return {ok:true,event:e,eventRef:ref};
 }
