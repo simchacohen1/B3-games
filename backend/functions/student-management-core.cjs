@@ -27,7 +27,8 @@ async function migratePasscodes(store,deletePublic,now){
 async function manageStudents(store,identity,body,now=Date.now()){
  if(!identity?.uid||identity.email_verified!==true||identity.firebase?.sign_in_provider!=='google.com')fail(403,'Verified Google teacher sign-in required.');
  const root='b3Games/workspaces/b3-2026',classId=body.classId;
- const owner=String(identity.email||'').toLowerCase()==='simcha5770@gmail.com';
+ // The owner account and any active site administrator count as owner here.
+ const owner=String(identity.email||'').toLowerCase()==='simcha5770@gmail.com'||(await store.get('b3Games/admins/'+identity.uid))?.active===true;
  if(body.action==='migratePasscodes'){if(!owner)fail(403,'Owner access required.');return migratePasscodes(store,body.deletePublic===true,now);}
  if(body.action==='list'&&owner&&body.all===true){
   const [students,legacy]=await Promise.all([store.get('b3Games/students'),store.get('posukPractice/allowedStudents')]);
