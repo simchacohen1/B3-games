@@ -10,7 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-<script src="recording-save.js?v=20261002-recording-timeout"></script>
+<script src="recording-save.js?v=20261002-recording-reliability"></script>
 <script src="../firebase-config.js"></script>
 <script src="../game-gate.js" data-game-id="chazara" data-back-href="../index.html"></script>
 </head>
@@ -249,21 +249,60 @@ async function finishRecording(st){
 function slugifyStudentName(name){return String(name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')}
 async function signInStudentHere(){
   const btn=$('studentSignInBtn'),msg=$('studentSignInMsg'),typed=$('studentNameInput').value.trim(),pin=$('classPinInput').value.trim();
+  const normalize=value=>String(value||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'');
   if(!typed){msg.textContent='Please type the student name.';return}
-  const id=slugifyStudentName(typed);btn.disabled=true;msg.textContent='Checking…';
+  if(!pin){msg.textContent='Please enter the passcode.';return}
+  btn.disabled=true;msg.textContent='Checking…';
   try{
-    const profileSnap=await db.ref('b3Games/students/'+id+'/profile').once('value');
-    let profile=profileSnap.val();
-    if(!profile){
-      const legacySnap=await db.ref('posukPractice/allowedStudents/'+id).once('value');
-      if(!legacySnap.exists()){msg.textContent='Ask your teacher to add your name first.';return}
-      const legacy=legacySnap.val()||{};profile={name:legacy.name||typed,passcode:String(legacy.passcode||'5770'),active:legacy.active!==false};
+    const [centralSnap,legacySnap]=await Promise.all([
+      db.ref('b3Games/students').once('value'),
+      db.ref('posukPractice/allowedStudents').once('value')
+    ]);
+    const central=centralSnap.val()||{},legacyRows=legacySnap.val()||{};
+    const sameName=(id,profile)=>normalize(profile?.name)===normalize(typed)||normalize(id)===normalize(typed);
+    const named=Object.entries(central).filter(([id,row])=>row?.profile&&row.profile.active!==false&&sameName(id,row.profile));
+    let matches=named.filter(([,row])=>String(row.profile.passcode||'').trim()===String(pin).trim());
+
+    // During the B3 account migration some new profiles retained an older PIN.
+    // Accept the same student's valid legacy PIN instead of locking him out.
+    if(!matches.length){
+      matches=named.filter(([id])=>{
+        const old=legacyRows[id];
+        return old&&old.active!==false&&String(old.passcode||'5770').trim()===String(pin).trim();
+      });
     }
+    if(matches.length>1){msg.textContent='More than one account matches. Sign in from the main B3 page.';return}
+
+    let id='',profile=null,legacy=null;
+    if(matches.length===1){
+      id=matches[0][0];profile=matches[0][1].profile;legacy=legacyRows[id]||null;
+    }else{
+      const legacyMatches=Object.entries(legacyRows).filter(([id,row])=>
+        row&&row.active!==false&&sameName(id,row)&&String(row.passcode||'5770').trim()===String(pin).trim());
+      if(legacyMatches.length>1){msg.textContent='More than one account matches. Sign in from the main B3 page.';return}
+      if(legacyMatches.length===1){
+        id=legacyMatches[0][0];legacy=legacyMatches[0][1]||{};
+        profile={name:legacy.name||typed,active:true,classId:legacy.classId||''};
+      }
+    }
+    if(!id||!profile){msg.textContent='Check your name and passcode.';return}
     if(profile.active===false){msg.textContent='Your student access is turned off. Ask your teacher.';return}
-    if(String(profile.passcode||'').trim()!==String(pin).trim()){msg.textContent='Incorrect passcode.';return}
-    const name=String(profile.name||typed);
-    localStorage.setItem('b3Games_studentId',id);localStorage.setItem('b3Games_studentName',name);localStorage.setItem('b3Games_classPin',String(pin).trim());
-    localStorage.setItem('posukPractice_studentId',id);localStorage.setItem('posukPractice_studentName',name);
+
+    const name=String(profile.name||legacy?.name||typed);
+    localStorage.setItem('b3Games_studentId',id);
+    localStorage.setItem('b3Games_studentName',name);
+    localStorage.setItem('b3Games_classPin',String(pin).trim());
+    localStorage.setItem('posukPractice_studentId',id);
+    localStorage.setItem('posukPractice_studentName',name);
+
+    // Preserve class identity for points/approvals when Chazara is opened directly.
+    const memberships=(central[id]?.memberships)||{};
+    const classId=Object.values(memberships).find(m=>m&&m.active!==false&&m.workspaceId==='b3-2026'&&m.classId)?.classId
+      ||profile.classId||legacy?.classId||'';
+    if(classId){
+      localStorage.setItem('b3Games_studentClass',String(classId));
+      localStorage.setItem('weeklyQuiz_classId',String(classId));
+    }
     location.reload();
   }catch(e){console.error(e);msg.textContent='Could not sign in. Please try again.'}
   finally{btn.disabled=false}
