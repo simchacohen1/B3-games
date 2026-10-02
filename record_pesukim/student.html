@@ -2281,21 +2281,51 @@ async function studentRecord(path){
 }
 async function checkAccess(name,pin,idHint=''){
   const normalize=value=>String(value||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'');
-  let id=idHint,profile;
-  if(id)profile=await studentRecord('b3Games/students/'+encodeURIComponent(id)+'/profile');
-  else{
-    const rows=await studentRecord('b3Games/students')||{};
-    const matches=Object.entries(rows).filter(([sid,row])=>row?.profile?.active!==false&&normalize(row?.profile?.name)===normalize(name)&&String(row?.profile?.passcode||'').trim()===String(pin).trim());
-    if(matches.length>1)return {ok:false,reason:'More than one account matches. Sign in from the main site.'};
-    if(matches.length===1){id=matches[0][0];profile=matches[0][1].profile;}
+  const enteredPin=String(pin||'').trim(),typed=String(name||'').trim();
+  if(!normalize(typed)||!enteredPin)return {ok:false,reason:'Enter your name and passcode.'};
+
+  const rows=await studentRecord('b3Games/students')||{};
+  const legacyRows=await studentRecord('posukPractice/allowedStudents')||{};
+  const sameName=(sid,profile)=>normalize(profile?.name)===normalize(typed)||normalize(sid)===normalize(typed);
+
+  let id=idHint,profile=null,legacy=null;
+  if(id){
+    profile=await studentRecord('b3Games/students/'+encodeURIComponent(id)+'/profile');
+    legacy=legacyRows[id]||null;
+    if(profile&&profile.active!==false&&sameName(id,profile)){
+      const centralOk=String(profile.passcode||'').trim()===enteredPin;
+      const legacyOk=legacy&&legacy.active!==false&&String(legacy.passcode||DEFAULT_STUDENT_PASSCODE).trim()===enteredPin;
+      if(!centralOk&&!legacyOk)return {ok:false,reason:'Check your name and passcode. Sign in from the main site if needed.'};
+      return {ok:true,slug:id,accessVersion:Number(profile.passcodeUpdatedAt)||0};
+    }
   }
-  if(!profile){
-    id=idHint||slugify(name);
-    const legacy=await studentRecord('posukPractice/allowedStudents/'+encodeURIComponent(id));
-    if(legacy)profile={...legacy,passcode:String(legacy.passcode||DEFAULT_STUDENT_PASSCODE)};
+
+  const named=Object.entries(rows).filter(([sid,row])=>row?.profile?.active!==false&&sameName(sid,row.profile));
+  const centralMatches=named.filter(([,row])=>String(row.profile.passcode||'').trim()===enteredPin);
+  if(centralMatches.length>1)return {ok:false,reason:'More than one account matches. Sign in from the main site.'};
+  if(centralMatches.length===1){
+    id=centralMatches[0][0];profile=centralMatches[0][1].profile;
+    return {ok:true,slug:id,accessVersion:Number(profile.passcodeUpdatedAt)||0};
   }
-  if(!profile||profile.active===false||normalize(profile.name)!==normalize(name)||String(profile.passcode||'').trim()!==String(pin).trim())return {ok:false,reason:'Check your name and passcode. Sign in from the main site if needed.'};
-  return {ok:true,slug:id,accessVersion:Number(profile.passcodeUpdatedAt)||0};
+
+  const repairMatches=named.filter(([sid])=>{
+    const old=legacyRows[sid];
+    return old&&old.active!==false&&String(old.passcode||DEFAULT_STUDENT_PASSCODE).trim()===enteredPin;
+  });
+  if(repairMatches.length>1)return {ok:false,reason:'More than one account matches. Sign in from the main site.'};
+  if(repairMatches.length===1){
+    id=repairMatches[0][0];profile=repairMatches[0][1].profile;
+    return {ok:true,slug:id,accessVersion:Number(profile.passcodeUpdatedAt)||0};
+  }
+
+  const legacyMatches=Object.entries(legacyRows).filter(([sid,row])=>
+    row&&row.active!==false&&sameName(sid,row)&&String(row.passcode||DEFAULT_STUDENT_PASSCODE).trim()===enteredPin);
+  if(legacyMatches.length>1)return {ok:false,reason:'More than one account matches. Sign in from the main site.'};
+  if(legacyMatches.length===1){
+    id=legacyMatches[0][0];legacy=legacyMatches[0][1]||{};
+    return {ok:true,slug:id,accessVersion:Number(legacy.passcodeUpdatedAt)||0};
+  }
+  return {ok:false,reason:'Check your name and passcode. Sign in from the main site if needed.'};
 }
 
 document.getElementById('startBtn').onclick = async () => {
