@@ -1,5 +1,5 @@
 'use strict';
-const APP_BUILD='2026-09-30-story-detective-v6-progress-fix';
+const APP_BUILD='2026-09-30-story-detective-v7-cheer-message';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
 let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null,soundGame=null;
@@ -42,6 +42,12 @@ const STORY_SUMMARIES={
   35:'The whole town came to Gitl’s wedding, including Mr. Weinman, and everyone celebrated.'
 };
 function message(s){$('notice').textContent=s}
+function cheer(){
+  const p=node('p','🎉 Great job, you finished! 🎉','cheer-message');
+  p.setAttribute('role','status');
+  p.style.cssText='font-size:26px;font-weight:900;color:#155431;background:#e2f3e8;border-radius:16px;padding:12px 18px;margin:12px auto;max-width:520px';
+  return p;
+}
 function clearAdvance(){if(advanceTimer){clearTimeout(advanceTimer);advanceTimer=null}}
 function focusPractice(){requestAnimationFrame(()=>$('practice')?.scrollIntoView({behavior:'smooth',block:'start'}))}
 function block(s){clearAdvance();$('lesson').hidden=true;$('practice').hidden=true;document.querySelectorAll('audio').forEach(a=>a.pause());message(s)}
@@ -446,7 +452,7 @@ function soundChoose(choice){
 function soundGameRender(){
   const box=$('soundgame');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
   if(soundGame.wordIndex>=soundGame.ids.length){
-    box.append(node('div','🔤','round-check'),node('h2','Sound Builder complete!'),node('p','You built all 8 Yiddish words in this section.'));
+    box.append(node('div','🔤','round-check'),node('h2','Sound Builder complete!'),cheer(),node('p','You built all 8 Yiddish words in this section.'));
     const again=node('button','Build them again');again.type='button';again.onclick=()=>{soundGame.ids=shuffleClient(config.sections[group].words.slice(0,8));soundGame.wordIndex=0;soundResetWord();soundGameRender();focusSoundGame()};
     const back=node('button','Back to my words');back.type='button';back.style.marginLeft='10px';back.onclick=()=>{soundGame=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
     box.append(again,back);focusSoundGame();return;
@@ -553,7 +559,7 @@ function sentenceGameRender(){
   const box=$('sentencegame');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
   const ids=sentenceGame.ids,sets=Math.max(1,Math.ceil(ids.length/4)),start=sentenceGame.setIndex*4,targets=ids.slice(start,start+4);
   if(start>=ids.length){
-    box.append(node('div','🧩','round-check'),node('h2','Missing Word complete!'),node('p','You filled in all '+ids.length+' words.'));
+    box.append(node('div','🧩','round-check'),node('h2','Missing Word complete!'),cheer(),node('p','You filled in all '+ids.length+' words.'));
     const again=node('button','Play again');again.type='button';again.onclick=()=>{const nextIds=shuffleClient(config.sections[group].words.slice(0,8));sentenceGame={group:group,ids:nextIds,setIndex:0,solved:new Set(),selected:null,feedback:'',feedbackKind:''};sentenceGameRender();focusSentenceGame()};
     const back=node('button','Back to my words');back.type='button';back.style.marginLeft='10px';back.onclick=()=>{sentenceGame=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
     box.append(again,back);focusSentenceGame();return;
@@ -613,7 +619,7 @@ $('flashStart').onclick=()=>{
 function flashRender(){
   const box=$('flashcards');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
   if(flash.idx>=flash.ids.length){
-    box.append(node('div','✓','round-check'),node('h2','Nice work!'),node('p',`You went through all ${flash.ids.length} flashcards in this section.`));
+    box.append(node('div','✓','round-check'),node('h2','Nice work!'),cheer(),node('p',`You went through all ${flash.ids.length} flashcards in this section.`));
     const again=node('button','Go again');again.type='button';again.onclick=()=>{flash={group,ids:shuffleClient(config.sections[group].words),idx:0,flipped:false};flashRender();focusFlash()};
     const back=node('button','Back to my words');back.type='button';back.style.marginLeft='10px';back.onclick=()=>{flash=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
     box.append(again,back);focusFlash();return;
@@ -639,7 +645,7 @@ function question(){
   clearAdvance();
   const box=$('practice');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
   if(round.finished){
-    box.append(node('div','✓','round-check'),node('h2','Round complete!'),node('p',`You practiced all ${round.total} words in this section.`),node('p','Your progress is saved. A word becomes “Learned” after two first-try correct rounds.'));
+    box.append(node('div','✓','round-check'),node('h2','Round complete!'),cheer(),node('p',`You practiced all ${round.total} words in this section.`),node('p','Your progress is saved. A word becomes “Learned” after two first-try correct rounds.'));
     const again=node('button','Practice this section again');again.type='button';again.onclick=async()=>{if(busy)return;busy=true;again.disabled=true;try{round=null;message('');const s=await API.call('start',{group,forceNew:true});round=s.round;pending=null;question();focusPractice()}catch(e){message(e.message)}finally{busy=false}};
     const back=node('button','Back to my words');back.type='button';back.style.marginLeft='10px';back.onclick=async()=>{round=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;try{await refresh()}catch(e){message(e.message)}window.scrollTo({top:0,behavior:'smooth'})};
     box.append(again,back);focusPractice();return;

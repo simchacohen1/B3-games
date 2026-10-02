@@ -4,9 +4,21 @@
 const C=window.StudentRewardsCommon;
 const {db,auth}=C.ensureFirebase();
 const ROOT=C.ROOT, ADMIN=C.ADMIN_EMAIL;
-const NAV=["Overview","Points Dashboard","Daily Points","Students","Categories","Comments","Rewards","Reports","People & Classes","Settings"];
+const OWNER_NAV=["Overview","Points Dashboard","Daily Points","Students","Categories","Comments","Rewards","Reports","People & Classes","Settings"];
+// Teachers other than the owner award points for their own classes through the
+// studentRewardsTeacher backend; the store, categories and settings stay with the owner.
+const TEACHER_NAV=["Overview","Points Dashboard","Daily Points","Students","Comments","Approvals","Reports"];
+let NAV=OWNER_NAV;
+const TEACHER_API="https://us-central1-b3-games.cloudfunctions.net/studentRewardsTeacher";
+async function teacherApi(action,extra={}){
+  const token=await auth.currentUser.getIdToken();
+  const response=await fetch(TEACHER_API,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({action,...extra})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
+  return data;
+}
 const REQUESTED_TAB=new URLSearchParams(window.location.search).get("tab");
-const ICONS={"Overview":"⌂","Points Dashboard":"★","Daily Points":"✓","Students":"♙","Categories":"☷","Comments":"✎","Rewards":"◇","Reports":"▤","People & Classes":"♧","Settings":"⚙"};
+const ICONS={"Approvals":"✓","Overview":"⌂","Points Dashboard":"★","Daily Points":"✓","Students":"♙","Categories":"☷","Comments":"✎","Rewards":"◇","Reports":"▤","People & Classes":"♧","Settings":"⚙"};
 const CLASS_REWARD_PRESETS=[
   {key:"gimkit",name:"Gimkit",icon:"🎯"},
   {key:"kahoot",name:"Kahoot",icon:"❓"},
@@ -106,7 +118,7 @@ function setHeader(){
   $("#datePretty").textContent=new Date(`${state.date}T12:00:00`).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
 }
 function buildNav(){
-  $("#nav").innerHTML=NAV.map(n=>`<button data-tab="${esc(n)}"><i>${ICONS[n]}</i><span>${esc(n)}</span>${n==="Rewards"&&pendingCount()?`<mark>${pendingCount()}</mark>`:""}</button>`).join("");
+  $("#nav").innerHTML=NAV.map(n=>`<button data-tab="${esc(n)}"><i>${ICONS[n]}</i><span>${esc(n)}</span>${(n==="Rewards"||n==="Approvals")&&pendingCount()?`<mark>${pendingCount()}</mark>`:""}</button>`).join("");
   $("#nav").onclick=e=>{const b=e.target.closest("[data-tab]");if(!b)return;state.tab=b.dataset.tab;render()};
 }
 function renderClassSelect(){
@@ -115,7 +127,8 @@ function renderClassSelect(){
   el.onchange=()=>{state.classId=el.value;state.selectedId="";prepareDraft();render()};
 }
 async function loadRoot(){
-  const snap=await db.ref(ROOT).once("value");state.root=snap.val()||{};
+  if(state.teacherMode){state.root=(await teacherApi("load")).root||{};}
+  else{const snap=await db.ref(ROOT).once("value");state.root=snap.val()||{};}
   if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=activeClasses()[0]?.id||"";
   prepareDraft();renderClassSelect();setHeader();buildNav();
 }
@@ -145,7 +158,7 @@ async function ensureRewardModelV2(){
   await db.ref().update(updates);
   return true;
 }
-function subscribe(){db.ref(ROOT).on("value",snap=>{state.root=snap.val()||{};if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=activeClasses()[0]?.id||"";renderClassSelect();if(state.tab!=="Daily Points"){setHeader();buildNav();render()}})}
+function subscribe(){if(state.teacherMode){clearInterval(state.pollTimer);state.pollTimer=setInterval(async()=>{try{await loadRoot();if(state.tab!=="Daily Points")render()}catch(e){console.warn(e)}},30000);return}db.ref(ROOT).on("value",snap=>{state.root=snap.val()||{};if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=activeClasses()[0]?.id||"";renderClassSelect();if(state.tab!=="Daily Points"){setHeader();buildNav();render()}})}
 function prepareDraft(){
   if(!state.root||!state.classId)return;state.draft={};state.awardDraft={};state.absent=new Set();
   for(const s of roster()){
@@ -167,6 +180,7 @@ function render(){if(!state.root||!state.user)return;setHeader();buildNav();docu
   if(state.tab==="Categories")p.innerHTML=categoriesPage();
   if(state.tab==="Comments")p.innerHTML=commentsPage();
   if(state.tab==="Rewards")p.innerHTML=rewardsPage();
+  if(state.tab==="Approvals")p.innerHTML=approvalsPage();
   if(state.tab==="Reports")p.innerHTML=reportsPage();
   if(state.tab==="People & Classes")p.innerHTML=peoplePage();
   if(state.tab==="Settings")p.innerHTML=settingsPage();
@@ -174,11 +188,11 @@ function render(){if(!state.root||!state.user)return;setHeader();buildNav();docu
 }
 function overview(){
   const r=roster(), avg=classAverage(), scored=savedTodayIds().size, pending=pendingCount(), enabled=String(state.root.settings?.studentWebsiteEnabled)!=="false";
-  return `<div class="welcome"><div><p class="eyebrow">SIGNED IN AS ADMIN</p><h1>Good afternoon, ${esc(state.user.displayName||"Simcha Cohen")}</h1><p>Here’s how ${esc(cls()?.name||"your class")} is doing today.</p></div><button class="primary" data-go="Daily Points">+ Give today’s points</button></div>
+  return `<div class="welcome"><div><p class="eyebrow">${state.teacherMode?"SIGNED IN AS TEACHER":"SIGNED IN AS ADMIN"}</p><h1>Good afternoon, ${esc(state.user.displayName||"Simcha Cohen")}</h1><p>Here’s how ${esc(cls()?.name||"your class")} is doing today.</p></div><button class="primary" data-go="Daily Points">+ Give today’s points</button></div>
   <div class="stats">
     <article class="stat purple"><i>↗</i><div><span>Class average</span><strong>${avg}%</strong><small class="up">Based on saved ratings</small></div><div class="bars"><b></b><b></b><b></b><b></b><b></b><b></b></div></article>
     <article class="stat gold"><i>★</i><div><span>Students scored today</span><strong>${scored}</strong><small>of ${r.length} students</small></div><div class="ring" style="background:conic-gradient(#e7ae34 ${r.length?Math.round(scored/r.length*100):0}%,#f1f2f6 0)"><b>${r.length?Math.round(scored/r.length*100):0}%</b></div></article>
-    <article class="stat green click" data-go="Rewards"><i>◇</i><div><span>Reward requests</span><strong>${pending}</strong><small>${pending?"awaiting approval":"All caught up"}</small></div><button>→</button></article>
+    <article class="stat green click" data-go="${state.teacherMode?"Approvals":"Rewards"}"><i>◇</i><div><span>Reward requests</span><strong>${pending}</strong><small>${pending?"awaiting approval":"All caught up"}</small></div><button>→</button></article>
   </div>
   <div class="dash">
     <section class="panel"><div class="panelhead"><div><h2>Student performance</h2><p>Today’s saved score</p></div><button data-go="Students">View all →</button></div><div class="list">${r.slice(0,6).map(s=>`<button class="studentrow" data-student="${esc(s.id)}"><em style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><span><strong>${esc(s.name)}</strong><small>${Number(s.rewardBalance)||0} reward points</small></span><u><i style="width:${Math.min(100,scoreFor(s))}%;background:${esc(safeColor(s))}"></i></u><b>${scoreFor(s)}%</b></button>`).join("")}</div></section>
@@ -452,6 +466,12 @@ function dailyRow(s,cats,saved){
 }
 function ratingClass(v){return String(v).toLowerCase().replace(/\s+/g,"-").replace("fair","average")}
 async function saveDaily(){
+  if(state.teacherMode){
+    const cats=categories(), r=roster();
+    const rows=r.map(s=>{const absent=state.absent.has(s.id),ratings={};if(!absent)for(const cat of cats)ratings[cat.name]=state.draft[`${s.id}|${cat.name}`]||"Good";return {studentId:s.id,absent,ratings,award:absent?0:Math.max(0,Math.round(Number(state.awardDraft[s.id]??10)||0))}});
+    try{await teacherApi("saveDaily",{classId:state.classId,date:state.date,rows});toast(`Saved ${r.length} students`)}catch(err){toast(err.message,"error")}
+    await loadRoot();render();return;
+  }
   const updates={}, cats=categories(), r=roster(), stamp=now(), balanceDeltas=[];
   for(const s of r){
     const absent=state.absent.has(s.id), ratings={};
@@ -482,7 +502,9 @@ function students(){
 }
 async function adjustPoints(){
   const s=currentStudent();if(!s)return;const raw=prompt(`Adjust ${s.name}'s points. Use a positive number to add or a negative number to deduct:`,"5");if(raw===null)return;const amount=Number(raw);if(!Number.isInteger(amount)||amount===0)return toast("Enter a whole number","error");
-  const reason=prompt("Reason:","Teacher adjustment")||"Teacher adjustment", key=db.ref(`${ROOT}/pointAdjustments`).push().key;
+  const reason=prompt("Reason:","Teacher adjustment")||"Teacher adjustment";
+  if(state.teacherMode){try{await teacherApi("adjust",{classId:state.classId,studentId:s.id,amount,reason});toast("Balance updated")}catch(err){toast(err.message,"error")}await loadRoot();render();return}
+  const key=db.ref(`${ROOT}/pointAdjustments`).push().key;
   let applied=0;
   await db.ref(`${ROOT}/students/${s.id}/rewardBalance`).transaction(cur=>{const old=Number(cur||0),next=Math.max(0,old+amount);applied=next-old;return next});
   await db.ref(`${ROOT}/pointAdjustments/${key}`).set({id:key,studentId:s.id,classId:state.classId,amount:applied,action:"teacher",reason,teacherEmail:state.user.email,createdAt:now()});
@@ -492,13 +514,13 @@ function categoriesPage(){
   const cats=categories();
   return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">DAILY SCORING</p><h1>Categories</h1><p>These are the areas scored on the Daily Points page.</p></div><button class="primary" id="addCategory">+ Add category</button></div><div class="category-grid">${cats.map((c,i)=>`<article class="category-card"><div class="catdot">${i+1}</div><h3>${esc(c.name)}</h3><p>Active · order ${Number(c.sortOrder||0)+1}</p><button data-catdelete="${esc(c.id)}">Remove</button></article>`).join("")}</div></section>`;
 }
-async function addCategory(){const name=prompt("Category name:");if(!name)return;const id=`cat-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;await db.ref(`${ROOT}/categories/${id}`).set({id,teacherEmail:state.user.email,name:name.trim(),points:1,sortOrder:categories().length,active:true});toast("Category added")}
-async function removeCategory(id){if(!confirm("Remove this category from future Daily Points screens? Old history will remain."))return;await db.ref(`${ROOT}/categories/${id}/active`).set(false);toast("Category removed")}
+async function addCategory(){if(state.teacherMode){toast("Only the administrator can change this.","error");return}const name=prompt("Category name:");if(!name)return;const id=`cat-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;await db.ref(`${ROOT}/categories/${id}`).set({id,teacherEmail:state.user.email,name:name.trim(),points:1,sortOrder:categories().length,active:true});toast("Category added")}
+async function removeCategory(id){if(state.teacherMode){toast("Only the administrator can change this.","error");return}if(!confirm("Remove this category from future Daily Points screens? Old history will remain."))return;await db.ref(`${ROOT}/categories/${id}/active`).set(false);toast("Category removed")}
 function commentsPage(){
   const s=currentStudent(), r=roster();if(s&&!state.selectedId)state.selectedId=s.id;const comments=s?vals(state.root.commentsByStudent?.[s.id]||{}).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))):[];
   return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">TEACHER NOTES</p><h1>Comments</h1><p>Write a private note or share encouragement with the student.</p></div><select id="commentPicker" class="picker">${r.map(x=>`<option value="${esc(x.id)}" ${s&&x.id===s.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select></div>${s?`<div class="admincolumns"><section><h2>${esc(s.name)}’s comments</h2><div class="commentlist">${comments.map(c=>`<article><p>${esc(c.body)}</p><small>${c.visibleToStudent===false?"Private teacher note":"Visible to student"} · ${c.createdAt?new Date(c.createdAt).toLocaleDateString():""}</small></article>`).join("")||`<div class="empty"><h3>No comments yet</h3><p>Add the first note for this student.</p></div>`}</div></section><section><h2>Add a comment</h2><form id="commentForm" class="adminform"><label>Comment<textarea id="commentText" required rows="5"></textarea></label><label class="check"><input id="commentVisible" type="checkbox" checked> Show this comment to the student</label><button class="primary">Save comment</button></form></section></div>`:`<div class="empty">No student selected.</div>`}</section>`;
 }
-async function addComment(e){e.preventDefault();const s=currentStudent(), body=$("#commentText").value.trim();if(!s||!body)return;const key=db.ref(`${ROOT}/commentsByStudent/${s.id}`).push().key;await db.ref(`${ROOT}/commentsByStudent/${s.id}/${key}`).set({id:key,studentId:s.id,body,visibleToStudent:$("#commentVisible").checked,teacherEmail:state.user.email,createdAt:now()});toast("Comment saved")}
+async function addComment(e){e.preventDefault();const s=currentStudent(), body=$("#commentText").value.trim();if(!s||!body)return;if(state.teacherMode){try{await teacherApi("comment",{classId:state.classId,studentId:s.id,body,visibleToStudent:$("#commentVisible").checked});toast("Comment saved")}catch(err){toast(err.message,"error")}await loadRoot();render();return}const key=db.ref(`${ROOT}/commentsByStudent/${s.id}`).push().key;await db.ref(`${ROOT}/commentsByStudent/${s.id}/${key}`).set({id:key,studentId:s.id,body,visibleToStudent:$("#commentVisible").checked,teacherEmail:state.user.email,createdAt:now()});toast("Comment saved")}
 function classRewardSnapshot(item,classId=state.classId){
   const count=Math.max(1,C.classRoster(state.root||{},classId).length),rawLive=state.root?.classRewardRounds?.[classId]?.[item.id]||null,raw=rawLive||{},cooldownDays=cooldownDaysValue(item?.cooldownDays);
   const perStudent=Math.max(1,Number(raw.perStudentCost)||Number(item.costPerStudent||100)),goal=Math.max(1,Number(raw.goalPoints)||perStudent*count),cap=Number(raw.maxPerStudent)||Math.min(goal,Math.ceil((goal/count)*2));
@@ -508,6 +530,11 @@ function classRewardSnapshot(item,classId=state.classId){
   }
   const rawTotal=Math.max(0,Number(raw.totalContributed)||0),completedAt=timeMs(raw.completedAt),cooldownUntil=cooldownDays>0&&completedAt?completedAt+cooldownDays*DAY_MS:0,cooling=rawTotal>=goal&&cooldownUntil>Date.now(),expired=rawTotal>=goal&&cooldownDays>0&&cooldownUntil>0&&cooldownUntil<=Date.now(),live=expired?null:rawLive,total=expired?0:rawTotal,byStudent=expired?{}:(raw.byStudent||{}),pct=Math.max(0,Math.min(100,Math.round(total/Math.max(1,goal)*100))),contributors=Object.keys(byStudent).filter(k=>Number(byStudent[k])>0).length,status=cooling?"cooldown":expired?"not-started":(total>=goal?"completed":String(raw.status||"not-started"));
   return {count,perStudent,live,goal,total,cap,pct,contributors,status,cooldownDays,cooldownUntil,cooling,expired,modeVoting:false};
+}
+function approvalsPage(){
+  const pointReq=pendingActivityPointRequests();
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">APPROVALS</p><h1>Activity points</h1><p>Posuk Practice and Chazara points for your students. Nothing below has been added yet.</p></div></div>
+  ${pointReq.length?`<section class="activity-queue"><div class="activity-head"><div><h2>Awaiting approval</h2></div><div class="activity-head-actions"><b>${pointReq.length}</b><button class="primary" id="approveAllActivity">Approve all</button></div></div>${pointReq.map(activityPointRow).join("")}</section>`:`<div class="empty"><h3>All caught up</h3><p>No points are waiting for approval.</p></div>`}</section>`;
 }
 function rewardsPage(){
   const rewards=vals(state.root.rewards||{}).filter(r=>r.active!==false&&String(r.rewardType||"personal")!=="class"&&String(r.rewardType||"personal")!=="class-migrated").sort((a,b)=>(a.cost||0)-(b.cost||0)), req=getRedemptions(), classRewards=vals(state.root.classRewardCatalog||{}).filter(x=>x.active!==false).sort((a,b)=>(a.costPerStudent||0)-(b.costPerStudent||0)||(a.name||"").localeCompare(b.name||"")), pointReq=pendingActivityPointRequests();
@@ -534,6 +561,7 @@ async function setChazaraPointStatus(item,status){
   try{await db.ref(path+'/'+field).set(status)}catch(e){console.warn('Could not mirror Chazara point status',e)}
 }
 async function approveActivityPoint(id,quiet=false){
+  if(state.teacherMode){try{const r=await teacherApi("approve",{requestId:id});if(!quiet)toast(`${r.actualAmount>=0?"+":""}${r.actualAmount} points approved`);if(!quiet){await loadRoot();render()}return true}catch(err){if(!quiet)toast(err.message,"error");return false}}
   const live=(await db.ref(`${ROOT}/pointRequests/${id}`).once("value")).val();
   if(!live||live.status!=="pending")return false;
   const reqRef=db.ref(`${ROOT}/pointRequests/${id}`), stamp=now();
@@ -557,6 +585,7 @@ async function approveActivityPoint(id,quiet=false){
   }
 }
 async function rejectActivityPoint(id,quiet=false){
+  if(state.teacherMode){try{await teacherApi("reject",{requestId:id});if(!quiet){toast("Point request rejected");await loadRoot();render()}return true}catch(err){if(!quiet)toast(err.message,"error");return false}}
   const snap=await db.ref(`${ROOT}/pointRequests/${id}`).once("value"), item=snap.val();
   if(!item||item.status!=="pending")return false;
   await db.ref(`${ROOT}/pointRequests/${id}`).update({status:"rejected",reviewedBy:state.user.email,reviewedAt:now()});
@@ -570,6 +599,7 @@ async function approveAllActivityPoints(){
   if(!confirm(`Approve all ${ids.length} pending activity point request${ids.length===1?"":"s"} for ${cls()?.name||"this class"}?`))return;
   let done=0;for(const id of ids)if(await approveActivityPoint(id,true))done++;
   toast(`${done} activity point request${done===1?"":"s"} approved`);
+  if(state.teacherMode){await loadRoot();render()}
 }
 function closeRewardEditor(){const overlay=document.querySelector(".reward-editor-backdrop");if(!overlay)return;if(overlay._rewardEditorKeyHandler)document.removeEventListener("keydown",overlay._rewardEditorKeyHandler);overlay.remove()}
 function rewardEditorBackdrop(title,subtitle,bodyHtml){
@@ -585,7 +615,7 @@ function rewardEditorBackdrop(title,subtitle,bodyHtml){
   document.addEventListener("keydown",onKey);
   return overlay;
 }
-function editReward(id=""){
+function editReward(id=""){if(state.teacherMode){toast("Only the administrator can change this.","error");return}
   const old=id?state.root.rewards?.[id]:null;
   const quantity=Number(old?.quantity??-1), unlimited=quantity<0, color=/^#[0-9a-f]{6}$/i.test(String(old?.color||""))?old.color:"#ede9fe";
   const overlay=rewardEditorBackdrop(id?"Edit personal reward":"Add personal reward","Change every reward setting here, then save once.",`
@@ -628,7 +658,7 @@ function editReward(id=""){
   };
   requestAnimationFrame(()=>overlay.querySelector("#rewardEditName")?.focus());
 }
-function editClassReward(id=""){
+function editClassReward(id=""){if(state.teacherMode){toast("Only the administrator can change this.","error");return}
   const old=id?state.root.classRewardCatalog?.[id]:null,isGimkit=isGimkitClassReward(old)||(!id&&false),startingModes=gimkitModesForItem(old||{id,name:"Gimkit"});
   const modeSection=isGimkit?`<div class="gimkit-mode-editor wide"><div class="gimkit-mode-editor-head"><div><b>Gimkit mode choices</b><small>Boys can choose one or several modes. Their contribution is split among the modes they check. Losing bars carry over to the next Gimkit.</small></div><button type="button" id="addGimkitMode">+ Add mode</button></div><div id="gimkitModeRows"></div></div>`:"";
   const overlay=rewardEditorBackdrop(id?"Edit class reward":"Add class reward","Change every class reward setting here, then save once.",`
@@ -671,10 +701,10 @@ function editClassReward(id=""){
   };
   requestAnimationFrame(()=>overlay.querySelector("#classRewardEditName")?.focus());
 }
-async function toggleRewardAvailability(id){const r=state.root.rewards?.[id];if(!r)return;const next=r.available===false;await db.ref(`${ROOT}/rewards/${id}/available`).set(next);toast(`${r.name||"Reward"} ${next?"opened":"closed"}`)}
-async function toggleClassRewardAvailability(id){const r=state.root.classRewardCatalog?.[id];if(!r)return;const next=r.available===false;await db.ref().update({[`${ROOT}/classRewardCatalog/${id}/available`]:next,[`${ROOT}/settings/classRewardAvailability/${id}`]:next});toast(`${r.name||"Class reward"} ${next?"opened":"closed"}`)}
-async function deleteClassReward(id){const r=state.root.classRewardCatalog?.[id];if(!r||!confirm(`Delete “${r.name}” from Class Rewards? Existing contribution history will be kept.`))return;await db.ref(`${ROOT}/classRewardCatalog/${id}/active`).set(false);toast("Class reward deleted")}
-async function resetClassReward(id){
+async function toggleRewardAvailability(id){if(state.teacherMode){toast("Only the administrator can change this.","error");return}const r=state.root.rewards?.[id];if(!r)return;const next=r.available===false;await db.ref(`${ROOT}/rewards/${id}/available`).set(next);toast(`${r.name||"Reward"} ${next?"opened":"closed"}`)}
+async function toggleClassRewardAvailability(id){if(state.teacherMode){toast("Only the administrator can change this.","error");return}const r=state.root.classRewardCatalog?.[id];if(!r)return;const next=r.available===false;await db.ref().update({[`${ROOT}/classRewardCatalog/${id}/available`]:next,[`${ROOT}/settings/classRewardAvailability/${id}`]:next});toast(`${r.name||"Class reward"} ${next?"opened":"closed"}`)}
+async function deleteClassReward(id){if(state.teacherMode){toast("Only the administrator can change this.","error");return}const r=state.root.classRewardCatalog?.[id];if(!r||!confirm(`Delete “${r.name}” from Class Rewards? Existing contribution history will be kept.`))return;await db.ref(`${ROOT}/classRewardCatalog/${id}/active`).set(false);toast("Class reward deleted")}
+async function resetClassReward(id){if(state.teacherMode){toast("Only the administrator can change this.","error");return}
   const r=state.root.classRewardCatalog?.[id];if(!r)return;
   const round=state.root?.classRewardRounds?.[state.classId]?.[id]||null,g=classRewardSnapshot(r);
   if(isGimkitClassReward(r)&&round&&g.cooling){
@@ -686,9 +716,9 @@ async function resetClassReward(id){
   await db.ref(`${ROOT}/classRewardRounds/${state.classId}/${id}`).remove();toast(isGimkitClassReward(r)?"Gimkit mode bars reset":"Class goal reset");
 }
 
-async function deleteReward(id){const r=state.root.rewards?.[id];if(!r||!confirm(`Delete “${r.name}” from the Prize Store? Past request history will be kept.`))return;await db.ref(`${ROOT}/rewards/${id}/active`).set(false);toast("Reward deleted")}
-async function toggleRewardStore(){const open=state.root.settings?.rewardStoreEnabled===true||String(state.root.settings?.rewardStoreEnabled)==="true",next=!open;await db.ref(`${ROOT}/settings/rewardStoreEnabled`).set(next);state.root.settings=state.root.settings||{};state.root.settings.rewardStoreEnabled=next;render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened")}
-async function review(sid,key,decision){
+async function deleteReward(id){if(state.teacherMode){toast("Only the administrator can change this.","error");return}const r=state.root.rewards?.[id];if(!r||!confirm(`Delete “${r.name}” from the Prize Store? Past request history will be kept.`))return;await db.ref(`${ROOT}/rewards/${id}/active`).set(false);toast("Reward deleted")}
+async function toggleRewardStore(){if(state.teacherMode){toast("Only the administrator can change this.","error");return}const open=state.root.settings?.rewardStoreEnabled===true||String(state.root.settings?.rewardStoreEnabled)==="true",next=!open;await db.ref(`${ROOT}/settings/rewardStoreEnabled`).set(next);state.root.settings=state.root.settings||{};state.root.settings.rewardStoreEnabled=next;render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened")}
+async function review(sid,key,decision){if(state.teacherMode){toast("Only the administrator can change this.","error");return}
   const item=state.root.redemptionsByStudent?.[sid]?.[key];if(!item)return;
   const updates={}, stamp=now(),status=decision==="approve"?"ready":decision==="collect"?"collected":"declined";
   updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/status`]=status;
@@ -711,11 +741,11 @@ function peoplePage(){
   const classes=activeClasses(), allStudents=vals(state.root.students||{}).filter(s=>s.active!==false);
   return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">SCHOOL ROSTER TOOLS</p><h1>People & Classes</h1><p>Manage the active classes and Student Rewards roster.</p></div></div><div class="people-grid">${classes.map(c=>{const count=C.classRoster(state.root,c.id).length;return `<article class="people-card"><h3>${esc(c.name)}</h3><p>${count} active students · ${esc(c.schoolYear||"")}</p><button data-openclass="${esc(c.id)}">Open class</button></article>`}).join("")}</div><div class="admincolumns" style="margin-top:20px"><section><h2>Current class roster</h2><div class="teacherlist">${roster().map(s=>`<div><em>${esc(s.initials)}</em><span><b>${esc(s.name)}</b><small>${Number(s.rewardBalance)||0} reward points</small></span></div>`).join("")}</div></section><section><h2>Add a student to ${esc(cls()?.name||"class")}</h2><form id="addStudentForm" class="adminform"><label>Student full name<input id="newStudentName" required></label><p style="font-size:11px;color:#788398">The student must also be on the main B3 Games approved-student list to use the shared B3 login.</p><button class="primary">Create student</button></form><h2 style="margin-top:22px">Add a class</h2><form id="addClassForm" class="inlineform"><input id="newClassName" required placeholder="Class name"><button>Add class</button></form></section></div></section>`;
 }
-async function addStudent(e){e.preventDefault();const name=$("#newStudentName").value.trim();if(!name)return;const id=`student-${crypto.randomUUID?crypto.randomUUID():Date.now()}`,ini=initials(name),colors=["#7c3aed","#2563eb","#0891b2","#059669","#d97706","#dc2626","#9333ea","#4f46e5"],color=colors[Math.floor(Math.random()*colors.length)];await db.ref().update({[`${ROOT}/students/${id}`]:{id,classId:state.classId,name,initials:ini,color,rewardBalance:0,active:true},[`${ROOT}/enrollments/${state.classId}/${id}`]:true});toast("Student added")}
-async function addClass(e){e.preventDefault();const name=$("#newClassName").value.trim();if(!name)return;const id=`class-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;await db.ref(`${ROOT}/classes/${id}`).set({id,name,schoolYear:state.root.settings?.schoolYear||"2026–27",active:true});toast("Class added")}
+async function addStudent(e){if(state.teacherMode){toast("Only the administrator can change this.","error");return}e.preventDefault();const name=$("#newStudentName").value.trim();if(!name)return;const id=`student-${crypto.randomUUID?crypto.randomUUID():Date.now()}`,ini=initials(name),colors=["#7c3aed","#2563eb","#0891b2","#059669","#d97706","#dc2626","#9333ea","#4f46e5"],color=colors[Math.floor(Math.random()*colors.length)];await db.ref().update({[`${ROOT}/students/${id}`]:{id,classId:state.classId,name,initials:ini,color,rewardBalance:0,active:true},[`${ROOT}/enrollments/${state.classId}/${id}`]:true});toast("Student added")}
+async function addClass(e){if(state.teacherMode){toast("Only the administrator can change this.","error");return}e.preventDefault();const name=$("#newClassName").value.trim();if(!name)return;const id=`class-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;await db.ref(`${ROOT}/classes/${id}`).set({id,name,schoolYear:state.root.settings?.schoolYear||"2026–27",active:true});toast("Class added")}
 function settingsPage(){const enabled=String(state.root.settings?.studentWebsiteEnabled)!=="false";return `<section class="workspace settings"><div class="workhead"><div><p class="eyebrow">SCHOOL SETUP</p><h1>Settings</h1><p>BrightPath display and access settings.</p></div></div><article><h2>School</h2><label>Display name <input id="displayName" value="${esc(state.root.settings?.displayName||"BrightPath")}"></label><label>Active school year <input id="schoolYear" value="${esc(state.root.settings?.schoolYear||"2026–27")}"></label></article><article><h2>Student website access</h2><label>Current status <b>${enabled?"Enabled":"Blocked"}</b></label><button class="primary" id="settingsAccess">${enabled?"Block student website":"Enable student website"}</button></article><article><h2>Daily rating scale</h2><label>Excellent <b>110%</b></label><label>Good (default) <b>100%</b></label><label>Fair <b>80%</b></label><label>Needs Improvement <b>50%</b></label></article><button class="primary" id="saveSettings">Save settings</button></section>`}
-async function toggleAccess(){const enabled=String(state.root.settings?.studentWebsiteEnabled)!=="false";await db.ref(`${ROOT}/settings/studentWebsiteEnabled`).set(enabled?"false":"true");toast(enabled?"Student website blocked":"Student website enabled")}
-async function saveSettings(){await db.ref(`${ROOT}/settings`).update({displayName:$("#displayName").value.trim()||"BrightPath",schoolYear:$("#schoolYear").value.trim()||"2026–27"});toast("Settings saved")}
+async function toggleAccess(){if(state.teacherMode){toast("Only the administrator can change this.","error");return}const enabled=String(state.root.settings?.studentWebsiteEnabled)!=="false";await db.ref(`${ROOT}/settings/studentWebsiteEnabled`).set(enabled?"false":"true");toast(enabled?"Student website blocked":"Student website enabled")}
+async function saveSettings(){if(state.teacherMode){toast("Only the administrator can change this.","error");return}await db.ref(`${ROOT}/settings`).update({displayName:$("#displayName").value.trim()||"BrightPath",schoolYear:$("#schoolYear").value.trim()||"2026–27"});toast("Settings saved")}
 function bindPage(){
   document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{state.tab=b.dataset.go;render()});
   document.querySelectorAll("[data-student]").forEach(b=>b.onclick=()=>{state.selectedId=b.dataset.student;state.tab="Students";render()});
@@ -750,6 +780,7 @@ function bindPage(){
   if(state.tab==="Categories"){$("#addCategory").onclick=addCategory;document.querySelectorAll("[data-catdelete]").forEach(b=>b.onclick=()=>removeCategory(b.dataset.catdelete))}
   if(state.tab==="Comments"){if($("#commentPicker"))$("#commentPicker").onchange=e=>{state.selectedId=e.target.value;render()};if($("#commentForm"))$("#commentForm").onsubmit=addComment}
   if(state.tab==="Rewards"){$("#addReward").onclick=()=>editReward();if($("#addClassReward"))$("#addClassReward").onclick=()=>editClassReward();$("#storeToggle").onclick=toggleRewardStore;if($("#approveAllActivity"))$("#approveAllActivity").onclick=approveAllActivityPoints;document.querySelectorAll("[data-point-approve]").forEach(b=>b.onclick=()=>approveActivityPoint(b.dataset.pointApprove));document.querySelectorAll("[data-point-reject]").forEach(b=>b.onclick=()=>rejectActivityPoint(b.dataset.pointReject));document.querySelectorAll("[data-toggle-reward]").forEach(b=>b.onclick=()=>toggleRewardAvailability(b.dataset.toggleReward));document.querySelectorAll("[data-editreward]").forEach(b=>b.onclick=()=>editReward(b.dataset.editreward));document.querySelectorAll("[data-deletereward]").forEach(b=>b.onclick=()=>deleteReward(b.dataset.deletereward));document.querySelectorAll("[data-toggle-class-reward]").forEach(b=>b.onclick=()=>toggleClassRewardAvailability(b.dataset.toggleClassReward));document.querySelectorAll("[data-editclassreward]").forEach(b=>b.onclick=()=>editClassReward(b.dataset.editclassreward));document.querySelectorAll("[data-deleteclassreward]").forEach(b=>b.onclick=()=>deleteClassReward(b.dataset.deleteclassreward));document.querySelectorAll("[data-resetclassreward]").forEach(b=>b.onclick=()=>resetClassReward(b.dataset.resetclassreward));document.querySelectorAll("[data-approve]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.approve.split("|");review(s,k,"approve")});document.querySelectorAll("[data-decline]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.decline.split("|");review(s,k,"decline")});document.querySelectorAll("[data-collect]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.collect.split("|");review(s,k,"collect")})}
+  if(state.tab==="Approvals"){if($("#approveAllActivity"))$("#approveAllActivity").onclick=approveAllActivityPoints;document.querySelectorAll("[data-point-approve]").forEach(b=>b.onclick=()=>approveActivityPoint(b.dataset.pointApprove));document.querySelectorAll("[data-point-reject]").forEach(b=>b.onclick=()=>rejectActivityPoint(b.dataset.pointReject))}
   if(state.tab==="Reports"){$("#csvBtn").onclick=exportCSV;$("#printBtn").onclick=()=>window.print()}
   if(state.tab==="People & Classes"){document.querySelectorAll("[data-openclass]").forEach(b=>b.onclick=()=>{state.classId=b.dataset.openclass;renderClassSelect();prepareDraft();render()});$("#addStudentForm").onsubmit=addStudent;$("#addClassForm").onsubmit=addClass}
   if(state.tab==="Settings"){$("#settingsAccess").onclick=toggleAccess;$("#saveSettings").onclick=saveSettings}
@@ -760,7 +791,12 @@ $("#googleBtn").onclick=async()=>{try{const p=new firebase.auth.GoogleAuthProvid
 $("#signOutBtn").onclick=()=>auth.signOut();
 auth.onAuthStateChanged(async user=>{
   if(!user){state.user=null;$("#loginView").classList.remove("hidden");$("#appView").classList.add("hidden");return}
-  if(!user.email||user.email.toLowerCase()!==ADMIN.toLowerCase()){await auth.signOut();$("#loginError").textContent=`This page is only authorized for ${ADMIN}.`;return}
-  state.user=user;$("#loginView").classList.add("hidden");$("#appView").classList.remove("hidden");await loadRoot();const seeded=await ensureRewardModelV2();if(seeded)await loadRoot();subscribe();render();
+  state.teacherMode=!user.email||user.email.toLowerCase()!==ADMIN.toLowerCase();
+  NAV=state.teacherMode?TEACHER_NAV:OWNER_NAV;if(!NAV.includes(state.tab))state.tab="Overview";
+  state.user=user;
+  try{await loadRoot()}catch(err){state.user=null;await auth.signOut();$("#loginError").textContent=err.message||String(err);return}
+  $("#loginView").classList.add("hidden");$("#appView").classList.remove("hidden");
+  if(!state.teacherMode){const seeded=await ensureRewardModelV2();if(seeded)await loadRoot();}
+  subscribe();render();
 });
 })();
