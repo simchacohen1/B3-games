@@ -80,7 +80,8 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="wrap" id="teacherGate" style="text-align:center;padding-top:60px">Checking your teacher account…</div>
+<div class="wrap" id="teacherApp" style="display:none">
   <header class="top">
     <h1>אותיות רש"י</h1>
     <p>Rashi Quest • Teacher dashboard</p>
@@ -88,9 +89,10 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 
   <div class="toolbar">
     <div>
-      <label style="font-size:0.85rem; color:var(--ink-soft);">
+      <label id="lockLabel" style="font-size:0.85rem; color:var(--ink-soft);display:none">
         <input type="checkbox" id="lockToggle"> Close practice for students
       </label>
+      <span id="scopeLabel" style="font-size:0.85rem; color:var(--ink-soft);"></span>
     </div>
     <button class="btn gold" id="refreshBtn">Refresh</button>
   </div>
@@ -100,20 +102,17 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script src="../firebase-config.js"></script>
+<script src="../site-settings.js"></script>
+<script src="../teacher-class-scope.js"></script>
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
-  authDomain: "b3-games.firebaseapp.com",
-  databaseURL: "https://b3-games-default-rtdb.firebaseio.com",
-  projectId: "b3-games",
-  storageBucket: "b3-games.firebasestorage.app",
-  messagingSenderId: "568530046190",
-  appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
-};
-firebase.initializeApp(firebaseConfig);
+if(!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 const db = firebase.database();
+// Only signed-in teachers see this dashboard, and only students in their classes.
+let teacherScope = null, isOwner = false;
 
 const UNITS = [
   { id:'zayin', label:'ז' },
@@ -142,8 +141,11 @@ function accuracyClass(pct){
 
 async function loadDashboard(){
   const holder = document.getElementById('tableHolder');
-  const snap = await db.ref('rashiLetters/progress').once('value');
-  const data = snap.val() || {};
+  if(!teacherScope){ holder.innerHTML = '<div class="empty">Sign in to see your class.</div>'; return; }
+  const ids = Object.keys(teacherScope.students || {});
+  const entries = await Promise.all(ids.map(async id => [id, (await db.ref('rashiLetters/progress/' + id).once('value')).val()]));
+  const data = {};
+  entries.forEach(([id, rec]) => { if(rec) data[id] = { ...rec, name: teacherScope.students[id].name || rec.name }; });
   const rows = Object.keys(data).map(slug => {
     const rec = data[slug];
     const units = rec.units || {};
@@ -205,8 +207,34 @@ document.getElementById('lockToggle').addEventListener('change', async (e) => {
 });
 document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
 
-loadLockState();
-loadDashboard();
+async function loadTeacher(user, access){
+  const gate = document.getElementById('teacherGate'), app = document.getElementById('teacherApp');
+  teacherScope = null;
+  if(!access || !access.authorized){
+    app.style.display = 'none'; gate.style.display = '';
+    gate.innerHTML = 'Sign in with your teacher Google account. <button class="btn gold" id="teacherLogin">Sign in with Google</button>';
+    document.getElementById('teacherLogin').onclick = () => window.B3SiteSettings.signInWithGoogle();
+    return;
+  }
+  try{
+    isOwner = access.role === 'admin';
+    if(!isOwner){
+      const row = (await db.ref('b3Games/workspaces/b3-2026/teachers/' + user.uid).once('value')).val();
+      if(!row || row.active === false) throw new Error('Your teacher account is not active.');
+      access = { ...access, classIds: Object.keys(row.classIds || {}).filter(id => id !== '*' && row.classIds[id] === true) };
+    }
+    teacherScope = await window.FunTorahTeacherScope.roster(async p => (await db.ref(p).once('value')).val(), access, new URLSearchParams(location.search).get('class') || '', 'rashi-letters');
+    document.getElementById('scopeLabel').textContent = Object.values(teacherScope.classes).map(c => c.name).join(' + ');
+    document.getElementById('lockLabel').style.display = isOwner ? '' : 'none';
+    gate.style.display = 'none'; app.style.display = '';
+    if(isOwner) loadLockState();
+    loadDashboard();
+  }catch(error){
+    app.style.display = 'none'; gate.style.display = '';
+    gate.textContent = error.message || 'Could not load your class.';
+  }
+}
+window.B3SiteSettings.onAuthStateChanged((user, authorized, access) => loadTeacher(user, access || { authorized }));
 </script>
 </body>
 </html>
