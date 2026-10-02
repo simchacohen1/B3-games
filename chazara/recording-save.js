@@ -13,12 +13,19 @@
       Promise.resolve(work).then(value=>{if(!settled){settled=true;clearTimeout(timer);resolve(value)}},error=>{if(!settled){settled=true;clearTimeout(timer);reject(error)}});
     });
   }
-  async function upload(ref,blob,onProgress,ms=60000){
+  async function upload(ref,blob,onProgress,ms=300000){
     const task=ref.put(blob,{contentType:blob.type||'audio/webm'});
     const unsubscribe=task.on('state_changed',snapshot=>{
       if(onProgress)onProgress(snapshot.totalBytes?Math.round(snapshot.bytesTransferred/snapshot.totalBytes*100):0);
     });
-    try{await deadline(task,ms,'Audio upload',()=>task.cancel());return await deadline(ref.getDownloadURL(),15000,'Audio link')}finally{if(unsubscribe)unsubscribe()}
+    try{
+      // Recordings can take longer on school/home connections. The old
+      // 60-second cutoff was cancelling valid uploads while they were still
+      // in progress. Allow up to five minutes before treating an upload as
+      // genuinely stalled.
+      await deadline(task,ms,'Audio upload',()=>task.cancel());
+      return await deadline(ref.getDownloadURL(),30000,'Audio link');
+    }finally{if(unsubscribe)unsubscribe()}
   }
   const api={deadline,upload};
   if(typeof module==='object'&&module.exports)module.exports=api;
