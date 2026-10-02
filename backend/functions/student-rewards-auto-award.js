@@ -580,8 +580,83 @@ async function mirrorChazaraPointStatus(item,status){
   await rtdb.ref(`posukPractice/chazara/events/${item.practiceStudentId}/${item.eventId}/${field}`).set(status).catch(err=>console.warn("Could not mirror Chazara point status",err));
 }
 
+async function repairMissingChazaraPointRequests(scope){
+  const studentIds=scope?Object.keys(scope.students||{}):[];
+  if(!studentIds.length)return;
+  for(const studentId of studentIds){
+    const eventsSnap=await rtdb.ref(`posukPractice/chazara/events/${studentId}`).get();
+    const events=eventsSnap.val()||{};
+    for(const [eventId,e0] of Object.entries(events)){
+      const e=e0||{};
+      if(e.reviewApplied!==true||e.removed===true||e.teacherRejected===true)continue;
+      if(e.pointRequestStatus==="approved"||e.pointRequestStatus==="rejected"||e.pointRequestStatus==="cancelled")continue;
+      if(!teacherClassScope.recordAllowed(scope,studentId,e))continue;
+
+      const source=e.recorded===true?"chazara-recording":"chazara";
+      const requestId=safeKey(`chazara_${studentId}_${eventId}`);
+      const existing=await rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`).get();
+      if(existing.exists()){
+        const value=existing.val()||{};
+        await rtdb.ref(`posukPractice/chazara/events/${studentId}/${eventId}`).update({
+          pointRequestId:requestId,
+          pointRequestStatus:value.status||"pending"
+        }).catch(()=>{});
+        continue;
+      }
+
+      const rewardStudentId=await resolveRewardStudentId(studentId);
+      if(!rewardStudentId){
+        await rtdb.ref(`posukPractice/chazara/events/${studentId}/${eventId}`).update({
+          pointRequestRepairError:"Could not match this student to Student Rewards.",
+          pointRequestRepairAt:Date.now()
+        }).catch(()=>{});
+        continue;
+      }
+
+      // Verify the event using the same rules as a student-created request.
+      const verified=await verifyChazara(studentId,source,eventId);
+      if(!verified.ok){
+        await rtdb.ref(`posukPractice/chazara/events/${studentId}/${eventId}`).update({
+          pointRequestRepairError:verified.error||"Could not verify Chazara.",
+          pointRequestRepairAt:Date.now()
+        }).catch(()=>{});
+        continue;
+      }
+
+      const amount=POINTS[source];
+      const record={
+        eventId,
+        perek:e.perek||null,
+        posuk:e.posuk||null,
+        workspaceClassId:e.workspaceClassId||scope.selected||null,
+        recorded:e.recorded===true
+      };
+      const result=await createPendingRequest({
+        requestId,
+        rewardStudentId,
+        studentId,
+        source,
+        amount,
+        reason:reasonFor(source,e.perek,e.posuk),
+        record
+      });
+      await rtdb.ref(`posukPractice/chazara/events/${studentId}/${eventId}`).update({
+        pointRequestId:requestId,
+        pointRequestStatus:result.status||"pending",
+        pointRequestCreatedAt:Date.now(),
+        pointRequestSyncedAt:Date.now(),
+        pointRequestRepairError:null
+      }).catch(()=>{});
+    }
+  }
+}
+
 async function listPendingChazaraRequests(scope){
   if(scope){
+    // Self-heal saved Chazaras whose client-side point request never reached
+    // the server. Loading the teacher approval panel now recreates any missing
+    // pending requests before returning the list.
+    await repairMissingChazaraPointRequests(scope);
     const rows=[];
     for(const studentId of Object.keys(scope.students)){
       const snap=await rtdb.ref(`${SR_ROOT}/pointRequests`).orderByChild('practiceStudentId').equalTo(studentId).get();
