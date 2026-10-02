@@ -1077,7 +1077,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     studentClassWatch=db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId);
     studentClassWatch.on("value",snap=>{myClassRecord=snap.val();if(!myClassRecord||myClassRecord.active===false||!myClassRecord.members?.[myStudentId]||myClassRecord.members?.[myStudentId]?.active===false){studentAccessRevoked=true;showLogin();return;}renderStudentAccess();});
     studentProfileWatch=db.ref("b3Games/students/"+myStudentId+"/profile");
-    studentProfileWatch.on("value",snap=>{if(snap.val()?.active===false){studentAccessRevoked=true;showLogin();}});
+    studentProfileWatch.on("value",snap=>{const v=snap.val();if(v?.active===false){studentAccessRevoked=true;showLogin();return;}if(!isStudentPreview&&String(v?.passcode||"").trim()&&String(v.passcode).trim()!==String(localStorage.getItem("b3Games_classPin")||"").trim()){studentAccessRevoked=true;localStorage.removeItem("b3Games_classPin");showLogin();setLoginMsg("Your passcode changed. Please sign in again.");}});
     studentMembershipWatch=db.ref("b3Games/students/"+myStudentId+"/memberships");
     studentMembershipWatch.on("value",snap=>{const rows=snap.val()||{};if(Object.keys(rows).length&&!Object.values(rows).some(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&m.classId===myClassId)){studentAccessRevoked=true;showLogin();}});
     renderStudentAccess();
@@ -1109,6 +1109,18 @@ const active=(members[id]?.active!==false&&profile.active!==false);
         try{await db.ref("b3Games/students/"+id+"/profile").set(d);}catch(e){}
       }
       if(d.active===false){showLogin();return;}
+      // Every activity reuses the passcode saved at homepage sign-in. If it is
+      // missing or out of date, ask once here instead of inside each activity.
+      if(!isStudentPreview){
+        const saved=String(localStorage.getItem("b3Games_classPin")||"").trim();
+        let expected=String(d.passcode||"").trim();
+        if(!expected){try{const lg=(await db.ref("posukPractice/allowedStudents/"+id).once("value")).val();expected=String(lg?.passcode||"").trim();}catch(e){}}
+        if(!saved||(expected&&saved!==expected)){
+          localStorage.removeItem("b3Games_classPin");
+          el("studentNameInput").value=d.name?String(d.name):"";
+          showLogin();setLoginMsg("Please sign in once more so all your activities open automatically.");return;
+        }
+      }
       const restoredClassId=await resolvedStudentClass(id,d);
       if(!restoredClassId){showLogin();return;}
       await enterStudent({id:id,name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
@@ -1662,4 +1674,4 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 })();
 </script>
 </body>
-</html>
+</html>

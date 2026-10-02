@@ -268,7 +268,7 @@ function bindCloudLogin(){
   const btn=document.getElementById('loginBtn'),nameEl=document.getElementById('studentNameInput'),pinEl=document.getElementById('classPinInput');
   const submit=async()=>{const name=nameEl.value.trim(),pin=pinEl.value.trim();if(!name){setLoginMsg('Please type your name.');return;}btn.disabled=true;setLoginMsg('Checking…');try{const result=await checkStudentAccess(name,pin);if(!result.ok){setLoginMsg(result.reason);return;}const displayName=result.displayName||name;localStorage.setItem('b3Games_studentId',result.slug);localStorage.setItem('b3Games_studentName',displayName);localStorage.setItem('b3Games_classPin',pin);localStorage.setItem('posukPractice_studentName',displayName);localStorage.setItem('posukPractice_studentId',result.slug);await enterCloudStudent(displayName,result.slug);setLoginMsg('');}catch(err){if(err&&err.message==='STUDENT_SITE_CLOSED'){applyStudentSiteOpen(false);setLoginMsg('');}else{console.error('Login failed',err);setLoginMsg('Could not connect. Check the internet and try again.');}}finally{btn.disabled=false;}};
   btn.onclick=submit;[nameEl,pinEl].forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();submit();}}));
-  document.getElementById('switchStudentBtn').onclick=()=>{localStorage.removeItem('posukPractice_studentName');localStorage.removeItem('posukPractice_studentId');location.reload();};
+  document.getElementById('switchStudentBtn').onclick=()=>{location.href='../index.html';};
   trySavedStudent();
 }
 

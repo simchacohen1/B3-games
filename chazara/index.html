@@ -329,11 +329,9 @@ async function signInStudentHere(){
 if($('studentSignInBtn'))$('studentSignInBtn').onclick=signInStudentHere;
 if($('classPinInput'))$('classPinInput').addEventListener('keydown',e=>{if(e.key==='Enter')signInStudentHere()});
 setInterval(()=>{if(sid)render()},60000);
-$('switchStudentBtn').onclick=()=>{
-  ['b3Games_studentId','b3Games_studentName','posukPractice_studentId','posukPractice_studentName'].forEach(k=>localStorage.removeItem(k));
-  location.reload();
-};
+// Students switch accounts on the Fun Torah Tools homepage only.
+$('switchStudentBtn').onclick=()=>{location.href='../index.html'};
 (async()=>{if(!sid){$('studentNameTop').textContent='Not signed in';$('switchStudentBtn').classList.add('hidden');$('noStudent').classList.remove('hidden');return}$('studentNameTop').textContent=sname;$('app').classList.remove('hidden');try{const [stateSnap,attemptSnap,eventSnap]=await Promise.all([db.ref(ROOT+sid).once('value'),db.ref('posukPractice/attempts/'+sid).once('value'),db.ref(EVENTS+sid).once('value')]);if(stateSnap.exists())d=norm(stateSnap.val());attemptsRoot=attemptSnap.val()||{};chazaraEvents=eventSnap.val()||{};rebuildUnlocked();renderRecordings();db.ref('posukPractice/attempts/'+sid).on('value',s=>{attemptsRoot=s.val()||{};rebuildUnlocked()});db.ref(EVENTS+sid).on('value',s=>{chazaraEvents=s.val()||{};render();renderRecordings()});retryPendingPointSyncs()}catch(e){console.warn(e);render();renderRecordings()}})();
 </script>
 </body>
-</html>
+</html>

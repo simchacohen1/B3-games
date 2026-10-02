@@ -233,11 +233,8 @@ async function restoreSharedStudentLogin() {
   }catch(error){console.warn('Could not restore shared student login:',error);}
 }
 
-document.getElementById('switchStudentBtn').addEventListener('click', () => {
-  localStorage.removeItem('posukPractice_studentId');
-  localStorage.removeItem('posukPractice_studentName');
-  location.reload();
-});
+// Students switch accounts on the Fun Torah Tools homepage only.
+document.getElementById('switchStudentBtn').addEventListener('click', () => { location.href='../index.html'; });
 
 ['classPinInput', 'studentNameInput'].forEach(id => {
   document.getElementById(id).addEventListener('keydown', event => {

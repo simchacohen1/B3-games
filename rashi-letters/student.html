@@ -610,6 +610,45 @@ document.getElementById('startBtn').onclick = async () => {
   }
 };
 
+// Students sign in only on the Fun Torah Tools homepage. Reuse that login here.
+async function checkSavedAccess(id){
+  const [lockSnap,profileSnap,siteSettingsSnap]=await Promise.all([
+    db.ref('rashiLetters/settings/accessLocked').once('value'),
+    db.ref('b3Games/students/'+id+'/profile').once('value'),
+    db.ref('b3Games/siteSettings').once('value')
+  ]);
+  const siteSettings=siteSettingsSnap.val()||{},gamesMap=siteSettings.games||{};
+  if(siteSettings.siteEnabled===false||gamesMap['rashi-letters']===false)return {ok:false,reason:'This game is currently turned off. Ask your teacher.'};
+  if(lockSnap.val()===true)return {ok:false,reason:'Practice is closed right now. Ask your teacher.'};
+  let profile=profileSnap.val();
+  if(!profile){
+    const legacySnap=await db.ref('posukPractice/allowedStudents/'+id).once('value');
+    if(!legacySnap.exists())return {ok:false,reason:'Please sign in again on Fun Torah Tools.'};
+    const legacy=legacySnap.val()||{};profile={name:legacy.name,active:legacy.active!==false};
+  }
+  if(profile.active===false)return {ok:false,reason:'Your student access is turned off. Ask your teacher.'};
+  return {ok:true,slug:id,displayName:String(profile.name||localStorage.getItem('b3Games_studentName')||'Student')};
+}
+(async function enterWithHomepageLogin(){
+  const gate=document.getElementById('nameGate'),msg=document.getElementById('gateMsg');
+  ['studentNameInput','classPinInput','startBtn'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.display='none';const lab=gate.querySelector('label[for="'+id+'"]');if(lab)lab.style.display='none';}});
+  const id=localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId')||'';
+  const sendHome=reason=>{msg.innerHTML='';msg.append(document.createTextNode(reason+' '));const a=document.createElement('a');a.href='../index.html';a.textContent='Go to Fun Torah Tools';msg.append(a);};
+  if(!id)return sendHome('Please sign in on Fun Torah Tools first.');
+  msg.textContent='Signing you in…';
+  try{
+    const result=await checkSavedAccess(id);
+    if(!result.ok)return sendHome(result.reason);
+    msg.textContent='';
+    studentName=result.displayName;studentId=result.slug;
+    localStorage.setItem('b3Games_studentName',studentName);
+    await loadProgress();
+    updateRewardHud();
+    gate.style.display='none';
+    showModeGate();
+  }catch(e){console.error(e);sendHome('Something went wrong.');}
+})();
+
 async function loadProgress(){
   const snap = await db.ref('rashiLetters/progress/' + studentId).once('value');
   const rec = snap.val() || {};
