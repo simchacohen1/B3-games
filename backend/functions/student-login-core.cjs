@@ -36,7 +36,9 @@ async function resolveStudent(get,body){
 
  if(!profile){
   const legacyMatches=[];
-  for(const [sid,row] of Object.entries(legacyAll))if(row&&row.active!==false&&sameName(sid,row)&&await pinOkFor(sid))legacyMatches.push([sid,row]);
+  // The old list is only a fallback for students with no central profile; a
+  // blocked central profile must never be bypassed through it.
+  for(const [sid,row] of Object.entries(legacyAll))if(row&&row.active!==false&&!all[sid]?.profile&&sameName(sid,row)&&await pinOkFor(sid))legacyMatches.push([sid,row]);
   if(legacyMatches.length>1)fail(409,'More than one account matches. Sign in from the main site.');
   if(legacyMatches.length){
    id=legacyMatches[0][0];
@@ -48,7 +50,7 @@ async function resolveStudent(get,body){
  if(!profile){
   id=id||name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
   if(!key(id))fail(401,'Check your name and passcode.');
-  const old=await get('posukPractice/allowedStudents/'+id);
+  const old=all[id]?.profile?null:await get('posukPractice/allowedStudents/'+id);
   if(old)profile={...old,passcode:await codeFor(id)};
  }
 
