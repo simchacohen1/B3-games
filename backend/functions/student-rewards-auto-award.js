@@ -1389,4 +1389,4 @@ exports.studentRewardsAutoAward = onRequest(
       return res.status(err.code||500).json({error:err.code?err.message:"Could not create the point request."});
     }
   }
-);
+);

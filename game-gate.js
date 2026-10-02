@@ -475,4 +475,4 @@
     if (document.visibilityState === "visible") checkNow();
   });
   window.addEventListener("focus", checkNow);
-})();
+})();

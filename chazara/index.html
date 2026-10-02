@@ -233,13 +233,15 @@ async function finishRecording(st){
     const [perek,posuk]=st.key.split('_').map(Number),path='posukPractice/'+sid+'/chazara_'+perek+'_'+posuk+'_'+eventId+'.'+extFor(blob.type);
     st.status.textContent='Saving audio…';
     let url='',audioDataURL='',storagePath=path,storageError=null;
-    const preferDatabase=localStorage.getItem('chazaraPreferDatabaseAudio')==='1';
+    // Always try Storage first; it keeps audio private-by-path and the teacher page fast.
+    try{localStorage.removeItem('chazaraPreferDatabaseAudio')}catch{}
+    const preferDatabase=false;
     try{
       if(preferDatabase)throw Object.assign(new Error('Using faster database audio save.'),{code:'recording/prefer-database'});
       // Storage currently fails on some student devices. Only give it a few
       // seconds; after one fallback on this device, future recordings skip
       // Storage entirely so saving feels immediate instead of pausing ~20 sec.
-      url=await ChazaraRecordingSave.upload(storage.ref(path),blob,percent=>{st.status.textContent='Uploading audio… '+percent+'%'},4000);
+      url=await ChazaraRecordingSave.upload(storage.ref(path),blob,percent=>{st.status.textContent='Uploading audio… '+percent+'%'},45000);
     }catch(err){
       storageError=err;
       if(err?.code!=='recording/prefer-database')console.warn('Storage upload failed; using database audio fallback',err);
@@ -247,7 +249,6 @@ async function finishRecording(st){
       st.status.textContent='Finishing recording…';
       if(blob.size>5*1024*1024)throw Object.assign(new Error('This recording is too large to save. Please make a shorter recording.'),{cause:err});
       audioDataURL=await blobToDataURL(blob);
-      try{localStorage.setItem('chazaraPreferDatabaseAudio','1')}catch{}
     }
     const event={id:eventId,studentId:sid,studentName:sname,workspaceClassId:localStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[st.key]?.practiceKey||null,recorded:true,points:2,reviewApplied:false,removed:false,chazaraDate:dayKey(),durationMs,soundDetected:true,peakRms:Number(st.peak.toFixed(4)),waveform:compactWave(st.samples),audioURL:url||null,audioDataURL:audioDataURL||null,storagePath:storagePath||null,storageFallback:Boolean(audioDataURL),storageErrorCode:storageError?.code||null,mimeType:blob.type||null,sizeBytes:blob.size,createdAt:firebase.database.ServerValue.TIMESTAMP,reviewNumber:(Number(d.reviews[st.key]?.count)||0)+1};
     writeStarted=true;
@@ -334,4 +335,4 @@ $('switchStudentBtn').onclick=()=>{location.href='../index.html'};
 (async()=>{if(!sid){$('studentNameTop').textContent='Not signed in';$('switchStudentBtn').classList.add('hidden');$('noStudent').classList.remove('hidden');return}$('studentNameTop').textContent=sname;$('app').classList.remove('hidden');try{const [stateSnap,attemptSnap,eventSnap]=await Promise.all([db.ref(ROOT+sid).once('value'),db.ref('posukPractice/attempts/'+sid).once('value'),db.ref(EVENTS+sid).once('value')]);if(stateSnap.exists())d=norm(stateSnap.val());attemptsRoot=attemptSnap.val()||{};chazaraEvents=eventSnap.val()||{};rebuildUnlocked();renderRecordings();db.ref('posukPractice/attempts/'+sid).on('value',s=>{attemptsRoot=s.val()||{};rebuildUnlocked()});db.ref(EVENTS+sid).on('value',s=>{chazaraEvents=s.val()||{};render();renderRecordings()});retryPendingPointSyncs()}catch(e){console.warn(e);render();renderRecordings()}})();
 </script>
 </body>
-</html>
+</html>
