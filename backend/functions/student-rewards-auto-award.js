@@ -3,6 +3,7 @@ const admin = require("firebase-admin");
 if (!admin.apps.length) admin.initializeApp();
 const rtdb = admin.database();
 
+const teacherClassScope=require("./teacher-class-scope");
 const SR_ROOT = "studentRewards";
 const ADMIN_EMAIL = "simcha5770@gmail.com";
 const POINTS = Object.freeze({
@@ -101,12 +102,42 @@ async function requireTeacher(req){
   try{
     const decoded=await admin.auth().verifyIdToken(header.slice(7));
     const email=String(decoded.email || "").trim().toLowerCase();
-    if(email !== ADMIN_EMAIL) return {ok:false,error:"This Google account is not authorized for Student Rewards."};
-    return {ok:true,email,decoded};
+    if(decoded.email_verified!==true)return {ok:false,error:"Verified Google sign-in required."};
+    const get=async p=>(await rtdb.ref(p).get()).val(),classId=String(req.body?.classId||'');
+    if(email===ADMIN_EMAIL){
+      const scope=classId?await teacherClassScope.roster(get,{authorized:true,role:'admin'},classId):null;
+      return {ok:true,email,decoded,owner:true,scope};
+    }
+    const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
+    if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
+    const actions=['list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
+    if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
+    const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
+    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId);
+    return {ok:true,email,decoded,owner:false,scope};
   }catch(err){
     console.warn("Teacher token verification failed",err);
     return {ok:false,error:"Teacher sign-in expired. Please sign in again."};
   }
+}
+
+async function authorizeChazaraAction(teacher,body){
+ if(!teacher.scope)return;
+ const scope=teacher.scope,action=body.action;
+ if(action==='list-chazara-pending')return;
+ if(action==='approve-point-request'||action==='reject-point-request'){
+  if(!/^[A-Za-z0-9_-]{1,220}$/.test(String(body.requestId||'')))throw Object.assign(new Error('Invalid point request.'),{code:403});
+  const item=(await rtdb.ref(`${SR_ROOT}/pointRequests/${body.requestId}`).get()).val();
+  if(!isChazaraRequest(item)||!teacherClassScope.recordAllowed(scope,item?.practiceStudentId,item))throw Object.assign(new Error('This request does not belong to your selected class.'),{code:403});
+  return;
+ }
+ if(!scope.students[body.studentId])throw Object.assign(new Error('This student does not belong to your selected class.'),{code:403});
+ if(action!=='teacher-add-chazara'){
+  if(!/^[A-Za-z0-9_-]{1,220}$/.test(String(body.eventId||'')))throw Object.assign(new Error('Invalid Chazara event.'),{code:403});
+  const event=(await rtdb.ref(`posukPractice/chazara/events/${body.studentId}/${body.eventId}`).get()).val();
+  if(!teacherClassScope.recordAllowed(scope,body.studentId,event))throw Object.assign(new Error('This Chazara does not belong to your selected class.'),{code:403});
+ }
+ body.classId=scope.selected;
 }
 
 async function requireStudent(req){
@@ -549,7 +580,15 @@ async function mirrorChazaraPointStatus(item,status){
   await rtdb.ref(`posukPractice/chazara/events/${item.practiceStudentId}/${item.eventId}/${field}`).set(status).catch(err=>console.warn("Could not mirror Chazara point status",err));
 }
 
-async function listPendingChazaraRequests(){
+async function listPendingChazaraRequests(scope){
+  if(scope){
+    const rows=[];
+    for(const studentId of Object.keys(scope.students)){
+      const snap=await rtdb.ref(`${SR_ROOT}/pointRequests`).orderByChild('practiceStudentId').equalTo(studentId).get();
+      for(const [id,item] of Object.entries(snap.val()||{}))if(item.status==='pending'&&isChazaraRequest(item)&&teacherClassScope.recordAllowed(scope,studentId,item))rows.push({id,...item});
+    }
+    return rows.sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
+  }
   const snap=await rtdb.ref(`${SR_ROOT}/pointRequests`).get();
   const rows=[];
   snap.forEach(child=>{
@@ -803,7 +842,9 @@ async function teacherAddChazara(body,reviewedBy){
   if(!Number.isInteger(perek)||perek<1||perek>200) return {ok:false,error:"Enter a valid perek."};
   if(!Number.isInteger(posuk)||posuk<1||posuk>250) return {ok:false,error:"Enter a valid pasuk."};
   if(!validDateKey(date)) return {ok:false,error:"Choose a valid date."};
-  const approved=await rtdb.ref(`posukPractice/allowedStudents/${studentId}`).get();
+  let approved=await rtdb.ref(`b3Games/students/${studentId}/profile`).get();
+  if(!approved.exists())approved=await rtdb.ref(`posukPractice/allowedStudents/${studentId}`).get();
+  if(approved.val()?.active===false)return {ok:false,error:'Student access is turned off.'};
   if(!approved.exists()) return {ok:false,error:"That student is not approved for Posuk Practice."};
   const rewardStudentId=await resolveRewardStudentId(studentId);
   if(!rewardStudentId) return {ok:false,error:"Could not match this student to Student Rewards."};
@@ -816,14 +857,14 @@ async function teacherAddChazara(body,reviewedBy){
     const eventRef=rtdb.ref(`posukPractice/chazara/events/${studentId}`).push(),eventId=eventRef.key,when=baseWhen+i;
     const event={
       id:eventId,studentId,studentName,perek,posuk,recorded:false,points:1,reviewApplied:false,removed:false,
-      teacherEntered:true,teacherEnteredBy:reviewedBy,teacherEnteredAt:Date.now(),chazaraDate:date,createdAt:when,reviewNumber:nextNumber+i
+      workspaceClassId:body.classId||null,teacherEntered:true,teacherEnteredBy:reviewedBy,teacherEnteredAt:Date.now(),chazaraDate:date,createdAt:when,reviewNumber:nextNumber+i
     };
     await eventRef.set(event);
     const requestId=safeKey(`chazara_${studentId}_${eventId}`);
     const award=await awardMilestoneImmediately({
       requestId,rewardStudentId,studentId,source:"chazara",amount:1,
       reason:`Teacher-entered Chazara — Perek ${perek} · Posuk ${posuk}`,
-      record:{eventId,perek,posuk,recorded:false,teacherEntered:true,chazaraDate:date},
+      record:{eventId,perek,posuk,workspaceClassId:body.classId||null,recorded:false,teacherEntered:true,chazaraDate:date},
       reviewedBy:`Teacher Chazara entry (${reviewedBy})`
     });
     if(!award.ok){
@@ -1143,12 +1184,13 @@ exports.studentRewardsAutoAward = onRequest(
         }
         const teacher=await requireTeacher(req);
         if(!teacher.ok) return res.status(401).json({error:teacher.error});
+        await authorizeChazaraAction(teacher,body);
         if(action==="read-rewards-data"){
           const data=await readStudentRewardsData(body.classId||"all");
           return res.status(200).json({ok:true,...data});
         }
         if(action==="list-chazara-pending"){
-          const requests=await listPendingChazaraRequests();
+          const requests=await listPendingChazaraRequests(teacher.scope);
           return res.status(200).json({ok:true,requests});
         }
         if(action==="approve-point-request"){
@@ -1188,7 +1230,9 @@ exports.studentRewardsAutoAward = onRequest(
       const source=String(body.source||"").trim();
       if(!studentId) return res.status(400).json({error:"Missing student."});
 
-      const approved=await rtdb.ref(`posukPractice/allowedStudents/${studentId}`).get();
+      let approved=await rtdb.ref(`b3Games/students/${studentId}/profile`).get();
+      if(!approved.exists())approved=await rtdb.ref(`posukPractice/allowedStudents/${studentId}`).get();
+      if(approved.val()?.active===false)return res.status(403).json({error:"Student access is turned off."});
       if(!approved.exists()) return res.status(403).json({error:"Student is not approved for Posuk Practice."});
 
       if(source==="chazara-remove"){
@@ -1217,9 +1261,10 @@ exports.studentRewardsAutoAward = onRequest(
         chazaraVerification=await verifyChazara(studentId,source,eventId);
         if(!chazaraVerification.ok) return res.status(409).json({error:chazaraVerification.error});
         const e=chazaraVerification.event;
+
         requestId=safeKey(`chazara_${studentId}_${eventId}`);
         reason=reasonFor(source,e.perek,e.posuk);
-        record={eventId,perek:e.perek||null,posuk:e.posuk||null,recorded:e.recorded===true};
+        record={eventId,perek:e.perek||null,posuk:e.posuk||null,workspaceClassId:e.workspaceClassId||null,recorded:e.recorded===true};
       }
 
       if(source === "reading100" || source === "translation100" || source === "understand100"){
@@ -1235,7 +1280,7 @@ exports.studentRewardsAutoAward = onRequest(
       return res.status(200).json({ok:true,requested:result.created,status:result.status,requestId,amount});
     }catch(err){
       console.error("studentRewardsAutoAward",err);
-      return res.status(500).json({error:"Could not create the point request."});
+      return res.status(err.code||500).json({error:err.code?err.message:"Could not create the point request."});
     }
   }
 );

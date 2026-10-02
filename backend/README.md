@@ -25,3 +25,5 @@ Yiddish preserves B3's existing configuration/progress paths. New classes use se
 Full database security remains unfinished: public profile passcodes and broad workspace writes in the transitional rules must be replaced after all student frontends use trusted authentication. `firebase-rules.json` has not been deployed or relaxed by this change.
 
 `funTorahManageStudents` checks the signed-in teacher UID against the selected class before creating students or changing passcodes/memberships. Teacher blocking is limited to that class membership; it does not disable the student profile across other teachers. Every change records a class audit entry without passcodes. Regular-teacher frontend writes use this endpoint; the owner keeps the existing direct-write compatibility flow until the remaining trusted-auth migration is complete.
+
+Chazara teacher scope: run `install-chazara-scope.ps1` in the existing Windows project to back up and install the updated review backend and shared class policy. Then deploy only `functions:studentRewardsAutoAward`. No database rules are changed by this installer.
