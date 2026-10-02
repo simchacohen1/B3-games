@@ -273,5 +273,21 @@ async function loadClassScope(user,access){
  }catch(error){if(generation===scopeGeneration)$('teacherGate').textContent=error.message||'Could not load your class.';}
 }
 window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>loadClassScope(user,access||{authorized}));
-setInterval(()=>{if(teacherAccess?.authorized)loadClassScope(auth.currentUser,teacherAccess)},60000);
-</script></body></html>
+// Re-check the teacher's classes every minute in the background. Only rebuild
+// the dashboard (which hides it while loading) when something actually changed.
+async function quietScopeCheck(){
+ if(!teacherAccess?.authorized||!teacherScope||document.hidden)return;
+ const sig=s=>JSON.stringify([Object.keys(s.classes||{}).sort(),Object.keys(s.students||{}).sort(),Object.values(s.students||{}).map(x=>x.classId).sort()]);
+ try{
+  let access=teacherAccess;
+  if(access.role!=='admin'){
+   const row=(await db.ref('b3Games/workspaces/b3-2026/teachers/'+auth.currentUser.uid).once('value')).val();
+   if(!row||row.active===false)return loadClassScope(auth.currentUser,teacherAccess);
+   access={...access,classIds:Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true)};
+  }
+  const scope=await window.FunTorahTeacherScope.roster(async p=>(await db.ref(p).once('value')).val(),access,new URLSearchParams(location.search).get('class')||'');
+  if(sig(scope)!==sig(teacherScope))loadClassScope(auth.currentUser,access);
+ }catch(error){loadClassScope(auth.currentUser,teacherAccess)}
+}
+setInterval(quietScopeCheck,60000);
+</script></body></html>

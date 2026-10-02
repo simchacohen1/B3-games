@@ -17,6 +17,9 @@ const get=async p=>(await store.get(p));
 const legacy=c=>['et','wt'].includes(c);
 const configPath=c=>!c||legacy(c)?'yiddishPrivate/config':'yiddishPrivate/classes/'+WORKSPACE+'/'+c+'/config';
 const studentPath=(c,id)=>legacy(c)?'yiddishPrivate/students/'+id:'yiddishPrivate/classes/'+WORKSPACE+'/'+c+'/students/'+id;
+// Migration bridge: ET/WT students who have no central passcode yet may use the
+// individual passcode from the private legacy list (never the shared 5770 default).
+async function passcodeFor(id,profile,classId){const central=String(profile?.passcode||'').trim();if(central)return central;if(!legacy(classId))return '';const old=await get('posukPractice/allowedStudents/'+id);const p=String(old?.passcode||'').trim();return old&&old.active!==false&&p&&p!=='5770'?p:''}
 const cfg=async c=>{const saved=await get(configPath(c));if(saved)return saved;const d=defaults();if(c&&!legacy(c))d.unlocked={[c]:0};return d};
 async function teacher(token,classId){
  const t=await verifyTeacher(token).catch(()=>null);
@@ -44,7 +47,7 @@ async function identity(body){
  const t=String(body.token||'');if(!/^[a-f0-9]{48}$/.test(t))fail(401,'Please sign in again.');
  const session=await get('yiddishPrivate/sessions/'+hash(t));if(!session||session.expires<now())fail(401,'Please sign in again.');
  const row=await studentRecord(session.studentId,session.classId),classId=row.classId;
- if(row.profile&&session.passcodeHash!==hash(String(row.profile.passcode||'').trim()))fail(401,'Your passcode changed. Sign in again.');
+ if(row.profile&&session.passcodeHash!==hash(await passcodeFor(session.studentId,row.profile,classId)))fail(401,'Your passcode changed. Sign in again.');
  if(legacy(classId)){
   const settings=await get('b3Games/siteSettings')||{};
   if(!policy.isGameEnabledForClass(settings,classId,'yiddish')||!(policy.isClassOpen(settings,classId,new Date(now()))||policy.studentHasGameOverride(settings,session.studentId,'yiddish')))fail(403,'Yiddish is closed for your class right now.');
@@ -86,9 +89,9 @@ return async function handle(b,ip='unknown'){
   await store.tx(bucket,p=>{blocked=false;if(!p||p.until<now())p={count:0,until:now()+600000};if(p.count>=30){blocked=true;return undefined}return {...p,count:p.count+1}});
   if(blocked)fail(429,'Too many sign-in attempts. Try again in 10 minutes.');
   const id=String(b.studentId||'');if(!validKey(id))fail(401,'Check your name and individual passcode.');
-  const row=await studentRecord(id,b.classId),person=row.profile;
-  if(!person||!person.passcode||!crypto.timingSafeEqual(Buffer.from(hash(b.pin||'')),Buffer.from(hash(String(person.passcode).trim()))))fail(401,'Check your name and individual passcode.');
-  const token=random();await store.set('yiddishPrivate/sessions/'+hash(token),{studentId:id,classId:row.classId,passcodeHash:hash(String(person.passcode).trim()),expires:now()+12*3600000});return {token};
+  const row=await studentRecord(id,b.classId),person=row.profile,code=person?await passcodeFor(id,person,row.classId):'';
+  if(!person||!code||!crypto.timingSafeEqual(Buffer.from(hash(String(b.pin||'').trim())),Buffer.from(hash(code))))fail(401,'Check your name and individual passcode.');
+  const token=random();await store.set('yiddishPrivate/sessions/'+hash(token),{studentId:id,classId:row.classId,passcodeHash:hash(code),expires:now()+12*3600000});return {token};
  }
  const who=await identity(b),c=await cfg(who.classId),path=studentPath(who.classId,who.id);
 
