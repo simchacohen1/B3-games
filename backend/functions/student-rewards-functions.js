@@ -13,6 +13,7 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
+const {resolveStudent}=require("./student-login-core.cjs");
 if (!admin.apps.length) admin.initializeApp();
 const rtdb = admin.database();
 const SR_ROOT = "studentRewards";
@@ -82,7 +83,7 @@ async function rewardStudentForB3(b3StudentId, allowedName, enteredName){
   const snap=await rtdb.ref(`${SR_ROOT}/students`).get();
   const rows=snap.val()||{};
   for(const [id,s] of Object.entries(rows)){
-    if(s && s.active!==false && normalizeName(s.name)===target) return {studentId:String(id),student:s};
+    if(s && s.active!==false && (!s.b3StudentId||s.b3StudentId===b3StudentId) && normalizeName(s.name)===target) return {studentId:String(id),student:s};
   }
   return null;
 }
@@ -100,23 +101,36 @@ exports.studentRewardsLogin = onRequest(
       const suppliedB3Id=String(req.body?.b3StudentId || "").trim().toLowerCase();
       const pin=String(req.body?.pin || "").trim();
       if(enteredName || suppliedB3Id){
-        const b3StudentId=suppliedB3Id || slugifyName(enteredName);
-        if(!b3StudentId || !pin) return res.status(400).json({error:"Enter your full name and Class PIN."});
-        const [pinSnap,allowedSnap]=await Promise.all([
-          rtdb.ref("posukPractice/settings/classPin").get(),
-          rtdb.ref(`posukPractice/allowedStudents/${b3StudentId}`).get()
-        ]);
-        const realPin=String(pinSnap.val() ?? "").trim();
-        if(realPin && !safeEqual(realPin,pin)) return res.status(401).json({error:"The Class PIN is incorrect."});
-        if(!allowedSnap.exists()) return res.status(401).json({error:"Your name is not on the B3 student list."});
-        const allowed=allowedSnap.val()||{};
-        const match=await rewardStudentForB3(b3StudentId, String(allowed.name||""), enteredName);
-        if(!match) return res.status(404).json({error:"Your Student Rewards account could not be matched. Ask Rabbi Cohen."});
-        const classId=(allowed.classId==="et"||allowed.classId==="wt")?allowed.classId:rosterClass(b3StudentId);
+        const get=async path=>(await rtdb.ref(path).get()).val();
+        const identity=await resolveStudent(get,{...req.body,name:enteredName,pin,b3StudentId:suppliedB3Id});
+        const b3StudentId=identity.id,allowed=identity.profile,classId=identity.classId;
+        if(!['et','wt'].includes(classId)&&identity.cls.toolGrants?.['student-rewards']!==true)
+          return res.status(403).json({error:'Student Rewards is not enabled for your class.'});
+        const rows=await get(`${SR_ROOT}/students`)||{};
+        let match=null;
+        const linked=Object.entries(rows).filter(([id,row])=>row&&row.active!==false&&row.b3StudentId===b3StudentId);
+        if(linked.length>1)return res.status(409).json({error:'Multiple rewards accounts are linked. Ask your teacher.'});
+        if(linked.length)match={studentId:linked[0][0],student:linked[0][1]};
+        // Preserve existing B3 balances, but never match a generic class by name alone.
+        if(!match&&['et','wt'].includes(classId)){
+          const legacyMatch=await rewardStudentForB3(b3StudentId,allowed.name,enteredName);
+          if(legacyMatch)match=legacyMatch;
+        }
+        if(!match){
+          const rewardId='b3_'+sha256(b3StudentId).slice(0,28);
+          const rewardClassId='b3_'+classId;
+          const ref=rtdb.ref(`${SR_ROOT}/students/${rewardId}`);
+          const result=await ref.transaction(current=>current||{id:rewardId,b3StudentId,name:allowed.name,initials:String(allowed.name).split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(),classId:rewardClassId,rewardBalance:0,active:true});
+          match={studentId:rewardId,student:result.snapshot.val()};
+          await rtdb.ref(`${SR_ROOT}/classes/${rewardClassId}`).transaction(current=>current||{id:rewardClassId,name:identity.cls.name||classId,active:true,b3ClassId:classId});
+          await rtdb.ref(`${SR_ROOT}/enrollments/${rewardClassId}/${rewardId}`).set(true);
+        }
+        await rtdb.ref(`${SR_ROOT}/students/${match.studentId}/b3StudentId`).set(b3StudentId);
         const uid=`sr_${sha256(match.studentId).slice(0,28)}`;
         const customToken=await admin.auth().createCustomToken(uid,{
           studentRewardsStudentId:match.studentId,
           studentRewardsRole:"student",
+          studentRewardsClassId:String(match.student.classId||""),
           b3StudentId,
           b3StudentName:String(allowed.name||enteredName||match.student.name||"Student"),
           b3ClassId:classId||""
@@ -140,7 +154,7 @@ exports.studentRewardsLogin = onRequest(
       return res.status(200).json({ok:true,customToken,studentId});
     } catch (err) {
       console.error("studentRewardsLogin",err);
-      return res.status(500).json({error:"Could not sign in right now."});
+      return res.status(Number.isInteger(err.code)?err.code:500).json({error:Number.isInteger(err.code)?err.message:"Could not sign in right now."});
     }
   }
 );
@@ -224,7 +238,7 @@ exports.studentRewardsRedeem = onRequest(
       return res.status(200).json({ok:true,balance:Number(balanceTx.snapshot.val()||0),requestId:requestRef.key});
     } catch (err) {
       console.error("studentRewardsRedeem", err);
-      return res.status(500).json({error:"Could not request that reward right now."});
+      return res.status(Number.isInteger(err.code)?err.code:500).json({error:"Could not request that reward right now."});
     }
   }
 );

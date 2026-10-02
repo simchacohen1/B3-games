@@ -652,6 +652,11 @@ async function awardMilestoneImmediately({requestId,rewardStudentId,studentId,so
 }
 
 async function resolveRewardStudentId(posukStudentId){
+  const linked=await rtdb.ref(`${SR_ROOT}/students`).orderByChild('b3StudentId').equalTo(posukStudentId).get();
+  const links=Object.keys(linked.val()||{});
+  if(links.length===1)return links[0];
+  if(links.length>1)return null;
+
   const direct = await rtdb.ref(`${SR_ROOT}/students/${posukStudentId}`).get();
   if(direct.exists()) return posukStudentId;
 

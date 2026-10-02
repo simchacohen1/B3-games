@@ -2271,36 +2271,31 @@ const DEFAULT_STUDENT_PASSCODE = '5770';
 // Checks the entered name (slugified) against the teacher-approved list and
 // then checks that student's own passcode. Older approved-student records that
 // do not yet have a passcode use 5770 so the change is backward-compatible.
-async function checkAccess(name, pin){
-  const slug = slugify(name);
-  if(!slug){ return { ok:false, reason:'Please type your name.' }; }
-
-  let allowedSnap = await db.ref('b3Games/students/' + slug + '/profile').once('value');
-  let allowedInfo = allowedSnap.val() || {};
-  if(!allowedSnap.exists()){
-    const legacySnap = await db.ref('posukPractice/allowedStudents/' + slug).once('value');
-    if(!legacySnap.exists()) return { ok:false, reason:'Ask your teacher to add your name first.' };
-    const legacy = legacySnap.val() || {};
-    allowedInfo = {
-      id: slug,
-      name: String(legacy.name || name.trim()),
-      passcode: String(legacy.passcode || DEFAULT_STUDENT_PASSCODE),
-      passcodeUpdatedAt: Number(legacy.passcodeUpdatedAt) || Date.now(),
-      active: true
-    };
-    try{ await db.ref('b3Games/students/' + slug + '/profile').set(allowedInfo); }catch(e){}
+async function studentRecord(path){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
+  try{
+    const response=await fetch(firebaseConfig.databaseURL+'/'+path+'.json',{signal:controller.signal,cache:'no-store'});
+    if(!response.ok)throw new Error('Student account could not be checked.');
+    return await response.json();
+  }finally{clearTimeout(timer);}
+}
+async function checkAccess(name,pin,idHint=''){
+  const normalize=value=>String(value||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'');
+  let id=idHint,profile;
+  if(id)profile=await studentRecord('b3Games/students/'+encodeURIComponent(id)+'/profile');
+  else{
+    const rows=await studentRecord('b3Games/students')||{};
+    const matches=Object.entries(rows).filter(([sid,row])=>row?.profile?.active!==false&&normalize(row?.profile?.name)===normalize(name)&&String(row?.profile?.passcode||'').trim()===String(pin).trim());
+    if(matches.length>1)return {ok:false,reason:'More than one account matches. Sign in from the main site.'};
+    if(matches.length===1){id=matches[0][0];profile=matches[0][1].profile;}
   }
-  if(allowedInfo.active === false) return { ok:false, reason:'Your B3 access is turned off. Ask your teacher.' };
-  const realPin = String(allowedInfo.passcode || '').trim();
-  if(String(pin).trim() !== realPin){
-    return { ok:false, reason:'Incorrect passcode. Ask your teacher.' };
+  if(!profile){
+    id=idHint||slugify(name);
+    const legacy=await studentRecord('posukPractice/allowedStudents/'+encodeURIComponent(id));
+    if(legacy)profile={...legacy,passcode:String(legacy.passcode||DEFAULT_STUDENT_PASSCODE)};
   }
-
-  return {
-    ok:true,
-    slug,
-    accessVersion: Number(allowedInfo.passcodeUpdatedAt) || 0
-  };
+  if(!profile||profile.active===false||normalize(profile.name)!==normalize(name)||String(profile.passcode||'').trim()!==String(pin).trim())return {ok:false,reason:'Check your name and passcode. Sign in from the main site if needed.'};
+  return {ok:true,slug:id,accessVersion:Number(profile.passcodeUpdatedAt)||0};
 }
 
 document.getElementById('startBtn').onclick = async () => {
@@ -2403,6 +2398,21 @@ function applyDeepLinkFromURL(){
 }
 
 window.addEventListener('load', async () => {
+  const sharedId=localStorage.getItem('b3Games_studentId'),sharedName=localStorage.getItem('b3Games_studentName'),sharedPin=localStorage.getItem('b3Games_classPin');
+  if(sharedId&&sharedName&&sharedPin){
+    setNameGateMsg('Checking your existing sign-in…');
+    try{
+      const result=await checkAccess(sharedName,sharedPin,sharedId);
+      if(result.ok){
+        studentId=result.slug;studentName=sharedName;
+        localStorage.setItem('posukPractice_studentId',studentId);
+        localStorage.setItem('posukPractice_studentName',studentName);
+        localStorage.setItem('posukPractice_studentAccessVersion',String(result.accessVersion));
+        setNameGateMsg('');enterApp();return;
+      }
+      setNameGateMsg(result.reason);return;
+    }catch(error){setNameGateMsg('Could not check your sign-in. Refresh and try again.');return;}
+  }
   const savedId = localStorage.getItem('posukPractice_studentId');
   const savedName = localStorage.getItem('posukPractice_studentName');
   const savedAccessVersion = localStorage.getItem('posukPractice_studentAccessVersion') || '0';
@@ -2411,8 +2421,9 @@ window.addEventListener('load', async () => {
     // If the teacher changed this student's passcode, an old remembered login
     // is cleared and the student must enter the new passcode.
     try{
-      let allowedSnap = await db.ref('b3Games/students/' + savedId + '/profile').once('value');
-      if(!allowedSnap.exists()) allowedSnap = await db.ref('posukPractice/allowedStudents/' + savedId).once('value');
+      let row=await studentRecord('b3Games/students/'+encodeURIComponent(savedId)+'/profile');
+      if(!row)row=await studentRecord('posukPractice/allowedStudents/'+encodeURIComponent(savedId));
+      const allowedSnap={exists:()=>!!row,val:()=>row};
       if(!allowedSnap.exists()){
         localStorage.removeItem('posukPractice_studentName');
         localStorage.removeItem('posukPractice_studentId');
@@ -2436,8 +2447,8 @@ window.addEventListener('load', async () => {
       }
     }catch(e){
       console.error('Access re-check failed:', e);
-      // If Firebase is temporarily unreachable, keep the existing behavior and
-      // do not lock out a returning student solely because of a network hiccup.
+      setNameGateMsg('Could not check your sign-in. Refresh and try again.');
+      return;
     }
     studentId = savedId;
     studentName = savedName;
