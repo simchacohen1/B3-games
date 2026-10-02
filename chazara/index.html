@@ -10,7 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-<script src="recording-save.js?v=20261002-recording-fallback"></script>
+<script src="recording-save.js?v=20261002-fast-save"></script>
 <script src="../firebase-config.js"></script>
 <script src="../game-gate.js" data-game-id="chazara" data-back-href="../index.html"></script>
 </head>
@@ -233,18 +233,21 @@ async function finishRecording(st){
     const [perek,posuk]=st.key.split('_').map(Number),path='posukPractice/'+sid+'/chazara_'+perek+'_'+posuk+'_'+eventId+'.'+extFor(blob.type);
     st.status.textContent='Saving audio…';
     let url='',audioDataURL='',storagePath=path,storageError=null;
+    const preferDatabase=localStorage.getItem('chazaraPreferDatabaseAudio')==='1';
     try{
-      // Give Firebase Storage a short chance. If the browser/storage route is
-      // unavailable, fall back to Realtime Database so a student's recording
-      // still saves instead of sitting forever at "Saving…".
-      url=await ChazaraRecordingSave.upload(storage.ref(path),blob,percent=>{st.status.textContent='Uploading audio… '+percent+'%'},15000);
+      if(preferDatabase)throw Object.assign(new Error('Using faster database audio save.'),{code:'recording/prefer-database'});
+      // Storage currently fails on some student devices. Only give it a few
+      // seconds; after one fallback on this device, future recordings skip
+      // Storage entirely so saving feels immediate instead of pausing ~20 sec.
+      url=await ChazaraRecordingSave.upload(storage.ref(path),blob,percent=>{st.status.textContent='Uploading audio… '+percent+'%'},4000);
     }catch(err){
       storageError=err;
-      console.warn('Storage upload failed; using database audio fallback',err);
+      if(err?.code!=='recording/prefer-database')console.warn('Storage upload failed; using database audio fallback',err);
       storagePath='';
       st.status.textContent='Finishing recording…';
       if(blob.size>5*1024*1024)throw Object.assign(new Error('This recording is too large to save. Please make a shorter recording.'),{cause:err});
       audioDataURL=await blobToDataURL(blob);
+      try{localStorage.setItem('chazaraPreferDatabaseAudio','1')}catch{}
     }
     const event={id:eventId,studentId:sid,studentName:sname,workspaceClassId:localStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[st.key]?.practiceKey||null,recorded:true,points:2,reviewApplied:false,removed:false,chazaraDate:dayKey(),durationMs,soundDetected:true,peakRms:Number(st.peak.toFixed(4)),waveform:compactWave(st.samples),audioURL:url||null,audioDataURL:audioDataURL||null,storagePath:storagePath||null,storageFallback:Boolean(audioDataURL),storageErrorCode:storageError?.code||null,mimeType:blob.type||null,sizeBytes:blob.size,createdAt:firebase.database.ServerValue.TIMESTAMP,reviewNumber:(Number(d.reviews[st.key]?.count)||0)+1};
     writeStarted=true;
