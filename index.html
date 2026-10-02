@@ -395,7 +395,7 @@
     return "";
   }
 
-  const el=id=>document.getElementById(id);  const el=id=>document.getElementById(id);
+  const el=id=>document.getElementById(id);
   const gameCards=Array.from(document.querySelectorAll(".game-card"));
   const gameDefinitions=gameCards.map(card=>({id:card.dataset.gameId,name:(card.querySelector(".card-title")?.textContent||card.textContent).trim(),element:card}));
   gameCards.forEach(card=>card.addEventListener("click",event=>{
@@ -1052,7 +1052,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     return{ok:true,id,name:String(d.name||legacy?.name||typed),classId};
   }
 
-  let studentClassWatch=null  let studentClassWatch=null,studentProfileWatch=null,studentMembershipWatch=null;
+  let studentClassWatch=null,studentProfileWatch=null,studentMembershipWatch=null;
   let studentAccessRevoked=false;
   async function enterStudent(r){
     if(studentClassWatch)studentClassWatch.off();
