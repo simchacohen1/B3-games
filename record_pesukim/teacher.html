@@ -2255,11 +2255,11 @@ function slugify(name){
 // before letting anyone past the name gate. Existing records that do not yet
 // have a passcode use 5770 until the teacher changes them.
 async function loadAccessTab(){
+  if(teacherAccess.role==='admin')return loadLegacyAccessTab();
   const mainEl=document.getElementById('mainContent');
   const classId=requestedTeacherClass||teacherAccess.classIds.find(id=>id!=='*')||'et';
   mainEl.innerHTML='<h2>Students &amp; Classes</h2><p>Names, individual passcodes, and memberships are managed centrally in Teacher Center.</p><a class="btn gold" href="../admin.html?tab=students&class='+encodeURIComponent(classId)+'" target="_blank" rel="noopener">Open Class Management</a>';
-  if(teacherAccess.role==='admin'){const button=document.createElement('button');button.className='btn';button.textContent='B3 legacy lesson controls';button.onclick=loadLegacyAccessTab;mainEl.appendChild(button);}
-}
+  }
 async function loadLegacyAccessTab(){
   if(teacherAccess.role!=='admin')throw new Error('Owner access required for legacy B3 settings.');
   const mainEl = document.getElementById('mainContent');
@@ -2283,9 +2283,6 @@ async function loadLegacyAccessTab(){
       .sort((a,b) => a.name.localeCompare(b.name));
 
     let html = `<h2>🔑 Manage Access</h2>
-      <div class="empty-msg" style="text-align:left;margin-bottom:18px;">
-        Each student needs an approved name and his own passcode. Existing students use <strong>${DEFAULT_STUDENT_PASSCODE}</strong> until you change their individual passcode below.
-      </div>
 
       <div style="margin-bottom:26px;padding:16px;border-radius:12px;background:#fff;border:2px solid var(--gold);">
         <div style="font-weight:700;margin-bottom:4px;">📖 Student Practice Limit</div>
@@ -2318,21 +2315,10 @@ async function loadLegacyAccessTab(){
         </div>
       </div>
 
-      <div>
-        <div style="font-weight:700;margin-bottom:6px;">Approved Students (${approvedNames.length})</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
-          <input id="newApprovedName" type="text" placeholder="Student's name" maxlength="30"
-            style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:220px;">
-          <input id="newApprovedPasscode" type="text" inputmode="numeric" maxlength="20" value="${DEFAULT_STUDENT_PASSCODE}" placeholder="Passcode"
-            style="padding:8px 12px;border-radius:8px;border:2px solid var(--gold);font-size:1rem;width:120px;">
-          <select id="newApprovedClass" style="padding:8px 10px;border-radius:8px;border:2px solid var(--gold);font-family:'Quicksand',sans-serif;">
-            <option value="">No Class</option>
-            ${CLASS_SECTIONS.map(c => `<option value="${c}">${c}</option>`).join('')}
-          </select>
-          <button class="btn small gold" id="addApprovedBtn">Add Student</button>
-          <span id="addApprovedMsg" style="font-size:0.85rem;"></span>
-        </div>
-        <div id="approvedListWrap">${renderApprovedGroups(approvedNames)}</div>
+      <div style="padding:16px;border-radius:12px;background:#fff;border:2px solid var(--ink-soft);">
+        <div style="font-weight:700;margin-bottom:6px;">👥 Students, passcodes &amp; classes</div>
+        <div style="font-size:0.84rem;color:var(--ink-soft);margin-bottom:10px;">Add students, change passcodes, and assign classes in Teacher Center.</div>
+        <a class="btn gold" href="../admin.html?tab=students">Open Teacher Center →</a>
       </div>`;
     mainEl.innerHTML = html;
 
@@ -2401,103 +2387,6 @@ async function loadLegacyAccessTab(){
       document.getElementById('practiceLimitCurrent').textContent='All pesukim available';
     };
 
-    document.getElementById('addApprovedBtn').onclick = async () => {
-      const nameVal = document.getElementById('newApprovedName').value.trim();
-      const passcodeVal = document.getElementById('newApprovedPasscode').value.trim() || DEFAULT_STUDENT_PASSCODE;
-      const classVal = document.getElementById('newApprovedClass').value;
-      const msgEl = document.getElementById('addApprovedMsg');
-      if(!nameVal){ return; }
-      const slug = slugify(nameVal);
-      if(!slug){
-        msgEl.style.color = '#ffb3b3';
-        msgEl.textContent = 'Please enter a valid name.';
-        return;
-      }
-      try{
-        await db.ref('posukPractice/allowedStudents/' + slug).set({
-          name: nameVal,
-          passcode: passcodeVal,
-          passcodeUpdatedAt: firebase.database.ServerValue.TIMESTAMP,
-          classSection: classVal,
-          addedAt: firebase.database.ServerValue.TIMESTAMP
-        });
-        document.getElementById('newApprovedName').value = '';
-        document.getElementById('newApprovedPasscode').value = DEFAULT_STUDENT_PASSCODE;
-        msgEl.style.color = '#8fd694';
-        msgEl.textContent = 'Added!';
-        loadAccessTab();
-      }catch(e){
-        msgEl.style.color = '#ffb3b3';
-        msgEl.textContent = 'Could not add.';
-        console.error(e);
-      }
-    };
-
-    // Save each student's individual passcode. Changing it also changes
-    // passcodeUpdatedAt so a browser that had previously remembered this
-    // student will be asked for the new passcode on its next page load.
-    mainEl.querySelectorAll('.save-passcode-btn').forEach(btn => {
-      btn.onclick = async () => {
-        const slug = btn.dataset.slug;
-        const input = mainEl.querySelector(`.approved-passcode-input[data-slug="${slug}"]`);
-        const msgEl = mainEl.querySelector(`.passcode-save-msg[data-slug="${slug}"]`);
-        const val = input ? input.value.trim() : '';
-        if(!val){
-          if(msgEl){ msgEl.style.color = '#8a3a3a'; msgEl.textContent = 'Required'; }
-          return;
-        }
-        try{
-          await db.ref('posukPractice/allowedStudents/' + slug).update({
-            passcode: val,
-            passcodeUpdatedAt: firebase.database.ServerValue.TIMESTAMP
-          });
-          if(msgEl){ msgEl.style.color = '#397839'; msgEl.textContent = 'Saved!'; }
-        }catch(e){
-          if(msgEl){ msgEl.style.color = '#8a3a3a'; msgEl.textContent = 'Could not save'; }
-          console.error(e);
-        }
-      };
-    });
-
-    mainEl.querySelectorAll('.approved-passcode-input').forEach(input => {
-      input.onkeydown = (ev) => {
-        if(ev.key === 'Enter'){
-          ev.preventDefault();
-          const btn = mainEl.querySelector(`.save-passcode-btn[data-slug="${input.dataset.slug}"]`);
-          if(btn) btn.click();
-        }
-      };
-    });
-
-    // Changing a student's class here only updates the classSection field —
-    // it never touches their name, passcode, or any recorded progress.
-    mainEl.querySelectorAll('.approved-class-select').forEach(sel => {
-      sel.onchange = async () => {
-        const slug = sel.dataset.slug;
-        try{
-          await db.ref('posukPractice/allowedStudents/' + slug + '/classSection').set(sel.value);
-          loadAccessTab();
-        }catch(e){
-          console.error(e);
-          alert('Could not update class. Please try again.');
-        }
-      };
-    });
-
-    mainEl.querySelectorAll('.remove-approved-btn').forEach(btn => {
-      btn.onclick = async () => {
-        const row = btn.closest('tr');
-        const slug = row.dataset.slug;
-        // This only removes permission for that name to log in going forward;
-        // it does NOT delete any existing student data, attempts, or recordings.
-        try{
-          await db.ref('posukPractice/allowedStudents/' + slug).remove();
-          loadAccessTab();
-        }catch(e){
-          console.error(e);
-        }
-      };
-    });
   }catch(err){
     mainEl.innerHTML = '<div class="empty-msg">Could not load access settings.</div>';
     console.error(err);
