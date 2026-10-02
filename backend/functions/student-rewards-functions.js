@@ -14,6 +14,7 @@ const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 const {resolveStudent}=require("./student-login-core.cjs");
+const rewardsStore=require('./rewards-store.cjs');
 if (!admin.apps.length) admin.initializeApp();
 const rtdb = admin.database();
 const SR_ROOT = "studentRewards";
@@ -175,6 +176,14 @@ exports.studentRewardsRedeem = onRequest(
       const rewardSnap = await rtdb.ref(`${SR_ROOT}/rewards/${rewardId}`).get();
       const reward = rewardSnap.val();
       if (!reward || reward.active === false) return res.status(404).json({error:"That reward is unavailable."});
+      // Per-class stores: the reward must belong to the student's own store, and that store must be open.
+      {
+        const [classes,enrollments,settings,student]=await Promise.all(["classes","enrollments","settings",`students/${studentId}`].map(p=>rtdb.ref(`${SR_ROOT}/${p}`).get().then(x=>x.val())));
+        const root={classes:classes||{},enrollments:enrollments||{},settings:settings||{},students:{[studentId]:student||{}}};
+        const storeClass=rewardsStore.storeClassFor(root,studentId,String(decoded.studentRewardsClassId||""));
+        if (!rewardsStore.itemInStore(root,storeClass,reward)) return res.status(403).json({error:"That reward is not in your class store."});
+        if (rewardsStore.isTeacherStore(root,storeClass) && !rewardsStore.storeOpenFor(root,storeClass)) return res.status(409).json({error:"The Prize Store is closed right now."});
+      }
       if (reward.available === false) return res.status(409).json({error:"That reward is closed right now."});
       const cooldownUntil=timeMs(reward.cooldownUntil);
       if (cooldownUntil>Date.now()) return res.status(409).json({error:`That reward will be available again in ${cooldownText(cooldownUntil)}.`});

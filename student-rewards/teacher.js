@@ -7,7 +7,7 @@ const ROOT=C.ROOT, ADMIN=C.ADMIN_EMAIL;
 const OWNER_NAV=["Overview","Points Dashboard","Daily Points","Students","Categories","Comments","Rewards","Reports","People & Classes","Settings"];
 // Teachers other than the owner award points for their own classes through the
 // studentRewardsTeacher backend; the store, categories and settings stay with the owner.
-const TEACHER_NAV=["Overview","Points Dashboard","Daily Points","Students","Comments","Approvals","Reports"];
+const TEACHER_NAV=["Overview","Points Dashboard","Daily Points","Students","Comments","Rewards","Approvals","Reports"];
 let NAV=OWNER_NAV;
 const TEACHER_API="https://us-central1-b3-games.cloudfunctions.net/studentRewardsTeacher";
 async function teacherApi(action,extra={}){
@@ -17,6 +17,23 @@ async function teacherApi(action,extra={}){
   if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
   return data;
 }
+// Classes made in Teacher Center run their own prize store; ET/WT and older
+// classes share the main store.
+function isTeacherStore(classId){const c=state.root?.classes?.[classId];return Boolean(c&&c.b3ClassId&&!["et","wt"].includes(String(c.b3ClassId)))}
+function itemInStore(item,classId=state.classId){return item&&(isTeacherStore(classId)?item.ownerClassId===classId:!item.ownerClassId)}
+function classStoreOpen(classId=state.classId){if(isTeacherStore(classId))return state.root?.settings?.classStoreEnabled?.[classId]===true;const v=state.root?.settings?.rewardStoreEnabled;return v===true||String(v)==="true"}
+// In teacher mode, store edits go to the backend, which checks every change.
+const teacherDb={ref(path){
+  const send=async updates=>{await teacherApi("storeWrite",{classId:state.classId,updates});await loadRoot();render()};
+  return {
+    key:db.ref().push().key,
+    set:v=>send({[path]:v}),
+    remove:()=>send({[path]:null}),
+    update:obj=>send(path?Object.fromEntries(Object.entries(obj).map(([k,v])=>[path+"/"+k,v])):obj),
+    push:()=>({key:db.ref().push().key})
+  };
+}};
+function sdb(){return state.teacherMode?teacherDb:db}
 const REQUESTED_TAB=new URLSearchParams(window.location.search).get("tab");
 const ICONS={"Approvals":"✓","Overview":"⌂","Points Dashboard":"★","Daily Points":"✓","Students":"♙","Categories":"☷","Comments":"✎","Rewards":"◇","Reports":"▤","People & Classes":"♧","Settings":"⚙"};
 const CLASS_REWARD_PRESETS=[
@@ -537,9 +554,9 @@ function approvalsPage(){
   ${pointReq.length?`<section class="activity-queue"><div class="activity-head"><div><h2>Awaiting approval</h2></div><div class="activity-head-actions"><b>${pointReq.length}</b><button class="primary" id="approveAllActivity">Approve all</button></div></div>${pointReq.map(activityPointRow).join("")}</section>`:`<div class="empty"><h3>All caught up</h3><p>No points are waiting for approval.</p></div>`}</section>`;
 }
 function rewardsPage(){
-  const rewards=vals(state.root.rewards||{}).filter(r=>r.active!==false&&String(r.rewardType||"personal")!=="class"&&String(r.rewardType||"personal")!=="class-migrated").sort((a,b)=>(a.cost||0)-(b.cost||0)), req=getRedemptions(), classRewards=vals(state.root.classRewardCatalog||{}).filter(x=>x.active!==false).sort((a,b)=>(a.costPerStudent||0)-(b.costPerStudent||0)||(a.name||"").localeCompare(b.name||"")), pointReq=pendingActivityPointRequests();
-  const storeOpen=state.root.settings?.rewardStoreEnabled===true||String(state.root.settings?.rewardStoreEnabled)==="true";
-  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">REWARDS</p><h1>Reward Store</h1><p>Personal rewards are bought by one student. Class rewards are shared goals funded by contributions.</p></div><a class="primary linkbutton" href="student.html">Open student portal</a></div>
+  const rewards=vals(state.root.rewards||{}).filter(r=>itemInStore(r)&&r.active!==false&&String(r.rewardType||"personal")!=="class"&&String(r.rewardType||"personal")!=="class-migrated").sort((a,b)=>(a.cost||0)-(b.cost||0)), req=getRedemptions(), classRewards=vals(state.root.classRewardCatalog||{}).filter(x=>itemInStore(x)&&x.active!==false).sort((a,b)=>(a.costPerStudent||0)-(b.costPerStudent||0)||(a.name||"").localeCompare(b.name||"")), pointReq=pendingActivityPointRequests();
+  const storeOpen=classStoreOpen();
+  return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">REWARDS${isTeacherStore(state.classId)?" · "+esc((cls()?.name||"").toUpperCase())+" STORE":""}</p><h1>Reward Store</h1><p>Personal rewards are bought by one student. Class rewards are shared goals funded by contributions.</p></div><a class="primary linkbutton" href="student.html">Open student portal</a></div>
   <div class="storecontrol ${storeOpen?"open":"closed"}"><div><strong>Prize Store Purchasing: ${storeOpen?"OPEN":"CLOSED"}</strong><small>${storeOpen?"Students can buy personal rewards and contribute to class goals.":"Students can browse rewards and progress, but cannot spend points."}</small></div><button class="primary" id="storeToggle">${storeOpen?"Close Prize Store":"Open Prize Store"}</button></div>
   ${pointReq.length?`<section class="activity-queue"><div class="activity-head"><div><h2>Activity points awaiting approval</h2><p>Posuk Practice and Chazara requests. Nothing below has been added yet.</p></div><div class="activity-head-actions"><b>${pointReq.length}</b><button class="primary" id="approveAllActivity">Approve all</button></div></div>${pointReq.map(activityPointRow).join("")}</section>`:""}
   <div class="reward-type-stack">
@@ -615,7 +632,7 @@ function rewardEditorBackdrop(title,subtitle,bodyHtml){
   document.addEventListener("keydown",onKey);
   return overlay;
 }
-function editReward(id=""){if(state.teacherMode){toast("Only the administrator can change this.","error");return}
+function editReward(id=""){
   const old=id?state.root.rewards?.[id]:null;
   const quantity=Number(old?.quantity??-1), unlimited=quantity<0, color=/^#[0-9a-f]{6}$/i.test(String(old?.color||""))?old.color:"#ede9fe";
   const overlay=rewardEditorBackdrop(id?"Edit personal reward":"Add personal reward","Change every reward setting here, then save once.",`
@@ -652,13 +669,13 @@ function editReward(id=""){if(state.teacherMode){toast("Only the administrator c
     try{
       const rid=id||`reward-${crypto.randomUUID?crypto.randomUUID():Date.now()}`,lastRedeemedAt=timeMs(old?.lastRedeemedAt);
       const cooldownUntil=cooldownDays>0&&lastRedeemedAt?lastRedeemedAt+cooldownDays*DAY_MS:null;
-      await db.ref(`${ROOT}/rewards/${rid}`).set({id:rid,name,cost:Math.round(cost),icon,color:selectedColor,active:true,available,quantity:unlimitedBox.checked?-1:Math.round(quantityValue),rewardType:"personal",cooldownDays,lastRedeemedAt:lastRedeemedAt||null,cooldownUntil});
+      await sdb().ref(`${ROOT}/rewards/${rid}`).set({...(isTeacherStore(state.classId)?{ownerClassId:old?.ownerClassId||state.classId}:{}),id:rid,name,cost:Math.round(cost),icon,color:selectedColor,active:true,available,quantity:unlimitedBox.checked?-1:Math.round(quantityValue),rewardType:"personal",cooldownDays,lastRedeemedAt:lastRedeemedAt||null,cooldownUntil});
       closeRewardEditor();toast(id?"Personal reward updated":"Personal reward added");
     }catch(err){console.error(err);save.disabled=false;error.textContent="Could not save this reward. Please try again."}
   };
   requestAnimationFrame(()=>overlay.querySelector("#rewardEditName")?.focus());
 }
-function editClassReward(id=""){if(state.teacherMode){toast("Only the administrator can change this.","error");return}
+function editClassReward(id=""){
   const old=id?state.root.classRewardCatalog?.[id]:null,isGimkit=isGimkitClassReward(old)||(!id&&false),startingModes=gimkitModesForItem(old||{id,name:"Gimkit"});
   const modeSection=isGimkit?`<div class="gimkit-mode-editor wide"><div class="gimkit-mode-editor-head"><div><b>Gimkit mode choices</b><small>Boys can choose one or several modes. Their contribution is split among the modes they check. Losing bars carry over to the next Gimkit.</small></div><button type="button" id="addGimkitMode">+ Add mode</button></div><div id="gimkitModeRows"></div></div>`:"";
   const overlay=rewardEditorBackdrop(id?"Edit class reward":"Add class reward","Change every class reward setting here, then save once.",`
@@ -692,33 +709,37 @@ function editClassReward(id=""){if(state.teacherMode){toast("Only the administra
     save.disabled=true;error.textContent="";
     try{
       const rid=id||`class-reward-${crypto.randomUUID?crypto.randomUUID():Date.now()}`;
-      const record={id:rid,name,costPerStudent:Math.round(cost),icon,active:true,available,cooldownDays};
+      const record={...(isTeacherStore(state.classId)?{ownerClassId:old?.ownerClassId||state.classId}:{}),id:rid,name,costPerStudent:Math.round(cost),icon,active:true,available,cooldownDays};
       if(savingGimkit){record.modeVotingEnabled=true;record.modes=Object.fromEntries(cleanedModes.map(m=>[m.id,m]))}
       const updates={[`${ROOT}/classRewardCatalog/${rid}`]:record};
       if(!id)updates[`${ROOT}/settings/classRewardAvailability/${rid}`]=available;
-      await db.ref().update(updates);closeRewardEditor();toast(id?"Class reward updated":"Class reward added");
+      await sdb().ref().update(updates);closeRewardEditor();toast(id?"Class reward updated":"Class reward added");
     }catch(err){console.error(err);save.disabled=false;error.textContent="Could not save this reward. Please try again."}
   };
   requestAnimationFrame(()=>overlay.querySelector("#classRewardEditName")?.focus());
 }
-async function toggleRewardAvailability(id){if(state.teacherMode){toast("Only the administrator can change this.","error");return}const r=state.root.rewards?.[id];if(!r)return;const next=r.available===false;await db.ref(`${ROOT}/rewards/${id}/available`).set(next);toast(`${r.name||"Reward"} ${next?"opened":"closed"}`)}
-async function toggleClassRewardAvailability(id){if(state.teacherMode){toast("Only the administrator can change this.","error");return}const r=state.root.classRewardCatalog?.[id];if(!r)return;const next=r.available===false;await db.ref().update({[`${ROOT}/classRewardCatalog/${id}/available`]:next,[`${ROOT}/settings/classRewardAvailability/${id}`]:next});toast(`${r.name||"Class reward"} ${next?"opened":"closed"}`)}
-async function deleteClassReward(id){if(state.teacherMode){toast("Only the administrator can change this.","error");return}const r=state.root.classRewardCatalog?.[id];if(!r||!confirm(`Delete “${r.name}” from Class Rewards? Existing contribution history will be kept.`))return;await db.ref(`${ROOT}/classRewardCatalog/${id}/active`).set(false);toast("Class reward deleted")}
-async function resetClassReward(id){if(state.teacherMode){toast("Only the administrator can change this.","error");return}
+async function toggleRewardAvailability(id){const r=state.root.rewards?.[id];if(!r)return;const next=r.available===false;await sdb().ref(`${ROOT}/rewards/${id}/available`).set(next);toast(`${r.name||"Reward"} ${next?"opened":"closed"}`)}
+async function toggleClassRewardAvailability(id){const r=state.root.classRewardCatalog?.[id];if(!r)return;const next=r.available===false;await sdb().ref().update({[`${ROOT}/classRewardCatalog/${id}/available`]:next,[`${ROOT}/settings/classRewardAvailability/${id}`]:next});toast(`${r.name||"Class reward"} ${next?"opened":"closed"}`)}
+async function deleteClassReward(id){const r=state.root.classRewardCatalog?.[id];if(!r||!confirm(`Delete “${r.name}” from Class Rewards? Existing contribution history will be kept.`))return;await sdb().ref(`${ROOT}/classRewardCatalog/${id}/active`).set(false);toast("Class reward deleted")}
+async function resetClassReward(id){
   const r=state.root.classRewardCatalog?.[id];if(!r)return;
   const round=state.root?.classRewardRounds?.[state.classId]?.[id]||null,g=classRewardSnapshot(r);
   if(isGimkitClassReward(r)&&round&&g.cooling){
     if(!confirm(`End the Gimkit cooldown now? The losing mode bars will keep all of their points.`))return;
-    await db.ref(`${ROOT}/classRewardRounds/${state.classId}/${id}`).update({status:"active",cooldownUntil:null,byStudent:{},updatedAt:Date.now()});toast("Gimkit cooldown ended");return;
+    await sdb().ref(`${ROOT}/classRewardRounds/${state.classId}/${id}`).update({status:"active",cooldownUntil:null,byStudent:{},updatedAt:Date.now()});toast("Gimkit cooldown ended");return;
   }
   const msg=isGimkitClassReward(r)?`Reset every Gimkit mode bar for ${cls()?.name||"this class"}? This clears the carried-over mode totals.`:`Start a fresh “${r.name}” class goal for ${cls()?.name||"this class"}? Previous contributions will stay in point history.`;
   if(!confirm(msg))return;
-  await db.ref(`${ROOT}/classRewardRounds/${state.classId}/${id}`).remove();toast(isGimkitClassReward(r)?"Gimkit mode bars reset":"Class goal reset");
+  await sdb().ref(`${ROOT}/classRewardRounds/${state.classId}/${id}`).remove();toast(isGimkitClassReward(r)?"Gimkit mode bars reset":"Class goal reset");
 }
 
-async function deleteReward(id){if(state.teacherMode){toast("Only the administrator can change this.","error");return}const r=state.root.rewards?.[id];if(!r||!confirm(`Delete “${r.name}” from the Prize Store? Past request history will be kept.`))return;await db.ref(`${ROOT}/rewards/${id}/active`).set(false);toast("Reward deleted")}
-async function toggleRewardStore(){if(state.teacherMode){toast("Only the administrator can change this.","error");return}const open=state.root.settings?.rewardStoreEnabled===true||String(state.root.settings?.rewardStoreEnabled)==="true",next=!open;await db.ref(`${ROOT}/settings/rewardStoreEnabled`).set(next);state.root.settings=state.root.settings||{};state.root.settings.rewardStoreEnabled=next;render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened")}
-async function review(sid,key,decision){if(state.teacherMode){toast("Only the administrator can change this.","error");return}
+async function deleteReward(id){const r=state.root.rewards?.[id];if(!r||!confirm(`Delete “${r.name}” from the Prize Store? Past request history will be kept.`))return;await sdb().ref(`${ROOT}/rewards/${id}/active`).set(false);toast("Reward deleted")}
+async function toggleRewardStore(){const open=classStoreOpen(),next=!open;
+  if(state.teacherMode){try{await teacherApi("setStore",{classId:state.classId,open:next})}catch(err){toast(err.message,"error");return}await loadRoot();render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened");return}
+  if(isTeacherStore(state.classId)){await db.ref(`${ROOT}/settings/classStoreEnabled/${state.classId}`).set(next);state.root.settings=state.root.settings||{};(state.root.settings.classStoreEnabled??={})[state.classId]=next;render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened");return}
+  await db.ref(`${ROOT}/settings/rewardStoreEnabled`).set(next);state.root.settings=state.root.settings||{};state.root.settings.rewardStoreEnabled=next;render();toast(open?"Prize Store purchasing closed":"Prize Store purchasing opened")}
+async function review(sid,key,decision){
+  if(state.teacherMode){try{const r=await teacherApi("review",{studentId:sid,key,decision});toast(`Request ${r.status}`)}catch(err){toast(err.message,"error")}await loadRoot();render();return}
   const item=state.root.redemptionsByStudent?.[sid]?.[key];if(!item)return;
   const updates={}, stamp=now(),status=decision==="approve"?"ready":decision==="collect"?"collected":"declined";
   updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/status`]=status;
@@ -732,7 +753,7 @@ async function review(sid,key,decision){if(state.teacherMode){toast("Only the ad
       updates[`${ROOT}/rewards/${item.rewardId}/cooldownUntil`]=null;
     }
   }
-  await db.ref().update(updates);toast(`Request ${status}`)
+  await sdb().ref().update(updates);toast(`Request ${status}`)
 }
 function reportRows(){const out=[];for(const s of roster()){const dates=new Set([...Object.keys(state.root.dailyAwards?.[s.id]?.[state.classId]||{}),...Object.keys(state.root.dailyAttendance?.[s.id]?.[state.classId]||{})]);for(const date of dates){const a=state.root.dailyAttendance?.[s.id]?.[state.classId]?.[date],aw=state.root.dailyAwards?.[s.id]?.[state.classId]?.[date];out.push({student:s.name,date,status:a?.status||"present",points:Number(aw?.points||0)})}}return out.sort((a,b)=>b.date.localeCompare(a.date)||a.student.localeCompare(b.student))}
 function reportsPage(){const rows=reportRows();return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">REPORTS</p><h1>Daily point history</h1><p>Review or export the saved class history.</p></div><div class="reportbuttons"><button id="csvBtn">Export CSV</button><button id="printBtn">Print / PDF</button></div></div><div class="historytable"><table><thead><tr><th>Student</th><th>Date</th><th>Attendance</th><th>Points</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.student)}</td><td>${esc(C.formatDate(r.date))}</td><td>${esc(r.status)}</td><td>${r.points} ★</td></tr>`).join("")}</tbody></table></div></section>`}
