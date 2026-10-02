@@ -27,7 +27,7 @@ if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 const auth=firebase.auth(),db=firebase.database(),q=id=>document.getElementById(id);let teacherData={},classData={};
 const PLATFORM_TOOLS=[
  ["yiddish","Yiddish"],["posuk-practice-scroll","Posuk Practice"],["rashi-letters","Rashi Letters"],["shorashim","Shorashim"],["chazara","Chazara"],["game-show","Game Show"],["student-rewards","Student Rewards"],["weekly-quiz","Weekly Quiz"],
- ["davening","Davening"],["gallery","Gallery"],["tag","Tag Game"],["tent-trail-trivia","Tent Trail Trivia"]
+ ["davening","Davening"],["gallery","Gallery"],["tag","Tag Game"]
 ];
 function key(s){return String(s||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"")}
 function safe(s){const d=document.createElement("div");d.textContent=String(s||"");return d.innerHTML}
