@@ -382,14 +382,20 @@
     }))).filter(Boolean);
     const stored=localStorage.getItem("b3Games_studentId")===studentId?localStorage.getItem("b3Games_studentClass"):"";
     if(studentClassChoices.length)return (studentClassChoices.find(c=>c.id===stored)||studentClassChoices[0]).id;
-    if(Object.keys(memberships).length)return "";
-    // Compatibility for an unmigrated B3 record only; revoked memberships never fall back.
+
+    // Migration repair: an active legacy B3 student should not be locked out
+    // just because the newer membership mirror is missing or half-migrated.
+    // Repair the ET/WT membership on successful sign-in and continue.
     const legacy=["et","wt"].includes(data?.classId)?data.classId:legacyMigrationClass(studentId);
-    if(legacy){studentClassChoices=[{id:legacy,name:legacy.toUpperCase()}];return legacy;}
+    if(legacy&&data?.active!==false){
+      await persistStudentMembership(studentId,legacy,data);
+      studentClassChoices=[{id:legacy,name:legacy.toUpperCase()}];
+      return legacy;
+    }
     return "";
   }
 
-  const el=id=>document.getElementById(id);
+  const el=id=>document.getElementById(id);  const el=id=>document.getElementById(id);
   const gameCards=Array.from(document.querySelectorAll(".game-card"));
   const gameDefinitions=gameCards.map(card=>({id:card.dataset.gameId,name:(card.querySelector(".card-title")?.textContent||card.textContent).trim(),element:card}));
   gameCards.forEach(card=>card.addEventListener("click",event=>{
@@ -989,30 +995,64 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   async function checkStudentAccess(name,pin){
-    const slug=slugify(name), enteredPin=String(pin||"").trim();
-    if(!slug)return{ok:false,reason:"Please type your name."};
-    const snap=await db.ref("b3Games/students").once("value");
-    const matches=Object.entries(snap.val()||{}).filter(([id,row])=>
-      row?.profile&&(id===String(name).trim()||slugify(row.profile.name)===slug)&&
-      String(row.profile.passcode||"").trim()===enteredPin);
-    if(matches.length>1)return{ok:false,reason:"More than one student has this name and passcode. Ask your teacher for a different passcode."};
-    let id,d;
-    if(matches.length){id=matches[0][0];d=matches[0][1].profile;}
-    else{
-      const central=await db.ref("b3Games/students/"+slug+"/profile").once("value");
-      if(central.exists())return{ok:false,reason:"Check your name and passcode."};
-      const legacySnap=await db.ref("posukPractice/allowedStudents/"+slug).once("value");
-      const legacy=legacySnap.val();
-      if(!legacy||String(legacy.passcode||"5770").trim()!==enteredPin)return{ok:false,reason:"Check your name and passcode."};
-      id=slug;d={id,name:String(legacy.name||name.trim()),active:legacy.active!==false};
+    const typed=String(name||"").trim(),enteredPin=String(pin||"").trim();
+    const normalize=value=>String(value||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"");
+    if(!normalize(typed))return{ok:false,reason:"Please type your name."};
+    if(!enteredPin)return{ok:false,reason:"Please enter your passcode."};
+
+    const [centralSnap,legacySnap]=await Promise.all([
+      db.ref("b3Games/students").once("value"),
+      db.ref("posukPractice/allowedStudents").once("value")
+    ]);
+    const central=centralSnap.val()||{},legacyRows=legacySnap.val()||{};
+    const sameName=(id,profile)=>normalize(profile?.name)===normalize(typed)||normalize(id)===normalize(typed);
+
+    // Find the student's canonical B3 account by name first. A stale passcode
+    // in the new profile must not override the valid legacy passcode during
+    // this migration; when legacy succeeds we repair the new profile.
+    const namedCentral=Object.entries(central).filter(([id,row])=>row?.profile&&row.profile.active!==false&&sameName(id,row.profile));
+    const validCentral=namedCentral.filter(([,row])=>String(row.profile.passcode||"").trim()===enteredPin);
+    let id="",d=null,legacy=null;
+
+    if(validCentral.length>1)return{ok:false,reason:"More than one student has this name and passcode. Ask your teacher for a different passcode."};
+    if(validCentral.length===1){
+      id=validCentral[0][0];d=validCentral[0][1].profile;
+      legacy=legacyRows[id]||null;
+    }else{
+      // If the central profile exists but its PIN is stale, accept the same
+      // student's valid legacy PIN and immediately synchronize the profile.
+      const repaired=namedCentral.filter(([sid])=>{
+        const old=legacyRows[sid];
+        return old&&old.active!==false&&String(old.passcode||"5770").trim()===enteredPin;
+      });
+      if(repaired.length>1)return{ok:false,reason:"More than one student has this name and passcode. Ask your teacher for a different passcode."};
+      if(repaired.length===1){
+        id=repaired[0][0];d={...repaired[0][1].profile,passcode:enteredPin};legacy=legacyRows[id];
+        try{await db.ref("b3Games/students/"+id+"/profile").update({passcode:enteredPin,name:String(d.name||legacy?.name||typed),active:true,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP});}catch(e){console.warn("Could not repair student passcode",e);}
+      }
     }
+
+    if(!id){
+      const legacyMatches=Object.entries(legacyRows).filter(([sid,row])=>
+        row&&row.active!==false&&sameName(sid,row)&&String(row.passcode||"5770").trim()===enteredPin);
+      if(legacyMatches.length>1)return{ok:false,reason:"More than one student has this name and passcode. Ask your teacher for a different passcode."};
+      if(legacyMatches.length===1){
+        id=legacyMatches[0][0];legacy=legacyMatches[0][1]||{};
+        d={id,name:String(legacy.name||typed),passcode:enteredPin,active:true,classId:legacy.classId||legacyMigrationClass(id)};
+        try{await db.ref("b3Games/students/"+id+"/profile").update({name:d.name,passcode:enteredPin,active:true,classId:d.classId||null,passcodeUpdatedAt:firebase.database.ServerValue.TIMESTAMP});}catch(e){console.warn("Could not migrate student profile",e);}
+      }
+    }
+
+    if(!id||!d)return{ok:false,reason:"Check your name and passcode."};
     if(d.active===false)return{ok:false,reason:"Your access is turned off. Ask your teacher."};
-    const classId=await resolvedStudentClass(id,d);
+    if(normalize(d.name)!==normalize(typed)&&normalize(id)!==normalize(typed))return{ok:false,reason:"Check your name and passcode."};
+
+    const classId=await resolvedStudentClass(id,{...d,classId:d.classId||legacy?.classId||legacyMigrationClass(id)});
     if(!classId)return{ok:false,reason:"Your class is not assigned yet. Ask your teacher."};
-    return{ok:true,id,name:String(d.name||name.trim()),classId};
+    return{ok:true,id,name:String(d.name||legacy?.name||typed),classId};
   }
 
-  let studentClassWatch=null,studentProfileWatch=null,studentMembershipWatch=null;
+  let studentClassWatch=null  let studentClassWatch=null,studentProfileWatch=null,studentMembershipWatch=null;
   let studentAccessRevoked=false;
   async function enterStudent(r){
     if(studentClassWatch)studentClassWatch.off();
