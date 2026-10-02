@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+<script src="recording-save.js?v=20261002-recording-timeout"></script>
 <script src="../firebase-config.js"></script>
 <script src="../game-gate.js" data-game-id="chazara" data-back-href="../index.html"></script>
 </head>
@@ -68,7 +69,7 @@ function rotationAllows(key){const pool=dailyRotationPool();if(pool.length<=1)re
 function canReview(key){return baseCanReview(key)&&!dailyLimitReached(key)&&rotationAllows(key)}
 function reviewLockReason(key){if(!baseCanReview(key))return '100% Understand needed after 10';if(dailyLimitReached(key))return 'Maximum 2 Chazaras for this Posuk today';if(!rotationAllows(key))return 'Review the other pesukim first';return ''}
 async function askNormalReview(key){return new Promise(resolve=>{const box=$('confirmBox');$('confirmQuestion').textContent='Did you read and translate '+R(key)+' correctly?';box.classList.remove('hidden');let done=false;const finish=v=>{if(done)return;done=true;box.classList.add('hidden');$('confirmYes').onclick=null;$('confirmNo').onclick=null;resolve(v)};$('confirmYes').onclick=()=>finish(true);$('confirmNo').onclick=()=>finish(false)})}
-async function requestPoints(source,eventId){try{const response=await fetch(POINT_REQUEST_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:sid,source,eventId})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||('HTTP '+response.status));if(eventId&&data.requestId)await db.ref(EVENTS+sid+'/'+eventId).update({pointRequestId:data.requestId,pointRequestStatus:data.status||'pending',pointRequestSyncedAt:firebase.database.ServerValue.TIMESTAMP});if(data.status==='pending'&&Number(data.amount)>0)showNotice('⭐ '+data.amount+' point'+(Number(data.amount)===1?'':'s')+' sent to your teacher for approval.');return data}catch(e){console.warn('Point request will be retried later',e);return null}}
+async function requestPoints(source,eventId){try{const response=await fetch(POINT_REQUEST_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:sid,source,eventId}),signal:AbortSignal.timeout(15000)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||('HTTP '+response.status));if(eventId&&data.requestId)await db.ref(EVENTS+sid+'/'+eventId).update({pointRequestId:data.requestId,pointRequestStatus:data.status||'pending',pointRequestSyncedAt:firebase.database.ServerValue.TIMESTAMP});if(data.status==='pending'&&Number(data.amount)>0)showNotice('⭐ '+data.amount+' point'+(Number(data.amount)===1?'':'s')+' sent to your teacher for approval.');return data}catch(e){console.warn('Point request will be retried later',e);return null}}
 async function requestRemovalPoints(eventId){try{const response=await fetch(POINT_REQUEST_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:sid,source:'chazara-remove',eventId})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||('HTTP '+response.status));await db.ref(EVENTS+sid+'/'+eventId).update({removalPointSynced:true,removalPointRequestId:data.requestId||null,removalPointRequestStatus:data.status||data.action||'none',removalPointSyncedAt:firebase.database.ServerValue.TIMESTAMP});return data}catch(e){console.warn('Point removal will be retried later',e);return null}}
 async function retryPendingPointSyncs(){try{const snap=await db.ref(EVENTS+sid).once('value');const events=snap.val()||{};for(const [id,e] of Object.entries(events)){if(!e||e.reviewApplied!==true)continue;if(e.removed===true){if(!isRejectedEvent(e)&&e.removalPointSynced!==true)await requestRemovalPoints(id)}else if(isRejectedEvent(e)){continue}else if(!e.pointRequestId){await requestPoints(e.recorded?'chazara-recording':'chazara',id)}}}catch(e){console.warn(e)}}
 async function incrementReview(key){const ref=db.ref(ROOT+sid+'/reviews/'+key),now=Date.now();let out=null;await ref.transaction(cur=>{const c=(cur&&Number(cur.count))||0;out={count:c+1,lastAt:now};return out});d.reviews[key]=out;d.reviewDays[dayKey(now)]=true;await db.ref(ROOT+sid).update({goal:GOAL,name:sname,updatedAt:firebase.database.ServerValue.TIMESTAMP,['reviewDays/'+dayKey(now)]:true});render();return out.count}
@@ -170,6 +171,7 @@ function displayPlan(){
 }
 function isChazaraUnlocked(key){return !!unlocked[key]}
 function render(){
+  if(recorderState)return;
   if(!sid)return;
   $('studentNameTop').textContent=sname;
   const activeKs=activeChazaraKeys();
@@ -209,7 +211,41 @@ function drawWave(st){if(!st||!st.analyser||!st.canvas)return;const ctx=st.canva
 function resetRecordingUI(st,message=''){if(!st)return;st.button.disabled=false;st.button.classList.remove('recording');st.button.textContent='🎙️ Record · 2 ★';if(message){st.status.innerHTML='<span class="error">'+message+'</span>';setTimeout(()=>{try{st.panel.remove()}catch{}},1400)}else{try{st.panel.remove()}catch{}}}
 async function toggleRecording(key,button){if(reviewSubmitting)return;if(recorderState){if(recorderState.key!==key){showNotice('Finish the recording already in progress first.');return}recorderState.recorder.stop();button.disabled=true;button.textContent='Saving…';return}if(!canReview(key))return;if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){alert('Recording is not supported on this browser.');return}try{const stream=await navigator.mediaDevices.getUserMedia({audio:true}),mime=preferredMime(),rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined),chunks=[];document.querySelectorAll('.rec-panel').forEach(x=>x.remove());document.querySelectorAll('.record-bar.recording').forEach(x=>{x.classList.remove('recording');x.textContent='🎙️ Record · 2 ★'});const wrap=button.parentElement,panel=document.createElement('div');panel.className='rec-panel';panel.innerHTML='<canvas></canvas><div class="rec-status">Recording… 0.0s</div>';wrap.insertBefore(panel,button.nextSibling);button.classList.add('recording');button.textContent='⏹ Stop';const AudioCtx=window.AudioContext||window.webkitAudioContext,audioCtx=new AudioCtx(),source=audioCtx.createMediaStreamSource(stream),analyser=audioCtx.createAnalyser();analyser.fftSize=512;source.connect(analyser);const st=recorderState={key,button,panel,canvas:panel.querySelector('canvas'),status:panel.querySelector('.rec-status'),stream,recorder:rec,audioCtx,analyser,start:performance.now(),chunks,samples:[],peak:0,voiced:0,frames:0,lastSample:0,raf:null,timer:null};st.timer=setInterval(()=>{st.status.textContent='Recording… '+((performance.now()-st.start)/1000).toFixed(1)+'s'},200);drawWave(st);rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};rec.onstop=()=>finishRecording(st);rec.start(250)}catch(e){console.error(e);alert('Could not start the microphone. Please allow microphone access and try again.');recorderState=null}}
 function compactWave(samples,max=64){if(samples.length<=max)return samples.map(v=>Number(v.toFixed(4)));const out=[];for(let i=0;i<max;i++){const a=Math.floor(i*samples.length/max),b=Math.max(a+1,Math.floor((i+1)*samples.length/max));out.push(Number((samples.slice(a,b).reduce((x,y)=>x+y,0)/(b-a)).toFixed(4)))}return out}
-async function finishRecording(st){const durationMs=Math.round(performance.now()-st.start);stopMediaTracks(st);const blob=new Blob(st.chunks,{type:st.recorder.mimeType||'audio/webm'}),soundDetected=st.peak>.018&&st.voiced>=Math.max(4,Math.floor(st.frames*.04));if(durationMs<5000||!soundDetected){resetRecordingUI(st,'Please try again.');recorderState=null;return}if(!canReview(st.key)){resetRecordingUI(st,reviewLockReason(st.key)||'That Posuk is not available for another Chazara right now.');recorderState=null;render();return}let saved=false;try{const eventRef=db.ref(EVENTS+sid).push(),eventId=eventRef.key,[perek,posuk]=st.key.split('_').map(Number);/* Store beside the already-working Posuk Practice recordings so the same Storage permission pattern applies. */const path='posukPractice/'+sid+'/chazara_'+perek+'_'+posuk+'_'+eventId+'.'+extFor(blob.type);st.status.textContent='Saving…';await storage.ref(path).put(blob,{contentType:blob.type||'audio/webm'});const url=await storage.ref(path).getDownloadURL();const reviewNumber=(Number(d.reviews[st.key]?.count)||0)+1;await eventRef.set({id:eventId,studentId:sid,studentName:sname,workspaceClassId:localStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[st.key]?.practiceKey||null,recorded:true,points:2,reviewApplied:false,removed:false,chazaraDate:dayKey(),durationMs,soundDetected:true,peakRms:Number(st.peak.toFixed(4)),waveform:compactWave(st.samples),audioURL:url,storagePath:path,mimeType:blob.type||null,sizeBytes:blob.size,createdAt:firebase.database.ServerValue.TIMESTAMP,reviewNumber});await incrementReview(st.key);await eventRef.update({reviewApplied:true});await requestPoints('chazara-recording',eventId);const savedSnap=await db.ref(EVENTS+sid+'/'+eventId).once('value');chazaraEvents[eventId]=savedSnap.val()||{};renderRecordings();saved=true}catch(e){console.error('Recorded Chazara save failed',e);resetRecordingUI(st,'Please try again.')}finally{recorderState=null;if(saved)render()}}
+function preserveRecording(blob,key,error,writeStarted){
+  const box=document.createElement('section');box.className='panel';
+  const title=document.createElement('h2');title.textContent='Recording could not finish saving';
+  const note=document.createElement('p');note.textContent=(error?.code==='storage/unauthorized'?'Audio upload permission was denied. ':error?.message||'The recording could not be saved.')+(writeStarted?' Check your recordings and count before recording this Posuk again; part of the save may have reached the server.':' Your audio is still available below.');
+  const link=document.createElement('a'),url=URL.createObjectURL(blob);link.href=url;link.download='chazara_'+key+'.'+extFor(blob.type);link.textContent='Download this recording';
+  const audio=document.createElement('audio');audio.controls=true;audio.src=url;audio.style.display='block';
+  box.append(title,note,audio,link);$('grid').parentElement.insertBefore(box,$('grid'));
+}
+async function finishRecording(st){
+  const durationMs=Math.round(performance.now()-st.start);stopMediaTracks(st);
+  const blob=new Blob(st.chunks,{type:st.recorder.mimeType||'audio/webm'}),soundDetected=st.peak>.018&&st.voiced>=Math.max(4,Math.floor(st.frames*.04));
+  if(durationMs<5000||!soundDetected){resetRecordingUI(st,'Please try again.');recorderState=null;return}
+  if(!canReview(st.key)){resetRecordingUI(st,reviewLockReason(st.key)||'That Posuk is not available for another Chazara right now.');recorderState=null;render();return}
+  let saved=false,writeStarted=false,eventId;
+  const step=(work,label)=>{st.status.textContent=label+'…';return ChazaraRecordingSave.deadline(work,30000,label)};
+  try{
+    const eventRef=db.ref(EVENTS+sid).push();eventId=eventRef.key;
+    const [perek,posuk]=st.key.split('_').map(Number),path='posukPractice/'+sid+'/chazara_'+perek+'_'+posuk+'_'+eventId+'.'+extFor(blob.type);
+    st.status.textContent='Uploading audio… 0%';
+    const url=await ChazaraRecordingSave.upload(storage.ref(path),blob,percent=>{st.status.textContent='Uploading audio… '+percent+'%'});
+    const event={id:eventId,studentId:sid,studentName:sname,workspaceClassId:localStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[st.key]?.practiceKey||null,recorded:true,points:2,reviewApplied:false,removed:false,chazaraDate:dayKey(),durationMs,soundDetected:true,peakRms:Number(st.peak.toFixed(4)),waveform:compactWave(st.samples),audioURL:url,storagePath:path,mimeType:blob.type||null,sizeBytes:blob.size,createdAt:firebase.database.ServerValue.TIMESTAMP,reviewNumber:(Number(d.reviews[st.key]?.count)||0)+1};
+    writeStarted=true;
+    await step(eventRef.set(event),'Saving recording');
+    await step(incrementReview(st.key),'Saving Chazara count');
+    await step(eventRef.update({reviewApplied:true}),'Confirming recording');
+    chazaraEvents[eventId]={...event,createdAt:Date.now(),reviewApplied:true};saved=true;
+  }catch(error){
+    console.error('Recorded Chazara save failed',error);resetRecordingUI(st,'Save did not finish. Your audio is available below.');preserveRecording(blob,st.key,error,writeStarted);
+  }finally{
+    recorderState=null;render();renderRecordings();
+  }
+  // The recording is already saved. Point syncing must never hold its UI open.
+  if(saved){showNotice('Recording saved. Sending points for teacher approval…');requestPoints('chazara-recording',eventId)}
+}
+
 function slugifyStudentName(name){return String(name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')}
 async function signInStudentHere(){
   const btn=$('studentSignInBtn'),msg=$('studentSignInMsg'),typed=$('studentNameInput').value.trim(),pin=$('classPinInput').value.trim();
