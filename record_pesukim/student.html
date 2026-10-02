@@ -2358,12 +2358,8 @@ document.getElementById('startBtn').onclick = async () => {
   }
 };
 
-document.getElementById('switchStudentBtn').onclick = () => {
-  localStorage.removeItem('posukPractice_studentName');
-  localStorage.removeItem('posukPractice_studentId');
-  localStorage.removeItem('posukPractice_studentAccessVersion');
-  location.reload();
-};
+// Students switch accounts on the Fun Torah Tools homepage only.
+document.getElementById('switchStudentBtn').onclick = () => { location.href='../index.html'; };
 
 function enterApp(){
   document.getElementById('nameGate').classList.add('hidden');

@@ -103,13 +103,13 @@ async function trySharedB3Login(){
   const id=localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId')||'';
   const name=localStorage.getItem('b3Games_studentName')||localStorage.getItem('posukPractice_studentName')||'';
   const pin=localStorage.getItem('b3Games_classPin')||'';
-  if(name&&$('#studentName')) $('#studentName').value=name;
-  if(pin&&$('#pin')) $('#pin').value=pin;
-  if(id&&name&&pin){
-    $('#loginError').textContent='Signing you in with your Fun Torah Tools login…';
-    try{await signInB3(name,pin,id);$('#loginError').textContent=''}
-    catch(err){$('#loginError').textContent=err.message||String(err)}
-  }
+  // Students sign in only on the Fun Torah Tools homepage; this page reuses that login.
+  const note=$('#homeSignInNote'),link=$('#homeSignInLink');
+  const needHome=msg=>{if(note)note.textContent=msg;if(link)link.style.display='';};
+  if(!(id&&name&&pin))return needHome('Please sign in on Fun Torah Tools first.');
+  if(note)note.textContent='Signing you in with your Fun Torah Tools login…';
+  try{await signInB3(name,pin,id);if(note)note.textContent=''}
+  catch(err){needHome((err.message||String(err))+' Please sign in again on Fun Torah Tools.')}
 }
 
 async function load(){
@@ -349,8 +349,8 @@ function showBlocked(){$('#blockedView').classList.remove('hidden');$('#loginVie
 
 $('#loginForm').addEventListener('submit',login);
 $('#logoutBtn').onclick=async()=>{
+  // Leave Student Rewards only; the Fun Torah Tools login stays active.
   await auth.signOut();
-  ['b3Games_studentId','b3Games_studentName','b3Games_studentClass','b3Games_classPin','posukPractice_studentId','posukPractice_studentName','weeklyQuiz_classId'].forEach(k=>localStorage.removeItem(k));
   location.href='../index.html';
 };
 
@@ -371,7 +371,7 @@ auth.onAuthStateChanged(async user=>{
   if(!sid){await auth.signOut();return}
   state.studentId=String(sid);
   await load();
-  }catch(error){$('#loginView').classList.remove('hidden');$('#loginError').textContent=error.message||'Could not load Student Rewards. Refresh and try again.';}
+  }catch(error){$('#loginView').classList.remove('hidden');$('#homeSignInNote').textContent=error.message||'Could not load Student Rewards. Refresh and try again.';$('#homeSignInLink').style.display='';}
 });
 setTimeout(trySharedB3Login,0);
 setInterval(async()=>{try{if(!await websiteEnabled())showBlocked()}catch(error){console.warn('Rewards access check failed',error)}},15000);
