@@ -658,12 +658,20 @@ async function listPendingChazaraRequests(scope){
     // pending requests before returning the list.
     await repairMissingChazaraPointRequests(scope);
     const rows=[];
+    // Read once and filter in code (no ".indexOn": "practiceStudentId" rule).
+    const allRequests=(await rtdb.ref(`${SR_ROOT}/pointRequests`).get()).val()||{};
     for(const studentId of Object.keys(scope.students)){
-      const snap=await rtdb.ref(`${SR_ROOT}/pointRequests`).orderByChild('practiceStudentId').equalTo(studentId).get();
-      for(const [id,item] of Object.entries(snap.val()||{}))if(item.status==='pending'&&isChazaraRequest(item)&&teacherClassScope.recordAllowed(scope,studentId,item))rows.push({id,...item});
+      for(const [id,item] of Object.entries(allRequests))if(item?.practiceStudentId===studentId&&item.status==='pending'&&isChazaraRequest(item)&&teacherClassScope.recordAllowed(scope,studentId,item))rows.push({id,...item});
     }
     return rows.sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
   }
+  // Owner viewing all classes has no class scope. Self-heal every student's
+  // saved Chazaras too, so the owner's "All classes" view also recovers
+  // missing point requests.
+  try{
+    const studentIds=Object.keys((await rtdb.ref('posukPractice/chazara/events').get()).val()||{}).filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id));
+    await repairMissingChazaraPointRequests({owner:true,selected:'',students:Object.fromEntries(studentIds.map(id=>[id,{}]))});
+  }catch(err){console.error('Owner Chazara self-heal failed',err)}
   const snap=await rtdb.ref(`${SR_ROOT}/pointRequests`).get();
   const rows=[];
   snap.forEach(child=>{
@@ -766,8 +774,10 @@ async function awardMilestoneImmediately({requestId,rewardStudentId,studentId,so
 }
 
 async function resolveRewardStudentId(posukStudentId){
-  const linked=await rtdb.ref(`${SR_ROOT}/students`).orderByChild('b3StudentId').equalTo(posukStudentId).get();
-  const links=Object.keys(linked.val()||{});
+  // Filter in code: the database has no ".indexOn": "b3StudentId" rule, and
+  // the Admin SDK refuses unindexed orderByChild queries.
+  const rewardStudents=(await rtdb.ref(`${SR_ROOT}/students`).get()).val()||{};
+  const links=Object.keys(rewardStudents).filter(id=>rewardStudents[id]?.b3StudentId===posukStudentId);
   if(links.length===1)return links[0];
   if(links.length>1)return null;
 
@@ -831,7 +841,7 @@ async function verifyChazara(studentId, source, eventId){
   }else{
     const dataUrl=String(e.audioDataURL||"");
     const declaredSize=Number(e.sizeBytes||0);
-    if(!/^data:audio\/[a-z0-9.+-]+;base64,/i.test(dataUrl) || declaredSize < 1000){
+    if(!/^data:audio\/[a-z0-9.+-]+(?:;[a-z0-9.+-]+=[a-z0-9.+-]+)*;base64,/i.test(dataUrl) || declaredSize < 1000){
       return {ok:false,error:"The recording audio could not be verified."};
     }
     // Sanity-check that the encoded payload is consistent with a real audio
@@ -1379,4 +1389,4 @@ exports.studentRewardsAutoAward = onRequest(
       return res.status(err.code||500).json({error:err.code?err.message:"Could not create the point request."});
     }
   }
-);
+);
