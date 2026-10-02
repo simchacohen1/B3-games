@@ -10,7 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-<script src="recording-save.js?v=20261002-recording-reliability"></script>
+<script src="recording-save.js?v=20261002-recording-fallback"></script>
 <script src="../firebase-config.js"></script>
 <script src="../game-gate.js" data-game-id="chazara" data-back-href="../index.html"></script>
 </head>
@@ -118,7 +118,8 @@ function recordingCard(e,status){
   left.innerHTML=`<div class="recording-title">${R(eventKey(e))}${badge}</div><div class="recording-meta">${e.createdAt?new Date(Number(e.createdAt)).toLocaleString():''}${e.durationMs?' · '+(Number(e.durationMs)/1000).toFixed(1)+' sec':''}</div>`;
   const del=document.createElement('button');del.type='button';del.className='recording-delete';del.textContent='Delete';del.onclick=async()=>{del.disabled=true;del.textContent='Deleting…';try{await removeChazaraEvent(e.id)}catch(err){console.error(err);alert('Could not delete that recording. Please try again.')}finally{del.disabled=false;del.textContent='Delete'}};
   row.append(left,del);
-  if(e.audioURL){const audio=document.createElement('audio');audio.controls=true;audio.preload='metadata';audio.src=e.audioURL;audio.addEventListener('play',()=>document.querySelectorAll('#recordingsList audio').forEach(a=>{if(a!==audio)a.pause()}));row.appendChild(audio)}
+  const audioSrc=e.audioURL||e.audioDataURL;
+  if(audioSrc){const audio=document.createElement('audio');audio.controls=true;audio.preload='metadata';audio.src=audioSrc;audio.addEventListener('play',()=>document.querySelectorAll('#recordingsList audio').forEach(a=>{if(a!==audio)a.pause()}));row.appendChild(audio)}
   return row;
 }
 function renderRecordingGroup(target,rows,status){
@@ -211,6 +212,7 @@ function drawWave(st){if(!st||!st.analyser||!st.canvas)return;const ctx=st.canva
 function resetRecordingUI(st,message=''){if(!st)return;st.button.disabled=false;st.button.classList.remove('recording');st.button.textContent='🎙️ Record · 2 ★';if(message){st.status.innerHTML='<span class="error">'+message+'</span>';setTimeout(()=>{try{st.panel.remove()}catch{}},1400)}else{try{st.panel.remove()}catch{}}}
 async function toggleRecording(key,button){if(reviewSubmitting)return;if(recorderState){if(recorderState.key!==key){showNotice('Finish the recording already in progress first.');return}recorderState.recorder.stop();button.disabled=true;button.textContent='Saving…';return}if(!canReview(key))return;if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){alert('Recording is not supported on this browser.');return}try{const stream=await navigator.mediaDevices.getUserMedia({audio:true}),mime=preferredMime(),rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined),chunks=[];document.querySelectorAll('.rec-panel').forEach(x=>x.remove());document.querySelectorAll('.record-bar.recording').forEach(x=>{x.classList.remove('recording');x.textContent='🎙️ Record · 2 ★'});const wrap=button.parentElement,panel=document.createElement('div');panel.className='rec-panel';panel.innerHTML='<canvas></canvas><div class="rec-status">Recording… 0.0s</div>';wrap.insertBefore(panel,button.nextSibling);button.classList.add('recording');button.textContent='⏹ Stop';const AudioCtx=window.AudioContext||window.webkitAudioContext,audioCtx=new AudioCtx(),source=audioCtx.createMediaStreamSource(stream),analyser=audioCtx.createAnalyser();analyser.fftSize=512;source.connect(analyser);const st=recorderState={key,button,panel,canvas:panel.querySelector('canvas'),status:panel.querySelector('.rec-status'),stream,recorder:rec,audioCtx,analyser,start:performance.now(),chunks,samples:[],peak:0,voiced:0,frames:0,lastSample:0,raf:null,timer:null};st.timer=setInterval(()=>{st.status.textContent='Recording… '+((performance.now()-st.start)/1000).toFixed(1)+'s'},200);drawWave(st);rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};rec.onstop=()=>finishRecording(st);rec.start(250)}catch(e){console.error(e);alert('Could not start the microphone. Please allow microphone access and try again.');recorderState=null}}
 function compactWave(samples,max=64){if(samples.length<=max)return samples.map(v=>Number(v.toFixed(4)));const out=[];for(let i=0;i<max;i++){const a=Math.floor(i*samples.length/max),b=Math.max(a+1,Math.floor((i+1)*samples.length/max));out.push(Number((samples.slice(a,b).reduce((x,y)=>x+y,0)/(b-a)).toFixed(4)))}return out}
+function blobToDataURL(blob){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(reader.error||new Error('Could not read recording.'));reader.readAsDataURL(blob)})}
 function preserveRecording(blob,key,error,writeStarted){
   const box=document.createElement('section');box.className='panel';
   const title=document.createElement('h2');title.textContent='Recording could not finish saving';
@@ -229,9 +231,22 @@ async function finishRecording(st){
   try{
     const eventRef=db.ref(EVENTS+sid).push();eventId=eventRef.key;
     const [perek,posuk]=st.key.split('_').map(Number),path='posukPractice/'+sid+'/chazara_'+perek+'_'+posuk+'_'+eventId+'.'+extFor(blob.type);
-    st.status.textContent='Uploading audio… 0%';
-    const url=await ChazaraRecordingSave.upload(storage.ref(path),blob,percent=>{st.status.textContent='Uploading audio… '+percent+'%'});
-    const event={id:eventId,studentId:sid,studentName:sname,workspaceClassId:localStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[st.key]?.practiceKey||null,recorded:true,points:2,reviewApplied:false,removed:false,chazaraDate:dayKey(),durationMs,soundDetected:true,peakRms:Number(st.peak.toFixed(4)),waveform:compactWave(st.samples),audioURL:url,storagePath:path,mimeType:blob.type||null,sizeBytes:blob.size,createdAt:firebase.database.ServerValue.TIMESTAMP,reviewNumber:(Number(d.reviews[st.key]?.count)||0)+1};
+    st.status.textContent='Saving audio…';
+    let url='',audioDataURL='',storagePath=path,storageError=null;
+    try{
+      // Give Firebase Storage a short chance. If the browser/storage route is
+      // unavailable, fall back to Realtime Database so a student's recording
+      // still saves instead of sitting forever at "Saving…".
+      url=await ChazaraRecordingSave.upload(storage.ref(path),blob,percent=>{st.status.textContent='Uploading audio… '+percent+'%'},15000);
+    }catch(err){
+      storageError=err;
+      console.warn('Storage upload failed; using database audio fallback',err);
+      storagePath='';
+      st.status.textContent='Finishing recording…';
+      if(blob.size>5*1024*1024)throw Object.assign(new Error('This recording is too large to save. Please make a shorter recording.'),{cause:err});
+      audioDataURL=await blobToDataURL(blob);
+    }
+    const event={id:eventId,studentId:sid,studentName:sname,workspaceClassId:localStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[st.key]?.practiceKey||null,recorded:true,points:2,reviewApplied:false,removed:false,chazaraDate:dayKey(),durationMs,soundDetected:true,peakRms:Number(st.peak.toFixed(4)),waveform:compactWave(st.samples),audioURL:url||null,audioDataURL:audioDataURL||null,storagePath:storagePath||null,storageFallback:Boolean(audioDataURL),storageErrorCode:storageError?.code||null,mimeType:blob.type||null,sizeBytes:blob.size,createdAt:firebase.database.ServerValue.TIMESTAMP,reviewNumber:(Number(d.reviews[st.key]?.count)||0)+1};
     writeStarted=true;
     await step(eventRef.set(event),'Saving recording');
     await step(incrementReview(st.key),'Saving Chazara count');
