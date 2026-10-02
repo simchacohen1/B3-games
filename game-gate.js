@@ -183,9 +183,14 @@
     try {
       // Let the page's own Firebase scripts finish before supplying missing ones.
       if(document.readyState === "loading") await new Promise(function(resolve){document.addEventListener("DOMContentLoaded",resolve,{once:true});});
+      // Add missing Firebase pieces in the SAME version the page already uses.
+      // Mixing versions (for example 12.x auth on a 10.x page) silently stops
+      // the page's database from connecting, so nothing loads or saves.
       if(!window.firebase) await loadAuthScript("https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js");
-      if(!window.firebase.auth) await loadAuthScript("https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js");
-      if(!window.firebase.database) await loadAuthScript("https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js");
+      var sdk=String(window.firebase.SDK_VERSION||"12.15.0"),major=parseInt(sdk,10)||12,suffix=major>=9?"-compat.js":".js";
+      var base="https://www.gstatic.com/firebasejs/"+sdk+"/firebase-";
+      if(!window.firebase.auth) await loadAuthScript(base+"auth"+suffix);
+      if(!window.firebase.database) await loadAuthScript(base+"database"+suffix);
       if(!window.B3_FIREBASE_CONFIG) await loadAuthScript(new URL("firebase-config.js",rootBase).href);
       if(!window.B3SiteSettings) await loadAuthScript(new URL("site-settings.js?v=20261001-role-scope",rootBase).href);
       window.B3SiteSettings.onAuthStateChanged(function(user,authorized,access){
@@ -470,4 +475,4 @@
     if (document.visibilityState === "visible") checkNow();
   });
   window.addEventListener("focus", checkNow);
-})();
+})();
