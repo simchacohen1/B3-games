@@ -48,3 +48,31 @@ test('comments are saved for the teacher’s own students',async()=>{const d=see
  await call(d,T,{action:'comment',classId:'b3_sc',studentId:a,body:'Great job',visibleToStudent:true});assert.equal(Object.values(d.tree.studentRewards.commentsByStudent[a])[0].body,'Great job')});
 test('existing rewards accounts are reused instead of duplicated',async()=>{const d=seed();d.tree.b3Games.workspaces['b3-2026'].classes.wt.toolGrants={'student-rewards':true};
  const {root}=await call(d,OTHER,{action:'load'});assert.deepEqual(Object.keys(root.students),['old_levi']);assert.equal(root.students.old_levi.rewardBalance,40)});
+
+const store=require('../backend/functions/rewards-store.cjs');
+test('class stores: Teacher Center classes use their own items; ET/WT keep the shared store',()=>{
+ const root={classes:{b3_sc:{b3ClassId:'sc'},b3_et:{b3ClassId:'et'},old:{}},settings:{rewardStoreEnabled:true,classStoreEnabled:{b3_sc:false}}};
+ assert.equal(store.isTeacherStore(root,'b3_sc'),true);assert.equal(store.isTeacherStore(root,'b3_et'),false);assert.equal(store.isTeacherStore(root,'old'),false);
+ assert.equal(store.itemInStore(root,'b3_sc',{ownerClassId:'b3_sc'}),true);assert.equal(store.itemInStore(root,'b3_sc',{}),false);assert.equal(store.itemInStore(root,'b3_et',{ownerClassId:'b3_sc'}),false);assert.equal(store.itemInStore(root,'b3_et',{}),true);
+ assert.equal(store.storeOpenFor(root,'b3_sc'),false);assert.equal(store.storeOpenFor(root,'b3_et'),true)});
+test('a teacher creates, edits and closes items only in their own class store',async()=>{const d=seed();await call(d,T,{action:'load'});
+ await call(d,T,{action:'storeWrite',classId:'b3_sc',updates:{'studentRewards/rewards/r-new':{name:'Sticker',cost:20,quantity:-1,available:true}}});
+ assert.equal(d.tree.studentRewards.rewards['r-new'].ownerClassId,'b3_sc');assert.equal(d.tree.studentRewards.rewards['r-new'].cost,20);
+ await call(d,T,{action:'storeWrite',classId:'b3_sc',updates:{'studentRewards/rewards/r-new/available':false}});assert.equal(d.tree.studentRewards.rewards['r-new'].available,false);
+ d.tree.studentRewards.rewards.global={id:'global',name:'Owner prize',cost:5};
+ await assert.rejects(call(d,T,{action:'storeWrite',classId:'b3_sc',updates:{'studentRewards/rewards/global/available':false}}),{code:403});
+ await assert.rejects(call(d,T,{action:'storeWrite',classId:'b3_sc',updates:{'studentRewards/students/x/rewardBalance':999}}),{code:403});
+ await assert.rejects(call(d,T,{action:'storeWrite',classId:'b3_sc',updates:{'studentRewards/settings/rewardStoreEnabled':true}}),{code:403});
+ const {root}=await call(d,T,{action:'load'});assert.deepEqual(Object.keys(root.rewards),['r-new'])});
+test('a teacher adds a class reward with availability in one save and opens their own store',async()=>{const d=seed();await call(d,T,{action:'load'});
+ await call(d,T,{action:'storeWrite',classId:'b3_sc',updates:{'studentRewards/classRewardCatalog/cr1':{name:'Extra recess',costPerStudent:50,available:true},'studentRewards/settings/classRewardAvailability/cr1':true}});
+ assert.equal(d.tree.studentRewards.classRewardCatalog.cr1.ownerClassId,'b3_sc');assert.equal(d.tree.studentRewards.settings.classRewardAvailability.cr1,true);
+ await call(d,T,{action:'setStore',classId:'b3_sc',open:true});assert.equal(d.tree.studentRewards.settings.classStoreEnabled.b3_sc,true);
+ await assert.rejects(call(d,T,{action:'setStore',classId:'b3_wt',open:true}),{code:403})});
+test('a teacher approves and declines purchases from their own store, refunding on decline',async()=>{const d=seed();const {root}=await call(d,T,{action:'load'});const a=Object.keys(root.students)[0];
+ (d.tree.studentRewards.rewards??={}).mine={id:'mine',name:'Pencil',cost:30,ownerClassId:'b3_sc'};d.tree.studentRewards.students[a].rewardBalance=0;
+ d.tree.studentRewards.redemptionsByStudent={[a]:{k1:{rewardId:'mine',cost:30,status:'pending',requestedAt:'2026-10-02T10:00:00Z'},k2:{rewardId:'mine',cost:30,status:'pending'}}};
+ assert.equal((await call(d,T,{action:'review',studentId:a,key:'k1',decision:'approve'})).status,'ready');
+ assert.equal((await call(d,T,{action:'review',studentId:a,key:'k1',decision:'collect'})).status,'collected');
+ await call(d,T,{action:'review',studentId:a,key:'k2',decision:'decline'});assert.equal(d.tree.studentRewards.students[a].rewardBalance,30);
+ await assert.rejects(call(d,T,{action:'review',studentId:a,key:'k2',decision:'decline'}),{code:409})});

@@ -45,6 +45,8 @@ async function classRewardsApi(action,payload={}){
 }
 async function loadClassRewardStatus(){
   const j=await classRewardsApi('class-reward-status');
+  // The server says which class store this student shops in.
+  state.storeClassId=String(j.classId||'');state.teacherStore=j.teacherStore===true;
   return {goals:Array.isArray(j.goals)?j.goals:[],storeOpen:j.storeOpen===true||String(j.storeOpen)==='true'};
 }
 function isStoreOpen(){
@@ -149,7 +151,7 @@ function subscribe(){
   });
   db.ref(`${ROOT}/redemptionsByStudent/${state.studentId}`).on('value',s=>{if(state.root){state.root.redemptions=s.val()||{};render()}});
   db.ref(`${ROOT}/rewards`).on('value',s=>{if(state.root){state.root.rewards=s.val()||{};render()}},()=>{});
-  db.ref(`${ROOT}/settings/rewardStoreEnabled`).on('value',s=>{if(state.root){state.root.settings.rewardStoreEnabled=s.val();state.storeOpen=s.val()===true||String(s.val())==='true';render()}},()=>{});
+  db.ref(`${ROOT}/settings/rewardStoreEnabled`).on('value',s=>{if(state.root){state.root.settings.rewardStoreEnabled=s.val();if(!state.teacherStore)state.storeOpen=s.val()===true||String(s.val())==='true';render()}},()=>{});
 }
 function allRatingRows(){
   const out=[];
@@ -275,7 +277,7 @@ function progressHTML(){
 function rewardsHTML(){
   const balance=Number(state.student.rewardBalance)||0,
         storeOpen=isStoreOpen(),
-        personalRewards=Object.values(state.root.rewards||{}).filter(r=>r.active!==false&&String(r.rewardType||'personal')!=='class'&&String(r.rewardType||'personal')!=='class-migrated').sort((a,b)=>(a.cost||0)-(b.cost||0)),
+        personalRewards=Object.values(state.root.rewards||{}).filter(r=>(state.teacherStore?r.ownerClassId===state.storeClassId:!r.ownerClassId)&&r.active!==false&&String(r.rewardType||'personal')!=='class'&&String(r.rewardType||'personal')!=='class-migrated').sort((a,b)=>(a.cost||0)-(b.cost||0)),
         goals=(state.classGoals||[]).filter(g=>g.active!==false).sort((a,b)=>(a.perStudentCost||0)-(b.perStudentCost||0)||(a.name||'').localeCompare(b.name||'')),
         byCost={};
   personalRewards.forEach(r=>(byCost[r.cost]??=[]).push(r));

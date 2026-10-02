@@ -4,6 +4,7 @@ if (!admin.apps.length) admin.initializeApp();
 const rtdb = admin.database();
 
 const teacherClassScope=require("./teacher-class-scope");
+const rewardsStore=require('./rewards-store.cjs');
 const SR_ROOT = "studentRewards";
 const ADMIN_EMAIL = "simcha5770@gmail.com";
 const POINTS = Object.freeze({
@@ -382,6 +383,7 @@ async function classRewardStatusForStudent(studentId,preferredClassId=''){
   if(!classId) return {goals:[],storeOpen:root?.settings?.rewardStoreEnabled===true||String(root?.settings?.rewardStoreEnabled)==='true',classId:''};
   const goals=[];
   for(const rewardId of Object.keys(root.classRewardCatalog||{})){
+    if(!rewardsStore.itemInStore(root,classId,root.classRewardCatalog[rewardId]))continue;
     const goal=classRewardGoalFromRoot(root,studentId,classId,rewardId);
     if(goal) goals.push(goal);
   }
@@ -390,7 +392,8 @@ async function classRewardStatusForStudent(studentId,preferredClassId=''){
     goals,
     classId,
     className:root?.classes?.[classId]?.name||classId,
-    storeOpen:root?.settings?.rewardStoreEnabled===true||String(root?.settings?.rewardStoreEnabled)==='true',
+    storeOpen:rewardsStore.storeOpenFor(root,classId),
+    teacherStore:rewardsStore.isTeacherStore(root,classId),
   };
 }
 
@@ -401,8 +404,8 @@ async function contributeToClassReward(studentId,rewardId,amount,preferredClassI
   const root=(await rtdb.ref(SR_ROOT).get()).val()||{};
   const classId=chooseStudentClass(root,studentId,preferredClassId);
   if(!classId) return {ok:false,error:'Could not find your class.'};
-  const storeOpen=root?.settings?.rewardStoreEnabled===true||String(root?.settings?.rewardStoreEnabled)==='true';
-  if(!storeOpen) return {ok:false,error:'The Prize Store is closed right now.'};
+  if(!rewardsStore.storeOpenFor(root,classId)) return {ok:false,error:'The Prize Store is closed right now.'};
+  if(!rewardsStore.itemInStore(root,classId,root?.classRewardCatalog?.[rewardId])) return {ok:false,error:'That class reward is not in your class store.'};
   const goal=classRewardGoalFromRoot(root,studentId,classId,rewardId);
   if(!goal) return {ok:false,error:'That class reward is no longer available.'};
   if(!goal.available) return {ok:false,error:'That class reward is closed right now.'};

@@ -72,16 +72,24 @@ async function loadRoot(store,scope){
   ['classes','students','categories','rewards','classRewardCatalog','settings','pointRequests','pointAdjustments','classRewardRounds'].map(p=>store.get(SR+'/'+p)));
  const ids=new Set(studentIds),root={
   classes:pick(classes||{},rewardClassIds),enrollments,students:pick(students||{},studentIds),
-  categories:categories||{},rewards:rewards||{},classRewardCatalog:catalog||{},
-  settings:{studentWebsiteEnabled:settings?.studentWebsiteEnabled,rewardStoreEnabled:settings?.rewardStoreEnabled,schoolYear:settings?.schoolYear},
+  categories:categories||{},
+  // Each teacher class has its own store: only that class's items.
+  rewards:Object.fromEntries(Object.entries(rewards||{}).filter(([,r])=>rewardClassIds.includes(r?.ownerClassId))),
+  classRewardCatalog:Object.fromEntries(Object.entries(catalog||{}).filter(([,r])=>rewardClassIds.includes(r?.ownerClassId))),
+  settings:{studentWebsiteEnabled:settings?.studentWebsiteEnabled,schoolYear:settings?.schoolYear,
+   classStoreEnabled:pick(settings?.classStoreEnabled||{},rewardClassIds),
+   classRewardAvailability:Object.fromEntries(Object.entries(settings?.classRewardAvailability||{}).filter(([id])=>rewardClassIds.includes(catalog?.[id]?.ownerClassId)))},
   pointRequests:Object.fromEntries(Object.entries(requests||{}).filter(([,r])=>ids.has(String(r?.rewardStudentId||'')))),
   pointAdjustments:Object.fromEntries(Object.entries(adjustments||{}).filter(([,r])=>ids.has(String(r?.studentId||'')))),
   classRewardRounds:pick(rounds||{},rewardClassIds),
   dailyRatings:{},dailyAwards:{},dailyAttendance:{},commentsByStudent:{},redemptionsByStudent:{},classRewardContributionsByStudent:{}
  };
+ const ownRewards=new Set(Object.keys(root.rewards));
  await Promise.all(studentIds.map(async sid=>{
   for(const p of ['dailyRatings','dailyAwards','dailyAttendance','commentsByStudent','redemptionsByStudent','classRewardContributionsByStudent']){
-   const v=await store.get(SR+'/'+p+'/'+sid);if(v)root[p][sid]=v;
+   let v=await store.get(SR+'/'+p+'/'+sid);
+   if(v&&p==='redemptionsByStudent')v=Object.fromEntries(Object.entries(v).filter(([,r])=>ownRewards.has(String(r?.rewardId||''))));
+   if(v&&Object.keys(v).length)root[p][sid]=v;
   }
  }));
  return root;
@@ -118,6 +126,89 @@ async function decideRequest(store,scope,email,requestId,approve,now){
   await store.update({['posukPractice/chazara/events/'+live.practiceStudentId+'/'+live.eventId+'/'+field]:result.status}).catch(()=>{});
  }
  return result;
+}
+
+
+// ---- Teacher-run class stores --------------------------------------------
+const num=(v,min,max,dflt)=>{const n=Number(v);return Number.isFinite(n)?Math.min(max,Math.max(min,n)):dflt};
+const text=(v,max,dflt='')=>String(v??dflt).slice(0,max);
+function cleanReward(v,ownerClassId,id){
+ if(!v||typeof v!=='object')fail(400,'Invalid reward.');
+ const name=text(v.name,100).trim();if(!name)fail(400,'Enter a reward name.');
+ const qty=Math.round(num(v.quantity,-1,100000,-1));
+ return {id,name,cost:Math.round(num(v.cost,0,100000,0)),icon:text(v.icon,12,'🎁'),color:/^#[0-9a-f]{6}$/i.test(String(v.color||''))?v.color:'#ede9fe',
+  active:v.active!==false,available:v.available!==false,quantity:qty<0?-1:qty,rewardType:'personal',cooldownDays:num(v.cooldownDays,0,365,0),
+  lastRedeemedAt:Number.isFinite(Number(v.lastRedeemedAt))&&v.lastRedeemedAt?Number(v.lastRedeemedAt):null,
+  cooldownUntil:Number.isFinite(Number(v.cooldownUntil))&&v.cooldownUntil?Number(v.cooldownUntil):null,ownerClassId};
+}
+function cleanClassReward(v,ownerClassId,id){
+ if(!v||typeof v!=='object')fail(400,'Invalid class reward.');
+ const name=text(v.name,100).trim();if(!name)fail(400,'Enter a class reward name.');
+ const out={id,name,costPerStudent:Math.round(num(v.costPerStudent,1,100000,100)),icon:text(v.icon,12,'⭐'),active:v.active!==false,available:v.available!==false,cooldownDays:num(v.cooldownDays,0,365,0),ownerClassId};
+ if(v.modeVotingEnabled===true&&v.modes&&typeof v.modes==='object'){
+  out.modeVotingEnabled=true;out.modes={};
+  for(const [mid,m] of Object.entries(v.modes).slice(0,30))if(key(mid))out.modes[mid]={id:mid,name:text(m?.name,60,'Mode'),active:m?.active!==false};
+ }
+ return out;
+}
+// Applies the database writes the store editor makes, but only to this
+// teacher's own class items, with every value checked and cleaned.
+async function storeWrite(store,scope,classId,updates){
+ requireClass(scope,classId);
+ const entries=Object.entries(updates||{});if(!entries.length||entries.length>20)fail(400,'Nothing to save.');
+ const out={},created=new Set();
+ const owned=async(kind,id)=>{
+  if(!key(id))fail(400,'Invalid item.');
+  if(created.has(kind+'/'+id))return classId;
+  const item=await store.get(SR+'/'+kind+'/'+id);
+  if(!item)return null;
+  if(!scope.rewardClassIds.includes(item.ownerClassId))fail(403,'You can only change your own class store.');
+  return item.ownerClassId;
+ };
+ // Whole-item saves first, so a new item and its availability can be saved together.
+ entries.sort(([a],[b])=>a.split('/').length-b.split('/').length);
+ for(const [path,value] of entries){
+  const p=String(path).split('/');
+  if(p[0]!==SR)fail(403,'You can only change your class store.');
+  const [,kind,id,field,...rest]=p;
+  if((kind==='rewards'||kind==='classRewardCatalog')&&id&&!field){
+   const owner=await owned(kind,id)||classId;
+   out[path]=kind==='rewards'?cleanReward(value,owner,id):cleanClassReward(value,owner,id);
+   created.add(kind+'/'+id);
+  }else if((kind==='rewards'||kind==='classRewardCatalog')&&['available','active'].includes(field)&&!rest.length){
+   if(!await owned(kind,id))fail(404,'That item no longer exists.');
+   out[path]=value===true;
+  }else if(kind==='settings'&&id==='classRewardAvailability'&&field&&!rest.length){
+   if(!await owned('classRewardCatalog',field))fail(404,'That item no longer exists.');
+   out[path]=value===true;
+  }else if(kind==='classRewardRounds'&&scope.rewardClassIds.includes(id)&&field){
+   if(!await owned('classRewardCatalog',field))fail(403,'You can only change your own class rewards.');
+   const sub=rest[0];
+   if(!sub&&value===null)out[path]=null;
+   else if(!sub&&value&&typeof value==='object'){const v={};if('status' in value)v.status=text(value.status,20);if('cooldownUntil' in value)v.cooldownUntil=value.cooldownUntil?Number(value.cooldownUntil):null;if('byStudent' in value)v.byStudent={};if('updatedAt' in value)v.updatedAt=Date.now();for(const [k2,v2] of Object.entries(v))out[path+'/'+k2]=v2;}
+   else if(sub&&rest.length===1&&['status','cooldownUntil','byStudent','updatedAt'].includes(sub))out[path]=sub==='status'?text(value,20):sub==='byStudent'?{}:sub==='updatedAt'?Date.now():(value?Number(value):null);
+   else fail(400,'Invalid class reward change.');
+  }else fail(403,'You can only change your class store.');
+ }
+ await store.update(out);
+ return {ok:true};
+}
+async function reviewRedemption(store,scope,email,studentId,keyId,decision,now){
+ if(!scope.studentIds.includes(studentId)||!key(keyId))fail(403,'This request is not for a student in your class.');
+ const path=SR+'/redemptionsByStudent/'+studentId+'/'+keyId,item=await store.get(path);
+ if(!item)fail(404,'That request no longer exists.');
+ const reward=await store.get(SR+'/rewards/'+item.rewardId);
+ if(!reward||!scope.rewardClassIds.includes(reward.ownerClassId))fail(403,'This request is not from your class store.');
+ const status=decision==='approve'?'ready':decision==='collect'?'collected':decision==='decline'?'declined':null;
+ if(!status)fail(400,'Choose approve, given or decline.');
+ if(decision==='collect'?item.status!=='ready':item.status!=='pending')fail(409,'This request was already handled.');
+ await store.update({[path+'/status']:status,[path+'/reviewedBy']:email,[path+'/reviewedAt']:now});
+ if(decision==='decline'){
+  await addToBalance(store,studentId,Number(item.cost||0));
+  const requestMs=Date.parse(item.requestedAt)||0,lastMs=Number(reward.lastRedeemedAt)||Date.parse(reward.lastRedeemedAt)||0;
+  if(requestMs&&lastMs&&Math.abs(requestMs-lastMs)<5000)await store.update({[SR+'/rewards/'+item.rewardId+'/lastRedeemedAt']:null,[SR+'/rewards/'+item.rewardId+'/cooldownUntil']:null});
+ }
+ return {ok:true,status};
 }
 
 async function rewardsTeacher(store,identity,body,nowMs=Date.now()){
@@ -167,6 +258,9 @@ async function rewardsTeacher(store,identity,body,nowMs=Date.now()){
   return {ok:true};
  }
  if(action==='approve'||action==='reject')return decideRequest(store,scope,email,String(body.requestId||''),action==='approve',now);
+ if(action==='storeWrite')return storeWrite(store,scope,String(body.classId||''),body.updates);
+ if(action==='setStore'){const classId=String(body.classId||'');requireClass(scope,classId);await store.update({[SR+'/settings/classStoreEnabled/'+classId]:body.open===true});return {ok:true,open:body.open===true}}
+ if(action==='review')return reviewRedemption(store,scope,email,String(body.studentId||''),String(body.key||''),String(body.decision||''),now);
  fail(400,'Unknown action.');
 }
 module.exports={rewardsTeacher,PROGRESS};
