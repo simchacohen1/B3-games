@@ -4,8 +4,6 @@ Live site: https://simchacohen1.github.io/B3-games/
 
 Student-facing games, linked from the homepage (`index.html`):
 
-- **Kahoot Word Quiz Engine** — `kahoot-word-quiz/index.html`
-- **Dikduk Arcade** — `kodesh-construct/index.html`
 - **Chumash Quiz** — `chumash-quiz/index.html`
 - **Posuk Practice Scroll** — `record_pesukim/student.html`
 - **Rashi Letters** — `rashi-letters/student.html`
