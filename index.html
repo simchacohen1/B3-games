@@ -123,6 +123,7 @@
   .approval-center-empty{padding:22px;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;text-align:center;color:#475569;font-weight:800}.approval-center-warning{margin-top:10px;padding:9px 11px;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:12px;font-weight:700}
   .approval-center-footer{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}.approval-center-footer button{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}.approval-center-refresh{background:#e2e8f0;color:#1f2937}.approval-center-done{background:#26364a;color:#fff}
   @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 64px 1fr}.time-span{flex-wrap:wrap}.admin-panel{top:54px}.approval-button{top:58px;left:10px}.approval-center-card{padding:17px}.approval-center-item{grid-template-columns:36px minmax(0,1fr) auto;padding:11px}.approval-center-icon{font-size:24px}}
+.login-card.checking>:not(h2):not(#loginMsg){display:none}.login-card.checking #loginMsg{color:#475569;font-size:16px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
@@ -777,7 +778,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   function slugify(name){return String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");}
   function setLoginMsg(t){el("loginMsg").textContent=t||"";}
 
+  function showChecking(){el("loginCard").classList.add("checking");el("loginCard").querySelector("h2").textContent="Opening B3 Games…";setLoginMsg("Checking your sign-in. This can take a few seconds.");}
   function showLogin(){
+    el("loginCard").classList.remove("checking");el("loginCard").querySelector("h2").textContent="Student Sign In";if(el("loginMsg").textContent.startsWith("Checking your sign-in"))setLoginMsg("");
     document.querySelectorAll(".student-nudge").forEach(n=>n.remove());
     el("loginCard").classList.remove("hidden");
     el("studentBar").classList.add("hidden");
@@ -1045,6 +1048,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   async function restoreStudent(){
     const id=isStudentPreview?previewStudentId:(localStorage.getItem("b3Games_studentId")||localStorage.getItem("posukPractice_studentId"));
     if(!id){showLogin();return;}
+    showChecking();
     try{
       let snap=await db.ref("b3Games/students/"+id+"/profile").once("value");
       let d=snap.val()||{};
