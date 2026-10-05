@@ -355,3 +355,4 @@
 .sound-next{background:#a05a17}
 .sound-next:hover{background:#b86b1b}
 @media(max-width:760px){.sound-word{font-size:46px;min-height:96px}.sound-options{grid-template-columns:1fr 1fr}.sound-option{font-size:31px;min-height:68px}}
+.activity-icon-hebrew{font:bold 25px Georgia,'Times New Roman',serif;color:#fff;line-height:1;letter-spacing:0;padding-bottom:4px}

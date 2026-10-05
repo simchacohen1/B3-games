@@ -1,8 +1,8 @@
 'use strict';
-const APP_BUILD='2026-10-04-shuffle-fixes';
+const APP_BUILD='2026-10-05-four-word-steps';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
-let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null,soundGame=null;
+let group=0,part=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null,soundGame=null;
 const word=id=>C.words.find(w=>w.id===id),node=(tag,text,cls)=>{const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n};
 const status=p=>!p?'New':p.credits>=2?'Learned':'Practicing';
 const STORY_SUMMARIES={
@@ -52,6 +52,15 @@ function clearAdvance(){if(advanceTimer){clearTimeout(advanceTimer);advanceTimer
 function focusPractice(){requestAnimationFrame(()=>$('practice')?.scrollIntoView({behavior:'smooth',block:'start'}))}
 function block(s){clearAdvance();$('lesson').hidden=true;$('practice').hidden=true;document.querySelectorAll('audio').forEach(a=>a.pause());message(s)}
 function open(g){return config&&g<config.unlocked[student.classId]&&config.sections[g].verified}
+// Each story section is split into steps of 4 new words. Every activity in a step
+// uses those 4 new words plus up to 4 review words from earlier steps.
+const STEP_SIZE=4;
+function partCount(g){return Math.max(1,Math.ceil(config.sections[g].words.length/STEP_SIZE))}
+function newWords(g,p){return config.sections[g].words.slice(p*STEP_SIZE,p*STEP_SIZE+STEP_SIZE)}
+function earlierWords(g,p){return [...config.sections.slice(0,g).flatMap(s=>s.words),...config.sections[g].words.slice(0,p*STEP_SIZE)]}
+function reviewWords(g,p){return shuffleClient(earlierWords(g,p)).sort((a,b)=>(progress[a]?.credits||0)-(progress[b]?.credits||0)).slice(0,STEP_SIZE)}
+function lessonWords(g,p){return [...newWords(g,p),...reviewWords(g,p)]}
+function stepNumber(g,p){let n=0;for(let i=0;i<g;i++)n+=partCount(i);return n+p+1}
 function render(){
   if(!student||!config)return;
   if(!round&&!flash&&!storyQuiz&&!sentenceGame&&!soundGame){$('words').hidden=false;$('toolbar').hidden=false;}
@@ -59,19 +68,21 @@ function render(){
   const ids=[...new Set(config.sections.flatMap(s=>s.words))];
   $('stats').textContent=`${ids.filter(id=>status(progress[id])==='Learned').length} learned · ${ids.filter(id=>status(progress[id])==='Practicing').length} practicing`;
   $('segments').replaceChildren();
-  config.sections.forEach((s,i)=>{const b=node('button',`${open(i)?'':'🔒 '}Section ${i+1}`,i===group?'active':'');b.type='button';b.disabled=!open(i);b.onclick=()=>{if(busy||pending)return;clearAdvance();group=i;showAll=false;round=null;flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;render()};$('segments').append(b)});
+  if(part>=partCount(group))part=0;
+  config.sections.forEach((s,i)=>{for(let pp=0;pp<partCount(i);pp++){const b=node('button',`${open(i)?'':'🔒 '}Step ${stepNumber(i,pp)}`,i===group&&pp===part?'active':'');b.type='button';b.disabled=!open(i);b.title='Story section '+(i+1);b.onclick=()=>{if(busy||pending)return;clearAdvance();group=i;part=pp;showAll=false;round=null;flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;render()};$('segments').append(b)}});
   $('words').replaceChildren();$('start').disabled=!open(group);$('flashStart').disabled=!open(group);$('sentenceStart').disabled=!open(group);$('soundStart').disabled=!open(group);$('storyQuizStart').disabled=!open(group);$('readStory').hidden=!open(group);$('readStory').href='story.html?section='+group;$('readStory').textContent='📖 Read the illustrated story — Section '+(group+1);
-  $('title').textContent=showAll?'My vocabulary':`Section ${group+1} words`;
-  const visible=showAll?config.sections.flatMap((s,i)=>open(i)?s.words:[]):open(group)?config.sections[group].words:[];
+  $('title').textContent=showAll?'My vocabulary':`Step ${stepNumber(group,part)} · new words`;
+  const visible=showAll?config.sections.flatMap((s,i)=>open(i)?s.words:[]):open(group)?newWords(group,part):[];
   for(const id of visible){const w=word(id);if(!w)continue;const card=node('article','','word'),st=status(progress[id]);card.append(node('span',st,'status '+st.toLowerCase()));const yi=node('div',w.yi,'yi');yi.lang='yi';card.append(yi,node('div',w.en));$('words').append(card)}
   if(!visible.length)$('words').append(node('p','Your teacher will open your next section soon.'));
+  else if(!showAll&&earlierWords(group,part).length)$('words').append(node('p','The games will also mix in some review words from earlier steps.','note'));
   if(round&&open(round.group))question();
   if(flash&&open(flash.group))flashRender();else if(flash){flash=null}
   if(storyQuiz&&open(storyQuiz.group))storyQuizRender();else if(storyQuiz){storyQuiz=null}
   if(sentenceGame&&open(sentenceGame.group))sentenceGameRender();else if(sentenceGame){sentenceGame=null}
   if(soundGame&&open(soundGame.group))soundGameRender();else if(soundGame){soundGame=null}
 }
-async function refresh(){const s=await API.call('status');student=s.student;config=s.config;progress=s.progress;if(!open(group))group=Math.max(0,config.unlocked[student.classId]-1);round=null;if(s.round&&!s.round.finished&&open(s.round.group))group=s.round.group;render()}
+async function refresh(){const s=await API.call('status');student=s.student;config=s.config;progress=s.progress;if(!open(group))group=Math.max(0,config.unlocked[student.classId]-1);round=null;if(s.round&&!s.round.finished&&open(s.round.group)){group=s.round.group;part=Number.isInteger(s.round.part)?s.round.part:0}render()}
 async function login(id,pin){const s=await API.call('login',{studentId:id,pin:pin.trim(),classId:localStorage.getItem('b3Games_studentClass')||''});sessionStorage.setItem('yiddishSession',s.token);sessionStorage.setItem('yiddishSessionClass',localStorage.getItem('b3Games_studentClass')||'');await refresh();message('Progress connected ✓')}
 $('loginForm').onsubmit=async e=>{e.preventDefault();$('signIn').disabled=true;try{await login($('name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''),$('pin').value);$('pin').value=''}catch(e){message(e.message)}finally{$('signIn').disabled=false}};
 $('all').onclick=()=>{if(busy||pending)return;clearAdvance();showAll=!showAll;round=null;flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;render()};
@@ -431,7 +442,7 @@ $('soundStart').onclick=()=>{
   if(busy||pending||!open(group))return;
   clearAdvance();round=null;flash=null;storyQuiz=null;sentenceGame=null;
   $('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;
-  const ids=shuffleClient(config.sections[group].words.slice(0,8));
+  const ids=shuffleClient(lessonWords(group,part));
   soundGame={group:group,ids:ids,wordIndex:0,cursor:0,placed:new Set(),transitioning:false,lastCorrect:null,feedback:'',wrongChoice:null};
   soundGameRender();focusSoundGame();
 };
@@ -452,8 +463,8 @@ function soundChoose(choice){
 function soundGameRender(){
   const box=$('soundgame');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
   if(soundGame.wordIndex>=soundGame.ids.length){
-    box.append(node('div','🔤','round-check'),node('h2','Sound Builder complete!'),cheer(),node('p','You built all 8 Yiddish words in this section.'));
-    const again=node('button','Build them again');again.type='button';again.onclick=()=>{soundGame.ids=shuffleClient(config.sections[group].words.slice(0,8));soundGame.wordIndex=0;soundResetWord();soundGameRender();focusSoundGame()};
+    box.append(node('div','🔤','round-check'),node('h2','Sound Builder complete!'),cheer(),node('p','You built all '+soundGame.ids.length+' Yiddish words in this step.'));
+    const again=node('button','Build them again');again.type='button';again.onclick=()=>{soundGame.ids=shuffleClient(lessonWords(group,part));soundGame.wordIndex=0;soundResetWord();soundGameRender();focusSoundGame()};
     const back=node('button','Back to my words');back.type='button';back.style.marginLeft='10px';back.onclick=()=>{soundGame=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
     box.append(again,back);focusSoundGame();return;
   }
@@ -553,7 +564,7 @@ $('sentenceStart').onclick=()=>{
   if(busy||pending||!open(group))return;
   clearAdvance();round=null;flash=null;storyQuiz=null;soundGame=null;
   $('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('soundgame').hidden=true;
-  const ids=shuffleClient(config.sections[group].words.slice(0,8));
+  const ids=shuffleClient(lessonWords(group,part));
   sentenceGame={group:group,ids:ids,setIndex:0,solved:new Set(),selected:null,feedback:'',feedbackKind:''};
   sentenceGameRender();focusSentenceGame();
 };
@@ -562,7 +573,7 @@ function sentenceGameRender(){
   const ids=sentenceGame.ids,sets=Math.max(1,Math.ceil(ids.length/4)),start=sentenceGame.setIndex*4,targets=ids.slice(start,start+4);
   if(start>=ids.length){
     box.append(node('div','🧩','round-check'),node('h2','Missing Word complete!'),cheer(),node('p','You filled in all '+ids.length+' words.'));
-    const again=node('button','Play again');again.type='button';again.onclick=()=>{const nextIds=shuffleClient(config.sections[group].words.slice(0,8));sentenceGame={group:group,ids:nextIds,setIndex:0,solved:new Set(),selected:null,feedback:'',feedbackKind:''};sentenceGameRender();focusSentenceGame()};
+    const again=node('button','Play again');again.type='button';again.onclick=()=>{const nextIds=shuffleClient(lessonWords(group,part));sentenceGame={group:group,ids:nextIds,setIndex:0,solved:new Set(),selected:null,feedback:'',feedbackKind:''};sentenceGameRender();focusSentenceGame()};
     const back=node('button','Back to my words');back.type='button';back.style.marginLeft='10px';back.onclick=()=>{sentenceGame=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
     box.append(again,back);focusSentenceGame();return;
   }
@@ -571,7 +582,7 @@ function sentenceGameRender(){
   back.onclick=()=>{sentenceGame=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
   top.append(back);box.append(top);
   box.append(node('div','Set '+(sentenceGame.setIndex+1)+' of '+sets,'practice-progress'),node('h2','Put in the missing word'));
-  box.append(node('p','Drag the correct Yiddish word into each blank. All 8 section words are in the word bank.','sentence-hint'));
+  box.append(node('p','Drag the correct Yiddish word into each blank. All of this step’s words are in the word bank.','sentence-hint'));
 
   const bank=node('div','','sentence-bank');
   bank.setAttribute('aria-label','Word bank');
@@ -616,14 +627,14 @@ function sentenceGameRender(){
 $('flashStart').onclick=()=>{
   if(busy||pending||!open(group))return;
   clearAdvance();round=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('practice').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;
-  flash={group,ids:shuffleClient(config.sections[group].words),idx:0,flipped:false};
+  flash={group,ids:shuffleClient(lessonWords(group,part)),idx:0,flipped:false};
   flashRender();focusFlash();
 };
 function flashRender(){
   const box=$('flashcards');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
   if(flash.idx>=flash.ids.length){
-    box.append(node('div','✓','round-check'),node('h2','Nice work!'),cheer(),node('p',`You went through all ${flash.ids.length} flashcards in this section.`));
-    const again=node('button','Go again');again.type='button';again.onclick=()=>{flash={group,ids:shuffleClient(config.sections[group].words),idx:0,flipped:false};flashRender();focusFlash()};
+    box.append(node('div','✓','round-check'),node('h2','Nice work!'),cheer(),node('p',`You went through all ${flash.ids.length} flashcards in this step.`));
+    const again=node('button','Go again');again.type='button';again.onclick=()=>{flash={group,ids:shuffleClient(lessonWords(group,part)),idx:0,flipped:false};flashRender();focusFlash()};
     const back=node('button','Back to my words');back.type='button';back.style.marginLeft='10px';back.onclick=()=>{flash=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
     box.append(again,back);focusFlash();return;
   }
@@ -646,13 +657,13 @@ function flashRender(){
   actions.append(dontKnow,know);
   box.append(actions);
 }
-$('start').onclick=async()=>{if(busy)return;clearAdvance();flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;busy=true;$('start').disabled=true;try{message('');const s=await API.call('start',{group});round=s.round;pending=null;$('practice').hidden=false;question();focusPractice()}catch(e){message(e.message)}finally{busy=false;$('start').disabled=!open(group)}};
+$('start').onclick=async()=>{if(busy)return;clearAdvance();flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;busy=true;$('start').disabled=true;try{message('');const s=await API.call('start',{group,part});round=s.round;pending=null;$('practice').hidden=false;question();focusPractice()}catch(e){message(e.message)}finally{busy=false;$('start').disabled=!open(group)}};
 function question(){
   clearAdvance();
   const box=$('practice');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
   if(round.finished){
-    box.append(node('div','✓','round-check'),node('h2','Round complete!'),cheer(),node('p',`You practiced all ${round.total} words in this section.`),node('p','Your progress is saved. A word becomes “Learned” after two first-try correct rounds.'));
-    const again=node('button','Practice this section again');again.type='button';again.onclick=async()=>{if(busy)return;busy=true;again.disabled=true;try{round=null;message('');const s=await API.call('start',{group,forceNew:true});round=s.round;pending=null;question();focusPractice()}catch(e){message(e.message)}finally{busy=false}};
+    box.append(node('div','✓','round-check'),node('h2','Round complete!'),cheer(),node('p',`You practiced all ${round.total} words in this step.`),node('p','Your progress is saved. A word becomes “Learned” after two first-try correct rounds.'));
+    const again=node('button','Practice this step again');again.type='button';again.onclick=async()=>{if(busy)return;busy=true;again.disabled=true;try{round=null;message('');const s=await API.call('start',{group,part,forceNew:true});round=s.round;pending=null;question();focusPractice()}catch(e){message(e.message)}finally{busy=false}};
     const back=node('button','Back to my words');back.type='button';back.style.marginLeft='10px';back.onclick=async()=>{round=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;try{await refresh()}catch(e){message(e.message)}window.scrollTo({top:0,behavior:'smooth'})};
     box.append(again,back);focusPractice();return;
   }
