@@ -353,6 +353,14 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const gameRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/live' : "tentTrailTrivia");
+// While this teacher screen is open and unlocked, tell student screens the game is live.
+// Students who open the Game Show when no teacher screen is open see a waiting message
+// instead of an old, finished game.
+setInterval(() => {
+  if (!document.getElementById('mainContent').classList.contains('hidden')) {
+    gameRef.child('hostSeenAt').set(firebase.database.ServerValue.TIMESTAMP).catch(() => {});
+  }
+}, 20000);
 
 // This is the question set teacher.html knows about locally, used only as a
 // one-time fallback seed if the database is ever empty. The real "master" copy

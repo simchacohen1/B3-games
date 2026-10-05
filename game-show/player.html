@@ -326,10 +326,31 @@ function updateBuzzAvailability() {
   }
 }
 
+// The game is "live" only while the teacher's Game Show screen is open (it updates
+// hostSeenAt every 20 seconds) or a question was opened recently.
+const LIVE_WINDOW_MS = 10 * 60 * 1000;
+function gameIsLive(d) {
+  const last = Math.max(Number(d && d.hostSeenAt) || 0, Number(d && d.buzzOpenAt) || 0);
+  return last > 0 && Date.now() - last < LIVE_WINDOW_MS;
+}
+function showWaiting(waiting) {
+  const panel = document.querySelector('#gameArea .panel');
+  let w = document.getElementById('waitingMsg');
+  if (!w) {
+    w = document.createElement('div'); w.id = 'waitingMsg'; w.className = 'panel';
+    w.innerHTML = '<div class="qtext">⏳ Waiting for your teacher to start the Game Show.</div><div class="status">This page will start by itself when the game begins.</div>';
+    panel.parentNode.insertBefore(w, panel);
+  }
+  w.style.display = waiting ? '' : 'none';
+  panel.style.display = waiting ? 'none' : '';
+}
+setInterval(() => { if (lastData) showWaiting(!gameIsLive(lastData)); }, 15000);
+
 gameRef.on('value', snapshot => {
   if (!questionsReady) return; // wait until questions have loaded from the database
   const data = snapshot.val() || {};
   lastData = data;
+  showWaiting(!gameIsLive(data));
   const qIndex = data.qIndex || 0;
   const q = questions[qIndex] || questions[0];
   document.getElementById('qnum').textContent = 'Question ' + (qIndex + 1) + ' of ' + questions.length;
