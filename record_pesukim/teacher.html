@@ -2254,7 +2254,93 @@ function slugify(name){
 // checks the selected student's approved record and that student's passcode
 // before letting anyone past the name gate. Existing records that do not yet
 // have a passcode use 5770 until the teacher changes them.
+// Classes other than B3's own (et/wt) have their own practice window, stored on
+// the class record. It starts empty: their students see no pesukim until it is set here.
+const LEGACY_CLASS_IDS=['et','wt'];
+function escapeHtml(s){const d=document.createElement("div");d.textContent=String(s==null?"":s);return d.innerHTML;}
+function ownSpaceClassId(){
+  const id=requestedTeacherClass;
+  return id&&!LEGACY_CLASS_IDS.includes(id)&&/^[A-Za-z0-9_-]{1,100}$/.test(id)?id:'';
+}
+if(ownSpaceClassId())document.getElementById('accessTabBtn').textContent='📖 Pesukim & Students';
+
+async function loadClassPesukimTab(classId){
+  const mainEl=document.getElementById('mainContent');
+  const owner=teacherAccess.role==='admin';
+  if(!owner&&!teacherAccess.classIds.includes(classId)){mainEl.innerHTML='<div class="empty-msg">This class is not assigned to you.</div>';return;}
+  mainEl.innerHTML='<div class="loading">Loading this class’s pesukim…</div>';
+  const classPath='b3Games/workspaces/'+teacherWorkspace+'/classes/'+classId;
+  const selectStyle="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;";
+  try{
+    const [nameSnap,limitSnap]=await Promise.all([db.ref(classPath+'/name').once('value'),db.ref(classPath+'/posukPracticeLimit').once('value')]);
+    const className=nameSnap.val()||classId;
+    const limit=limitSnap.val();
+    const describe=l=>l?formatPracticeWindow(l):'No pesukim open yet — students see nothing to practice.';
+    mainEl.innerHTML=`<h2>📖 Pesukim for ${escapeHtml(className)}</h2>
+      <div style="margin-bottom:26px;padding:16px;border-radius:12px;background:#fff;border:2px solid var(--gold);">
+        <div style="font-size:0.84rem;color:var(--ink-soft);margin-bottom:10px;">Choose the pesukim (from Sefer Bereishis) your students may practice. Only this class is affected.</div>
+        <div style="display:grid;gap:10px;">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><strong style="min-width:58px;">From</strong>
+            <select id="classStartPerek" style="${selectStyle}"><option value="">Choose Perek</option></select>
+            <select id="classStartPosuk" disabled style="${selectStyle}"><option value="">Choose Posuk</option></select></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><strong style="min-width:58px;">Through</strong>
+            <select id="classEndPerek" style="${selectStyle}"><option value="">Choose Perek</option></select>
+            <select id="classEndPosuk" disabled style="${selectStyle}"><option value="">Choose Posuk</option></select></div>
+          <div><button class="btn small gold" id="saveClassLimitBtn">Open These Pesukim</button>
+            <button class="btn small" id="closeClassLimitBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;margin-left:6px;">Close All</button></div>
+        </div>
+        <div id="classLimitMsg" style="font-size:0.85rem;margin-top:8px;"></div>
+        <div style="font-size:0.8rem;color:var(--ink-soft);margin-top:6px;">Current: <strong id="classLimitCurrent">${escapeHtml(describe(limit))}</strong></div>
+      </div>
+      <div style="padding:16px;border-radius:12px;background:#fff;border:2px solid var(--ink-soft);">
+        <div style="font-weight:700;margin-bottom:6px;">👥 Students &amp; passcodes</div>
+        <div style="font-size:0.84rem;color:var(--ink-soft);margin-bottom:10px;">Names, individual passcodes, and memberships are managed centrally in Teacher Center.</div>
+        <a class="btn gold" href="../admin.html?tab=students&class=${encodeURIComponent(classId)}" target="_blank" rel="noopener">Open Class Management</a>
+      </div>`;
+    const startPerek=document.getElementById('classStartPerek'),startPosuk=document.getElementById('classStartPosuk');
+    const endPerek=document.getElementById('classEndPerek'),endPosuk=document.getElementById('classEndPosuk');
+    const msg=document.getElementById('classLimitMsg');
+    const say=(text,ok)=>{msg.style.color=ok?'#397839':'#8a3a3a';msg.textContent=text;};
+    [startPerek,endPerek].forEach(sel=>getAllPerekNums().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent='Perek '+n;sel.appendChild(o);}));
+    async function fillPosuk(perekNum,sel,selected){
+      sel.innerHTML='<option value="">Choose Posuk</option>';sel.disabled=true;
+      if(!perekNum)return;
+      const range=await getPerekRange(parseInt(perekNum));
+      for(let p=range.min;p<=range.max;p++){const o=document.createElement('option');o.value=p;o.textContent='Posuk '+p;sel.appendChild(o);}
+      sel.disabled=false;if(selected)sel.value=String(selected);
+    }
+    startPerek.onchange=()=>fillPosuk(startPerek.value,startPosuk,null);
+    endPerek.onchange=()=>fillPosuk(endPerek.value,endPosuk,null);
+    if(limit&&limit.endPerek&&limit.endPosuk){
+      startPerek.value=String(limit.startPerek||1);endPerek.value=String(limit.endPerek);
+      await fillPosuk(limit.startPerek||1,startPosuk,limit.startPosuk||1);
+      await fillPosuk(limit.endPerek,endPosuk,limit.endPosuk);
+    }
+    document.getElementById('saveClassLimitBtn').onclick=async()=>{
+      const sp=parseInt(startPerek.value),sv=parseInt(startPosuk.value),ep=parseInt(endPerek.value),ev=parseInt(endPosuk.value);
+      if(!sp||!sv||!ep||!ev)return say('Choose both the starting and ending posuk.');
+      if(ep<sp||(ep===sp&&ev<sv))return say('The ending posuk must come after the starting posuk.');
+      const next={startPerek:sp,startPosuk:sv,endPerek:ep,endPosuk:ev,updatedAt:firebase.database.ServerValue.TIMESTAMP};
+      try{await db.ref(classPath+'/posukPracticeLimit').set(next);}catch(err){console.error(err);return say('Could not save. Please try again.');}
+      say('Saved — your students’ menus update automatically.',true);
+      document.getElementById('classLimitCurrent').textContent=describe(next);
+    };
+    document.getElementById('closeClassLimitBtn').onclick=async()=>{
+      try{await db.ref(classPath+'/posukPracticeLimit').remove();}catch(err){console.error(err);return say('Could not save. Please try again.');}
+      [startPerek,endPerek].forEach(s=>s.value='');
+      [startPosuk,endPosuk].forEach(s=>{s.innerHTML='<option value="">Choose Posuk</option>';s.disabled=true;});
+      say('All pesukim are closed for this class.',true);
+      document.getElementById('classLimitCurrent').textContent=describe(null);
+    };
+  }catch(err){
+    console.error(err);
+    mainEl.innerHTML='<div class="empty-msg">Could not load this class’s pesukim.</div>';
+  }
+}
+
 async function loadAccessTab(){
+  const ownClass=ownSpaceClassId();
+  if(ownClass)return loadClassPesukimTab(ownClass);
   if(teacherAccess.role==='admin')return loadLegacyAccessTab();
   const mainEl=document.getElementById('mainContent');
   const classId=requestedTeacherClass||teacherAccess.classIds.find(id=>id!=='*')||'et';

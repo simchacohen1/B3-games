@@ -1419,6 +1419,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+<script src="../student-class.js?v=20261005"></script>
 
 <script>
 /* =========================================================
@@ -2369,17 +2370,32 @@ function enterApp(){
     name: studentName,
     lastActive: firebase.database.ServerValue.TIMESTAMP
   });
-  startPracticeLimitListener();
-  // Load the boundary explicitly before honoring a deep link. The live
-  // listener above keeps it updated afterward, but this one-time read avoids
-  // a race where a bookmarked future posuk could open before the limit arrives.
-  db.ref('posukPractice/settings/practiceLimit').once('value').then(snap => {
-    const limit = snap.val();
-    classPracticeLimit = normalizedPracticeWindow(limit);
-    rebuildPerekOptionsForClassLimit();
-    applyDeepLinkFromURL();
+  // Nothing is selectable until we know which class's practice window applies.
+  practiceScopeReady = false;
+  rebuildPerekOptionsForClassLimit();
+  window.FunTorahStudentClass.resolve(db, studentId).catch(err => {
+    console.error('Could not read class membership', err);
+    return {ownSpace:false};
+  }).then(cls => {
+    if(cls.ownSpace){
+      ownClassSpace = true;
+      practiceLimitPath = 'b3Games/workspaces/' + cls.workspaceId + '/classes/' + cls.classId + '/posukPracticeLimit';
+    }
+    startPracticeLimitListener();
+    // Load the boundary explicitly before honoring a deep link. The live
+    // listener above keeps it updated afterward, but this one-time read avoids
+    // a race where a bookmarked future posuk could open before the limit arrives.
+    return db.ref(practiceLimitPath).once('value').then(snap => {
+      const limit = snap.val();
+      classPracticeLimit = normalizedPracticeWindow(limit);
+      practiceScopeReady = true;
+      rebuildPerekOptionsForClassLimit();
+      applyDeepLinkFromURL();
+    });
   }).catch(err => {
     console.error('Could not load practice limit before deep link', err);
+    practiceScopeReady = true;
+    rebuildPerekOptionsForClassLimit();
     applyDeepLinkFromURL();
   });
 }
@@ -2492,10 +2508,15 @@ const perekSelect = document.getElementById('perekSelect');
 const posukSelect = document.getElementById('posukSelect');
 const endPosukSelect = document.getElementById('endPosukSelect');
 
-// Teacher-controlled class-wide practice window. Null means unrestricted.
+// Teacher-controlled class-wide practice window. Null means unrestricted for
+// B3's own classes, but NOTHING open for a class with its own space (a new
+// class starts empty until its teacher or the admin opens pesukim).
 // Old one-sided settings still work as "from the beginning through..."
 let classPracticeLimit = null;
 let practiceLimitListenerStarted = false;
+let practiceLimitPath = 'posukPractice/settings/practiceLimit';
+let ownClassSpace = false;
+let practiceScopeReady = true;
 
 function normalizedPracticeWindow(limit){
   if(!limit) return null;
@@ -2510,7 +2531,8 @@ function normalizedPracticeWindow(limit){
 }
 
 function isWithinClassPracticeLimit(perekNum, posukNum){
-  if(!classPracticeLimit) return true;
+  if(!practiceScopeReady) return false;
+  if(!classPracticeLimit) return !ownClassSpace;
   const p=parseInt(perekNum), v=parseInt(posukNum);
   const afterStart=p>classPracticeLimit.startPerek||(p===classPracticeLimit.startPerek&&v>=classPracticeLimit.startPosuk);
   const beforeEnd=p<classPracticeLimit.endPerek||(p===classPracticeLimit.endPerek&&v<=classPracticeLimit.endPosuk);
@@ -2518,7 +2540,8 @@ function isWithinClassPracticeLimit(perekNum, posukNum){
 }
 
 function perekAllowedByClassLimit(perekNum){
-  if(!classPracticeLimit) return true;
+  if(!practiceScopeReady) return false;
+  if(!classPracticeLimit) return !ownClassSpace;
   const p=parseInt(perekNum);
   return p>=classPracticeLimit.startPerek&&p<=classPracticeLimit.endPerek;
 }
@@ -2544,15 +2567,20 @@ function rebuildPerekOptionsForClassLimit(){
     endPosukSelect.disabled = true;
     resetScroll();
     document.getElementById('fetchMsg').textContent = '🔒 Your teacher has not opened that section yet.';
+  }else if(practiceScopeReady && ownClassSpace && !classPracticeLimit){
+    document.getElementById('fetchMsg').textContent = '📖 Your teacher has not opened any pesukim yet.';
   }
 }
 
 function startPracticeLimitListener(){
   if(practiceLimitListenerStarted) return;
   practiceLimitListenerStarted = true;
-  db.ref('posukPractice/settings/practiceLimit').on('value', async snap => {
+  db.ref(practiceLimitPath).on('value', async snap => {
     const nextLimit = snap.val();
     classPracticeLimit = normalizedPracticeWindow(nextLimit);
+    practiceScopeReady = true;
+    const fetchMsgEl = document.getElementById('fetchMsg');
+    if(classPracticeLimit && fetchMsgEl.textContent.startsWith('📖 Your teacher has not opened')) fetchMsgEl.textContent = '';
 
     const selectedPerek = parseInt(perekSelect.value);
     const selectedPosuk = parseInt(posukSelect.value);

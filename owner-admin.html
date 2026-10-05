@@ -15,7 +15,7 @@
 <section class="card"><div class="icon">👨‍🏫</div><h2>Teachers</h2><input id="teacherEmail" placeholder="Teacher Gmail"><input id="teacherName" placeholder="Teacher name"><button id="addTeacher">Add teacher</button><div id="teachers"></div></section>
 <section class="card"><div class="icon">🏫</div><h2>Classes</h2><input id="className" placeholder="New class name"><button id="addClass">Add class</button><div id="classes"></div></section>
 <section class="card"><div class="icon">🔗</div><h2>Teacher → Class</h2><select id="teacherSelect"><option value="">Choose teacher</option></select><select id="classSelect"><option value="">Choose class</option></select><button id="assign">Assign</button><p id="status"></p><div id="assignments"></div></section>
-<section class="card"><div class="icon">🧰</div><h2>Class Tools</h2><p>New classes start with no tools. Choose a class, then grant only the tools its teacher should receive.</p><select id="toolClassSelect"><option value="">Choose class</option></select><div id="toolList"></div><h3 style="margin:18px 0 4px">Class Content</h3><p>New classes start with empty word lists. Their teacher adds their own, or you can give them a copy of yours.</p><div id="resourceList"></div></section>
+<section class="card"><div class="icon">🧰</div><h2>Class Tools</h2><p>New classes start with no tools. Choose a class, then grant only the tools its teacher should receive.</p><select id="toolClassSelect"><option value="">Choose class</option></select><div id="toolList"></div><h3 style="margin:18px 0 4px">Class Content</h3><p>New classes start empty. Their teacher adds their own, or you can give them a copy of yours.</p><div id="resourceList"></div></section>
 </div></div></main>
 <style>
 .card input,.card select{width:100%;padding:11px;margin:6px 0;border:1px solid #cbd5e1;border-radius:9px}.card button{border:0;border-radius:9px;padding:10px 13px;background:#2563eb;color:#fff;font-weight:800;cursor:pointer}.entry{padding:9px 0;border-bottom:1px solid #e2e8f0}.entry small{display:block;color:#64748b}
@@ -55,11 +55,25 @@ async function renderToolGrants(){
 }
 // Shorashim: B3's own lists live at the base path; every other class has its own copy under classes/<id>.
 const SHORASHIM_ROOT="posukPractice/shorashimLearning";
+function describeLimit(l){return "Perek "+(l.startPerek||1)+", Posuk "+(l.startPosuk||1)+" through Perek "+l.endPerek+", Posuk "+l.endPosuk}
 function countWords(catalog){return ["shorashim","prefix","suffix"].reduce((n,t)=>n+(Array.isArray(catalog?.[t])?catalog[t].length:0),0)}
 async function renderResources(classId){
  if(!classId||["et","wt"].includes(classId)){q("resourceList").innerHTML=classId?'<small>This is one of your own B3 classes. It already uses your lists.</small>':"";return}
- const snap=await db.ref(SHORASHIM_ROOT+"/classes/"+classId+"/catalog").once("value"),count=countWords(snap.val());
- q("resourceList").innerHTML='<div class="entry"><b>🌳 Shorashim words</b><small>'+(count?count+" words in this class":"Empty. The teacher has not added any words yet.")+'</small><button id="copyShorashim" style="margin-top:8px">Give this class a copy of my Shorashim words</button><small id="copyShorashimMsg"></small></div>';
+ const classPath="b3Games/workspaces/"+WS+"/classes/"+classId;
+ const [snap,limitSnap]=await Promise.all([db.ref(SHORASHIM_ROOT+"/classes/"+classId+"/catalog").once("value"),db.ref(classPath+"/posukPracticeLimit").once("value")]),count=countWords(snap.val()),limit=limitSnap.val();
+ q("resourceList").innerHTML='<div class="entry"><b>🌳 Shorashim words</b><small>'+(count?count+" words in this class":"Empty. The teacher has not added any words yet.")+'</small><button id="copyShorashim" style="margin-top:8px">Give this class a copy of my Shorashim words</button><small id="copyShorashimMsg"></small></div>'+
+  '<div class="entry"><b>📜 Posuk Practice pesukim</b><small>'+(limit?describeLimit(limit):"None open yet. The teacher has not chosen any pesukim.")+'</small><button id="copyPesukim" style="margin-top:8px">Open the same pesukim my classes have</button><small id="copyPesukimMsg"></small></div>';
+ q("copyPesukim").onclick=async()=>{
+  if(limit&&!confirm("This class already has pesukim open. Replace them with the same pesukim your classes have?"))return;
+  q("copyPesukim").disabled=true;q("copyPesukimMsg").textContent="Copying…";
+  try{
+   // B3's window lives in posukPractice/settings; "no limit" there means all of Bereishis.
+   const mine=(await db.ref("posukPractice/settings/practiceLimit").once("value")).val();
+   const next=mine&&(mine.endPerek||mine.perek)?{startPerek:+mine.startPerek||1,startPosuk:+mine.startPosuk||1,endPerek:+(mine.endPerek||mine.perek),endPosuk:+(mine.endPosuk||mine.posuk)}:{startPerek:1,startPosuk:1,endPerek:50,endPosuk:26};
+   await db.ref(classPath+"/posukPracticeLimit").set({...next,updatedAt:firebase.database.ServerValue.TIMESTAMP});
+   await renderResources(classId);q("copyPesukimMsg").textContent="Done ✓ The teacher can change this class's pesukim any time.";
+  }catch(err){console.error(err);q("copyPesukimMsg").textContent="Could not copy. Please try again.";q("copyPesukim").disabled=false}
+ };
  q("copyShorashim").onclick=async()=>{
   if(count&&!confirm("This class already has "+count+" words. Replace them with a copy of your words?"))return;
   q("copyShorashim").disabled=true;q("copyShorashimMsg").textContent="Copying…";
