@@ -14,13 +14,11 @@ button{appearance:none;border:0;border-radius:12px;padding:12px 17px;font-size:1
 .status{margin-left:auto;display:inline-flex;align-items:center;gap:8px;font-weight:700;color:#5d6878}.dot{width:10px;height:10px;border-radius:50%;background:#98a3b4}
 .status.live{color:#177245}.status.live .dot{background:#20a864;box-shadow:0 0 0 4px rgba(32,168,100,.12)}
 .preview-wrap{padding:22px 26px 26px}.preview{position:relative;width:100%;aspect-ratio:16/9;background:#151a23;border-radius:14px;overflow:hidden;display:grid;place-items:center;cursor:crosshair}
-video{width:100%;height:100%;object-fit:contain;display:none}.empty{color:#cbd3df;text-align:center;padding:30px}.empty strong{display:block;color:#fff;font-size:20px;margin-bottom:8px}
-#pointer{display:none;position:absolute;width:34px;height:34px;border-radius:50%;border:5px solid #ff2d2d;background:rgba(255,45,45,.18);transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 0 4px rgba(255,255,255,.8),0 2px 10px rgba(0,0,0,.35)}
-#pointer:after{content:"";position:absolute;width:8px;height:8px;background:#ff2d2d;border-radius:50%;left:8px;top:8px}
+video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none;pointer-events:none}.empty{color:#cbd3df;text-align:center;padding:30px;pointer-events:none}.empty strong{display:block;color:#fff;font-size:20px;margin-bottom:8px}
 #pointerLayer{position:absolute;inset:0;pointer-events:none;z-index:5}
-.student-pointer{display:none;position:absolute;width:28px;height:28px;border-radius:50%;border:4px solid var(--pc);background:color-mix(in srgb,var(--pc) 20%,transparent);transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 0 3px rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.3)}
-.student-pointer:after{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:var(--pc);left:6.5px;top:6.5px}
-.student-pointer .label{position:absolute;left:50%;top:34px;transform:translateX(-50%);white-space:nowrap;background:rgba(20,26,35,.88);color:#fff;border-radius:7px;padding:3px 7px;font-size:12px;font-weight:700;line-height:1.2}
+.student-pointer{display:none;position:absolute;width:16px;height:16px;border-radius:50%;border:2px solid var(--pc);background:color-mix(in srgb,var(--pc) 20%,transparent);transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 0 1px rgba(255,255,255,.9)}
+.student-pointer:after{content:"";position:absolute;width:4px;height:4px;border-radius:50%;background:var(--pc);left:4px;top:4px}
+.student-pointer .label{position:absolute;left:50%;top:19px;transform:translateX(-50%);white-space:nowrap;background:rgba(20,26,35,.78);color:#fff;border-radius:5px;padding:2px 5px;font-size:11px;line-height:1.2}
 .student-choice{background:#e8edf5;color:#23304a;border:2px solid transparent}
 .student-choice.active{border-color:#2557d6;background:#eef3ff;color:#1745b8}
 .note{margin-top:14px;padding:13px 15px;border-radius:12px;background:#f3f6fb;color:#526075;font-size:14px;line-height:1.45}
@@ -29,25 +27,88 @@ video{width:100%;height:100%;object-fit:contain;display:none}.empty{color:#cbd3d
 </style>
 </head>
 <body><main><section class="card">
-<header><h1>Class Pointer — pointer test</h1><p>Share your teaching screen, then click anywhere on the live preview. A red pointer should land exactly where you clicked.</p></header>
-<div class="controls"><button id="startBtn">Share teaching screen</button><button id="stopBtn" disabled>Stop sharing</button><button id="clearBtn" disabled>Clear pointer</button><div id="status" class="status"><span class="dot"></span><span id="statusText">Not sharing</span></div></div>
+<header><h1>Class Pointer — local student test</h1><p>Select a student below, then click the preview to place their named pointer. You can test here immediately or share your teaching screen.</p></header>
+<div class="controls"><button id="startBtn">Share teaching screen</button><button id="stopBtn" disabled>Stop sharing</button><button id="clearBtn">Clear pointers</button><div id="status" class="status" role="status"><span class="dot"></span><span id="statusText">Local test — Mayer selected</span></div></div>
 <div id="error" class="error"></div>
-<div class="preview-wrap"><div id="stage" class="preview"><video id="preview" autoplay playsinline muted></video><div id="pointerLayer"></div><div id="empty" class="empty"><strong>No screen selected yet</strong>Click “Share teaching screen,” then choose the tab, window, or screen you normally teach from.</div></div>
-<div class="note"><strong>Pointer test:</strong> after sharing starts, click a word or object inside the preview. The red target should appear directly on it. Resize the browser window and try again too. This is still local-only: no student can control it yet.</div></div>
+<div class="preview-wrap"><div id="stage" class="preview"><video id="preview" autoplay playsinline muted></video><div id="pointerLayer"></div><div id="empty" class="empty"><strong>Local practice preview</strong>Select Mayer, Yossi, Sholom, or Moshe below, then click here.<br>Use “Share teaching screen” to test over your teaching material.</div></div>
+<div class="note"><strong>Pointer test:</strong> each click moves only the selected student's pointer. Other students' pointers stay visible. Resize the window to check alignment. This is local-only; students are not connected yet.</div></div>
+<div class="controls"><label for="accessMode"><strong>Teacher allows:</strong></label><select id="accessMode"><option value="everyone">Everyone</option><option value="selected">Selected students (one or several)</option><option value="nobody">Nobody</option></select><div id="allowedStudents" hidden></div></div>
 <div class="preview-wrap"><div class="note"><strong>Multi-student design:</strong> each student gets an independent pointer layer. This local prototype lets you simulate several students before we connect the real class roster.</div><div id="studentControls" class="controls" style="border:0;padding:14px 0 0"></div></div></section></main>
 <script>
-const startBtn=document.getElementById('startBtn'),stopBtn=document.getElementById('stopBtn'),clearBtn=document.getElementById('clearBtn'),preview=document.getElementById('preview'),stage=document.getElementById('stage'),empty=document.getElementById('empty'),status=document.getElementById('status'),statusText=document.getElementById('statusText'),errorBox=document.getElementById('error'),pointerLayer=document.getElementById('pointerLayer'),studentControls=document.getElementById('studentControls');
+const byId=id=>document.getElementById(id);
+const startBtn=byId('startBtn'),stopBtn=byId('stopBtn'),clearBtn=byId('clearBtn'),preview=byId('preview'),stage=byId('stage'),empty=byId('empty'),status=byId('status'),statusText=byId('statusText'),errorBox=byId('error'),pointerLayer=byId('pointerLayer'),studentControls=byId('studentControls'),accessMode=byId('accessMode'),allowedStudents=byId('allowedStudents');
 let stream=null,activeStudent='Mayer',points={};
 const students=[['Mayer','#ff3b30'],['Yossi','#007aff'],['Sholom','#34c759'],['Moshe','#af52de']];
-function setStatus(l,t){status.classList.toggle('live',l);statusText.textContent=t}
-function showError(m){errorBox.textContent=m;errorBox.style.display='block'}function clearError(){errorBox.style.display='none'}
-function renderControls(){studentControls.innerHTML='<strong style="align-self:center;margin-right:4px">Test as:</strong>'+students.map(([n])=>'<button type="button" class="student-choice '+(n===activeStudent?'active':'')+'" data-name="'+n+'">'+n+'</button>').join('');studentControls.querySelectorAll('.student-choice').forEach(b=>b.addEventListener('click',()=>{activeStudent=b.dataset.name;renderControls();setStatus(!!stream,(stream?'Selected '+activeStudent+' — click the preview':'Selected '+activeStudent))}))}
-function ensurePointer(name){let p=document.getElementById('ptr-'+name);if(p)return p;const color=students.find(s=>s[0]===name)?.[1]||'#ff3b30';p=document.createElement('div');p.id='ptr-'+name;p.className='student-pointer';p.style.setProperty('--pc',color);p.innerHTML='<span class="label">'+name+'</span>';pointerLayer.appendChild(p);return p}
-function clearPointer(){points={};students.forEach(([n])=>{const p=document.getElementById('ptr-'+n);if(p)p.style.display='none'})}
-function videoBox(){const r=stage.getBoundingClientRect();if(!preview.videoWidth||!preview.videoHeight)return null;const scale=Math.min(r.width/preview.videoWidth,r.height/preview.videoHeight),w=preview.videoWidth*scale,h=preview.videoHeight*scale;return{r,w,h,left:(r.width-w)/2,top:(r.height-h)/2}}
-function positionPointers(){const b=videoBox();if(!b)return;Object.entries(points).forEach(([name,pt])=>{const p=ensurePointer(name);p.style.left=(b.left+pt.x*b.w)+'px';p.style.top=(b.top+pt.y*b.h)+'px';p.style.display='block'})}
-function stopSharing(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;preview.srcObject=null;preview.style.display='none';empty.style.display='block';startBtn.disabled=false;stopBtn.disabled=true;clearBtn.disabled=true;clearPointer();setStatus(false,'Not sharing')}
-async function startSharing(){clearError();if(!navigator.mediaDevices?.getDisplayMedia){showError('This browser does not support browser-based screen capture.');return}try{stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:15,max:30}},audio:false});preview.srcObject=stream;preview.style.display='block';empty.style.display='none';startBtn.disabled=true;stopBtn.disabled=false;clearBtn.disabled=false;setStatus(true,'Sharing live — multiple pointers enabled');const[t]=stream.getVideoTracks();if(t)t.addEventListener('ended',stopSharing,{once:true})}catch(e){if(e?.name==='NotAllowedError')showError('Screen sharing was canceled or blocked.');else showError('Screen capture could not start: '+(e?.message||'Unknown error'));stopSharing()}}
-stage.addEventListener('click',e=>{if(!stream)return;const b=videoBox();if(!b)return;const x=e.clientX-b.r.left,y=e.clientY-b.r.top;if(x<b.left||x>b.left+b.w||y<b.top||y>b.top+b.h)return;points[activeStudent]={x:(x-b.left)/b.w,y:(y-b.top)/b.h};positionPointers()});
-window.addEventListener('resize',positionPointers);preview.addEventListener('loadedmetadata',positionPointers);startBtn.addEventListener('click',startSharing);stopBtn.addEventListener('click',stopSharing);clearBtn.addEventListener('click',clearPointer);renderControls();
+const allowed=new Set(['Mayer']);
+function setStatus(text){status.classList.toggle('live',!!stream);statusText.textContent=text}
+function showError(message){errorBox.textContent=message;errorBox.style.display='block'}
+function clearError(){errorBox.style.display='none'}
+function canPoint(name){return accessMode.value==='everyone'||(accessMode.value==='selected'&&allowed.has(name))}
+function selectionStatus(){setStatus((stream?'Sharing live':'Local test')+' — '+activeStudent+(canPoint(activeStudent)?' selected; click the preview':' is not allowed to point'))}
+function renderControls(){
+  studentControls.replaceChildren();
+  const title=document.createElement('strong');title.textContent='Test as:';studentControls.appendChild(title);
+  students.forEach(([name])=>{
+    const button=document.createElement('button');button.type='button';button.className='student-choice'+(name===activeStudent?' active':'');button.textContent=name;button.setAttribute('aria-pressed',String(name===activeStudent));
+    button.addEventListener('click',()=>{activeStudent=name;renderControls();selectionStatus()});studentControls.appendChild(button);
+  });
+  stage.style.cursor=canPoint(activeStudent)?'crosshair':'not-allowed';
+}
+function ensurePointer(name){
+  let pointer=byId('ptr-'+name);if(pointer)return pointer;
+  pointer=document.createElement('div');pointer.id='ptr-'+name;pointer.className='student-pointer';pointer.style.setProperty('--pc',students.find(s=>s[0]===name)[1]);
+  const label=document.createElement('span');label.className='label';label.textContent=name;pointer.appendChild(label);pointerLayer.appendChild(pointer);return pointer;
+}
+function clearPointer(){points={};pointerLayer.replaceChildren()}
+// Coordinates belong to each student. Future highlights must use separate student layers too.
+function videoBox(){
+  const r=stage.getBoundingClientRect();if(!r.width||!r.height)return null;
+  if(!stream)return{r,w:r.width,h:r.height,left:0,top:0};
+  if(!preview.videoWidth||!preview.videoHeight)return null;
+  const scale=Math.min(r.width/preview.videoWidth,r.height/preview.videoHeight),w=preview.videoWidth*scale,h=preview.videoHeight*scale;
+  return{r,w,h,left:(r.width-w)/2,top:(r.height-h)/2};
+}
+function positionPointers(){
+  const box=videoBox();if(!box)return;
+  Object.entries(points).forEach(([name,point])=>{
+    const pointer=ensurePointer(name);pointer.style.left=(box.left+point.x*box.w)+'px';pointer.style.top=(box.top+point.y*box.h)+'px';pointer.style.display='block';
+  });
+}
+function updateAccess(){
+  allowedStudents.hidden=accessMode.value!=='selected';
+  Object.keys(points).forEach(name=>{if(!canPoint(name)){delete points[name];byId('ptr-'+name)?.remove()}});
+  renderControls();selectionStatus();
+}
+students.forEach(([name])=>{
+  const label=document.createElement('label'),checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=allowed.has(name);
+  checkbox.addEventListener('change',()=>{if(checkbox.checked)allowed.add(name);else allowed.delete(name);updateAccess()});
+  label.append(checkbox,document.createTextNode(name+' '));allowedStudents.appendChild(label);
+});
+function stopSharing(){
+  const oldStream=stream;stream=null;if(oldStream)oldStream.getTracks().forEach(track=>track.stop());
+  preview.srcObject=null;preview.style.display='none';empty.style.display='block';startBtn.disabled=false;stopBtn.disabled=true;clearPointer();selectionStatus();
+}
+async function startSharing(){
+  clearError();if(!navigator.mediaDevices?.getDisplayMedia){showError('Screen capture is unavailable in this browser. You can still use the local practice preview.');return}
+  startBtn.disabled=true;
+  try{
+    const captured=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:15,max:30}},audio:false});
+    stream=captured;clearPointer();preview.srcObject=captured;preview.style.display='block';empty.style.display='none';stopBtn.disabled=false;
+    setStatus('Preparing shared preview…');
+    const [track]=captured.getVideoTracks();if(track)track.addEventListener('ended',()=>{if(stream===captured)stopSharing()},{once:true});
+    await preview.play();if(stream===captured)selectionStatus();
+  }catch(error){stopSharing();showError(error?.name==='NotAllowedError'?'Screen sharing was canceled or blocked. The local practice preview is still available.':'Screen capture could not start: '+(error?.message||'Unknown error'))}
+}
+stage.addEventListener('click',event=>{
+  if(!canPoint(activeStudent)){selectionStatus();return}
+  const box=videoBox();if(!box){setStatus('Waiting for the shared preview to load — try again in a moment');return}
+  const x=event.clientX-box.r.left-box.left,y=event.clientY-box.r.top-box.top;
+  if(x<0||x>box.w||y<0||y>box.h){setStatus('Click inside the shared picture, away from the black margins');return}
+  points[activeStudent]={x:x/box.w,y:y/box.h};positionPointers();setStatus(activeStudent+' pointer placed');
+});
+new ResizeObserver(positionPointers).observe(stage);
+preview.addEventListener('loadedmetadata',positionPointers);preview.addEventListener('resize',positionPointers);
+startBtn.addEventListener('click',startSharing);stopBtn.addEventListener('click',stopSharing);
+clearBtn.addEventListener('click',()=>{clearPointer();setStatus('All pointers cleared')});
+accessMode.addEventListener('change',updateAccess);renderControls();
 </script></body></html>
