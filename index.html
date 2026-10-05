@@ -609,7 +609,152 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   };
 
   const approvalDefinitions=[
-    {key:"posukDisputes",icon:"📜",title:"Posuk Practice disputes",detail:"St…2186 tokens truncated…n    if(msg)msg.textContent="";
+    {key:"posukDisputes",icon:"📜",title:"Posuk Practice disputes",detail:"Student reading, translation, or understanding disputes waiting for you.",href:"record_pesukim/teacher.html?review=disputes"},
+    {key:"posukPoints",icon:"⭐",title:"Posuk Practice points",detail:"100% milestone point requests waiting for approval.",href:"student-rewards/teacher.html?tab=Rewards"},
+    {key:"chazara",icon:"🔁",title:"Chazara approvals",detail:"Chazara points waiting for approval.",href:"chazara/teacher.html#approvalPanel"},
+    {key:"shorashimRecordings",icon:"🎙️",title:"Shorashim recordings",detail:"Recorded Shorashim waiting for point approval.",href:"shorashim/teacher.html?tab=recordings"},
+    {key:"shorashimWords",icon:"🌳",title:"Shorashim word approvals",detail:"Lower-commonness words waiting for your approval.",href:"shorashim/teacher.html?tab=lists&approval=pending"},
+    {key:"gallery",icon:"🖼️",title:"Class Gallery projects",detail:"Student projects waiting to be approved for the gallery.",href:"class-gallery/index.html?review=pending"},
+    {key:"prizeStore",icon:"🎁",title:"Prize Store requests",detail:"Student reward purchases waiting for approval.",href:"student-rewards/teacher.html?tab=Rewards"}
+  ];
+
+  function approvalValues(v){return v&&typeof v==="object"?Object.values(v):[];}
+  function countPosukDisputes(allAttempts){
+    let count=0;
+    approvalValues(allAttempts).forEach(function(posukMap){
+      approvalValues(posukMap).forEach(function(attemptMap){
+        approvalValues(attemptMap).forEach(function(a){
+          if(!a||typeof a!=="object")return;
+          if(a.hebrewAudioURL&&a.hebrewDisputeStatus==="pending")count++;
+          if(a.comprehensionAudioURL&&a.comprehensionDisputeStatus==="pending")count++;
+          approvalValues(a.questionResults).forEach(function(q){if(q&&q.audioURL&&q.disputeStatus==="pending")count++;});
+          approvalValues(a.translationChunkResults).forEach(function(x){if(x&&x.audioURL&&x.disputeStatus==="pending")count++;});
+        });
+      });
+    });
+    return count;
+  }
+  function countNested(root,predicate){
+    let count=0;
+    approvalValues(root).forEach(function(group){
+      approvalValues(group).forEach(function(item){if(predicate(item||{}))count++;});
+    });
+    return count;
+  }
+  function countPendingShorashimWords(catalog){
+    return approvalValues(catalog).filter(function(item){
+      if(!item||item.hidden===true||item.teacherApproved===true)return false;
+      const raw=item.commonness!==undefined?item.commonness:(item.commonnessScore!==undefined?item.commonnessScore:item.frequency);
+      const n=Number(raw);
+      return Number.isFinite(n)&&n<=5;
+    }).length;
+  }
+  function renderApprovalCenter(){
+    const list=el("approvalCenterList");
+    const active=approvalDefinitions.filter(function(item){return Number(approvalCounts[item.key]||0)>0;});
+    const total=active.reduce(function(n,item){return n+Number(approvalCounts[item.key]||0);},0);
+    el("approvalCenterBadge").textContent=String(total);
+    el("approvalCenterBadge").classList.toggle("hidden",total===0);
+    if(approvalCenterLoading){
+      el("approvalCenterSummary").textContent="Checking what needs your attention…";
+    }else if(total){
+      el("approvalCenterSummary").textContent=String(total)+" item"+(total===1?"":"s")+" waiting for you. Click any section to go straight there.";
+    }else{
+      el("approvalCenterSummary").textContent="Nothing is waiting for approval right now.";
+    }
+    if(approvalCenterLoading&&!active.length){
+      list.innerHTML='<div class="approval-center-empty">Checking approvals…</div>';
+      return total;
+    }
+    if(!active.length){
+      list.innerHTML='<div class="approval-center-empty">✅ All caught up — no approvals are waiting.</div>';
+      return 0;
+    }
+    list.innerHTML=active.map(function(item){
+      const count=Number(approvalCounts[item.key]||0);
+      return '<a class="approval-center-item" href="'+item.href+'" target="_blank" rel="noopener"><span class="approval-center-icon">'+item.icon+'</span><span><strong>'+item.title+'</strong><small>'+item.detail+'</small></span><span class="approval-center-count">'+count+'</span></a>';
+    }).join("");
+    return total;
+  }
+  function openApprovalCenter(){if(isAuthorizedAdmin)el("approvalCenterModal").classList.remove("hidden");}
+  function closeApprovalCenter(){el("approvalCenterModal").classList.add("hidden");}
+  async function loadApprovalCenter(autoOpen){
+    if(!isAuthorizedAdmin||approvalCenterLoading)return;
+    approvalCenterLoading=true;
+    renderApprovalCenter();
+    const reads=[
+      ["attempts",db.ref("posukPractice/attempts").once("value")],
+      ["pointRequests",db.ref("studentRewards/pointRequests").once("value")],
+      ["shorashimRecordings",db.ref("posukPractice/shorashimLearning/recordingEvents").once("value")],
+      ["shorashimWords",db.ref("posukPractice/shorashimLearning/catalog/shorashim").once("value")],
+      ["gallery",db.ref("classGallery/posts").once("value")],
+      ["redemptions",db.ref("studentRewards/redemptionsByStudent").once("value")]
+    ];
+    const settled=await Promise.allSettled(reads.map(function(x){return x[1];}));
+    const data={};const failed=[];
+    settled.forEach(function(result,i){
+      const key=reads[i][0];
+      if(result.status==="fulfilled")data[key]=result.value.val()||{};
+      else failed.push(key);
+    });
+    const pointRequests=approvalValues(data.pointRequests).filter(function(x){return x&&String(x.status||"pending")==="pending";});
+    approvalCounts={
+      posukDisputes:data.attempts?countPosukDisputes(data.attempts):0,
+      posukPoints:data.pointRequests?pointRequests.filter(function(x){return ["reading100","translation100","understand100"].includes(String(x.source||""));}).length:0,
+      chazara:data.pointRequests?pointRequests.filter(function(x){return ["chazara","chazara-recording","chazara-remove"].includes(String(x.source||""));}).length:0,
+      shorashimRecordings:data.shorashimRecordings?countNested(data.shorashimRecordings,function(x){return String(x.pointRequestStatus||x.status||"pending")==="pending"&&!!x.pointRequestId;}):0,
+      shorashimWords:data.shorashimWords?countPendingShorashimWords(data.shorashimWords):0,
+      gallery:data.gallery?approvalValues(data.gallery).filter(function(x){return x&&x.status==="pending";}).length:0,
+      prizeStore:data.redemptions?countNested(data.redemptions,function(x){return String(x.status||"pending")==="pending";}):0
+    };
+    approvalCenterLoading=false;
+    const total=renderApprovalCenter();
+    const warning=el("approvalCenterWarning");
+    if(failed.length){
+      warning.textContent="Some approval sources could not be checked right now. The counts shown are for the sources that loaded successfully.";
+      warning.classList.remove("hidden");
+    }else{
+      warning.classList.add("hidden");
+    }
+    if(autoOpen&&!approvalCenterAutoShown&&total>0){
+      approvalCenterAutoShown=true;
+      openApprovalCenter();
+    }
+  }
+  function startApprovalCenter(){
+    el("approvalCenterButton").classList.remove("hidden");
+    if(approvalCenterTimer)clearInterval(approvalCenterTimer);
+    loadApprovalCenter(true);
+    approvalCenterTimer=setInterval(function(){loadApprovalCenter(false);},30000);
+  }
+  function stopApprovalCenter(){
+    if(approvalCenterTimer){clearInterval(approvalCenterTimer);approvalCenterTimer=null;}
+    el("approvalCenterButton").classList.add("hidden");
+    closeApprovalCenter();
+    approvalCounts={};
+    approvalCenterAutoShown=false;
+  }
+
+  // Password gate only keeps students from reaching the Google sign-in screen.
+  // Google/Firebase authentication remains the real administrator security.
+  const ADMIN_PASSWORD_HASH="57532c1bb37dcc8f1f9c86501590f50bcae0825fdd22a6a88605a046be7d43e3";
+  const ADMIN_PASSWORD_SESSION_KEY="b3AdminPasswordUnlocked";
+
+  function adminPasswordUnlocked(){
+    try{return sessionStorage.getItem(ADMIN_PASSWORD_SESSION_KEY)==="1";}catch(e){return false;}
+  }
+
+  async function sha256Hex(value){
+    const bytes=new TextEncoder().encode(String(value||""));
+    const digest=await crypto.subtle.digest("SHA-256",bytes);
+    return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");
+  }
+
+  async function unlockAdminPassword(){
+    const input=el("adminPasswordInput");
+    const msg=el("adminPasswordMsg");
+    const btn=el("adminPasswordButton");
+    if(msg)msg.textContent="";
     if(btn)btn.disabled=true;
     try{
       const hash=await sha256Hex(input?input.value:"");
