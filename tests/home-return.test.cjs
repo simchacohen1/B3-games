@@ -1,5 +1,9 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync(process.env.HOME_RETURN_SOURCE||__dirname+'/../index.html','utf8');
+test('all inline home page scripts parse before a release',()=>{
+  const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.ok(scripts.length);
+  for(const script of scripts)new vm.Script(script[1]);
+});
 const block=(start,end)=>html.slice(html.indexOf(start),html.indexOf(end,html.indexOf(start)));
 function fixture({teacher=false,missing=false,verify}={}){
   const nodes=new Map(),classes=id=>{if(!nodes.has(id)){const values=new Set();nodes.set(id,{value:'',textContent:'',classList:{add:x=>values.add(x),remove:x=>values.delete(x),contains:x=>values.has(x)},querySelector:()=>({textContent:''})})}return nodes.get(id)};
