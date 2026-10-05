@@ -19,6 +19,8 @@ video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;displa
 .student-pointer{display:none;position:absolute;width:16px;height:16px;border-radius:50%;border:2px solid var(--pc);background:color-mix(in srgb,var(--pc) 20%,transparent);transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 0 1px rgba(255,255,255,.9)}
 .student-pointer:after{content:"";position:absolute;width:4px;height:4px;border-radius:50%;background:var(--pc);left:4px;top:4px}
 .student-pointer .label{position:absolute;left:50%;top:19px;transform:translateX(-50%);white-space:nowrap;background:rgba(20,26,35,.78);color:#fff;border-radius:5px;padding:2px 5px;font-size:11px;line-height:1.2}
+.teacher-arrow{border:0;background:transparent;box-shadow:none;border-radius:0;width:20px;height:20px}
+.teacher-arrow:after{content:"➤";width:auto;height:auto;background:none;color:var(--pc);font-size:24px;left:0;top:-8px;text-shadow:0 1px 2px #000}
 .student-choice{background:#e8edf5;color:#23304a;border:2px solid transparent}
 .student-choice.active{border-color:#2557d6;background:#eef3ff;color:#1745b8}
 .note{margin-top:14px;padding:13px 15px;border-radius:12px;background:#f3f6fb;color:#526075;font-size:14px;line-height:1.45}
@@ -27,11 +29,12 @@ video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;displa
 </style>
 </head>
 <body><main><section class="card">
-<header><h1>Class Pointer — local student test</h1><p>Select a student below, then click the preview to place their named pointer. You can test here immediately or share your teaching screen.</p></header>
+<header><h1>Class Pointer — local student test</h1><p>Select Teacher pointer or a student below, then click the preview to place their named pointer. You can test here immediately or share your teaching screen.</p></header>
 <div class="controls"><button id="startBtn">Share teaching screen</button><button id="stopBtn" disabled>Stop sharing</button><button id="clearBtn">Clear pointers</button><div id="status" class="status" role="status"><span class="dot"></span><span id="statusText">Local test — Mayer selected</span></div></div>
+<div class="controls"><button id="teacherBtn" type="button" class="student-choice">Teacher pointer</button><label for="teacherTool">Teacher tool:</label><select id="teacherTool"><option value="target">Target</option><option value="arrow">Arrow</option></select><button id="clearTeacherBtn" type="button">Clear teacher pointer</button><span>Click the preview to point. Student permissions do not restrict the teacher.</span></div>
 <div id="error" class="error"></div>
 <div class="preview-wrap"><div id="stage" class="preview"><video id="preview" autoplay playsinline muted></video><div id="pointerLayer"></div><div id="empty" class="empty"><strong>Local practice preview</strong>Select Mayer, Yossi, Sholom, or Moshe below, then click here.<br>Use “Share teaching screen” to test over your teaching material.</div></div>
-<div class="note"><strong>Pointer test:</strong> each click moves only the selected student's pointer. Other students' pointers stay visible. Resize the window to check alignment. This is local-only; students are not connected yet.</div></div>
+<div class="note"><strong>Pointer test:</strong> each click moves only the selected teacher or student pointer. Other students' pointers stay visible. Resize the window to check alignment. This is local-only; students are not connected yet.</div></div>
 <div class="controls"><label for="accessMode"><strong>Teacher allows:</strong></label><select id="accessMode"><option value="everyone">Everyone</option><option value="selected">Selected students (one or several)</option><option value="nobody">Nobody</option></select><div id="allowedStudents" hidden></div></div>
 <div class="preview-wrap"><div class="note"><strong>Multi-student design:</strong> each student gets an independent pointer layer. This local prototype lets you simulate several students before we connect the real class roster.</div><div id="studentControls" class="controls" style="border:0;padding:14px 0 0"></div></div></section></main>
 <script>
@@ -40,10 +43,11 @@ const startBtn=byId('startBtn'),stopBtn=byId('stopBtn'),clearBtn=byId('clearBtn'
 let stream=null,activeStudent='Mayer',points={};
 const students=[['Mayer','#ff3b30'],['Yossi','#007aff'],['Sholom','#34c759'],['Moshe','#af52de']];
 const allowed=new Set(['Mayer']);
+const teacherBtn=byId('teacherBtn'),teacherTool=byId('teacherTool'),clearTeacherBtn=byId('clearTeacherBtn');
 function setStatus(text){status.classList.toggle('live',!!stream);statusText.textContent=text}
 function showError(message){errorBox.textContent=message;errorBox.style.display='block'}
 function clearError(){errorBox.style.display='none'}
-function canPoint(name){return accessMode.value==='everyone'||(accessMode.value==='selected'&&allowed.has(name))}
+function canPoint(name){return name==='Teacher'||accessMode.value==='everyone'||(accessMode.value==='selected'&&allowed.has(name))}
 function selectionStatus(){setStatus((stream?'Sharing live':'Local test')+' — '+activeStudent+(canPoint(activeStudent)?' selected; click the preview':' is not allowed to point'))}
 function renderControls(){
   studentControls.replaceChildren();
@@ -52,11 +56,13 @@ function renderControls(){
     const button=document.createElement('button');button.type='button';button.className='student-choice'+(name===activeStudent?' active':'');button.textContent=name;button.setAttribute('aria-pressed',String(name===activeStudent));
     button.addEventListener('click',()=>{activeStudent=name;renderControls();selectionStatus()});studentControls.appendChild(button);
   });
+  teacherBtn.classList.toggle('active',activeStudent==='Teacher');teacherBtn.setAttribute('aria-pressed',String(activeStudent==='Teacher'));
   stage.style.cursor=canPoint(activeStudent)?'crosshair':'not-allowed';
 }
 function ensurePointer(name){
   let pointer=byId('ptr-'+name);if(pointer)return pointer;
-  pointer=document.createElement('div');pointer.id='ptr-'+name;pointer.className='student-pointer';pointer.style.setProperty('--pc',students.find(s=>s[0]===name)[1]);
+  pointer=document.createElement('div');pointer.id='ptr-'+name;pointer.className='student-pointer';pointer.style.setProperty('--pc',name==='Teacher'?'#ffcc00':students.find(s=>s[0]===name)[1]);
+  pointer.classList.toggle('teacher-arrow',name==='Teacher'&&teacherTool.value==='arrow');
   const label=document.createElement('span');label.className='label';label.textContent=name;pointer.appendChild(label);pointerLayer.appendChild(pointer);return pointer;
 }
 function clearPointer(){points={};pointerLayer.replaceChildren()}
@@ -110,5 +116,8 @@ new ResizeObserver(positionPointers).observe(stage);
 preview.addEventListener('loadedmetadata',positionPointers);preview.addEventListener('resize',positionPointers);
 startBtn.addEventListener('click',startSharing);stopBtn.addEventListener('click',stopSharing);
 clearBtn.addEventListener('click',()=>{clearPointer();setStatus('All pointers cleared')});
+teacherBtn.addEventListener('click',()=>{activeStudent='Teacher';renderControls();selectionStatus()});
+teacherTool.addEventListener('change',()=>{activeStudent='Teacher';byId('ptr-Teacher')?.classList.toggle('teacher-arrow',teacherTool.value==='arrow');renderControls();selectionStatus()});
+clearTeacherBtn.addEventListener('click',()=>{delete points.Teacher;byId('ptr-Teacher')?.remove();setStatus('Teacher pointer cleared')});
 accessMode.addEventListener('change',updateAccess);renderControls();
 </script></body></html>
