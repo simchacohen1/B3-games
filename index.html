@@ -291,7 +291,7 @@
           <select id="classStudentSelect" class="override-student-select"></select>
           <button id="addStudentToClassButton" class="admin-action secondary" type="button">Add Existing Student to Class</button>
         </div>
-        <div style="overflow-x:auto"><div id="studentListHeading" style="min-width:480px;display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px;gap:8px;padding:14px 10px 7px;margin-top:12px;color:#64748b;font-size:12px;font-weight:900;text-transform:uppercase"><span>Name</span><span>Passcode</span><span>Access</span><span></span></div>
+        <div style="overflow-x:auto"><div id="studentListHeading" style="min-width:480px;display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px 90px;gap:8px;padding:14px 10px 7px;margin-top:12px;color:#64748b;font-size:12px;font-weight:900;text-transform:uppercase"><span>Name</span><span>Passcode</span><span>Access</span><span></span><span></span></div>
         <div id="classMemberList" style="min-width:480px"></div></div>
         <div style="display:none"><input id="editManagedStudentPasscode"><button id="saveManagedStudentPasscodeButton" type="button"></button></div>
         <div id="classManagementStatus" class="override-saving" aria-live="polite"></div>
@@ -470,7 +470,7 @@
       const profile=students[id]?.profile||{}, name=members[id]?.name||profile.name||id;
       const passcode=String(profile.passcode||"");
 const active=(members[id]?.active!==false&&profile.active!==false);
-      return '<div style="display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px;gap:8px;align-items:center;padding:10px;border-top:1px solid #e5e7eb"><strong>'+name+'</strong><input data-student-passcode="'+id+'" value="'+passcode.replace(/"/g,"&quot;")+'" inputmode="numeric" aria-label="Current passcode for '+name.replace(/"/g,"&quot;")+'" title="Current saved passcode" style="width:100%;padding:7px 8px;border:1px solid #94a3b8;border-radius:8px;background:#fff;font-weight:800;color:#0f172a"><button type="button" data-toggle-student="'+id+'" data-active="'+active+'" style="border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer;background:'+(active?'#dcfce7':'#fee2e2')+';color:'+(active?'#166534':'#991b1b')+'">'+(active?'Enabled':'Blocked')+'</button><button type="button" data-save-student="'+id+'" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer">Save</button></div>';
+      return '<div style="display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px 90px;gap:8px;align-items:center;padding:10px;border-top:1px solid #e5e7eb"><strong>'+name+'</strong><input data-student-passcode="'+id+'" value="'+passcode.replace(/"/g,"&quot;")+'" inputmode="numeric" aria-label="Current passcode for '+name.replace(/"/g,"&quot;")+'" title="Current saved passcode" style="width:100%;padding:7px 8px;border:1px solid #94a3b8;border-radius:8px;background:#fff;font-weight:800;color:#0f172a"><button type="button" data-toggle-student="'+id+'" data-active="'+active+'" style="border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer;background:'+(active?'#dcfce7':'#fee2e2')+';color:'+(active?'#166534':'#991b1b')+'">'+(active?'Enabled':'Blocked')+'</button><button type="button" data-save-student="'+id+'" style="border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer">Save</button><button type="button" data-remove-student="'+id+'" data-student-name="'+name.replace(/"/g,"&quot;")+'" style="border:1px solid #fecaca;background:#fff;color:#991b1b;border-radius:8px;padding:7px 9px;font-weight:800;cursor:pointer">Remove</button></div>';
     }).join(""):'<div class="admin-message" style="padding:14px 10px">No students in this class yet. Use “Add Student” above.</div>';
 
     const selectedStudent=studentSel.value;
@@ -1545,6 +1545,14 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   el("classMemberList").addEventListener("click",async e=>{
     const save=e.target.closest("[data-save-student]");
     const toggle=e.target.closest("[data-toggle-student]");
+    const remove=e.target.closest("[data-remove-student]");
+    if(remove){
+      // Takes the student out of this class only. Their account and work stay, and they can be added back.
+      if(!confirm("Remove "+remove.dataset.studentName+" from this class? They will no longer see this class's activities. You can add them back later."))return;
+      await removeStudentFromManagedClass(remove.dataset.removeStudent);
+      el("classManagementStatus").textContent="Student removed from this class.";
+      return;
+    }
     if(save){
       const id=save.dataset.saveStudent, input=el("classMemberList").querySelector('[data-student-passcode="'+id+'"]'), passcode=input?input.value.trim():"";
       if(!passcode){el("classManagementStatus").textContent="Passcode cannot be blank.";return;}

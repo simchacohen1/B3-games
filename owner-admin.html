@@ -18,7 +18,7 @@
 <section class="card"><div class="icon">🧰</div><h2>Class Tools</h2><p>New classes start with no tools. Choose a class, then grant only the tools its teacher should receive.</p><select id="toolClassSelect"><option value="">Choose class</option></select><div id="toolList"></div><h3 style="margin:18px 0 4px">Class Content</h3><p>New classes start empty. Their teacher adds their own, or you can give them a copy of yours.</p><div id="resourceList"></div></section>
 </div></div></main>
 <style>
-.card input,.card select{width:100%;padding:11px;margin:6px 0;border:1px solid #cbd5e1;border-radius:9px}.card button{border:0;border-radius:9px;padding:10px 13px;background:#2563eb;color:#fff;font-weight:800;cursor:pointer}.entry{padding:9px 0;border-bottom:1px solid #e2e8f0}.entry small{display:block;color:#64748b}
+.card input,.card select{width:100%;padding:11px;margin:6px 0;border:1px solid #cbd5e1;border-radius:9px}.card button{border:0;border-radius:9px;padding:10px 13px;background:#2563eb;color:#fff;font-weight:800;cursor:pointer}.entry{padding:9px 0;border-bottom:1px solid #e2e8f0}.entry small{display:block;color:#64748b}.entry.row{display:flex;justify-content:space-between;align-items:center;gap:10px}.card button.danger{background:#fff;color:#b91c1c;border:1px solid #fecaca;padding:6px 10px}.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chip{display:inline-flex;align-items:center;gap:4px;background:#eef2ff;border-radius:999px;padding:3px 4px 3px 10px;font-size:14px}.card .chip button{background:transparent;color:#64748b;padding:2px 7px;border-radius:999px}.card .chip button:hover{background:#fee2e2;color:#b91c1c}
 </style>
 <script>
 (function(){
@@ -35,17 +35,59 @@ function safe(s){const d=document.createElement("div");d.textContent=String(s||"
 async function load(){
  const ts=await db.ref("b3Games/workspaces/"+WS+"/teacherInvites").once("value"),cs=await db.ref("b3Games/workspaces/"+WS+"/classes").once("value");teacherData=ts.val()||{};classData=cs.val()||{};
  q("teachers").innerHTML="";q("teacherSelect").innerHTML='<option value="">Choose teacher</option>';
- Object.entries(teacherData).forEach(([id,v])=>{q("teachers").insertAdjacentHTML("beforeend",'<div class="entry"><b>'+safe(v.name||v.email)+'</b><small>'+safe(v.email)+'</small></div>');q("teacherSelect").insertAdjacentHTML("beforeend",'<option value="'+id+'">'+safe(v.name||v.email)+'</option>')});
+ Object.entries(teacherData).forEach(([id,v])=>{q("teachers").insertAdjacentHTML("beforeend",'<div class="entry row"><span><b>'+safe(v.name||v.email)+'</b><small>'+safe(v.email)+'</small></span><button class="danger" data-delete-teacher="'+id+'">Delete</button></div>');q("teacherSelect").insertAdjacentHTML("beforeend",'<option value="'+id+'">'+safe(v.name||v.email)+'</option>')});
  q("classes").innerHTML="";q("classSelect").innerHTML='<option value="">Choose class</option>';q("toolClassSelect").innerHTML='<option value="">Choose class</option>';
- Object.entries(classData).forEach(([id,v])=>{q("classes").insertAdjacentHTML("beforeend",'<div class="entry"><b>'+safe(v.name||id)+'</b></div>');const opt='<option value="'+id+'">'+safe(v.name||id)+'</option>';q("classSelect").insertAdjacentHTML("beforeend",opt);q("toolClassSelect").insertAdjacentHTML("beforeend",opt)});
+ Object.entries(classData).forEach(([id,v])=>{q("classes").insertAdjacentHTML("beforeend",'<div class="entry row"><b>'+safe(v.name||id)+'</b>'+(B3_CLASSES.includes(id)?'<small>B3 class</small>':'<button class="danger" data-delete-class="'+id+'">Delete</button>')+'</div>');const opt='<option value="'+id+'">'+safe(v.name||id)+'</option>';q("classSelect").insertAdjacentHTML("beforeend",opt);q("toolClassSelect").insertAdjacentHTML("beforeend",opt)});
  const assignmentLines=[];
- Object.entries(teacherData).forEach(([tid,t])=>{const ids=Object.keys(t.classIds||{}).filter(id=>t.classIds[id]);if(ids.length)assignmentLines.push('<div class="entry"><b>'+safe(t.name||t.email)+'</b><small>'+ids.map(id=>safe(classData[id]?.name||id)).join(", ")+'</small></div>')});
+ Object.entries(teacherData).forEach(([tid,t])=>{const ids=Object.keys(t.classIds||{}).filter(id=>t.classIds[id]);if(ids.length)assignmentLines.push('<div class="entry"><b>'+safe(t.name||t.email)+'</b><div class="chips">'+ids.map(id=>'<span class="chip">'+safe(classData[id]?.name||id)+' <button title="Unassign" data-unassign-teacher="'+tid+'" data-unassign-class="'+id+'">✕</button></span>').join("")+'</div></div>')});
  q("assignments").innerHTML=assignmentLines.join("")||'<small>No class assignments yet.</small>';
  await renderToolGrants();
 }
 q("addTeacher").onclick=async()=>{const email=q("teacherEmail").value.trim().toLowerCase(),name=q("teacherName").value.trim();if(!email.includes("@"))return;await db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+key(email)).update({email:email,name:name||email,role:"teacher",active:true,updatedAt:firebase.database.ServerValue.TIMESTAMP});q("teacherEmail").value="";q("teacherName").value="";q("status").textContent="Teacher invitation saved. Assign a class below; the teacher can then sign in with Google.";await load()};
 q("addClass").onclick=async()=>{const name=q("className").value.trim();if(!name)return;let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true});q("className").value="";await load()};
 q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=q("classSelect").value;if(!t||!c){q("status").textContent="Choose a teacher and class.";return}const root="b3Games/workspaces/"+WS,updates={[root+"/teacherInvites/"+t+"/classIds/"+c]:true},uid=teacherData[t]?.claimedUid;if(uid){updates[root+"/teachers/"+uid+"/classIds/"+c]=true;updates[root+"/classes/"+c+"/teacherIds/"+uid]=true;}await db.ref().update(updates);q("status").textContent="Assigned.";await load()};
+// ---- Unassign / delete (owner only; this page is gated to the owner account) ----
+const B3_CLASSES=["et","wt"];
+// A signed-in teacher's own record, found by their invitation's claimedUid or by matching email.
+async function teacherUidFor(inviteId){
+ const inv=teacherData[inviteId]||{};if(inv.claimedUid)return inv.claimedUid;
+ const all=(await db.ref("b3Games/workspaces/"+WS+"/teachers").once("value")).val()||{};
+ const email=String(inv.email||"").toLowerCase();
+ return Object.keys(all).find(uid=>String(all[uid]?.email||"").toLowerCase()===email)||"";
+}
+async function unassign(inviteId,classId){
+ const t=teacherData[inviteId]||{},cname=classData[classId]?.name||classId;
+ if(!confirm("Take "+cname+" away from "+(t.name||t.email)+"?"))return;
+ const root="b3Games/workspaces/"+WS,uid=await teacherUidFor(inviteId),updates={[root+"/teacherInvites/"+inviteId+"/classIds/"+classId]:null};
+ if(uid){updates[root+"/teachers/"+uid+"/classIds/"+classId]=null;updates[root+"/classes/"+classId+"/teacherIds/"+uid]=null;}
+ await db.ref().update(updates);q("status").textContent="Unassigned.";await load();
+}
+async function deleteTeacher(inviteId){
+ const t=teacherData[inviteId]||{};
+ if(!confirm("Delete teacher "+(t.name||t.email)+"? They will lose access to all their classes. Their classes and students stay."))return;
+ const root="b3Games/workspaces/"+WS,uid=await teacherUidFor(inviteId),updates={[root+"/teacherInvites/"+inviteId]:null};
+ if(uid){updates[root+"/teachers/"+uid]=null;Object.keys(classData).forEach(c=>{if(classData[c]?.teacherIds?.[uid])updates[root+"/classes/"+c+"/teacherIds/"+uid]=null;});}
+ await db.ref().update(updates);q("status").textContent="Teacher deleted.";await load();
+}
+async function deleteClass(classId){
+ if(B3_CLASSES.includes(classId))return;
+ const cname=classData[classId]?.name||classId;
+ const typed=prompt("Delete the class "+cname+"? Its students are taken out of the class (their accounts stay) and its teachers lose it. This cannot be undone. Type the class name to confirm:");
+ if(typed===null)return;if(typed.trim()!==cname){alert("The name did not match, so nothing was deleted.");return}
+ const root="b3Games/workspaces/"+WS,updates={[root+"/classes/"+classId]:null,[root+"/contentGrants/"+classId]:null};
+ Object.keys(classData[classId]?.members||{}).forEach(sid=>{updates["b3Games/students/"+sid+"/memberships/"+WS+"_"+classId]=null;});
+ Object.entries(teacherData).forEach(([tid,t])=>{if(t.classIds?.[classId])updates[root+"/teacherInvites/"+tid+"/classIds/"+classId]=null;});
+ const teachers=(await db.ref(root+"/teachers").once("value")).val()||{};
+ Object.entries(teachers).forEach(([uid,t])=>{if(t?.classIds?.[classId])updates[root+"/teachers/"+uid+"/classIds/"+classId]=null;});
+ await db.ref().update(updates);q("status").textContent="Class deleted.";await load();
+}
+document.addEventListener("click",e=>{
+ const u=e.target.closest("[data-unassign-teacher]"),dt=e.target.closest("[data-delete-teacher]"),dc=e.target.closest("[data-delete-class]");
+ const run=p=>p.catch(err=>{console.error(err);q("status").textContent="Could not save. Please try again.";});
+ if(u)run(unassign(u.dataset.unassignTeacher,u.dataset.unassignClass));
+ if(dt)run(deleteTeacher(dt.dataset.deleteTeacher));
+ if(dc)run(deleteClass(dc.dataset.deleteClass));
+});
 async function renderToolGrants(){
  const classId=q("toolClassSelect").value;
  if(!classId){q("toolList").innerHTML='<small>Choose a class to manage its tools.</small>';q("resourceList").innerHTML="";return}
