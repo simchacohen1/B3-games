@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Class Pointer Classroom | Fun Torah Tools</title>
+<link rel="stylesheet" href="classroom.css">
+<script defer src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script defer src="classroom-core.js"></script><script defer src="classroom.js"></script>
+</head>
+<body><main>
+<header><h1>Class Pointer Classroom</h1><p>Keep Zoom open for voices and webcams. View the lesson and point here.</p></header>
+<section id="teacherPanel" hidden>
+<div class="controls"><button id="startClass">Start class</button><button id="endClass" disabled>End class</button></div>
+<div id="invitePanel" hidden><label for="joinLink">Student join link</label><div class="controls"><input id="joinLink" readonly><button id="copyLink">Copy join link</button></div><p>Give this link to your students. Admit each boy when his name appears below. Closing this teacher page ends the class.</p></div>
+<div class="controls"><button id="shareScreen" disabled>Share teaching screen</button><button id="stopScreen" disabled>Stop sharing</button><label for="teacherTool">Teacher tool</label><select id="teacherTool"><option value="target">Target</option><option value="arrow">Arrow</option></select><button id="clearTeacher">Clear teacher pointer</button><button id="clearAll">Clear all pointers</button></div>
+<div class="controls"><label for="accessMode">Students may point:</label><select id="accessMode"><option value="nobody">Nobody</option><option value="selected">Selected students</option><option value="everyone">Everyone admitted</option></select></div>
+<section aria-label="Student roster"><h2>Students</h2><div id="roster">Start a class to receive join requests.</div></section>
+</section>
+<section id="studentPanel" hidden><form id="joinForm"><label for="studentName">Your name</label><input id="studentName" maxlength="32" required autocomplete="given-name"><button id="joinClass" type="submit">Join class</button></form><button id="leaveClass" hidden>Leave class</button><p id="permissionText">Enter your name to request admission.</p></section>
+<p id="connectionStatus" role="status">Ready to start.</p><p id="error" role="alert" hidden></p>
+<section id="stage" aria-label="Shared teaching screen"><video id="lesson" autoplay muted playsinline></video><div id="placeholder">The shared teaching screen will appear here.</div><div id="pointerLayer"></div></section>
+<p id="pointerStatus" role="status">Click the shared picture to place a pointer.</p>
+<footer><p>This first classroom test sends the screen directly from the teacher to each admitted student. School networks may block the connection; test with one student before using it for a full class. No student camera or microphone is requested.</p><a href="index.html">Open local pointer practice</a></footer>
+</main></body></html>
