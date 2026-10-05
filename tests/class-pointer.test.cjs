@@ -4,7 +4,7 @@ const C=require('../class-pointer-prototype/classroom-core.js');
 const vm=require('node:vm'),fs=require('node:fs'),{EventEmitter}=require('node:events');
 function teacherFixture(){
   const elements=new Map();
-  function element(){return {value:'nobody',hidden:false,style:{setProperty(){}},classList:{},events:{},append(){},appendChild(){},replaceChildren(){},addEventListener(type,fn){this.events[type]=fn},getBoundingClientRect(){return{width:800,height:450}}}}
+  function element(){return {value:'nobody',hidden:false,dataset:{},style:{setProperty(){}},classList:{},events:{},append(){},appendChild(){},replaceChildren(){},remove(){},addEventListener(type,fn){this.events[type]=fn},getBoundingClientRect(){return{left:0,top:0,width:800,height:450}}}}
   const document={getElementById(id){if(!elements.has(id))elements.set(id,element());return elements.get(id)},createElement:element,createTextNode:text=>({textContent:text})};
   const context=vm.createContext({document,window:{ClassPointerCore:C,addEventListener(){}},location:{href:'https://example.test/classroom.html'},URL,ResizeObserver:class{observe(){}},setTimeout:()=>1,clearTimeout(){},Date,console});
   vm.runInContext(fs.readFileSync(require.resolve('../class-pointer-prototype/classroom.js'),'utf8'),context);
@@ -41,7 +41,7 @@ test('teacher rejects network pointer messages until admission and permission',(
   assert.equal(f.run('Object.keys(state.points).length'),0);
   f.run("members.get('student:student-a').allowed=true");f.connection.emit('data',{type:'point',id:'teacher',name:'Teacher',point:{x:0.25,y:0.75,tool:'arrow'}});
   assert.equal(f.run('state.points.teacher'),undefined);assert.equal(f.run("state.points['student:student-a'].x"),0.25);
-  assert.equal(f.run("state.points['student:student-a'].tool"),undefined);
+  assert.equal(f.run("state.points['student:student-a'].tool"),'arrow');
 });
 test('revoking access removes student pointers while preserving teacher position',()=>{
   const f=teacherFixture();f.run("members.get('student:student-a').admitted=true;members.get('student:student-a').allowed=true;state.mode='selected';state.points={'student:student-a':{x:0.2,y:0.2},teacher:{x:0.7,y:0.7}}");
@@ -52,4 +52,36 @@ test('revoking access removes student pointers while preserving teacher position
 test('disconnected students are removed from the roster and pointer state',()=>{
   const f=teacherFixture();f.run("state.points['student:student-a']={x:0.5,y:0.5}");f.connection.close();
   assert.equal(f.run('members.size'),0);assert.equal(f.run("state.points['student:student-a']"),undefined);
+});
+test('pointer styles accept only supported shapes and palette colors',()=>{
+  assert.deepEqual(C.pointStyle({tool:'yad',color:'#dca0ff'}),{tool:'yad',color:'#dca0ff'});
+  assert.deepEqual(C.pointStyle({tool:'spotlight',color:'url(https://example.test)'}),{tool:'target',color:null});
+});
+test('leaving the picture cancels queued hover and removes only that student',()=>{
+  const f=teacherFixture();f.run("members.get('student:student-a').admitted=true;state.points={'student:student-a':{x:0.1,y:0.2},teacher:{x:0.5,y:0.5}};pendingPoint={x:0.9,y:0.9};hoverTimer=1");
+  f.connection.emit('data',{type:'pointer-hide'});
+  assert.equal(f.run("state.points['student:student-a']"),undefined);assert.equal(f.run('state.points.teacher.x'),0.5);
+  f.elements.get('stage').events.pointerleave();assert.equal(f.run('state.points.teacher'),undefined);assert.equal(f.run('pendingPoint'),null);
+});
+test('hover movement places a teacher pointer without clicking, and leaving letterbox hides it',()=>{
+  const f=teacherFixture();f.run("state.sharing=true");f.elements.get('lesson').videoWidth=1200;f.elements.get('lesson').videoHeight=900;
+  f.elements.get('teacherTool').value='star';f.elements.get('teacherColor').value='#75df9a';
+  f.elements.get('stage').events.pointermove({clientX:400,clientY:225});
+  assert.equal(f.run('state.points.teacher.x'),0.5);assert.equal(f.run('state.points.teacher.y'),0.5);
+  assert.equal(f.run('state.points.teacher.tool'),'star');
+  f.elements.get('stage').events.pointermove({clientX:10,clientY:225});assert.equal(f.run('state.points.teacher'),undefined);
+});
+test('a queued hover cannot restore a cleared pointer or survive stopped sharing',()=>{
+  const f=teacherFixture();f.run("state.sharing=true;pendingPoint={x:0.2,y:0.2};hoverTimer=1");
+  f.elements.get('clearTeacher').events.click();f.run('sendHover()');assert.equal(f.run('state.points.teacher'),undefined);
+  f.run("pendingPoint={x:0.2,y:0.2};hoverTimer=1;stopSharing();sendHover()");assert.equal(f.run('state.points.teacher'),undefined);
+});
+test('network hover keeps the final position and never restores it after hiding',()=>{
+  const f=teacherFixture();f.run("members.get('student:student-a').admitted=true;state.sharing=true;state.mode='everyone'");
+  f.connection.emit('data',{type:'point',point:{x:0.1,y:0.2}});
+  f.connection.emit('data',{type:'point',point:{x:0.7,y:0.2}});f.connection.emit('data',{type:'point',point:{x:0.9,y:0.2}});
+  assert.equal(f.run("members.get('student:student-a').pendingPoint.x"),0.9);
+  f.run("commitStudentHover(members.get('student:student-a'))");assert.equal(f.run("state.points['student:student-a'].x"),0.9);
+  f.connection.emit('data',{type:'point',point:{x:0.6,y:0.6}});f.connection.emit('data',{type:'pointer-hide'});
+  f.run("commitStudentHover(members.get('student:student-a'))");assert.equal(f.run("state.points['student:student-a']"),undefined);
 });

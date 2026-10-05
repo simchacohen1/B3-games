@@ -3,27 +3,43 @@ const C=window.ClassPointerCore,$=id=>document.getElementById(id);
 const room=new URL(location.href).searchParams.get('room'),isTeacher=!room;
 const members=new Map();
 let peer=null,teacherConnection=null,screen=null,mediaCall=null,state={sharing:false,mode:'nobody',members:[],points:{}},started=false,admitted=false,joining=false,joinTimer=null;
-let generation=0,colorIndex=0;
+let generation=0,colorIndex=0,pendingPoint=null,hoverTimer=null,lastHover=0;
+const pointerNodes=new Map();
+const pointerIcons={
+  arrow:'<path d="M16 16L1 8L5 16L1 24Z" fill="currentColor"/>',
+  star:'<path d="M16 3L19.5 11.5L29 12L21.5 18L24 27L16 22L8 27L10.5 18L3 12L12.5 11.5Z" fill="currentColor"/>',
+  yad:'<path d="M3 29L11 21" stroke="currentColor" stroke-width="3"/><circle cx="3" cy="29" r="2" fill="currentColor"/><path d="M11 21L10 17Q10 15 12 15L14 15L16 16L14 18L15 20L13 22Z" fill="currentColor" stroke="white" stroke-width=".7"/>'
+};
 function status(text){$('connectionStatus').textContent=text}
 function fail(text){$('error').textContent=text;$('error').hidden=false}
 function clearError(){$('error').hidden=true}
 function send(connection,message){if(connection?.open){try{connection.send(message)}catch{fail('The connection was interrupted. Please rejoin the class.')}}}
 function allowed(){return isTeacher||C.canPoint(state.mode,state.members.find(member=>member.id==='student:'+peer?.id))}
 function pointerPermission(){
-  $('stage').style.cursor=allowed()?'crosshair':'not-allowed';
-  if(!isTeacher)$('permissionText').textContent=!admitted?'Waiting for your teacher to admit you.':allowed()?'You may point. Click the shared picture.':'Watch the lesson. Your teacher has not enabled your pointer.';
+  const mayPoint=allowed();$('stage').style.cursor=mayPoint?'crosshair':'not-allowed';
+  if(!mayPoint)cancelHover();
+  if(!isTeacher)$('permissionText').textContent=!admitted?'Waiting for your teacher to admit you.':allowed()?'You may point. Move your mouse over the lesson.':'Watch the lesson. Your teacher has not enabled your pointer.';
 }
 function drawPointers(){
   const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight);
-  $('pointerLayer').replaceChildren();if(!state.sharing||!box)return;
-  Object.entries(state.points).forEach(([id,point])=>{
+  const visible=new Set();$('spotlightCircle').hidden=true;
+  if(state.sharing&&box)Object.entries(state.points).forEach(([id,point])=>{
     if(!C.validPoint(point))return;
     const member=id==='teacher'?{name:'Teacher',color:'#ffcc00'}:state.members.find(person=>person.id===id);
     if(!member)return;
-    const pointer=document.createElement('div');pointer.className='pointer'+(id==='teacher'&&point.tool==='arrow'?' arrow':'');pointer.dataset.person=id;
-    pointer.style.setProperty('--color',member.color);pointer.style.left=(box.left+point.x*box.w)+'px';pointer.style.top=(box.top+point.y*box.h)+'px';
-    const name=document.createElement('span');name.className='name';name.textContent=member.name;pointer.appendChild(name);$('pointerLayer').appendChild(pointer);
+    const style=C.pointStyle(point),left=box.left+point.x*box.w,top=box.top+point.y*box.h;visible.add(id);
+    let pointer=pointerNodes.get(id);
+    if(!pointer){pointer=document.createElement('div');pointer.dataset.person=id;pointerNodes.set(id,pointer);$('pointerLayer').appendChild(pointer)}
+    if(pointer.dataset.tool!==style.tool){
+      pointer.replaceChildren();pointer.dataset.tool=style.tool;
+      if(pointerIcons[style.tool]){const icon=document.createElement('span');icon.className='pointer-icon';icon.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true">'+pointerIcons[style.tool]+'</svg>';pointer.appendChild(icon)}
+      const name=document.createElement('span');name.className='name';name.textContent=member.name;pointer.appendChild(name);
+    }
+    pointer.className='pointer '+style.tool+(top>rect.height-38?' label-above':'')+(left<45?' label-right':left>rect.width-45?' label-left':'');
+    pointer.style.setProperty('--color',style.color||member.color);pointer.style.left=left+'px';pointer.style.top=top+'px';
+    if(id==='teacher'&&state.spotlight){const focus=$('spotlightCircle');focus.hidden=false;focus.style.left=left+'px';focus.style.top=top+'px'}
   });
+  for(const [id,node] of pointerNodes)if(!visible.has(id)){node.remove();pointerNodes.delete(id)}
 }
 function publish(){
   state.members=Array.from(members.values()).filter(member=>member.admitted).map(({id,name,color,allowed})=>({id,name,color,admitted:true,allowed}));
@@ -38,7 +54,7 @@ function roster(){
     if(!member.admitted){const admit=document.createElement('button');admit.textContent='Admit '+member.name;admit.addEventListener('click',()=>{member.admitted=true;publish();roster();if(screen)callStudent(member)});row.appendChild(admit)}
     else{
       const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=member.allowed;input.disabled=state.mode!=='selected';
-      input.addEventListener('change',()=>{member.allowed=input.checked;if(!C.canPoint(state.mode,member))delete state.points[member.id];publish()});label.append(input,document.createTextNode('Allow '+member.name+' to point'));row.appendChild(label);
+      input.addEventListener('change',()=>{member.allowed=input.checked;if(!C.canPoint(state.mode,member)){clearStudentHover(member);delete state.points[member.id]}publish()});label.append(input,document.createTextNode('Allow '+member.name+' to point'));row.appendChild(label);
     }
     const remove=document.createElement('button');remove.textContent=member.admitted?'Remove '+member.name:'Decline '+member.name;
     remove.addEventListener('click',()=>{send(member.connection,{type:'removed'});member.connection.close();removeMember(member)});row.appendChild(remove);list.appendChild(row);
@@ -46,7 +62,14 @@ function roster(){
 }
 function removeMember(member){
   if(members.get(member.id)!==member)return;
+  clearStudentHover(member);
   member.call?.close();clearTimeout(member.mediaTimer);members.delete(member.id);delete state.points[member.id];publish();roster();
+}
+function clearStudentHover(member){clearTimeout(member.pointTimer);member.pointTimer=null;member.pendingPoint=null}
+function commitStudentHover(member){
+  member.pointTimer=null;const point=member.pendingPoint;member.pendingPoint=null;
+  if(!point||members.get(member.id)!==member||!state.sharing||!C.canPoint(state.mode,member))return;
+  member.lastPoint=Date.now();state.points[member.id]=point;publish();
 }
 function callStudent(member){
   member.call?.close();clearTimeout(member.mediaTimer);if(!screen||!member.admitted)return;
@@ -68,10 +91,13 @@ function receiveStudent(connection){
     }
     if(!member||members.get(member.id)!==member)return;
     if(message.type==='video-ready'&&member.admitted){member.videoReady=true;clearTimeout(member.mediaTimer)}
+    if(message.type==='pointer-hide'&&member.admitted){clearStudentHover(member);delete state.points[member.id];member.lastPoint=0;publish()}
     if(message.type==='point'&&state.sharing&&C.canPoint(state.mode,member)&&C.validPoint(message.point)){
-      const now=Date.now();if(now-member.lastPoint<75)return;member.lastPoint=now;
       // Identity comes from this connection, never from a student-supplied name or ID.
-      state.points[member.id]={x:message.point.x,y:message.point.y};publish();
+      member.pendingPoint={x:message.point.x,y:message.point.y,...C.pointStyle(message.point)};
+      const delay=75-(Date.now()-member.lastPoint);
+      if(delay<=0){clearTimeout(member.pointTimer);commitStudentHover(member)}
+      else if(!member.pointTimer)member.pointTimer=setTimeout(()=>commitStudentHover(member),delay);
     }
   });
   connection.on('close',()=>{clearTimeout(handshake);if(member)removeMember(member)});
@@ -98,8 +124,8 @@ function startClass(){
   peer.on('connection',receiveStudent);peer.on('call',call=>call.close());
 }
 function stopSharing(){
-  generation++;const oldScreen=screen;screen=null;oldScreen?.getTracks().forEach(track=>track.stop());
-  for(const member of members.values()){member.call?.close();member.call=null;member.videoReady=false;clearTimeout(member.mediaTimer)}
+  cancelHover();generation++;const oldScreen=screen;screen=null;oldScreen?.getTracks().forEach(track=>track.stop());
+  for(const member of members.values()){clearStudentHover(member);member.call?.close();member.call=null;member.videoReady=false;clearTimeout(member.mediaTimer)}
   state.sharing=false;state.points={};$('lesson').srcObject=null;$('placeholder').hidden=false;$('stopScreen').disabled=true;$('shareScreen').disabled=!started;publish();
 }
 async function shareScreen(){
@@ -110,16 +136,16 @@ async function shareScreen(){
     if(peer!==currentPeer||!started){captured.getTracks().forEach(track=>track.stop());return}
     screen=captured;generation++;state.sharing=true;state.points={};$('lesson').srcObject=screen;$('placeholder').hidden=true;$('stopScreen').disabled=false;
     screen.getVideoTracks()[0].addEventListener('ended',()=>{if(screen===captured)stopSharing()},{once:true});
-    await $('lesson').play();if(screen!==captured)return;publish();for(const member of members.values())if(member.admitted)callStudent(member);status('Teaching screen is sharing. Click the picture to point as Teacher.');
+    await $('lesson').play();if(screen!==captured)return;publish();for(const member of members.values())if(member.admitted)callStudent(member);status('Teaching screen is sharing. Move your mouse over the picture to point as Teacher.');
   }catch(error){if(peer!==currentPeer||(error.name==='AbortError'&&!screen))return;stopSharing();fail(error.name==='NotAllowedError'?'Screen sharing was canceled. Click Share teaching screen to try again.':'Could not share the screen. Please try again.')}
 }
 function endClass(){
   clearTimeout(joinTimer);started=false;stopSharing();for(const member of members.values()){send(member.connection,{type:'ended'});member.connection.close()}
-  members.clear();const oldPeer=peer;peer=null;oldPeer?.destroy();state={sharing:false,mode:'nobody',members:[],points:{}};$('accessMode').value='nobody';$('startClass').disabled=false;$('endClass').disabled=true;$('invitePanel').hidden=true;roster();status('Class ended. Start a new class for a new join link.');
+  members.clear();const oldPeer=peer;peer=null;oldPeer?.destroy();state={sharing:false,mode:'nobody',members:[],points:{}};$('accessMode').value='nobody';$('spotlight').checked=false;$('startClass').disabled=false;$('endClass').disabled=true;$('invitePanel').hidden=true;roster();status('Class ended. Start a new class for a new join link.');
 }
 function clearStudentVideo(){const oldCall=mediaCall;mediaCall=null;oldCall?.close();$('lesson').srcObject=null;$('placeholder').hidden=false;drawPointers()}
 function leaveClass(){
-  clearTimeout(joinTimer);joining=false;admitted=false;clearStudentVideo();const oldConnection=teacherConnection;teacherConnection=null;oldConnection?.close();const oldPeer=peer;peer=null;oldPeer?.destroy();
+  cancelHover();clearTimeout(joinTimer);joining=false;admitted=false;clearStudentVideo();const oldConnection=teacherConnection;teacherConnection=null;oldConnection?.close();const oldPeer=peer;peer=null;oldPeer?.destroy();
   state={sharing:false,mode:'nobody',members:[],points:{}};$('joinForm').hidden=false;$('joinClass').disabled=false;$('leaveClass').hidden=true;$('pointerLayer').replaceChildren();$('permissionText').textContent='Enter your name to request admission.';status('Not connected.');
 }
 function joinClass(event){
@@ -152,22 +178,46 @@ function joinClass(event){
   });
   peer.on('connection',connection=>connection.close());
 }
-$('stage').addEventListener('click',event=>{
+function cancelHover(){clearTimeout(hoverTimer);hoverTimer=null;pendingPoint=null}
+function hideOwnPointer(){
+  cancelHover();lastHover=0;
+  if(isTeacher){if(state.points.teacher){delete state.points.teacher;publish()}}else send(teacherConnection,{type:'pointer-hide'});
+}
+function sendHover(){
+  hoverTimer=null;const point=pendingPoint;pendingPoint=null;if(!point||!state.sharing||!allowed())return;
+  lastHover=Date.now();
+  if(isTeacher){state.points.teacher=point;publish()}else send(teacherConnection,{type:'point',point});
+}
+function pointAt(event,immediate=false){
   if(!state.sharing)return;
-  if($('lesson').paused)$('lesson').play().catch(()=>fail('Video playback could not resume. Leave and rejoin the class.'));
-  if(!allowed()){$('pointerStatus').textContent='Your teacher has not enabled your pointer.';return}
+  if(!allowed()){if(immediate)$('pointerStatus').textContent='Your teacher has not enabled your pointer.';return}
   const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight);if(!box)return;
-  const point={x:(event.clientX-rect.left-box.left)/box.w,y:(event.clientY-rect.top-box.top)/box.h};
-  if(!C.validPoint(point)){$('pointerStatus').textContent='Click inside the picture, away from the black margins.';return}
-  if(isTeacher){state.points.teacher={...point,tool:$('teacherTool').value};publish()}else send(teacherConnection,{type:'point',point});
-  $('pointerStatus').textContent=isTeacher?'Teacher pointer placed.':'Pointer sent to your teacher.';
+  const point={x:(event.clientX-rect.left-box.left)/box.w,y:(event.clientY-rect.top-box.top)/box.h,...C.pointStyle({tool:$(isTeacher?'teacherTool':'studentTool').value,color:$(isTeacher?'teacherColor':'studentColor').value})};
+  if(!C.validPoint(point)){hideOwnPointer();return}
+  pendingPoint=point;
+  // Keep a trailing update, so the final hover location is never lost between sends.
+  if(immediate||Date.now()-lastHover>=90){clearTimeout(hoverTimer);sendHover()}
+  else if(!hoverTimer)hoverTimer=setTimeout(sendHover,90-(Date.now()-lastHover));
+}
+$('stage').addEventListener('pointermove',event=>pointAt(event));
+$('stage').addEventListener('pointerleave',hideOwnPointer);
+$('stage').addEventListener('pointercancel',hideOwnPointer);
+$('stage').addEventListener('click',event=>{
+  if(state.sharing&&$('lesson').paused)$('lesson').play().catch(()=>fail('Video playback could not resume. Leave and rejoin the class.'));
+  pointAt(event,true);
 });
 $('accessMode').addEventListener('change',()=>{
-  state.mode=$('accessMode').value;for(const member of members.values())if(!C.canPoint(state.mode,member))delete state.points[member.id];publish();roster();
+  state.mode=$('accessMode').value;for(const member of members.values())if(!C.canPoint(state.mode,member)){clearStudentHover(member);delete state.points[member.id]}publish();roster();
 });
-$('teacherTool').addEventListener('change',()=>{if(state.points.teacher){state.points.teacher.tool=$('teacherTool').value;publish()}});
-$('clearTeacher').addEventListener('click',()=>{delete state.points.teacher;publish()});
-$('clearAll').addEventListener('click',()=>{state.points={};publish()});
+function changeStyle(){
+  const style=C.pointStyle({tool:$(isTeacher?'teacherTool':'studentTool').value,color:$(isTeacher?'teacherColor':'studentColor').value});
+  if(pendingPoint)Object.assign(pendingPoint,style);
+  if(isTeacher&&state.points.teacher){Object.assign(state.points.teacher,style);publish()}
+}
+['teacherTool','teacherColor','studentTool','studentColor'].forEach(id=>$(id).addEventListener('change',changeStyle));
+$('spotlight').addEventListener('change',()=>{state.spotlight=$('spotlight').checked;publish()});
+$('clearTeacher').addEventListener('click',()=>{cancelHover();delete state.points.teacher;publish()});
+$('clearAll').addEventListener('click',()=>{cancelHover();state.points={};publish()});
 $('copyLink').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('joinLink').value);status('Join link copied. Send it to your students.')}catch{$('joinLink').select();status('Select and copy the student join link.')}});
 $('startClass').addEventListener('click',startClass);$('endClass').addEventListener('click',endClass);$('shareScreen').addEventListener('click',shareScreen);$('stopScreen').addEventListener('click',stopSharing);
 $('joinForm').addEventListener('submit',joinClass);$('leaveClass').addEventListener('click',leaveClass);
