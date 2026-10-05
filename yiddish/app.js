@@ -1,5 +1,5 @@
 'use strict';
-const APP_BUILD='2026-09-30-story-detective-v7-cheer-message';
+const APP_BUILD='2026-10-04-shuffle-fixes';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
 let group=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null,soundGame=null;
@@ -425,7 +425,7 @@ function soundChallengeIndexes(profile){
   return out;
 }
 function soundResetWord(){
-  soundGame.cursor=0;soundGame.placed=new Set();soundGame.transitioning=false;soundGame.lastCorrect=null;soundGame.feedback='';soundGame.wrongChoice=null;
+  soundGame.choiceOrder={};soundGame.cursor=0;soundGame.placed=new Set();soundGame.transitioning=false;soundGame.lastCorrect=null;soundGame.feedback='';soundGame.wrongChoice=null;
 }
 $('soundStart').onclick=()=>{
   if(busy||pending||!open(group))return;
@@ -483,7 +483,9 @@ function soundGameRender(){
   const part=profile[activePart];
   box.append(node('p','Choose the correct version for the highlighted part. In this learning activity, ע with an “e” sound gets a segol; two yuds get patach for “ay” and tzere for “ey.”','sound-hint'));
   const opts=node('div','','sound-options');
-  for(const choice of part.choices){
+  soundGame.choiceOrder=soundGame.choiceOrder||{};const orderKey=soundGame.wordIndex+':'+w.id+':'+activePart;
+  if(!soundGame.choiceOrder[orderKey])soundGame.choiceOrder[orderKey]=shuffleClient(part.choices);
+  for(const choice of soundGame.choiceOrder[orderKey]){
     const b=node('button',choice,'sound-option'+(soundGame.wrongChoice===choice?' wrong':''));
     b.type='button';b.lang='yi';b.dir='rtl';b.disabled=soundGame.transitioning;b.onclick=()=>soundChoose(choice);opts.append(b);
   }
@@ -573,7 +575,8 @@ function sentenceGameRender(){
 
   const bank=node('div','','sentence-bank');
   bank.setAttribute('aria-label','Word bank');
-  for(const id of shuffleClient(ids)){
+  if(!sentenceGame.bankOrder||sentenceGame.bankSet!==sentenceGame.setIndex){sentenceGame.bankOrder=shuffleClient(ids);sentenceGame.bankSet=sentenceGame.setIndex}
+  for(const id of sentenceGame.bankOrder){
     const w=word(id);if(!w)continue;
     const used=sentenceGame.solved.has(id)&&targets.includes(id);
     const b=node('button',w.yi,'sentence-word'+(sentenceGame.selected===id?' selected':'')+(used?' used':''));b.type='button';b.lang='yi';b.dir='rtl';b.draggable=!used;b.disabled=used;
