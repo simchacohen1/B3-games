@@ -1,5 +1,5 @@
 'use strict';
-const APP_BUILD='2026-10-05-step-unlock';
+const APP_BUILD='2026-10-05-passcode-form';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
 let group=0,part=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null,soundGame=null;
@@ -719,5 +719,13 @@ async function submit(answer,answers,feedback){
     const id=localStorage.getItem('b3Games_studentId');
     const pin=localStorage.getItem('b3Games_classPin');
     if(id&&pin) await login(id,pin);
+    else{
+      // No saved passcode on this device (for example a teacher's own student account):
+      // show the sign-in form instead of waiting forever.
+      const f=$('loginForm');f.hidden=false;f.style.display='';
+      $('name').value=localStorage.getItem('b3Games_studentName')||'';
+      $('login').querySelector('p').textContent='Type your name and passcode to open Yiddish.';
+      $(($('name').value?'pin':'name')).focus();
+    }
   }
-}catch(e){block(e.message);$('login').hidden=false}setInterval(async()=>{if(!student||busy||pending)return;try{const s=await API.call('status');config=s.config;student=s.student;if(round&&!open(round.group)){round=null;block('Your teacher closed this section.')}else if(!round){progress=s.progress;render()}}catch(e){block(e.message)}},15000)})();
+}catch(e){block(e.message);$('login').hidden=false;const f=$('loginForm');f.hidden=false;f.style.display='';if(!$('name').value)$('name').value=localStorage.getItem('b3Games_studentName')||''}setInterval(async()=>{if(!student||busy||pending)return;try{const s=await API.call('status');config=s.config;student=s.student;if(round&&!open(round.group)){round=null;block('Your teacher closed this section.')}else if(!round){progress=s.progress;render()}}catch(e){block(e.message)}},15000)})();
