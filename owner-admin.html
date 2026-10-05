@@ -1,25 +1,84 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Fun Torah Tools — Owner Admin</title>
-<style>
-*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#1f2937}header{background:#172033;color:#fff;padding:22px 28px;display:flex;justify-content:space-between;align-items:center;gap:18px}h1{margin:0;font-size:25px}.sub{color:#b9c6da;font-size:13px;margin-top:5px}.back{color:#fff;text-decoration:none;font-weight:800;background:#2b3953;padding:10px 14px;border-radius:10px}main{max-width:1050px;margin:28px auto;padding:0 18px}.notice{background:#eef2ff;border:1px solid #c7d2fe;border-radius:15px;padding:15px 17px;margin-bottom:20px;line-height:1.45}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:18px}.card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:20px;box-shadow:0 5px 16px rgba(15,23,42,.06)}.icon{font-size:34px}.card h2{font-size:19px;margin:10px 0 6px}.card p{color:#64748b;line-height:1.45;margin:0}.status{margin-top:13px;font-size:12px;font-weight:900;color:#6d28d9;background:#f5f3ff;border-radius:999px;display:inline-block;padding:6px 9px}.gate{max-width:520px;margin:70px auto;background:#fff;border-radius:20px;padding:28px;box-shadow:0 10px 30px rgba(15,23,42,.12);text-align:center}.gate button{border:0;border-radius:10px;padding:11px 15px;background:#2563eb;color:#fff;font-weight:900;cursor:pointer}.hidden{display:none!important}
-</style>
+
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script src="firebase-config.js?v=20261001-teacherauth"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:#f1f5f9;color:#1f2937;font-size:17px}
+header{background:#172033;color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+h1{margin:0;font-size:24px}.sub{color:#b9c6da;font-size:14px;margin-top:4px}
+.back{color:#fff;text-decoration:none;font-weight:800;background:#2b3953;padding:11px 16px;border-radius:10px}
+main{max-width:760px;margin:24px auto 90px;padding:0 16px}
+.notice{background:#eef2ff;border:1px solid #c7d2fe;border-radius:14px;padding:14px 16px;margin-bottom:18px;line-height:1.45;font-size:16px}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:22px;margin-bottom:18px;box-shadow:0 4px 14px rgba(15,23,42,.06)}
+.card-head{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+.stepnum{flex:none;width:42px;height:42px;border-radius:50%;background:#2563eb;color:#fff;font-weight:900;font-size:21px;display:flex;align-items:center;justify-content:center}
+.card h2{font-size:23px;margin:0}
+.hint{color:#64748b;line-height:1.45;margin:4px 0 14px;font-size:16px}
+.formrow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.formrow input,.formrow select{flex:1 1 200px}
+.card input,.card select{padding:13px;border:1px solid #cbd5e1;border-radius:10px;font-size:17px;background:#fff;width:100%}
+.card button{border:0;border-radius:10px;padding:13px 20px;background:#2563eb;color:#fff;font-weight:800;font-size:17px;cursor:pointer}
+.card button:hover{background:#1d4ed8}.card button:disabled{opacity:.5}
+.formrow button{flex:none}
+.listlabel{margin:16px 0 4px;font-size:14px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.04em}
+.entry{padding:12px 0;border-bottom:1px solid #e2e8f0}.entry:last-child{border-bottom:0}
+.entry b{font-size:18px}
+.entry small{display:block;color:#64748b;font-size:15px;margin-top:2px}
+.entry.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.card button.danger{background:#fff;color:#b91c1c;border:1px solid #fecaca;padding:8px 14px;font-size:15px}
+.card button.danger:hover{background:#fef2f2}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#eef2ff;border-radius:999px;padding:5px 6px 5px 14px;font-size:16px}
+.card .chip button{background:transparent;color:#64748b;padding:3px 9px;border-radius:999px;font-size:16px}
+.card .chip button:hover{background:#fee2e2;color:#b91c1c}
+.toolgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:14px}
+.tool{display:flex;align-items:center;gap:12px;padding:14px 16px;border:2px solid #e2e8f0;border-radius:14px;background:#f8fafc;cursor:pointer;user-select:none;font-weight:700;font-size:17px;line-height:1.25}
+.tool input{width:24px;height:24px;margin:0;flex:none;accent-color:#16a34a;cursor:pointer;padding:0}
+.tool:has(input:checked){background:#dcfce7;border-color:#22c55e;color:#14532d}
+.tool .on{margin-left:auto;font-size:13px;font-weight:900;color:#15803d;display:none}
+.tool:has(input:checked) .on{display:inline}
+.tools-title{margin:26px 0 4px;font-size:21px}
+.gate{max-width:520px;margin:70px auto;background:#fff;border-radius:20px;padding:28px;box-shadow:0 10px 30px rgba(15,23,42,.12);text-align:center}
+.gate button{border:0;border-radius:10px;padding:13px 20px;background:#2563eb;color:#fff;font-weight:900;font-size:17px;cursor:pointer}
+.hidden{display:none!important}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(30px);background:#172033;color:#fff;padding:14px 22px;border-radius:12px;font-weight:700;font-size:17px;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;max-width:92vw;text-align:center;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
 </head><body>
 <header><div><h1>Fun Torah Tools — Owner Admin</h1><div class="sub">Platform-wide management</div></div><a class="back" href="index.html">← Back to B3</a></header>
 <main>
 <div id="gate" class="gate"><h2>Owner access</h2><p id="gateMsg">Checking your signed-in Google account…</p><button id="signIn" class="hidden" type="button">Sign in with Google</button></div>
 <div id="ownerArea" class="hidden">
-<div class="notice"><strong>Owner level:</strong> Manage the Fun Torah Tools platform here. B3 is your first classroom.</div>
-<div class="grid">
-<section class="card"><div class="icon">👨‍🏫</div><h2>Teachers</h2><input id="teacherEmail" placeholder="Teacher Gmail"><input id="teacherName" placeholder="Teacher name"><button id="addTeacher">Add teacher</button><div id="teachers"></div></section>
-<section class="card"><div class="icon">🏫</div><h2>Classes</h2><input id="className" placeholder="New class name"><button id="addClass">Add class</button><div id="classes"></div></section>
-<section class="card"><div class="icon">🔗</div><h2>Teacher → Class</h2><select id="teacherSelect"><option value="">Choose teacher</option></select><select id="classSelect"><option value="">Choose class</option></select><button id="assign">Assign</button><p id="status"></p><div id="assignments"></div></section>
-<section class="card"><div class="icon">🧰</div><h2>Class Tools</h2><p>New classes start with no tools. Choose a class, then grant only the tools its teacher should receive.</p><select id="toolClassSelect"><option value="">Choose class</option></select><div id="toolList"></div><h3 style="margin:18px 0 4px">Class Content</h3><p>New classes start empty. Their teacher adds their own, or you can give them a copy of yours.</p><div id="resourceList"></div></section>
-</div></div></main>
-<style>
-.card input,.card select{width:100%;padding:11px;margin:6px 0;border:1px solid #cbd5e1;border-radius:9px}.card button{border:0;border-radius:9px;padding:10px 13px;background:#2563eb;color:#fff;font-weight:800;cursor:pointer}.entry{padding:9px 0;border-bottom:1px solid #e2e8f0}.entry small{display:block;color:#64748b}.entry.row{display:flex;justify-content:space-between;align-items:center;gap:10px}.card button.danger{background:#fff;color:#b91c1c;border:1px solid #fecaca;padding:6px 10px}.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chip{display:inline-flex;align-items:center;gap:4px;background:#eef2ff;border-radius:999px;padding:3px 4px 3px 10px;font-size:14px}.card .chip button{background:transparent;color:#64748b;padding:2px 7px;border-radius:999px}.card .chip button:hover{background:#fee2e2;color:#b91c1c}
-</style>
+<div class="notice"><strong>Owner level:</strong> Manage the Fun Torah Tools platform here. B3 is your first classroom. Work top to bottom: 1 → 4.</div>
+
+<section class="card"><div class="card-head"><div class="stepnum">1</div><h2>Teachers</h2></div>
+<p class="hint">Add a teacher by their Gmail. They can sign in with Google after you give them a class (step 3).</p>
+<div class="formrow"><input id="teacherEmail" placeholder="Teacher Gmail"><input id="teacherName" placeholder="Teacher name"><button id="addTeacher">Add teacher</button></div>
+<div class="listlabel">Your teachers</div><div id="teachers"></div></section>
+
+<section class="card"><div class="card-head"><div class="stepnum">2</div><h2>Classes</h2></div>
+<p class="hint">Create a class for each group of students.</p>
+<div class="formrow"><input id="className" placeholder="New class name"><button id="addClass">Add class</button></div>
+<div class="listlabel">Your classes</div><div id="classes"></div></section>
+
+<section class="card"><div class="card-head"><div class="stepnum">3</div><h2>Give a teacher a class</h2></div>
+<p class="hint">Pick a teacher and a class, then press Assign.</p>
+<div class="formrow"><select id="teacherSelect"><option value="">Choose teacher</option></select><select id="classSelect"><option value="">Choose class</option></select><button id="assign">Assign</button></div>
+<div class="listlabel">Who has what</div><div id="assignments"></div></section>
+
+<section class="card"><div class="card-head"><div class="stepnum">4</div><h2>Tools and content</h2></div>
+<p class="hint">New classes start with no tools. Choose a class, then tap only the tools its teacher should get. Green = on. Changes save instantly.</p>
+<select id="toolClassSelect"><option value="">Choose class</option></select>
+<div id="toolList"></div>
+<h3 class="tools-title">Class Content</h3>
+<p class="hint">New classes start empty. Their teacher adds their own, or you can give them a copy of yours.</p>
+<div id="resourceList"></div></section>
+</div>
+<div id="status" class="toast"></div>
+</main>
+
 <script>
 (function(){
 const OWNER="simcha5770@gmail.com",WS=(window.B3_APP_CONTEXT&&window.B3_APP_CONTEXT.workspaceId)||"b3-2026";
@@ -44,7 +103,7 @@ async function load(){
  await renderToolGrants();
 }
 q("addTeacher").onclick=async()=>{const email=q("teacherEmail").value.trim().toLowerCase(),name=q("teacherName").value.trim();if(!email.includes("@"))return;await db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+key(email)).update({email:email,name:name||email,role:"teacher",active:true,updatedAt:firebase.database.ServerValue.TIMESTAMP});q("teacherEmail").value="";q("teacherName").value="";q("status").textContent="Teacher invitation saved. Assign a class below; the teacher can then sign in with Google.";await load()};
-q("addClass").onclick=async()=>{const name=q("className").value.trim();if(!name)return;let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true});q("className").value="";await load()};
+q("addClass").onclick=async()=>{const name=q("className").value.trim();if(!name)return;let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true});q("className").value="";q("status").textContent="Class added ✓";await load()};
 q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=q("classSelect").value;if(!t||!c){q("status").textContent="Choose a teacher and class.";return}const root="b3Games/workspaces/"+WS,updates={[root+"/teacherInvites/"+t+"/classIds/"+c]:true},uid=teacherData[t]?.claimedUid;if(uid){updates[root+"/teachers/"+uid+"/classIds/"+c]=true;updates[root+"/classes/"+c+"/teacherIds/"+uid]=true;}await db.ref().update(updates);q("status").textContent="Assigned.";await load()};
 // ---- Unassign / delete (owner only; this page is gated to the owner account) ----
 const B3_CLASSES=["et","wt"];
@@ -90,10 +149,10 @@ document.addEventListener("click",e=>{
 });
 async function renderToolGrants(){
  const classId=q("toolClassSelect").value;
- if(!classId){q("toolList").innerHTML='<small>Choose a class to manage its tools.</small>';q("resourceList").innerHTML="";return}
+ if(!classId){q("toolList").innerHTML='<p class="hint" style="margin-top:12px">Choose a class above to see its tools.</p>';q("resourceList").innerHTML="";return}
  const snap=await db.ref("b3Games/workspaces/"+WS+"/classes/"+classId+"/toolGrants").once("value"),grants=snap.val()||{};
- q("toolList").innerHTML=PLATFORM_TOOLS.map(([id,name])=>'<label class="entry" style="display:flex;gap:9px;align-items:center"><input type="checkbox" data-tool="'+id+'" '+(grants[id]===true?"checked":"")+'><span><b>'+safe(name)+'</b></span></label>').join("");
- q("toolList").querySelectorAll("[data-tool]").forEach(box=>box.onchange=()=>db.ref("b3Games/workspaces/"+WS+"/classes/"+classId+"/toolGrants/"+box.dataset.tool).set(box.checked));
+ q("toolList").innerHTML='<div class="toolgrid">'+PLATFORM_TOOLS.map(([id,name])=>'<label class="tool"><input type="checkbox" data-tool="'+id+'" '+(grants[id]===true?"checked":"")+'><span>'+safe(name)+'</span><span class="on">ON</span></label>').join("")+'</div>';
+ q("toolList").querySelectorAll("[data-tool]").forEach(box=>box.onchange=()=>db.ref("b3Games/workspaces/"+WS+"/classes/"+classId+"/toolGrants/"+box.dataset.tool).set(box.checked).then(()=>{q("status").textContent="Saved ✓"}).catch(err=>{console.error(err);box.checked=!box.checked;q("status").textContent="Could not save. Please try again."}));
  await renderResources(classId);
 }
 // Shorashim: B3's own lists live at the base path; every other class has its own copy under classes/<id>.
@@ -139,4 +198,7 @@ q("toolClassSelect").onchange=renderToolGrants;
 q("signIn").onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
 auth.onAuthStateChanged(async user=>{const owner=user&&String(user.email||"").toLowerCase()===OWNER;if(owner){q("gate").classList.add("hidden");q("ownerArea").classList.remove("hidden");await load();return}q("ownerArea").classList.add("hidden");q("gate").classList.remove("hidden");q("signIn").classList.remove("hidden");q("gateMsg").textContent=user?"This Google account is not the Fun Torah Tools owner.":"Sign in with the Fun Torah Tools owner Google account."});
 })();
+</script>
+<script>
+(function(){const t=document.getElementById("status");let timer;new MutationObserver(()=>{if(!t.textContent)return;t.classList.add("show");clearTimeout(timer);timer=setTimeout(()=>{t.classList.remove("show")},3800)}).observe(t,{childList:true,characterData:true,subtree:true})})();
 </script></body></html>
