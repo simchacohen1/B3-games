@@ -1,5 +1,5 @@
 'use strict';
-const APP_BUILD='2026-10-05-story-sync';
+const APP_BUILD='2026-10-05-step-unlock';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
 let group=0,part=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null,soundGame=null;
@@ -61,6 +61,8 @@ function earlierWords(g,p){return [...config.sections.slice(0,g).flatMap(s=>s.wo
 function reviewWords(g,p){return shuffleClient(earlierWords(g,p)).sort((a,b)=>(progress[a]?.credits||0)-(progress[b]?.credits||0)).slice(0,STEP_SIZE)}
 function lessonWords(g,p){return [...newWords(g,p),...reviewWords(g,p)]}
 function stepNumber(g,p){let n=0;for(let i=0;i<g;i++)n+=partCount(i);return n+p+1}
+// The teacher opens steps one at a time (config.unlockedSteps); older settings open whole sections.
+function stepOpen(g,p){if(!open(g))return false;const n=config.unlockedSteps&&config.unlockedSteps[student.classId];return !Number.isInteger(n)||stepNumber(g,p)<=n}
 function render(){
   if(!student||!config)return;
   if(!round&&!flash&&!storyQuiz&&!sentenceGame&&!soundGame){$('words').hidden=false;$('toolbar').hidden=false;}
@@ -69,10 +71,11 @@ function render(){
   $('stats').textContent=`${ids.filter(id=>status(progress[id])==='Learned').length} learned · ${ids.filter(id=>status(progress[id])==='Practicing').length} practicing`;
   $('segments').replaceChildren();
   if(part>=partCount(group))part=0;
-  config.sections.forEach((s,i)=>{for(let pp=0;pp<partCount(i);pp++){const b=node('button',`${open(i)?'':'🔒 '}Step ${stepNumber(i,pp)}`,i===group&&pp===part?'active':'');b.type='button';b.disabled=!open(i);b.title='Story section '+(i+1);b.onclick=()=>{if(busy||pending)return;clearAdvance();group=i;part=pp;showAll=false;round=null;flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;render()};$('segments').append(b)}});
-  $('words').replaceChildren();$('start').disabled=!open(group);$('flashStart').disabled=!open(group);$('sentenceStart').disabled=!open(group);$('soundStart').disabled=!open(group);$('storyQuizStart').disabled=!open(group);$('readStory').hidden=!open(group);$('readStory').href='story.html?section='+group;$('readStory').textContent='📖 Read the illustrated story — '+(partCount(group)>1?'Steps '+stepNumber(group,0)+'–'+stepNumber(group,partCount(group)-1):'Step '+stepNumber(group,0));
+  if(!stepOpen(group,part)){for(let i=config.sections.length-1;i>=0;i--){let found=false;for(let pp=partCount(i)-1;pp>=0;pp--){if(stepOpen(i,pp)){group=i;part=pp;found=true;break}}if(found)break}}
+  config.sections.forEach((s,i)=>{for(let pp=0;pp<partCount(i);pp++){const b=node('button',`${stepOpen(i,pp)?'':'🔒 '}Step ${stepNumber(i,pp)}`,i===group&&pp===part?'active':'');b.type='button';b.disabled=!stepOpen(i,pp);b.title='Story section '+(i+1);b.onclick=()=>{if(busy||pending)return;clearAdvance();group=i;part=pp;showAll=false;round=null;flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;render()};$('segments').append(b)}});
+  $('words').replaceChildren();$('start').disabled=!stepOpen(group,part);$('flashStart').disabled=!stepOpen(group,part);$('sentenceStart').disabled=!stepOpen(group,part);$('soundStart').disabled=!stepOpen(group,part);$('storyQuizStart').disabled=!open(group);$('readStory').hidden=!open(group);$('readStory').href='story.html?section='+group;$('readStory').textContent='📖 Read the illustrated story — '+(partCount(group)>1?'Steps '+stepNumber(group,0)+'–'+stepNumber(group,partCount(group)-1):'Step '+stepNumber(group,0));
   $('title').textContent=showAll?'My vocabulary':`Step ${stepNumber(group,part)} · new words`;
-  const visible=showAll?config.sections.flatMap((s,i)=>open(i)?s.words:[]):open(group)?newWords(group,part):[];
+  const visible=showAll?config.sections.flatMap((s,i)=>open(i)?s.words:[]):stepOpen(group,part)?newWords(group,part):[];
   for(const id of visible){const w=word(id);if(!w)continue;const card=node('article','','word'),st=status(progress[id]);card.append(node('span',st,'status '+st.toLowerCase()));const yi=node('div',w.yi,'yi');yi.lang='yi';card.append(yi,node('div',w.en));$('words').append(card)}
   if(!visible.length)$('words').append(node('p','Your teacher will open your next section soon.'));
   else if(!showAll&&earlierWords(group,part).length)$('words').append(node('p','The games will also mix in some review words from earlier steps.','note'));
@@ -439,7 +442,7 @@ function soundResetWord(){
   soundGame.choiceOrder={};soundGame.cursor=0;soundGame.placed=new Set();soundGame.transitioning=false;soundGame.lastCorrect=null;soundGame.feedback='';soundGame.wrongChoice=null;
 }
 $('soundStart').onclick=()=>{
-  if(busy||pending||!open(group))return;
+  if(busy||pending||!stepOpen(group,part))return;
   clearAdvance();round=null;flash=null;storyQuiz=null;sentenceGame=null;
   $('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;
   const ids=shuffleClient(lessonWords(group,part));
@@ -561,7 +564,7 @@ function sentenceAttempt(targetId,answerId){
   sentenceGameRender();
 }
 $('sentenceStart').onclick=()=>{
-  if(busy||pending||!open(group))return;
+  if(busy||pending||!stepOpen(group,part))return;
   clearAdvance();round=null;flash=null;storyQuiz=null;soundGame=null;
   $('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('soundgame').hidden=true;
   const ids=shuffleClient(lessonWords(group,part));
@@ -625,7 +628,7 @@ function sentenceGameRender(){
 }
 
 $('flashStart').onclick=()=>{
-  if(busy||pending||!open(group))return;
+  if(busy||pending||!stepOpen(group,part))return;
   clearAdvance();round=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('practice').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;
   flash={group,ids:shuffleClient(lessonWords(group,part)),idx:0,flipped:false};
   flashRender();focusFlash();
@@ -657,7 +660,7 @@ function flashRender(){
   actions.append(dontKnow,know);
   box.append(actions);
 }
-$('start').onclick=async()=>{if(busy)return;clearAdvance();flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;busy=true;$('start').disabled=true;try{message('');const s=await API.call('start',{group,part});round=s.round;pending=null;$('practice').hidden=false;question();focusPractice()}catch(e){message(e.message)}finally{busy=false;$('start').disabled=!open(group)}};
+$('start').onclick=async()=>{if(busy||!stepOpen(group,part))return;clearAdvance();flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;busy=true;$('start').disabled=true;try{message('');const s=await API.call('start',{group,part});round=s.round;pending=null;$('practice').hidden=false;question();focusPractice()}catch(e){message(e.message)}finally{busy=false;$('start').disabled=!open(group)}};
 function question(){
   clearAdvance();
   const box=$('practice');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
