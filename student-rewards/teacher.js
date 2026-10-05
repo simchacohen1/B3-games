@@ -815,7 +815,7 @@ auth.onAuthStateChanged(async user=>{
   state.teacherMode=!user.email||user.email.toLowerCase()!==ADMIN.toLowerCase();
   NAV=state.teacherMode?TEACHER_NAV:OWNER_NAV;if(!NAV.includes(state.tab))state.tab="Overview";
   state.user=user;
-  try{await loadRoot()}catch(err){state.user=null;await auth.signOut();$("#loginError").textContent=err.message||String(err);return}
+  try{await loadRoot()}catch(err){state.user=null;$("#loginView").classList.remove("hidden");$("#appView").classList.add("hidden");$("#loginError").textContent="Could not open Student Rewards: "+(err.message||String(err))+" Refresh the page to try again.";return}
   $("#loginView").classList.add("hidden");$("#appView").classList.remove("hidden");
   if(!state.teacherMode){const seeded=await ensureRewardModelV2();if(seeded)await loadRoot();}
   subscribe();render();
