@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -85,13 +86,16 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-const gameRef = db.ref("tentTrailTrivia");
+// A class other than B3's own (et/wt) plays its own separate game with its own questions.
+const GS_CLASS = (new URLSearchParams(location.search).get('class') || localStorage.getItem('b3Games_studentClass') || '').trim();
+const CLASS_SPACE = /^[A-Za-z0-9_-]{1,100}$/.test(GS_CLASS) && !['et', 'wt'].includes(GS_CLASS);
+const gameRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/live' : "tentTrailTrivia");
 
 // Questions live in the database (teacher.html is the master copy). This
 // screen just reads them live - you never need to edit this file for
 // question changes.
 const ACTIVE_SET_ID = "vayeira18";
-const setRef = db.ref("questionSets/" + ACTIVE_SET_ID);
+const setRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/set' : "questionSets/" + ACTIVE_SET_ID);
 
 let questions = [];
 let questionsReady = false;

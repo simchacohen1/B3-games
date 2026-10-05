@@ -8,6 +8,9 @@
 <title>Game Show - Teacher</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="../firebase-config.js"></script>
+<script src="../site-settings.js"></script>
 <style>
   body { font-family: Calibri, Arial, sans-serif; background: #fdf6ec; margin: 0; padding: 20px; color: #3a2417; }
   h1 { text-align: center; color: #b85042; margin-bottom: 4px; }
@@ -153,7 +156,8 @@
     <h2>Teacher Access</h2>
     <div>Enter the password to continue</div>
     <input type="password" id="lockPassword" placeholder="Password" onkeydown="if(event.key==='Enter')checkPassword()">
-    <button onclick="checkPassword()">Unlock</button>
+    <button onclick="checkPassword()" id="lockUnlock">Unlock</button>
+    <button id="lockGoogle" style="display:none">Sign in with Google</button>
     <div class="lock-error" id="lockError"></div>
   </div>
 </div>
@@ -269,7 +273,14 @@
 const TEACHER_PASSWORD = "class123";
 // ------------------------------------------------------
 
+// Opened from a teacher's home page as ?class=<id>: any class other than B3's own
+// (et/wt) gets its own live game and its own questions, and its teacher signs in
+// with Google instead of the B3 password.
+const GS_CLASS = (new URLSearchParams(location.search).get('class') || '').trim();
+const CLASS_SPACE = /^[A-Za-z0-9_-]{1,100}$/.test(GS_CLASS) && !['et', 'wt'].includes(GS_CLASS);
+
 function checkPassword() {
+  if (CLASS_SPACE) return;
   const entered = document.getElementById('lockPassword').value;
   if (entered === TEACHER_PASSWORD) {
     document.getElementById('lockOverlay').style.display = 'none';
@@ -307,7 +318,7 @@ loadSavedTheme();
 // swapping "teacher.html" for "player.html", so it's always correct no
 // matter where this file is hosted.
 function getStudentLink() {
-  return window.location.href.replace(/teacher\.html(\?.*)?$/, 'player.html');
+  return window.location.href.replace(/teacher\.html(\?.*)?$/, 'player.html') + (CLASS_SPACE ? '?class=' + encodeURIComponent(GS_CLASS) : '');
 }
 
 function copyStudentLink() {
@@ -322,7 +333,7 @@ function copyStudentLink() {
 document.getElementById('studentLinkText').textContent = getStudentLink();
 
 // Skip re-entering the password if already unlocked earlier in this browser tab.
-if (sessionStorage.getItem('teacherUnlocked') === 'yes') {
+if (!CLASS_SPACE && sessionStorage.getItem('teacherUnlocked') === 'yes') {
   document.getElementById('lockOverlay').style.display = 'none';
   document.getElementById('mainContent').classList.remove('hidden');
 }
@@ -341,14 +352,36 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-const gameRef = db.ref("tentTrailTrivia");
+const gameRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/live' : "tentTrailTrivia");
 
 // This is the question set teacher.html knows about locally, used only as a
 // one-time fallback seed if the database is ever empty. The real "master" copy
 // lives in the database from now on - edit it using the on-page editor.
 const ACTIVE_SET_ID = "vayeira18";
 const ACTIVE_SET_TITLE = "Game Show";
-const setRef = db.ref("questionSets/" + ACTIVE_SET_ID);
+const setRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/set' : "questionSets/" + ACTIVE_SET_ID);
+
+if (CLASS_SPACE) {
+  document.getElementById('lockPassword').style.display = 'none';
+  document.getElementById('lockUnlock').style.display = 'none';
+  const lockError = document.getElementById('lockError');
+  lockError.textContent = 'Checking your teacher account…';
+  document.getElementById('lockGoogle').onclick = () => window.B3SiteSettings.signInWithGoogle().catch(err => { lockError.textContent = (err && err.message) || 'Google sign-in did not complete.'; });
+  window.B3SiteSettings.onAuthStateChanged(async (user, authorized, access) => {
+    if (!user || !authorized) {
+      document.getElementById('lockGoogle').style.display = '';
+      lockError.textContent = user ? 'This Google account is not a Fun Torah Tools teacher.' : 'Sign in with your teacher Google account.';
+      return;
+    }
+    const admin = access && access.role === 'admin';
+    if (!admin && !((access && access.classIds) || []).includes(GS_CLASS)) { lockError.textContent = 'This class is not assigned to your teacher account.'; return; }
+    const cls = (await db.ref('b3Games/workspaces/' + window.B3SiteSettings.workspaceId + '/classes/' + GS_CLASS).once('value')).val();
+    if (!cls || cls.active === false || (!admin && !(cls.toolGrants && cls.toolGrants['game-show'] === true))) { lockError.textContent = 'Game Show is not turned on for this class. Ask the admin.'; return; }
+    document.getElementById('lockGoogle').style.display = 'none';
+    document.getElementById('lockOverlay').style.display = 'none';
+    document.getElementById('mainContent').classList.remove('hidden');
+  });
+}
 
 const localQuestions = [
   { q: "וַיֵּרָא אֵלָיו\nThis phrase means...", ans: "Hashem appeared to him (Avrohom)" },
@@ -452,6 +485,7 @@ function confirmByTyping(word, message) {
 }
 
 function syncQuestionsToDatabase() {
+  if (CLASS_SPACE) { alert('This class uses its own questions. Add them in the Setup tab.'); return; }
   const sure = confirmByTyping('RESTORE', "This will REPLACE your current question list with the original built-in Vayeira Perek 18 list this file shipped with. Any edits you made will be lost.");
   if (!sure) return;
   setRef.set({ title: ACTIVE_SET_TITLE, questions: localQuestions }).then(() => {
@@ -474,6 +508,10 @@ setRef.once('value').then(snap => {
       buildFromQuestions(flat);
       document.getElementById('soundStatus').textContent = 'Converted old question format automatically';
     });
+  } else if (CLASS_SPACE) {
+    // A new class starts with no questions; its teacher adds their own.
+    buildFromQuestions([]);
+    document.getElementById('soundStatus').textContent = 'No questions yet. Add your own in the Setup tab.';
   } else {
     setRef.set({ title: ACTIVE_SET_TITLE, questions: localQuestions }).then(() => {
       buildFromQuestions(localQuestions);
@@ -490,6 +528,7 @@ setRef.once('value').then(snap => {
 
 function loadQuestion(qIndex) {
   const q = questions[qIndex] || questions[0];
+  if (!q) { document.getElementById('qnum').textContent = ''; document.getElementById('qtext').textContent = 'No questions yet. Add your own in the Setup tab.'; return; }
   document.getElementById('qnum').textContent = 'Question ' + (qIndex + 1) + ' of ' + questions.length;
   document.getElementById('qtext').textContent = q.q;
   highlightActiveQuestion(qIndex);
