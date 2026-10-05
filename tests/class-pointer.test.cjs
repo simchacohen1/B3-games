@@ -54,7 +54,8 @@ test('disconnected students are removed from the roster and pointer state',()=>{
   assert.equal(f.run('members.size'),0);assert.equal(f.run("state.points['student:student-a']"),undefined);
 });
 test('pointer styles accept only supported shapes and palette colors',()=>{
-  assert.deepEqual(C.pointStyle({tool:'yad',color:'#dca0ff'}),{tool:'yad',color:'#dca0ff'});
+  assert.deepEqual(C.pointStyle({tool:'star',color:'#dca0ff'}),{tool:'star',color:'#dca0ff'});
+  assert.equal(C.pointStyle({tool:'yad'}).tool,'target');
   assert.deepEqual(C.pointStyle({tool:'spotlight',color:'url(https://example.test)'}),{tool:'target',color:null});
 });
 test('leaving the picture cancels queued hover and removes only that student',()=>{
@@ -84,4 +85,22 @@ test('network hover keeps the final position and never restores it after hiding'
   f.run("commitStudentHover(members.get('student:student-a'))");assert.equal(f.run("state.points['student:student-a'].x"),0.9);
   f.connection.emit('data',{type:'point',point:{x:0.6,y:0.6}});f.connection.emit('data',{type:'pointer-hide'});
   f.run("commitStudentHover(members.get('student:student-a'))");assert.equal(f.run("state.points['student:student-a']"),undefined);
+});
+const sampleStroke={tool:'highlight',color:'#75df9a',size:0.016,points:[{x:0.1,y:0.2},{x:0.6,y:0.2}]};
+test('highlight validation bounds data and rejects nonfinite or off-picture strokes',()=>{
+  assert.ok(C.cleanStroke(sampleStroke));
+  for(const stroke of [{...sampleStroke,tool:'yad'},{...sampleStroke,points:[]},{...sampleStroke,points:[{x:NaN,y:0},{x:0,y:0}]},{...sampleStroke,points:Array(257).fill({x:0,y:0})}])assert.equal(C.cleanStroke(stroke),null);
+});
+test('highlights have separate owners and undo or clear never deletes another layer',()=>{
+  const store=new C.HighlightStore();store.add('student:a',sampleStroke);store.add('student:b',sampleStroke);store.add('student:a',sampleStroke);
+  store.edit('student:a','undo');assert.equal(store.strokes.length,2);
+  store.edit('student:b','clear');assert.equal(store.strokes.length,1);assert.equal(store.strokes[0].owner,'student:a');
+});
+test('highlight messages enforce admission and permission and ignore forged ownership',()=>{
+  const f=teacherFixture();f.run("state.sharing=true;state.mode='everyone'");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
+  f.run("members.get('student:student-a').admitted=true;state.mode='nobody'");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
+  f.run("state.mode='everyone'");f.connection.emit('data',{type:'highlight',stroke:{...sampleStroke,owner:'teacher'}});assert.equal(f.run('highlightStore.strokes[0].owner'),'student:student-a');
+  f.run("highlightStore.add('teacher',{tool:'box',points:[{x:0,y:0},{x:0.5,y:0.5}]})");
+  f.connection.emit('data',{type:'edit-highlights',action:'all',owner:'teacher'});assert.equal(f.run('highlightStore.strokes.length'),2);
+  f.connection.emit('data',{type:'edit-highlights',action:'clear',owner:'teacher'});assert.equal(f.run('highlightStore.strokes.length'),1);assert.equal(f.run('highlightStore.strokes[0].owner'),'teacher');
 });
