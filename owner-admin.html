@@ -85,10 +85,11 @@ const OWNER="simcha5770@gmail.com",WS=(window.B3_APP_CONTEXT&&window.B3_APP_CONT
 if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 const auth=firebase.auth(),db=firebase.database(),q=id=>document.getElementById(id);let teacherData={},classData={};
 const PLATFORM_TOOLS=[
- ["yiddish","Yiddish"],["posuk-practice-scroll","Posuk Practice"],["rashi-letters","Rashi Letters"],["shorashim","Shorashim"],["chazara","Chazara"],["game-show","Game Show"],["student-rewards","Student Rewards"],["weekly-quiz","Weekly Quiz"],
- ["davening","Davening Player"],["gallery","Gallery"],["tag","Tag Game"],
- ["chumash-quiz","Chumash Quiz (one screen)"],["work-timer","Work Timer"],["class-slides","Class Slides"],["class-pointer","Class Pointer"],["name-picker","Name Picker"],["chavrusa","Chavrusa of the Day"]
+ ["yiddish","Yiddish","dual"],["posuk-practice-scroll","Posuk Practice","dual"],["rashi-letters","Rashi Letters","dual"],["shorashim","Shorashim","dual"],["chazara","Chazara","dual"],["game-show","Game Show","dual"],["student-rewards","Student Rewards","dual"],["weekly-quiz","Weekly Quiz","dual"],["gallery","Gallery","dual"],["tag","Tag Game","dual"],
+ ["davening","Davening Player","teacher"],["chavrusa","Chavrusa of the Day","teacher"],["name-picker","Name Picker","teacher"],
+ ["class-pointer","Class Pointer","unsorted"]
 ];
+const TOOL_GROUPS=[["dual","Student activities","Students use these. The teacher also gets a control or reports view."],["teacher","Teacher-only tools","Only the teacher sees these. Students never do."],["unsorted","Not sorted yet","Still deciding where these belong."]];
 function key(s){return String(s||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"")}
 function safe(s){const d=document.createElement("div");d.textContent=String(s||"");return d.innerHTML}
 async function load(){
@@ -151,7 +152,7 @@ async function renderToolGrants(){
  const classId=q("toolClassSelect").value;
  if(!classId){q("toolList").innerHTML='<p class="hint" style="margin-top:12px">Choose a class above to see its tools.</p>';q("resourceList").innerHTML="";return}
  const snap=await db.ref("b3Games/workspaces/"+WS+"/classes/"+classId+"/toolGrants").once("value"),grants=snap.val()||{};
- q("toolList").innerHTML='<div class="toolgrid">'+PLATFORM_TOOLS.map(([id,name])=>'<label class="tool"><input type="checkbox" data-tool="'+id+'" '+(grants[id]===true?"checked":"")+'><span>'+safe(name)+'</span><span class="on">ON</span></label>').join("")+'</div>';
+ q("toolList").innerHTML=TOOL_GROUPS.map(([g,title,desc])=>{const items=PLATFORM_TOOLS.filter(t=>t[2]===g);if(!items.length)return"";return '<div class="listlabel">'+title+'</div><p class="hint" style="margin:0 0 4px">'+desc+'</p><div class="toolgrid">'+items.map(([id,name])=>'<label class="tool"><input type="checkbox" data-tool="'+id+'" '+(grants[id]===true?"checked":"")+'><span>'+safe(name)+'</span><span class="on">ON</span></label>').join("")+'</div>'}).join("");
  q("toolList").querySelectorAll("[data-tool]").forEach(box=>box.onchange=()=>db.ref("b3Games/workspaces/"+WS+"/classes/"+classId+"/toolGrants/"+box.dataset.tool).set(box.checked).then(()=>{q("status").textContent="Saved ✓"}).catch(err=>{console.error(err);box.checked=!box.checked;q("status").textContent="Could not save. Please try again."}));
  await renderResources(classId);
 }
