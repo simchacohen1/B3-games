@@ -24,7 +24,7 @@ main{max-width:1050px;margin:auto;padding:16px}
 </style></head><body>
 <header>
 <h1>Story Timing Tool (teacher only)</h1>
-<p>Click a paragraph to choose it. Play the audio, then press <b>Set start</b> when it begins and <b>Set end</b> when it finishes.
+<p>Click a paragraph to choose it. Play the audio, then press <b>Set end</b> when it finishes. The next paragraph's start is filled in automatically.
 Keys: <b>Space</b> play/pause · <b>←</b> back 5 sec · <b>→</b> forward 5 sec · <b>S</b> set start · <b>E</b> set end.</p>
 <div class="bar">
   <button id="back5">⏪ 5 sec</button><button id="playBtn">▶ Play</button><button id="fwd5">5 sec ⏩</button>
@@ -70,7 +70,7 @@ function draw(scroll){
     const c=document.createElement('div');c.className='controls';
     const num=document.createElement('span');num.className='num';num.textContent='Paragraph '+i;
     const field=(obj,label)=>{const l=document.createElement('label');l.textContent=label+' ';const inp=document.createElement('input');inp.value=fmt(obj[i]);inp.placeholder='m:ss.s';
-      inp.onchange=()=>{const v=parse(inp.value);if(v===undefined){inp.value=fmt(obj[i]);return}if(v===null)delete obj[i];else obj[i]=v;sel=k;draw()};l.append(inp);return l};
+      inp.onchange=()=>{const v=parse(inp.value);if(v===undefined){inp.value=fmt(obj[i]);return}if(v===null)delete obj[i];else obj[i]=v;if(obj===ends)linkNext(k);sel=k;draw()};l.append(inp);return l};
     const btn=(label,fn,cls)=>{const b=document.createElement('button');b.textContent=label;if(cls)b.className=cls;b.onclick=()=>{sel=k;fn()};return b};
     c.append(num,field(starts,'Start'),btn('Set start = now',()=>setStart(k),'set'),field(ends,'End'),btn('Set end = now',()=>setEnd(k),'set'),
       btn('▶ Play paragraph',()=>playPara(k)),btn('▶ Last 3 sec',()=>playEnd(k)));
@@ -81,7 +81,8 @@ function draw(scroll){
   if(scroll){const cur=$('row'+sel);if(cur)cur.scrollIntoView({block:'center',behavior:'smooth'})}
 }
 function setStart(k){starts[order[k]]=r1(audio.currentTime);draw()}
-function setEnd(k){const i=order[k];ends[i]=r1(audio.currentTime);const n=order[k+1];if(n!=null&&starts[n]==null)starts[n]=ends[i];if(k+1<order.length)sel=k+1;draw(true)}
+function linkNext(k){const i=order[k],n=order[k+1];if(n!=null&&ends[i]!=null)starts[n]=ends[i]}
+function setEnd(k){const i=order[k];ends[i]=r1(audio.currentTime);linkNext(k);if(k+1<order.length)sel=k+1;draw(true)}
 function playPara(k){const i=order[k];if(starts[i]==null)return;audio.currentTime=starts[i];stopAt=ends[i]??null;audio.play()}
 function playEnd(k){const i=order[k];if(ends[i]==null)return;audio.currentTime=Math.max(0,ends[i]-3);stopAt=ends[i]+0.5;audio.play()}
 function jump(d){audio.currentTime=Math.max(0,Math.min(audio.duration||1e9,audio.currentTime+d))}
