@@ -3,60 +3,107 @@
 <title>Story Timing Tool</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#eee7d7;color:#201c18}
-header{background:#143e69;color:#fff;padding:14px 20px;position:sticky;top:0;z-index:2}
-header h1{margin:0 0 6px;font-size:22px}header p{margin:0;font-size:14px;color:#dbe6f3}
-.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
-audio{width:min(700px,100%)}
-button{font:bold 16px Arial;border:0;border-radius:10px;padding:10px 16px;background:#fff;color:#143e69;cursor:pointer}
-#tap{background:#ffd34d;color:#201c18;font-size:20px;padding:14px 22px}
-#tap:disabled{opacity:.5}
-main{max-width:1000px;margin:auto;padding:16px}
-.para{direction:rtl;text-align:right;font:22px/1.6 'Times New Roman',serif;background:#fff;border:3px solid transparent;border-radius:10px;padding:10px 14px;margin:0 0 10px;display:flex;gap:14px;align-items:flex-start}
-.para .t{direction:ltr;font:bold 14px Arial;color:#666;min-width:64px;padding-top:6px}
-.para.done .t{color:#1b7a3d}
-.para.next{border-color:#e0a800;background:#fff8dc}
-.para button{direction:ltr;font-size:12px;padding:6px 8px;background:#eef3f8}
-#out{width:100%;height:110px;font:13px monospace;margin-top:10px}
+header{background:#143e69;color:#fff;padding:12px 20px;position:sticky;top:0;z-index:2;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+header h1{margin:0 0 4px;font-size:20px}header p{margin:0;font-size:14px;color:#dbe6f3}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+audio{width:min(560px,100%)}
+button,select{font:bold 15px Arial;border:0;border-radius:10px;padding:9px 13px;background:#fff;color:#143e69;cursor:pointer}
+#now{font:bold 26px monospace;color:#ffd34d;min-width:120px}
+main{max-width:1050px;margin:auto;padding:16px}
+.para{background:#fff;border:3px solid transparent;border-radius:12px;padding:12px 14px;margin:0 0 12px;cursor:pointer}
+.para.sel{border-color:#e0a800;background:#fff8dc}
+.para.bad{box-shadow:0 0 0 3px #d33 inset}
+.text{direction:rtl;text-align:right;font:22px/1.6 'Times New Roman',serif;margin-bottom:10px}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:14px}
+.controls input{width:86px;font:bold 15px monospace;padding:7px;border:2px solid #cbd5e1;border-radius:8px;text-align:center}
+.controls button{background:#e8eff7;font-size:14px;padding:8px 11px}
+.controls .set{background:#ffd34d;color:#201c18}
+.num{font:bold 13px Arial;color:#777;margin-right:6px}
+.warn{color:#c22;font-weight:bold}
+#out{width:100%;height:120px;font:13px monospace;margin-top:10px}
 </style></head><body>
 <header>
 <h1>Story Timing Tool (teacher only)</h1>
-<p>To fix one paragraph: click it, press ▶ a little before it on the audio, then press the yellow button when it starts. Press Play. Each time the speaker STARTS a new paragraph, press the yellow button (or the Space bar). Made a mistake? Press Undo.</p>
-<div class="bar"><audio id="audio" controls preload="auto" src="audio.mp3"></audio></div>
-<div class="bar"><button id="tap" disabled>▶ Next paragraph starts NOW</button><button id="undo">↩ Undo</button><span id="status"></span></div>
+<p>Click a paragraph to choose it. Play the audio, then press <b>Set start</b> when it begins and <b>Set end</b> when it finishes.
+Keys: <b>Space</b> play/pause · <b>←</b> back 5 sec · <b>→</b> forward 5 sec · <b>S</b> set start · <b>E</b> set end.</p>
+<div class="bar">
+  <button id="back5">⏪ 5 sec</button><button id="playBtn">▶ Play</button><button id="fwd5">5 sec ⏩</button>
+  <span id="now">0:00.0</span>
+  <label style="color:#fff">Speed <select id="speed"><option>0.75</option><option selected>1</option><option>1.25</option><option>1.5</option><option>2</option></select></label>
+  <audio id="audio" controls preload="auto" src="audio.mp3"></audio>
+</div>
 </header>
 <main>
 <div id="list">Loading the story…</div>
 <h2>When you are done</h2>
-<p>Press <b>Copy</b> and paste the result into the chat with Claude.</p>
+<p>Press <b>Copy</b> and paste the result into the chat with Claude. <span id="summary"></span></p>
 <button id="copy">Copy</button>
 <textarea id="out" readonly></textarea>
 </main>
 <script src="story-times.js"></script>
 <script>
 const $=id=>document.getElementById(id),audio=$('audio');
-let paras=[],order=[],times={...(window.STORY_TIMES||{})},next=0;
-function fmt(s){if(s==null)return '—';const m=Math.floor(s/60),r=(s-m*60).toFixed(1).padStart(4,'0');return m+':'+r}
-function draw(){
-  $('list').replaceChildren();
-  order.forEach((i,k)=>{const row=document.createElement('div');row.className='para'+(times[i]!=null?' done':'')+(k===next?' next':'');row.id='row'+i;
-    const t=document.createElement('span');t.className='t';t.textContent=fmt(times[i]);
-    const txt=document.createElement('span');txt.textContent=paras[i];
-    const play=document.createElement('button');play.textContent='▶ from here';play.disabled=times[i]==null;play.onclick=()=>{audio.currentTime=Math.max(0,times[i]-1);audio.play();next=k+1;draw()};
-    row.title='Click to re-time this paragraph';row.onclick=e=>{if(e.target.tagName==='BUTTON')return;next=k;draw()};row.style.cursor='pointer';row.append(t,txt,play);$('list').append(row)});
-  const done=order.filter(i=>times[i]!=null).length;
-  $('status').textContent=`${done} of ${order.length} paragraphs timed`;
-  $('tap').disabled=next>=order.length;
-  $('out').value='STORY_TIMES '+JSON.stringify(Object.fromEntries(order.filter(i=>times[i]!=null).map(i=>[i,Math.round(times[i]*10)/10])));
-  const cur=$('row'+order[next]);if(cur)cur.scrollIntoView({block:'center',behavior:'smooth'});
+let paras=[],order=[],sel=0,stopAt=null;
+const starts={...(window.STORY_TIMES||{})},ends={...(window.STORY_ENDS||{})};
+const r1=v=>Math.round(v*10)/10;
+function fmt(s){if(s==null||!Number.isFinite(s))return '';const m=Math.floor(s/60),r=(s-m*60).toFixed(1).padStart(4,'0');return m+':'+r}
+function parse(v){v=String(v).trim();if(!v)return null;const p=v.split(':');const n=p.length===2?Number(p[0])*60+Number(p[1]):Number(v);return Number.isFinite(n)&&n>=0?r1(n):undefined}
+function problem(i,k){
+  const s=starts[i],e=ends[i];
+  if(s!=null&&e!=null&&e<=s)return 'End is before start';
+  const prev=order[k-1];if(prev!=null&&s!=null&&starts[prev]!=null&&s<starts[prev])return 'Starts before the paragraph above';
+  return '';
 }
-function tap(){if(next>=order.length)return;times[order[next]]=audio.currentTime;next++;draw()}
-$('tap').onclick=tap;
-document.addEventListener('keydown',e=>{if(e.code==='Space'&&e.target.tagName!=='TEXTAREA'){e.preventDefault();tap()}});
-$('undo').onclick=()=>{if(next>0){next--;delete times[order[next]];draw()}};
-$('copy').onclick=async()=>{$('out').select();try{await navigator.clipboard.writeText($('out').value);$('copy').textContent='Copied ✓'}catch(e){document.execCommand('copy');$('copy').textContent='Copied ✓'}};
+function output(){
+  const pick=o=>Object.fromEntries(order.filter(i=>o[i]!=null).map(i=>[i,r1(o[i])]));
+  $('out').value='STORY_TIMES '+JSON.stringify(pick(starts))+'\nSTORY_ENDS '+JSON.stringify(pick(ends));
+  const ns=order.filter(i=>starts[i]!=null).length,ne=order.filter(i=>ends[i]!=null).length,bad=order.filter((i,k)=>problem(i,k)).length;
+  $('summary').textContent=`${ns} of ${order.length} starts and ${ne} ends set`+(bad?` · ${bad} need fixing (red)`:'');
+}
+function draw(scroll){
+  $('list').replaceChildren();
+  order.forEach((i,k)=>{
+    const card=document.createElement('div');const issue=problem(i,k);
+    card.className='para'+(k===sel?' sel':'')+(issue?' bad':'');card.id='row'+k;
+    card.onclick=e=>{if(/BUTTON|INPUT/.test(e.target.tagName))return;sel=k;draw()};
+    const text=document.createElement('div');text.className='text';text.textContent=paras[i];
+    const c=document.createElement('div');c.className='controls';
+    const num=document.createElement('span');num.className='num';num.textContent='Paragraph '+i;
+    const field=(obj,label)=>{const l=document.createElement('label');l.textContent=label+' ';const inp=document.createElement('input');inp.value=fmt(obj[i]);inp.placeholder='m:ss.s';
+      inp.onchange=()=>{const v=parse(inp.value);if(v===undefined){inp.value=fmt(obj[i]);return}if(v===null)delete obj[i];else obj[i]=v;sel=k;draw()};l.append(inp);return l};
+    const btn=(label,fn,cls)=>{const b=document.createElement('button');b.textContent=label;if(cls)b.className=cls;b.onclick=()=>{sel=k;fn()};return b};
+    c.append(num,field(starts,'Start'),btn('Set start = now',()=>setStart(k),'set'),field(ends,'End'),btn('Set end = now',()=>setEnd(k),'set'),
+      btn('▶ Play paragraph',()=>playPara(k)),btn('▶ Last 3 sec',()=>playEnd(k)));
+    if(issue){const w=document.createElement('span');w.className='warn';w.textContent='⚠ '+issue;c.append(w)}
+    card.append(text,c);$('list').append(card);
+  });
+  output();
+  if(scroll){const cur=$('row'+sel);if(cur)cur.scrollIntoView({block:'center',behavior:'smooth'})}
+}
+function setStart(k){starts[order[k]]=r1(audio.currentTime);draw()}
+function setEnd(k){const i=order[k];ends[i]=r1(audio.currentTime);const n=order[k+1];if(n!=null&&starts[n]==null)starts[n]=ends[i];if(k+1<order.length)sel=k+1;draw(true)}
+function playPara(k){const i=order[k];if(starts[i]==null)return;audio.currentTime=starts[i];stopAt=ends[i]??null;audio.play()}
+function playEnd(k){const i=order[k];if(ends[i]==null)return;audio.currentTime=Math.max(0,ends[i]-3);stopAt=ends[i]+0.5;audio.play()}
+function jump(d){audio.currentTime=Math.max(0,Math.min(audio.duration||1e9,audio.currentTime+d))}
+$('back5').onclick=()=>jump(-5);$('fwd5').onclick=()=>jump(5);
+$('playBtn').onclick=()=>{stopAt=null;audio.paused?audio.play():audio.pause()};
+$('speed').onchange=e=>audio.playbackRate=Number(e.target.value);
+audio.addEventListener('play',()=>$('playBtn').textContent='⏸ Pause');
+audio.addEventListener('pause',()=>$('playBtn').textContent='▶ Play');
+audio.addEventListener('timeupdate',()=>{$('now').textContent=fmt(audio.currentTime);if(stopAt!=null&&audio.currentTime>=stopAt){audio.pause();stopAt=null}});
+document.addEventListener('keydown',e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.code==='Space'){e.preventDefault();$('playBtn').click()}
+  else if(e.key==='ArrowLeft'){e.preventDefault();jump(-5)}
+  else if(e.key==='ArrowRight'){e.preventDefault();jump(5)}
+  else if(e.key==='s'||e.key==='S'){setStart(sel)}
+  else if(e.key==='e'||e.key==='E'){setEnd(sel)}
+});
+$('copy').onclick=async()=>{$('out').select();try{await navigator.clipboard.writeText($('out').value)}catch(e){document.execCommand('copy')}$('copy').textContent='Copied ✓';setTimeout(()=>$('copy').textContent='Copy',2000)};
 fetch('story.html').then(r=>r.text()).then(h=>{
   const m=h.match(/<script id="payload" type="application\/json">([\s\S]*?)<\/script>/);
-  paras=JSON.parse(m[1]).paras;order=paras.map((p,i)=>i).filter(i=>paras[i].trim());const firstMissing=order.findIndex(i=>times[i]==null);next=firstMissing<0?order.length:firstMissing;draw();
+  paras=JSON.parse(m[1]).paras;order=paras.map((p,i)=>i).filter(i=>paras[i].trim());
+  const firstMissing=order.findIndex(i=>starts[i]==null||ends[i]==null);sel=firstMissing<0?0:firstMissing;draw(true);
 }).catch(()=>{$('list').textContent='Could not load the story. Refresh the page.'});
 </script>
 </body></html>
