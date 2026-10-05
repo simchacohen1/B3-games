@@ -20,7 +20,7 @@ main{max-width:1000px;margin:auto;padding:16px}
 </style></head><body>
 <header>
 <h1>Story Timing Tool (teacher only)</h1>
-<p>Press Play. Each time the speaker STARTS a new paragraph, press the yellow button (or the Space bar). Made a mistake? Press Undo.</p>
+<p>To fix one paragraph: click it, press ▶ a little before it on the audio, then press the yellow button when it starts. Press Play. Each time the speaker STARTS a new paragraph, press the yellow button (or the Space bar). Made a mistake? Press Undo.</p>
 <div class="bar"><audio id="audio" controls preload="auto" src="audio.mp3"></audio></div>
 <div class="bar"><button id="tap" disabled>▶ Next paragraph starts NOW</button><button id="undo">↩ Undo</button><span id="status"></span></div>
 </header>
@@ -31,9 +31,10 @@ main{max-width:1000px;margin:auto;padding:16px}
 <button id="copy">Copy</button>
 <textarea id="out" readonly></textarea>
 </main>
+<script src="story-times.js"></script>
 <script>
 const $=id=>document.getElementById(id),audio=$('audio');
-let paras=[],order=[],times={},next=0;
+let paras=[],order=[],times={...(window.STORY_TIMES||{})},next=0;
 function fmt(s){if(s==null)return '—';const m=Math.floor(s/60),r=(s-m*60).toFixed(1).padStart(4,'0');return m+':'+r}
 function draw(){
   $('list').replaceChildren();
@@ -41,7 +42,7 @@ function draw(){
     const t=document.createElement('span');t.className='t';t.textContent=fmt(times[i]);
     const txt=document.createElement('span');txt.textContent=paras[i];
     const play=document.createElement('button');play.textContent='▶ from here';play.disabled=times[i]==null;play.onclick=()=>{audio.currentTime=Math.max(0,times[i]-1);audio.play();next=k+1;draw()};
-    row.append(t,txt,play);$('list').append(row)});
+    row.title='Click to re-time this paragraph';row.onclick=e=>{if(e.target.tagName==='BUTTON')return;next=k;draw()};row.style.cursor='pointer';row.append(t,txt,play);$('list').append(row)});
   const done=order.filter(i=>times[i]!=null).length;
   $('status').textContent=`${done} of ${order.length} paragraphs timed`;
   $('tap').disabled=next>=order.length;
@@ -55,7 +56,7 @@ $('undo').onclick=()=>{if(next>0){next--;delete times[order[next]];draw()}};
 $('copy').onclick=async()=>{$('out').select();try{await navigator.clipboard.writeText($('out').value);$('copy').textContent='Copied ✓'}catch(e){document.execCommand('copy');$('copy').textContent='Copied ✓'}};
 fetch('story.html').then(r=>r.text()).then(h=>{
   const m=h.match(/<script id="payload" type="application\/json">([\s\S]*?)<\/script>/);
-  paras=JSON.parse(m[1]).paras;order=paras.map((p,i)=>i).filter(i=>paras[i].trim());draw();
+  paras=JSON.parse(m[1]).paras;order=paras.map((p,i)=>i).filter(i=>paras[i].trim());const firstMissing=order.findIndex(i=>times[i]==null);next=firstMissing<0?order.length:firstMissing;draw();
 }).catch(()=>{$('list').textContent='Could not load the story. Refresh the page.'});
 </script>
 </body></html>
