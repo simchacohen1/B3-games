@@ -20,6 +20,10 @@ const studentPath=(c,id)=>legacy(c)?'yiddishPrivate/students/'+id:'yiddishPrivat
 // Migration bridge: ET/WT students who have no central passcode yet may use the
 // individual passcode from the private legacy list (never the shared 5770 default).
 async function passcodeFor(id,profile,classId){const priv=String((await get('b3Private/passcodes/'+id))?.passcode||'').trim();if(priv)return priv;const central=String(profile?.passcode||'').trim();if(central)return central;if(!legacy(classId))return '';const old=await get('posukPractice/allowedStudents/'+id);const p=String(old?.passcode||'').trim();return old&&old.active!==false&&p&&p!=='5770'?p:''}
+// B3's own classes always have the Wine Merchant story. Any other class gets it only
+// when the admin grants it (Owner Admin > Class Content), stored where teachers cannot write.
+const STORY_GRANT='yiddishWineMerchant';
+const storyGranted=async c=>legacy(c)||(validKey(c)&&(await get('b3Games/workspaces/'+WORKSPACE+'/contentGrants/'+c+'/'+STORY_GRANT))===true);
 const cfg=async c=>{const saved=await get(configPath(c));if(saved)return saved;const d=defaults();if(c&&!legacy(c))d.unlocked={[c]:0};return d};
 async function teacher(token,classId){
  const t=await verifyTeacher(token).catch(()=>null);
@@ -73,9 +77,10 @@ return async function handle(b,ip='unknown'){
     roster[id]={name:v.name||id,classId:studentClass};
     students[id]=await get(studentPath(classId,id))||{};
    }
-   return {config:c,roster,students,classId};
+   return {config:c,roster,students,classId,storyGranted:await storyGranted(classId)};
   }
   if(b.action==='teacherSave'){
+   if(!await storyGranted(classId))fail(403,'The admin has not given this class a Yiddish story yet.');
    const c=validateConfig(b.config);
    if(!legacy(classId)&&(Object.keys(c.unlocked).length!==1||!Object.hasOwn(c.unlocked,classId)))fail(400,'Settings must belong to the selected class.');
    let conflict=false;await store.tx(configPath(classId),old=>{conflict=false;old=old||{...defaults(),unlocked:legacy(classId)?defaults().unlocked:{[classId]:0}};if(old.version!==c.version){conflict=true;return undefined}return {...c,version:c.version+1}});
@@ -94,6 +99,11 @@ return async function handle(b,ip='unknown'){
   const token=random();await store.set('yiddishPrivate/sessions/'+hash(token),{studentId:id,classId:row.classId,passcodeHash:hash(code),expires:now()+12*3600000});return {token};
  }
  const who=await identity(b),c=await cfg(who.classId),path=studentPath(who.classId,who.id);
+ if(!await storyGranted(who.classId)){
+  // Nothing is open and no progress is shown until the admin gives this class a story.
+  if(b.action==='status')return {student:who,config:{...c,unlocked:{[who.classId]:0},unlockedSteps:{[who.classId]:0}},progress:{},round:null,noStory:true};
+  fail(403,'Your class does not have a Yiddish story yet.');
+ }
 
  if(b.action==='status'){const p=await get(path)||{};return {student:who,config:c,progress:p.words||{},round:publicRound(p.round)}}
  if(b.action==='start'){allowed(c,who,b.group);const shuffle=a=>a.map(v=>({v,n:crypto.randomInt(1000000)})).sort((a,b)=>a.n-b.n).map(x=>x.v);const secWords=c.sections[b.group].words;let selected=secWords,part=null;if(b.part!==undefined&&b.part!==null){part=Number(b.part);const parts=Math.max(1,Math.ceil(secWords.length/4));if(!Number.isInteger(part)||part<0||part>=parts)fail(400,'Choose a valid step.');const openSteps=c.unlockedSteps&&c.unlockedSteps[who.classId];const stepNo=c.sections.slice(0,b.group).reduce((n,s)=>n+Math.max(1,Math.ceil(s.words.length/4)),0)+part+1;if(Number.isInteger(openSteps)&&stepNo>openSteps)fail(403,'This step is not open yet.');const fresh=secWords.slice(part*4,part*4+4);const earlier=[...c.sections.slice(0,b.group).flatMap(s=>s.words),...secWords.slice(0,part*4)];const prog=(await get(path))?.words||{};const review=shuffle(earlier).sort((x,y)=>(prog[x]?.credits||0)-(prog[y]?.credits||0)).slice(0,4);selected=[...fresh,...review]}const round={id:random(),group:b.group,part,version:c.version,index:0,started:now(),items:shuffle(selected).map(id=>({wordId:id,choices:shuffle([id,...shuffle(words.filter(w=>w.id!==id).map(w=>w.id)).slice(0,3)])})),results:{},responses:{}};await store.tx(path,p=>{p=p||{};p.rounds=p.rounds||{};p.rounds[round.id]=round;p.round=round;const ids=Object.keys(p.rounds).sort((a,b)=>(p.rounds[b]?.started||0)-(p.rounds[a]?.started||0));for(const id of ids.slice(6))delete p.rounds[id];return p});return {round:publicRound(round)}}

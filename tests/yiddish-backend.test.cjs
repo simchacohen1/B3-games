@@ -1,10 +1,11 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {makeService,defaults}=require('../backend/functions/yiddish-service/core.cjs');
 const {claimTeacher}=require('../backend/functions/teacher-claim-core.cjs');
-function setup(classId='alpha'){
+function setup(classId='alpha',{storyGranted=true}={}){
  const profile={name:'Same Name',passcode:'1234',active:true};
  const config=defaults();config.unlocked=classId==='et'?{et:1,wt:0}:{[classId]:1};config.sections[0].verified=true;
  const data={['b3Games/students/student_unique/profile']:profile,['b3Games/students/student_unique/memberships']:{a:{workspaceId:'b3-2026',classId,active:true}},['b3Games/workspaces/b3-2026/classes/'+classId]:{active:true,members:{student_unique:{name:'Same Name',active:true}},toolGrants:{yiddish:true}},[classId==='et'?'yiddishPrivate/config':'yiddishPrivate/classes/b3-2026/'+classId+'/config']:config,'b3Games/siteSettings':{classAccess:{et:{mode:'open'}}}};
+ if(storyGranted&&!['et','wt'].includes(classId))data['b3Games/workspaces/b3-2026/contentGrants/'+classId+'/yiddishWineMerchant']=true;
  const store={get:async p=>data[p]??null,set:async(p,v)=>data[p]=v,tx:async(p,f)=>{const v=f(structuredClone(data[p]??null));if(v!==undefined)data[p]=v},update:async changes=>Object.assign(data,changes)};
  return {data,store,service:makeService(store,async token=>token==='owner'?{uid:'owner',email:'simcha5770@gmail.com',email_verified:true}:{uid:'teacher',email:'teacher@test',email_verified:true})};
 }
@@ -28,3 +29,8 @@ test('legacy fallback never accepts the shared 5770 default or a missing/blocked
 test('legacy fallback does not apply to new classes',async()=>{const x=setup('alpha');delete x.data['b3Games/students/student_unique/profile'].passcode;x.data['posukPractice/allowedStudents/student_unique']={name:'Same Name',passcode:'4321'};await assert.rejects(login(x,'alpha','4321'),/individual passcode/)});
 test('setting a central passcode replaces the legacy one and ends old sessions',async()=>{const x=legacySetup({name:'Same Name',passcode:'4321'}),{token}=await login(x,'et','4321');x.data['b3Games/students/student_unique/profile'].passcode='8888';await assert.rejects(x.service({action:'status',token}),/passcode changed/);await assert.rejects(login(x,'et','4321'),/individual passcode/);assert.ok((await login(x,'et','8888')).token)});
 test('Yiddish uses the private passcode when one exists',async()=>{const x=setup();x.data['b3Private/passcodes/student_unique']={passcode:'6543'};await assert.rejects(login(x,'alpha','1234'),/individual passcode/);assert.ok((await login(x,'alpha','6543')).token)});
+
+test('a new class without the admin story grant sees nothing open and cannot practice',async()=>{const x=setup('alpha',{storyGranted:false}),{token}=await login(x);const st=await x.service({action:'status',token});assert.equal(st.noStory,true);assert.equal(st.config.unlocked.alpha,0);assert.deepEqual(st.progress,{});await assert.rejects(x.service({action:'start',token,group:0}),/does not have a Yiddish story/)});
+test('teacher of a class without the story grant cannot save lesson settings',async()=>{const x=setup('alpha',{storyGranted:false});x.data['b3Games/workspaces/b3-2026/teachers/teacher']={active:true,classIds:{alpha:true}};const r=await x.service({action:'teacherLoad',idToken:'t',classId:'alpha'});assert.equal(r.storyGranted,false);await assert.rejects(x.service({action:'teacherSave',idToken:'t',classId:'alpha',config:r.config}),/has not given this class/)});
+test('admin story grant opens Yiddish for a new class',async()=>{const x=setup('alpha'),{token}=await login(x);const st=await x.service({action:'status',token});assert.equal(st.noStory,undefined);assert.ok((await x.service({action:'start',token,group:0})).round)});
+test('B3 classes keep the story without any grant',async()=>{const x=setup('et',{storyGranted:false}),{token}=await login(x,'et');const st=await x.service({action:'status',token});assert.equal(st.noStory,undefined)});

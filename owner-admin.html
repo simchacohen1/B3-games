@@ -60,9 +60,17 @@ function countWords(catalog){return ["shorashim","prefix","suffix"].reduce((n,t)
 async function renderResources(classId){
  if(!classId||["et","wt"].includes(classId)){q("resourceList").innerHTML=classId?'<small>This is one of your own B3 classes. It already uses your lists.</small>':"";return}
  const classPath="b3Games/workspaces/"+WS+"/classes/"+classId;
- const [snap,limitSnap]=await Promise.all([db.ref(SHORASHIM_ROOT+"/classes/"+classId+"/catalog").once("value"),db.ref(classPath+"/posukPracticeLimit").once("value")]),count=countWords(snap.val()),limit=limitSnap.val();
+ const storyPath="b3Games/workspaces/"+WS+"/contentGrants/"+classId+"/yiddishWineMerchant";
+ const [snap,limitSnap,storySnap]=await Promise.all([db.ref(SHORASHIM_ROOT+"/classes/"+classId+"/catalog").once("value"),db.ref(classPath+"/posukPracticeLimit").once("value"),db.ref(storyPath).once("value")]),count=countWords(snap.val()),limit=limitSnap.val(),hasStory=storySnap.val()===true;
  q("resourceList").innerHTML='<div class="entry"><b>🌳 Shorashim words</b><small>'+(count?count+" words in this class":"Empty. The teacher has not added any words yet.")+'</small><button id="copyShorashim" style="margin-top:8px">Give this class a copy of my Shorashim words</button><small id="copyShorashimMsg"></small></div>'+
-  '<div class="entry"><b>📜 Posuk Practice pesukim</b><small>'+(limit?describeLimit(limit):"None open yet. The teacher has not chosen any pesukim.")+'</small><button id="copyPesukim" style="margin-top:8px">Open the same pesukim my classes have</button><small id="copyPesukimMsg"></small></div>';
+  '<div class="entry"><b>📜 Posuk Practice pesukim</b><small>'+(limit?describeLimit(limit):"None open yet. The teacher has not chosen any pesukim.")+'</small><button id="copyPesukim" style="margin-top:8px">Open the same pesukim my classes have</button><small id="copyPesukimMsg"></small></div>'+
+  '<div class="entry"><b>ייִדיש Yiddish story “The Wine Merchant”</b><small>'+(hasStory?"This class has the story. Its teacher chooses which steps are open.":"Not given. Students see “Your teacher has not added a Yiddish story yet.”")+'</small><button id="toggleStory" style="margin-top:8px">'+(hasStory?"Take the story away from this class":"Give this class the Wine Merchant story")+'</button><small id="toggleStoryMsg"></small></div>';
+ q("toggleStory").onclick=async()=>{
+  if(hasStory&&!confirm("Take the Yiddish story away from this class? Their students will no longer be able to practice it."))return;
+  q("toggleStory").disabled=true;
+  try{await db.ref(storyPath).set(hasStory?null:true);await renderResources(classId);q("toggleStoryMsg").textContent=hasStory?"Removed ✓":"Given ✓ The teacher can now open steps for their students.";}
+  catch(err){console.error(err);q("toggleStoryMsg").textContent="Could not save. Please try again.";q("toggleStory").disabled=false}
+ };
  q("copyPesukim").onclick=async()=>{
   if(limit&&!confirm("This class already has pesukim open. Replace them with the same pesukim your classes have?"))return;
   q("copyPesukim").disabled=true;q("copyPesukimMsg").textContent="Copying…";

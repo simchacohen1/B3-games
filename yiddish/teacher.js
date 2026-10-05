@@ -2,7 +2,7 @@ const C=YIDDISH_CONTENT,$=id=>document.getElementById(id);let config,roster={},s
 const node=(tag,text)=>{const n=document.createElement(tag);n.textContent=text;return n};
 async function call(action,data={}){return YiddishAPI.call(action,{...data,classId:new URLSearchParams(location.search).get('class')||'',idToken:await user.getIdToken()})}
 function notice(t){$('notice').textContent=t}
-async function load(){const r=await call('teacherLoad');config=r.config;roster=r.roster;students=r.students;dirty=false;editors();table();notice('Progress loaded.');$('dashboard').hidden=false}
+async function load(){const r=await call('teacherLoad');if(r.storyGranted===false){$('dashboard').hidden=true;notice('The admin has not given this class a Yiddish story yet.');return}config=r.config;roster=r.roster;students=r.students;dirty=false;editors();table();notice('Progress loaded.');$('dashboard').hidden=false}
 function storySummary(data){
   const sd=data.storyDetective||{},g=Number(sd.lastGroup),sec=sd.sections?.[g];
   if(!Number.isInteger(g)||!sec||!sec.answers)return 'Not started';
