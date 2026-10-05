@@ -1,5 +1,14 @@
 const FIREBASE_CONFIG={apiKey:"AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",authDomain:"b3-games.firebaseapp.com",databaseURL:"https://b3-games-default-rtdb.firebaseio.com",projectId:"b3-games",storageBucket:"b3-games.firebasestorage.app",messagingSenderId:"568530046190",appId:"1:568530046190:web:fd765fdd27e55a3c73f7ff"};
 if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);const db=firebase.database();const ROOT='posukPractice/shorashimLearning';
+// Opened from the teacher home page as ?class=<id>. B3's own classes (et/wt) and the
+// plain link keep the original shared lists. Any other class has its own separate
+// lists, students and leaderboards, starts empty, and needs a Google teacher sign-in.
+const CLASS_ID=(new URLSearchParams(location.search).get('class')||'').trim();
+const CLASS_MODE=!!CLASS_ID&&!['et','wt'].includes(CLASS_ID);
+// Firebase drops empty lists, so a brand-new class may come back with no tracks at all.
+function withAllTracks(c){c=c||{};['shorashim','prefix','suffix'].forEach(t=>{if(!Array.isArray(c[t]))c[t]=[]});return c}
+const CLASS_ID_VALID=/^[A-Za-z0-9_-]{1,100}$/.test(CLASS_ID);
+const SPACE=CLASS_MODE&&CLASS_ID_VALID?`${ROOT}/classes/${CLASS_ID}`:ROOT;
 // Same teacher passcode used by the existing Posuk Practice teacher dashboard.
 const TEACHER_PASSCODE="vayeira5786";
 // AI picture-choice helper. Deploy the matching generateShorashimArt Cloud Function.
@@ -327,14 +336,14 @@ function learned(s,type){return Object.values(s.cards||{}).filter(c=>c.learnedAt
 function status(t,k=''){const e=$('teacherCloudStatus');e.textContent=t;e.className='cloud-status '+k}
 async function loadAll(){
   status('☁️ Loading…','syncing');
-  const[a,b,c,d]=await Promise.all([db.ref(`${ROOT}/catalog`).once('value'),db.ref(`${ROOT}/settings`).once('value'),db.ref(`${ROOT}/students`).once('value'),db.ref(`${ROOT}/leaderboards`).once('value')]);
-  state.catalog=a.val()||state.catalog;
+  const[a,b,c,d]=await Promise.all([db.ref(`${SPACE}/catalog`).once('value'),db.ref(`${SPACE}/settings`).once('value'),db.ref(`${SPACE}/students`).once('value'),db.ref(`${SPACE}/leaderboards`).once('value')]);
+  state.catalog=withAllTracks(a.val()||state.catalog);
   state.settings={minReviewMs:500,studentSiteOpen:true,...(b.val()||{})};
   state.students=c.val()||{};
   state.leaderboards=d.val()||{};
   // Seed the Perek-unit catalog only once.  The version flag is stored in Firebase,
   // so a word deleted later stays deleted even after page reloads or file updates.
-  const needsCatalogSeed=Number(state.settings.catalogSeedVersion||0)<CATALOG_SEED_VERSION;
+  const needsCatalogSeed=!CLASS_MODE&&Number(state.settings.catalogSeedVersion||0)<CATALOG_SEED_VERSION;
   const p18Added=needsCatalogSeed?ensurePerek18FinalShorashim():[];
   const unitMigration=needsCatalogSeed?ensurePerekUnitsAnd19():{tagged:0,added:[]};
   if(needsCatalogSeed)state.settings.catalogSeedVersion=CATALOG_SEED_VERSION;
@@ -344,8 +353,8 @@ async function loadAll(){
     status(`☁️ Creating picture choices for ${needsArt.length} word${needsArt.length===1?'':'s'}…`,'syncing');
     repaired=await fillArtForShorashim(needsArt);
   }
-  if(repaired||p18Added.length||unitMigration.tagged||unitMigration.added.length) await db.ref(`${ROOT}/catalog`).set(state.catalog);
-  if(needsCatalogSeed)await db.ref(`${ROOT}/settings/catalogSeedVersion`).set(CATALOG_SEED_VERSION);
+  if(repaired||p18Added.length||unitMigration.tagged||unitMigration.added.length) await db.ref(`${SPACE}/catalog`).set(state.catalog);
+  if(needsCatalogSeed)await db.ref(`${SPACE}/settings/catalogSeedVersion`).set(CATALOG_SEED_VERSION);
   $('teacherMinReview').value=String(state.settings.minReviewMs||500);
   renderStudentSiteControl();
   renderAll();
@@ -534,8 +543,8 @@ async function mergeDuplicateWord(duplicateId){
   state.catalog.shorashim=list.filter(x=>x.id!==duplicate.id);
   status('☁️ Merging duplicate…','syncing');
   await Promise.all([
-    db.ref(`${ROOT}/catalog`).set(state.catalog),
-    db.ref(`${ROOT}/students`).set(state.students)
+    db.ref(`${SPACE}/catalog`).set(state.catalog),
+    db.ref(`${SPACE}/students`).set(state.students)
   ]);
   renderCatalog();
   status(`☁️ Duplicate merged • ${duplicate.front}`);
@@ -552,7 +561,7 @@ async function removePictureChoice(id,artValue){
 }
 
 async function moveNamed(id,dir){const all=state.catalog[currentTrack],chosen=$('teacherListName').value,pf=$('teacherPerekFilter')?.value||'all',list=all.filter(i=>listNameOf(i)===chosen).filter(i=>currentTrack!=='shorashim'||pf==='all'||perekOf(i)===Number(pf)),i=list.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=list.length)return;const ai=all.indexOf(list[i]),aj=all.indexOf(list[j]);[all[ai],all[aj]]=[all[aj],all[ai]];renderCatalog();await saveCatalog()}
-async function saveCatalog(){status('☁️ Saving…','syncing');await db.ref(`${ROOT}/catalog`).set(state.catalog);status('☁️ Saved')}
+async function saveCatalog(){status('☁️ Saving…','syncing');await db.ref(`${SPACE}/catalog`).set(state.catalog);status('☁️ Saved')}
 async function move(id,dir){const l=state.catalog[currentTrack],i=l.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=l.length)return;[l[i],l[j]]=[l[j],l[i]];renderCatalog();await saveCatalog()}
 async function toggleHide(id){const i=(state.catalog[currentTrack]||[]).find(x=>x.id===id);if(!i)return;if(!i.hidden&&!confirm(`Remove “${i.front}” from the student learning list?\n\nIt will no longer appear in future learning or review. Any existing student history will be kept, and you can Restore the item later.`))return;i.hidden=!i.hidden;renderCatalog();await saveCatalog()}
 async function deleteCatalogItem(id){
@@ -627,7 +636,7 @@ async function toggleStudentSite(){
   state.settings.studentSiteOpen=!currentlyOpen;
   renderStudentSiteControl();
   status('☁️ Saving…','syncing');
-  await db.ref(`${ROOT}/settings/studentSiteOpen`).set(state.settings.studentSiteOpen);
+  await db.ref(`${SPACE}/settings/studentSiteOpen`).set(state.settings.studentSiteOpen);
   status('☁️ Saved');
 }
 async function loadAccess(){const[p,a]=await Promise.all([db.ref('posukPractice/settings/classPin').once('value'),db.ref('posukPractice/allowedStudents').once('value')]);$('accessPin').value=p.val()||'';renderRoster(a.val()||{})}
@@ -663,7 +672,7 @@ function applyRequestedTeacherView(){
   }
 }
 
-$('teacherEnter').onclick=()=>{if($('teacherPasscode').value!==TEACHER_PASSCODE){$('teacherGateMsg').textContent='Incorrect passcode.';return}$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');sessionStorage.setItem('shorashimTeacher','1');loadAll()};
+$('teacherEnter').onclick=()=>{if(CLASS_MODE)return;if($('teacherPasscode').value!==TEACHER_PASSCODE){$('teacherGateMsg').textContent='Incorrect passcode.';return}$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');sessionStorage.setItem('shorashimTeacher','1');loadAll()};
 $('teacherPasscode').addEventListener('keydown',e=>{if(e.key==='Enter')$('teacherEnter').click()});
 $('teacherLogout').onclick=()=>{sessionStorage.removeItem('shorashimTeacher');location.reload()};
 $('teacherTrack').onchange=()=>{refreshNamedLists();renderCatalog()};
@@ -675,7 +684,7 @@ $('teacherNewList').onclick=async()=>{
   const lists=Array.isArray(state.settings.namedLists[currentTrack])?state.settings.namedLists[currentTrack]:[];
   if(namedLists().some(x=>x.toLowerCase()===name.toLowerCase())){alert('A list with that name already exists.');refreshNamedLists(name);return}
   state.settings.namedLists[currentTrack]=[...lists,name];
-  status('☁️ Saving…','syncing');await db.ref(`${ROOT}/settings`).set(state.settings);status('☁️ Saved');
+  status('☁️ Saving…','syncing');await db.ref(`${SPACE}/settings`).set(state.settings);status('☁️ Saved');
   refreshNamedLists(name);renderCatalog();$('teacherListName').value=name;renderCatalog()
 };
 $('teacherBulkAdd').onclick=()=>{
@@ -724,7 +733,7 @@ $('saveBulkItems').onclick=async e=>{
   await saveCatalog();
 };
 $('toggleStudentSite').onclick=toggleStudentSite;
-$('teacherMinReview').onchange=async()=>{state.settings.minReviewMs=+$('teacherMinReview').value;await db.ref(`${ROOT}/settings`).set(state.settings)};
+$('teacherMinReview').onchange=async()=>{state.settings.minReviewMs=+$('teacherMinReview').value;await db.ref(`${SPACE}/settings`).set(state.settings)};
 $('teacherAddItem').onclick=()=>openEdit();
 $('tCancelItem').onclick=()=>$('teacherCatalogDialog').close();
 $('cancelBulkItems').onclick=()=>$('teacherBulkDialog').close();
@@ -732,12 +741,36 @@ $('tSaveItem').onclick=saveEdit;
 $('saveAccessPin').onclick=async()=>{await db.ref('posukPractice/settings/classPin').set($('accessPin').value.trim());$('accessPinMsg').textContent='Saved ✓'};
 $('addAccessName').onclick=async()=>{const name=$('newAccessName').value.trim(),id=slug(name);if(!id)return;await db.ref('posukPractice/allowedStudents/'+id).set({name});$('newAccessName').value='';$('accessNameMsg').textContent='Added ✓';loadAccess()};
 bindTabs();
-if(sessionStorage.getItem('shorashimTeacher')==='1'){$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');loadAll()}
+let teacherAppOpened=false;
+function openTeacherApp(){if(teacherAppOpened)return;teacherAppOpened=true;$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');loadAll()}
+async function checkClassTeacher(user,access){
+  if(!user||!access?.authorized){$('teacherGoogleSignIn').classList.remove('hidden');$('teacherGateMsg').textContent=user?'This Google account is not a Fun Torah Tools teacher.':'Sign in with your teacher Google account.';return}
+  const admin=access.role==='admin';
+  if(!admin&&!(access.classIds||[]).includes(CLASS_ID)){$('teacherGateMsg').textContent='This class is not assigned to your teacher account.';return}
+  const cls=(await db.ref(`b3Games/workspaces/${window.B3_APP_CONTEXT?.workspaceId||'b3-2026'}/classes/${CLASS_ID}`).once('value')).val();
+  if(!cls||cls.active===false||(!admin&&cls.toolGrants?.shorashim!==true)){$('teacherGateMsg').textContent='Shorashim is not turned on for this class. Ask the admin.';return}
+  $('teacherGoogleSignIn').classList.add('hidden');
+  document.querySelector('.topbar h1').textContent=`Shorashim Learning Lab · ${cls.name||CLASS_ID}`;
+  openTeacherApp();
+}
+if(CLASS_MODE){
+  // Class teachers sign in with Google; the B3 passcode and B3's student-access tab do not apply here.
+  $('teacherPasscode').classList.add('hidden');$('teacherEnter').classList.add('hidden');
+  document.querySelector('[data-tab="access"]')?.classList.add('hidden');
+  $('teacherLogout').textContent='Sign out';
+  $('teacherLogout').onclick=()=>window.B3SiteSettings.signOut().then(()=>location.reload());
+  if(!CLASS_ID_VALID){$('teacherGateMsg').textContent='This class link is not valid. Open Shorashim from your teacher home page.'}
+  else{
+    $('teacherGateMsg').textContent='Checking your teacher account…';
+    $('teacherGoogleSignIn').onclick=()=>window.B3SiteSettings.signInWithGoogle().catch(err=>{$('teacherGateMsg').textContent=err?.message||'Google sign-in did not complete.'});
+    window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>checkClassTeacher(user,access).catch(err=>{console.error(err);$('teacherGateMsg').textContent='Could not check your teacher account.'}));
+  }
+}else if(sessionStorage.getItem('shorashimTeacher')==='1')openTeacherApp();
 
-db.ref(ROOT).on('value',snap=>{
+db.ref(SPACE).on('value',snap=>{
   if($('teacherApp').classList.contains('hidden'))return;
   const v=snap.val()||{};
-  if(v.catalog)state.catalog=v.catalog;
+  if(v.catalog||CLASS_MODE)state.catalog=withAllTracks(v.catalog);
   if(v.settings){state.settings={minReviewMs:500,studentSiteOpen:true,...v.settings};renderStudentSiteControl();}
   if(v.students)state.students=v.students;
   if(v.leaderboards)state.leaderboards=v.leaderboards;
@@ -760,7 +793,7 @@ function recordingPoints(r){return Number(r.points||((r.noHints===true||r.mode==
 async function loadShorashimRecordings(){
   const box=$('shorashimRecordingsList'); if(!box)return;
   try{
-    const snap=await db.ref(`${ROOT}/recordingEvents`).once('value');
+    const snap=await db.ref(`${SPACE}/recordingEvents`).once('value');
     const rows=[];
     snap.forEach(studentSnap=>studentSnap.forEach(eventSnap=>{
       const r=eventSnap.val()||{};

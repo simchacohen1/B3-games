@@ -86,7 +86,7 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
 <style>.approval-box{margin-top:8px;padding:9px 11px;border-radius:11px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:.82rem}.approval-box.pending{background:#fff3cd;border:1px solid #e3b341;color:#6b4f00}.approval-box.approved{background:#e8f7ed;border:1px solid #55a56a;color:#205c2e}.approval-box button{margin-left:auto;padding:6px 9px}</style>
 </head>
 <body>
-<section id="teacherGate" class="teacher-gate"><div class="teacher-gate-card"><div style="font-size:3rem">🧑‍🏫</div><div class="eyebrow">Shorashim Learning Lab</div><h1>Teacher Dashboard</h1><input id="teacherPasscode" type="password" placeholder="Teacher passcode" autocomplete="current-password"><button id="teacherEnter" class="primary big" style="width:100%">Enter Dashboard</button><div id="teacherGateMsg" class="msg"></div></div></section>
+<section id="teacherGate" class="teacher-gate"><div class="teacher-gate-card"><div style="font-size:3rem">🧑‍🏫</div><div class="eyebrow">Shorashim Learning Lab</div><h1>Teacher Dashboard</h1><input id="teacherPasscode" type="password" placeholder="Teacher passcode" autocomplete="current-password"><button id="teacherEnter" class="primary big" style="width:100%">Enter Dashboard</button><button id="teacherGoogleSignIn" class="primary big hidden" style="width:100%">Sign in with Google</button><div id="teacherGateMsg" class="msg"></div></div></section>
 <div id="teacherApp" class="hidden teacher-wrap">
 <header class="topbar"><div><div class="eyebrow">Teacher dashboard</div><h1>Shorashim Learning Lab</h1></div><div class="topbar-actions"><span id="teacherCloudStatus" class="cloud-status">☁️ Connected</span><button id="teacherLogout" class="ghost small">Lock Dashboard</button></div></header>
 <nav class="teacher-nav"><button data-tab="dashboard" class="ghost active">📊 Class</button><button data-tab="lists" class="ghost">📝 Manage Learning Lists</button><button data-tab="access" class="ghost">🔑 Student Access</button><button data-tab="recordings" class="ghost">🎙️ Recordings <span id="recordingsBadge" class="hidden" style="background:#dc2626;color:#fff;border-radius:999px;padding:2px 8px;margin-left:4px">0</span></button><button data-tab="leaderboard" class="ghost">🏆 Leaderboard</button></nav>
@@ -110,6 +110,8 @@ dialog{border:0;border-radius:18px;padding:0;box-shadow:0 25px 80px #0003}.dialo
 יָשַׁב | sat / dwelled"></textarea><div class="dialog-actions"><button id="cancelBulkItems" type="button" class="ghost">Cancel</button><button id="saveBulkItems" value="default" class="primary">Add Items</button></div></form></dialog><script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-<script src="teacher.js?v=20260930-approval-center"></script>
+<script src="../firebase-config.js"></script>
+<script src="../site-settings.js"></script>
+<script src="teacher.js?v=20261005-class-lists"></script>
 <script src="hebrew-keyboard.js?v=20260917-floating"></script>
 </body></html>

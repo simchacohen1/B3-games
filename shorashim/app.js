@@ -19,7 +19,29 @@ const FIREBASE_CONFIG = {
 if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
 const cloudDb = firebase.database();
 const cloudStorage = firebase.storage();
-const CLOUD_ROOT = 'posukPractice/shorashimLearning';
+const SHORASHIM_BASE_ROOT = 'posukPractice/shorashimLearning';
+// B3's own classes (et/wt) keep the original shared lists at the base root.
+// Every other class gets its own separate lists, students and leaderboards
+// under classes/<classId>, and starts empty until its teacher adds words.
+let CLOUD_ROOT = SHORASHIM_BASE_ROOT;
+let classSpaceId = '';
+const LEGACY_CLASS_IDS = ['et','wt'];
+function emptyCatalog(){return {shorashim:[],prefix:[],suffix:[]};}
+async function resolveStudentSpace(studentId){
+  let classId='';
+  try{
+    const memberships=(await cloudDb.ref('b3Games/students/'+studentId+'/memberships').once('value')).val()||{};
+    const ws=window.B3_WORKSPACE_ID||'b3-2026';
+    const valid=Object.values(memberships).filter(m=>m&&m.active!==false&&m.workspaceId===ws&&m.classId);
+    const stored=localStorage.getItem('b3Games_studentClass')||'';
+    const match=valid.find(m=>m.classId===stored)||valid.find(m=>LEGACY_CLASS_IDS.includes(m.classId))||valid[0];
+    classId=match?String(match.classId):'';
+  }catch(err){console.warn('Could not read class membership',err);}
+  const isClassSpace=!!classId&&!LEGACY_CLASS_IDS.includes(classId)&&/^[A-Za-z0-9_-]{1,100}$/.test(classId);
+  const nextRoot=isClassSpace?`${SHORASHIM_BASE_ROOT}/classes/${classId}`:SHORASHIM_BASE_ROOT;
+  classSpaceId=isClassSpace?classId:'';
+  if(nextRoot!==CLOUD_ROOT){CLOUD_ROOT=nextRoot;startStudentSiteWatcher();}
+}
 const STUDENT_REWARDS_AUTO_AWARD_URL='https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
 let studentSiteOpen=true;
 function applyStudentSiteOpen(open){
@@ -54,8 +76,11 @@ function recomputeSiteOpen(){
   if(!(ownWatcherReady && masterWatcherReady)) return;
   applyStudentSiteOpen(ownSettingOpen && masterSettingOpen);
 }
+let studentSiteWatchRef=null;
 function startStudentSiteWatcher(){
-  cloudDb.ref(`${CLOUD_ROOT}/settings/studentSiteOpen`).on('value',snap=>{
+  if(studentSiteWatchRef)studentSiteWatchRef.off();
+  studentSiteWatchRef=cloudDb.ref(`${CLOUD_ROOT}/settings/studentSiteOpen`);
+  studentSiteWatchRef.on('value',snap=>{
     ownSettingOpen = snap.exists()?snap.val():true;
     ownWatcherReady = true;
     recomputeSiteOpen();
@@ -236,7 +261,9 @@ function startCloudListeners(){
 }
 async function enterCloudStudent(name,studentId){
   setLoginMsg('Opening your cards…');setCloudStatus('☁️ Connecting…','syncing');
-  const cachedCatalog=clone(db.catalog||DEFAULT_CATALOG),cachedSettings={minReviewMs:500,studentSiteOpen:true,...(db.settings||{})},cachedStudent=db.students?.[name]?clone(db.students[name]):null;
+  await resolveStudentSpace(studentId);
+  // A class with its own lists must never fall back to B3's built-in words or this browser's cached copy.
+  const cachedCatalog=classSpaceId?emptyCatalog():clone(db.catalog||DEFAULT_CATALOG),cachedSettings={minReviewMs:500,studentSiteOpen:true,...(classSpaceId?{}:(db.settings||{}))},cachedStudent=!classSpaceId&&db.students?.[name]?clone(db.students[name]):null;
   const [catalogSnap,settingsSnap,studentSnap]=await Promise.all([
     cloudDb.ref(`${CLOUD_ROOT}/catalog`).once('value'),
     cloudDb.ref(`${CLOUD_ROOT}/settings`).once('value'),
@@ -244,7 +271,7 @@ async function enterCloudStudent(name,studentId){
   ]);
   const catalog=normalizeCatalogUnits(catalogSnap.val()||cachedCatalog);const settings={minReviewMs:500,studentSiteOpen:true,...(settingsSnap.val()||cachedSettings)};if(settings.studentSiteOpen===false){applyStudentSiteOpen(false);throw new Error('STUDENT_SITE_CLOSED');}const s=studentSnap.val()||cachedStudent||blankStudent();normalizeStudent(s);s.name=name;s.lastActive=Date.now();
   db={students:{[name]:s},currentStudent:name,catalog,settings};currentStudent=name;cloudStudentId=studentId;cloudStudentName=name;cloudEnabled=true;saveRaw(db);
-  if(!catalogSnap.exists())cloudDb.ref(`${CLOUD_ROOT}/catalog`).set(catalog).catch(console.warn);
+  if(!catalogSnap.exists()&&!classSpaceId)cloudDb.ref(`${CLOUD_ROOT}/catalog`).set(catalog).catch(console.warn);
   if(!settingsSnap.exists())cloudDb.ref(`${CLOUD_ROOT}/settings`).set(settings).catch(console.warn);
   document.getElementById('loginGate').classList.add('hidden');document.getElementById('appShell').classList.remove('hidden');document.getElementById('signedInStudentName').textContent=name;
   if(!appStarted){init();appStarted=true;}else{populateStudents();renderAll();goScreen('studentHome');}
