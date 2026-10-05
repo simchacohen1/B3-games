@@ -665,14 +665,40 @@ document.getElementById("fullBtn").addEventListener("click",async()=>{
   }catch(e){document.body.classList.toggle("fullscreen")}
 });
 
-const savedClass=localStorage.getItem("chavrusaClass");
-if(savedClass&&classes[savedClass])classSelect.value=savedClass;
+function startPage(){
+  const savedClass=localStorage.getItem("chavrusaClass");
+  if(savedClass&&classes[savedClass])classSelect.value=savedClass;
 
-// Always open to today's school date. If today is not a listed school day,
-// open to the next available school date instead.
-populateDates(null);
-renderHolidayList();
-renderAll();
+  // Always open to today's school date. If today is not a listed school day,
+  // open to the next available school date instead.
+  populateDates(null);
+  renderHolidayList();
+  renderAll();
+}
+
+// Opened from a teacher's home page as ?class=<id>: any class other than B3's own
+// (et/wt) pairs that class's own students instead of the ET/WT lists above.
+const CLASS_ID=(new URLSearchParams(location.search).get("class")||"").trim();
+if(/^[A-Za-z0-9_-]{1,100}$/.test(CLASS_ID)&&!["et","wt"].includes(CLASS_ID)){
+  const key="C_"+CLASS_ID;
+  delete classes.ET;delete classes.WT;
+  classes[key]={label:CLASS_ID,students:[]};
+  classSelect.innerHTML="";
+  fetch("https://b3-games-default-rtdb.firebaseio.com/b3Games/workspaces/b3-2026/classes/"+CLASS_ID+".json")
+    .then(r=>r.json())
+    .then(cls=>{
+      cls=cls||{};
+      classes[key].label=cls.name||CLASS_ID;
+      classes[key].students=Object.values(cls.members||{}).filter(m=>m&&m.active!==false&&m.name).map(m=>String(m.name)).sort((a,b)=>a.localeCompare(b));
+    })
+    .catch(err=>console.error("Could not load class list",err))
+    .then(()=>{
+      const opt=document.createElement("option");opt.value=key;opt.textContent=classes[key].label;classSelect.append(opt);
+      startPage();
+    });
+}else{
+  startPage();
+}
 </script>
 </body>
 </html>

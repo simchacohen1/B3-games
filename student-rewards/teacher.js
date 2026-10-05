@@ -35,6 +35,9 @@ const teacherDb={ref(path){
 }};
 function sdb(){return state.teacherMode?teacherDb:db}
 const REQUESTED_TAB=new URLSearchParams(window.location.search).get("tab");
+// Opened from the teacher home page as ?class=<id> (a site class id); pick the matching rewards class.
+const REQUESTED_CLASS=new URLSearchParams(window.location.search).get("class")||"";
+function requestedClassId(){if(!REQUESTED_CLASS)return "";const list=activeClasses();return (list.find(c=>c.id===REQUESTED_CLASS)||list.find(c=>String(state.root?.classes?.[c.id]?.b3ClassId||"")===REQUESTED_CLASS))?.id||""}
 const ICONS={"Approvals":"✓","Overview":"⌂","Points Dashboard":"★","Daily Points":"✓","Students":"♙","Categories":"☷","Comments":"✎","Rewards":"◇","Reports":"▤","People & Classes":"♧","Settings":"⚙"};
 const CLASS_REWARD_PRESETS=[
   {key:"gimkit",name:"Gimkit",icon:"🎯"},
@@ -146,7 +149,7 @@ function renderClassSelect(){
 async function loadRoot(){
   if(state.teacherMode){state.root=(await teacherApi("load")).root||{};}
   else{const snap=await db.ref(ROOT).once("value");state.root=snap.val()||{};}
-  if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=activeClasses()[0]?.id||"";
+  if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=requestedClassId()||activeClasses()[0]?.id||"";
   prepareDraft();renderClassSelect();setHeader();buildNav();
 }
 async function ensureRewardModelV2(){
@@ -175,7 +178,7 @@ async function ensureRewardModelV2(){
   await db.ref().update(updates);
   return true;
 }
-function subscribe(){if(state.teacherMode){clearInterval(state.pollTimer);state.pollTimer=setInterval(async()=>{try{await loadRoot();if(state.tab!=="Daily Points")render()}catch(e){console.warn(e)}},30000);return}db.ref(ROOT).on("value",snap=>{state.root=snap.val()||{};if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=activeClasses()[0]?.id||"";renderClassSelect();if(state.tab!=="Daily Points"){setHeader();buildNav();render()}})}
+function subscribe(){if(state.teacherMode){clearInterval(state.pollTimer);state.pollTimer=setInterval(async()=>{try{await loadRoot();if(state.tab!=="Daily Points")render()}catch(e){console.warn(e)}},30000);return}db.ref(ROOT).on("value",snap=>{state.root=snap.val()||{};if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=requestedClassId()||activeClasses()[0]?.id||"";renderClassSelect();if(state.tab!=="Daily Points"){setHeader();buildNav();render()}})}
 function prepareDraft(){
   if(!state.root||!state.classId)return;state.draft={};state.awardDraft={};state.absent=new Set();
   for(const s of roster()){

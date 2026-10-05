@@ -394,6 +394,32 @@ const FIXED_ROSTERS = {
   ]
 };
 
+// Opened from a teacher's home page as ?class=<id>: any class other than B3's own
+// (et/wt) uses that class's student list instead of the East/West lists above.
+const CLASS_ID = (new URLSearchParams(location.search).get('class') || '').trim();
+const CLASS_MODE = /^[A-Za-z0-9_-]{1,100}$/.test(CLASS_ID) && !['et', 'wt'].includes(CLASS_ID);
+let classLabel = '';
+async function loadClassRoster() {
+  const url = 'https://b3-games-default-rtdb.firebaseio.com/b3Games/workspaces/b3-2026/classes/' + CLASS_ID + '.json';
+  const cls = await (await fetch(url)).json() || {};
+  classLabel = cls.name || CLASS_ID;
+  FIXED_ROSTERS.east = Object.values(cls.members || {}).filter(m => m && m.active !== false && m.name).map(m => String(m.name)).sort((a, b) => a.localeCompare(b));
+  FIXED_ROSTERS.west = [];
+  document.querySelector('[data-list="east"]').textContent = classLabel;
+  document.querySelector('[data-list="west"]').hidden = true;
+}
+
+// This page used to rely on a storage feature that only exists inside Claude, so
+// nothing was ever saved on the real website. Use this browser's own storage
+// instead, kept separate for each class.
+if (typeof window.storage === 'undefined') {
+  const prefix = 'namePicker:' + (CLASS_MODE ? CLASS_ID : 'b3') + ':';
+  window.storage = {
+    async get(key) { const value = localStorage.getItem(prefix + key); return value == null ? null : { value }; },
+    async set(key, value) { localStorage.setItem(prefix + key, value); return { value }; }
+  };
+}
+
 let state = {
   rosters: { east: FIXED_ROSTERS.east.slice(), west: FIXED_ROSTERS.west.slice() },
   customNames: [],
@@ -425,6 +451,7 @@ async function loadState() {
   // Saved browser data can never overwrite them.
   state.rosters = { east: FIXED_ROSTERS.east.slice(), west: FIXED_ROSTERS.west.slice() };
   if (state.activeList !== 'east' && state.activeList !== 'west' && state.activeList !== 'custom') state.activeList = 'east';
+  if (CLASS_MODE && state.activeList === 'west') state.activeList = 'east';
   if (!state.purposes || state.purposes.length === 0) state.purposes = DEFAULT_PURPOSES.slice();
 }
 
@@ -813,7 +840,7 @@ function updateRosterHint() {
   if (state.activeList === 'custom') {
     rosterHint.textContent = n === 0 ? 'One name per line.' : `${n} name${n === 1 ? '' : 's'} loaded.`;
   } else {
-    rosterHint.textContent = `${n} name${n === 1 ? '' : 's'} active. Temporary edits only — the full ${state.activeList === 'east' ? 'East' : 'West'} Track list returns when the page refreshes.`;
+    rosterHint.textContent = `${n} name${n === 1 ? '' : 's'} active. Temporary edits only — the full ${CLASS_MODE ? classLabel : state.activeList === 'east' ? 'East Track' : 'West Track'} list returns when the page refreshes.`;
   }
 }
 
@@ -1185,7 +1212,13 @@ async function init() {
   showTab('setup');
 }
 
-init();
+if (CLASS_MODE) {
+  // Never fall back to B3's names for another class, even if loading fails.
+  FIXED_ROSTERS.east = []; FIXED_ROSTERS.west = [];
+  loadClassRoster().catch(err => console.error('Could not load class list', err)).then(init);
+} else {
+  init();
+}
 </script>
 </body>
 </html>
