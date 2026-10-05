@@ -13,6 +13,9 @@
 <title>B3 Weekly Quiz - Teacher</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="../firebase-config.js"></script>
+<script src="../site-settings.js"></script>
 <style>
   :root { --ink:#18324a; --blue:#2d6ea3; --blue2:#1f5885; --light:#eef6fc; --line:#bdd5e8; --good:#2e8b57; --bad:#c74b50; --gold:#d9a441; --muted:#64788b; --gray:#e7edf2; --purple:#7757a6; }
   * { box-sizing:border-box; }
@@ -258,7 +261,8 @@
     <h2 style="margin-top:0;color:var(--blue)">Teacher Access</h2>
     <div>Enter the teacher password.</div>
     <input type="password" id="lockPassword" onkeydown="if(event.key==='Enter')checkPassword()" placeholder="Password">
-    <button class="primary" onclick="checkPassword()">Unlock</button>
+    <button class="primary" onclick="checkPassword()" id="lockUnlock">Unlock</button>
+    <button class="primary" id="lockGoogle" style="display:none">Sign in with Google</button>
     <div id="lockError" class="lock-error"></div>
   </div>
 </div>
@@ -683,13 +687,20 @@
 
 <script>
 const TEACHER_PASSWORD='class123';
+// Opened from a teacher's home page as ?class=<id>: any class other than B3's own
+// (et/wt) keeps its own quizzes, launches and results under b3Quiz/classes/<id>,
+// uses that class's own students, and its teacher signs in with Google.
+const WQ_CLASS=(new URLSearchParams(location.search).get('class')||'').trim();
+const CLASS_SPACE=/^[A-Za-z0-9_-]{1,100}$/.test(WQ_CLASS)&&!['et','wt'].includes(WQ_CLASS);
+const QROOT=CLASS_SPACE?'b3Quiz/classes/'+WQ_CLASS:'b3Quiz';
 const GENERATE_WEEKLY_QUIZ_URL='https://us-central1-b3-games.cloudfunctions.net/generateWeeklyQuiz';
 
 function checkPassword(){
+  if(CLASS_SPACE)return;
   if(document.getElementById('lockPassword').value===TEACHER_PASSWORD){document.getElementById('lockOverlay').style.display='none';document.getElementById('mainContent').classList.remove('hidden');localStorage.setItem('weeklyQuizTeacherUnlocked','yes');}
   else document.getElementById('lockError').textContent='Incorrect password.';
 }
-if(localStorage.getItem('weeklyQuizTeacherUnlocked')==='yes'){document.getElementById('lockOverlay').style.display='none';document.getElementById('mainContent').classList.remove('hidden');}
+if(!CLASS_SPACE&&localStorage.getItem('weeklyQuizTeacherUnlocked')==='yes'){document.getElementById('lockOverlay').style.display='none';document.getElementById('mainContent').classList.remove('hidden');}
 
 const firebaseConfig={
   apiKey:"AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
@@ -711,7 +722,7 @@ const SKILL_LABELS={shorashim:'Shoreshim',translation:'Words & Phrases',comprehe
 let roster={},quizzes={},allLaunches={},allResponses={},completions={},audit={};
 let currentQuizId='',editorQuestions=[],generatorCandidates=[];
 let previewQuestions=[],previewIndex=0,previewSelected=null,previewChecked=false;
-let liveClassId='et',activeLaunchByClass={},activeLaunchId='',liveLaunch=null,liveResponses={},currentQ=0;
+let liveClassId=CLASS_SPACE?WQ_CLASS:'et',activeLaunchByClass={},activeLaunchId='',liveLaunch=null,liveResponses={},currentQ=0;
 let liveLaunchRef=null,liveResponseRef=null;
 let resultsLaunchId='';
 let modalContext=null;
@@ -729,13 +740,51 @@ function setupMsg(t){document.getElementById('setupMsg').textContent=t||'';}
 function launchMsg(t){document.getElementById('launchMsg').textContent=t||'';}
 
 // ---------- Shared data listeners ----------
-db.ref('posukPractice/allowedStudents').on('value',snap=>{roster=snap.val()||{};renderLiveGrid();renderResults();populateProgressStudents();populateLaunchStudents();});
-db.ref('b3Quiz/quizzes').on('value',snap=>{quizzes=snap.val()||{};renderQuizList();});
-db.ref('b3Quiz/launches').on('value',snap=>{allLaunches=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
-db.ref('b3Quiz/responses').on('value',snap=>{allResponses=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
-db.ref('b3Quiz/completions').on('value',snap=>{completions=snap.val()||{};renderResults();renderStudentProgress();});
-db.ref('b3Quiz/audit').on('value',snap=>{audit=snap.val()||{};renderResults();renderStudentProgress();});
-db.ref('b3Quiz/settings/activeLaunchByClass').on('value',snap=>{activeLaunchByClass=snap.val()||{};attachLiveLaunch(activeLaunchByClass[liveClassId]||'');renderLaunchHistory();});
+if(CLASS_SPACE){
+  // This class's own students replace the B3 East/West lists everywhere on the page.
+  delete CLASS_ROSTERS.et;delete CLASS_ROSTERS.wt;
+  CLASS_ROSTERS[WQ_CLASS]={label:WQ_CLASS,students:[]};
+  const one=(label)=>'<option value="'+esc(WQ_CLASS)+'">'+esc(label)+'</option>';
+  const applyClassLabel=label=>{
+    ['liveClassSelect','launchClass','progressClass'].forEach(id=>{const el=document.getElementById(id);if(el){el.innerHTML=one(label);el.value=WQ_CLASS;}});
+    const filter=document.getElementById('resultsClassFilter');if(filter)filter.innerHTML='<option value="all">'+esc(label)+'</option>';
+    const etBtn=document.getElementById('classEtBtn'),wtBtn=document.getElementById('classWtBtn');
+    if(etBtn){etBtn.textContent=label;etBtn.onclick=()=>selectLaunchClass(WQ_CLASS);}
+    if(wtBtn)wtBtn.style.display='none';
+  };
+  applyClassLabel(WQ_CLASS);
+  db.ref('b3Games/workspaces/b3-2026/classes/'+WQ_CLASS).on('value',snap=>{
+    const cls=snap.val()||{},members=cls.members||{};
+    const ids=Object.keys(members).filter(id=>members[id]&&members[id].active!==false);
+    CLASS_ROSTERS[WQ_CLASS]={label:cls.name||WQ_CLASS,students:ids};
+    roster={};ids.forEach(id=>{roster[id]={name:members[id].name||id};});
+    applyClassLabel(cls.name||WQ_CLASS);
+    renderLiveGrid();renderResults();populateProgressStudents();populateLaunchStudents();
+  });
+  document.getElementById('lockPassword').style.display='none';
+  document.getElementById('lockUnlock').style.display='none';
+  const lockError=document.getElementById('lockError');
+  lockError.textContent='Checking your teacher account…';
+  document.getElementById('lockGoogle').onclick=()=>window.B3SiteSettings.signInWithGoogle().catch(err=>{lockError.textContent=(err&&err.message)||'Google sign-in did not complete.';});
+  window.B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
+    if(!user||!authorized){document.getElementById('lockGoogle').style.display='';lockError.textContent=user?'This Google account is not a Fun Torah Tools teacher.':'Sign in with your teacher Google account.';return;}
+    const admin=access&&access.role==='admin';
+    if(!admin&&!((access&&access.classIds)||[]).includes(WQ_CLASS)){lockError.textContent='This class is not assigned to your teacher account.';return;}
+    const cls=(await db.ref('b3Games/workspaces/b3-2026/classes/'+WQ_CLASS).once('value')).val();
+    if(!cls||cls.active===false||(!admin&&!(cls.toolGrants&&cls.toolGrants['weekly-quiz']===true))){lockError.textContent='Weekly Quiz is not turned on for this class. Ask the admin.';return;}
+    document.getElementById('lockGoogle').style.display='none';
+    document.getElementById('lockOverlay').style.display='none';
+    document.getElementById('mainContent').classList.remove('hidden');
+  });
+}else{
+  db.ref('posukPractice/allowedStudents').on('value',snap=>{roster=snap.val()||{};renderLiveGrid();renderResults();populateProgressStudents();populateLaunchStudents();});
+}
+db.ref(QROOT+'/quizzes').on('value',snap=>{quizzes=snap.val()||{};renderQuizList();});
+db.ref(QROOT+'/launches').on('value',snap=>{allLaunches=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
+db.ref(QROOT+'/responses').on('value',snap=>{allResponses=snap.val()||{};renderLaunchHistory();renderResults();renderStudentProgress();});
+db.ref(QROOT+'/completions').on('value',snap=>{completions=snap.val()||{};renderResults();renderStudentProgress();});
+db.ref(QROOT+'/audit').on('value',snap=>{audit=snap.val()||{};renderResults();renderStudentProgress();});
+db.ref(QROOT+'/settings/activeLaunchByClass').on('value',snap=>{activeLaunchByClass=snap.val()||{};attachLiveLaunch(activeLaunchByClass[liveClassId]||'');renderLaunchHistory();});
 
 // ---------- Built-in generator ----------
 function generatorTypeChanged(){
@@ -1322,19 +1371,17 @@ async function saveQuiz(){
   const title=document.getElementById('editorTitle').value.trim(),skillType=document.getElementById('editorSkillType').value,sourceLabel=document.getElementById('editorSourceLabel').value.trim(),questions=cleanedEditorQuestions();
   if(!title){alert('Give the quiz a title.');return null;}if(!questions.length){alert('Add at least one question with at least two choices.');return null;}
   let id=currentQuizId;if(!id)id=Date.now()+'_'+slugTitle(title);const existing=quizzes[id]||{};
-  await db.ref('b3Quiz/quizzes/'+id).set({title,skillType,sourceLabel,questions,createdAt:existing.createdAt||firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP});currentQuizId=id;setupMsg('Saved.');document.getElementById('deleteQuizBtn').disabled=false;renderQuizList();return id;
+  await db.ref(QROOT+'/quizzes/'+id).set({title,skillType,sourceLabel,questions,createdAt:existing.createdAt||firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP});currentQuizId=id;setupMsg('Saved.');document.getElementById('deleteQuizBtn').disabled=false;renderQuizList();return id;
 }
 async function deleteCurrentQuiz(){
   if(!currentQuizId)return;const title=(quizzes[currentQuizId]&&quizzes[currentQuizId].title)||'this quiz';if(!confirm('Delete "'+title+'" from the saved quiz library? Historical launches and results will NOT be deleted.'))return;
-  await db.ref('b3Quiz/quizzes/'+currentQuizId).remove();newQuizDraft();
+  await db.ref(QROOT+'/quizzes/'+currentQuizId).remove();newQuizDraft();
 }
 
 // ---------- Launching: class or individual student ----------
 function makeQuestionStates(questions,mode){const out={};questions.forEach((_,i)=>out[i]={open:mode==='test'||i===0,reveal:false});return out;}
 function classForStudent(studentId){
-  if((CLASS_ROSTERS.et.students||[]).includes(studentId))return'et';
-  if((CLASS_ROSTERS.wt.students||[]).includes(studentId))return'wt';
-  return'';
+  return Object.keys(CLASS_ROSTERS).find(id=>(CLASS_ROSTERS[id].students||[]).includes(studentId))||'';
 }
 
 function selectDelivery(type){
@@ -1379,7 +1426,7 @@ function syncFriendlyLaunchUI(){
   if(multiBtn)multiBtn.classList.toggle('active',target==='multiple');
 
   const et=document.getElementById('classEtBtn'),wt=document.getElementById('classWtBtn');
-  if(et)et.classList.toggle('active',classId==='et');
+  if(et)et.classList.toggle('active',classId===(CLASS_SPACE?WQ_CLASS:'et'));
   if(wt)wt.classList.toggle('active',classId==='wt');
 
   const btn=document.getElementById('friendlyLaunchBtn');
@@ -1398,7 +1445,7 @@ function syncFriendlyLaunchUI(){
 function populateLaunchStudents(){
   const sel=document.getElementById('launchStudent');if(!sel)return;
   const old=sel.value;
-  const allIds=[...new Set([...(CLASS_ROSTERS.et.students||[]),...(CLASS_ROSTERS.wt.students||[])])].filter(id=>id!=='simcha_cohen');
+  const allIds=[...new Set(Object.values(CLASS_ROSTERS).flatMap(c=>c.students||[]))].filter(id=>id!=='simcha_cohen');
   const rows=allIds.map(id=>({id,name:(roster[id]&&roster[id].name)||id,classId:classForStudent(id)})).sort((a,b)=>a.name.localeCompare(b.name));
   sel.innerHTML='';
   rows.forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=x.name+' — '+classLabel(x.classId);sel.appendChild(o);});
@@ -1493,7 +1540,7 @@ async function launchSelectedQuiz(){
 
   if(delivery!=='live'){
     const activeChecks=await Promise.all(studentIds.map(async sid=>{
-      const s=await db.ref('b3Quiz/settings/studentActiveLaunch/'+sid).once('value');
+      const s=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');
       return {sid,old:s.val()||''};
     }));
     const conflicts=activeChecks.filter(x=>x.old);
@@ -1526,10 +1573,10 @@ async function launchSelectedQuiz(){
   if(autoStart)launch.startedAt=firebase.database.ServerValue.TIMESTAMP;
   if(makeupSourceLaunchId)launch.makeupOf=makeupSourceLaunchId;
 
-  await db.ref('b3Quiz/launches/'+id).set(launch);
+  await db.ref(QROOT+'/launches/'+id).set(launch);
 
   if(delivery==='live'){
-    await db.ref('b3Quiz/settings/activeLaunchByClass/'+classId).set(id);
+    await db.ref(QROOT+'/settings/activeLaunchByClass/'+classId).set(id);
     launchMsg('Live Class Test staged for '+targetLabel+'. Click Start on the Live Quiz tab.');
     liveClassId=classId;
     document.getElementById('liveClassSelect').value=classId;
@@ -1537,7 +1584,7 @@ async function launchSelectedQuiz(){
     attachLiveLaunch(id);
   }else{
     const updates={};
-    studentIds.forEach(sid=>updates['b3Quiz/settings/studentActiveLaunch/'+sid]=id);
+    studentIds.forEach(sid=>updates[QROOT+'/settings/studentActiveLaunch/'+sid]=id);
     await db.ref().update(updates);
     launchMsg((delivery==='makeup'?'Make-Up Test':'Take Anytime')+' is now available to '+targetLabel+'.');
     if(delivery==='makeup')makeupSourceLaunchId='';
@@ -1551,7 +1598,7 @@ function detachLive(){if(liveLaunchRef)liveLaunchRef.off();if(liveResponseRef)li
 function attachLiveLaunch(id){
   if(id===activeLaunchId&&liveLaunchRef)return;detachLive();activeLaunchId=id;liveLaunch=null;liveResponses={};currentQ=0;
   if(!id){renderLive();renderLiveGrid();return;}
-  liveLaunchRef=db.ref('b3Quiz/launches/'+id);liveResponseRef=db.ref('b3Quiz/responses/'+id);
+  liveLaunchRef=db.ref(QROOT+'/launches/'+id);liveResponseRef=db.ref(QROOT+'/responses/'+id);
   liveLaunchRef.on('value',s=>{liveLaunch=s.val();if(liveLaunch&&liveLaunch.activeQuestion!==undefined)currentQ=Number(liveLaunch.activeQuestion)||0;renderLive();renderLiveGrid();});
   liveResponseRef.on('value',s=>{liveResponses=s.val()||{};renderLiveGrid();});
 }
@@ -1571,22 +1618,22 @@ function renderLive(){
   document.getElementById('liveQnum').textContent='Question '+(currentQ+1)+' of '+qs.length+(st.open?' • OPEN':' • LOCKED');document.getElementById('liveQtext').textContent=q.q||'';document.getElementById('liveAnswer').textContent='Correct answer: '+(choices[Number(q.correctIndex)]||'');document.getElementById('revealBtn').textContent=st.reveal?'Hide answer from students':'Reveal answer to students';
   const strip=document.getElementById('questionStrip');strip.innerHTML='';qs.forEach((_,i)=>{const s=qState(i),b=document.createElement('button');b.textContent=i+1;if(i===currentQ)b.classList.add('active');if(s.open)b.classList.add('open');if(s.reveal)b.classList.add('reveal');b.onclick=()=>goQuestion(i);strip.appendChild(b);});
 }
-function goQuestion(i){currentQ=i;if(activeLaunchId)db.ref('b3Quiz/launches/'+activeLaunchId+'/activeQuestion').set(i);else renderLive();}
+function goQuestion(i){currentQ=i;if(activeLaunchId)db.ref(QROOT+'/launches/'+activeLaunchId+'/activeQuestion').set(i);else renderLive();}
 function prevQuestion(){const qs=liveQuestions();if(qs.length)goQuestion(Math.max(0,currentQ-1));}
-async function nextQuestion(){const qs=liveQuestions();if(!qs.length||!activeLaunchId)return;const next=Math.min(qs.length-1,currentQ+1);if((liveLaunch.mode||'paced')==='paced'){const updates={};/* Opening the next question must never push a student off an unfinished earlier question. Leave previously reached questions available; the student chooses when to move. */updates['activeQuestion']=next;updates['questionStates/'+next+'/open']=true;updates['questionStates/'+next+'/reveal']=false;await db.ref('b3Quiz/launches/'+activeLaunchId).update(updates);}else goQuestion(next);}
-async function setCurrentOpen(open){if(activeLaunchId)await db.ref('b3Quiz/launches/'+activeLaunchId+'/questionStates/'+currentQ+'/open').set(!!open);}
-async function toggleReveal(){if(!activeLaunchId)return;await db.ref('b3Quiz/launches/'+activeLaunchId+'/questionStates/'+currentQ+'/reveal').set(!qState(currentQ).reveal);}
-async function changeMode(){if(!activeLaunchId)return;const mode=document.getElementById('modeSelect').value,qs=liveQuestions(),updates={mode};qs.forEach((_,i)=>{updates['questionStates/'+i+'/open']=mode==='test'||i<=currentQ;updates['questionStates/'+i+'/reveal']=false;});await db.ref('b3Quiz/launches/'+activeLaunchId).update(updates);}
-async function startLaunch(){if(!activeLaunchId||!liveQuestions().length){alert('Launch a quiz first.');return;}const updates={started:true,startedAt:liveLaunch.startedAt||firebase.database.ServerValue.TIMESTAMP};await db.ref('b3Quiz/launches/'+activeLaunchId).update(updates);}
+async function nextQuestion(){const qs=liveQuestions();if(!qs.length||!activeLaunchId)return;const next=Math.min(qs.length-1,currentQ+1);if((liveLaunch.mode||'paced')==='paced'){const updates={};/* Opening the next question must never push a student off an unfinished earlier question. Leave previously reached questions available; the student chooses when to move. */updates['activeQuestion']=next;updates['questionStates/'+next+'/open']=true;updates['questionStates/'+next+'/reveal']=false;await db.ref(QROOT+'/launches/'+activeLaunchId).update(updates);}else goQuestion(next);}
+async function setCurrentOpen(open){if(activeLaunchId)await db.ref(QROOT+'/launches/'+activeLaunchId+'/questionStates/'+currentQ+'/open').set(!!open);}
+async function toggleReveal(){if(!activeLaunchId)return;await db.ref(QROOT+'/launches/'+activeLaunchId+'/questionStates/'+currentQ+'/reveal').set(!qState(currentQ).reveal);}
+async function changeMode(){if(!activeLaunchId)return;const mode=document.getElementById('modeSelect').value,qs=liveQuestions(),updates={mode};qs.forEach((_,i)=>{updates['questionStates/'+i+'/open']=mode==='test'||i<=currentQ;updates['questionStates/'+i+'/reveal']=false;});await db.ref(QROOT+'/launches/'+activeLaunchId).update(updates);}
+async function startLaunch(){if(!activeLaunchId||!liveQuestions().length){alert('Launch a quiz first.');return;}const updates={started:true,startedAt:liveLaunch.startedAt||firebase.database.ServerValue.TIMESTAMP};await db.ref(QROOT+'/launches/'+activeLaunchId).update(updates);}
 async function toggleScoreRelease(){
   if(!activeLaunchId||!liveLaunch)return;
-  await db.ref('b3Quiz/launches/'+activeLaunchId+'/showScore').set(!(liveLaunch.showScore===true));
+  await db.ref(QROOT+'/launches/'+activeLaunchId+'/showScore').set(!(liveLaunch.showScore===true));
 }
 async function stopLaunch(){
   if(!activeLaunchId||!liveLaunch)return;const targets=liveLaunch.targetStudents?Object.keys(liveLaunch.targetStudents).filter(k=>liveLaunch.targetStudents[k]):[];const who=targets.length?((roster[targets[0]]&&roster[targets[0]].name)||targets[0]):classLabel(liveLaunch.classId);if(!confirm('End this '+who+' launch? All data stays saved.'))return;
-  await db.ref('b3Quiz/launches/'+activeLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP});
-  if(targets.length){for(const sid of targets){const snap=await db.ref('b3Quiz/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===activeLaunchId)await db.ref('b3Quiz/settings/studentActiveLaunch/'+sid).remove();}}
-  else if(activeLaunchByClass[liveLaunch.classId]===activeLaunchId)await db.ref('b3Quiz/settings/activeLaunchByClass/'+liveLaunch.classId).remove();
+  await db.ref(QROOT+'/launches/'+activeLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP});
+  if(targets.length){for(const sid of targets){const snap=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===activeLaunchId)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}
+  else if(activeLaunchByClass[liveLaunch.classId]===activeLaunchId)await db.ref(QROOT+'/settings/activeLaunchByClass/'+liveLaunch.classId).remove();
 }
 function rosterRowsForLaunch(launch=liveLaunch){
   if(!launch)return[];const targets=launch.targetStudents&&Object.keys(launch.targetStudents).filter(k=>launch.targetStudents[k]);const allowed=targets&&targets.length?targets:(CLASS_ROSTERS[launch.classId]||{}).students||[];
@@ -1609,13 +1656,13 @@ function openAnswerModal(studentId,i,source,launchId){
   modalContext={launchId:lid,studentId,i,response:r};document.getElementById('modalAdjustmentNote').value='';document.getElementById('modalAnswerInfo').innerHTML='<b>'+esc(st.name||r.name||studentId)+'</b> — Question '+(i+1)+'<br><br><b>Question:</b> '+esc(q.q||'')+'<br><b>Student answer:</b> '+esc(chosen)+'<br><b>Answer key:</b> '+esc(correct)+'<br><b>Current final result:</b> '+(r.correct?'Correct':'Incorrect')+(r.adjusted?' <span class="audit-note">(teacher adjusted)</span>':'');document.getElementById('answerModal').classList.remove('hidden');
 }
 function closeAnswerModal(){document.getElementById('answerModal').classList.add('hidden');modalContext=null;}
-async function writeAudit(type,before,after,note,extra={}){if(!modalContext)return;const ref=db.ref('b3Quiz/audit/'+modalContext.launchId+'/'+modalContext.studentId).push();await ref.set({type,questionIndex:modalContext.i,before,after,note:note||'',at:firebase.database.ServerValue.TIMESTAMP,...extra});}
+async function writeAudit(type,before,after,note,extra={}){if(!modalContext)return;const ref=db.ref(QROOT+'/audit/'+modalContext.launchId+'/'+modalContext.studentId).push();await ref.set({type,questionIndex:modalContext.i,before,after,note:note||'',at:firebase.database.ServerValue.TIMESTAMP,...extra});}
 async function adjustCurrentAnswer(markCorrect){
   if(!modalContext)return;const note=document.getElementById('modalAdjustmentNote').value.trim(),r=modalContext.response,before=!!r.correct;if(before===!!markCorrect&&!note){closeAnswerModal();return;}
-  await writeAudit('score_adjustment',before,!!markCorrect,note,{originalCorrect:r.originalCorrect!==undefined?!!r.originalCorrect:before});await db.ref('b3Quiz/responses/'+modalContext.launchId+'/'+modalContext.studentId+'/'+modalContext.i).update({correct:!!markCorrect,adjusted:true,adjustedAt:firebase.database.ServerValue.TIMESTAMP,adjustmentNote:note||''});closeAnswerModal();
+  await writeAudit('score_adjustment',before,!!markCorrect,note,{originalCorrect:r.originalCorrect!==undefined?!!r.originalCorrect:before});await db.ref(QROOT+'/responses/'+modalContext.launchId+'/'+modalContext.studentId+'/'+modalContext.i).update({correct:!!markCorrect,adjusted:true,adjustedAt:firebase.database.ServerValue.TIMESTAMP,adjustmentNote:note||''});closeAnswerModal();
 }
 async function clearCurrentAnswer(){
-  if(!modalContext)return;if(!confirm('Clear this answer so the student may try this question again? The original answer will remain in the teacher audit trail.'))return;const note=document.getElementById('modalAdjustmentNote').value.trim(),r=modalContext.response;await writeAudit('answer_cleared',r,null,note,{clearedResponse:r});await db.ref('b3Quiz/responses/'+modalContext.launchId+'/'+modalContext.studentId+'/'+modalContext.i).remove();closeAnswerModal();
+  if(!modalContext)return;if(!confirm('Clear this answer so the student may try this question again? The original answer will remain in the teacher audit trail.'))return;const note=document.getElementById('modalAdjustmentNote').value.trim(),r=modalContext.response;await writeAudit('answer_cleared',r,null,note,{clearedResponse:r});await db.ref(QROOT+'/responses/'+modalContext.launchId+'/'+modalContext.studentId+'/'+modalContext.i).remove();closeAnswerModal();
 }
 
 // ---------- Results / history ----------
@@ -1658,7 +1705,7 @@ function renderResults(){
 async function toggleResultsScoreRelease(){
   const l=allLaunches[resultsLaunchId];
   if(!l)return;
-  await db.ref('b3Quiz/launches/'+resultsLaunchId+'/showScore').set(!(l.showScore===true));
+  await db.ref(QROOT+'/launches/'+resultsLaunchId+'/showScore').set(!(l.showScore===true));
 }
 function openMakeupFromResults(){
   const base=allLaunches[resultsLaunchId];
@@ -1674,7 +1721,7 @@ function openMakeupFromResults(){
 
   document.getElementById('launchDeliveryType').value='makeup';
   document.getElementById('launchTargetType').value='multiple';
-  document.getElementById('launchClass').value=base.classId||'et';
+  document.getElementById('launchClass').value=base.classId||(CLASS_SPACE?WQ_CLASS:'et');
   document.getElementById('launchShowScore').checked=base.showScore===true;
   document.getElementById('launchNote').value='Make-up from '+((base.quizSnapshot&&base.quizSnapshot.title)||'original test');
   updateLaunchTargetUI();
@@ -1682,11 +1729,11 @@ function openMakeupFromResults(){
   showTab('setup');
   document.getElementById('launchTypeHelp').scrollIntoView({behavior:'smooth',block:'center'});
 }
-async function endSelectedLaunch(){const l=allLaunches[resultsLaunchId];if(!l)return;if(!confirm('End this launch? Data will remain saved.'))return;await db.ref('b3Quiz/launches/'+resultsLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP});if(l.targetStudents){for(const sid of Object.keys(l.targetStudents)){const snap=await db.ref('b3Quiz/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===resultsLaunchId)await db.ref('b3Quiz/settings/studentActiveLaunch/'+sid).remove();}}else if(activeLaunchByClass[l.classId]===resultsLaunchId)await db.ref('b3Quiz/settings/activeLaunchByClass/'+l.classId).remove();}
+async function endSelectedLaunch(){const l=allLaunches[resultsLaunchId];if(!l)return;if(!confirm('End this launch? Data will remain saved.'))return;await db.ref(QROOT+'/launches/'+resultsLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP});if(l.targetStudents){for(const sid of Object.keys(l.targetStudents)){const snap=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===resultsLaunchId)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}else if(activeLaunchByClass[l.classId]===resultsLaunchId)await db.ref(QROOT+'/settings/activeLaunchByClass/'+l.classId).remove();}
 async function launchRetake(studentId){
   const base=allLaunches[resultsLaunchId];if(!base)return;const snap=base.quizSnapshot||{},qs=launchQuestions(base),group=base.attemptGroupId||resultsLaunchId;let maxAttempt=1;Object.values(allLaunches).forEach(l=>{if((l.attemptGroupId||'')===group&&l.targetStudents&&l.targetStudents[studentId])maxAttempt=Math.max(maxAttempt,Number(l.attemptNumber)||1);});const attempt=maxAttempt+1,id=Date.now()+'_retake_'+studentId+'_'+slugTitle(snap.title||'quiz');
   const launch={quizId:base.quizId||'',quizSnapshot:snap,classId:base.classId,targetStudents:{[studentId]:true},createdAt:firebase.database.ServerValue.TIMESTAMP,started:true,startedAt:firebase.database.ServerValue.TIMESTAMP,mode:'test',deliveryType:'anytime',showScore:base.showScore===true,activeQuestion:0,questionStates:makeQuestionStates(qs,'test'),attemptGroupId:group,attemptNumber:attempt,retakeOf:resultsLaunchId,note:'Student retake'};
-  await db.ref('b3Quiz/launches/'+id).set(launch);await db.ref('b3Quiz/settings/studentActiveLaunch/'+studentId).set(id);
+  await db.ref(QROOT+'/launches/'+id).set(launch);await db.ref(QROOT+'/settings/studentActiveLaunch/'+studentId).set(id);
   const name=(roster[studentId]&&roster[studentId].name)||studentId,link=getLaunchLink(id);
   try{await navigator.clipboard.writeText(link);alert('Retake '+attempt+' is now active for '+name+'. It does not affect the rest of the class.\n\nA direct link to this retake was copied — paste it wherever you message '+name+'.');}
   catch(e){prompt('Retake '+attempt+' is now active for '+name+'. Copy this direct link to send:',link);}
@@ -1695,13 +1742,13 @@ async function deleteLaunch(id){
   const l=allLaunches[id];if(!l){alert('That launch no longer exists.');return;}
   const snap=l.quizSnapshot||{},retakeLabel=l.retakeOf?(' (Retake '+(l.attemptNumber||2)+')'):'',target=l.targetStudents?Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]):[],who=target.length?' for '+((roster[target[0]]&&roster[target[0]].name)||target[0]):'';
   if(!confirm('Delete "'+(snap.title||'Untitled')+retakeLabel+'"'+who+'? This permanently removes its results, responses, and audit trail. This cannot be undone.'))return;
-  await db.ref('b3Quiz/launches/'+id).remove();
-  await db.ref('b3Quiz/responses/'+id).remove();
-  await db.ref('b3Quiz/completions/'+id).remove();
-  await db.ref('b3Quiz/audit/'+id).remove();
+  await db.ref(QROOT+'/launches/'+id).remove();
+  await db.ref(QROOT+'/responses/'+id).remove();
+  await db.ref(QROOT+'/completions/'+id).remove();
+  await db.ref(QROOT+'/audit/'+id).remove();
   // Clean up any dangling pointers so no student/class is left aimed at a deleted launch.
-  if(activeLaunchByClass[l.classId]===id)await db.ref('b3Quiz/settings/activeLaunchByClass/'+l.classId).remove();
-  if(l.targetStudents){for(const sid of Object.keys(l.targetStudents)){const s=await db.ref('b3Quiz/settings/studentActiveLaunch/'+sid).once('value');if(s.val()===id)await db.ref('b3Quiz/settings/studentActiveLaunch/'+sid).remove();}}
+  if(activeLaunchByClass[l.classId]===id)await db.ref(QROOT+'/settings/activeLaunchByClass/'+l.classId).remove();
+  if(l.targetStudents){for(const sid of Object.keys(l.targetStudents)){const s=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(s.val()===id)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}
   if(resultsLaunchId===id)resultsLaunchId='';
   renderLaunchHistory();renderResults();
 }

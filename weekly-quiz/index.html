@@ -198,6 +198,9 @@ let markingComplete=false;
 // send a student straight to one exact quiz — the current one or an old retake.
 const forcedLaunchId=new URLSearchParams(window.location.search).get('launch')||'';
 
+// B3's own classes (et/wt) use b3Quiz directly; any other class has its own
+// quizzes and results under b3Quiz/classes/<id>. Set once the student's class is known.
+let QROOT='b3Quiz';
 const CLASS_ROSTERS={
   et:{label:'East Track',students:['chaim_chaikin','yossi_gourarie','sholom_huebner','moshe_lapine','kehos_notik','yisroel_oirechman','moshe_raichman','avrohom_rosenfeld','levi_rozmarin','arik_traxler','simcha_cohen']},
   wt:{label:'West Track',students:['ari_greenberg','zev_rosenfeld','levi_schtroks','yisroel_aryeh_simmonds','leibel_vogel','leib_wolf','simcha_cohen']}
@@ -346,6 +349,7 @@ async function joinQuiz(){
 
 function enterStudent(displayName,studentId,classId){
   myName=displayName;myStudentId=studentId;myClassId=classId;
+  QROOT=/^[A-Za-z0-9_-]{1,100}$/.test(classId)&&!['et','wt'].includes(classId)?'b3Quiz/classes/'+classId:'b3Quiz';
   localStorage.setItem('posukPractice_studentName',displayName);
   localStorage.setItem('posukPractice_studentId',studentId);
   localStorage.setItem('weeklyQuiz_classId',classId);
@@ -390,8 +394,8 @@ function detachLaunchListeners(){
 
 function listenForLaunches(){
   detachLaunchListeners();
-  classLaunchRef=db.ref('b3Quiz/settings/activeLaunchByClass/'+myClassId);
-  personalLaunchRef=db.ref('b3Quiz/settings/studentActiveLaunch/'+myStudentId);
+  classLaunchRef=db.ref(QROOT+'/settings/activeLaunchByClass/'+myClassId);
+  personalLaunchRef=db.ref(QROOT+'/settings/studentActiveLaunch/'+myStudentId);
   classLaunchRef.on('value',s=>{classLaunchId=s.val()||'';chooseActiveLaunch();});
   personalLaunchRef.on('value',s=>{personalLaunchId=s.val()||'';chooseActiveLaunch();});
 }
@@ -399,8 +403,8 @@ function listenForLaunches(){
 function listenForHistory(){
   if(historyLaunchRef)historyLaunchRef.off();
   if(historyCompletionRef)historyCompletionRef.off();
-  historyLaunchRef=db.ref('b3Quiz/launches');
-  historyCompletionRef=db.ref('b3Quiz/completions');
+  historyLaunchRef=db.ref(QROOT+'/launches');
+  historyCompletionRef=db.ref(QROOT+'/completions');
   historyLaunchRef.on('value',s=>{allLaunches=s.val()||{};renderPastQuizzes();});
   historyCompletionRef.on('value',s=>{allCompletions=s.val()||{};renderPastQuizzes();});
 }
@@ -411,8 +415,8 @@ function chooseActiveLaunch(){
   if(launchRef)launchRef.off();if(responseRef)responseRef.off();launchRef=responseRef=null;
   activeLaunchId=id;launchData=null;myResponses={};selectedChoice=null;displayedQuestion=0;
   if(!id){render();return;}
-  launchRef=db.ref('b3Quiz/launches/'+id);
-  responseRef=db.ref('b3Quiz/responses/'+id+'/'+myStudentId);
+  launchRef=db.ref(QROOT+'/launches/'+id);
+  responseRef=db.ref(QROOT+'/responses/'+id+'/'+myStudentId);
   launchRef.on('value',s=>{launchData=s.val();render();});
   responseRef.on('value',s=>{myResponses=s.val()||{};render();});
 }
@@ -549,7 +553,7 @@ function renderNav(mode,questions){
 async function submitAnswer(){
   if(selectedChoice===null){const s=document.getElementById('answerStatus');s.textContent='Choose an answer first.';s.className='status bad';return;}
   const qs=getQuestions(),q=qs[displayedQuestion],mode=launchData&&launchData.mode||'paced',st=studentEffectiveQuestionState(displayedQuestion,mode);if(!st.open||responseFor(displayedQuestion))return;
-  const ref=db.ref('b3Quiz/responses/'+activeLaunchId+'/'+myStudentId+'/'+displayedQuestion);
+  const ref=db.ref(QROOT+'/responses/'+activeLaunchId+'/'+myStudentId+'/'+displayedQuestion);
   const correct=Number(selectedChoice)===Number(q.correctIndex);
   const answer={name:myName,choiceIndex:selectedChoice,originalCorrect:correct,correct,adjusted:false,submittedAt:firebase.database.ServerValue.TIMESTAMP};
   try{await ref.set(answer);}catch(e){console.error(e);const s=document.getElementById('answerStatus');s.textContent='Could not save your answer. Try again.';s.className='status bad';}
@@ -558,7 +562,7 @@ async function submitAnswer(){
 async function markCompletion(){
   if(markingComplete||!activeLaunchId||!myStudentId)return;markingComplete=true;
   try{
-    const ref=db.ref('b3Quiz/completions/'+activeLaunchId+'/'+myStudentId),existing=await ref.once('value');
+    const ref=db.ref(QROOT+'/completions/'+activeLaunchId+'/'+myStudentId),existing=await ref.once('value');
     if(!existing.exists()){
       const qs=getQuestions(),score=scoreFromResponses(qs,myResponses);
       await ref.set({name:myName,completedAt:firebase.database.ServerValue.TIMESTAMP,correct:score.correct,total:score.total,pct:score.pct});
@@ -592,7 +596,7 @@ async function openPastQuiz(launchId){
   document.getElementById('reviewQuestions').innerHTML='<div class="past-meta">Loading your answers…</div>';review.classList.remove('hidden');
   review.scrollIntoView({behavior:'smooth',block:'start'});
   try{
-    const rs=await db.ref('b3Quiz/responses/'+launchId+'/'+myStudentId).once('value'),responses=rs.val()||{},score=scoreFromResponses(questions,responses),released=launch.showScore===true;
+    const rs=await db.ref(QROOT+'/responses/'+launchId+'/'+myStudentId).once('value'),responses=rs.val()||{},score=scoreFromResponses(questions,responses),released=launch.showScore===true;
     const scoreEl=document.getElementById('reviewScore'),notice=document.getElementById('reviewNotice');
     if(released){scoreEl.textContent=score.correct+' / '+score.total+' — '+score.pct+'%';scoreEl.classList.remove('hidden');notice.textContent='This review is read-only. Green answers were correct; red answers were incorrect.';notice.className='status good';}
     else{scoreEl.textContent='';scoreEl.classList.add('hidden');notice.textContent='Your answers are saved. Your teacher has not released the score/right-wrong review yet.';notice.className='status';}
