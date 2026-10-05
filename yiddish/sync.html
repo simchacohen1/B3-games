@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Story Timing Tool</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#eee7d7;color:#201c18}
+header{background:#143e69;color:#fff;padding:14px 20px;position:sticky;top:0;z-index:2}
+header h1{margin:0 0 6px;font-size:22px}header p{margin:0;font-size:14px;color:#dbe6f3}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+audio{width:min(700px,100%)}
+button{font:bold 16px Arial;border:0;border-radius:10px;padding:10px 16px;background:#fff;color:#143e69;cursor:pointer}
+#tap{background:#ffd34d;color:#201c18;font-size:20px;padding:14px 22px}
+#tap:disabled{opacity:.5}
+main{max-width:1000px;margin:auto;padding:16px}
+.para{direction:rtl;text-align:right;font:22px/1.6 'Times New Roman',serif;background:#fff;border:3px solid transparent;border-radius:10px;padding:10px 14px;margin:0 0 10px;display:flex;gap:14px;align-items:flex-start}
+.para .t{direction:ltr;font:bold 14px Arial;color:#666;min-width:64px;padding-top:6px}
+.para.done .t{color:#1b7a3d}
+.para.next{border-color:#e0a800;background:#fff8dc}
+.para button{direction:ltr;font-size:12px;padding:6px 8px;background:#eef3f8}
+#out{width:100%;height:110px;font:13px monospace;margin-top:10px}
+</style></head><body>
+<header>
+<h1>Story Timing Tool (teacher only)</h1>
+<p>Press Play. Each time the speaker STARTS a new paragraph, press the yellow button (or the Space bar). Made a mistake? Press Undo.</p>
+<div class="bar"><audio id="audio" controls preload="auto" src="audio.mp3"></audio></div>
+<div class="bar"><button id="tap" disabled>▶ Next paragraph starts NOW</button><button id="undo">↩ Undo</button><span id="status"></span></div>
+</header>
+<main>
+<div id="list">Loading the story…</div>
+<h2>When you are done</h2>
+<p>Press <b>Copy</b> and paste the result into the chat with Claude.</p>
+<button id="copy">Copy</button>
+<textarea id="out" readonly></textarea>
+</main>
+<script>
+const $=id=>document.getElementById(id),audio=$('audio');
+let paras=[],order=[],times={},next=0;
+function fmt(s){if(s==null)return '—';const m=Math.floor(s/60),r=(s-m*60).toFixed(1).padStart(4,'0');return m+':'+r}
+function draw(){
+  $('list').replaceChildren();
+  order.forEach((i,k)=>{const row=document.createElement('div');row.className='para'+(times[i]!=null?' done':'')+(k===next?' next':'');row.id='row'+i;
+    const t=document.createElement('span');t.className='t';t.textContent=fmt(times[i]);
+    const txt=document.createElement('span');txt.textContent=paras[i];
+    const play=document.createElement('button');play.textContent='▶ from here';play.disabled=times[i]==null;play.onclick=()=>{audio.currentTime=Math.max(0,times[i]-1);audio.play();next=k+1;draw()};
+    row.append(t,txt,play);$('list').append(row)});
+  const done=order.filter(i=>times[i]!=null).length;
+  $('status').textContent=`${done} of ${order.length} paragraphs timed`;
+  $('tap').disabled=next>=order.length;
+  $('out').value='STORY_TIMES '+JSON.stringify(Object.fromEntries(order.filter(i=>times[i]!=null).map(i=>[i,Math.round(times[i]*10)/10])));
+  const cur=$('row'+order[next]);if(cur)cur.scrollIntoView({block:'center',behavior:'smooth'});
+}
+function tap(){if(next>=order.length)return;times[order[next]]=audio.currentTime;next++;draw()}
+$('tap').onclick=tap;
+document.addEventListener('keydown',e=>{if(e.code==='Space'&&e.target.tagName!=='TEXTAREA'){e.preventDefault();tap()}});
+$('undo').onclick=()=>{if(next>0){next--;delete times[order[next]];draw()}};
+$('copy').onclick=async()=>{$('out').select();try{await navigator.clipboard.writeText($('out').value);$('copy').textContent='Copied ✓'}catch(e){document.execCommand('copy');$('copy').textContent='Copied ✓'}};
+fetch('story.html').then(r=>r.text()).then(h=>{
+  const m=h.match(/<script id="payload" type="application\/json">([\s\S]*?)<\/script>/);
+  paras=JSON.parse(m[1]).paras;order=paras.map((p,i)=>i).filter(i=>paras[i].trim());draw();
+}).catch(()=>{$('list').textContent='Could not load the story. Refresh the page.'});
+</script>
+</body></html>

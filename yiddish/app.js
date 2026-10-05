@@ -1,5 +1,5 @@
 'use strict';
-const APP_BUILD='2026-10-05-four-word-steps';
+const APP_BUILD='2026-10-05-story-sync';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
 let group=0,part=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null,soundGame=null;
@@ -70,7 +70,7 @@ function render(){
   $('segments').replaceChildren();
   if(part>=partCount(group))part=0;
   config.sections.forEach((s,i)=>{for(let pp=0;pp<partCount(i);pp++){const b=node('button',`${open(i)?'':'🔒 '}Step ${stepNumber(i,pp)}`,i===group&&pp===part?'active':'');b.type='button';b.disabled=!open(i);b.title='Story section '+(i+1);b.onclick=()=>{if(busy||pending)return;clearAdvance();group=i;part=pp;showAll=false;round=null;flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;render()};$('segments').append(b)}});
-  $('words').replaceChildren();$('start').disabled=!open(group);$('flashStart').disabled=!open(group);$('sentenceStart').disabled=!open(group);$('soundStart').disabled=!open(group);$('storyQuizStart').disabled=!open(group);$('readStory').hidden=!open(group);$('readStory').href='story.html?section='+group;$('readStory').textContent='📖 Read the illustrated story — Section '+(group+1);
+  $('words').replaceChildren();$('start').disabled=!open(group);$('flashStart').disabled=!open(group);$('sentenceStart').disabled=!open(group);$('soundStart').disabled=!open(group);$('storyQuizStart').disabled=!open(group);$('readStory').hidden=!open(group);$('readStory').href='story.html?section='+group;$('readStory').textContent='📖 Read the illustrated story — '+(partCount(group)>1?'Steps '+stepNumber(group,0)+'–'+stepNumber(group,partCount(group)-1):'Step '+stepNumber(group,0));
   $('title').textContent=showAll?'My vocabulary':`Step ${stepNumber(group,part)} · new words`;
   const visible=showAll?config.sections.flatMap((s,i)=>open(i)?s.words:[]):open(group)?newWords(group,part):[];
   for(const id of visible){const w=word(id);if(!w)continue;const card=node('article','','word'),st=status(progress[id]);card.append(node('span',st,'status '+st.toLowerCase()));const yi=node('div',w.yi,'yi');yi.lang='yi';card.append(yi,node('div',w.en));$('words').append(card)}
