@@ -6,7 +6,7 @@
 <title>Class Pointer Classroom | Fun Torah Tools</title>
 <link rel="stylesheet" href="classroom.css">
 <script defer src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
-<script defer src="classroom-core.js"></script><script defer src="highlighting.js"></script><script defer src="classroom.js"></script>
+<script defer src="classroom-core.js"></script><script defer src="highlighting.js"></script><script defer src="lesson-fullscreen.js"></script><script defer src="classroom.js"></script>
 </head>
 <body><main>
 <header><h1>Class Pointer Classroom</h1><p>Keep Zoom open for voices and webcams. View the lesson and point here.</p></header>
@@ -19,7 +19,8 @@
 </section>
 <section id="studentPanel" hidden><form id="joinForm"><label for="studentName">Your name</label><input id="studentName" maxlength="32" required autocomplete="given-name"><button id="joinClass" type="submit">Join class</button></form><button id="leaveClass" hidden>Leave class</button><div class="controls"><label for="studentTool">My pointer</label><select id="studentTool"><option value="target">Target</option><option value="arrow">Arrow</option><option value="star">Star</option><option value="highlight">Highlighter</option><option value="underline">Underline</option><option value="box">Highlight box</option></select><label for="studentColor">My color</label><select id="studentColor"><option value="">Class color</option><option value="#ffcc00">Gold</option><option value="#57b8ff">Blue</option><option value="#ff7979">Coral</option><option value="#75df9a">Green</option><option value="#dca0ff">Purple</option><option value="#ffa65c">Orange</option><option value="#7ce4dc">Teal</option></select><label for="studentSize">Highlight size</label><select id="studentSize"><option value="0.008">Thin</option><option value="0.016" selected>Medium</option><option value="0.028">Thick</option></select><button id="undoStudentHighlight">Undo my highlight</button><button id="clearStudentHighlights">Clear my highlights</button></div><p id="permissionText">Enter your name to request admission.</p></section>
 <p id="connectionStatus" role="status">Ready to start.</p><p id="error" role="alert" hidden></p>
-<section id="stage" aria-label="Shared teaching screen"><video id="lesson" autoplay muted playsinline></video><div id="placeholder">The shared teaching screen will appear here.</div><svg id="highlightLayer" aria-label="Class highlights"></svg><div id="focusLayer"><div id="spotlightCircle" hidden></div></div><div id="pointerLayer"></div></section>
+<div class="controls"><button id="fullScreenLesson" type="button" aria-controls="stage" aria-expanded="false">Full-screen lesson</button></div>
+<section id="stage" aria-label="Shared teaching screen"><video id="lesson" autoplay muted playsinline></video><div id="placeholder">The shared teaching screen will appear here.</div><svg id="highlightLayer" aria-label="Class highlights"></svg><div id="focusLayer"><div id="spotlightCircle" hidden></div></div><div id="pointerLayer"></div><button id="exitFullScreenLesson" type="button" hidden>Exit full screen</button></section>
 <p id="pointerStatus" role="status">Hover to point. Choose a highlighting tool, then drag on the lesson. Student permissions apply to both.</p>
 <footer><p>This first classroom test sends the screen directly from the teacher to each admitted student. School networks may block the connection; test with one student before using it for a full class. No student camera or microphone is requested.</p><a href="index.html">Open local pointer practice</a></footer>
 </main></body></html>

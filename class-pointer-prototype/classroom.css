@@ -14,3 +14,8 @@ h1{color:#234ea8}button{transition:background .15s,box-shadow .15s}button:hover:
 #stage{touch-action:pan-y}
 #highlightLayer{position:absolute;z-index:1;pointer-events:none;overflow:hidden}
 #stage:has(#highlightLayer){touch-action:none}
+#stage:fullscreen,#stage.lesson-fullscreen{width:100vw;height:100dvh;aspect-ratio:auto;border-radius:0}
+#stage.lesson-fullscreen{position:fixed;inset:0;z-index:10000}
+body.lesson-expanded{overflow:hidden}
+#exitFullScreenLesson{position:absolute;top:12px;right:12px;z-index:4;background:#172033e6;color:white;border-color:#ffffff70;font-size:14px;cursor:pointer;touch-action:manipulation}
+#exitFullScreenLesson:hover{background:#334155}

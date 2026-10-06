@@ -16,6 +16,8 @@ Open `classroom.html` as the teacher. Keep Zoom open for voices and webcams.
 
 The existing `index.html` practice simulation remains separate.
 
+Teacher and student pages have **Full-screen lesson** above the picture. This expands the entire lesson stage, including pointers, highlights, and spotlight, while hiding the surrounding controls. Click **Exit full screen** in the top-right corner, or press **Escape**, to return. Each person controls their own view. If native browser fullscreen is unavailable, the lesson fills the browser viewport instead. Letterboxing and normalized overlay coordinates update through the existing resize observers. The exit button does not create a pointer or highlight.
+
 ## Connection design
 
 PeerJS 1.5.5 uses its public signaling service to establish WebRTC data and one-way video connections. Video is sent from the teacher directly to each admitted student. There is no recording, database write, student camera, or student microphone. Names are self-entered; teacher admission is required. A random join link identifies a temporary session. Refreshing or closing the teacher page ends it.
