@@ -1,0 +1,304 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Halacha Scrapbook V14</title><style>
+*{box-sizing:border-box}body{margin:0;font-family:Trebuchet MS,Arial,sans-serif;background:#dcecf3;color:#233746}
+button{font:inherit;cursor:pointer}header{position:sticky;top:0;z-index:100;background:#173b62;color:white;padding:10px 16px;box-shadow:0 2px 10px #0003}
+.bar{max-width:1400px;margin:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.bar h1{font-size:22px;margin:0 auto 0 0}.bar button{border:0;border-radius:10px;padding:8px 11px;font-weight:800}
+main{max-width:1400px;margin:auto;padding:14px}.tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}.tabs button{border:2px solid #b7cfdb;background:white;border-radius:12px;padding:9px 12px;font-weight:bold}.tabs button.on{background:#173b62;color:white}
+.section{display:none}.section.on{display:block}.work{display:grid;grid-template-columns:285px 1fr;gap:14px}.side{background:#fff;border-radius:18px;padding:13px;box-shadow:0 6px 20px #0001;height:max-content;position:sticky;top:68px}
+.side h3{margin:3px 0 8px}.step{border:2px solid #d6e5ed;border-radius:14px;padding:10px;margin:8px 0}.step b{display:block;margin-bottom:5px}.step button{border:2px solid #bfd5e0;background:#f1f9fc;border-radius:9px;padding:6px;margin:2px}.step button.good{background:#dff3df;border-color:#74b981}.step button.bad{animation:shake .25s}.earned{background:#e5f5e7;border:2px solid #7fbd88;border-radius:10px;padding:7px;margin-top:6px;font-weight:bold}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.book{background:#976442;border-radius:24px;padding:18px;box-shadow:0 15px 35px #0002}.spread{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.page{height:700px;position:relative;overflow:hidden;border-radius:7px;background:#fff8df;background-image:linear-gradient(#0000 31px,#ddd3b8 32px),linear-gradient(90deg,#0000 31px,#eadfc3 32px);background-size:32px 32px;box-shadow:inset 0 0 35px #7d633222}
+.page.blue{background:#e3f6ff;background-image:radial-gradient(#9bcadd 1.2px,transparent 1.2px);background-size:19px 19px}.page.craft{background:#d7b27b;background-image:linear-gradient(45deg,#fff2 25%,transparent 25%,transparent 75%,#fff2 75%);background-size:28px 28px}.page.night{background:#173758;background-image:radial-gradient(#fff 1px,transparent 1px);background-size:33px 33px;color:white}
+.scrap{position:absolute;padding:11px;min-width:90px;max-width:390px;background:#fff;border:2px solid #d4c08c;box-shadow:4px 5px 9px #0003;cursor:move;touch-action:none;user-select:none;transform:rotate(var(--r,0deg));z-index:2}.scrap.selected{outline:4px dashed #4fa4d3;outline-offset:3px}.scrap.he{direction:rtl;text-align:center;font-size:23px;font-weight:900;background:#fff0b4}.scrap.sticker{font-size:45px;border:0;background:transparent;box-shadow:none}.scrap img{max-width:250px;max-height:220px;display:block}
+.mini{display:flex;gap:3px;flex-wrap:wrap;margin-top:5px}.mini button{font-size:11px;padding:3px 6px;border:0;border-radius:6px;background:#eaf2f6}.themeRow{display:flex;gap:6px}.themeRow button{width:34px;height:34px;border:2px solid #666;border-radius:50%;padding:0}
+.activityBoard{position:absolute;left:6%;top:7%;width:88%;min-height:82%;background:#fffdf3eF;border:4px solid #cda95c;border-radius:18px;padding:18px;z-index:1;box-shadow:0 7px 15px #0002}.activityBoard h2{margin:0 0 8px;text-align:center}.activityBoard.finished{opacity:.25;pointer-events:none}
+.wordbank,.dropzone,.matchgrid,.comic{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}.card{background:#fff;border:2px solid #d0bd8e;border-radius:10px;padding:9px 12px;font-weight:800;box-shadow:2px 3px 4px #0002}.card[draggable=true]{cursor:grab}.slot{min-width:105px;min-height:48px;border:3px dashed #9eb4c0;border-radius:10px;padding:7px;background:#f5fbfd}.slot.filled{border-style:solid;background:#e4f4e5}.matchgrid{display:grid;grid-template-columns:1fr 1fr}.matchgrid button{padding:10px;border:2px solid #c8d7df;border-radius:10px;background:white}.comic .bubble{width:45%;background:#fff;border:3px solid #333;border-radius:30px;padding:12px;text-align:center}.finishBtn{display:block;margin:12px auto 0;border:0;background:#173b62;color:#fff;border-radius:11px;padding:9px 15px;font-weight:bold}
+.teacherOnly{display:none}.teacherMode .teacherOnly{display:block}.notes{display:none;background:#fff8d8;border:2px solid #d5b84e;border-radius:14px;padding:12px;margin-bottom:10px}.notes.open{display:block}.source{direction:rtl;text-align:right;background:#fff;border-right:5px solid #b99a28;padding:9px;margin:8px 0}.qbank{background:#fff;border-radius:18px;padding:16px}.qbank li{margin:7px 0}
+@media(max-width:950px){.work{grid-template-columns:1fr}.side{position:static}.spread{grid-template-columns:1fr}.page{height:680px}}
+@media print{header,.tabs,.side,.teacherOnly,.activityBoard:not(.keep){display:none!important}.work{display:block}.book{padding:0;background:none;box-shadow:none}.spread{display:block}.page{height:10in;break-after:page;box-shadow:none}}
+
+.teacher-source-panel{display:none;margin:14px 18px;padding:18px;border:3px solid #d2aa57;border-radius:18px;background:#fffaf0;box-shadow:0 6px 18px #0002;position:relative;z-index:30}
+.teacher-source-panel.show{display:block}
+.teacher-source-panel h3{margin:0 0 8px;color:#173f68}
+.teacher-source-panel .source-label{font-weight:800;color:#7b4c12;margin-top:12px}
+.teacher-source-panel .kitzur{direction:rtl;text-align:right;font-size:19px;line-height:1.75;background:#fff;padding:12px;border-radius:12px;border:1px solid #e5cf9c;max-height:260px;overflow:auto}
+.teacher-source-panel .ppt{background:#eef7ff;padding:12px;border-radius:12px;border:1px solid #b7d6ee;line-height:1.5}
+.teacher-source-panel .bringout{background:#eef8ea;padding:12px;border-radius:12px;border:1px solid #b8d7ae;line-height:1.5}
+.teacher-source-panel ul{margin-top:6px}
+.teacher-source-toggle{margin-left:8px}
+body:not(.teacher-mode) .teacher-source-panel,body:not(.teacher-mode) .teacher-source-toggle{display:none!important}
+
+
+/* V9: cross-page dragging + page coloring */
+.page{overflow:visible}
+.spread{position:relative}
+.canvas{position:absolute;inset:0;pointer-events:none}
+.canvas .scrap{pointer-events:auto}
+.page-tools{position:absolute;right:8px;bottom:8px;z-index:18;display:flex;gap:5px;align-items:center;padding:5px 7px;border-radius:12px;background:#fffffff0;box-shadow:0 2px 8px #0002}
+.page-tools button{width:28px;height:28px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #789;padding:0;font-size:14px}
+.page-tools button.pen-on{outline:3px solid #173b62}
+.draw-layer{position:absolute;inset:0;width:100%;height:100%;z-index:6;pointer-events:none;touch-action:none}
+.page.drawing .draw-layer{pointer-events:auto;cursor:crosshair}
+.page.drawing .scrap{pointer-events:none}
+@media print{.page-tools{display:none!important}.draw-layer{z-index:0}.scrap{z-index:2}}
+
+
+/* V11 cross-page bridge: preserve working V9 rendering */
+.spread{position:relative!important;overflow:visible!important}
+.page{overflow:visible!important}
+.canvas{overflow:visible!important}
+.scrap{z-index:20}
+
+
+/* V12 scrapbook piece customization */
+.piece-customizer{position:fixed;z-index:9999;display:none;width:260px;padding:12px;border-radius:16px;background:#fff;box-shadow:0 8px 30px #0004;border:2px solid #9fc4dc;font:14px Arial;color:#243746}
+.piece-customizer.show{display:block}
+.piece-customizer .pc-title{font-weight:800;margin-bottom:8px}
+.piece-customizer .pc-row{display:flex;gap:7px;align-items:center;margin:7px 0;flex-wrap:wrap}
+.piece-customizer label{font-weight:700;font-size:12px}
+.piece-customizer select,.piece-customizer input[type=range]{flex:1;min-width:120px}
+.piece-customizer input[type=color]{width:38px;height:30px;padding:0;border:0;background:none}
+.piece-customizer button{border:1px solid #b7c9d6;background:#f4f8fb;border-radius:8px;padding:5px 8px}
+.scrap.selected{outline:3px dashed #43a5df;outline-offset:3px}
+
+
+@media print{
+ @page{size:landscape;margin:.2in}
+ html,body{background:#fff!important;overflow:visible!important;height:auto!important}
+ body *{visibility:hidden!important}
+ .print-target,.print-target *{visibility:visible!important}
+ .print-target{display:block!important;position:absolute!important;left:0!important;top:0!important;width:100%!important}
+ .print-target .spread{display:flex!important;position:relative!important;width:100%!important;min-height:7in!important;
+ margin:0!important;gap:10px!important;box-shadow:none!important;overflow:visible!important}
+ .print-target .page{display:block!important;position:relative!important;width:50%!important;flex:1 1 50%!important;
+ height:7in!important;min-height:7in!important;overflow:visible!important;
+ -webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+ .print-target .canvas{display:block!important;visibility:visible!important;position:absolute!important;inset:0!important;overflow:visible!important}
+ .print-target .scrap{display:block!important;visibility:visible!important;opacity:1!important;
+ -webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+ .print-target .draw-layer{display:block!important;visibility:visible!important;opacity:1!important;
+ -webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+ .print-target .activityBoard,.print-target .tray,.print-target .page-tools,.print-target .mini,
+ header,.tabs,.teacher-source-panel,.teacher-source-toggle,#pieceCustomizer,button{display:none!important}
+ .print-target .scrap.selected{outline:none!important}
+}
+
+</style></head><body><header><div class=bar><h1>📔 My Halacha Scrapbook — סימן א</h1><button onclick="mode(false)">Student</button><button onclick="mode(true)">Teacher</button><button onclick="printScrapbook()">Print / PDF</button></div></header><main><div id=tabs class=tabs></div><div id=sections></div><div id=review class="section teacherOnly"></div></main><script>
+const lessons=[
+{id:"a",tab:"1 · שויתי",title:"שויתי ה׳ לנגדי תמיד",seif:"סעיף א",objective:"Develop a constant awareness that Hashem is always present, which shapes one’s behavior in public and in private.",source:"שויתי ה׳ לנגדי תמיד · הכרה תמידית בהשגחת ה׳",qs:["What is the meaning of שויתי ה׳ לנגדי תמיד?","Why is it important to remember Hashem is always with us?","How does this awareness affect how we speak and behave?"],type:"choices",pieces:[["he","שויתי ה׳ לנגדי תמיד"],["text","I remember Hashem wherever I am"],["sticker","🏠"],["sticker","🏫"],["sticker","💬"]]},
+{id:"b",tab:"2 · מודה אני",title:"מודה אני — השבת הנשמה",seif:"סעיף ב",objective:"Understand the importance of thanking Hashem for returning one’s נשמה each morning and how to express it through מודה אני.",source:"אמירת מודה אני והכרת הטוב עם הקימה",qs:["What should a person think about as soon as he wakes up?","Why is it permitted to say מודה אני even before נטילת ידים?","What is the proper pause when saying מודה אני?"],type:"sequence",pieces:[["sticker","🌅"],["text","Thank You for returning my נשמה"],["sticker","💛"]]},
+{id:"c",tab:"3 · ארבע מידות",title:"ארבע מידות בעבודת ה׳",seif:"סעיף ג",objective:"Begin the day with energy and strength and use the four מידות in עבודת ה׳.",source:"ארבע מידות להתנהלות בעבודת ה׳",qs:["What are the four מידות mentioned by יהודה בן תימא?","What does each מידה symbolize?"],type:"match",pieces:[["he","עז כנמר"],["he","קל כנשר"],["he","רץ כצבי"],["he","גיבור כארי"],["sticker","🐆"],["sticker","🦅"],["sticker","🦌"],["sticker","🦁"]]},
+{id:"d",tab:"4 · היצר הרע",title:"מתגברים על היצר הרע",seif:"סעיף ד",objective:"Conquer laziness and excuses and act with bravery and זריזות in עבודת ה׳.",source:"זריזות עם הקימה והתגברות על היצר",qs:["What excuses does the יצר הרע give for not waking up early?","How can we overcome the יצר הרע in the morning?","What lesson does the קיצור שולחן ערוך bring from someone running for money or business?"],type:"comic",pieces:[["text","I can overcome an excuse!"],["sticker","⏰"],["sticker","💪"]]},
+{id:"e",tab:"5 · לילה",title:"עבודת ה׳ בלילה ותיקון חצות",seif:"סעיף ה",objective:"Appreciate the greatness of nighttime Torah study and תיקון חצות, and its spiritual rewards.",source:"השכמה בחצות וחשיבות לימוד תורה בלילה",qs:["What is the ideal time for תיקון חצות?","What should one do if he cannot wake at חצות?","Why is learning Torah at night so special?","What is meant by משנה – אותיות נשמה?"],type:"night",pieces:[["he","תיקון חצות"],["he","משנה ↔ נשמה"],["sticker","🌙"],["sticker","⭐"],["sticker","📖"]]}
+];
+let S={};try{S=JSON.parse(localStorage.getItem("halachaV14")||"{}")}catch(e){};function save(){localStorage.setItem("halachaV14",JSON.stringify(S))}
+
+function teacherSource(id){
+ const x={
+ a:`<b>קיצור שולחן ערוך — סעיף א</b><br><br>שִׁוִיתִי ה' לְנֶגְדִּי תָמִיד, הוּא כְּלָל גָּדוֹל בַּתּוֹרָה וּבְמַעֲלוֹת הַצַּדִּיקִים אֲשֶׁר הוֹלְכִים לִפְנֵי הָאֱלֹהִים. כִּי אֵין יְשִׁיבַת הָאָדָם תְּנוּעָתוֹ וַעֲסָקָיו וְהוּא לְבַדּוֹ בְּבֵיתוֹ, כְּמוֹ יְשִׁיבָתוֹ וּתְנוּעָתוֹ וַעֲסָקָיו כַּאֲשֶׁר הוּא לִפְנֵי מֶלֶךְ גָּדוֹל... כָּל שֶׁכֵּן כַּאֲשֶׁר יָשִׂים הָאָדָם אֶל לִבּוֹ כִּי הַמֶּלֶךְ הַגָּדוֹל הַקָּדוֹשׁ בָּרוּךְ הוּא... עוֹמֵד עָלָיו וְרוֹאֶה בְמַעֲשָׂיו... בְּוַדַּאי מִיָּד תַּגִּיעַ אֵלָיו הַיִּרְאָה וְהַהַכְנָעָה...`,
+ b:`<b>קיצור שולחן ערוך — סעיף ב</b><br><br>וּמִיָּד כְּשֶׁיֵּעוֹר מִשְּׁנָתוֹ יִזְכֹּר חַסְדֵי ה'... שֶׁהֶחֱזִיר לוֹ אֶת נִשְׁמָתוֹ... וּבְעוֹדוֹ עַל מִשְׁכָּבוֹ, יֹאמַר, מוֹדֶה אֲנִי לְפָנֶיךָ מֶלֶךְ חַי וְקַיָּם שֶׁהֶחֱזַרְתָּ בִּי נִשְׁמָתִי בְּחֶמְלָה, רַבָּה אֱמוּנָתֶךָ. וְאַף עַל פִּי שֶׁעֲדַיִן אֵין יָדָיו נְקִיּוֹת, יָכוֹל לוֹמַר זֹאת, כֵּיוָן שֶׁאֵין בּוֹ שֵׁם. וְיַפְסִיק מְעַט בֵּין תֵּבַת בְּחֶמְלָה לְתֵבַת רַבָּה.`,
+ c:`<b>קיצור שולחן ערוך — סעיף ג</b><br><br>יְהוּדָה בֶן תֵּימָא אוֹמֵר, הֱוֵי עַז כַּנָּמֵר וְקַל כַּנֶּשֶׁר, רָץ כַּצְּבִי וְגִבּוֹר כָּאֲרִי לַעֲשׂוֹת רְצוֹן אָבִיךָ שֶׁבַּשָּׁמַיִם. עַז כַּנָּמֵר... שֶׁלֹּא יִתְבַּיֵּשׁ... קַל כַּנֶּשֶׁר, כְּנֶגֶד רְאוֹת הָעָיִן... רָץ כַּצְּבִי, כְּנֶגֶד הָרַגְלַיִם... וְגִבּוֹר כָּאֲרִי, כְּנֶגֶד הַלֵּב... וְתִתְגַּבֵּר עַל הַיֵּצֶר לְנַצְּחוֹ.`,
+ d:`<b>קיצור שולחן ערוך — סעיף ד</b><br><br>לָכֵן צָרִיךְ הָאָדָם לְהִתְגַּבֵּר כַּאֲרִי... יָקוּם בִּזְרִיזוּת... קֹדֶם שֶׁיִּתְגַּבֵּר עָלָיו הַיֵּצֶר הָרַע בְּטַעֲנוֹת וְתוֹאֲנוֹת... בַּחֹרֶף, אֵיךְ תָּקוּם עַתָּה... וְהַקֹּר גָּדוֹל. וּבַקַּיִץ... וַעֲדַיִן לֹא שָׂבַעְתָּ מִשְּׁנָתֶךָ... אִם הָיָה קוֹרֵא אוֹתוֹ אֵיזֶה אָדָם לְאֵיזֶה עֵסֶק שֶׁיַּרְוִיחַ בּוֹ מָמוֹן... בְּוַדַּאי הָיָה זָרִיז לָקוּם מִיָּד... עַל אַחַת כַּמָּה וְכַמָּה לַעֲבוֹדַת מֶלֶךְ מַלְכֵי הַמְּלָכִים...`,
+ e:`<b>קיצור שולחן ערוך — סעיף ה</b><br><br>אִם אֶפְשָׁר לוֹ לְהַשְׁכִּים וְלָקוּם בַּחֲצוֹת הַלַּיְלָה לַעֲרֹךְ אָז תִּקּוּן חֲצוֹת, מַה טּוֹב... וְאִם אִי אֶפְשָׁר לוֹ לָקוּם בַּחֲצוֹת, יִתְגַּבֵּר עַל כָּל פָּנִים לָקוּם קֹדֶם עֲלוֹת הַשָּׁחַר... וְאַחַר כָּךְ יַעֲסֹק בַּתּוֹרָה... וְשִׁעוּר מִשְׁנָיוֹת קוֹדֵם לְכָל דָּבָר, וְעַל יְדֵי זֶה זוֹכֶה לִנְשָׁמָה, מִשְׁנָה אוֹתִיּוֹת נְשָׁמָה... וְטוֹב מְעַט בְּכַוָּנָה, מֵהַרְבּוֹת בְּלֹא כַוָּנָה.`}; return x[id]||'';
+}
+function teacherPoint(id){return ({a:'Compare how a person naturally behaves alone at home with how he behaves before a great king. Then bring out the Kitzur’s kal vachomer: awareness that Hashem sees our actions changes both behavior and speech.',b:'Focus on gratitude immediately upon waking: Hashem returned the נשמה refreshed. Teach why מודה אני may be said before washing and the pause between בחמלה and רבה.',c:'Do not stop at identifying the animals. Teach what each quality means: courage despite mockery, guarding the eyes, running toward good, and strengthening the heart against the Yetzer Hara.',d:'Act out the Yetzer Hara’s winter and summer excuses, then use the Kitzur’s money/business example to show how quickly a person gets up for something he values.',e:'Teach the ideal of חצות, the alternative of rising before dawn, the special value of nighttime Torah, and the word connection משנה / נשמה.'})[id]||''}
+function mode(t){document.body.classList.toggle("teacherMode",t);document.body.classList.toggle("teacher-mode",t);show("a")}
+function show(id){document.querySelectorAll(".section").forEach(x=>x.classList.remove("on"));document.getElementById(id).classList.add("on");tabs.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.id===id))}
+function pageCanvas(page){return page.querySelector(".canvas")}
+function add(id,type,text,pageIndex=0){
+ let pages=document.querySelectorAll("#"+id+" .page"),page=pages[Math.min(pageIndex,pages.length-1)],p=pageCanvas(page),e=document.createElement("div");
+ e.className="scrap "+(type==="he"?"he":type==="sticker"?"sticker":"");
+ e.innerHTML=text+`<div class=mini><button onclick="event.stopPropagation();size(this,1.12)">＋</button><button onclick="event.stopPropagation();size(this,.89)">－</button><button onclick="event.stopPropagation();rot(this)">↻</button><button onclick="event.stopPropagation();removeP(this)">×</button></div>`;
+ e.style.left=(30+Math.random()*140)+"px";e.style.top=(45+Math.random()*470)+"px";
+ p.appendChild(e);drag(e);clampPiece(e);persist(id)
+}
+function clampPiece(e){
+ let page=e.closest(".page"); if(!page)return;
+ let maxL=Math.max(0,page.clientWidth-e.offsetWidth-8),maxT=Math.max(0,page.clientHeight-e.offsetHeight-8);
+ e.style.left=Math.min(Math.max(8,e.offsetLeft),maxL)+"px";
+ e.style.top=Math.min(Math.max(8,e.offsetTop),maxT)+"px";
+}
+function removeP(b){let id=b.closest(".section").id;b.closest(".scrap").remove();persist(id)}
+function size(b,f){let e=b.closest(".scrap"),z=parseFloat(e.dataset.z||1)*f;e.dataset.z=z;e.style.zoom=z;clampPiece(e);persist(e.closest(".section").id)}
+function rot(b){let e=b.closest(".scrap"),r=(+e.dataset.r||0)+5;e.dataset.r=r;e.style.setProperty("--r",r+"deg");persist(e.closest(".section").id)}
+function drag(e){
+ let sx,sy,l,t,on=false;
+ e.ondblclick=v=>{v.stopPropagation();openCustomizer(e,v)};
+ e.onpointerdown=v=>{
+ if(v.target.tagName==="BUTTON")return;
+ on=true;sx=v.clientX;sy=v.clientY;l=e.offsetLeft;t=e.offsetTop;
+ e.setPointerCapture(v.pointerId);
+ document.querySelectorAll(".scrap").forEach(x=>x.classList.remove("selected"));e.classList.add("selected")
+ };
+ e.onpointermove=v=>{
+ if(!on)return;
+ let sec=e.closest(".section"),pages=[...sec.querySelectorAll(".page")],cur=e.closest(".page");
+ let target=pages.find(p=>{let r=p.getBoundingClientRect();return v.clientX>=r.left&&v.clientX<=r.right&&v.clientY>=r.top&&v.clientY<=r.bottom});
+ if(target && target!==cur){
+ let er=e.getBoundingClientRect(),tr=target.getBoundingClientRect(),c=target.querySelector(".canvas");
+ c.appendChild(e);
+ e.style.left=(er.left-tr.left)+"px";e.style.top=(er.top-tr.top)+"px";
+ sx=v.clientX;sy=v.clientY;l=e.offsetLeft;t=e.offsetTop;
+ } else {
+ e.style.left=(l+v.clientX-sx)+"px";
+ e.style.top=(t+v.clientY-sy)+"px";
+ }
+ };
+ e.onpointerup=()=>{on=false;clampPiece(e);persist(e.closest(".section").id)}
+}
+function persist(id){
+ let pages=[...document.querySelectorAll("#"+id+" .page")];
+ S[id+"_scrap_pages"]=pages.map(p=>pageCanvas(p).innerHTML);save()
+}
+
+const drawColors=["#e53935","#fb8c00","#fdd835","#43a047","#1e88e5","#8e24aa","#6d4c41","#263238"];
+function drawTools(id,idx){
+ return `<div class="page-tools"><button title="Color" style="background:#e53935" onclick="setPen('${id}',${idx},this,'#e53935')"></button><button title="Color" style="background:#1e88e5" onclick="setPen('${id}',${idx},this,'#1e88e5')"></button><button title="Color" style="background:#43a047" onclick="setPen('${id}',${idx},this,'#43a047')"></button><button title="Color" style="background:#fdd835" onclick="setPen('${id}',${idx},this,'#fdd835')"></button><button title="More colors" onclick="moreColor('${id}',${idx},this)">🎨</button><button title="Eraser" onclick="setEraser('${id}',${idx},this)">⌫</button><button title="Stop drawing" onclick="stopDraw('${id}',${idx})">✓</button></div><canvas class="draw-layer"></canvas>`
+}
+function setupDraw(id,idx){
+ let page=document.querySelectorAll("#"+id+" .page")[idx],c=page.querySelector(".draw-layer"); if(!c)return;
+ let dpr=window.devicePixelRatio||1,rect=page.getBoundingClientRect();
+ c.width=Math.round(rect.width*dpr);c.height=Math.round(rect.height*dpr);
+ c.style.width=rect.width+"px";c.style.height=rect.height+"px";
+ let ctx=c.getContext("2d");ctx.scale(dpr,dpr);ctx.lineCap="round";ctx.lineJoin="round";
+ let saved=(S[id+"_draw"]||[])[idx]; if(saved){let im=new Image();im.onload=()=>ctx.drawImage(im,0,0,rect.width,rect.height);im.src=saved}
+ let drawing=false;
+ c.onpointerdown=e=>{drawing=true;c.setPointerCapture(e.pointerId);paint(e)};
+ c.onpointermove=e=>{if(drawing)paint(e)};
+ c.onpointerup=()=>{drawing=false;saveDrawing(id)};
+ function paint(e){
+ let r=c.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+ let mode=page.dataset.drawMode||"pen";
+ ctx.globalCompositeOperation=mode==="erase"?"destination-out":"source-over";
+ ctx.strokeStyle=page.dataset.pen||"#e53935";ctx.lineWidth=mode==="erase"?28:10;
+ if(!page._last){page._last=[x,y]}
+ ctx.beginPath();ctx.moveTo(page._last[0],page._last[1]);ctx.lineTo(x,y);ctx.stroke();page._last=[x,y]
+ }
+ c.addEventListener("pointerup",()=>page._last=null);c.addEventListener("pointercancel",()=>page._last=null)
+}
+function setPen(id,idx,b,color){let p=document.querySelectorAll("#"+id+" .page")[idx];p.dataset.pen=color;p.dataset.drawMode="pen";p.classList.add("drawing");p.querySelectorAll(".page-tools button").forEach(x=>x.classList.remove("pen-on"));b.classList.add("pen-on")}
+function moreColor(id,idx,b){let color=prompt("Enter a color name or hex color, for example purple or #ff66aa:","#ff66aa");if(color)setPen(id,idx,b,color)}
+function setEraser(id,idx,b){let p=document.querySelectorAll("#"+id+" .page")[idx];p.dataset.drawMode="erase";p.classList.add("drawing");p.querySelectorAll(".page-tools button").forEach(x=>x.classList.remove("pen-on"));b.classList.add("pen-on")}
+function stopDraw(id,idx){let p=document.querySelectorAll("#"+id+" .page")[idx];p.classList.remove("drawing");p.querySelectorAll(".page-tools button").forEach(x=>x.classList.remove("pen-on"));saveDrawing(id)}
+function saveDrawing(id){let arr=[...document.querySelectorAll("#"+id+" .draw-layer")].map(c=>c.toDataURL("image/png"));S[id+"_draw"]=arr;save()}
+
+function setTheme(id,t){document.querySelectorAll("#"+id+" .page").forEach(p=>p.className="page "+t);S[id+"_theme"]=t;save()}
+function upload(ev,id){let f=ev.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>add(id,"photo",`<img src="${r.result}">`);r.readAsDataURL(f)}
+function reward(id,label){add(id,"text","✓ "+label);S[id+"_done"]=true;save();let b=document.querySelector("#"+id+" .activityBoard");if(b)b.classList.add("finished")}
+function choose(btn,ok,id,label){if(ok){btn.classList.add("good");reward(id,label)}else{btn.classList.add("bad");setTimeout(()=>btn.classList.remove("bad"),300)}}
+function singleChoice(btn,ok,id){
+ let box=document.getElementById("shivisiFeedback");
+ document.querySelectorAll("#shivisiAnswers button").forEach(x=>x.classList.remove("good","bad"));
+ if(!ok){
+ btn.classList.add("bad");
+ box.innerHTML='<div style="margin-top:10px;padding:9px;border-radius:10px;background:#fff0ef;border:2px solid #d77"><b>Try again.</b> Look for the answer that is true everywhere.</div>';
+ return;
+ }
+ btn.classList.add("good");
+ document.querySelectorAll("#shivisiAnswers button").forEach(x=>x.disabled=true);
+ box.innerHTML='<div class="earned">✓ Correct! We remember Hashem everywhere — in public and in private.</div>';
+ add("a","he","שויתי ה׳ לנגדי תמיד");
+ add("a","text","I remember Hashem everywhere — even when nobody else is around.");
+ S[id+"_done"]=true; save();
+}
+function board(l){
+if(l.type==="choices")return `<h2>🕵️ שויתי Challenge</h2><p><b>Choose the ONE best answer.</b></p><p>Where should a Yid remember that Hashem is with him?</p><div class=wordbank id=shivisiAnswers><button class=card onclick="singleChoice(this,false,'a')">Only in class</button><button class=card onclick="singleChoice(this,false,'a')">Only at home</button><button class=card onclick="singleChoice(this,true,'a')">Everywhere — even when nobody else is around</button></div><div id=shivisiFeedback aria-live=polite></div>`;
+if(l.type==="sequence")return `<h2>✂️ Build the Modeh Ani card</h2><p>Click the strips in the correct order. Your finished card becomes a scrapbook piece.</p><div id=seqout class=dropzone><div class=slot>1</div><div class=slot>2</div><div class=slot>3</div></div><div class=wordbank><button class=card onclick="seq(this,'מודה אני')">מודה אני</button><button class=card onclick="seq(this,'לפניך')">לפניך</button><button class=card onclick="seq(this,'בחמלה')">בחמלה</button></div><p>Where is the important pause?</p><button class=card onclick="choose(this,true,'b','Pause after בחמלה')">After בחמלה</button><button class=card onclick="choose(this,false,'b','')">After מודה אני</button>`;
+if(l.type==="match")return `<h2>🧩 Match the Four Middos</h2><p>Match each phrase to its animal. Correct matches become pieces for your page.</p><div class=matchgrid><button onclick="matchM(this,'עז כנמר','🐆')">עז כנמר → ?</button><button onclick="matchM(this,'קל כנשר','🦅')">קל כנשר → ?</button><button onclick="matchM(this,'רץ כצבי','🦌')">רץ כצבי → ?</button><button onclick="matchM(this,'גיבור כארי','🦁')">גיבור כארי → ?</button></div><div class=wordbank><span class=card>🐆 נמר</span><span class=card>🦅 נשר</span><span class=card>🦌 צבי</span><span class=card>🦁 ארי</span></div>`;
+if(l.type==="comic")return `<h2>💥 Beat the Yetzer Hara!</h2><div class=comic><div class=bubble>“It’s cold! Stay under the blanket!”</div><div class=bubble>“It’s so early! Sleep longer!”</div></div><p>Pick the strongest response:</p><button class=card onclick="choose(this,true,'d','I get up with זריזות!')">I get up with זריזות!</button><button class=card onclick="choose(this,false,'d','')">Maybe tomorrow…</button><p>Someone would run early for an important business opportunity. What lesson does that teach us about עבודת ה׳?</p><button class=card onclick="choose(this,true,'d','Be at least as eager for עבודת ה׳')">Be at least as eager for עבודת ה׳</button>`;
+return `<h2>🌙 Night Torah Challenge</h2><p>Choose the ideas that belong on this nighttime page.</p><button class=card onclick="choose(this,true,'e','תיקון חצות')">תיקון חצות</button><button class=card onclick="choose(this,true,'e','Torah learning at night')">Torah learning at night</button><button class=card onclick="choose(this,true,'e','משנה — אותיות נשמה')">משנה — אותיות נשמה</button><p>Teacher can use the complete review bank for the exact time/details from סעיף ה.</p>`}
+let seqN=0;function seq(b,w){let slots=document.querySelectorAll("#b #seqout .slot");if(seqN>=3)return;let correct=["מודה אני","לפניך","בחמלה"][seqN];if(w===correct){slots[seqN].textContent=w;slots[seqN].classList.add("filled");b.disabled=true;seqN++;if(seqN===3){add("b","he","מודה אני לפניך בחמלה");S.b_done=true;save()}}else{b.classList.add("bad");setTimeout(()=>b.classList.remove("bad"),300)}}
+function matchM(b,txt,animal){if(b.dataset.done)return;b.textContent=txt+" "+animal;b.classList.add("good");b.dataset.done=1;add("c","he",txt+" "+animal)}
+function render(l){let sec=document.createElement("div");sec.id=l.id;sec.className="section"+(l.id==="a"?" on":"");let th=S[l.id+"_theme"]||"";sec.innerHTML=`<div class=teacherOnly><button onclick="this.nextElementSibling.classList.toggle('open')">📚 Show Teacher Notes</button><div class=notes><b>${l.seif}</b><div class=source>${teacherSource(l.id)}</div><p><b>What to bring out:</b> ${teacherPoint(l.id)}</p><p><b>Objective:</b> ${l.objective}</p><b>Ask students:</b><ol>${l.qs.map(q=>"<li>"+q+"</li>").join("")}</ol></div></div><div class=work><aside class=side><h3>🎨 Scrapbook Tray</h3><div class=themeRow><button style="background:#fff3c9" onclick="setTheme('${l.id}','')"></button><button style="background:#e3f6ff" onclick="setTheme('${l.id}','blue')"></button><button style="background:#d7b27b" onclick="setTheme('${l.id}','craft')"></button><button style="background:#173758" onclick="setTheme('${l.id}','night')"></button></div><div class=step><b>Pieces to decorate with</b>${l.pieces.map(p=>`<button onclick="add('${l.id}','${p[0]}',\`${p[1]}\`)">${p[1]}</button>`).join("")}</div><div class=step><button onclick="document.getElementById('u_${l.id}').click()">📷 Add my picture</button><input hidden id="u_${l.id}" type=file accept="image/*" onchange="upload(event,'${l.id}')"></div><p><small>Drag pieces across either page. Use + / − / ↻ to resize or rotate. Use the crayons on each page to color and draw.</small></p></aside><div class=book><div class=spread><div class="page ${th}"><div class=activityBoard>${board(l)}</div><div class=canvas></div>${drawTools(l.id,0)}</div><div class="page ${th}"><div class=canvas></div>${drawTools(l.id,1)}</div></div></div></div>`;sections.appendChild(sec);let savedPages=S[l.id+"_scrap_pages"];if(savedPages){sec.querySelectorAll(".canvas").forEach((c,i)=>c.innerHTML=savedPages[i]||"")}else{let saved=S[l.id+"_scrap"];if(saved)sec.querySelector(".canvas").innerHTML=saved}sec.querySelectorAll(".scrap").forEach(e=>{drag(e);setTimeout(()=>clampPiece(e),0)});setTimeout(()=>{setupDraw(l.id,0);setupDraw(l.id,1)},0);if(S[l.id+"_done"] && l.id!=="a")sec.querySelector(".activityBoard").classList.add("finished")}
+lessons.forEach(render);
+lessons.forEach(l=>{let b=document.createElement("button");b.dataset.id=l.id;b.textContent=l.tab;b.onclick=()=>show(l.id);if(l.id==="a")b.className="on";tabs.appendChild(b)});
+let rb=document.createElement("button");rb.dataset.id="review";rb.textContent="🎤 Teacher Review";rb.className="teacherOnly";rb.onclick=()=>show("review");tabs.appendChild(rb);
+review.innerHTML=`<div class=qbank><h2>Complete Review Bank — סימן א</h2>${lessons.map(l=>`<h3>${l.seif} · ${l.title}</h3><p><b>Objective:</b> ${l.objective}</p><ol>${l.qs.map(q=>"<li>"+q+"</li>").join("")}</ol>`).join("")}</div>`;
+
+function toggleTeacherSource(id){
+ const p=document.getElementById("teacher-source-"+id);
+ if(p) p.classList.toggle("show");
+}
+
+
+document.addEventListener("click",function(ev){
+ const t=(ev.target.textContent||"").trim().toLowerCase();
+ if(t==="teacher"){document.body.classList.add("teacher-mode")}
+ if(t==="student"){document.body.classList.remove("teacher-mode");document.querySelectorAll(".teacher-source-panel").forEach(x=>x.classList.remove("show"))}
+});
+
+
+let activePiece=null;
+function openCustomizer(e,ev){
+ activePiece=e;
+ document.querySelectorAll(".scrap").forEach(x=>x.classList.remove("selected"));e.classList.add("selected");
+ let p=document.getElementById("pieceCustomizer"),r=e.getBoundingClientRect();
+ p.style.left=Math.min(window.innerWidth-275,Math.max(8,r.right+8))+"px";
+ p.style.top=Math.min(window.innerHeight-300,Math.max(8,r.top))+"px";
+ p.classList.add("show");
+ let cs=getComputedStyle(e);
+ document.getElementById("pcFont").value=e.dataset.font||"Arial, sans-serif";
+ document.getElementById("pcText").value=rgbToHex(cs.color)||"#243746";
+ document.getElementById("pcBg").value=rgbToHex(cs.backgroundColor)||"#fff1b8";
+ let fs=parseInt(cs.fontSize)||18,w=Math.round(r.width);
+ document.getElementById("pcFontSize").value=Math.min(42,Math.max(12,fs));
+ document.getElementById("pcWidth").value=Math.min(520,Math.max(100,w));
+ document.getElementById("pcFontSizeVal").textContent=fs;
+ document.getElementById("pcWidthVal").textContent=w;
+}
+function rgbToHex(rgb){
+ let m=(rgb||"").match(/\d+/g);if(!m||m.length<3)return null;
+ return "#"+m.slice(0,3).map(x=>(+x).toString(16).padStart(2,"0")).join("");
+}
+function applyPieceStyle(){
+ if(!activePiece)return;
+ let f=document.getElementById("pcFont").value,tc=document.getElementById("pcText").value,bg=document.getElementById("pcBg").value,
+ fs=document.getElementById("pcFontSize").value,w=document.getElementById("pcWidth").value;
+ activePiece.dataset.font=f;activePiece.style.fontFamily=f;activePiece.style.color=tc;activePiece.style.background=bg;
+ activePiece.style.fontSize=fs+"px";activePiece.style.width=w+"px";
+ document.getElementById("pcFontSizeVal").textContent=fs;document.getElementById("pcWidthVal").textContent=w;
+ clampPiece(activePiece);persist(activePiece.closest(".section").id)
+}
+function transparentPiece(){if(!activePiece)return;activePiece.style.background="transparent";persist(activePiece.closest(".section").id)}
+function resetPieceStyle(){
+ if(!activePiece)return;
+ activePiece.style.fontFamily="";activePiece.style.color="";activePiece.style.background="";activePiece.style.fontSize="";activePiece.style.width="";
+ activePiece.dataset.font="";persist(activePiece.closest(".section").id);openCustomizer(activePiece)
+}
+function closeCustomizer(){document.getElementById("pieceCustomizer").classList.remove("show");if(activePiece)activePiece.classList.remove("selected");activePiece=null}
+document.addEventListener("pointerdown",ev=>{
+ let p=ev.target.closest&&ev.target.closest(".scrap");
+ if(p && !ev.target.closest("button")) {
+ clearTimeout(window._pcTimer); window._pcTimer=setTimeout(()=>openCustomizer(p,ev),250);
+ }
+});
+document.addEventListener("pointermove",()=>clearTimeout(window._pcTimer));
+
+
+function printScrapbook(){
+ closeCustomizer();
+ document.querySelectorAll(".section").forEach(x=>x.classList.remove("print-target"));
+ // Determine the section that is actually visible on screen instead of assuming an "active" class.
+ let sections=[...document.querySelectorAll(".section")];
+ let current=sections.find(x=>getComputedStyle(x).display!=="none" && x.getBoundingClientRect().height>0) || sections[0];
+ if(!current){alert("No scrapbook page is open.");return}
+ current.classList.add("print-target");
+ // Mirror drawings to a printable image background.
+ current.querySelectorAll(".draw-layer").forEach(c=>{
+ try{
+ c.dataset.prePrintBg=c.style.backgroundImage||"";
+ c.style.backgroundImage=`url("${c.toDataURL("image/png")}")`;
+ c.style.backgroundSize="100% 100%";c.style.backgroundRepeat="no-repeat";
+ }catch(e){}
+ });
+ setTimeout(()=>window.print(),200);
+}
+window.addEventListener("afterprint",()=>{
+ document.querySelectorAll(".print-target").forEach(x=>x.classList.remove("print-target"));
+ document.querySelectorAll(".draw-layer").forEach(c=>{
+ c.style.backgroundImage=c.dataset.prePrintBg||"";
+ c.style.backgroundSize="";c.style.backgroundRepeat="";
+ });
+});
+
+</script><div id="pieceCustomizer" class="piece-customizer"><div class="pc-title">Customize this piece</div><div class="pc-row"><label>Font</label><select id="pcFont" onchange="applyPieceStyle()"><option value="Arial, sans-serif">Arial</option><option value="Georgia, serif">Book</option><option value="'Comic Sans MS', cursive">Playful</option><option value="'Trebuchet MS', sans-serif">Rounded</option><option value="'Times New Roman', serif">Classic</option></select></div><div class="pc-row"><label>Text</label><input id="pcText" type="color" value="#243746" oninput="applyPieceStyle()"><label>Background</label><input id="pcBg" type="color" value="#fff1b8" oninput="applyPieceStyle()"></div><div class="pc-row"><label>Text size</label><input id="pcFontSize" type="range" min="12" max="42" value="18" oninput="applyPieceStyle()"><span id="pcFontSizeVal">18</span></div><div class="pc-row"><label>Piece width</label><input id="pcWidth" type="range" min="100" max="520" value="220" oninput="applyPieceStyle()"><span id="pcWidthVal">220</span></div><div class="pc-row"><button onclick="transparentPiece()">No background</button><button onclick="resetPieceStyle()">Reset</button><button onclick="closeCustomizer()">Done ✓</button></div></div></body></html>
