@@ -185,7 +185,9 @@ function setHalachaMode(teacher){
  show("a");
 }
 function mode(t){setHalachaMode(t&&HALACHA_TEACHER_PREVIEW)}
-function show(id){document.querySelectorAll(".section").forEach(x=>x.classList.remove("on"));document.getElementById(id).classList.add("on");tabs.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.id===id))}
+function ensureDraw(id){[0,1].forEach(i=>{let p=document.querySelectorAll("#"+id+" .page")[i],c=p&&p.querySelector(".draw-layer");if(!c)return;let w=Math.round(p.getBoundingClientRect().width);if(w&&c._w!==w)setupDraw(id,i)})}
+window.addEventListener("resize",()=>{let on=document.querySelector(".section.on");if(on)ensureDraw(on.id)});
+function show(id){document.querySelectorAll(".section").forEach(x=>x.classList.remove("on"));document.getElementById(id).classList.add("on");tabs.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.id===id));ensureDraw(id)}
 function pageCanvas(page){return page.querySelector(".canvas")}
 function add(id,type,text,pageIndex=0){
  let pages=document.querySelectorAll("#"+id+" .page"),page=pages[Math.min(pageIndex,pages.length-1)],p=pageCanvas(page),e=document.createElement("div");
@@ -306,6 +308,8 @@ function drawTools(id,idx){
 function setupDraw(id,idx){
  let page=document.querySelectorAll("#"+id+" .page")[idx],c=page.querySelector(".draw-layer"); if(!c)return;
  let dpr=window.devicePixelRatio||1,rect=page.getBoundingClientRect();
+ if(!rect.width||!rect.height)return; // section is hidden; ensureDraw() sets it up when shown
+ c._w=Math.round(rect.width);
  c.width=Math.round(rect.width*dpr);c.height=Math.round(rect.height*dpr);
  c.style.width=rect.width+"px";c.style.height=rect.height+"px";
  let ctx=c.getContext("2d");ctx.scale(dpr,dpr);ctx.lineCap="round";ctx.lineJoin="round";
