@@ -17,7 +17,7 @@
     const rawStream=options.rawStream,stage=options.stage,lesson=options.lesson;
     const before=options.onBeforeViewChange||function(){},say=options.onStatus||function(){},fail=options.onError||function(){};
     const source=document.createElement('video');source.muted=true;source.autoplay=true;source.playsInline=true;source.srcObject=rawStream;
-    const rawTrack=rawStream.getVideoTracks?.()[0];if(rawTrack&&'contentHint' in rawTrack){try{rawTrack.contentHint='detail'}catch{}}
+    const rawTrack=rawStream.getVideoTracks?.()[0];if(rawTrack&&'contentHint' in rawTrack){try{rawTrack.contentHint='text'}catch{}}
     try{await source.play()}catch(error){if(error.name!=='AbortError')throw error}
     await waitForVideo(source);
     if(!HTMLCanvasElement.prototype.captureStream){
@@ -28,11 +28,11 @@
     const context=canvas.getContext('2d',{alpha:false});
     if(!context)throw new Error('The browser could not prepare the cropped lesson view.');
     context.imageSmoothingEnabled=true;if('imageSmoothingQuality' in context)context.imageSmoothingQuality='high';
-    const stream=canvas.captureStream(10);const outputTrack=stream.getVideoTracks?.()[0];if(outputTrack&&'contentHint' in outputTrack){try{outputTrack.contentHint='detail'}catch{}}
+    const stream=canvas.captureStream(8);const outputTrack=stream.getVideoTracks?.()[0];if(outputTrack&&'contentHint' in outputTrack){try{outputTrack.contentHint='text'}catch{}}
     let base={x:0,y:0,w:1,h:1},view={...base},zoom=1,raf=0,lastFrame=0,stopped=false,panMode=false,dragPointer=null,lastDrag=null,selection={...base},selectStart=null;
     function renderFrame(time){
       if(stopped)return;
-      if(time-lastFrame>=90&&source.readyState>=2){
+      if(time-lastFrame>=120&&source.readyState>=2){
         const sx=view.x*sourceWidth,sy=view.y*sourceHeight,sw=view.w*sourceWidth,sh=view.h*sourceHeight;
         context.fillStyle='#151a23';context.fillRect(0,0,canvas.width,canvas.height);
         try{context.drawImage(source,sx,sy,sw,sh,0,0,canvas.width,canvas.height)}catch{}
