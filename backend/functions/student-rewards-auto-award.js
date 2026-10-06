@@ -379,8 +379,9 @@ function classRewardGoalFromRoot(root,studentId,classId,rewardId){
 
 async function classRewardStatusForStudent(studentId,preferredClassId=''){
   const root=(await rtdb.ref(SR_ROOT).get()).val()||{};
+  const balance=Math.max(0,Number(root?.students?.[studentId]?.rewardBalance)||0);
   const classId=chooseStudentClass(root,studentId,preferredClassId);
-  if(!classId) return {goals:[],storeOpen:root?.settings?.rewardStoreEnabled===true||String(root?.settings?.rewardStoreEnabled)==='true',classId:''};
+  if(!classId) return {goals:[],storeOpen:root?.settings?.rewardStoreEnabled===true||String(root?.settings?.rewardStoreEnabled)==='true',classId:'',balance};
   const goals=[];
   for(const rewardId of Object.keys(root.classRewardCatalog||{})){
     if(!rewardsStore.itemInStore(root,classId,root.classRewardCatalog[rewardId]))continue;
@@ -394,6 +395,7 @@ async function classRewardStatusForStudent(studentId,preferredClassId=''){
     className:root?.classes?.[classId]?.name||classId,
     storeOpen:rewardsStore.storeOpenFor(root,classId),
     teacherStore:rewardsStore.isTeacherStore(root,classId),
+    balance,
   };
 }
 
