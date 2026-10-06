@@ -24,7 +24,7 @@ main{max-width:1050px;margin:auto;padding:16px}
 </style></head><body>
 <header>
 <h1>Story Timing Tool (teacher only)</h1>
-<p>Click a paragraph to choose it. Play the audio, then press <b>Set end</b> when it finishes. The next paragraph's start is filled in automatically.
+<p>To fix a start: press <b>🔊 Hear start</b>, then <b>◀ ½s</b> or <b>½s ▶</b> until the new paragraph begins right after the pause. Click a paragraph to choose it. Play the audio, then press <b>Set end</b> when it finishes. The next paragraph's start is filled in automatically.
 Keys: <b>Space</b> play/pause · <b>←</b> back 5 sec · <b>→</b> forward 5 sec · <b>S</b> set start · <b>E</b> set end.</p>
 <div class="bar">
   <button id="back5">⏪ 5 sec</button><button id="playBtn">▶ Play</button><button id="fwd5">5 sec ⏩</button>
@@ -35,11 +35,18 @@ Keys: <b>Space</b> play/pause · <b>←</b> back 5 sec · <b>→</b> forward 5 s
 </header>
 <main>
 <div id="list">Loading the story…</div>
-<h2>When you are done</h2>
-<p>Press <b>Copy</b> and paste the result into the chat with Claude. <span id="summary"></span></p>
-<button id="copy">Copy</button>
-<textarea id="out" readonly></textarea>
+<h2>Save your changes</h2>
+<p id="saveStatus">Checking your sign-in…</p>
+<p><button id="signInBtn" class="set" hidden>Sign in with Google (owner account)</button> <button id="saveBtn" class="set" hidden>💾 Save to website</button></p>
+<p><span id="summary"></span></p>
+<details><summary>Backup: copy the times as text</summary><button id="copy">Copy</button><textarea id="out" readonly></textarea></details>
 </main>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script src="../firebase-config.js"></script>
+<script src="../site-settings.js"></script>
+<script src="api.js"></script>
 <script src="story-times.js"></script>
 <script>
 const $=id=>document.getElementById(id),audio=$('audio');
@@ -72,7 +79,7 @@ function draw(scroll){
     const field=(obj,label)=>{const l=document.createElement('label');l.textContent=label+' ';const inp=document.createElement('input');inp.value=fmt(obj[i]);inp.placeholder='m:ss.s';
       inp.onchange=()=>{const v=parse(inp.value);if(v===undefined){inp.value=fmt(obj[i]);return}if(v===null)delete obj[i];else obj[i]=v;if(obj===ends)linkNext(k);sel=k;draw()};l.append(inp);return l};
     const btn=(label,fn,cls)=>{const b=document.createElement('button');b.textContent=label;if(cls)b.className=cls;b.onclick=()=>{sel=k;fn()};return b};
-    c.append(num,field(starts,'Start'),btn('Set start = now',()=>setStart(k),'set'),field(ends,'End'),btn('Set end = now',()=>setEnd(k),'set'),
+    c.append(num,field(starts,'Start'),btn('◀ ½s',()=>nudge(k,-0.5)),btn('½s ▶',()=>nudge(k,0.5)),btn('🔊 Hear start',()=>hearStart(k)),btn('Set start = now',()=>setStart(k),'set'),field(ends,'End'),btn('Set end = now',()=>setEnd(k),'set'),
       btn('▶ Play paragraph',()=>playPara(k)),btn('▶ Last 3 sec',()=>playEnd(k)));
     if(issue){const w=document.createElement('span');w.className='warn';w.textContent='⚠ '+issue;c.append(w)}
     card.append(text,c);$('list').append(card);
@@ -80,10 +87,14 @@ function draw(scroll){
   output();
   if(scroll){const cur=$('row'+sel);if(cur)cur.scrollIntoView({block:'center',behavior:'smooth'})}
 }
-function setStart(k){starts[order[k]]=r1(audio.currentTime);draw()}
+function setStart(k){starts[order[k]]=r1(audio.currentTime);const p=order[k-1];if(p!=null)ends[p]=starts[order[k]];draw()}
 function linkNext(k){const i=order[k],n=order[k+1];if(n!=null&&ends[i]!=null)starts[n]=ends[i]}
 function setEnd(k){const i=order[k];ends[i]=r1(audio.currentTime);linkNext(k);if(k+1<order.length)sel=k+1;draw(true)}
 function playPara(k){const i=order[k];if(starts[i]==null)return;audio.currentTime=starts[i];stopAt=ends[i]??null;audio.play()}
+// Move this paragraph's start (and the previous paragraph's end) by half a second.
+function nudge(k,d){const i=order[k];if(starts[i]==null)return;starts[i]=Math.max(0,r1(starts[i]+d));const p=order[k-1];if(p!=null)ends[p]=starts[i];draw();hearStart(k)}
+// Play from 1.5 seconds before this paragraph's start to 2.5 seconds after it.
+function hearStart(k){const i=order[k];if(starts[i]==null)return;audio.currentTime=Math.max(0,starts[i]-1.5);stopAt=starts[i]+2.5;audio.play()}
 function playEnd(k){const i=order[k];if(ends[i]==null)return;audio.currentTime=Math.max(0,ends[i]-3);stopAt=ends[i]+0.5;audio.play()}
 function jump(d){audio.currentTime=Math.max(0,Math.min(audio.duration||1e9,audio.currentTime+d))}
 $('back5').onclick=()=>jump(-5);$('fwd5').onclick=()=>jump(5);
@@ -106,5 +117,31 @@ fetch('story.html').then(r=>r.text()).then(h=>{
   paras=JSON.parse(m[1]).paras;order=paras.map((p,i)=>i).filter(i=>paras[i].trim());
   const firstMissing=order.findIndex(i=>starts[i]==null||ends[i]==null);sel=firstMissing<0?0:firstMissing;draw(true);
 }).catch(()=>{$('list').textContent='Could not load the story. Refresh the page.'});
+
+// ---- Save straight to the website (owner Google account only) ----
+let user=null,dirty=false;
+const markDirty=()=>{dirty=true;if(user)$('saveStatus').textContent='You have unsaved changes. Press Save to website.'};
+['click','change','keydown'].forEach(ev=>document.getElementById('list').addEventListener(ev,e=>{if(/BUTTON|INPUT/.test(e.target.tagName)&&!/Play|Hear|Last/.test(e.target.textContent))setTimeout(markDirty,0)}));
+document.addEventListener('keydown',e=>{if(/^[sSeE]$/.test(e.key)&&!/INPUT|TEXTAREA/.test(e.target.tagName))setTimeout(markDirty,0)});
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
+const api=async(action,data={})=>YiddishAPI.call(action,{...data,classId:'',idToken:await user.getIdToken()});
+$('signInBtn').onclick=()=>B3SiteSettings.signInWithGoogle().catch(e=>$('saveStatus').textContent=e.message);
+$('saveBtn').onclick=async()=>{
+  const pick=o=>Object.fromEntries(order.filter(i=>o[i]!=null).map(i=>[i,r1(o[i])]));
+  $('saveBtn').disabled=true;$('saveStatus').textContent='Saving…';
+  try{await api('teacherSaveTimes',{starts:pick(starts),ends:pick(ends)});dirty=false;$('saveStatus').textContent='✓ Saved. Students will see the new times the next time they open the story.'}
+  catch(e){$('saveStatus').textContent='Not saved: '+e.message}
+  finally{$('saveBtn').disabled=false}
+};
+B3SiteSettings.onAuthStateChanged(async(u,ok)=>{
+  user=ok?u:null;
+  if(!user){$('signInBtn').hidden=false;$('saveBtn').hidden=true;$('saveStatus').textContent='Sign in with your owner Google account to save.';return}
+  try{
+    const r=await api('teacherLoad');
+    if(!r.owner){$('saveStatus').textContent='Only the owner account (simcha5770@gmail.com) can save story times.';$('signInBtn').hidden=false;$('saveBtn').hidden=true;return}
+    if(r.storyTimes&&r.storyTimes.starts&&!dirty){Object.keys(starts).forEach(k=>delete starts[k]);Object.keys(ends).forEach(k=>delete ends[k]);Object.assign(starts,r.storyTimes.starts);Object.assign(ends,r.storyTimes.ends||{});if(order.length)draw()}
+    $('signInBtn').hidden=true;$('saveBtn').hidden=false;$('saveStatus').textContent=dirty?'You have unsaved changes. Press Save to website.':'Signed in as the owner. Make your changes, then press Save to website.';
+  }catch(e){$('saveStatus').textContent='Could not check your account: '+e.message}
+});
 </script>
 </body></html>

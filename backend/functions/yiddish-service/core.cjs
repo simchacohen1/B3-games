@@ -23,6 +23,18 @@ async function passcodeFor(id,profile,classId){const priv=String((await get('b3P
 // B3's own classes always have the Wine Merchant story. Any other class gets it only
 // when the admin grants it (Owner Admin > Class Content), stored where teachers cannot write.
 const STORY_GRANT='yiddishWineMerchant';
+// Paragraph start/end times for the Wine Merchant story audio, edited by the owner in yiddish/sync.html.
+const TIMES_PATH='yiddishPrivate/storyTimes/wineMerchant';
+const storyTimes=async()=>{const v=await get(TIMES_PATH);return v&&v.starts?{starts:v.starts,ends:v.ends||{},updatedAt:v.updatedAt||0}:null};
+function validateTimes(starts,ends){
+ const ok=o=>o&&typeof o==='object'&&!Array.isArray(o)&&Object.keys(o).length<=60&&Object.entries(o).every(([k,v])=>/^\d{1,2}$/.test(k)&&Number(k)<=60&&typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1300);
+ if(!ok(starts)||!ok(ends||{}))fail(400,'Invalid story times.');
+ const ks=Object.keys(starts).map(Number).sort((a,b)=>a-b);
+ for(let i=1;i<ks.length;i++)if(starts[ks[i]]<=starts[ks[i-1]])fail(400,'Paragraph '+ks[i]+' starts before paragraph '+ks[i-1]+'.');
+ for(const [k,v] of Object.entries(ends||{}))if(starts[k]!==undefined&&v<=starts[k])fail(400,'Paragraph '+k+' ends before it starts.');
+ const r=o=>Object.fromEntries(Object.entries(o||{}).map(([k,v])=>[k,Math.round(v*10)/10]));
+ return {starts:r(starts),ends:r(ends)};
+}
 const storyGranted=async c=>legacy(c)||(validKey(c)&&(await get('b3Games/workspaces/'+WORKSPACE+'/contentGrants/'+c+'/'+STORY_GRANT))===true);
 const cfg=async c=>{const saved=await get(configPath(c));if(saved)return saved;const d=defaults();if(c&&!legacy(c))d.unlocked={[c]:0};return d};
 async function teacher(token,classId){
@@ -77,7 +89,13 @@ return async function handle(b,ip='unknown'){
     roster[id]={name:v.name||id,classId:studentClass};
     students[id]=await get(studentPath(classId,id))||{};
    }
-   return {config:c,roster,students,classId,storyGranted:await storyGranted(classId)};
+   return {config:c,roster,students,classId,storyGranted:await storyGranted(classId),storyTimes:await storyTimes(),owner:access.owner};
+  }
+  if(b.action==='teacherSaveTimes'){
+   if(!access.owner)fail(403,'Only the owner account can change the story times.');
+   const v=validateTimes(b.starts,b.ends);
+   await store.set(TIMES_PATH,{...v,updatedAt:now()});
+   return {ok:true,storyTimes:await storyTimes()};
   }
   if(b.action==='teacherSave'){
    if(!await storyGranted(classId))fail(403,'The admin has not given this class a Yiddish story yet.');
@@ -105,7 +123,7 @@ return async function handle(b,ip='unknown'){
   fail(403,'Your class does not have a Yiddish story yet.');
  }
 
- if(b.action==='status'){const p=await get(path)||{};return {student:who,config:c,progress:p.words||{},round:publicRound(p.round)}}
+ if(b.action==='status'){const p=await get(path)||{};return {student:who,config:c,progress:p.words||{},round:publicRound(p.round),storyTimes:await storyTimes()}}
  if(b.action==='start'){allowed(c,who,b.group);const shuffle=a=>a.map(v=>({v,n:crypto.randomInt(1000000)})).sort((a,b)=>a.n-b.n).map(x=>x.v);const secWords=c.sections[b.group].words;let selected=secWords,part=null;if(b.part!==undefined&&b.part!==null){part=Number(b.part);const parts=Math.max(1,Math.ceil(secWords.length/4));if(!Number.isInteger(part)||part<0||part>=parts)fail(400,'Choose a valid step.');const openSteps=c.unlockedSteps&&c.unlockedSteps[who.classId];const stepNo=c.sections.slice(0,b.group).reduce((n,s)=>n+Math.max(1,Math.ceil(s.words.length/4)),0)+part+1;if(Number.isInteger(openSteps)&&stepNo>openSteps)fail(403,'This step is not open yet.');const fresh=secWords.slice(part*4,part*4+4);const earlier=[...c.sections.slice(0,b.group).flatMap(s=>s.words),...secWords.slice(0,part*4)];const prog=(await get(path))?.words||{};const review=shuffle(earlier).sort((x,y)=>(prog[x]?.credits||0)-(prog[y]?.credits||0)).slice(0,4);selected=[...fresh,...review]}const round={id:random(),group:b.group,part,version:c.version,index:0,started:now(),items:shuffle(selected).map(id=>({wordId:id,choices:shuffle([id,...shuffle(words.filter(w=>w.id!==id).map(w=>w.id)).slice(0,3)])})),results:{},responses:{}};await store.tx(path,p=>{p=p||{};p.rounds=p.rounds||{};p.rounds[round.id]=round;p.round=round;const ids=Object.keys(p.rounds).sort((a,b)=>(p.rounds[b]?.started||0)-(p.rounds[a]?.started||0));for(const id of ids.slice(6))delete p.rounds[id];return p});return {round:publicRound(round)}}
  if(b.action==='storyAnswer'){allowed(c,who,b.group);const sec=c.sections[b.group],paragraph=Number(b.paragraph),position=Number(b.position),total=Number(b.total),wrongCount=Number(b.wrongCount),requestId=String(b.requestId||'');if(!Number.isInteger(paragraph)||paragraph<sec.first||paragraph>sec.last||!Number.isInteger(position)||position<1||!Number.isInteger(total)||total<1||position>total||!Number.isInteger(wrongCount)||wrongCount<0||wrongCount>20||!/^[a-f0-9-]{20,64}$/.test(requestId))fail(400,'Invalid Story Detective result.');await store.tx(path,p=>{p=p||{};p.storyDetective=p.storyDetective||{sections:{},responses:{}};const sd=p.storyDetective;sd.sections=sd.sections||{};sd.responses=sd.responses||{};if(sd.responses[requestId])return p;const key=String(b.group),ss=sd.sections[key]||{answers:0,firstTryCorrect:0,misses:0,completedRounds:0,paragraphs:{}};ss.answers=Number(ss.answers||0)+1;ss.firstTryCorrect=Number(ss.firstTryCorrect||0)+(wrongCount===0?1:0);ss.misses=Number(ss.misses||0)+wrongCount;ss.lastPosition=position;ss.lastTotal=total;ss.lastParagraph=paragraph;ss.lastActive=now();if(position===total)ss.completedRounds=Number(ss.completedRounds||0)+1;ss.paragraphs=ss.paragraphs||{};const pk=String(paragraph),ps=ss.paragraphs[pk]||{answers:0,firstTryCorrect:0,misses:0};ps.answers=Number(ps.answers||0)+1;ps.firstTryCorrect=Number(ps.firstTryCorrect||0)+(wrongCount===0?1:0);ps.misses=Number(ps.misses||0)+wrongCount;ps.lastActive=now();ss.paragraphs[pk]=ps;sd.sections[key]=ss;sd.lastGroup=b.group;sd.lastActive=now();sd.responses[requestId]=now();const responseIds=Object.keys(sd.responses).sort((a,b)=>Number(sd.responses[b]||0)-Number(sd.responses[a]||0));for(const id of responseIds.slice(200))delete sd.responses[id];p.storyDetective=sd;p.lastActive=now();return p});return {ok:true}}
  if(b.action==='answer'){let result,error;await store.tx(path,p=>{error=null;result=null;p=p||{};p.rounds=p.rounds||{};const r=(p.round&&p.round.id===b.roundId)?p.round:p.rounds[b.roundId];if(!r){error='This practice round could not be found. Press Practice this section to start again.';return p}if(r.responses?.[b.requestId]){result={...r.responses[b.requestId],progress:r.responses[b.requestId].progress||{}};return p}try{allowed(c,who,r.group)}catch(e){error=e.message;return p}if(r.version!==c.version){error='Your teacher changed this lesson. Start a new round.';return p}const q=r.items[r.index];if(!q||b.index!==r.index||!q.choices.includes(b.answer)||!/^[a-f0-9-]{20,64}$/.test(b.requestId||'')){error='This answer is no longer current.';return p}r.results=r.results||{};r.responses=r.responses||{};const correct=b.answer===q.wordId;r.results[q.wordId]=r.results[q.wordId]||{wrong:[],firstTry:true};const a=r.results[q.wordId];a.wrong=a.wrong||[];if(!correct){if(!a.wrong.includes(b.answer))a.wrong.push(b.answer);a.firstTry=false}else{r.index++;if(r.index===r.items.length){p.words=p.words||{};for(const item of r.items){const id=item.wordId,v=p.words[id]||{credits:0,rounds:0};v.rounds++;if(r.results[id]?.firstTry)v.credits=Math.min(2,v.credits+1);v.lastSeen=now();p.words[id]=v}p.lastActive=now()}}result={correct,firstTry:a.firstTry,round:publicRound(r),progress:p.words||{}};r.responses[b.requestId]=result;p.rounds[r.id]=r;if(p.round&&p.round.id===r.id)p.round=r;if(r.index===r.items.length){for(const id of Object.keys(p.rounds)){if(id!==r.id&&p.rounds[id]?.index===p.rounds[id]?.items?.length)delete p.rounds[id]}}return p});if(error)fail(409,error);return result}
