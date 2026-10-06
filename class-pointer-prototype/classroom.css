@@ -54,3 +54,5 @@ body.lesson-expanded{overflow:hidden}
   .fullscreen-teacher-toolbar{right:74px;max-height:42vh;overflow:auto}
   .fullscreen-toolbar-control select,.fullscreen-toolbar-control button{font-size:11px;padding:4px 6px}
 }
+
+.drawing-owner-label{position:absolute;z-index:5;pointer-events:none;background:#172033ee;color:white;border:1px solid #ffffff55;border-radius:6px;padding:4px 7px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px #0005;transform:translateY(-100%)}
