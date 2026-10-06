@@ -314,6 +314,11 @@
     return Boolean(studentMap && studentMap[gameId] === true);
   }
 
+  function classHasLockedGameOverride(settings, classId) {
+    if (!settings || !classId || !settings.classLockedGameOverride) return false;
+    return String(settings.classLockedGameOverride[classId] || "") === String(gameId || "");
+  }
+
   // Match the B3 homepage's ET/WT activity switches.
   // A class-specific switch is authoritative when it exists. Older/global
   // settings.games values remain supported as a fallback for compatibility.
@@ -395,6 +400,15 @@
         "This activity is turned off",
         "This individual activity is disabled in Teacher Tools."
       );
+      return;
+    }
+
+    // A class-wide exception lets exactly one selected activity stay open for
+    // every student in that ET/WT class while the site/class lock is active.
+    // The activity-enabled check above still wins.
+    if (classHasLockedGameOverride(lastSettings, studentClassId)) {
+      syncEmbeddedGameOverride(true);
+      showOpen();
       return;
     }
 
