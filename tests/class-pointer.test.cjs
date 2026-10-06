@@ -105,7 +105,8 @@ test('highlights have separate owners and undo or clear never deletes another la
 test('highlight messages enforce admission and permission and ignore forged ownership',()=>{
   const f=teacherFixture();f.run("members.get('student:student-a').admitted=false;state.sharing=true;state.mode='everyone'");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
   f.run("members.get('student:student-a').admitted=true;state.mode='nobody'");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
-  f.run("state.mode='everyone';members.get('student:student-a').writeAllowed=true");f.connection.emit('data',{type:'highlight',stroke:{...sampleStroke,owner:'teacher'}});assert.equal(f.run('highlightStore.strokes[0].owner'),'student:student-a');
+  f.run("state.mode='everyone';members.get('student:student-a').writeAllowed=false");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
+  f.run("members.get('student:student-a').writeAllowed=true");f.connection.emit('data',{type:'highlight',stroke:{...sampleStroke,owner:'teacher'}});assert.equal(f.run('highlightStore.strokes[0].owner'),'student:student-a');
   f.run("highlightStore.add('teacher',{tool:'box',points:[{x:0,y:0},{x:0.5,y:0.5}]})");
   f.connection.emit('data',{type:'edit-highlights',action:'all',owner:'teacher'});assert.equal(f.run('highlightStore.strokes.length'),2);
   f.connection.emit('data',{type:'edit-highlights',action:'clear',owner:'teacher'});assert.equal(f.run('highlightStore.strokes.length'),1);assert.equal(f.run('highlightStore.strokes[0].owner'),'teacher');
