@@ -5,8 +5,8 @@
   if(root)root.ClassPointerViewportCore=api;
 })(typeof window!=='undefined'?window:globalThis,function(){
   function clamp(value,min,max){return Math.min(max,Math.max(min,value))}
-  function outputSize(width,height,maxWidth=1280,maxHeight=720){
-    if(!(width>0&&height>0))return{width:1280,height:720};
+  function outputSize(width,height,maxWidth=1920,maxHeight=1080){
+    if(!(width>0&&height>0))return{width:1920,height:1080};
     const scale=Math.min(1,maxWidth/width,maxHeight/height);
     return{width:Math.max(2,Math.round(width*scale)),height:Math.max(2,Math.round(height*scale))};
   }
