@@ -8,7 +8,10 @@ const pointerNodes=new Map();
 const highlightStore=new C.HighlightStore();let highlighter=null;
 const pointerIcons={
   arrow:'<path d="M16 16L1 8L5 16L1 24Z" fill="currentColor"/>',
-  star:'<path d="M16 3L19.5 11.5L29 12L21.5 18L24 27L16 22L8 27L10.5 18L3 12L12.5 11.5Z" fill="currentColor"/>'
+  star:'<path d="M16 3L19.5 11.5L29 12L21.5 18L24 27L16 22L8 27L10.5 18L3 12L12.5 11.5Z" fill="currentColor"/>',
+  heart:'<path d="M16 28S3 20 3 11.5C3 5 11 3 16 10c5-7 13-5 13 1.5C29 20 16 28 16 28Z" fill="currentColor"/>',
+  paw:'<circle cx="16" cy="21" r="7" fill="currentColor"/><ellipse cx="7" cy="11" rx="3.3" ry="4.5" fill="currentColor"/><ellipse cx="15" cy="7" rx="3.3" ry="4.5" fill="currentColor"/><ellipse cx="23" cy="9" rx="3.3" ry="4.5" fill="currentColor"/><ellipse cx="28" cy="15" rx="2.8" ry="3.8" fill="currentColor"/>',
+  sparkle:'<path d="M16 1L19.5 12.5L31 16L19.5 19.5L16 31L12.5 19.5L1 16L12.5 12.5Z" fill="currentColor"/><path d="M26 1L27.5 5.5L32 7L27.5 8.5L26 13L24.5 8.5L20 7L24.5 5.5Z" fill="currentColor"/>'
 };
 function status(text){$('connectionStatus').textContent=text}
 function fail(text){$('error').textContent=text;$('error').hidden=false}
