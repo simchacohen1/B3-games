@@ -77,6 +77,7 @@
     }
     function openDialog(){
       setPanMode(false);selection={...base};showSelection();
+      const maxWidth=Math.max(280,Math.min(window.innerWidth*0.88,window.innerHeight*0.68*aspect));preview.style.width=maxWidth+'px';preview.style.margin='0 auto';
       if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');
     }
     function closeDialog(){if(typeof dialog.close==='function'&&dialog.open)dialog.close();else dialog.removeAttribute('open')}
