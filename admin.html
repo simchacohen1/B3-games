@@ -120,6 +120,15 @@ function applyRoleView(){
     const w=frame.contentWindow,d=frame.contentDocument;
     const access=w?.B3SiteSettings?.getCurrentAccess?.()||{};
     const owner=access.role==="admin";
+    const teacherPanel=document.getElementById("teacherAccessPanel");
+    // Auth resolves asynchronously inside the embedded page. If this page was
+    // initially rendered as a regular-teacher view, make sure the stale
+    // "Loading your class..." overlay is removed as soon as the owner/admin
+    // role becomes available.
+    if(owner&&teacherPanel&&teacherPanel.style.display!=="none"){
+      teacherPanel.style.display="none";
+      d.querySelectorAll(".admin-dashboard-section").forEach(s=>s.style.display=s.id==="admin-section-"+currentTab?"block":"none");
+    }
     document.querySelector(".brand").textContent=owner?"B3 Teacher Center":"Fun Torah Tools Teacher Center";
     const accessNav=document.getElementById("classAccessNav");
     if(accessNav){accessNav.style.display="";accessNav.textContent=owner?"🔐 Class Access":"🔐 Open / Lock My Class";}
