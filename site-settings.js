@@ -171,6 +171,9 @@
     // activity while the master/class lock is active. Individual activity
     // switches still win, so a game explicitly turned off stays off.
     studentGameOverrides: {},
+    // One class-wide exception per ET/WT class. When the site/class is locked,
+    // this one activity may stay open for every student in that class.
+    classLockedGameOverride: { et: "", wt: "" },
     classAccess: {
       et: { mode: "auto", lockWindows: defaultLockWindows("et") },
       wt: { mode: "auto", lockWindows: defaultLockWindows("wt") }
@@ -300,6 +303,9 @@
     const sourceGames = source.games && typeof source.games === "object" ? source.games : {};
     const sourceClassGames = source.classGames && typeof source.classGames === "object" ? source.classGames : {};
     const sourceClassAccess = source.classAccess && typeof source.classAccess === "object" ? source.classAccess : {};
+    const sourceClassLockedGameOverride = source.classLockedGameOverride && typeof source.classLockedGameOverride === "object"
+      ? source.classLockedGameOverride
+      : {};
 
     normalized.siteEnabled = typeof source.siteEnabled === "boolean" ? source.siteEnabled : true;
 
@@ -317,6 +323,10 @@
     });
 
     normalized.studentGameOverrides = normalizeStudentGameOverrides(source.studentGameOverrides);
+    normalized.classLockedGameOverride = {
+      et: typeof sourceClassLockedGameOverride.et === "string" ? sourceClassLockedGameOverride.et.trim() : "",
+      wt: typeof sourceClassLockedGameOverride.wt === "string" ? sourceClassLockedGameOverride.wt.trim() : ""
+    };
 
     const fallbackAccess = cloneDefaultSettings().classAccess;
     normalized.classAccess = {
@@ -634,6 +644,22 @@
     });
   }
 
+  function classHasLockedGameOverride(settings, classId, gameId) {
+    if (!["et", "wt"].includes(classId) || !gameId) return false;
+    const normalized = normalizeSettings(settings);
+    return normalized.classLockedGameOverride[classId] === String(gameId);
+  }
+
+  function updateClassLockedGameOverride(classId, gameId) {
+    if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
+    const value = String(gameId || "").trim();
+    return readOnce().then(function (settings) {
+      settings.classLockedGameOverride = settings.classLockedGameOverride || { et: "", wt: "" };
+      settings.classLockedGameOverride[classId] = value;
+      return save(settings);
+    });
+  }
+
   function updateClassMode(classId, mode) {
     if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
     if (!["auto", "open", "locked"].includes(mode)) return Promise.reject(new Error("Unknown access mode."));
@@ -797,6 +823,8 @@
     isGameEnabledForClass: isGameEnabledForClass,
     updateStudentGameOverride: updateStudentGameOverride,
     studentHasGameOverride: studentHasGameOverride,
+    updateClassLockedGameOverride: updateClassLockedGameOverride,
+    classHasLockedGameOverride: classHasLockedGameOverride,
     updateClassMode: updateClassMode,
     updateClassLockWindows: updateClassLockWindows,
     getDefaultClassLockWindows: function (classId) {
