@@ -117,6 +117,7 @@
       if(event.pointerId!==dragPointer)return;if(panMode)stopStageEvent(event);try{stage.releasePointerCapture?.(dragPointer)}catch{}dragPointer=null;lastDrag=null;stage.classList.remove('viewport-panning');
     }
     stage.addEventListener('pointerup',endPan,true);stage.addEventListener('pointercancel',endPan,true);
+    stage.addEventListener('click',event=>{if(panMode)stopStageEvent(event)},true);
     updateControls();
 
     return{
