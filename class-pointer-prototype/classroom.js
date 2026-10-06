@@ -2,7 +2,7 @@
 const C=window.ClassPointerCore,$=id=>document.getElementById(id);
 const room=new URL(location.href).searchParams.get('room'),isTeacher=!room;
 const members=new Map();
-let peer=null,teacherConnection=null,screen=null,mediaCall=null,state={sharing:false,mode:'nobody',members:[],points:{}},started=false,admitted=false,joining=false,joinTimer=null;
+let peer=null,teacherConnection=null,screen=null,mediaCall=null,viewportController=null,state={sharing:false,mode:'nobody',members:[],points:{}},started=false,admitted=false,joining=false,joinTimer=null;
 let generation=0,colorIndex=0,pendingPoint=null,hoverTimer=null,lastHover=0;
 const pointerNodes=new Map();
 const highlightStore=new C.HighlightStore();let highlighter=null;
@@ -129,20 +129,35 @@ async function startClass(){
   peer.on('connection',receiveStudent);peer.on('call',call=>call.close());
 }
 function stopSharing(){
-  cancelHover();highlighter?.cancel();highlightStore.reset();publishHighlights();generation++;const oldScreen=screen;screen=null;oldScreen?.getTracks().forEach(track=>track.stop());
+  cancelHover();highlighter?.cancel();highlightStore.reset();publishHighlights();generation++;
+  const oldViewport=viewportController;viewportController=null;const oldScreen=screen;screen=null;
+  oldViewport?.stop();oldScreen?.getTracks().forEach(track=>track.stop());
   for(const member of members.values()){clearStudentHover(member);member.call?.close();member.call=null;member.videoReady=false;clearTimeout(member.mediaTimer)}
   state.sharing=false;state.points={};$('lesson').srcObject=null;$('placeholder').hidden=false;$('stopScreen').disabled=true;$('shareScreen').disabled=!started;publish();
 }
+function resetOverlaysForViewChange(){
+  cancelHover();highlighter?.cancel();state.points={};highlightStore.reset();publishHighlights();publish();
+}
 async function shareScreen(){
   clearError();if(!navigator.mediaDevices?.getDisplayMedia){fail('Use Chrome or Edge on a computer to share your teaching screen.');return}
-  $('shareScreen').disabled=true;const currentPeer=peer;
+  $('shareScreen').disabled=true;const currentPeer=peer;let captured=null,processor=null,outgoing=null;
   try{
-    const captured=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:1280},frameRate:{ideal:12,max:15}},audio:false});
+    captured=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:1280},frameRate:{ideal:12,max:15}},audio:false});
     if(peer!==currentPeer||!started){captured.getTracks().forEach(track=>track.stop());return}
-    screen=captured;generation++;state.sharing=true;state.points={};$('lesson').srcObject=screen;$('placeholder').hidden=true;$('stopScreen').disabled=false;
-    screen.getVideoTracks()[0].addEventListener('ended',()=>{if(screen===captured)stopSharing()},{once:true});
-    await $('lesson').play();if(screen!==captured)return;publish();for(const member of members.values())if(member.admitted)callStudent(member);status('Teaching screen is sharing. Move your mouse over the picture to point as Teacher.');
-  }catch(error){if(peer!==currentPeer||(error.name==='AbortError'&&!screen))return;stopSharing();fail(error.name==='NotAllowedError'?'Screen sharing was canceled. Click Share teaching screen to try again.':'Could not share the screen. Please try again.')}
+    if(window.ClassPointerViewport?.create){
+      processor=await window.ClassPointerViewport.create({rawStream:captured,stage:$('stage'),lesson:$('lesson'),onBeforeViewChange:resetOverlaysForViewChange,onStatus:status,onError:fail});
+      if(peer!==currentPeer||!started){processor?.stop();return}
+      viewportController=processor;outgoing=processor.stream||captured;
+    }else outgoing=captured;
+    screen=outgoing;generation++;state.sharing=true;state.points={};$('lesson').srcObject=screen;$('placeholder').hidden=true;$('stopScreen').disabled=false;
+    captured.getVideoTracks()[0]?.addEventListener('ended',()=>{if(screen===outgoing)stopSharing()},{once:true});
+    await $('lesson').play();if(screen!==outgoing)return;publish();for(const member of members.values())if(member.admitted)callStudent(member);
+    status(viewportController?.active?'Teaching screen is sharing. Use Choose shared area, Zoom +, and Move view to focus the lesson.':'Teaching screen is sharing. Move your mouse over the picture to point as Teacher.');
+  }catch(error){
+    if(peer!==currentPeer||(error.name==='AbortError'&&!screen)){processor?.stop();captured?.getTracks().forEach(track=>track.stop());return}
+    processor?.stop();if(viewportController===processor)viewportController=null;captured?.getTracks().forEach(track=>track.stop());stopSharing();
+    fail(error.name==='NotAllowedError'?'Screen sharing was canceled. Click Share teaching screen to try again.':'Could not share the screen. Please try again.');
+  }
 }
 function endClass(){
   window.ClassPointerDashboard?.end().catch(()=>fail('Could not remove the dashboard lesson. Refresh before starting another class.'));
