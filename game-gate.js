@@ -325,13 +325,15 @@
   function gameIsEnabledForClass(settings, classId) {
     if (!settings) return true;
 
+    // The global activity switch is the master switch. If an activity is
+    // globally inactive, no class override may reopen it.
+    if (settings.games && Object.prototype.hasOwnProperty.call(settings.games, gameId) && settings.games[gameId] === false) {
+      return false;
+    }
+
     var classMap = settings.classGames && classId ? settings.classGames[classId] : null;
     if (classMap && Object.prototype.hasOwnProperty.call(classMap, gameId)) {
       return classMap[gameId] !== false;
-    }
-
-    if (settings.games && Object.prototype.hasOwnProperty.call(settings.games, gameId)) {
-      return settings.games[gameId] !== false;
     }
 
     return true;
