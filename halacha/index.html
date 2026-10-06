@@ -83,7 +83,11 @@ body:not(.teacher-mode) .teacher-source-panel,body:not(.teacher-mode) .teacher-s
  .print-target .scrap.selected{outline:none!important}
 }
 
-</style></head><body><header><div class=bar><h1>📔 My Halacha Scrapbook — סימן א</h1><button onclick="mode(false)">Student</button><button onclick="mode(true)">Teacher</button><button onclick="printScrapbook()">Print / PDF</button></div></header><main><div id=tabs class=tabs></div><div id=sections></div><div id=review class="section teacherOnly"></div></main><script>
+</style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="../firebase-config.js"></script>
+</head><body><header><div class=bar><h1>📔 My Halacha Scrapbook — סימן א</h1><button onclick="mode(false)">Student</button><button onclick="mode(true)">Teacher</button><button onclick="printScrapbook()">Print / PDF</button><span id="cloudSaveStatus" style="font-size:12px;font-weight:800;opacity:.9">Saving on this device</span></div></header><main><div id=tabs class=tabs></div><div id=sections></div><div id=review class="section teacherOnly"></div></main><script>
 const lessons=[
 {id:"a",tab:"1 · שויתי",title:"שויתי ה׳ לנגדי תמיד",seif:"סעיף א",objective:"Develop a constant awareness that Hashem is always present, which shapes one’s behavior in public and in private.",source:"שויתי ה׳ לנגדי תמיד · הכרה תמידית בהשגחת ה׳",qs:["What is the meaning of שויתי ה׳ לנגדי תמיד?","Why is it important to remember Hashem is always with us?","How does this awareness affect how we speak and behave?"],type:"choices",pieces:[["he","שויתי ה׳ לנגדי תמיד"],["text","I remember Hashem wherever I am"],["sticker","🏠"],["sticker","🏫"],["sticker","💬"]]},
 {id:"b",tab:"2 · מודה אני",title:"מודה אני — השבת הנשמה",seif:"סעיף ב",objective:"Understand the importance of thanking Hashem for returning one’s נשמה each morning and how to express it through מודה אני.",source:"אמירת מודה אני והכרת הטוב עם הקימה",qs:["What should a person think about as soon as he wakes up?","Why is it permitted to say מודה אני even before נטילת ידים?","What is the proper pause when saying מודה אני?"],type:"sequence",pieces:[["sticker","🌅"],["text","Thank You for returning my נשמה"],["sticker","💛"]]},
@@ -91,7 +95,49 @@ const lessons=[
 {id:"d",tab:"4 · היצר הרע",title:"מתגברים על היצר הרע",seif:"סעיף ד",objective:"Conquer laziness and excuses and act with bravery and זריזות in עבודת ה׳.",source:"זריזות עם הקימה והתגברות על היצר",qs:["What excuses does the יצר הרע give for not waking up early?","How can we overcome the יצר הרע in the morning?","What lesson does the קיצור שולחן ערוך bring from someone running for money or business?"],type:"comic",pieces:[["text","I can overcome an excuse!"],["sticker","⏰"],["sticker","💪"]]},
 {id:"e",tab:"5 · לילה",title:"עבודת ה׳ בלילה ותיקון חצות",seif:"סעיף ה",objective:"Appreciate the greatness of nighttime Torah study and תיקון חצות, and its spiritual rewards.",source:"השכמה בחצות וחשיבות לימוד תורה בלילה",qs:["What is the ideal time for תיקון חצות?","What should one do if he cannot wake at חצות?","Why is learning Torah at night so special?","What is meant by משנה – אותיות נשמה?"],type:"night",pieces:[["he","תיקון חצות"],["he","משנה ↔ נשמה"],["sticker","🌙"],["sticker","⭐"],["sticker","📖"]]}
 ];
-let S={};try{S=JSON.parse(localStorage.getItem("halachaV14")||"{}")}catch(e){};function save(){localStorage.setItem("halachaV14",JSON.stringify(S))}
+const HALACHA_LOCAL_KEY="halachaV14";
+const HALACHA_STUDENT_ID=String(localStorage.getItem("b3Games_studentId")||"").trim();
+let S={};try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY)||"{}")}catch(e){}
+let halachaDb=null,cloudSaveTimer=null;
+try{
+ if(window.firebase&&window.B3_FIREBASE_CONFIG){
+   if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+   halachaDb=firebase.database();
+ }
+}catch(e){console.warn("Halacha cloud save unavailable",e)}
+function cloudPath(){
+ return HALACHA_STUDENT_ID?"b3Games/students/"+HALACHA_STUDENT_ID+"/halacha/siman1":null;
+}
+function setSaveStatus(msg){let x=document.getElementById("cloudSaveStatus");if(x)x.textContent=msg}
+function save(){
+ try{localStorage.setItem(HALACHA_LOCAL_KEY,JSON.stringify(S))}catch(e){}
+ if(!halachaDb||!cloudPath()){setSaveStatus("Saved on this device");return}
+ setSaveStatus("Saving…");
+ clearTimeout(cloudSaveTimer);
+ cloudSaveTimer=setTimeout(()=>{
+   halachaDb.ref(cloudPath()).set({version:1,updatedAt:firebase.database.ServerValue.TIMESTAMP,state:S})
+    .then(()=>setSaveStatus("✓ Saved to my account"))
+    .catch(e=>{console.warn("Halacha cloud save failed",e);setSaveStatus("Saved on this device")});
+ },350);
+}
+async function loadCloudHalacha(){
+ if(!halachaDb||!cloudPath()){setSaveStatus("Saved on this device");return}
+ try{
+   setSaveStatus("Loading my scrapbook…");
+   const snap=await halachaDb.ref(cloudPath()).once("value"),row=snap.val();
+   if(row&&row.state&&typeof row.state==="object"){
+     const remote=JSON.stringify(row.state),local=JSON.stringify(S);
+     if(remote!==local && sessionStorage.getItem("halachaCloudLoaded")!=="1"){
+       localStorage.setItem(HALACHA_LOCAL_KEY,remote);
+       sessionStorage.setItem("halachaCloudLoaded","1");
+       location.reload(); return;
+     }
+   }else if(Object.keys(S).length){
+     await halachaDb.ref(cloudPath()).set({version:1,updatedAt:firebase.database.ServerValue.TIMESTAMP,state:S});
+   }
+   setSaveStatus("✓ Saved to my account");
+ }catch(e){console.warn("Halacha cloud load failed",e);setSaveStatus("Saved on this device")}
+}
 
 function teacherSource(id){
  const x={
@@ -213,6 +259,7 @@ function render(l){let sec=document.createElement("div");sec.id=l.id;sec.classNa
 lessons.forEach(render);
 lessons.forEach(l=>{let b=document.createElement("button");b.dataset.id=l.id;b.textContent=l.tab;b.onclick=()=>show(l.id);if(l.id==="a")b.className="on";tabs.appendChild(b)});
 let rb=document.createElement("button");rb.dataset.id="review";rb.textContent="🎤 Teacher Review";rb.className="teacherOnly";rb.onclick=()=>show("review");tabs.appendChild(rb);
+loadCloudHalacha();
 review.innerHTML=`<div class=qbank><h2>Complete Review Bank — סימן א</h2>${lessons.map(l=>`<h3>${l.seif} · ${l.title}</h3><p><b>Objective:</b> ${l.objective}</p><ol>${l.qs.map(q=>"<li>"+q+"</li>").join("")}</ol>`).join("")}</div>`;
 
 function toggleTeacherSource(id){
