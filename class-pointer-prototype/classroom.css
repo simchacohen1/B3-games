@@ -32,3 +32,25 @@ body.lesson-expanded{overflow:hidden}
 .share-area-video{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none}
 .share-area-shade{position:absolute;inset:0;background:transparent;pointer-events:none}
 .share-area-selection{position:absolute;border:3px solid #ffcc00;box-shadow:0 0 0 9999px #07152966,0 0 0 1px #fff6;border-radius:6px;pointer-events:none}
+
+/* Full-screen teaching controls stay inside the fullscreen stage so the teacher never has to exit to change tools. */
+.fullscreen-teacher-toolbar{position:absolute;top:10px;left:10px;right:92px;z-index:6;background:#101827e8;color:white;border:1px solid #ffffff38;border-radius:12px;box-shadow:0 8px 28px #0007;backdrop-filter:blur(10px);padding:8px;pointer-events:auto}
+.fullscreen-toolbar-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 2px 6px}
+.fullscreen-toolbar-top strong{font-size:13px;letter-spacing:.02em}
+.fullscreen-toolbar-collapse{padding:5px 9px!important;font-size:12px;background:#334155!important;color:white!important;border-color:#ffffff42!important}
+.fullscreen-toolbar-body{display:flex;flex-wrap:wrap;align-items:end;gap:6px}
+.fullscreen-toolbar-control{display:flex;align-items:center;gap:4px;margin:0;color:#e8eef8;font-size:11px}
+.fullscreen-toolbar-control>span{white-space:nowrap}
+.fullscreen-toolbar-control select,.fullscreen-toolbar-control button{min-height:32px;padding:5px 8px;border-radius:7px;font-size:12px;background:#f8fafc;color:#172033;border-color:#cbd5e1}
+.fullscreen-toolbar-control select{max-width:135px}
+.fullscreen-toolbar-control input[type=checkbox]{width:16px;height:16px;margin:0}
+.fullscreen-toolbar-control button.active{background:#2557d6;color:white;border-color:#7ba2ff}
+.fullscreen-toolbar-control button.danger{background:#8f2630;color:white;border-color:#d7646e}
+.fullscreen-zoom-readout{align-self:center;min-width:40px;text-align:center;font-size:12px;font-weight:700;color:#dbeafe}
+.fullscreen-teacher-toolbar.collapsed{right:auto;min-width:190px}
+.fullscreen-teacher-toolbar.collapsed .fullscreen-toolbar-top{padding-bottom:0}
+#stage:fullscreen .share-area-dialog,#stage.lesson-fullscreen .share-area-dialog{z-index:20}
+@media(max-width:850px){
+  .fullscreen-teacher-toolbar{right:74px;max-height:42vh;overflow:auto}
+  .fullscreen-toolbar-control select,.fullscreen-toolbar-control button{font-size:11px;padding:4px 6px}
+}
