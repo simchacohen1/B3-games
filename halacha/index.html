@@ -9,7 +9,7 @@ main{max-width:1400px;margin:auto;padding:14px}.tabs{display:flex;gap:7px;flex-w
 .book{background:#976442;border-radius:24px;padding:18px;box-shadow:0 15px 35px #0002}.spread{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .page{height:700px;position:relative;overflow:hidden;border-radius:7px;background:#fff8df;background-image:linear-gradient(#0000 31px,#ddd3b8 32px),linear-gradient(90deg,#0000 31px,#eadfc3 32px);background-size:32px 32px;box-shadow:inset 0 0 35px #7d633222}
 .page.blue{background:#e3f6ff;background-image:radial-gradient(#9bcadd 1.2px,transparent 1.2px);background-size:19px 19px}.page.craft{background:#d7b27b;background-image:linear-gradient(45deg,#fff2 25%,transparent 25%,transparent 75%,#fff2 75%);background-size:28px 28px}.page.night{background:#173758;background-image:radial-gradient(#fff 1px,transparent 1px);background-size:33px 33px;color:white}
-.scrap{position:absolute;padding:11px;min-width:90px;max-width:390px;background:#fff;border:2px solid #d4c08c;box-shadow:4px 5px 9px #0003;cursor:move;touch-action:none;user-select:none;transform:rotate(var(--r,0deg));z-index:2}.scrap.selected{outline:4px dashed #4fa4d3;outline-offset:3px}.scrap.he{direction:rtl;text-align:center;font-size:23px;font-weight:900;background:#fff0b4}.scrap.sticker{font-size:45px;border:0;background:transparent;box-shadow:none}.scrap img{max-width:250px;max-height:220px;display:block}
+.scrap{position:absolute;padding:11px;min-width:90px;max-width:none;background:#fff;border:2px solid #d4c08c;box-shadow:4px 5px 9px #0003;cursor:move;touch-action:none;user-select:none;transform:rotate(var(--r,0deg));z-index:2}.scrap.textbox{white-space:pre-wrap;overflow-wrap:anywhere;min-width:120px;min-height:70px}.resize-handle{position:absolute;right:-8px;bottom:-8px;width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 1px 4px #0005;cursor:nwse-resize;z-index:30;touch-action:none}.scrap.sticker .resize-handle{right:-5px;bottom:-5px}.scrap img{width:100%;height:auto;max-width:none;max-height:none;display:block}.scrap.selected{outline:4px dashed #4fa4d3;outline-offset:3px}.scrap.he{direction:rtl;text-align:center;font-size:23px;font-weight:900;background:#fff0b4}.scrap.sticker{font-size:45px;border:0;background:transparent;box-shadow:none}
 .mini{display:flex;gap:3px;flex-wrap:wrap;margin-top:5px}.mini button{font-size:11px;padding:3px 6px;border:0;border-radius:6px;background:#eaf2f6}.mini .delete-piece{background:#fee2e2;color:#991b1b;font-weight:900}.reset-page-btn{background:#fee2e2!important;color:#991b1b!important;font-weight:900}.themeRow{display:flex;gap:6px}.themeRow button{width:34px;height:34px;border:2px solid #666;border-radius:50%;padding:0}
 .activityBoard{position:absolute;left:6%;top:7%;width:88%;min-height:82%;background:#fffdf3eF;border:4px solid #cda95c;border-radius:18px;padding:18px;z-index:1;box-shadow:0 7px 15px #0002}.activityBoard h2{margin:0 0 8px;text-align:center}.activityBoard.finished{opacity:.25;pointer-events:none}
 .wordbank,.dropzone,.matchgrid,.comic{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}.card{background:#fff;border:2px solid #d0bd8e;border-radius:10px;padding:9px 12px;font-weight:800;box-shadow:2px 3px 4px #0002}.card[draggable=true]{cursor:grab}.slot{min-width:105px;min-height:48px;border:3px dashed #9eb4c0;border-radius:10px;padding:7px;background:#f5fbfd}.slot.filled{border-style:solid;background:#e4f4e5}.matchgrid{display:grid;grid-template-columns:1fr 1fr}.matchgrid button{padding:10px;border:2px solid #c8d7df;border-radius:10px;background:white}.comic .bubble{width:45%;background:#fff;border:3px solid #333;border-radius:30px;padding:12px;text-align:center}.finishBtn{display:block;margin:12px auto 0;border:0;background:#173b62;color:#fff;border-radius:11px;padding:9px 15px;font-weight:bold}
@@ -187,10 +187,11 @@ function show(id){document.querySelectorAll(".section").forEach(x=>x.classList.r
 function pageCanvas(page){return page.querySelector(".canvas")}
 function add(id,type,text,pageIndex=0){
  let pages=document.querySelectorAll("#"+id+" .page"),page=pages[Math.min(pageIndex,pages.length-1)],p=pageCanvas(page),e=document.createElement("div");
- e.className="scrap "+(type==="he"?"he":type==="sticker"?"sticker":"");
- e.innerHTML=text+`<div class=mini><button onclick="event.stopPropagation();size(this,1.12)">＋</button><button onclick="event.stopPropagation();size(this,.89)">－</button><button onclick="event.stopPropagation();rot(this)">↻</button><button class="delete-piece" title="Delete this item" onclick="event.stopPropagation();removeP(this)">🗑</button></div>`;
+ e.className="scrap "+(type==="he"?"he":type==="sticker"?"sticker":type==="textbox"?"textbox":"");
+ e.innerHTML=text+`<div class=mini><button onclick="event.stopPropagation();rot(this)">↻</button><button class="delete-piece" title="Delete this item" onclick="event.stopPropagation();removeP(this)">🗑</button></div><div class="resize-handle" title="Drag to resize"></div>`;
  e.style.left=(30+Math.random()*140)+"px";e.style.top=(45+Math.random()*470)+"px";
- p.appendChild(e);ensureDeleteControl(e);drag(e);clampPiece(e);persist(id)
+ if(type==="photo"){e.style.width="220px"}else if(type==="textbox"){e.style.width="220px";e.style.height="110px"}else if(type==="sticker"){e.style.width="90px"}else{e.style.width="220px"}
+ p.appendChild(e);ensureDeleteControl(e);ensureResizeHandle(e);drag(e);clampPiece(e);persist(id)
 }
 function clampPiece(e){
  let page=e.closest(".page"); if(!page)return;
@@ -207,6 +208,56 @@ function ensureDeleteControl(e){
  del.onclick=ev=>{ev.stopPropagation();removeP(del)};
  mini.appendChild(del);
 }
+function ensureResizeHandle(e){
+ if(!e||e.querySelector(".resize-handle"))return;
+ // Remove the old +/- size buttons from saved pieces; resizing is now by dragging.
+ e.querySelectorAll(".mini button").forEach(btn=>{
+   const t=(btn.textContent||"").trim();
+   if(t==="＋"||t==="+"||t==="－"||t==="-")btn.remove();
+ });
+ const h=document.createElement("div");
+ h.className="resize-handle";h.title="Drag to resize";e.appendChild(h);
+ installResize(e,h);
+}
+function installResize(e,h){
+ if(!e||!h||h.dataset.bound==="1")return;
+ h.dataset.bound="1";
+ h.onpointerdown=ev=>{
+   ev.preventDefault();ev.stopPropagation();
+   const rect=e.getBoundingClientRect(),page=e.closest(".page");
+   const startX=ev.clientX,startY=ev.clientY,startW=rect.width,startH=rect.height;
+   const keepRatio=!e.classList.contains("textbox")&&!e.classList.contains("he")&&!e.classList.contains("text");
+   const ratio=startW/Math.max(1,startH);
+   h.setPointerCapture(ev.pointerId);
+   const move=mv=>{
+     let w=Math.max(60,startW+(mv.clientX-startX)),hgt=Math.max(40,startH+(mv.clientY-startY));
+     if(keepRatio){
+       const byW=w/ratio,byH=hgt*ratio;
+       if(Math.abs(w-startW)>=Math.abs(hgt-startH)){hgt=byW}else{w=byH}
+     }
+     if(page){
+       w=Math.min(w,Math.max(60,page.clientWidth-e.offsetLeft-8));
+       hgt=Math.min(hgt,Math.max(40,page.clientHeight-e.offsetTop-8));
+     }
+     e.style.width=Math.round(w)+"px";
+     if(e.classList.contains("textbox"))e.style.height=Math.round(hgt)+"px";
+     else e.style.height="auto";
+   };
+   const up=()=>{
+     h.onpointermove=null;h.onpointerup=null;h.onpointercancel=null;
+     clampPiece(e);persist(e.closest(".section").id);
+   };
+   h.onpointermove=move;h.onpointerup=up;h.onpointercancel=up;
+ };
+}
+function addTextBox(id){
+ const text=prompt("Type the text you want to add:");
+ if(text===null)return;
+ const clean=text.trim();
+ if(!clean)return;
+ add(id,"textbox",escText(clean));
+}
+function escText(s){return String(s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])).replace(/\n/g,"<br>")}
 function removeP(b){
  const scrap=b.closest(".scrap");if(!scrap)return;
  const sec=scrap.closest(".section");if(!sec)return;
@@ -220,7 +271,7 @@ function drag(e){
  let sx,sy,l,t,on=false;
  e.ondblclick=v=>{v.stopPropagation();openCustomizer(e,v)};
  e.onpointerdown=v=>{
- if(v.target.tagName==="BUTTON")return;
+ if(v.target.tagName==="BUTTON"||v.target.closest(".resize-handle"))return;
  on=true;sx=v.clientX;sy=v.clientY;l=e.offsetLeft;t=e.offsetTop;
  e.setPointerCapture(v.pointerId);
  document.querySelectorAll(".scrap").forEach(x=>x.classList.remove("selected"));e.classList.add("selected")
@@ -325,7 +376,7 @@ if(l.type==="comic")return `<h2>💥 Beat the Yetzer Hara!</h2><div class=comic>
 return `<h2>🌙 Night Torah Challenge</h2><p>Choose the ideas that belong on this nighttime page.</p><button class=card onclick="choose(this,true,'e','תיקון חצות')">תיקון חצות</button><button class=card onclick="choose(this,true,'e','Torah learning at night')">Torah learning at night</button><button class=card onclick="choose(this,true,'e','משנה — אותיות נשמה')">משנה — אותיות נשמה</button><p>Teacher can use the complete review bank for the exact time/details from סעיף ה.</p>`}
 let seqN=0;function seq(b,w){let slots=document.querySelectorAll("#b #seqout .slot");if(seqN>=3)return;let correct=["מודה אני","לפניך","בחמלה"][seqN];if(w===correct){slots[seqN].textContent=w;slots[seqN].classList.add("filled");b.disabled=true;seqN++;if(seqN===3){add("b","he","מודה אני לפניך בחמלה");S.b_done=true;save()}}else{b.classList.add("bad");setTimeout(()=>b.classList.remove("bad"),300)}}
 function matchM(b,txt,animal){if(b.dataset.done)return;b.textContent=txt+" "+animal;b.classList.add("good");b.dataset.done=1;add("c","he",txt+" "+animal)}
-function render(l){let sec=document.createElement("div");sec.id=l.id;sec.className="section"+(l.id==="a"?" on":"");let th=S[l.id+"_theme"]||"";sec.innerHTML=`<div class=teacherOnly><div class="notes ${HALACHA_TEACHER_PREVIEW?'open':''}"><h3 style="margin-top:0">👨‍🏫 Teacher Notes — ${l.seif}</h3><div class=source>${teacherSource(l.id)}</div><p><b>What to bring out:</b> ${teacherPoint(l.id)}</p><p><b>Objective:</b> ${l.objective}</p><b>Ask students:</b><ol>${l.qs.map(q=>"<li>"+q+"</li>").join("")}</ol></div></div><div class=work><aside class=side><h3>🎨 Scrapbook Tray</h3><div class=themeRow><button style="background:#fff3c9" onclick="setTheme('${l.id}','')"></button><button style="background:#e3f6ff" onclick="setTheme('${l.id}','blue')"></button><button style="background:#d7b27b" onclick="setTheme('${l.id}','craft')"></button><button style="background:#173758" onclick="setTheme('${l.id}','night')"></button></div><div class=step><b>Pieces to decorate with</b>${l.pieces.map(p=>`<button onclick="add('${l.id}','${p[0]}',\`${p[1]}\`)">${p[1]}</button>`).join("")}</div><div class=step><button onclick="document.getElementById('u_${l.id}').click()">📷 Add my picture</button><input hidden id="u_${l.id}" type=file accept="image/*" onchange="upload(event,'${l.id}')"></div><p><small>Drag pieces across either page. Use + / − / ↻ to resize or rotate. Use the crayons on each page to color and draw.</small></p></aside><div class=book><div class=spread><div class="page ${th}"><div class=activityBoard>${board(l)}</div><div class=canvas></div>${drawTools(l.id,0)}</div><div class="page ${th}"><div class=canvas></div>${drawTools(l.id,1)}</div></div></div></div>`;sections.appendChild(sec);let savedPages=S[l.id+"_scrap_pages"];if(savedPages){sec.querySelectorAll(".canvas").forEach((c,i)=>c.innerHTML=savedPages[i]||"")}else{let saved=S[l.id+"_scrap"];if(saved)sec.querySelector(".canvas").innerHTML=saved}sec.querySelectorAll(".scrap").forEach(e=>{ensureDeleteControl(e);drag(e);setTimeout(()=>clampPiece(e),0)});setTimeout(()=>{setupDraw(l.id,0);setupDraw(l.id,1)},0);if(S[l.id+"_done"] && l.id!=="a")sec.querySelector(".activityBoard").classList.add("finished")}
+function render(l){let sec=document.createElement("div");sec.id=l.id;sec.className="section"+(l.id==="a"?" on":"");let th=S[l.id+"_theme"]||"";sec.innerHTML=`<div class=teacherOnly><div class="notes ${HALACHA_TEACHER_PREVIEW?'open':''}"><h3 style="margin-top:0">👨‍🏫 Teacher Notes — ${l.seif}</h3><div class=source>${teacherSource(l.id)}</div><p><b>What to bring out:</b> ${teacherPoint(l.id)}</p><p><b>Objective:</b> ${l.objective}</p><b>Ask students:</b><ol>${l.qs.map(q=>"<li>"+q+"</li>").join("")}</ol></div></div><div class=work><aside class=side><h3>🎨 Scrapbook Tray</h3><div class=themeRow><button style="background:#fff3c9" onclick="setTheme('${l.id}','')"></button><button style="background:#e3f6ff" onclick="setTheme('${l.id}','blue')"></button><button style="background:#d7b27b" onclick="setTheme('${l.id}','craft')"></button><button style="background:#173758" onclick="setTheme('${l.id}','night')"></button></div><div class=step><b>Pieces to decorate with</b>${l.pieces.map(p=>`<button onclick="add('${l.id}','${p[0]}',\`${p[1]}\`)">${p[1]}</button>`).join("")}</div><div class=step><button onclick="addTextBox('${l.id}')">✏️ Add text box</button><button onclick="document.getElementById('u_${l.id}').click()">📷 Add my picture</button><input hidden id="u_${l.id}" type=file accept="image/*" onchange="upload(event,'${l.id}')"></div><p><small>Drag pieces anywhere. Resize by dragging the blue handle on the bottom-right corner. Use ↻ to rotate. Use the crayons on each page to color and draw.</small></p></aside><div class=book><div class=spread><div class="page ${th}"><div class=activityBoard>${board(l)}</div><div class=canvas></div>${drawTools(l.id,0)}</div><div class="page ${th}"><div class=canvas></div>${drawTools(l.id,1)}</div></div></div></div>`;sections.appendChild(sec);let savedPages=S[l.id+"_scrap_pages"];if(savedPages){sec.querySelectorAll(".canvas").forEach((c,i)=>c.innerHTML=savedPages[i]||"")}else{let saved=S[l.id+"_scrap"];if(saved)sec.querySelector(".canvas").innerHTML=saved}sec.querySelectorAll(".scrap").forEach(e=>{ensureDeleteControl(e);ensureResizeHandle(e);drag(e);setTimeout(()=>clampPiece(e),0)});setTimeout(()=>{setupDraw(l.id,0);setupDraw(l.id,1)},0);if(S[l.id+"_done"] && l.id!=="a")sec.querySelector(".activityBoard").classList.add("finished")}
 lessons.forEach(render);
 lessons.forEach(l=>{let b=document.createElement("button");b.dataset.id=l.id;b.textContent=l.tab;b.onclick=()=>show(l.id);if(l.id==="a")b.className="on";tabs.appendChild(b)});
 let rb=document.createElement("button");rb.dataset.id="review";rb.textContent="🎤 Teacher Review";rb.className="teacherOnly";rb.onclick=()=>show("review");tabs.appendChild(rb);
@@ -379,11 +430,9 @@ function openCustomizer(e,ev){
  document.getElementById("pcFont").value=e.dataset.font||"Arial, sans-serif";
  document.getElementById("pcText").value=rgbToHex(cs.color)||"#243746";
  document.getElementById("pcBg").value=rgbToHex(cs.backgroundColor)||"#fff1b8";
- let fs=parseInt(cs.fontSize)||18,w=Math.round(r.width);
+ let fs=parseInt(cs.fontSize)||18;
  document.getElementById("pcFontSize").value=Math.min(42,Math.max(12,fs));
- document.getElementById("pcWidth").value=Math.min(520,Math.max(100,w));
  document.getElementById("pcFontSizeVal").textContent=fs;
- document.getElementById("pcWidthVal").textContent=w;
 }
 function rgbToHex(rgb){
  let m=(rgb||"").match(/\d+/g);if(!m||m.length<3)return null;
@@ -392,10 +441,10 @@ function rgbToHex(rgb){
 function applyPieceStyle(){
  if(!activePiece)return;
  let f=document.getElementById("pcFont").value,tc=document.getElementById("pcText").value,bg=document.getElementById("pcBg").value,
- fs=document.getElementById("pcFontSize").value,w=document.getElementById("pcWidth").value;
+ fs=document.getElementById("pcFontSize").value;
  activePiece.dataset.font=f;activePiece.style.fontFamily=f;activePiece.style.color=tc;activePiece.style.background=bg;
- activePiece.style.fontSize=fs+"px";activePiece.style.width=w+"px";
- document.getElementById("pcFontSizeVal").textContent=fs;document.getElementById("pcWidthVal").textContent=w;
+ activePiece.style.fontSize=fs+"px";
+ document.getElementById("pcFontSizeVal").textContent=fs;
  clampPiece(activePiece);persist(activePiece.closest(".section").id)
 }
 function transparentPiece(){if(!activePiece)return;activePiece.style.background="transparent";persist(activePiece.closest(".section").id)}
@@ -440,4 +489,4 @@ window.addEventListener("afterprint",()=>{
  });
 });
 
-</script><div id="pieceCustomizer" class="piece-customizer"><div class="pc-title">Customize this piece</div><div class="pc-row"><label>Font</label><select id="pcFont" onchange="applyPieceStyle()"><option value="Arial, sans-serif">Arial</option><option value="Georgia, serif">Book</option><option value="'Comic Sans MS', cursive">Playful</option><option value="'Trebuchet MS', sans-serif">Rounded</option><option value="'Times New Roman', serif">Classic</option></select></div><div class="pc-row"><label>Text</label><input id="pcText" type="color" value="#243746" oninput="applyPieceStyle()"><label>Background</label><input id="pcBg" type="color" value="#fff1b8" oninput="applyPieceStyle()"></div><div class="pc-row"><label>Text size</label><input id="pcFontSize" type="range" min="12" max="42" value="18" oninput="applyPieceStyle()"><span id="pcFontSizeVal">18</span></div><div class="pc-row"><label>Piece width</label><input id="pcWidth" type="range" min="100" max="520" value="220" oninput="applyPieceStyle()"><span id="pcWidthVal">220</span></div><div class="pc-row"><button onclick="transparentPiece()">No background</button><button onclick="resetPieceStyle()">Reset</button><button onclick="closeCustomizer()">Done ✓</button></div></div></body></html>
+</script><div id="pieceCustomizer" class="piece-customizer"><div class="pc-title">Customize this piece</div><div class="pc-row"><label>Font</label><select id="pcFont" onchange="applyPieceStyle()"><option value="Arial, sans-serif">Arial</option><option value="Georgia, serif">Book</option><option value="'Comic Sans MS', cursive">Playful</option><option value="'Trebuchet MS', sans-serif">Rounded</option><option value="'Times New Roman', serif">Classic</option></select></div><div class="pc-row"><label>Text</label><input id="pcText" type="color" value="#243746" oninput="applyPieceStyle()"><label>Background</label><input id="pcBg" type="color" value="#fff1b8" oninput="applyPieceStyle()"></div><div class="pc-row"><label>Text size</label><input id="pcFontSize" type="range" min="12" max="42" value="18" oninput="applyPieceStyle()"><span id="pcFontSizeVal">18</span></div><div class="pc-row"><button onclick="transparentPiece()">No background</button><button onclick="resetPieceStyle()">Reset</button><button onclick="closeCustomizer()">Done ✓</button></div></div></body></html>
