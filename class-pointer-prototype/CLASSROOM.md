@@ -24,6 +24,8 @@ The existing `index.html` practice simulation remains separate.
 
 Teacher and student pages have **Full-screen lesson** above the picture. This expands the entire lesson stage, including pointers, highlights, and spotlight, while hiding the surrounding controls. Click **Exit full screen** in the top-right corner, or press **Escape**, to return. Each person controls their own view. If native browser fullscreen is unavailable, the lesson fills the browser viewport instead. Letterboxing and normalized overlay coordinates update through the existing resize observers. The exit button does not create a pointer or highlight.
 
+While sharing, the teacher also gets **Choose shared area**, **Share full screen**, **Zoom −**, **Zoom +**, and **Move view**. **Choose shared area** opens the original capture and lets the teacher drag a rectangle around the part students should see; the selection keeps the capture's aspect ratio so text is not stretched. The browser renders that selected/zoomed viewport into a new canvas-backed video stream, and that processed stream is what admitted students receive. **Zoom +** moves closer inside the selected area; turn on **Move view** and drag the lesson to pan without placing a teacher pointer or highlight. Changing crop/zoom resets existing pointers and highlights so old marks cannot drift onto different content.
+
 ## Connection design
 
 PeerJS 1.5.5 uses its public signaling service to establish WebRTC data and one-way video connections. Video is sent from the teacher directly to each admitted student. No lesson recording, student camera or student microphone is used. Direct-link names are self-entered; dashboard entry uses the account name. Teacher admission is required. A random join link identifies a temporary session. Refreshing or closing the teacher page ends it.
@@ -38,6 +40,6 @@ References: [PeerJS getting started](https://peerjs.com/client/getting-started),
 
 ## Validation
 
-Run `node --test tests/class-pointer.test.cjs`. Tests cover admission, allow-one/several/everyone/nobody policy, malformed coordinates, letterboxing and resize math, connection-bound identity, forged teacher identity, revocation, disconnect cleanup, bounded highlight payloads, and owner-only undo/clear.
+Run `node --test tests/class-pointer.test.cjs tests/class-pointer-viewport.test.cjs`. Tests cover admission, allow-one/several/everyone/nobody policy, malformed coordinates, letterboxing and resize math, connection-bound identity, forged teacher identity, revocation, disconnect cleanup, bounded highlight payloads, and owner-only undo/clear.
 
 Browser verification uses separate teacher and student tabs, the real PeerJS signaling service, real WebRTC media/data connections, and a synthetic animated teaching-screen stream instead of capturing private desktop content. Same-computer tabs do not prove connectivity from a student's school network.
