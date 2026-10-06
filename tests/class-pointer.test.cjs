@@ -128,3 +128,15 @@ test('highlight messages enforce admission and permission and ignore forged owne
   assert.equal(second.sent.find(message=>message.type==='state').state.sharing,true);
   assert.equal(second.sent.find(message=>message.type==='highlights').strokes[0].owner,'teacher');
  });
+
+test('connection errors distinguish blocked service, expired rooms and unsupported browsers',()=>{
+ const f=teacherFixture();
+ for(const [type,expected] of [['network','0.peerjs.com'],['socket-error','port 443'],['peer-unavailable','new join link'],['browser-incompatible','Chrome or Edge'],['webrtc','WebRTC']]){
+  f.context.peerFailure={type};f.run('peerError(peerFailure)');assert.ok(f.elements.get('error').textContent.includes(expected));
+ }
+});
+test('student connection IDs are generated locally without a server ID request',()=>{
+ const f=teacherFixture();let received;const instance=new EventEmitter();
+ f.context.Peer=function(id){received=id;return instance};f.context.crypto={randomUUID:()=> 'test-uuid'};
+ f.run('makePeer()');assert.equal(received,'class-pointer-student-test-uuid');
+});

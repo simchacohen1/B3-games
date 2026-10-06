@@ -106,12 +106,17 @@ function receiveStudent(connection){
   connection.on('error',()=>{if(member)removeMember(member)});
 }
 function peerError(error){
-  const message=error.type==='peer-unavailable'?'This class is no longer open. Ask your teacher for a new join link.':'The classroom connection failed. Try again; the school network may be blocking it.';
+  const kind=error?.type;
+  const message=kind==='peer-unavailable'?'This class is no longer open. Ask your teacher for a new join link.':
+    ['network','socket-error','socket-closed','server-error'].includes(kind)?'Could not reach the classroom connection service ('+kind+'). Try joining again. If this repeats, ask the school to allow secure WebSocket connections to 0.peerjs.com on port 443.':
+    kind==='webrtc'?'The browser could not connect to the teacher. Ask the school to allow WebRTC connections.':
+    kind==='browser-incompatible'?'This browser does not support the classroom connection. Open this page in Chrome or Edge.':
+    'The classroom connection failed'+(typeof kind==='string'&&/^[a-z-]+$/.test(kind)?' ('+kind+')':'')+'. Try joining again.';
   fail(message);if(!started&&!admitted){if(isTeacher){endClass();fail(message)}else{leaveClass();fail(message)}}
 }
 function makePeer(id){
   if(typeof Peer==='undefined'){fail('The classroom connection library could not load. Refresh or ask the school to allow this page.');return null}
-  const instance=id?new Peer(id):new Peer();instance.on('error',peerError);
+  const instance=new Peer(id||'class-pointer-student-'+crypto.randomUUID());instance.on('error',peerError);
   instance.on('disconnected',()=>{status('Connection service interrupted. Existing lesson connections may still work.');if(!instance.destroyed)instance.reconnect()});return instance;
 }
 async function startClass(){
