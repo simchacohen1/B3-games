@@ -1,27 +1,62 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Halacha — Student Work</title>
 <style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#eef4f8;color:#203040}header{background:#173b62;color:#fff;padding:16px 22px}main{max-width:1100px;margin:auto;padding:20px}.status{padding:12px;background:#fff;border-radius:12px;margin-bottom:15px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}.card{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 14px #0001}.card h3{margin:0 0 6px}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#e5f5e7;color:#25612f;font-size:12px;font-weight:bold}.empty{color:#718096}.card button{margin-top:12px;border:0;border-radius:9px;padding:9px 12px;background:#173b62;color:white;font-weight:bold;cursor:pointer}</style>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script src="../firebase-config.js"></script></head>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script src="../firebase-config.js"></script><script src="../site-settings.js?v=20261006-halacha-teacher-auth"></script></head>
 <body><header><h1>📔 Halacha — Student Work</h1></header><main><div id=status class=status>Checking teacher access…</div><div id=grid class=grid></div></main>
 <script>
-if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);const db=firebase.database(),auth=firebase.auth();
+if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+const db=firebase.database();
+const settingsApi=window.B3SiteSettings;
+const workspaceId=settingsApi?.workspaceId||"b3-2026";
+const statusEl=document.getElementById("status"),grid=document.getElementById("grid");
 function esc(s){return String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function doneCount(st){return ["a","b","c","d","e"].filter(x=>st&&st[x+"_done"]).length}
-async function load(){
- const u=auth.currentUser;if(!u){status.textContent="Please open this from the signed-in Teacher Tools area.";return}
- status.textContent="Loading student Halacha books…";
+async function classMembers(classId){
+ const snap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members").once("value");
+ return Object.entries(snap.val()||{}).filter(([,m])=>!m||m.active!==false).map(([id,m])=>({id,name:String(m?.name||id),classId}));
+}
+async function authorizedRoster(access){
+ if(access?.role==="admin"){
+  const classesSnap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");
+  const classIds=Object.entries(classesSnap.val()||{}).filter(([,row])=>row?.active!==false).map(([id])=>id);
+  const groups=await Promise.all(classIds.map(classMembers));
+  const unique=new Map();groups.flat().forEach(x=>{if(!unique.has(x.id))unique.set(x.id,x)});
+  return [...unique.values()].sort((a,b)=>a.name.localeCompare(b.name));
+ }
+ const ids=(access?.classIds||[]).filter(Boolean);
+ const groups=await Promise.all(ids.map(classMembers));
+ const unique=new Map();groups.flat().forEach(x=>{if(!unique.has(x.id))unique.set(x.id,x)});
+ return [...unique.values()].sort((a,b)=>a.name.localeCompare(b.name));
+}
+async function loadForAccess(user,authorized,access){
+ if(!user){statusEl.textContent="Please sign in from the Fun Torah Tools Teacher area first.";grid.innerHTML="";return}
+ if(!authorized){statusEl.textContent="This Google account is not authorized for Teacher Tools.";grid.innerHTML="";return}
+ statusEl.textContent="Loading student Halacha books…";
  try{
-  const [ts,ss]=await Promise.all([db.ref("b3Games/teachers/"+u.uid).once("value"),db.ref("b3Games/students").once("value")]);
-  const teacher=ts.val()||{}, students=ss.val()||{}; grid.innerHTML="";
-  const cards=[];
-  Object.entries(students).forEach(([id,s])=>{
-    const h=s&&s.halacha&&s.halacha.siman1;if(!h||!h.state)return;
-    const n=doneCount(h.state),updated=h.updatedAt?new Date(h.updatedAt).toLocaleString():"";
-    cards.push('<div class="card"><h3>'+esc(s.name||s.displayName||id)+'</h3><span class="pill">'+n+' / 5 sections started/completed</span><p>'+(updated?'Last saved: '+esc(updated):'Saved work available')+'</p><button onclick="openStudent(\''+esc(id)+'\')">Open scrapbook</button></div>');
+  const roster=await authorizedRoster(access||{});
+  const rows=await Promise.all(roster.map(async s=>{
+   try{
+    const snap=await db.ref("b3Games/students/"+s.id+"/halacha/siman1").once("value");
+    return {...s,halacha:snap.val()};
+   }catch(e){console.warn("Could not read Halacha for",s.id,e);return {...s,halacha:null}}
+  }));
+  const cards=rows.filter(s=>s.halacha&&s.halacha.state).map(s=>{
+    const h=s.halacha,n=doneCount(h.state),updated=h.updatedAt?new Date(h.updatedAt).toLocaleString():"";
+    return '<div class="card"><h3>'+esc(s.name)+'</h3><span class="pill">'+n+' / 5 sections started/completed</span><p>'+(updated?'Last saved: '+esc(updated):'Saved work available')+'</p><button type="button" data-open-student="'+esc(s.id)+'">Open scrapbook</button></div>';
   });
   grid.innerHTML=cards.join("")||'<div class="card empty">No student Halacha work has been saved yet.</div>';
-  status.textContent="Student work — "+cards.length+" scrapbook"+(cards.length===1?"":"s");
- }catch(e){console.error(e);status.textContent="Could not load student work. Teacher access may need Firebase permission."}
+  statusEl.textContent="Student work — "+cards.length+" scrapbook"+(cards.length===1?"":"s")+" · "+roster.length+" students checked";
+  grid.querySelectorAll("[data-open-student]").forEach(btn=>btn.onclick=()=>openStudent(btn.dataset.openStudent));
+ }catch(e){
+  console.error(e);
+  statusEl.textContent="Could not load student work: "+(e.message||"teacher access error");
+  grid.innerHTML="";
+ }
 }
 function openStudent(id){sessionStorage.setItem("halachaTeacherViewStudent",id);location.href="index.html?teacherView="+encodeURIComponent(id)}
-auth.onAuthStateChanged(load);
+if(settingsApi&&typeof settingsApi.onAuthStateChanged==="function"){
+ settingsApi.onAuthStateChanged(loadForAccess);
+}else{
+ statusEl.textContent="Teacher access could not start. Please refresh the page.";
+}
+setTimeout(()=>{if(statusEl.textContent==="Checking teacher access…")statusEl.textContent="Teacher sign-in is taking too long. Refresh this page from Fun Torah Tools.";},8000);
 </script></body></html>
