@@ -1,8 +1,8 @@
 (function(root){
   'use strict';
   const colors=['#57b8ff','#ff7979','#75df9a','#dca0ff','#ffa65c','#7ce4dc'];
-  const tools=['target','arrow','star'];
-  const highlightTools=['highlight','underline','box'];
+  const tools=['target','arrow','star','heart','paw','sparkle'];
+  const highlightTools=['highlight','pencil','crayon','underline','box'];
   function cleanStroke(value){
     if(!value||!highlightTools.includes(value.tool)||!Array.isArray(value.points)||value.points.length<2||value.points.length>256||!value.points.every(validPoint))return null;
     return{tool:value.tool,color:pointStyle(value).color||'#ffcc00',size:[0.008,0.016,0.028].includes(value.size)?value.size:0.016,points:value.points.map(({x,y})=>({x,y}))};
