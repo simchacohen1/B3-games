@@ -215,8 +215,38 @@ function activeClassGoalsHTML(){
   if(!active.length)return '';
   return `<section class="active-class-goals"><div class="active-class-goals-head"><div><p class="eyebrow">YOUR CLASS IS WORKING TOWARD</p><h2>Class Reward Goals</h2><p>Add some of your points if you want to help the class reach a goal.</p></div><button class="secondary" id="openClassRewards">See all class rewards →</button></div><div class="active-class-goal-grid">${active.map(g=>classGoalCard(g,{compact:true})).join('')}</div></section>`;
 }
+function captureContributionForms(){
+  return [...document.querySelectorAll('[data-class-contribute]')].map(button=>{
+    const input=document.getElementById(button.dataset.input),card=button.closest('.class-goal-card');
+    return {inputId:button.dataset.input,value:input?.value||'',focused:document.activeElement===input,
+      modes:[...(card?.querySelectorAll('[data-gimkit-mode]:checked')||[])].map(box=>box.dataset.gimkitMode),
+      focusedMode:document.activeElement?.closest('.class-goal-card')===card?document.activeElement?.dataset.gimkitMode:null};
+  });
+}
+function restoreContributionForms(forms){
+  for(const draft of forms){
+    const input=document.getElementById(draft.inputId);
+    if(!input)continue;
+    input.value=draft.value;
+    if(draft.focused&&!input.disabled)input.focus({preventScroll:true});
+    const card=input.closest('.class-goal-card');
+    card?.querySelectorAll('[data-gimkit-mode]').forEach(box=>{
+      box.checked=draft.modes.includes(box.dataset.gimkitMode);
+      if(draft.focusedMode===box.dataset.gimkitMode&&!box.disabled)box.focus({preventScroll:true});
+    });
+  }
+}
+function clearContributionForms(rewardId){
+  document.querySelectorAll('[data-class-contribute]').forEach(button=>{
+    if(button.dataset.classContribute!==rewardId)return;
+    const input=document.getElementById(button.dataset.input);
+    if(input)input.value='';
+    button.closest('.class-goal-card')?.querySelectorAll('[data-gimkit-mode]').forEach(box=>{box.checked=false});
+  });
+}
 function render(){
   if(!state.student||!state.root)return;
+  const contributionForms=captureContributionForms();
   $('#loginView').classList.add('hidden');
   $('#blockedView').classList.add('hidden');
   $('#portalView').classList.remove('hidden');
@@ -227,6 +257,7 @@ function render(){
   if($('#openClassRewards'))$('#openClassRewards').onclick=()=>{state.tab='Rewards';render()};
   bindClassContributionButtons();
   renderTab();
+  restoreContributionForms(contributionForms);
 }
 function renderTab(){
   const box=$('#studentTab');
@@ -317,6 +348,7 @@ async function contributeClassReward(rewardId,inputId,buttonEl){
   state.busy=true;render();
   try{
     const j=await classRewardsApi('contribute-class-reward',{classRewardId:rewardId,amount,modeIds});
+    clearContributionForms(rewardId);
     if(j.goal)state.classGoals=(state.classGoals||[]).map(g=>g.rewardId===rewardId?j.goal:g);
     else {const status=await loadClassRewardStatus();state.classGoals=status.goals;state.storeOpen=status.storeOpen;}
     if(Number.isFinite(Number(j.balance))){state.student.rewardBalance=Number(j.balance);if(state.root?.student)state.root.student.rewardBalance=Number(j.balance)}

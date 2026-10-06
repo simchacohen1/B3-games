@@ -1379,13 +1379,13 @@ async function ensureRewardsSignedIn(){
   const auth=ensureRewardsClient();if(auth.currentUser)return auth.currentUser;
   const id=presenceStudentId,name=presenceProfile?.name||localStorage.getItem('b3Games_studentName')||'',pin=localStorage.getItem('b3Games_classPin')||'';
   if(!id||!name||!pin)throw new Error('Sign in through Fun Torah Tools first so your points can be connected.');
-  const r=await fetch(TAG_REWARDS_LOGIN_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({b3StudentId:id,name,pin})});
+  const r=await fetch(TAG_REWARDS_LOGIN_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({b3StudentId:id,name,pin,classId:galleryClassId})});
   const j=await r.json().catch(()=>({}));if(!r.ok||!j.customToken)throw new Error(j.error||'Could not connect your points.');
   await auth.signInWithCustomToken(j.customToken);return auth.currentUser;
 }
 async function callPowerApi(body){
   const user=await ensureRewardsSignedIn(),token=await user.getIdToken();
-  const r=await fetch(TAG_POWER_API,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({b3StudentId:presenceStudentId,...body})});
+  const r=await fetch(TAG_POWER_API,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({b3StudentId:presenceStudentId,classId:galleryClassId,mode:tagMode,...body})});
   const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Could not use that power right now.');return j;
 }
 async function refreshPowerAccount(){
@@ -2203,24 +2203,6 @@ function buildPowerEffectUpdates(powerId,targetStudentId,tokenPrefix){
   else if(powerId==='freeze'&&targetStudentId){u['effects/'+targetStudentId+'/frozenUntil']=now+3000;u['effects/'+targetStudentId+'/frozenBy']=me;}
   return u;
 }
-function buildRegularCleanupUpdates(powerId,targetStudentId){
-  const me=currentTagStudentKey(),u={};
-  if(powerId==='speed')u['effects/'+me+'/speedUntil']=null;
-  else if(powerId==='invisible')u['effects/'+me+'/invisibleUntil']=null;
-  else if(powerId==='shield')u['effects/'+me+'/shieldUntil']=null;
-  else if(powerId==='dash'){u['effects/'+me+'/dashToken']=null;u['effects/'+me+'/dashAt']=null;}
-  else if(powerId==='teleport'){u['effects/'+me+'/teleportToken']=null;u['effects/'+me+'/teleportAt']=null;}
-  else if(powerId==='freeze'&&targetStudentId){u['effects/'+targetStudentId+'/frozenUntil']=null;u['effects/'+targetStudentId+'/frozenBy']=null;}
-  return u;
-}
-async function activateManhuntPowerAfterCharge(powerId,targetStudentId){
-  if(tagMode!=='manhunt'||!tagClassRef)return;
-  await tagClassRef.update(buildPowerEffectUpdates(powerId,targetStudentId,'manhunt'));
-  if(tagRoot){
-    const cleanup=buildRegularCleanupUpdates(powerId,targetStudentId);
-    if(Object.keys(cleanup).length)await tagRoot.child('all').update(cleanup).catch(()=>{});
-  }
-}
 renderPowerShop=function(){
   const grid=document.getElementById('powerGrid'),bal=document.getElementById('powerBalance'),spend=document.getElementById('powerSpendText'),fill=document.getElementById('powerSpendFill'),note=document.getElementById('powerShopNote');
   const title=document.getElementById('powerShopTitle'),sub=document.getElementById('powerShopSub');
@@ -2272,8 +2254,9 @@ buyTagPower=async function(powerId){
       powerBalance=Number(j.balance||0);
       powerSpent=Number(j.spent||0);
       powerCooldownUntil=Number(j.cooldownUntil||0);
-      if(tagMode==='manhunt')await activateManhuntPowerAfterCharge(powerId,target?.id||'');
+
     }
+    closePowerShop();
     note.textContent=p.icon+' '+p.name+' activated!';
     showTagPop(p.icon+' '+p.name+'!');
   }catch(err){

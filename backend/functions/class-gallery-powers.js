@@ -13,7 +13,6 @@ if (!admin.apps.length) admin.initializeApp();
 const rtdb = admin.database();
 
 const SR_ROOT = 'studentRewards';
-const TAG_ROOT = 'b3Games/classGalleryTag/all';
 const PRESENCE_ROOT = 'b3Games/classGalleryPresence';
 const TAG_ENABLED_PATH = 'b3Games/classGalleryPresenceSettings/tagEnabled';
 const SPEND_CAP = 12;
@@ -75,7 +74,13 @@ async function resolveRewardStudentId(b3StudentId){
   return match;
 }
 
-async function verifyIdentity(authStudentId,b3StudentId){
+async function verifyIdentity(authStudentId,b3StudentId,decoded){
+  if(decoded.b3StudentId){
+    if(decoded.b3StudentId!==b3StudentId)return {ok:false,error:'The B3 login does not match this points account.'};
+    const profile=(await rtdb.ref(`b3Games/students/${b3StudentId}/profile`).get()).val();
+    if(profile?.active===false)return {ok:false,error:'This student account is inactive.'};
+    return {ok:true,rewardStudentId:authStudentId,studentName:profile?.name||b3StudentId};
+  }
   if(!b3StudentId) return {ok:false,error:'Could not identify your B3 account.'};
   const allowed=await rtdb.ref(`posukPractice/allowedStudents/${b3StudentId}`).get();
   if(!allowed.exists()) return {ok:false,error:'This B3 student is not approved.'};
@@ -85,10 +90,10 @@ async function verifyIdentity(authStudentId,b3StudentId){
   return {ok:true,rewardStudentId,studentName:allowed.val()?.name||b3StudentId};
 }
 
-async function latestPresence(studentId){
-  const root=await rtdb.ref(PRESENCE_ROOT).get();
+async function latestPresence(studentId,context={presenceRoot:PRESENCE_ROOT,classes:['et','wt','all']}){
+  const root=await rtdb.ref(context.presenceRoot).get();
   let best=null;
-  ['et','wt','all'].forEach(classId=>{
+  context.classes.forEach(classId=>{
     const sessions=root.child(`${classId}/${studentId}`).val()||{};
     Object.values(sessions).forEach(row=>{
       if(!row||typeof row!=='object') return;
@@ -101,9 +106,9 @@ async function latestPresence(studentId){
   return best;
 }
 
-async function verifyPlayingTag(b3StudentId){
-  const p=await latestPresence(b3StudentId);
-  if(!p || p.playingTag!==true || p.space!=='hallway') return {ok:false,error:'Join Tag in the main hallway before buying a power.'};
+async function verifyPlayingTag(b3StudentId,context){
+  const p=await latestPresence(b3StudentId,context);
+  if(!p || p.playingTag!==true || p.space!=='hallway'||(p.tagMode==='manhunt'?'manhunt':'regular')!==context.mode) return {ok:false,error:'Join Tag in the main hallway before buying a power.'};
   return {ok:true,presence:p};
 }
 
@@ -115,8 +120,8 @@ async function rollbackSpend(spendRef,purchaseId,cost){
   }).catch(err=>console.warn('Could not roll back Tag power spend reservation',err));
 }
 
-async function applyEffect({powerId,b3StudentId,targetStudentId,purchaseId,now}){
-  const effectsRef=rtdb.ref(`${TAG_ROOT}/effects`);
+async function applyEffect({powerId,b3StudentId,targetStudentId,purchaseId,now,context}){
+  const effectsRef=rtdb.ref(`${context.tagRoot}/effects`);
   if(powerId==='speed'){
     await effectsRef.child(b3StudentId).update({speedUntil:now+POWERS.speed.durationMs,lastPower:'speed',lastPowerAt:now});
     return {effectUntil:now+POWERS.speed.durationMs};
@@ -140,9 +145,9 @@ async function applyEffect({powerId,b3StudentId,targetStudentId,purchaseId,now})
   if(powerId==='freeze'){
     if(!targetStudentId || targetStudentId===b3StudentId) throw new Error('Choose a nearby classmate to freeze.');
     const [buyer,target,allowedTarget]=await Promise.all([
-      latestPresence(b3StudentId),
-      latestPresence(targetStudentId),
-      rtdb.ref(`posukPractice/allowedStudents/${targetStudentId}`).get()
+      latestPresence(b3StudentId,context),
+      latestPresence(targetStudentId,context),
+      rtdb.ref(context.legacy?`posukPractice/allowedStudents/${targetStudentId}`:`b3Games/students/${targetStudentId}/profile`).get()
     ]);
     if(!allowedTarget.exists() || !buyer || !target || buyer.playingTag!==true || target.playingTag!==true || buyer.space!=='hallway' || target.space!=='hallway'){
       throw new Error('That classmate is not available to freeze right now.');
@@ -189,13 +194,24 @@ exports.classGalleryPowerPurchase=onRequest(
       const body=req.body||{};
       const action=String(body.action||'balance').trim();
       const b3StudentId=String(body.b3StudentId||'').trim();
-      const identity=await verifyIdentity(student.studentId,b3StudentId);
+      const identity=await verifyIdentity(student.studentId,b3StudentId,student.decoded);
       if(!identity.ok) return res.status(403).json({error:identity.error});
       const rewardStudentId=identity.rewardStudentId;
+      const mode=body.mode==='manhunt'?'manhunt':'regular';
+      const classId=String(body.classId||student.decoded.b3ClassId||'et');
+      if(!/^[A-Za-z0-9_-]{1,100}$/.test(classId))return res.status(400).json({error:'Invalid class.'});
+      const legacy=['et','wt'].includes(classId);
+      const resourceRoot='b3Games/workspaces/b3-2026/classes/'+classId+'/resources/gallery';
+      if(!legacy){
+        const cls=(await rtdb.ref('b3Games/workspaces/b3-2026/classes/'+classId).get()).val();
+        if(!cls||cls.active===false||!cls.members?.[b3StudentId]||cls.members[b3StudentId].active===false)return res.status(403).json({error:'This class is not available to your account.'});
+      }
+      const context={mode,legacy,presenceRoot:legacy?PRESENCE_ROOT:resourceRoot+'/presence',classes:legacy?['et','wt','all']:[classId],tagRoot:legacy?'b3Games/classGalleryTag/'+(mode==='manhunt'?'manhunt':'all'):resourceRoot+'/tag/'+(mode==='manhunt'?'manhunt_':'class_')+classId,enabledPath:legacy?TAG_ENABLED_PATH:resourceRoot+'/settings/tagEnabled'};
+
 
       const [balanceSnap,spendSnap]=await Promise.all([
         rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`).get(),
-        rtdb.ref(`${TAG_ROOT}/powerSpend/${b3StudentId}`).get()
+        rtdb.ref(`${context.tagRoot}/powerSpend/${b3StudentId}`).get()
       ]);
       const currentBalance=num(balanceSnap.val());
       const currentSpend=spendSnap.val()||{};
@@ -209,13 +225,17 @@ exports.classGalleryPowerPurchase=onRequest(
       const powerId=String(body.powerId||'').trim();
       const power=POWERS[powerId];
       if(!power) return res.status(400).json({error:'That power is not available.'});
-      const tagEnabled=await rtdb.ref(TAG_ENABLED_PATH).get();
+      const tagEnabled=await rtdb.ref(context.enabledPath).get();
       if(tagEnabled.val()!==true) return res.status(409).json({error:'Tag is not turned on right now.'});
-      const playing=await verifyPlayingTag(b3StudentId);
+      const playing=await verifyPlayingTag(b3StudentId,context);
       if(!playing.ok) return res.status(409).json({error:playing.error});
 
+      if(mode==='manhunt'){
+        const hunter=(await rtdb.ref(context.tagRoot+'/hunters/'+b3StudentId).get()).val();
+        if(!(hunter?['speed','dash','freeze']:['speed','dash','invisible']).includes(powerId))return res.status(409).json({error:'That power is not available for your Manhunt role.'});
+      }
       const now=Date.now();
-      const selfEffects=(await rtdb.ref(`${TAG_ROOT}/effects/${b3StudentId}`).get()).val()||{};
+      const selfEffects=(await rtdb.ref(`${context.tagRoot}/effects/${b3StudentId}`).get()).val()||{};
       const selfTimedActive=['speedUntil','invisibleUntil','shieldUntil'].some(k=>num(selfEffects[k])>now);
       if(selfTimedActive && ['speed','invisible','shield'].includes(powerId)){
         return res.status(409).json({error:'Wait until your current power ends before starting another timed power.'});
@@ -225,13 +245,15 @@ exports.classGalleryPowerPurchase=onRequest(
       if(powerId==='freeze'){
         if(!targetStudentId) return res.status(409).json({error:'Get closer to another player before using Freeze.'});
         // Validate distance before charging points.
-        const [buyer,target]=await Promise.all([latestPresence(b3StudentId),latestPresence(targetStudentId)]);
+        const [buyer,target]=await Promise.all([latestPresence(b3StudentId,context),latestPresence(targetStudentId,context)]);
         if(!buyer||!target||buyer.playingTag!==true||target.playingTag!==true||buyer.space!=='hallway'||target.space!=='hallway') return res.status(409).json({error:'That classmate is not available to freeze right now.'});
+        if((target.tagMode==='manhunt'?'manhunt':'regular')!==mode)return res.status(409).json({error:'That classmate is playing a different game.'});
+        if(mode==='manhunt'&&(await rtdb.ref(context.tagRoot+'/hunters/'+targetStudentId).get()).val())return res.status(409).json({error:'Choose a runner to freeze.'});
         if(Math.hypot(num(target.x)-num(buyer.x),num(target.z)-num(buyer.z))>5.8) return res.status(409).json({error:'Get closer to that classmate before using Freeze.'});
       }else targetStudentId='';
 
       const purchaseId=safeKey(`${now}_${Math.random().toString(36).slice(2,10)}`);
-      const spendRef=rtdb.ref(`${TAG_ROOT}/powerSpend/${b3StudentId}`);
+      const spendRef=rtdb.ref(`${context.tagRoot}/powerSpend/${b3StudentId}`);
       let reserveError='';
       const reserve=await spendRef.transaction(cur=>{
         cur=cur||{};
@@ -258,7 +280,7 @@ exports.classGalleryPowerPurchase=onRequest(
 
       let effectResult;
       try{
-        effectResult=await applyEffect({powerId,b3StudentId,targetStudentId,purchaseId,now});
+        effectResult=await applyEffect({powerId,b3StudentId,targetStudentId,purchaseId,now,context});
         await writePurchaseHistory({purchaseId,powerId,power,rewardStudentId,b3StudentId,studentName:identity.studentName,balanceAfter,spent,now,targetStudentId:effectResult.targetStudentId||targetStudentId});
       }catch(err){
         console.error('Could not apply Tag power after charge',err);
