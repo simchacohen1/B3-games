@@ -77,7 +77,7 @@ function favorTextDetail(call){
     const sender=pc.getSenders().find(item=>item.track?.kind==='video');if(!sender?.getParameters||!sender?.setParameters)return;
     try{
       const parameters=sender.getParameters();parameters.degradationPreference='maintain-resolution';
-      if(parameters.encodings?.length)parameters.encodings.forEach(encoding=>{encoding.maxFramerate=10;if(!encoding.scaleResolutionDownBy||encoding.scaleResolutionDownBy>1)encoding.scaleResolutionDownBy=1});
+      if(parameters.encodings?.length)parameters.encodings.forEach(encoding=>{encoding.maxFramerate=8;if(!encoding.scaleResolutionDownBy||encoding.scaleResolutionDownBy>1)encoding.scaleResolutionDownBy=1});
       sender.setParameters(parameters).catch(()=>{});
     }catch{}
   };
@@ -159,7 +159,7 @@ async function shareScreen(){
   clearError();if(!navigator.mediaDevices?.getDisplayMedia){fail('Use Chrome or Edge on a computer to share your teaching screen.');return}
   $('shareScreen').disabled=true;const currentPeer=peer;let captured=null,processor=null,outgoing=null;
   try{
-    captured=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:2560},height:{ideal:1440},frameRate:{ideal:10,max:12}},audio:false});
+    captured=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:2560},height:{ideal:1440},frameRate:{ideal:8,max:10}},audio:false});
     if(peer!==currentPeer||!started){captured.getTracks().forEach(track=>track.stop());return}
     if(window.ClassPointerViewport?.create){
       processor=await window.ClassPointerViewport.create({rawStream:captured,stage:$('stage'),lesson:$('lesson'),onBeforeViewChange:resetOverlaysForViewChange,onStatus:status,onError:fail});
