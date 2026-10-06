@@ -67,7 +67,14 @@ body:not(.teacher-mode) .teacher-source-panel,body:not(.teacher-mode) .teacher-s
  html,body{background:#fff!important;overflow:visible!important;height:auto!important}
  body *{visibility:hidden!important}
  .print-target,.print-target *{visibility:visible!important}
- .print-target{display:block!important;position:absolute!important;left:0!important;top:0!important;width:100%!important}
+ .section:not(.print-target){display:none!important}
+ .print-target{display:block!important;position:relative!important;left:0!important;top:0!important;width:100%!important;break-after:page;page-break-after:always}
+ .print-target:last-of-type{break-after:auto;page-break-after:auto}
+ .print-target .side{display:none!important}
+ .print-target .work{display:block!important}
+ .print-target .book{background:none!important;padding:0!important;box-shadow:none!important}
+ .print-target .print-title{display:block!important;font:800 16px Arial,sans-serif;margin:0 0 6px}
+ #exportDlg{display:none!important}
  .print-target .spread{display:flex!important;position:relative!important;width:100%!important;min-height:7in!important;
  margin:0!important;gap:10px!important;box-shadow:none!important;overflow:visible!important}
  .print-target .page{display:block!important;position:relative!important;width:50%!important;flex:1 1 50%!important;
@@ -81,8 +88,23 @@ body:not(.teacher-mode) .teacher-source-panel,body:not(.teacher-mode) .teacher-s
  .print-target .activityBoard,.print-target .tray,.print-target .page-tools,.print-target .mini,
  header,.tabs,.teacher-source-panel,.teacher-source-toggle,#pieceCustomizer,button{display:none!important}
  .print-target .scrap.selected{outline:none!important}
+ .print-target .resize-handle,.print-target .tb-move{display:none!important}
+ .print-target .scrap.clear{border-color:transparent!important}
 }
 
+.print-title{display:none}
+#exportDlg{position:fixed;inset:0;background:#0006;z-index:1000;display:none;align-items:center;justify-content:center;padding:16px}
+#exportDlg.show{display:flex}
+#exportDlg .box{background:#fff;border-radius:16px;padding:18px;max-width:420px;width:100%;box-shadow:0 10px 40px #0004}
+#exportDlg h3{margin:0 0 10px}
+#exportDlg label{display:flex;gap:8px;align-items:center;padding:6px 4px;font-weight:700;cursor:pointer}
+#exportDlg .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+#exportDlg .row button{flex:1;border:0;border-radius:10px;padding:10px;font-weight:800;cursor:pointer;background:#173b62;color:#fff}
+#exportDlg .row button.ghost{background:#eef3f7;color:#173b62}
+#exportDlg .msg{min-height:20px;margin-top:8px;font-weight:700;color:#173b62}
+body.exporting .page-tools,body.exporting .activityBoard,body.exporting .mini,body.exporting .resize-handle,body.exporting .tb-move{display:none!important}
+body.exporting .scrap.selected{outline:none!important}
+body.exporting .scrap.clear{border-color:transparent!important}
 .scrap.textbox .tb-text{min-height:60px;outline:none;user-select:text;-webkit-user-select:text;cursor:text;white-space:pre-wrap;overflow-wrap:anywhere}.tb-text:empty:before{content:attr(data-ph);opacity:.5}.tb-move{font-size:11px;font-weight:800;opacity:.6;cursor:move;margin:-4px 0 4px;user-select:none}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -90,7 +112,7 @@ body:not(.teacher-mode) .teacher-source-panel,body:not(.teacher-mode) .teacher-s
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="../firebase-config.js"></script>
 <script src="../site-settings.js?v=20261006-halacha-mode"></script>
-</head><body><header><div class=bar><h1 id="halachaTitle">📔 My Halacha Scrapbook — סימן א</h1><button id="studentModeBtn" onclick="setHalachaMode(false)">Student</button><button id="teacherModeBtn" style="display:none;background:#fff3bf;color:#5c4300" onclick="setHalachaMode(true)">👨‍🏫 Teacher</button><button onclick="printScrapbook()">Print / PDF</button><span id="cloudSaveStatus" style="font-size:12px;font-weight:800;opacity:.9">Saving on this device</span></div></header><main><div id=tabs class=tabs></div><div id=sections></div><div id=review class="section teacherOnly"></div></main><script>
+</head><body><header><div class=bar><h1 id="halachaTitle">📔 My Halacha Scrapbook — סימן א</h1><button id="studentModeBtn" onclick="setHalachaMode(false)">Student</button><button id="teacherModeBtn" style="display:none;background:#fff3bf;color:#5c4300" onclick="setHalachaMode(true)">👨‍🏫 Teacher</button><button onclick="openExport()">Print / PDF / Slides</button><span id="cloudSaveStatus" style="font-size:12px;font-weight:800;opacity:.9">Saving on this device</span></div></header><main><div id=tabs class=tabs></div><div id=sections></div><div id=review class="section teacherOnly"></div></main><script>
 const lessons=[
 {id:"a",tab:"1 · שויתי",title:"שויתי ה׳ לנגדי תמיד",seif:"סעיף א",objective:"Develop a constant awareness that Hashem is always present, which shapes one’s behavior in public and in private.",source:"שויתי ה׳ לנגדי תמיד · הכרה תמידית בהשגחת ה׳",qs:["What is the meaning of שויתי ה׳ לנגדי תמיד?","Why is it important to remember Hashem is always with us?","How does this awareness affect how we speak and behave?"],type:"choices",pieces:[["he","שויתי ה׳ לנגדי תמיד"],["text","I remember Hashem wherever I am"],["sticker","🏠"],["sticker","🏫"],["sticker","💬"]]},
 {id:"b",tab:"2 · מודה אני",title:"מודה אני — השבת הנשמה",seif:"סעיף ב",objective:"Understand the importance of thanking Hashem for returning one’s נשמה each morning and how to express it through מודה אני.",source:"אמירת מודה אני והכרת הטוב עם הקימה",qs:["What should a person think about as soon as he wakes up?","Why is it permitted to say מודה אני even before נטילת ידים?","What is the proper pause when saying מודה אני?"],type:"sequence",pieces:[["sticker","🌅"],["text","Thank You for returning my נשמה"],["sticker","💛"]]},
@@ -543,6 +565,40 @@ document.addEventListener("pointerdown",ev=>{
 document.addEventListener("pointermove",()=>clearTimeout(window._pcTimer));
 
 
+function currentSectionId(){let sec=[...document.querySelectorAll(".section")].find(x=>x.classList.contains("on"))||document.querySelector(".section");return sec?sec.id:null}
+function openExport(){closeCustomizer();let cur=currentSectionId();document.getElementById("expList").innerHTML=lessons.map(l=>`<label><input type="checkbox" class="expSec" value="${l.id}" ${l.id===cur?"checked":""} onchange="document.getElementById('expAll').checked=[...document.querySelectorAll('.expSec')].every(c=>c.checked)"> ${l.tab}</label>`).join("");document.getElementById("expAll").checked=false;document.getElementById("expMsg").textContent="";document.getElementById("exportDlg").classList.add("show")}
+function closeExport(){document.getElementById("exportDlg").classList.remove("show")}
+function selectedSections(){let ids=[...document.querySelectorAll(".expSec:checked")].map(c=>c.value);if(!ids.length){document.getElementById("expMsg").textContent="Pick at least one section.";return null}return ids}
+function drawingImage(id,idx){let c=document.querySelectorAll("#"+id+" .draw-layer")[idx];let saved=(S[id+"_draw"]||[])[idx];try{if(c&&c.width&&c._w)return c.toDataURL("image/png")}catch(e){}return saved||""}
+function addPrintTitles(ids){ids.forEach(id=>{let sec=document.getElementById(id),l=lessons.find(x=>x.id===id);if(sec&&!sec.querySelector(".print-title")){let t=document.createElement("div");t.className="print-title";t.textContent=(l?l.title:"");t.dir="rtl";t.style.textAlign="right";sec.insertBefore(t,sec.firstChild)}})}
+function printSelected(){let ids=selectedSections();if(!ids)return;closeExport();
+ document.querySelectorAll(".section").forEach(x=>x.classList.remove("print-target"));
+ addPrintTitles(ids);
+ ids.forEach(id=>{let sec=document.getElementById(id);sec.classList.add("print-target");sec.querySelectorAll(".draw-layer").forEach((c,i)=>{c.dataset.prePrintBg=c.style.backgroundImage||"";let img=drawingImage(id,i);if(img){c.style.backgroundImage=`url("${img}")`;c.style.backgroundSize="100% 100%";c.style.backgroundRepeat="no-repeat"}})});
+ setTimeout(()=>window.print(),250)}
+function loadScriptOnce(src){return new Promise((res,rej)=>{if(document.querySelector('script[src="'+src+'"]'))return res();let s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>rej(new Error("Could not load "+src));document.head.appendChild(s)})}
+async function exportSlides(){let ids=selectedSections();if(!ids)return;let msg=document.getElementById("expMsg"),back=currentSectionId();
+ try{msg.textContent="Preparing slides…";
+  await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
+  await loadScriptOnce("https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js");
+  let pptx=new PptxGenJS();pptx.layout="LAYOUT_WIDE";pptx.title="My Halacha Scrapbook";
+  document.body.classList.add("exporting");
+  for(let n=0;n<ids.length;n++){let id=ids[n],l=lessons.find(x=>x.id===id);msg.textContent=`Making slide ${n+1} of ${ids.length}…`;
+   show(id);await new Promise(r=>setTimeout(r,250));
+   let pages=[...document.querySelectorAll("#"+id+" .page")],shots=[];
+   for(let i=0;i<pages.length;i++){let pg=pages[i],c=pg.querySelector(".draw-layer"),img=drawingImage(id,i),prev=c?c.style.backgroundImage:"";
+    if(c&&img&&!c.width){c.style.backgroundImage=`url("${img}")`;c.style.backgroundSize="100% 100%"}
+    let cv=await html2canvas(pg,{scale:2,useCORS:true,backgroundColor:null,logging:false});if(c)c.style.backgroundImage=prev;
+    shots.push({data:cv.toDataURL("image/png"),w:cv.width,h:cv.height})}
+   let slide=pptx.addSlide();slide.background={color:"976442"};
+   slide.addText((l?l.title:id),{x:0.3,y:0.1,w:12.7,h:0.5,fontSize:22,bold:true,color:"FFFFFF",fontFace:"Arial",align:"right",rtlMode:true});
+   let top=0.7,maxH=7.5-top-0.2,gap=0.2,availW=13.333-0.6,count=shots.length;
+   let scale=Math.min(...shots.map(sh=>maxH/(sh.h/96)),(availW-gap*(count-1))/shots.reduce((a,sh)=>a+sh.w/96,0));
+   let totalW=shots.reduce((a,sh)=>a+sh.w/96*scale,0)+gap*(count-1),x=(13.333-totalW)/2;
+   shots.forEach(sh=>{let w=sh.w/96*scale,h=sh.h/96*scale;slide.addImage({data:sh.data,x,y:top,w,h});x+=w+gap})}
+  document.body.classList.remove("exporting");if(back)show(back);
+  msg.textContent="Downloading…";await pptx.writeFile({fileName:"Halacha Scrapbook.pptx"});msg.textContent="✓ Downloaded. Upload it to Google Drive and open with Google Slides.";
+ }catch(e){console.warn("Slides export failed",e);document.body.classList.remove("exporting");if(back)show(back);msg.textContent="Sorry — the slides could not be made. Check your internet connection and try again."}}
 function printScrapbook(){
  closeCustomizer();
  document.querySelectorAll(".section").forEach(x=>x.classList.remove("print-target"));
@@ -569,4 +625,4 @@ window.addEventListener("afterprint",()=>{
  });
 });
 
-</script><div id="pieceCustomizer" class="piece-customizer"><div class="pc-title">Customize this piece</div><div class="pc-row"><label>Font</label><select id="pcFont" onchange="applyPieceStyle()"><option value="Arial, sans-serif">Arial</option><option value="Georgia, serif">Book</option><option value="'Comic Sans MS', cursive">Playful</option><option value="'Trebuchet MS', sans-serif">Rounded</option><option value="'Times New Roman', serif">Classic</option></select></div><div class="pc-row"><label>Text</label><input id="pcText" type="color" value="#243746" oninput="applyPieceStyle()"><label>Background</label><input id="pcBg" type="color" value="#fff1b8" oninput="applyPieceStyle()"></div><div class="pc-row"><label>Text size</label><input id="pcFontSize" type="range" min="12" max="42" value="18" oninput="applyPieceStyle()"><span id="pcFontSizeVal">18</span></div><div class="pc-row"><button onclick="transparentPiece()">No background</button><button onclick="resetPieceStyle()">Reset</button><button onclick="closeCustomizer()">Done ✓</button></div></div></body></html>
+</script><div id="exportDlg" role="dialog" aria-label="Print or export"><div class="box"><h3>🖨️ Print / PDF / Slides</h3><div><label><input type="checkbox" id="expAll" onchange="document.querySelectorAll('.expSec').forEach(c=>c.checked=this.checked)"> All sections</label><div id="expList"></div></div><div class="row"><button onclick="printSelected()">🖨️ Print / Save as PDF</button><button onclick="exportSlides()">📊 Download slides</button></div><div class="row"><button class="ghost" onclick="closeExport()">Cancel</button></div><div class="msg" id="expMsg"></div><p style="margin:6px 0 0;font-size:12px;color:#567">Slides download as a PowerPoint file. To use Google Slides: upload it to Google Drive and open it with Google Slides.</p></div></div><div id="pieceCustomizer" class="piece-customizer"><div class="pc-title">Customize this piece</div><div class="pc-row"><label>Font</label><select id="pcFont" onchange="applyPieceStyle()"><option value="Arial, sans-serif">Arial</option><option value="Georgia, serif">Book</option><option value="'Comic Sans MS', cursive">Playful</option><option value="'Trebuchet MS', sans-serif">Rounded</option><option value="'Times New Roman', serif">Classic</option></select></div><div class="pc-row"><label>Text</label><input id="pcText" type="color" value="#243746" oninput="applyPieceStyle()"><label>Background</label><input id="pcBg" type="color" value="#fff1b8" oninput="applyPieceStyle()"></div><div class="pc-row"><label>Text size</label><input id="pcFontSize" type="range" min="12" max="42" value="18" oninput="applyPieceStyle()"><span id="pcFontSizeVal">18</span></div><div class="pc-row"><button onclick="transparentPiece()">No background</button><button onclick="resetPieceStyle()">Reset</button><button onclick="closeCustomizer()">Done ✓</button></div></div></body></html>
