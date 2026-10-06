@@ -29,10 +29,9 @@
     if(!response.ok||!(await response.json()).ok)throw Error('Your sign-in needs to be renewed. Go back to Fun Torah Tools and sign in.');
     const scope=await window.FunTorahStudentClass.resolve(db,id);
     if(scope.workspaceId!==ws||!C.validId(scope.classId))throw Error('Your account is not assigned to a class. Ask your teacher.');
-    const ref=classes.child(scope.classId),[profileSnap,classSnap,settingsSnap]=await Promise.all([db.ref('b3Games/students/'+id+'/profile').once('value'),ref.once('value'),db.ref('b3Games/siteSettings').once('value')]);
-    const profile=profileSnap.val(),row=classSnap.val(),settings=settingsSnap.val()||{},member=row?.members?.[id];
+    const ref=classes.child(scope.classId),[profileSnap,classSnap]=await Promise.all([db.ref('b3Games/students/'+id+'/profile').once('value'),ref.once('value')]);
+    const profile=profileSnap.val(),row=classSnap.val(),member=row?.members?.[id];
     if(!profile||profile.active===false||!row||row.active===false||!member||member.active===false)throw Error('Your class access is unavailable. Ask your teacher.');
-    if(settings.siteEnabled===false||row.siteEnabled===false)throw Error('Fun Torah Tools is closed right now. Ask your teacher.');
     if(!['et','wt'].includes(scope.classId)&&row.toolGrants?.['class-pointer']!==true)throw Error('Class Pointer is not enabled for your class yet.');
     const name=String(profile.name||'').trim().slice(0,32);if(!name)throw Error('Your account needs a student name. Ask your teacher.');
     $('welcome').textContent='Hello, '+name+'.';message('Waiting for your teacher to start '+(row.name||'your class')+'. Keep this page open.');

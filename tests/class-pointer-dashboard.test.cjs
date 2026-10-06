@@ -16,10 +16,10 @@ test('automatic join only accepts a fresh handoff for this room and student clas
  const C=core(),value={room,name:'Test Boy',studentId:'test-boy',classId:'one',at:Date.now()};
  assert.ok(C.handoff(value,room));assert.equal(C.handoff(value,'wrong'),null);assert.equal(C.handoff({...value,classId:'../et'},room),null);assert.equal(C.handoff({...value,at:0},room),null);
 });
-function studentFixture({verified=true,enabled=true,granted=true,member=true}={}){
+function studentFixture({verified=true,enabled=true,classEnabled=true,classLocked=false,granted=true,member=true}={}){
  let listener,redirect,stored,request;
  const nodes=new Map(),element=id=>{if(!nodes.has(id))nodes.set(id,{textContent:''});return nodes.get(id)};
- const row={name:'Test Class',active:true,toolGrants:{'class-pointer':granted},members:member?{'test-boy':{active:true}}:{}};
+ const row={name:'Test Class',active:true,siteEnabled:classEnabled,access:{mode:classLocked?'locked':'open'},toolGrants:{'class-pointer':granted},members:member?{'test-boy':{active:true}}:{}};
  const db={ref:path=>({child:key=>db.ref(path+'/'+key),once:async()=>({val:()=>path.endsWith('/profile')?{name:'Canonical Boy'}:path.endsWith('/siteSettings')?{siteEnabled:enabled}:row}),on:(event,callback)=>{listener=callback}})};
  const firebase={apps:[{}],database:()=>db};
  const context=vm.createContext({window:{B3_APP_CONTEXT:{workspaceId:'b3-2026'},FunTorahStudentClass:{resolve:async()=>({workspaceId:'b3-2026',classId:'one'})}},firebase,document:{getElementById:element},location:{href:'https://example.test/dashboard.html',replace:value=>redirect=value},URL,AbortSignal,
@@ -32,8 +32,8 @@ test('dashboard verifies existing sign-in, reads canonical name and joins only i
  f.listener({val:()=>({[room]:{roomId:room,createdAt:Date.now()}})});
  assert.equal(f.stored.name,'Canonical Boy');assert.equal(f.stored.classId,'one');assert.equal(f.stored.pin,undefined);assert.match(f.redirect,/dashboard=student&room=/);
 });
-test('dashboard does not join when sign-in, emergency access, grant or membership is unavailable',async()=>{
- for(const options of [{verified:false},{enabled:false},{granted:false},{member:false}]){const f=studentFixture(options);await f.run();assert.equal(f.listener,undefined);assert.equal(f.redirect,undefined);assert.ok(f.element('message').textContent)}
+test('dashboard does not join when sign-in, grant or membership is unavailable',async()=>{
+ for(const options of [{verified:false},{granted:false},{member:false}]){const f=studentFixture(options);await f.run();assert.equal(f.listener,undefined);assert.equal(f.redirect,undefined);assert.ok(f.element('message').textContent)}
 });
 test('teacher publishes and removes only its own random room and registers disconnect cleanup first',async()=>{
  const writes=[],C=core(),classId='one';let auth;
@@ -43,4 +43,12 @@ test('teacher publishes and removes only its own random room and registers disco
  vm.runInContext(source('dashboard-session.js'),context);await auth({uid:'test-teacher'},true,{authorized:true,role:'teacher',classIds:[classId]});
  await context.window.ClassPointerDashboard.publish(room);await context.window.ClassPointerDashboard.end();
  assert.equal(writes[0][0],'disconnect');assert.equal(writes[1][0],'set');assert.equal(writes[2][0],'remove');for(const write of writes)assert.ok(write[1].endsWith('/classPointerSessions/'+room));assert.equal(writes[1][2].teacherUid,'test-teacher');
+});
+
+test('Class Pointer joins during global and class game locks',async()=>{
+ for(const options of [{enabled:false},{classEnabled:false},{classLocked:true},{enabled:false,classEnabled:false,classLocked:true}]){
+  const f=studentFixture(options);await f.run();assert.equal(typeof f.listener,'function');
+  f.listener({val:()=>({[room]:{roomId:room,createdAt:Date.now()}})});
+  assert.match(f.redirect,/dashboard=student&room=/);
+ }
 });
