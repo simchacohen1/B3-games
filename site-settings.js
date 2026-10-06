@@ -374,10 +374,13 @@
     const services = ensureFirebase();
     if (!services || !services.db || !user) return Promise.resolve({ authorized:false, role:"", classIds:[] });
     if (isBootstrapAdmin(user)) return Promise.resolve({ authorized:true, role:"admin", classIds:["*"] });
+
+    // Established admins/teachers are the common case. Resolve those two small
+    // records first instead of always downloading the entire teacherInvites
+    // collection before the Teacher Center can decide who the user is.
     return Promise.all([
       services.db.ref("b3Games/admins/" + user.uid).once("value"),
-      services.db.ref(WORKSPACE_ROOT_KEY + "/teachers/" + user.uid).once("value"),
-      services.db.ref(WORKSPACE_ROOT_KEY + "/teacherInvites").once("value")
+      services.db.ref(WORKSPACE_ROOT_KEY + "/teachers/" + user.uid).once("value")
     ]).then(function (snaps) {
       const admin = snaps[0].val();
       const teacher = snaps[1].val();
@@ -388,34 +391,34 @@
         return { authorized:true, role:"teacher", classIds:classIds };
       }
 
-      // Owner-created teacher accounts begin as email invitations because the
-      // teacher's Firebase UID is not known until that teacher first signs in.
-      // Recognize the invitation by the verified Google-account email.
-      const email = String(user.email || "").trim().toLowerCase();
-      const invites = snaps[2].val() || {};
-      const inviteEntry = Object.keys(invites).map(function (id) {
-        return { id:id, value:invites[id] || {} };
-      }).find(function (entry) {
-        return entry.value.active !== false &&
-          String(entry.value.email || "").trim().toLowerCase() === email;
-      });
-      if (inviteEntry && user.emailVerified === true) {
-        const invite = inviteEntry.value;
-        const classIds = invite.classIds ? Object.keys(invite.classIds).filter(function(k){return k !== "*" && invite.classIds[k] === true;}) : [];
-        return user.getIdToken().then(function(token){
-          return fetch("https://us-central1-b3-games.cloudfunctions.net/funTorahTeacherClaim",{
-            method:"POST",signal:AbortSignal.timeout(10000),headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:"{}"
-          });
-        }).then(async function(response){
-          if(!response.ok){const error=new Error("Teacher account linking is awaiting backend deployment.");error.status=response.status;throw error;}
-          const claimed=await response.json();
-          return {authorized:claimed.authorized===true,role:"teacher",classIds:(claimed.classIds||[]).filter(id=>id!=="*"),inviteId:inviteEntry.id};
-        }).catch(function(error){
-          if(error.status&&error.status!==404&&error.status!==503)return {authorized:false,role:"",classIds:[]};
-          return {authorized:true,role:"teacher",classIds:classIds,inviteId:inviteEntry.id,claimPending:true,claimError:error.message};
+      // Only unclaimed accounts need the invitations collection.
+      return services.db.ref(WORKSPACE_ROOT_KEY + "/teacherInvites").once("value").then(function(inviteSnap){
+        const email = String(user.email || "").trim().toLowerCase();
+        const invites = inviteSnap.val() || {};
+        const inviteEntry = Object.keys(invites).map(function (id) {
+          return { id:id, value:invites[id] || {} };
+        }).find(function (entry) {
+          return entry.value.active !== false &&
+            String(entry.value.email || "").trim().toLowerCase() === email;
         });
-      }
-      return { authorized:false, role:"", classIds:[] };
+        if (inviteEntry && user.emailVerified === true) {
+          const invite = inviteEntry.value;
+          const classIds = invite.classIds ? Object.keys(invite.classIds).filter(function(k){return k !== "*" && invite.classIds[k] === true;}) : [];
+          return user.getIdToken().then(function(token){
+            return fetch("https://us-central1-b3-games.cloudfunctions.net/funTorahTeacherClaim",{
+              method:"POST",signal:AbortSignal.timeout(10000),headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:"{}"
+            });
+          }).then(async function(response){
+            if(!response.ok){const error=new Error("Teacher account linking is awaiting backend deployment.");error.status=response.status;throw error;}
+            const claimed=await response.json();
+            return {authorized:claimed.authorized===true,role:"teacher",classIds:(claimed.classIds||[]).filter(id=>id!=="*"),inviteId:inviteEntry.id};
+          }).catch(function(error){
+            if(error.status&&error.status!==404&&error.status!==503)return {authorized:false,role:"",classIds:[]};
+            return {authorized:true,role:"teacher",classIds:classIds,inviteId:inviteEntry.id,claimPending:true,claimError:error.message};
+          });
+        }
+        return { authorized:false, role:"", classIds:[] };
+      });
     }).catch(function(){ return { authorized:false, role:"", classIds:[] }; });
   }
 
