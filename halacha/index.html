@@ -98,7 +98,7 @@ const lessons=[
 const HALACHA_LOCAL_KEY="halachaV14";
 const HALACHA_PARAMS=new URLSearchParams(location.search);
 const HALACHA_TEACHER_VIEW=HALACHA_PARAMS.get("teacherView")||"";
-const HALACHA_TEACHER_PREVIEW=HALACHA_PARAMS.get("teacherPreview")==="1";
+const HALACHA_TEACHER_PREVIEW=!!HALACHA_TEACHER_VIEW;
 const HALACHA_STUDENT_ID=String(HALACHA_TEACHER_VIEW||localStorage.getItem("b3Games_studentId")||"").trim();
 let S={};try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY)||"{}")}catch(e){}
 let halachaDb=null,cloudSaveTimer=null;
@@ -131,7 +131,7 @@ async function loadCloudHalacha(){
    const snap=await halachaDb.ref(cloudPath()).once("value"),row=snap.val();
    if(row&&row.state&&typeof row.state==="object"){
      const remote=JSON.stringify(row.state),local=JSON.stringify(S);
-     if(HALACHA_TEACHER_VIEW){localStorage.setItem(HALACHA_LOCAL_KEY,remote);sessionStorage.setItem("halachaCloudLoaded","1");location.href=location.pathname+"?teacherPreview=1";return}
+     if(HALACHA_TEACHER_VIEW && sessionStorage.getItem("halachaTeacherLoaded:"+HALACHA_TEACHER_VIEW)!=="1"){localStorage.setItem(HALACHA_LOCAL_KEY,remote);sessionStorage.setItem("halachaTeacherLoaded:"+HALACHA_TEACHER_VIEW,"1");location.reload();return}
      if(remote!==local && sessionStorage.getItem("halachaCloudLoaded")!=="1"){
        localStorage.setItem(HALACHA_LOCAL_KEY,remote);
        sessionStorage.setItem("halachaCloudLoaded","1");
@@ -265,7 +265,18 @@ lessons.forEach(render);
 lessons.forEach(l=>{let b=document.createElement("button");b.dataset.id=l.id;b.textContent=l.tab;b.onclick=()=>show(l.id);if(l.id==="a")b.className="on";tabs.appendChild(b)});
 let rb=document.createElement("button");rb.dataset.id="review";rb.textContent="🎤 Teacher Review";rb.className="teacherOnly";rb.onclick=()=>show("review");tabs.appendChild(rb);
 loadCloudHalacha();
-if(HALACHA_TEACHER_PREVIEW){document.body.classList.add("teacherMode","teacher-mode")}
+if(HALACHA_TEACHER_PREVIEW){
+ document.body.classList.add("teacherMode","teacher-mode");
+ setTimeout(()=>{
+   const bar=document.querySelector(".bar");
+   if(bar&&!document.getElementById("teacherPreviewBanner")){
+     const x=document.createElement("span");x.id="teacherPreviewBanner";
+     x.textContent="👨‍🏫 Teacher view — student work (read only)";
+     x.style.cssText="background:#fff3bf;color:#5c4300;padding:7px 10px;border-radius:9px;font-weight:900";
+     bar.appendChild(x);
+   }
+ },0);
+}
 review.innerHTML=`<div class=qbank><h2>Complete Review Bank — סימן א</h2>${lessons.map(l=>`<h3>${l.seif} · ${l.title}</h3><p><b>Objective:</b> ${l.objective}</p><ol>${l.qs.map(q=>"<li>"+q+"</li>").join("")}</ol>`).join("")}</div>`;
 
 function toggleTeacherSource(id){
