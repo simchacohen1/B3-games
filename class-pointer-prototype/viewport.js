@@ -44,7 +44,8 @@
 
     const shareButton=document.getElementById('shareScreen'),controls=document.createElement('div');controls.className='controls share-view-controls';
     const areaButton=makeButton('Choose shared area'),fullButton=makeButton('Share full screen'),zoomOut=makeButton('Zoom −'),zoomIn=makeButton('Zoom +'),moveButton=makeButton('Move view');
-    const zoomLabel=document.createElement('span');zoomLabel.className='zoom-label';zoomLabel.setAttribute('aria-live','polite');
+    areaButton.id='viewChooseArea';fullButton.id='viewShareFull';zoomOut.id='viewZoomOut';zoomIn.id='viewZoomIn';moveButton.id='viewMove';
+    const zoomLabel=document.createElement('span');zoomLabel.id='viewZoomLabel';zoomLabel.className='zoom-label';zoomLabel.setAttribute('aria-live','polite');
     moveButton.setAttribute('aria-pressed','false');controls.append(areaButton,fullButton,zoomOut,zoomLabel,zoomIn,moveButton);
     if(shareButton?.parentElement)shareButton.parentElement.insertAdjacentElement('afterend',controls);
 
@@ -57,7 +58,7 @@
     const selectionBox=document.createElement('div');selectionBox.className='share-area-selection';preview.appendChild(selectionBox);
     const dialogControls=document.createElement('div');dialogControls.className='controls';
     const useArea=makeButton('Use selected area'),cancelArea=makeButton('Cancel');dialogControls.append(useArea,cancelArea);
-    dialog.append(title,help,preview,dialogControls);document.body.appendChild(dialog);
+    dialog.append(title,help,preview,dialogControls);stage.appendChild(dialog);
 
     function setPanMode(next){
       panMode=!!next&&zoom>1;moveButton.setAttribute('aria-pressed',String(panMode));moveButton.classList.toggle('active',panMode);stage.classList.toggle('viewport-pan-mode',panMode);
@@ -114,7 +115,7 @@
     // Choosing a lesson tool returns input to the pointer/highlighter handlers.
     const teacherTool=document.getElementById('teacherTool');
     if(teacherTool)listen(teacherTool,'change',()=>{if(panMode){setPanMode(false);say('Move view is off. Hover to point, or drag with a highlighting tool.')}});
-    function lessonEvent(event){return !event.target?.closest?.('button')}
+    function lessonEvent(event){return !event.target?.closest?.('[data-stage-ui],button')}
     function stopStageEvent(event){event.preventDefault();event.stopPropagation();event.stopImmediatePropagation?.()}
     listen(stage,'pointerdown',event=>{
       if(!panMode||!lessonEvent(event)||event.button!==0)return;stopStageEvent(event);dragPointer=event.pointerId;lastDrag={x:event.clientX,y:event.clientY};stage.setPointerCapture?.(dragPointer);stage.classList.add('viewport-panning');
