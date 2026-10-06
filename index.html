@@ -805,6 +805,12 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     return Boolean(currentSettings.studentGameOverrides?.[studentId]?.[gameId]===true);
   }
 
+  function classHasLockedGameOverride(gameId,classId=myClassId){
+    if(!classId||!gameId)return false;
+    if(typeof settingsApi.classHasLockedGameOverride==="function")return settingsApi.classHasLockedGameOverride(currentSettings,classId,gameId);
+    return String(currentSettings.classLockedGameOverride?.[classId]||"")===String(gameId);
+  }
+
   function studentNudgeVisitKey(gameId){
     return "b3Games_lastVisit_"+myStudentId+"_"+gameId;
   }
@@ -944,7 +950,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     gameDefinitions.forEach(game=>{
       const globallyActive=currentSettings.games?.[game.id]!==false;
       const classOpen=currentSettings.classGames?.[myClassId]?.[game.id]!==false;
-      const exceptionAllowed=studentHasOverride(game.id);
+      const exceptionAllowed=studentHasOverride(game.id)||classHasLockedGameOverride(game.id,myClassId);
       const show=globallyActive&&(info.open||exceptionAllowed);
       const closed=show&&!classOpen;
 
@@ -1125,6 +1131,16 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     </div>`;
   }
 
+  function lockedGameOverrideOptions(classId){
+    const selected=String(currentSettings.classLockedGameOverride?.[classId]||"");
+    const choices=gameDefinitions.filter(game=>
+      currentSettings.games?.[game.id]!==false &&
+      currentSettings.classGames?.[classId]?.[game.id]!==false
+    );
+    const none='<option value=""'+(selected===""?" selected":"")+'>None — lock everything</option>';
+    return none+choices.map(game=>'<option value="'+game.id.replace(/"/g,"&quot;")+'"'+(selected===game.id?" selected":"")+'>'+game.name.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+'</option>').join("");
+  }
+
   function classCardHtml(classId){
     const access=currentSettings.classAccess[classId];
     const info=settingsApi.describeClassAccess(currentSettings,classId,new Date());
@@ -1155,6 +1171,11 @@ const active=(members[id]?.active!==false&&profile.active!==false);
         <button class="mode-btn ${access.mode==="auto"?"active":""}" data-class-mode="${classId}:auto">Automatic</button>
         <button class="mode-btn ${access.mode==="open"?"active":""}" data-class-mode="${classId}:open">Unlock Now</button>
         <button class="mode-btn ${access.mode==="locked"?"active":""}" data-class-mode="${classId}:locked">Lock Now</button>
+      </div>
+      <div style="margin-top:12px;padding:11px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:11px">
+        <label style="display:block;font-size:13px;font-weight:900;color:#1e3a8a;margin-bottom:6px" for="lockedGameOverride-${classId}">🔓 Keep one activity open while locked</label>
+        <select id="lockedGameOverride-${classId}" data-locked-game-override="${classId}" style="width:100%;padding:9px 10px;border:1px solid #93c5fd;border-radius:9px;background:#fff;font-weight:800;color:#1f2937">${lockedGameOverrideOptions(classId)}</select>
+        <div style="font-size:11px;color:#475569;line-height:1.4;margin-top:6px">When B3 Games or this class is locked, only this selected activity stays available to the whole ${classLabels[classId]} class. Choose “None” to lock everything.</div>
       </div>
       <details><summary>Recess Access Schedule</summary><div class="schedule-grid"><div class="schedule-help">B3 Games is OPEN by default. These are the periods when it is CLOSED. Use the simple hour / minute / AM-PM menus below. Nothing changes until you press <b>Save Schedule</b>, so the times will not jump around while you are editing.${delayNote}</div>${rows}<div class="schedule-actions"><button type="button" class="schedule-save" data-save-schedule="${classId}" disabled>Save Schedule</button><button type="button" class="schedule-reset" data-reset-schedule="${classId}">Reset to Master Schedule</button><span class="schedule-save-status" data-schedule-status="${classId}">No unsaved changes</span></div></div></details>
     </div>`;
@@ -1404,6 +1425,22 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     document.querySelectorAll("[data-class-mode]").forEach(btn=>btn.addEventListener("click",async()=>{
       const [classId,mode]=btn.dataset.classMode.split(":");
       try{await settingsApi.updateClassMode(classId,mode);}catch(e){alert("Could not save the class access setting.");console.error(e);}
+    }));
+
+    document.querySelectorAll("[data-locked-game-override]").forEach(select=>select.addEventListener("change",async()=>{
+      const classId=select.dataset.lockedGameOverride;
+      const previous=String(currentSettings.classLockedGameOverride?.[classId]||"");
+      const next=String(select.value||"");
+      select.disabled=true;
+      try{
+        await settingsApi.updateClassLockedGameOverride(classId,next);
+      }catch(e){
+        select.value=previous;
+        alert("Could not save the activity that should stay open while locked.");
+        console.error(e);
+      }finally{
+        select.disabled=false;
+      }
     }));
 
     function readFriendlyTime(classId,day,i,which){
