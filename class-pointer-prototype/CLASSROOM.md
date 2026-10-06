@@ -2,7 +2,7 @@
 
 ## Dashboard entry
 
-Teachers open **Teacher Tools → Class Pointer — Start a lesson**, choose their class, click **Open teacher classroom**, then **Start class** and **Share teaching screen**. Students already signed in to Fun Torah Tools click **Class Pointer** beside their name. The entry page verifies their existing passcode, reads their account name and active class membership, and waits for that class's lesson. It requests admission automatically using their account name; the teacher still admits each student and controls pointing/highlighting permissions. No passcode is included in a classroom URL or sent to another participant. For other classes, the owner must grant the Class Pointer tool first.
+Teachers open **Teacher Tools → Class Pointer — Start a lesson**, choose their class, click **Open teacher classroom**, then **Start class** and **Share teaching screen**. Students already signed in to Fun Torah Tools click **Class Pointer** beside their name. The entry page verifies their existing passcode, reads their account name and active class membership, and waits for that class's lesson. Students join automatically using their account name; the teacher controls pointing/highlighting permissions and can remove students. No passcode is included in a classroom URL or sent to another participant. For other classes, the owner must grant the Class Pointer tool first.
 
 Dashboard lesson discovery stores only temporary room metadata under `b3Games/workspaces/<workspace>/classes/<class>/classPointerSessions/<room>`, using existing authenticated class teacher rules. Disconnect cleanup and End class remove only that room, avoiding interference with another teacher's session. Discovery ignores rooms older than four hours. Screen video, pointers and highlights still travel through PeerJS/WebRTC; no lesson recording is saved. This live-lesson entry is separate from ordinary games' recess schedules; emergency master/class disabling still blocks entry. Direct join links remain available for manual-name pilot use.
 
@@ -10,7 +10,7 @@ Open `classroom.html` as the teacher. Keep Zoom open for voices and webcams.
 
 1. Click **Start class** and **Copy join link**.
 2. Give the link to one student on another computer. The student enters a name and clicks **Join class**.
-3. Click **Admit [name]** in the teacher roster, then **Share teaching screen** and choose the teaching window or tab.
+3. The student appears in the teacher roster automatically. Click **Share teaching screen** and choose the teaching window or tab.
 4. Check that the student receives the live picture. Students do not grant camera or microphone access.
 5. Choose **Selected students**, then check **Allow [name] to point**. Moving the student's mouse over the lesson must show their pointer in both views without clicking. Moving out of the picture hides it.
 6. Uncheck the student or choose **Nobody**. The student cannot place a new pointer, and their existing pointer disappears. The teacher can still point.
@@ -28,7 +28,7 @@ While sharing, the teacher also gets **Choose shared area**, **Share full screen
 
 ## Connection design
 
-PeerJS 1.5.5 uses its public signaling service to establish WebRTC data and one-way video connections. Video is sent from the teacher directly to each admitted student. No lesson recording, student camera or student microphone is used. Direct-link names are self-entered; dashboard entry uses the account name. Teacher admission is required. A random join link identifies a temporary session. Refreshing or closing the teacher page ends it.
+PeerJS 1.5.5 uses its public signaling service to establish WebRTC data and one-way video connections. Video is sent from the teacher directly to each admitted student. No lesson recording, student camera or student microphone is used. Direct-link names are self-entered; dashboard entry uses the account name. Students with a valid name join automatically while the class is open, up to the 12-student pilot limit. A random join link identifies a temporary session. Refreshing or closing the teacher page ends it.
 
 The teacher is authoritative: admission and pointing permission are checked on receipt, not only in student controls. Student identities derive from the connection and use a separate namespace from the teacher. Untrusted names render as text. Coordinates are finite values between 0 and 1, relative to the contained video picture. Shapes and colors use fixed allowlists. Only the teacher controls the spotlight. Hover updates are coalesced with a trailing update to retain the final position. Mouse leave, revoking access, disconnecting, stopping capture, or ending class cancels queued updates and removes the appropriate pointer state.
 

@@ -35,7 +35,7 @@ test('student names have a bounded display length and exclude control characters
   assert.equal(C.cleanName('M'.repeat(100)).length,32);
 });
 test('teacher rejects network pointer messages until admission and permission',()=>{
-  const f=teacherFixture();f.run("state.sharing=true;state.mode='everyone'");f.connection.emit('data',{type:'point',point:{x:0.5,y:0.5}});
+  const f=teacherFixture();f.run("members.get('student:student-a').admitted=false;state.sharing=true;state.mode='everyone'");f.connection.emit('data',{type:'point',point:{x:0.5,y:0.5}});
   assert.equal(f.run('Object.keys(state.points).length'),0);
   f.run("members.get('student:student-a').admitted=true;state.mode='selected'");f.connection.emit('data',{type:'point',point:{x:0.5,y:0.5}});
   assert.equal(f.run('Object.keys(state.points).length'),0);
@@ -97,10 +97,34 @@ test('highlights have separate owners and undo or clear never deletes another la
   store.edit('student:b','clear');assert.equal(store.strokes.length,1);assert.equal(store.strokes[0].owner,'student:a');
 });
 test('highlight messages enforce admission and permission and ignore forged ownership',()=>{
-  const f=teacherFixture();f.run("state.sharing=true;state.mode='everyone'");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
+  const f=teacherFixture();f.run("members.get('student:student-a').admitted=false;state.sharing=true;state.mode='everyone'");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
   f.run("members.get('student:student-a').admitted=true;state.mode='nobody'");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
   f.run("state.mode='everyone'");f.connection.emit('data',{type:'highlight',stroke:{...sampleStroke,owner:'teacher'}});assert.equal(f.run('highlightStore.strokes[0].owner'),'student:student-a');
   f.run("highlightStore.add('teacher',{tool:'box',points:[{x:0,y:0},{x:0.5,y:0.5}]})");
   f.connection.emit('data',{type:'edit-highlights',action:'all',owner:'teacher'});assert.equal(f.run('highlightStore.strokes.length'),2);
   f.connection.emit('data',{type:'edit-highlights',action:'clear',owner:'teacher'});assert.equal(f.run('highlightStore.strokes.length'),1);assert.equal(f.run('highlightStore.strokes[0].owner'),'teacher');
 });
+
+ test('students join automatically and receive state and highlights without pointer permission',()=>{
+  const f=teacherFixture();
+  assert.equal(f.run("members.get('student:student-a').admitted"),true);
+  assert.equal(f.run("members.get('student:student-a').allowed"),false);
+  assert.deepEqual(f.connection.sent.map(message=>message.type),['state','highlights']);
+  assert.equal(f.connection.sent[0].state.members[0].name,'Mayer');
+  f.run('state.sharing=true');
+  f.connection.emit('data',{type:'point',point:{x:0.5,y:0.5}});
+  assert.equal(f.run('Object.keys(state.points).length'),0);
+  f.run("state.mode='everyone'");
+  f.connection.emit('data',{type:'point',point:{x:0.5,y:0.5}});
+  assert.equal(f.run("state.points['student:student-a'].x"),0.5);
+ });
+ test('automatic join sends an already shared lesson and existing highlights',()=>{
+  const f=teacherFixture(),second=new EventEmitter();second.peer='student-b';second.open=true;second.sent=[];
+  second.send=message=>second.sent.push(structuredClone(message));second.close=()=>second.emit('close');
+  f.context.second=second;
+  f.run("screen={};state.sharing=true;highlightStore.add('teacher',{tool:'box',points:[{x:0,y:0},{x:0.5,y:0.5}]});peer={call(id,stream){called=id;return{on(){},close(){}}}};receiveStudent(second)");
+  second.emit('data',{type:'join',name:'Yossi'});
+  assert.equal(f.run('called'),'student-b');
+  assert.equal(second.sent.find(message=>message.type==='state').state.sharing,true);
+  assert.equal(second.sent.find(message=>message.type==='highlights').strokes[0].owner,'teacher');
+ });

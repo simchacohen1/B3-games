@@ -59,7 +59,11 @@
 
     function setPanMode(next){
       panMode=!!next&&zoom>1;moveButton.setAttribute('aria-pressed',String(panMode));moveButton.classList.toggle('active',panMode);stage.classList.toggle('viewport-pan-mode',panMode);
-      if(!panMode){dragPointer=null;lastDrag=null}
+      if(!panMode){
+        const pointer=dragPointer;dragPointer=null;lastDrag=null;
+        if(pointer!==null&&stage.hasPointerCapture?.(pointer))stage.releasePointerCapture(pointer);
+        stage.classList.remove('viewport-panning');
+      }
     }
     function updateControls(){
       zoomLabel.textContent=Math.round(zoom*100)+'%';zoomOut.disabled=zoom<=1.001;zoomIn.disabled=zoom>=5.99;moveButton.disabled=zoom<=1.001;
@@ -103,12 +107,18 @@
     zoomOut.addEventListener('click',()=>zoomTo(zoom/1.25));zoomIn.addEventListener('click',()=>zoomTo(zoom*1.25));
     moveButton.addEventListener('click',()=>{if(zoom<=1)return;setPanMode(!panMode);if(panMode){resetOverlays();say('Move view is on. Drag the lesson to pan around the zoomed screen.')}else say('Move view is off.')});
 
+    const listeners=[];
+    function listen(target,type,handler,capture=false){target.addEventListener(type,handler,capture);listeners.push(()=>target.removeEventListener(type,handler,capture))}
+    // Choosing a lesson tool returns input to the pointer/highlighter handlers.
+    const teacherTool=document.getElementById('teacherTool');
+    if(teacherTool)listen(teacherTool,'change',()=>{if(panMode){setPanMode(false);say('Move view is off. Hover to point, or drag with a highlighting tool.')}});
+    function lessonEvent(event){return !event.target?.closest?.('button')}
     function stopStageEvent(event){event.preventDefault();event.stopPropagation();event.stopImmediatePropagation?.()}
-    stage.addEventListener('pointerdown',event=>{
-      if(!panMode||event.button!==0)return;stopStageEvent(event);dragPointer=event.pointerId;lastDrag={x:event.clientX,y:event.clientY};stage.setPointerCapture?.(dragPointer);stage.classList.add('viewport-panning');
+    listen(stage,'pointerdown',event=>{
+      if(!panMode||!lessonEvent(event)||event.button!==0)return;stopStageEvent(event);dragPointer=event.pointerId;lastDrag={x:event.clientX,y:event.clientY};stage.setPointerCapture?.(dragPointer);stage.classList.add('viewport-panning');
     },true);
-    stage.addEventListener('pointermove',event=>{
-      if(!panMode)return;stopStageEvent(event);if(event.pointerId!==dragPointer||!lastDrag)return;
+    listen(stage,'pointermove',event=>{
+      if(!panMode||!lessonEvent(event))return;stopStageEvent(event);if(event.pointerId!==dragPointer||!lastDrag)return;
       const rect=stage.getBoundingClientRect(),box=C?.pictureBox?.(rect.width,rect.height,lesson.videoWidth,lesson.videoHeight),w=box?.w||rect.width,h=box?.h||rect.height;
       const dx=event.clientX-lastDrag.x,dy=event.clientY-lastDrag.y;lastDrag={x:event.clientX,y:event.clientY};
       view=V.panRegion(base,view,-dx/w*view.w,-dy/h*view.h);
@@ -116,14 +126,15 @@
     function endPan(event){
       if(event.pointerId!==dragPointer)return;if(panMode)stopStageEvent(event);try{stage.releasePointerCapture?.(dragPointer)}catch{}dragPointer=null;lastDrag=null;stage.classList.remove('viewport-panning');
     }
-    stage.addEventListener('pointerup',endPan,true);stage.addEventListener('pointercancel',endPan,true);
-    stage.addEventListener('click',event=>{if(panMode)stopStageEvent(event)},true);
+    listen(stage,'pointerup',endPan,true);listen(stage,'pointercancel',endPan,true);
+    listen(stage,'click',event=>{if(panMode&&lessonEvent(event))stopStageEvent(event)},true);
     updateControls();
 
     return{
       stream,active:true,
       stop(){
         if(stopped)return;stopped=true;cancelAnimationFrame(raf);setPanMode(false);stage.classList.remove('viewport-panning');
+        listeners.forEach(remove=>remove());
         controls.remove();dialog.remove();source.srcObject=null;stream.getTracks().forEach(track=>track.stop());rawStream.getTracks().forEach(track=>track.stop());
       }
     };

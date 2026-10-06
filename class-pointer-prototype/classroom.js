@@ -18,7 +18,7 @@ function allowed(){return isTeacher||C.canPoint(state.mode,state.members.find(me
 function pointerPermission(){
   const mayPoint=allowed();$('stage').style.cursor=mayPoint?'crosshair':'not-allowed';
   if(!mayPoint){cancelHover();highlighter?.cancel()}
-  if(!isTeacher)$('permissionText').textContent=!admitted?'Waiting for your teacher to admit you.':allowed()?'You may point or highlight. Hover to point, or choose a highlighter and drag.':'Watch the lesson. Your teacher has not enabled your pointer.';
+  if(!isTeacher)$('permissionText').textContent=!admitted?'Connecting to your class.':allowed()?'You may point or highlight. Hover to point, or choose a highlighter and drag.':'Watch the lesson. Your teacher has not enabled your pointer.';
 }
 function drawPointers(){
   const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight);
@@ -87,7 +87,7 @@ function receiveStudent(connection){
     if(message.type==='join'&&!member){
       const name=C.cleanName(message.name);if(!name){connection.close();return}
       if(members.size>=12){send(connection,{type:'full'});connection.close();return}
-      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,color:C.colors[colorIndex++%C.colors.length],allowed:false,admitted:false,connection,lastPoint:0};members.set(member.id,member);send(connection,{type:'waiting'});roster();return;
+      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,color:C.colors[colorIndex++%C.colors.length],allowed:false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);return;
     }
     if(!member||members.get(member.id)!==member)return;
     if(message.type==='highlight'&&state.sharing&&C.canPoint(state.mode,member)){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
@@ -124,7 +124,7 @@ async function startClass(){
     if(peer!==current)return;
     try{if(window.ClassPointerDashboard)await window.ClassPointerDashboard.publish(id)}catch(error){if(peer===current){endClass();fail('Could not open the lesson on student dashboards. '+error.message)}return}
     if(peer!==current)return;clearTimeout(joinTimer);started=true;$('endClass').disabled=false;$('shareScreen').disabled=false;
-    const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status(window.ClassPointerDashboard?'Class open. Students click Class Pointer on Fun Torah Tools. Admit their names below.':'Class open. Send the join link and admit your students.');roster();
+    const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status(window.ClassPointerDashboard?'Class open. Students click Class Pointer on Fun Torah Tools and join automatically.':'Class open. Send the join link. Students join automatically.');roster();
   });
   peer.on('connection',receiveStudent);peer.on('call',call=>call.close());
 }
@@ -167,7 +167,7 @@ function endClass(){
 function clearStudentVideo(){const oldCall=mediaCall;mediaCall=null;oldCall?.close();$('lesson').srcObject=null;$('placeholder').hidden=false;drawPointers()}
 function leaveClass(){
   cancelHover();highlighter?.cancel();highlighter?.receive([]);clearTimeout(joinTimer);joining=false;admitted=false;clearStudentVideo();const oldConnection=teacherConnection;teacherConnection=null;oldConnection?.close();const oldPeer=peer;peer=null;oldPeer?.destroy();
-  state={sharing:false,mode:'nobody',members:[],points:{}};$('joinForm').hidden=false;$('joinClass').disabled=false;$('leaveClass').hidden=true;$('pointerLayer').replaceChildren();$('permissionText').textContent='Enter your name to request admission.';status('Not connected.');
+  state={sharing:false,mode:'nobody',members:[],points:{}};$('joinForm').hidden=false;$('joinClass').disabled=false;$('leaveClass').hidden=true;$('pointerLayer').replaceChildren();$('permissionText').textContent='Enter your name to join your class.';status('Not connected.');
 }
 function joinClass(event){
   event.preventDefault();if(joining||peer)return;const name=C.cleanName($('studentName').value);if(!name){fail('Please enter your name.');return}
@@ -187,7 +187,7 @@ function joinClass(event){
         clearTimeout(joinTimer);joining=false;admitted=true;$('joinForm').hidden=true;$('leaveClass').hidden=false;state=message.state;
         if(!state.sharing){highlighter?.cancel();highlighter?.receive([]);clearStudentVideo()}status(state.sharing?'Class connected.':'Admitted. Waiting for the teaching screen.');pointerPermission();drawPointers();
       }
-      if(['ended','removed','full'].includes(message.type)){leaveClass();fail(message.type==='ended'?'Your teacher ended the class.':message.type==='full'?'This first test supports up to 12 students.':'Your teacher declined or ended your admission.')}
+      if(['ended','removed','full'].includes(message.type)){leaveClass();fail(message.type==='ended'?'Your teacher ended the class.':message.type==='full'?'This first test supports up to 12 students.':'Your teacher removed you from the class.')}
     });
     connection.on('close',()=>{if(teacherConnection===connection){leaveClass();fail('The teacher connection closed. Ask your teacher whether to rejoin.')}});
     connection.on('error',()=>{if(teacherConnection===connection){leaveClass();fail('Could not connect to the teacher. Try another network or a new join link.')}});
