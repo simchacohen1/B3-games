@@ -71,9 +71,21 @@ function commitStudentHover(member){
   if(!point||members.get(member.id)!==member||!state.sharing||!C.canPoint(state.mode,member))return;
   member.lastPoint=Date.now();state.points[member.id]=point;publish();
 }
+function favorTextDetail(call){
+  const tune=()=>{
+    const pc=call?.peerConnection;if(!pc?.getSenders)return;
+    const sender=pc.getSenders().find(item=>item.track?.kind==='video');if(!sender?.getParameters||!sender?.setParameters)return;
+    try{
+      const parameters=sender.getParameters();parameters.degradationPreference='maintain-resolution';
+      if(parameters.encodings?.length)parameters.encodings.forEach(encoding=>{encoding.maxFramerate=10;if(!encoding.scaleResolutionDownBy||encoding.scaleResolutionDownBy>1)encoding.scaleResolutionDownBy=1});
+      sender.setParameters(parameters).catch(()=>{});
+    }catch{}
+  };
+  tune();setTimeout(tune,500);
+}
 function callStudent(member){
   member.call?.close();clearTimeout(member.mediaTimer);if(!screen||!member.admitted)return;
-  const call=peer.call(member.peerId,screen,{metadata:{generation}});member.call=call;
+  const call=peer.call(member.peerId,screen,{metadata:{generation}});member.call=call;favorTextDetail(call);
   if(!call){fail('Could not send the lesson to '+member.name+'. Ask him to leave and rejoin.');return}
   call.on('error',()=>fail('The screen connection to '+member.name+' failed. Ask him to rejoin or try another network.'));
   member.mediaTimer=setTimeout(()=>{if(members.get(member.id)===member&&state.sharing&&!member.videoReady)fail(member.name+' has not received the lesson. School network restrictions may be blocking it.')},20000);
