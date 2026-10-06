@@ -97,6 +97,18 @@
     outline:2px solid var(--accent);outline-offset:1px;
   }
   .hint{color:var(--muted);font-size:13px;margin-top:6px;}
+  .exclude-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-top:10px;}
+  .exclude-option{
+    display:flex;align-items:center;gap:9px;
+    background:var(--surface2);
+    border:2px solid transparent;
+    border-radius:7px;
+    padding:8px 10px;
+    font-weight:700;
+    font-size:14px;
+  }
+  .exclude-option:has(input:checked){border-color:var(--accent2);color:var(--accent2);}
+  .exclude-option input{width:18px;height:18px;margin:0;}
 
   select{
     background:var(--surface2);
@@ -281,6 +293,12 @@
     </div>
 
     <div class="panel">
+      <h2>Don&rsquo;t land on</h2>
+      <div class="hint">Checked boys stay visible on the wheel, but cannot be selected as the winner.</div>
+      <div id="excludePicker" class="exclude-list"></div>
+    </div>
+
+    <div class="panel">
       <h2>Purpose</h2>
       <div class="purpose-row">
         <select id="purposeSelect"></select>
@@ -448,6 +466,7 @@ let state = {
   rosters: { east: FIXED_ROSTERS.east.slice(), west: FIXED_ROSTERS.west.slice() },
   customNames: [],
   activeList: 'east',
+  excludedByList: { east: [], west: [], custom: [] },
   purposes: DEFAULT_PURPOSES.slice(),
   activePurposeId: 'p_chazzan',
   history: {},
@@ -460,7 +479,7 @@ let audioCtx = null;
 
 // ---------- Storage helpers ----------
 async function loadState() {
-  const keys = ['rosters', 'customNames', 'activeList', 'purposes', 'activePurposeId', 'history', 'totalPicks', 'settings'];
+  const keys = ['rosters', 'customNames', 'activeList', 'excludedByList', 'purposes', 'activePurposeId', 'history', 'totalPicks', 'settings'];
   for (const key of keys) {
     try {
       const res = await window.storage.get(key, false);
@@ -476,6 +495,10 @@ async function loadState() {
   state.rosters = { east: FIXED_ROSTERS.east.slice(), west: FIXED_ROSTERS.west.slice() };
   if (state.activeList !== 'east' && state.activeList !== 'west' && state.activeList !== 'custom') state.activeList = 'east';
   if (CLASS_MODE && state.activeList === 'west') state.activeList = 'east';
+  if (!state.excludedByList || typeof state.excludedByList !== 'object') state.excludedByList = { east: [], west: [], custom: [] };
+  ['east', 'west', 'custom'].forEach(k => {
+    if (!Array.isArray(state.excludedByList[k])) state.excludedByList[k] = [];
+  });
   if (!state.purposes || state.purposes.length === 0) state.purposes = DEFAULT_PURPOSES.slice();
   // Always start the Name Picker in Chazzan mode when that built-in purpose exists.
   if (state.purposes.some(p => p.id === 'p_chazzan')) {
@@ -508,6 +531,16 @@ function getActiveNames() {
   return state.customNames || [];
 }
 
+function getExcludedNames() {
+  const names = new Set(getActiveNames());
+  return (state.excludedByList[state.activeList] || []).filter(name => names.has(name));
+}
+
+function getSelectableNames(names = getActiveNames()) {
+  const excluded = new Set(getExcludedNames());
+  return names.filter(name => !excluded.has(name));
+}
+
 function rosterKey(names) {
   return names.slice().sort().join('|');
 }
@@ -525,25 +558,28 @@ function getHistoryEntry(purposeId, names) {
 
 function fairnessStatus(purpose, names) {
   if (!purpose.noRepeat) return null;
-  if (names.length === 0) return null;
+  const selectable = getSelectableNames(names);
+  if (selectable.length === 0) return null;
   const entry = getHistoryEntry(purpose.id, names);
-  const remaining = names.filter(n => !entry.picked.includes(n));
-  return { remaining: remaining.length, total: names.length };
+  const remaining = selectable.filter(n => !entry.picked.includes(n));
+  return { remaining: remaining.length, total: selectable.length };
 }
 
 // ---------- Picking logic ----------
 function pickWinner(purpose, names) {
   const entry = getHistoryEntry(purpose.id, names);
+  const selectable = getSelectableNames(names);
   let eligible;
   if (purpose.noRepeat) {
-    eligible = names.filter(n => !entry.picked.includes(n));
-    if (eligible.length === 0) {
+    eligible = selectable.filter(n => !entry.picked.includes(n));
+    if (eligible.length === 0 && selectable.length > 0) {
       entry.picked = [];
-      eligible = names.slice();
+      eligible = selectable.slice();
     }
   } else {
-    eligible = names.slice();
+    eligible = selectable.slice();
   }
+  if (eligible.length === 0) return { winner: null, entry };
   const winner = eligible[Math.floor(Math.random() * eligible.length)];
   return { winner, entry };
 }
@@ -782,6 +818,7 @@ const tabDisplayBtn = el('#tabDisplayBtn');
 const listButtons = els('.list-choice button');
 const rosterEditor = el('#rosterEditor');
 const rosterHint = el('#rosterHint');
+const excludePicker = el('#excludePicker');
 
 const purposeSelect = el('#purposeSelect');
 const addPurposeBtn = el('#addPurposeBtn');
@@ -885,6 +922,7 @@ function commitRosterEditor() {
     // East/West changes are intentionally session-only and are not persisted.
   }
   updateRosterHint();
+  renderExcludePicker();
   renderFairnessStatus();
   renderChazzanCounts();
 }
@@ -894,12 +932,51 @@ listButtons.forEach(btn => {
     state.activeList = btn.dataset.list;
     persist('activeList');
     loadRosterEditor();
+    renderExcludePicker();
     renderFairnessStatus();
     renderChazzanCounts();
   });
 });
 rosterEditor.addEventListener('input', commitRosterEditor);
 rosterEditor.addEventListener('blur', commitRosterEditor);
+
+// ---------- Winner exclusions ----------
+function renderExcludePicker() {
+  const names = getActiveNames();
+  const selected = new Set(getExcludedNames());
+
+  if (names.length === 0) {
+    excludePicker.innerHTML = '<div class="stats-empty">No boys in this list.</div>';
+    return;
+  }
+
+  excludePicker.innerHTML = '';
+  names.forEach(name => {
+    const label = document.createElement('label');
+    label.className = 'exclude-option';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = selected.has(name);
+    input.setAttribute('aria-label', `Do not land on ${name}`);
+
+    const text = document.createElement('span');
+    text.textContent = name;
+
+    input.addEventListener('change', () => {
+      const current = new Set(state.excludedByList[state.activeList] || []);
+      if (input.checked) current.add(name);
+      else current.delete(name);
+      state.excludedByList[state.activeList] = Array.from(current);
+      persist('excludedByList');
+      renderFairnessStatus();
+    });
+
+    label.appendChild(input);
+    label.appendChild(text);
+    excludePicker.appendChild(label);
+  });
+}
 
 // ---------- Purpose selector ----------
 function renderPurposeSelect() {
@@ -971,10 +1048,12 @@ function renderFairnessStatus() {
   const purpose = getPurpose(state.activePurposeId);
   const names = getActiveNames();
   const status = fairnessStatus(purpose, names);
-  if (!status) {
+  if (getSelectableNames(names).length === 0 && names.length > 0) {
+    fairnessStatusEl.textContent = 'No one is eligible to be picked. Uncheck at least one boy above.';
+  } else if (!status) {
     fairnessStatusEl.textContent = purpose.noRepeat
-      ? 'Everyone gets a turn before anyone repeats.'
-      : 'Fully random every time \u2014 repeats are allowed.';
+      ? 'Everyone eligible gets a turn before anyone repeats.'
+      : 'Fully random among eligible boys \u2014 repeats are allowed.';
   } else {
     fairnessStatusEl.textContent = `${status.remaining} of ${status.total} still need a turn this round.`;
   }
@@ -1072,7 +1151,7 @@ function escapeHtml(s) {
 statsScope.addEventListener('change', renderStats);
 
 // ---------- Backup / restore ----------
-const BACKUP_KEYS = ['rosters', 'customNames', 'activeList', 'purposes', 'activePurposeId', 'history', 'totalPicks', 'settings'];
+const BACKUP_KEYS = ['rosters', 'customNames', 'activeList', 'excludedByList', 'purposes', 'activePurposeId', 'history', 'totalPicks', 'settings'];
 
 function refreshAllUi() {
   applyTheme();
@@ -1080,6 +1159,7 @@ function refreshAllUi() {
   confettiToggle.checked = state.settings.confetti;
   soundToggle.checked = state.settings.sound;
   loadRosterEditor();
+  renderExcludePicker();
   renderPurposeSelect();
   renderFairnessStatus();
   renderStatsScopeOptions();
@@ -1188,7 +1268,7 @@ function renderDisplay() {
 
   const status = fairnessStatus(purpose, names);
   displayFairnessNote.textContent = status ? `${status.remaining} of ${status.total} still need a turn` : '';
-  spinBtn.disabled = names.length === 0;
+  spinBtn.disabled = getSelectableNames(names).length === 0;
   resetCycleBtn.hidden = !purpose.noRepeat;
 }
 
@@ -1197,12 +1277,17 @@ spinBtn.addEventListener('click', () => {
   if (spinning) return;
   const purpose = getPurpose(state.activePurposeId);
   const names = getActiveNames();
-  if (names.length === 0) return;
+  if (getSelectableNames(names).length === 0) return;
   spinning = true;
   spinBtn.disabled = true;
   winnerBanner.hidden = true;
 
   const { winner, entry } = pickWinner(purpose, names);
+  if (!winner) {
+    spinning = false;
+    spinBtn.disabled = true;
+    return;
+  }
   ensureAudio();
 
   if (state.settings.style === 'wheel') {
@@ -1283,6 +1368,7 @@ async function init() {
   confettiToggle.checked = state.settings.confetti;
   soundToggle.checked = state.settings.sound;
   loadRosterEditor();
+  renderExcludePicker();
   renderPurposeSelect();
   renderFairnessStatus();
   renderChazzanCounts();
