@@ -3,8 +3,8 @@ const assert=require('node:assert/strict');
 const V=require('../class-pointer-prototype/viewport-core.js');
 
 test('viewport output keeps source aspect ratio while bounding resolution',()=>{
-  assert.deepEqual(V.outputSize(1920,1080),{width:1280,height:720});
-  assert.deepEqual(V.outputSize(2560,1600),{width:1152,height:720});
+  assert.deepEqual(V.outputSize(1920,1080),{width:1920,height:1080});
+  assert.deepEqual(V.outputSize(2560,1600),{width:1728,height:1080});
   assert.deepEqual(V.outputSize(800,600),{width:800,height:600});
 });
 
