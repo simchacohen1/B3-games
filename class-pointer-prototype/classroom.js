@@ -147,7 +147,7 @@ async function shareScreen(){
   clearError();if(!navigator.mediaDevices?.getDisplayMedia){fail('Use Chrome or Edge on a computer to share your teaching screen.');return}
   $('shareScreen').disabled=true;const currentPeer=peer;let captured=null,processor=null,outgoing=null;
   try{
-    captured=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:1280},frameRate:{ideal:12,max:15}},audio:false});
+    captured=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:2560},height:{ideal:1440},frameRate:{ideal:10,max:12}},audio:false});
     if(peer!==currentPeer||!started){captured.getTracks().forEach(track=>track.stop());return}
     if(window.ClassPointerViewport?.create){
       processor=await window.ClassPointerViewport.create({rawStream:captured,stage:$('stage'),lesson:$('lesson'),onBeforeViewChange:resetOverlaysForViewChange,onStatus:status,onError:fail});
