@@ -16,7 +16,7 @@ if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 const db=firebase.database(),q=id=>document.getElementById(id);
 const TOOLS={
 "yiddish":["Yiddish","yiddish/teacher.html"],"posuk-practice-scroll":["Posuk Practice","record_pesukim/teacher.html"],"rashi-letters":["Rashi Letters","rashi-letters/teacher.html"],"shorashim":["Shorashim","shorashim/teacher.html?v=20260917-correct-dashboard"],"chazara":["Chazara","chazara/teacher.html"],"game-show":["Game Show","game-show/teacher.html"],"student-rewards":["Student Rewards","student-rewards/teacher.html"],"weekly-quiz":["Weekly Quiz","weekly-quiz/teacher.html"],"gallery":["Gallery","class-gallery/index.html"],"tag":["Tag Game","class-gallery/index.html"],
-"davening":["Davening Player","davening_student_app/index.html"],"class-pointer":["Class Pointer","class-pointer-prototype/classroom.html"],"name-picker":["Name Picker","name-picker/index.html"],"chavrusa":["Chavrusa of the Day","chavrusa/index.html"]
+"davening":["Davening Player","davening_student_app/index.html"],"class-pointer":["Class Pointer","class-pointer-prototype/dashboard.html?teacher=1"],"name-picker":["Name Picker","name-picker/index.html"],"chavrusa":["Chavrusa of the Day","chavrusa/index.html"]
 };
 const ICONS={'yiddish':'<img src="assets/yiddish-icon-v2.png" alt="">','posuk-practice-scroll':'📜','rashi-letters':'אב','shorashim':'🌳','chazara':'🔁','game-show':'🏆','student-rewards':'🌟','weekly-quiz':'📝','gallery':'🖼️','class-gallery':'🖼️','tag':'🏃','davening':'📖','chumash-quiz':'❓','work-timer':'⏱️','class-slides':'🖥️','class-pointer':'👆','name-picker':'🎡','chavrusa':'👥'};
 TOOLS['class-gallery']=TOOLS.gallery;

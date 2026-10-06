@@ -114,14 +114,17 @@ function makePeer(id){
   const instance=id?new Peer(id):new Peer();instance.on('error',peerError);
   instance.on('disconnected',()=>{status('Connection service interrupted. Existing lesson connections may still work.');if(!instance.destroyed)instance.reconnect()});return instance;
 }
-function startClass(){
+async function startClass(){
   clearError();$('startClass').disabled=true;status('Opening class…');
+  try{if(window.ClassPointerDashboard)await window.ClassPointerDashboard.ready}catch(error){$('startClass').disabled=false;fail(error.message);return}
   peer=makePeer('class-pointer-'+crypto.randomUUID());if(!peer){$('startClass').disabled=false;return}
   const current=peer;
   joinTimer=setTimeout(()=>{if(peer===current&&!started){endClass();fail('The class could not connect. Try again or use another network.')}},20000);
-  peer.on('open',id=>{
+  peer.on('open',async id=>{
+    if(peer!==current)return;
+    try{if(window.ClassPointerDashboard)await window.ClassPointerDashboard.publish(id)}catch(error){if(peer===current){endClass();fail('Could not open the lesson on student dashboards. '+error.message)}return}
     if(peer!==current)return;clearTimeout(joinTimer);started=true;$('endClass').disabled=false;$('shareScreen').disabled=false;
-    const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status('Class open. Send the join link and admit your students.');roster();
+    const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status(window.ClassPointerDashboard?'Class open. Students click Class Pointer on Fun Torah Tools. Admit their names below.':'Class open. Send the join link and admit your students.');roster();
   });
   peer.on('connection',receiveStudent);peer.on('call',call=>call.close());
 }
@@ -142,6 +145,7 @@ async function shareScreen(){
   }catch(error){if(peer!==currentPeer||(error.name==='AbortError'&&!screen))return;stopSharing();fail(error.name==='NotAllowedError'?'Screen sharing was canceled. Click Share teaching screen to try again.':'Could not share the screen. Please try again.')}
 }
 function endClass(){
+  window.ClassPointerDashboard?.end().catch(()=>fail('Could not remove the dashboard lesson. Refresh before starting another class.'));
   clearTimeout(joinTimer);started=false;stopSharing();for(const member of members.values()){send(member.connection,{type:'ended'});member.connection.close()}
   members.clear();const oldPeer=peer;peer=null;oldPeer?.destroy();state={sharing:false,mode:'nobody',members:[],points:{}};$('accessMode').value='nobody';$('spotlight').checked=false;$('startClass').disabled=false;$('endClass').disabled=true;$('invitePanel').hidden=true;roster();status('Class ended. Start a new class for a new join link.');
 }
@@ -235,3 +239,8 @@ if(window.createClassHighlighter)highlighter=window.createClassHighlighter({
 });
 $('teacherPanel').hidden=!isTeacher;$('studentPanel').hidden=isTeacher;if(!isTeacher)status('Join your teacher’s class.');
 window.addEventListener('pagehide',()=>{if(isTeacher)endClass();else leaveClass()});
+if(!isTeacher&&new URL(location.href).searchParams.get('dashboard')==='student'){
+  let saved=null;try{saved=window.ClassPointerDashboardCore.handoff(JSON.parse(sessionStorage.getItem('classPointerDashboardJoin')),room)}catch{}
+  if(saved){$('studentName').value=C.cleanName(saved.name);$('studentName').readOnly=true;const welcome=document.createElement('p');welcome.textContent='Joining as '+$('studentName').value+'.';$('studentPanel').prepend(welcome);joinClass({preventDefault(){}})}
+  else{ $('joinClass').disabled=true;fail('Go back to Fun Torah Tools and click Class Pointer to join with your name.'); }
+}

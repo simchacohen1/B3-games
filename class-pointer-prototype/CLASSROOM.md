@@ -1,5 +1,11 @@
 # Class Pointer classroom pilot
 
+## Dashboard entry
+
+Teachers open **Teacher Tools → Class Pointer — Start a lesson**, choose their class, click **Open teacher classroom**, then **Start class** and **Share teaching screen**. Students already signed in to Fun Torah Tools click **Class Pointer** beside their name. The entry page verifies their existing passcode, reads their account name and active class membership, and waits for that class's lesson. It requests admission automatically using their account name; the teacher still admits each student and controls pointing/highlighting permissions. No passcode is included in a classroom URL or sent to another participant. For other classes, the owner must grant the Class Pointer tool first.
+
+Dashboard lesson discovery stores only temporary room metadata under `b3Games/workspaces/<workspace>/classes/<class>/classPointerSessions/<room>`, using existing authenticated class teacher rules. Disconnect cleanup and End class remove only that room, avoiding interference with another teacher's session. Discovery ignores rooms older than four hours. Screen video, pointers and highlights still travel through PeerJS/WebRTC; no lesson recording is saved. This live-lesson entry is separate from ordinary games' recess schedules; emergency master/class disabling still blocks entry. Direct join links remain available for manual-name pilot use.
+
 Open `classroom.html` as the teacher. Keep Zoom open for voices and webcams.
 
 1. Click **Start class** and **Copy join link**.
@@ -20,7 +26,7 @@ Teacher and student pages have **Full-screen lesson** above the picture. This ex
 
 ## Connection design
 
-PeerJS 1.5.5 uses its public signaling service to establish WebRTC data and one-way video connections. Video is sent from the teacher directly to each admitted student. There is no recording, database write, student camera, or student microphone. Names are self-entered; teacher admission is required. A random join link identifies a temporary session. Refreshing or closing the teacher page ends it.
+PeerJS 1.5.5 uses its public signaling service to establish WebRTC data and one-way video connections. Video is sent from the teacher directly to each admitted student. No lesson recording, student camera or student microphone is used. Direct-link names are self-entered; dashboard entry uses the account name. Teacher admission is required. A random join link identifies a temporary session. Refreshing or closing the teacher page ends it.
 
 The teacher is authoritative: admission and pointing permission are checked on receipt, not only in student controls. Student identities derive from the connection and use a separate namespace from the teacher. Untrusted names render as text. Coordinates are finite values between 0 and 1, relative to the contained video picture. Shapes and colors use fixed allowlists. Only the teacher controls the spotlight. Hover updates are coalesced with a trailing update to retain the final position. Mouse leave, revoking access, disconnecting, stopping capture, or ending class cancels queued updates and removes the appropriate pointer state.
 

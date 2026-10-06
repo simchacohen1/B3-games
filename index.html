@@ -138,6 +138,7 @@
   <div id="studentBar" class="student-bar hidden">
     <div><strong id="studentNameLabel"></strong><br><span id="studentClassLabel"></span></div>
     <button id="switchStudentBtn" type="button">Switch student</button>
+    <a id="classPointerStudentLink" href="class-pointer-prototype/dashboard.html" target="_blank" rel="noopener" style="padding:10px 14px;border-radius:8px;background:#2563eb;color:white;font-weight:700;text-decoration:none">👆 Class Pointer</a>
   </div>
 
   <div id="loginCard" class="login-card">
@@ -203,6 +204,7 @@
     <h2>👩‍🏫 Teacher Tools</h2>
     <p class="teacher-tools-subtitle">Always available to you, regardless of student toggle state.</p>
     <div class="teacher-tools-container">
+      <a class="teacher-tool-card" href="class-pointer-prototype/dashboard.html?teacher=1" target="_blank" rel="noopener"><span class="card-icon">👆</span><span class="card-title">Class Pointer — Start a lesson</span></a>
       <a class="teacher-tool-card" href="game-show/teacher.html" target="_blank" rel="noopener"><span class="card-icon">🏆</span><span class="card-title">Game Show — Host</span></a>
       <a class="teacher-tool-card" href="record_pesukim/teacher.html" target="_blank" rel="noopener"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll — Teacher Dashboard</span></a>
       <a class="teacher-tool-card" href="shorashim/teacher.html?v=20260917-correct-dashboard" target="_blank" rel="noopener"><span class="card-icon">🌳</span><span class="card-title">Shorashim — Teacher Dashboard</span></a>
@@ -876,6 +878,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   function renderStudentAccess(){
+    el("classPointerStudentLink").classList.toggle("hidden",isAuthorizedTeacher||isStudentPreview);
     queueMicrotask(renderStudentNudges);
     setTeacherToolPairVisibility();
     // The authorized teacher account is never treated as ET or WT.
