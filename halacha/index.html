@@ -96,7 +96,9 @@ const lessons=[
 {id:"e",tab:"5 · לילה",title:"עבודת ה׳ בלילה ותיקון חצות",seif:"סעיף ה",objective:"Appreciate the greatness of nighttime Torah study and תיקון חצות, and its spiritual rewards.",source:"השכמה בחצות וחשיבות לימוד תורה בלילה",qs:["What is the ideal time for תיקון חצות?","What should one do if he cannot wake at חצות?","Why is learning Torah at night so special?","What is meant by משנה – אותיות נשמה?"],type:"night",pieces:[["he","תיקון חצות"],["he","משנה ↔ נשמה"],["sticker","🌙"],["sticker","⭐"],["sticker","📖"]]}
 ];
 const HALACHA_LOCAL_KEY="halachaV14";
-const HALACHA_STUDENT_ID=String(localStorage.getItem("b3Games_studentId")||"").trim();
+const HALACHA_PARAMS=new URLSearchParams(location.search);
+const HALACHA_TEACHER_VIEW=HALACHA_PARAMS.get("teacherView")||"";
+const HALACHA_STUDENT_ID=String(HALACHA_TEACHER_VIEW||localStorage.getItem("b3Games_studentId")||"").trim();
 let S={};try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY)||"{}")}catch(e){}
 let halachaDb=null,cloudSaveTimer=null;
 try{
@@ -110,6 +112,7 @@ function cloudPath(){
 }
 function setSaveStatus(msg){let x=document.getElementById("cloudSaveStatus");if(x)x.textContent=msg}
 function save(){
+ if(HALACHA_TEACHER_VIEW){setSaveStatus("Teacher view — read only");return}
  try{localStorage.setItem(HALACHA_LOCAL_KEY,JSON.stringify(S))}catch(e){}
  if(!halachaDb||!cloudPath()){setSaveStatus("Saved on this device");return}
  setSaveStatus("Saving…");
@@ -127,6 +130,7 @@ async function loadCloudHalacha(){
    const snap=await halachaDb.ref(cloudPath()).once("value"),row=snap.val();
    if(row&&row.state&&typeof row.state==="object"){
      const remote=JSON.stringify(row.state),local=JSON.stringify(S);
+     if(HALACHA_TEACHER_VIEW){localStorage.setItem(HALACHA_LOCAL_KEY,remote);sessionStorage.setItem("halachaCloudLoaded","1");location.href=location.pathname+"?teacherPreview=1";return}
      if(remote!==local && sessionStorage.getItem("halachaCloudLoaded")!=="1"){
        localStorage.setItem(HALACHA_LOCAL_KEY,remote);
        sessionStorage.setItem("halachaCloudLoaded","1");
