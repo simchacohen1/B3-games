@@ -2221,7 +2221,7 @@ renderPowerShop=function(){
     const active=powerCurrentlyActive(id);
     const disabled=powerBusy||cooling||active||!canAfford||!capOk;
     const label=active?'ACTIVE':(teacherMode?'Test':'Buy '+p.cost);
-    return `<div class='power-card${cooling?' cooling':''}'><div class='power-icon'>${p.icon}</div><div><h3>${p.name}</h3><p>${p.detail}</p></div><div class='power-meta'><span class='power-cost'>${teacherMode?'Free test':p.cost+' point'+(p.cost===1?'':'s')+' · '+p.duration}</span><button class='power-buy' data-power='${id}' ${disabled?'disabled':''}>${label}</button></div></div>`;
+    return `<div class='power-card${cooling?' cooling':''}'><div class='power-icon'>${p.icon}</div><div><h3>${p.name}</h3><p>${p.detail}</p></div><div class='power-meta'><span class='power-cost'>${teacherMode?'Free test':p.cost+' point'+(p.cost===1?'':'s')+' · '+p.duration}</span><button type='button' class='power-buy' data-power='${id}' ${disabled?'disabled':''}>${label}</button></div></div>`;
   }).join('');
   grid.querySelectorAll('[data-power]').forEach(btn=>btn.onclick=()=>buyTagPower(btn.dataset.power));
   if(cooling&&!powerBusy)note.textContent='Power shop cooldown: '+Math.max(1,Math.ceil((powerCooldownUntil-now)/1000))+'s';
@@ -2235,13 +2235,25 @@ teacherTestPower=async function(powerId,targetStudentId){
 };
 buyTagPower=async function(powerId){
   const p=TAG_POWERS[powerId];
-  if(!p||powerBusy||!tagOptedIn||!powerAllowedInCurrentMode(powerId))return;
   const note=document.getElementById('powerShopNote');
+  if(!p||powerBusy)return;
+  if(!tagOptedIn){
+    if(isTeacher&&tagGameEnabled&&livePresenceEnabled){
+      setTagOptIn(true,tagMode);
+    }else{
+      note.textContent='Join Regular Tag or Manhunt first.';
+      return;
+    }
+  }
+  if(!powerAllowedInCurrentMode(powerId)){
+    note.textContent='That power is not available in your current game role.';
+    return;
+  }
   if(powerCurrentlyActive(powerId)){note.textContent=p.name+' is already active.';return;}
   let target=null;
   if(powerId==='freeze'){
     target=nearestTagOpponent(5.5);
-    if(!target){note.textContent=tagMode==='manhunt'?'Get closer to a runner before buying Freeze.':'Get closer to another player before buying Freeze.';return;}
+    if(!target){note.textContent=tagMode==='manhunt'?'Get closer to a runner before testing Freeze.':'Get closer to another player before testing Freeze.';return;}
   }
   powerBusy=true;
   note.textContent=isTeacher?'Testing '+p.name+'…':'Buying '+p.name+'…';
@@ -2254,9 +2266,8 @@ buyTagPower=async function(powerId){
       powerBalance=Number(j.balance||0);
       powerSpent=Number(j.spent||0);
       powerCooldownUntil=Number(j.cooldownUntil||0);
-
+      closePowerShop();
     }
-    closePowerShop();
     note.textContent=p.icon+' '+p.name+' activated!';
     showTagPop(p.icon+' '+p.name+'!');
   }catch(err){
