@@ -87,7 +87,7 @@ body:not(.teacher-mode) .teacher-source-panel,body:not(.teacher-mode) .teacher-s
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="../firebase-config.js"></script>
-</head><body><header><div class=bar><h1>📔 My Halacha Scrapbook — סימן א</h1><button onclick="mode(false)">Student</button><button onclick="mode(true)">Teacher</button><button onclick="printScrapbook()">Print / PDF</button><span id="cloudSaveStatus" style="font-size:12px;font-weight:800;opacity:.9">Saving on this device</span></div></header><main><div id=tabs class=tabs></div><div id=sections></div><div id=review class="section teacherOnly"></div></main><script>
+</head><body><header><div class=bar><h1>📔 My Halacha Scrapbook — סימן א</h1><button onclick="mode(false)">Student</button><button onclick="printScrapbook()">Print / PDF</button><span id="cloudSaveStatus" style="font-size:12px;font-weight:800;opacity:.9">Saving on this device</span></div></header><main><div id=tabs class=tabs></div><div id=sections></div><div id=review class="section teacherOnly"></div></main><script>
 const lessons=[
 {id:"a",tab:"1 · שויתי",title:"שויתי ה׳ לנגדי תמיד",seif:"סעיף א",objective:"Develop a constant awareness that Hashem is always present, which shapes one’s behavior in public and in private.",source:"שויתי ה׳ לנגדי תמיד · הכרה תמידית בהשגחת ה׳",qs:["What is the meaning of שויתי ה׳ לנגדי תמיד?","Why is it important to remember Hashem is always with us?","How does this awareness affect how we speak and behave?"],type:"choices",pieces:[["he","שויתי ה׳ לנגדי תמיד"],["text","I remember Hashem wherever I am"],["sticker","🏠"],["sticker","🏫"],["sticker","💬"]]},
 {id:"b",tab:"2 · מודה אני",title:"מודה אני — השבת הנשמה",seif:"סעיף ב",objective:"Understand the importance of thanking Hashem for returning one’s נשמה each morning and how to express it through מודה אני.",source:"אמירת מודה אני והכרת הטוב עם הקימה",qs:["What should a person think about as soon as he wakes up?","Why is it permitted to say מודה אני even before נטילת ידים?","What is the proper pause when saying מודה אני?"],type:"sequence",pieces:[["sticker","🌅"],["text","Thank You for returning my נשמה"],["sticker","💛"]]},
@@ -98,6 +98,7 @@ const lessons=[
 const HALACHA_LOCAL_KEY="halachaV14";
 const HALACHA_PARAMS=new URLSearchParams(location.search);
 const HALACHA_TEACHER_VIEW=HALACHA_PARAMS.get("teacherView")||"";
+const HALACHA_TEACHER_PREVIEW=HALACHA_PARAMS.get("teacherPreview")==="1";
 const HALACHA_STUDENT_ID=String(HALACHA_TEACHER_VIEW||localStorage.getItem("b3Games_studentId")||"").trim();
 let S={};try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY)||"{}")}catch(e){}
 let halachaDb=null,cloudSaveTimer=null;
@@ -152,7 +153,7 @@ function teacherSource(id){
  e:`<b>קיצור שולחן ערוך — סעיף ה</b><br><br>אִם אֶפְשָׁר לוֹ לְהַשְׁכִּים וְלָקוּם בַּחֲצוֹת הַלַּיְלָה לַעֲרֹךְ אָז תִּקּוּן חֲצוֹת, מַה טּוֹב... וְאִם אִי אֶפְשָׁר לוֹ לָקוּם בַּחֲצוֹת, יִתְגַּבֵּר עַל כָּל פָּנִים לָקוּם קֹדֶם עֲלוֹת הַשָּׁחַר... וְאַחַר כָּךְ יַעֲסֹק בַּתּוֹרָה... וְשִׁעוּר מִשְׁנָיוֹת קוֹדֵם לְכָל דָּבָר, וְעַל יְדֵי זֶה זוֹכֶה לִנְשָׁמָה, מִשְׁנָה אוֹתִיּוֹת נְשָׁמָה... וְטוֹב מְעַט בְּכַוָּנָה, מֵהַרְבּוֹת בְּלֹא כַוָּנָה.`}; return x[id]||'';
 }
 function teacherPoint(id){return ({a:'Compare how a person naturally behaves alone at home with how he behaves before a great king. Then bring out the Kitzur’s kal vachomer: awareness that Hashem sees our actions changes both behavior and speech.',b:'Focus on gratitude immediately upon waking: Hashem returned the נשמה refreshed. Teach why מודה אני may be said before washing and the pause between בחמלה and רבה.',c:'Do not stop at identifying the animals. Teach what each quality means: courage despite mockery, guarding the eyes, running toward good, and strengthening the heart against the Yetzer Hara.',d:'Act out the Yetzer Hara’s winter and summer excuses, then use the Kitzur’s money/business example to show how quickly a person gets up for something he values.',e:'Teach the ideal of חצות, the alternative of rising before dawn, the special value of nighttime Torah, and the word connection משנה / נשמה.'})[id]||''}
-function mode(t){document.body.classList.toggle("teacherMode",t);document.body.classList.toggle("teacher-mode",t);show("a")}
+function mode(t){const allow=!!t&&HALACHA_TEACHER_PREVIEW;document.body.classList.toggle("teacherMode",allow);document.body.classList.toggle("teacher-mode",allow);show("a")}
 function show(id){document.querySelectorAll(".section").forEach(x=>x.classList.remove("on"));document.getElementById(id).classList.add("on");tabs.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.id===id))}
 function pageCanvas(page){return page.querySelector(".canvas")}
 function add(id,type,text,pageIndex=0){
@@ -264,6 +265,7 @@ lessons.forEach(render);
 lessons.forEach(l=>{let b=document.createElement("button");b.dataset.id=l.id;b.textContent=l.tab;b.onclick=()=>show(l.id);if(l.id==="a")b.className="on";tabs.appendChild(b)});
 let rb=document.createElement("button");rb.dataset.id="review";rb.textContent="🎤 Teacher Review";rb.className="teacherOnly";rb.onclick=()=>show("review");tabs.appendChild(rb);
 loadCloudHalacha();
+if(HALACHA_TEACHER_PREVIEW){document.body.classList.add("teacherMode","teacher-mode")}
 review.innerHTML=`<div class=qbank><h2>Complete Review Bank — סימן א</h2>${lessons.map(l=>`<h3>${l.seif} · ${l.title}</h3><p><b>Objective:</b> ${l.objective}</p><ol>${l.qs.map(q=>"<li>"+q+"</li>").join("")}</ol>`).join("")}</div>`;
 
 function toggleTeacherSource(id){
@@ -274,7 +276,7 @@ function toggleTeacherSource(id){
 
 document.addEventListener("click",function(ev){
  const t=(ev.target.textContent||"").trim().toLowerCase();
- if(t==="teacher"){document.body.classList.add("teacher-mode")}
+ if(t==="teacher" && HALACHA_TEACHER_PREVIEW){document.body.classList.add("teacher-mode")}
  if(t==="student"){document.body.classList.remove("teacher-mode");document.querySelectorAll(".teacher-source-panel").forEach(x=>x.classList.remove("show"))}
 });
 
