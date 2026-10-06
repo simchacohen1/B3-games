@@ -14,11 +14,16 @@ function status(text){$('connectionStatus').textContent=text}
 function fail(text){$('error').textContent=text;$('error').hidden=false}
 function clearError(){$('error').hidden=true}
 function send(connection,message){if(connection?.open){try{connection.send(message)}catch{fail('The connection was interrupted. Please rejoin the class.')}}}
-function allowed(){return isTeacher||C.canPoint(state.mode,state.members.find(member=>member.id==='student:'+peer?.id))}
+function ownMember(){return state.members.find(member=>member.id==='student:'+peer?.id)}
+function allowed(){return isTeacher||C.canPoint(state.mode,ownMember())}
+function writingAllowed(){return isTeacher||C.canWrite(state.mode,ownMember())}
 function pointerPermission(){
-  const mayPoint=allowed();$('stage').style.cursor=mayPoint?'crosshair':'not-allowed';
+  const mayPoint=allowed(),mayWrite=writingAllowed();$('stage').style.cursor=mayPoint?'crosshair':'not-allowed';
   if(!mayPoint){cancelHover();highlighter?.cancel()}
-  if(!isTeacher)$('permissionText').textContent=!admitted?'Connecting to your class.':allowed()?'You may point or highlight. Hover to point, or choose a highlighter and drag.':'Watch the lesson. Your teacher has not enabled your pointer.';
+  if(!isTeacher){
+    const tool=$('studentTool');if(tool){for(const option of tool.options)if(C.highlightTools.includes(option.value))option.disabled=!mayWrite;if(!mayWrite&&C.highlightTools.includes(tool.value)){tool.value='target';tool.dispatchEvent(new Event('change',{bubbles:true}))}}
+    $('permissionText').textContent=!admitted?'Connecting to your class.':!mayPoint?'Watch the lesson. Your teacher has not enabled your pointer.':mayWrite?'You may point and use writing tools.':'Pointer only. Your teacher has not enabled writing tools.';
+  }
 }
 function drawPointers(){
   const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight);
@@ -42,7 +47,7 @@ function drawPointers(){
   for(const [id,node] of pointerNodes)if(!visible.has(id)){node.remove();pointerNodes.delete(id)}
 }
 function publish(){
-  state.members=Array.from(members.values()).filter(member=>member.admitted).map(({id,name,color,allowed})=>({id,name,color,admitted:true,allowed}));
+  state.members=Array.from(members.values()).filter(member=>member.admitted).map(({id,name,color,allowed,writeAllowed})=>({id,name,color,admitted:true,allowed,writeAllowed:writeAllowed===true}));
   for(const member of members.values())if(member.admitted)send(member.connection,{type:'state',state});
   drawPointers();pointerPermission();
 }
@@ -54,7 +59,9 @@ function roster(){
     if(!member.admitted){const admit=document.createElement('button');admit.textContent='Admit '+member.name;admit.addEventListener('click',()=>{member.admitted=true;publish();send(member.connection,{type:"highlights",strokes:highlightStore.strokes});roster();if(screen)callStudent(member)});row.appendChild(admit)}
     else{
       const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=member.allowed;input.disabled=state.mode!=='selected';
-      input.addEventListener('change',()=>{member.allowed=input.checked;if(!C.canPoint(state.mode,member)){clearStudentHover(member);delete state.points[member.id]}publish()});label.append(input,document.createTextNode('Allow '+member.name+' to point'));row.appendChild(label);
+      input.addEventListener('change',()=>{member.allowed=input.checked;if(!C.canPoint(state.mode,member)){clearStudentHover(member);delete state.points[member.id]}if(!member.allowed)member.writeAllowed=false;publish();roster()});label.append(input,document.createTextNode(' Pointer'));row.appendChild(label);
+      const writeLabel=document.createElement('label'),writeInput=document.createElement('input');writeInput.type='checkbox';writeInput.checked=member.writeAllowed===true;writeInput.disabled=state.mode==='nobody'||(state.mode==='selected'&&!member.allowed);
+      writeInput.addEventListener('change',()=>{member.writeAllowed=writeInput.checked;publish()});writeLabel.append(writeInput,document.createTextNode(' Writing'));row.appendChild(writeLabel);
     }
     const remove=document.createElement('button');remove.textContent=member.admitted?'Remove '+member.name:'Decline '+member.name;
     remove.addEventListener('click',()=>{send(member.connection,{type:'removed'});member.connection.close();removeMember(member)});row.appendChild(remove);list.appendChild(row);
@@ -99,10 +106,10 @@ function receiveStudent(connection){
     if(message.type==='join'&&!member){
       const name=C.cleanName(message.name);if(!name){connection.close();return}
       if(members.size>=12){send(connection,{type:'full'});connection.close();return}
-      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,color:C.colors[colorIndex++%C.colors.length],allowed:false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);return;
+      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,color:C.colors[colorIndex++%C.colors.length],allowed:false,writeAllowed:false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);return;
     }
     if(!member||members.get(member.id)!==member)return;
-    if(message.type==='highlight'&&state.sharing&&C.canPoint(state.mode,member)){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
+    if(message.type==='highlight'&&state.sharing&&C.canWrite(state.mode,member)){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
     if(message.type==='edit-highlights'&&member.admitted){if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}return}
     if(message.type==='video-ready'&&member.admitted){member.videoReady=true;clearTimeout(member.mediaTimer)}
     if(message.type==='pointer-hide'&&member.admitted){clearStudentHover(member);delete state.points[member.id];member.lastPoint=0;publish()}
@@ -247,7 +254,7 @@ $('stage').addEventListener('click',event=>{
   pointAt(event,true);
 });
 $('accessMode').addEventListener('change',()=>{
-  state.mode=$('accessMode').value;for(const member of members.values())if(!C.canPoint(state.mode,member)){clearStudentHover(member);delete state.points[member.id]}publish();roster();
+  state.mode=$('accessMode').value;for(const member of members.values())if(!C.canPoint(state.mode,member)){clearStudentHover(member);delete state.points[member.id];member.writeAllowed=false}publish();roster();
 });
 function changeStyle(){
   const style=C.pointStyle({tool:$(isTeacher?'teacherTool':'studentTool').value,color:$(isTeacher?'teacherColor':'studentColor').value});
@@ -264,7 +271,8 @@ $('joinForm').addEventListener('submit',joinClass);$('leaveClass').addEventListe
 new ResizeObserver(drawPointers).observe($('stage'));$('lesson').addEventListener('loadedmetadata',drawPointers);$('lesson').addEventListener('resize',drawPointers);
 function publishHighlights(){highlighter?.receive(highlightStore.strokes);for(const member of members.values())if(member.admitted)send(member.connection,{type:'highlights',strokes:highlightStore.strokes})}
 if(window.createClassHighlighter)highlighter=window.createClassHighlighter({
-  teacher:isTeacher,allowed,sharing:()=>state.sharing,owner:()=>isTeacher?'teacher':'student:'+peer?.id,
+  teacher:isTeacher,allowed:writingAllowed,sharing:()=>state.sharing,owner:()=>isTeacher?'teacher':'student:'+peer?.id,
+  ownerName:owner=>owner==='teacher'?'Teacher':state.members.find(m=>m.id===owner)?.name||'Student',
   color:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   submit(stroke){if(isTeacher){if(highlightStore.add('teacher',stroke))publishHighlights();else fail('Highlight limit reached. Undo or clear some highlights.')}else send(teacherConnection,{type:'highlight',stroke})},
   edit(action){if(isTeacher){if(action==='all')highlightStore.reset();else highlightStore.edit('teacher',action);publishHighlights()}else send(teacherConnection,{type:'edit-highlights',action})}
