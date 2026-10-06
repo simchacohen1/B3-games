@@ -1,8 +1,83 @@
 'use strict';
 (function(){
-  const stage=document.getElementById('stage'),enter=document.getElementById('fullScreenLesson'),exit=document.getElementById('exitFullScreenLesson');
+  const stage=document.getElementById('stage'),enter=document.getElementById('fullScreenLesson'),exit=document.getElementById('exitFullScreenLesson'),teacherPanel=document.getElementById('teacherPanel');
+  let syncTimer=null;
+  const toolbar=document.createElement('div');toolbar.id='fullscreenTeacherToolbar';toolbar.className='fullscreen-teacher-toolbar';toolbar.dataset.stageUi='true';toolbar.hidden=true;
+  const top=document.createElement('div');top.className='fullscreen-toolbar-top';
+  const title=document.createElement('strong');title.textContent='Teaching controls';
+  const collapse=document.createElement('button');collapse.type='button';collapse.className='fullscreen-toolbar-collapse';collapse.textContent='Hide controls';collapse.setAttribute('aria-expanded','true');
+  top.append(title,collapse);
+  const body=document.createElement('div');body.className='fullscreen-toolbar-body';toolbar.append(top,body);
+  stage.appendChild(toolbar);exit.dataset.stageUi='true';
+
+  const proxySpecs=[
+    {source:'teacherTool',label:'Tool',type:'select'},
+    {source:'teacherColor',label:'Color',type:'select'},
+    {source:'teacherSize',label:'Size',type:'select'},
+    {source:'accessMode',label:'Students',type:'select'},
+    {source:'spotlight',label:'Spotlight',type:'check'},
+    {source:'viewChooseArea',label:'Choose area',type:'button',share:true},
+    {source:'viewShareFull',label:'Full view',type:'button',share:true},
+    {source:'viewZoomOut',label:'Zoom −',type:'button',share:true},
+    {source:'viewZoomIn',label:'Zoom +',type:'button',share:true},
+    {source:'viewMove',label:'Move',type:'button',share:true},
+    {source:'undoTeacherHighlight',label:'Undo',type:'button'},
+    {source:'clearTeacherHighlights',label:'Clear mine',type:'button'},
+    {source:'clearAllHighlights',label:'Clear highlights',type:'button'},
+    {source:'clearTeacher',label:'Clear pointer',type:'button'},
+    {source:'clearAll',label:'Clear pointers',type:'button'},
+    {source:'stopScreen',label:'Stop sharing',type:'button',danger:true}
+  ];
+  const proxies=new Map();
+
+  function build(){
+    body.replaceChildren();proxies.clear();
+    for(const spec of proxySpecs){
+      const source=document.getElementById(spec.source);
+      if(!source)continue;
+      const wrap=document.createElement(spec.type==='check'?'label':'div');wrap.className='fullscreen-toolbar-control';wrap.dataset.source=spec.source;
+      if(spec.share)wrap.classList.add('share-control');
+      if(spec.type==='select'){
+        const text=document.createElement('span');text.textContent=spec.label;
+        const proxy=document.createElement('select');proxy.innerHTML=source.innerHTML;
+        proxy.addEventListener('change',()=>{source.value=proxy.value;source.dispatchEvent(new Event('change',{bubbles:true}))});
+        wrap.append(text,proxy);proxies.set(spec.source,proxy);
+      }else if(spec.type==='check'){
+        const proxy=document.createElement('input');proxy.type='checkbox';
+        proxy.addEventListener('change',()=>{source.checked=proxy.checked;source.dispatchEvent(new Event('change',{bubbles:true}))});
+        wrap.append(proxy,document.createTextNode(' '+spec.label));proxies.set(spec.source,proxy);
+      }else{
+        const proxy=document.createElement('button');proxy.type='button';proxy.textContent=spec.label;if(spec.danger)proxy.classList.add('danger');
+        proxy.addEventListener('click',()=>source.click());wrap.append(proxy);proxies.set(spec.source,proxy);
+      }
+      body.appendChild(wrap);
+    }
+    const zoom=document.createElement('span');zoom.className='fullscreen-zoom-readout';zoom.dataset.source='viewZoomLabel';body.appendChild(zoom);proxies.set('viewZoomLabel',zoom);
+    syncControls();
+  }
+  function syncControls(){
+    for(const spec of proxySpecs){
+      const source=document.getElementById(spec.source),proxy=proxies.get(spec.source),wrap=proxy?.closest?.('.fullscreen-toolbar-control');
+      if(!proxy||!wrap)continue;
+      const available=!!source;
+      wrap.hidden=!available;
+      if(!available)continue;
+      if(spec.type==='select'){proxy.value=source.value;proxy.disabled=source.disabled}
+      else if(spec.type==='check'){proxy.checked=source.checked;proxy.disabled=source.disabled}
+      else{proxy.disabled=source.disabled;proxy.classList.toggle('active',source.classList.contains('active')||source.getAttribute('aria-pressed')==='true')}
+    }
+    const zoomSource=document.getElementById('viewZoomLabel'),zoomProxy=proxies.get('viewZoomLabel');
+    if(zoomProxy){zoomProxy.hidden=!zoomSource;zoomProxy.textContent=zoomSource?.textContent||''}
+  }
   function expanded(){return document.fullscreenElement===stage||stage.classList.contains('lesson-fullscreen')}
-  function sync(){const active=expanded();exit.hidden=!active;enter.setAttribute('aria-expanded',String(active));if(!active)enter.focus()}
+  function teacherView(){return teacherPanel&&!teacherPanel.hidden}
+  function startSync(){clearInterval(syncTimer);syncTimer=setInterval(syncControls,200)}
+  function stopSync(){clearInterval(syncTimer);syncTimer=null}
+  function sync(){
+    const active=expanded();exit.hidden=!active;enter.setAttribute('aria-expanded',String(active));
+    toolbar.hidden=!(active&&teacherView());
+    if(active&&teacherView()){build();startSync()}else{stopSync();if(!active)enter.focus()}
+  }
   function fallback(){stage.classList.add('lesson-fullscreen');document.body.classList.add('lesson-expanded');sync()}
   enter.addEventListener('click',async()=>{
     if(expanded())return;
@@ -13,8 +88,13 @@
     if(document.fullscreenElement===stage){try{await document.exitFullscreen()}catch{return}}
     stage.classList.remove('lesson-fullscreen');document.body.classList.remove('lesson-expanded');sync();
   }
-  // The exit button must never place a pointer or start a highlight on the lesson.
-  ['pointerdown','pointermove','pointerup','pointercancel'].forEach(type=>exit.addEventListener(type,event=>event.stopPropagation()));
+  collapse.addEventListener('click',event=>{
+    event.stopPropagation();const collapsed=toolbar.classList.toggle('collapsed');body.hidden=collapsed;collapse.textContent=collapsed?'Show controls':'Hide controls';collapse.setAttribute('aria-expanded',String(!collapsed));
+  });
+  // UI inside the lesson must never place a pointer or start a highlight.
+  [toolbar,exit].forEach(control=>{
+    ['pointerdown','pointermove','pointerup','pointercancel','click'].forEach(type=>control.addEventListener(type,event=>event.stopPropagation()));
+  });
   exit.addEventListener('click',event=>{event.stopPropagation();close()});
   document.addEventListener('fullscreenchange',sync);
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&stage.classList.contains('lesson-fullscreen'))close()});
