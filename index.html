@@ -730,7 +730,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   function startApprovalCenter(){
     el("approvalCenterButton").classList.remove("hidden");
     if(approvalCenterTimer)clearInterval(approvalCenterTimer);
-    loadApprovalCenter(true);
+    // Keep the corner approval badge updated without auto-opening the center modal.
+    loadApprovalCenter(false);
     approvalCenterTimer=setInterval(function(){loadApprovalCenter(false);},30000);
   }
   function stopApprovalCenter(){
