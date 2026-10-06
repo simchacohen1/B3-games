@@ -128,6 +128,24 @@
     padding:2px 10px;border-radius:20px;min-width:22px;text-align:center;
   }
   .stats-empty{color:var(--muted);font-size:13px;}
+  .chazzan-counts{margin-top:8px;}
+  .chazzan-count-row{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 90px;
+    gap:12px;
+    align-items:center;
+    padding:8px 2px;
+    border-bottom:1px dashed rgba(255,255,255,0.1);
+  }
+  .chazzan-count-row:last-child{border-bottom:none;}
+  .chazzan-count-name{font-weight:700;}
+  .chazzan-count-input{
+    width:90px !important;
+    text-align:center;
+    padding:7px 8px !important;
+    font-weight:800;
+    color:var(--accent) !important;
+  }
 
   .notice{
     background:rgba(255,107,74,0.14);
@@ -286,6 +304,12 @@
           <button id="deletePurposeBtn" class="ghost" hidden>Delete</button>
         </div>
       </div>
+    </div>
+
+    <div class="panel">
+      <h2>Chazzan count</h2>
+      <div class="hint" style="margin-bottom:8px;">How many times each boy has been Chazzan. You can edit any number here.</div>
+      <div id="chazzanCounts" class="chazzan-counts"></div>
     </div>
 
     <div class="panel">
@@ -770,6 +794,7 @@ const savePurposeBtn = el('#savePurposeBtn');
 const deletePurposeBtn = el('#deletePurposeBtn');
 const cancelPurposeBtn = el('#cancelPurposeBtn');
 const fairnessStatusEl = el('#fairnessStatus');
+const chazzanCounts = el('#chazzanCounts');
 const statsScope = el('#statsScope');
 const statsTable = el('#statsTable');
 const downloadBackupBtn = el('#downloadBackupBtn');
@@ -861,6 +886,7 @@ function commitRosterEditor() {
   }
   updateRosterHint();
   renderFairnessStatus();
+  renderChazzanCounts();
 }
 
 listButtons.forEach(btn => {
@@ -869,6 +895,7 @@ listButtons.forEach(btn => {
     persist('activeList');
     loadRosterEditor();
     renderFairnessStatus();
+    renderChazzanCounts();
   });
 });
 rosterEditor.addEventListener('input', commitRosterEditor);
@@ -922,6 +949,7 @@ savePurposeBtn.addEventListener('click', () => {
   purposeEditor.hidden = true;
   renderPurposeSelect();
   renderFairnessStatus();
+  renderChazzanCounts();
   renderStatsScopeOptions();
   renderStats();
 });
@@ -950,6 +978,49 @@ function renderFairnessStatus() {
   } else {
     fairnessStatusEl.textContent = `${status.remaining} of ${status.total} still need a turn this round.`;
   }
+}
+
+// ---------- Chazzan totals ----------
+function renderChazzanCounts() {
+  const names = getActiveNames();
+  if (!state.totalPicks['p_chazzan']) state.totalPicks['p_chazzan'] = {};
+  const counts = state.totalPicks['p_chazzan'];
+
+  if (names.length === 0) {
+    chazzanCounts.innerHTML = '<div class="stats-empty">No boys in this list.</div>';
+    return;
+  }
+
+  chazzanCounts.innerHTML = '';
+  names.forEach(name => {
+    const row = document.createElement('div');
+    row.className = 'chazzan-count-row';
+
+    const label = document.createElement('div');
+    label.className = 'chazzan-count-name';
+    label.textContent = name;
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.step = '1';
+    input.inputMode = 'numeric';
+    input.className = 'chazzan-count-input';
+    input.value = Math.max(0, Number(counts[name] || 0));
+    input.setAttribute('aria-label', `Chazzan count for ${name}`);
+
+    input.addEventListener('change', () => {
+      const value = Math.max(0, Math.floor(Number(input.value) || 0));
+      input.value = value;
+      counts[name] = value;
+      persist('totalPicks');
+      renderStats();
+    });
+
+    row.appendChild(label);
+    row.appendChild(input);
+    chazzanCounts.appendChild(row);
+  });
 }
 
 // ---------- All-time pick stats ----------
@@ -1159,6 +1230,7 @@ function finishSpin(purpose, entry, winner, names) {
   spinBtn.disabled = false;
   spinning = false;
   renderStats();
+  if (purpose.id === 'p_chazzan') renderChazzanCounts();
 }
 
 resetCycleBtn.addEventListener('click', () => {
@@ -1213,6 +1285,7 @@ async function init() {
   loadRosterEditor();
   renderPurposeSelect();
   renderFairnessStatus();
+  renderChazzanCounts();
   renderStatsScopeOptions();
   renderStats();
   showTab('setup');
