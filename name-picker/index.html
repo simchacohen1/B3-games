@@ -425,7 +425,7 @@ let state = {
   customNames: [],
   activeList: 'east',
   purposes: DEFAULT_PURPOSES.slice(),
-  activePurposeId: DEFAULT_PURPOSES[0].id,
+  activePurposeId: 'p_chazzan',
   history: {},
   totalPicks: {}, // purposeId -> name -> count, kept forever
   settings: { style: 'wheel', theme: 'gold', confetti: true, sound: true },
@@ -453,6 +453,12 @@ async function loadState() {
   if (state.activeList !== 'east' && state.activeList !== 'west' && state.activeList !== 'custom') state.activeList = 'east';
   if (CLASS_MODE && state.activeList === 'west') state.activeList = 'east';
   if (!state.purposes || state.purposes.length === 0) state.purposes = DEFAULT_PURPOSES.slice();
+  // Always start the Name Picker in Chazzan mode when that built-in purpose exists.
+  if (state.purposes.some(p => p.id === 'p_chazzan')) {
+    state.activePurposeId = 'p_chazzan';
+  } else if (!state.purposes.some(p => p.id === state.activePurposeId)) {
+    state.activePurposeId = state.purposes[0].id;
+  }
 }
 
 async function persist(key) {
