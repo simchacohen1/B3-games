@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Halacha — Student Work</title>
-<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#eef4f8;color:#203040}header{background:#173b62;color:#fff;padding:16px 22px}main{max-width:1100px;margin:auto;padding:20px}.status{padding:12px;background:#fff;border-radius:12px;margin-bottom:15px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}.card{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 14px #0001}.card h3{margin:0 0 6px}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#e5f5e7;color:#25612f;font-size:12px;font-weight:bold}.empty{color:#718096}.card button{margin-top:12px;border:0;border-radius:9px;padding:9px 12px;background:#173b62;color:white;font-weight:bold;cursor:pointer}</style>
+<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#eef4f8;color:#203040}header{background:#173b62;color:#fff;padding:16px 22px}main{max-width:1100px;margin:auto;padding:20px}.status{padding:12px;background:#fff;border-radius:12px;margin-bottom:15px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}.card{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 14px #0001}.card h3{margin:0 0 6px}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#e5f5e7;color:#25612f;font-size:12px;font-weight:bold}.empty{color:#718096}.card button{margin-top:12px;border:0;border-radius:9px;padding:9px 12px;background:#173b62;color:white;font-weight:bold;cursor:pointer}.accessbox{background:#fff8df;border:3px solid #d2aa57;border-radius:16px;padding:16px;margin-bottom:18px}.accessbox h2{margin:0 0 8px}.accessrow{padding:10px 0;border-top:1px solid #e4d7b4}.accessrow:first-of-type{border-top:0}.accessrow strong{display:inline-block;min-width:150px}.simanBtns{display:inline-flex;gap:6px;flex-wrap:wrap;direction:rtl}.simanBtns button{margin:0;border:2px solid #b7cfdb;background:#fff;color:#173b62}.simanBtns button.on{background:#173b62;color:#fff}.hint{font-size:12px;color:#64748b;margin-top:6px}</style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script src="../firebase-config.js"></script><script src="../site-settings.js?v=20261006-halacha-teacher-auth"></script></head>
-<body><header><h1>📔 Halacha — Student Work</h1></header><main><div id=status class=status>Checking teacher access…</div><div id=grid class=grid></div></main>
+<body><header><h1>📔 Halacha — Student Work</h1></header><main><div id=status class=status>Checking teacher access…</div><div id="accessBox" class="accessbox"><h2>🔒 Student Siman Access</h2><div id="accessRows">Loading…</div><div class="hint">Choose the furthest Siman students may open. Earlier Simanim stay available; later ones stay locked.</div></div><div id=grid class=grid></div></main>
 <script>
 if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 const db=firebase.database();
@@ -9,7 +9,21 @@ const settingsApi=window.B3SiteSettings;
 const workspaceId=settingsApi?.workspaceId||"b3-2026";
 const statusEl=document.getElementById("status"),grid=document.getElementById("grid");
 function esc(s){return String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
-function doneCount(st){return ["a","b","c","d","e","f"].filter(x=>st&&st[x+"_done"]).length}
+const HALACHA_SECTION_IDS=["a","b","c","d","e","f","s2a","s2b","s2c","s2d","s3a","s3b","s3c","s3d","s3e","s4a","s4b","s4c","s4d","s4e","s4f","s6a","s6b","s6c","s6d","s6e","s6f","s6g","s6h","s6i","s6j","s6k"];const SIMAN_ORDER=["א","ב","ג","ד","ו"];
+function doneCount(st){return HALACHA_SECTION_IDS.filter(x=>st&&st[x+"_done"]).length}
+async function editableClassIds(access){
+ if(access?.role==="admin"){const snap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");return Object.entries(snap.val()||{}).filter(([,r])=>r?.active!==false).map(([id])=>id)}
+ return (access?.classIds||[]).filter(Boolean);
+}
+async function renderSimanAccess(access){
+ const box=document.getElementById("accessRows");if(!box)return;
+ try{
+  const ids=await editableClassIds(access||{});if(!ids.length){box.textContent="No classes are assigned to this teacher.";return}
+  const rows=await Promise.all(ids.map(async id=>{const [c,a]=await Promise.all([db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id).once("value"),db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id+"/halachaAccess/maxSiman").once("value")]);return {id,name:String(c.val()?.name||id),max:SIMAN_ORDER.includes(String(a.val()||""))?String(a.val()):"א"}}));
+  box.innerHTML=rows.map(r=>'<div class="accessrow"><strong>'+esc(r.name)+'</strong><span class="simanBtns">'+SIMAN_ORDER.map(s=>'<button type="button" class="'+(s===r.max?'on':'')+'" data-class="'+esc(r.id)+'" data-siman="'+s+'">סימן '+s+'</button>').join('')+'</span></div>').join('');
+  box.querySelectorAll("[data-class][data-siman]").forEach(b=>b.onclick=async()=>{b.disabled=true;try{await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+b.dataset.class+"/halachaAccess/maxSiman").set(b.dataset.siman);await renderSimanAccess(access)}catch(e){alert("Could not change Halacha access: "+(e.message||e))}});
+ }catch(e){box.textContent="Could not load Siman access controls."}
+}
 async function classMembers(classId){
  const snap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members").once("value");
  return Object.entries(snap.val()||{}).filter(([,m])=>!m||m.active!==false).map(([id,m])=>({id,name:String(m?.name||id),classId}));
@@ -30,7 +44,7 @@ async function authorizedRoster(access){
 async function loadForAccess(user,authorized,access){
  if(!user){statusEl.textContent="Please sign in from the Fun Torah Tools Teacher area first.";grid.innerHTML="";return}
  if(!authorized){statusEl.textContent="This Google account is not authorized for Teacher Tools.";grid.innerHTML="";return}
- statusEl.textContent="Loading student Halacha books…";
+ statusEl.textContent="Loading student Halacha books…";renderSimanAccess(access);
  try{
   const roster=await authorizedRoster(access||{});
   const rows=await Promise.all(roster.map(async s=>{
@@ -41,7 +55,7 @@ async function loadForAccess(user,authorized,access){
   }));
   const cards=rows.filter(s=>s.halacha&&s.halacha.state).map(s=>{
     const h=s.halacha,n=doneCount(h.state),updated=h.updatedAt?new Date(h.updatedAt).toLocaleString():"";
-    return '<div class="card"><h3>'+esc(s.name)+'</h3><span class="pill">'+n+' / 6 sections started/completed</span><p>'+(updated?'Last saved: '+esc(updated):'Saved work available')+'</p><button type="button" data-open-student="'+esc(s.id)+'">Open scrapbook</button></div>';
+    return '<div class="card"><h3>'+esc(s.name)+'</h3><span class="pill">'+n+' / '+HALACHA_SECTION_IDS.length+' sections started/completed</span><p>'+(updated?'Last saved: '+esc(updated):'Saved work available')+'</p><button type="button" data-open-student="'+esc(s.id)+'">Open scrapbook</button></div>';
   });
   grid.innerHTML=cards.join("")||'<div class="card empty">No student Halacha work has been saved yet.</div>';
   statusEl.textContent="Student work — "+cards.length+" scrapbook"+(cards.length===1?"":"s")+" · "+roster.length+" students checked";
