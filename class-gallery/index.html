@@ -606,7 +606,7 @@ function init3D(){
   scene.add(new THREE.HemisphereLight(0xfff6e5,0x7a695b,1.25));
   const sun=new THREE.DirectionalLight(0xffeed0,1.05);sun.position.set(2,9,6);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-16;sun.shadow.camera.right=16;sun.shadow.camera.top=24;sun.shadow.camera.bottom=-24;scene.add(sun);
   buildScene();
-  avatar=createAvatar(selectedAvatarId);avatarParts=avatar.userData.parts;scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);
+  avatar=createAvatar(selectedAvatarId);avatarParts=avatar.userData.parts;avatar.scale.setScalar(.78);scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);
   remoteAvatarsGroup=new THREE.Group();scene.add(remoteAvatarsGroup);
   renderer.domElement.addEventListener('pointerdown',onPointerDown);renderer.domElement.addEventListener('pointermove',onPointerMove);renderer.domElement.addEventListener('pointerup',onPointerUp);renderer.domElement.addEventListener('pointercancel',()=>dragging=false);
   window.addEventListener('resize',onResize);
@@ -1034,7 +1034,7 @@ function createAvatar(avatarId=selectedAvatarId){
 function rebuildAvatar(){
   if(!scene)return;
   if(avatar){scene.remove(avatar);disposeGroup(avatar);}
-  avatar=createAvatar(selectedAvatarId);avatarParts=avatar.userData.parts;scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);avatar.rotation.y=avatarState.angle;
+  avatar=createAvatar(selectedAvatarId);avatarParts=avatar.userData.parts;avatar.scale.setScalar(.78);scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);avatar.rotation.y=avatarState.angle;
   syncLivePresence(true);
 }
 
