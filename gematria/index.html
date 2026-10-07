@@ -106,11 +106,13 @@ bdi.he{unicode-bidi:isolate}.sofitList{direction:ltr;display:inline}
 .hidden{display:none!important}
 .pop{animation:pop .35s ease}
 @keyframes pop{0%{transform:scale(.9)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+.b3r-big.he{font-family:"Frank Ruhl Libre",serif;font-size:76px}.b3r-choices button.he{font-family:"Frank Ruhl Libre",serif;font-size:34px}
 .saveNote{font-size:12px;color:var(--muted);text-align:center;margin-top:18px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
 <script src="../firebase-config.js"></script>
 <script src="../student-class.js"></script>
+<script src="../b3-race.js?v=20261007"></script>
 <script src="../game-gate.js?v=20261007-gematria" data-game-id="gematria" data-back-href="../index.html"></script>
 </head>
 <body>
@@ -134,6 +136,7 @@ bdi.he{unicode-bidi:isolate}.sofitList{direction:ltr;display:inline}
       <button class="tile" type="button" data-go="numbers"><span class="ic">✍️</span><span class="t">Number → Letters</span><span class="s">Write a number in Hebrew letters</span></button>
       <button class="tile" type="button" data-go="speed"><span class="ic">⏱️</span><span class="t">Speed Round</span><span class="s">How many in 60 seconds?</span></button>
       <button class="tile" type="button" data-go="match"><span class="ic">🃏</span><span class="t">Memory Match</span><span class="s">Match each letter to its number</span></button>
+      <button class="tile" type="button" data-go="race"><span class="ic">👥</span><span class="t">Play with Friends</span><span class="s">Race your classmates live!</span></button>
     </div>
   </section>
 
@@ -222,6 +225,13 @@ bdi.he{unicode-bidi:isolate}.sofitList{direction:ltr;display:inline}
     </div>
   </section>
 
+  <!-- RACE -->
+  <section id="race" class="panel hidden">
+    <h2>👥 Play with Friends</h2>
+    <p class="sub">Race your classmates on 10 gematria questions. Most right answers wins!</p>
+    <div id="raceBox"></div>
+  </section>
+
   <!-- MATCH -->
   <section id="match" class="panel hidden">
     <h2>🃏 Memory Match</h2>
@@ -287,11 +297,11 @@ const LOCAL_KEY="gematria_progress:"+(studentId||"guest");
 let P=blankProgress();
 try{const c=JSON.parse(safeGet(LOCAL_KEY)||"null");if(c&&typeof c==="object")P=Object.assign(blankProgress(),c)}catch(e){}
 let level=Number(safeGet("gematria_level"))||1;if(!LEVEL_MAX[level])level=1;
-let db=null,progressRef=null,saveTimer=null;
+let db=null,progressRef=null,saveTimer=null,classBase="";
 
-function blankProgress(){return {stars:0,learn:{correct:0,attempts:0},words:{correct:0,attempts:0},numbers:{correct:0,attempts:0},speed:{best:0,plays:0},match:{bestSeconds:0,plays:0},missed:{},level:1}}
+function blankProgress(){return {race:{plays:0,wins:0},stars:0,learn:{correct:0,attempts:0},words:{correct:0,attempts:0},numbers:{correct:0,attempts:0},speed:{best:0,plays:0},match:{bestSeconds:0,plays:0},missed:{},level:1}}
 function num(x){return Number(x)||0}
-function hasPlayed(p){return num(p.stars)>0||["learn","words","numbers"].some(k=>num(p[k]?.attempts)>0)||num(p.speed?.plays)>0||num(p.match?.plays)>0}
+function hasPlayed(p){return num(p.stars)>0||["learn","words","numbers"].some(k=>num(p[k]?.attempts)>0)||num(p.speed?.plays)>0||num(p.match?.plays)>0||num(p.race?.plays)>0}
 function merge(local,remote){ // keep the best of both copies
  const r=Object.assign(blankProgress(),remote||{}),l=local,o=blankProgress();
  o.stars=Math.max(num(l.stars),num(r.stars));
@@ -301,6 +311,7 @@ function merge(local,remote){ // keep the best of both copies
  o.match={bestSeconds:(lb&&rb)?Math.min(lb,rb):(lb||rb),plays:Math.max(num(l.match?.plays),num(r.match?.plays))};
  const keys=new Set([...Object.keys(l.missed||{}),...Object.keys(r.missed||{})]);
  keys.forEach(k=>o.missed[k]=Math.max(num(l.missed?.[k]),num(r.missed?.[k])));
+ o.race={plays:Math.max(num(l.race?.plays),num(r.race?.plays)),wins:Math.max(num(l.race?.wins),num(r.race?.wins))};
  o.level=num(l.level)||num(r.level)||1;
  return o;
 }
@@ -334,7 +345,8 @@ async function connect(){
   db=firebase.database();
   const info=await window.FunTorahStudentClass.resolve(db,studentId);
   if(!info.classId){setNote("Practice mode — ask your teacher to add you to a class to save stars.");return}
-  progressRef=db.ref("b3Games/workspaces/"+info.workspaceId+"/classes/"+info.classId+"/resources/gematria/progress/"+studentId);
+  classBase="b3Games/workspaces/"+info.workspaceId+"/classes/"+info.classId+"/resources/gematria";
+  progressRef=db.ref(classBase+"/progress/"+studentId);
   const snap=await progressRef.once("value");
   const remote=snap.val();P=merge(P,remote);
   if(!safeGet("gematria_level")&&P.level)level=P.level;
@@ -347,14 +359,14 @@ async function connect(){
 }
 
 /* ---------- Navigation ---------- */
-const SECTIONS=["menu","learn","words","numbers","speed","match"];
+const SECTIONS=["menu","learn","words","numbers","speed","match","race"];
 let stopCurrent=null;
 function show(id){
  if(stopCurrent){stopCurrent();stopCurrent=null}
  SECTIONS.forEach(s=>$(s).classList.toggle("hidden",s!==id));
  $("menuBtn").classList.toggle("hidden",id==="menu");
  window.scrollTo(0,0);
- ({learn:startLearn,words:nextWord,numbers:nextNumber,speed:speedIntro,match:startMatch}[id]||(()=>{}))();
+ ({learn:startLearn,words:nextWord,numbers:nextNumber,speed:speedIntro,match:startMatch,race:startRace}[id]||(()=>{}))();
 }
 document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>show(b.dataset.go));
 $("menuBtn").onclick=()=>show("menu");
@@ -569,9 +581,40 @@ function endMatch(){
 }
 $("mAgain").onclick=startMatch;
 
+/* ---------- Play with friends (shared B3 Race) ---------- */
+function raceQuestions(){
+ const L=levelLetters(),qs=[],seen=new Set();
+ let guard=0;
+ while(qs.length<10&&guard++<200){
+  const kind=level>1?pick(["lv","vl","word","word"]):pick(["lv","vl","vl","word"]);
+  let q;
+  if(kind==="lv"){const [h,v]=pick(L);q={prompt:"What number is this letter?",big:h,bigClass:"he",bigDir:"rtl",choices:numberChoices(v,L.map(x=>x[1])).map(String),answer:String(v),explain:h+" = "+v,key:"l"+h}}
+  else if(kind==="vl"){const [h,v]=pick(L);q={prompt:"Which letter equals this number?",big:String(v),choices:letterChoices(h,L.map(x=>x[0])),answer:h,choiceClass:"he",explain:v+" = "+h,key:"v"+h}}
+  else{const pool=WORDS.filter(([w])=>wordLevel(w)<=level&&w.length<=4),[w,mean]=pick(pool),v=wordValue(w);
+   const wrong=new Set();[...w].forEach(c=>{if(v-VAL[c]>0)wrong.add(v-VAL[c]);wrong.add(v+VAL[c])});[1,10,-1,-10].forEach(d=>{if(v+d>0)wrong.add(v+d)});wrong.delete(v);
+   q={prompt:"What is "+mean+" worth?",big:w,bigClass:"he",bigDir:"rtl",choices:shuffle([v,...shuffle([...wrong]).slice(0,3)]).map(String),answer:String(v),explain:"\u2068"+w+"\u2069 = "+v,key:"w"+w}}
+  if(seen.has(q.key))continue;seen.add(q.key);delete q.key;qs.push(q);
+ }
+ return qs;
+}
+let race=null;
+function startRace(){
+ if(!race){
+  race=B3Race.create({container:$("raceBox"),db,roomsPath:classBase?classBase+"/rooms":"",studentId,studentName:studentName||studentId,
+   makeQuestions:raceQuestions,roomInfo:()=>({label:"Level "+level+" ("+["","א–י","א–צ","א–ת"][level]+")"}),
+   onCorrect:()=>{star();save()},
+   onWrong:q=>{const h=VAL[q.big]?q.big:VAL[q.answer]?q.answer:"";if(h){P.missed[h]=num(P.missed[h])+1;save()}},
+   onFinish:({won})=>{P.race=P.race||{plays:0,wins:0};P.race.plays=num(P.race.plays)+1;if(won)P.race.wins=num(P.race.wins)+1;save()},
+   onExit:()=>show("menu")});
+ }
+ race.start();
+ stopCurrent=()=>race.leave();
+}
+window.addEventListener("pagehide",()=>{if(race)race.leave()});
+
 $("starCount").textContent=P.stars;
 connect();
-window.__gematria={toLetters,withMarks,wordValue,WORDS,wordLevel};
+window.__gematria={toLetters,withMarks,wordValue,WORDS,wordLevel,raceQuestions};
 })();
 </script>
 </body>
