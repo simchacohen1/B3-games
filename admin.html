@@ -144,8 +144,8 @@ async function renderTeacherAccess(msg){
 }
 // ---- Owner Control page -------------------------------------------------
 // One class at a time: status, Automatic / Open now / Lock now, and every
-// game with a one-tap Open/Closed switch. A star marks the one game that
-// stays open while the class is locked.
+// game with a one-tap Open/Closed switch. Starred games stay open while the
+// class is locked.
 const CP_CLASSES=[{id:"et",name:"ET"},{id:"wt",name:"WT"}];
 let cpClass=(()=>{try{const v=localStorage.getItem("b3ControlClass");return CP_CLASSES.some(c=>c.id===v)?v:"et"}catch(e){return "et"}})();
 let cpSettings=null,cpUnsub=null,cpTimer=null,cpBusy=false,cpMsg="";
@@ -188,7 +188,7 @@ function renderOwnerControl(){
   const panel=document.getElementById("ownerControlPanel"),api=cpApi();
   if(!cpSettings||!api){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">Loading your classes…</div></div>';return}
   const s=cpSettings,cls=cpClass,info=api.describeClassAccess(s,cls),access=s.classAccess?.[cls]||{mode:"auto"};
-  const star=s.classLockedGameOverride?.[cls]||"";
+  const stars=String(s.classLockedGameOverride?.[cls]||"").split(",").map(v=>v.trim()).filter(Boolean);
   let detail;
   if(s.siteEnabled===false)detail="Emergency lock is on";
   else if(access.mode==="open")detail="Opened by you · stays open until you press Automatic";
@@ -198,7 +198,7 @@ function renderOwnerControl(){
   const modes=[["auto","⏰ Automatic"],["open","🔓 Open now"],["locked","🔒 Lock now"]].map(([m,l])=>'<button type="button" data-cp-mode="'+m+'" class="'+(access.mode===m?"on":"")+'"'+(cpBusy?" disabled":"")+'>'+l+'</button>').join("");
   const games=cpGames().filter(g=>s.games?.[g.id]!==false);
   const rows=games.map(g=>{
-    const open=s.classGames?.[cls]?.[g.id]!==false,starred=star===g.id;
+    const open=s.classGames?.[cls]?.[g.id]!==false,starred=stars.includes(g.id);
     const note=starred?(info.open?"⭐ stays open during lock":"⭐ open now even though class is locked"):"";
     return '<div class="cp-row"><button type="button" class="cp-star'+(starred?" on":"")+'" data-cp-star="'+cpEsc(g.id)+'" title="'+(starred?"Remove star":"Keep this game open while the class is locked")+'" aria-label="Star '+cpEsc(g.name)+'"'+(cpBusy?" disabled":"")+'>⭐</button>'
       +'<div class="cp-name">'+cpEsc(g.name)+(note?'<small>'+note+'</small>':"")+'</div>'
@@ -213,10 +213,10 @@ function renderOwnerControl(){
   panel.querySelectorAll("[data-cp-class]").forEach(b=>b.onclick=()=>{cpClass=b.dataset.cpClass;cpMsg="";try{localStorage.setItem("b3ControlClass",cpClass)}catch(e){}renderOwnerControl()});
   panel.querySelectorAll("[data-cp-mode]").forEach(b=>b.onclick=()=>cpSave(()=>api.updateClassMode(cls,b.dataset.cpMode),{auto:"Back on the recess schedule ✓",open:cls.toUpperCase()+" opened ✓",locked:cls.toUpperCase()+" locked ✓"}[b.dataset.cpMode]));
   panel.querySelectorAll("[data-cp-game]").forEach(b=>b.onclick=()=>{const id=b.dataset.cpGame,open=s.classGames?.[cls]?.[id]!==false,name=games.find(g=>g.id===id)?.name||id;
-    cpSave(async()=>{await api.updateClassGameEnabled(cls,id,!open);if(open&&star===id)await api.updateClassLockedGameOverride(cls,"");},name+(open?" closed":" opened")+" for "+cls.toUpperCase()+" ✓")});
+    cpSave(async()=>{await api.updateClassGameEnabled(cls,id,!open);if(open&&stars.includes(id))await api.setClassLockedGame(cls,id,false);},name+(open?" closed":" opened")+" for "+cls.toUpperCase()+" ✓")});
   panel.querySelectorAll("[data-cp-star]").forEach(b=>b.onclick=()=>{const id=b.dataset.cpStar,name=games.find(g=>g.id===id)?.name||id;
-    if(star===id)return cpSave(()=>api.updateClassLockedGameOverride(cls,""),"Star removed ✓");
-    cpSave(async()=>{if(s.classGames?.[cls]?.[id]===false)await api.updateClassGameEnabled(cls,id,true);await api.updateClassLockedGameOverride(cls,id);},name+" will stay open during lock ✓");});
+    if(stars.includes(id))return cpSave(()=>api.setClassLockedGame(cls,id,false),name+" will lock with the class ✓");
+    cpSave(async()=>{if(s.classGames?.[cls]?.[id]===false)await api.updateClassGameEnabled(cls,id,true);await api.setClassLockedGame(cls,id,true);},name+" will stay open during lock ✓");});
   const em=document.getElementById("cpEmergencyOff");if(em)em.onclick=()=>{if(confirm("Turn the emergency lock off? Classes go back to their normal settings."))cpSave(()=>api.updateSiteEnabled(true),"Emergency lock off ✓")};
 }
 async function cpSave(fn,okMsg){

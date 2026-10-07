@@ -169,7 +169,7 @@
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
 <script src="firebase-config.js?v=20261001-teacherauth"></script>
-<script src="site-settings.js?v=20261007-class-toggle"></script>
+<script src="site-settings.js?v=20261007-multistar"></script>
 </head>
 <body>
   <h1>B3 Games</h1>
@@ -870,7 +870,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   function classHasLockedGameOverride(gameId,classId=myClassId){
     if(!classId||!gameId)return false;
     if(typeof settingsApi.classHasLockedGameOverride==="function")return settingsApi.classHasLockedGameOverride(currentSettings,classId,gameId);
-    return String(currentSettings.classLockedGameOverride?.[classId]||"")===String(gameId);
+    return String(currentSettings.classLockedGameOverride?.[classId]||"").split(",").map(v=>v.trim()).includes(String(gameId));
   }
 
   function studentNudgeVisitKey(gameId){

@@ -316,7 +316,7 @@
 
   function classHasLockedGameOverride(settings, classId) {
     if (!settings || !classId || !settings.classLockedGameOverride) return false;
-    return String(settings.classLockedGameOverride[classId] || "") === String(gameId || "");
+    return String(settings.classLockedGameOverride[classId] || "").split(",").map(function (v) { return v.trim(); }).indexOf(String(gameId || "")) !== -1;
   }
 
   // Match the B3 homepage's ET/WT activity switches.
