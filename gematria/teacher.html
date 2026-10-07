@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gematria — Teacher</title>
+<style>
+*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#eef4f8;color:#203040}
+header{background:#173b62;color:#fff;padding:16px 22px}header h1{margin:0;font-size:24px}header p{margin:4px 0 0;color:#c9d8e8;font-size:13px}
+main{max-width:1150px;margin:auto;padding:20px}
+.status{padding:12px;background:#fff;border-radius:12px;margin-bottom:15px;font-weight:bold}
+.classTabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.classTabs button{border:2px solid #c9d8e6;background:#fff;color:#173b62;border-radius:10px;padding:8px 14px;font-weight:bold;cursor:pointer}
+.classTabs button.on{background:#173b62;color:#fff;border-color:#173b62}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.stat{background:#fff;border-radius:14px;padding:14px;box-shadow:0 3px 10px #0001}
+.stat .v{font-size:28px;font-weight:900;color:#173b62}.stat .l{font-size:13px;color:#64748b;font-weight:bold}
+.stat .he{font-family:"Times New Roman",serif;font-size:26px;direction:rtl}
+.tableWrap{background:#fff;border-radius:14px;box-shadow:0 3px 10px #0001;overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:860px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #e5edf4;font-size:14px;white-space:nowrap}
+th{background:#f6f9fc;color:#475569;font-size:12px;text-transform:uppercase;letter-spacing:.3px;cursor:pointer;user-select:none}
+th:hover{color:#173b62}
+tr.none td{color:#94a3b8}
+.pct{display:inline-block;min-width:44px;padding:3px 7px;border-radius:999px;font-weight:bold;text-align:center}
+.g{background:#e5f7ec;color:#1f7a45}.y{background:#fff4d6;color:#8a6200}.r{background:#fdecea;color:#b42318}.n{background:#f1f5f9;color:#94a3b8}
+.tricky{font-family:"Times New Roman",serif;font-size:20px;direction:rtl;letter-spacing:4px}
+.muted{color:#64748b;font-size:13px}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap}
+.toolbar button{border:0;border-radius:9px;padding:8px 12px;background:#173b62;color:#fff;font-weight:bold;cursor:pointer}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="../firebase-config.js"></script><script src="../site-settings.js?v=20261007-gematria"></script>
+</head>
+<body>
+<header><h1>🔢 Gematria — Teacher Dashboard</h1><p>Each student's stars, accuracy, best scores, and the letters they miss most.</p></header>
+<main>
+ <div id="status" class="status">Checking teacher access…</div>
+ <div id="classTabs" class="classTabs"></div>
+ <div id="summary" class="summary"></div>
+ <div class="toolbar"><span class="muted" id="updated"></span><button type="button" id="refresh">↻ Refresh</button></div>
+ <div class="tableWrap"><table><thead><tr>
+  <th data-sort="name">Student</th><th data-sort="stars">⭐ Stars</th><th data-sort="level">Level</th>
+  <th data-sort="learn">Letters</th><th data-sort="words">Word value</th><th data-sort="numbers">Number → letters</th>
+  <th data-sort="speed">Speed best</th><th data-sort="match">Match best</th><th>Tricky letters</th><th data-sort="last">Last played</th>
+ </tr></thead><tbody id="rows"><tr><td colspan="10" class="muted">—</td></tr></tbody></table></div>
+ <p class="muted">Percent = right answers ÷ tries. Tricky letters are the letters the student missed most.</p>
+</main>
+<script>
+(function(){
+if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+const db=firebase.database(),api=window.B3SiteSettings,ws=api?.workspaceId||"b3-2026";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+let classes=[],current="",rows=[],sortKey="name",sortDir=1;
+const params=new URLSearchParams(location.search);
+function pct(o){const a=Number(o?.attempts)||0,c=Number(o?.correct)||0;return a?Math.round(c/a*100):null}
+function pctCell(o){const p=pct(o);if(p===null)return '<span class="pct n">—</span>';const cls=p>=80?"g":p>=60?"y":"r";return '<span class="pct '+cls+'">'+p+'%</span> <span class="muted">'+(o.correct||0)+'/'+(o.attempts||0)+'</span>'}
+function tricky(m){return Object.entries(m||{}).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([h])=>h).join(" ")}
+function ago(t){if(!t)return"";const d=(Date.now()-t)/1000;if(d<90)return"just now";if(d<3600)return Math.round(d/60)+" min ago";if(d<86400)return Math.round(d/3600)+" hr ago";return new Date(t).toLocaleDateString()}
+async function classList(access){
+ const snap=await db.ref("b3Games/workspaces/"+ws+"/classes").once("value");const all=snap.val()||{};
+ const allowed=access?.role==="admin"?null:new Set(access?.classIds||[]);
+ return Object.entries(all).filter(([id,r])=>r&&r.active!==false&&(!allowed||allowed.has(id))).map(([id,r])=>({id,name:String(r.name||id.toUpperCase()),members:r.members||{}}));
+}
+function drawTabs(){
+ $("classTabs").innerHTML=classes.map(c=>'<button type="button" data-c="'+esc(c.id)+'" class="'+(c.id===current?"on":"")+'">'+esc(c.name)+'</button>').join("");
+ $("classTabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{current=b.dataset.c;drawTabs();loadClass()});
+}
+async function loadClass(){
+ const c=classes.find(x=>x.id===current);if(!c)return;
+ $("status").textContent="Loading "+c.name+"…";
+ try{
+  const snap=await db.ref("b3Games/workspaces/"+ws+"/classes/"+c.id+"/resources/gematria/progress").once("value");
+  const prog=snap.val()||{};
+  const ids=new Set([...Object.entries(c.members).filter(([,m])=>!m||m.active!==false).map(([id])=>id),...Object.keys(prog)]);
+  rows=[...ids].map(id=>{const p=prog[id]||null,m=c.members[id]||{};return {id,name:String(m.name||p?.name||id),p}});
+  drawRows();drawSummary(c);
+  const started=rows.filter(r=>r.p).length;
+  $("status").textContent=c.name+" — "+started+" of "+rows.length+" students have played";
+  $("updated").textContent="Updated "+new Date().toLocaleTimeString();
+ }catch(e){console.error(e);$("status").textContent="Could not load Gematria progress: "+(e.message||e)}
+}
+function sortVal(r){const p=r.p||{};switch(sortKey){
+ case"stars":return Number(p.stars)||-1;case"level":return Number(p.level)||-1;
+ case"learn":case"words":case"numbers":return pct(p[sortKey])??-1;
+ case"speed":return Number(p.speed?.best)||-1;case"match":return p.match?.bestSeconds?-p.match.bestSeconds:-1e9;
+ case"last":return Number(p.lastActive)||-1;default:return r.name.toLowerCase()}}
+function drawRows(){
+ const list=rows.slice().sort((a,b)=>{const x=sortVal(a),y=sortVal(b);return (x>y?1:x<y?-1:0)*sortDir});
+ $("rows").innerHTML=list.map(r=>{const p=r.p;
+  if(!p)return '<tr class="none"><td>'+esc(r.name)+'</td><td colspan="9">Not started yet</td></tr>';
+  return '<tr><td><b>'+esc(r.name)+'</b></td><td>⭐ '+(p.stars||0)+'</td><td>'+(p.level||1)+'</td><td>'+pctCell(p.learn)+'</td><td>'+pctCell(p.words)+'</td><td>'+pctCell(p.numbers)+'</td><td>'+(p.speed?.best?p.speed.best+' <span class="muted">('+p.speed.plays+' plays)</span>':'—')+'</td><td>'+(p.match?.bestSeconds?p.match.bestSeconds+'s':'—')+'</td><td class="tricky">'+esc(tricky(p.missed))+'</td><td>'+esc(ago(p.lastActive))+'</td></tr>'}).join("")||'<tr><td colspan="10" class="muted">No students in this class yet.</td></tr>';
+}
+function drawSummary(c){
+ const ps=rows.map(r=>r.p).filter(Boolean);
+ const stars=ps.reduce((s,p)=>s+(Number(p.stars)||0),0);
+ const tot=k=>ps.reduce((a,p)=>({c:a.c+(Number(p[k]?.correct)||0),t:a.t+(Number(p[k]?.attempts)||0)}),{c:0,t:0});
+ const all=["learn","words","numbers"].map(tot).reduce((a,b)=>({c:a.c+b.c,t:a.t+b.t}),{c:0,t:0});
+ const missed={};ps.forEach(p=>Object.entries(p.missed||{}).forEach(([h,n])=>missed[h]=(missed[h]||0)+n));
+ const topSpeed=ps.reduce((m,p)=>Math.max(m,Number(p.speed?.best)||0),0);
+ $("summary").innerHTML=
+  '<div class="stat"><div class="v">'+ps.length+' / '+rows.length+'</div><div class="l">Students who played</div></div>'+
+  '<div class="stat"><div class="v">⭐ '+stars+'</div><div class="l">Class stars</div></div>'+
+  '<div class="stat"><div class="v">'+(all.t?Math.round(all.c/all.t*100)+'%':'—')+'</div><div class="l">Class accuracy</div></div>'+
+  '<div class="stat"><div class="v">'+(topSpeed||'—')+'</div><div class="l">Top Speed Round score</div></div>'+
+  '<div class="stat"><div class="v he">'+(esc(tricky(missed))||'—')+'</div><div class="l">Letters the class misses most</div></div>';
+}
+document.querySelectorAll("th[data-sort]").forEach(th=>th.onclick=()=>{const k=th.dataset.sort;sortDir=(sortKey===k)?-sortDir:(k==="name"?1:-1);sortKey=k;drawRows()});
+$("refresh").onclick=loadClass;
+async function start(user,authorized,access){
+ if(!user){$("status").textContent="Please sign in from the B3 Games Teacher area first.";return}
+ if(!authorized){$("status").textContent="This Google account is not authorized for Teacher Tools.";return}
+ try{
+  classes=await classList(access||{});
+  if(!classes.length){$("status").textContent="No classes are assigned to this teacher.";return}
+  const want=params.get("class");current=classes.some(c=>c.id===want)?want:classes[0].id;
+  drawTabs();loadClass();
+ }catch(e){console.error(e);$("status").textContent="Could not load classes: "+(e.message||e)}
+}
+if(api&&typeof api.onAuthStateChanged==="function")api.onAuthStateChanged(start);
+else $("status").textContent="Teacher access could not start. Please refresh the page.";
+setTimeout(()=>{if($("status").textContent==="Checking teacher access…")$("status").textContent="Teacher sign-in is taking too long. Refresh this page from B3 Games.";},8000);
+})();
+</script>
+</body></html>
