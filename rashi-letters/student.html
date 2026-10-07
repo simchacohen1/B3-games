@@ -254,6 +254,27 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 .mp-results{text-align:left}.mp-results .mp-row{font-size:19px;padding:8px 4px;border-bottom:1px solid #e5eafa}
 @media(max-width:600px){.mp-choose{grid-template-columns:1fr}.mp-code{font-size:48px}.mp-row{grid-template-columns:26px minmax(60px,100px) 1fr 46px;font-size:13px}}
 
+/* Video lessons + words */
+.video-card{width:min(860px,96vw)}
+.video-frame{position:relative;padding-top:56.25%;border-radius:18px;overflow:hidden;background:#000;margin-top:10px}
+.video-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.watch-link{border:0;background:#fff3d6;color:#7a4b00;padding:10px 14px;border-radius:12px;font:700 14px 'Quicksand',sans-serif;cursor:pointer}
+.letter-pick-btn.similar-tile span.start-here{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#f2be32;color:#4a3200;font:800 11px 'Quicksand',sans-serif;letter-spacing:1px;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.word-levels{display:flex;gap:8px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
+.word-level{border:2px solid #dbe2f1;border-bottom-width:4px;background:#fff;border-radius:12px;padding:10px 16px;font:700 15px 'Quicksand',sans-serif;color:#475675;cursor:pointer}
+.word-level.selected{background:#ede9ff;border-color:#6553d6;color:#3f3099}
+.sim-big.word{font-size:96px}
+.choice-btn.word-choice{font-family:'Frank Ruhl Libre',serif;font-size:40px;direction:rtl}
+@media(max-width:600px){.sim-big.word{font-size:70px}.choice-btn.word-choice{font-size:30px}}
+
+/* Locked path */
+.letter-pick-btn.locked{opacity:.45;filter:grayscale(.6);border-style:solid}
+.letter-pick-btn span.tile-lock,.letter-pick-btn span.tile-done,.letter-pick-btn.similar-tile span.tile-lock,.letter-pick-btn.similar-tile span.tile-done{letter-spacing:0;position:absolute;top:6px;right:8px;font:800 16px 'Quicksand',sans-serif}
+.letter-pick-btn .tile-done{color:#249665}
+.letter-pick-btn.mastered{border-color:#bfe9d8}
+.letter-pick-btn.words-tile span[dir]{font-size:30px}
+.letter-pick-btn span.start-here{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#f2be32;color:#4a3200;font:800 11px 'Quicksand',sans-serif;letter-spacing:1px;padding:4px 10px;border-radius:999px;white-space:nowrap}
+
 @media(min-width:800px){#app{max-width:760px;margin:auto}}
 @media(max-width:600px){.wrap{padding:18px 12px}.card{padding:20px;border-radius:22px}header.top h1{font-size:27px}.brand-icon{width:54px;height:54px}.letter-grid{grid-template-columns:repeat(3,1fr)}.unit-label{font-size:14px}.phase-row{gap:8px}.phase-pill{display:none}#rashiLetter.word-mode{font-size:62px}.choice-btn.word-btn{font-size:29px}.hud{font-size:13px;padding:10px}.letter-box{min-height:205px}.compare{gap:25px}.compare span{font-size:65px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
@@ -277,7 +298,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
       <button class="btn continue-btn" id="continueBtn">▶ Continue my quest</button>
     </div>
     <div class="mode-gate-section">
-      <h3>Choose a mission to practice:</h3>
+      <h3>Your Rashi path — master each step to unlock the next:</h3>
       <div class="letter-grid" id="letterGrid"></div>
     </div>
     <div class="mode-gate-section hidden" id="modeTypeSection">
@@ -311,7 +332,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
     </div>
     <div class="letter-box" lang="he" dir="rtl"><span id="rashiLetter"></span></div>
     <div class="prompt" id="promptText">Which letter is this?</div>
-    <div class="help-row"><button class="helper" id="learnBtn">🔎 Show me how</button></div><div id="studyPanel" class="study hidden"></div><div class="choices" id="choicesRow"></div>
+    <div class="help-row"><button class="helper" id="learnBtn">🔎 Show me how</button><button class="helper" id="watchBtn">▶ Watch the lesson</button></div><div id="studyPanel" class="study hidden"></div><div class="choices" id="choicesRow"></div>
     <div id="feedback" role="status" aria-live="polite"></div>
     <div class="progress-track"><div id="progFill" style="width:0%"></div></div>
     <div class="streak-row" id="streakRow"></div><div class="star-note">Get 3 correct to complete this step. A mistake does not erase your stars.</div><button class="btn hidden" id="nextBtn" style="display:block;margin:18px auto 0">Next question →</button>
@@ -320,7 +341,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
   <div class="card" id="completeScreen">
     <div class="confetti-row">🎉🎊🎉</div>
     <div style="font-family:'Frank Ruhl Libre', serif; font-size:1.5rem; color:var(--rimon-dark); margin-bottom:8px;">כל הכבוד!</div>
-    <h2>Quest complete!</h2><p>You finished all 9 missions. Keep your Rashi skills strong with more practice!</p><button class="btn" onclick="showModeGate()">Choose a practice mission</button>
+    <h2>Quest complete!</h2><p>You finished the whole Rashi path. Keep your Rashi skills strong with more practice!</p><button class="btn" onclick="showModeGate()">Choose a practice mission</button>
   </div>
 
   <div class="card" id="practiceCompleteScreen" style="display:none;text-align:center;">
@@ -333,11 +354,12 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 
   <div class="card" id="similarScreen">
     <div class="sim-head"><h2>Look-alike letters</h2><button class="menu-link" id="simMenuBtn">⬅ Menu</button></div>
-    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them!</p>
+    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them! <b>Get 7 of 8 in 🎯 Match it to unlock the next step.</b> <button class="watch-link" id="simWatchBtn">▶ Watch the lesson</button></p>
     <div class="sim-tabs">
       <button class="sim-tab" data-sim="explore">👀 Side by side</button>
       <button class="sim-tab" data-sim="match">🎯 Match it</button>
       <button class="sim-tab" data-sim="memory">🃏 Memory</button>
+      <button class="sim-tab" data-sim="words">📖 Words</button>
     </div>
     <div id="simArea"></div>
   </div>
@@ -347,6 +369,14 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
   </div>
 </div>
 
+<div class="mini-overlay hidden" id="videoModal" role="dialog" aria-modal="true" aria-labelledby="videoTitle">
+  <div class="mini-card video-card">
+    <div class="mini-kicker">▶ WATCH THE LESSON</div>
+    <h2 id="videoTitle"></h2>
+    <div class="video-frame"><iframe id="videoFrame" title="Reading Rashi Made Easy Shmeezy" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
+    <div class="sim-row" style="margin-top:12px"><a id="videoLink" class="mini-skip" target="_blank" rel="noopener">Video not playing? Open it on YouTube</a><button class="btn" id="videoClose">Done watching</button></div>
+  </div>
+</div>
 <div class="quest-toast" id="questToast" role="status" aria-live="polite"></div>
 <div class="mini-overlay hidden" id="miniGame" role="dialog" aria-modal="true" aria-labelledby="miniTitle">
   <div class="mini-card">
@@ -737,26 +767,87 @@ async function loadProgress(){
   unitIndex = (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex <= UNITS.length) ? savedIndex : 0;
   phase = (rec.currentPhase === 'word') ? 'word' : 'letter';
   streak = 0; attemptsThisStep = 0; retryQuestion = null; guidedIndex = unitIndex; guidedPhase = phase;
+  chainFlags = { similarDone:!!rec.similarDone, words2Done:!!rec.words2Done, words3Done:!!rec.words3Done, words4Done:!!rec.words4Done };
 }
 
 function renderLetterGrid(){
   const grid = document.getElementById('letterGrid');
-  if(grid.dataset.built) return;
-  grid.dataset.built = '1';
-  UNITS.forEach(u => {
+  grid.replaceChildren();
+  const cur = currentStep();
+  STEPS.forEach((st, idx) => {
     const b = document.createElement('button');
-    b.className = 'letter-pick-btn';
-    b.innerHTML = '<span dir="rtl">' + (u.id === 'finalreview' ? 'שׁ / שׂ' : u.label) + '</span><small>' + (u.id === 'finalreview' ? 'Final review' : 'Mission ' + (UNITS.indexOf(u)+1)) + '</small>';
-    b.setAttribute('aria-label', 'Practice mission ' + (UNITS.indexOf(u)+1));
-    b.onclick = () => selectPracticeLetter(u.id, b);
+    const unlocked = stepUnlocked(idx), mastered = stepMastered(idx);
+    b.className = 'letter-pick-btn' + (st.k==='similar' ? ' similar-tile' : '') + (st.k==='words' ? ' words-tile' : '') + (unlocked ? '' : ' locked') + (mastered ? ' mastered' : '');
+    let glyph, label;
+    if(st.k==='similar'){ glyph='ד ל ר'; label='Look-alike letters'; }
+    else if(st.k==='words'){ glyph={2:'כִּי',3:'טוֹב',4:'תּוֹרָה'}[st.n]; label=st.n+'-letter words'; }
+    else { const u=UNITS[st.i]; glyph = u.id==='finalreview' ? 'שׁ / שׂ' : u.label; label = u.id==='finalreview' ? 'Final review' : 'Mission ' + (st.i+1); }
+    const badge = !unlocked ? '<span class="tile-lock">🔒</span>' : (mastered ? '<span class="tile-done">✓</span>' : (idx===cur ? '<span class="start-here">'+(idx===0?'START HERE':'NEXT')+'</span>' : ''));
+    b.innerHTML = badge + '<span dir="rtl">' + glyph + '</span><small>' + (idx+1) + '. ' + label + '</small>';
+    b.setAttribute('aria-label', 'Step ' + (idx+1) + ': ' + stepName(st) + (unlocked ? (mastered ? ', mastered' : ', ready') : ', locked'));
+    b.onclick = () => {
+      if(!unlocked){ showQuestToast('🔒 First master: ' + stepName(STEPS[firstUnmasteredBefore(idx)])); return; }
+      if(st.k==='unit'){
+        if(mastered) selectPracticeLetter(UNITS[st.i].id, b);
+        else goStep(idx);
+      } else goStep(idx);
+    };
     grid.appendChild(b);
   });
-  const sim = document.createElement('button');
-  sim.className = 'letter-pick-btn similar-tile';
-  sim.innerHTML = '<span dir="rtl">ד ל ר</span><small>Look-alike letters</small>';
-  sim.setAttribute('aria-label', 'Look-alike letters: letters that look almost the same in Rashi and regular print');
-  sim.onclick = openSimilar;
-  grid.appendChild(sim);
+}
+
+/* ---------- Locked path in "Reading Rashi Made Easy Shmeezy" order ---------- */
+const STEPS = [{k:'similar'},{k:'words',n:2},{k:'words',n:3},{k:'unit',i:0},{k:'unit',i:1},{k:'words',n:4},
+  {k:'unit',i:2},{k:'unit',i:3},{k:'unit',i:4},{k:'unit',i:5},{k:'unit',i:6},{k:'unit',i:7},{k:'unit',i:8}];
+const MASTER_MATCH = 7, MASTER_WORDS = 5;
+let chainFlags = {}, pendingWordLevel = null;
+function flagKey(st){ return st.k==='similar' ? 'similarDone' : 'words'+st.n+'Done'; }
+function stepName(st){
+  if(st.k==='similar') return 'Look-alike letters';
+  if(st.k==='words') return st.n+'-letter words';
+  const u=UNITS[st.i]; return u.id==='finalreview' ? 'Final review' : 'Mission '+(st.i+1)+' ('+u.label+')';
+}
+function stepMastered(idx){
+  const st=STEPS[idx];
+  if(st.k==='unit') return guidedIndex > st.i;
+  if(chainFlags[flagKey(st)]) return true;
+  // Boys who already passed later missions keep their place.
+  return STEPS.slice(idx+1).some(t=>t.k==='unit' && guidedIndex > t.i);
+}
+function stepUnlocked(idx){ for(let j=0;j<idx;j++) if(!stepMastered(j)) return false; return true; }
+function firstUnmasteredBefore(idx){ for(let j=0;j<idx;j++) if(!stepMastered(j)) return j; return idx; }
+function currentStep(){ return STEPS.findIndex((_,j)=>!stepMastered(j)); }
+function stepIndexOf(k,v){ return STEPS.findIndex(st=>st.k===k && (k==='similar' || st.n===v || st.i===v)); }
+
+function goStep(idx){
+  const st=STEPS[idx];
+  if(st.k==='similar'){ openSimilar(); return; }
+  if(st.k==='words'){ openSimilar(); pendingWordLevel=st.n; setSimTab('words'); return; }
+  mode='continue'; unitIndex=guidedIndex; phase=guidedPhase; streak=0; attemptsThisStep=0; retryQuestion=null;
+  document.getElementById('modeGate').style.display='none';
+  document.getElementById('similarScreen').style.display='none';
+  document.getElementById('app').style.display='block';
+  renderQuestion();
+}
+function goNextStep(){
+  const idx=currentStep();
+  if(idx<0){
+    clearTimeout(questionTimer); viewVersion++;
+    ['app','modeGate','similarScreen','practiceCompleteScreen'].forEach(id=>document.getElementById(id).style.display='none');
+    document.getElementById('completeScreen').classList.add('show'); return;
+  }
+  goStep(idx);
+}
+function markMastered(key){
+  if(chainFlags[key]) return false;
+  chainFlags[key]=true;
+  if(studentId) db.ref('rashiLetters/progress/'+studentId).update({[key]:true}).catch(()=>{});
+  const nxt=currentStep();
+  showQuestToast('🔓 Unlocked: '+(nxt<0?'all done!':stepName(STEPS[nxt])));
+  return true;
+}
+function nextStepButton(){
+  const b=el('button','btn','Next step →'); b.style.margin='10px 6px 0'; b.onclick=goNextStep; return b;
 }
 
 function selectPracticeLetter(unitId, btnEl){
@@ -770,8 +861,9 @@ function selectPracticeLetter(unitId, btnEl){
 function showModeGate(){
   clearTimeout(questionTimer); viewVersion++;
   document.getElementById('welcome').textContent = 'Let’s learn, ' + studentName + '!';
-  document.getElementById('continueBtn').textContent = guidedIndex >= UNITS.length ? '★ Quest complete — choose a practice mission below' : '▶ Continue my quest · Mission ' + (guidedIndex+1) + ' of 9';
-  document.getElementById('continueBtn').disabled = guidedIndex >= UNITS.length;
+  const cur = currentStep();
+  document.getElementById('continueBtn').textContent = cur < 0 ? '★ Quest complete — practice any step below' : '▶ Continue my quest · Step ' + (cur+1) + ' of ' + STEPS.length + ': ' + stepName(STEPS[cur]);
+  document.getElementById('continueBtn').disabled = cur < 0;
   document.getElementById('app').style.display = 'none';
   document.getElementById('completeScreen').classList.remove('show');
   document.getElementById('practiceCompleteScreen').style.display = 'none';
@@ -781,12 +873,7 @@ function showModeGate(){
   renderLetterGrid();
 }
 
-document.getElementById('continueBtn').onclick = () => {
-  mode = 'continue'; unitIndex = guidedIndex; phase = guidedPhase; streak = 0; attemptsThisStep = 0; retryQuestion = null;
-  document.getElementById('modeGate').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  renderQuestion();
-};
+document.getElementById('continueBtn').onclick = () => goNextStep();
 
 document.querySelectorAll('.mode-type-btn').forEach(b => {
   b.onclick = () => {
@@ -867,6 +954,7 @@ function renderQuestion(){
     // 'mixed' leaves phase as-is so it can toggle naturally on streak completion
   }
   const unit = getActiveUnit();
+  updateWatchBtn();
   const rashiEl = document.getElementById('rashiLetter');
   const pill = document.getElementById('phasePill');
   const promptEl = document.getElementById('promptText');
@@ -984,7 +1072,7 @@ async function handleAnswer(letter, btnEl){
 
   const writes=[logAttempt(unit.id,answeredPhase,isCorrect)];
   const stepComplete = streak >= NEEDED_CORRECT || (attemptsThisStep >= MAX_QUESTIONS_PER_STEP && isCorrect) || attemptsThisStep > MAX_QUESTIONS_PER_STEP;
-  let practiceFinished = false;
+  let practiceFinished = false, unitAdvanced = false;
   const miniGamePending = isCorrect && !assisted && starsThisVisit > 0 && starsThisVisit % 4 === 0;
 
   if(stepComplete){
@@ -1000,7 +1088,7 @@ async function handleAnswer(letter, btnEl){
 
     if(mode==='continue'){
       if(phase==='letter') phase='word';
-      else { phase='letter'; unitIndex++; }
+      else { phase='letter'; unitIndex++; unitAdvanced = true; }
       guidedIndex=unitIndex; guidedPhase=phase;
       writes.push(db.ref('rashiLetters/progress/'+studentId).update({currentUnitIndex:unitIndex,currentPhase:phase}));
     } else if(practiceModeType==='mixed'){
@@ -1018,9 +1106,9 @@ async function handleAnswer(letter, btnEl){
     questionTimer=setTimeout(()=>finishPracticeMission(unit),1500);
   } else if(miniGamePending){
     const delay = stepComplete ? 1250 : 900;
-    questionTimer=setTimeout(()=>startMiniGame(unit, renderQuestion),delay);
+    questionTimer=setTimeout(()=>startMiniGame(unit, unitAdvanced ? goNextStep : renderQuestion),delay);
   } else if(stepComplete){
-    questionTimer=setTimeout(renderQuestion,1400);
+    questionTimer=setTimeout(unitAdvanced ? goNextStep : renderQuestion,1400);
   } else if(isCorrect){
     questionTimer=setTimeout(renderQuestion,1050);
   } else {
@@ -1048,6 +1136,7 @@ function setSimTab(tab){
   document.querySelectorAll('.sim-tab').forEach(b=>b.classList.toggle('selected', b.dataset.sim===tab));
   if(tab==='explore') renderSimExplore();
   else if(tab==='match') renderMatchMenu();
+  else if(tab==='words'){ const c=currentStep(); const lvl = pendingWordLevel || (c>=0 && STEPS[c].k==='words' ? STEPS[c].n : wordLevel); pendingWordLevel=null; startWords(lvl); }
   else startSimMemory();
 }
 document.querySelectorAll('.sim-tab').forEach(b=>b.onclick=()=>setSimTab(b.dataset.sim));
@@ -1104,8 +1193,11 @@ function renderSimMatch(){
   const area=document.getElementById('simArea'); area.replaceChildren();
   const m=simMatch;
   if(m.round>=m.order.length){
-    const d=el('div','sim-done'); d.append(el('div','finish-icon','🏆'), el('h3',null,'You matched '+m.correct+' of '+m.order.length+'!'), el('p','sim-intro','See? Rashi and regular letters are almost twins.'));
-    const again=el('button','btn','Play again'); again.onclick=startSimMatch; d.appendChild(again);
+    const passed=m.correct>=MASTER_MATCH; if(passed) markMastered('similarDone');
+    const d=el('div','sim-done'); d.append(el('div','finish-icon',passed?'🏆':'💪'), el('h3',null,'You matched '+m.correct+' of '+m.order.length+'!'),
+      el('p','sim-intro', passed ? 'Look-alike letters mastered! See? Rashi and regular letters are almost twins.' : 'Get '+MASTER_MATCH+' of '+m.order.length+' to unlock the next step. Try again!'));
+    const again=el('button','btn','Play again'); again.onclick=startSimMatch; again.style.margin='10px 6px 0'; d.appendChild(again);
+    if(passed && currentStep()>=0) d.appendChild(nextStepButton());
     area.appendChild(d); rewardBurst(d.querySelector('.finish-icon'),true); return;
   }
   const target=m.order[m.round];
@@ -1437,8 +1529,114 @@ function renderMpResults(room){
   const again=el('button','btn','Play again'); again.onclick=()=>enterMultiplayer(); again.style.marginTop='10px';
   d.append(icon, el('h3',null,iWon?'You won the race!':(ranked[0]?(ranked[0][1].name+' wins!'):'Game over')), boardRows(room,true), again);
   area.appendChild(d);
-  if(iWon){ starsThisVisit+=5; updateRewardHud(); rewardBurst(icon,true); showQuestToast('🏆 Winner! +5 stars'); }
+  const myScore=(room.players&&room.players[studentId]&&room.players[studentId].score)||0;
+  if(myScore>=8) markMastered('similarDone');
+  if(iWon){ starsThisVisit+=5; updateRewardHud(); rewardBurst(icon,true); setTimeout(()=>showQuestToast('🏆 Winner! +5 stars'), myScore>=8?1300:0); }
   else rewardBurst(icon,false);
+}
+
+/* ---------- Video lessons (Reading Rashi Made Easy Shmeezy) ---------- */
+const LESSON_VIDEO = 'iCL_-ae4XKc';
+const LESSONS = {
+  intro:      {title:'Introduction to Rashi',        start:361,  end:751},
+  similar:    {title:'Identical letters',            start:751,  end:1454},
+  words2:     {title:'Two-letter words',             start:1454, end:1734},
+  words3:     {title:'Three-letter words',           start:1734, end:1859},
+  zayin:      {title:'Introducing Zayin',            start:1859, end:1996},
+  bet:        {title:'Introducing Bet',              start:1996, end:2194},
+  words4:     {title:'Four-letter words',            start:2194, end:2288},
+  tsadi:      {title:'Introducing Tsadi',            start:2288, end:2356},
+  alef:       {title:'Introducing Aleph',            start:2356, end:2509},
+  tsadisofit: {title:'Final Tsadi',                  start:2509, end:2591},
+  memsofit:   {title:'Final Mem',                    start:2591, end:2702},
+  shin:       {title:'Shin and Sin',                 start:2702, end:2890},
+  finalreview:{title:'Final review and tips',        start:2890, end:3096}
+};
+function openLesson(key){
+  const L=LESSONS[key]; if(!L) return;
+  document.getElementById('videoTitle').textContent=L.title;
+  document.getElementById('videoFrame').src='https://www.youtube-nocookie.com/embed/'+LESSON_VIDEO+'?start='+L.start+'&end='+L.end+'&rel=0&modestbranding=1&autoplay=1';
+  document.getElementById('videoLink').href='https://www.youtube.com/watch?v='+LESSON_VIDEO+'&t='+L.start+'s';
+  document.getElementById('videoModal').classList.remove('hidden');
+}
+function closeLesson(){ document.getElementById('videoFrame').src='about:blank'; document.getElementById('videoModal').classList.add('hidden'); }
+document.getElementById('videoClose').onclick=closeLesson;
+document.getElementById('videoModal').addEventListener('click',e=>{ if(e.target.id==='videoModal') closeLesson(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !document.getElementById('videoModal').classList.contains('hidden')) closeLesson(); });
+document.getElementById('simWatchBtn').onclick=()=>openLesson('similar');
+document.getElementById('watchBtn').onclick=()=>{ const u=getActiveUnit(); openLesson(u && u.id); };
+function updateWatchBtn(){ const u=getActiveUnit(); document.getElementById('watchBtn').classList.toggle('hidden', !(u && LESSONS[u.id])); }
+
+/* ---------- Word practice with only the letters learned so far ---------- */
+const PRACTICE_WORDS = [
+  // 2 letters
+  'כִּי','עַל','כָּל','מִי','מָה','עַד','הֵן','פֹּה','יָד','כֵּן','רַק','חַי','גַּן','הַר','לֹא','נָא','זֶה','לֵב','אָב','אַף','שָׁם','יָם','עֵץ','אִם','גַּם','דָּם',
+  // 3 letters
+  'הוּא','הִיא','טוֹב','נֹחַ','עִיר','הָיָה','יָלַד','הָלַךְ','עָלָה','יָדַע','נָתַן','לָקַח','מֶלֶךְ','נָהָר','דָּגָן','כֹּהֵן','עֵדָה','קָהָל','יוֹם','אוֹר','קָרָא','לֶחֶם','כָּתַב','שָׁנָה','זָכַר','בָּרָא','אֶרֶץ','צֹאן',
+  // 4 letters
+  'תּוֹרָה','פַּרְעֹה','מִנְחָה','הֵיכָל','מִגְדָּל','לְמַעַן','עוֹלָה','מִקְנֶה','גּוֹרָל','חֲנוֹךְ','כִּנּוֹר','תְּהִלָּה','אַהֲרֹן','יַעֲקֹב','מַלְאָךְ','מִצְוָה','מִקְדָּשׁ','יוֹסֵף'
+];
+const baseLetters = w => w.normalize('NFD').replace(/[֑-ׇ]/g,'').split('');
+let wordLevel = 2, wordGame = null;
+function unlockedLetters(){
+  const set=new Set(SIMILAR);
+  const done = Math.min(typeof guidedIndex==='number'?guidedIndex:0, UNITS.length);
+  UNITS.slice(0,done).forEach(u=>(u.type==='single'?[u.correct]:u.pair).forEach(ch=>baseLetters(ch).forEach(c=>set.add(c))));
+  return set;
+}
+function wordsFor(level){
+  const ok=unlockedLetters();
+  return PRACTICE_WORDS.filter(w=>{ const b=baseLetters(w); return b.length===level && b.every(c=>ok.has(c)); });
+}
+function startWords(level){
+  wordLevel=level;
+  const pool=wordsFor(level);
+  wordGame={level, pool, order:shuffle(pool).slice(0,6), round:0, correct:0};
+  renderWords();
+}
+function renderWords(){
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const g=wordGame;
+  const levels=el('div','word-levels');
+  [2,3,4].forEach(n=>{ const open=stepUnlocked(stepIndexOf('words',n)); const b=el('button','word-level'+(n===g.level?' selected':''),(open?'':'🔒 ')+n+'-letter words'); b.onclick=()=>{ viewVersion++; startWords(n); }; levels.appendChild(b); });
+  const watch=el('button','watch-link','▶ Watch: '+LESSONS['words'+g.level].title); watch.onclick=()=>openLesson('words'+g.level);
+  const top=el('div','sim-row'); top.append(levels, watch); top.style.justifyContent='center';
+  area.appendChild(top);
+  const si=stepIndexOf('words',g.level);
+  if(!stepUnlocked(si)){
+    area.append(el('p','prompt','🔒 '+g.level+'-letter words are locked.'), el('p','sim-intro','First master: '+stepName(STEPS[firstUnmasteredBefore(si)])+'.'));
+    const go=el('button','btn','Go there →'); go.onclick=()=>goStep(firstUnmasteredBefore(si)); area.appendChild(go); return;
+  }
+  if(g.pool.length<4){
+    area.append(el('p','prompt','Finish more missions to unlock '+g.level+'-letter words!'), el('p','sim-intro','These words use letters from missions you haven’t done yet. Try 2-letter words first.'));
+    return;
+  }
+  if(g.round>=g.order.length){
+    const passed=g.correct>=MASTER_WORDS; if(passed) markMastered('words'+g.level+'Done');
+    const d=el('div','sim-done'); d.append(el('div','finish-icon',passed?'📖':'💪'), el('h3',null,'You read '+g.correct+' of '+g.order.length+' words!'),
+      el('p','sim-intro', passed ? g.level+'-letter words mastered!' : 'Get '+MASTER_WORDS+' of '+g.order.length+' to unlock the next step. Try again!'));
+    const again=el('button','btn','More words'); again.onclick=()=>startWords(g.level); again.style.margin='10px 6px 0'; d.appendChild(again);
+    if(passed && currentStep()>=0) d.appendChild(nextStepButton());
+    area.appendChild(d); rewardBurst(d.firstChild, g.correct===g.order.length); return;
+  }
+  const target=g.order[g.round];
+  const box=el('div','letter-box'); box.setAttribute('dir','rtl'); box.appendChild(el('span','sim-big word',target));
+  const opts=shuffle([target, ...shuffle(g.pool.filter(w=>w!==target)).slice(0,3)]);
+  const row=el('div','choices'), fb=el('div',null); fb.style.cssText='min-height:30px;text-align:center;font-size:19px;font-weight:700;margin:4px 0 10px';
+  const next=el('button','btn hidden','Next →'); next.style.cssText='display:block;margin:10px auto 0';
+  const v=viewVersion; const advance=()=>{ if(v!==viewVersion) return; g.round++; renderWords(); }; next.onclick=advance;
+  opts.forEach(w=>{
+    const b=el('button','choice-btn word-choice',w);
+    b.onclick=()=>{
+      row.querySelectorAll('button').forEach(x=>x.disabled=true);
+      const ok=w===target;
+      if(ok){ b.classList.add('correct'); g.correct++; starsThisVisit++; coinsThisVisit++; updateRewardHud(); rewardBurst(b); beep('correct'); fb.style.color='#176447'; fb.textContent='You read it!'; setTimeout(advance,1000); }
+      else { b.classList.add('incorrect'); row.querySelectorAll('button').forEach(x=>{ if(x.textContent===target) x.classList.add('correct'); }); beep('wrong'); fb.style.color='#865014'; fb.textContent='Look again — the green word is the match.'; next.classList.remove('hidden'); }
+      if(studentId) logAttempt('similar','word',ok).catch(()=>{});
+    };
+    row.appendChild(b);
+  });
+  area.append(el('div','sim-status','Word '+(g.round+1)+' of '+g.order.length+' · ★ '+g.correct), box, el('p','prompt','Which word is the same?'), row, fb, next);
 }
 
 async function logAttempt(unitId, ph, correct){

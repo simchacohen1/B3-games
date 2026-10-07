@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gematria</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700;900&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#173b62;--navy2:#0f2a47;--gold:#e6b33a;--gold2:#fff4d6;--sky:#e8f3fb;--green:#1f9d55;--greenbg:#e5f7ec;--red:#c0392b;--redbg:#fdecea;--ink:#1f2d3d;--muted:#5d6b7a;--card:#fff;--line:#d9e4ee}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:Nunito,Arial,sans-serif;background:linear-gradient(180deg,#eaf4fb 0%,#fdf7e8 100%);color:var(--ink);min-height:100vh}
+button{font:inherit;cursor:pointer}
+.he{font-family:"Frank Ruhl Libre","Times New Roman",serif;direction:rtl}
+header{background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:5;box-shadow:0 3px 10px #0002}
+header h1{margin:0;font-size:22px;font-weight:900;display:flex;align-items:center;gap:8px}
+header .who{margin-left:auto;display:flex;align-items:center;gap:10px;font-weight:800}
+.stars{background:var(--gold);color:var(--navy2);border-radius:999px;padding:5px 12px;font-weight:900}
+.homeBtn{background:#ffffff22;color:#fff;border:0;border-radius:10px;padding:7px 12px;font-weight:800}
+main{max-width:900px;margin:0 auto;padding:18px 16px 60px}
+.banner{background:#fff8e1;border:2px solid #f1d58a;border-radius:12px;padding:10px 14px;margin-bottom:14px;font-weight:700}
+.banner a{color:var(--navy)}
+.levels{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:4px 0 18px}
+.levels button{border:2px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-weight:800;color:var(--navy)}
+.levels button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.levels .lv{font-family:"Frank Ruhl Libre",serif;font-size:18px;margin-left:4px}
+.menu{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.tile{background:#fff;border:0;border-radius:18px;padding:22px 14px;box-shadow:0 5px 16px #173b6218;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;transition:transform .1s}
+.tile:hover{transform:translateY(-3px)}
+.tile .ic{font-size:44px;line-height:1}
+.tile .t{font-size:19px;font-weight:900;color:var(--navy)}
+.tile .s{font-size:14px;color:var(--muted);font-weight:700}
+.panel{background:#fff;border-radius:18px;padding:18px;box-shadow:0 5px 16px #173b6218}
+.panel h2{margin:0 0 4px;color:var(--navy);font-size:22px}
+.sub{color:var(--muted);font-weight:700;margin:0 0 14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.center{text-align:center}
+.btn{border:0;border-radius:12px;padding:11px 18px;font-weight:900;background:var(--navy);color:#fff;box-shadow:0 3px 0 var(--navy2)}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--navy2)}
+.btn.light{background:var(--sky);color:var(--navy);box-shadow:0 3px 0 #c5dbea}
+.btn.gold{background:var(--gold);color:var(--navy2);box-shadow:0 3px 0 #b88a1c}
+.btn:disabled{opacity:.5;cursor:default}
+.tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.tabs button{border:2px solid var(--line);background:#fff;border-radius:10px;padding:8px 14px;font-weight:800;color:var(--navy)}
+.tabs button.on{background:var(--gold2);border-color:var(--gold)}
+/* chart */
+.chartRow{margin-bottom:12px}
+.chartRow .lab{font-weight:900;color:var(--muted);font-size:13px;margin-bottom:6px}
+.letters{display:grid;grid-template-columns:repeat(9,1fr);gap:8px;direction:rtl}
+@media(max-width:560px){.letters{grid-template-columns:repeat(5,1fr)}}
+.lt{border:2px solid var(--line);background:#fff;border-radius:12px;padding:6px 2px;display:flex;flex-direction:column;align-items:center}
+.lt .h{font-family:"Frank Ruhl Libre",serif;font-size:32px;font-weight:700;line-height:1.1;color:var(--navy)}
+.lt .n{font-weight:900;color:var(--muted);font-size:14px}
+.lt.on{background:var(--gold2);border-color:var(--gold)}
+.lt.locked{opacity:.35}
+.lt.hideNum .n{visibility:hidden}
+.big{display:flex;align-items:center;justify-content:center;gap:22px;background:var(--sky);border-radius:16px;padding:16px;margin-top:10px;flex-wrap:wrap}
+.big .h{font-family:"Frank Ruhl Libre",serif;font-size:84px;font-weight:900;color:var(--navy);line-height:1}
+.big .info{font-size:18px;font-weight:800}
+.big .eq{font-size:44px;font-weight:900;color:var(--navy)}
+.sofit{margin-top:12px;font-weight:700;color:var(--muted);font-size:14px}
+.sofit .he{font-size:20px;color:var(--navy);font-weight:700}
+bdi.he{unicode-bidi:isolate}.sofitList{direction:ltr;display:inline}
+/* question */
+.qbox{text-align:center;padding:10px 0}
+.qprompt{font-size:18px;font-weight:800;color:var(--muted);margin-bottom:6px}
+.qbig{font-family:"Frank Ruhl Libre",serif;font-size:76px;font-weight:900;color:var(--navy);line-height:1.15;direction:rtl}
+.qnum{font-size:66px;font-weight:900;color:var(--navy);line-height:1.15}
+.choices{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-width:460px;margin:14px auto 0}
+.choices button{border:3px solid var(--line);background:#fff;border-radius:14px;padding:14px 6px;font-size:28px;font-weight:900;color:var(--navy)}
+.choices button.he{font-size:36px}
+.choices button.right{background:var(--greenbg);border-color:var(--green);color:var(--green)}
+.choices button.wrong{background:var(--redbg);border-color:var(--red);color:var(--red)}
+.feedback{min-height:30px;font-weight:900;font-size:18px;margin-top:12px}
+.feedback.ok{color:var(--green)}.feedback.no{color:var(--red)}
+.tiles{display:flex;justify-content:center;gap:8px;direction:rtl;flex-wrap:wrap;margin:10px 0}
+.tile2{min-width:62px;border:3px solid var(--line);border-radius:14px;background:#fff;padding:6px 8px;text-align:center}
+.tile2 .h{font-family:"Frank Ruhl Libre",serif;font-size:46px;font-weight:900;color:var(--navy);line-height:1.1}
+.tile2 .n{font-weight:900;color:var(--green);min-height:22px;font-size:17px}
+.mean{font-weight:800;color:var(--muted)}
+.equation{direction:ltr;font-weight:900;font-size:18px;color:var(--navy);margin-top:6px}
+.equation .he{font-size:22px}
+/* builder */
+.build{display:flex;align-items:center;justify-content:center;gap:10px;min-height:78px;background:var(--sky);border-radius:14px;padding:8px;direction:rtl;flex-wrap:wrap}
+.build .h{font-family:"Frank Ruhl Libre",serif;font-size:56px;font-weight:900;color:var(--navy)}
+.build .ph{color:var(--muted);font-weight:800;direction:ltr}
+.total{font-weight:900;font-size:18px;margin:8px 0}
+.keys{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;direction:rtl;margin-top:10px}
+@media(max-width:560px){.keys{grid-template-columns:repeat(6,1fr)}}
+.keys button{border:2px solid var(--line);background:#fff;border-radius:10px;padding:4px 0;display:flex;flex-direction:column;align-items:center}
+.keys button .h{font-family:"Frank Ruhl Libre",serif;font-size:28px;font-weight:900;color:var(--navy);line-height:1.1}
+.keys button .n{font-size:12px;font-weight:900;color:var(--muted)}
+.keys button:disabled{opacity:.3}
+/* timer + match */
+.hud{display:flex;justify-content:space-between;font-weight:900;font-size:18px;color:var(--navy);margin-bottom:6px}
+.bar{height:10px;background:#e6edf3;border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),#f08a24);transition:width .25s linear}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-width:520px;margin:12px auto 0}
+.mc{aspect-ratio:1/1;border:0;border-radius:14px;background:var(--navy);color:#fff;font-size:30px;font-weight:900;box-shadow:0 3px 0 var(--navy2)}
+.mc.up{background:#fff;color:var(--navy);border:3px solid var(--line);box-shadow:none}
+.mc.up.he{font-family:"Frank Ruhl Libre",serif;font-size:42px}
+.mc.done{background:var(--greenbg);color:var(--green);border:3px solid var(--green);box-shadow:none}
+.result{text-align:center;padding:14px}
+.result .bigscore{font-size:56px;font-weight:900;color:var(--navy)}
+.hidden{display:none!important}
+.pop{animation:pop .35s ease}
+@keyframes pop{0%{transform:scale(.9)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+.saveNote{font-size:12px;color:var(--muted);text-align:center;margin-top:18px}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="../firebase-config.js"></script>
+<script src="../student-class.js"></script>
+<script src="../game-gate.js?v=20261007-gematria" data-game-id="gematria" data-back-href="../index.html"></script>
+</head>
+<body>
+<header>
+  <h1><span aria-hidden="true">🔢</span> Gematria</h1>
+  <button class="homeBtn hidden" id="menuBtn" type="button">⬅ Menu</button>
+  <div class="who"><span id="whoName"></span><span class="stars" title="Stars you earned">⭐ <span id="starCount">0</span></span></div>
+</header>
+<main>
+  <div id="banner" class="banner hidden"></div>
+
+  <section id="menu">
+    <div class="levels" role="group" aria-label="Choose your level">
+      <button type="button" data-level="1">Level 1 <span class="lv">א–י</span></button>
+      <button type="button" data-level="2">Level 2 <span class="lv">א–צ</span></button>
+      <button type="button" data-level="3">Level 3 <span class="lv">א–ת</span></button>
+    </div>
+    <div class="menu">
+      <button class="tile" type="button" data-go="learn"><span class="ic">📖</span><span class="t">Learn the Letters</span><span class="s">Every letter has a number</span></button>
+      <button class="tile" type="button" data-go="words"><span class="ic">🧮</span><span class="t">Word Value</span><span class="s">Add up the letters in a word</span></button>
+      <button class="tile" type="button" data-go="numbers"><span class="ic">✍️</span><span class="t">Number → Letters</span><span class="s">Write a number in Hebrew letters</span></button>
+      <button class="tile" type="button" data-go="speed"><span class="ic">⏱️</span><span class="t">Speed Round</span><span class="s">How many in 60 seconds?</span></button>
+      <button class="tile" type="button" data-go="match"><span class="ic">🃏</span><span class="t">Memory Match</span><span class="s">Match each letter to its number</span></button>
+    </div>
+  </section>
+
+  <!-- LEARN -->
+  <section id="learn" class="panel hidden">
+    <h2>📖 Learn the Letters</h2>
+    <p class="sub">Tap a letter to see its number.</p>
+    <div class="tabs" role="tablist">
+      <button type="button" data-ltab="chart" class="on">Chart</button>
+      <button type="button" data-ltab="quiz">Quick Quiz</button>
+    </div>
+    <div id="learnChart">
+      <div id="chartRows"></div>
+      <div class="big" id="bigLetter" aria-live="polite"><span class="info">Tap any letter above 👆</span></div>
+      <p class="sofit">Final letters (סופיות) have the same value as the regular letter:
+        <span class="sofitList"><span><bdi class="he">ך</bdi> = 20</span> · <span><bdi class="he">ם</bdi> = 40</span> · <span><bdi class="he">ן</bdi> = 50</span> · <span><bdi class="he">ף</bdi> = 80</span> · <span><bdi class="he">ץ</bdi> = 90</span></span></p>
+    </div>
+    <div id="learnQuiz" class="hidden">
+      <div class="qbox">
+        <div class="qprompt" id="lqPrompt"></div>
+        <div id="lqBig"></div>
+        <div class="choices" id="lqChoices"></div>
+        <div class="feedback" id="lqFeedback" aria-live="polite"></div>
+        <button class="btn hidden" id="lqNext" type="button">Next ➜</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORDS -->
+  <section id="words" class="panel hidden">
+    <h2>🧮 Word Value</h2>
+    <p class="sub">Add up the value of every letter. What is the word worth?</p>
+    <div class="qbox">
+      <div class="tiles" id="wTiles"></div>
+      <div class="mean" id="wMean"></div>
+      <div class="row" style="justify-content:center;margin-top:8px"><button class="btn light" id="wHelp" type="button">💡 Show letter values</button></div>
+      <div class="choices" id="wChoices"></div>
+      <div class="feedback" id="wFeedback" aria-live="polite"></div>
+      <div class="equation" id="wEq"></div>
+      <button class="btn hidden" id="wNext" type="button" style="margin-top:10px">Next word ➜</button>
+    </div>
+  </section>
+
+  <!-- NUMBERS -->
+  <section id="numbers" class="panel hidden">
+    <h2>✍️ Number → Letters</h2>
+    <p class="sub">Tap letters to build the number. Start with the <b>biggest</b> letter.</p>
+    <div class="center">
+      <div class="qprompt">Write this number in Hebrew letters:</div>
+      <div class="qnum" id="nTarget"></div>
+      <div class="build" id="nBuild" aria-live="polite"></div>
+      <div class="total" id="nTotal"></div>
+      <div class="row" style="justify-content:center">
+        <button class="btn light" id="nUndo" type="button">⌫ Undo</button>
+        <button class="btn light" id="nClear" type="button">Clear</button>
+        <button class="btn gold" id="nCheck" type="button">Check ✓</button>
+      </div>
+      <div class="feedback" id="nFeedback" aria-live="polite"></div>
+      <button class="btn hidden" id="nNext" type="button">Next number ➜</button>
+      <div class="keys" id="nKeys"></div>
+    </div>
+  </section>
+
+  <!-- SPEED -->
+  <section id="speed" class="panel hidden">
+    <h2>⏱️ Speed Round</h2>
+    <div id="spIntro" class="center">
+      <p class="sub">Answer as many as you can in 60 seconds. Every right answer = ⭐</p>
+      <p class="sub">Your best: <b id="spBest">—</b></p>
+      <button class="btn gold" id="spStart" type="button">Start! ▶</button>
+    </div>
+    <div id="spGame" class="hidden">
+      <div class="hud"><span>⏱️ <span id="spTime">60</span>s</span><span>✅ <span id="spScore">0</span></span></div>
+      <div class="bar"><i id="spBar" style="width:100%"></i></div>
+      <div class="qbox">
+        <div class="qprompt" id="spPrompt"></div>
+        <div id="spBig"></div>
+        <div class="choices" id="spChoices"></div>
+      </div>
+    </div>
+    <div id="spDone" class="result hidden">
+      <div class="qprompt">Time's up! You got</div>
+      <div class="bigscore" id="spFinal">0</div>
+      <div class="feedback ok" id="spMsg"></div>
+      <button class="btn gold" id="spAgain" type="button">Play again</button>
+    </div>
+  </section>
+
+  <!-- MATCH -->
+  <section id="match" class="panel hidden">
+    <h2>🃏 Memory Match</h2>
+    <p class="sub">Flip two cards. Match each letter with its number!</p>
+    <div class="hud"><span>Moves: <span id="mMoves">0</span></span><span>⏱️ <span id="mTime">0</span>s</span><span>Best: <span id="mBest">—</span></span></div>
+    <div class="grid" id="mGrid"></div>
+    <div id="mDone" class="result hidden">
+      <div class="bigscore">🎉</div>
+      <div class="feedback ok" id="mMsg"></div>
+      <button class="btn gold" id="mAgain" type="button">Play again</button>
+    </div>
+  </section>
+
+  <p class="saveNote" id="saveNote"></p>
+</main>
+
+<script>
+(function(){
+"use strict";
+/* ---------- Gematria data ---------- */
+const LETTERS=[
+ ["א",1,"Alef"],["ב",2,"Beis"],["ג",3,"Gimmel"],["ד",4,"Dalet"],["ה",5,"Hey"],["ו",6,"Vov"],["ז",7,"Zayin"],["ח",8,"Ches"],["ט",9,"Tes"],
+ ["י",10,"Yud"],["כ",20,"Kaf"],["ל",30,"Lamed"],["מ",40,"Mem"],["נ",50,"Nun"],["ס",60,"Samech"],["ע",70,"Ayin"],["פ",80,"Pey"],["צ",90,"Tzadik"],
+ ["ק",100,"Kuf"],["ר",200,"Reish"],["ש",300,"Shin"],["ת",400,"Tof"]
+];
+const VAL={};LETTERS.forEach(([h,v])=>VAL[h]=v);
+Object.assign(VAL,{"ך":20,"ם":40,"ן":50,"ף":80,"ץ":90});
+const NAME={};LETTERS.forEach(([h,,n])=>NAME[h]=n);
+Object.assign(NAME,{"ך":"Final Kaf","ם":"Final Mem","ן":"Final Nun","ף":"Final Pey","ץ":"Final Tzadik"});
+const LEVEL_MAX={1:10,2:90,3:400};
+const LEVEL_NUM_MAX={1:19,2:99,3:499};
+const WORDS=[
+ ["אב","father"],["אבא","Abba"],["אח","brother"],["יד","hand"],["חי","alive"],["טוב","good"],["דג","fish"],["זהב","gold"],["חג","holiday"],["בגד","clothing"],["אחד","one"],["הוא","he"],["היא","she"],["דוד","Dovid"],["גדי","young goat"],
+ ["לב","heart"],["אם","mother"],["מים","water"],["לחם","bread"],["כלב","dog"],["מלך","king"],["עין","eye"],["נח","Noach"],["גן","garden"],["כהן","Kohen"],["יום","day"],["חלב","milk"],["עץ","tree"],["פה","mouth"],["ים","sea"],["נס","miracle"],["אמן","Amen"],["חכם","wise"],["עולם","world"],["ילד","child"],["מצוה","mitzvah"],["כוכב","star"],["סוכה","sukkah"],["לולב","lulav"],["יין","wine"],["נחל","stream"],
+ ["שבת","Shabbos"],["תורה","Torah"],["שלום","peace"],["אור","light"],["ספר","book"],["משה","Moshe"],["אמת","truth"],["ברכה","blessing"],["קדוש","holy"],["שמש","sun"],["ארץ","land"],["צדקה","tzedakah"],["תפילה","prayer"],["ראש","head"],["שופר","shofar"],["אתרוג","esrog"],["רבי","Rebbe"],["תהלים","Tehillim"],["שמחה","joy"]
+];
+function wordValue(w){return [...w].reduce((s,c)=>s+(VAL[c]||0),0)}
+function wordLevel(w){const m=Math.max(...[...w].map(c=>VAL[c]||0));return m<=10?1:m<=90?2:3}
+function baseLetter(c){return {"ך":"כ","ם":"מ","ן":"נ","ף":"פ","ץ":"צ"}[c]||c}
+/* Number -> standard Hebrew numeral letters (no geresh marks) */
+function toLetters(n){
+ let out="";while(n>=400){out+="ת";n-=400}
+ const H={100:"ק",200:"ר",300:"ש"},T={10:"י",20:"כ",30:"ל",40:"מ",50:"נ",60:"ס",70:"ע",80:"פ",90:"צ"},O=["","א","ב","ג","ד","ה","ו","ז","ח","ט"];
+ if(n>=100){const h=Math.floor(n/100)*100;out+=H[h];n-=h}
+ if(n===15)return out+"טו";if(n===16)return out+"טז";
+ if(n>=10){const t=Math.floor(n/10)*10;out+=T[t];n-=t}
+ return out+O[n];
+}
+function iso(s){return "\u2068"+s+"\u2069"}
+function withMarks(s){if(!s)return"";if(s.length===1)return s+"׳";return s.slice(0,-1)+"״"+s.slice(-1)}
+
+/* ---------- State, student, saving ---------- */
+const $=id=>document.getElementById(id);
+const rnd=n=>Math.floor(Math.random()*n);
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+const pick=a=>a[rnd(a.length)];
+function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function safeSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+
+const studentId=String(safeGet("b3Games_studentId")||safeGet("posukPractice_studentId")||"").trim();
+const studentName=String(safeGet("b3Games_studentName")||"").trim();
+const LOCAL_KEY="gematria_progress:"+(studentId||"guest");
+let P=blankProgress();
+try{const c=JSON.parse(safeGet(LOCAL_KEY)||"null");if(c&&typeof c==="object")P=Object.assign(blankProgress(),c)}catch(e){}
+let level=Number(safeGet("gematria_level"))||1;if(!LEVEL_MAX[level])level=1;
+let db=null,progressRef=null,saveTimer=null;
+
+function blankProgress(){return {stars:0,learn:{correct:0,attempts:0},words:{correct:0,attempts:0},numbers:{correct:0,attempts:0},speed:{best:0,plays:0},match:{bestSeconds:0,plays:0},missed:{},level:1}}
+function num(x){return Number(x)||0}
+function hasPlayed(p){return num(p.stars)>0||["learn","words","numbers"].some(k=>num(p[k]?.attempts)>0)||num(p.speed?.plays)>0||num(p.match?.plays)>0}
+function merge(local,remote){ // keep the best of both copies
+ const r=Object.assign(blankProgress(),remote||{}),l=local,o=blankProgress();
+ o.stars=Math.max(num(l.stars),num(r.stars));
+ ["learn","words","numbers"].forEach(k=>{o[k]={correct:Math.max(num(l[k]?.correct),num(r[k]?.correct)),attempts:Math.max(num(l[k]?.attempts),num(r[k]?.attempts))}});
+ o.speed={best:Math.max(num(l.speed?.best),num(r.speed?.best)),plays:Math.max(num(l.speed?.plays),num(r.speed?.plays))};
+ const lb=num(l.match?.bestSeconds),rb=num(r.match?.bestSeconds);
+ o.match={bestSeconds:(lb&&rb)?Math.min(lb,rb):(lb||rb),plays:Math.max(num(l.match?.plays),num(r.match?.plays))};
+ const keys=new Set([...Object.keys(l.missed||{}),...Object.keys(r.missed||{})]);
+ keys.forEach(k=>o.missed[k]=Math.max(num(l.missed?.[k]),num(r.missed?.[k])));
+ o.level=num(l.level)||num(r.level)||1;
+ return o;
+}
+function setNote(t){$("saveNote").textContent=t}
+function save(){
+ P.level=level;safeSet(LOCAL_KEY,JSON.stringify(P));
+ $("starCount").textContent=P.stars;
+ if(!progressRef){return}
+ clearTimeout(saveTimer);
+ saveTimer=setTimeout(()=>{
+  const payload=Object.assign({},P,{name:studentName||studentId,lastActive:firebase.database.ServerValue.TIMESTAMP});
+  progressRef.set(payload).then(()=>setNote("✓ Progress saved for your teacher")).catch(e=>{console.warn("Gematria save failed",e);setNote("Saved on this device (could not reach the server)")});
+ },1200);
+}
+function star(){P.stars++;const el=$("starCount");el.textContent=P.stars;el.parentElement.classList.remove("pop");void el.offsetWidth;el.parentElement.classList.add("pop")}
+function record(kind,ok,letters){
+ P[kind].attempts++;if(ok){P[kind].correct++;star()}
+ else (letters||[]).forEach(c=>{c=baseLetter(c);if(VAL[c])P.missed[c]=num(P.missed[c])+1});
+ save();
+}
+
+async function connect(){
+ $("whoName").textContent=studentName||"";
+ if(!studentId){
+  $("banner").innerHTML='You can practice, but your stars will not be saved. <a href="../index.html">Sign in on B3 Games</a> to save them.';
+  $("banner").classList.remove("hidden");return;
+ }
+ try{
+  if(!window.firebase||!window.B3_FIREBASE_CONFIG)throw new Error("Firebase not loaded");
+  if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+  db=firebase.database();
+  const info=await window.FunTorahStudentClass.resolve(db,studentId);
+  if(!info.classId){setNote("Practice mode — ask your teacher to add you to a class to save stars.");return}
+  progressRef=db.ref("b3Games/workspaces/"+info.workspaceId+"/classes/"+info.classId+"/resources/gematria/progress/"+studentId);
+  const snap=await progressRef.once("value");
+  const remote=snap.val();P=merge(P,remote);
+  if(!safeGet("gematria_level")&&P.level)level=P.level;
+  paintLevels();
+  // Only write now if this device has progress the server doesn't have yet.
+  if(hasPlayed(P)&&JSON.stringify(merge(blankProgress(),remote))!==JSON.stringify(P))save();
+  else{safeSet(LOCAL_KEY,JSON.stringify(P));$("starCount").textContent=P.stars}
+  setNote("✓ Your stars are saved for your teacher");
+ }catch(e){console.warn("Gematria connect failed",e);setNote("Saved on this device only (could not reach the server)")}
+}
+
+/* ---------- Navigation ---------- */
+const SECTIONS=["menu","learn","words","numbers","speed","match"];
+let stopCurrent=null;
+function show(id){
+ if(stopCurrent){stopCurrent();stopCurrent=null}
+ SECTIONS.forEach(s=>$(s).classList.toggle("hidden",s!==id));
+ $("menuBtn").classList.toggle("hidden",id==="menu");
+ window.scrollTo(0,0);
+ ({learn:startLearn,words:nextWord,numbers:nextNumber,speed:speedIntro,match:startMatch}[id]||(()=>{}))();
+}
+document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>show(b.dataset.go));
+$("menuBtn").onclick=()=>show("menu");
+function paintLevels(){document.querySelectorAll("[data-level]").forEach(b=>b.classList.toggle("on",Number(b.dataset.level)===level))}
+document.querySelectorAll("[data-level]").forEach(b=>b.onclick=()=>{level=Number(b.dataset.level);safeSet("gematria_level",String(level));paintLevels();save()});
+paintLevels();
+function levelLetters(){return LETTERS.filter(([,v])=>v<=LEVEL_MAX[level])}
+
+/* ---------- Learn ---------- */
+function startLearn(){setLearnTab(currentLTab)}
+let currentLTab="chart";
+document.querySelectorAll("[data-ltab]").forEach(b=>b.onclick=()=>setLearnTab(b.dataset.ltab));
+function setLearnTab(t){
+ currentLTab=t;
+ document.querySelectorAll("[data-ltab]").forEach(b=>b.classList.toggle("on",b.dataset.ltab===t));
+ $("learnChart").classList.toggle("hidden",t!=="chart");$("learnQuiz").classList.toggle("hidden",t!=="quiz");
+ if(t==="chart")drawChart();else learnQuestion();
+}
+function drawChart(){
+ const groups=[["Ones (1–9)",0,9],["Tens (10–90)",9,18],["Hundreds (100–400)",18,22]];
+ $("chartRows").innerHTML=groups.map(([lab,a,b])=>'<div class="chartRow"><div class="lab">'+lab+'</div><div class="letters">'+
+  LETTERS.slice(a,b).map(([h,v])=>'<button type="button" class="lt'+(v>LEVEL_MAX[level]?' locked':'')+'" data-h="'+h+'" aria-label="'+NAME[h]+' equals '+v+'"><span class="h">'+h+'</span><span class="n">'+v+'</span></button>').join("")+'</div></div>').join("");
+ $("chartRows").querySelectorAll(".lt").forEach(b=>b.onclick=()=>{
+  $("chartRows").querySelectorAll(".lt").forEach(x=>x.classList.remove("on"));b.classList.add("on");
+  const h=b.dataset.h,v=VAL[h];
+  const ex=WORDS.find(([w])=>w.includes(h)&&wordLevel(w)<=Math.max(level,wordLevel(h)));
+  $("bigLetter").innerHTML='<span class="h">'+h+'</span><span class="eq">= '+v+'</span><span class="info">'+NAME[h]+(ex?'<br><span style="font-weight:700;color:#5d6b7a">in <span class="he" style="font-size:22px">'+ex[0]+'</span> ('+ex[1]+')</span>':'')+'</span>';
+  $("bigLetter").classList.remove("pop");void $("bigLetter").offsetWidth;$("bigLetter").classList.add("pop");
+ });
+}
+function numberChoices(correct,pool){
+ const set=new Set([correct]);const opts=shuffle(pool.filter(x=>x!==correct));
+ for(const o of opts){if(set.size>=4)break;set.add(o)}
+ let k=1;while(set.size<4){const c=correct+k*(k%2?1:-1)*(correct>=10?10:1);if(c>0)set.add(c);k++}
+ return shuffle([...set]);
+}
+function letterChoices(correct,pool){return shuffle([correct,...shuffle(pool.filter(h=>h!==correct)).slice(0,3)])}
+function makeLetterQuestion(){
+ const L=levelLetters(),[h,v]=pick(L);
+ if(Math.random()<.5)return {prompt:"What number is this letter?",bigHtml:'<div class="qbig">'+h+'</div>',choices:numberChoices(v,L.map(x=>x[1])).map(String),answer:String(v),heChoices:false,letters:[h]};
+ return {prompt:"Which letter equals this number?",bigHtml:'<div class="qnum">'+v+'</div>',choices:letterChoices(h,L.map(x=>x[0])),answer:h,heChoices:true,letters:[h]};
+}
+function askQuestion(q,box,onAnswer){
+ $(box.prompt).textContent=q.prompt;$(box.big).innerHTML=q.bigHtml;
+ const c=$(box.choices);c.innerHTML="";
+ q.choices.forEach(ch=>{const b=document.createElement("button");b.type="button";b.textContent=ch;if(q.heChoices)b.className="he";
+  b.onclick=()=>{const ok=ch===q.answer;onAnswer(ok,b,c)};c.appendChild(b)});
+}
+function markChoices(c,answer,clicked,ok){
+ c.querySelectorAll("button").forEach(b=>{b.disabled=true;if(b.textContent===answer)b.classList.add("right")});
+ if(!ok)clicked.classList.add("wrong");
+}
+function learnQuestion(){
+ const q=makeLetterQuestion();
+ $("lqFeedback").textContent="";$("lqFeedback").className="feedback";$("lqNext").classList.add("hidden");
+ askQuestion(q,{prompt:"lqPrompt",big:"lqBig",choices:"lqChoices"},(ok,b,c)=>{
+  markChoices(c,q.answer,b,ok);record("learn",ok,q.letters);
+  const h=q.letters[0];
+  $("lqFeedback").textContent=ok?pick(["Great job! ⭐","Correct! ⭐","You got it! ⭐"]):"Not quite — "+iso(h)+" = "+VAL[h];
+  $("lqFeedback").className="feedback "+(ok?"ok":"no");
+  if(ok)setTimeout(()=>{if(!$("learnQuiz").classList.contains("hidden")&&currentLTab==="quiz")learnQuestion()},900);
+  else $("lqNext").classList.remove("hidden");
+ });
+}
+$("lqNext").onclick=learnQuestion;
+
+/* ---------- Word value ---------- */
+let curWord=null,lastWord="";
+function wordsForLevel(){
+ const exact=WORDS.filter(([w])=>wordLevel(w)===level),lower=WORDS.filter(([w])=>wordLevel(w)<level);
+ return Math.random()<.75||!lower.length?exact:lower;
+}
+function nextWord(){
+ let pool=wordsForLevel().filter(([w])=>w!==lastWord);curWord=pick(pool);lastWord=curWord[0];
+ const [w,mean]=curWord,val=wordValue(w);
+ $("wTiles").innerHTML=[...w].map(c=>'<div class="tile2"><div class="h">'+c+'</div><div class="n" data-v="'+VAL[c]+'"></div></div>').join("");
+ $("wMean").textContent="“"+mean+"”";
+ $("wFeedback").textContent="";$("wFeedback").className="feedback";$("wEq").innerHTML="";$("wNext").classList.add("hidden");$("wHelp").disabled=false;
+ const letters=[...w].map(c=>VAL[c]);
+ const wrong=new Set();
+ // believable mistakes: forget one letter, count a letter twice, off by 1 or 10
+ letters.forEach(v=>{if(val-v>0)wrong.add(val-v);wrong.add(val+v)});
+ [1,10,-1,-10,2].forEach(d=>{if(val+d>0)wrong.add(val+d)});wrong.delete(val);
+ const choices=shuffle([val,...shuffle([...wrong]).slice(0,3)]);
+ const c=$("wChoices");c.innerHTML="";
+ choices.forEach(ch=>{const b=document.createElement("button");b.type="button";b.textContent=ch;b.onclick=()=>{
+  const ok=ch===val;markChoices(c,String(val),b,ok);record("words",ok,ok?[]:[...w]);showValues();
+  $("wFeedback").innerHTML=(ok?"Excellent! ⭐ ":"Good try! ")+'<bdi class="he">'+w+'</bdi> = '+val;
+  $("wFeedback").className="feedback "+(ok?"ok":"no");
+  $("wEq").innerHTML=[...w].map(c=>'<bdi class="he">'+c+'</bdi> ('+VAL[c]+')').join(" + ")+" = "+val;
+  $("wNext").classList.remove("hidden");$("wHelp").disabled=true;
+ };c.appendChild(b)});
+}
+function showValues(){$("wTiles").querySelectorAll(".n").forEach(n=>n.textContent=n.dataset.v)}
+$("wHelp").onclick=()=>{showValues();$("wHelp").disabled=true};
+$("wNext").onclick=nextWord;
+
+/* ---------- Number -> letters ---------- */
+let nTarget=0,nBuilt=[],nDone=false,lastN=0;
+function nextNumber(){
+ const max=LEVEL_NUM_MAX[level];
+ let n;
+ if(level===3&&Math.random()<.12)n=787; // this year: תשפ״ז
+ else{
+  const min=level===1?1:level===2?11:100;
+  do{n=min+rnd(max-min+1)}while(n===lastN);
+  if(level===1&&Math.random()<.2)n=pick([15,16]);
+ }
+ lastN=n;nTarget=n;nBuilt=[];nDone=false;
+ $("nTarget").textContent=n;
+ $("nFeedback").textContent=n===787?"Hint: this is our year, 5787!":"";$("nFeedback").className="feedback";
+ $("nNext").classList.add("hidden");$("nCheck").disabled=false;
+ drawKeys();drawBuild();
+}
+function drawKeys(){
+ $("nKeys").innerHTML=LETTERS.map(([h,v])=>'<button type="button" data-h="'+h+'"'+(v>LEVEL_MAX[level]?' disabled':'')+' aria-label="'+NAME[h]+' '+v+'"><span class="h">'+h+'</span><span class="n">'+v+'</span></button>').join("");
+ $("nKeys").querySelectorAll("button").forEach(b=>b.onclick=()=>{if(nDone||nBuilt.length>=6)return;nBuilt.push(b.dataset.h);drawBuild()});
+}
+function drawBuild(){
+ const s=nBuilt.join("");
+ $("nBuild").innerHTML=s?'<span class="h">'+withMarks(s)+'</span>':'<span class="ph">Tap letters below…</span>';
+ const t=wordValue(s);
+ $("nTotal").textContent=s?"Your letters add up to "+t+(t===nTarget?" ✓":""):"";
+}
+$("nUndo").onclick=()=>{if(nDone)return;nBuilt.pop();drawBuild()};
+$("nClear").onclick=()=>{if(nDone)return;nBuilt=[];drawBuild()};
+$("nCheck").onclick=()=>{
+ if(nDone||!nBuilt.length)return;
+ const s=nBuilt.join(""),want=toLetters(nTarget),sum=wordValue(s);
+ if(s===want){
+  nDone=true;record("numbers",true);
+  $("nFeedback").textContent="Perfect! ⭐ "+nTarget+" = "+iso(withMarks(want))+(nTarget===787?" — that's this year, "+iso("תשפ״ז")+"!":"");
+  $("nFeedback").className="feedback ok";$("nNext").classList.remove("hidden");$("nCheck").disabled=true;return;
+ }
+ let msg;
+ if(sum===nTarget&&(nTarget===15||nTarget===16)&&s.includes("י"))msg="It adds up! But for "+nTarget+" we write "+iso(withMarks(want))+" so we don't write Hashem's name.";
+ else if(sum===nTarget)msg="It adds up to "+nTarget+"! Now use the fewest letters, biggest first: "+iso(withMarks(want));
+ else if(sum<nTarget)msg="Too small — you have "+sum+". You need "+(nTarget-sum)+" more.";
+ else msg="Too big — you have "+sum+". That's "+(sum-nTarget)+" too many.";
+ const reveal=sum===nTarget;
+ record("numbers",false,reveal?[]:[...want]);
+ $("nFeedback").textContent=msg;$("nFeedback").className="feedback no";
+ if(reveal){nDone=true;$("nNext").classList.remove("hidden");$("nCheck").disabled=true}
+};
+$("nNext").onclick=nextNumber;
+
+/* ---------- Speed round ---------- */
+let spTimer=null,spLeft=60,spScore=0,spRunning=false;
+function speedIntro(){$("spIntro").classList.remove("hidden");$("spGame").classList.add("hidden");$("spDone").classList.add("hidden");$("spBest").textContent=P.speed.best||"—"}
+function speedQuestion(){
+ let q;
+ if(level>1&&Math.random()<.3){
+  const pool=WORDS.filter(([w])=>w.length<=3&&wordLevel(w)<=level),[w]=pick(pool),v=wordValue(w);
+  q={prompt:"What is this word worth?",bigHtml:'<div class="qbig">'+w+'</div>',choices:numberChoices(v,[...[...w].map(c=>v-VAL[c]).filter(x=>x>0),v+1,v+10,v-1]).map(String),answer:String(v),heChoices:false,letters:[...w]};
+ }else q=makeLetterQuestion();
+ askQuestion(q,{prompt:"spPrompt",big:"spBig",choices:"spChoices"},(ok,b,c)=>{
+  if(!spRunning)return;
+  markChoices(c,q.answer,b,ok);
+  if(ok){spScore++;$("spScore").textContent=spScore;star()}else q.letters.forEach(h=>{h=baseLetter(h);P.missed[h]=num(P.missed[h])+1});
+  setTimeout(()=>{if(spRunning)speedQuestion()},ok?350:900);
+ });
+}
+$("spStart").onclick=$("spAgain").onclick=()=>{
+ spLeft=60;spScore=0;spRunning=true;$("spScore").textContent=0;$("spTime").textContent=60;$("spBar").style.width="100%";
+ $("spIntro").classList.add("hidden");$("spDone").classList.add("hidden");$("spGame").classList.remove("hidden");
+ speedQuestion();
+ clearInterval(spTimer);
+ spTimer=setInterval(()=>{spLeft--;$("spTime").textContent=spLeft;$("spBar").style.width=(spLeft/60*100)+"%";if(spLeft<=0)endSpeed()},1000);
+ stopCurrent=()=>{clearInterval(spTimer);spRunning=false};
+};
+function endSpeed(){
+ clearInterval(spTimer);spRunning=false;stopCurrent=null;
+ const prev=P.speed.best;P.speed.plays++;if(spScore>prev)P.speed.best=spScore;save();
+ $("spGame").classList.add("hidden");$("spDone").classList.remove("hidden");$("spFinal").textContent=spScore;
+ $("spMsg").textContent=spScore>prev&&prev>0?"🏆 New personal best!":spScore>prev?"Nice first round!":"Your best is "+P.speed.best+". Try to beat it!";
+}
+
+/* ---------- Memory match ---------- */
+let mFirst=null,mLock=false,mMoves=0,mPairs=0,mStart=0,mClock=null;
+function startMatch(){
+ clearInterval(mClock);mFirst=null;mLock=false;mMoves=0;mPairs=0;mStart=0;
+ $("mMoves").textContent=0;$("mTime").textContent=0;$("mBest").textContent=P.match.bestSeconds?P.match.bestSeconds+"s":"—";
+ $("mDone").classList.add("hidden");$("mGrid").classList.remove("hidden");
+ const chosen=shuffle(levelLetters()).slice(0,6);
+ const cards=shuffle(chosen.flatMap(([h,v])=>[{k:h,face:h,he:true},{k:h,face:String(v),he:false}]));
+ const g=$("mGrid");g.innerHTML="";
+ cards.forEach(card=>{const b=document.createElement("button");b.type="button";b.className="mc";b.textContent="?";b.setAttribute("aria-label","Hidden card");
+  b.onclick=()=>flip(b,card);g.appendChild(b)});
+ stopCurrent=()=>clearInterval(mClock);
+}
+function flip(b,card){
+ if(mLock||b.classList.contains("up")||b.classList.contains("done"))return;
+ if(!mStart){mStart=Date.now();mClock=setInterval(()=>$("mTime").textContent=Math.floor((Date.now()-mStart)/1000),500)}
+ b.classList.add("up");if(card.he)b.classList.add("he");b.textContent=card.face;b.setAttribute("aria-label",card.face);
+ if(!mFirst){mFirst={b,card};return}
+ mMoves++;$("mMoves").textContent=mMoves;
+ const a=mFirst;mFirst=null;
+ if(a.card.k===card.k&&a.card.he!==card.he){
+  [a.b,b].forEach(x=>{x.classList.remove("up");x.classList.add("done")});mPairs++;star();
+  if(mPairs===6)setTimeout(endMatch,400);
+ }else{
+  mLock=true;setTimeout(()=>{[a.b,b].forEach(x=>{x.classList.remove("up","he");x.textContent="?";x.setAttribute("aria-label","Hidden card")});mLock=false},900);
+ }
+}
+function endMatch(){
+ clearInterval(mClock);stopCurrent=null;
+ const secs=Math.max(1,Math.round((Date.now()-mStart)/1000)),prev=P.match.bestSeconds;
+ P.match.plays++;if(!prev||secs<prev)P.match.bestSeconds=secs;save();
+ $("mDone").classList.remove("hidden");
+ $("mMsg").textContent="You matched them all in "+secs+" seconds and "+mMoves+" moves!"+(prev&&secs<prev?" 🏆 New best time!":"");
+ $("mBest").textContent=P.match.bestSeconds+"s";
+}
+$("mAgain").onclick=startMatch;
+
+$("starCount").textContent=P.stars;
+connect();
+window.__gematria={toLetters,withMarks,wordValue,WORDS,wordLevel};
+})();
+</script>
+</body>
+</html>
