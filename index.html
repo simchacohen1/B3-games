@@ -124,6 +124,23 @@
   .approval-center-footer{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}.approval-center-footer button{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}.approval-center-refresh{background:#e2e8f0;color:#1f2937}.approval-center-done{background:#26364a;color:#fff}
   @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 64px 1fr}.time-span{flex-wrap:wrap}.admin-panel{top:54px}.approval-button{top:58px;left:10px}.approval-center-card{padding:17px}.approval-center-item{grid-template-columns:36px minmax(0,1fr) auto;padding:11px}.approval-center-icon{font-size:24px}}
 .login-card.checking>:not(h2):not(#loginMsg){display:none}.login-card.checking #loginMsg{color:#475569;font-size:16px}
+/* Keep the student launchers visible together on desktop screens. */
+@media(min-width:760px){
+ body{padding-top:16px}
+ h1{font-size:34px;margin:4px 0}
+ .subtitle{margin-bottom:12px}
+ .student-bar{max-width:1100px;margin-bottom:12px;padding:9px 14px}
+ .game-container{max-width:1100px;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ .game-group{padding:12px;border-radius:16px}
+ .game-group-head{margin-bottom:10px}
+ .game-group-title{font-size:18px}
+ .game-group-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+ .game-group[data-game-group="class"] .game-group-grid,.game-group[data-game-group="challenge"] .game-group-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .game-card{min-height:96px;padding:12px 8px;gap:6px;border-radius:12px}
+ .card-icon{font-size:32px}.rashi-icon{font-size:36px}.yiddish-icon{width:42px;height:42px}
+ .card-title{font-size:15px}
+ .teacher-tools-section{margin-top:24px;padding-top:18px}
+}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
@@ -185,17 +202,6 @@
         </div>
       </section>
 
-      <section class="game-group" data-game-group="challenge">
-        <div class="game-group-head">
-          <span class="game-group-icon">🏆</span>
-          <div><div class="game-group-title">Tests &amp; Challenges</div><div class="game-group-subtitle">Quizzes and class challenges</div></div>
-        </div>
-        <div class="game-group-grid">
-          <a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html" target="_blank" rel="noopener"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz &amp; Practice</span></a>
-          <a class="game-card" data-game-id="game-show" href="game-show/player.html" target="_blank" rel="noopener"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a>
-        </div>
-      </section>
-
       <section class="game-group" data-game-group="class">
         <div class="game-group-head">
           <span class="game-group-icon">👥</span>
@@ -204,6 +210,17 @@
         <div class="game-group-grid">
           <a class="game-card" data-game-id="class-gallery" href="class-gallery/index.html" target="_blank" rel="noopener"><span class="card-icon">🖼️</span><span class="card-title">Class Gallery</span></a>
           <a class="game-card" data-game-id="student-rewards" href="student-rewards/student.html" target="_blank" rel="noopener"><span class="card-icon">🌟</span><span class="card-title">Student Rewards</span></a>
+        </div>
+      </section>
+
+      <section class="game-group" data-game-group="challenge">
+        <div class="game-group-head">
+          <span class="game-group-icon">🏆</span>
+          <div><div class="game-group-title">Tests &amp; Challenges</div><div class="game-group-subtitle">Quizzes and class challenges</div></div>
+        </div>
+        <div class="game-group-grid">
+          <a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html" target="_blank" rel="noopener"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz &amp; Practice</span></a>
+          <a class="game-card" data-game-id="game-show" href="game-show/player.html" target="_blank" rel="noopener"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a>
         </div>
       </section>
     </div>
