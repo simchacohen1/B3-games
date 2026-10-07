@@ -1,6 +1,7 @@
 'use strict';
 const C=window.ClassPointerCore,$=id=>document.getElementById(id);
-const room=new URL(location.href).searchParams.get('room'),isTeacher=!room;
+const room=new URL(location.href).searchParams.get('room'),isTeacher=!room;   const entry=new URL(location.href).searchParams.get('dashboard');
+   if((isTeacher&&entry!=='teacher')||(!isTeacher&&entry!=='student')){document.body.innerHTML='<main style="padding:2rem;font:1rem system-ui">Open Class Pointer from Fun Torah Tools.</main>';throw Error('Class Pointer must be opened from the dashboard.')}
 const members=new Map();
 let peer=null,teacherConnection=null,screen=null,mediaCall=null,viewportController=null,state={sharing:false,mode:'nobody',members:[],points:{}},started=false,admitted=false,joining=false,joinTimer=null;
 let generation=0,colorIndex=0,pendingPoint=null,hoverTimer=null,lastHover=0;
