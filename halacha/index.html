@@ -119,6 +119,11 @@ body.exporting .scrap.clear{border-color:transparent!important}
 .teacher-notes-columns li{margin-bottom:9px;line-height:1.5}
 .notes .source:empty{display:none}
 @media(max-width:700px){.teacher-notes-columns{grid-template-columns:1fr;gap:6px}}
+.resize-width,.resize-height{position:absolute;width:14px;height:14px;background:#2563eb;border:2px solid white;border-radius:3px;z-index:30;touch-action:none;box-shadow:0 1px 4px #0005}
+.resize-width{right:-8px;top:50%;transform:translateY(-50%);cursor:ew-resize}
+.resize-height{bottom:-8px;left:50%;transform:translateX(-50%);cursor:ns-resize}
+@media print{.resize-width,.resize-height{display:none!important}}
+body.exporting .resize-width,body.exporting .resize-height{display:none!important}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -297,6 +302,7 @@ function ensureDeleteControl(e){
 }
 function ensureResizeHandle(e){
  if(!e)return;
+ ["width","height"].forEach(axis=>{let handle=e.querySelector(".resize-"+axis);if(!handle){handle=document.createElement("div");handle.className="resize-"+axis;handle.title=axis==="width"?"Drag to change width":"Drag to change height";e.appendChild(handle)}installResize(e,handle,axis)});
  const existing=e.querySelector(".resize-handle");
  if(existing){installResize(e,existing);return;}
  // Remove the old +/- size buttons from saved pieces; resizing is now by dragging.
@@ -308,7 +314,7 @@ function ensureResizeHandle(e){
  h.className="resize-handle";h.title="Drag to resize";e.appendChild(h);
  installResize(e,h);
 }
-function installResize(e,h){
+function installResize(e,h,axis="both"){
  if(!e||!h||h._resizeBound)return;
  h._resizeBound=true;delete h.dataset.bound;
  h.onpointerdown=ev=>{
@@ -317,11 +323,13 @@ function installResize(e,h){
    const startX=ev.clientX,startY=ev.clientY,startW=e.offsetWidth,startH=e.offsetHeight;
    const startFont=parseFloat(getComputedStyle(e).fontSize);
    const startPadding=parseFloat(getComputedStyle(e).paddingTop);
-   const keepRatio=!e.classList.contains("textbox");
+   const keepRatio=axis==="both";
    const ratio=startW/Math.max(1,startH);
    h.setPointerCapture(ev.pointerId);
    const move=mv=>{
      let w=Math.max(60,startW+(mv.clientX-startX)),hgt=Math.max(40,startH+(mv.clientY-startY));
+     if(axis==="width")hgt=startH;
+     if(axis==="height")w=startW;
      if(keepRatio){
        const byW=w/ratio,byH=hgt*ratio;
        if(Math.abs(w-startW)>=Math.abs(hgt-startH)){hgt=byW}else{w=byH}
@@ -378,7 +386,7 @@ function drag(e){
  let sx,sy,l,t,on=false;
  e.ondblclick=v=>{v.stopPropagation();openCustomizer(e,v)};
  e.onpointerdown=v=>{
- if(v.target.tagName==="BUTTON"||v.target.closest(".resize-handle")||v.target.closest(".tb-text"))return;
+ if(v.target.tagName==="BUTTON"||v.target.closest(".resize-handle,.resize-width,.resize-height")||v.target.closest(".tb-text"))return;
  e.tabIndex=-1;e.focus({preventScroll:true});
  on=true;sx=v.clientX;sy=v.clientY;l=e.offsetLeft;t=e.offsetTop;
  e.setPointerCapture(v.pointerId);
