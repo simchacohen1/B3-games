@@ -141,6 +141,10 @@
  .card-title{font-size:15px}
  .teacher-tools-section{margin-top:24px;padding-top:18px}
 }
+.student-card-shell{position:relative;min-width:0}.student-card-shell>.game-card{height:100%;padding-right:40px}
+.card-lock{position:absolute;right:7px;top:7px;width:28px;height:28px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:16px;cursor:pointer;z-index:2}
+.card-lock-menu{position:absolute;right:6px;top:38px;z-index:20;display:flex;gap:6px;padding:8px;background:#fff;border:1px solid #94a3b8;border-radius:10px;box-shadow:0 4px 15px #0003}
+.card-lock-menu button{white-space:nowrap;padding:7px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;cursor:pointer;font-weight:bold}.card-lock-menu small{max-width:150px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
@@ -916,9 +920,31 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     showNext();
   }
 
+  function renderCardLocks(){
+    document.querySelectorAll('#gamesArea .game-card[data-game-id]').forEach(card=>{
+      let shell=card.parentElement;
+      if(!shell.classList.contains('student-card-shell')){shell=document.createElement('div');shell.className='student-card-shell';card.before(shell);shell.appendChild(card)}
+      shell.querySelectorAll('.card-lock,.card-lock-menu').forEach(e=>e.remove());
+      if(!isAuthorizedTeacher)return;
+      const id=card.dataset.gameId;
+      const classes=currentAccess.role==='admin'?['et','wt']:(currentAccess.classIds||[]);
+      const locked=classes.some(c=>currentSettings.classGames?.[c]?.[id]===false)||currentSettings.games?.[id]===false;
+      const button=document.createElement('button');button.type='button';button.className='card-lock';
+      button.textContent=locked?'\uD83D\uDD12':'\uD83D\uDD13';
+      button.title='Student access: '+(locked?'locked for some students':'open')+' ? click to manage';button.setAttribute('aria-label','Manage student access for '+card.innerText.trim());
+      button.addEventListener('click',()=>{
+        const prior=shell.querySelector('.card-lock-menu');document.querySelectorAll('.card-lock-menu').forEach(e=>e.remove());if(prior)return;
+        const menu=document.createElement('div');menu.className='card-lock-menu';
+        classes.forEach(c=>{const open=currentSettings.classGames?.[c]?.[id]!==false;const b=document.createElement('button');b.type='button';b.textContent=c.toUpperCase()+': '+(open?'Open \uD83D\uDD13':'Locked \uD83D\uDD12');b.title=(open?'Lock ':'Unlock ')+c.toUpperCase();b.onclick=()=>setActivityClassOpen(id,c,!open);menu.appendChild(b)});
+        if(currentSettings.games?.[id]===false){const note=document.createElement('small');note.textContent='Activity is globally inactive. Enable it in Teacher Tools.';menu.appendChild(note)}
+        shell.appendChild(menu);
+      });shell.appendChild(button);
+    });
+  }
   function renderStudentAccess(){
     el("classPointerStudentLink").classList.toggle("hidden",isAuthorizedTeacher||isStudentPreview);
     queueMicrotask(renderStudentNudges);
+    queueMicrotask(renderCardLocks);
     setTeacherToolPairVisibility();
     // The authorized teacher account is never treated as ET or WT.
     if(isAuthorizedTeacher){
