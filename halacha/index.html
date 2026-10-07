@@ -314,8 +314,9 @@ function installResize(e,h){
  h.onpointerdown=ev=>{
    ev.preventDefault();ev.stopPropagation();
    const rect=e.getBoundingClientRect(),page=e.closest(".page");
-   const startX=ev.clientX,startY=ev.clientY,startW=rect.width,startH=rect.height;
+   const startX=ev.clientX,startY=ev.clientY,startW=e.offsetWidth,startH=e.offsetHeight;
    const startFont=parseFloat(getComputedStyle(e).fontSize);
+   const startPadding=parseFloat(getComputedStyle(e).paddingTop);
    const keepRatio=!e.classList.contains("textbox");
    const ratio=startW/Math.max(1,startH);
    h.setPointerCapture(ev.pointerId);
@@ -325,14 +326,19 @@ function installResize(e,h){
        const byW=w/ratio,byH=hgt*ratio;
        if(Math.abs(w-startW)>=Math.abs(hgt-startH)){hgt=byW}else{w=byH}
      }
-     if(page){
+     if(keepRatio){
+       let scale=w/startW;
+       if(page)scale=Math.min(scale,Math.max(60,page.clientWidth-e.offsetLeft-8)/startW,Math.max(40,page.clientHeight-e.offsetTop-8)/startH);
+       w=startW*scale;hgt=startH*scale;
+       if(!e.querySelector("img"))e.style.fontSize=Math.max(10,startFont*scale)+"px";
+       e.style.padding=startPadding*scale+"px";
+       e.style.minWidth="0";e.style.minHeight="0";
+     }else if(page){
        w=Math.min(w,Math.max(60,page.clientWidth-e.offsetLeft-8));
        hgt=Math.min(hgt,Math.max(40,page.clientHeight-e.offsetTop-8));
      }
-     e.style.width=Math.round(w)+"px";
-     if(!e.classList.contains("textbox")&&!e.querySelector("img"))e.style.fontSize=Math.max(10,startFont*w/startW)+"px";
-     if(e.classList.contains("textbox"))e.style.height=Math.round(hgt)+"px";
-     else e.style.height="auto";
+     e.style.width=w+"px";
+     e.style.height=hgt+"px";
    };
    const up=()=>{
      h.onpointermove=null;h.onpointerup=null;h.onpointercancel=null;
