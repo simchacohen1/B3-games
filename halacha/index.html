@@ -316,7 +316,7 @@ function installResize(e,h){
    const rect=e.getBoundingClientRect(),page=e.closest(".page");
    const startX=ev.clientX,startY=ev.clientY,startW=rect.width,startH=rect.height;
    const startFont=parseFloat(getComputedStyle(e).fontSize);
-   const keepRatio=!e.classList.contains("textbox")&&!e.classList.contains("he")&&!e.classList.contains("text");
+   const keepRatio=!e.classList.contains("textbox");
    const ratio=startW/Math.max(1,startH);
    h.setPointerCapture(ev.pointerId);
    const move=mv=>{
@@ -330,7 +330,7 @@ function installResize(e,h){
        hgt=Math.min(hgt,Math.max(40,page.clientHeight-e.offsetTop-8));
      }
      e.style.width=Math.round(w)+"px";
-     if(e.classList.contains("sticker"))e.style.fontSize=Math.max(16,startFont*w/startW)+"px";
+     if(!e.classList.contains("textbox")&&!e.querySelector("img"))e.style.fontSize=Math.max(10,startFont*w/startW)+"px";
      if(e.classList.contains("textbox"))e.style.height=Math.round(hgt)+"px";
      else e.style.height="auto";
    };
