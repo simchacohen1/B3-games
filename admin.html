@@ -26,6 +26,32 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}.student
 .ta-lock{background:#dc2626}.ta-unlock{background:#16a34a}.ta-btns button:disabled{opacity:.45;cursor:default}
 .ta-msg{margin-top:14px;font-weight:800;font-size:16px;min-height:22px}
 .ta-panel select{width:100%;padding:13px;font-size:17px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;margin-bottom:14px}
+/* Owner control panel: one class at a time, every game one tap away. */
+.cp-wrap{max-width:720px;margin:0 auto}
+.cp-switch{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:14px}
+.cp-switch button{border:2px solid #cbd5e1;background:#fff;border-radius:14px;padding:14px;font-size:22px;font-weight:900;cursor:pointer;color:#334155;display:flex;align-items:center;justify-content:center;gap:9px}
+.cp-switch button.on{border-color:#172033;background:#172033;color:#fff}
+.cp-dot{width:12px;height:12px;border-radius:50%;display:inline-block}.cp-dot.open{background:#22c55e}.cp-dot.locked{background:#ef4444}
+.cp-status{border-radius:16px;padding:16px 18px;margin-bottom:12px;font-size:20px;font-weight:900;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.cp-status.open{background:#dcfce7;color:#14532d}.cp-status.locked{background:#fee2e2;color:#7f1d1d}
+.cp-status small{display:block;font-size:14px;font-weight:700;opacity:.85;margin-top:3px}
+.cp-modes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}
+.cp-modes button{border:1px solid #cbd5e1;background:#fff;border-radius:12px;padding:13px 6px;font-size:15px;font-weight:900;cursor:pointer;color:#334155}
+.cp-modes button.on{background:#172033;border-color:#172033;color:#fff}
+.cp-emergency{background:#7f1d1d;color:#fff;border-radius:14px;padding:13px 16px;margin-bottom:12px;font-weight:800;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.cp-emergency button{border:0;border-radius:10px;padding:9px 13px;font-weight:900;cursor:pointer}
+.cp-games{background:#fff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden}
+.cp-games-head{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;border-bottom:1px solid #e2e8f0;font-weight:900;color:#334155}
+.cp-games-head span{font-size:12px;color:#64748b;font-weight:700}
+.cp-row{display:grid;grid-template-columns:44px minmax(0,1fr) 118px;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid #f1f5f9}
+.cp-row:first-of-type{border-top:0}
+.cp-name{font-weight:800;font-size:16px;color:#1f2937;overflow:hidden;text-overflow:ellipsis}
+.cp-name small{display:block;font-size:11px;color:#b45309;font-weight:800}
+.cp-star{border:0;background:transparent;font-size:24px;cursor:pointer;filter:grayscale(1);opacity:.3;padding:4px}.cp-star.on{filter:none;opacity:1}
+.cp-toggle{border:0;border-radius:999px;padding:11px 8px;font-size:15px;font-weight:900;cursor:pointer}
+.cp-toggle.open{background:#dcfce7;color:#166534}.cp-toggle.closed{background:#fee2e2;color:#991b1b}
+.cp-row button:disabled,.cp-modes button:disabled{opacity:.5;cursor:wait}
+.cp-msg{min-height:22px;margin-top:10px;font-weight:800;color:#475569;text-align:center}
 </style>
 </head>
 <body>
@@ -33,10 +59,9 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}.student
   <div class="brand">B3 Teacher Center</div>
   <div class="brand-sub">Everything for your class, organized in one place.</div>
   <nav>
-    <button class="nav-btn active" data-tab="access" id="classAccessNav">🔐 Class Access</button>
+    <button class="nav-btn active" data-tab="access" id="classAccessNav">🎛️ Control</button>
     <button class="nav-btn" data-tab="students">👥 Students &amp; Classes</button>
-    <button class="nav-btn" data-tab="activities">🎮 Activities</button>
-    <button class="nav-btn" data-tab="special">⭐ Special Access</button>
+    <button class="nav-btn" data-tab="settings">⚙️ Settings</button>
   </nav>
   <a class="back" id="backToTools" href="index.html">← Back to Fun Torah Tools</a>
 </aside>
@@ -44,6 +69,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}.student
   <div class="topbar"><div><h1 id="pageTitle">Class Access</h1><p id="pageSub">Open, close, and schedule your classes.</p></div></div>
   <div class="workspace" id="workspace">
     <div id="teacherAccessPanel" class="ta-panel"></div>
+    <div id="ownerControlPanel" class="ta-panel"></div>
     <iframe id="adminFrame" src="index.html?adminPage=1" title="B3 administration"></iframe>
     <div class="preview-resizer" id="previewResizer" title="Drag to resize preview"></div><aside class="student-preview" id="studentPreview">
       <div class="preview-head"><span>👀 Student Preview</span><span style="display:flex;gap:7px;align-items:center"><select id="previewStudentSelect" aria-label="Student to preview" style="max-width:190px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-weight:700"><option value="">Choose student…</option></select><button id="refreshPreview" type="button">Refresh</button></span></div>
@@ -53,14 +79,15 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}.student
 </main>
 <script>
 const tabs={
-  access:["Class Access","Open, close, and schedule your classes."],
+  access:["Control","Open or lock a class and its games."],
   students:["Students & Classes","Add students, change passcodes, and choose class memberships."],
-  activities:["Activities","Choose which activities each class can use."],
-  special:["Special Access","Give an individual student access while the class is locked."]
+  settings:["Settings","Recess schedule, special access, adding/removing games, emergency lock and teacher accounts."]
 };
 const adminParams=new URLSearchParams(location.search);
 const requestedClassId=String(adminParams.get("class")||"").trim();
 let currentTab=String(adminParams.get("tab")||"access").trim()||"access";
+if(currentTab==="activities"||currentTab==="special")currentTab="settings";
+if(!tabs[currentTab])currentTab="access";
 const frame=document.getElementById("adminFrame");
 const backToTools=document.getElementById("backToTools");
 backToTools.addEventListener("click",e=>{
@@ -115,6 +142,88 @@ async function renderTeacherAccess(msg){
   const lb=document.getElementById("taLock"),ub=document.getElementById("taUnlock");
   if(lb)lb.onclick=()=>save(true);if(ub)ub.onclick=()=>save(false);
 }
+// ---- Owner Control page -------------------------------------------------
+// One class at a time: status, Automatic / Open now / Lock now, and every
+// game with a one-tap Open/Closed switch. A star marks the one game that
+// stays open while the class is locked.
+const CP_CLASSES=[{id:"et",name:"ET"},{id:"wt",name:"WT"}];
+let cpClass=(()=>{try{const v=localStorage.getItem("b3ControlClass");return CP_CLASSES.some(c=>c.id===v)?v:"et"}catch(e){return "et"}})();
+let cpSettings=null,cpUnsub=null,cpTimer=null,cpBusy=false,cpMsg="";
+function cpApi(){return frame.contentWindow?.B3SiteSettings}
+function cpGames(){
+  const d=frame.contentDocument;if(!d)return [];
+  const seen=new Set();
+  return [...d.querySelectorAll(".game-card[data-game-id]")].map(card=>{
+    const id=card.dataset.gameId;if(!id||seen.has(id))return null;seen.add(id);
+    return {id,name:(card.querySelector(".card-title")?.textContent||card.textContent).trim()};
+  }).filter(Boolean);
+}
+function cpFmt(mins){let h=Math.floor(mins/60)%24,m=mins%60;const ap=h>=12?"PM":"AM";h=h%12||12;return h+":"+String(m).padStart(2,"0")+" "+ap}
+function cpNow(){
+  const parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"short",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(new Date());
+  const get=t=>parts.find(p=>p.type===t)?.value||"";
+  return {day:get("weekday").slice(0,3).toLowerCase(),mins:(Number(get("hour"))%24)*60+Number(get("minute"))};
+}
+function cpToMin(t){const [h,m]=String(t||"0:0").split(":").map(Number);return (h||0)*60+(m||0)}
+// Next schedule change today, e.g. "locks at 12:15 PM" / "opens at 12:25 PM".
+function cpNextChange(lockWindows,isLockedNow){
+  const now=cpNow(),ranges=(lockWindows&&lockWindows[now.day])||[];
+  if(isLockedNow){
+    const r=ranges.find(r=>{const s=cpToMin(r.start),e=cpToMin(r.end);return s===e||(s<e?now.mins>=s&&now.mins<e:now.mins>=s||now.mins<e)});
+    if(!r||cpToMin(r.start)===cpToMin(r.end))return "locked all day";
+    return "opens at "+cpFmt(cpToMin(r.end));
+  }
+  const next=ranges.map(r=>cpToMin(r.start)).filter(s=>s>now.mins).sort((a,b)=>a-b)[0];
+  return next==null?"no more locks today":"locks at "+cpFmt(next);
+}
+function cpEsc(v){const d=document.createElement("div");d.textContent=String(v==null?"":v);return d.innerHTML}
+function startOwnerControl(){
+  const api=cpApi();
+  if(!api){document.getElementById("ownerControlPanel").innerHTML='<div class="cp-wrap"><div class="ta-card">Loading…</div></div>';setTimeout(()=>{if(currentTab==="access"&&isOwnerNow())startOwnerControl()},700);return}
+  if(!cpUnsub){cpUnsub=true;api.subscribe(s=>{cpSettings=api.normalizeSettings?api.normalizeSettings(s):s;if(currentTab==="access")renderOwnerControl();});}
+  if(!cpTimer)cpTimer=setInterval(()=>{if(currentTab==="access"&&isOwnerNow())renderOwnerControl()},30000);
+  renderOwnerControl();
+}
+function renderOwnerControl(){
+  const panel=document.getElementById("ownerControlPanel"),api=cpApi();
+  if(!cpSettings||!api){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">Loading your classes…</div></div>';return}
+  const s=cpSettings,cls=cpClass,info=api.describeClassAccess(s,cls),access=s.classAccess?.[cls]||{mode:"auto"};
+  const star=s.classLockedGameOverride?.[cls]||"";
+  let detail;
+  if(s.siteEnabled===false)detail="Emergency lock is on";
+  else if(access.mode==="open")detail="Opened by you · stays open until you press Automatic";
+  else if(access.mode==="locked")detail="Locked by you · stays locked until you press Automatic";
+  else detail="Following recess schedule · "+cpNextChange(access.lockWindows,!info.open);
+  const tabsHtml=CP_CLASSES.map(c=>{const o=api.isClassOpen(s,c.id);return '<button type="button" data-cp-class="'+c.id+'" class="'+(c.id===cls?"on":"")+'"><span class="cp-dot '+(o?"open":"locked")+'"></span>'+c.name+'</button>'}).join("");
+  const modes=[["auto","⏰ Automatic"],["open","🔓 Open now"],["locked","🔒 Lock now"]].map(([m,l])=>'<button type="button" data-cp-mode="'+m+'" class="'+(access.mode===m?"on":"")+'"'+(cpBusy?" disabled":"")+'>'+l+'</button>').join("");
+  const games=cpGames().filter(g=>s.games?.[g.id]!==false);
+  const rows=games.map(g=>{
+    const open=s.classGames?.[cls]?.[g.id]!==false,starred=star===g.id;
+    const note=starred?(info.open?"⭐ stays open during lock":"⭐ open now even though class is locked"):"";
+    return '<div class="cp-row"><button type="button" class="cp-star'+(starred?" on":"")+'" data-cp-star="'+cpEsc(g.id)+'" title="'+(starred?"Remove star":"Keep this game open while the class is locked")+'" aria-label="Star '+cpEsc(g.name)+'"'+(cpBusy?" disabled":"")+'>⭐</button>'
+      +'<div class="cp-name">'+cpEsc(g.name)+(note?'<small>'+note+'</small>':"")+'</div>'
+      +'<button type="button" class="cp-toggle '+(open?"open":"closed")+'" data-cp-game="'+cpEsc(g.id)+'"'+(cpBusy?" disabled":"")+'>'+(open?"✅ Open":"⛔ Closed")+'</button></div>';
+  }).join("");
+  panel.innerHTML='<div class="cp-wrap"><div class="cp-switch">'+tabsHtml+'</div>'
+    +(s.siteEnabled===false?'<div class="cp-emergency"><span>🚨 Emergency lock is ON — every class is locked.</span><button type="button" id="cpEmergencyOff">Turn emergency lock off</button></div>':"")
+    +'<div class="cp-status '+(info.open?"open":"locked")+'"><div>'+(info.open?"✅ "+cls.toUpperCase()+" is OPEN":"🔒 "+cls.toUpperCase()+" is LOCKED")+'<small>'+cpEsc(detail)+'</small></div></div>'
+    +'<div class="cp-modes">'+modes+'</div>'
+    +'<div class="cp-games"><div class="cp-games-head">Games for '+cls.toUpperCase()+'<span>Tap to open/close · ⭐ = stays open during lock</span></div>'+(rows||'<div class="cp-row"><div></div><div class="cp-name">No games yet.</div><div></div></div>')+'</div>'
+    +'<div class="cp-msg" id="cpMsg">'+cpEsc(cpMsg)+'</div></div>';
+  panel.querySelectorAll("[data-cp-class]").forEach(b=>b.onclick=()=>{cpClass=b.dataset.cpClass;cpMsg="";try{localStorage.setItem("b3ControlClass",cpClass)}catch(e){}renderOwnerControl()});
+  panel.querySelectorAll("[data-cp-mode]").forEach(b=>b.onclick=()=>cpSave(()=>api.updateClassMode(cls,b.dataset.cpMode),{auto:"Back on the recess schedule ✓",open:cls.toUpperCase()+" opened ✓",locked:cls.toUpperCase()+" locked ✓"}[b.dataset.cpMode]));
+  panel.querySelectorAll("[data-cp-game]").forEach(b=>b.onclick=()=>{const id=b.dataset.cpGame,open=s.classGames?.[cls]?.[id]!==false,name=games.find(g=>g.id===id)?.name||id;
+    cpSave(async()=>{await api.updateClassGameEnabled(cls,id,!open);if(open&&star===id)await api.updateClassLockedGameOverride(cls,"");},name+(open?" closed":" opened")+" for "+cls.toUpperCase()+" ✓")});
+  panel.querySelectorAll("[data-cp-star]").forEach(b=>b.onclick=()=>{const id=b.dataset.cpStar,name=games.find(g=>g.id===id)?.name||id;
+    if(star===id)return cpSave(()=>api.updateClassLockedGameOverride(cls,""),"Star removed ✓");
+    cpSave(async()=>{if(s.classGames?.[cls]?.[id]===false)await api.updateClassGameEnabled(cls,id,true);await api.updateClassLockedGameOverride(cls,id);},name+" will stay open during lock ✓");});
+  const em=document.getElementById("cpEmergencyOff");if(em)em.onclick=()=>{if(confirm("Turn the emergency lock off? Classes go back to their normal settings."))cpSave(()=>api.updateSiteEnabled(true),"Emergency lock off ✓")};
+}
+async function cpSave(fn,okMsg){
+  if(cpBusy)return;cpBusy=true;cpMsg="Saving…";renderOwnerControl();
+  try{await fn();cpMsg=okMsg;}catch(e){console.error(e);cpMsg="Could not save. Please try again.";}
+  cpBusy=false;renderOwnerControl();
+}
 function applyRoleView(){
   try{
     const w=frame.contentWindow,d=frame.contentDocument;
@@ -125,16 +234,14 @@ function applyRoleView(){
     // initially rendered as a regular-teacher view, make sure the stale
     // "Loading your class..." overlay is removed as soon as the owner/admin
     // role becomes available.
-    if(owner&&teacherPanel&&teacherPanel.style.display!=="none"){
-      teacherPanel.style.display="none";
-      d.querySelectorAll(".admin-dashboard-section").forEach(s=>s.style.display=s.id==="admin-section-"+currentTab?"block":"none");
-    }
+    d.body.classList.toggle("b3-owner-view",owner);
+    if(owner&&teacherPanel&&teacherPanel.style.display!=="none")showTab(currentTab);
     document.querySelector(".brand").textContent=owner?"B3 Teacher Center":"Fun Torah Tools Teacher Center";
     const accessNav=document.getElementById("classAccessNav");
-    if(accessNav){accessNav.style.display="";accessNav.textContent=owner?"🔐 Class Access":"🔐 Open / Lock My Class";}
+    if(accessNav){accessNav.style.display="";accessNav.textContent=owner?"🎛️ Control":"🔐 Open / Lock My Class";}
     if(!owner){d.querySelectorAll("p,div,span").forEach(n=>{if(n.children.length===0&&/Turn this off only when you want both ET and WT/.test(n.textContent))n.style.display="none"});}
     // Teacher-account creation is platform-owner administration only.
-    const teacherHeading=[...d.querySelectorAll("#adminControls > h3")].find(h=>h.textContent.trim()==="Teacher accounts");
+    const teacherHeading=[...d.querySelectorAll("#adminControls h3")].find(h=>h.textContent.trim()==="Teacher accounts");
     if(teacherHeading){
       teacherHeading.style.display=owner?"":"none";
       let n=teacherHeading.nextElementSibling;
@@ -147,13 +254,26 @@ function organize(){
   const panel=d.getElementById("adminPanel"),controls=d.getElementById("adminControls");if(!panel||!controls)return;
   panel.classList.remove("hidden");
 
-  if(!d.getElementById("admin-section-access")){
-    const access=makeSection(d,"access"),students=makeSection(d,"students"),activities=makeSection(d,"activities"),special=makeSection(d,"special");
-    const master=controls.querySelector(".master-row");if(master){access.appendChild(master);const p=master.nextElementSibling;if(p&&p.classList.contains("admin-message"))access.appendChild(p)}
-    const classControls=d.getElementById("classControls");if(classControls)access.appendChild(classControls);
+  if(!d.getElementById("admin-section-settings")){
+    const students=makeSection(d,"students"),settings=makeSection(d,"settings");
     const ch=findHeading(d,"Class management");if(ch)moveRange(ch,3,students);
-    const ah=findHeading(d,"Student activities");if(ah)moveRange(ah,3,activities);
-    const sh=findHeading(d,"Student access while locked");if(sh)moveRange(sh,4,special);
+    const add=(title,help,ownerOnly)=>{const h=d.createElement("h3");h.textContent=title;settings.appendChild(h);let p=null;if(help){p=d.createElement("p");p.className="admin-message";p.textContent=help;settings.appendChild(p);}if(ownerOnly){h.classList.add("b3-owner-only");if(p)p.classList.add("b3-owner-only");}};
+    // 1. Recess schedule (the Automatic times)
+    add("⏰ Recess schedule","These are the times each class is LOCKED when it is set to Automatic. Open a class below to change its times.",true);
+    const classControls=d.getElementById("classControls");if(classControls)settings.appendChild(classControls);
+    // 2. One-student exceptions
+    const sh=findHeading(d,"Student access while locked");if(sh){sh.textContent="⭐ Special access for one student";moveRange(sh,4,settings);}
+    // 3. Add / remove games for everyone
+    const ah=findHeading(d,"Student activities");if(ah){ah.textContent="🎮 Add or remove games";moveRange(ah,3,settings);
+      const help=settings.querySelector(".activity-manager-help");if(help)help.textContent="Drag a game to Inactive to remove it for everyone. Open and close games for a class on the Control page.";}
+    // 4. Emergency lock
+    add("🚨 Emergency lock","Turning off Emergency master access locks every class at once.",true);
+    const master=controls.querySelector(".master-row");if(master){const p=master.nextElementSibling;master.classList.add("b3-owner-only");settings.appendChild(master);if(p&&p.classList.contains("admin-message")){p.classList.add("b3-owner-only");settings.appendChild(p)}}
+    if(classControls)classControls.classList.add("b3-owner-only");
+    // 5. Teacher accounts + sign out
+    const th=findHeading(d,"Teacher accounts");if(th)moveRange(th,3,settings);
+    const status=d.getElementById("adminStatus"),out=d.getElementById("signOutButton");
+    if(status)settings.appendChild(status);if(out)settings.appendChild(out);
   }
   applyRoleView();
   if(requestedClassId){
@@ -168,13 +288,17 @@ function organize(){
 function showTab(tab){
   currentTab=tab;
   const preview=document.getElementById("studentPreview"),workspace=document.getElementById("workspace");
-  const showing=tab==="activities";
+  const showing=tab==="settings";
   preview.classList.toggle("visible",showing);workspace.classList.toggle("preview-open",showing);
   if(showing){ populatePreviewStudents(); setTimeout(scaleStudentPreview,0); }
   const d=frame.contentDocument;if(!d)return;
-  const teacherPanel=document.getElementById("teacherAccessPanel"),isTeacherAccess=tab==="access"&&!isOwnerNow();
+  const owner=isOwnerNow();
+  const teacherPanel=document.getElementById("teacherAccessPanel"),isTeacherAccess=tab==="access"&&!owner;
   teacherPanel.style.display=isTeacherAccess?"block":"none";
   if(isTeacherAccess)renderTeacherAccess();
+  const ownerPanel=document.getElementById("ownerControlPanel"),isOwnerControl=tab==="access"&&owner;
+  ownerPanel.style.display=isOwnerControl?"block":"none";
+  if(isOwnerControl)startOwnerControl();
   d.querySelectorAll(".admin-dashboard-section").forEach(s=>s.style.display=s.id==="admin-section-"+tab?"block":"none");
   document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
   document.getElementById("pageTitle").textContent=tabs[tab][0];
@@ -298,6 +422,12 @@ frame.addEventListener("load",()=>{
     .admin-dashboard-section>.admin-message,.admin-dashboard-section>.activity-manager-help{margin-bottom:16px!important}
     .class-card{padding:16px!important}.override-box{margin-top:10px!important}
     body.admin-panel-open #gamesArea,body.admin-panel-open #teacherToolsSection{width:auto!important;margin:0!important}
+    body:not(.b3-owner-view) .b3-owner-only{display:none!important}
+    body.b3-owner-view #classControls .mode-buttons,
+    body.b3-owner-view #classControls .class-card>div:has(>[data-locked-game-override]),
+    body.b3-owner-view .activity-class-controls{display:none!important}
+    #admin-section-settings>h3{margin-top:26px!important}#admin-section-settings>h3:first-child{margin-top:0!important}
+    #admin-section-settings #adminStatus{margin-top:22px!important}
     @media(max-width:650px){body{padding:12px!important}.admin-dashboard-section{padding:14px}.mode-buttons{grid-template-columns:1fr!important}}
   `;
   d.head.appendChild(style);
@@ -311,6 +441,8 @@ frame.addEventListener("load",()=>{
   if(panel) panel.classList.remove("hidden");
   setTimeout(()=>{applyRoleView();populatePreviewStudents();},700);
   setTimeout(applyRoleView,1800);
+  // Sign-in finishes at its own pace; keep the owner/teacher view in sync.
+  if(!window.__b3RoleTimer)window.__b3RoleTimer=setInterval(applyRoleView,2500);
 });
 </script>
 </body>

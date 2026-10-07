@@ -942,7 +942,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
         shell.appendChild(card);
       }
       shell.querySelectorAll('.card-lock,.card-lock-menu').forEach(e=>e.remove());
-      if(!isAuthorizedTeacher)return;
+      // Games are opened and closed per class in Teacher Center > Control.
+      // The old home-page lock icons changed every class at once, so they are gone.
+      return;
 
       const id=card.dataset.gameId;
       const classes=currentAccess.role==='admin'?['et','wt']:(currentAccess.classIds||[]);
