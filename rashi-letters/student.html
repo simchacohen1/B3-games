@@ -185,6 +185,47 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 .mini-skip{border:0;background:transparent;color:#64708d;text-decoration:underline;font:700 13px 'Quicksand',sans-serif;cursor:pointer;margin-top:4px}
 @media(max-width:600px){.quest-scene{min-height:105px}.explorer{font-size:35px}.treasure-chest{font-size:38px}.quest-badge,.quest-coins{font-size:10px;padding:6px 8px}.mini-card{padding:18px}.mini-target{font-size:68px;width:102px;height:90px}.mini-arena{height:180px}.mini-choice{width:64px;height:64px;font-size:32px}}
 
+
+/* Look-alike letters */
+.letter-pick-btn.similar-tile{background:linear-gradient(135deg,#ede9ff,#e3f7f1)!important;border-style:dashed;border-color:#8877e6}
+.letter-pick-btn.similar-tile span{font-size:32px;letter-spacing:3px}
+#similarScreen{display:none}
+.sim-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sim-head h2{margin:0;font-size:28px}
+.sim-intro{color:var(--ink-soft);font-weight:600;font-size:16px;line-height:1.6;margin:8px 0 18px}
+.sim-tabs{display:flex;gap:8px;margin-bottom:20px}
+.sim-tab{flex:1;font:700 16px 'Quicksand',sans-serif;border:2px solid #dbe2f1;border-bottom-width:5px;border-radius:14px;background:#f8f9ff;color:var(--ink-soft);padding:14px 6px;cursor:pointer}
+.sim-tab.selected{background:#ede9ff;color:#3f3099;border-color:#6553d6}
+.sim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:12px}
+.sim-card{border:2px solid #e0e5f3;border-bottom-width:5px;border-radius:18px;background:#fff;padding:12px 6px;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:10px;direction:rtl;font:inherit;color:var(--ink)}
+.sim-card:nth-child(3n+2){background:#f3fbf8}.sim-card:nth-child(3n){background:#fffaf0}
+.sim-card:hover{border-color:#8877e6;transform:translateY(-2px)}
+.sim-card .r{font-family:'Mekorot Rashi';font-size:48px;line-height:1;color:#342773}
+.sim-card .p{font-family:'Frank Ruhl Libre',serif;font-size:48px;line-height:1}
+.sim-card .eq{font-size:20px;color:#9aa5c0;font-weight:700}
+.sim-key{display:flex;justify-content:center;gap:22px;font-size:13px;font-weight:700;color:#536180;margin-bottom:12px}
+.sim-key b{color:#342773}
+.morph-box{position:relative;height:230px;border-radius:22px;background:linear-gradient(135deg,#f0edff,#edf6ff);margin:10px 0 14px}
+.morph-box span{position:absolute;inset:0;display:grid;place-items:center;font-size:160px;line-height:1;color:#342773}
+.morph-box .r{font-family:'Mekorot Rashi'}.morph-box .p{font-family:'Frank Ruhl Libre',serif}
+.morph-labels{display:flex;justify-content:space-between;font-weight:800;color:#536180;font-size:15px}
+input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
+.sim-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.sim-small-btn{border:0;background:#ece9ff;color:#443694;padding:12px 16px;border-radius:12px;font:700 15px 'Quicksand',sans-serif;cursor:pointer}
+.sim-small-btn:disabled{opacity:.4;cursor:default}
+.sim-status{text-align:center;font-weight:700;color:#536180;margin-bottom:10px}
+.sim-big{font-family:'Mekorot Rashi';font-size:150px;line-height:1;color:#342773}
+.sim-done{text-align:center;padding:10px 0}
+.sim-done h3{font-size:28px;margin:6px 0}
+.mem-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;direction:rtl}
+.mem-card{height:105px;border-radius:16px;border:2px solid #4938ae;border-bottom-width:5px;background:#6553d6;color:#fff;font:700 34px 'Quicksand',sans-serif;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;transition:transform .15s ease,background .15s ease}
+.mem-card.up{background:#fff;color:#342773;border-color:#dbe2f1;transform:rotateY(0)}
+.mem-card .g{font-size:52px;line-height:1}
+.mem-card.rashi .g{font-family:'Mekorot Rashi'}.mem-card.print .g{font-family:'Frank Ruhl Libre',serif}
+.mem-card small{font:700 11px 'Quicksand',sans-serif;color:#536180;letter-spacing:1px;text-transform:uppercase}
+.mem-card.done{background:#d9f9e8;border-color:#249665;animation:pop .35s ease}
+@media(max-width:600px){.mem-grid{grid-template-columns:repeat(3,1fr)}.sim-tab{font-size:13px;padding:12px 4px}.morph-box span{font-size:130px}.sim-card .r,.sim-card .p{font-size:40px}.sim-grid{grid-template-columns:repeat(auto-fill,minmax(105px,1fr))}}
+
 @media(min-width:800px){#app{max-width:760px;margin:auto}}
 @media(max-width:600px){.wrap{padding:18px 12px}.card{padding:20px;border-radius:22px}header.top h1{font-size:27px}.brand-icon{width:54px;height:54px}.letter-grid{grid-template-columns:repeat(3,1fr)}.unit-label{font-size:14px}.phase-row{gap:8px}.phase-pill{display:none}#rashiLetter.word-mode{font-size:62px}.choice-btn.word-btn{font-size:29px}.hud{font-size:13px;padding:10px}.letter-box{min-height:205px}.compare{gap:25px}.compare span{font-size:65px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
@@ -260,6 +301,17 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
     <h2 id="practiceCompleteTitle">Practice complete!</h2>
     <p id="practiceCompleteText">You finished this practice mission.</p>
     <button class="btn" id="practiceDoneBtn">Choose another mission</button>
+  </div>
+
+  <div class="card" id="similarScreen">
+    <div class="sim-head"><h2>Look-alike letters</h2><button class="menu-link" id="simMenuBtn">⬅ Menu</button></div>
+    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them!</p>
+    <div class="sim-tabs">
+      <button class="sim-tab" data-sim="explore">👀 Side by side</button>
+      <button class="sim-tab" data-sim="match">🎯 Match it</button>
+      <button class="sim-tab" data-sim="memory">🃏 Memory</button>
+    </div>
+    <div id="simArea"></div>
   </div>
 
   <div class="card" id="closedScreen">
@@ -670,6 +722,12 @@ function renderLetterGrid(){
     b.onclick = () => selectPracticeLetter(u.id, b);
     grid.appendChild(b);
   });
+  const sim = document.createElement('button');
+  sim.className = 'letter-pick-btn similar-tile';
+  sim.innerHTML = '<span dir="rtl">ד ל ר</span><small>Look-alike letters</small>';
+  sim.setAttribute('aria-label', 'Look-alike letters: letters that look almost the same in Rashi and regular print');
+  sim.onclick = openSimilar;
+  grid.appendChild(sim);
 }
 
 function selectPracticeLetter(unitId, btnEl){
@@ -688,6 +746,7 @@ function showModeGate(){
   document.getElementById('app').style.display = 'none';
   document.getElementById('completeScreen').classList.remove('show');
   document.getElementById('practiceCompleteScreen').style.display = 'none';
+  document.getElementById('similarScreen').style.display = 'none';
   document.getElementById('modeGate').style.display = 'block';
   renderLetterGrid();
 }
@@ -937,6 +996,149 @@ async function handleAnswer(letter, btnEl){
   } else {
     document.getElementById('nextBtn').classList.remove('hidden');
   }
+}
+
+/* ---------- Look-alike letters ---------- */
+const ALL_LETTERS = 'אבגדהוזחטיכךלמםנןסעפףצץקרשת'.split('');
+const TAUGHT_LETTERS = new Set(UNITS.flatMap(u => (u.type==='single' ? [u.correct] : u.pair)).map(ch => ch.normalize('NFD').replace(/[֑-ׇ]/g,'')));
+const SIMILAR = ALL_LETTERS.filter(ch => !TAUGHT_LETTERS.has(ch));
+let simTab = 'explore', simMatch = null, simMem = null, morphTimer = null;
+
+function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+
+function openSimilar(){
+  clearTimeout(questionTimer); viewVersion++;
+  ['modeGate','app','practiceCompleteScreen'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('completeScreen').classList.remove('show');
+  document.getElementById('similarScreen').style.display='block';
+  setSimTab('explore');
+}
+function setSimTab(tab){
+  simTab = tab; viewVersion++; cancelAnimationFrame(morphTimer);
+  document.querySelectorAll('.sim-tab').forEach(b=>b.classList.toggle('selected', b.dataset.sim===tab));
+  if(tab==='explore') renderSimExplore();
+  else if(tab==='match') startSimMatch();
+  else startSimMemory();
+}
+document.querySelectorAll('.sim-tab').forEach(b=>b.onclick=()=>setSimTab(b.dataset.sim));
+document.getElementById('simMenuBtn').onclick=()=>{ cancelAnimationFrame(morphTimer); showModeGate(); };
+
+function renderSimExplore(){
+  cancelAnimationFrame(morphTimer);
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const key=el('div','sim-key'); key.innerHTML='<span><b>Rashi</b> on the right</span><span><b>Regular</b> on the left</span>';
+  const grid=el('div','sim-grid');
+  SIMILAR.forEach((ch,i)=>{
+    const c=el('button','sim-card'); c.setAttribute('aria-label','Letter '+ch+': see Rashi and regular side by side');
+    c.append(el('span','r',ch), el('span','eq','='), el('span','p',ch));
+    c.onclick=()=>renderSimMorph(i);
+    grid.appendChild(c);
+  });
+  area.append(el('p','prompt','Tap a letter to watch it change from Rashi to regular!'), key, grid);
+}
+
+function renderSimMorph(i){
+  cancelAnimationFrame(morphTimer);
+  const ch=SIMILAR[i];
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const top=el('div','sim-row');
+  const back=el('button','sim-small-btn','← All letters'); back.onclick=renderSimExplore;
+  top.append(back, el('span','sim-status',(i+1)+' of '+SIMILAR.length));
+  const box=el('div','morph-box'); box.setAttribute('dir','rtl');
+  const r=el('span','r',ch), p=el('span','p',ch); p.style.opacity=0; box.append(r,p);
+  const labels=el('div','morph-labels'); labels.append(el('span',null,'Rashi'), el('span',null,'Regular'));
+  const slider=document.createElement('input'); slider.type='range'; slider.min=0; slider.max=100; slider.value=0; slider.className='morph';
+  slider.setAttribute('aria-label','Slide from Rashi to regular');
+  const setV=v=>{ r.style.opacity=1-v/100; p.style.opacity=v/100; };
+  slider.oninput=()=>{ cancelAnimationFrame(morphTimer); setV(+slider.value); };
+  const play=el('button','helper','▶ Watch it change');
+  play.onclick=()=>{
+    cancelAnimationFrame(morphTimer); const start=performance.now(), dur=3200;
+    const step=t=>{ const k=Math.min(1,(t-start)/dur); const v=Math.round((1-Math.cos(k*Math.PI*2))/2*100); slider.value=v; setV(v); if(k<1) morphTimer=requestAnimationFrame(step); };
+    morphTimer=requestAnimationFrame(step);
+  };
+  const helpRow=el('div','help-row'); helpRow.appendChild(play);
+  const nav=el('div','sim-row');
+  const prev=el('button','sim-small-btn','← Previous'), next=el('button','sim-small-btn','Next →');
+  prev.disabled=i===0; next.disabled=i===SIMILAR.length-1;
+  prev.onclick=()=>renderSimMorph(i-1); next.onclick=()=>renderSimMorph(i+1);
+  nav.append(prev,next);
+  area.append(top, el('p','prompt','Slide or press play — see how little changes!'), box, labels, slider, helpRow, nav);
+}
+
+function startSimMatch(){
+  simMatch={ order:shuffle(SIMILAR).slice(0,8), round:0, correct:0 };
+  renderSimMatch();
+}
+function renderSimMatch(){
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const m=simMatch;
+  if(m.round>=m.order.length){
+    const d=el('div','sim-done'); d.append(el('div','finish-icon','🏆'), el('h3',null,'You matched '+m.correct+' of '+m.order.length+'!'), el('p','sim-intro','See? Rashi and regular letters are almost twins.'));
+    const again=el('button','btn','Play again'); again.onclick=startSimMatch; d.appendChild(again);
+    area.appendChild(d); rewardBurst(d.querySelector('.finish-icon'),true); return;
+  }
+  const target=m.order[m.round];
+  const box=el('div','letter-box'); box.setAttribute('dir','rtl'); box.appendChild(el('span','sim-big',target));
+  const opts=shuffle([target, ...shuffle(SIMILAR.filter(c=>c!==target)).slice(0,3)]);
+  const row=el('div','choices'), fb=el('div',null); fb.id='simFeedback'; fb.style.cssText='min-height:30px;text-align:center;font-size:19px;font-weight:700;margin:4px 0 10px';
+  const next=el('button','btn hidden','Next →'); next.style.cssText='display:block;margin:10px auto 0';
+  const version=viewVersion;
+  const advance=()=>{ if(version!==viewVersion) return; m.round++; renderSimMatch(); };
+  next.onclick=advance;
+  opts.forEach(ch=>{
+    const b=el('button','choice-btn',ch);
+    b.onclick=()=>{
+      row.querySelectorAll('button').forEach(x=>x.disabled=true);
+      const ok=ch===target;
+      if(ok){ b.classList.add('correct'); m.correct++; starsThisVisit++; coinsThisVisit++; updateRewardHud(); rewardBurst(b); beep('correct'); fb.style.color='#176447'; fb.textContent='Same letter — just a different style!'; setTimeout(advance,1000); }
+      else { b.classList.add('incorrect'); row.querySelectorAll('button').forEach(x=>{ if(x.textContent===target) x.classList.add('correct'); }); beep('wrong'); fb.style.color='#865014'; fb.textContent='Look again — the green one is its twin.'; next.classList.remove('hidden'); }
+      if(studentId) logAttempt('similar','letter',ok).catch(()=>{});
+    };
+    row.appendChild(b);
+  });
+  area.append(el('div','sim-status','Question '+(m.round+1)+' of '+m.order.length+' · ★ '+m.correct), box, el('p','prompt','Which regular letter is the same?'), row, fb, next);
+}
+
+function startSimMemory(){
+  const picks=shuffle(SIMILAR).slice(0,6);
+  simMem={ cards:shuffle(picks.flatMap(ch=>[{ch,kind:'rashi'},{ch,kind:'print'}])), open:[], matched:0, moves:0, lock:false };
+  renderSimMemory();
+}
+function renderSimMemory(){
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const g=simMem;
+  const status=el('div','sim-status'); const setStatus=()=>status.textContent='Find each Rashi letter and its regular twin · Pairs: '+g.matched+' of 6 · Tries: '+g.moves;
+  setStatus();
+  const grid=el('div','mem-grid');
+  const version=viewVersion;
+  g.cards.forEach(card=>{
+    const b=el('button','mem-card '+card.kind); b.setAttribute('aria-label','Hidden card');
+    const face=()=>{ b.replaceChildren(el('span','g',card.ch), el('small',null,card.kind==='rashi'?'Rashi':'Regular')); b.classList.add('up'); b.setAttribute('aria-label',(card.kind==='rashi'?'Rashi ':'Regular ')+card.ch); };
+    const hide=()=>{ b.replaceChildren(el('span',null,'?')); b.classList.remove('up'); b.setAttribute('aria-label','Hidden card'); };
+    hide();
+    b.onclick=()=>{
+      if(g.lock || b.classList.contains('up')) return;
+      face(); g.open.push({card,b,hide});
+      if(g.open.length<2) return;
+      g.moves++; const [a,c]=g.open; g.open=[];
+      if(a.card.ch===c.card.ch && a.card.kind!==c.card.kind){
+        [a.b,c.b].forEach(x=>{ x.classList.add('done'); x.disabled=true; });
+        g.matched++; coinsThisVisit++; updateRewardHud(); rewardBurst(c.b); beep('correct'); setStatus();
+        if(g.matched===6){
+          starsThisVisit+=3; updateRewardHud(); showQuestToast('🃏 All pairs found!');
+          const d=el('div','sim-done'); d.append(el('h3',null,'All twins found in '+g.moves+' tries!'));
+          const again=el('button','btn','Play again'); again.onclick=startSimMemory; d.appendChild(again);
+          setTimeout(()=>{ if(version===viewVersion) area.appendChild(d); },500);
+        }
+      } else {
+        g.lock=true; beep('wrong'); setStatus();
+        setTimeout(()=>{ if(version!==viewVersion) return; a.hide(); c.hide(); g.lock=false; },950);
+      }
+    };
+    grid.appendChild(b);
+  });
+  area.append(status, grid);
 }
 
 async function logAttempt(unitId, ph, correct){
