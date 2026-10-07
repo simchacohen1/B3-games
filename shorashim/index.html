@@ -1141,6 +1141,20 @@ body.shorashim-review-active #activeReviewRecording .kid-record-note{grid-column
 body.shorashim-review-active .review-card-wrap{max-width:880px!important}
 @media(max-width:680px){body.shorashim-review-active #activeReviewRecording{grid-template-columns:1fr!important}body.shorashim-review-active #activeReviewRecording .kid-record-note{grid-column:1!important}}
 </style>
+<style id="review-fit-screen-v1">
+/* Review mode: fit card + controls on one screen, trim extra text */
+body.shorashim-review-active .app-shell{padding:0 24px!important}
+body.shorashim-review-active #reviewScreen.active{height:100vh!important;height:100dvh!important;max-height:100dvh!important;margin:0!important;padding:10px 12px!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;box-sizing:border-box}
+body.shorashim-review-active #reviewArea{display:flex!important;flex-direction:column!important;justify-content:flex-start!important;flex:1 1 auto!important;min-height:0!important;width:100%}
+body.shorashim-review-active #reviewPasuk,body.shorashim-review-active #shorashimRecordStatus,body.shorashim-review-active .keyboard-hint{display:none!important}
+body.shorashim-review-active .review-meta{font-size:22px!important;margin:0 auto 8px!important;gap:16px!important;justify-content:center!important}
+body.shorashim-review-active #activeReviewRecording{display:flex!important;justify-content:center!important;gap:12px!important;margin:0 auto 10px!important;padding:0!important;min-height:0!important;max-width:none!important}
+body.shorashim-review-active #activeReviewRecording.hidden,body.shorashim-review-active #shorashimPauseBtn.hidden{display:none!important}
+body.shorashim-review-active #shorashimRecordBtn,body.shorashim-review-active #shorashimPauseBtn{width:auto!important;min-height:0!important;padding:10px 22px!important;font-size:20px!important;border-radius:16px!important}
+body.shorashim-review-active .review-card-wrap{flex:0 1 auto!important;min-height:0!important;display:flex!important;justify-content:center!important;align-items:center!important;width:100%}
+body.shorashim-review-active #reviewScreen .review-card{height:min(620px,calc(100dvh - 250px))!important;min-height:0!important;max-height:none!important;width:min(760px,92vw)!important}
+body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px!important}
+</style>
 </head>
 <body>
   <section id="studentSiteClosed" class="login-gate hidden">
@@ -1528,6 +1542,9 @@ body.shorashim-review-active .review-card-wrap{max-width:880px!important}
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
   <script src="app.js?v=20261006-no-hints"></script>
   <script src="review-categories.js?v=20260917-picturefix1"></script>
+  <script src="../student-class.js"></script>
+  <script src="../b3-race.js?v=20261007"></script>
+  <script src="friends-race.js?v=20261007"></script>
 
 <script data-shorashim-workspace-ux="v1">
 (() => {
