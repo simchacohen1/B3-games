@@ -484,7 +484,7 @@ let rb=document.createElement("button");rb.dataset.id="review";rb.textContent="ð
 function halachaAuthReady(){return new Promise(r=>{try{if(!window.firebase||!firebase.auth)return r(null);let done=false,t=setTimeout(()=>{if(!done){done=true;r(null)}},4000),u=firebase.auth().onAuthStateChanged(x=>{if(done)return;done=true;clearTimeout(t);u();r(x)})}catch(e){r(null)}})}
 halachaAuthReady().then(loadCloudHalacha);
 if(HALACHA_TEACHER_PREVIEW){
- setHalachaMode(true);
+ document.addEventListener("DOMContentLoaded",()=>setHalachaMode(true),{once:true});
  setTimeout(()=>{
    const bar=document.querySelector(".bar");
    if(bar&&!document.getElementById("teacherPreviewBanner")){
@@ -555,7 +555,7 @@ function resetPieceStyle(){
  activePiece.classList.remove("clear");activePiece.style.fontFamily="";activePiece.style.color="";activePiece.style.background="";activePiece.style.fontSize="";activePiece.style.width="";
  activePiece.dataset.font="";persist(activePiece.closest(".section").id);openCustomizer(activePiece)
 }
-function closeCustomizer(){document.getElementById("pieceCustomizer").classList.remove("show");if(activePiece)activePiece.classList.remove("selected");activePiece=null}
+function closeCustomizer(){const panel=document.getElementById("pieceCustomizer");if(panel)panel.classList.remove("show");if(activePiece)activePiece.classList.remove("selected");activePiece=null}
 document.addEventListener("pointerdown",ev=>{
  let p=ev.target.closest&&ev.target.closest(".scrap");
  if(p && !ev.target.closest("button") && !ev.target.closest(".tb-text")) {
