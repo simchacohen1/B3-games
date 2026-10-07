@@ -135,13 +135,23 @@ body.exporting .resize-width,body.exporting .resize-height{display:none!importan
 .simanBack{display:none;margin-bottom:12px;border:0;border-radius:10px;padding:9px 12px;background:#173b62;color:#fff;font-weight:900}
 #tabs.siman-tabs{display:none;direction:rtl}
 #tabs .simanTag{display:none}
+
+.halacha-access-panel{display:none;background:#fff8df;border:3px solid #d2aa57;border-radius:16px;padding:14px 16px;margin:0 0 16px;box-shadow:0 4px 14px #0001}
+.teacherMode .halacha-access-panel{display:block}
+.halacha-access-panel h3{margin:0 0 8px;color:#173b62}
+.halacha-access-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 0;border-top:1px solid #e8d9ad}
+.halacha-access-row:first-of-type{border-top:0}.halacha-access-row strong{min-width:120px}
+.halacha-access-buttons{display:flex;gap:6px;flex-wrap:wrap;direction:rtl}
+.halacha-access-buttons button{border:2px solid #b7cfdb;background:#fff;color:#173b62;border-radius:9px;padding:7px 10px;font-weight:900}
+.halacha-access-buttons button.on{background:#173b62;color:#fff;border-color:#173b62}
+.halacha-access-note{font-size:12px;color:#64748b;margin-top:5px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="../firebase-config.js"></script>
 <script src="../site-settings.js?v=20261006-halacha-mode"></script><script src="../student-class.js?v=20261007-halacha-simanim"></script>\n<script src="../game-gate.js?v=20261006-lockoverride" data-game-id="halacha" data-back-href="../index.html"></script>
-</head><body><header><div class=bar><h1 id="halachaTitle">📔 My Halacha Scrapbook — סימן א</h1><button id="studentModeBtn" onclick="setHalachaMode(false)">Student</button><button id="teacherModeBtn" style="display:none;background:#fff3bf;color:#5c4300" onclick="setHalachaMode(true)">👨‍🏫 Teacher</button><a class="game-show-link" href="../game-show/teacher.html" target="_blank" rel="noopener">🏆 Game Show</a><button onclick="openExport()">Print / PDF / Slides</button><span id="cloudSaveStatus" style="font-size:12px;font-weight:800;opacity:.9">Saving on this device</span></div></header><main><div id="simanHub" class="simanHub"></div><button id="simanBack" class="simanBack" type="button" onclick="showSimanHub()">← Back to Simanim</button><div id=tabs class="tabs siman-tabs"></div><div id=sections></div><div id=review class="section teacherOnly"></div></main><script>
+</head><body><header><div class=bar><h1 id="halachaTitle">📔 My Halacha Scrapbook — סימן א</h1><button id="studentModeBtn" onclick="setHalachaMode(false)">Student</button><button id="teacherModeBtn" style="display:none;background:#fff3bf;color:#5c4300" onclick="setHalachaMode(true)">👨‍🏫 Teacher</button><a class="game-show-link" href="../game-show/teacher.html" target="_blank" rel="noopener">🏆 Game Show</a><button onclick="openExport()">Print / PDF / Slides</button><span id="cloudSaveStatus" style="font-size:12px;font-weight:800;opacity:.9">Saving on this device</span></div></header><main><div id="halachaAccessPanelMain" class="halacha-access-panel"><h3>🔒 Student Siman Access</h3><div id="halachaAccessRowsMain">Loading class access…</div><div class="halacha-access-note">Choose the furthest Siman students may open. Earlier Simanim remain open; later Simanim stay locked.</div></div><div id="simanHub" class="simanHub"></div><button id="simanBack" class="simanBack" type="button" onclick="showSimanHub()">← Back to Simanim</button><div id=tabs class="tabs siman-tabs"></div><div id=sections></div><div id=review class="section teacherOnly"></div></main><script>
 const lessons=[
 {id:"a",tab:"1 · שויתי",title:"שויתי ה׳ לנגדי תמיד",seif:"סעיף א",objective:"Develop a constant awareness that Hashem is always present, which shapes one’s behavior in public and in private.",source:"שויתי ה׳ לנגדי תמיד · הכרה תמידית בהשגחת ה׳",qs:["What is the meaning of שויתי ה׳ לנגדי תמיד?","Why is it important to remember Hashem is always with us?","How does this awareness affect how we speak and behave?"],type:"choices",pieces:[["he","שויתי ה׳ לנגדי תמיד"],["text","I remember Hashem wherever I am"],["sticker","🏠"],["sticker","🏫"],["sticker","💬"]]},
 {id:"b",tab:"2 · מודה אני",title:"מודה אני — השבת הנשמה",seif:"סעיף ב",objective:"Understand the importance of thanking Hashem for returning one’s נשמה each morning and how to express it through מודה אני.",source:"אמירת מודה אני והכרת הטוב עם הקימה",qs:["What should a person think about as soon as he wakes up?","Why is it permitted to say מודה אני even before נטילת ידים?","What is the proper pause when saying מודה אני?"],type:"sequence",pieces:[["sticker","🌅"],["text","Thank You for returning my נשמה"],["sticker","💛"]]},
@@ -719,12 +729,37 @@ function toggleTeacherSource(id){
 
 
 
+const HALACHA_ACCESS_ORDER=["א","ב","ג","ד","ו"];
+async function renderHalachaTeacherAccess(access){
+ const host=document.getElementById("halachaAccessRowsMain");if(!host)return;
+ try{
+  let classIds=(access&&access.role==="admin")?["et","wt"]:(access&&access.classIds||[]).filter(Boolean);
+  if(!classIds.length){host.textContent="No classes are assigned to this teacher.";return}
+  const ws=(window.B3SiteSettings&&B3SiteSettings.workspaceId)||"b3-2026";
+  const rows=await Promise.all(classIds.map(async id=>{
+    const cs=await halachaDb.ref("b3Games/workspaces/"+ws+"/classes/"+id).once("value");
+    const as=await halachaDb.ref("b3Games/workspaces/"+ws+"/classes/"+id+"/halachaAccess/maxSiman").once("value");
+    const row=cs.val()||{},raw=String(as.val()||"א");
+    return {id,name:String(row.name||id.toUpperCase()),max:HALACHA_ACCESS_ORDER.includes(raw)?raw:"א"};
+  }));
+  host.innerHTML=rows.map(r=>'<div class="halacha-access-row"><strong>'+r.name+'</strong><span class="halacha-access-buttons">'+HALACHA_ACCESS_ORDER.map(s=>'<button type="button" class="'+(s===r.max?'on':'')+'" data-halacha-class="'+r.id+'" data-halacha-siman="'+s+'">סימן '+s+'</button>').join('')+'</span></div>').join('');
+  host.querySelectorAll("[data-halacha-class][data-halacha-siman]").forEach(btn=>btn.onclick=async()=>{
+    btn.disabled=true;
+    try{
+      await halachaDb.ref("b3Games/workspaces/"+ws+"/classes/"+btn.dataset.halachaClass+"/halachaAccess/maxSiman").set(btn.dataset.halachaSiman);
+      await renderHalachaTeacherAccess(access);
+    }catch(e){console.warn("Could not update Halacha Siman access",e);alert("Could not change Siman access.");btn.disabled=false}
+  });
+ }catch(e){console.warn("Could not load Halacha Siman access",e);host.textContent="Could not load class access controls."}
+}
+
 // Authorized teachers always get an explicit Teacher button, even if an older
 // homepage link opened this page without ?teacher=1.
 if(window.B3SiteSettings&&typeof B3SiteSettings.onAuthStateChanged==="function"){
- B3SiteSettings.onAuthStateChanged((user,authorized)=>{
+ B3SiteSettings.onAuthStateChanged((user,authorized,access)=>{
    const btn=document.getElementById("teacherModeBtn");
    if(btn)btn.style.display=authorized?"":"none";
+   if(authorized)renderHalachaTeacherAccess(access||{});
    if(authorized&&HALACHA_TEACHER_LESSON)setHalachaMode(true);
  });
 }
