@@ -34,9 +34,14 @@ test('missing balance cannot create a free contribution',async()=>{const r=await
 test('failed class-round update refunds deducted points',async()=>{const r=await contribute(100,25,{roundFails:true});assert.equal(r.result.ok,false);assert.equal(r.balance,100);assert.equal(r.historyWrites,0)});
 test('contribution uses the same spendable balance as displayed server balance',async()=>{
  const src=fs.readFileSync('student-rewards/student.js','utf8');
- const ctx={state:{serverRewardBalance:100,student:{rewardBalance:0},classGoals:[{rewardId:'gimkit',modeVoting:true,remainingStudentCap:200}],busy:false},C:{toast(){assert.fail('Should accept 25 points')}},isStoreOpen:()=>true,timeMs:()=>0,document:{getElementById:()=>({value:'25'})},render(){},classRewardsApi:async()=>{throw Error('reached server')},console};
+ let submitted=null;
+ const goal={rewardId:'gimkit',modeVoting:true,remainingStudentCap:200};
+ const ctx={state:{serverRewardBalance:100,student:{rewardBalance:0},classGoals:[goal],busy:false},C:{toast(message,type){assert.notEqual(type,'error',message)}},isStoreOpen:()=>true,timeMs:()=>0,document:{getElementById:()=>({value:'25'})},render(){},clearContributionForms(){},loadActivityPointHistory:async()=>[],classRewardsApi:async(action,payload)=>{submitted={action,payload};return {goal,balance:75}},console};
  vm.runInNewContext(src.slice(src.indexOf('function spendableRewardBalance(){'),src.indexOf('function classGoalProgress(')),ctx);
  assert.equal(ctx.spendableRewardBalance(),100);
- assert.match(src,/Math\.min\(spendableRewardBalance\(\)/);
+ vm.runInNewContext(src.slice(src.indexOf('async function contributeClassReward('),src.indexOf('async function redeem(')),ctx);
+ await ctx.contributeClassReward('gimkit','input',{closest:()=>({querySelectorAll:()=>[{dataset:{gimkitMode:'blastball'}}]})});
+ assert.equal(submitted.action,'contribute-class-reward');assert.equal(submitted.payload.amount,25);
+ assert.equal(ctx.state.serverRewardBalance,75);assert.equal(ctx.state.student.rewardBalance,75);
  ctx.state.serverRewardBalance=null;ctx.state.student.rewardBalance=40;assert.equal(ctx.spendableRewardBalance(),40);
 });
