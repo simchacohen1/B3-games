@@ -15,7 +15,7 @@
   .student-bar strong{font-size:16px}.student-bar span{color:#64748b;font-size:13px}.student-bar button{border:0;border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer;background:#e2e8f0;color:#1f2937}
   .login-card,.locked-card{max-width:520px;margin:24px auto;background:white;border-radius:20px;padding:26px;box-shadow:0 8px 24px rgba(0,0,0,.10);text-align:left}
   .login-card h2,.locked-card h2{margin:0 0 8px;color:#26364a}.login-card p,.locked-card p{color:#64748b;line-height:1.45}
-  .login-card label{display:block;font-weight:700;margin:12px 0 6px}.login-card input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px}.login-card button{width:100%;margin-top:14px;border:0;border-radius:11px;padding:12px;background:#2563eb;color:white;font-weight:800;font-size:16px;cursor:pointer}.login-msg{margin-top:10px;color:#b91c1c;min-height:20px}
+  .login-card label{display:block;font-weight:700;margin:12px 0 6px}.login-card input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px}.login-card button{width:100%;margin-top:14px;border:0;border-radius:11px;padding:12px;background:#2563eb;color:white;font-weight:800;font-size:16px;cursor:pointer}.login-card button:disabled{opacity:.6;cursor:wait}.login-msg{margin-top:10px;color:#b91c1c;min-height:20px}
   .lock-icon{font-size:54px;text-align:center}.locked-card{text-align:center}
   .game-container{display:grid;gap:18px;max-width:900px;margin:auto}
   .game-group{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:18px;box-shadow:0 4px 14px rgba(15,23,42,.06);text-align:left}
@@ -124,12 +124,52 @@
   .approval-center-footer{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}.approval-center-footer button{border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}.approval-center-refresh{background:#e2e8f0;color:#1f2937}.approval-center-done{background:#26364a;color:#fff}
   @media(max-width:560px){h1{font-size:38px}.student-bar{align-items:flex-start}.lock-range{grid-template-columns:22px 64px 1fr}.time-span{flex-wrap:wrap}.admin-panel{top:54px}.approval-button{top:58px;left:10px}.approval-center-card{padding:17px}.approval-center-item{grid-template-columns:36px minmax(0,1fr) auto;padding:11px}.approval-center-icon{font-size:24px}}
 .login-card.checking>:not(h2):not(#loginMsg){display:none}.login-card.checking #loginMsg{color:#475569;font-size:16px}
+/* Keep the student launchers visible together on desktop screens. */
+@media(min-width:760px){
+ body{padding-top:16px}
+ h1{font-size:34px;margin:4px 0}
+ .subtitle{margin-bottom:12px}
+ .student-bar{max-width:1100px;margin-bottom:12px;padding:9px 14px}
+ .game-container{max-width:1100px;grid-template-columns:1fr;gap:8px}
+ .game-group{padding:10px 12px;border-radius:16px}
+ .game-group-head{margin-bottom:6px}
+ .game-group-title{font-size:18px}
+ .game-group-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+ .game-group[data-game-group="class"] .game-group-grid,.game-group[data-game-group="challenge"] .game-group-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .game-card{min-height:64px;padding:10px 8px;gap:10px;border-radius:12px;flex-direction:row}
+ .card-icon{font-size:54px}.rashi-icon{font-size:58px}.yiddish-icon{width:68px;height:68px}
+ .card-title{font-size:18px;font-weight:800}
+ .teacher-tools-section{margin-top:24px;padding-top:18px}
+}
+.student-card-shell{position:relative;min-width:0}.student-card-shell>.game-card{height:100%;padding-right:40px}
+.card-lock{position:absolute;right:7px;top:7px;width:42px;height:42px;border:0;border-radius:10px;font-size:24px;cursor:pointer;z-index:2;font-weight:900}.card-lock.is-open{background:#dcfce7;color:#166534}.card-lock.is-locked{background:#fee2e2;color:#b91c1c}.card-lock:disabled{opacity:.65;cursor:default}
+.card-lock-menu{position:absolute;right:6px;top:38px;z-index:20;display:flex;gap:6px;padding:8px;background:#fff;border:1px solid #94a3b8;border-radius:10px;box-shadow:0 4px 15px #0003}
+.card-lock-menu button{white-space:nowrap;padding:7px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;cursor:pointer;font-weight:bold}.card-lock-menu small{max-width:150px}
 </style>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script>
+  window.__b3Errors = [];
+  window.addEventListener("error", function (e) {
+    var t = e.target;
+    if (t && t !== window && (t.src || t.href)) {
+      window.__b3Errors.push("Part of the page could not load (" + (t.src || t.href).split("?")[0].split("/")[2] + ").");
+    } else {
+      window.__b3Errors.push("The page hit an error while loading.");
+    }
+  }, true);
+  document.addEventListener("click", function (e) {
+    if (window.__b3Ready) return;
+    var btn = e.target.closest ? e.target.closest("#studentSignInBtn") : null;
+    if (!btn) return;
+    var msg = document.getElementById("loginMsg");
+    var why = window.__b3Errors[0] || "The page did not finish loading.";
+    if (msg) msg.textContent = why + " Press Ctrl+Shift+R to reload. If it keeps happening, your school network may be blocking this site.";
+  });
+</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
 <script src="firebase-config.js?v=20261001-teacherauth"></script>
-<script src="site-settings.js?v=20261006-lockoverride"></script>
+<script src="site-settings.js?v=20261007-multistar"></script>
 </head>
 <body>
   <h1>B3 Games</h1>
@@ -170,19 +210,18 @@
           <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html" target="_blank" rel="noopener"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
           <a class="game-card" data-game-id="chazara" href="chazara/index.html" target="_blank" rel="noopener"><span class="card-icon">🔁</span><span class="card-title">Chazara Chart</span></a>
           <a class="game-card" data-game-id="shorashim" href="shorashim/index.html" target="_blank" rel="noopener"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span></a>
-          <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html" target="_blank" rel="noopener"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
-          <a class="game-card" data-game-id="yiddish" href="yiddish/index.html" target="_blank" rel="noopener"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
         </div>
       </section>
 
-      <section class="game-group" data-game-group="challenge">
+      <section class="game-group" data-game-group="more-learning">
         <div class="game-group-head">
-          <span class="game-group-icon">🏆</span>
-          <div><div class="game-group-title">Tests &amp; Challenges</div><div class="game-group-subtitle">Quizzes and class challenges</div></div>
+          <span class="game-group-icon">&#128218;</span>
+          <div><div class="game-group-title">More Learning</div><div class="game-group-subtitle">Rashi, Yiddish, and Halacha</div></div>
         </div>
         <div class="game-group-grid">
-          <a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html" target="_blank" rel="noopener"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz &amp; Practice</span></a>
-          <a class="game-card" data-game-id="game-show" href="game-show/player.html" target="_blank" rel="noopener"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a>
+          <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html" target="_blank" rel="noopener"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
+          <a class="game-card" data-game-id="yiddish" href="yiddish/index.html" target="_blank" rel="noopener"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
+          <a class="game-card" data-game-id="halacha" href="halacha/index.html?v=20261007-teacher-sync" target="_blank" rel="noopener"><span class="card-icon">📔</span><span class="card-title">Halacha</span></a>
         </div>
       </section>
 
@@ -194,7 +233,17 @@
         <div class="game-group-grid">
           <a class="game-card" data-game-id="class-gallery" href="class-gallery/index.html" target="_blank" rel="noopener"><span class="card-icon">🖼️</span><span class="card-title">Class Gallery</span></a>
           <a class="game-card" data-game-id="student-rewards" href="student-rewards/student.html" target="_blank" rel="noopener"><span class="card-icon">🌟</span><span class="card-title">Student Rewards</span></a>
-          <a class="game-card" data-game-id="halacha" href="halacha/index.html?v=20261006-1953" target="_blank" rel="noopener"><span class="card-icon">📔</span><span class="card-title">Halacha</span></a>
+        </div>
+      </section>
+
+      <section class="game-group" data-game-group="challenge">
+        <div class="game-group-head">
+          <span class="game-group-icon">🏆</span>
+          <div><div class="game-group-title">Tests &amp; Challenges</div><div class="game-group-subtitle">Quizzes and class challenges</div></div>
+        </div>
+        <div class="game-group-grid">
+          <a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html" target="_blank" rel="noopener"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz &amp; Practice</span></a>
+          <a class="game-card" data-game-id="game-show" href="game-show/player.html" target="_blank" rel="noopener"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a>
         </div>
       </section>
     </div>
@@ -214,7 +263,7 @@
       <a class="teacher-tool-card" href="rashi-letters/teacher.html" target="_blank" rel="noopener"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters — Teacher Dashboard</span></a>
       <a class="teacher-tool-card" href="student-rewards/teacher.html" target="_blank" rel="noopener"><span class="card-icon">🏅</span><span class="card-title">Student Rewards — Teacher</span></a>
       <a class="teacher-tool-card" href="weekly-quiz/teacher.html" target="_blank" rel="noopener"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz — Teacher</span></a>
-      <a class="teacher-tool-card" href="halacha/index.html?teacher=1&v=20261006-1953" target="_blank" rel="noopener"><span class="card-icon">📔</span><span class="card-title">Halacha — Teacher Lesson</span></a>
+      <a class="teacher-tool-card" href="halacha/index.html?teacher=1&v=20261007-teacher-sync" target="_blank" rel="noopener"><span class="card-icon">📔</span><span class="card-title">Halacha — Teacher Lesson</span></a>
       <a class="teacher-tool-card" href="halacha/teacher.html" target="_blank" rel="noopener"><span class="card-icon">🗂️</span><span class="card-title">Halacha — Student Work</span></a>
       <a class="teacher-tool-card" href="chavrusa/index.html" target="_blank" rel="noopener"><span class="card-icon">👥</span><span class="card-title">Chavrusa of the Day</span></a>
       <a class="teacher-tool-card" href="name-picker/index.html" target="_blank" rel="noopener"><span class="card-icon">🎡</span><span class="card-title">Name Picker</span></a>
@@ -381,11 +430,18 @@
     try{await db.ref().update(updates);}catch(e){console.warn("Could not persist student membership",e);}
   }
   let studentClassChoices=[];
+  // Firebase reads can hang forever on a slow or filtered connection. Sign-in
+  // must never wait silently, so every read on that path gets a time limit.
+  function withTimeout(promise,ms,message){
+    let timer;
+    return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message||"The connection is slow. Please try again.")),ms);})]).finally(()=>clearTimeout(timer));
+  }
+  const readOnce=(path,ms=10000)=>withTimeout(db.ref(path).once("value"),ms,"The connection is slow. Please try again.");
   async function resolvedStudentClass(studentId,data){
-    const memberships=(await db.ref("b3Games/students/"+studentId+"/memberships").once("value")).val()||{};
+    const memberships=(await readOnce("b3Games/students/"+studentId+"/memberships")).val()||{};
     const ids=[...new Set(Object.values(memberships).filter(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&m.classId).map(m=>String(m.classId)))];
     studentClassChoices=(await Promise.all(ids.map(async id=>{
-      const row=(await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id).once("value")).val();
+      const row=(await readOnce("b3Games/workspaces/"+workspaceId+"/classes/"+id)).val();
       return row&&row.active!==false&&row.members?.[studentId]?.active!==false&&row.members?.[studentId]?{id,name:String(row.name||id)}:null;
     }))).filter(Boolean);
     const stored=localStorage.getItem("b3Games_studentId")===studentId?localStorage.getItem("b3Games_studentClass"):"";
@@ -404,6 +460,12 @@
   }
 
   const el=id=>document.getElementById(id);
+  // Hook up student sign-in first. If any later setup code fails, the button
+  // still responds instead of silently doing nothing.
+  el("studentSignInBtn").addEventListener("click",studentSignIn);
+  el("studentNameInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
+  el("classPinInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
+  window.__b3Ready = true;
   const gameCards=Array.from(document.querySelectorAll(".game-card"));
   const gameDefinitions=gameCards.map(card=>({id:card.dataset.gameId,name:(card.querySelector(".card-title")?.textContent||card.textContent).trim(),element:card}));
   gameCards.forEach(card=>card.addEventListener("click",event=>{
@@ -421,7 +483,7 @@
     "game-show":"game-show/teacher.html",
     "student-rewards":"student-rewards/teacher.html",
     "weekly-quiz":"weekly-quiz/teacher.html",
-    "halacha":"halacha/index.html?teacher=1&v=20261006-1953"
+    "halacha":"halacha/index.html?teacher=1&v=20261007-teacher-sync"
   };
   const pairedTeacherHrefs=new Set(Object.values(teacherVersionByGame).map(h=>h.split("?")[0]));
 
@@ -808,7 +870,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   function classHasLockedGameOverride(gameId,classId=myClassId){
     if(!classId||!gameId)return false;
     if(typeof settingsApi.classHasLockedGameOverride==="function")return settingsApi.classHasLockedGameOverride(currentSettings,classId,gameId);
-    return String(currentSettings.classLockedGameOverride?.[classId]||"")===String(gameId);
+    return String(currentSettings.classLockedGameOverride?.[classId]||"").split(",").map(v=>v.trim()).includes(String(gameId));
   }
 
   function studentNudgeVisitKey(gameId){
@@ -890,9 +952,79 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     showNext();
   }
 
+  function renderCardLocks(){
+    document.querySelectorAll('#gamesArea .game-card[data-game-id]').forEach(card=>{
+      let shell=card.parentElement;
+      if(!shell.classList.contains('student-card-shell')){
+        shell=document.createElement('div');
+        shell.className='student-card-shell';
+        card.before(shell);
+        shell.appendChild(card);
+      }
+      shell.querySelectorAll('.card-lock,.card-lock-menu').forEach(e=>e.remove());
+      // Games are opened and closed per class in Teacher Center > Control.
+      // The old home-page lock icons changed every class at once, so they are gone.
+      return;
+
+      const id=card.dataset.gameId;
+      const classes=currentAccess.role==='admin'?['et','wt']:(currentAccess.classIds||[]);
+      const globallyActive=currentSettings.games?.[id]!==false;
+      const locked=!globallyActive||classes.some(c=>currentSettings.classGames?.[c]?.[id]===false);
+      const button=document.createElement('button');
+      button.type='button';
+      button.className='card-lock';
+      button.textContent=locked?'\uD83D\uDD12':'\uD83D\uDD13';
+      button.classList.add(locked?'is-locked':'is-open');
+
+      if(!globallyActive){
+        button.title='This activity is inactive. Use Teacher Tools to enable it.';
+        button.setAttribute('aria-label',card.innerText.trim()+' is inactive. Use Teacher Tools to enable it.');
+        button.addEventListener('click',event=>{
+          event.preventDefault();
+          event.stopPropagation();
+          alert('This activity is inactive. Enable it in Teacher Tools first.');
+        });
+      }else{
+        const nextOpen=locked;
+        button.title=(nextOpen?'Open':'Lock')+' this activity for all of your classes';
+        button.setAttribute('aria-label',(nextOpen?'Open ':'Lock ')+card.innerText.trim()+' for all classes');
+        button.addEventListener('click',async event=>{
+          event.preventDefault();
+          event.stopPropagation();
+          button.disabled=true;
+
+          const oldValues={};
+          currentSettings.classGames=currentSettings.classGames||{};
+          classes.forEach(classId=>{
+            currentSettings.classGames[classId]=currentSettings.classGames[classId]||{};
+            oldValues[classId]=currentSettings.classGames[classId][id]!==false;
+            currentSettings.classGames[classId][id]=nextOpen;
+          });
+          renderActivityManager();
+          renderStudentAccess();
+
+          try{
+            await settingsApi.updateClassesGameEnabled(classes,id,nextOpen);
+          }catch(e){
+            classes.forEach(classId=>{
+              currentSettings.classGames[classId]=currentSettings.classGames[classId]||{};
+              currentSettings.classGames[classId][id]=oldValues[classId];
+            });
+            renderActivityManager();
+            renderStudentAccess();
+            alert('Could not save this activity setting.');
+            console.error(e);
+          }
+        });
+      }
+      shell.appendChild(button);
+    });
+  }
+
   function renderStudentAccess(){
     el("classPointerStudentLink").classList.toggle("hidden",isAuthorizedTeacher||isStudentPreview);
     queueMicrotask(renderStudentNudges);
+    queueMicrotask(renderCardLocks);
     setTeacherToolPairVisibility();
     // The authorized teacher account is never treated as ET or WT.
     if(isAuthorizedTeacher){
@@ -1010,7 +1142,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     let r;
     try{r=await studentAuthCall({action:"login",name:typed,pin:enteredPin});}
     catch(e){return{ok:false,reason:e.message}}
-    const classId=await resolvedStudentClass(r.id,{id:r.id,name:r.name,active:true,classId:r.classId||legacyMigrationClass(r.id)});
+    let classId;
+    try{classId=await resolvedStudentClass(r.id,{id:r.id,name:r.name,active:true,classId:r.classId||legacyMigrationClass(r.id)});}
+    catch(e){return{ok:false,reason:e.message||"The connection is slow. Please try again."}}
     if(!classId)return{ok:false,reason:"Your class is not assigned yet. Ask your teacher."};
     return{ok:true,id:r.id,name:r.name,classId};
   }
@@ -1023,7 +1157,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(studentMembershipWatch)studentMembershipWatch.off();
     studentAccessRevoked=false;
     myStudentId=r.id;myStudentName=r.name;myClassId=r.classId;myClassRecord=null;
-    try{myClassRecord=(await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId).once("value")).val()||null;}catch(e){}
+    try{myClassRecord=(await readOnce("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId,8000)).val()||null;}catch(e){}
     if(!isStudentPreview){
       localStorage.setItem("b3Games_studentId",myStudentId);
       localStorage.setItem("b3Games_studentName",myStudentName);
@@ -1052,13 +1186,14 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 
   async function studentSignIn(){
     const btn=el("studentSignInBtn");
+    if(btn.disabled)return;
     btn.disabled=true;setLoginMsg("Checking…");
     try{
       const r=await checkStudentAccess(el("studentNameInput").value,el("classPinInput").value);
       if(!r.ok){setLoginMsg(r.reason);return;}
       localStorage.setItem("b3Games_classPin",el("classPinInput").value.trim());
-      setLoginMsg("");await enterStudent(r);
-    }catch(e){console.error(e);setLoginMsg("Could not check your login. Try again.");}
+      setLoginMsg("Opening your games…");await enterStudent(r);setLoginMsg("");
+    }catch(e){console.error(e);setLoginMsg(e&&e.message?e.message:"Could not check your login. Try again.");}
     finally{btn.disabled=false;}
   }
 
@@ -1573,9 +1708,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(href)openTeacherToolInBackground(href);
   }));
 
-  el("studentSignInBtn").addEventListener("click",studentSignIn);
-  el("studentNameInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
-  el("classPinInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
   el("switchStudentBtn").addEventListener("click",switchStudent);
   el("adminAccessButton").addEventListener("click",()=>{
     window.location.href="admin.html";

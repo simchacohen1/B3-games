@@ -185,6 +185,75 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 .mini-skip{border:0;background:transparent;color:#64708d;text-decoration:underline;font:700 13px 'Quicksand',sans-serif;cursor:pointer;margin-top:4px}
 @media(max-width:600px){.quest-scene{min-height:105px}.explorer{font-size:35px}.treasure-chest{font-size:38px}.quest-badge,.quest-coins{font-size:10px;padding:6px 8px}.mini-card{padding:18px}.mini-target{font-size:68px;width:102px;height:90px}.mini-arena{height:180px}.mini-choice{width:64px;height:64px;font-size:32px}}
 
+
+/* Look-alike letters */
+.letter-pick-btn.similar-tile{background:linear-gradient(135deg,#ede9ff,#e3f7f1)!important;border-style:dashed;border-color:#8877e6}
+.letter-pick-btn.similar-tile span{font-size:32px;letter-spacing:3px}
+#similarScreen{display:none}
+.sim-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sim-head h2{margin:0;font-size:28px}
+.sim-intro{color:var(--ink-soft);font-weight:600;font-size:16px;line-height:1.6;margin:8px 0 18px}
+.sim-tabs{display:flex;gap:8px;margin-bottom:20px}
+.sim-tab{flex:1;font:700 16px 'Quicksand',sans-serif;border:2px solid #dbe2f1;border-bottom-width:5px;border-radius:14px;background:#f8f9ff;color:var(--ink-soft);padding:14px 6px;cursor:pointer}
+.sim-tab.selected{background:#ede9ff;color:#3f3099;border-color:#6553d6}
+.sim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:12px}
+.sim-card{border:2px solid #e0e5f3;border-bottom-width:5px;border-radius:18px;background:#fff;padding:12px 6px;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:10px;direction:rtl;font:inherit;color:var(--ink)}
+.sim-card:nth-child(3n+2){background:#f3fbf8}.sim-card:nth-child(3n){background:#fffaf0}
+.sim-card:hover{border-color:#8877e6;transform:translateY(-2px)}
+.sim-card .r{font-family:'Mekorot Rashi';font-size:48px;line-height:1;color:#342773}
+.sim-card .p{font-family:'Frank Ruhl Libre',serif;font-size:48px;line-height:1}
+.sim-card .eq{font-size:20px;color:#9aa5c0;font-weight:700}
+.sim-key{display:flex;justify-content:center;gap:22px;font-size:13px;font-weight:700;color:#536180;margin-bottom:12px}
+.sim-key b{color:#342773}
+.morph-box{position:relative;height:230px;border-radius:22px;background:linear-gradient(135deg,#f0edff,#edf6ff);margin:10px 0 14px}
+.morph-box span{position:absolute;inset:0;display:grid;place-items:center;font-size:160px;line-height:1;color:#342773}
+.morph-box .r{font-family:'Mekorot Rashi'}.morph-box .p{font-family:'Frank Ruhl Libre',serif}
+.morph-labels{display:flex;justify-content:space-between;font-weight:800;color:#536180;font-size:15px}
+input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
+.sim-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.sim-small-btn{border:0;background:#ece9ff;color:#443694;padding:12px 16px;border-radius:12px;font:700 15px 'Quicksand',sans-serif;cursor:pointer}
+.sim-small-btn:disabled{opacity:.4;cursor:default}
+.sim-status{text-align:center;font-weight:700;color:#536180;margin-bottom:10px}
+.sim-big{font-family:'Mekorot Rashi';font-size:150px;line-height:1;color:#342773}
+.sim-done{text-align:center;padding:10px 0}
+.sim-done h3{font-size:28px;margin:6px 0}
+.mem-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;direction:rtl}
+.mem-card{height:105px;border-radius:16px;border:2px solid #4938ae;border-bottom-width:5px;background:#6553d6;color:#fff;font:700 34px 'Quicksand',sans-serif;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;transition:transform .15s ease,background .15s ease}
+.mem-card.up{background:#fff;color:#342773;border-color:#dbe2f1;transform:rotateY(0)}
+.mem-card .g{font-size:52px;line-height:1}
+.mem-card.rashi .g{font-family:'Mekorot Rashi'}.mem-card.print .g{font-family:'Frank Ruhl Libre',serif}
+.mem-card small{font:700 11px 'Quicksand',sans-serif;color:#536180;letter-spacing:1px;text-transform:uppercase}
+.mem-card.done{background:#d9f9e8;border-color:#249665;animation:pop .35s ease}
+@media(max-width:600px){.mem-grid{grid-template-columns:repeat(3,1fr)}.sim-tab{font-size:13px;padding:12px 4px}.morph-box span{font-size:130px}.sim-card .r,.sim-card .p{font-size:40px}.sim-grid{grid-template-columns:repeat(auto-fill,minmax(105px,1fr))}}
+
+/* Multiplayer match */
+.mp-choose{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+.mp-big{border:2px solid #dbe2f1;border-bottom-width:6px;border-radius:22px;background:#fff;padding:24px 12px;cursor:pointer;font:800 21px 'Quicksand',sans-serif;color:#2d266f;display:flex;flex-direction:column;align-items:center;gap:8px}
+.mp-big .e{font-size:44px}.mp-big small{font:600 14px 'Quicksand',sans-serif;color:#536180}
+.mp-big:hover{border-color:#8877e6;transform:translateY(-2px)}
+.mp-big.friends{background:#f3fbf8}
+.mp-panel{background:#f8f9ff;border:2px solid #e0e5f3;border-radius:20px;padding:20px;text-align:center;margin-bottom:14px}
+.mp-panel h3{margin:0 0 10px;font-size:20px}
+.mp-join{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.mp-join input{font:800 28px 'Quicksand',sans-serif;letter-spacing:8px;text-align:center;width:170px;padding:10px;border:2px solid #d9e0f1;border-radius:14px;background:#fff}
+.mp-msg{min-height:24px;font-weight:700;color:#8a4b12;margin-top:10px}
+.mp-code{font:900 64px 'Quicksand',sans-serif;letter-spacing:12px;color:#3f3099;background:#ede9ff;border-radius:20px;display:inline-block;padding:6px 22px 6px 34px;margin:6px 0}
+.mp-players{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:14px 0}
+.mp-chip{background:#fff;border:2px solid #dbe2f1;border-radius:999px;padding:8px 14px;font-weight:800;color:#2d266f}
+.mp-chip.me{border-color:#6553d6;background:#ede9ff}
+.mp-offer{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f3fbf8;border:2px solid #bfe9d8;border-bottom-width:5px;border-radius:18px;padding:14px 16px;margin-bottom:10px;text-align:left}
+.mp-offer-txt{display:flex;flex-direction:column;gap:3px}.mp-offer-txt b{font-size:19px;color:#2d266f}.mp-offer-txt small{font-weight:600;color:#536180}
+.mp-count{font-size:120px;font-weight:900;color:#6553d6;text-align:center;line-height:1.2;animation:pop .5s ease}
+.mp-board{background:#f8f9ff;border:2px solid #e0e5f3;border-radius:18px;padding:10px 12px;margin-bottom:14px}
+.mp-row{display:grid;grid-template-columns:30px minmax(70px,140px) 1fr 54px;align-items:center;gap:8px;padding:4px 0;font-weight:800;font-size:15px}
+.mp-row.me{color:#3f3099}.mp-row.left{opacity:.4}
+.mp-bar{height:12px;background:#e5eafa;border-radius:999px;overflow:hidden}
+.mp-bar i{display:block;height:100%;background:linear-gradient(90deg,#7160e6,#36bda3);border-radius:999px;transition:width .3s ease}
+.mp-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mp-score{text-align:right;color:#755400}
+.mp-results{text-align:left}.mp-results .mp-row{font-size:19px;padding:8px 4px;border-bottom:1px solid #e5eafa}
+@media(max-width:600px){.mp-choose{grid-template-columns:1fr}.mp-code{font-size:48px}.mp-row{grid-template-columns:26px minmax(60px,100px) 1fr 46px;font-size:13px}}
+
 @media(min-width:800px){#app{max-width:760px;margin:auto}}
 @media(max-width:600px){.wrap{padding:18px 12px}.card{padding:20px;border-radius:22px}header.top h1{font-size:27px}.brand-icon{width:54px;height:54px}.letter-grid{grid-template-columns:repeat(3,1fr)}.unit-label{font-size:14px}.phase-row{gap:8px}.phase-pill{display:none}#rashiLetter.word-mode{font-size:62px}.choice-btn.word-btn{font-size:29px}.hud{font-size:13px;padding:10px}.letter-box{min-height:205px}.compare{gap:25px}.compare span{font-size:65px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
@@ -262,6 +331,17 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
     <button class="btn" id="practiceDoneBtn">Choose another mission</button>
   </div>
 
+  <div class="card" id="similarScreen">
+    <div class="sim-head"><h2>Look-alike letters</h2><button class="menu-link" id="simMenuBtn">⬅ Menu</button></div>
+    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them!</p>
+    <div class="sim-tabs">
+      <button class="sim-tab" data-sim="explore">👀 Side by side</button>
+      <button class="sim-tab" data-sim="match">🎯 Match it</button>
+      <button class="sim-tab" data-sim="memory">🃏 Memory</button>
+    </div>
+    <div id="simArea"></div>
+  </div>
+
   <div class="card" id="closedScreen">
     <p>Practice is closed right now. Ask your teacher.</p>
   </div>
@@ -280,6 +360,7 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
   </div>
 </div>
 
+<script src="../student-class.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script>
@@ -670,6 +751,12 @@ function renderLetterGrid(){
     b.onclick = () => selectPracticeLetter(u.id, b);
     grid.appendChild(b);
   });
+  const sim = document.createElement('button');
+  sim.className = 'letter-pick-btn similar-tile';
+  sim.innerHTML = '<span dir="rtl">ד ל ר</span><small>Look-alike letters</small>';
+  sim.setAttribute('aria-label', 'Look-alike letters: letters that look almost the same in Rashi and regular print');
+  sim.onclick = openSimilar;
+  grid.appendChild(sim);
 }
 
 function selectPracticeLetter(unitId, btnEl){
@@ -688,6 +775,8 @@ function showModeGate(){
   document.getElementById('app').style.display = 'none';
   document.getElementById('completeScreen').classList.remove('show');
   document.getElementById('practiceCompleteScreen').style.display = 'none';
+  document.getElementById('similarScreen').style.display = 'none';
+  if(typeof leaveRoom==='function') leaveRoom();
   document.getElementById('modeGate').style.display = 'block';
   renderLetterGrid();
 }
@@ -937,6 +1026,419 @@ async function handleAnswer(letter, btnEl){
   } else {
     document.getElementById('nextBtn').classList.remove('hidden');
   }
+}
+
+/* ---------- Look-alike letters ---------- */
+const ALL_LETTERS = 'אבגדהוזחטיכךלמםנןסעפףצץקרשת'.split('');
+const TAUGHT_LETTERS = new Set(UNITS.flatMap(u => (u.type==='single' ? [u.correct] : u.pair)).map(ch => ch.normalize('NFD').replace(/[֑-ׇ]/g,'')));
+const SIMILAR = ALL_LETTERS.filter(ch => !TAUGHT_LETTERS.has(ch));
+let simTab = 'explore', simMatch = null, simMem = null, morphTimer = null;
+
+function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+
+function openSimilar(){
+  clearTimeout(questionTimer); viewVersion++;
+  ['modeGate','app','practiceCompleteScreen'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('completeScreen').classList.remove('show');
+  document.getElementById('similarScreen').style.display='block';
+  setSimTab('explore');
+}
+function setSimTab(tab){
+  leaveRoom(); simTab = tab; viewVersion++; cancelAnimationFrame(morphTimer);
+  document.querySelectorAll('.sim-tab').forEach(b=>b.classList.toggle('selected', b.dataset.sim===tab));
+  if(tab==='explore') renderSimExplore();
+  else if(tab==='match') renderMatchMenu();
+  else startSimMemory();
+}
+document.querySelectorAll('.sim-tab').forEach(b=>b.onclick=()=>setSimTab(b.dataset.sim));
+document.getElementById('simMenuBtn').onclick=()=>{ cancelAnimationFrame(morphTimer); leaveRoom(); showModeGate(); };
+
+function renderSimExplore(){
+  cancelAnimationFrame(morphTimer);
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const key=el('div','sim-key'); key.innerHTML='<span><b>Rashi</b> on the right</span><span><b>Regular</b> on the left</span>';
+  const grid=el('div','sim-grid');
+  SIMILAR.forEach((ch,i)=>{
+    const c=el('button','sim-card'); c.setAttribute('aria-label','Letter '+ch+': see Rashi and regular side by side');
+    c.append(el('span','r',ch), el('span','eq','='), el('span','p',ch));
+    c.onclick=()=>renderSimMorph(i);
+    grid.appendChild(c);
+  });
+  area.append(el('p','prompt','Tap a letter to watch it change from Rashi to regular!'), key, grid);
+}
+
+function renderSimMorph(i){
+  cancelAnimationFrame(morphTimer);
+  const ch=SIMILAR[i];
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const top=el('div','sim-row');
+  const back=el('button','sim-small-btn','← All letters'); back.onclick=renderSimExplore;
+  top.append(back, el('span','sim-status',(i+1)+' of '+SIMILAR.length));
+  const box=el('div','morph-box'); box.setAttribute('dir','rtl');
+  const r=el('span','r',ch), p=el('span','p',ch); p.style.opacity=0; box.append(r,p);
+  const labels=el('div','morph-labels'); labels.append(el('span',null,'Rashi'), el('span',null,'Regular'));
+  const slider=document.createElement('input'); slider.type='range'; slider.min=0; slider.max=100; slider.value=0; slider.className='morph';
+  slider.setAttribute('aria-label','Slide from Rashi to regular');
+  const setV=v=>{ r.style.opacity=1-v/100; p.style.opacity=v/100; };
+  slider.oninput=()=>{ cancelAnimationFrame(morphTimer); setV(+slider.value); };
+  const play=el('button','helper','▶ Watch it change');
+  play.onclick=()=>{
+    cancelAnimationFrame(morphTimer); const start=performance.now(), dur=3200;
+    const step=t=>{ const k=Math.min(1,(t-start)/dur); const v=Math.round((1-Math.cos(k*Math.PI*2))/2*100); slider.value=v; setV(v); if(k<1) morphTimer=requestAnimationFrame(step); };
+    morphTimer=requestAnimationFrame(step);
+  };
+  const helpRow=el('div','help-row'); helpRow.appendChild(play);
+  const nav=el('div','sim-row');
+  const prev=el('button','sim-small-btn','← Previous'), next=el('button','sim-small-btn','Next →');
+  prev.disabled=i===0; next.disabled=i===SIMILAR.length-1;
+  prev.onclick=()=>renderSimMorph(i-1); next.onclick=()=>renderSimMorph(i+1);
+  nav.append(prev,next);
+  area.append(top, el('p','prompt','Slide or press play — see how little changes!'), box, labels, slider, helpRow, nav);
+}
+
+function startSimMatch(){
+  simMatch={ order:shuffle(SIMILAR).slice(0,8), round:0, correct:0 };
+  renderSimMatch();
+}
+function renderSimMatch(){
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const m=simMatch;
+  if(m.round>=m.order.length){
+    const d=el('div','sim-done'); d.append(el('div','finish-icon','🏆'), el('h3',null,'You matched '+m.correct+' of '+m.order.length+'!'), el('p','sim-intro','See? Rashi and regular letters are almost twins.'));
+    const again=el('button','btn','Play again'); again.onclick=startSimMatch; d.appendChild(again);
+    area.appendChild(d); rewardBurst(d.querySelector('.finish-icon'),true); return;
+  }
+  const target=m.order[m.round];
+  const box=el('div','letter-box'); box.setAttribute('dir','rtl'); box.appendChild(el('span','sim-big',target));
+  const opts=shuffle([target, ...shuffle(SIMILAR.filter(c=>c!==target)).slice(0,3)]);
+  const row=el('div','choices'), fb=el('div',null); fb.id='simFeedback'; fb.style.cssText='min-height:30px;text-align:center;font-size:19px;font-weight:700;margin:4px 0 10px';
+  const next=el('button','btn hidden','Next →'); next.style.cssText='display:block;margin:10px auto 0';
+  const version=viewVersion;
+  const advance=()=>{ if(version!==viewVersion) return; m.round++; renderSimMatch(); };
+  next.onclick=advance;
+  opts.forEach(ch=>{
+    const b=el('button','choice-btn',ch);
+    b.onclick=()=>{
+      row.querySelectorAll('button').forEach(x=>x.disabled=true);
+      const ok=ch===target;
+      if(ok){ b.classList.add('correct'); m.correct++; starsThisVisit++; coinsThisVisit++; updateRewardHud(); rewardBurst(b); beep('correct'); fb.style.color='#176447'; fb.textContent='Same letter — just a different style!'; setTimeout(advance,1000); }
+      else { b.classList.add('incorrect'); row.querySelectorAll('button').forEach(x=>{ if(x.textContent===target) x.classList.add('correct'); }); beep('wrong'); fb.style.color='#865014'; fb.textContent='Look again — the green one is its twin.'; next.classList.remove('hidden'); }
+      if(studentId) logAttempt('similar','letter',ok).catch(()=>{});
+    };
+    row.appendChild(b);
+  });
+  area.append(el('div','sim-status','Question '+(m.round+1)+' of '+m.order.length+' · ★ '+m.correct), box, el('p','prompt','Which regular letter is the same?'), row, fb, next);
+}
+
+function startSimMemory(){
+  const picks=shuffle(SIMILAR).slice(0,6);
+  simMem={ cards:shuffle(picks.flatMap(ch=>[{ch,kind:'rashi'},{ch,kind:'print'}])), open:[], matched:0, moves:0, lock:false };
+  renderSimMemory();
+}
+function renderSimMemory(){
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const g=simMem;
+  const status=el('div','sim-status'); const setStatus=()=>status.textContent='Find each Rashi letter and its regular twin · Pairs: '+g.matched+' of 6 · Tries: '+g.moves;
+  setStatus();
+  const grid=el('div','mem-grid');
+  const version=viewVersion;
+  g.cards.forEach(card=>{
+    const b=el('button','mem-card '+card.kind); b.setAttribute('aria-label','Hidden card');
+    const face=()=>{ b.replaceChildren(el('span','g',card.ch), el('small',null,card.kind==='rashi'?'Rashi':'Regular')); b.classList.add('up'); b.setAttribute('aria-label',(card.kind==='rashi'?'Rashi ':'Regular ')+card.ch); };
+    const hide=()=>{ b.replaceChildren(el('span',null,'?')); b.classList.remove('up'); b.setAttribute('aria-label','Hidden card'); };
+    hide();
+    b.onclick=()=>{
+      if(g.lock || b.classList.contains('up')) return;
+      face(); g.open.push({card,b,hide});
+      if(g.open.length<2) return;
+      g.moves++; const [a,c]=g.open; g.open=[];
+      if(a.card.ch===c.card.ch && a.card.kind!==c.card.kind){
+        [a.b,c.b].forEach(x=>{ x.classList.add('done'); x.disabled=true; });
+        g.matched++; coinsThisVisit++; updateRewardHud(); rewardBurst(c.b); beep('correct'); setStatus();
+        if(g.matched===6){
+          starsThisVisit+=3; updateRewardHud(); showQuestToast('🃏 All pairs found!');
+          const d=el('div','sim-done'); d.append(el('h3',null,'All twins found in '+g.moves+' tries!'));
+          const again=el('button','btn','Play again'); again.onclick=startSimMemory; d.appendChild(again);
+          setTimeout(()=>{ if(version===viewVersion) area.appendChild(d); },500);
+        }
+      } else {
+        g.lock=true; beep('wrong'); setStatus();
+        setTimeout(()=>{ if(version!==viewVersion) return; a.hide(); c.hide(); g.lock=false; },950);
+      }
+    };
+    grid.appendChild(b);
+  });
+  area.append(status, grid);
+}
+
+/* ---------- Match it: solo or live multiplayer ---------- */
+const MP_QUESTIONS = 10;
+const MP_OPEN_MS = 20*60*1000;      // a waiting game stays open for 20 minutes
+const ROOMS_PATH = 'rashiLetters/matchRooms';
+let simRoom = null;                  // the game I'm in
+let mpWatch = null;                  // listener on all games while I'm in multiplayer
+let mpClass = null;                  // my class id ('' if none)
+
+function renderMatchMenu(){
+  leaveRoom();
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const wrap=el('div','mp-choose');
+  const solo=el('button','mp-big'); solo.append(el('span','e','🎯'), el('span',null,'Play alone'), el('small',null,'8 letters, just you'));
+  const fr=el('button','mp-big friends'); fr.append(el('span','e','👥'), el('span',null,'Play with friends'), el('small',null,'Race other boys live'));
+  solo.onclick=()=>{ leaveRoom(); startSimMatch(); }; fr.onclick=()=>enterMultiplayer();
+  wrap.append(solo,fr);
+  area.append(el('p','prompt','How do you want to play?'), wrap);
+}
+
+async function myClassId(){
+  if(mpClass!==null) return mpClass;
+  try{ if(window.FunTorahStudentClass){ const c=await FunTorahStudentClass.resolve(db, studentId); mpClass=String(c.classId||''); } else mpClass=''; }
+  catch(e){ mpClass=''; }
+  return mpClass;
+}
+
+function openGames(all){
+  const now=Date.now();
+  return Object.entries(all||{}).filter(([code,r])=>r && r.state==='lobby' && (r.classId||'')===mpClass &&
+    r.createdAt && now-r.createdAt<MP_OPEN_MS && r.players && r.players[r.host] && !r.players[r.host].left &&
+    !(simRoom && simRoom.code===code) && activePlayers(r).length<8);
+}
+
+async function enterMultiplayer(msgText){
+  leaveRoom(); viewVersion++;
+  const area=document.getElementById('simArea');
+  if(!studentId){ area.replaceChildren(el('p','prompt','Please sign in on Fun Torah Tools to play with friends.')); return; }
+  area.replaceChildren(el('p','prompt','Looking for friends…'));
+  const v=viewVersion;
+  try{
+    await myClassId();
+    const all=(await db.ref(ROOMS_PATH).once('value')).val()||{};
+    if(v!==viewVersion) return;
+    cleanupOldGames(all);
+    if(openGames(all).length===0){ await createRoom(); return; }   // nobody waiting: open my game, others will be offered it
+    watchGames();
+    renderOffers(all, msgText);
+  }catch(e){ console.error(e); area.replaceChildren(el('p','prompt','Could not reach the game server. Ask your teacher.')); }
+}
+
+function cleanupOldGames(all){
+  const now=Date.now();
+  Object.entries(all||{}).forEach(([code,r])=>{ if(!r || !r.createdAt || now-r.createdAt>3*3600*1000) db.ref(ROOMS_PATH+'/'+code).remove().catch(()=>{}); });
+}
+
+function watchGames(){
+  if(mpWatch) return;
+  const ref=db.ref(ROOMS_PATH);
+  const cb=ref.on('value', snap=>onGamesUpdate(snap.val()||{}));
+  mpWatch={ref,cb};
+}
+function stopWatching(){ if(mpWatch){ mpWatch.ref.off('value', mpWatch.cb); mpWatch=null; } }
+
+function onGamesUpdate(all){
+  if(simRoom){ onRoomUpdate(all[simRoom.code]||null, all); return; }
+  if(document.getElementById('mpOffers')) renderOffers(all);
+}
+
+function offerList(all){
+  const list=el('div'); list.id='mpOffers';
+  openGames(all).sort(([,a],[,b])=>a.createdAt-b.createdAt).forEach(([code,r])=>{
+    const others=activePlayers(r).map(([,p])=>p.name);
+    const card=el('div','mp-offer');
+    const txt=el('div','mp-offer-txt'); txt.append(el('b',null,(r.hostName||others[0]||'A friend')+' wants to play!'), el('small',null,others.length+' player'+(others.length===1?'':'s')+' waiting: '+others.join(', ')));
+    const j=el('button','btn','Join'); j.onclick=()=>{ j.disabled=true; joinRoom(code).then(err=>{ if(err) enterMultiplayer(err); }).catch(()=>enterMultiplayer('Could not join. Try again.')); };
+    card.append(txt,j); list.appendChild(card);
+  });
+  return list;
+}
+
+function renderOffers(all, msgText){
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const list=offerList(all);
+  if(!list.children.length){ createRoom().catch(()=>{}); return; }
+  const own=el('button','sim-small-btn','Start my own game instead'); own.onclick=()=>{ own.disabled=true; createRoom().catch(()=>{}); };
+  const back=el('button','sim-small-btn','← Back'); back.onclick=renderMatchMenu;
+  const row=el('div','sim-row'); row.append(back,own);
+  area.append(el('p','prompt','Friends are waiting for you!'), list, el('div','mp-msg',msgText||''), row);
+}
+
+function makeQuestions(){
+  return shuffle(SIMILAR).slice(0,MP_QUESTIONS).map(t=>({t, o:shuffle([t, ...shuffle(SIMILAR.filter(c=>c!==t)).slice(0,3)])}));
+}
+
+let mpCreating = false;
+async function createRoom(){
+  if(mpCreating) return; mpCreating=true;
+  try{ await createRoomInner(); } finally { mpCreating=false; }
+}
+async function createRoomInner(){
+  leaveRoom();
+  let code=null;
+  for(let i=0;i<8 && !code;i++){
+    const c=String(1000+Math.floor(Math.random()*9000));
+    const r=(await db.ref(ROOMS_PATH+'/'+c).once('value')).val();
+    if(!r || (r.createdAt && Date.now()-r.createdAt>3*3600*1000)) code=c;
+  }
+  if(!code) throw new Error('no free code');
+  const ref=db.ref(ROOMS_PATH+'/'+code);
+  const players={}; players[studentId]={name:studentName, score:0, q:0};
+  await ref.set({host:studentId, hostName:studentName, classId:mpClass||'', state:'lobby', createdAt:firebase.database.ServerValue.TIMESTAMP, questions:makeQuestions(), players});
+  ref.onDisconnect().remove();
+  enterRoom(code,true);
+}
+
+async function joinRoom(code){
+  const ref=db.ref(ROOMS_PATH+'/'+code); const r=(await ref.once('value')).val();
+  if(!r) return 'That game closed. Try another one.';
+  if(r.state!=='lobby') return 'That game already started.';
+  if(activePlayers(r).length>=8 && !(r.players||{})[studentId]) return 'That game is full.';
+  leaveRoom();   // if I was waiting in my own empty game, close it
+  const me=ref.child('players/'+studentId);
+  await me.set({name:studentName, score:0, q:0});
+  me.onDisconnect().update({left:true});
+  enterRoom(code,false);
+  return null;
+}
+
+function enterRoom(code,isHost){
+  viewVersion++;
+  simRoom={code, ref:db.ref(ROOMS_PATH+'/'+code), isHost, data:null, started:false, qi:0, score:0, finished:false, shown:null};
+  watchGames();
+  db.ref(ROOMS_PATH).once('value').then(s=>{ const all=s.val()||{}; if(simRoom && simRoom.code===code) onRoomUpdate(all[code]||null, all); });
+}
+
+function leaveRoom(){
+  stopWatching();
+  const r=simRoom; if(!r) return; simRoom=null;
+  try{
+    const state=r.data && r.data.state;
+    if(r.isHost && (state==='lobby' || r.shown==='results')){ r.ref.onDisconnect().cancel(); r.ref.remove().catch(()=>{}); }
+    else if(!r.finished && r.data){ const me=r.ref.child('players/'+studentId); me.onDisconnect().cancel(); me.update({left:true}).catch(()=>{}); }
+  }catch(e){ console.error(e); }
+}
+
+function activePlayers(room){ return Object.entries((room&&room.players)||{}).filter(([,p])=>p && !p.left); }
+function allDone(room){ const a=activePlayers(room); return a.length>0 && a.every(([,p])=>p.finishedAt); }
+
+function onRoomUpdate(room, all){
+  const r=simRoom; if(!r) return;
+  if(!room){ if(r.shown!=='results'){ simRoom=null; enterMultiplayer(r.isHost?'':'That game was closed.'); } return; }
+  r.data=room;
+  if(room.state==='lobby'){ renderLobby(room, all); return; }
+  if(r.shown==='results') return;
+  if(room.state==='ended' || (r.finished && allDone(room))){ renderMpResults(room); return; }
+  if(room.state==='playing' && !r.started){
+    if(!room.players || !room.players[studentId] || room.players[studentId].left){ simRoom=null; enterMultiplayer('That game already started.'); return; }
+    r.started=true; r.ref.onDisconnect().cancel();
+    r.ref.child('players/'+studentId).onDisconnect().update({left:true});
+    runCountdown(); return;
+  }
+  updateBoard(room);
+}
+
+function renderLobby(room, all){
+  const r=simRoom; r.shown='lobby';
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const panel=el('div','mp-panel');
+  const players=activePlayers(room); const count=players.length;
+  panel.append(el('h3',null, count<2 ? 'Waiting for friends to join…' : 'Your race is ready!'));
+  if(count<2) panel.appendChild(el('p','sim-intro','When another boy taps 👥 Play with friends, he’ll be asked to join you.'));
+  const list=el('div','mp-players');
+  players.forEach(([id,p])=>list.appendChild(el('span','mp-chip'+(id===studentId?' me':''), (id===room.host?'👑 ':'')+(id===studentId?'You':p.name))));
+  panel.append(el('div','sim-status',count+' player'+(count===1?'':'s')+' here'), list);
+  if(r.isHost){
+    const go=el('button','btn', count<2 ? 'Waiting…' : '▶ Start the race!'); go.disabled=count<2;
+    go.onclick=()=>{ go.disabled=true; r.ref.onDisconnect().cancel(); r.ref.update({state:'playing', startedAt:firebase.database.ServerValue.TIMESTAMP}); };
+    panel.appendChild(go);
+  } else panel.appendChild(el('p','prompt','Waiting for '+(room.hostName||'the host')+' to start…'));
+  area.appendChild(panel);
+  // Someone else is waiting alone too? Offer to join them so nobody waits forever.
+  if(r.isHost && count<2 && all){
+    const offers=offerList(all);
+    if(offers.children.length){ area.append(el('p','prompt','Or join a friend who is waiting:'), offers); }
+  }
+  const leave=el('button','sim-small-btn','← Leave'); leave.onclick=renderMatchMenu;
+  area.appendChild(leave);
+}
+
+function runCountdown(){
+  const r=simRoom; r.shown='countdown'; const v=viewVersion;
+  const area=document.getElementById('simArea');
+  const steps=['3','2','1','Go!']; let i=0;
+  const tick=()=>{
+    if(simRoom!==r || v!==viewVersion) return;
+    if(i>=steps.length){ renderMpQuestion(); return; }
+    area.replaceChildren(el('p','prompt','Get ready…'), el('div','mp-count',steps[i])); beep(i===3?'correct':'wrong'); i++; setTimeout(tick,750);
+  };
+  tick();
+}
+
+function rankPlayers(room){ return Object.entries(room.players||{}).sort(([,a],[,b])=>(b.score||0)-(a.score||0) || ((a.finishedAt||Infinity)-(b.finishedAt||Infinity))); }
+function boardRows(room, results){
+  const total=(room.questions||[]).length||MP_QUESTIONS;
+  const box=el('div','mp-board'+(results?' mp-results':''));
+  rankPlayers(room).forEach(([id,p],i)=>{
+    const row=el('div','mp-row'+(id===studentId?' me':'')+(p.left?' left':''));
+    const medal=results ? (['🥇','🥈','🥉'][i]||(i+1)+'.') : (p.finishedAt?'🏁':(i+1)+'.');
+    const bar=el('div','mp-bar'); const fill=document.createElement('i'); fill.style.width=Math.min(100,(p.q||0)/total*100)+'%'; bar.appendChild(fill);
+    row.append(el('span',null,medal), el('span','mp-name',(id===studentId?'You':p.name)+(p.left?' (left)':'')), bar, el('span','mp-score','⭐ '+(p.score||0)));
+    box.appendChild(row);
+  });
+  return box;
+}
+function updateBoard(room){ const old=document.getElementById('mpBoard'); if(!old) return; const nb=boardRows(room,false); nb.id='mpBoard'; old.replaceWith(nb); }
+
+function renderMpQuestion(){
+  const r=simRoom; if(!r) return; r.shown='question';
+  const qs=r.data.questions; const q=qs[r.qi];
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const board=boardRows(r.data,false); board.id='mpBoard';
+  const box=el('div','letter-box'); box.setAttribute('dir','rtl'); box.appendChild(el('span','sim-big',q.t));
+  const row=el('div','choices'); const fb=el('div',null); fb.style.cssText='min-height:30px;text-align:center;font-size:19px;font-weight:700;margin:4px 0';
+  const v=viewVersion;
+  q.o.forEach(ch=>{
+    const b=el('button','choice-btn',ch);
+    b.onclick=()=>{
+      row.querySelectorAll('button').forEach(x=>x.disabled=true);
+      const ok=ch===q.t;
+      if(ok){ b.classList.add('correct'); r.score++; coinsThisVisit++; updateRewardHud(); rewardBurst(b); beep('correct'); fb.style.color='#176447'; fb.textContent='Got it!'; }
+      else { b.classList.add('incorrect'); row.querySelectorAll('button').forEach(x=>{ if(x.textContent===q.t) x.classList.add('correct'); }); beep('wrong'); fb.style.color='#865014'; fb.textContent='The green one is its twin.'; }
+      r.qi++;
+      const upd={score:r.score, q:r.qi};
+      if(r.qi>=qs.length){ upd.finishedAt=firebase.database.ServerValue.TIMESTAMP; r.finished=true; r.ref.child('players/'+studentId).onDisconnect().cancel(); }
+      r.ref.child('players/'+studentId).update(upd).catch(()=>{});
+      logAttempt('similar','letter',ok).catch(()=>{});
+      setTimeout(()=>{ if(simRoom!==r || v!==viewVersion) return; if(r.qi>=qs.length) renderMpWaiting(); else renderMpQuestion(); }, ok?650:1400);
+    };
+    row.appendChild(b);
+  });
+  area.append(board, el('div','sim-status','Letter '+(r.qi+1)+' of '+qs.length), box, el('p','prompt','Which regular letter is the same?'), row, fb);
+}
+
+function renderMpWaiting(){
+  const r=simRoom; if(!r) return;
+  if(allDone(r.data) || r.data.state==='ended'){ renderMpResults(r.data); return; }
+  r.shown='waiting';
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const board=boardRows(r.data,false); board.id='mpBoard';
+  const d=el('div','sim-done'); d.append(el('div','finish-icon','🏁'), el('p','prompt','You finished with ⭐ '+r.score+'! Waiting for your friends…'), board);
+  if(r.isHost){ const end=el('button','sim-small-btn','End the game now'); end.onclick=()=>r.ref.update({state:'ended'}); d.appendChild(end); }
+  area.appendChild(d);
+}
+
+function renderMpResults(room){
+  const r=simRoom; if(!r || r.shown==='results') return; r.shown='results';
+  r.ref.child('players/'+studentId).onDisconnect().cancel();
+  if(r.isHost) r.ref.onDisconnect().remove();
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const ranked=rankPlayers(room);
+  const iWon=ranked.length && ranked[0][0]===studentId;
+  const icon=el('div','finish-icon',iWon?'🏆':'🎉');
+  const d=el('div','sim-done');
+  const again=el('button','btn','Play again'); again.onclick=()=>enterMultiplayer(); again.style.marginTop='10px';
+  d.append(icon, el('h3',null,iWon?'You won the race!':(ranked[0]?(ranked[0][1].name+' wins!'):'Game over')), boardRows(room,true), again);
+  area.appendChild(d);
+  if(iWon){ starsThisVisit+=5; updateRewardHud(); rewardBurst(icon,true); showQuestToast('🏆 Winner! +5 stars'); }
+  else rewardBurst(icon,false);
 }
 
 async function logAttempt(unitId, ph, correct){

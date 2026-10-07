@@ -427,11 +427,14 @@ async function contributeToClassReward(studentId,rewardId,amount,preferredClassI
   const balRef=rtdb.ref(`${SR_ROOT}/students/${studentId}/rewardBalance`);
   let balanceAfter=null;
   const balTx=await balRef.transaction(cur=>{
+    // A cold transaction may start with null before the server value arrives.
+    // Preserve null so Firebase retries against the actual balance.
+    if(cur===null)return null;
     const current=Math.max(0,Number(cur)||0);
     if(current<amount) return;
     return current-amount;
   });
-  if(!balTx.committed) return {ok:false,error:'You do not have enough points for that contribution.'};
+  if(!balTx.committed||balTx.snapshot.val()===null) return {ok:false,error:'You do not have enough points for that contribution.'};
   balanceAfter=Math.max(0,Number(balTx.snapshot.val())||0);
 
   const item=root?.classRewardCatalog?.[rewardId]||{};

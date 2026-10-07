@@ -4273,6 +4273,7 @@ async function applyHebrewWordFix(){
         hebrewScoreIsPercent: true,
         hebrewWords: hebrewWords
       });
+      if(Number(hebrewScore) >= 100) await awardMilestoneForSelection('reading100');
     }catch(err){
       console.error('Could not save updated score after word fix', err);
     }

@@ -144,7 +144,7 @@ function subscribe(){
   db.ref(`${ROOT}/students/${state.studentId}`).on('value',async s=>{
     if(!state.root)return;
     const next=s.val(),nextBalance=Number(next?.rewardBalance||0),balanceChanged=nextBalance!==lastBalance;
-    state.root.student=next;state.student=next;lastBalance=nextBalance;
+    state.root.student=next;state.student=next;lastBalance=nextBalance;state.serverRewardBalance=Math.max(0,nextBalance);
     if(balanceChanged){
       try{state.activityPointHistory=await loadActivityPointHistory()}catch(err){console.warn('Could not refresh point history',err)}
     }
@@ -193,8 +193,11 @@ function redeemedPoints(){
   return redeemed;
 }
 function pointAccountTotals(){
-  const currentBalance=Number(state.student?.rewardBalance||0), redeemed=redeemedPoints();
+  const currentBalance=spendableRewardBalance(), redeemed=redeemedPoints();
   return {totalPoints:currentBalance+redeemed,redeemed,currentBalance};
+}
+function spendableRewardBalance(){
+  return Math.max(0,Number(state.serverRewardBalance!==null?state.serverRewardBalance:state.student?.rewardBalance)||0);
 }
 function classGoalProgress(g){
   const goal=Math.max(1,Number(g.goalPoints||1));
@@ -338,7 +341,7 @@ async function contributeClassReward(rewardId,inputId,buttonEl){
   if(String(goal?.status||'')==='cooldown'||timeMs(goal?.cooldownUntil)>Date.now()){C.toast(`Gimkit is available again in ${cooldownText(goal.cooldownUntil)}.`,'error');return}
   const input=document.getElementById(inputId),amount=Math.floor(Number(input?.value||0));
   if(!Number.isFinite(amount)||amount<1){C.toast('Enter how many points you want to contribute.','error');return}
-  const allowed=Math.max(0,Math.min(Number(state.student?.rewardBalance||0),Number(goal?.remainingStudentCap||0),goal?.modeVoting?Number.MAX_SAFE_INTEGER:Number(goal?.remainingGoal||0)));
+  const allowed=Math.max(0,Math.min(spendableRewardBalance(),Number(goal?.remainingStudentCap||0),goal?.modeVoting?Number.MAX_SAFE_INTEGER:Number(goal?.remainingGoal||0)));
   if(amount>allowed){C.toast(`You can contribute up to ${allowed} points to this goal right now.`,'error');return}
   let modeIds=[];
   if(goal?.modeVoting){

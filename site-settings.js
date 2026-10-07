@@ -605,6 +605,19 @@
     });
   }
 
+  function updateClassesGameEnabled(classIds, gameId, enabled) {
+    if (!Array.isArray(classIds) || !classIds.length || classIds.some(function (id) { return !["et", "wt"].includes(id); })) {
+      return Promise.reject(new Error("Unknown class."));
+    }
+    return readOnce().then(function (settings) {
+      classIds.forEach(function (classId) {
+        settings.classGames[classId][gameId] = Boolean(enabled);
+      });
+      // One save prevents separate read/modify/write calls overwriting each other.
+      return save(settings);
+    });
+  }
+
   function isGameEnabledForClass(settings, classId, gameId) {
     const normalized = normalizeSettings(settings);
     if (normalized.games && normalized.games[gameId] === false) return false;
@@ -644,10 +657,30 @@
     });
   }
 
+  // Games that stay open while a class is locked. Stored as one
+  // comma-separated string (e.g. "shorashim,yiddish") so older single-game
+  // values keep working.
+  function lockedGameList(value) {
+    return String(value || "").split(",").map(function (v) { return v.trim(); }).filter(Boolean);
+  }
+
   function classHasLockedGameOverride(settings, classId, gameId) {
     if (!["et", "wt"].includes(classId) || !gameId) return false;
     const normalized = normalizeSettings(settings);
-    return normalized.classLockedGameOverride[classId] === String(gameId);
+    return lockedGameList(normalized.classLockedGameOverride[classId]).indexOf(String(gameId)) !== -1;
+  }
+
+  function setClassLockedGame(classId, gameId, keepOpen) {
+    if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
+    gameId = String(gameId || "").trim();
+    if (!gameId) return Promise.reject(new Error("Activity is required."));
+    return readOnce().then(function (settings) {
+      settings.classLockedGameOverride = settings.classLockedGameOverride || { et: "", wt: "" };
+      const list = lockedGameList(settings.classLockedGameOverride[classId]).filter(function (id) { return id !== gameId; });
+      if (keepOpen) list.push(gameId);
+      settings.classLockedGameOverride[classId] = list.join(",");
+      return save(settings);
+    });
   }
 
   function updateClassLockedGameOverride(classId, gameId) {
@@ -820,11 +853,14 @@
     updateSiteEnabled: updateSiteEnabled,
     updateGameEnabled: updateGameEnabled,
     updateClassGameEnabled: updateClassGameEnabled,
+    updateClassesGameEnabled: updateClassesGameEnabled,
     isGameEnabledForClass: isGameEnabledForClass,
     updateStudentGameOverride: updateStudentGameOverride,
     studentHasGameOverride: studentHasGameOverride,
     updateClassLockedGameOverride: updateClassLockedGameOverride,
     classHasLockedGameOverride: classHasLockedGameOverride,
+    setClassLockedGame: setClassLockedGame,
+    lockedGameList: lockedGameList,
     updateClassMode: updateClassMode,
     updateClassLockWindows: updateClassLockWindows,
     getDefaultClassLockWindows: function (classId) {

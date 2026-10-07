@@ -107,20 +107,62 @@ body.exporting .page-tools,body.exporting .activityBoard,body.exporting .mini,bo
 body.exporting .scrap.selected{outline:none!important}
 body.exporting .scrap.clear{border-color:transparent!important}
 .scrap.textbox .tb-text{min-height:60px;outline:none;user-select:text;-webkit-user-select:text;cursor:text;white-space:pre-wrap;overflow-wrap:anywhere}.tb-text:empty:before{content:attr(data-ph);opacity:.5}.tb-move{font-size:11px;font-weight:800;opacity:.6;cursor:move;margin:-4px 0 4px;user-select:none}
+/* Larger animal illustrations in Lesson 3. */
+#c .wordbank.animals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#c .wordbank.animals button.card{min-width:0;padding:10px;font-size:20px;display:flex;flex-direction:column;align-items:center;gap:5px}
+#c .animal-picture{font-size:64px;line-height:1.15}
+#c .side button.animal-tray{font-size:44px;line-height:1.2;min-width:70px;padding:8px}
+#c .scrap.sticker{font-size:80px}
+.teacher-notes-columns{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:16px}
+.teacher-notes-columns h4{margin:0 0 8px}
+.teacher-notes-columns ul,.teacher-notes-columns ol{margin:0 0 18px;padding-inline-start:24px}
+.teacher-notes-columns li{margin-bottom:9px;line-height:1.5}
+.notes .source:empty{display:none}
+@media(max-width:700px){.teacher-notes-columns{grid-template-columns:1fr;gap:6px}}
+.resize-width,.resize-height{position:absolute;width:14px;height:14px;background:#2563eb;border:2px solid white;border-radius:3px;z-index:30;touch-action:none;box-shadow:0 1px 4px #0005}
+.resize-width{right:-8px;top:50%;transform:translateY(-50%);cursor:ew-resize}
+.resize-height{bottom:-8px;left:50%;transform:translateX(-50%);cursor:ns-resize}
+@media print{.resize-width,.resize-height{display:none!important}}
+body.exporting .resize-width,body.exporting .resize-height{display:none!important}
+
+/* HALACHA_SIMAN_HUB_V1 */
+.simanHub{direction:rtl;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;max-width:1050px;margin:34px auto}
+.simanCard{direction:rtl;background:#fff;border:3px solid #b7cfdb;border-radius:22px;padding:24px;text-align:center;box-shadow:0 8px 24px #0001;font-weight:900;color:#173b62;min-height:155px}
+.simanCard:hover:not(.locked){transform:translateY(-2px)}
+.simanCard .big{font-size:44px;display:block;margin-bottom:8px}
+.simanCard.locked{opacity:.62;filter:grayscale(.45);cursor:not-allowed}
+.simanCard .lockline{font-size:12px;margin-top:7px;color:#7b4c12}
+.simanBack{display:none;margin-bottom:12px;border:0;border-radius:10px;padding:9px 12px;background:#173b62;color:#fff;font-weight:900}
+#tabs.siman-tabs{display:none;direction:rtl}
+#tabs .simanTag{display:none}
+
+.halacha-access-panel{display:none;background:#fff8df;border:3px solid #d2aa57;border-radius:16px;padding:14px 16px;margin:0 0 16px;box-shadow:0 4px 14px #0001}
+.teacherMode .halacha-access-panel{display:block}
+.halacha-access-panel h3{margin:0 0 8px;color:#173b62}
+.halacha-access-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 0;border-top:1px solid #e8d9ad}
+.halacha-access-row:first-of-type{border-top:0}.halacha-access-row strong{min-width:120px}
+.halacha-access-buttons{display:flex;gap:6px;flex-wrap:wrap;direction:rtl}
+.halacha-access-buttons button{border:2px solid #b7cfdb;background:#fff;color:#173b62;border-radius:9px;padding:8px 11px;font-weight:900;min-width:92px}
+.halacha-access-buttons button.open{background:#e8f7ec;color:#166534;border-color:#86c995}
+.halacha-access-buttons button.current{background:#173b62;color:#fff;border-color:#173b62;box-shadow:0 0 0 3px #93c5fd}
+.halacha-access-buttons button.locked{background:#f1f5f9;color:#64748b;border-color:#cbd5e1}
+.halacha-access-status{font-size:12px;font-weight:900;color:#173b62;margin-left:auto}
+.halacha-access-note{font-size:12px;color:#64748b;margin-top:7px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="../firebase-config.js"></script>
-<script src="../site-settings.js?v=20261006-halacha-mode"></script>\n<script src="../game-gate.js?v=20261006-lockoverride" data-game-id="halacha" data-back-href="../index.html"></script>
-</head><body><header><div class=bar><h1 id="halachaTitle">📔 My Halacha Scrapbook — סימן א</h1><button id="studentModeBtn" onclick="setHalachaMode(false)">Student</button><button id="teacherModeBtn" style="display:none;background:#fff3bf;color:#5c4300" onclick="setHalachaMode(true)">👨‍🏫 Teacher</button><a class="game-show-link" href="../game-show/teacher.html" target="_blank" rel="noopener">🏆 Game Show</a><button onclick="openExport()">Print / PDF / Slides</button><span id="cloudSaveStatus" style="font-size:12px;font-weight:800;opacity:.9">Saving on this device</span></div></header><main><div id=tabs class=tabs></div><div id=sections></div><div id=review class="section teacherOnly"></div></main><script>
+<script src="../site-settings.js?v=20261006-halacha-mode"></script><script src="../student-class.js?v=20261007-halacha-simanim"></script>\n<script src="../game-gate.js?v=20261006-lockoverride" data-game-id="halacha" data-back-href="../index.html"></script>
+</head><body><header><div class=bar><h1 id="halachaTitle">📔 My Halacha Scrapbook — סימן א</h1><button id="studentModeBtn" onclick="setHalachaMode(false)">Student</button><button id="teacherModeBtn" style="display:none;background:#fff3bf;color:#5c4300" onclick="setHalachaMode(true)">👨‍🏫 Teacher</button><a class="game-show-link" href="../game-show/teacher.html" target="_blank" rel="noopener">🏆 Game Show</a><button onclick="openExport()">Print / PDF / Slides</button><span id="cloudSaveStatus" style="font-size:12px;font-weight:800;opacity:.9">Saving on this device</span></div></header><main><div id="halachaAccessPanelMain" class="halacha-access-panel"><h3>🔒 Student Siman Access</h3><div id="halachaAccessRowsMain">Loading class access…</div><div class="halacha-access-note">Choose the furthest Siman students may open. Earlier Simanim remain open; later Simanim stay locked.</div></div><div id="simanHub" class="simanHub"></div><button id="simanBack" class="simanBack" type="button" onclick="showSimanHub()">← Back to Simanim</button><div id=tabs class="tabs siman-tabs"></div><div id=sections></div><div id=review class="section teacherOnly"></div></main><script>
 const lessons=[
 {id:"a",tab:"1 · שויתי",title:"שויתי ה׳ לנגדי תמיד",seif:"סעיף א",objective:"Develop a constant awareness that Hashem is always present, which shapes one’s behavior in public and in private.",source:"שויתי ה׳ לנגדי תמיד · הכרה תמידית בהשגחת ה׳",qs:["What is the meaning of שויתי ה׳ לנגדי תמיד?","Why is it important to remember Hashem is always with us?","How does this awareness affect how we speak and behave?"],type:"choices",pieces:[["he","שויתי ה׳ לנגדי תמיד"],["text","I remember Hashem wherever I am"],["sticker","🏠"],["sticker","🏫"],["sticker","💬"]]},
 {id:"b",tab:"2 · מודה אני",title:"מודה אני — השבת הנשמה",seif:"סעיף ב",objective:"Understand the importance of thanking Hashem for returning one’s נשמה each morning and how to express it through מודה אני.",source:"אמירת מודה אני והכרת הטוב עם הקימה",qs:["What should a person think about as soon as he wakes up?","Why is it permitted to say מודה אני even before נטילת ידים?","What is the proper pause when saying מודה אני?"],type:"sequence",pieces:[["sticker","🌅"],["text","Thank You for returning my נשמה"],["sticker","💛"]]},
 {id:"c",tab:"3 · ארבע מידות",title:"ארבע מידות בעבודת ה׳",seif:"סעיף ג",objective:"Begin the day with energy and strength and use the four מידות in עבודת ה׳.",source:"ארבע מידות להתנהלות בעבודת ה׳",qs:["What are the four מידות mentioned by יהודה בן תימא?","What does each מידה symbolize?"],type:"match",pieces:[["he","עז כנמר"],["he","קל כנשר"],["he","רץ כצבי"],["he","גיבור כארי"],["sticker","🐆"],["sticker","🦅"],["sticker","🦌"],["sticker","🦁"]]},
 {id:"d",tab:"4 · היצר הרע",title:"מתגברים על היצר הרע",seif:"סעיף ד",objective:"Conquer laziness and excuses and act with bravery and זריזות in עבודת ה׳.",source:"זריזות עם הקימה והתגברות על היצר",qs:["What excuses does the יצר הרע give for not waking up early?","How can we overcome the יצר הרע in the morning?","What lesson does the קיצור שולחן ערוך bring from someone running for money or business?"],type:"comic",pieces:[["text","I can overcome an excuse!"],["sticker","⏰"],["sticker","💪"]]},
 {id:"e",tab:"5 · לילה",title:"עבודת ה׳ בלילה ותיקון חצות",seif:"סעיף ה",objective:"Appreciate the greatness of nighttime Torah study and תיקון חצות, and its spiritual rewards.",source:"השכמה בחצות וחשיבות לימוד תורה בלילה",qs:["What is the ideal time for תיקון חצות?","What should one do if he cannot wake at חצות?","Why is learning Torah at night so special?","What is meant by משנה – אותיות נשמה?"],type:"night",pieces:[["he","תיקון חצות"],["he","משנה ↔ נשמה"],["sticker","🌙"],["sticker","⭐"],["sticker","📖"]]},
-{id:"f",tab:"6 · נעגל וואסער",title:"נעגל וואסער — נטילת ידים בבוקר",seif:"נעגל וואסער",objective:"Learn to prepare for נעגל וואסער before sleep, how it is done, and the two reasons we wash our hands every morning.",source:"הכנת נעגל וואסער ונטילת ידים עם הקימה",qs:["What do we prepare near our bed before we go to sleep?","How do we wash נעגל וואסער, and how many times?","Is there a ברכה at this time?","What are the two reasons we wash every morning?","Why do we not touch before washing?"],type:"nigel",pieces:[["he","נעגל וואסער"],["sticker","💧"],["sticker","🛏️"],["sticker","🥣"],["text","I prepare my נעגל וואסער before I go to sleep"]]}
+{id:"f",tab:"6 · נעגל וואסער",title:"נעגל וואסער — נטילת ידים בבוקר",seif:"נעגל וואסער",objective:"Learn to prepare for נעגל וואסער before sleep, how it is done, and the two reasons we wash our hands every morning.",source:"הכנת נעגל וואסער ונטילת ידים עם הקימה",qs:["What do we prepare near our bed before we go to sleep?","How do we wash נעגל וואסער, and how many times?","Is there a ברכה at this time?","What are the two reasons we wash every morning?","Why do we not touch before washing?"],type:"nigel",pieces:[["he","נעגל וואסער"],["sticker","💧"],["sticker","🛏️"],["sticker","🥣"],["text","I prepare my נעגל וואסער before I go to sleep"]]},
+{"id":"s2a","siman":"ב","tab":"1 · טעם הנטילה","title":"טעם ומצוות נטילה בבוקר","seif":"סעיפים א–ב","objective":"Understand the spiritual reasons and morning obligations upon waking, including נטילת ידים and wearing ציצית.","sourceText":"סעיף א – כעבודת כהן וכדי להסיר רוח רעה. סעיף ב – לבישת טלית קטן לפני הליכה ד׳ אמות.","bringout":["Compare waking in the morning to beginning a new day of עבודת ה׳.","Review the רוח רעה on the hands and the comparison to the כהנים washing from the כיור.","Bring out the morning obligation of טלית קטן."],"qs":["What is a person compared to when waking up?","What rests on the hands in the morning?","How is the נטילה done to remove the טומאה?","What should be the first garment worn in the morning?","Why don’t we say a ברכה immediately on לבישת טלית קטן?"],"type":"quick","q":"What rests on the hands in the morning?","opts":["רוח רעה","Only ordinary dirt","Nothing at all"],"ans":0,"pieces":[["he","נטילת ידים"],["he","רוח רעה"],["sticker","💧"],["sticker","👕"]]},{"id":"s2b","siman":"ב","tab":"2 · סדר הנטילה","title":"מעשה הנטילה ודינים נלווים","seif":"סעיפים ג–ה","objective":"Review the practical steps and halachic requirements of נטילת ידים, including the use of כלי, placement of מים, and related prohibitions.","sourceText":"סעיף ג – סדר הנטילה, רחיצת הפנים והפה. סעיף ד – שימוש בכלי ואיסור הנאה ממים. סעיף ה – איברים שאסור לגעת בהם לפני נטילה.","bringout":["Walk through the order of pouring on the hands.","Review use of a כלי and what is done with the used water.","Review what else is washed and what may not be touched before נטילה."],"qs":["What is the correct order of pouring water on the hands?","Until where should the hands be washed ideally?","What is important to wash besides one’s hands?","What must the water be poured from?","Why can't we benefit from the water?","Where should the used water be poured?","Which body parts should not be touched before נטילת ידים?"],"type":"quick","q":"What must the water be poured from?","opts":["A כלי","Only directly from a faucet","A paper towel"],"ans":0,"pieces":[["he","כלי"],["he","נטילה"],["sticker","🥣"],["sticker","💦"]]},{"id":"s2c","siman":"ב","tab":"3 · הידורים וברכה","title":"הידורים, ברכה, וספק נטילה","seif":"סעיפים ו–ח","objective":"Understand the preferred way to perform נטילת ידים, proper timing for the ברכה, and what to do in cases of doubt.","sourceText":"סעיף ו – הידור בכוח גברא ובמים כשירים. סעיף ז – זמן הברכה לאחר עשיית צרכיו. סעיף ח – מקרה של ספק אם שורה רוח רעה.","bringout":["Distinguish לכתחילה from situations of need.","Teach כוח גברא and suitable water.","Review the timing of the morning ברכות and cases of doubt."],"qs":["What are לכתחילה requirements for נטילת שחרית?","What may one do if proper water or a כלי isn’t available?","When should one use snow or a river?","When is it proper to say brochos of נטילת ידים, אשר יצר etc?","Does someone who didn’t sleep need נטילה?","What if one went back to sleep briefly after waking?"],"type":"quick","q":"This lesson especially distinguishes between…","opts":["לכתחילה and situations of need","Weekdays and Yom Tov only","Children and adults only"],"ans":0,"pieces":[["he","לכתחילה"],["he","ברכה"],["sticker","✨"],["sticker","❓"]]},{"id":"s2d","siman":"ב","tab":"4 · מתי נוטלים","title":"מצבים נוספים הטעונים נטילה","seif":"סעיף ט","objective":"Familiarize students with various situations that require נטילת ידים beyond sleeping.","sourceText":"סעיף ט – מעשים שמחייבים נטילה.","bringout":["Use the workbook list to sort situations that require washing from those that do not.","Include touching covered places, cutting nails or hair, leaving a bathroom or bathhouse, and visiting a cemetery or levaya."],"qs":["Name five activities after which one must wash hands.","What is required after touching places typically covered?","What’s the הלכה after visiting a בית קברות or cutting nails?"],"type":"quick","q":"Which is one situation mentioned that requires washing?","opts":["After cutting nails","After opening a book","After putting on a coat"],"ans":0,"pieces":[["he","מצבים הטעונים נטילה"],["sticker","✂️"],["sticker","👐"],["sticker","🚪"]]},{"id":"s3a","siman":"ג","tab":"1 · צניעות","title":"הצניעות בלבוש ובהתנהגות","seif":"סעיף א","objective":"Understand how צניעות applies even in private situations and its connection to יראת שמים.","sourceText":"סעיף א – להקפיד שלא לגלות את הגוף גם בפרטיות, ולזכור שה׳ רואה הכל.","bringout":["Connect private behavior with the awareness that Hashem sees everywhere.","Use the workbook questions: What is צניעות? Why does it matter if I am alone? Where are good places to get dressed?"],"qs":["Why must one be careful about how they dress even when alone?","What is meant by מלא כל הארץ כבודו?","What does צניעות lead to?"],"type":"quick","q":"Does צניעות apply when a person is alone?","opts":["Yes","No","Only on Shabbos"],"ans":0,"pieces":[["he","צניעות"],["he","יראת שמים"],["sticker","🏠"],["sticker","👔"]]},{"id":"s3b","siman":"ג","tab":"2 · חוקות הגויים","title":"איסור חיקוי הגויים ולבוש פרוץ","seif":"סעיף ב","objective":"Identify the dangers of copying non-Jewish styles and the importance of humility and separation.","sourceText":"סעיף ב – איסור הליכה בחוקות הגויים ובבגדים פרוצים או יהירים.","bringout":["Use the workbook phrase ובחוקותיהם לא תלכו.","Discuss three examples of ways a Yid does not copy the ways of the גויים.","Bring out that a Yid’s clothing should reflect Jewish identity and humility."],"qs":["What kind of clothing is prohibited due to חוקות הגויים?","Is it forbidden to imitate even shoelace styles or colors?","How should a Yid present himself through his clothing?"],"type":"quick","q":"A Yid’s clothing should reflect…","opts":["Jewish identity and humility","Whatever gets the most attention","Only the newest fashion"],"ans":0,"pieces":[["he","ובחוקותיהם לא תלכו"],["he","ענוה"],["sticker","👞"],["sticker","🧥"]]},{"id":"s3c","siman":"ג","tab":"3 · פשטות וכבוד","title":"שיווי משקל בין פשטות לכבוד","seif":"סעיף ג","objective":"Understand the balance between כבוד האדם and avoiding גאווה through clothing.","sourceText":"סעיף ג – לא ללבוש בגדים יקרים מדי ולא בגדים מבוזים.","bringout":["Use the workbook mirror words to discuss which descriptions fit Jewish clothing.","Teach the balance between respectable, clean clothing and avoiding showiness or גאווה."],"qs":["Why should one avoid both overly expensive and degraded clothing?","What rule is given about buying shoes?"],"type":"quick","q":"The lesson teaches a balance between…","opts":["Respectable clothing and avoiding גאווה","Always wearing the most expensive clothing","Not caring how clothing looks"],"ans":0,"pieces":[["he","כבוד האדם"],["he","גאווה"],["sticker","⚖️"],["sticker","👞"]]},{"id":"s3d","siman":"ג","tab":"4 · ימין ושמאל","title":"קדימת הימין בלבישה","seif":"סעיף ד","objective":"Learn the proper סדר when dressing, based on חשיבות הימין and מצות תפילין.","sourceText":"סעיף ד – הלכות קדימה בלבישת בגדים ונעליים.","bringout":["Practice the shoe sequence from the workbook.","Explain why tying or buckling the left shoe has a special priority because of תפילין."],"qs":["What part of the body is dressed first – שמאל or ימין?","Why is tying done on the שמאל first?","How does this apply to shoes?"],"type":"quick","q":"Which side is generally given priority when putting clothing on?","opts":["ימין","שמאל","There is never any order"],"ans":0,"pieces":[["he","ימין"],["he","שמאל"],["sticker","👟"],["sticker","➡️"]]},{"id":"s3e","siman":"ג","tab":"5 · זהירות","title":"סימני זהירות והתנהגות","seif":"סעיפים ה–ח","objective":"Inculcate behaviors that reflect a Jewish way of humility, כבוד שמים, and careful conduct.","sourceText":"סעיף ה – לא ללבוש שני בגדים יחד (מפני שכחה). סעיף ו – איסור גילוי ראש בארבע אמות ובדברי קדושה. סעיף ז – ללכת בקומה זקופה בגבול הנדרש. סעיף ח – לא ללכת בין שתי נשים או שני כלבים/חזירים.","bringout":["Review the separate cautions in these סעיפים.","Connect them to a Jewish way of dressing and behaving with כבוד שמים and זהירות."],"qs":["What is the concern with wearing two garments at once?","Why must the ראש be covered even for children?","What is the balance between זקיפות קומה and ענוה?","What types of beings should a man not walk between, or let pass between them?"],"type":"quick","q":"What concern is given for putting on two garments together?","opts":["שכחה","It changes their color","It makes them too warm"],"ans":0,"pieces":[["he","כבוד שמים"],["he","זהירות"],["sticker","🧢"],["sticker","⚠️"]]},{"id":"s4a","siman":"ד","tab":"1 · בל תשקצו","title":"הרגלי צניעות וניקיון","seif":"סעיף א","objective":"Understand the importance of proper hygiene, cleanliness, and care for one's body in halacha.","sourceText":"הרגל לפנות בבוקר ובערב הוא מידה טובה של זריזות וניקיון. המשהה נקביו עובר בבל תשקצו ולעיתים גם לא יהיה בך עקר.","bringout":["Teach the importance of not delaying bodily needs.","Connect this with cleanliness and proper care of the body."],"qs":["When does one transgress the prohibition of בל תשקצו?","What should a person do if he cannot relieve himself right away?"],"type":"quick","q":"What prohibition is mentioned when a person improperly delays his needs?","opts":["בל תשקצו","בל תוסיף","לא תחמוד"],"ans":0,"pieces":[["he","בל תשקצו"],["he","ניקיון"],["sticker","🧼"],["sticker","⏱️"]]},{"id":"s4b","siman":"ד","tab":"2 · צניעות","title":"צניעות והלכות פניה","seif":"סעיף ב","objective":"Review modesty-related halachos while relieving oneself, especially in open areas.","sourceText":"יש לנהוג בצניעות בפניה – לא לגלות יתר על המידה. אין לפנות מול אנשים, אפילו גויים. אסור לפנות בין מזרח למערב אלא אם יש מחיצה.","bringout":["Keep the lesson matter-of-fact and age-appropriate.","Emphasize privacy, modesty, and the directional rule in an open area."],"qs":["Why is privacy important when using the bathroom?","What directional restriction is taught for an open area?"],"type":"quick","q":"The main theme of this סעיף is…","opts":["צניעות and privacy","Eating carefully","Getting dressed"],"ans":0,"pieces":[["he","צניעות"],["he","פרטיות"],["sticker","🚪"],["sticker","🧱"]]},{"id":"s4c","siman":"ד","tab":"3 · אופן הפניה","title":"אופן הפניה ושמירה על ניקיון","seif":"סעיף ג","objective":"Understand the physical and spiritual risks of improper behavior during relieving oneself.","sourceText":"אין לפנות בעמידה או לאנוס את עצמו יתר על המידה. יש לוודא סיום הפניה כדי שלא יצטרך לשוב מיד.","bringout":["Review proper and careful bathroom conduct without unnecessary detail.","Use the supplied review questions to reinforce the practical rules."],"qs":["Is it forbidden to relieve oneself while standing?","What should one avoid when using the bathroom?","Is one forbidden to hold his mila?"],"type":"quick","q":"This סעיף emphasizes using the bathroom…","opts":["Carefully and properly","As quickly as possible no matter what","Only at one set time"],"ans":0,"pieces":[["he","ניקיון"],["he","זהירות"],["sticker","✅"],["sticker","🧼"]]},{"id":"s4d","siman":"ד","tab":"4 · מחשבה","title":"מחשבה בבית הכסא","seif":"סעיף ד","objective":"Know what one may and may not think about in the bathroom.","sourceText":"בבית הכסא אסור להרהר בדברי תורה. בשבת – יחשוב בדברים ניטרליים.","bringout":["Distinguish Torah thoughts from neutral thoughts.","Include the special Shabbos note from the lesson plan."],"qs":["What thoughts are forbidden in the bathroom?","What should one think about instead of Torah?","What should one think about on Shabbos?"],"type":"quick","q":"Which thoughts are forbidden in the bathroom?","opts":["דברי תורה","Neutral everyday matters","Thinking about the weather"],"ans":0,"pieces":[["he","דברי תורה"],["he","מחשבה"],["sticker","💭"],["sticker","🚫"]]},{"id":"s4e","siman":"ד","tab":"5 · קינוח","title":"דיני קינוח","seif":"סעיף ה","objective":"Learn the halachos of proper cleaning after relieving oneself.","sourceText":"צריך לקנח היטב, כי שיירי צואה מונעים אמירת דברים שבקדושה. לא יקנח ביד ימין או באצבע שמניחים עליה תפילין.","bringout":["Stress cleanliness as preparation for דברים שבקדושה.","Review which hand should not be used and why."],"qs":["Which hand should not be used for cleaning and why?","Why is cleanliness so crucial after relieving oneself?","What should a left-handed person do?"],"type":"quick","q":"Why is proper cleaning especially important?","opts":["So one may say דברים שבקדושה properly","Only so clothing stays neat","There is no particular reason"],"ans":0,"pieces":[["he","נקיות"],["he","דברים שבקדושה"],["sticker","🧼"],["sticker","✨"]]},{"id":"s4f","siman":"ד","tab":"6 · אשר יצר","title":"ברכת אשר יצר","seif":"סעיף ו","objective":"Review the halachos of the Asher Yatzar blessing and when it should be said.","sourceText":"אחרי כל פניה או הטלת מים — even a drop — מברך אשר יצר. אם שכח לברך בפעם הראשונה, יברך רק פעם אחת לאחר מכן.","bringout":["Practice when אשר יצר is said.","Review what happens if it was forgotten after a previous bathroom use.","Review when to wait until one is completely finished."],"qs":["When must one recite Asher Yatzar?","What is the halacha if he forgot to say it after the previous bathroom use?","When should one delay the bracha until after finishing completely?"],"type":"quick","q":"When is אשר יצר recited?","opts":["After using the bathroom","Before going to sleep only","Only after breakfast"],"ans":0,"pieces":[["he","אשר יצר"],["he","ברכה"],["sticker","🙏"],["sticker","✨"]]},{"id":"s6a","siman":"ו","tab":"1 · כוונה","title":"כוונה ומחשבה בעת הברכה","seif":"סעיף א","objective":"Understand the importance of having כוונה when saying a ברכה and preparing one’s thoughts beforehand.","sourceText":"צריך לדעת מראש איזו ברכה מברך. יש לכוון פירוש המילים ולומר בקול רם. אין לעשות פעולה תוך כדי הברכה.","bringout":["Pause before the ברכה to know which ברכה is being said.","Understand the words, say them aloud, and avoid doing something else at the same time."],"qs":["What must a person know before mentioning Hashem’s name in a brochah?","What should a person avoid doing during a ברכה?","Why is it important to say ברכות aloud?"],"type":"quick","q":"Before beginning a ברכה, a person should…","opts":["Know which ברכה he is saying","Start first and think later","Be doing another activity"],"ans":0,"pieces":[["he","כוונה"],["he","ברכה"],["sticker","🧠"],["sticker","💬"]]},{"id":"s6b","siman":"ו","tab":"2 · נקיות הפה","title":"ניקיון הפה בשעת הברכה","seif":"סעיף ב","objective":"Learn that the mouth must be clean and empty when saying a ברכה.","sourceText":"אין לברך עם רוק או דבר אחר בתוך הפה. ימלא פי תהלתך – פי נקי בשעת שבח.","bringout":["Connect physical cleanliness of the mouth with praising Hashem properly.","Use the פסוק ימלא פי תהלתך from the lesson plan."],"qs":["What must be removed from the mouth before saying a ברכה?","Which פסוק teaches this idea?"],"type":"quick","q":"When saying a ברכה, the mouth should be…","opts":["Clean and empty","Full of food","Covered so nobody hears"],"ans":0,"pieces":[["he","ימלא פי תהלתך"],["he","פי נקי"],["sticker","👄"],["sticker","✨"]]},{"id":"s6c","siman":"ו","tab":"3 · שם שמים","title":"איסור הזכרת שם שמים לבטלה","seif":"סעיף ג","objective":"Recognize the seriousness of saying Hashem’s name in vain and learn the proper ways to refer to it.","sourceText":"איסור לומר או לכתוב שם ה׳ לבטלה, גם בלשון אחרת. גם כינויים של ה׳ בכלל האיסור. אין לומר אדושם, ואין לכתוב אדיע או d-G.","bringout":["Use the exact examples supplied by the lesson plan.","Stress respect for Hashem’s name in speech and writing."],"qs":["When is it allowed to say Hashem’s name?","What is a כינוי of Hashem, and are they also included in the איסור?","What is the halacha about writing Hashem’s name in other languages?"],"type":"quick","q":"The lesson teaches that Hashem’s name must be treated with…","opts":["Respect and care","Casualness","No special care"],"ans":0,"pieces":[["he","שם שמים"],["he","כבוד"],["sticker","⚠️"],["sticker","✍️"]]},{"id":"s6d","siman":"ו","tab":"4 · ברכה לבטלה","title":"ברכה לבטלה או שאינה צריכה","seif":"סעיף ד","objective":"Understand what makes a ברכה forbidden and what to do if one said a ברכה לבטלה.","sourceText":"יש להימנע מברכה מיותרת. אם בירך בטעות – יאמר ברוך שם... אם התחיל – ישלימו ללימוד. אם התחיל שם ה׳ – ישלים פסוק מתאים.","bringout":["Teach prevention of an unnecessary ברכה.","Review the corrective responses listed for different points at which the mistake is noticed."],"qs":["What should a person do if he accidentally said a ברכה לבטלה?","What should he say if he realized his mistake in the middle of the brochah?","What should he say if he started the word אלוקינו and then remembered?"],"type":"quick","q":"A person should avoid making…","opts":["An unnecessary ברכה","Any ברכה aloud","A ברכה before food"],"ans":0,"pieces":[["he","ברכה לבטלה"],["he","ברוך שם"],["sticker","🛑"],["sticker","💬"]]},{"id":"s6e","siman":"ו","tab":"5 · סכנה","title":"שתיית מים כשיש סכנה","seif":"סעיף ה","objective":"Learn what to do if danger is discovered right after making a ברכה.","sourceText":"אם כבר בירך – ישתה מעט כדי לא לבטל את הברכה. לא לפחד, כי שומר מצוה לא ידע דבר רע.","bringout":["Present the specific case from the lesson plan.","Bring out that if the ברכה was already made, one drinks a little rather than make it לבטלה."],"qs":["What should be done if someone said a ברכה on water and then heard there's a מת in the area?"],"type":"quick","q":"If the ברכה was already made in the case described, the lesson says to…","opts":["Drink a little","Throw everything away without drinking","Say the ברכה again"],"ans":0,"pieces":[["he","שומר מצוה לא ידע דבר רע"],["sticker","🥤"],["sticker","🛡️"]]},{"id":"s6f","siman":"ו","tab":"6 · ספק","title":"ספק אם בירך","seif":"סעיף ו","objective":"Know the halacha when unsure if a ברכה was already said.","sourceText":"אם מסופק אם בירך – לא חוזר ומברך. יוצא מן הכלל: ברכת המזון (בסימן מד).","bringout":["Teach the general rule not to repeat a doubtful ברכה.","Clearly identify the ברכת המזון exception noted in the lesson plan."],"qs":["If someone is unsure whether he said a ברכה, what should he do?","Does this apply to all ברכות?"],"type":"quick","q":"If someone is unsure whether he already said a ברכה, generally he…","opts":["Does not repeat it","Always repeats it","Says it three times"],"ans":0,"pieces":[["he","ספק ברכות"],["he","לא חוזר ומברך"],["sticker","❓"],["sticker","🚫"]]},{"id":"s6g","siman":"ו","tab":"7 · מאה ברכות","title":"מאה ברכות בכל יום","seif":"סעיף ז","objective":"Understand the requirement to say 100 ברכות each day and where it comes from.","sourceText":"חובה מדרבנן לומר ק׳ ברכות בכל יום. מקור מהפסוק: מה ה׳ אלוקיך שואל → מאה.","bringout":["Make the number 100 memorable.","Review the hint from מה to מאה exactly as supplied in the lesson plan."],"qs":["Who established the idea of saying 100 ברכות daily?","What פסוק hints to this idea?"],"type":"quick","q":"How many ברכות is the daily goal taught here?","opts":["100","10","18"],"ans":0,"pieces":[["he","מאה ברכות"],["he","מה → מאה"],["sticker","💯"],["sticker","💬"]]},{"id":"s6h","siman":"ו","tab":"8 · עונים לברכה","title":"דין שמיעת ברכה","seif":"סעיף ח","objective":"Learn what to say when hearing a ברכה from someone else.","sourceText":"שומע ברכה – אומר ברוך הוא וברוך שמו ואחר כך אמן. אמן = אמת, ויש לכוון בברכות שהן גם תפילה.","bringout":["Practice the responses in order.","Teach the meaning of אמן and the extra כוונה for a ברכה that is also a תפילה."],"qs":["What do we respond when we hear someone say a ברכה?","What does the word אמן mean?","What extra כוונה should be had when answering אמן to a ברכה that is also a תפילה?"],"type":"quick","q":"What does אמן mean according to this lesson?","opts":["אמת","שלום","תודה"],"ans":0,"pieces":[["he","ברוך הוא וברוך שמו"],["he","אמן = אמת"],["sticker","👂"],["sticker","💬"]]},{"id":"s6i","siman":"ו","tab":"9 · הפסק","title":"מקומות שאין להפסיק","seif":"סעיף ט","objective":"Learn when not to say ברוך הוא וברוך שמו.","sourceText":"אם אסור להפסיק – לא יאמר ברוך הוא וברוך שמו. בברכה שיוצא בה ידי חובה – גם לא יפסיק.","bringout":["Teach that a normally appropriate response can become an improper interruption in certain places.","Review the case of a ברכה through which one is being יוצא."],"qs":["Is it sometimes forbidden to say ברוך הוא וברוך שמו?","When is there a problem because of a הפסק?"],"type":"quick","q":"If one is in a place where interrupting is forbidden, he should…","opts":["Not say ברוך הוא וברוך שמו","Always say it anyway","Repeat the whole ברכה"],"ans":0,"pieces":[["he","הפסק"],["he","ברוך הוא וברוך שמו"],["sticker","🤫"],["sticker","🚫"]]},{"id":"s6j","siman":"ו","tab":"10 · אמן","title":"אמירת אמן כראוי","seif":"סעיף י","objective":"Understand how and when to say אמן properly.","sourceText":"אין לחטוף את האל״ף או לבלוע את הנו״ן. לא להקדים את האמן או לאחר יותר מדי. לא לענות בקול רם יותר מהמברך.","bringout":["Practice a clear, properly timed אמן.","Identify the timing, pronunciation, and volume mistakes listed in the lesson plan."],"qs":["What is an אמן חטופה or יתומה?","When exactly should אמן be said?","Can the אמן be said louder than the ברכה?"],"type":"quick","q":"A proper אמן should be…","opts":["Clear and at the proper time","Rushed and swallowed","Louder than the person making the ברכה"],"ans":0,"pieces":[["he","אמן"],["he","בזמן הנכון"],["sticker","⏰"],["sticker","💬"]]},{"id":"s6k","siman":"ו","tab":"11 · אמן על עצמו","title":"עניית אמן על ברכת עצמו","seif":"סעיף יא","objective":"Learn when one may or may not answer אמן to his own ברכה.","sourceText":"אין לענות אמן על ברכת עצמו (חוץ מבונה ירושלים). אם סיים יחד עם הש״ץ – לא יענה. אם כל אחד סיים ברכה אחרת – כן יענה.","bringout":["Teach the general rule and the בונה ירושלים exception.","Review the two cases involving finishing together with the שליח ציבור."],"qs":["May someone answer אמן to their own ברכה?","What is the exception?","What happens if he finishes at the same time as the שליח ציבור?"],"type":"quick","q":"What is the exception mentioned for answering אמן to one’s own ברכה?","opts":["בונה ירושלים","שהכל","בורא פרי העץ"],"ans":0,"pieces":[["he","בונה ירושלים"],["he","אמן"],["sticker","🏙️"],["sticker","💬"]]}
 ];
 
 const HALACHA_PARAMS=new URLSearchParams(location.search);
@@ -129,8 +171,9 @@ const HALACHA_TEACHER_LESSON=HALACHA_PARAMS.get("teacher")==="1";
 const HALACHA_TEACHER_PREVIEW=HALACHA_TEACHER_LESSON||!!HALACHA_TEACHER_VIEW;
 const HALACHA_STUDENT_ID=String(HALACHA_TEACHER_VIEW||(HALACHA_TEACHER_LESSON?"":localStorage.getItem("b3Games_studentId")||"")).trim();
 const HALACHA_LOCAL_KEY="halachaV14"+(HALACHA_STUDENT_ID?":"+HALACHA_STUDENT_ID:"");
-let S={};try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY)||"{}")}catch(e){}
+let S={};try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY+(HALACHA_TEACHER_LESSON?"_teacher":""))||"{}")}catch(e){}
 let halachaDb=null,cloudSaveTimer=null;
+let teacherAccountUid="",teacherCloudReady=false,teacherDirty=false;
 try{
  if(window.firebase&&window.B3_FIREBASE_CONFIG){
    if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
@@ -138,15 +181,23 @@ try{
  }
 }catch(e){console.warn("Halacha cloud save unavailable",e)}
 function cloudPath(){
+ if(HALACHA_TEACHER_LESSON)return teacherAccountUid?"b3Games/teachers/"+teacherAccountUid+"/halacha/siman1":null;
  return HALACHA_STUDENT_ID?"b3Games/students/"+HALACHA_STUDENT_ID+"/halacha/siman1":null;
 }
 function setSaveStatus(msg){let x=document.getElementById("cloudSaveStatus");if(x)x.textContent=msg}
 function save(){
  if(HALACHA_TEACHER_VIEW){setSaveStatus("Teacher view — student work is read only");return}
  if(HALACHA_TEACHER_LESSON){
-   try{localStorage.setItem(HALACHA_LOCAL_KEY+"_teacher",JSON.stringify(S))}catch(e){}
-   setSaveStatus("Teacher lesson copy saved on this device");
-   return
+   teacherDirty=true;
+   try{localStorage.setItem(HALACHA_LOCAL_KEY+"_teacher",JSON.stringify(S));if(teacherAccountUid)localStorage.setItem("halachaTeacherPending:"+teacherAccountUid,JSON.stringify(S))}catch(e){}
+   try{localStorage.setItem(teacherAccountUid?"halachaV14_teacher:"+teacherAccountUid:HALACHA_LOCAL_KEY+"_teacher",JSON.stringify(S))}catch(e){}
+   if(!teacherCloudReady||!cloudPath()){setSaveStatus("Teacher copy saved on this device ? connecting to account?");return}
+   setSaveStatus("Saving teacher copy?");clearTimeout(cloudSaveTimer);
+   const state=JSON.parse(JSON.stringify(S));
+   halachaDb.ref(cloudPath()).set({version:1,updatedAt:firebase.database.ServerValue.TIMESTAMP,state})
+    .then(()=>{if(JSON.stringify(S)===JSON.stringify(state)){teacherDirty=false;localStorage.removeItem("halachaTeacherPending:"+teacherAccountUid)}setSaveStatus("Teacher copy saved to my account")})
+    .catch(e=>{console.warn("Teacher cloud save failed",e);setSaveStatus("Teacher copy saved on this device ? account save failed")});
+   return;
  }
  try{localStorage.setItem(HALACHA_LOCAL_KEY,JSON.stringify(S))}catch(e){}
  if(!halachaDb||!cloudPath()){setSaveStatus("Saved on this device");return}
@@ -159,11 +210,7 @@ function save(){
  },350);
 }
 async function loadCloudHalacha(){
- if(HALACHA_TEACHER_LESSON){
-   try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY+"_teacher")||"{}")}catch(e){}
-   setSaveStatus("Teacher lesson mode");
-   return
- }
+ if(HALACHA_TEACHER_LESSON){await loadTeacherCopy();return}
  if(!halachaDb||!cloudPath()){setSaveStatus("Saved on this device");return}
  try{
    setSaveStatus("Loading my scrapbook…");
@@ -183,7 +230,33 @@ async function loadCloudHalacha(){
  }catch(e){console.warn("Halacha cloud load failed",e);setSaveStatus("Saved on this device")}
 }
 
+async function loadTeacherCopy(){
+ const user=window.firebase&&firebase.auth().currentUser;
+ if(!user||!halachaDb){setSaveStatus("Teacher copy saved on this device ? sign in to sync");return}
+ teacherAccountUid=user.uid;
+ const key="halachaV14_teacher:"+user.uid;
+ setSaveStatus("Loading teacher copy from my account?");
+ try{
+  const snap=await halachaDb.ref(cloudPath()).once("value"),row=snap.val();
+  const pending=localStorage.getItem("halachaTeacherPending:"+user.uid);
+  if(pending&&!teacherDirty){S=JSON.parse(pending);teacherDirty=true}
+  if(!teacherDirty){
+   if(row&&row.state)S=row.state;
+   else{const local=localStorage.getItem(key);if(local)S=JSON.parse(local)}
+   localStorage.setItem(key,JSON.stringify(S));
+   const current=document.querySelector(".section.on"),id=current?current.id:"";
+   closeCustomizer();sections.innerHTML="";lessons.forEach(render);
+   if(id&&lessons.some(l=>l.id===id)){const l=lessons.find(x=>x.id===id);CURRENT_SIMAN=simanOfLesson(l);openSiman(CURRENT_SIMAN);show(id)}else showSimanHub();
+  }
+  teacherCloudReady=true;
+  if(!row||!row.state||teacherDirty)save();
+  else setSaveStatus("Teacher copy saved to my account");
+ }catch(e){console.warn("Teacher cloud load failed",e);setSaveStatus("Teacher copy saved on this device ? account sync unavailable")}
+}
+
 function teacherSource(id){
+ const lesson=lessons.find(l=>l.id===id);
+ if(lesson&&lesson.sourceText)return '<b>Lesson-plan source</b><br><br>'+lesson.sourceText;
  const x={
  a:`<b>קיצור שולחן ערוך — סעיף א</b><br><br>שִׁוִיתִי ה' לְנֶגְדִּי תָמִיד, הוּא כְּלָל גָּדוֹל בַּתּוֹרָה וּבְמַעֲלוֹת הַצַּדִּיקִים אֲשֶׁר הוֹלְכִים לִפְנֵי הָאֱלֹהִים. כִּי אֵין יְשִׁיבַת הָאָדָם תְּנוּעָתוֹ וַעֲסָקָיו וְהוּא לְבַדּוֹ בְּבֵיתוֹ, כְּמוֹ יְשִׁיבָתוֹ וּתְנוּעָתוֹ וַעֲסָקָיו כַּאֲשֶׁר הוּא לִפְנֵי מֶלֶךְ גָּדוֹל... כָּל שֶׁכֵּן כַּאֲשֶׁר יָשִׂים הָאָדָם אֶל לִבּוֹ כִּי הַמֶּלֶךְ הַגָּדוֹל הַקָּדוֹשׁ בָּרוּךְ הוּא... עוֹמֵד עָלָיו וְרוֹאֶה בְמַעֲשָׂיו... בְּוַדַּאי מִיָּד תַּגִּיעַ אֵלָיו הַיִּרְאָה וְהַהַכְנָעָה...`,
  b:`<b>קיצור שולחן ערוך — סעיף ב</b><br><br>וּמִיָּד כְּשֶׁיֵּעוֹר מִשְּׁנָתוֹ יִזְכֹּר חַסְדֵי ה'... שֶׁהֶחֱזִיר לוֹ אֶת נִשְׁמָתוֹ... וּבְעוֹדוֹ עַל מִשְׁכָּבוֹ, יֹאמַר, מוֹדֶה אֲנִי לְפָנֶיךָ מֶלֶךְ חַי וְקַיָּם שֶׁהֶחֱזַרְתָּ בִּי נִשְׁמָתִי בְּחֶמְלָה, רַבָּה אֱמוּנָתֶךָ. וְאַף עַל פִּי שֶׁעֲדַיִן אֵין יָדָיו נְקִיּוֹת, יָכוֹל לוֹמַר זֹאת, כֵּיוָן שֶׁאֵין בּוֹ שֵׁם. וְיַפְסִיק מְעַט בֵּין תֵּבַת בְּחֶמְלָה לְתֵבַת רַבָּה.`,
@@ -191,27 +264,100 @@ function teacherSource(id){
  d:`<b>קיצור שולחן ערוך — סעיף ד</b><br><br>לָכֵן צָרִיךְ הָאָדָם לְהִתְגַּבֵּר כַּאֲרִי... יָקוּם בִּזְרִיזוּת... קֹדֶם שֶׁיִּתְגַּבֵּר עָלָיו הַיֵּצֶר הָרַע בְּטַעֲנוֹת וְתוֹאֲנוֹת... בַּחֹרֶף, אֵיךְ תָּקוּם עַתָּה... וְהַקֹּר גָּדוֹל. וּבַקַּיִץ... וַעֲדַיִן לֹא שָׂבַעְתָּ מִשְּׁנָתֶךָ... אִם הָיָה קוֹרֵא אוֹתוֹ אֵיזֶה אָדָם לְאֵיזֶה עֵסֶק שֶׁיַּרְוִיחַ בּוֹ מָמוֹן... בְּוַדַּאי הָיָה זָרִיז לָקוּם מִיָּד... עַל אַחַת כַּמָּה וְכַמָּה לַעֲבוֹדַת מֶלֶךְ מַלְכֵי הַמְּלָכִים...`,
  e:`<b>קיצור שולחן ערוך — סעיף ה</b><br><br>אִם אֶפְשָׁר לוֹ לְהַשְׁכִּים וְלָקוּם בַּחֲצוֹת הַלַּיְלָה לַעֲרֹךְ אָז תִּקּוּן חֲצוֹת, מַה טּוֹב... וְאִם אִי אֶפְשָׁר לוֹ לָקוּם בַּחֲצוֹת, יִתְגַּבֵּר עַל כָּל פָּנִים לָקוּם קֹדֶם עֲלוֹת הַשָּׁחַר... וְאַחַר כָּךְ יַעֲסֹק בַּתּוֹרָה... וְשִׁעוּר מִשְׁנָיוֹת קוֹדֵם לְכָל דָּבָר, וְעַל יְדֵי זֶה זוֹכֶה לִנְשָׁמָה, מִשְׁנָה אוֹתִיּוֹת נְשָׁמָה... וְטוֹב מְעַט בְּכַוָּנָה, מֵהַרְבּוֹת בְּלֹא כַוָּנָה.`}; return x[id]||'';
 }
-function teacherPoint(id){return ({a:'Compare how a person naturally behaves alone at home with how he behaves before a great king. Then bring out the Kitzur’s kal vachomer: awareness that Hashem sees our actions changes both behavior and speech.',b:'Focus on gratitude immediately upon waking: Hashem returned the נשמה refreshed. Teach why מודה אני may be said before washing and the pause between בחמלה and רבה.',c:'Do not stop at identifying the animals. Teach what each quality means: courage despite mockery, guarding the eyes, running toward good, and strengthening the heart against the Yetzer Hara.',d:'Act out the Yetzer Hara’s winter and summer excuses, then use the Kitzur’s money/business example to show how quickly a person gets up for something he values.',f:'Walk through the workbook pages: prepare the cup and bowl near the bed, wash right and left alternately three times, and note whether there is a ברכה. Then teach the two reasons (confirm the exact wording from the sefer you are using): we are like a new person serving Hashem, as the Kohanim washed from the Kiyor each day; and a רוח רעה rests on the hands after the נשמה leaves at night. Finish with not touching before washing.',e:'Teach the ideal of חצות, the alternative of rising before dawn, the special value of nighttime Torah, and the word connection משנה / נשמה.'})[id]||''}
+function teacherPoint(id){
+ const lesson=lessons.find(l=>l.id===id);
+ if(lesson&&lesson.bringout){
+  const arr=Array.isArray(lesson.bringout)?lesson.bringout:[lesson.bringout];
+  return '<ul class="teaching-points">'+arr.map(p=>'<li>'+p+'</li>').join('')+'</ul>';
+ }
+ const points={
+ a:["Compare behavior alone at home with behavior before a great king.","Explain the Kitzur's kal vachomer: Hashem sees all our actions.","Apply this awareness to both behavior and speech."],
+ b:["Begin with gratitude: Hashem returned the neshamah refreshed.","Explain why Modeh Ani may be said before washing.","Practice the pause between bechemlah and rabbah."],
+ c:["Leopard: have courage despite mockery.","Eagle: guard the eyes.","Deer: run toward good.","Lion: strengthen the heart to overcome the Yetzer Hara."],
+ d:["Act out the Yetzer Hara's winter and summer excuses.","Use the Kitzur's money and business example.","Show how quickly a person gets up for something he values."],
+ e:["Teach the ideal of rising at chatzos.","Explain the alternative: rise before dawn.","Discuss the special value of nighttime Torah.","Connect the words Mishnah and neshamah."],
+ f:["Prepare a cup and bowl near the bed before sleep.","Practice washing right and left alternately, three times each.","Discuss whether a berachah is said.","Reason 1: we are like a new person serving Hashem, as the Kohanim washed from the Kiyor each day.","Reason 2: a ruach ra'ah rests on the hands after the neshamah leaves at night.","Confirm the exact wording of the two reasons in the sefer you are using.","Finish with the rule about not touching before washing."]
+ };
+ return '<ul class="teaching-points">'+(points[id]||[]).map(p=>'<li>'+p+'</li>').join('')+'</ul>';
+}
+const SIMAN_META={
+ "א":{title:"השכמת הבוקר",icon:"🌅"},
+ "ב":{title:"נטילת ידים שחרית",icon:"💧"},
+ "ג":{title:"צניעות וקדושה",icon:"👔"},
+ "ד":{title:"בית הכסא ואשר יצר",icon:"🚪"},
+ "ו":{title:"ברכות ואמן",icon:"💬"}
+};
+const SIMAN_ORDER=["א","ב","ג","ד","ו"];
+let CURRENT_SIMAN=null,HALACHA_CLASS_ID="",HALACHA_MAX_SIMAN="א";
+function simanOfLesson(l){return l&&l.siman?l.siman:"א"}
+function simanRank(s){const n=SIMAN_ORDER.indexOf(s);return n<0?0:n}
+function isSimanUnlocked(s){return HALACHA_TEACHER_PREVIEW||simanRank(s)<=simanRank(HALACHA_MAX_SIMAN)}
+function refreshHubLocks(){
+ document.querySelectorAll(".simanCard[data-siman]").forEach(b=>{
+  const s=b.dataset.siman,locked=!isSimanUnlocked(s);
+  b.classList.toggle("locked",locked);b.setAttribute("aria-disabled",locked?"true":"false");
+  const line=b.querySelector(".lockline");if(line)line.textContent=locked?"🔒 Teacher has not opened this Siman yet":"";
+ });
+}
+function buildSimanHub(){
+ const hub=document.getElementById("simanHub");if(!hub)return;
+ hub.innerHTML=SIMAN_ORDER.map(s=>{const m=SIMAN_META[s];return '<button class="simanCard" data-siman="'+s+'" type="button" onclick="openSiman(\''+s+'\')"><span class="big">'+m.icon+'</span><div style="font-size:25px">סימן '+s+'</div><div style="font-size:15px;margin-top:5px;font-weight:700">'+m.title+'</div><div class="lockline"></div></button>'}).join("");
+ refreshHubLocks();
+}
+function openSiman(s){
+ if(!isSimanUnlocked(s)){refreshHubLocks();return}
+ CURRENT_SIMAN=s;
+ document.getElementById("simanHub").style.display="none";
+ document.getElementById("simanBack").style.display="inline-block";
+ document.getElementById("tabs").style.display="flex";
+ document.querySelectorAll("#tabs button[data-id]").forEach(b=>{const l=lessons.find(x=>x.id===b.dataset.id);b.style.display=(l&&simanOfLesson(l)===s)?"":"none"});
+ const first=lessons.find(l=>simanOfLesson(l)===s);if(first)show(first.id);
+}
+function showSimanHub(){
+ CURRENT_SIMAN=null;
+ const hub=document.getElementById("simanHub");if(hub)hub.style.display="grid";
+ document.getElementById("simanBack").style.display="none";
+ document.getElementById("tabs").style.display="none";
+ document.querySelectorAll(".section").forEach(x=>x.classList.remove("on"));
+ const title=document.getElementById("halachaTitle");if(title)title.textContent=document.body.classList.contains("teacherMode")?"📔 Halacha — Teacher Lesson":"📔 My Halacha Scrapbook";
+ refreshHubLocks();
+}
+async function loadSimanAccess(){
+ if(HALACHA_TEACHER_PREVIEW){HALACHA_MAX_SIMAN="ו";refreshHubLocks();return}
+ HALACHA_MAX_SIMAN="א";
+ try{
+  if(!halachaDb||!HALACHA_STUDENT_ID||!window.FunTorahStudentClass)return refreshHubLocks();
+  const info=await FunTorahStudentClass.resolve(halachaDb,HALACHA_STUDENT_ID);
+  HALACHA_CLASS_ID=String(info&&info.classId||"");
+  if(!HALACHA_CLASS_ID)return refreshHubLocks();
+  const ws=(window.B3SiteSettings&&B3SiteSettings.workspaceId)||"b3-2026";
+  const snap=await halachaDb.ref("b3Games/workspaces/"+ws+"/classes/"+HALACHA_CLASS_ID+"/halachaAccess/maxSiman").once("value");
+  const v=String(snap.val()||"א");HALACHA_MAX_SIMAN=SIMAN_ORDER.includes(v)?v:"א";
+ }catch(e){console.warn("Could not load Halacha Siman access",e)}
+ refreshHubLocks();
+}
 function setHalachaMode(teacher){
  const allow=!!teacher;
- document.body.classList.toggle("teacherMode",allow);
- document.body.classList.toggle("teacher-mode",allow);
- const title=document.getElementById("halachaTitle");
- if(title)title.textContent=allow?"📔 Halacha — Teacher Lesson · סימן א":"📔 My Halacha Scrapbook — סימן א";
+ document.body.classList.toggle("teacherMode",allow);document.body.classList.toggle("teacher-mode",allow);
  const s=document.getElementById("studentModeBtn"),t=document.getElementById("teacherModeBtn");
- if(s)s.style.fontWeight=allow?"700":"900";
- if(t)t.style.fontWeight=allow?"900":"700";
- if(allow){
-   document.querySelectorAll(".notes").forEach(x=>x.classList.add("open"));
- }else{
-   document.querySelectorAll(".teacher-source-panel").forEach(x=>x.classList.remove("show"));
- }
- show("a");
+ if(s)s.style.fontWeight=allow?"700":"900";if(t)t.style.fontWeight=allow?"900":"700";
+ if(allow)document.querySelectorAll(".notes").forEach(x=>x.classList.add("open"));
+ else document.querySelectorAll(".teacher-source-panel").forEach(x=>x.classList.remove("show"));
+ if(allow){HALACHA_MAX_SIMAN="ו";refreshHubLocks()}
+ showSimanHub();
 }
 function mode(t){setHalachaMode(t&&HALACHA_TEACHER_PREVIEW)}
 function ensureDraw(id){[0,1].forEach(i=>{let p=document.querySelectorAll("#"+id+" .page")[i],c=p&&p.querySelector(".draw-layer");if(!c)return;let w=Math.round(p.getBoundingClientRect().width);if(w&&c._w!==w)setupDraw(id,i)})}
 window.addEventListener("resize",()=>{let on=document.querySelector(".section.on");if(on)ensureDraw(on.id)});
-function show(id){if(typeof closeCustomizer==="function")closeCustomizer();document.querySelectorAll(".section").forEach(x=>x.classList.remove("on"));document.getElementById(id).classList.add("on");tabs.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.id===id));ensureDraw(id)}
+function show(id){
+ if(typeof closeCustomizer==="function")closeCustomizer();
+ const l=lessons.find(x=>x.id===id);if(l&&!isSimanUnlocked(simanOfLesson(l))){showSimanHub();return}
+ document.querySelectorAll(".section").forEach(x=>x.classList.remove("on"));
+ const sec=document.getElementById(id);if(!sec)return;sec.classList.add("on");
+ tabs.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.id===id));
+ if(l){CURRENT_SIMAN=simanOfLesson(l);const title=document.getElementById("halachaTitle");if(title)title.textContent=(document.body.classList.contains("teacherMode")?"📔 Halacha — Teacher Lesson · סימן ":"📔 My Halacha Scrapbook — סימן ")+CURRENT_SIMAN}
+ ensureDraw(id)
+}
 function pageCanvas(page){return page.querySelector(".canvas")}
 function add(id,type,text,pageIndex=0){
  let pages=document.querySelectorAll("#"+id+" .page"),page=pages[Math.min(pageIndex,pages.length-1)],p=pageCanvas(page),e=document.createElement("div");
@@ -246,7 +392,10 @@ function ensureDeleteControl(e){
  mini.appendChild(del);
 }
 function ensureResizeHandle(e){
- if(!e||e.querySelector(".resize-handle"))return;
+ if(!e)return;
+ ["width","height"].forEach(axis=>{let handle=e.querySelector(".resize-"+axis);if(!handle){handle=document.createElement("div");handle.className="resize-"+axis;handle.title=axis==="width"?"Drag to change width":"Drag to change height";e.appendChild(handle)}installResize(e,handle,axis)});
+ const existing=e.querySelector(".resize-handle");
+ if(existing){installResize(e,existing);return;}
  // Remove the old +/- size buttons from saved pieces; resizing is now by dragging.
  e.querySelectorAll(".mini button").forEach(btn=>{
    const t=(btn.textContent||"").trim();
@@ -256,29 +405,39 @@ function ensureResizeHandle(e){
  h.className="resize-handle";h.title="Drag to resize";e.appendChild(h);
  installResize(e,h);
 }
-function installResize(e,h){
- if(!e||!h||h.dataset.bound==="1")return;
- h.dataset.bound="1";
+function installResize(e,h,axis="both"){
+ if(!e||!h||h._resizeBound)return;
+ h._resizeBound=true;delete h.dataset.bound;
  h.onpointerdown=ev=>{
    ev.preventDefault();ev.stopPropagation();
    const rect=e.getBoundingClientRect(),page=e.closest(".page");
-   const startX=ev.clientX,startY=ev.clientY,startW=rect.width,startH=rect.height;
-   const keepRatio=!e.classList.contains("textbox")&&!e.classList.contains("he")&&!e.classList.contains("text");
+   const startX=ev.clientX,startY=ev.clientY,startW=e.offsetWidth,startH=e.offsetHeight;
+   const startFont=parseFloat(getComputedStyle(e).fontSize);
+   const startPadding=parseFloat(getComputedStyle(e).paddingTop);
+   const keepRatio=axis==="both";
    const ratio=startW/Math.max(1,startH);
    h.setPointerCapture(ev.pointerId);
    const move=mv=>{
      let w=Math.max(60,startW+(mv.clientX-startX)),hgt=Math.max(40,startH+(mv.clientY-startY));
+     if(axis==="width")hgt=startH;
+     if(axis==="height")w=startW;
      if(keepRatio){
        const byW=w/ratio,byH=hgt*ratio;
        if(Math.abs(w-startW)>=Math.abs(hgt-startH)){hgt=byW}else{w=byH}
      }
-     if(page){
+     if(keepRatio){
+       let scale=w/startW;
+       if(page)scale=Math.min(scale,Math.max(60,page.clientWidth-e.offsetLeft-8)/startW,Math.max(40,page.clientHeight-e.offsetTop-8)/startH);
+       w=startW*scale;hgt=startH*scale;
+       if(!e.querySelector("img"))e.style.fontSize=Math.max(10,startFont*scale)+"px";
+       e.style.padding=startPadding*scale+"px";
+       e.style.minWidth="0";e.style.minHeight="0";
+     }else if(page){
        w=Math.min(w,Math.max(60,page.clientWidth-e.offsetLeft-8));
        hgt=Math.min(hgt,Math.max(40,page.clientHeight-e.offsetTop-8));
      }
-     e.style.width=Math.round(w)+"px";
-     if(e.classList.contains("textbox"))e.style.height=Math.round(hgt)+"px";
-     else e.style.height="auto";
+     e.style.width=w+"px";
+     e.style.height=hgt+"px";
    };
    const up=()=>{
      h.onpointermove=null;h.onpointerup=null;h.onpointercancel=null;
@@ -301,13 +460,25 @@ function removeP(b){
  scrap.remove();
  persist(id);
 }
+// Delete the selected piece without intercepting text editing or form controls.
+document.addEventListener("keydown",ev=>{
+ if(ev.key!=="Delete"||ev.defaultPrevented||ev.isComposing||ev.ctrlKey||ev.altKey||ev.metaKey||ev.shiftKey||HALACHA_TEACHER_VIEW)return;
+ const target=ev.target;
+ if(target instanceof Element&&(target.closest("input,textarea,select")||target.isContentEditable))return;
+ const scrap=document.querySelector(".section.on .scrap.selected");
+ if(!scrap)return;
+ ev.preventDefault();
+ if(typeof activePiece!=="undefined"&&activePiece===scrap)closeCustomizer();
+ removeP(scrap);
+});
 function size(b,f){let e=b.closest(".scrap"),z=parseFloat(e.dataset.z||1)*f;e.dataset.z=z;e.style.zoom=z;clampPiece(e);persist(e.closest(".section").id)}
 function rot(b){let e=b.closest(".scrap"),r=(+e.dataset.r||0)+5;e.dataset.r=r;e.style.setProperty("--r",r+"deg");persist(e.closest(".section").id)}
 function drag(e){
  let sx,sy,l,t,on=false;
  e.ondblclick=v=>{v.stopPropagation();openCustomizer(e,v)};
  e.onpointerdown=v=>{
- if(v.target.tagName==="BUTTON"||v.target.closest(".resize-handle")||v.target.closest(".tb-text"))return;
+ if(v.target.tagName==="BUTTON"||v.target.closest(".resize-handle,.resize-width,.resize-height")||v.target.closest(".tb-text"))return;
+ e.tabIndex=-1;e.focus({preventScroll:true});
  on=true;sx=v.clientX;sy=v.clientY;l=e.offsetLeft;t=e.offsetTop;
  e.setPointerCapture(v.pointerId);
  document.querySelectorAll(".scrap").forEach(x=>x.classList.remove("selected"));e.classList.add("selected")
@@ -335,7 +506,7 @@ function persist(id){
 
 const drawColors=["#e53935","#fb8c00","#fdd835","#43a047","#1e88e5","#8e24aa","#6d4c41","#263238"];
 function drawTools(id,idx){
- return `<div class="page-tools"><button title="Color" style="background:#e53935" onclick="setPen('${id}',${idx},this,'#e53935')"></button><button title="Color" style="background:#1e88e5" onclick="setPen('${id}',${idx},this,'#1e88e5')"></button><button title="Color" style="background:#43a047" onclick="setPen('${id}',${idx},this,'#43a047')"></button><button title="Color" style="background:#fdd835" onclick="setPen('${id}',${idx},this,'#fdd835')"></button><button title="More colors" onclick="moreColor('${id}',${idx},this)">🎨</button><span class="tool-sep"></span><button class="size-btn size-on" title="Thin line" onclick="setSize('${id}',${idx},this,3)"><i style="width:4px;height:4px"></i></button><button class="size-btn" title="Medium line" onclick="setSize('${id}',${idx},this,7)"><i style="width:8px;height:8px"></i></button><button class="size-btn" title="Thick line" onclick="setSize('${id}',${idx},this,12)"><i style="width:13px;height:13px"></i></button><span class="tool-sep"></span><button title="Eraser" onclick="setEraser('${id}',${idx},this)">⌫</button><button title="Stop drawing" onclick="stopDraw('${id}',${idx})">✓</button><button class="reset-page-btn" title="Reset this whole scrapbook page" onclick="resetScrapbookPage('${id}',${idx})">↺</button></div><canvas class="draw-layer"></canvas>`
+ return `<div class="page-tools"><button title="Color" style="background:#e53935" onclick="setPen('${id}',${idx},this,'#e53935')"></button><button title="Color" style="background:#1e88e5" onclick="setPen('${id}',${idx},this,'#1e88e5')"></button><button title="Color" style="background:#43a047" onclick="setPen('${id}',${idx},this,'#43a047')"></button><button title="Color" style="background:#fdd835" onclick="setPen('${id}',${idx},this,'#fdd835')"></button><button title="More colors" onclick="moreColor('${id}',${idx},this)">🎨</button><span class="tool-sep"></span><button class="size-btn size-on" title="Thin line" onclick="setSize('${id}',${idx},this,3)"><i style="width:4px;height:4px"></i></button><button class="size-btn" title="Medium line" onclick="setSize('${id}',${idx},this,7)"><i style="width:8px;height:8px"></i></button><button class="size-btn" title="Thick line" onclick="setSize('${id}',${idx},this,12)"><i style="width:13px;height:13px"></i></button><span class="tool-sep"></span><button title="Eraser" onclick="setEraser('${id}',${idx},this)">⌫</button><button title="Stop drawing" onclick="stopDraw('${id}',${idx})">✓</button><button class="reset-page-btn" title="Reset both scrapbook pages" onclick="resetScrapbookPage('${id}',${idx})">↺</button></div><canvas class="draw-layer"></canvas>`
 }
 function setupDraw(id,idx){
  let page=document.querySelectorAll("#"+id+" .page")[idx],c=page.querySelector(".draw-layer"); if(!c)return;
@@ -345,7 +516,7 @@ function setupDraw(id,idx){
  c.width=Math.round(rect.width*dpr);c.height=Math.round(rect.height*dpr);
  c.style.width=rect.width+"px";c.style.height=rect.height+"px";
  let ctx=c.getContext("2d");ctx.scale(dpr,dpr);ctx.lineCap="round";ctx.lineJoin="round";
- let saved=(S[id+"_draw"]||[])[idx]; if(saved){let im=new Image();im.onload=()=>ctx.drawImage(im,0,0,rect.width,rect.height);im.src=saved}
+ let saved=(S[id+"_draw"]||[])[idx]; if(saved){let im=new Image();im.onload=()=>{if((S[id+"_draw"]||[])[idx]===saved)ctx.drawImage(im,0,0,rect.width,rect.height)};im.src=saved}
  let drawing=false;
  c.onpointerdown=e=>{drawing=true;c.setPointerCapture(e.pointerId);paint(e)};
  c.onpointermove=e=>{if(drawing)paint(e)};
@@ -366,26 +537,39 @@ function moreColor(id,idx,b){let color=prompt("Enter a color name or hex color, 
 function setEraser(id,idx,b){let p=document.querySelectorAll("#"+id+" .page")[idx];p.dataset.drawMode="erase";p.classList.add("drawing");p.querySelectorAll(".page-tools button:not(.size-btn)").forEach(x=>x.classList.remove("pen-on"));b.classList.add("pen-on")}
 function stopDraw(id,idx){let p=document.querySelectorAll("#"+id+" .page")[idx];p.classList.remove("drawing");p.querySelectorAll(".page-tools button:not(.size-btn)").forEach(x=>x.classList.remove("pen-on"));saveDrawing(id)}
 function saveDrawing(id){let arr=[...document.querySelectorAll("#"+id+" .draw-layer")].map(c=>c.toDataURL("image/png"));S[id+"_draw"]=arr;save()}
-function resetScrapbookPage(id,idx){
+let lastScrapbookReset=null;
+function resetScrapbookPage(id){
+ if(HALACHA_TEACHER_VIEW)return;
  const pages=[...document.querySelectorAll("#"+id+" .page")];
- const page=pages[idx];if(!page)return;
- if(!confirm("Reset this whole scrapbook page? This will delete every item and all drawing on this page."))return;
- const canvas=page.querySelector(".canvas");
- if(canvas)canvas.innerHTML="";
- const draw=page.querySelector(".draw-layer");
- if(draw){
-   const ctx=draw.getContext("2d");
-   if(ctx)ctx.clearRect(0,0,draw.width,draw.height);
- }
- page.classList.remove("drawing");
- page.querySelectorAll(".page-tools button").forEach(x=>x.classList.remove("pen-on"));
- const scrapPages=pages.map(p=>pageCanvas(p).innerHTML);
- S[id+"_scrap_pages"]=scrapPages;
- const drawings=Array.isArray(S[id+"_draw"])?S[id+"_draw"].slice():[];
- while(drawings.length<pages.length)drawings.push("");
- drawings[idx]="";
- S[id+"_draw"]=drawings;
- save();
+ if(!pages.length)return;
+ closeCustomizer();
+ lastScrapbookReset={id,pieces:pages.map(p=>pageCanvas(p).innerHTML),drawings:pages.map(p=>p.querySelector(".draw-layer").toDataURL("image/png"))};
+ S[id+"_scrap_pages"]=pages.map(()=>"");
+ delete S[id+"_scrap"];
+ S[id+"_draw"]=pages.map(()=>"");
+ pages.forEach(p=>{
+  pageCanvas(p).innerHTML="";
+  const c=p.querySelector(".draw-layer");
+  // Resetting the bitmap also clears any transform and pending drawing stroke.
+  c.width=c.width;c._w=0;p._last=null;
+  p.classList.remove("drawing");
+  p.querySelectorAll(".page-tools button").forEach(x=>x.classList.remove("pen-on"));
+ });
+ ensureDraw(id);save();
+ document.querySelectorAll(".undo-reset-btn").forEach(b=>b.hidden=b.dataset.section!==id);
+}
+function undoScrapbookReset(id){
+ if(!lastScrapbookReset||lastScrapbookReset.id!==id)return;
+ const backup=lastScrapbookReset;lastScrapbookReset=null;
+ closeCustomizer();
+ S[id+"_scrap_pages"]=backup.pieces;S[id+"_draw"]=backup.drawings;
+ document.querySelectorAll("#"+id+" .page").forEach((p,i)=>{
+  pageCanvas(p).innerHTML=backup.pieces[i];
+  p.querySelectorAll(".scrap").forEach(e=>{ensureDeleteControl(e);ensureResizeHandle(e);drag(e)});
+  p.querySelector(".draw-layer")._w=0;
+ });
+ ensureDraw(id);save();
+ document.querySelectorAll(".undo-reset-btn").forEach(b=>b.hidden=true);
 }
 
 function setTheme(id,t){document.querySelectorAll("#"+id+" .page").forEach(p=>p.className="page "+t);S[id+"_theme"]=t;save()}
@@ -408,11 +592,43 @@ function workbookPieceData(id){
    {label:"גבור כארי",html:'<div class="wb-title">גבור כארי</div><div>In the morning we need to be like a<br><span class="wb-line"></span> <span class="wb-line"></span><br>to wake up like a Yid should.</div>'}
   ]
  };
+ Object.assign(items,{
+  s2a:[
+   {label:"נעגל וואסער — reminder",html:'<div class="wb-title">REMINDER</div><div>Before I go to sleep, I need to prepare<br><span class="wb-line"></span><br><span class="wb-line"></span><br>near my bed.</div>'},
+   {label:"2 reasons for washing",html:'<div class="wb-title">Every morning we wash נעגל וואסער for 2 reasons:</div><div>1. Since we are like a new person serving <span class="wb-line"></span>. Just like the <span class="wb-line"></span> wash their hands from the <span class="wb-line"></span> each day.<br>2. To remove the <span class="wb-line"></span> that stayed on our <span class="wb-line"></span> from when our <span class="wb-line"></span> left us at night.</div>'}
+  ],
+  s2b:[
+   {label:"How we wash",html:'<div class="wb-title">When washing נעגל וואסער</div><div>We wash:<br>* <span class="wb-line"></span><br>* <span class="wb-line"></span><br><b>3 × each</b><br><br>Is there a ברכה at this time? <span class="wb-line"></span></div>'},
+   {label:"Do not touch",html:'<div class="wb-title">🚫 Do Not Touch Before Washing נעגל וואסער!</div><div><span class="wb-line"></span> <span class="wb-line"></span><br><span class="wb-line"></span> <span class="wb-line"></span></div>'}
+  ],
+  s2c:[
+   {label:"Review — 2 reasons",html:'<div class="wb-title">Review: Why do we wash every morning?</div><div>Like a new person serving <span class="wb-line"></span> — like the <span class="wb-line"></span> at the <span class="wb-line"></span>.<br><br>To remove the <span class="wb-line"></span> from our <span class="wb-line"></span>.</div>'}
+  ],
+  s2d:[
+   {label:"When is נטילת ידים required?",html:'<div class="wb-title">Circle the situations that require נטילת ידים</div><div>Waking up · Before eating bread · Before Bentching · After leaving the bathroom · After Davening · Before a Mitzva · After leaving a bath-house · Havdola · Cutting nails · Cutting hair · Tzedaka time · Taking off shoes · Touching lice · Lighting Shabbos candles · Touching something not Kosher · Scratching one’s head · Touching a usually-covered part of the body · Eating a favorite food · After leaving a cemetery / levaya</div>'}
+  ],
+  s3a:[
+   {label:"What is צניעות?",html:'<div class="wb-title">הצנע לכת עם ה׳ אלקיך</div><div>What is צניעות?<br><span class="wb-line"></span> <span class="wb-line"></span> <span class="wb-line"></span><br><br>Why does it matter? What if I am alone and no one sees?<br><span class="wb-line"></span><br><br>What are 2 of the best places to get dressed because of this?<br><span class="wb-line"></span></div>'}
+  ],
+  s3b:[
+   {label:"ובחוקותיהם לא תלכו",html:'<div class="wb-title">ובחוקותיהם לא תלכו</div><div>Because we do not want to follow in the ways of the Goyim, we do not:<br>1) <span class="wb-line"></span><br>2) <span class="wb-line"></span><br>3) <span class="wb-line"></span><br><br>Draw a picture showing צניעות.</div>'}
+  ],
+  s3c:[
+   {label:"My clothing should be…",html:'<div class="wb-title">Looking into the Mirror</div><div>Which words belong?<br><br>איידעל · loud · Expensive · torn · Clean · Fancy · Neat<br><br>My clothing should be: <span class="wb-line"></span> <span class="wb-line"></span> <span class="wb-line"></span></div>'}
+  ],
+  s3d:[
+   {label:"Putting on shoes",html:'<div class="wb-title">When putting on shoes, the process is…</div><div>1. <span class="wb-line"></span><br>2. <span class="wb-line"></span><br>3. Tie or buckle the left shoe. This is like תפילין that are tied on the left hand.<br>4. <span class="wb-line"></span></div>'}
+  ],
+  s3e:[
+   {label:"Getting dressed — remember",html:'<div class="wb-title">Some things to remember about the way I get dressed:</div><div>1) <span class="wb-line"></span><br><br>2) <span class="wb-line"></span></div>'}
+  ]
+ });
  return items[id]||[];
 }
 function workbookTray(id){
  const items=workbookPieceData(id);if(!items.length)return "";
- const page=id==="b"?"Workbook pp. 2–3":id==="f"?"Workbook pp. 3–4":"Workbook p. 2";
+ const pages={b:"Workbook pp. 2–3",f:"Workbook pp. 3–4",c:"Workbook p. 2",s2a:"Workbook pp. 3–4",s2b:"Workbook pp. 3–4",s2c:"Workbook p. 4",s2d:"Workbook p. 5",s3a:"Workbook p. 6",s3b:"Workbook p. 7",s3c:"Workbook p. 8",s3d:"Workbook p. 8",s3e:"Workbook p. 8"};
+ const page=pages[id]||"B3 Halacha Workbook";
  return '<div class="workbook-box"><b>📘 From the Halacha Workbook</b><small>'+page+' · click to add to the scrapbook</small>'+items.map((x,i)=>'<button type="button" onclick="addWorkbookPiece(\''+id+'\','+i+')">'+x.label+'</button>').join("")+'</div>';
 }
 function addWorkbookPiece(id,index){
@@ -459,11 +675,21 @@ function singleChoice(btn,ok,id){
  rewardAdd("a","text","I remember Hashem everywhere — even when nobody else is around.");
  finishBoard(id);
 }
+function quickChoice(btn,ok,id,label){
+ const box=btn.closest(".activityBoard");
+ if(!ok){btn.classList.remove("bad");void btn.offsetWidth;btn.classList.add("bad");setTimeout(()=>btn.classList.remove("bad"),400);actFb(btn,"Try again — look back at the lesson.","bad");return}
+ box.querySelectorAll("button.card").forEach(x=>x.disabled=true);
+ btn.classList.add("good");actFb(btn,"✓ Correct! Add the idea to your scrapbook.","good");
+ rewardAdd(id,"text","✓ "+label);finishBoard(id);
+}
 function board(l){
+if(l.type==="quick"){
+ return '<h2>🎯 Quick Halacha Challenge</h2><p><b>'+l.q+'</b></p><div class="wordbank">'+l.opts.map((o,i)=>'<button class="card" onclick="quickChoice(this,'+(i===l.ans)+',\''+l.id+'\',this.textContent)">'+o+'</button>').join('')+'</div><div class="act-fb" aria-live="polite"></div>';
+}
 if(l.type==="nigel")return `<div style="padding:8px 10px;margin-bottom:10px;border:2px solid #2563eb;border-radius:10px;background:#eff6ff"><b>📘 Workbook connection:</b> The reminder, how we wash, the 2 reasons and the do-not-touch rule are in the Scrapbook Tray.</div><h2>💧 נעגל וואסער</h2><p>Choose the <b>2 reasons</b> we wash our hands every morning:</p><button class=card onclick="choose(this,true,'f','Like a new person serving Hashem')">Like a new person serving Hashem</button><button class=card onclick="choose(this,false,'f','')">Only because our hands look dirty</button><button class=card onclick="choose(this,true,'f','To remove the רוח רעה from our hands')">To remove the רוח רעה that rests on our hands</button><button class=card onclick="choose(this,false,'f','')">Because it is just a nice custom</button>`;
 if(l.type==="choices")return `<h2>🕵️ שויתי Challenge</h2><p><b>Choose the ONE best answer.</b></p><p>Where should a Yid remember that Hashem is with him?</p><div class=wordbank id=shivisiAnswers><button class=card onclick="singleChoice(this,false,'a')">Only in class</button><button class=card onclick="singleChoice(this,false,'a')">Only at home</button><button class=card onclick="singleChoice(this,true,'a')">Everywhere — even when nobody else is around</button></div><div id=shivisiFeedback aria-live=polite></div>`;
 if(l.type==="sequence")return `<div style="padding:8px 10px;margin-bottom:10px;border:2px solid #2563eb;border-radius:10px;background:#eff6ff"><b>📘 Workbook connection:</b> מודה אני fill-in, the pause between words, and נעגל וואסער review are available in the Scrapbook Tray.</div><h2>✂️ Build the Modeh Ani card</h2><p>Click the strips in the correct order. Your finished card becomes a scrapbook piece.</p><div id=seqout class=dropzone dir=rtl><div class=slot>1</div><div class=slot>2</div><div class=slot>3</div></div><div class=wordbank dir=rtl><button class=card onclick="seq(this,'מודה אני')">מודה אני</button><button class=card onclick="seq(this,'לפניך')">לפניך</button><button class=card onclick="seq(this,'בחמלה')">בחמלה</button></div><p>Where is the important pause?</p><button class=card onclick="choose(this,true,'b','Pause after בחמלה')">After בחמלה</button><button class=card onclick="choose(this,false,'b','')">After מודה אני</button>`;
-if(l.type==="match")return `<div style="padding:8px 10px;margin-bottom:10px;border:2px solid #2563eb;border-radius:10px;background:#eff6ff"><b>📘 Workbook connection:</b> Add the גבור כארי workbook segment from the Scrapbook Tray.</div><h2>🧩 Match the Four Middos</h2><p>Tap a phrase, then tap the animal that goes with it.</p><div class="matchgrid m4">${MIDDOS.map(m=>`<button data-k="${m[0]}" onclick="matchSel(this)">${m[0]} ← ?</button>`).join("")}</div><div class="wordbank animals">${shuffleArr(MIDDOS.slice()).map(m=>`<button class=card data-a="${m[1]}" onclick="matchPick(this)">${m[1]} ${m[2]}</button>`).join("")}</div><div class=match-fb id=matchFb></div>`;
+if(l.type==="match")return `<div style="padding:8px 10px;margin-bottom:10px;border:2px solid #2563eb;border-radius:10px;background:#eff6ff"><b>📘 Workbook connection:</b> Add the גבור כארי workbook segment from the Scrapbook Tray.</div><h2>🧩 Match the Four Middos</h2><p>Tap a phrase, then tap the animal that goes with it.</p><div class="matchgrid m4">${MIDDOS.map(m=>`<button data-k="${m[0]}" onclick="matchSel(this)">${m[0]} ← ?</button>`).join("")}</div><div class="wordbank animals">${shuffleArr(MIDDOS.slice()).map(m=>`<button class=card data-a="${m[1]}" onclick="matchPick(this)"><span class="animal-picture">${m[1]}</span><span>${m[2]}</span></button>`).join("")}</div><div class=match-fb id=matchFb></div>`;
 if(l.type==="comic")return `<h2>💥 Beat the Yetzer Hara!</h2><div class=comic><div class=bubble>“It’s cold! Stay under the blanket!”</div><div class=bubble>“It’s so early! Sleep longer!”</div></div><p>Pick the strongest response:</p><button class=card onclick="choose(this,true,'d','I get up with זריזות!')">I get up with זריזות!</button><button class=card onclick="choose(this,false,'d','')">Maybe tomorrow…</button><p>Someone would run early for an important business opportunity. What lesson does that teach us about עבודת ה׳?</p><button class=card onclick="choose(this,false,'d','')">Business is more important</button><button class=card onclick="choose(this,true,'d','Be at least as eager for עבודת ה׳')">Be at least as eager for עבודת ה׳</button><button class=card onclick="choose(this,false,'d','')">Only grown-ups need to hurry</button>`;
 return `<h2>🌙 Night Torah Challenge</h2><p>Choose the <b>3</b> ideas that belong on this nighttime page.</p><button class=card onclick="choose(this,true,'e','תיקון חצות')">תיקון חצות</button><button class=card onclick="choose(this,false,'e','')">Staying up late playing games</button><button class=card onclick="choose(this,true,'e','Torah learning at night')">Torah learning at night</button><button class=card onclick="choose(this,true,'e','משנה — אותיות נשמה')">משנה — אותיות נשמה</button><button class=card onclick="choose(this,false,'e','')">Sleeping through davening</button><p class=teacherOnly><small>Teacher: use the complete review bank for the exact time and details from סעיף ה.</small></p>`}
 let seqN=0;function seq(b,w){let slots=document.querySelectorAll("#b #seqout .slot");if(seqN>=3)return;let correct=["מודה אני","לפניך","בחמלה"][seqN];if(w===correct){slots[seqN].textContent=w;slots[seqN].classList.add("filled");b.disabled=true;seqN++;actFb(b,seqN<3?"✓ Good! What comes next?":"✓ Your Modeh Ani card is on the next page.","good");if(seqN===3){rewardAdd("b","he","מודה אני לפניך בחמלה");S.b_seqdone=true;save();tryFinish("b")}}else{b.classList.remove("bad");void b.offsetWidth;b.classList.add("bad");setTimeout(()=>b.classList.remove("bad"),400);actFb(b,"Not yet — which words come "+(seqN?"next":"first")+"?","bad")}}
@@ -478,9 +704,9 @@ function matchPick(a){if(a.disabled)return;let sel=document.querySelector("#c .m
  let got=S.c_got=S.c_got||[];if(got.includes(m[0]))return;got.push(m[0]);matchMark(m[0]);
  rewardAdd("c","he",m[0]+" "+m[1]);
  matchFb(got.length<4?"✓ Correct! "+m[0]+" "+m[1]:"✓ All four matched! Decorate your page.","good");tryFinish("c")}
-function render(l){let sec=document.createElement("div");sec.id=l.id;sec.className="section"+(l.id==="a"?" on":"");let th=S[l.id+"_theme"]||"";let workbookNotice=l.id==="a"?'<div style="margin:0 0 10px;padding:9px 11px;border:2px solid #93c5fd;border-radius:10px;background:#eff6ff;color:#1e3a8a;font-weight:800">📘 Workbook segments are included in Lessons 2, 3 and 6.</div>':'';sec.innerHTML=`<div class=teacherOnly><div class="notes ${HALACHA_TEACHER_PREVIEW?'open':''}"><h3 style="margin-top:0">👨‍🏫 Teacher Notes — ${l.seif}</h3><div class=source>${teacherSource(l.id)}</div><p><b>What to bring out:</b> ${teacherPoint(l.id)}</p><p><b>Objective:</b> ${l.objective}</p><b>Ask students:</b><ol>${l.qs.map(q=>"<li>"+q+"</li>").join("")}</ol></div></div><div class=work><aside class=side>${workbookNotice}<h3>🎨 Scrapbook Tray</h3><div class=themeRow><button style="background:#fff3c9" onclick="setTheme('${l.id}','')"></button><button style="background:#e3f6ff" onclick="setTheme('${l.id}','blue')"></button><button style="background:#d7b27b" onclick="setTheme('${l.id}','craft')"></button><button style="background:#173758" onclick="setTheme('${l.id}','night')"></button></div><div class=step><button class=actbtn id="actbtn_${l.id}" onclick="toggleActivity('${l.id}')"></button></div><div class=step><b>Pieces to decorate with</b>${l.pieces.map(p=>`<button onclick="add('${l.id}','${p[0]}',\`${p[1]}\`)">${p[1]}</button>`).join("")}</div>${workbookTray(l.id)}<div class=step><button onclick="addTextBox('${l.id}')">✏️ Add text box</button><button onclick="document.getElementById('u_${l.id}').click()">📷 Add my picture</button><input hidden id="u_${l.id}" type=file accept="image/*" onchange="upload(event,'${l.id}')"></div><p><small>Drag pieces anywhere. Resize by dragging the blue handle on the bottom-right corner. Use ↻ to rotate. Use the crayons on each page to color and draw.</small></p></aside><div class=book><div class=spread><div class="page ${th}"><div class=activityBoard>${board(l)}</div><div class=canvas></div>${drawTools(l.id,0)}</div><div class="page ${th}"><div class=canvas></div>${drawTools(l.id,1)}</div></div></div></div>`;sections.appendChild(sec);let savedPages=S[l.id+"_scrap_pages"];if(savedPages){sec.querySelectorAll(".canvas").forEach((c,i)=>c.innerHTML=savedPages[i]||"")}else{let saved=S[l.id+"_scrap"];if(saved)sec.querySelector(".canvas").innerHTML=saved}sec.querySelectorAll(".scrap").forEach(e=>{ensureDeleteControl(e);ensureResizeHandle(e);drag(e);if(HALACHA_TEACHER_VIEW)e.querySelectorAll(".tb-text").forEach(t=>t.contentEditable="false");setTimeout(()=>clampPiece(e),0)});setTimeout(()=>{setupDraw(l.id,0);setupDraw(l.id,1)},0);let got=S[l.id+"_got"]||[];sec.querySelectorAll(".activityBoard button.card[onclick*=choose]").forEach(b=>{let m=(b.getAttribute("onclick")||"").match(/'[a-f]','([^']+)'\)/);if(m&&got.includes(m[1])){b.classList.add("good");b.disabled=true}});if(l.id==="c")got.forEach(matchMark);let ab=sec.querySelector(".activityBoard");if(S[l.id+"_done"])ab.classList.add("finished");else if(S[l.id+"_hideAct"])ab.classList.add("hidden");updateActBtn(l.id)}
+function render(l){let sec=document.createElement("div");sec.id=l.id;sec.className="section";let th=S[l.id+"_theme"]||"";let workbookNotice=l.id==="a"?'<div style="margin:0 0 10px;padding:9px 11px;border:2px solid #93c5fd;border-radius:10px;background:#eff6ff;color:#1e3a8a;font-weight:800">📘 Workbook segments are included in Lessons 2, 3 and 6.</div>':'';sec.innerHTML=`<div class=teacherOnly><div class="notes ${HALACHA_TEACHER_PREVIEW?'open':''}"><h3 style="margin-top:0">👨‍🏫 Teacher Notes — ${l.seif}</h3><div class=source>${teacherSource(l.id)}</div><div class="teacher-notes-columns"><div><h4>What to bring out</h4>${teacherPoint(l.id)}</div><div><h4>Objective</h4><ul><li>${l.objective}</li></ul><h4>Ask students</h4><ol>${l.qs.map(q=>"<li>"+q+"</li>").join("")}</ol></div></div></div></div><div class=work><aside class=side>${workbookNotice}<h3>🎨 Scrapbook Tray</h3><div class=themeRow><button style="background:#fff3c9" onclick="setTheme('${l.id}','')"></button><button style="background:#e3f6ff" onclick="setTheme('${l.id}','blue')"></button><button style="background:#d7b27b" onclick="setTheme('${l.id}','craft')"></button><button style="background:#173758" onclick="setTheme('${l.id}','night')"></button></div><div class=step><button class=actbtn id="actbtn_${l.id}" onclick="toggleActivity('${l.id}')"></button></div><div class=step><button class="undo-reset-btn" data-section="${l.id}" hidden onclick="undoScrapbookReset('${l.id}')">Undo reset</button></div><div class=step><b>Pieces to decorate with</b>${l.pieces.map(p=>`<button class="${l.id==='c'&&p[0]==='sticker'?'animal-tray':''}" onclick="add('${l.id}','${p[0]}',\`${p[1]}\`)">${p[1]}</button>`).join("")}</div>${workbookTray(l.id)}<div class=step><button onclick="addTextBox('${l.id}')">✏️ Add text box</button><button onclick="document.getElementById('u_${l.id}').click()">📷 Add my picture</button><input hidden id="u_${l.id}" type=file accept="image/*" onchange="upload(event,'${l.id}')"></div><p><small>Click a piece and press Delete to remove it. Drag pieces anywhere. Resize by dragging the blue handle on the bottom-right corner. Use ↻ to rotate. Use the crayons on each page to color and draw.</small></p></aside><div class=book><div class=spread><div class="page ${th}"><div class=activityBoard>${board(l)}</div><div class=canvas></div>${drawTools(l.id,0)}</div><div class="page ${th}"><div class=canvas></div>${drawTools(l.id,1)}</div></div></div></div>`;sections.appendChild(sec);let savedPages=S[l.id+"_scrap_pages"];if(savedPages){sec.querySelectorAll(".canvas").forEach((c,i)=>c.innerHTML=savedPages[i]||"")}else{let saved=S[l.id+"_scrap"];if(saved)sec.querySelector(".canvas").innerHTML=saved}sec.querySelectorAll(".scrap").forEach(e=>{ensureDeleteControl(e);ensureResizeHandle(e);drag(e);if(HALACHA_TEACHER_VIEW)e.querySelectorAll(".tb-text").forEach(t=>t.contentEditable="false");setTimeout(()=>clampPiece(e),0)});setTimeout(()=>{setupDraw(l.id,0);setupDraw(l.id,1)},0);let got=S[l.id+"_got"]||[];sec.querySelectorAll(".activityBoard button.card[onclick*=choose]").forEach(b=>{let m=(b.getAttribute("onclick")||"").match(/'[a-f]','([^']+)'\)/);if(m&&got.includes(m[1])){b.classList.add("good");b.disabled=true}});if(l.id==="c")got.forEach(matchMark);let ab=sec.querySelector(".activityBoard");if(S[l.id+"_done"])ab.classList.add("finished");else if(S[l.id+"_hideAct"])ab.classList.add("hidden");updateActBtn(l.id)}
 lessons.forEach(render);
-lessons.forEach(l=>{let b=document.createElement("button");b.dataset.id=l.id;b.textContent=(["b","c","f"].includes(l.id)?"📘 ":"")+l.tab;b.onclick=()=>show(l.id);if(l.id==="a")b.className="on";tabs.appendChild(b)});
+lessons.forEach(l=>{let b=document.createElement("button");b.dataset.id=l.id;b.textContent=(["b","c","f"].includes(l.id)?"📘 ":"")+l.tab;b.onclick=()=>show(l.id);b.style.display="none";tabs.appendChild(b)});
 let rb=document.createElement("button");rb.dataset.id="review";rb.textContent="🎤 Teacher Review";rb.className="teacherOnly";rb.onclick=()=>show("review");tabs.appendChild(rb);
 function halachaAuthReady(){return new Promise(r=>{try{if(!window.firebase||!firebase.auth)return r(null);let done=false,t=setTimeout(()=>{if(!done){done=true;r(null)}},4000),u=firebase.auth().onAuthStateChanged(x=>{if(done)return;done=true;clearTimeout(t);u();r(x)})}catch(e){r(null)}})}
 halachaAuthReady().then(loadCloudHalacha);
@@ -496,7 +722,8 @@ if(HALACHA_TEACHER_PREVIEW){
    }
  },0);
 }
-review.innerHTML=`<div class=qbank><h2>Complete Review Bank — סימן א</h2>${lessons.map(l=>`<h3>${l.seif} · ${l.title}</h3><p><b>Objective:</b> ${l.objective}</p><ol>${l.qs.map(q=>"<li>"+q+"</li>").join("")}</ol>`).join("")}</div>`;
+review.innerHTML='<div class="qbank"><h2>Complete Review Bank — כל הסימנים</h2>'+SIMAN_ORDER.map(s=>'<h2 style="border-bottom:3px solid #173b62;padding-bottom:5px">סימן '+s+'</h2>'+lessons.filter(l=>simanOfLesson(l)===s).map(l=>'<h3>'+l.seif+' · '+l.title+'</h3><p><b>Objective:</b> '+l.objective+'</p><ol>'+l.qs.map(q=>'<li>'+q+'</li>').join('')+'</ol>').join('')).join('')+'</div>';
+buildSimanHub();showSimanHub();loadSimanAccess();
 
 function toggleTeacherSource(id){
  const p=document.getElementById("teacher-source-"+id);
@@ -505,12 +732,45 @@ function toggleTeacherSource(id){
 
 
 
+const HALACHA_ACCESS_ORDER=["א","ב","ג","ד","ו"];
+async function renderHalachaTeacherAccess(access){
+ const host=document.getElementById("halachaAccessRowsMain");if(!host)return;
+ try{
+  let classIds=(access&&access.role==="admin")?["et","wt"]:(access&&access.classIds||[]).filter(Boolean);
+  if(!classIds.length){host.textContent="No classes are assigned to this teacher.";return}
+  const ws=(window.B3SiteSettings&&B3SiteSettings.workspaceId)||"b3-2026";
+  const rows=await Promise.all(classIds.map(async id=>{
+    const cs=await halachaDb.ref("b3Games/workspaces/"+ws+"/classes/"+id).once("value");
+    const as=await halachaDb.ref("b3Games/workspaces/"+ws+"/classes/"+id+"/halachaAccess/maxSiman").once("value");
+    const row=cs.val()||{},raw=String(as.val()||"א");
+    return {id,name:String(row.name||id.toUpperCase()),max:HALACHA_ACCESS_ORDER.includes(raw)?raw:"א"};
+  }));
+  host.innerHTML=rows.map(r=>{
+    const maxRank=HALACHA_ACCESS_ORDER.indexOf(r.max);
+    const buttons=HALACHA_ACCESS_ORDER.map((s,i)=>{
+      const state=i<maxRank?"open":i===maxRank?"current":"locked";
+      const icon=state==="locked"?"🔒":state==="current"?"✅":"🔓";
+      return '<button type="button" class="'+state+'" data-halacha-class="'+r.id+'" data-halacha-siman="'+s+'">'+icon+' סימן '+s+'</button>';
+    }).join('');
+    return '<div class="halacha-access-row"><strong>'+r.name+'</strong><span class="halacha-access-buttons">'+buttons+'</span><span class="halacha-access-status">Open through סימן '+r.max+'</span></div>';
+  }).join('');
+  host.querySelectorAll("[data-halacha-class][data-halacha-siman]").forEach(btn=>btn.onclick=async()=>{
+    btn.disabled=true;
+    try{
+      await halachaDb.ref("b3Games/workspaces/"+ws+"/classes/"+btn.dataset.halachaClass+"/halachaAccess/maxSiman").set(btn.dataset.halachaSiman);
+      await renderHalachaTeacherAccess(access);
+    }catch(e){console.warn("Could not update Halacha Siman access",e);alert("Could not change Siman access.");btn.disabled=false}
+  });
+ }catch(e){console.warn("Could not load Halacha Siman access",e);host.textContent="Could not load class access controls."}
+}
+
 // Authorized teachers always get an explicit Teacher button, even if an older
 // homepage link opened this page without ?teacher=1.
 if(window.B3SiteSettings&&typeof B3SiteSettings.onAuthStateChanged==="function"){
- B3SiteSettings.onAuthStateChanged((user,authorized)=>{
+ B3SiteSettings.onAuthStateChanged((user,authorized,access)=>{
    const btn=document.getElementById("teacherModeBtn");
    if(btn)btn.style.display=authorized?"":"none";
+   if(authorized)renderHalachaTeacherAccess(access||{});
    if(authorized&&HALACHA_TEACHER_LESSON)setHalachaMode(true);
  });
 }
@@ -567,7 +827,7 @@ document.addEventListener("pointermove",()=>clearTimeout(window._pcTimer));
 
 
 function currentSectionId(){let sec=[...document.querySelectorAll(".section")].find(x=>x.classList.contains("on"))||document.querySelector(".section");return sec?sec.id:null}
-function openExport(){closeCustomizer();let cur=currentSectionId();document.getElementById("expList").innerHTML=lessons.map(l=>`<label><input type="checkbox" class="expSec" value="${l.id}" ${l.id===cur?"checked":""} onchange="document.getElementById('expAll').checked=[...document.querySelectorAll('.expSec')].every(c=>c.checked)"> ${l.tab}</label>`).join("");document.getElementById("expAll").checked=false;document.getElementById("expMsg").textContent="";document.getElementById("exportDlg").classList.add("show")}
+function openExport(){closeCustomizer();let cur=currentSectionId();document.getElementById("expList").innerHTML=lessons.filter(l=>!CURRENT_SIMAN||simanOfLesson(l)===CURRENT_SIMAN).map(l=>`<label><input type="checkbox" class="expSec" value="${l.id}" ${l.id===cur?"checked":""} onchange="document.getElementById('expAll').checked=[...document.querySelectorAll('.expSec')].every(c=>c.checked)"> ${l.tab}</label>`).join("");document.getElementById("expAll").checked=false;document.getElementById("expMsg").textContent="";document.getElementById("exportDlg").classList.add("show")}
 function closeExport(){document.getElementById("exportDlg").classList.remove("show")}
 function selectedSections(){let ids=[...document.querySelectorAll(".expSec:checked")].map(c=>c.value);if(!ids.length){document.getElementById("expMsg").textContent="Pick at least one section.";return null}return ids}
 function drawingImage(id,idx){let c=document.querySelectorAll("#"+id+" .draw-layer")[idx];let saved=(S[id+"_draw"]||[])[idx];try{if(c&&c.width&&c._w)return c.toDataURL("image/png")}catch(e){}return saved||""}
@@ -577,7 +837,14 @@ function printSelected(){let ids=selectedSections();if(!ids)return;closeExport()
  addPrintTitles(ids);
  ids.forEach(id=>{let sec=document.getElementById(id);sec.classList.add("print-target");sec.querySelectorAll(".draw-layer").forEach((c,i)=>{c.dataset.prePrintBg=c.style.backgroundImage||"";let img=drawingImage(id,i);if(img){c.style.backgroundImage=`url("${img}")`;c.style.backgroundSize="100% 100%";c.style.backgroundRepeat="no-repeat"}})});
  setTimeout(()=>window.print(),250)}
-function loadScriptOnce(src){return new Promise((res,rej)=>{if(document.querySelector('script[src="'+src+'"]'))return res();let s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>rej(new Error("Could not load "+src));document.head.appendChild(s)})}
+const _scriptLoads={};
+const _scriptSources={"https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js":["html2canvas.min.js?v=1.4.1","https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js","https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"],"https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js":["https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js","https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js"]};
+const _scriptGlobals={"html2canvas":"html2canvas","pptxgen":"PptxGenJS"};
+function _globalFor(src){for(const k in _scriptGlobals)if(src.includes(k))return _scriptGlobals[k];return null}
+function _loadTag(src){return new Promise((res,rej)=>{document.querySelectorAll('script[src="'+src+'"]').forEach(t=>t.remove());const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>{s.remove();rej(new Error("Could not load "+src))};document.head.appendChild(s)})}
+function loadScriptOnce(src){const g=_globalFor(src);if(g&&window[g])return Promise.resolve();if(_scriptLoads[src])return _scriptLoads[src];
+_scriptLoads[src]=(async()=>{const list=_scriptSources[src]||[src];let err;for(const u of list){try{await _loadTag(u);if(!g||window[g])return}catch(e){err=e}}
+throw new Error("A helper file didn't finish loading. Please check your internet connection and try again.")})().catch(e=>{delete _scriptLoads[src];throw e});return _scriptLoads[src]}
 async function exportSlides(){let ids=selectedSections();if(!ids)return;let msg=document.getElementById("expMsg"),back=currentSectionId();
  try{msg.textContent="Preparing slides…";
   await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
@@ -626,4 +893,4 @@ window.addEventListener("afterprint",()=>{
  });
 });
 
-</script><div id="exportDlg" role="dialog" aria-label="Print or export"><div class="box"><h3>🖨️ Print / PDF / Slides</h3><div><label><input type="checkbox" id="expAll" onchange="document.querySelectorAll('.expSec').forEach(c=>c.checked=this.checked)"> All sections</label><div id="expList"></div></div><div class="row"><button onclick="printSelected()">🖨️ Print / Save as PDF</button><button onclick="exportSlides()">📊 Download slides</button></div><div class="row"><button class="ghost" onclick="closeExport()">Cancel</button></div><div class="msg" id="expMsg"></div><p style="margin:6px 0 0;font-size:12px;color:#567">Slides download as a PowerPoint file. To use Google Slides: upload it to Google Drive and open it with Google Slides.</p></div></div><div id="pieceCustomizer" class="piece-customizer"><div class="pc-title">Customize this piece</div><div class="pc-row"><label>Font</label><select id="pcFont" onchange="applyPieceStyle()"><option value="Arial, sans-serif">Arial</option><option value="Georgia, serif">Book</option><option value="'Comic Sans MS', cursive">Playful</option><option value="'Trebuchet MS', sans-serif">Rounded</option><option value="'Times New Roman', serif">Classic</option></select></div><div class="pc-row"><label>Text</label><input id="pcText" type="color" value="#243746" oninput="applyPieceStyle()"><label>Background</label><input id="pcBg" type="color" value="#fff1b8" oninput="applyPieceStyle()"></div><div class="pc-row"><label>Text size</label><input id="pcFontSize" type="range" min="12" max="42" value="18" oninput="applyPieceStyle()"><span id="pcFontSizeVal">18</span></div><div class="pc-row"><button onclick="transparentPiece()">No background</button><button onclick="resetPieceStyle()">Reset</button><button onclick="closeCustomizer()">Done ✓</button></div></div></body></html>
+</script><div id="exportDlg" role="dialog" aria-label="Print or export"><div class="box"><h3>🖨️ Print / PDF / Slides</h3><div><label><input type="checkbox" id="expAll" onchange="document.querySelectorAll('.expSec').forEach(c=>c.checked=this.checked)"> All sections</label><div id="expList"></div></div><div class="row"><button onclick="printSelected()">🖨️ Print / Save as PDF</button><button onclick="exportSlides()">📊 Download slides</button></div><div class="row"><button class="ghost" onclick="closeExport()">Cancel</button></div><div class="msg" id="expMsg"></div><p style="margin:6px 0 0;font-size:12px;color:#567">Slides download as a PowerPoint file. To use Google Slides: upload it to Google Drive and open it with Google Slides.</p></div></div><div id="pieceCustomizer" class="piece-customizer"><div class="pc-title">Customize this piece</div><div class="pc-row"><label>Font</label><select id="pcFont" onchange="applyPieceStyle()"><option value="Arial, sans-serif">Arial</option><option value="Georgia, serif">Book</option><option value="'Comic Sans MS', cursive">Playful</option><option value="'Trebuchet MS', sans-serif">Rounded</option><option value="'Times New Roman', serif">Classic</option></select></div><div class="pc-row"><label>Text</label><input id="pcText" type="color" value="#243746" oninput="applyPieceStyle()"><label>Background</label><input id="pcBg" type="color" value="#fff1b8" oninput="applyPieceStyle()"></div><div class="pc-row"><label>Text size</label><input id="pcFontSize" type="range" min="12" max="42" value="18" oninput="applyPieceStyle()"><span id="pcFontSizeVal">18</span></div><div class="pc-row"><button onclick="transparentPiece()">No background</button><button onclick="resetPieceStyle()">Reset</button><button onclick="closeCustomizer()">Done ✓</button></div></div><script src="gallery.js?v=20261007b"></script></body></html>
