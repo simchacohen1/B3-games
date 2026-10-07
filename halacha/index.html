@@ -153,13 +153,14 @@ function save(){
  if(HALACHA_TEACHER_VIEW){setSaveStatus("Teacher view — student work is read only");return}
  if(HALACHA_TEACHER_LESSON){
    teacherDirty=true;
+   try{localStorage.setItem(HALACHA_LOCAL_KEY+"_teacher",JSON.stringify(S));if(teacherAccountUid)localStorage.setItem("halachaTeacherPending:"+teacherAccountUid,JSON.stringify(S))}catch(e){}
    try{localStorage.setItem(teacherAccountUid?"halachaV14_teacher:"+teacherAccountUid:HALACHA_LOCAL_KEY+"_teacher",JSON.stringify(S))}catch(e){}
    if(!teacherCloudReady||!cloudPath()){setSaveStatus("Teacher copy saved on this device ? connecting to account?");return}
    setSaveStatus("Saving teacher copy?");clearTimeout(cloudSaveTimer);
    const state=JSON.parse(JSON.stringify(S));
-   cloudSaveTimer=setTimeout(()=>halachaDb.ref(cloudPath()).set({version:1,updatedAt:firebase.database.ServerValue.TIMESTAMP,state})
-    .then(()=>{teacherDirty=false;setSaveStatus("? Teacher copy saved to my account")})
-    .catch(e=>{console.warn("Teacher cloud save failed",e);setSaveStatus("Teacher copy saved on this device ? account save failed")}),350);
+   halachaDb.ref(cloudPath()).set({version:1,updatedAt:firebase.database.ServerValue.TIMESTAMP,state})
+    .then(()=>{if(JSON.stringify(S)===JSON.stringify(state)){teacherDirty=false;localStorage.removeItem("halachaTeacherPending:"+teacherAccountUid)}setSaveStatus("Teacher copy saved to my account")})
+    .catch(e=>{console.warn("Teacher cloud save failed",e);setSaveStatus("Teacher copy saved on this device ? account save failed")});
    return;
  }
  try{localStorage.setItem(HALACHA_LOCAL_KEY,JSON.stringify(S))}catch(e){}
@@ -201,6 +202,8 @@ async function loadTeacherCopy(){
  setSaveStatus("Loading teacher copy from my account?");
  try{
   const snap=await halachaDb.ref(cloudPath()).once("value"),row=snap.val();
+  const pending=localStorage.getItem("halachaTeacherPending:"+user.uid);
+  if(pending&&!teacherDirty){S=JSON.parse(pending);teacherDirty=true}
   if(!teacherDirty){
    if(row&&row.state)S=row.state;
    else{const local=localStorage.getItem(key);if(local)S=JSON.parse(local)}
@@ -210,7 +213,7 @@ async function loadTeacherCopy(){
   }
   teacherCloudReady=true;
   if(!row||!row.state||teacherDirty)save();
-  else setSaveStatus("? Teacher copy saved to my account");
+  else setSaveStatus("Teacher copy saved to my account");
  }catch(e){console.warn("Teacher cloud load failed",e);setSaveStatus("Teacher copy saved on this device ? account sync unavailable")}
 }
 
