@@ -71,7 +71,8 @@ async function loadClass(){
   const snap=await db.ref("b3Games/workspaces/"+ws+"/classes/"+c.id+"/resources/gematria/progress").once("value");
   const prog=snap.val()||{};
   const ids=new Set([...Object.entries(c.members).filter(([,m])=>!m||m.active!==false).map(([id])=>id),...Object.keys(prog)]);
-  rows=[...ids].map(id=>{const p=prog[id]||null,m=c.members[id]||{};return {id,name:String(m.name||p?.name||id),p}});
+  const played=p=>p&&((Number(p.stars)||0)>0||['learn','words','numbers'].some(k=>(Number(p[k]?.attempts)||0)>0)||(Number(p.speed?.plays)||0)>0||(Number(p.match?.plays)||0)>0);
+  rows=[...ids].map(id=>{const p=played(prog[id])?prog[id]:null,m=c.members[id]||{};return {id,name:String(m.name||p?.name||id),p}});
   drawRows();drawSummary(c);
   const started=rows.filter(r=>r.p).length;
   $("status").textContent=c.name+" — "+started+" of "+rows.length+" students have played";

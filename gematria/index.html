@@ -291,6 +291,7 @@ let db=null,progressRef=null,saveTimer=null;
 
 function blankProgress(){return {stars:0,learn:{correct:0,attempts:0},words:{correct:0,attempts:0},numbers:{correct:0,attempts:0},speed:{best:0,plays:0},match:{bestSeconds:0,plays:0},missed:{},level:1}}
 function num(x){return Number(x)||0}
+function hasPlayed(p){return num(p.stars)>0||["learn","words","numbers"].some(k=>num(p[k]?.attempts)>0)||num(p.speed?.plays)>0||num(p.match?.plays)>0}
 function merge(local,remote){ // keep the best of both copies
  const r=Object.assign(blankProgress(),remote||{}),l=local,o=blankProgress();
  o.stars=Math.max(num(l.stars),num(r.stars));
@@ -335,9 +336,13 @@ async function connect(){
   if(!info.classId){setNote("Practice mode — ask your teacher to add you to a class to save stars.");return}
   progressRef=db.ref("b3Games/workspaces/"+info.workspaceId+"/classes/"+info.classId+"/resources/gematria/progress/"+studentId);
   const snap=await progressRef.once("value");
-  P=merge(P,snap.val());
+  const remote=snap.val();P=merge(P,remote);
   if(!safeGet("gematria_level")&&P.level)level=P.level;
-  paintLevels();save();setNote("✓ Your stars are saved for your teacher");
+  paintLevels();
+  // Only write now if this device has progress the server doesn't have yet.
+  if(hasPlayed(P)&&JSON.stringify(merge(blankProgress(),remote))!==JSON.stringify(P))save();
+  else{safeSet(LOCAL_KEY,JSON.stringify(P));$("starCount").textContent=P.stars}
+  setNote("✓ Your stars are saved for your teacher");
  }catch(e){console.warn("Gematria connect failed",e);setNote("Saved on this device only (could not reach the server)")}
 }
 
