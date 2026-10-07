@@ -69,7 +69,7 @@ button,input,select,textarea{font:inherit}
 .pending-note.show{display:block}
 .online-note{display:none;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.72);background:rgba(45,36,27,.64);color:#fffdf6;border-radius:999px;padding:9px 13px;font-size:.72rem;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.18);backdrop-filter:blur(9px);white-space:nowrap}
 .online-note.show{display:flex}.online-dot{width:8px;height:8px;border-radius:50%;background:#78df8c;box-shadow:0 0 0 3px rgba(120,223,140,.18)}
-.tag-hud{display:none;position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:31;align-items:center;gap:9px;padding:10px 16px;border-radius:999px;background:rgba(116,45,36,.91);color:#fff9ee;font-size:.78rem;font-weight:900;letter-spacing:.02em;box-shadow:0 8px 26px rgba(0,0,0,.24);backdrop-filter:blur(10px);pointer-events:none}.tag-hud.show{display:flex}.tag-hud.safe{background:rgba(53,87,62,.9)}.tag-hud .tag-icon{font-size:1rem}.tag-pop{position:fixed;left:50%;top:66px;transform:translateX(-50%) translateY(-8px);z-index:32;opacity:0;pointer-events:none;background:#fff8e9;color:#4b3728;border:1px solid rgba(95,65,43,.18);border-radius:13px;padding:10px 16px;font-weight:900;font-size:.82rem;box-shadow:0 10px 30px rgba(0,0,0,.2);transition:.18s ease}.tag-pop.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.tag-hud{display:none;position:fixed;left:50%;top:68px;transform:translateX(-50%);z-index:31;align-items:center;gap:9px;padding:10px 16px;border-radius:999px;background:rgba(116,45,36,.91);color:#fff9ee;font-size:.78rem;font-weight:900;letter-spacing:.02em;box-shadow:0 8px 26px rgba(0,0,0,.24);backdrop-filter:blur(10px);pointer-events:none}.tag-hud.show{display:flex}.tag-hud.safe{background:rgba(53,87,62,.9)}.tag-hud .tag-icon{font-size:1rem}.tag-pop{position:fixed;left:50%;top:116px;transform:translateX(-50%) translateY(-8px);z-index:32;opacity:0;pointer-events:none;background:#fff8e9;color:#4b3728;border:1px solid rgba(95,65,43,.18);border-radius:13px;padding:10px 16px;font-weight:900;font-size:.82rem;box-shadow:0 10px 30px rgba(0,0,0,.2);transition:.18s ease}.tag-pop.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 .start-help{position:fixed;left:50%;bottom:24px;z-index:35;transform:translateX(-50%);padding:9px 16px;border-radius:999px;background:rgba(255,253,248,.84);color:#4b4034;font-size:.76rem;font-weight:800;box-shadow:0 6px 22px rgba(0,0,0,.14);backdrop-filter:blur(10px);pointer-events:none;transition:opacity .65s ease,transform .65s ease}
 .start-help.hide{opacity:0;transform:translate(-50%,18px)}
@@ -606,7 +606,7 @@ function init3D(){
   scene.add(new THREE.HemisphereLight(0xfff6e5,0x7a695b,1.25));
   const sun=new THREE.DirectionalLight(0xffeed0,1.05);sun.position.set(2,9,6);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-16;sun.shadow.camera.right=16;sun.shadow.camera.top=24;sun.shadow.camera.bottom=-24;scene.add(sun);
   buildScene();
-  avatar=createAvatar(selectedAvatarId);avatarParts=avatar.userData.parts;avatar.scale.setScalar(.78);scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);
+  avatar=createAvatar(selectedAvatarId);avatarParts=avatar.userData.parts;scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);
   remoteAvatarsGroup=new THREE.Group();scene.add(remoteAvatarsGroup);
   renderer.domElement.addEventListener('pointerdown',onPointerDown);renderer.domElement.addEventListener('pointermove',onPointerMove);renderer.domElement.addEventListener('pointerup',onPointerUp);renderer.domElement.addEventListener('pointercancel',()=>dragging=false);
   window.addEventListener('resize',onResize);
@@ -1034,7 +1034,7 @@ function createAvatar(avatarId=selectedAvatarId){
 function rebuildAvatar(){
   if(!scene)return;
   if(avatar){scene.remove(avatar);disposeGroup(avatar);}
-  avatar=createAvatar(selectedAvatarId);avatarParts=avatar.userData.parts;avatar.scale.setScalar(.78);scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);avatar.rotation.y=avatarState.angle;
+  avatar=createAvatar(selectedAvatarId);avatarParts=avatar.userData.parts;scene.add(avatar);avatar.position.set(avatarState.x,0,avatarState.z);avatar.rotation.y=avatarState.angle;
   syncLivePresence(true);
 }
 
