@@ -433,6 +433,7 @@
   }
 
   function isAuthorizedUser(user) {
+    if (getActingStudent()) return false;
     return Boolean(user && (isBootstrapAdmin(user) || currentAccess.authorized));
   }
 
@@ -828,6 +829,15 @@
         callback(null, false, currentAccess);
         return;
       }
+      // A teacher who chose "Sign in as a student" sees every page exactly as
+      // that student does until they press Exit. This only ever removes
+      // teacher access in this browser; it never grants anything.
+      const acting = getActingStudent();
+      if (acting) {
+        currentAccess = { authorized:false, role:"", classIds:[], actingAsStudent:acting };
+        callback(user, false, currentAccess);
+        return;
+      }
       readUserAccess(user).then(function(access){
         currentAccess = access;
         callback(user, access.authorized, access);
@@ -841,6 +851,179 @@
           });
         }
       });
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Teacher "Sign in as a student"
+  // The teacher's Google sign-in stays in place. We fetch the student's
+  // passcode through the existing teacher-only funTorahManageStudents "list"
+  // action (which already checks the teacher owns that class), save the same
+  // values a normal student sign-in saves, and mark this browser as acting.
+  // ---------------------------------------------------------------------
+  const ACTING_KEY = "b3ActingAsStudent";
+  const ACTING_ID = /^[A-Za-z0-9_-]{1,100}$/;
+  const STUDENT_STORAGE_KEYS = ["b3Games_studentId", "b3Games_studentName", "b3Games_studentClass", "b3Games_classPin",
+    "posukPractice_studentId", "posukPractice_studentName", "weeklyQuiz_classId"];
+  const MANAGE_STUDENTS_URL = "https://us-central1-b3-games.cloudfunctions.net/funTorahManageStudents";
+  const SITE_BASE = (function () {
+    try {
+      const own = document.currentScript && document.currentScript.src;
+      const tag = own || Array.prototype.map.call(document.getElementsByTagName("script"), function (s) { return s.src; })
+        .find(function (src) { return /\/site-settings\.js(\?|$)/.test(src || ""); });
+      return new URL(".", tag || location.href).href;
+    } catch (e) { return ""; }
+  })();
+
+  function getActingStudent() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(ACTING_KEY) || "null");
+      if (!raw || !ACTING_ID.test(String(raw.id || "")) || !ACTING_ID.test(String(raw.classId || ""))) return null;
+      return { id:String(raw.id), name:String(raw.name || raw.id), classId:String(raw.classId), className:String(raw.className || raw.classId), startedAt:raw.startedAt || null };
+    } catch (e) { return null; }
+  }
+
+  function clearStudentStorage() {
+    try { STUDENT_STORAGE_KEYS.forEach(function (k) { localStorage.removeItem(k); }); } catch (e) {}
+    // Per-tab caches (Yiddish session, Halacha view, etc.) belong to the old identity.
+    try { sessionStorage.clear(); } catch (e) {}
+  }
+
+  async function listStudentsForActing() {
+    const services = ensureFirebase();
+    const user = services && services.auth && services.auth.currentUser;
+    if (!user) throw new Error("Sign in with your teacher Google account first.");
+    const access = await readUserAccess(user);
+    if (!access.authorized) throw new Error("This Google account is not a Fun Torah Tools teacher.");
+    let classIds = access.classIds || [];
+    if (access.role === "admin") {
+      const all = (await services.db.ref(WORKSPACE_ROOT_KEY + "/classes").once("value")).val() || {};
+      classIds = Object.keys(all);
+    }
+    const rows = await Promise.all(classIds.filter(function (id) { return ACTING_ID.test(id); }).map(function (id) {
+      return services.db.ref(WORKSPACE_ROOT_KEY + "/classes/" + id).once("value").then(function (snap) {
+        const cls = snap.val();
+        if (!cls || cls.active === false) return null;
+        const students = Object.keys(cls.members || {}).filter(function (sid) {
+          const m = cls.members[sid];
+          return ACTING_ID.test(sid) && m && m.active !== false;
+        }).map(function (sid) {
+          return { id:sid, name:String(cls.members[sid].name || sid) };
+        }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+        return { classId:id, className:String(cls.name || id.toUpperCase()), students:students };
+      });
+    }));
+    return rows.filter(function (r) { return r && r.students.length; })
+      .sort(function (a, b) { return a.className.localeCompare(b.className); });
+  }
+
+  async function startActingAsStudent(classId, studentId) {
+    classId = String(classId || ""); studentId = String(studentId || "");
+    if (!ACTING_ID.test(classId) || !ACTING_ID.test(studentId)) throw new Error("Choose a student.");
+    const services = ensureFirebase();
+    const user = services && services.auth && services.auth.currentUser;
+    if (!user) throw new Error("Sign in with your teacher Google account first.");
+    const access = await readUserAccess(user);
+    if (!access.authorized) throw new Error("This Google account is not a Fun Torah Tools teacher.");
+    if (access.role !== "admin" && (access.classIds || []).indexOf(classId) < 0) throw new Error("This class is not assigned to your teacher account.");
+    const cls = (await services.db.ref(WORKSPACE_ROOT_KEY + "/classes/" + classId).once("value")).val();
+    const member = cls && cls.members && cls.members[studentId];
+    if (!cls || cls.active === false || !member || member.active === false) throw new Error("That student is not active in this class.");
+    const response = await fetch(MANAGE_STUDENTS_URL, {
+      method:"POST", signal:AbortSignal.timeout(15000),
+      headers:{ "Content-Type":"application/json", "Authorization":"Bearer " + await user.getIdToken() },
+      body:JSON.stringify({ action:"list", classId:classId })
+    });
+    const result = await response.json().catch(function () { return {}; });
+    if (!response.ok) throw new Error(result.error || "Could not open this student's account.");
+    const pin = String((result.passcodes || {})[studentId] || "").trim();
+    if (!pin) throw new Error("This student doesn't have a passcode yet. Set one in Manage Class first.");
+    const name = String(member.name || studentId);
+    clearStudentStorage();
+    localStorage.setItem("b3Games_studentId", studentId);
+    localStorage.setItem("b3Games_studentName", name);
+    localStorage.setItem("b3Games_studentClass", classId);
+    localStorage.setItem("b3Games_classPin", pin);
+    localStorage.setItem("posukPractice_studentId", studentId);
+    localStorage.setItem("posukPractice_studentName", name);
+    localStorage.setItem("weeklyQuiz_classId", classId);
+    localStorage.setItem("b3Games_workspaceId", WORKSPACE_ID);
+    localStorage.removeItem("b3TeacherBypass");
+    localStorage.setItem(ACTING_KEY, JSON.stringify({ id:studentId, name:name, classId:classId, className:String(cls.name || classId.toUpperCase()), startedAt:Date.now() }));
+    location.href = SITE_BASE + "index.html";
+  }
+
+  function stopActingAsStudent() {
+    clearStudentStorage();
+    try { localStorage.removeItem(ACTING_KEY); } catch (e) {}
+    location.href = SITE_BASE + "teacher-home.html";
+  }
+
+  function actingEsc(s) { const d = document.createElement("div"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
+
+  function showActingBanner() {
+    const acting = getActingStudent();
+    if (!acting || window.top !== window || document.getElementById("b3ActingBanner")) return;
+    const bar = document.createElement("div");
+    bar.id = "b3ActingBanner";
+    bar.setAttribute("role", "status");
+    bar.style.cssText = "position:fixed;left:16px;right:16px;bottom:14px;margin:0 auto;width:fit-content;z-index:2147483647;display:flex;align-items:center;gap:12px;" +
+      "padding:10px 12px 10px 16px;border-radius:999px;background:#7c2d12;color:#fff;font:600 14px/1.3 Arial,sans-serif;" +
+      "box-shadow:0 8px 24px rgba(0,0,0,.28)";
+    bar.innerHTML = '<span>\uD83D\uDC40 Viewing as <strong>' + actingEsc(acting.name) + '</strong> \u00B7 ' + actingEsc(acting.className) + '</span>' +
+      '<button type="button" style="border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#7c2d12;font:800 13px Arial,sans-serif;cursor:pointer;white-space:nowrap">Exit student view</button>';
+    bar.querySelector("button").onclick = stopActingAsStudent;
+    document.body.appendChild(bar);
+  }
+
+  function openActAsStudentPicker() {
+    const old = document.getElementById("b3ActAsPicker");
+    if (old) old.remove();
+    const wrap = document.createElement("div");
+    wrap.id = "b3ActAsPicker";
+    wrap.setAttribute("role", "dialog");
+    wrap.setAttribute("aria-modal", "true");
+    wrap.style.cssText = "position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.55);font-family:Arial,sans-serif";
+    const field = "width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font:15px Arial,sans-serif;margin-top:6px;background:#fff;color:#1f2937";
+    wrap.innerHTML = '<div style="background:#fff;color:#1f2937;border-radius:18px;padding:22px;width:100%;max-width:420px;box-shadow:0 20px 50px rgba(0,0,0,.3)">' +
+      '<h2 style="margin:0 0 6px;font-size:21px">Sign in as a student</h2>' +
+      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">See Fun Torah Tools exactly as this student does. Anything you do counts as their work. Press <strong>Exit student view</strong> to come back.</p>' +
+      '<label style="display:block;font-weight:700;font-size:14px">Class<select id="b3ActAsClass" style="' + field + '"><option>Loading\u2026</option></select></label>' +
+      '<label style="display:block;font-weight:700;font-size:14px;margin-top:12px">Student<select id="b3ActAsStudent" style="' + field + '"></select></label>' +
+      '<p id="b3ActAsMsg" style="min-height:20px;margin:12px 0 0;color:#b91c1c;font-size:14px"></p>' +
+      '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">' +
+      '<button type="button" id="b3ActAsCancel" style="border:1px solid #cbd5e1;background:#fff;color:#1f2937;border-radius:10px;padding:10px 14px;font:700 14px Arial,sans-serif;cursor:pointer">Cancel</button>' +
+      '<button type="button" id="b3ActAsGo" disabled style="border:0;background:#15803d;color:#fff;border-radius:10px;padding:10px 14px;font:800 14px Arial,sans-serif;cursor:pointer">Open as student</button>' +
+      '</div></div>';
+    document.body.appendChild(wrap);
+    const q = function (id) { return document.getElementById(id); };
+    const close = function () { wrap.remove(); };
+    q("b3ActAsCancel").onclick = close;
+    wrap.addEventListener("click", function (e) { if (e.target === wrap) close(); });
+    let classes = [];
+    const fillStudents = function () {
+      const cls = classes.find(function (c) { return c.classId === q("b3ActAsClass").value; });
+      q("b3ActAsStudent").innerHTML = (cls ? cls.students : []).map(function (s) {
+        return '<option value="' + actingEsc(s.id) + '">' + actingEsc(s.name) + '</option>';
+      }).join("");
+      q("b3ActAsGo").disabled = !cls || !cls.students.length;
+    };
+    q("b3ActAsClass").onchange = fillStudents;
+    q("b3ActAsGo").onclick = function () {
+      q("b3ActAsGo").disabled = true; q("b3ActAsMsg").style.color = "#475569"; q("b3ActAsMsg").textContent = "Opening\u2026";
+      startActingAsStudent(q("b3ActAsClass").value, q("b3ActAsStudent").value).catch(function (e) {
+        q("b3ActAsMsg").style.color = "#b91c1c"; q("b3ActAsMsg").textContent = e.message || "Could not open this student.";
+        q("b3ActAsGo").disabled = false;
+      });
+    };
+    listStudentsForActing().then(function (rows) {
+      classes = rows;
+      if (!rows.length) { q("b3ActAsClass").innerHTML = '<option value="">No students in your classes</option>'; fillStudents(); return; }
+      q("b3ActAsClass").innerHTML = rows.map(function (c) { return '<option value="' + actingEsc(c.classId) + '">' + actingEsc(c.className) + '</option>'; }).join("");
+      fillStudents();
+    }).catch(function (e) {
+      q("b3ActAsClass").innerHTML = '<option value="">\u2014</option>';
+      q("b3ActAsMsg").textContent = e.message || "Could not load your classes.";
     });
   }
 
@@ -877,6 +1060,15 @@
     workspaceId: WORKSPACE_ID,
     timeZone: TIME_ZONE,
     dayKeys: DAY_KEYS.slice(),
-    getMode: function () { ensureFirebase(); return activeMode; }
+    getMode: function () { ensureFirebase(); return activeMode; },
+    getActingStudent: getActingStudent,
+    listStudentsForActing: listStudentsForActing,
+    startActingAsStudent: startActingAsStudent,
+    stopActingAsStudent: stopActingAsStudent,
+    openActAsStudentPicker: openActAsStudentPicker
   };
+  if (getActingStudent()) {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", showActingBanner);
+    else showActingBanner();
+  }
 })();

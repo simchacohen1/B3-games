@@ -27,7 +27,7 @@ tr.none td{color:#94a3b8}
 .toolbar button{border:0;border-radius:9px;padding:8px 12px;background:#173b62;color:#fff;font-weight:bold;cursor:pointer}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
-<script src="../firebase-config.js"></script><script src="../site-settings.js?v=20261007-gematria"></script>
+<script src="../firebase-config.js"></script><script src="../site-settings.js?v=20261007-act-as-student"></script>
 </head>
 <body>
 <header><h1>🔢 Gematria — Teacher Dashboard</h1><p>Each student's stars, accuracy, best scores, and the letters they miss most.</p></header>
@@ -39,8 +39,8 @@ tr.none td{color:#94a3b8}
  <div class="tableWrap"><table><thead><tr>
   <th data-sort="name">Student</th><th data-sort="stars">⭐ Stars</th><th data-sort="level">Level</th>
   <th data-sort="learn">Letters</th><th data-sort="words">Word value</th><th data-sort="numbers">Number → letters</th>
-  <th data-sort="speed">Speed best</th><th data-sort="match">Match best</th><th>Tricky letters</th><th data-sort="last">Last played</th>
- </tr></thead><tbody id="rows"><tr><td colspan="10" class="muted">—</td></tr></tbody></table></div>
+  <th data-sort="speed">Speed best</th><th data-sort="match">Match best</th><th data-sort="race">👥 Races won</th><th>Tricky letters</th><th data-sort="last">Last played</th>
+ </tr></thead><tbody id="rows"><tr><td colspan="11" class="muted">—</td></tr></tbody></table></div>
  <p class="muted">Percent = right answers ÷ tries. Tricky letters are the letters the student missed most.</p>
 </main>
 <script>
@@ -71,7 +71,7 @@ async function loadClass(){
   const snap=await db.ref("b3Games/workspaces/"+ws+"/classes/"+c.id+"/resources/gematria/progress").once("value");
   const prog=snap.val()||{};
   const ids=new Set([...Object.entries(c.members).filter(([,m])=>!m||m.active!==false).map(([id])=>id),...Object.keys(prog)]);
-  const played=p=>p&&((Number(p.stars)||0)>0||['learn','words','numbers'].some(k=>(Number(p[k]?.attempts)||0)>0)||(Number(p.speed?.plays)||0)>0||(Number(p.match?.plays)||0)>0);
+  const played=p=>p&&((Number(p.stars)||0)>0||['learn','words','numbers'].some(k=>(Number(p[k]?.attempts)||0)>0)||(Number(p.speed?.plays)||0)>0||(Number(p.match?.plays)||0)>0||(Number(p.race?.plays)||0)>0);
   rows=[...ids].map(id=>{const p=played(prog[id])?prog[id]:null,m=c.members[id]||{};return {id,name:String(m.name||p?.name||id),p}});
   drawRows();drawSummary(c);
   const started=rows.filter(r=>r.p).length;
@@ -83,12 +83,12 @@ function sortVal(r){const p=r.p||{};switch(sortKey){
  case"stars":return Number(p.stars)||-1;case"level":return Number(p.level)||-1;
  case"learn":case"words":case"numbers":return pct(p[sortKey])??-1;
  case"speed":return Number(p.speed?.best)||-1;case"match":return p.match?.bestSeconds?-p.match.bestSeconds:-1e9;
- case"last":return Number(p.lastActive)||-1;default:return r.name.toLowerCase()}}
+ case"race":return Number(p.race?.wins)||(p.race?.plays?0:-1);case"last":return Number(p.lastActive)||-1;default:return r.name.toLowerCase()}}
 function drawRows(){
  const list=rows.slice().sort((a,b)=>{const x=sortVal(a),y=sortVal(b);return (x>y?1:x<y?-1:0)*sortDir});
  $("rows").innerHTML=list.map(r=>{const p=r.p;
-  if(!p)return '<tr class="none"><td>'+esc(r.name)+'</td><td colspan="9">Not started yet</td></tr>';
-  return '<tr><td><b>'+esc(r.name)+'</b></td><td>⭐ '+(p.stars||0)+'</td><td>'+(p.level||1)+'</td><td>'+pctCell(p.learn)+'</td><td>'+pctCell(p.words)+'</td><td>'+pctCell(p.numbers)+'</td><td>'+(p.speed?.best?p.speed.best+' <span class="muted">('+p.speed.plays+' plays)</span>':'—')+'</td><td>'+(p.match?.bestSeconds?p.match.bestSeconds+'s':'—')+'</td><td class="tricky">'+esc(tricky(p.missed))+'</td><td>'+esc(ago(p.lastActive))+'</td></tr>'}).join("")||'<tr><td colspan="10" class="muted">No students in this class yet.</td></tr>';
+  if(!p)return '<tr class="none"><td>'+esc(r.name)+'</td><td colspan="10">Not started yet</td></tr>';
+  return '<tr><td><b>'+esc(r.name)+'</b></td><td>⭐ '+(p.stars||0)+'</td><td>'+(p.level||1)+'</td><td>'+pctCell(p.learn)+'</td><td>'+pctCell(p.words)+'</td><td>'+pctCell(p.numbers)+'</td><td>'+(p.speed?.best?p.speed.best+' <span class="muted">('+p.speed.plays+' plays)</span>':'—')+'</td><td>'+(p.match?.bestSeconds?p.match.bestSeconds+'s':'—')+'</td><td>'+(p.race?.plays?(p.race.wins||0)+' <span class="muted">of '+p.race.plays+'</span>':'—')+'</td><td class="tricky">'+esc(tricky(p.missed))+'</td><td>'+esc(ago(p.lastActive))+'</td></tr>'}).join("")||'<tr><td colspan="11" class="muted">No students in this class yet.</td></tr>';
 }
 function drawSummary(c){
  const ps=rows.map(r=>r.p).filter(Boolean);
