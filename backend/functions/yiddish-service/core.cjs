@@ -66,7 +66,7 @@ async function identity(body){
  if(row.profile&&session.passcodeHash!==hash(await passcodeFor(session.studentId,row.profile,classId)))fail(401,'Your passcode changed. Sign in again.');
  if(legacy(classId)){
   const settings=await get('b3Games/siteSettings')||{};
-  if(!policy.isGameEnabledForClass(settings,classId,'yiddish')||!(policy.isClassOpen(settings,classId,new Date(now()))||policy.studentHasGameOverride(settings,session.studentId,'yiddish')))fail(403,'Yiddish is closed for your class right now.');
+  if(!policy.isGameEnabledForClass(settings,classId,'yiddish')||!(policy.isClassOpen(settings,classId,new Date(now()))||policy.studentHasGameOverride(settings,session.studentId,'yiddish')||String(settings.classLockedGameOverride?.[classId]||'').split(',').map(v=>v.trim()).includes('yiddish')))fail(403,'Yiddish is closed for your class right now.');
  }else if(row.classRecord.toolGrants?.yiddish!==true||row.classRecord.siteEnabled===false||row.classRecord.access?.mode==='locked')fail(403,'Yiddish is closed for your class right now.');
  return {id:session.studentId,name:row.profile?.name||row.classRecord.members[session.studentId].name||session.studentId,classId};
 }
