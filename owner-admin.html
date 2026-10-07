@@ -132,8 +132,7 @@ async function deleteTeacher(inviteId){
 async function deleteClass(classId){
  if(B3_CLASSES.includes(classId))return;
  const cname=classData[classId]?.name||classId;
- const typed=prompt("Delete the class "+cname+"? Its students are taken out of the class (their accounts stay) and its teachers lose it. This cannot be undone. Type the class name to confirm:");
- if(typed===null)return;if(typed.trim()!==cname){alert("The name did not match, so nothing was deleted.");return}
+ if(!confirm("Are you sure you want to delete the class "+cname+"? Its students are taken out of the class (their accounts stay) and its teachers lose it. This cannot be undone."))return;
  const root="b3Games/workspaces/"+WS,updates={[root+"/classes/"+classId]:null,[root+"/contentGrants/"+classId]:null};
  Object.keys(classData[classId]?.members||{}).forEach(sid=>{updates["b3Games/students/"+sid+"/memberships/"+WS+"_"+classId]=null;});
  Object.entries(teacherData).forEach(([tid,t])=>{if(t.classIds?.[classId])updates[root+"/teacherInvites/"+tid+"/classIds/"+classId]=null;});
