@@ -39,6 +39,7 @@
       if (!studentName) throw new Error('Please sign in with your name on the home page first.');
       closeCustomizer(); persist(id); saveDrawing(id);
       await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+      if (typeof html2canvas !== 'function') throw new Error('The picture tool did not load. Please check your internet connection and try again.');
       const spread = document.querySelector('#' + id + ' .spread');
       await document.fonts.ready;
       const canvas = await html2canvas(spread, {
