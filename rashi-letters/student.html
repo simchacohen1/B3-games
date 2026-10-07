@@ -810,11 +810,10 @@ function stepName(st){
 function stepMastered(idx){
   const st=STEPS[idx];
   if(st.k==='unit') return guidedIndex > st.i;
-  if(chainFlags[flagKey(st)]) return true;
-  // Boys who already passed later missions keep their place.
-  return STEPS.slice(idx+1).some(t=>t.k==='unit' && guidedIndex > t.i);
+  return !!chainFlags[flagKey(st)];   // no free passes: Look-alike and word steps must be mastered by everyone
 }
-function stepUnlocked(idx){ for(let j=0;j<idx;j++) if(!stepMastered(j)) return false; return true; }
+// A step is open if it's already mastered (missions stay finished) or everything before it is mastered.
+function stepUnlocked(idx){ if(stepMastered(idx)) return true; for(let j=0;j<idx;j++) if(!stepMastered(j)) return false; return true; }
 function firstUnmasteredBefore(idx){ for(let j=0;j<idx;j++) if(!stepMastered(j)) return j; return idx; }
 function currentStep(){ return STEPS.findIndex((_,j)=>!stepMastered(j)); }
 function stepIndexOf(k,v){ return STEPS.findIndex(st=>st.k===k && (k==='similar' || st.n===v || st.i===v)); }
