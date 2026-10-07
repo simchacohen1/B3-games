@@ -13,7 +13,10 @@
       },
       "students": {
         "$studentId": {
-          ".write": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"
+          ".write": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)",
+          "halacha": {
+            ".write": "auth != null && auth.token.b3StudentId == $studentId"
+          }
         }
       },
       "workspaces": {
@@ -117,6 +120,12 @@
       "progress": {
         ".read": true,
         "$studentId": {
+          ".write": true
+        }
+      },
+      "matchRooms": {
+        ".read": true,
+        "$room": {
           ".write": true
         }
       }
