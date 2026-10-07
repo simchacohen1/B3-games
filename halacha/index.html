@@ -142,9 +142,12 @@ body.exporting .resize-width,body.exporting .resize-height{display:none!importan
 .halacha-access-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 0;border-top:1px solid #e8d9ad}
 .halacha-access-row:first-of-type{border-top:0}.halacha-access-row strong{min-width:120px}
 .halacha-access-buttons{display:flex;gap:6px;flex-wrap:wrap;direction:rtl}
-.halacha-access-buttons button{border:2px solid #b7cfdb;background:#fff;color:#173b62;border-radius:9px;padding:7px 10px;font-weight:900}
-.halacha-access-buttons button.on{background:#173b62;color:#fff;border-color:#173b62}
-.halacha-access-note{font-size:12px;color:#64748b;margin-top:5px}
+.halacha-access-buttons button{border:2px solid #b7cfdb;background:#fff;color:#173b62;border-radius:9px;padding:8px 11px;font-weight:900;min-width:92px}
+.halacha-access-buttons button.open{background:#e8f7ec;color:#166534;border-color:#86c995}
+.halacha-access-buttons button.current{background:#173b62;color:#fff;border-color:#173b62;box-shadow:0 0 0 3px #93c5fd}
+.halacha-access-buttons button.locked{background:#f1f5f9;color:#64748b;border-color:#cbd5e1}
+.halacha-access-status{font-size:12px;font-weight:900;color:#173b62;margin-left:auto}
+.halacha-access-note{font-size:12px;color:#64748b;margin-top:7px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -742,7 +745,15 @@ async function renderHalachaTeacherAccess(access){
     const row=cs.val()||{},raw=String(as.val()||"א");
     return {id,name:String(row.name||id.toUpperCase()),max:HALACHA_ACCESS_ORDER.includes(raw)?raw:"א"};
   }));
-  host.innerHTML=rows.map(r=>'<div class="halacha-access-row"><strong>'+r.name+'</strong><span class="halacha-access-buttons">'+HALACHA_ACCESS_ORDER.map(s=>'<button type="button" class="'+(s===r.max?'on':'')+'" data-halacha-class="'+r.id+'" data-halacha-siman="'+s+'">סימן '+s+'</button>').join('')+'</span></div>').join('');
+  host.innerHTML=rows.map(r=>{
+    const maxRank=HALACHA_ACCESS_ORDER.indexOf(r.max);
+    const buttons=HALACHA_ACCESS_ORDER.map((s,i)=>{
+      const state=i<maxRank?"open":i===maxRank?"current":"locked";
+      const icon=state==="locked"?"🔒":state==="current"?"✅":"🔓";
+      return '<button type="button" class="'+state+'" data-halacha-class="'+r.id+'" data-halacha-siman="'+s+'">'+icon+' סימן '+s+'</button>';
+    }).join('');
+    return '<div class="halacha-access-row"><strong>'+r.name+'</strong><span class="halacha-access-buttons">'+buttons+'</span><span class="halacha-access-status">Open through סימן '+r.max+'</span></div>';
+  }).join('');
   host.querySelectorAll("[data-halacha-class][data-halacha-siman]").forEach(btn=>btn.onclick=async()=>{
     btn.disabled=true;
     try{
