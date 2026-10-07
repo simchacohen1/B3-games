@@ -26,7 +26,7 @@
   installButtons();
   async function prepare(id) {
     if (busy) return;
-    draft = null; send.disabled = true;
+    busy = true; draft = null; send.disabled = true; cancel.disabled = true; cancel.textContent = 'Cancel';
     dialog.querySelector('img').removeAttribute('src');
     const lesson = lessons.find(l => l.id === id);
     dialog.querySelector('input').value = ('Halacha — ' + lesson.title).slice(0, 60);
@@ -53,6 +53,7 @@
       dialog.querySelector('img').src = image;
       status.textContent = 'Check your pages, then send them to your teacher.'; send.disabled = false;
     } catch (error) { status.textContent = error.message || 'Could not prepare your pages. Please try again.'; }
+    finally { busy = false; cancel.disabled = false; }
   }
   send.onclick = async () => {
     if (!draft || busy) return;
