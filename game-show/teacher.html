@@ -485,16 +485,9 @@ function flattenLegacyPosukData(posukData) {
   return flat;
 }
 
-// Requires the user to type an exact word before proceeding, so a destructive
-// action can't happen from a single accidental click through a popup.
-function confirmByTyping(word, message) {
-  const entered = prompt(message + '\n\nType ' + word + ' below to confirm:');
-  return entered !== null && entered.trim().toUpperCase() === word;
-}
-
 function syncQuestionsToDatabase() {
   if (CLASS_SPACE) { alert('This class uses its own questions. Add them in the Setup tab.'); return; }
-  const sure = confirmByTyping('RESTORE', "This will REPLACE your current question list with the original built-in Vayeira Perek 18 list this file shipped with. Any edits you made will be lost.");
+  const sure = confirm("Are you sure? " + "This will REPLACE your current question list with the original built-in Vayeira Perek 18 list this file shipped with. Any edits you made will be lost.");
   if (!sure) return;
   setRef.set({ title: ACTIVE_SET_TITLE, questions: localQuestions }).then(() => {
     document.getElementById('soundStatus').textContent = 'Restored built-in questions';
@@ -864,7 +857,7 @@ function sanitize(name) {
 
 function resetGame() {
   ensureAudioAwake();
-  const sure = confirmByTyping('RESET', "This will erase ALL player names and scores for a fresh start.");
+  const sure = confirm("Are you sure? " + "This will erase ALL player names and scores for a fresh start.");
   if (!sure) return;
   gameRef.set({
     qIndex: 0,
