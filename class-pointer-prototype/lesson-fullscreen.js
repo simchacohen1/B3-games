@@ -1,16 +1,23 @@
 'use strict';
 (function(){
   const stage=document.getElementById('stage'),enter=document.getElementById('fullScreenLesson'),exit=document.getElementById('exitFullScreenLesson'),teacherPanel=document.getElementById('teacherPanel');
+  const studentView=!!new URL(location.href).searchParams.get('room');
   let syncTimer=null;
   const toolbar=document.createElement('div');toolbar.id='fullscreenTeacherToolbar';toolbar.className='fullscreen-teacher-toolbar';toolbar.dataset.stageUi='true';toolbar.hidden=true;
   const top=document.createElement('div');top.className='fullscreen-toolbar-top';
-  const title=document.createElement('strong');title.textContent='Teaching controls';
+  const title=document.createElement('strong');title.textContent=studentView?'My tools · drag to move':'Teaching controls';
   const collapse=document.createElement('button');collapse.type='button';collapse.className='fullscreen-toolbar-collapse';collapse.textContent='Hide controls';collapse.setAttribute('aria-expanded','true');
   top.append(title,collapse);
   const body=document.createElement('div');body.className='fullscreen-toolbar-body';toolbar.append(top,body);
   stage.appendChild(toolbar);exit.dataset.stageUi='true';
 
-  const proxySpecs=[
+  const proxySpecs=studentView?[
+    {source:'studentTool',label:'Tool',type:'select'},
+    {source:'studentColor',label:'Color',type:'select'},
+    {source:'studentSize',label:'Size',type:'select'},
+    {source:'undoStudentHighlight',label:'Undo',type:'button'},
+    {source:'clearStudentHighlights',label:'Clear mine',type:'button'}
+  ]:[
     {source:'teacherTool',label:'Tool',type:'select'},
     {source:'teacherColor',label:'Color',type:'select'},
     {source:'teacherSize',label:'Size',type:'select'},
@@ -39,7 +46,7 @@
       if(spec.share)wrap.classList.add('share-control');
       if(spec.type==='select'){
         const text=document.createElement('span');text.textContent=spec.label;
-        const proxy=document.createElement('select');proxy.innerHTML=source.innerHTML;
+        const proxy=document.createElement('select');proxy.innerHTML=source.innerHTML;proxy.setAttribute('aria-label',spec.label);
         proxy.addEventListener('change',()=>{source.value=proxy.value;source.dispatchEvent(new Event('change',{bubbles:true}))});
         wrap.append(text,proxy);proxies.set(spec.source,proxy);
       }else if(spec.type==='check'){
@@ -62,7 +69,7 @@
       const available=!!source;
       wrap.hidden=!available;
       if(!available)continue;
-      if(spec.type==='select'){proxy.value=source.value;proxy.disabled=source.disabled}
+      if(spec.type==='select'){proxy.value=source.value;proxy.disabled=source.disabled;for(const option of proxy.options){const original=Array.from(source.options).find(item=>item.value===option.value);option.disabled=original?.disabled||false}}
       else if(spec.type==='check'){proxy.checked=source.checked;proxy.disabled=source.disabled}
       else{proxy.disabled=source.disabled;proxy.classList.toggle('active',source.classList.contains('active')||source.getAttribute('aria-pressed')==='true')}
     }
@@ -75,8 +82,8 @@
   function stopSync(){clearInterval(syncTimer);syncTimer=null}
   function sync(){
     const active=expanded();exit.hidden=!active;enter.setAttribute('aria-expanded',String(active));
-    toolbar.hidden=!(active&&teacherView());
-    if(active&&teacherView()){build();startSync()}else{stopSync();if(!active)enter.focus()}
+    toolbar.hidden=!(studentView||(active&&teacherView()));
+    if(studentView||(active&&teacherView())){build();startSync()}else{stopSync();if(!active)enter.focus()}
   }
   function fallback(){stage.classList.add('lesson-fullscreen');document.body.classList.add('lesson-expanded');sync()}
   enter.addEventListener('click',async()=>{
@@ -96,6 +103,33 @@
     ['pointerdown','pointermove','pointerup','pointercancel','click'].forEach(type=>control.addEventListener(type,event=>event.stopPropagation()));
   });
   exit.addEventListener('click',event=>{event.stopPropagation();close()});
+  if(studentView){
+    toolbar.classList.add('student-floating-toolbar');
+    let drag=null;
+    top.addEventListener('pointerdown',event=>{
+      if(event.target.closest('button')||event.button!==0)return;
+      event.preventDefault();event.stopPropagation();
+      const box=toolbar.getBoundingClientRect(),bounds=stage.getBoundingClientRect();
+      drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:box.left-bounds.left,top:box.top-bounds.top};
+      top.setPointerCapture(event.pointerId);
+    });
+    top.addEventListener('pointermove',event=>{
+      if(!drag||drag.id!==event.pointerId)return;
+      toolbar.style.right='auto';
+      toolbar.style.left=Math.max(0,Math.min(stage.clientWidth-toolbar.offsetWidth,drag.left+event.clientX-drag.x))+'px';
+      toolbar.style.top=Math.max(0,Math.min(stage.clientHeight-toolbar.offsetHeight,drag.top+event.clientY-drag.y))+'px';
+    });
+    const endDrag=()=>{drag=null};
+    top.addEventListener('pointerup',endDrag);top.addEventListener('pointercancel',endDrag);top.addEventListener('lostpointercapture',endDrag);
+    const keepVisible=()=>{
+      if(!toolbar.style.left)return;
+      toolbar.style.left=Math.max(0,Math.min(stage.clientWidth-toolbar.offsetWidth,parseFloat(toolbar.style.left)||0))+'px';
+      toolbar.style.top=Math.max(0,Math.min(stage.clientHeight-toolbar.offsetHeight,parseFloat(toolbar.style.top)||0))+'px';
+    };
+    new ResizeObserver(keepVisible).observe(stage);
+    document.querySelector('.student-tool-card').hidden=true;
+    sync();
+  }
   document.addEventListener('fullscreenchange',sync);
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&stage.classList.contains('lesson-fullscreen'))close()});
 })();
