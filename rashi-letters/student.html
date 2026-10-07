@@ -254,6 +254,19 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 .mp-results{text-align:left}.mp-results .mp-row{font-size:19px;padding:8px 4px;border-bottom:1px solid #e5eafa}
 @media(max-width:600px){.mp-choose{grid-template-columns:1fr}.mp-code{font-size:48px}.mp-row{grid-template-columns:26px minmax(60px,100px) 1fr 46px;font-size:13px}}
 
+/* Video lessons + words */
+.video-card{width:min(860px,96vw)}
+.video-frame{position:relative;padding-top:56.25%;border-radius:18px;overflow:hidden;background:#000;margin-top:10px}
+.video-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.watch-link{border:0;background:#fff3d6;color:#7a4b00;padding:10px 14px;border-radius:12px;font:700 14px 'Quicksand',sans-serif;cursor:pointer}
+.letter-pick-btn.similar-tile span.start-here{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#f2be32;color:#4a3200;font:800 11px 'Quicksand',sans-serif;letter-spacing:1px;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.word-levels{display:flex;gap:8px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
+.word-level{border:2px solid #dbe2f1;border-bottom-width:4px;background:#fff;border-radius:12px;padding:10px 16px;font:700 15px 'Quicksand',sans-serif;color:#475675;cursor:pointer}
+.word-level.selected{background:#ede9ff;border-color:#6553d6;color:#3f3099}
+.sim-big.word{font-size:96px}
+.choice-btn.word-choice{font-family:'Frank Ruhl Libre',serif;font-size:40px;direction:rtl}
+@media(max-width:600px){.sim-big.word{font-size:70px}.choice-btn.word-choice{font-size:30px}}
+
 @media(min-width:800px){#app{max-width:760px;margin:auto}}
 @media(max-width:600px){.wrap{padding:18px 12px}.card{padding:20px;border-radius:22px}header.top h1{font-size:27px}.brand-icon{width:54px;height:54px}.letter-grid{grid-template-columns:repeat(3,1fr)}.unit-label{font-size:14px}.phase-row{gap:8px}.phase-pill{display:none}#rashiLetter.word-mode{font-size:62px}.choice-btn.word-btn{font-size:29px}.hud{font-size:13px;padding:10px}.letter-box{min-height:205px}.compare{gap:25px}.compare span{font-size:65px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
@@ -311,7 +324,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
     </div>
     <div class="letter-box" lang="he" dir="rtl"><span id="rashiLetter"></span></div>
     <div class="prompt" id="promptText">Which letter is this?</div>
-    <div class="help-row"><button class="helper" id="learnBtn">🔎 Show me how</button></div><div id="studyPanel" class="study hidden"></div><div class="choices" id="choicesRow"></div>
+    <div class="help-row"><button class="helper" id="learnBtn">🔎 Show me how</button><button class="helper" id="watchBtn">▶ Watch the lesson</button></div><div id="studyPanel" class="study hidden"></div><div class="choices" id="choicesRow"></div>
     <div id="feedback" role="status" aria-live="polite"></div>
     <div class="progress-track"><div id="progFill" style="width:0%"></div></div>
     <div class="streak-row" id="streakRow"></div><div class="star-note">Get 3 correct to complete this step. A mistake does not erase your stars.</div><button class="btn hidden" id="nextBtn" style="display:block;margin:18px auto 0">Next question →</button>
@@ -333,11 +346,12 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 
   <div class="card" id="similarScreen">
     <div class="sim-head"><h2>Look-alike letters</h2><button class="menu-link" id="simMenuBtn">⬅ Menu</button></div>
-    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them!</p>
+    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them! <button class="watch-link" id="simWatchBtn">▶ Watch the lesson</button></p>
     <div class="sim-tabs">
       <button class="sim-tab" data-sim="explore">👀 Side by side</button>
       <button class="sim-tab" data-sim="match">🎯 Match it</button>
       <button class="sim-tab" data-sim="memory">🃏 Memory</button>
+      <button class="sim-tab" data-sim="words">📖 Words</button>
     </div>
     <div id="simArea"></div>
   </div>
@@ -347,6 +361,14 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
   </div>
 </div>
 
+<div class="mini-overlay hidden" id="videoModal" role="dialog" aria-modal="true" aria-labelledby="videoTitle">
+  <div class="mini-card video-card">
+    <div class="mini-kicker">▶ WATCH THE LESSON</div>
+    <h2 id="videoTitle"></h2>
+    <div class="video-frame"><iframe id="videoFrame" title="Reading Rashi Made Easy Shmeezy" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
+    <div class="sim-row" style="margin-top:12px"><a id="videoLink" class="mini-skip" target="_blank" rel="noopener">Video not playing? Open it on YouTube</a><button class="btn" id="videoClose">Done watching</button></div>
+  </div>
+</div>
 <div class="quest-toast" id="questToast" role="status" aria-live="polite"></div>
 <div class="mini-overlay hidden" id="miniGame" role="dialog" aria-modal="true" aria-labelledby="miniTitle">
   <div class="mini-card">
@@ -753,10 +775,10 @@ function renderLetterGrid(){
   });
   const sim = document.createElement('button');
   sim.className = 'letter-pick-btn similar-tile';
-  sim.innerHTML = '<span dir="rtl">ד ל ר</span><small>Look-alike letters</small>';
+  sim.innerHTML = '<span class="start-here">START HERE</span><span dir="rtl">ד ל ר</span><small>Look-alike letters</small>';
   sim.setAttribute('aria-label', 'Look-alike letters: letters that look almost the same in Rashi and regular print');
   sim.onclick = openSimilar;
-  grid.appendChild(sim);
+  grid.prepend(sim);
 }
 
 function selectPracticeLetter(unitId, btnEl){
@@ -867,6 +889,7 @@ function renderQuestion(){
     // 'mixed' leaves phase as-is so it can toggle naturally on streak completion
   }
   const unit = getActiveUnit();
+  updateWatchBtn();
   const rashiEl = document.getElementById('rashiLetter');
   const pill = document.getElementById('phasePill');
   const promptEl = document.getElementById('promptText');
@@ -1048,6 +1071,7 @@ function setSimTab(tab){
   document.querySelectorAll('.sim-tab').forEach(b=>b.classList.toggle('selected', b.dataset.sim===tab));
   if(tab==='explore') renderSimExplore();
   else if(tab==='match') renderMatchMenu();
+  else if(tab==='words') startWords(wordLevel);
   else startSimMemory();
 }
 document.querySelectorAll('.sim-tab').forEach(b=>b.onclick=()=>setSimTab(b.dataset.sim));
@@ -1439,6 +1463,102 @@ function renderMpResults(room){
   area.appendChild(d);
   if(iWon){ starsThisVisit+=5; updateRewardHud(); rewardBurst(icon,true); showQuestToast('🏆 Winner! +5 stars'); }
   else rewardBurst(icon,false);
+}
+
+/* ---------- Video lessons (Reading Rashi Made Easy Shmeezy) ---------- */
+const LESSON_VIDEO = 'iCL_-ae4XKc';
+const LESSONS = {
+  intro:      {title:'Introduction to Rashi',        start:361,  end:751},
+  similar:    {title:'Identical letters',            start:751,  end:1454},
+  words2:     {title:'Two-letter words',             start:1454, end:1734},
+  words3:     {title:'Three-letter words',           start:1734, end:1859},
+  zayin:      {title:'Introducing Zayin',            start:1859, end:1996},
+  bet:        {title:'Introducing Bet',              start:1996, end:2194},
+  words4:     {title:'Four-letter words',            start:2194, end:2288},
+  tsadi:      {title:'Introducing Tsadi',            start:2288, end:2356},
+  alef:       {title:'Introducing Aleph',            start:2356, end:2509},
+  tsadisofit: {title:'Final Tsadi',                  start:2509, end:2591},
+  memsofit:   {title:'Final Mem',                    start:2591, end:2702},
+  shin:       {title:'Shin and Sin',                 start:2702, end:2890},
+  finalreview:{title:'Final review and tips',        start:2890, end:3096}
+};
+function openLesson(key){
+  const L=LESSONS[key]; if(!L) return;
+  document.getElementById('videoTitle').textContent=L.title;
+  document.getElementById('videoFrame').src='https://www.youtube-nocookie.com/embed/'+LESSON_VIDEO+'?start='+L.start+'&end='+L.end+'&rel=0&modestbranding=1&autoplay=1';
+  document.getElementById('videoLink').href='https://www.youtube.com/watch?v='+LESSON_VIDEO+'&t='+L.start+'s';
+  document.getElementById('videoModal').classList.remove('hidden');
+}
+function closeLesson(){ document.getElementById('videoFrame').src='about:blank'; document.getElementById('videoModal').classList.add('hidden'); }
+document.getElementById('videoClose').onclick=closeLesson;
+document.getElementById('videoModal').addEventListener('click',e=>{ if(e.target.id==='videoModal') closeLesson(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !document.getElementById('videoModal').classList.contains('hidden')) closeLesson(); });
+document.getElementById('simWatchBtn').onclick=()=>openLesson('similar');
+document.getElementById('watchBtn').onclick=()=>{ const u=getActiveUnit(); openLesson(u && u.id); };
+function updateWatchBtn(){ const u=getActiveUnit(); document.getElementById('watchBtn').classList.toggle('hidden', !(u && LESSONS[u.id])); }
+
+/* ---------- Word practice with only the letters learned so far ---------- */
+const PRACTICE_WORDS = [
+  // 2 letters
+  'כִּי','עַל','כָּל','מִי','מָה','עַד','הֵן','פֹּה','יָד','כֵּן','רַק','חַי','גַּן','הַר','לֹא','נָא','זֶה','לֵב','אָב','אַף','שָׁם','יָם','עֵץ','אִם','גַּם','דָּם',
+  // 3 letters
+  'הוּא','הִיא','טוֹב','נֹחַ','עִיר','הָיָה','יָלַד','הָלַךְ','עָלָה','יָדַע','נָתַן','לָקַח','מֶלֶךְ','נָהָר','דָּגָן','כֹּהֵן','עֵדָה','קָהָל','יוֹם','אוֹר','קָרָא','לֶחֶם','כָּתַב','שָׁנָה','זָכַר','בָּרָא','אֶרֶץ','צֹאן',
+  // 4 letters
+  'תּוֹרָה','פַּרְעֹה','מִנְחָה','הֵיכָל','מִגְדָּל','לְמַעַן','עוֹלָה','מִקְנֶה','גּוֹרָל','חֲנוֹךְ','כִּנּוֹר','תְּהִלָּה','אַהֲרֹן','יַעֲקֹב','מַלְאָךְ','מִצְוָה','מִקְדָּשׁ','יוֹסֵף'
+];
+const baseLetters = w => w.normalize('NFD').replace(/[֑-ׇ]/g,'').split('');
+let wordLevel = 2, wordGame = null;
+function unlockedLetters(){
+  const set=new Set(SIMILAR);
+  const done = Math.min(typeof guidedIndex==='number'?guidedIndex:0, UNITS.length);
+  UNITS.slice(0,done).forEach(u=>(u.type==='single'?[u.correct]:u.pair).forEach(ch=>baseLetters(ch).forEach(c=>set.add(c))));
+  return set;
+}
+function wordsFor(level){
+  const ok=unlockedLetters();
+  return PRACTICE_WORDS.filter(w=>{ const b=baseLetters(w); return b.length===level && b.every(c=>ok.has(c)); });
+}
+function startWords(level){
+  wordLevel=level;
+  const pool=wordsFor(level);
+  wordGame={level, pool, order:shuffle(pool).slice(0,6), round:0, correct:0};
+  renderWords();
+}
+function renderWords(){
+  const area=document.getElementById('simArea'); area.replaceChildren();
+  const g=wordGame;
+  const levels=el('div','word-levels');
+  [2,3,4].forEach(n=>{ const b=el('button','word-level'+(n===g.level?' selected':''),n+'-letter words'); b.onclick=()=>{ viewVersion++; startWords(n); }; levels.appendChild(b); });
+  const watch=el('button','watch-link','▶ Watch: '+LESSONS['words'+g.level].title); watch.onclick=()=>openLesson('words'+g.level);
+  const top=el('div','sim-row'); top.append(levels, watch); top.style.justifyContent='center';
+  area.appendChild(top);
+  if(g.pool.length<4){
+    area.append(el('p','prompt','Finish more missions to unlock '+g.level+'-letter words!'), el('p','sim-intro','These words use letters from missions you haven’t done yet. Try 2-letter words first.'));
+    return;
+  }
+  if(g.round>=g.order.length){
+    const d=el('div','sim-done'); d.append(el('div','finish-icon','📖'), el('h3',null,'You read '+g.correct+' of '+g.order.length+' words!'));
+    const again=el('button','btn','More words'); again.onclick=()=>startWords(g.level); d.appendChild(again);
+    area.appendChild(d); rewardBurst(d.firstChild, g.correct===g.order.length); return;
+  }
+  const target=g.order[g.round];
+  const box=el('div','letter-box'); box.setAttribute('dir','rtl'); box.appendChild(el('span','sim-big word',target));
+  const opts=shuffle([target, ...shuffle(g.pool.filter(w=>w!==target)).slice(0,3)]);
+  const row=el('div','choices'), fb=el('div',null); fb.style.cssText='min-height:30px;text-align:center;font-size:19px;font-weight:700;margin:4px 0 10px';
+  const next=el('button','btn hidden','Next →'); next.style.cssText='display:block;margin:10px auto 0';
+  const v=viewVersion; const advance=()=>{ if(v!==viewVersion) return; g.round++; renderWords(); }; next.onclick=advance;
+  opts.forEach(w=>{
+    const b=el('button','choice-btn word-choice',w);
+    b.onclick=()=>{
+      row.querySelectorAll('button').forEach(x=>x.disabled=true);
+      const ok=w===target;
+      if(ok){ b.classList.add('correct'); g.correct++; starsThisVisit++; coinsThisVisit++; updateRewardHud(); rewardBurst(b); beep('correct'); fb.style.color='#176447'; fb.textContent='You read it!'; setTimeout(advance,1000); }
+      else { b.classList.add('incorrect'); row.querySelectorAll('button').forEach(x=>{ if(x.textContent===target) x.classList.add('correct'); }); beep('wrong'); fb.style.color='#865014'; fb.textContent='Look again — the green word is the match.'; next.classList.remove('hidden'); }
+      if(studentId) logAttempt('similar','word',ok).catch(()=>{});
+    };
+    row.appendChild(b);
+  });
+  area.append(el('div','sim-status','Word '+(g.round+1)+' of '+g.order.length+' · ★ '+g.correct), box, el('p','prompt','Which word is the same?'), row, fb, next);
 }
 
 async function logAttempt(unitId, ph, correct){
