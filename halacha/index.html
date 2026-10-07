@@ -135,8 +135,9 @@ const HALACHA_TEACHER_LESSON=HALACHA_PARAMS.get("teacher")==="1";
 const HALACHA_TEACHER_PREVIEW=HALACHA_TEACHER_LESSON||!!HALACHA_TEACHER_VIEW;
 const HALACHA_STUDENT_ID=String(HALACHA_TEACHER_VIEW||(HALACHA_TEACHER_LESSON?"":localStorage.getItem("b3Games_studentId")||"")).trim();
 const HALACHA_LOCAL_KEY="halachaV14"+(HALACHA_STUDENT_ID?":"+HALACHA_STUDENT_ID:"");
-let S={};try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY)||"{}")}catch(e){}
+let S={};try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY+(HALACHA_TEACHER_LESSON?"_teacher":""))||"{}")}catch(e){}
 let halachaDb=null,cloudSaveTimer=null;
+let teacherAccountUid="",teacherCloudReady=false,teacherDirty=false;
 try{
  if(window.firebase&&window.B3_FIREBASE_CONFIG){
    if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
@@ -144,15 +145,22 @@ try{
  }
 }catch(e){console.warn("Halacha cloud save unavailable",e)}
 function cloudPath(){
+ if(HALACHA_TEACHER_LESSON)return teacherAccountUid?"b3Games/teachers/"+teacherAccountUid+"/halacha/siman1":null;
  return HALACHA_STUDENT_ID?"b3Games/students/"+HALACHA_STUDENT_ID+"/halacha/siman1":null;
 }
 function setSaveStatus(msg){let x=document.getElementById("cloudSaveStatus");if(x)x.textContent=msg}
 function save(){
  if(HALACHA_TEACHER_VIEW){setSaveStatus("Teacher view — student work is read only");return}
  if(HALACHA_TEACHER_LESSON){
-   try{localStorage.setItem(HALACHA_LOCAL_KEY+"_teacher",JSON.stringify(S))}catch(e){}
-   setSaveStatus("Teacher lesson copy saved on this device");
-   return
+   teacherDirty=true;
+   try{localStorage.setItem(teacherAccountUid?"halachaV14_teacher:"+teacherAccountUid:HALACHA_LOCAL_KEY+"_teacher",JSON.stringify(S))}catch(e){}
+   if(!teacherCloudReady||!cloudPath()){setSaveStatus("Teacher copy saved on this device ? connecting to account?");return}
+   setSaveStatus("Saving teacher copy?");clearTimeout(cloudSaveTimer);
+   const state=JSON.parse(JSON.stringify(S));
+   cloudSaveTimer=setTimeout(()=>halachaDb.ref(cloudPath()).set({version:1,updatedAt:firebase.database.ServerValue.TIMESTAMP,state})
+    .then(()=>{teacherDirty=false;setSaveStatus("? Teacher copy saved to my account")})
+    .catch(e=>{console.warn("Teacher cloud save failed",e);setSaveStatus("Teacher copy saved on this device ? account save failed")}),350);
+   return;
  }
  try{localStorage.setItem(HALACHA_LOCAL_KEY,JSON.stringify(S))}catch(e){}
  if(!halachaDb||!cloudPath()){setSaveStatus("Saved on this device");return}
@@ -165,11 +173,7 @@ function save(){
  },350);
 }
 async function loadCloudHalacha(){
- if(HALACHA_TEACHER_LESSON){
-   try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY+"_teacher")||"{}")}catch(e){}
-   setSaveStatus("Teacher lesson mode");
-   return
- }
+ if(HALACHA_TEACHER_LESSON){await loadTeacherCopy();return}
  if(!halachaDb||!cloudPath()){setSaveStatus("Saved on this device");return}
  try{
    setSaveStatus("Loading my scrapbook…");
@@ -187,6 +191,27 @@ async function loadCloudHalacha(){
    }
    setSaveStatus("✓ Saved to my account");
  }catch(e){console.warn("Halacha cloud load failed",e);setSaveStatus("Saved on this device")}
+}
+
+async function loadTeacherCopy(){
+ const user=window.firebase&&firebase.auth().currentUser;
+ if(!user||!halachaDb){setSaveStatus("Teacher copy saved on this device ? sign in to sync");return}
+ teacherAccountUid=user.uid;
+ const key="halachaV14_teacher:"+user.uid;
+ setSaveStatus("Loading teacher copy from my account?");
+ try{
+  const snap=await halachaDb.ref(cloudPath()).once("value"),row=snap.val();
+  if(!teacherDirty){
+   if(row&&row.state)S=row.state;
+   else{const local=localStorage.getItem(key);if(local)S=JSON.parse(local)}
+   localStorage.setItem(key,JSON.stringify(S));
+   const current=document.querySelector(".section.on"),id=current?current.id:"a";
+   closeCustomizer();sections.innerHTML="";lessons.forEach(render);show(id==="review"?"a":id);
+  }
+  teacherCloudReady=true;
+  if(!row||!row.state||teacherDirty)save();
+  else setSaveStatus("? Teacher copy saved to my account");
+ }catch(e){console.warn("Teacher cloud load failed",e);setSaveStatus("Teacher copy saved on this device ? account sync unavailable")}
 }
 
 function teacherSource(id){
