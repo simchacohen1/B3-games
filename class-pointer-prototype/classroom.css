@@ -102,3 +102,12 @@ footer{padding-top:8px;border-top:1px solid #e9edf5;color:#738098}
 #highlightLayer [data-tool="pencil"]{opacity:.94!important}
 #highlightLayer [data-tool="crayon"]{opacity:.78!important;stroke-dasharray:8 4}
 @media(max-width:720px){main{margin:10px;padding:16px;border-radius:18px}.tool-card{padding:15px}.tool-controls{align-items:stretch}.field{width:100%}.field select{width:100%}.roster-row{gap:8px}}
+
+/* Student tools remain inside the shared lesson, including native fullscreen. */
+.student-floating-toolbar{right:auto;width:max-content;max-width:calc(100% - 24px);max-height:calc(100% - 24px);overflow:auto;background:#fffffff2;color:#23334e;border:2px solid #b9cbff;box-shadow:0 6px 24px #17203340}
+.student-floating-toolbar .fullscreen-toolbar-top{cursor:move;touch-action:none;color:#234ea8}
+.student-floating-toolbar .fullscreen-toolbar-control{color:#45536c}
+.student-floating-toolbar .fullscreen-toolbar-body{gap:8px}
+.student-floating-toolbar .fullscreen-toolbar-collapse{background:#e8efff!important;color:#234ea8!important}
+.student-floating-toolbar.collapsed{min-width:0}
+.student-floating-toolbar .fullscreen-toolbar-control select{max-width:125px}
