@@ -923,24 +923,69 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   function renderCardLocks(){
     document.querySelectorAll('#gamesArea .game-card[data-game-id]').forEach(card=>{
       let shell=card.parentElement;
-      if(!shell.classList.contains('student-card-shell')){shell=document.createElement('div');shell.className='student-card-shell';card.before(shell);shell.appendChild(card)}
+      if(!shell.classList.contains('student-card-shell')){
+        shell=document.createElement('div');
+        shell.className='student-card-shell';
+        card.before(shell);
+        shell.appendChild(card);
+      }
       shell.querySelectorAll('.card-lock,.card-lock-menu').forEach(e=>e.remove());
       if(!isAuthorizedTeacher)return;
+
       const id=card.dataset.gameId;
       const classes=currentAccess.role==='admin'?['et','wt']:(currentAccess.classIds||[]);
-      const locked=classes.some(c=>currentSettings.classGames?.[c]?.[id]===false)||currentSettings.games?.[id]===false;
-      const button=document.createElement('button');button.type='button';button.className='card-lock';
+      const globallyActive=currentSettings.games?.[id]!==false;
+      const locked=!globallyActive||classes.some(c=>currentSettings.classGames?.[c]?.[id]===false);
+      const button=document.createElement('button');
+      button.type='button';
+      button.className='card-lock';
       button.textContent=locked?'\uD83D\uDD12':'\uD83D\uDD13';
-      button.title='Student access: '+(locked?'locked for some students':'open')+' ? click to manage';button.setAttribute('aria-label','Manage student access for '+card.innerText.trim());
-      button.addEventListener('click',()=>{
-        const prior=shell.querySelector('.card-lock-menu');document.querySelectorAll('.card-lock-menu').forEach(e=>e.remove());if(prior)return;
-        const menu=document.createElement('div');menu.className='card-lock-menu';
-        classes.forEach(c=>{const open=currentSettings.classGames?.[c]?.[id]!==false;const b=document.createElement('button');b.type='button';b.textContent=c.toUpperCase()+': '+(open?'Open \uD83D\uDD13':'Locked \uD83D\uDD12');b.title=(open?'Lock ':'Unlock ')+c.toUpperCase();b.onclick=()=>setActivityClassOpen(id,c,!open);menu.appendChild(b)});
-        if(currentSettings.games?.[id]===false){const note=document.createElement('small');note.textContent='Activity is globally inactive. Enable it in Teacher Tools.';menu.appendChild(note)}
-        shell.appendChild(menu);
-      });shell.appendChild(button);
+
+      if(!globallyActive){
+        button.title='This activity is inactive. Use Teacher Tools to enable it.';
+        button.setAttribute('aria-label',card.innerText.trim()+' is inactive. Use Teacher Tools to enable it.');
+        button.addEventListener('click',event=>{
+          event.preventDefault();
+          event.stopPropagation();
+          alert('This activity is inactive. Enable it in Teacher Tools first.');
+        });
+      }else{
+        const nextOpen=locked;
+        button.title=(nextOpen?'Open':'Lock')+' this activity for all of your classes';
+        button.setAttribute('aria-label',(nextOpen?'Open ':'Lock ')+card.innerText.trim()+' for all classes');
+        button.addEventListener('click',async event=>{
+          event.preventDefault();
+          event.stopPropagation();
+          button.disabled=true;
+
+          const oldValues={};
+          currentSettings.classGames=currentSettings.classGames||{};
+          classes.forEach(classId=>{
+            currentSettings.classGames[classId]=currentSettings.classGames[classId]||{};
+            oldValues[classId]=currentSettings.classGames[classId][id]!==false;
+            currentSettings.classGames[classId][id]=nextOpen;
+          });
+          renderActivityManager();
+          renderStudentAccess();
+
+          try{
+            await Promise.all(classes.map(classId=>settingsApi.updateClassGameEnabled(classId,id,nextOpen)));
+          }catch(e){
+            classes.forEach(classId=>{
+              currentSettings.classGames[classId]=currentSettings.classGames[classId]||{};
+              currentSettings.classGames[classId][id]=oldValues[classId];
+            });
+            renderActivityManager();
+            renderStudentAccess();
+            alert('Could not save this activity setting.');
+            console.error(e);
+          }
+        });
+      }
+      shell.appendChild(button);
     });
   }
+
   function renderStudentAccess(){
     el("classPointerStudentLink").classList.toggle("hidden",isAuthorizedTeacher||isStudentPreview);
     queueMicrotask(renderStudentNudges);
