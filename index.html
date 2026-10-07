@@ -187,7 +187,7 @@
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
 <script src="firebase-config.js?v=20261001-teacherauth"></script>
-<script src="site-settings.js?v=20261007-multistar"></script>
+<script src="site-settings.js?v=20261007-act-as-student"></script>
 </head>
 <body>
   <h1>B3 Games</h1>
@@ -273,6 +273,7 @@
     <h2>👩‍🏫 Teacher Tools</h2>
     <p class="teacher-tools-subtitle">Always available to you, regardless of student toggle state.</p>
     <div class="teacher-tools-container">
+      <button type="button" id="actAsStudentCard" class="teacher-tool-card" style="cursor:pointer;font:inherit;border:1px solid #bbf7d0;background:#f0fdf4"><span class="card-icon">👀</span><span class="card-title" style="color:#166534">Sign in as a Student</span></button>
       <a class="teacher-tool-card" href="student-rewards/teacher.html" target="_blank" rel="noopener"><span class="card-icon">✓</span><span class="card-title">Daily Points</span></a>
       <a class="teacher-tool-card" href="class-pointer-prototype/dashboard.html?teacher=1" target="_blank" rel="noopener"><span class="card-icon">👆</span><span class="card-title">Class Pointer — Start a lesson</span></a>
       <a class="teacher-tool-card" href="game-show/teacher.html" target="_blank" rel="noopener"><span class="card-icon">🏆</span><span class="card-title">Game Show — Host</span></a>
@@ -1835,6 +1836,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       Promise.all([loadClassManagement(),loadTeacherToolGrants(),loadSpecialAccessRoster()]).then(()=>renderAdminPanel()).catch(console.warn);
     }else{overrideRoster=[];renderStudentOverrideControls();stopApprovalCenter();}
   });
+  el("actAsStudentCard").addEventListener("click",()=>settingsApi.openActAsStudentPicker());
   settingsApi.subscribe(settings=>{currentSettings=settings;renderStudentAccess();renderAdminPanel();});
   setInterval(()=>{renderStudentAccess();},15000);
   restoreStudent();
