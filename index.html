@@ -142,6 +142,24 @@
  .teacher-tools-section{margin-top:24px;padding-top:18px}
 }
 .student-card-shell{position:relative;min-width:0}.student-card-shell>.game-card{height:100%;padding-right:40px}
+/* Each activity group stays on ONE row. On narrow screens the gaps, icons and text shrink instead of wrapping. */
+.game-group-grid,.game-group[data-game-group] .game-group-grid{grid-template-columns:none!important;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:clamp(4px,1.4vw,14px)}
+.game-group-grid>*{min-width:0}
+.game-group-grid .game-card{min-width:0;padding:clamp(8px,2vw,24px) clamp(3px,1vw,12px);gap:clamp(4px,1vw,10px);min-height:clamp(78px,16vw,125px)}
+.game-group-grid .card-title{font-size:clamp(11px,2.4vw,17px);line-height:1.15;text-align:center;overflow-wrap:break-word;min-width:0}
+.game-group-grid .card-icon{font-size:clamp(24px,6.5vw,40px)}
+.game-group-grid .rashi-icon{font-size:clamp(26px,7vw,44px)}
+.game-group-grid .yiddish-icon{width:clamp(36px,10vw,74px);height:clamp(36px,10vw,74px)}
+.game-group-grid .student-card-shell>.game-card{padding-right:clamp(3px,1vw,12px);padding-top:clamp(30px,6vw,24px)}
+.game-group-grid .card-lock{width:clamp(26px,5vw,42px);height:clamp(26px,5vw,42px);font-size:clamp(14px,2.8vw,24px);right:clamp(3px,.8vw,7px);top:clamp(3px,.8vw,7px)}
+@media(min-width:760px){
+ .game-group-grid .game-card{min-height:64px;padding:10px 8px;gap:clamp(6px,.9vw,10px);flex-direction:row}
+ .game-group-grid .card-title{font-size:clamp(14px,1.6vw,18px);text-align:left}
+ .game-group-grid .card-icon{font-size:clamp(34px,4.6vw,54px)}
+ .game-group-grid .rashi-icon{font-size:clamp(36px,5vw,58px)}
+ .game-group-grid .yiddish-icon{width:clamp(44px,5.8vw,68px);height:clamp(44px,5.8vw,68px)}
+ .game-group-grid .student-card-shell>.game-card{padding-right:clamp(30px,4vw,40px);padding-top:10px}
+}
 .card-lock{position:absolute;right:7px;top:7px;width:42px;height:42px;border:0;border-radius:10px;font-size:24px;cursor:pointer;z-index:2;font-weight:900}.card-lock.is-open{background:#dcfce7;color:#166534}.card-lock.is-locked{background:#fee2e2;color:#b91c1c}.card-lock:disabled{opacity:.65;cursor:default}
 .card-lock-menu{position:absolute;right:6px;top:38px;z-index:20;display:flex;gap:6px;padding:8px;background:#fff;border:1px solid #94a3b8;border-radius:10px;box-shadow:0 4px 15px #0003}
 .card-lock-menu button{white-space:nowrap;padding:7px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;cursor:pointer;font-weight:bold}.card-lock-menu small{max-width:150px}
@@ -210,19 +228,19 @@
           <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html" target="_blank" rel="noopener"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
           <a class="game-card" data-game-id="chazara" href="chazara/index.html" target="_blank" rel="noopener"><span class="card-icon">🔁</span><span class="card-title">Chazara Chart</span></a>
           <a class="game-card" data-game-id="shorashim" href="shorashim/index.html" target="_blank" rel="noopener"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span></a>
-          <a class="game-card" data-game-id="gematria" href="gematria/index.html" target="_blank" rel="noopener"><span class="card-icon">🔢</span><span class="card-title">Gematria</span></a>
         </div>
       </section>
 
       <section class="game-group" data-game-group="more-learning">
         <div class="game-group-head">
           <span class="game-group-icon">&#128218;</span>
-          <div><div class="game-group-title">More Learning</div><div class="game-group-subtitle">Rashi, Yiddish, and Halacha</div></div>
+          <div><div class="game-group-title">More Learning</div><div class="game-group-subtitle">Rashi, Yiddish, Halacha, and Gematria</div></div>
         </div>
         <div class="game-group-grid">
           <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html" target="_blank" rel="noopener"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
           <a class="game-card" data-game-id="yiddish" href="yiddish/index.html" target="_blank" rel="noopener"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
           <a class="game-card" data-game-id="halacha" href="halacha/index.html?v=20261007-teacher-sync" target="_blank" rel="noopener"><span class="card-icon">📔</span><span class="card-title">Halacha</span></a>
+          <a class="game-card" data-game-id="gematria" href="gematria/index.html" target="_blank" rel="noopener"><span class="card-icon">🔢</span><span class="card-title">Gematria</span></a>
         </div>
       </section>
 
