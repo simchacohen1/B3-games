@@ -605,6 +605,19 @@
     });
   }
 
+  function updateClassesGameEnabled(classIds, gameId, enabled) {
+    if (!Array.isArray(classIds) || !classIds.length || classIds.some(function (id) { return !["et", "wt"].includes(id); })) {
+      return Promise.reject(new Error("Unknown class."));
+    }
+    return readOnce().then(function (settings) {
+      classIds.forEach(function (classId) {
+        settings.classGames[classId][gameId] = Boolean(enabled);
+      });
+      // One save prevents separate read/modify/write calls overwriting each other.
+      return save(settings);
+    });
+  }
+
   function isGameEnabledForClass(settings, classId, gameId) {
     const normalized = normalizeSettings(settings);
     if (normalized.games && normalized.games[gameId] === false) return false;
@@ -820,6 +833,7 @@
     updateSiteEnabled: updateSiteEnabled,
     updateGameEnabled: updateGameEnabled,
     updateClassGameEnabled: updateClassGameEnabled,
+    updateClassesGameEnabled: updateClassesGameEnabled,
     isGameEnabledForClass: isGameEnabledForClass,
     updateStudentGameOverride: updateStudentGameOverride,
     studentHasGameOverride: studentHasGameOverride,

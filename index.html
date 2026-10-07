@@ -150,7 +150,7 @@
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
 <script src="firebase-config.js?v=20261001-teacherauth"></script>
-<script src="site-settings.js?v=20261006-lockoverride"></script>
+<script src="site-settings.js?v=20261007-class-toggle"></script>
 </head>
 <body>
   <h1>B3 Games</h1>
@@ -970,7 +970,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
           renderStudentAccess();
 
           try{
-            await Promise.all(classes.map(classId=>settingsApi.updateClassGameEnabled(classId,id,nextOpen)));
+            await settingsApi.updateClassesGameEnabled(classes,id,nextOpen);
           }catch(e){
             classes.forEach(classId=>{
               currentSettings.classGames[classId]=currentSettings.classGames[classId]||{};
