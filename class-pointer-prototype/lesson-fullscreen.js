@@ -9,6 +9,31 @@
   const collapse=document.createElement('button');collapse.type='button';collapse.className='fullscreen-toolbar-collapse';collapse.textContent='Hide controls';collapse.setAttribute('aria-expanded','true');
   top.append(title,collapse);
   const body=document.createElement('div');body.className='fullscreen-toolbar-body';toolbar.append(top,body);
+  // Teacher: the real student roster moves into the full-screen toolbar so admit / pointer / writing / remove all work without leaving full screen.
+  const rosterEl=document.getElementById('roster');
+  const rosterHome=document.createComment('roster-home');
+  const rosterPanel=document.createElement('div');rosterPanel.className='fullscreen-roster-panel';rosterPanel.hidden=true;
+  const rosterToggle=document.createElement('button');rosterToggle.type='button';rosterToggle.className='fullscreen-roster-toggle';rosterToggle.textContent='Students';rosterToggle.setAttribute('aria-expanded','false');
+  if(!studentView&&rosterEl){
+    rosterEl.parentNode.insertBefore(rosterHome,rosterEl);
+    const panelTitle=document.createElement('strong');panelTitle.textContent='Students · admit, pointer, writing';
+    rosterPanel.append(panelTitle);toolbar.append(rosterPanel);
+    top.insertBefore(rosterToggle,collapse);
+    rosterToggle.addEventListener('click',event=>{event.stopPropagation();setRosterOpen(rosterPanel.hidden)});
+  }
+  function setRosterOpen(open){rosterPanel.hidden=!open||toolbar.classList.contains('collapsed');rosterToggle.setAttribute('aria-expanded',String(open));rosterToggle.classList.toggle('active',open)}
+  function placeRoster(inFullscreen){
+    if(studentView||!rosterEl)return;
+    if(inFullscreen){if(rosterEl.parentNode!==rosterPanel)rosterPanel.appendChild(rosterEl)}
+    else if(rosterHome.parentNode&&rosterEl.parentNode!==rosterHome.parentNode){rosterHome.parentNode.insertBefore(rosterEl,rosterHome.nextSibling);setRosterOpen(false)}
+  }
+  function updateRosterToggle(){
+    if(studentView||!rosterEl)return;
+    const waiting=Array.from(rosterEl.querySelectorAll('button')).filter(b=>b.textContent.startsWith('Admit ')).length;
+    const admittedCount=rosterEl.querySelectorAll('.roster-row').length-waiting;
+    rosterToggle.textContent=waiting?`Students · ${waiting} waiting`:`Students (${admittedCount})`;
+    rosterToggle.classList.toggle('alert',waiting>0);
+  }
   stage.appendChild(toolbar);exit.dataset.stageUi='true';
 
   const proxySpecs=studentView?[
@@ -75,6 +100,7 @@
     }
     const zoomSource=document.getElementById('viewZoomLabel'),zoomProxy=proxies.get('viewZoomLabel');
     if(zoomProxy){zoomProxy.hidden=!zoomSource;zoomProxy.textContent=zoomSource?.textContent||''}
+    updateRosterToggle();
   }
   function expanded(){return document.fullscreenElement===stage||stage.classList.contains('lesson-fullscreen')}
   function teacherView(){return teacherPanel&&!teacherPanel.hidden}
@@ -83,6 +109,7 @@
   function sync(){
     const active=expanded();exit.hidden=!active;enter.setAttribute('aria-expanded',String(active));
     toolbar.hidden=!(studentView||(active&&teacherView()));
+    placeRoster(active&&teacherView());
     if(studentView||(active&&teacherView())){build();startSync()}else{stopSync();if(!active)enter.focus()}
   }
   function fallback(){stage.classList.add('lesson-fullscreen');document.body.classList.add('lesson-expanded');sync()}
@@ -97,6 +124,7 @@
   }
   collapse.addEventListener('click',event=>{
     event.stopPropagation();const collapsed=toolbar.classList.toggle('collapsed');body.hidden=collapsed;collapse.textContent=collapsed?'Show controls':'Hide controls';collapse.setAttribute('aria-expanded',String(!collapsed));
+    if(collapsed)rosterPanel.hidden=true;else if(rosterToggle.getAttribute('aria-expanded')==='true')rosterPanel.hidden=false;
   });
   // UI inside the lesson must never place a pointer or start a highlight.
   [toolbar,exit].forEach(control=>{

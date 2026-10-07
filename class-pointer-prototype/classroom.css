@@ -111,3 +111,17 @@ footer{padding-top:8px;border-top:1px solid #e9edf5;color:#738098}
 .student-floating-toolbar .fullscreen-toolbar-collapse{background:#e8efff!important;color:#234ea8!important}
 .student-floating-toolbar.collapsed{min-width:0}
 .student-floating-toolbar .fullscreen-toolbar-control select{max-width:125px}
+
+/* Student roster inside the full-screen teacher toolbar. */
+.fullscreen-toolbar-top{flex-wrap:wrap}
+.fullscreen-roster-toggle{margin-left:auto;padding:5px 10px!important;font-size:12px;background:#334155!important;color:white!important;border-color:#ffffff42!important}
+.fullscreen-roster-toggle.active{background:#2557d6!important}
+.fullscreen-roster-toggle.alert{background:#d97706!important;border-color:#fcd34d!important;animation:rosterPulse 1.2s ease-in-out infinite}
+@keyframes rosterPulse{50%{box-shadow:0 0 0 4px #fbbf2466}}
+.fullscreen-roster-panel{margin-top:8px;background:#f8fafc;color:#172033;border-radius:10px;padding:8px 12px;max-height:45vh;overflow:auto}
+.fullscreen-roster-panel>strong{display:block;font-size:12px;color:#34445f;margin-bottom:2px}
+.fullscreen-roster-panel #roster{margin-top:0;font-size:13px}
+.fullscreen-roster-panel .roster-row{padding:6px 0;gap:8px}
+.fullscreen-roster-panel .roster-row span{min-width:120px}
+.fullscreen-roster-panel .roster-row button{padding:5px 9px;font-size:12px}
+.fullscreen-roster-panel .roster-row label{padding:4px 8px;font-size:12px}
