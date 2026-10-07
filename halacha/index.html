@@ -246,7 +246,9 @@ function ensureDeleteControl(e){
  mini.appendChild(del);
 }
 function ensureResizeHandle(e){
- if(!e||e.querySelector(".resize-handle"))return;
+ if(!e)return;
+ const existing=e.querySelector(".resize-handle");
+ if(existing){installResize(e,existing);return;}
  // Remove the old +/- size buttons from saved pieces; resizing is now by dragging.
  e.querySelectorAll(".mini button").forEach(btn=>{
    const t=(btn.textContent||"").trim();
@@ -257,12 +259,13 @@ function ensureResizeHandle(e){
  installResize(e,h);
 }
 function installResize(e,h){
- if(!e||!h||h.dataset.bound==="1")return;
- h.dataset.bound="1";
+ if(!e||!h||h._resizeBound)return;
+ h._resizeBound=true;delete h.dataset.bound;
  h.onpointerdown=ev=>{
    ev.preventDefault();ev.stopPropagation();
    const rect=e.getBoundingClientRect(),page=e.closest(".page");
    const startX=ev.clientX,startY=ev.clientY,startW=rect.width,startH=rect.height;
+   const startFont=parseFloat(getComputedStyle(e).fontSize);
    const keepRatio=!e.classList.contains("textbox")&&!e.classList.contains("he")&&!e.classList.contains("text");
    const ratio=startW/Math.max(1,startH);
    h.setPointerCapture(ev.pointerId);
@@ -277,6 +280,7 @@ function installResize(e,h){
        hgt=Math.min(hgt,Math.max(40,page.clientHeight-e.offsetTop-8));
      }
      e.style.width=Math.round(w)+"px";
+     if(e.classList.contains("sticker"))e.style.fontSize=Math.max(16,startFont*w/startW)+"px";
      if(e.classList.contains("textbox"))e.style.height=Math.round(hgt)+"px";
      else e.style.height="auto";
    };
@@ -301,6 +305,17 @@ function removeP(b){
  scrap.remove();
  persist(id);
 }
+// Delete the selected piece without intercepting text editing or form controls.
+document.addEventListener("keydown",ev=>{
+ if(ev.key!=="Delete"||ev.defaultPrevented||ev.isComposing||ev.ctrlKey||ev.altKey||ev.metaKey||ev.shiftKey||HALACHA_TEACHER_VIEW)return;
+ const target=ev.target;
+ if(target instanceof Element&&(target.closest("input,textarea,select")||target.isContentEditable))return;
+ const scrap=document.querySelector(".section.on .scrap.selected");
+ if(!scrap)return;
+ ev.preventDefault();
+ if(typeof activePiece!=="undefined"&&activePiece===scrap)closeCustomizer();
+ removeP(scrap);
+});
 function size(b,f){let e=b.closest(".scrap"),z=parseFloat(e.dataset.z||1)*f;e.dataset.z=z;e.style.zoom=z;clampPiece(e);persist(e.closest(".section").id)}
 function rot(b){let e=b.closest(".scrap"),r=(+e.dataset.r||0)+5;e.dataset.r=r;e.style.setProperty("--r",r+"deg");persist(e.closest(".section").id)}
 function drag(e){
@@ -308,6 +323,7 @@ function drag(e){
  e.ondblclick=v=>{v.stopPropagation();openCustomizer(e,v)};
  e.onpointerdown=v=>{
  if(v.target.tagName==="BUTTON"||v.target.closest(".resize-handle")||v.target.closest(".tb-text"))return;
+ e.tabIndex=-1;e.focus({preventScroll:true});
  on=true;sx=v.clientX;sy=v.clientY;l=e.offsetLeft;t=e.offsetTop;
  e.setPointerCapture(v.pointerId);
  document.querySelectorAll(".scrap").forEach(x=>x.classList.remove("selected"));e.classList.add("selected")
@@ -478,7 +494,7 @@ function matchPick(a){if(a.disabled)return;let sel=document.querySelector("#c .m
  let got=S.c_got=S.c_got||[];if(got.includes(m[0]))return;got.push(m[0]);matchMark(m[0]);
  rewardAdd("c","he",m[0]+" "+m[1]);
  matchFb(got.length<4?"✓ Correct! "+m[0]+" "+m[1]:"✓ All four matched! Decorate your page.","good");tryFinish("c")}
-function render(l){let sec=document.createElement("div");sec.id=l.id;sec.className="section"+(l.id==="a"?" on":"");let th=S[l.id+"_theme"]||"";let workbookNotice=l.id==="a"?'<div style="margin:0 0 10px;padding:9px 11px;border:2px solid #93c5fd;border-radius:10px;background:#eff6ff;color:#1e3a8a;font-weight:800">📘 Workbook segments are included in Lessons 2, 3 and 6.</div>':'';sec.innerHTML=`<div class=teacherOnly><div class="notes ${HALACHA_TEACHER_PREVIEW?'open':''}"><h3 style="margin-top:0">👨‍🏫 Teacher Notes — ${l.seif}</h3><div class=source>${teacherSource(l.id)}</div><p><b>What to bring out:</b> ${teacherPoint(l.id)}</p><p><b>Objective:</b> ${l.objective}</p><b>Ask students:</b><ol>${l.qs.map(q=>"<li>"+q+"</li>").join("")}</ol></div></div><div class=work><aside class=side>${workbookNotice}<h3>🎨 Scrapbook Tray</h3><div class=themeRow><button style="background:#fff3c9" onclick="setTheme('${l.id}','')"></button><button style="background:#e3f6ff" onclick="setTheme('${l.id}','blue')"></button><button style="background:#d7b27b" onclick="setTheme('${l.id}','craft')"></button><button style="background:#173758" onclick="setTheme('${l.id}','night')"></button></div><div class=step><button class=actbtn id="actbtn_${l.id}" onclick="toggleActivity('${l.id}')"></button></div><div class=step><b>Pieces to decorate with</b>${l.pieces.map(p=>`<button onclick="add('${l.id}','${p[0]}',\`${p[1]}\`)">${p[1]}</button>`).join("")}</div>${workbookTray(l.id)}<div class=step><button onclick="addTextBox('${l.id}')">✏️ Add text box</button><button onclick="document.getElementById('u_${l.id}').click()">📷 Add my picture</button><input hidden id="u_${l.id}" type=file accept="image/*" onchange="upload(event,'${l.id}')"></div><p><small>Drag pieces anywhere. Resize by dragging the blue handle on the bottom-right corner. Use ↻ to rotate. Use the crayons on each page to color and draw.</small></p></aside><div class=book><div class=spread><div class="page ${th}"><div class=activityBoard>${board(l)}</div><div class=canvas></div>${drawTools(l.id,0)}</div><div class="page ${th}"><div class=canvas></div>${drawTools(l.id,1)}</div></div></div></div>`;sections.appendChild(sec);let savedPages=S[l.id+"_scrap_pages"];if(savedPages){sec.querySelectorAll(".canvas").forEach((c,i)=>c.innerHTML=savedPages[i]||"")}else{let saved=S[l.id+"_scrap"];if(saved)sec.querySelector(".canvas").innerHTML=saved}sec.querySelectorAll(".scrap").forEach(e=>{ensureDeleteControl(e);ensureResizeHandle(e);drag(e);if(HALACHA_TEACHER_VIEW)e.querySelectorAll(".tb-text").forEach(t=>t.contentEditable="false");setTimeout(()=>clampPiece(e),0)});setTimeout(()=>{setupDraw(l.id,0);setupDraw(l.id,1)},0);let got=S[l.id+"_got"]||[];sec.querySelectorAll(".activityBoard button.card[onclick*=choose]").forEach(b=>{let m=(b.getAttribute("onclick")||"").match(/'[a-f]','([^']+)'\)/);if(m&&got.includes(m[1])){b.classList.add("good");b.disabled=true}});if(l.id==="c")got.forEach(matchMark);let ab=sec.querySelector(".activityBoard");if(S[l.id+"_done"])ab.classList.add("finished");else if(S[l.id+"_hideAct"])ab.classList.add("hidden");updateActBtn(l.id)}
+function render(l){let sec=document.createElement("div");sec.id=l.id;sec.className="section"+(l.id==="a"?" on":"");let th=S[l.id+"_theme"]||"";let workbookNotice=l.id==="a"?'<div style="margin:0 0 10px;padding:9px 11px;border:2px solid #93c5fd;border-radius:10px;background:#eff6ff;color:#1e3a8a;font-weight:800">📘 Workbook segments are included in Lessons 2, 3 and 6.</div>':'';sec.innerHTML=`<div class=teacherOnly><div class="notes ${HALACHA_TEACHER_PREVIEW?'open':''}"><h3 style="margin-top:0">👨‍🏫 Teacher Notes — ${l.seif}</h3><div class=source>${teacherSource(l.id)}</div><p><b>What to bring out:</b> ${teacherPoint(l.id)}</p><p><b>Objective:</b> ${l.objective}</p><b>Ask students:</b><ol>${l.qs.map(q=>"<li>"+q+"</li>").join("")}</ol></div></div><div class=work><aside class=side>${workbookNotice}<h3>🎨 Scrapbook Tray</h3><div class=themeRow><button style="background:#fff3c9" onclick="setTheme('${l.id}','')"></button><button style="background:#e3f6ff" onclick="setTheme('${l.id}','blue')"></button><button style="background:#d7b27b" onclick="setTheme('${l.id}','craft')"></button><button style="background:#173758" onclick="setTheme('${l.id}','night')"></button></div><div class=step><button class=actbtn id="actbtn_${l.id}" onclick="toggleActivity('${l.id}')"></button></div><div class=step><b>Pieces to decorate with</b>${l.pieces.map(p=>`<button onclick="add('${l.id}','${p[0]}',\`${p[1]}\`)">${p[1]}</button>`).join("")}</div>${workbookTray(l.id)}<div class=step><button onclick="addTextBox('${l.id}')">✏️ Add text box</button><button onclick="document.getElementById('u_${l.id}').click()">📷 Add my picture</button><input hidden id="u_${l.id}" type=file accept="image/*" onchange="upload(event,'${l.id}')"></div><p><small>Click a piece and press Delete to remove it. Drag pieces anywhere. Resize by dragging the blue handle on the bottom-right corner. Use ↻ to rotate. Use the crayons on each page to color and draw.</small></p></aside><div class=book><div class=spread><div class="page ${th}"><div class=activityBoard>${board(l)}</div><div class=canvas></div>${drawTools(l.id,0)}</div><div class="page ${th}"><div class=canvas></div>${drawTools(l.id,1)}</div></div></div></div>`;sections.appendChild(sec);let savedPages=S[l.id+"_scrap_pages"];if(savedPages){sec.querySelectorAll(".canvas").forEach((c,i)=>c.innerHTML=savedPages[i]||"")}else{let saved=S[l.id+"_scrap"];if(saved)sec.querySelector(".canvas").innerHTML=saved}sec.querySelectorAll(".scrap").forEach(e=>{ensureDeleteControl(e);ensureResizeHandle(e);drag(e);if(HALACHA_TEACHER_VIEW)e.querySelectorAll(".tb-text").forEach(t=>t.contentEditable="false");setTimeout(()=>clampPiece(e),0)});setTimeout(()=>{setupDraw(l.id,0);setupDraw(l.id,1)},0);let got=S[l.id+"_got"]||[];sec.querySelectorAll(".activityBoard button.card[onclick*=choose]").forEach(b=>{let m=(b.getAttribute("onclick")||"").match(/'[a-f]','([^']+)'\)/);if(m&&got.includes(m[1])){b.classList.add("good");b.disabled=true}});if(l.id==="c")got.forEach(matchMark);let ab=sec.querySelector(".activityBoard");if(S[l.id+"_done"])ab.classList.add("finished");else if(S[l.id+"_hideAct"])ab.classList.add("hidden");updateActBtn(l.id)}
 lessons.forEach(render);
 lessons.forEach(l=>{let b=document.createElement("button");b.dataset.id=l.id;b.textContent=(["b","c","f"].includes(l.id)?"📘 ":"")+l.tab;b.onclick=()=>show(l.id);if(l.id==="a")b.className="on";tabs.appendChild(b)});
 let rb=document.createElement("button");rb.dataset.id="review";rb.textContent="🎤 Teacher Review";rb.className="teacherOnly";rb.onclick=()=>show("review");tabs.appendChild(rb);
