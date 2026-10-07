@@ -173,10 +173,18 @@
       verifiedTeacherAccess.role === "admin");
   }
 
-  function loadAuthScript(url) {
+  function loadOneScript(url) {
     return new Promise(function(resolve,reject){
       var script=document.createElement("script");script.src=url;
-      script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
+      script.onload=resolve;script.onerror=function(e){script.remove();reject(e);};document.head.appendChild(script);
+    });
+  }
+  // If gstatic.com is blocked (some school networks), fall back to the copy hosted on this site.
+  function loadAuthScript(url) {
+    var m=/gstatic\.com\/firebasejs\/12\.15\.0\/(firebase-[a-z]+-compat\.js)$/.exec(url);
+    return loadOneScript(url).catch(function(e){
+      if(!m) throw e;
+      return loadOneScript(new URL("vendor/firebase/12.15.0/"+m[1],rootBase).href);
     });
   }
   async function watchTeacherAccess() {
