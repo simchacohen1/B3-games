@@ -357,7 +357,7 @@ function persist(id){
 
 const drawColors=["#e53935","#fb8c00","#fdd835","#43a047","#1e88e5","#8e24aa","#6d4c41","#263238"];
 function drawTools(id,idx){
- return `<div class="page-tools"><button title="Color" style="background:#e53935" onclick="setPen('${id}',${idx},this,'#e53935')"></button><button title="Color" style="background:#1e88e5" onclick="setPen('${id}',${idx},this,'#1e88e5')"></button><button title="Color" style="background:#43a047" onclick="setPen('${id}',${idx},this,'#43a047')"></button><button title="Color" style="background:#fdd835" onclick="setPen('${id}',${idx},this,'#fdd835')"></button><button title="More colors" onclick="moreColor('${id}',${idx},this)">🎨</button><span class="tool-sep"></span><button class="size-btn size-on" title="Thin line" onclick="setSize('${id}',${idx},this,3)"><i style="width:4px;height:4px"></i></button><button class="size-btn" title="Medium line" onclick="setSize('${id}',${idx},this,7)"><i style="width:8px;height:8px"></i></button><button class="size-btn" title="Thick line" onclick="setSize('${id}',${idx},this,12)"><i style="width:13px;height:13px"></i></button><span class="tool-sep"></span><button title="Eraser" onclick="setEraser('${id}',${idx},this)">⌫</button><button title="Stop drawing" onclick="stopDraw('${id}',${idx})">✓</button><button class="reset-page-btn" title="Reset this whole scrapbook page" onclick="resetScrapbookPage('${id}',${idx})">↺</button></div><canvas class="draw-layer"></canvas>`
+ return `<div class="page-tools"><button title="Color" style="background:#e53935" onclick="setPen('${id}',${idx},this,'#e53935')"></button><button title="Color" style="background:#1e88e5" onclick="setPen('${id}',${idx},this,'#1e88e5')"></button><button title="Color" style="background:#43a047" onclick="setPen('${id}',${idx},this,'#43a047')"></button><button title="Color" style="background:#fdd835" onclick="setPen('${id}',${idx},this,'#fdd835')"></button><button title="More colors" onclick="moreColor('${id}',${idx},this)">🎨</button><span class="tool-sep"></span><button class="size-btn size-on" title="Thin line" onclick="setSize('${id}',${idx},this,3)"><i style="width:4px;height:4px"></i></button><button class="size-btn" title="Medium line" onclick="setSize('${id}',${idx},this,7)"><i style="width:8px;height:8px"></i></button><button class="size-btn" title="Thick line" onclick="setSize('${id}',${idx},this,12)"><i style="width:13px;height:13px"></i></button><span class="tool-sep"></span><button title="Eraser" onclick="setEraser('${id}',${idx},this)">⌫</button><button title="Stop drawing" onclick="stopDraw('${id}',${idx})">✓</button><button class="reset-page-btn" title="Reset both scrapbook pages" onclick="resetScrapbookPage('${id}',${idx})">↺</button></div><canvas class="draw-layer"></canvas>`
 }
 function setupDraw(id,idx){
  let page=document.querySelectorAll("#"+id+" .page")[idx],c=page.querySelector(".draw-layer"); if(!c)return;
@@ -367,7 +367,7 @@ function setupDraw(id,idx){
  c.width=Math.round(rect.width*dpr);c.height=Math.round(rect.height*dpr);
  c.style.width=rect.width+"px";c.style.height=rect.height+"px";
  let ctx=c.getContext("2d");ctx.scale(dpr,dpr);ctx.lineCap="round";ctx.lineJoin="round";
- let saved=(S[id+"_draw"]||[])[idx]; if(saved){let im=new Image();im.onload=()=>ctx.drawImage(im,0,0,rect.width,rect.height);im.src=saved}
+ let saved=(S[id+"_draw"]||[])[idx]; if(saved){let im=new Image();im.onload=()=>{if((S[id+"_draw"]||[])[idx]===saved)ctx.drawImage(im,0,0,rect.width,rect.height)};im.src=saved}
  let drawing=false;
  c.onpointerdown=e=>{drawing=true;c.setPointerCapture(e.pointerId);paint(e)};
  c.onpointermove=e=>{if(drawing)paint(e)};
@@ -388,26 +388,39 @@ function moreColor(id,idx,b){let color=prompt("Enter a color name or hex color, 
 function setEraser(id,idx,b){let p=document.querySelectorAll("#"+id+" .page")[idx];p.dataset.drawMode="erase";p.classList.add("drawing");p.querySelectorAll(".page-tools button:not(.size-btn)").forEach(x=>x.classList.remove("pen-on"));b.classList.add("pen-on")}
 function stopDraw(id,idx){let p=document.querySelectorAll("#"+id+" .page")[idx];p.classList.remove("drawing");p.querySelectorAll(".page-tools button:not(.size-btn)").forEach(x=>x.classList.remove("pen-on"));saveDrawing(id)}
 function saveDrawing(id){let arr=[...document.querySelectorAll("#"+id+" .draw-layer")].map(c=>c.toDataURL("image/png"));S[id+"_draw"]=arr;save()}
-function resetScrapbookPage(id,idx){
+let lastScrapbookReset=null;
+function resetScrapbookPage(id){
+ if(HALACHA_TEACHER_VIEW)return;
  const pages=[...document.querySelectorAll("#"+id+" .page")];
- const page=pages[idx];if(!page)return;
- if(!confirm("Reset this whole scrapbook page? This will delete every item and all drawing on this page."))return;
- const canvas=page.querySelector(".canvas");
- if(canvas)canvas.innerHTML="";
- const draw=page.querySelector(".draw-layer");
- if(draw){
-   const ctx=draw.getContext("2d");
-   if(ctx)ctx.clearRect(0,0,draw.width,draw.height);
- }
- page.classList.remove("drawing");
- page.querySelectorAll(".page-tools button").forEach(x=>x.classList.remove("pen-on"));
- const scrapPages=pages.map(p=>pageCanvas(p).innerHTML);
- S[id+"_scrap_pages"]=scrapPages;
- const drawings=Array.isArray(S[id+"_draw"])?S[id+"_draw"].slice():[];
- while(drawings.length<pages.length)drawings.push("");
- drawings[idx]="";
- S[id+"_draw"]=drawings;
- save();
+ if(!pages.length)return;
+ closeCustomizer();
+ lastScrapbookReset={id,pieces:pages.map(p=>pageCanvas(p).innerHTML),drawings:pages.map(p=>p.querySelector(".draw-layer").toDataURL("image/png"))};
+ S[id+"_scrap_pages"]=pages.map(()=>"");
+ delete S[id+"_scrap"];
+ S[id+"_draw"]=pages.map(()=>"");
+ pages.forEach(p=>{
+  pageCanvas(p).innerHTML="";
+  const c=p.querySelector(".draw-layer");
+  // Resetting the bitmap also clears any transform and pending drawing stroke.
+  c.width=c.width;c._w=0;p._last=null;
+  p.classList.remove("drawing");
+  p.querySelectorAll(".page-tools button").forEach(x=>x.classList.remove("pen-on"));
+ });
+ ensureDraw(id);save();
+ document.querySelectorAll(".undo-reset-btn").forEach(b=>b.hidden=b.dataset.section!==id);
+}
+function undoScrapbookReset(id){
+ if(!lastScrapbookReset||lastScrapbookReset.id!==id)return;
+ const backup=lastScrapbookReset;lastScrapbookReset=null;
+ closeCustomizer();
+ S[id+"_scrap_pages"]=backup.pieces;S[id+"_draw"]=backup.drawings;
+ document.querySelectorAll("#"+id+" .page").forEach((p,i)=>{
+  pageCanvas(p).innerHTML=backup.pieces[i];
+  p.querySelectorAll(".scrap").forEach(e=>{ensureDeleteControl(e);ensureResizeHandle(e);drag(e)});
+  p.querySelector(".draw-layer")._w=0;
+ });
+ ensureDraw(id);save();
+ document.querySelectorAll(".undo-reset-btn").forEach(b=>b.hidden=true);
 }
 
 function setTheme(id,t){document.querySelectorAll("#"+id+" .page").forEach(p=>p.className="page "+t);S[id+"_theme"]=t;save()}
@@ -500,7 +513,7 @@ function matchPick(a){if(a.disabled)return;let sel=document.querySelector("#c .m
  let got=S.c_got=S.c_got||[];if(got.includes(m[0]))return;got.push(m[0]);matchMark(m[0]);
  rewardAdd("c","he",m[0]+" "+m[1]);
  matchFb(got.length<4?"✓ Correct! "+m[0]+" "+m[1]:"✓ All four matched! Decorate your page.","good");tryFinish("c")}
-function render(l){let sec=document.createElement("div");sec.id=l.id;sec.className="section"+(l.id==="a"?" on":"");let th=S[l.id+"_theme"]||"";let workbookNotice=l.id==="a"?'<div style="margin:0 0 10px;padding:9px 11px;border:2px solid #93c5fd;border-radius:10px;background:#eff6ff;color:#1e3a8a;font-weight:800">📘 Workbook segments are included in Lessons 2, 3 and 6.</div>':'';sec.innerHTML=`<div class=teacherOnly><div class="notes ${HALACHA_TEACHER_PREVIEW?'open':''}"><h3 style="margin-top:0">👨‍🏫 Teacher Notes — ${l.seif}</h3><div class=source>${teacherSource(l.id)}</div><p><b>What to bring out:</b> ${teacherPoint(l.id)}</p><p><b>Objective:</b> ${l.objective}</p><b>Ask students:</b><ol>${l.qs.map(q=>"<li>"+q+"</li>").join("")}</ol></div></div><div class=work><aside class=side>${workbookNotice}<h3>🎨 Scrapbook Tray</h3><div class=themeRow><button style="background:#fff3c9" onclick="setTheme('${l.id}','')"></button><button style="background:#e3f6ff" onclick="setTheme('${l.id}','blue')"></button><button style="background:#d7b27b" onclick="setTheme('${l.id}','craft')"></button><button style="background:#173758" onclick="setTheme('${l.id}','night')"></button></div><div class=step><button class=actbtn id="actbtn_${l.id}" onclick="toggleActivity('${l.id}')"></button></div><div class=step><b>Pieces to decorate with</b>${l.pieces.map(p=>`<button class="${l.id==='c'&&p[0]==='sticker'?'animal-tray':''}" onclick="add('${l.id}','${p[0]}',\`${p[1]}\`)">${p[1]}</button>`).join("")}</div>${workbookTray(l.id)}<div class=step><button onclick="addTextBox('${l.id}')">✏️ Add text box</button><button onclick="document.getElementById('u_${l.id}').click()">📷 Add my picture</button><input hidden id="u_${l.id}" type=file accept="image/*" onchange="upload(event,'${l.id}')"></div><p><small>Click a piece and press Delete to remove it. Drag pieces anywhere. Resize by dragging the blue handle on the bottom-right corner. Use ↻ to rotate. Use the crayons on each page to color and draw.</small></p></aside><div class=book><div class=spread><div class="page ${th}"><div class=activityBoard>${board(l)}</div><div class=canvas></div>${drawTools(l.id,0)}</div><div class="page ${th}"><div class=canvas></div>${drawTools(l.id,1)}</div></div></div></div>`;sections.appendChild(sec);let savedPages=S[l.id+"_scrap_pages"];if(savedPages){sec.querySelectorAll(".canvas").forEach((c,i)=>c.innerHTML=savedPages[i]||"")}else{let saved=S[l.id+"_scrap"];if(saved)sec.querySelector(".canvas").innerHTML=saved}sec.querySelectorAll(".scrap").forEach(e=>{ensureDeleteControl(e);ensureResizeHandle(e);drag(e);if(HALACHA_TEACHER_VIEW)e.querySelectorAll(".tb-text").forEach(t=>t.contentEditable="false");setTimeout(()=>clampPiece(e),0)});setTimeout(()=>{setupDraw(l.id,0);setupDraw(l.id,1)},0);let got=S[l.id+"_got"]||[];sec.querySelectorAll(".activityBoard button.card[onclick*=choose]").forEach(b=>{let m=(b.getAttribute("onclick")||"").match(/'[a-f]','([^']+)'\)/);if(m&&got.includes(m[1])){b.classList.add("good");b.disabled=true}});if(l.id==="c")got.forEach(matchMark);let ab=sec.querySelector(".activityBoard");if(S[l.id+"_done"])ab.classList.add("finished");else if(S[l.id+"_hideAct"])ab.classList.add("hidden");updateActBtn(l.id)}
+function render(l){let sec=document.createElement("div");sec.id=l.id;sec.className="section"+(l.id==="a"?" on":"");let th=S[l.id+"_theme"]||"";let workbookNotice=l.id==="a"?'<div style="margin:0 0 10px;padding:9px 11px;border:2px solid #93c5fd;border-radius:10px;background:#eff6ff;color:#1e3a8a;font-weight:800">📘 Workbook segments are included in Lessons 2, 3 and 6.</div>':'';sec.innerHTML=`<div class=teacherOnly><div class="notes ${HALACHA_TEACHER_PREVIEW?'open':''}"><h3 style="margin-top:0">👨‍🏫 Teacher Notes — ${l.seif}</h3><div class=source>${teacherSource(l.id)}</div><p><b>What to bring out:</b> ${teacherPoint(l.id)}</p><p><b>Objective:</b> ${l.objective}</p><b>Ask students:</b><ol>${l.qs.map(q=>"<li>"+q+"</li>").join("")}</ol></div></div><div class=work><aside class=side>${workbookNotice}<h3>🎨 Scrapbook Tray</h3><div class=themeRow><button style="background:#fff3c9" onclick="setTheme('${l.id}','')"></button><button style="background:#e3f6ff" onclick="setTheme('${l.id}','blue')"></button><button style="background:#d7b27b" onclick="setTheme('${l.id}','craft')"></button><button style="background:#173758" onclick="setTheme('${l.id}','night')"></button></div><div class=step><button class=actbtn id="actbtn_${l.id}" onclick="toggleActivity('${l.id}')"></button></div><div class=step><button class="undo-reset-btn" data-section="${l.id}" hidden onclick="undoScrapbookReset('${l.id}')">Undo reset</button></div><div class=step><b>Pieces to decorate with</b>${l.pieces.map(p=>`<button class="${l.id==='c'&&p[0]==='sticker'?'animal-tray':''}" onclick="add('${l.id}','${p[0]}',\`${p[1]}\`)">${p[1]}</button>`).join("")}</div>${workbookTray(l.id)}<div class=step><button onclick="addTextBox('${l.id}')">✏️ Add text box</button><button onclick="document.getElementById('u_${l.id}').click()">📷 Add my picture</button><input hidden id="u_${l.id}" type=file accept="image/*" onchange="upload(event,'${l.id}')"></div><p><small>Click a piece and press Delete to remove it. Drag pieces anywhere. Resize by dragging the blue handle on the bottom-right corner. Use ↻ to rotate. Use the crayons on each page to color and draw.</small></p></aside><div class=book><div class=spread><div class="page ${th}"><div class=activityBoard>${board(l)}</div><div class=canvas></div>${drawTools(l.id,0)}</div><div class="page ${th}"><div class=canvas></div>${drawTools(l.id,1)}</div></div></div></div>`;sections.appendChild(sec);let savedPages=S[l.id+"_scrap_pages"];if(savedPages){sec.querySelectorAll(".canvas").forEach((c,i)=>c.innerHTML=savedPages[i]||"")}else{let saved=S[l.id+"_scrap"];if(saved)sec.querySelector(".canvas").innerHTML=saved}sec.querySelectorAll(".scrap").forEach(e=>{ensureDeleteControl(e);ensureResizeHandle(e);drag(e);if(HALACHA_TEACHER_VIEW)e.querySelectorAll(".tb-text").forEach(t=>t.contentEditable="false");setTimeout(()=>clampPiece(e),0)});setTimeout(()=>{setupDraw(l.id,0);setupDraw(l.id,1)},0);let got=S[l.id+"_got"]||[];sec.querySelectorAll(".activityBoard button.card[onclick*=choose]").forEach(b=>{let m=(b.getAttribute("onclick")||"").match(/'[a-f]','([^']+)'\)/);if(m&&got.includes(m[1])){b.classList.add("good");b.disabled=true}});if(l.id==="c")got.forEach(matchMark);let ab=sec.querySelector(".activityBoard");if(S[l.id+"_done"])ab.classList.add("finished");else if(S[l.id+"_hideAct"])ab.classList.add("hidden");updateActBtn(l.id)}
 lessons.forEach(render);
 lessons.forEach(l=>{let b=document.createElement("button");b.dataset.id=l.id;b.textContent=(["b","c","f"].includes(l.id)?"📘 ":"")+l.tab;b.onclick=()=>show(l.id);if(l.id==="a")b.className="on";tabs.appendChild(b)});
 let rb=document.createElement("button");rb.dataset.id="review";rb.textContent="🎤 Teacher Review";rb.className="teacherOnly";rb.onclick=()=>show("review");tabs.appendChild(rb);
