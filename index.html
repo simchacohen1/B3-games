@@ -146,6 +146,25 @@
 .card-lock-menu{position:absolute;right:6px;top:38px;z-index:20;display:flex;gap:6px;padding:8px;background:#fff;border:1px solid #94a3b8;border-radius:10px;box-shadow:0 4px 15px #0003}
 .card-lock-menu button{white-space:nowrap;padding:7px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;cursor:pointer;font-weight:bold}.card-lock-menu small{max-width:150px}
 </style>
+<script>
+  window.__b3Errors = [];
+  window.addEventListener("error", function (e) {
+    var t = e.target;
+    if (t && t !== window && (t.src || t.href)) {
+      window.__b3Errors.push("Part of the page could not load (" + (t.src || t.href).split("?")[0].split("/")[2] + ").");
+    } else {
+      window.__b3Errors.push("The page hit an error while loading.");
+    }
+  }, true);
+  document.addEventListener("click", function (e) {
+    if (window.__b3Ready) return;
+    var btn = e.target.closest ? e.target.closest("#studentSignInBtn") : null;
+    if (!btn) return;
+    var msg = document.getElementById("loginMsg");
+    var why = window.__b3Errors[0] || "The page did not finish loading.";
+    if (msg) msg.textContent = why + " Press Ctrl+Shift+R to reload. If it keeps happening, your school network may be blocking this site.";
+  });
+</script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
@@ -446,6 +465,7 @@
   el("studentSignInBtn").addEventListener("click",studentSignIn);
   el("studentNameInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
   el("classPinInput").addEventListener("keydown",e=>{if(e.key==="Enter")studentSignIn();});
+  window.__b3Ready = true;
   const gameCards=Array.from(document.querySelectorAll(".game-card"));
   const gameDefinitions=gameCards.map(card=>({id:card.dataset.gameId,name:(card.querySelector(".card-title")?.textContent||card.textContent).trim(),element:card}));
   gameCards.forEach(card=>card.addEventListener("click",event=>{
