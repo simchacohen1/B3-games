@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<script src="../game-gate.js?v=20261006-lockoverride" data-game-id="class-gallery"></script>
+<script src="../game-gate.js?v=20261007-gallery-lock" data-game-id="class-gallery"></script>
 <title>Our Wall of Learning</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
@@ -13,6 +13,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="../firebase-config.js"></script>
 <script src="../site-settings.js?v=20261001-role-scope"></script>
+<script src="../student-class.js?v=20261007-gallery-lock"></script>
+<script src="access.js?v=20261007-gallery-lock"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.min.js"></script>
 <script>
   /* School networks sometimes block one CDN. Try two independent fallbacks
@@ -373,12 +375,28 @@ function populateRoomSelect(){
 populateRoomSelect();
 
 /* ---------- Firebase lock ---------- */
+let galleryAccessBlocked=true, galleryAccessSettings=null, galleryVerifiedClass='', galleryServerOffset=0;
+function refreshGalleryAccess(){
+  const studentId=String(localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId')||'');
+  galleryAccessBlocked=!B3GalleryAccess(B3SiteSettings,galleryAccessSettings,galleryVerifiedClass,studentId,isTeacher,new Date(Date.now()+galleryServerOffset));
+  document.getElementById('masterBlockedOverlay').classList.toggle('show',galleryAccessBlocked);
+  if(galleryAccessBlocked){
+    Object.keys(pressed).forEach(k=>pressed[k]=false);navTween=null;
+    document.querySelectorAll('audio,video').forEach(media=>media.pause());
+  }
+}
 window.addEventListener('DOMContentLoaded',()=>{
   if(!window.firebase) return;
+  const studentId=String(localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId')||'');
+  if(studentId)FunTorahStudentClass.resolve(firebase.database(),studentId).then(info=>{galleryVerifiedClass=info.classId;refreshGalleryAccess();}).catch(()=>{galleryVerifiedClass='';refreshGalleryAccess();});
+  firebase.database().ref('.info/serverTimeOffset').on('value',snap=>{galleryServerOffset=Number(snap.val())||0;refreshGalleryAccess();});
   firebase.database().ref('b3Games/siteSettings').on('value',snap=>{
-    const settings=snap.val()||{}, games=settings.games||{};
-    document.getElementById('masterBlockedOverlay').classList.toggle('show',settings.siteEnabled===false||games['class-gallery']===false);
+    galleryAccessSettings=snap.val()||{};refreshGalleryAccess();
   },err=>console.warn('Could not read master site settings',err));
+  setInterval(refreshGalleryAccess,1000);
+  ['click','pointerdown','keydown','submit'].forEach(type=>document.addEventListener(type,event=>{
+    if(!galleryAccessBlocked||event.target.closest?.('#b3-gate-overlay'))return;event.preventDefault();event.stopImmediatePropagation();
+  },true));
 });
 
 /* ---------- 3D hallway ---------- */
@@ -1878,7 +1896,7 @@ function updateAvatar(dt){
   if(tagOptedIn&&walking&&Math.hypot(avatarState.x-oldX,avatarState.z-oldZ)>.002)markItActivity();
   syncLivePresence(false);
 }
-function animate(){requestAnimationFrame(animate);const dt=Math.min(.04,clock.getDelta());updateAvatar(dt);updateRemoteAvatars(dt);maybeTagNearbyClassmate();checkTagIdle();updateTagHud();const now=performance.now();if(now-lastPowerUiAt>180){lastPowerUiAt=now;updatePowerStatusHud();if(document.getElementById('powerOverlay')?.classList.contains('show'))renderPowerShop();}renderer.render(scene,camera);}
+function animate(){requestAnimationFrame(animate);const dt=Math.min(.04,clock.getDelta());if(!galleryAccessBlocked){updateAvatar(dt);updateRemoteAvatars(dt);maybeTagNearbyClassmate();checkTagIdle();}updateTagHud();const now=performance.now();if(now-lastPowerUiAt>180){lastPowerUiAt=now;updatePowerStatusHud();if(document.getElementById('powerOverlay')?.classList.contains('show'))renderPowerShop();}renderer.render(scene,camera);}
 function onResize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);}
 
 function onPointerDown(e){dragging=true;dragStartX=dragLastX=e.clientX;dragMoved=0;pointerDownAt=performance.now();renderer.domElement.setPointerCapture?.(e.pointerId);}
@@ -1974,6 +1992,7 @@ document.getElementById('loginSubmitBtn').onclick=async()=>{
 B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
   const allowed=authorized&&(access?.role==='admin'||(access?.classIds||[]).includes(galleryClassId));
   teacherUser=allowed?user:null;isTeacher=!!allowed;teacherPresenceViewer=!!allowed;
+  refreshGalleryAccess();
   if(allowed){
     PRESENCE_STUDENTS[currentTagStudentKey()]={name:user.displayName||user.email||'Teacher',classId:galleryClassId};
     if(!legacyGallery)presenceProfile={name:user.displayName||'Teacher',classId:galleryClassId};
