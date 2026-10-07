@@ -13,7 +13,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="../firebase-config.js"></script>
 <script src="../site-settings.js?v=20261001-role-scope"></script>
-<script src="../student-class.js?v=20261007-gallery-lock"></script>
+<script src="../student-class.js?v=20261007-gallery-identity-fix"></script>
 <script src="access.js?v=20261007-gallery-lock"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.min.js"></script>
 <script>
@@ -376,10 +376,28 @@ populateRoomSelect();
 
 /* ---------- Firebase lock ---------- */
 let galleryAccessBlocked=true, galleryAccessSettings=null, galleryVerifiedClass='', galleryServerOffset=0;
+let galleryIdentity='', galleryIdentityCheckAt=0, galleryIdentityPending=false;
+function refreshGalleryIdentity(){
+  if(!window.firebase || !window.FunTorahStudentClass)return;
+  const id=String(localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId')||'');
+  if(id!==galleryIdentity){galleryIdentity=id;galleryVerifiedClass='';galleryIdentityCheckAt=0;}
+  if(!id || galleryIdentityPending || Date.now()-galleryIdentityCheckAt<15000)return;
+  galleryIdentityPending=true;galleryIdentityCheckAt=Date.now();
+  FunTorahStudentClass.resolve(firebase.database(),id).then(info=>{
+    if(id===galleryIdentity)galleryVerifiedClass=info.classId;
+  }).catch(err=>{if(id===galleryIdentity)galleryVerifiedClass='';console.warn('Gallery class verification failed',err);})
+    .finally(()=>{galleryIdentityPending=false;refreshGalleryAccess();});
+}
 function refreshGalleryAccess(){
   const studentId=String(localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId')||'');
+  refreshGalleryIdentity();
   galleryAccessBlocked=!B3GalleryAccess(B3SiteSettings,galleryAccessSettings,galleryVerifiedClass,studentId,isTeacher,new Date(Date.now()+galleryServerOffset));
   document.getElementById('masterBlockedOverlay').classList.toggle('show',galleryAccessBlocked);
+  const message=document.querySelector('#masterBlockedOverlay .master-blocked-card');
+  if(message)message.textContent=!studentId?'Please sign in to B3 Games, then return to the gallery.':
+    !galleryVerifiedClass?'Checking your class access. If this continues, sign in again from B3 Games.':
+    !galleryAccessSettings?'Loading gallery access settings. Please wait.':
+    'This gallery is currently turned off. Ask your teacher.';
   if(galleryAccessBlocked){
     Object.keys(pressed).forEach(k=>pressed[k]=false);navTween=null;
     document.querySelectorAll('audio,video').forEach(media=>media.pause());
@@ -388,7 +406,7 @@ function refreshGalleryAccess(){
 window.addEventListener('DOMContentLoaded',()=>{
   if(!window.firebase) return;
   const studentId=String(localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId')||'');
-  if(studentId)FunTorahStudentClass.resolve(firebase.database(),studentId).then(info=>{galleryVerifiedClass=info.classId;refreshGalleryAccess();}).catch(()=>{galleryVerifiedClass='';refreshGalleryAccess();});
+  refreshGalleryAccess();
   firebase.database().ref('.info/serverTimeOffset').on('value',snap=>{galleryServerOffset=Number(snap.val())||0;refreshGalleryAccess();});
   firebase.database().ref('b3Games/siteSettings').on('value',snap=>{
     galleryAccessSettings=snap.val()||{};refreshGalleryAccess();
