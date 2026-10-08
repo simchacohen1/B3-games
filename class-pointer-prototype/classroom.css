@@ -125,3 +125,64 @@ footer{padding-top:8px;border-top:1px solid #e9edf5;color:#738098}
 .fullscreen-roster-panel .roster-row span{min-width:120px}
 .fullscreen-roster-panel .roster-row button{padding:5px 9px;font-size:12px}
 .fullscreen-roster-panel .roster-row label{padding:4px 8px;font-size:12px}
+
+/* Teacher dock: one compact toolbar directly above the lesson; floats inside the lesson in full screen. */
+.session-controls{display:flex;flex-wrap:wrap;gap:8px;padding:14px 0 0}
+.session-controls button.quiet{background:#fff;color:#56637a;font-weight:650}
+body.teacher-view .lesson-actions{display:none}
+body.teacher-view #pointerStatus{display:none}
+body.teacher-view #stage:fullscreen #exitFullScreenLesson,body.teacher-view #stage.lesson-fullscreen #exitFullScreenLesson{display:none!important}
+.teacher-dock{position:sticky;top:8px;z-index:30;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 0;padding:6px;background:#ffffffee;border:1px solid #dbe3f2;border-radius:16px;box-shadow:0 6px 20px #23355a1a;backdrop-filter:blur(8px)}
+.teacher-dock button,.teacher-dock select{box-shadow:none}
+.tb-group{display:flex;align-items:center;gap:3px;padding:2px;background:#f3f6fc;border-radius:12px}
+.tb-spacer{flex:1}
+.tb-btn{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:6px 11px;border:0;border-radius:10px;background:transparent;color:#2a3a57;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap}
+.tb-btn:hover:enabled{background:#e4ecfb}
+.tb-btn[aria-pressed="true"]{background:#3268e8;color:#fff;box-shadow:0 2px 6px #3268e855}
+.tb-btn[aria-pressed="true"]:hover{background:#2758ce}
+.tb-ico{font-size:17px;line-height:1}
+.tb-caret{padding:6px 7px;margin-left:-4px;font-size:12px}
+.tb-swatches button{width:26px;height:26px;min-height:0;padding:0;margin:0 1px;border-radius:50%;background:var(--c);border:2px solid #fff;box-shadow:0 0 0 1px #c9d3e4;cursor:pointer}
+.tb-swatches button[aria-pressed="true"]{box-shadow:0 0 0 2px #fff,0 0 0 4px #23334e;transform:scale(1.08)}
+.tb-sizes button{display:grid;place-items:center;width:32px;height:34px;min-height:0;padding:0;border:0;border-radius:9px;background:transparent;cursor:pointer}
+.tb-sizes i{display:block;width:var(--d);height:var(--d);border-radius:50%;background:#2a3a57}
+.tb-sizes button[aria-pressed="true"]{background:#dfe8fb}
+.tb-sizes.dim{opacity:.45}
+.tb-toggle{gap:4px;cursor:pointer;user-select:none}
+.tb-toggle input{position:absolute;opacity:0;pointer-events:none}
+.tb-toggle:has(input:checked){background:#ffe58a;color:#4a3b00}
+.tb-toggle:has(input:focus-visible){outline:2px solid #3268e8}
+.tb-menu-wrap{position:relative;display:inline-flex}
+.tb-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:40;display:grid;gap:2px;min-width:190px;padding:6px;background:#fff;border:1px solid #dbe3f2;border-radius:14px;box-shadow:0 14px 40px #1a284633;color:#23334e}
+.tb-menu-right{left:auto;right:0}
+.tb-menu>button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border:0;border-radius:9px;background:transparent;text-align:left;font-size:14px;font-weight:650;cursor:pointer}
+.tb-menu>button:hover:enabled{background:#eef3fd}
+.tb-menu>button.active{background:#e3ebfd;color:#234ea8}
+.tb-menu>button span{width:20px;text-align:center}
+.tb-menu>button.danger{color:#b4232f}
+.tb-menu>button.danger:hover:enabled{background:#fdecee}
+.tb-menu small{padding:8px 11px 2px;color:#7a869b;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.tb-view-menu{min-width:260px}
+.tb-view-menu .share-view-controls{margin:0;padding:4px;background:none;border:0;display:flex;flex-wrap:wrap;gap:6px}
+.tb-view-menu .share-view-controls button{padding:8px 10px;font-size:13px}
+.tb-students{width:min(420px,88vw);max-height:min(60vh,520px);overflow:auto;padding:12px}
+.tb-students .field{margin-bottom:6px}
+.tb-students .field select{width:100%}
+.tb-students #roster{margin-top:6px;font-size:14px;color:#56637a}
+.tb-students .roster-row{padding:8px 0;gap:8px}
+.tb-students .roster-row span{min-width:110px}
+.tb-students .roster-row button{padding:6px 10px;font-size:13px}
+.tb-students .roster-row label{padding:5px 8px;font-size:12px}
+#tbStudentsBtn.alert{background:#f59e0b;color:#fff;animation:rosterPulse 1.2s ease-in-out infinite}
+.tb-collapse{display:none}
+.teacher-dock.floating{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 20px);margin:0;background:#ffffffeb;z-index:8}
+.teacher-dock.floating .tb-collapse{display:inline-flex}
+.teacher-dock.floating.collapsed>*:not(.tb-group:last-child),.teacher-dock.floating.collapsed .tb-group:last-child>*:not(.tb-collapse):not(#tbFullscreen){display:none}
+.teacher-dock.floating.collapsed .tb-collapse::after{content:' Tools'}
+.teacher-dock.floating.collapsed .tb-collapse{font-size:0}
+.teacher-dock.floating.collapsed .tb-collapse::after{font-size:14px;content:'🛠 Tools'}
+#stage{margin-top:10px}
+@media(max-width:900px){.tb-text{display:none}.tb-btn{padding:6px 9px}}
+@media(max-width:560px){.teacher-dock{gap:4px}.tb-swatches button{width:22px;height:22px}}
+.tb-swatches button:hover:enabled{background:var(--c)}
+.tb-sizes button:hover:enabled{background:#e4ecfb}

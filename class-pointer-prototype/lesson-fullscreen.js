@@ -2,6 +2,8 @@
 (function(){
   const stage=document.getElementById('stage'),enter=document.getElementById('fullScreenLesson'),exit=document.getElementById('exitFullScreenLesson'),teacherPanel=document.getElementById('teacherPanel');
   const studentView=!!new URL(location.href).searchParams.get('room');
+  // Teachers use the docked toolbar from teacher-toolbar.js, which follows the lesson into full screen.
+  const teacherDock=!studentView&&!!document.getElementById('teacherDock');
   let syncTimer=null;
   const toolbar=document.createElement('div');toolbar.id='fullscreenTeacherToolbar';toolbar.className='fullscreen-teacher-toolbar';toolbar.dataset.stageUi='true';toolbar.hidden=true;
   const top=document.createElement('div');top.className='fullscreen-toolbar-top';
@@ -14,7 +16,7 @@
   const rosterHome=document.createComment('roster-home');
   const rosterPanel=document.createElement('div');rosterPanel.className='fullscreen-roster-panel';rosterPanel.hidden=true;
   const rosterToggle=document.createElement('button');rosterToggle.type='button';rosterToggle.className='fullscreen-roster-toggle';rosterToggle.textContent='Students';rosterToggle.setAttribute('aria-expanded','false');
-  if(!studentView&&rosterEl){
+  if(!studentView&&!teacherDock&&rosterEl){
     rosterEl.parentNode.insertBefore(rosterHome,rosterEl);
     const panelTitle=document.createElement('strong');panelTitle.textContent='Students · admit, pointer, writing';
     rosterPanel.append(panelTitle);toolbar.append(rosterPanel);
@@ -23,12 +25,12 @@
   }
   function setRosterOpen(open){rosterPanel.hidden=!open||toolbar.classList.contains('collapsed');rosterToggle.setAttribute('aria-expanded',String(open));rosterToggle.classList.toggle('active',open)}
   function placeRoster(inFullscreen){
-    if(studentView||!rosterEl)return;
+    if(studentView||teacherDock||!rosterEl)return;
     if(inFullscreen){if(rosterEl.parentNode!==rosterPanel)rosterPanel.appendChild(rosterEl)}
     else if(rosterHome.parentNode&&rosterEl.parentNode!==rosterHome.parentNode){rosterHome.parentNode.insertBefore(rosterEl,rosterHome.nextSibling);setRosterOpen(false)}
   }
   function updateRosterToggle(){
-    if(studentView||!rosterEl)return;
+    if(studentView||teacherDock||!rosterEl)return;
     const waiting=Array.from(rosterEl.querySelectorAll('button')).filter(b=>b.textContent.startsWith('Admit ')).length;
     const admittedCount=rosterEl.querySelectorAll('.roster-row').length-waiting;
     rosterToggle.textContent=waiting?`Students · ${waiting} waiting`:`Students (${admittedCount})`;
@@ -103,7 +105,7 @@
     updateRosterToggle();
   }
   function expanded(){return document.fullscreenElement===stage||stage.classList.contains('lesson-fullscreen')}
-  function teacherView(){return teacherPanel&&!teacherPanel.hidden}
+  function teacherView(){return !teacherDock&&teacherPanel&&!teacherPanel.hidden}
   function startSync(){clearInterval(syncTimer);syncTimer=setInterval(syncControls,200)}
   function stopSync(){clearInterval(syncTimer);syncTimer=null}
   function sync(){
