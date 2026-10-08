@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -147,6 +148,37 @@
   body.play-mode.theme-blue .team:hover { border-color:#7ec8ff; }
   body.play-mode.theme-blue .team.selected { border-color:#7ec8ff; background:rgba(126,200,255,0.18); box-shadow:0 0 20px rgba(126,200,255,0.35); }
   body.play-mode.theme-blue .team .score { color:#7ec8ff; }
+  /* Keep questions and navigation compact; give contestants the remaining height. */
+  body.play-mode { padding: 10px 16px; }
+  body.play-mode .tab-bar { margin-bottom: 6px; }
+  body.play-mode #tabPlay.active { display: flex; flex-direction: column; height: calc(100dvh - 66px); max-width: 900px; margin: 0 auto; min-height: 0; }
+  body.play-mode .marquee { padding: 2px 0 8px; flex-shrink: 0; }
+  body.play-mode .marquee-title { font-size: 24px; }
+  body.play-mode #tabPlay > .panel { box-sizing: border-box; width: 100%; padding: 12px 16px; margin: 0 auto 10px; flex-shrink: 0; }
+  body.play-mode .qnum { margin-bottom: 4px; }
+  body.play-mode .qtext { font-size: 22px; line-height: 1.35; max-height: 5.4em; overflow-y: auto; overflow-wrap: anywhere; margin-bottom: 8px; scrollbar-gutter: stable; }
+  body.play-mode .answer { font-size: 16px; line-height: 1.35; min-height: 0; max-height: 2.7em; overflow-y: auto; margin-bottom: 8px; }
+  body.play-mode .answer:empty { display: none; }
+  body.play-mode .controls { gap: 6px; }
+  body.play-mode .controls button { padding: 7px 12px; }
+  body.play-mode .panel .question-grid { margin-top: 10px; max-height: 68px; overflow-y: auto; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 4px; scrollbar-gutter: stable; }
+  body.play-mode .question-btn { padding: 5px 0; }
+  body.play-mode .buzzed { margin: 0 auto 8px; flex-shrink: 0; }
+  body.play-mode .buzzed > div:first-child { display: inline; margin-right: 8px; color: #f0d9b0 !important; }
+  body.play-mode .buzzed-name { font-size: 22px; padding: 6px 16px; }
+  body.play-mode .score-panel { display: flex; flex-direction: column; width: 100%; flex: 1; min-height: 0; margin: 0 auto; }
+  body.play-mode .score-controls { flex-shrink: 0; margin-bottom: 8px; }
+  body.play-mode .selected-label { margin-bottom: 5px; }
+  body.play-mode .score-btn { font-size: 19px; padding: 6px 24px; }
+  body.play-mode .board { width: 100%; overflow-y: auto; min-height: 0; align-content: start; scrollbar-gutter: stable; }
+  body.play-mode .team { padding: 10px 8px; }
+  body.play-mode .team .name { font-size: 15px; margin-bottom: 4px; }
+  body.play-mode .team .score { font-size: 23px; }
+  @media (max-width: 480px) {
+    body.play-mode { padding: 8px; }
+    body.play-mode .controls button { font-size: 12px; padding: 6px 8px; }
+    body.play-mode .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
 </style>
 </head>
 <body class="play-mode">
@@ -177,7 +209,7 @@
 
 <div class="panel">
   <div class="qnum" id="qnum">Question 1 of 1</div>
-  <div class="qtext" id="qtext"></div>
+  <div class="qtext" id="qtext" tabindex="0" role="region" aria-label="Question"></div>
   <div class="answer" id="answer"></div>
   <div class="controls">
     <button class="btn-reveal" onclick="reveal()">Show answer</button>
@@ -185,7 +217,7 @@
     <button class="btn-next" onclick="prevQuestion()">Previous question</button>
     <button class="btn-next" onclick="nextQuestion()">Next question</button>
   </div>
-  <div class="question-grid" id="questionGrid"></div>
+  <div class="question-grid" id="questionGrid" tabindex="0" role="navigation" aria-label="Question numbers"></div>
 </div>
 
 <div class="buzzed">
@@ -688,24 +720,28 @@ function pickRandomWinner(qIndexAtSchedule) {
       return;
     }
 
-    const lastWinner = data.lastWinner || null;
-    const lastWinnerStreak = data.lastWinnerStreak || 0;
-    let eligible = names;
-    // A student who won two questions in a row sits out this random pick,
-    // as long as someone else is actually available to be picked instead.
-    if (lastWinner && lastWinnerStreak >= 2 && names.includes(lastWinner) && names.length > 1) {
-      eligible = names.filter(n => n !== lastWinner);
-    }
-
-    const winner = eligible[Math.floor(Math.random() * eligible.length)];
-    const newStreak = (winner === lastWinner) ? lastWinnerStreak + 1 : 1;
-
-    gameRef.update({
-      buzzedBy: winner,
-      selectedPlayer: winner,
-      lastWinner: winner,
-      lastWinnerStreak: newStreak,
-      buzzPool: null
+    // Decide against fresh state atomically, including the strict two-win cap.
+    gameRef.transaction(current => {
+      if (!current || current.buzzedBy || !current.revealDelayOn ||
+          (current.qIndex || 0) !== qIndexAtSchedule || current.buzzOpenAt !== data.buzzOpenAt) return;
+      const eligible = Object.keys(current.buzzPool || {}).filter(name =>
+        !(current.lastWinner === name && (current.lastWinnerStreak || 0) >= 2));
+      if (!eligible.length) return; // Never award a third win, even with only one buzzer.
+      const winner = eligible[Math.floor(Math.random() * eligible.length)];
+      const round = String(current.buzzOpenAt || 0) + ':' + (current.qIndex || 0);
+      if (current.lastWinnerRound !== round) {
+        current.lastWinnerStreak = current.lastWinner === winner ? (current.lastWinnerStreak || 0) + 1 : 1;
+        current.lastWinner = winner;
+        current.lastWinnerRound = round;
+      }
+      current.buzzedBy = winner;
+      current.selectedPlayer = winner;
+      current.buzzPool = null;
+      return current;
+    }, (error, committed) => {
+      if (!error && !committed) {
+        revealPickTimer = setTimeout(() => pickRandomWinner(qIndexAtSchedule), 400);
+      }
     });
   });
 }
@@ -876,7 +912,8 @@ function resetGame() {
     buzzOpenAt: Date.now(),
     buzzPool: null,
     lastWinner: null,
-    lastWinnerStreak: 0
+    lastWinnerStreak: 0,
+    lastWinnerRound: null
   });
   document.getElementById('soundStatus').textContent = 'Game reset - names cleared';
 }
