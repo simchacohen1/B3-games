@@ -842,7 +842,9 @@
     bar = document.createElement('nav'); bar.id = 'b3ToolVersions';
     bar.setAttribute('aria-label','Tool version');
     bar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;padding:10px 16px;margin:0;background:#eef4f2;font:600 15px Arial;color:#163c49';
-    const classId = current.searchParams.get('class') || access.classIds[0] || (access.role==='admin'?'et':'');
+    const requested = current.searchParams.get('class');
+    const validClass = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(id);
+    const classId = validClass(requested) ? requested : access.classIds.find(validClass) || (access.role==='admin'?'et':'');
     pair.forEach((path,index)=>{
       const link = document.createElement('a'), target = new URL(path,SITE_BASE);
       if (classId) target.searchParams.set('class',classId);

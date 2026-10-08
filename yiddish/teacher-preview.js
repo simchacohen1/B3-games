@@ -10,7 +10,9 @@
   api.ready = (async function () {
     const account = await window.B3TeacherAccountReady;
     if (!account.user || !account.authorized || B3SiteSettings.getActingStudent()) return;
-    const classId = new URLSearchParams(location.search).get('class') || account.access?.classIds?.[0] || 'et';
+    const requested = new URLSearchParams(location.search).get('class');
+    const validClass = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(id);
+    const classId = validClass(requested) ? requested : (account.access?.classIds || []).find(validClass) || 'et';
     const loaded = await liveCall('teacherLoad', {classId, idToken:await account.user.getIdToken()});
     const config = structuredClone(loaded.config);
     config.unlocked[classId] = 4;
