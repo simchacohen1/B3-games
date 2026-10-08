@@ -211,7 +211,7 @@ function redeemedPoints(){
   let redeemed=0;
   for(const item0 of Object.values(state.root?.redemptions||{})){
     const item=item0||{}, cost=Number(item.cost||0), status=String(item.status||'requested').toLowerCase();
-    if(cost>0&&status!=='declined')redeemed+=cost;
+    if(cost>0&&status!=='declined'&&status!=='canceled')redeemed+=cost;
   }
   for(const item of state.activityPointHistory||[]){
     if(String(item?.source||'')==='class-reward-contribution')redeemed+=Math.abs(Number(item.actualAmount??item.amount??0));
@@ -320,9 +320,9 @@ function pointHistoryRows(){
     const rewardName=state.root.rewards?.[p.rewardId]?.name||'Reward';
     const requested=typeof p.requestedAt==='number'?p.requestedAt:(Date.parse(p.requestedAt||'')||0);
     if(requested)rows.push({amount:-cost,title:`Reward requested — ${rewardName}`,detail:p.status||'requested',when:requested});
-    if(p.status==='declined'){
+    if(p.status==='declined'||p.status==='canceled'){
       const reviewed=typeof p.reviewedAt==='number'?p.reviewedAt:(Date.parse(p.reviewedAt||'')||0);
-      if(reviewed)rows.push({amount:cost,title:`Points returned — ${rewardName}`,detail:'Request declined',when:reviewed});
+      if(reviewed)rows.push({amount:cost,title:`Points returned — ${rewardName}`,detail:p.status==='canceled'?'You canceled this request':'Request declined',when:reviewed});
     }
   }
   return rows.sort((a,b)=>b.when-a.when);
@@ -344,11 +344,11 @@ function rewardsHTML(){
   personalRewards.forEach(r=>(byCost[r.cost]??=[]).push(r));
   const personalCards=Object.entries(byCost).map(([cost,list])=>`<h3 class="level-title">${cost}-Point Choices</h3>${list.map(r=>{const rewardOpen=r.available!==false,canAfford=balance>=Number(r.cost||0),cd=personalCooldown(r),disabled=state.busy||!storeOpen||!rewardOpen||cd.active||!canAfford||r.quantity===0,buttonText=!storeOpen?'Store closed':!rewardOpen?'Closed':cd.active?cd.label:r.quantity===0?'Unavailable':canAfford?'Request this':'Not enough points',message=!rewardOpen?'Not available right now':cd.active?cd.label:canAfford?'You can choose this now':'Keep earning points';return `<article class="reward-card ${rewardOpen&&!cd.active?'reward-open':'reward-closed'}"><div class="icon" style="background:${e(r.color||'#f3f1ff')}">${e(r.icon||'🎁')}</div><h3>${e(r.name)}</h3><div class="cost">${Number(r.cost)||0} ★</div><p>${e(message)}</p>${Number(r.cooldownDays)>0?`<small>Can be bought once every ${Number(r.cooldownDays)} day${Number(r.cooldownDays)===1?'':'s'}</small>`:''}<button class="primary" data-redeem="${e(r.id)}" ${disabled?'disabled':''}>${e(buttonText)}</button></article>`}).join('')}`).join('');
   const classCards=goals.length?goals.map(g=>classGoalCard(g)).join(''):'<div class="class-goals-empty">No class rewards are available yet.</div>';
-  const purchases=Object.values(state.root.redemptions||{}).sort((a,b)=>String(b.requestedAt||'').localeCompare(String(a.requestedAt||'')));
+  const purchases=Object.entries(state.root.redemptions||{}).map(([key,p])=>({...(p||{}),key:(p&&p.id)||key})).sort((a,b)=>String(b.requestedAt||'').localeCompare(String(a.requestedAt||'')));
   return `<section class="panel rewards-intro"><div><p class="eyebrow">PRIZE STORE</p><h2>You have ${balance} points to use</h2><p>Personal rewards are just for you. Class rewards are shared goals that everyone can help reach.</p></div></section>
   <section class="reward-store-section personal-store"><div class="reward-store-heading"><span class="store-kind-icon">👤</span><div><p class="eyebrow">JUST FOR YOU</p><h2>Personal Rewards</h2><p>Spend your own points on something for yourself.</p></div></div><div class="rewardgrid studentrewards">${personalCards||'<p>No personal rewards are available right now.</p>'}</div></section>
   <section class="reward-store-section class-store"><div class="reward-store-heading"><span class="store-kind-icon">👥</span><div><p class="eyebrow">WORK TOGETHER</p><h2>Class Rewards</h2><p>Give any amount you choose, up to your personal contribution limit. No one student can fund a class prize by himself.</p></div></div><div class="class-goal-store-grid">${classCards}</div></section>
-  <section class="panel"><h2>My personal reward requests</h2><div class="purchasehistory">${purchases.length?purchases.map(p=>`<article><b>${e(state.root.rewards?.[p.rewardId]?.name||'Reward')}</b><span>${Number(p.cost)||0} ★</span><mark class="badge ${e(p.status)}">${e(p.status)}</mark></article>`).join(''):'<p>No personal reward requests yet.</p>'}</div></section>`;
+  <section class="panel"><h2>My personal reward requests</h2><p class="cancel-note">Changed your mind? You can cancel a request and get your points back until your teacher approves it.</p><div class="purchasehistory">${purchases.length?purchases.map(p=>`<article><b>${e(state.root.rewards?.[p.rewardId]?.name||'Reward')}</b><span>${Number(p.cost)||0} ★</span><mark class="badge ${e(p.status)}">${e(p.status)}</mark>${String(p.status||'pending')==='pending'?`<button class="ghost cancel-request" data-cancel-request="${e(p.key)}" ${state.busy?'disabled':''}>Cancel</button>`:''}</article>`).join(''):'<p>No personal reward requests yet.</p>'}</div></section>`;
 }
 function commentsHTML(){
   const rows=Object.values(state.root.comments||{}).filter(c=>c.visibleToStudent!==false).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
@@ -357,7 +357,7 @@ function commentsHTML(){
 function bindClassContributionButtons(){
   document.querySelectorAll('[data-class-contribute]').forEach(b=>b.onclick=()=>contributeClassReward(b.dataset.classContribute,b.dataset.input,b));
 }
-function bindTab(){if(state.tab==='Rewards'){document.querySelectorAll('[data-redeem]').forEach(b=>b.onclick=()=>redeem(b.dataset.redeem));bindClassContributionButtons()}}
+function bindTab(){if(state.tab==='Rewards'){document.querySelectorAll('[data-redeem]').forEach(b=>b.onclick=()=>redeem(b.dataset.redeem));document.querySelectorAll('[data-cancel-request]').forEach(b=>b.onclick=()=>cancelRequest(b.dataset.cancelRequest));bindClassContributionButtons()}}
 async function contributeClassReward(rewardId,inputId,buttonEl){
   if(teacherPreview){C.toast('Teacher preview: no points contributed.');return;}
   if(state.busy)return;
@@ -413,6 +413,30 @@ async function redeem(rewardId){
     const j=await r.json();
     if(!r.ok)throw new Error(j.error||'Could not request reward');
     C.toast('Reward requested!');
+    await load();
+  }catch(err){C.toast(err.message||String(err),'error')}
+  finally{state.busy=false;renderTab()}
+}
+async function cancelRequest(requestId){
+  const item=state.root?.redemptions?.[requestId]||Object.values(state.root?.redemptions||{}).find(p=>p&&p.id===requestId);
+  if(!item||String(item.status||'pending')!=='pending'){C.toast('That request can no longer be canceled.','error');return}
+  const rewardName=state.root?.rewards?.[item.rewardId]?.name||'this reward',cost=Number(item.cost)||0;
+  if(!confirm(`Cancel your request for ${rewardName}? ${cost} ★ will go back to your balance.`))return;
+  if(teacherPreview){
+    item.status='canceled';item.reviewedAt=Date.now();
+    state.serverRewardBalance+=cost;state.student.rewardBalance=state.serverRewardBalance;
+    render();C.toast('Preview request canceled — nothing real changed.');return;
+  }
+  if(state.busy)return;
+  state.busy=true;renderTab();
+  try{
+    const user=auth.currentUser;
+    if(!user)throw new Error('Please sign in again.');
+    const token=await user.getIdToken();
+    const r=await fetch(C.CANCEL_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({requestId})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error||'Could not cancel that request');
+    C.toast(`Request canceled — ${cost} ★ returned.`);
     await load();
   }catch(err){C.toast(err.message||String(err),'error')}
   finally{state.busy=false;renderTab()}

@@ -2540,6 +2540,7 @@ const studentRewardsFunctions = require("./student-rewards-functions");
 
 exports.studentRewardsLogin = studentRewardsFunctions.studentRewardsLogin;
 exports.studentRewardsRedeem = studentRewardsFunctions.studentRewardsRedeem;
+exports.studentRewardsCancel = studentRewardsFunctions.studentRewardsCancel;
 exports.studentRewardsAutoAward = require("./student-rewards-auto-award").studentRewardsAutoAward;
 exports.classGalleryPowerPurchase = require('./class-gallery-powers').classGalleryPowerPurchase;
 

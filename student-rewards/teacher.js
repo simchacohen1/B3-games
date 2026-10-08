@@ -284,9 +284,9 @@ function allPointLedger(includeGaps=true){
       const rewardName=state.root?.rewards?.[item.rewardId]?.name||"Reward";
       const requested=pointTime(item.requestedAt);
       if(requested)add({id:`redeem:${s.id}:${key}:request`,sid:s.id,amount:-cost,when:requested,source:"reward-store",sourceGroup:"store",sourceLabel:"Prize Store",reason:`Reward requested — ${rewardName}`,detail:`${String(item.status||"requested")} · ${cost} ★`,status:"posted",counts:true});
-      if(String(item.status||"")==="declined"){
+      if(["declined","canceled"].includes(String(item.status||""))){
         const reviewed=pointTime(item.reviewedAt);
-        if(reviewed)add({id:`redeem:${s.id}:${key}:return`,sid:s.id,amount:cost,when:reviewed,source:"reward-return",sourceGroup:"store",sourceLabel:"Prize Store",reason:`Points returned — ${rewardName}`,detail:"Request declined",status:"posted",counts:true});
+        if(reviewed)add({id:`redeem:${s.id}:${key}:return`,sid:s.id,amount:cost,when:reviewed,source:"reward-return",sourceGroup:"store",sourceLabel:"Prize Store",reason:`Points returned — ${rewardName}`,detail:item.status==="canceled"?"Canceled by student":"Request declined",status:"posted",counts:true});
       }
     }
   }
@@ -341,7 +341,7 @@ function redeemedPointsForStudent(studentId){
   let redeemed=0;
   for(const item0 of Object.values(state.root?.redemptionsByStudent?.[studentId]||{})){
     const item=item0||{}, cost=Number(item.cost||0), status=String(item.status||"requested").toLowerCase();
-    if(cost>0&&status!=="declined")redeemed+=cost;
+    if(cost>0&&status!=="declined"&&status!=="canceled")redeemed+=cost;
   }
   return redeemed;
 }
@@ -745,11 +745,13 @@ async function review(sid,key,decision){
   if(state.teacherMode){try{const r=await teacherApi("review",{studentId:sid,key,decision});toast(`Request ${r.status}`)}catch(err){toast(err.message,"error")}await loadRoot();render();return}
   const item=state.root.redemptionsByStudent?.[sid]?.[key];if(!item)return;
   const updates={}, stamp=now(),status=decision==="approve"?"ready":decision==="collect"?"collected":"declined";
-  updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/status`]=status;
+  const expected=decision==="collect"?"ready":"pending";
+  const claim=await sdb().ref(`${ROOT}/redemptionsByStudent/${sid}/${key}/status`).transaction(cur=>String(cur||"pending")===expected?status:undefined);
+  if(!claim.committed){toast("The student already canceled or this request was already handled.","error");return}
   updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/reviewedBy`]=state.user.email;
   updates[`${ROOT}/redemptionsByStudent/${sid}/${key}/reviewedAt`]=stamp;
   if(decision==="decline"){
-    updates[`${ROOT}/students/${sid}/rewardBalance`]=Number(state.root.students[sid].rewardBalance||0)+Number(item.cost||0);
+    await sdb().ref(`${ROOT}/students/${sid}/rewardBalance`).transaction(cur=>Number(cur||0)+Number(item.cost||0));
     const r=state.root.rewards?.[item.rewardId],requestMs=timeMs(item.requestedAt),lastMs=timeMs(r?.lastRedeemedAt);
     if(r&&requestMs&&lastMs&&Math.abs(requestMs-lastMs)<5000){
       updates[`${ROOT}/rewards/${item.rewardId}/lastRedeemedAt`]=null;

@@ -201,8 +201,11 @@ async function reviewRedemption(store,scope,email,studentId,keyId,decision,now){
  if(!reward||!scope.rewardClassIds.includes(reward.ownerClassId))fail(403,'This request is not from your class store.');
  const status=decision==='approve'?'ready':decision==='collect'?'collected':decision==='decline'?'declined':null;
  if(!status)fail(400,'Choose approve, given or decline.');
- if(decision==='collect'?item.status!=='ready':item.status!=='pending')fail(409,'This request was already handled.');
- await store.update({[path+'/status']:status,[path+'/reviewedBy']:email,[path+'/reviewedAt']:now});
+ const expected=decision==='collect'?'ready':'pending';
+ if(String(item.status||'pending')!==expected)fail(409,item.status==='canceled'?'The student canceled this request.':'This request was already handled.');
+ const claim=await store.tx(path+'/status',cur=>String(cur||'pending')===expected?status:undefined);
+ if(!claim?.committed)fail(409,'This request was already handled.');
+ await store.update({[path+'/reviewedBy']:email,[path+'/reviewedAt']:now});
  if(decision==='decline'){
   await addToBalance(store,studentId,Number(item.cost||0));
   const requestMs=Date.parse(item.requestedAt)||0,lastMs=Number(reward.lastRedeemedAt)||Date.parse(reward.lastRedeemedAt)||0;
