@@ -8,13 +8,14 @@
  *   firebase-functions
  *
  * Deploy after merging:
- *   firebase deploy --only functions:studentRewardsLogin,functions:studentRewardsRedeem
+ *   firebase deploy --only functions:studentRewardsLogin,functions:studentRewardsRedeem,functions:studentRewardsCancel
  */
 const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 const {resolveStudent}=require("./student-login-core.cjs");
 const rewardsStore=require('./rewards-store.cjs');
+const {cancelRedemption}=require("./rewards-cancel-core.cjs");
 if (!admin.apps.length) admin.initializeApp();
 const rtdb = admin.database();
 const SR_ROOT = "studentRewards";
@@ -242,12 +243,40 @@ exports.studentRewardsRedeem = onRequest(
         rewardId,
         cost,
         status: "pending",
+        quantityReserved: qty > 0,
         requestedAt
       });
       return res.status(200).json({ok:true,balance:Number(balanceTx.snapshot.val()||0),requestId:requestRef.key});
     } catch (err) {
       console.error("studentRewardsRedeem", err);
       return res.status(Number.isInteger(err.code)?err.code:500).json({error:"Could not request that reward right now."});
+    }
+  }
+);
+
+// A student may cancel his own Prize Store request while it is still pending.
+exports.studentRewardsCancel = onRequest(
+  { cors: true, region: "us-central1", memory: "256MiB" },
+  async (req, res) => {
+    if (cors(req,res)) return;
+    if (req.method !== "POST") return res.status(405).json({error:"Use POST"});
+    try {
+      if (!await siteEnabled()) return res.status(423).json({error:"Student Website Temporarily Unavailable"});
+      const header = String(req.headers.authorization || "");
+      if (!header.startsWith("Bearer ")) return res.status(401).json({error:"Please sign in again."});
+      const decoded = await admin.auth().verifyIdToken(header.slice(7));
+      const studentId = decoded.studentRewardsStudentId;
+      if (!studentId || decoded.studentRewardsRole !== "student") return res.status(403).json({error:"Student sign-in required."});
+      const store = {
+        get: async path => (await rtdb.ref(path).get()).val(),
+        update: updates => rtdb.ref().update(updates),
+        tx: (path, fn) => rtdb.ref(path).transaction(fn)
+      };
+      return res.status(200).json(await cancelRedemption(store, String(studentId), String(req.body?.requestId || "")));
+    } catch (err) {
+      const code = Number.isInteger(err.code) ? err.code : 500;
+      if (code === 500) console.error("studentRewardsCancel", err);
+      return res.status(code).json({error: code === 500 ? "Could not cancel that request right now." : err.message});
     }
   }
 );

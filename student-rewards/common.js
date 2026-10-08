@@ -5,6 +5,7 @@
   const FUNCTIONS_BASE='https://us-central1-b3-games.cloudfunctions.net';
   const LOGIN_URL=`${FUNCTIONS_BASE}/studentRewardsLogin`;
   const REDEEM_URL=`${FUNCTIONS_BASE}/studentRewardsRedeem`;
+  const CANCEL_URL=`${FUNCTIONS_BASE}/studentRewardsCancel`;
 
   function ensureFirebase(options={}){
     if(!window.firebase) throw new Error('Firebase libraries did not load.');
@@ -79,5 +80,5 @@
     el.className=`toast show ${type}`;el.textContent=message;clearTimeout(el._timer);el._timer=setTimeout(()=>el.classList.remove('show'),2800);
   }
   function formatDate(iso){try{return new Date(`${iso}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}catch{return iso}}
-  window.StudentRewardsCommon={ROOT,ADMIN_EMAIL,LOGIN_URL,REDEEM_URL,ensureFirebase,schoolDateString,progressValue,dailyProgress,dailyAward,cumulativeProgress,escapeHtml,ratingClass,categoryKey,sha256,objectValues,activeClasses,classRoster,activeCategories,latestRatings,allProgressRows,toast,formatDate};
+  window.StudentRewardsCommon={ROOT,ADMIN_EMAIL,LOGIN_URL,REDEEM_URL,CANCEL_URL,ensureFirebase,schoolDateString,progressValue,dailyProgress,dailyAward,cumulativeProgress,escapeHtml,ratingClass,categoryKey,sha256,objectValues,activeClasses,classRoster,activeCategories,latestRatings,allProgressRows,toast,formatDate};
 })();

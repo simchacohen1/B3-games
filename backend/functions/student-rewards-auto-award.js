@@ -1268,8 +1268,8 @@ async function readStudentRewardsData(classId="all"){
     for(const [id,i0] of Object.entries(root.redemptionsByStudent?.[studentId]||{})){
       const i=i0||{}, cost=Number(i.cost||0); if(!cost) continue;
       const rewardName=rewards?.[i.rewardId]?.name||'Reward';
-      events.push({id:`redeem:${id}`,source:'reward-store',amount:-cost,reason:`Reward requested — ${rewardName}`,rewardId:i.rewardId||null,createdAt:i.requestedAt||null,status:i.status||'requested',countsTowardBalance:String(i.status||'').toLowerCase()!=='declined'});
-      if(String(i.status||'').toLowerCase()==='declined') events.push({id:`redeem-return:${id}`,source:'reward-return',amount:cost,reason:`Points returned — ${rewardName}`,rewardId:i.rewardId||null,createdAt:i.reviewedAt||null,status:'posted',countsTowardBalance:true});
+      events.push({id:`redeem:${id}`,source:'reward-store',amount:-cost,reason:`Reward requested — ${rewardName}`,rewardId:i.rewardId||null,createdAt:i.requestedAt||null,status:i.status||'requested',countsTowardBalance:!['declined','canceled'].includes(String(i.status||'').toLowerCase())});
+      if(['declined','canceled'].includes(String(i.status||'').toLowerCase())) events.push({id:`redeem-return:${id}`,source:'reward-return',amount:cost,reason:String(i.status).toLowerCase()==='canceled'?`Request canceled — ${rewardName}`:`Points returned — ${rewardName}`,rewardId:i.rewardId||null,createdAt:i.reviewedAt||null,status:'posted',countsTowardBalance:true});
     }
     for(const [id,i0] of Object.entries(root.classRewardContributionsByStudent?.[studentId]||{})){
       const i=i0||{}, amount=Math.abs(Number(i.amount||0)); if(!amount) continue;
