@@ -32,6 +32,15 @@
     padding: 24px 16px 80px;
   }
   .wrap { max-width: 680px; margin: 0 auto; }
+  .hidden { display:none !important; }
+  .mode-choice-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:18px; }
+  .mode-choice { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:150px; border:1px solid var(--border); border-radius:16px; background:#fff; text-decoration:none; color:var(--ink); cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.06); }
+  .mode-choice:hover { border-color:#b9c2ff; box-shadow:0 8px 20px rgba(0,0,0,.09); }
+  .mode-choice .icon { font-size:42px; }
+  .mode-choice .title { font-size:18px; font-weight:800; }
+  .mode-choice .desc { font-size:12px; color:var(--muted); text-align:center; padding:0 12px; line-height:1.35; }
+  .back-btn { border:0; background:none; color:var(--accent); font-weight:700; cursor:pointer; padding:0; margin:0 0 14px; }
+  @media(max-width:560px){ .mode-choice-grid{grid-template-columns:1fr;} }
   h1 {
     font-size: 22px;
     margin: 0 0 4px;
@@ -230,7 +239,26 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Sync to Nigri</h1>
+  <div id="modeChooser">
+    <h1>Sync to Nigri</h1>
+    <div class="sub">What would you like to sync?</div>
+    <div class="mode-choice-grid">
+      <button class="mode-choice" type="button" onclick="openAttendance()">
+        <span class="icon">📋</span>
+        <span class="title">Attendance</span>
+        <span class="desc">Attendance, lateness, and daily points.</span>
+      </button>
+      <a class="mode-choice" href="school-marks.html">
+        <span class="icon">📝</span>
+        <span class="title">School Marks</span>
+        <span class="desc">Weekly quizzes and other marks that go into the Nigri gradebook.</span>
+      </a>
+    </div>
+  </div>
+
+  <div id="attendanceApp" class="hidden">
+  <button class="back-btn" type="button" onclick="backToChoices()">← Back to Sync choices</button>
+  <h1>Attendance → Nigri</h1>
   <div class="sub">Everyone starts Present for all 4 periods, with 5 points. Change any period to Absent, Excused, or Late as needed, then sync.</div>
 
   <div class="card">
@@ -264,9 +292,18 @@
 
   <button class="sync-btn" id="syncBtn" type="button">Sync Selected to Nigri</button>
   <div id="status"></div>
+  </div>
 </div>
 
 <script>
+function openAttendance(){
+  document.getElementById("modeChooser").classList.add("hidden");
+  document.getElementById("attendanceApp").classList.remove("hidden");
+}
+function backToChoices(){
+  document.getElementById("attendanceApp").classList.add("hidden");
+  document.getElementById("modeChooser").classList.remove("hidden");
+}
 const API_URL = "https://nigrisync.onrender.com/sync-points";
 const API_KEY = "1qaz2wsx";
 const DEFAULT_POINTS = 5;
