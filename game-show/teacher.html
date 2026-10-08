@@ -223,7 +223,7 @@
   <h3>Game controls</h3>
   <div style="font-size:13px; color:#7d5236; margin-bottom:10px; text-align:center;">These two work independently and can be combined: "Wait timer" delays when the buzzer opens; "Randomize winner" hides who buzzed first for a few seconds and picks fairly among everyone who buzzed in that window (a student who wins two questions in a row sits out the random pick on the next one).</div>
   <div class="top-controls">
-    <button id="enableSoundBtn" onclick="enableSound()" style="background:#3b6d11;">Click here to enable sound</button>
+    <button id="enableSoundBtn" onclick="enableSound()" style="background:#3b6d11;">Enable / test buzzer</button>
     <button id="resetGameBtn" onclick="resetGame()" style="background:#b85042;">Reset game (clear all names)</button>
     <button id="editBtn" onclick="openEditor()" style="background:#3b6d11;">Edit questions</button>
     <button id="syncBtn" onclick="syncQuestionsToDatabase()" style="background:#999; font-size:13px;">Restore built-in questions</button>
@@ -235,6 +235,9 @@
       <label><input type="checkbox" id="revealDelayToggle" onchange="saveDelaySettings()"> Randomize winner (hide reveal)</label>
       <input type="number" id="revealDelaySeconds" value="3" min="1" max="30" onchange="saveDelaySettings()"> sec
     </span>
+    <label for="buzzerVolume">Buzzer volume</label>
+    <input id="buzzerVolume" type="range" min="0" max="100" value="75" oninput="setBuzzerVolume(this.value)" style="width:120px;" aria-describedby="buzzerVolumeValue">
+    <output id="buzzerVolumeValue" for="buzzerVolume">75%</output>
     <span id="soundStatus" style="margin-left:10px; color:#7d5236;"></span>
   </div>
 </div>
@@ -880,58 +883,94 @@ function resetGame() {
 
 let sharedAudioCtx = null;
 
-function enableSound() {
-  sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const osc = sharedAudioCtx.createOscillator();
-  const gain = sharedAudioCtx.createGain();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(440, sharedAudioCtx.currentTime);
-  gain.gain.setValueAtTime(0.2, sharedAudioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, sharedAudioCtx.currentTime + 0.15);
-  osc.connect(gain);
-  gain.connect(sharedAudioCtx.destination);
-  osc.start();
-  osc.stop(sharedAudioCtx.currentTime + 0.15);
-  document.getElementById('soundStatus').textContent = 'Sound enabled';
+// Volume stays on this device without changing shared game state.
+let buzzerVolume = 0.75;
+try {
+  const stored = localStorage.getItem('gameShowBuzzerVolume');
+  if (stored !== null && Number.isFinite(Number(stored))) {
+    buzzerVolume = Math.max(0, Math.min(1, Number(stored)));
+  }
+} catch (_) { /* Sound works when storage is unavailable. */ }
+document.getElementById('buzzerVolume').value = Math.round(buzzerVolume * 100);
+document.getElementById('buzzerVolumeValue').textContent = Math.round(buzzerVolume * 100) + '%';
+
+function setBuzzerVolume(value) {
+  buzzerVolume = Math.max(0, Math.min(1, Number(value) / 100));
+  document.getElementById('buzzerVolumeValue').textContent = Math.round(buzzerVolume * 100) + '%';
+  try { localStorage.setItem('gameShowBuzzerVolume', String(buzzerVolume)); } catch (_) {}
 }
 
-function playAlertSound() {
+function enableSound() {
+  playAlertSound();
+}
+
+let buzzerPlaying = false;
+async function playAlertSound() {
+  // Prevent rapid preview clicks or simultaneous events stacking the volume.
+  if (buzzerPlaying) return;
+  buzzerPlaying = true;
+  let soundScheduled = false;
   try {
-    // Don't just bail if there's no audio context yet - create or resume it
-    // right here, so a buzz-in works even if "enable sound" was never
-    // clicked, or the browser suspended it again in the background.
-    if (!sharedAudioCtx) {
-      sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = getAudioCtx();
+    if (ctx.state !== 'running') await ctx.resume();
+    if (ctx.state !== 'running') {
+      document.getElementById('soundStatus').textContent = 'Click Enable / test buzzer to turn on sound';
+      return;
     }
-    if (sharedAudioCtx.state === 'suspended') {
-      sharedAudioCtx.resume();
+    if (buzzerVolume === 0) {
+      document.getElementById('soundStatus').textContent = 'Buzzer muted';
+      return;
     }
-    const ctx = sharedAudioCtx;
-    const startTime = ctx.currentTime;
-    const duration = 0.6;
-
-    // Loud, sustained, unmistakable game-show buzzer: a flat square-wave
-    // tone held at full volume for a good half-second (not a quick blip
-    // that's easy to miss over classroom noise), with a hard cutoff instead
-    // of a slow fade so it reads as a clean "BZZZT" rather than a chime.
-    const osc = ctx.createOscillator();
-    osc.type = "square";
-    osc.frequency.setValueAtTime(150, startTime);
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0, startTime);
-    gain.gain.linearRampToValueAtTime(0.5, startTime + 0.02);
-    gain.gain.setValueAtTime(0.5, startTime + duration - 0.05);
-    gain.gain.linearRampToValueAtTime(0, startTime + duration);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(startTime);
-    osc.stop(startTime + duration);
-
-    document.getElementById('soundStatus').textContent = 'Alert fired (state: ' + ctx.state + ')';
+    const start = ctx.currentTime + 0.01;
+    const end = start + 0.52;
+    // Detuned reeds add body and movement. Filtering softens upper harmonics;
+    // the short attack and release remove clicks without losing the impact.
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2400, start);
+    filter.frequency.exponentialRampToValueAtTime(1200, end);
+    filter.Q.value = 0.65;
+    const envelope = ctx.createGain();
+    envelope.gain.setValueAtTime(0, start);
+    envelope.gain.linearRampToValueAtTime(buzzerVolume * 0.65, start + 0.012);
+    envelope.gain.setValueAtTime(buzzerVolume * 0.65, end - 0.09);
+    envelope.gain.linearRampToValueAtTime(0, end);
+    filter.connect(envelope);
+    envelope.connect(ctx.destination);
+    const voices = [
+      { type: 'sawtooth', frequency: 196, level: 0.42 },
+      { type: 'sawtooth', frequency: 201, level: 0.28 },
+      { type: 'square', frequency: 392, level: 0.16 },
+      { type: 'sine', frequency: 98, level: 0.14 }
+    ];
+    let remaining = voices.length;
+    voices.forEach(voice => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = voice.type;
+      osc.frequency.setValueAtTime(voice.frequency * 1.07, start);
+      osc.frequency.exponentialRampToValueAtTime(voice.frequency, start + 0.035);
+      gain.gain.value = voice.level;
+      osc.connect(gain);
+      gain.connect(filter);
+      osc.onended = () => {
+        osc.disconnect();
+        gain.disconnect();
+        if (--remaining === 0) {
+          filter.disconnect();
+          envelope.disconnect();
+          buzzerPlaying = false;
+        }
+      };
+      osc.start(start);
+      osc.stop(end);
+    });
+    soundScheduled = true;
+    document.getElementById('soundStatus').textContent = 'Buzzer ready';
   } catch (err) {
-    document.getElementById('soundStatus').textContent = 'Sound error: ' + err.message;
+    document.getElementById('soundStatus').textContent = 'Sound unavailable - click Enable / test buzzer to retry';
+  } finally {
+    if (!soundScheduled) buzzerPlaying = false;
   }
 }
 
