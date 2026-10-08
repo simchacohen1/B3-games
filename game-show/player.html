@@ -410,7 +410,7 @@ function gameIsLive(d) {
   return last > 0 && Date.now() - last < LIVE_WINDOW_MS;
 }
 function showWaiting(waiting) {
-  const panel = document.querySelector('#gameArea .panel');
+  const panel = document.querySelector('#gameArea .panel:not(#waitingMsg)');
   let w = document.getElementById('waitingMsg');
   if (!w) {
     w = document.createElement('div'); w.id = 'waitingMsg'; w.className = 'panel';
