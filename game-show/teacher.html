@@ -255,7 +255,9 @@
   <h3>Game controls</h3>
   <div style="font-size:13px; color:#7d5236; margin-bottom:10px; text-align:center;">These two work independently and can be combined: "Wait timer" delays when the buzzer opens; "Randomize winner" hides who buzzed first for a few seconds and picks fairly among everyone who buzzed in that window (a student who wins two questions in a row sits out the random pick on the next one).</div>
   <div class="top-controls">
-    <button id="enableSoundBtn" onclick="enableSound()" style="background:#3b6d11;">Enable / test buzzer</button>
+    <button id="enableSoundBtn" onclick="enableSound()" style="background:#3b6d11;">Enable / preview ding</button>
+    <button onclick="playApplauseSound()" style="background:#3b6d11;">Preview correct</button>
+    <button onclick="playWrongSound()" style="background:#b85042;">Preview wrong</button>
     <button id="resetGameBtn" onclick="resetGame()" style="background:#b85042;">Reset game (clear all names)</button>
     <button id="editBtn" onclick="openEditor()" style="background:#3b6d11;">Edit questions</button>
     <button id="syncBtn" onclick="syncQuestionsToDatabase()" style="background:#999; font-size:13px;">Restore built-in questions</button>
@@ -267,7 +269,7 @@
       <label><input type="checkbox" id="revealDelayToggle" onchange="saveDelaySettings()"> Randomize winner (hide reveal)</label>
       <input type="number" id="revealDelaySeconds" value="3" min="1" max="30" onchange="saveDelaySettings()"> sec
     </span>
-    <label for="buzzerVolume">Buzzer volume</label>
+    <label for="buzzerVolume">Sound volume</label>
     <input id="buzzerVolume" type="range" min="0" max="100" value="75" oninput="setBuzzerVolume(this.value)" style="width:120px;" aria-describedby="buzzerVolumeValue">
     <output id="buzzerVolumeValue" for="buzzerVolume">75%</output>
     <span id="soundStatus" style="margin-left:10px; color:#7d5236;"></span>
@@ -806,49 +808,117 @@ function getAudioCtx() {
   return sharedAudioCtx;
 }
 
-function playApplauseSound() {
-  const ctx = getAudioCtx();
-  // A quick, bright ascending chime - reads as a "ta-da!" of success.
-  [523, 659, 784, 1046].forEach((freq, i) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.09);
-    gain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.09);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.09 + 0.35);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(ctx.currentTime + i * 0.09);
-    osc.stop(ctx.currentTime + i * 0.09 + 0.35);
-  });
-  // Soft applause-like noise burst underneath the chime.
-  const bufferSize = ctx.sampleRate * 0.6;
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.15;
-  const noise = ctx.createBufferSource();
-  noise.buffer = buffer;
-  const noiseGain = ctx.createGain();
-  noiseGain.gain.setValueAtTime(0.2, ctx.currentTime);
-  noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
-  noise.connect(noiseGain);
-  noiseGain.connect(ctx.destination);
-  noise.start();
-}
+function playApplauseSound() { return playGameShowSound('correct'); }
+function playWrongSound() { return playGameShowSound('wrong'); }
 
-function playWrongSound() {
-  const ctx = getAudioCtx();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = "sawtooth";
-  osc.frequency.setValueAtTime(180, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(90, ctx.currentTime + 0.35);
-  gain.gain.setValueAtTime(0.2, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + 0.35);
+// Original TV-style cues: metallic lock-in bell, brass victory sting,
+// and a two-tone wrong-answer horn. One engine keeps their volume consistent.
+let activeGameSound = null;
+async function playGameShowSound(kind) {
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state !== 'running') await ctx.resume();
+    if (ctx.state !== 'running') {
+      document.getElementById('soundStatus').textContent = 'Click Enable / preview ding to turn on sound';
+      return;
+    }
+    if (activeGameSound) activeGameSound.stop();
+    if (buzzerVolume === 0) {
+      document.getElementById('soundStatus').textContent = 'Sounds muted';
+      return;
+    }
+    const start = ctx.currentTime + 0.01;
+    const bus = ctx.createGain();
+    const volume = ctx.createGain();
+    volume.gain.value = buzzerVolume * 0.8;
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -9;
+    limiter.knee.value = 6;
+    limiter.ratio.value = 5;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.1;
+    bus.connect(volume);
+    volume.connect(limiter);
+    limiter.connect(ctx.destination);
+    // Two quiet room reflections add a studio feel without a long echo.
+    const reflections = [0.065, 0.125].map((seconds, i) => {
+      const delay = ctx.createDelay(0.2);
+      const wet = ctx.createGain();
+      delay.delayTime.value = seconds;
+      wet.gain.value = i === 0 ? 0.12 : 0.055;
+      bus.connect(delay); delay.connect(wet); wet.connect(volume);
+      return [delay, wet];
+    });
+    const sources = [];
+    const gains = [];
+    function tone(freq, offset, duration, level, type, release, wave) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      if (wave) osc.setPeriodicWave(wave); else osc.type = type;
+      const at = start + offset;
+      osc.frequency.setValueAtTime(freq, at);
+      gain.gain.setValueAtTime(0, at);
+      gain.gain.linearRampToValueAtTime(level, at + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+      if (release) {
+        gain.gain.cancelScheduledValues(at + 0.009);
+        gain.gain.setValueAtTime(level, at + 0.009);
+        gain.gain.linearRampToValueAtTime(level * 0.72, at + duration - release);
+        gain.gain.linearRampToValueAtTime(0, at + duration);
+      }
+      osc.connect(gain); gain.connect(bus);
+      osc.start(at); osc.stop(at + duration);
+      sources.push(osc); gains.push(gain);
+    }
+    let duration;
+    if (kind === 'correct') {
+      duration = 1.18;
+      const real = new Float32Array(9);
+      const imag = new Float32Array([0, 1, 0.48, 0.24, 0.13, 0.07, 0.035, 0.02, 0.01]);
+      const brass = ctx.createPeriodicWave(real, imag);
+      // A quick pickup leads into a full major chord: ba-ba-BAA!
+      [523.25, 659.25, 783.99].forEach((freq, i) => tone(freq, i * 0.115, 0.16, 0.3, 'sine', 0.04, brass));
+      [523.25, 659.25, 783.99, 1046.5].forEach(freq => tone(freq, 0.36, 0.8, 0.16, 'sine', 0.3, brass));
+      tone(261.63, 0.36, 0.8, 0.18, 'sine', 0.3);
+    } else if (kind === 'wrong') {
+      duration = 0.68;
+      // Band-limited brass harmonics give the familiar low game-show horn.
+      const horn = ctx.createPeriodicWave(new Float32Array(7), new Float32Array([0, 1, 0.3, 0.5, 0.12, 0.2, 0.08]));
+      [0, 0.31].forEach((offset, i) => {
+        tone(i ? 130.81 : 146.83, offset, 0.32, 0.36, 'sine', 0.06, horn);
+        tone(i ? 138.59 : 155.56, offset, 0.32, 0.25, 'sine', 0.06, horn);
+      });
+    } else {
+      duration = 0.72;
+      // Inharmonic bell partials make a bright physical "ding", clearly
+      // distinct from the wrong-answer horn. Low partials give it body.
+      [[880, 0.36], [1760, 0.13], [2398, 0.085], [3520, 0.035]].forEach(([freq, level]) =>
+        tone(freq, 0, freq > 2000 ? 0.28 : 0.68, level, 'sine', 0));
+      tone(440, 0, 0.2, 0.07, 'sine', 0);
+    }
+    const nodes = [bus, volume, limiter, ...gains, ...reflections.flat()];
+    const sound = {
+      stop() {
+        volume.gain.cancelScheduledValues(ctx.currentTime);
+        volume.gain.setTargetAtTime(0, ctx.currentTime, 0.004);
+        sources.forEach(osc => { try { osc.stop(ctx.currentTime + 0.02); } catch (_) {} });
+      }
+    };
+    activeGameSound = sound;
+    let remaining = sources.length;
+    sources.forEach(osc => {
+      osc.onended = () => {
+        osc.disconnect();
+        if (--remaining === 0) {
+          setTimeout(() => nodes.forEach(node => node.disconnect()), 160);
+          if (activeGameSound === sound) activeGameSound = null;
+        }
+      };
+    });
+    document.getElementById('soundStatus').textContent = kind === 'correct' ? 'Correct-answer fanfare' : kind === 'wrong' ? 'Wrong-answer buzzer' : 'Contestant ding ready';
+  } catch (err) {
+    document.getElementById('soundStatus').textContent = 'Sound unavailable - click Enable / preview ding to retry';
+  }
 }
 
 function launchConfetti() {
@@ -941,75 +1011,7 @@ function enableSound() {
   playAlertSound();
 }
 
-let buzzerPlaying = false;
-async function playAlertSound() {
-  // Prevent rapid preview clicks or simultaneous events stacking the volume.
-  if (buzzerPlaying) return;
-  buzzerPlaying = true;
-  let soundScheduled = false;
-  try {
-    const ctx = getAudioCtx();
-    if (ctx.state !== 'running') await ctx.resume();
-    if (ctx.state !== 'running') {
-      document.getElementById('soundStatus').textContent = 'Click Enable / test buzzer to turn on sound';
-      return;
-    }
-    if (buzzerVolume === 0) {
-      document.getElementById('soundStatus').textContent = 'Buzzer muted';
-      return;
-    }
-    const start = ctx.currentTime + 0.01;
-    const end = start + 0.52;
-    // Detuned reeds add body and movement. Filtering softens upper harmonics;
-    // the short attack and release remove clicks without losing the impact.
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(2400, start);
-    filter.frequency.exponentialRampToValueAtTime(1200, end);
-    filter.Q.value = 0.65;
-    const envelope = ctx.createGain();
-    envelope.gain.setValueAtTime(0, start);
-    envelope.gain.linearRampToValueAtTime(buzzerVolume * 0.65, start + 0.012);
-    envelope.gain.setValueAtTime(buzzerVolume * 0.65, end - 0.09);
-    envelope.gain.linearRampToValueAtTime(0, end);
-    filter.connect(envelope);
-    envelope.connect(ctx.destination);
-    const voices = [
-      { type: 'sawtooth', frequency: 196, level: 0.42 },
-      { type: 'sawtooth', frequency: 201, level: 0.28 },
-      { type: 'square', frequency: 392, level: 0.16 },
-      { type: 'sine', frequency: 98, level: 0.14 }
-    ];
-    let remaining = voices.length;
-    voices.forEach(voice => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = voice.type;
-      osc.frequency.setValueAtTime(voice.frequency * 1.07, start);
-      osc.frequency.exponentialRampToValueAtTime(voice.frequency, start + 0.035);
-      gain.gain.value = voice.level;
-      osc.connect(gain);
-      gain.connect(filter);
-      osc.onended = () => {
-        osc.disconnect();
-        gain.disconnect();
-        if (--remaining === 0) {
-          filter.disconnect();
-          envelope.disconnect();
-          buzzerPlaying = false;
-        }
-      };
-      osc.start(start);
-      osc.stop(end);
-    });
-    soundScheduled = true;
-    document.getElementById('soundStatus').textContent = 'Buzzer ready';
-  } catch (err) {
-    document.getElementById('soundStatus').textContent = 'Sound unavailable - click Enable / test buzzer to retry';
-  } finally {
-    if (!soundScheduled) buzzerPlaying = false;
-  }
-}
+function playAlertSound() { return playGameShowSound('ding'); }
 
 let lastBuzzedBy = null;
 let lastPoolSize = 0;
