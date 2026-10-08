@@ -74,31 +74,6 @@
   box-shadow:0 3px 14px rgba(20,46,62,.12);
 }
 .student-page main{padding-top:28px}
-.student-hero{
-  position:relative;
-  padding:26px 30px 24px;
-  border-radius:28px;
-  background:linear-gradient(135deg,#fffdf6 0%,#f1f8f5 100%);
-  border:1px solid #e3e4d7;
-  box-shadow:0 12px 32px rgba(20,46,62,.08);
-  overflow:hidden;
-}
-.student-hero:after{
-  content:"א ב ג";
-  position:absolute;
-  right:28px;
-  top:18px;
-  font:bold 52px Georgia,serif;
-  letter-spacing:12px;
-  color:rgba(38,119,102,.09);
-  transform:rotate(-4deg);
-  pointer-events:none;
-}
-.student-page h1{
-  font-size:clamp(36px,5vw,56px);
-  margin:10px 0 8px;
-}
-.student-page .intro{margin:0 0 12px}
 .student-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .student-meta #who{margin:4px 0;font-weight:800;color:#52616a}
 .student-page #notice{
@@ -297,8 +272,6 @@
   .activity-grid{grid-template-columns:1fr 1fr}
 }
 @media(max-width:650px){
-  .student-hero{padding:22px 18px}
-  .student-hero:after{font-size:34px;right:12px}
   .student-page #segments{grid-template-columns:1fr 1fr}
   .activity-zone{padding:16px}
   .activity-grid{grid-template-columns:1fr}
