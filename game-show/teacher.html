@@ -163,6 +163,9 @@
   .buzzed-name { font-size: clamp(22px, 2.6vw, 36px); font-weight: 900; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .buzzed.live { border-style: solid; border-color: var(--hot); background: linear-gradient(90deg, rgba(255,122,77,.25), rgba(0,0,0,.3)); box-shadow: 0 0 30px rgba(255,122,77,.45); }
   .buzzed.live .buzzed-label { color: var(--hot); }
+  .buzzed.waiting { border-style: solid; border-color: var(--accent); }
+  .buzzed.waiting .buzzed-label, .buzzed.waiting .buzzed-name { color: var(--accent); }
+  .buzzed.waiting .light { background: var(--accent); box-shadow: 0 0 12px var(--glow); }
   .buzzed.live .buzzed-name { color: #fff; animation: pop .35s ease; }
   .buzzed .light { width: 18px; height: 18px; border-radius: 50%; background: #444; flex-shrink: 0; box-shadow: inset 0 -2px 4px rgba(0,0,0,.5); }
   .buzzed.live .light { background: var(--hot); box-shadow: 0 0 16px var(--hot); animation: blink .6s ease-in-out infinite alternate; }
@@ -453,7 +456,7 @@
         <h3>Buzzer rules</h3>
         <p class="hint">Use either rule, or both together.</p>
         <div class="setting">
-          <div class="label"><b>Wait before buzzer opens</b><span>Gives everyone time to read the question.</span></div>
+          <div class="label"><b>Wait before buzzer opens</b><span>Starts each time you go to a question. Students see a countdown.</span></div>
           <div class="ctrl">
             <input type="number" class="num" id="delaySeconds" value="10" min="1" max="60" onchange="saveDelaySettings()" aria-label="Wait seconds"> sec
             <input type="checkbox" class="switch" id="delayToggle" onchange="saveDelaySettings()" aria-label="Wait before buzzer opens">
@@ -476,8 +479,7 @@
           <div class="ctrl">
             <select id="buzzSoundSelect" class="select" onchange="setBuzzSound(this.value)" aria-label="Buzz-in sound">
               <option value="ding">Bell ding</option>
-              <option value="buzzer">Classic buzzer</option>
-              <option value="chime">Triple chime</option>
+                    <option value="chime">Triple chime</option>
               <option value="zap">Laser zap</option>
               <option value="bloop">Quiz-board bloop</option>
               <option value="alarm">Lock-in alarm</option>
@@ -637,6 +639,12 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+
+// Every screen measures the wait timer against Firebase's server clock, so a
+// student whose computer clock is a few seconds off still unlocks on time.
+let serverOffset = 0;
+db.ref('.info/serverTimeOffset').on('value', snap => { serverOffset = Number(snap.val()) || 0; });
+function serverNow() { return Date.now() + serverOffset; }
 const gameRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/live' : "tentTrailTrivia");
 // While this teacher screen is open and unlocked, tell student screens the game is live.
 // Students who open the Game Show when no teacher screen is open see a waiting message
@@ -857,7 +865,7 @@ function goToQuestion(qIndex) {
   document.getElementById('jumpMenu').open = false;
   const delayOn = document.getElementById('delayToggle').checked;
   const delaySecs = parseInt(document.getElementById('delaySeconds').value) || 10;
-  const now = Date.now();
+  const now = serverNow();
   const unlockAt = delayOn ? (now + delaySecs * 1000) : 0;
   const updates = {
     qIndex: qIndex,
@@ -942,7 +950,7 @@ function maybeScheduleRevealPick(data, qIndex) {
     // than falling back to "now" on every single data change - that bug
     // was pushing the random pick further into the future with every buzz,
     // so it could effectively never fire.
-    gameRef.child('buzzOpenAt').set(Date.now());
+    gameRef.child('buzzOpenAt').set(serverNow());
     return;
   }
   const openAt = data.buzzOpenAt;
@@ -952,7 +960,7 @@ function maybeScheduleRevealPick(data, qIndex) {
   revealPickScheduledKey = key;
   const delaySecs = data.revealDelaySeconds || 3;
   const fireAt = openAt + delaySecs * 1000;
-  const wait = Math.max(0, fireAt - Date.now());
+  const wait = Math.max(0, fireAt - serverNow());
   revealPickTimer = setTimeout(() => pickRandomWinner(qIndex), wait);
 }
 
@@ -1137,12 +1145,7 @@ async function playGameShowSound(kind) {
       sources.push(osc); gains.push(gain);
     }
     let duration;
-    if (kind === 'buzzer') {
-      duration = 0.6;
-      // Fat, slightly detuned square waves: the classic contestant buzzer.
-      [[110, 0.2], [116.5, 0.16], [220, 0.07]].forEach(([freq, level]) =>
-        tone(freq, 0, 0.6, level, 'square', 0.08));
-    } else if (kind === 'chime') {
+    if (kind === 'chime') {
       duration = 0.95;
       [783.99, 987.77, 1318.51].forEach((freq, i) => {
         tone(freq, i * 0.12, 0.6, 0.28, 'sine', 0);
@@ -1270,7 +1273,7 @@ function resetGame() {
     buzzUnlockAt: 0,
     revealDelayOn: document.getElementById('revealDelayToggle').checked,
     revealDelaySeconds: parseInt(document.getElementById('revealDelaySeconds').value) || 3,
-    buzzOpenAt: Date.now(),
+    buzzOpenAt: serverNow(),
     buzzPool: null,
     lastWinner: null,
     lastWinnerStreak: 0,
@@ -1305,9 +1308,10 @@ function enableSound() {
 
 // Which sound plays when a student buzzes in. Saved on this device and shared
 // through the live game so student screens play the same buzz.
-const BUZZ_SOUND_LABELS = { ding: 'Bell ding', buzzer: 'Classic buzzer', chime: 'Triple chime', zap: 'Laser zap', bloop: 'Quiz-board bloop', alarm: 'Lock-in alarm' };
-let buzzSoundChoice = 'buzzer';
-try { buzzSoundChoice = localStorage.getItem('gameShowBuzzSound') || 'buzzer'; } catch (_) {}
+const BUZZ_SOUND_LABELS = { ding: 'Bell ding', chime: 'Triple chime', zap: 'Laser zap', bloop: 'Quiz-board bloop', alarm: 'Lock-in alarm' };
+let buzzSoundChoice = 'ding';
+try { buzzSoundChoice = localStorage.getItem('gameShowBuzzSound') || 'ding'; } catch (_) {}
+if (buzzSoundChoice !== 'random' && !BUZZ_SOUND_LABELS[buzzSoundChoice]) buzzSoundChoice = 'ding';
 document.getElementById('buzzSoundSelect').value = buzzSoundChoice;
 gameRef.child('buzzSound').set(buzzSoundChoice).catch(() => {});
 
@@ -1327,6 +1331,31 @@ function resolveBuzzSound() {
 function playAlertSound() { return playGameShowSound(resolveBuzzSound()); }
 
 let lastBuzzedBy = null;
+let lastGameData = {};
+let buzzBarTimer = null;
+
+// Shows who buzzed, or - while the wait timer runs - a countdown until buzzers open.
+function updateBuzzBar() {
+  const data = lastGameData || {};
+  const bar = document.getElementById('buzzedBar');
+  const label = bar.querySelector('.buzzed-label');
+  const nameEl = document.getElementById('buzzedName');
+  const left = data.buzzerDelayOn && !data.buzzedBy ? Math.ceil(((data.buzzUnlockAt || 0) - serverNow()) / 1000) : 0;
+  bar.classList.toggle('live', !!data.buzzedBy);
+  bar.classList.toggle('waiting', left > 0);
+  if (data.buzzedBy) {
+    label.textContent = 'Buzzed in';
+    nameEl.textContent = data.buzzedBy;
+  } else if (left > 0) {
+    label.textContent = 'Buzzers locked';
+    nameEl.textContent = 'Open in ' + left + '…';
+  } else {
+    label.textContent = 'Buzzers open';
+    nameEl.textContent = 'Waiting for a buzz…';
+  }
+  clearTimeout(buzzBarTimer);
+  if (left > 0) buzzBarTimer = setTimeout(updateBuzzBar, 250);
+}
 let lastPoolSize = 0;
 
 gameRef.on('value', snapshot => {
@@ -1336,8 +1365,8 @@ gameRef.on('value', snapshot => {
   loadQuestion(qIndex);
   document.getElementById('answer').textContent = data.revealed && questions[qIndex] ? (questions[qIndex].ans || '') : '';
   requestAnimationFrame(fitQuestion);
-  document.getElementById('buzzedName').textContent = data.buzzedBy || 'Waiting for a buzz…';
-  document.getElementById('buzzedBar').classList.toggle('live', !!data.buzzedBy);
+  lastGameData = data;
+  updateBuzzBar();
 
   document.getElementById('delayToggle').checked = !!data.buzzerDelayOn;
   if (data.buzzerDelaySeconds) {
