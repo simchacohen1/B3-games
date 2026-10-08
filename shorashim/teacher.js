@@ -284,7 +284,7 @@ async function generateAiArtForItems(items){
   for(let n=0;n<clean.length;n+=40){
     const batch=clean.slice(n,n+40);
     try{
-      const res=await fetch(GENERATE_SHORASHIM_ART_URL,{
+      const res=await B3PaidApi.fetch(GENERATE_SHORASHIM_ART_URL,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({items:batch})
@@ -860,3 +860,14 @@ window.addEventListener("DOMContentLoaded",()=>{
   });
 });
 
+
+// Existing local dashboard unlocks do not authorize paid services.
+const paidTeacherSignIn = document.createElement('button');
+paidTeacherSignIn.type = 'button';
+paidTeacherSignIn.className = 'ghost small';
+paidTeacherSignIn.textContent = 'Google teacher sign-in';
+paidTeacherSignIn.onclick = async () => {
+  try { await window.B3SiteSettings.signInWithGoogle(); }
+  catch(error) { alert(error.message || 'Google sign-in did not complete.'); }
+};
+document.querySelector('.topbar-actions').appendChild(paidTeacherSignIn);

@@ -178,7 +178,7 @@ async function ensureRewardModelV2(){
   await db.ref().update(updates);
   return true;
 }
-function subscribe(){if(state.teacherMode){clearInterval(state.pollTimer);state.pollTimer=setInterval(async()=>{try{await loadRoot();if(state.tab!=="Daily Points")render()}catch(e){console.warn(e)}},30000);return}db.ref(ROOT).on("value",snap=>{state.root=snap.val()||{};if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=requestedClassId()||activeClasses()[0]?.id||"";renderClassSelect();if(state.tab!=="Daily Points"){setHeader();buildNav();render()}})}
+function subscribe(){if(state.teacherMode){clearInterval(state.pollTimer);state.pollTimer=setInterval(async()=>{if(document.hidden||state.pollChecking)return;state.pollChecking=true;try{await loadRoot();if(state.tab!=="Daily Points")render()}catch(e){console.warn(e)}finally{state.pollChecking=false}},30000);return}db.ref(ROOT).on("value",snap=>{state.root=snap.val()||{};if(!state.classId||!state.root.classes?.[state.classId]?.active)state.classId=requestedClassId()||activeClasses()[0]?.id||"";renderClassSelect();if(state.tab!=="Daily Points"){setHeader();buildNav();render()}})}
 function prepareDraft(){
   if(!state.root||!state.classId)return;state.draft={};state.awardDraft={};state.absent=new Set();
   for(const s of roster()){

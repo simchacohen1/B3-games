@@ -412,6 +412,6 @@ auth.onAuthStateChanged(async user=>{
   }catch(error){$('#loginView').classList.remove('hidden');$('#homeSignInNote').textContent=error.message||'Could not load Student Rewards. Refresh and try again.';$('#homeSignInLink').style.display='';}
 });
 setTimeout(trySharedB3Login,0);
-setInterval(async()=>{try{if(!await websiteEnabled())showBlocked()}catch(error){console.warn('Rewards access check failed',error)}},15000);
+setInterval(async()=>{if(document.hidden)return;try{if(!await websiteEnabled())showBlocked()}catch(error){console.warn('Rewards access check failed',error)}},15000);
 setInterval(()=>{if(state.tab==='Rewards'&&state.root&&!state.busy)renderTab()},60000);
 })();

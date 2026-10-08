@@ -708,7 +708,14 @@ function seedDemo(){
 }
 
 function bindActivityTracking(){['pointerdown','keydown','mousemove','touchstart'].forEach(ev=>document.addEventListener(ev,()=>lastInteraction=Date.now(),{passive:true}));}
-function startTicker(){clearInterval(ticker);ticker=setInterval(()=>{const s=student(),studying=['learnScreen','reviewScreen','gamesScreen'].includes(activeScreenId)&&!document.getElementById('studentView').classList.contains('hidden');if(studying&&document.visibilityState==='visible'&&Date.now()-lastInteraction<30000){s.totalActiveSeconds++;s.lastActive=Date.now();if(s.totalActiveSeconds%10===0)saveDB();}},1000);}
+// Activity ticks update only the two counters, never the full card history.
+function saveActivityCounters(){
+  const s=student();saveRaw(db);
+  if(!cloudEnabled||!cloudStudentId)return;
+  cloudDb.ref(`${CLOUD_ROOT}/students/${cloudStudentId}`).update({totalActiveSeconds:s.totalActiveSeconds,lastActive:s.lastActive}).catch(err=>console.warn('Could not save activity time',err));
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&appStarted)saveActivityCounters();});
+function startTicker(){clearInterval(ticker);ticker=setInterval(()=>{const s=student(),studying=['learnScreen','reviewScreen','gamesScreen'].includes(activeScreenId)&&!document.getElementById('studentView').classList.contains('hidden');if(studying&&document.visibilityState==='visible'&&Date.now()-lastInteraction<30000){s.totalActiveSeconds++;s.lastActive=Date.now();if(s.totalActiveSeconds%10===0)saveRaw(db);if(s.totalActiveSeconds%60===0)saveActivityCounters();}},1000);}
 function updateReviewGameCopy(){
   const reviewHome=document.querySelector('.feature-card.review span:last-child');
   if(reviewHome)reviewHome.textContent='Review what you learned — and record your Chazara for points!';

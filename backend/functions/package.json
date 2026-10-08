@@ -2,7 +2,7 @@
   "name": "b3-games-functions",
   "description": "Cloud Functions for B3 Games — comprehension grading via Claude",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "index.js",
   "dependencies": {

@@ -18,4 +18,4 @@ try{
   const box=document.getElementById('text');box.parentNode.insertBefore(lg,box);
  }
 }catch(err){console.warn('Could not mark story words',err)}
-setInterval(async()=>{try{const v=await YiddishAPI.call('status');if(g>=v.config.unlocked[v.student.classId]||JSON.stringify(v.config.sections[g])!==JSON.stringify(section))lock('Your teacher changed access. Return to Yiddish.')}catch(e){lock(e.message)}},15000)}catch(e){lock(e.message)}})();
+let statusChecking=false;setInterval(async()=>{if(document.hidden||statusChecking)return;statusChecking=true;try{const v=await YiddishAPI.call('status');if(g>=v.config.unlocked[v.student.classId]||JSON.stringify(v.config.sections[g])!==JSON.stringify(section))lock('Your teacher changed access. Return to Yiddish.')}catch(e){lock(e.message)}finally{statusChecking=false}},15000)}catch(e){lock(e.message)}})();

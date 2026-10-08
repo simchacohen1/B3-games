@@ -84,6 +84,7 @@ button:hover:not(:disabled){transform:translateY(-2px)}
 .race-btn{background:linear-gradient(135deg,#ff9b4a,#ff6fae);color:white;box-shadow:0 5px 0 #c94f84}
 @media(max-width:600px){h1{font-size:27px}.card{padding:16px;border-radius:19px}.question{font-size:24px}.type-grid{grid-template-columns:1fr 1fr}}
 </style>
+<script src="../paid-api.js?v=20261008-cost-controls"></script>
 </head>
 <body>
 <header>
@@ -203,7 +204,7 @@ async function speakStudentText(text){
 
     let audioUrl=ttsAudioCache.get(text);
     if(!audioUrl){
-      const res=await fetch(SYNTHESIZE_SPEECH_URL,{
+      const res=await B3PaidApi.fetch(SYNTHESIZE_SPEECH_URL,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({text:String(text)})
@@ -293,7 +294,7 @@ async function generatePractice(){
   document.getElementById('builder').classList.add('hidden');document.getElementById('resultCard').classList.add('hidden');document.getElementById('loadingCard').classList.remove('hidden');
   try{
     const body={sourceText:sourceText(),references:selectedSefariaRefs(),quizType,difficulty,choiceCount:3,count:questionCount,mixedCounts:quizType==='mixed'?mixedCounts(questionCount):{shorashim:0,translation:0,comprehension:0}};
-    const r=await fetch(GENERATE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const r=await B3PaidApi.fetch(GENERATE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const data=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(data.error||'Could not make the quiz.');
     items=Array.isArray(data.items)?data.items:[];
@@ -340,7 +341,7 @@ let race=null;
 async function raceQuestions(){
   if(!selected.size)throw new Error('Pick at least one posuk first, then tap Race My Friends.');
   const body={sourceText:sourceText(),references:selectedSefariaRefs(),quizType,difficulty,choiceCount:3,count:questionCount,mixedCounts:quizType==='mixed'?mixedCounts(questionCount):{shorashim:0,translation:0,comprehension:0}};
-  const r=await fetch(GENERATE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const r=await B3PaidApi.fetch(GENERATE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data.error||'Could not make the quiz. Try again.');
   const list=(Array.isArray(data.items)?data.items:[]).filter(q=>Array.isArray(q.choices)&&q.choices.length>1);

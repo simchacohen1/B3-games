@@ -84,16 +84,16 @@
       "allowedStudents": {
         ".read": true,
         "$studentId": {
-          ".write": true
+          ".write": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)"
         }
       },
       "translationChunks": {
         ".read": true,
-        ".write": true
+        ".write": false
       },
       "generatedQuestions": {
         ".read": true,
-        ".write": true
+        ".write": false
       },
       "classroomTranslations": {
         ".read": true,

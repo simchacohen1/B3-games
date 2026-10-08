@@ -1177,6 +1177,7 @@
   }
 
 </style>
+<script src="../paid-api.js?v=20261008-cost-controls"></script>
 </head>
 <body>
 <div class="wrap">
@@ -1741,7 +1742,7 @@ async function getGeneratedQuestionsForPart(part){
 
     if(!GENERATE_COMPREHENSION_QUESTIONS_URL || GENERATE_COMPREHENSION_QUESTIONS_URL.indexOf('PASTE') === 0) return [];
 
-    const res = await fetch(GENERATE_COMPREHENSION_QUESTIONS_URL, {
+    const res = await B3PaidApi.fetch(GENERATE_COMPREHENSION_QUESTIONS_URL, {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
       body:JSON.stringify({
@@ -1757,19 +1758,7 @@ async function getGeneratedQuestionsForPart(part){
     const rawItems = Array.isArray(data.items) ? data.items.filter(x => x && x.question) : [];
     if(!rawItems.length) return [];
 
-    // Shared path has no student ID: the first successful generation becomes
-    // the permanent question set used by every student for this posuk.
-    try{
-      await ref.set({
-        perekNum: currentPerekNum,
-        posukNum: part.posukNum,
-        generatedAt: firebase.database.ServerValue.TIMESTAMP,
-        items: rawItems
-      });
-    }catch(err){
-      console.warn('Could not save generated-question cache', err);
-    }
-
+    // The server stores the shared AI cache; students cannot overwrite it.
     const items = normalizeGeneratedItems(rawItems, part.posukNum);
     generatedQuestionMemoryCache.set(cacheKey, items);
     saveLocalGeneratedQuestions(cacheKey, rawItems);
@@ -2165,7 +2154,7 @@ async function speakText(text){
 
     let audioUrl = ttsAudioCache.get(text);
     if(!audioUrl){
-      const res = await fetch(SYNTHESIZE_SPEECH_URL, {
+      const res = await B3PaidApi.fetch(SYNTHESIZE_SPEECH_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text })
@@ -4364,7 +4353,7 @@ async function gradeComprehensionAttempt(){
     formData.append('classroomReferenceTranslation', classroomRefs[currentPosukNum - 1] || '');
     formData.append('kehotReferenceTranslation', kehotRefs[currentPosukNum - 1] || '');
 
-    const res = await fetch(GRADE_COMPREHENSION_URL, { method: 'POST', body: formData });
+    const res = await B3PaidApi.fetch(GRADE_COMPREHENSION_URL, { method: 'POST', body: formData });
     if(!res.ok) throw new Error('Grading request failed');
     const data = await res.json();
 
@@ -4465,7 +4454,7 @@ async function gradeCurrentQuestionAnswer(){
     formData.append('classroomReferenceTranslation', classroomRefs[currentPosukNum - 1] || '');
     formData.append('kehotReferenceTranslation', kehotRefs[currentPosukNum - 1] || '');
 
-    const res = await fetch(GRADE_QUESTION_ANSWER_URL, { method: 'POST', body: formData });
+    const res = await B3PaidApi.fetch(GRADE_QUESTION_ANSWER_URL, { method: 'POST', body: formData });
     if(!res.ok) throw new Error('Grading request failed');
     const data = await res.json();
 
@@ -4766,40 +4755,28 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
   if(!GENERATE_TRANSLATION_CHUNKS_URL || GENERATE_TRANSLATION_CHUNKS_URL.indexOf('PASTE') === 0) return null;
   try{
     const classroomReferenceTranslation = await getClassroomReferenceForPart(part);
-    let res = null;
-    let lastErr = null;
-    for(let attempt = 0; attempt < 2; attempt++){
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 35000);
-      try{
-        res = await fetch(GENERATE_TRANSLATION_CHUNKS_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: controller.signal,
-          body: JSON.stringify({
-            posukText: part.text,
-            posukTranslation: part.translation || '',
-            classroomReferenceTranslation,
-            perekNum: currentPerekNum,
-            posukNum: part.posukNum
-          }),
-        });
-        clearTimeout(timeout);
-        if(res.ok) break;
-        lastErr = new Error('Chunk generation request failed: ' + res.status);
-      }catch(err){
-        clearTimeout(timeout);
-        lastErr = err;
-      }
-      if(attempt === 0) await new Promise(r => setTimeout(r, 900));
-    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 35000);
+    let res;
+    try{
+      res = await B3PaidApi.fetch(GENERATE_TRANSLATION_CHUNKS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          posukText: part.text,
+          posukTranslation: part.translation || '',
+          classroomReferenceTranslation,
+          perekNum: currentPerekNum,
+          posukNum: part.posukNum
+        })
+      });
+    }finally{ clearTimeout(timeout); }
     if(myToken !== translationLoadToken) return null;
-    if(!res || !res.ok) throw (lastErr || new Error('Chunk generation request failed'));
+    if(!res.ok) throw new Error('Chunk generation request failed: ' + res.status);
     const data = await res.json();
     if(!data.levels || !Array.isArray(data.levels) || !data.levels.length) throw new Error('No levels returned');
-    chunkRef.set({ levels: data.levels, generatedAt: Date.now() }).catch(err => {
-      console.error('Could not cache translation chunks', part.key, err);
-    });
+    // The protected backend caches this result for subsequent students.
     return data.levels;
   }catch(err){
     console.error('generateTranslationChunks error for', part.key, err);
@@ -5339,7 +5316,7 @@ function gradeSingleTranslationSegment(idx, level){
         const kehotRefs = await fetchKehotChapterTranslation(currentPerekNum);
         formData.append('kehotReferenceTranslation', kehotRefs[(chunk.posukNum || currentPosukNum) - 1] || '');
       }catch(_err){}
-      const res = await fetch(GRADE_TRANSLATION_CHUNK_URL, { method:'POST', body: formData });
+      const res = await B3PaidApi.fetch(GRADE_TRANSLATION_CHUNK_URL, { method:'POST', body: formData });
       if(!res.ok) throw new Error('Grading request failed');
       const data = await res.json();
       if(data.verdict === 'no_speech'){
@@ -5651,7 +5628,7 @@ async function recordChunkFix(index, btnEl){
           const kehotRefs = await fetchKehotChapterTranslation(currentPerekNum);
           formData.append('kehotReferenceTranslation', kehotRefs[(chunk.posukNum || currentPosukNum) - 1] || '');
         }catch(_err){}
-        const res = await fetch(GRADE_TRANSLATION_CHUNK_URL, { method: 'POST', body: formData });
+        const res = await B3PaidApi.fetch(GRADE_TRANSLATION_CHUNK_URL, { method: 'POST', body: formData });
         if(!res.ok) throw new Error('Grading request failed');
         const data = await res.json();
 

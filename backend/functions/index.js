@@ -92,6 +92,7 @@
  */
 
 const { onRequest } = require("firebase-functions/v2/https");
+const { paidHandler, ALLOWED_ORIGINS: PAID_ORIGINS } = require("./paid-api");
 const { defineSecret } = require("firebase-functions/params");
 const textToSpeech = require("@google-cloud/text-to-speech");
 const speech = require("@google-cloud/speech");
@@ -634,7 +635,7 @@ function setCors(req, res) {
     res.set("Vary", "Origin");
   }
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-B3-Student-Id, X-B3-Student-Pin");
   res.set("Access-Control-Max-Age", "3600");
 }
 
@@ -656,14 +657,18 @@ function parseMultipart(req) {
     const fields = {};
     let audioBuffer = null;
     let audioFilename = null;
-    const busboy = Busboy({ headers: req.headers });
+    const busboy = Busboy({ headers: req.headers, limits: { files: 1, fileSize: 5 * 1024 * 1024, fields: 20, fieldSize: 12000 } });
+    busboy.on("filesLimit", () => reject(new Error("Only one recording is allowed.")));
+    busboy.on("fieldsLimit", () => reject(new Error("Too many fields.")));
 
-    busboy.on("field", (name, value) => {
+    busboy.on("field", (name, value, info) => {
+      if (info?.valueTruncated) return reject(new Error("Text field too large."));
       fields[name] = value;
     });
     busboy.on("file", (name, file, info) => {
       audioFilename = (info && info.filename) || null;
       const chunks = [];
+      file.on("limit", () => reject(new Error("Recording too large.")));
       file.on("data", (chunk) => chunks.push(chunk));
       file.on("end", () => {
         audioBuffer = Buffer.concat(chunks);
@@ -703,6 +708,7 @@ function transcodeToWav(audioBuffer, filenameHint) {
         return;
       }
       ffmpeg(inputPath)
+        .duration(61)
         .audioChannels(1)
         .audioFrequency(16000)
         .audioCodec("pcm_s16le")
@@ -715,6 +721,7 @@ function transcodeToWav(audioBuffer, filenameHint) {
           fs.readFile(outputPath, (readErr, wavBuffer) => {
             cleanup();
             if (readErr) reject(readErr);
+            else if (wavBuffer.length > 16000 * 2 * 60 + 4096) reject(new Error("Recordings must be shorter than one minute."));
             else resolve(wavBuffer);
           });
         })
@@ -982,8 +989,8 @@ function sanitizeScore(rawScore, verdict, hasMinorNote, feedbackText) {
 }
 
 exports.gradeComprehension = onRequest(
-  { secrets: [ANTHROPIC_API_KEY], cors: true, region: "us-central1", memory: "512MiB" },
-  async (req, res) => {
+  { secrets: [ANTHROPIC_API_KEY], cors: PAID_ORIGINS, maxInstances: 5, minInstances: 0, region: "us-central1", memory: "512MiB" },
+  paidHandler("gradeComprehension", "grading", async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") {
       res.status(204).send("");
@@ -1222,12 +1229,12 @@ PRONUNCIATION: your feedback text is read aloud by a text-to-speech voice, so sp
       console.error("gradeComprehension error:", err);
       res.status(500).json({ error: "Something went wrong grading this attempt." });
     }
-  }
+  })
 );
 
 exports.synthesizeSpeech = onRequest(
-  { cors: true, region: "us-central1" },
-  async (req, res) => {
+  { cors: PAID_ORIGINS, maxInstances: 5, minInstances: 0, region: "us-central1" },
+  paidHandler("synthesizeSpeech", "speech", async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") {
       res.status(204).send("");
@@ -1273,7 +1280,7 @@ exports.synthesizeSpeech = onRequest(
       console.error("synthesizeSpeech error:", err);
       res.status(500).json({ error: "Could not generate audio." });
     }
-  }
+  })
 );
 
 /**
@@ -1313,8 +1320,8 @@ exports.synthesizeSpeech = onRequest(
  *   firebase deploy --only functions:generateTranslationChunks
  */
 exports.generateTranslationChunks = onRequest(
-  { secrets: [ANTHROPIC_API_KEY], cors: true, region: "us-central1", memory: "512MiB" },
-  async (req, res) => {
+  { secrets: [ANTHROPIC_API_KEY], cors: PAID_ORIGINS, maxInstances: 5, minInstances: 0, region: "us-central1", memory: "512MiB" },
+  paidHandler("generateTranslationChunks", "generation", async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") {
       res.status(204).send("");
@@ -1461,7 +1468,7 @@ items: { type: "string" }
       console.error("generateTranslationChunks error:", err);
       res.status(500).json({ error: "Something went wrong generating the chunk breakdown." });
     }
-  }
+  })
 );
 
 /**
@@ -1496,8 +1503,8 @@ items: { type: "string" }
  *   firebase deploy --only functions:gradeTranslationChunk
  */
 exports.gradeTranslationChunk = onRequest(
-  { secrets: [ANTHROPIC_API_KEY], cors: true, region: "us-central1", memory: "512MiB" },
-  async (req, res) => {
+  { secrets: [ANTHROPIC_API_KEY], cors: PAID_ORIGINS, maxInstances: 5, minInstances: 0, region: "us-central1", memory: "512MiB" },
+  paidHandler("gradeTranslationChunk", "grading", async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") {
       res.status(204).send("");
@@ -1671,7 +1678,7 @@ Respond with ONLY a JSON object, no preamble, no markdown fences: {"verdict":"co
       console.error("gradeTranslationChunk error:", err);
       res.status(500).json({ error: "Something went wrong grading this attempt." });
     }
-  }
+  })
 );
 
 const FRUM_BIBLICAL_NAME_PRONUNCIATIONS = {
@@ -1755,8 +1762,8 @@ function applyFrumBiblicalNames(text) {
  * RESPONSE: { items:[{sourceFact, question, expectedAnswer}] }
  */
 exports.generateComprehensionQuestions = onRequest(
-  { secrets: [ANTHROPIC_API_KEY], cors: true, region: "us-central1", memory: "512MiB" },
-  async (req, res) => {
+  { secrets: [ANTHROPIC_API_KEY], cors: PAID_ORIGINS, maxInstances: 5, minInstances: 0, region: "us-central1", memory: "512MiB" },
+  paidHandler("generateComprehensionQuestions", "generation", async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") {
       res.status(204).send("");
@@ -1898,7 +1905,7 @@ items: {
       console.error("generateComprehensionQuestions error:", err);
       res.status(500).json({ error: "Something went wrong generating questions." });
     }
-  }
+  })
 );
 
 /**
@@ -1928,8 +1935,8 @@ items: {
  *   firebase deploy --only functions:gradeQuestionAnswer
  */
 exports.gradeQuestionAnswer = onRequest(
-  { secrets: [ANTHROPIC_API_KEY], cors: true, region: "us-central1", memory: "512MiB" },
-  async (req, res) => {
+  { secrets: [ANTHROPIC_API_KEY], cors: PAID_ORIGINS, maxInstances: 5, minInstances: 0, region: "us-central1", memory: "512MiB" },
+  paidHandler("gradeQuestionAnswer", "grading", async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") {
       res.status(204).send("");
@@ -2081,7 +2088,7 @@ Respond with ONLY a JSON object, no preamble, no markdown fences: {"verdict":"co
       console.error("gradeQuestionAnswer error:", err);
       res.status(500).json({ error: "Something went wrong grading this attempt." });
     }
-  }
+  })
 );
 
 
@@ -2225,12 +2232,12 @@ async function weeklyQuizBuildTrustedComprehension(refs) {
 exports.generateWeeklyQuiz = onRequest(
   {
     secrets: [ANTHROPIC_API_KEY],
-    cors: true,
+    cors: PAID_ORIGINS, maxInstances: 5, minInstances: 0,
     region: "us-central1",
     timeoutSeconds: 60,
     memory: "512MiB",
   },
-  async (req, res) => {
+  paidHandler("generateWeeklyQuiz", "generation", async (req, res) => {
     setCors(req, res);
     if (req.method === "OPTIONS") {
       res.status(204).send("");
@@ -2522,7 +2529,7 @@ The choices array must contain exactly ${choiceCount} strings.`;
       console.error("generateWeeklyQuiz error:", err);
       res.status(500).json({ error: "Could not generate quiz questions." });
     }
-  }
+  })
 );
 
 /* =========================================================
@@ -2552,3 +2559,6 @@ exports.funTorahManageStudents = require("./student-management").funTorahManageS
 exports.funTorahStudentAuth = require("./student-auth").funTorahStudentAuth;
 // Student Rewards for every teacher (class-scoped, server-checked).
 exports.studentRewardsTeacher = require("./rewards-teacher").studentRewardsTeacher;
+
+// Preserve the deployed picture-choice helper; it now shares paid API protection.
+exports.generateShorashimArt = require("./shorashim-art").generateShorashimArt;

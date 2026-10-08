@@ -138,6 +138,7 @@
     .past-row{align-items:flex-start;flex-direction:column}.past-row button{width:100%}
   }
 </style>
+<script src="../paid-api.js?v=20261008-cost-controls"></script>
 </head>
 <body>
 <header>
@@ -326,7 +327,7 @@ function waitMs(ms){return new Promise(r=>setTimeout(r,ms));}
 async function getStudentAudioUrl(text){
   let audioUrl=ttsAudioCache.get(text);
   if(audioUrl)return audioUrl;
-  const res=await fetch(SYNTHESIZE_SPEECH_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:String(text)})});
+  const res=await B3PaidApi.fetch(SYNTHESIZE_SPEECH_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:String(text)})});
   if(!res.ok)throw new Error('Speech request failed');
   const data=await res.json();if(!data.audioContent)throw new Error('No audio returned');
   const bytes=atob(data.audioContent),nums=new Uint8Array(bytes.length);for(let i=0;i<bytes.length;i++)nums[i]=bytes.charCodeAt(i);

@@ -336,6 +336,7 @@
     .step-sub{display:none}
   }
 </style>
+<script src="../paid-api.js?v=20261008-cost-controls"></script>
 </head>
 <body>
 <div class="lock-overlay" id="lockOverlay">
@@ -892,6 +893,17 @@ function showTab(name){['live','setup','results','progress'].forEach(n=>{documen
 function setupMsg(t){document.getElementById('setupMsg').textContent=t||'';}
 function launchMsg(t){document.getElementById('launchMsg').textContent=t||'';}
 
+// Paid services always use a verified teacher Google account, including ET/WT.
+const paidSignInButton = document.createElement('button');
+paidSignInButton.type = 'button';
+paidSignInButton.textContent = 'Google teacher sign-in';
+paidSignInButton.style.margin = '8px';
+paidSignInButton.onclick = async () => {
+  try { await window.B3SiteSettings.signInWithGoogle(); setupMsg('Google sign-in complete.'); }
+  catch(error) { setupMsg(error.message || 'Google sign-in did not complete.'); }
+};
+document.getElementById('mainContent').prepend(paidSignInButton);
+
 // ---------- Shared data listeners ----------
 if(CLASS_SPACE){
   // This class's own students replace the B3 East/West lists everywhere on the page.
@@ -1179,7 +1191,7 @@ async function generateQuizDraft(){
     // Kehot/Metsudah grounding sources.
     if(references.length)payload.references=references;
 
-    const resp=await fetch(GENERATE_WEEKLY_QUIZ_URL,{
+    const resp=await B3PaidApi.fetch(GENERATE_WEEKLY_QUIZ_URL,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify(payload)
@@ -1393,7 +1405,7 @@ function renderPreviewQuestion(el,text){
 function previewWait(ms){return new Promise(r=>setTimeout(r,ms));}
 async function getPreviewAudio(text){
   const clean=String(text||'').replace(/\s+/g,' ').trim();if(!clean)return null;let src=previewAudioCache.get(clean);if(src)return src;
-  const resp=await fetch(PREVIEW_TTS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:clean})});if(!resp.ok)throw new Error('Audio service error');
+  const resp=await B3PaidApi.fetch(PREVIEW_TTS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:clean})});if(!resp.ok)throw new Error('Audio service error');
   const data=await resp.json();if(data.audioContent)src='data:audio/mp3;base64,'+data.audioContent;else if(data.audioUrl)src=data.audioUrl;else if(data.url)src=data.url;else throw new Error('No audio returned');previewAudioCache.set(clean,src);return src;
 }
 async function playPreviewChunk(text){
