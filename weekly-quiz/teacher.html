@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- BUILD: 2026-10-07 UI-REDESIGN + NIGRI-SYNC -->
 <!-- BUILD: 2026-09-08 SOURCE-LABEL-OPTIONAL + AUTO-PEREK-18-DETECTION -->
 <!-- BUILD: 2026-09-08 CURRENT-BASE + CHUMASH-SKILLS + SOURCE-REF-FIX -->
 <!-- BUILD: 2026-09-07 FRIENDLY-LAUNCH-UI -->
@@ -15,251 +16,331 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="../firebase-config.js"></script>
-<script src="../site-settings.js?v=20261007-tab-login"></script>
+<script src="../site-settings.js"></script>
 <style>
-  :root { --ink:#18324a; --blue:#2d6ea3; --blue2:#1f5885; --light:#eef6fc; --line:#bdd5e8; --good:#2e8b57; --bad:#c74b50; --gold:#d9a441; --muted:#64788b; --gray:#e7edf2; --purple:#7757a6; }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:Calibri, Arial, sans-serif; background:#f4f8fb; color:var(--ink); }
-  header { background:white; border-bottom:1px solid var(--line); padding:14px 18px; text-align:center; position:sticky; top:0; z-index:20; }
-  h1 { margin:0; color:var(--blue); font-size:28px; }
-  .subtitle { color:var(--muted); font-size:14px; }
-  .wrap { max-width:1320px; margin:18px auto 40px; padding:0 14px; }
-  .card { background:white; border:1px solid var(--line); border-radius:14px; padding:18px; margin-bottom:16px; box-shadow:0 4px 16px rgba(32,72,105,.05); }
-  .hidden { display:none !important; }
-  button,input,select,textarea { font:inherit; }
-  button { border:none; border-radius:9px; padding:9px 14px; cursor:pointer; font-weight:700; }
-  button:disabled { opacity:.5; cursor:not-allowed; }
-  .primary{background:var(--blue);color:white}.good{background:var(--good);color:white}.danger{background:var(--bad);color:white}.secondary{background:#e8f1f7;color:var(--ink)}.gold{background:var(--gold);color:#332711}.purple{background:var(--purple);color:white}
-  .tabs { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-bottom:16px; }
-  .tab { background:#dfeaf2; color:var(--ink); }
-  .tab.active { background:var(--blue); color:white; }
-  .panel { display:none; }.panel.active { display:block; }
-  .topline { display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; }
-  .quiz-name { font-size:24px; font-weight:800; color:var(--blue); }
-  .status-pill { display:inline-block; padding:6px 10px; border-radius:999px; font-size:13px; font-weight:800; background:#e7edf2; }
-  .status-pill.live { background:#e8f7ef; color:#236a40; }
-  .controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  select,input[type=text],input[type=password],input[type=number],textarea { border:1px solid var(--line); border-radius:9px; padding:9px 10px; background:white; color:var(--ink); }
-  textarea { width:100%; min-height:130px; resize:vertical; }
-  .question-card { text-align:center; }
-  .qnum { color:var(--muted); font-size:14px; }
-  .qtext { font-size:28px; line-height:1.25; font-weight:800; white-space:pre-line; margin:10px 0 12px; unicode-bidi:plaintext; }
-  .answer-line { font-size:17px; color:var(--good); font-weight:800; min-height:24px; }
-  .qstrip { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:14px; }
-  .qstrip button { width:40px; padding:8px 4px; background:#e7edf2; color:var(--ink); position:relative; }
-  .qstrip button.active { background:var(--blue); color:white; }
-  .qstrip button.open::after { content:'•'; position:absolute; right:4px; top:0; color:var(--good); font-size:20px; }
-  .qstrip button.reveal { outline:2px solid var(--gold); }
-  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:13px; color:var(--muted); margin:10px 0; align-items:center; }
-  .sw { width:14px; height:14px; border-radius:3px; display:inline-block; vertical-align:-2px; margin-right:4px; border:1px solid rgba(0,0,0,.08); }
-  .grid-wrap { overflow:auto; border:1px solid var(--line); border-radius:10px; }
-  table { border-collapse:separate; border-spacing:0; min-width:100%; background:white; }
-  th,td { border-right:1px solid #d9e5ee; border-bottom:1px solid #d9e5ee; padding:7px; text-align:center; white-space:nowrap; }
-  th { background:#edf5fa; position:sticky; top:0; z-index:3; font-size:13px; }
-  th:first-child,td:first-child { position:sticky; left:0; z-index:2; background:white; text-align:left; min-width:160px; font-weight:700; }
-  th:first-child { z-index:4; background:#edf5fa; }
-  td.cell { min-width:42px; height:36px; cursor:pointer; font-weight:900; }
-  td.blank { background:#f3f5f7; color:#9ba8b3; }
-  td.correct { background:#d9f1e3; color:#17673b; }
-  td.incorrect { background:#f8d9dc; color:#962f35; }
-  td.adjusted { outline:2px solid var(--gold); outline-offset:-3px; }
-  td.locked { box-shadow:inset 0 0 0 2px #d9dee3; }
-  .summary-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
-  .summary { background:#f0f6fa; border-radius:10px; padding:10px 14px; min-width:130px; }
-  .summary b { font-size:21px; color:var(--blue); }
-  .setup-grid { display:grid; grid-template-columns:320px 1fr; gap:16px; }
-  .quiz-list,.launch-list { max-height:520px; overflow:auto; }
-  .quiz-item,.launch-item { border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:8px; cursor:pointer; }
-  .quiz-item.active,.launch-item.active { border-color:var(--blue); background:#edf6fc; }
-  .quiz-item-title,.launch-item-title { font-weight:800; }
-  .small { font-size:13px; color:var(--muted); }
-  .editor-row { border:1px solid var(--line); border-radius:10px; padding:10px; margin-top:10px; background:#fbfdff; }
-  .editor-row input { width:100%; margin-top:5px; }
-  .choice-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:7px; }
-  .editor-head { display:flex; justify-content:space-between; gap:8px; align-items:center; }
-  .paste-help,.info-box { background:#f0f6fa; padding:10px; border-radius:8px; color:var(--muted); font-size:13px; margin-bottom:8px; }
-  .generator-grid { display:grid; grid-template-columns:repeat(4,minmax(150px,1fr)); gap:10px; margin:10px 0; }
-  .generator-grid label { font-weight:700; font-size:13px; display:flex; flex-direction:column; gap:5px; }
-  .generator-candidates { display:grid; gap:8px; margin-top:10px; }
-  .candidate { border:1px solid var(--line); border-radius:10px; padding:10px; background:#fbfdff; display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:start; }
-  .candidate .focus { font-weight:800; color:var(--blue); }
-  .candidate .reason { font-size:12px; color:var(--muted); margin-top:3px; }
-  .candidate .answer { color:var(--good); font-size:13px; margin-top:4px; }
-  .skill-tag { display:inline-block; padding:3px 7px; border-radius:999px; font-size:11px; font-weight:800; background:#e8f1f7; color:var(--blue2); margin-left:6px; }
-  .launch-controls { display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:10px; align-items:end; }
-  .launch-controls label { display:flex; flex-direction:column; gap:5px; font-size:13px; font-weight:700; }
-  .student-checklist { border:1px solid var(--line); border-radius:10px; padding:10px; max-height:190px; overflow:auto; background:#fbfdff; display:grid; grid-template-columns:repeat(2,minmax(180px,1fr)); gap:6px 12px; }
-  .student-checklist label { display:flex; flex-direction:row; align-items:center; gap:7px; font-weight:600; margin:0; }
-  .launch-type-help { background:#fff8df; border:1px solid #eadb9b; border-radius:9px; padding:9px 11px; margin-top:10px; font-size:13px; color:#6f5a18; }
-  .lock-overlay,.modal-overlay { position:fixed; inset:0; background:rgba(244,248,251,.96); display:flex; align-items:center; justify-content:center; z-index:99; }
-  .lock-box,.modal-box { width:min(520px,92vw); background:white; border:1px solid var(--line); border-radius:14px; padding:25px; text-align:center; box-shadow:0 18px 50px rgba(0,0,0,.18); }
-  .lock-box input { width:100%; margin:12px 0; font-size:18px; }
-  .lock-error { color:var(--bad); min-height:20px; }
-  .modal-box { text-align:left; }
-  .modal-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:14px; }
-  .progress-layout { display:grid; grid-template-columns:280px 1fr; gap:16px; }
-  .skill-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:12px 0; }
-  .skill-card { background:#f0f6fa; border-radius:12px; padding:14px; text-align:center; }
-  .skill-card .big { font-size:28px; font-weight:900; color:var(--blue); }
-  .parent-summary { background:#fffdf4; border:1px solid #eadb9b; border-radius:10px; padding:14px; line-height:1.5; }
-  .audit-note { color:#8b6a15; font-size:12px; }
-  .preview-box { width:min(820px,94vw); max-height:92vh; overflow:auto; background:white; border:1px solid var(--line); border-radius:16px; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,.2); }
-  .preview-banner { background:#fff7db; border:1px solid #eadb9b; border-radius:10px; padding:9px 12px; text-align:center; font-weight:700; color:#745b12; margin-bottom:14px; }
-  .preview-question { font-size:28px; font-weight:800; line-height:1.25; text-align:center; white-space:pre-line; margin:18px 0; unicode-bidi:plaintext; }
-  .preview-choices { display:grid; gap:10px; }
-  .preview-choice { width:100%; text-align:left; background:#f7fbfe; border:2px solid var(--line); color:var(--ink); font-size:19px; padding:14px 15px; border-radius:12px; }
-  .preview-choice:hover:not(:disabled) { border-color:var(--blue); }
-  .preview-choice.selected { border-color:var(--blue); background:#e5f2fb; }
-  .preview-choice.correct { border-color:var(--good); background:#eaf7ef; }
-  .preview-choice.wrong { border-color:var(--bad); background:#fdecee; }
-  .preview-status { margin-top:14px; padding:12px; border-radius:10px; text-align:center; font-weight:700; background:#f1f5f7; min-height:44px; }
-  .preview-status.good { background:#eaf7ef; color:#1f6b40; }
-  .preview-status.bad { background:#fdecee; color:#9b3439; }
-  .preview-nav { display:flex; justify-content:center; gap:7px; flex-wrap:wrap; margin-top:15px; }
-  .preview-nav button { min-width:40px; padding:7px 9px; background:#e8f1f7; color:var(--ink); }
-  .preview-nav button.active { background:var(--blue); color:white; }
+  /* ===== B3 Weekly Quiz — Teacher (2026-10 redesign) ===== */
+  :root{
+    --ink:#1b2b3a; --muted:#647487; --line:#dde5ee; --line2:#c9d6e3;
+    --bg:#f5f7fa; --card:#ffffff; --soft:#f1f5f9;
+    --blue:#2563a8; --blue2:#1d4f86; --light:#e9f1fb; --gray:#eef2f6;
+    --good:#1f8a52; --good-bg:#e6f5ec; --bad:#c9434b; --bad-bg:#fbe9ea;
+    --gold:#c98a12; --gold-bg:#fff6e0; --purple:#6a4bb0; --purple-bg:#f1ecfb;
+    --radius:14px; --shadow:0 1px 2px rgba(16,40,70,.06),0 4px 14px rgba(16,40,70,.05);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Calibri,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
+  h1,h2,h3{line-height:1.2;color:var(--ink)}
+  h2{font-size:19px;font-weight:700} h3{font-size:16px;font-weight:700}
+  .hidden{display:none!important}
+  button,input,select,textarea{font:inherit;color:inherit}
 
-  /* Hebrew on-screen keyboard for Quiz Setup editing */
-  .hebrew-keyboard {
-    position:fixed;
-    left:50%;
-    bottom:14px;
-    transform:translateX(-50%);
-    width:min(900px,96vw);
-    background:white;
-    border:1px solid var(--line);
-    border-radius:16px;
-    box-shadow:0 18px 55px rgba(0,0,0,.22);
-    padding:12px;
-    z-index:140;
-  }
-  .hebrew-keyboard-head {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:10px;
-    margin-bottom:8px;
-  }
-  .hebrew-keyboard-title { font-weight:900; color:var(--blue); }
-  .hebrew-keyboard-help { font-size:12px; color:var(--muted); }
-  .hebrew-keyboard-row {
-    display:flex;
-    flex-wrap:wrap;
-    justify-content:center;
-    gap:6px;
-    margin:6px 0;
-  }
-  .hebrew-key {
-    min-width:42px;
-    min-height:40px;
-    padding:6px 10px;
-    background:#f4f9fc;
-    color:var(--ink);
-    border:1px solid var(--line);
-    font-size:22px;
-    line-height:1;
-    border-radius:9px;
-  }
-  .hebrew-key:hover { border-color:var(--blue); background:#eaf4fb; }
-  .hebrew-key.nikud { min-width:38px; font-size:24px; background:#fffaf0; }
-  .hebrew-key.utility { font-size:14px; min-width:70px; background:#e8f1f7; }
-  .hebrew-keyboard-label {
-    width:100%;
-    text-align:center;
-    font-size:11px;
-    color:var(--muted);
-    margin-top:2px;
-  }
-  .hebrew-editing-target {
-    outline:3px solid rgba(45,110,163,.22) !important;
-    border-color:var(--blue) !important;
-  }
+  /* ---------- Buttons ---------- */
+  button{border:1px solid transparent;border-radius:10px;padding:9px 15px;cursor:pointer;font-weight:600;line-height:1.2;transition:background .12s,border-color .12s,box-shadow .12s,transform .05s}
+  button:active:not(:disabled){transform:translateY(1px)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid rgba(37,99,168,.3);outline-offset:1px}
+  .primary{background:var(--blue);color:#fff}.primary:hover:not(:disabled){background:var(--blue2)}
+  .good{background:var(--good);color:#fff}.good:hover:not(:disabled){background:#187244}
+  .danger{background:#fff;color:var(--bad);border-color:#efc4c7}.danger:hover:not(:disabled){background:var(--bad-bg)}
+  .secondary{background:#fff;color:var(--ink);border-color:var(--line2)}.secondary:hover:not(:disabled){background:var(--soft)}
+  .gold{background:var(--gold-bg);color:#7a5200;border-color:#f0d491}.gold:hover:not(:disabled){background:#ffeec2}
+  .purple{background:var(--purple);color:#fff}.purple:hover:not(:disabled){background:#573c96}
+  .btn-lg{padding:12px 20px;font-size:16px;border-radius:12px}
+  .link-btn{background:none;border:none;color:var(--blue);padding:4px 0;font-weight:600}
+  .link-btn:hover{text-decoration:underline}
 
-  @media(max-width:900px){.setup-grid,.progress-layout{grid-template-columns:1fr}.generator-grid{grid-template-columns:1fr 1fr}.launch-controls{grid-template-columns:1fr 1fr}.choice-grid{grid-template-columns:1fr}.skill-cards{grid-template-columns:1fr}}
+  /* ---------- Inputs ---------- */
+  select,input[type=text],input[type=password],input[type=number],input[type=date],textarea{border:1px solid var(--line2);border-radius:10px;padding:9px 11px;background:#fff;min-height:40px}
+  select:hover,input:hover,textarea:hover{border-color:#aebfd1}
+  textarea{width:100%;min-height:120px;resize:vertical}
+  label{font-size:13px;font-weight:600;color:#3d4f62}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field input,.field select{width:100%}
 
-  /* Friendlier teacher dashboard */
-  body { background:linear-gradient(180deg,#edf5fb 0,#f8fbfd 260px,#f4f8fb 100%); }
-  header { padding:18px 20px 16px; box-shadow:0 2px 12px rgba(32,72,105,.07); }
-  h1 { font-size:30px; letter-spacing:-.4px; }
-  .tabs { background:white; border:1px solid var(--line); border-radius:14px; padding:7px; box-shadow:0 4px 16px rgba(32,72,105,.06); }
-  .tab { flex:1 1 150px; min-height:44px; border-radius:10px; font-size:15px; }
-  .card { box-shadow:0 8px 24px rgba(32,72,105,.07); }
-  .launch-card { border:2px solid #a9cce5; box-shadow:0 12px 30px rgba(45,110,163,.12); overflow:hidden; }
-  .launch-card h2 { font-size:25px; color:var(--blue); margin-bottom:4px; }
-  .launch-intro { color:var(--muted); margin-bottom:16px; line-height:1.45; }
+  /* ---------- App shell ---------- */
+  header{position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 1px 8px rgba(16,40,70,.04)}
+  .header-inner{max-width:1320px;margin:0 auto;padding:10px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+  .brand-mark{width:36px;height:36px;border-radius:10px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+  h1{margin:0;font-size:19px;font-weight:700}
+  .subtitle{color:var(--muted);font-size:12.5px}
+  .tabs{display:flex;gap:4px;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:4px;flex-wrap:wrap}
+  .tab{background:transparent;color:#435467;border:none;padding:8px 14px;border-radius:9px;font-weight:600;display:flex;align-items:center;gap:7px}
+  .tab:hover{background:#e6edf5}
+  .tab.active{background:#fff;color:var(--blue);box-shadow:0 1px 3px rgba(16,40,70,.12)}
+  .tab-ico{font-size:15px;line-height:1}
+  .wrap{max-width:1320px;margin:20px auto 60px;padding:0 18px}
+  .panel{display:none}.panel.active{display:block;animation:fade .15s ease}
+  @keyframes fade{from{opacity:.4}to{opacity:1}}
+  .page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2px 0 14px}
+  .page-head h2{margin:0;font-size:22px}
+  .page-head p{margin:3px 0 0;color:var(--muted);font-size:14px}
 
-  .launch-step { margin-top:18px; padding-top:17px; border-top:1px solid #dce9f2; }
-  .launch-step:first-of-type { margin-top:0; padding-top:0; border-top:0; }
-  .step-title { display:flex; align-items:center; gap:9px; font-size:17px; font-weight:900; margin-bottom:10px; color:var(--ink); }
-  .step-number { width:27px; height:27px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; background:var(--blue); color:white; font-size:14px; flex:0 0 auto; }
+  /* ---------- Cards & layout ---------- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .card-head h2,.card-head h3{margin:0}
+  .topline{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .small{font-size:13px;color:var(--muted)}
+  .muted{color:var(--muted)}
+  .setup-grid{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}
+  .setup-grid>*,.progress-layout>*{min-width:0}
+  .details-grid{grid-template-columns:2fr 1fr 1fr}
+  .progress-layout{display:grid;grid-template-columns:280px 1fr;gap:16px;align-items:start}
+  .sticky-side{position:sticky;top:84px}
+  .info-box,.paste-help{background:var(--soft);border:1px solid var(--line);padding:11px 13px;border-radius:10px;color:#4b5d70;font-size:13.5px;margin-bottom:10px}
+  .empty{padding:26px 16px;text-align:center;color:var(--muted);border:1.5px dashed var(--line2);border-radius:12px;background:#fafcfe}
 
-  .launch-mode-picker { display:grid; grid-template-columns:repeat(3,1fr); gap:11px; }
-  .launch-mode-card {
-    border:2px solid #d4e3ee; background:#fbfdff; border-radius:14px; padding:15px;
-    cursor:pointer; text-align:left; transition:.15s ease; min-height:128px;
+  /* ---------- Live ---------- */
+  .live-head{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start}
+  .quiz-name{font-size:22px;font-weight:700;color:var(--ink)}
+  .status-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;font-size:12.5px;font-weight:700;background:var(--gray);color:#4b5d70;margin-top:8px}
+  .status-pill::before{content:"";width:8px;height:8px;border-radius:50%;background:#9aa9b8}
+  .status-pill.live{background:var(--good-bg);color:#17683d}
+  .status-pill.live::before{background:var(--good);box-shadow:0 0 0 3px rgba(31,138,82,.2)}
+  .live-settings{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;justify-content:flex-end}
+  .live-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+  .live-actions .spacer{flex:1}
+  .question-card{text-align:center;padding:26px 20px}
+  .qnum{color:var(--muted);font-size:13.5px;font-weight:600;letter-spacing:.2px}
+  .qtext{font-size:30px;line-height:1.3;font-weight:700;white-space:pre-line;margin:12px auto 12px;max-width:900px;unicode-bidi:plaintext}
+  .answer-line{display:inline-block;font-size:15px;color:#17683d;background:var(--good-bg);border-radius:999px;padding:5px 14px;font-weight:600;min-height:0}
+  .answer-line:empty{display:none}
+  .q-controls{justify-content:center;margin-top:18px}
+  .qstrip{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:16px}
+  .qstrip button{width:40px;height:36px;padding:0;background:#fff;border:1px solid var(--line2);color:var(--ink);position:relative;font-weight:600}
+  .qstrip button.open{border-color:#8fd0ac;background:var(--good-bg)}
+  .qstrip button.active{background:var(--blue);border-color:var(--blue);color:#fff}
+  .qstrip button.reveal{box-shadow:0 0 0 2px var(--gold)}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:4px 0 12px;align-items:center}
+  .sw{width:14px;height:14px;border-radius:4px;display:inline-block;vertical-align:-2px;margin-right:5px;border:1px solid rgba(0,0,0,.06)}
+  .summary-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .summary{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:10px 16px;min-width:140px;font-size:13px;color:var(--muted)}
+  .summary b{display:block;font-size:22px;color:var(--ink)}
+
+  /* ---------- Tables ---------- */
+  .grid-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;max-height:70vh}
+  table{border-collapse:separate;border-spacing:0;min-width:100%;background:#fff;font-size:14px}
+  th,td{border-bottom:1px solid #edf1f5;padding:8px 9px;text-align:center;white-space:nowrap}
+  th{background:#f6f8fb;position:sticky;top:0;z-index:3;font-size:12px;font-weight:700;color:#55687b;text-transform:uppercase;letter-spacing:.3px}
+  th:first-child,td:first-child{position:sticky;left:0;z-index:2;background:#fff;text-align:left;min-width:170px;font-weight:600;border-right:1px solid #edf1f5}
+  th:first-child{z-index:4;background:#f6f8fb}
+  tbody tr:hover td{background:#fafcfe}
+  tbody tr:hover td.correct{background:#d3efdf}tbody tr:hover td.incorrect{background:#f6d6d9}
+  td.cell{min-width:40px;height:36px;cursor:pointer;font-weight:700}
+  td.blank{color:#b3bfcb}
+  td.correct{background:var(--good-bg);color:#17683d}
+  td.incorrect{background:var(--bad-bg);color:#a3333a}
+  td.adjusted{box-shadow:inset 0 0 0 2px var(--gold)}
+  td.locked{color:#c3ccd6}
+  td.locked.correct,td.locked.incorrect{color:inherit}
+  td button{padding:5px 10px;font-size:13px}
+
+  /* ---------- Lists (saved quizzes / history) ---------- */
+  .quiz-list,.launch-list{max-height:62vh;overflow:auto;margin:0 -4px;padding:0 4px}
+  .quiz-item,.launch-item{border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-bottom:8px;cursor:pointer;background:#fff;transition:border-color .12s,background .12s}
+  .quiz-item:hover,.launch-item:hover{border-color:#aec6df;background:#fafcfe}
+  .quiz-item.active,.launch-item.active{border-color:var(--blue);background:var(--light);box-shadow:inset 3px 0 0 var(--blue)}
+  .quiz-item-title,.launch-item-title{font-weight:600}
+  .launch-item-title button{opacity:.55}
+  .launch-item:hover .launch-item-title button{opacity:1}
+  .quiz-grid .quiz-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;max-height:none}
+  .quiz-grid .quiz-item{margin:0;padding:14px}
+  .list-search{width:100%;margin-bottom:10px}
+
+  /* ---------- Quiz Setup stepper ---------- */
+  .stepper{display:flex;gap:0;background:#fff;border:1px solid var(--line);border-radius:14px;padding:6px;margin-bottom:12px;box-shadow:var(--shadow);flex-wrap:wrap}
+  .step-btn{flex:1 1 180px;background:transparent;border:none;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;color:#56687a;font-weight:600;text-align:left}
+  .step-btn:hover{background:var(--soft)}
+  .step-btn .num{width:26px;height:26px;border-radius:50%;border:2px solid #b8c6d4;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none}
+  .step-btn.active{background:var(--light);color:var(--blue2)}
+  .step-btn.active .num{background:var(--blue);border-color:var(--blue);color:#fff}
+  .step-btn.done .num{background:var(--good-bg);border-color:#8fd0ac;color:var(--good)}
+  .step-sub{display:block;font-size:12px;font-weight:500;color:var(--muted)}
+  .current-quiz-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin:0 2px 14px}
+  .current-quiz-bar b{color:var(--ink)}
+  .chip{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--gray);color:#4b5d70}
+  .chip.blue{background:var(--light);color:var(--blue2)}
+  .start-tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .start-tile{background:#fff;border:1.5px solid var(--line2);border-radius:14px;padding:18px;text-align:left;display:flex;gap:14px;align-items:flex-start;color:var(--ink)}
+  .start-tile:hover{border-color:var(--blue);background:#fafcff;box-shadow:0 4px 14px rgba(37,99,168,.08)}
+  .tile-ico{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none;background:var(--light);color:var(--blue)}
+  .start-tile.ai .tile-ico{background:var(--purple-bg);color:var(--purple)}
+  .tile-title{font-size:16px;font-weight:700;margin-bottom:3px}
+  .tile-desc{font-size:13px;color:var(--muted);font-weight:500;line-height:1.4}
+  .step-footer{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;position:sticky;bottom:0;background:rgba(255,255,255,.96);backdrop-filter:blur(4px);border-top:1px solid var(--line);margin:18px -20px -20px;padding:12px 20px;border-radius:0 0 var(--radius) var(--radius);z-index:5}
+  .back-link{margin-bottom:10px}
+
+  /* ---------- Generator ---------- */
+  .generator-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;margin:12px 0}
+  .generator-grid label{display:flex;flex-direction:column;gap:5px}
+  .generator-grid input,.generator-grid select{width:100%}
+  .generator-candidates{display:grid;gap:8px;margin-top:10px}
+  .candidate{border:1px solid var(--line);border-radius:11px;padding:12px;background:#fff;display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start}
+  .candidate input[type=checkbox]{width:18px;height:18px;margin-top:2px}
+  .candidate .focus{font-weight:700;color:var(--blue2)}
+  .candidate .reason{font-size:12px;color:var(--muted);margin-top:3px}
+  .candidate .answer{color:var(--good);font-size:13px;margin-top:4px;font-weight:600}
+  .skill-tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;background:var(--light);color:var(--blue2);margin-left:6px;vertical-align:1px}
+  #generatorStatus{font-weight:600}
+
+  /* ---------- Editor ---------- */
+  .editor-row{border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px;background:#fff}
+  .editor-row:focus-within{border-color:#9dbbdb;box-shadow:0 0 0 3px rgba(37,99,168,.08)}
+  .editor-row input{width:100%;margin-top:6px}
+  .editor-row select{min-height:34px;padding:5px 8px;font-size:13px}
+  .editor-head{display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .editor-head .danger{padding:5px 10px!important;font-size:13px}
+  .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  details.paste-panel{border:1px solid var(--line);border-radius:12px;background:var(--soft);margin:12px 0}
+  details.paste-panel summary{cursor:pointer;padding:11px 14px;font-weight:600;color:#3d4f62;list-style:none}
+  details.paste-panel summary::-webkit-details-marker{display:none}
+  details.paste-panel summary::before{content:"▸ ";color:var(--muted)}
+  details.paste-panel[open] summary::before{content:"▾ "}
+  details.paste-panel .paste-body{padding:0 14px 14px}
+  details.paste-panel .paste-help{background:#fff}
+  #setupMsg{font-weight:600;color:var(--good)}
+
+  /* ---------- Give to students ---------- */
+  .launch-card h2{font-size:20px;margin:0 0 4px}
+  .launch-intro{color:var(--muted);margin-bottom:16px}
+  .launch-step{margin-top:20px;padding-top:18px;border-top:1px solid var(--line)}
+  .launch-step:first-of-type{margin-top:0;padding-top:0;border-top:0}
+  .step-title{display:flex;align-items:center;gap:9px;font-size:16px;font-weight:700;margin-bottom:12px}
+  .step-number{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--blue);color:#fff;font-size:13px;flex:none}
+  .launch-mode-picker{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .launch-mode-card{border:1.5px solid var(--line2);background:#fff;border-radius:13px;padding:16px;text-align:left;min-height:124px;color:var(--ink)}
+  .launch-mode-card:hover{border-color:#8fb2d6;background:#fafcff}
+  .launch-mode-card.active{border-color:var(--blue);background:var(--light);box-shadow:0 0 0 3px rgba(37,99,168,.12)}
+  .launch-mode-icon{font-size:20px;line-height:1;margin-bottom:8px;color:var(--blue)}
+  .launch-mode-title{font-size:16px;font-weight:700;color:var(--ink);margin-bottom:4px}
+  .launch-mode-desc{font-size:13px;color:var(--muted);line-height:1.4;font-weight:500}
+  .choice-pills{display:flex;gap:6px;flex-wrap:wrap;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:4px;width:max-content;max-width:100%}
+  .choice-pill{border:none;background:transparent;color:#435467;border-radius:9px;padding:8px 14px;font-weight:600}
+  .choice-pill.active{background:#fff;color:var(--blue);box-shadow:0 1px 3px rgba(16,40,70,.14)}
+  .choice-pill:disabled{opacity:.35}
+  .class-picker{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:520px}
+  .class-choice{border:1.5px solid var(--line2);background:#fff;border-radius:12px;padding:12px 15px;font-weight:700;color:var(--ink);text-align:center}
+  .class-choice:hover{border-color:#8fb2d6}
+  .class-choice.active{border-color:var(--blue);background:var(--light);color:var(--blue2)}
+  .launch-options-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .launch-field{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600}
+  .launch-field input,.launch-field select{width:100%;min-height:42px}
+  .score-toggle{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--soft);border-radius:11px;padding:11px 13px;font-weight:600;font-size:14px;color:var(--ink);cursor:pointer}
+  .score-toggle input{width:18px;height:18px}
+  .launch-student-select{max-width:520px;width:100%}
+  .student-checklist{border:1px solid var(--line);border-radius:12px;padding:10px;max-height:240px;overflow:auto;background:var(--soft);display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
+  .student-checklist label{display:flex;flex-direction:row;align-items:center;gap:8px;font-weight:600;margin:0;padding:8px 10px;border-radius:9px;background:#fff;border:1px solid var(--line);cursor:pointer;color:var(--ink);font-size:14px}
+  .student-checklist label:hover{border-color:#aec6df}
+  .launch-help{margin-top:14px;border-radius:11px;padding:11px 14px;background:var(--light);border:1px solid #cfe0f2;font-size:13.5px;color:#34506c}
+  .launch-type-help{background:var(--gold-bg);border:1px solid #f0d491;border-radius:10px;padding:9px 11px;margin-top:10px;font-size:13px;color:#7a5200}
+  .launch-main-button{width:100%;min-height:52px;margin-top:20px;font-size:17px;border-radius:12px}
+  .launch-source-msg{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--purple-bg);color:var(--purple);font-weight:600}
+  .launch-success{margin-top:10px;font-weight:600;color:var(--good)}
+  .launch-success:empty{display:none}
+
+  /* ---------- Results ---------- */
+  .results-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  details.menu{position:relative}
+  details.menu>summary{list-style:none;cursor:pointer;border:1px solid var(--line2);background:#fff;border-radius:10px;padding:9px 14px;font-weight:600;user-select:none}
+  details.menu>summary::-webkit-details-marker{display:none}
+  details.menu>summary:hover{background:var(--soft)}
+  details.menu[open]>summary{background:var(--soft)}
+  .menu-list{position:absolute;right:0;top:calc(100% + 6px);min-width:240px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(16,40,70,.16);padding:6px;z-index:20;display:flex;flex-direction:column;gap:2px}
+  .menu-list button{background:none;border:none;text-align:left;padding:9px 12px;border-radius:8px;color:var(--ink);font-weight:500;width:100%}
+  .menu-list button:hover{background:var(--soft)}
+  .menu-list button.danger{color:var(--bad)}
+  .menu-list hr{border:none;border-top:1px solid var(--line);margin:4px 0}
+
+  /* ---------- Progress ---------- */
+  .skill-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+  .skill-card{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
+  .skill-card .big{font-size:28px;font-weight:700;color:var(--blue)}
+  .parent-summary{background:#fffdf5;border:1px solid #f0e2b0;border-radius:12px;padding:14px;line-height:1.55}
+  .audit-note{color:#8b6a15;font-size:12px}
+
+  /* ---------- Lock / modals ---------- */
+  .lock-overlay,.modal-overlay{position:fixed;inset:0;background:rgba(20,35,52,.45);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;z-index:99;padding:16px}
+  .lock-overlay{background:linear-gradient(160deg,#e9f1fb,#f5f7fa)}
+  .lock-box,.modal-box{width:min(520px,94vw);background:#fff;border:1px solid var(--line);border-radius:18px;padding:28px;text-align:center;box-shadow:0 20px 60px rgba(16,40,70,.22)}
+  .lock-box h2{margin:0 0 4px;font-size:22px}
+  .lock-box input{width:100%;margin:16px 0 10px;font-size:17px;min-height:46px}
+  .lock-box button{width:100%;min-height:46px;font-size:16px}
+  .lock-error{color:var(--bad);min-height:20px;margin-top:8px;font-size:14px}
+  .modal-box{text-align:left}
+  .modal-box h2{margin-top:0}
+  .modal-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px}
+
+  /* ---------- Preview ---------- */
+  .preview-box{width:min(820px,96vw);max-height:92vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 20px 60px rgba(16,40,70,.22)}
+  .preview-banner{background:var(--gold-bg);border:1px solid #f0d491;border-radius:10px;padding:9px 12px;text-align:center;font-weight:600;color:#7a5200;margin:14px 0}
+  .preview-question{font-size:28px;font-weight:700;line-height:1.3;text-align:center;white-space:pre-line;margin:18px 0;unicode-bidi:plaintext}
+  .preview-choices{display:grid;gap:10px}
+  .preview-choice{width:100%;text-align:left;background:#fff;border:1.5px solid var(--line2);color:var(--ink);font-size:19px;padding:14px 16px;border-radius:12px;font-weight:500}
+  .preview-choice:hover:not(:disabled){border-color:var(--blue)}
+  .preview-choice.selected{border-color:var(--blue);background:var(--light)}
+  .preview-choice.correct{border-color:var(--good);background:var(--good-bg)}
+  .preview-choice.wrong{border-color:var(--bad);background:var(--bad-bg)}
+  .preview-status{margin-top:14px;padding:12px;border-radius:10px;text-align:center;font-weight:600;background:var(--soft);min-height:44px}
+  .preview-status.good{background:var(--good-bg);color:#17683d}
+  .preview-status.bad{background:var(--bad-bg);color:#a3333a}
+  .preview-nav{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:15px}
+  .preview-nav button{min-width:38px;padding:7px 9px;background:#fff;border-color:var(--line2);color:var(--ink)}
+  .preview-nav button.active{background:var(--blue);border-color:var(--blue);color:#fff}
+
+  /* ---------- Hebrew keyboard ---------- */
+  .hebrew-keyboard{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);width:min(900px,96vw);background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 55px rgba(16,40,70,.22);padding:12px;z-index:140}
+  .hebrew-keyboard-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+  .hebrew-keyboard-title{font-weight:700;color:var(--blue)}
+  .hebrew-keyboard-help{font-size:12px;color:var(--muted)}
+  .hebrew-keyboard-row{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:6px 0}
+  .hebrew-key{min-width:42px;min-height:40px;padding:6px 10px;background:#fff;color:var(--ink);border:1px solid var(--line2);font-size:22px;line-height:1;border-radius:9px;font-weight:500}
+  .hebrew-key:hover{border-color:var(--blue);background:var(--light)}
+  .hebrew-key.nikud{min-width:38px;font-size:24px;background:#fffaf0}
+  .hebrew-key.utility{font-size:14px;min-width:70px;background:var(--soft)}
+  .hebrew-keyboard-label{width:100%;text-align:center;font-size:11px;color:var(--muted);margin-top:2px}
+  .hebrew-editing-target{outline:3px solid rgba(37,99,168,.22)!important;border-color:var(--blue)!important}
+
+  /* ---------- Read-aloud ---------- */
+  .tts-hebrew{direction:rtl;unicode-bidi:isolate;display:inline-block;border-radius:5px;padding:0 2px;transition:background .15s,box-shadow .15s}
+  .tts-english{direction:ltr;unicode-bidi:isolate;display:inline}
+  .question-type-label{display:table;margin:0 auto 7px;padding:5px 10px;border-radius:999px;background:#eef2ff;font-size:16px;font-weight:700;direction:rtl;unicode-bidi:isolate}
+  .tts-highlight,.tts-hebrew.tts-highlight{background:#ffe66d;box-shadow:0 0 0 2px #ffe66d}
+
+  /* ---------- Responsive ---------- */
+  @media(max-width:1000px){
+    .setup-grid,.progress-layout{grid-template-columns:1fr}
+    .sticky-side{position:static}
+    .generator-grid{grid-template-columns:1fr 1fr}
+    .skill-cards{grid-template-columns:1fr 1fr}
+    .live-head{grid-template-columns:1fr}
+    .live-settings{justify-content:flex-start}
   }
-  .launch-mode-card:hover { border-color:#8ab8d8; transform:translateY(-1px); }
-  .launch-mode-card.active { border-color:var(--blue); background:#edf7fe; box-shadow:0 0 0 3px rgba(45,110,163,.10); }
-  .launch-mode-icon { font-size:25px; line-height:1; margin-bottom:8px; }
-  .launch-mode-title { font-size:17px; font-weight:900; color:var(--blue2); margin-bottom:5px; }
-  .launch-mode-desc { font-size:13px; color:var(--muted); line-height:1.35; font-weight:500; }
-
-  .choice-pills { display:flex; gap:8px; flex-wrap:wrap; }
-  .choice-pill {
-    border:1px solid var(--line); background:#f5f9fc; color:var(--ink); border-radius:999px;
-    padding:9px 14px; font-weight:800;
-  }
-  .choice-pill.active { background:var(--blue); color:white; border-color:var(--blue); }
-
-  .class-picker { display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:520px; }
-  .class-choice {
-    border:2px solid #d4e3ee; background:white; border-radius:12px; padding:13px 15px;
-    font-weight:900; color:var(--ink); text-align:center;
-  }
-  .class-choice.active { border-color:var(--blue); background:#edf7fe; color:var(--blue2); }
-
-  .launch-options-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .launch-field { display:flex; flex-direction:column; gap:5px; font-size:13px; font-weight:800; }
-  .launch-field input,.launch-field select { width:100%; min-height:42px; }
-  .score-toggle {
-    display:flex; align-items:center; gap:10px; border:1px solid var(--line); background:#f8fbfd;
-    border-radius:11px; padding:11px 13px; font-weight:800; min-height:44px;
-  }
-  .score-toggle input { width:19px; height:19px; }
-
-  .launch-student-select { max-width:520px; width:100%; min-height:44px; }
-  .student-checklist { margin-top:8px; }
-  .student-checklist label { padding:8px 9px; border-radius:8px; background:white; border:1px solid #e1ebf2; }
-  .student-checklist label:hover { background:#f2f8fc; }
-
-  .launch-help {
-    margin-top:13px; border-radius:11px; padding:12px 14px; background:#f6fbff; border:1px solid #cde2f1;
-    font-size:13px; line-height:1.45; color:#456278;
-  }
-  .launch-main-button {
-    width:100%; min-height:52px; margin-top:17px; font-size:18px; border-radius:12px;
-    box-shadow:0 6px 16px rgba(45,110,163,.20);
-  }
-  .launch-source-msg { margin-top:10px; padding:10px 12px; border-radius:9px; background:#f7f1ff; color:var(--purple); font-weight:800; }
-  .launch-success { margin-top:10px; font-weight:800; color:var(--good); }
-
   @media(max-width:760px){
-    .launch-mode-picker { grid-template-columns:1fr; }
-    .launch-options-grid { grid-template-columns:1fr; }
-    .class-picker { grid-template-columns:1fr; }
+    .header-inner{padding:10px 12px}
+    .tabs{width:100%;display:grid;grid-template-columns:1fr 1fr}.tab{justify-content:center;padding:8px 6px}
+    .details-grid{grid-template-columns:1fr}
+    .step-footer{position:static;flex-direction:column;align-items:stretch}.step-footer .controls{display:grid;grid-template-columns:1fr 1fr}.step-footer .controls button:last-child{grid-column:1/-1}
+    .menu-list{right:auto;left:0}
+    .launch-item-title button{opacity:1}
+    .subtitle{display:none}
+    .wrap{padding:0 12px;margin-top:14px}
+    .card{padding:16px}
+    .step-footer{margin:16px -16px -16px;padding:12px 16px}
+    .start-tiles,.launch-mode-picker,.launch-options-grid,.class-picker,.choice-grid,.skill-cards,.generator-grid{grid-template-columns:1fr}
+    .qtext{font-size:24px}
+    .step-sub{display:none}
   }
-
-  .tts-hebrew { direction:rtl; unicode-bidi:isolate; display:inline-block; border-radius:5px; padding:0 2px; transition:background .15s, box-shadow .15s; }
-  .tts-english { direction:ltr; unicode-bidi:isolate; display:inline; }
-  .question-type-label { display:table; margin:0 auto 7px; padding:5px 10px; border-radius:999px; background:#eef2ff; font-size:16px; font-weight:800; direction:rtl; unicode-bidi:isolate; }
-  .tts-hebrew.tts-highlight { background:#ffe66d; box-shadow:0 0 0 2px #ffe66d; }
 </style>
 </head>
 <body>
 <div class="lock-overlay" id="lockOverlay">
   <div class="lock-box">
-    <h2 style="margin-top:0;color:var(--blue)">Teacher Access</h2>
-    <div>Enter the teacher password.</div>
+    <div class="brand-mark" style="margin:0 auto 12px;width:48px;height:48px;font-size:18px">B3</div>
+    <h2>Weekly Quiz — Teacher</h2>
+    <div class="small">Enter the teacher password to continue.</div>
     <input type="password" id="lockPassword" onkeydown="if(event.key==='Enter')checkPassword()" placeholder="Password">
     <button class="primary" onclick="checkPassword()" id="lockUnlock">Unlock</button>
     <button class="primary" id="lockGoogle" style="display:none">Sign in with Google</button>
@@ -269,7 +350,7 @@
 
 <div id="answerModal" class="modal-overlay hidden">
   <div class="modal-box">
-    <h2 style="margin-top:0;color:var(--blue)">Review Student Answer</h2>
+    <h2>Review answer</h2>
     <div id="modalAnswerInfo"></div>
     <label style="display:block;margin-top:12px;font-weight:700">Adjustment note (teacher only)</label>
     <input id="modalAdjustmentNote" type="text" style="width:100%;margin-top:5px" placeholder="Optional reason">
@@ -286,7 +367,7 @@
   <div class="preview-box">
     <div class="topline">
       <div>
-        <h2 id="previewTitle" style="margin:0;color:var(--blue)">Quiz Preview</h2>
+        <h2 id="previewTitle" style="margin:0">Quiz Preview</h2>
         <div id="previewMeta" class="small" style="margin-top:3px"></div>
       </div>
       <button class="secondary" onclick="closeQuizPreview()">Close Preview</button>
@@ -377,50 +458,64 @@
 </div>
 
 <header>
-  <h1>B3 Weekly Quiz — Teacher</h1>
-  <div class="subtitle">Quiz generator • independent ET/WT launches • live monitoring • long-term progress</div>
-</header>
-<div class="wrap hidden" id="mainContent">
-  <div class="tabs">
-    <button id="tabLive" class="tab active" onclick="showTab('live')">Live Quiz</button>
-    <button id="tabSetup" class="tab" onclick="showTab('setup')">Quiz Setup</button>
-    <button id="tabResults" class="tab" onclick="showTab('results')">Results</button>
-    <button id="tabProgress" class="tab" onclick="showTab('progress')">Student Progress</button>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-mark">B3</div>
+      <div>
+        <h1>Weekly Quiz</h1>
+        <div class="subtitle">Teacher dashboard</div>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Main sections">
+      <button id="tabLive" class="tab active" onclick="showTab('live')"><span class="tab-ico">●</span>Live Class</button>
+      <button id="tabSetup" class="tab" onclick="showTab('setup')"><span class="tab-ico">✎</span>Quizzes</button>
+      <button id="tabResults" class="tab" onclick="showTab('results')"><span class="tab-ico">▤</span>Results</button>
+      <button id="tabProgress" class="tab" onclick="showTab('progress')"><span class="tab-ico">↗</span>Student Progress</button>
+    </nav>
   </div>
+</header>
 
+<div class="wrap hidden" id="mainContent">
+
+  <!-- ================= LIVE CLASS ================= -->
   <section id="panelLive" class="panel active">
     <div class="card">
-      <div class="topline">
+      <div class="live-head">
         <div>
+          <div class="small">Now running</div>
           <div class="quiz-name" id="liveQuizTitle">No active launch</div>
           <div class="small" id="liveLaunchMeta"></div>
           <span id="liveStatus" class="status-pill">Not started</span>
         </div>
-        <div class="controls">
-          <label style="font-weight:700">Live class
+        <div class="live-settings">
+          <label class="field">Class
             <select id="liveClassSelect" onchange="changeLiveClass()">
               <option value="et">East Track</option>
               <option value="wt">West Track</option>
             </select>
           </label>
-          <label style="font-weight:700">Mode
+          <label class="field">Question style
             <select id="modeSelect" onchange="changeMode()">
               <option value="paced">One question at a time</option>
               <option value="test">Open test / student navigation</option>
             </select>
           </label>
-          <button class="good" onclick="startLaunch()">Start</button>
-          <button id="scoreReleaseBtn" class="secondary" onclick="toggleScoreRelease()">Score & review hidden</button>
-          <button class="danger" onclick="stopLaunch()">End Launch</button>
         </div>
+      </div>
+      <div class="live-actions">
+        <button class="good btn-lg" onclick="startLaunch()">▶ Start test</button>
+        <button id="scoreReleaseBtn" class="secondary" onclick="toggleScoreRelease()">Score & review hidden</button>
+        <span class="spacer"></span>
+        <button class="secondary" onclick="copyStudentLink()">Copy student link</button>
+        <button class="danger" onclick="stopLaunch()">End test</button>
       </div>
     </div>
 
     <div class="card question-card">
       <div class="qnum" id="liveQnum">Question —</div>
-      <div class="qtext" id="liveQtext" dir="auto">Launch a quiz to ET or WT from Quiz Setup.</div>
+      <div class="qtext" id="liveQtext" dir="auto">No test is running. Go to Quizzes → Give to students to set one up.</div>
       <div class="answer-line" id="liveAnswer"></div>
-      <div class="controls" style="justify-content:center;margin-top:10px;">
+      <div class="controls q-controls">
         <button class="secondary" onclick="prevQuestion()">← Previous</button>
         <button class="good" id="openBtn" onclick="setCurrentOpen(true)">Open question</button>
         <button class="danger" id="lockBtn" onclick="setCurrentOpen(false)">Lock question</button>
@@ -431,253 +526,313 @@
     </div>
 
     <div class="card">
-      <div class="topline">
-        <div><h2 style="margin:0">Live Student Grid</h2><div class="small">Gray = no answer, green = correct, red = incorrect. Gold outline = teacher-adjusted result.</div></div>
-        <button class="secondary" onclick="copyStudentLink()">Copy student link</button>
+      <div class="card-head">
+        <div><h2>Live answers</h2><div class="small">Click any box to review or adjust a student's answer.</div></div>
       </div>
       <div class="legend">
-        <span><span class="sw" style="background:#f3f5f7"></span>No answer</span>
-        <span><span class="sw" style="background:#d9f1e3"></span>Correct</span>
-        <span><span class="sw" style="background:#f8d9dc"></span>Incorrect</span>
-        <span><span class="sw" style="background:#fff4c9;border:2px solid var(--gold)"></span>Adjusted</span>
+        <span><span class="sw" style="background:#fff;border-color:#c9d6e3"></span>No answer</span>
+        <span><span class="sw" style="background:#e6f5ec"></span>Correct</span>
+        <span><span class="sw" style="background:#fbe9ea"></span>Incorrect</span>
+        <span><span class="sw" style="background:#fff;box-shadow:inset 0 0 0 2px #c98a12"></span>Adjusted by teacher</span>
       </div>
       <div class="grid-wrap"><table id="liveGrid"></table></div>
       <div class="summary-row" id="liveSummary"></div>
     </div>
   </section>
 
+  <!-- ================= QUIZZES (setup) ================= -->
   <section id="panelSetup" class="panel">
-    <div class="card">
-      <h2 style="margin-top:0">Built-in Quiz Generator</h2>
-      <div class="info-box">Paste the pesukim you are testing. The generator drafts questions into the editor; nothing is saved or launched until you review it.</div>
-      <div class="generator-grid">
-        <label>Quiz type
-          <select id="generatorType" onchange="generatorTypeChanged()">
-            <option value="shorashim">Shoreshim</option>
-            <option value="translation">Words & Phrases</option>
-            <option value="comprehension">Comprehension</option>
-            <option value="integrated">Chumash Understanding &amp; Skills</option>
-            <option value="mixed">Mixed (optional)</option>
-          </select>
-        </label>
-        <label>How many questions
-          <input type="number" id="generatorCount" min="1" max="40" value="10">
-        </label>
-        <label>Choices per question
-          <select id="generatorChoices"><option value="3" selected>3 choices (default)</option><option value="4">4 choices</option></select>
-        </label>
-        <label>Source label (optional)
-          <input type="text" id="generatorSourceLabel" placeholder="Example: Vayeira 18:1–5">
-        </label>
+    <nav class="stepper" id="setupStepper" aria-label="Quiz steps">
+      <button type="button" class="step-btn active" data-step="library" onclick="showSetupStep('library')"><span class="num">1</span><span>Choose a quiz<span class="step-sub">Pick a saved quiz or make a new one</span></span></button>
+      <button type="button" class="step-btn" data-step="edit" onclick="showSetupStep('edit')"><span class="num">2</span><span>Edit questions<span class="step-sub">Check, fix and save</span></span></button>
+      <button type="button" class="step-btn" data-step="assign" onclick="showSetupStep('assign')"><span class="num">3</span><span>Give to students<span class="step-sub">Live, anytime, or make-up</span></span></button>
+    </nav>
+    <div class="current-quiz-bar" id="currentQuizBar">Working on: <b id="currentQuizName">—</b> <span class="chip blue" id="currentQuizType"></span> <span class="chip" id="currentQuizCount"></span></div>
+
+    <!-- Step 1: library -->
+    <div class="setup-step" id="stepLibrary">
+      <div class="card">
+        <div class="card-head"><h2>Make a new quiz</h2></div>
+        <div class="start-tiles">
+          <button type="button" class="start-tile ai" onclick="showSetupStep('generate')">
+            <span class="tile-ico">✨</span>
+            <span><span class="tile-title" style="display:block">Generate from pesukim</span><span class="tile-desc">Paste the pesukim, pick a quiz type, and get draft questions to review.</span></span>
+          </button>
+          <button type="button" class="start-tile" onclick="uiNewQuiz()">
+            <span class="tile-ico">✎</span>
+            <span><span class="tile-title" style="display:block">Write or paste questions</span><span class="tile-desc">Start a blank quiz, type questions, or paste rows from Google Sheets.</span></span>
+          </button>
+        </div>
       </div>
-      <div id="integratedModeHelp" class="info-box hidden" style="border:2px solid #b9d8ee;background:#f4faff;margin-top:10px">
-        <b style="color:var(--blue)">Chumash Understanding &amp; Skills</b><br>
-        Mostly regular translation and comprehension, with a few easy third-grade skills mixed in:
-        <b>מי אמר אל מי</b>, <b>על מי נאמר</b>, and simple
-        <b>prefix / shoresh / suffix</b> word parts. The new skills are introduced gradually and only used when the pasted pesukim clearly support them.
-      </div>
-      <div id="mixedCounts" class="generator-grid hidden">
-        <label>Shoreshim<input type="number" id="mixedShoreshim" min="0" max="30" value="5"></label>
-        <label>Words & Phrases<input type="number" id="mixedTranslation" min="0" max="30" value="5"></label>
-        <label>Comprehension<input type="number" id="mixedComprehension" min="0" max="30" value="5"></label>
-      </div>
-      <label style="font-weight:700">Paste the pesukim / source text</label>
-      <textarea id="generatorSource" dir="auto" placeholder="Paste the five pesukim here..."></textarea>
-      <div class="controls" style="margin-top:9px">
-        <button id="generateBtn" class="purple" onclick="generateQuizDraft()">Generate Quiz Draft</button>
-        <span id="generatorStatus" class="small"></span>
-      </div>
-      <div id="generatorReview" class="hidden">
-        <div class="topline" style="margin-top:14px"><h3 style="margin:0">Generated Questions</h3><div class="controls"><button class="secondary" onclick="setAllCandidates(true)">Select all</button><button class="secondary" onclick="setAllCandidates(false)">Uncheck all</button></div></div>
-        <div class="small" style="margin:4px 0 8px">All generated items are selected by default. Uncheck anything you do not want.</div>
-        <div id="candidateList" class="generator-candidates"></div>
-        <div class="controls" style="margin-top:10px"><button class="good" onclick="addSelectedCandidates(false)">Add selected to editor</button><button class="primary" onclick="addSelectedCandidates(true)">Replace editor with selected</button></div>
+      <div class="card quiz-grid">
+        <div class="card-head">
+          <div><h2>Saved quizzes</h2><div class="small">Click a quiz to open it. A saved quiz is just the questions — you choose ET or WT when you give it.</div></div>
+          <input type="text" id="quizSearch" placeholder="Search quizzes…" style="min-width:220px" oninput="filterQuizList()">
+        </div>
+        <div id="quizList" class="quiz-list"></div>
       </div>
     </div>
 
-    <div class="setup-grid">
+    <!-- Step 1b: generator -->
+    <div class="setup-step hidden" id="stepGenerate">
+      <button type="button" class="link-btn back-link" onclick="showSetupStep('library')">← Back to quizzes</button>
       <div class="card">
-        <div class="topline"><h2 style="margin:0">Saved Quizzes</h2><button class="primary" onclick="newQuizDraft()">+ New</button></div>
-        <div class="small" style="margin:5px 0 12px">A saved quiz is just the question set. ET and WT are chosen only when you launch it.</div>
-        <div id="quizList" class="quiz-list"></div>
+        <div class="card-head"><div><h2>Generate a quiz from pesukim</h2><div class="small">Nothing is saved or given to students until you review it.</div></div></div>
+        <div class="generator-grid">
+          <label>Quiz type
+            <select id="generatorType" onchange="generatorTypeChanged()">
+              <option value="shorashim">Shoroshim</option>
+              <option value="translation">Chumash Translation</option>
+              <option value="comprehension">Chumash Comprehension</option>
+              <option value="integrated">Chumash Havana (skills)</option>
+              <option value="mixed">Chumash (mixed)</option>
+            </select>
+          </label>
+          <label>How many questions
+            <input type="number" id="generatorCount" min="1" max="40" value="10">
+          </label>
+          <label>Choices per question
+            <select id="generatorChoices"><option value="3" selected>3 choices</option><option value="4">4 choices</option></select>
+          </label>
+          <label>Source (optional)
+            <input type="text" id="generatorSourceLabel" placeholder="e.g. Vayeira 18:1–5">
+          </label>
+        </div>
+        <div id="integratedModeHelp" class="info-box hidden">
+          <b>Chumash Havana (skills)</b> — mostly regular translation and comprehension, with a few easy third-grade skills mixed in:
+          <b>מי אמר אל מי</b>, <b>על מי נאמר</b>, and simple <b>prefix / shoresh / suffix</b> word parts.
+          These skill questions only appear when the pasted pesukim clearly support them, so check the draft.
+        </div>
+        <div id="mixedCounts" class="generator-grid hidden">
+          <label>Shoroshim questions<input type="number" id="mixedShoreshim" min="0" max="30" value="5"></label>
+          <label>Translation questions<input type="number" id="mixedTranslation" min="0" max="30" value="5"></label>
+          <label>Comprehension questions<input type="number" id="mixedComprehension" min="0" max="30" value="5"></label>
+        </div>
+        <label for="generatorSource">Pesukim / source text</label>
+        <textarea id="generatorSource" dir="auto" placeholder="Paste the pesukim here…" style="margin-top:5px"></textarea>
+        <div class="controls" style="margin-top:12px">
+          <button id="generateBtn" class="purple btn-lg" onclick="generateQuizDraft()">✨ Generate draft</button>
+          <span id="generatorStatus" class="small"></span>
+        </div>
+        <div id="generatorReview" class="hidden" style="margin-top:20px;padding-top:18px;border-top:1px solid var(--line)">
+          <div class="card-head" style="margin-bottom:4px">
+            <div><h3>Draft questions</h3><div class="small">Everything is checked. Uncheck anything you don't want.</div></div>
+            <div class="controls"><button class="link-btn" onclick="setAllCandidates(true)">Check all</button><span class="muted">·</span><button class="link-btn" onclick="setAllCandidates(false)">Uncheck all</button></div>
+          </div>
+          <div id="candidateList" class="generator-candidates"></div>
+          <div class="step-footer">
+            <span class="small">Checked questions go into the quiz editor.</span>
+            <div class="controls">
+              <button class="secondary" onclick="addSelectedCandidates(false)">Add to current quiz</button>
+              <button class="primary" onclick="addSelectedCandidates(true)">Use these questions →</button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div>
-        <div class="card">
-          <h2 style="margin-top:0">Quiz Editor</h2>
-          <label style="font-weight:700">Quiz title</label>
-          <input type="text" id="editorTitle" style="width:100%;margin:5px 0 10px" placeholder="Example: Vayeira 18:1–8 Comprehension">
-          <div class="generator-grid" style="grid-template-columns:1fr 1fr">
-            <label>Quiz skill type
-              <select id="editorSkillType" onchange="editorSkillChanged()">
-                <option value="shorashim">Shoreshim</option>
-                <option value="translation">Words & Phrases</option>
-                <option value="comprehension">Comprehension</option>
-                <option value="mixed">Mixed</option>
-              </select>
-            </label>
-            <label>Source label
-              <input type="text" id="editorSourceLabel" placeholder="Example: Vayeira 18:1–5">
-            </label>
-          </div>
-          <div class="paste-help">
-            Fast manual setup from Google Sheets/Excel: copy rows and paste them below. Use columns:<br>
-            <b>Question | Choice A | Choice B | Choice C | Choice D | Correct</b><br>
-            You do <b>not</b> type “\t”. Copying from a spreadsheet inserts the real tabs automatically. Correct may be A/B/C/D, 1/2/3/4, or the exact answer.
-          </div>
-          <textarea id="pasteBox" placeholder="Example row shown with | for clarity:\nWhat did Avrohom see? | Three men | Two men | A camel | A"></textarea>
-          <div class="controls" style="margin-top:8px">
-            <button class="secondary" onclick="loadPasted(false)">Add pasted questions</button>
-            <button class="secondary" onclick="loadPasted(true)">Replace with pasted questions</button>
-            <button class="secondary" onclick="addEditorRow()">+ Add question manually</button>
-          </div>
-          <div id="editorRows"></div>
-          <div class="controls" style="margin-top:14px">
-            <button class="purple" onclick="openQuizPreview()">▶ Try Out Quiz</button>
-            <button class="good" onclick="saveQuiz()">Save quiz</button>
-            <button class="danger" id="deleteQuizBtn" onclick="deleteCurrentQuiz()">Delete quiz</button>
-          </div>
-          <div id="setupMsg" class="small" style="margin-top:9px"></div>
+    </div>
+
+    <!-- Step 2: editor -->
+    <div class="setup-step hidden" id="stepEdit">
+      <div class="card">
+        <div class="card-head"><h2>Quiz details</h2><button class="danger" id="deleteQuizBtn" onclick="deleteCurrentQuiz()">Delete quiz</button></div>
+        <div class="generator-grid details-grid" style="margin-top:0">
+          <label>Quiz title
+            <input type="text" id="editorTitle" placeholder="e.g. Vayeira 18:1–8 Comprehension">
+          </label>
+          <label>Quiz type (Nigri topic)
+            <select id="editorSkillType" onchange="editorSkillChanged()">
+              <option value="shorashim">Shoroshim</option>
+              <option value="translation">Chumash Translation</option>
+              <option value="comprehension">Chumash Comprehension</option>
+              <option value="integrated">Chumash Havana</option>
+              <option value="mixed">Chumash</option>
+            </select>
+          </label>
+          <label>Source (optional)
+            <input type="text" id="editorSourceLabel" placeholder="e.g. Vayeira 18:1–5">
+          </label>
         </div>
 
-        <div class="card launch-card">
-          <h2>Give This Quiz to Students</h2>
-          <div class="launch-intro">Choose how you want the quiz to work. The page will only show you the choices that matter for that type of test.</div>
-
-          <div class="launch-step">
-            <div class="step-title"><span class="step-number">1</span> How should students take it?</div>
-
-            <select id="launchDeliveryType" class="hidden" onchange="updateLaunchTargetUI()">
-              <option value="live">Live Class Test</option>
-              <option value="anytime">Take Anytime</option>
-              <option value="makeup">Make-Up Test</option>
-            </select>
-
-            <div class="launch-mode-picker">
-              <button type="button" class="launch-mode-card" id="deliveryCardLive" onclick="selectDelivery('live')">
-                <div class="launch-mode-icon">▶</div>
-                <div class="launch-mode-title">Live Class Test</div>
-                <div class="launch-mode-desc">You control the test during class: start it, open or lock questions, and move the class along.</div>
-              </button>
-              <button type="button" class="launch-mode-card" id="deliveryCardAnytime" onclick="selectDelivery('anytime')">
-                <div class="launch-mode-icon">⏱</div>
-                <div class="launch-mode-title">Take Anytime</div>
-                <div class="launch-mode-desc">Students may log in later and take it independently. A completed attempt stays finished unless you allow a retake.</div>
-              </button>
-              <button type="button" class="launch-mode-card" id="deliveryCardMakeup" onclick="selectDelivery('makeup')">
-                <div class="launch-mode-icon">↻</div>
-                <div class="launch-mode-title">Make-Up Test</div>
-                <div class="launch-mode-desc">Give the original test only to absent or unfinished students without reopening it for everybody.</div>
-              </button>
+        <details class="paste-panel">
+          <summary>Paste questions from Google Sheets / Excel</summary>
+          <div class="paste-body">
+            <div class="paste-help">
+              Copy rows with these columns and paste them below:<br>
+              <b>Question | Choice A | Choice B | Choice C | Choice D | Correct</b><br>
+              The tabs come in automatically when you copy from a spreadsheet. "Correct" can be A/B/C/D, 1/2/3/4, or the exact answer.
+            </div>
+            <textarea id="pasteBox" placeholder="What did Avrohom see? | Three men | Two men | A camel | A"></textarea>
+            <div class="controls" style="margin-top:8px">
+              <button class="secondary" onclick="loadPasted(false)">Add pasted questions</button>
+              <button class="secondary" onclick="loadPasted(true)">Replace all with pasted</button>
             </div>
           </div>
+        </details>
 
-          <div class="launch-step">
-            <div class="step-title"><span class="step-number">2</span> Who should receive it?</div>
+        <div class="card-head" style="margin:18px 0 0"><h3 id="editorCountTitle">Questions</h3><button class="secondary" onclick="addEditorRow()">+ Add question</button></div>
+        <div id="editorRows"></div>
 
-            <select id="launchTargetType" class="hidden" onchange="updateLaunchTargetUI()">
-              <option value="class">Whole class</option>
-              <option value="student">Individual student</option>
-              <option value="multiple">Several students</option>
-            </select>
-
-            <div id="launchTargetPills" class="choice-pills">
-              <button type="button" id="targetClassBtn" class="choice-pill" onclick="selectLaunchTarget('class')">Whole class</button>
-              <button type="button" id="targetStudentBtn" class="choice-pill" onclick="selectLaunchTarget('student')">One student</button>
-              <button type="button" id="targetMultipleBtn" class="choice-pill" onclick="selectLaunchTarget('multiple')">Several students</button>
-            </div>
-
-            <div id="launchClassWrap" style="margin-top:12px">
-              <select id="launchClass" class="hidden" onchange="populateLaunchStudents()">
-                <option value="et">East Track</option>
-                <option value="wt">West Track</option>
-              </select>
-              <div class="class-picker">
-                <button type="button" id="classEtBtn" class="class-choice" onclick="selectLaunchClass('et')">East Track</button>
-                <button type="button" id="classWtBtn" class="class-choice" onclick="selectLaunchClass('wt')">West Track</button>
-              </div>
-            </div>
-
-            <div id="launchStudentWrap" class="hidden" style="margin-top:12px">
-              <label class="launch-field">Choose student
-                <select id="launchStudent" class="launch-student-select"></select>
-              </label>
-            </div>
-
-            <div id="launchMultiWrap" class="hidden" style="margin-top:12px">
-              <div style="font-weight:800;font-size:13px;margin-bottom:7px">Choose students</div>
-              <div id="launchStudentChecklist" class="student-checklist"></div>
-            </div>
+        <div class="step-footer">
+          <span id="setupMsg" class="small"></span>
+          <div class="controls">
+            <button class="secondary" onclick="openQuizPreview()">▶ Try it out</button>
+            <button class="secondary" onclick="saveQuiz()">Save</button>
+            <button class="primary" onclick="uiSaveAndAssign()">Save &amp; give to students →</button>
           </div>
-
-          <div class="launch-step">
-            <div class="step-title"><span class="step-number">3</span> Test options</div>
-
-            <div class="launch-options-grid">
-              <label id="launchModeWrap" class="launch-field">Live test style
-                <select id="launchMode">
-                  <option value="paced">One question at a time</option>
-                  <option value="test">Open test — students may navigate</option>
-                </select>
-              </label>
-
-              <label class="launch-field">Optional note
-                <input type="text" id="launchNote" placeholder="Example: Monday make-up">
-              </label>
-            </div>
-
-            <label class="score-toggle" style="margin-top:10px">
-              <input type="checkbox" id="launchShowScore">
-              <span>Show students their score & right/wrong review when they finish</span>
-            </label>
-
-            <div id="launchTypeHelp" class="launch-help">Live Class Test: you start it and control opening, locking, and revealing questions during class.</div>
-            <div id="makeupSourceMsg" class="launch-source-msg hidden"></div>
-          </div>
-
-          <button id="friendlyLaunchBtn" class="primary launch-main-button" onclick="launchSelectedQuiz()">Set Up Live Class Test</button>
-          <div id="launchMsg" class="launch-success"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- Step 3: give to students -->
+    <div class="setup-step hidden" id="stepAssign">
+      <div class="card launch-card">
+        <h2>Give this quiz to students</h2>
+        <div class="launch-intro">Pick how students take it and who gets it. Only the choices that matter are shown.</div>
+
+        <div class="launch-step">
+          <div class="step-title"><span class="step-number">1</span> How will they take it?</div>
+          <select id="launchDeliveryType" class="hidden" onchange="updateLaunchTargetUI()">
+            <option value="live">Live Class Test</option>
+            <option value="anytime">Take Anytime</option>
+            <option value="makeup">Make-Up Test</option>
+          </select>
+          <div class="launch-mode-picker">
+            <button type="button" class="launch-mode-card" id="deliveryCardLive" onclick="selectDelivery('live')">
+              <div class="launch-mode-icon">▶</div>
+              <div class="launch-mode-title">Live in class</div>
+              <div class="launch-mode-desc">You run it from the Live Class tab: open, lock and reveal questions as you go.</div>
+            </button>
+            <button type="button" class="launch-mode-card" id="deliveryCardAnytime" onclick="selectDelivery('anytime')">
+              <div class="launch-mode-icon">⏱</div>
+              <div class="launch-mode-title">Take anytime</div>
+              <div class="launch-mode-desc">Students take it on their own. Once finished, it stays finished unless you give a retake.</div>
+            </button>
+            <button type="button" class="launch-mode-card" id="deliveryCardMakeup" onclick="selectDelivery('makeup')">
+              <div class="launch-mode-icon">↻</div>
+              <div class="launch-mode-title">Make-up</div>
+              <div class="launch-mode-desc">Give the original test only to boys who were absent or didn't finish.</div>
+            </button>
+          </div>
+        </div>
+
+        <div class="launch-step">
+          <div class="step-title"><span class="step-number">2</span> Who gets it?</div>
+          <select id="launchTargetType" class="hidden" onchange="updateLaunchTargetUI()">
+            <option value="class">Whole class</option>
+            <option value="student">Individual student</option>
+            <option value="multiple">Several students</option>
+          </select>
+          <div id="launchTargetPills" class="choice-pills">
+            <button type="button" id="targetClassBtn" class="choice-pill" onclick="selectLaunchTarget('class')">Whole class</button>
+            <button type="button" id="targetStudentBtn" class="choice-pill" onclick="selectLaunchTarget('student')">One student</button>
+            <button type="button" id="targetMultipleBtn" class="choice-pill" onclick="selectLaunchTarget('multiple')">Several students</button>
+          </div>
+          <div id="launchClassWrap" style="margin-top:12px">
+            <select id="launchClass" class="hidden" onchange="populateLaunchStudents()">
+              <option value="et">East Track</option>
+              <option value="wt">West Track</option>
+            </select>
+            <div class="class-picker">
+              <button type="button" id="classEtBtn" class="class-choice" onclick="selectLaunchClass('et')">East Track</button>
+              <button type="button" id="classWtBtn" class="class-choice" onclick="selectLaunchClass('wt')">West Track</button>
+            </div>
+          </div>
+          <div id="launchStudentWrap" class="hidden" style="margin-top:12px">
+            <label class="launch-field">Student
+              <select id="launchStudent" class="launch-student-select"></select>
+            </label>
+          </div>
+          <div id="launchMultiWrap" class="hidden" style="margin-top:12px">
+            <div style="font-weight:600;font-size:13px;margin-bottom:7px;color:#3d4f62">Check the students who should get it</div>
+            <div id="launchStudentChecklist" class="student-checklist"></div>
+          </div>
+        </div>
+
+        <div class="launch-step">
+          <div class="step-title"><span class="step-number">3</span> Options</div>
+          <div class="launch-options-grid">
+            <label id="launchModeWrap" class="launch-field">Question style
+              <select id="launchMode">
+                <option value="paced">One question at a time</option>
+                <option value="test">Open test — students may navigate</option>
+              </select>
+            </label>
+            <label class="launch-field">Note (optional)
+              <input type="text" id="launchNote" placeholder="e.g. Monday make-up">
+            </label>
+          </div>
+          <label class="score-toggle" style="margin-top:12px">
+            <input type="checkbox" id="launchShowScore">
+            <span>Show students their score and right/wrong review when they finish</span>
+          </label>
+          <div id="launchTypeHelp" class="launch-help">Live Class Test: you start it and control opening, locking, and revealing questions during class.</div>
+          <div id="makeupSourceMsg" class="launch-source-msg hidden"></div>
+        </div>
+
+        <button id="friendlyLaunchBtn" class="primary launch-main-button" onclick="launchSelectedQuiz()">Set Up Live Class Test</button>
+        <div id="launchMsg" class="launch-success"></div>
       </div>
     </div>
   </section>
 
+  <!-- ================= RESULTS ================= -->
   <section id="panelResults" class="panel">
     <div class="setup-grid">
-      <div class="card">
-        <div class="topline"><h2 style="margin:0">Quiz History</h2><select id="resultsClassFilter" onchange="renderLaunchHistory()"><option value="all">All classes</option><option value="et">ET</option><option value="wt">WT</option></select></div>
-        <div class="small" style="margin:5px 0 12px">Each launch is preserved separately, including retakes.</div>
+      <div class="card sticky-side">
+        <div class="card-head">
+          <h2>Quiz history</h2>
+          <select id="resultsClassFilter" onchange="renderLaunchHistory()"><option value="all">All classes</option><option value="et">ET</option><option value="wt">WT</option></select>
+        </div>
+        <div class="small" style="margin:-4px 0 12px">Every launch is kept separately, including retakes and make-ups.</div>
         <div id="launchHistory" class="launch-list"></div>
       </div>
       <div>
         <div class="card">
-          <div class="topline">
-            <div><h2 style="margin:0" id="resultsQuizTitle">Results</h2><div id="resultsMeta" class="small"></div></div>
-            <div class="controls"><button class="primary" onclick="downloadCSV()">Download CSV</button><button class="secondary" onclick="copyResultsTSV()">Copy for Google Sheets</button><button class="secondary" onclick="copyLaunchLink(resultsLaunchId)">Copy Direct Link</button><button id="assignMakeupBtn" class="purple" onclick="openMakeupFromResults()">Assign Make-Up</button><button id="resultsScoreBtn" class="secondary" onclick="toggleResultsScoreRelease()">Score & review hidden</button><button id="endSelectedBtn" class="danger hidden" onclick="endSelectedLaunch()">End this launch</button></div>
+          <div class="card-head">
+            <div><h2 id="resultsQuizTitle">Results</h2><div id="resultsMeta" class="small"></div></div>
+            <div class="controls results-actions">
+              <button id="assignMakeupBtn" class="secondary" onclick="openMakeupFromResults()">Assign make-up</button>
+              <details class="menu" id="resultsMenu">
+                <summary>More ▾</summary>
+                <div class="menu-list">
+                  <button id="resultsScoreBtn" onclick="toggleResultsScoreRelease()">Score & review hidden</button>
+                  <button onclick="copyLaunchLink(resultsLaunchId)">Copy direct link to this test</button>
+                  <hr>
+                  <button onclick="downloadCSV()">Download CSV</button>
+                  <button onclick="copyResultsTSV()">Copy for Google Sheets</button>
+                  <hr>
+                  <button id="endSelectedBtn" class="danger hidden" onclick="endSelectedLaunch()">End this launch</button>
+                </div>
+              </details>
+            </div>
           </div>
-          <div class="grid-wrap" style="margin-top:12px"><table id="resultsTable"></table></div>
-          <div class="small" style="margin-top:8px">Click a question result to review/adjust it. Parent-facing summaries use only the final adjusted result; the audit trail stays teacher-only.</div>
+          <div class="grid-wrap"><table id="resultsTable"></table></div>
+          <div class="small" style="margin-top:10px">Click a ✓ or × to review or adjust that answer. Parents only see the final adjusted result; the change history stays teacher-only.</div>
         </div>
       </div>
     </div>
   </section>
 
+  <!-- ================= PROGRESS ================= -->
   <section id="panelProgress" class="panel">
     <div class="progress-layout">
-      <div class="card">
-        <h2 style="margin-top:0">Choose Student</h2>
-        <label style="font-weight:700">Class</label>
-        <select id="progressClass" style="width:100%;margin:5px 0 10px" onchange="populateProgressStudents()"><option value="et">East Track</option><option value="wt">West Track</option></select>
-        <label style="font-weight:700">Student</label>
-        <select id="progressStudent" style="width:100%;margin-top:5px" onchange="renderStudentProgress()"></select>
+      <div class="card sticky-side">
+        <h2 style="margin-top:0">Choose a student</h2>
+        <label class="field">Class
+          <select id="progressClass" onchange="populateProgressStudents()"><option value="et">East Track</option><option value="wt">West Track</option></select>
+        </label>
+        <label class="field" style="margin-top:10px">Student
+          <select id="progressStudent" onchange="renderStudentProgress()"></select>
+        </label>
       </div>
       <div>
         <div class="card">
-          <div class="topline"><div><h2 id="progressStudentName" style="margin:0">Student Progress</h2><div class="small">Uses final scores, with retakes replacing the earlier attempt for current skill averages.</div></div><button class="secondary" onclick="copyParentSummary()">Copy parent summary</button></div>
+          <div class="card-head"><div><h2 id="progressStudentName">Student Progress</h2><div class="small">Uses final scores. A retake replaces the earlier attempt in the averages.</div></div><button class="secondary" onclick="copyParentSummary()">Copy parent summary</button></div>
           <div id="skillCards" class="skill-cards"></div>
           <div id="parentSummary" class="parent-summary"></div>
         </div>
         <div class="card">
-          <h2 style="margin-top:0">Assessment History</h2>
+          <h2 style="margin-top:0">Assessment history</h2>
           <div class="grid-wrap"><table id="progressHistory"></table></div>
         </div>
       </div>
@@ -717,7 +872,9 @@ const CLASS_ROSTERS={
   et:{label:'East Track',students:['chaim_chaikin','yossi_gourarie','sholom_huebner','moshe_lapine','kehos_notik','yisroel_oirechman','moshe_raichman','avrohom_rosenfeld','levi_rozmarin','arik_traxler','simcha_cohen']},
   wt:{label:'West Track',students:['ari_greenberg','zev_rosenfeld','levi_schtroks','yisroel_aryeh_simmonds','leibel_vogel','leib_wolf','simcha_cohen']}
 };
-const SKILL_LABELS={shorashim:'Shoreshim',translation:'Words & Phrases',comprehension:'Comprehension',mixed:'Mixed'};
+const SKILL_LABELS={shorashim:'Shoroshim',translation:'Chumash Translation',comprehension:'Chumash Comprehension',integrated:'Chumash Havana',mixed:'Chumash'};
+// Quiz types whose questions each keep their own skill (shorashim/translation/comprehension).
+function isMultiSkill(t){return t==='mixed'||t==='integrated';}
 
 let roster={},quizzes={},allLaunches={},allResponses={},completions={},audit={};
 let currentQuizId='',editorQuestions=[],generatorCandidates=[];
@@ -792,7 +949,7 @@ function generatorTypeChanged(){
   document.getElementById('mixedCounts').classList.toggle('hidden',t!=='mixed');
   const help=document.getElementById('integratedModeHelp');
   if(help)help.classList.toggle('hidden',t!=='integrated');
-  if(t==='integrated')document.getElementById('editorSkillType').value='mixed';
+  if(t==='integrated')document.getElementById('editorSkillType').value='integrated';
   else if(t!=='mixed')document.getElementById('editorSkillType').value=t;
 }
 
@@ -1075,7 +1232,7 @@ async function generateQuizDraft(){
       : 'Generated '+generatorCandidates.length+' question(s).')+warning;
 
     if(sourceLabel)document.getElementById('editorSourceLabel').value=sourceLabel;
-    document.getElementById('editorSkillType').value=integrated?'mixed':quizType;
+    document.getElementById('editorSkillType').value=integrated?'integrated':quizType;
   }catch(e){
     console.error(e);
     const needsRefs=(quizType==='comprehension'||quizType==='mixed')&&!references.length;
@@ -1342,14 +1499,14 @@ function loadQuizEditor(id){
   editorQuestions=asArray(q.questions).map(x=>({q:x.q||'',choices:asArray(x.choices),correctIndex:Number(x.correctIndex)||0,skillType:x.skillType||q.skillType||'comprehension'}));renderEditorRows();document.getElementById('deleteQuizBtn').disabled=false;setupMsg('Loaded saved quiz.');renderQuizList();
 }
 function defaultEditorChoices(){return document.getElementById('generatorChoices').value==='4'?['','','','']:['','',''];}
-function addEditorRow(data){editorQuestions.push(data||{q:'',choices:defaultEditorChoices(),correctIndex:0,skillType:document.getElementById('editorSkillType').value==='mixed'?'comprehension':document.getElementById('editorSkillType').value});renderEditorRows();}
-function editorSkillChanged(){const t=document.getElementById('editorSkillType').value;if(t!=='mixed')editorQuestions.forEach(x=>x.skillType=t);renderEditorRows();}
+function addEditorRow(data){editorQuestions.push(data||{q:'',choices:defaultEditorChoices(),correctIndex:0,skillType:isMultiSkill(document.getElementById('editorSkillType').value)?'comprehension':document.getElementById('editorSkillType').value});renderEditorRows();}
+function editorSkillChanged(){const t=document.getElementById('editorSkillType').value;if(!isMultiSkill(t))editorQuestions.forEach(x=>x.skillType=t);renderEditorRows();}
 function renderEditorRows(){
   const box=document.getElementById('editorRows');box.innerHTML='';const quizSkill=document.getElementById('editorSkillType').value;
   editorQuestions.forEach((r,i)=>{
     if(!Array.isArray(r.choices))r.choices=[];while(r.choices.length<3)r.choices.push('');if(r.choices.length>4)r.choices=r.choices.slice(0,4);
     const d=document.createElement('div');d.className='editor-row';
-    d.innerHTML='<div class="editor-head"><b>Question '+(i+1)+'</b><div class="controls"><select onchange="editorQuestions['+i+'].skillType=this.value" '+(quizSkill!=='mixed'?'disabled':'')+'><option value="shorashim" '+(r.skillType==='shorashim'?'selected':'')+'>Shoreshim</option><option value="translation" '+(r.skillType==='translation'?'selected':'')+'>Words & Phrases</option><option value="comprehension" '+(r.skillType==='comprehension'?'selected':'')+'>Comprehension</option></select><button class="danger" style="padding:5px 9px" onclick="removeEditorRow('+i+')">Remove</button></div></div><input type="text" dir="auto" value="'+esc(r.q)+'" oninput="editorQuestions['+i+'].q=this.value" placeholder="Question"><div class="choice-grid">'+r.choices.map((c,ci)=>'<div><label style="font-size:12px">'+String.fromCharCode(65+ci)+(Number(r.correctIndex)===ci?' ✓ correct':'')+'</label><input type="text" dir="auto" value="'+esc(c)+'" oninput="editorQuestions['+i+'].choices['+ci+']=this.value"></div>').join('')+'</div><div class="controls" style="margin-top:7px"><label style="font-size:12px">Correct answer <select onchange="editorQuestions['+i+'].correctIndex=Number(this.value);renderEditorRows()">'+r.choices.map((_,ci)=>'<option value="'+ci+'" '+(Number(r.correctIndex)===ci?'selected':'')+'>'+String.fromCharCode(65+ci)+'</option>').join('')+'</select></label>'+(r.choices.length<4?'<button class="secondary" onclick="addChoice('+i+')">+ 4th choice</button>':'<button class="secondary" onclick="removeFourthChoice('+i+')">Use 3 choices</button>')+'</div>';
+    d.innerHTML='<div class="editor-head"><b>Question '+(i+1)+'</b><div class="controls"><select onchange="editorQuestions['+i+'].skillType=this.value" '+(!isMultiSkill(quizSkill)?'disabled':'')+'><option value="shorashim" '+(r.skillType==='shorashim'?'selected':'')+'>Shoroshim</option><option value="translation" '+(r.skillType==='translation'?'selected':'')+'>Chumash Translation</option><option value="comprehension" '+(r.skillType==='comprehension'?'selected':'')+'>Chumash Comprehension</option></select><button class="danger" style="padding:5px 9px" onclick="removeEditorRow('+i+')">Remove</button></div></div><input type="text" dir="auto" value="'+esc(r.q)+'" oninput="editorQuestions['+i+'].q=this.value" placeholder="Question"><div class="choice-grid">'+r.choices.map((c,ci)=>'<div><label style="font-size:12px">'+String.fromCharCode(65+ci)+(Number(r.correctIndex)===ci?' ✓ correct':'')+'</label><input type="text" dir="auto" value="'+esc(c)+'" oninput="editorQuestions['+i+'].choices['+ci+']=this.value"></div>').join('')+'</div><div class="controls" style="margin-top:7px"><label style="font-size:12px">Correct answer <select onchange="editorQuestions['+i+'].correctIndex=Number(this.value);renderEditorRows()">'+r.choices.map((_,ci)=>'<option value="'+ci+'" '+(Number(r.correctIndex)===ci?'selected':'')+'>'+String.fromCharCode(65+ci)+'</option>').join('')+'</select></label>'+(r.choices.length<4?'<button class="secondary" onclick="addChoice('+i+')">+ 4th choice</button>':'<button class="secondary" onclick="removeFourthChoice('+i+')">Use 3 choices</button>')+'</div>';
     box.appendChild(d);
   });
 }
@@ -1359,13 +1516,13 @@ function removeEditorRow(i){editorQuestions.splice(i,1);renderEditorRows();}
 function parseCorrectToken(token,choices){const t=String(token||'').trim();if(/^[A-Da-d]$/.test(t))return t.toUpperCase().charCodeAt(0)-65;if(/^[1-4]$/.test(t))return Number(t)-1;const idx=choices.findIndex(c=>c.trim().toLowerCase()===t.toLowerCase());return idx>=0?idx:0;}
 function parsePasted(text){
   return text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(line=>{
-    let cells=line.includes('\t')?line.split('\t'):line.split(',');cells=cells.map(x=>x.trim());const q=(cells.shift()||'').trim(),correct=(cells.pop()||'').trim();const choices=cells.filter(Boolean).slice(0,4);return{q,choices,correctIndex:parseCorrectToken(correct,choices),skillType:document.getElementById('editorSkillType').value==='mixed'?'comprehension':document.getElementById('editorSkillType').value};
+    let cells=line.includes('\t')?line.split('\t'):line.split(',');cells=cells.map(x=>x.trim());const q=(cells.shift()||'').trim(),correct=(cells.pop()||'').trim();const choices=cells.filter(Boolean).slice(0,4);return{q,choices,correctIndex:parseCorrectToken(correct,choices),skillType:isMultiSkill(document.getElementById('editorSkillType').value)?'comprehension':document.getElementById('editorSkillType').value};
   }).filter(x=>x.q&&x.choices.length>=2);
 }
 function loadPasted(replace){const rows=parsePasted(document.getElementById('pasteBox').value);if(!rows.length){alert('Nothing usable was found. Copy rows from Sheets/Excel, or use comma-separated rows.');return;}if(replace)editorQuestions=[];editorQuestions.push(...rows);document.getElementById('pasteBox').value='';renderEditorRows();setupMsg('Loaded '+rows.length+' question(s) into the editor.');}
 function cleanedEditorQuestions(){
   const quizSkill=document.getElementById('editorSkillType').value;
-  return editorQuestions.map(r=>{const choices=r.choices.map(x=>String(x||'').trim()).filter(Boolean).slice(0,4);let ci=Number(r.correctIndex)||0;if(ci>=choices.length)ci=0;return{q:String(r.q||'').trim(),choices,correctIndex:ci,skillType:quizSkill==='mixed'?(r.skillType||'comprehension'):quizSkill};}).filter(r=>r.q&&r.choices.length>=2);
+  return editorQuestions.map(r=>{const choices=r.choices.map(x=>String(x||'').trim()).filter(Boolean).slice(0,4);let ci=Number(r.correctIndex)||0;if(ci>=choices.length)ci=0;return{q:String(r.q||'').trim(),choices,correctIndex:ci,skillType:isMultiSkill(quizSkill)?(r.skillType||'comprehension'):quizSkill};}).filter(r=>r.q&&r.choices.length>=2);
 }
 async function saveQuiz(){
   const title=document.getElementById('editorTitle').value.trim(),skillType=document.getElementById('editorSkillType').value,sourceLabel=document.getElementById('editorSourceLabel').value.trim(),questions=cleanedEditorQuestions();
@@ -1577,7 +1734,7 @@ async function launchSelectedQuiz(){
 
   if(delivery==='live'){
     await db.ref(QROOT+'/settings/activeLaunchByClass/'+classId).set(id);
-    launchMsg('Live Class Test staged for '+targetLabel+'. Click Start on the Live Quiz tab.');
+    launchMsg('Live Class Test staged for '+targetLabel+'. Click Start test when the class is ready.');
     liveClassId=classId;
     document.getElementById('liveClassSelect').value=classId;
     showTab('live');
@@ -1613,7 +1770,7 @@ function renderLive(){
   document.getElementById('modeSelect').value=liveLaunch&&liveLaunch.mode||'paced';
   const scoreBtn=document.getElementById('scoreReleaseBtn');
   if(scoreBtn){scoreBtn.disabled=!liveLaunch;scoreBtn.textContent=liveLaunch&&liveLaunch.showScore===true?'Score & review shown':'Score & review hidden';}
-  if(!qs.length){document.getElementById('liveQnum').textContent='Question —';document.getElementById('liveQtext').textContent='Launch a quiz to ET or WT from Quiz Setup.';document.getElementById('liveAnswer').textContent='';document.getElementById('questionStrip').innerHTML='';return;}
+  if(!qs.length){document.getElementById('liveQnum').textContent='Question —';document.getElementById('liveQtext').textContent='No test is running. Go to Quizzes → Give to students to set one up.';document.getElementById('liveAnswer').textContent='';document.getElementById('questionStrip').innerHTML='';return;}
   currentQ=Math.max(0,Math.min(qs.length-1,currentQ));const q=qs[currentQ],st=qState(currentQ),choices=asArray(q.choices);
   document.getElementById('liveQnum').textContent='Question '+(currentQ+1)+' of '+qs.length+(st.open?' • OPEN':' • LOCKED');document.getElementById('liveQtext').textContent=q.q||'';document.getElementById('liveAnswer').textContent='Correct answer: '+(choices[Number(q.correctIndex)]||'');document.getElementById('revealBtn').textContent=st.reveal?'Hide answer from students':'Reveal answer to students';
   const strip=document.getElementById('questionStrip');strip.innerHTML='';qs.forEach((_,i)=>{const s=qState(i),b=document.createElement('button');b.textContent=i+1;if(i===currentQ)b.classList.add('active');if(s.open)b.classList.add('open');if(s.reveal)b.classList.add('reveal');b.onclick=()=>goQuestion(i);strip.appendChild(b);});
@@ -1828,6 +1985,76 @@ async function copyLaunchLink(id){
 }
 
 newQuizDraft();generatorTypeChanged();populateProgressStudents();updateLaunchTargetUI();
+</script>
+<script>
+// ===== UI navigation for the 2026-10 redesign (layout only; no data changes) =====
+(function(){
+  const $=id=>document.getElementById(id);
+  const STEP_IDS={library:'stepLibrary',generate:'stepGenerate',edit:'stepEdit',assign:'stepAssign'};
+  let setupStep='library';
+
+  window.showSetupStep=function(step){
+    if(!STEP_IDS[step])step='library';
+    setupStep=step;
+    Object.entries(STEP_IDS).forEach(([k,id])=>{const el=$(id);if(el)el.classList.toggle('hidden',k!==step);});
+    const order=['library','edit','assign'],cur=step==='generate'?0:order.indexOf(step);
+    document.querySelectorAll('#setupStepper .step-btn').forEach(b=>{
+      const i=order.indexOf(b.dataset.step);
+      b.classList.toggle('active',b.dataset.step===step||(step==='generate'&&b.dataset.step==='library'));
+      b.classList.toggle('done',i<cur);
+    });
+    updateCurrentQuizBar();
+    window.scrollTo({top:0,behavior:'smooth'});
+  };
+
+  function updateCurrentQuizBar(){
+    const bar=$('currentQuizBar');if(!bar)return;
+    const title=($('editorTitle')&&$('editorTitle').value.trim())||(currentQuizId&&quizzes[currentQuizId]&&quizzes[currentQuizId].title)||'';
+    const n=(typeof editorQuestions!=='undefined'?editorQuestions.length:0);
+    const makeup=typeof makeupSourceLaunchId!=='undefined'&&makeupSourceLaunchId&&allLaunches[makeupSourceLaunchId];
+    if(setupStep==='assign'&&makeup){
+      $('currentQuizName').textContent=((makeup.quizSnapshot&&makeup.quizSnapshot.title)||'Original test')+' (make-up)';
+      $('currentQuizType').textContent=skillLabel(makeup.quizSnapshot&&makeup.quizSnapshot.skillType);
+      $('currentQuizCount').textContent=asArray(makeup.quizSnapshot&&makeup.quizSnapshot.questions).length+' questions';
+    }else{
+      $('currentQuizName').textContent=title||(currentQuizId?'Untitled quiz':'New quiz (not saved yet)');
+      $('currentQuizType').textContent=skillLabel($('editorSkillType').value);
+      $('currentQuizCount').textContent=n+' question'+(n===1?'':'s');
+    }
+    bar.classList.toggle('hidden',setupStep==='library'||setupStep==='generate');
+    const ct=$('editorCountTitle');if(ct)ct.textContent='Questions ('+n+')';
+  }
+  window.updateCurrentQuizBar=updateCurrentQuizBar;
+
+  window.uiNewQuiz=function(){newQuizDraft();showSetupStep('edit');setTimeout(()=>{const t=$('editorTitle');if(t)t.focus();},250);};
+  window.uiSaveAndAssign=async function(){const id=await saveQuiz();if(id){makeupSourceLaunchId='';const m=$('makeupSourceMsg');if(m){m.textContent='';m.classList.add('hidden');}if($('launchDeliveryType').value==='makeup')selectDelivery('live');showSetupStep('assign');}};
+
+  window.filterQuizList=function(){
+    const q=(($('quizSearch')&&$('quizSearch').value)||'').trim().toLowerCase();
+    document.querySelectorAll('#quizList .quiz-item').forEach(el=>{el.style.display=!q||el.textContent.toLowerCase().includes(q)?'':'none';});
+  };
+
+  // --- Hook existing functions so the flow moves to the right step ---
+  const wrap=(name,after)=>{const orig=window[name];if(typeof orig!=='function')return;window[name]=function(){const r=orig.apply(this,arguments);try{after.apply(this,[r].concat([].slice.call(arguments)));}catch(e){console.warn(e);}return r;};};
+  wrap('loadQuizEditor',()=>{showSetupStep('edit');});
+  wrap('addSelectedCandidates',()=>{if(editorQuestions.length)showSetupStep('edit');});
+  wrap('renderQuizList',()=>{filterQuizList();updateCurrentQuizBar();if(!Object.keys(quizzes).length)$('quizList').innerHTML='<div class="empty">No saved quizzes yet. Use one of the options above to make your first quiz.</div>';});
+  wrap('renderEditorRows',()=>{updateCurrentQuizBar();if(!editorQuestions.length)$('editorRows').innerHTML='<div class="empty" style="margin-top:12px">No questions yet. Click <b>+ Add question</b>, paste from a spreadsheet, or generate from pesukim.</div>';});
+  wrap('deleteCurrentQuiz',r=>{if(r&&r.then)r.then(()=>{if(!currentQuizId)showSetupStep('library');});});
+  wrap('openMakeupFromResults',()=>{showSetupStep('assign');});
+  wrap('showTab',(r,name)=>{if(name==='setup')showSetupStep(setupStep);});
+  const t=$('editorTitle');if(t)t.addEventListener('input',updateCurrentQuizBar);
+
+  // --- "More" menus close after a choice or a click elsewhere ---
+  document.addEventListener('click',e=>{
+    document.querySelectorAll('details.menu[open]').forEach(d=>{
+      if(!d.contains(e.target)||e.target.closest('.menu-list button'))d.removeAttribute('open');
+    });
+  });
+
+  showSetupStep('library');
+  try{renderQuizList();renderEditorRows();}catch(e){}
+})();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script src="nigri-sync.js"></script>

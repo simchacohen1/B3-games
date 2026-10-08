@@ -34,12 +34,12 @@
     leib_wolf: 'Wolf Yisroel Arye Leib'
   };
 
-  // Quiz type -> Nigri topic. "Chumash Understanding & Skills" quizzes are saved
-  // as "mixed", so mixed defaults to Chumash Havana. The teacher can change it.
+  // Quiz type -> Nigri topic (quiz types are named after the Nigri topics).
   function skillTopic(s) {
     if (s === 'shorashim') return 'Shoroshim';
     if (s === 'translation') return 'Chumash Translation';
-    if (s === 'mixed' || s === 'integrated') return 'Chumash Havana';
+    if (s === 'integrated') return 'Chumash Havana';
+    if (s === 'mixed') return 'Chumash';
     return 'Chumash Comprehension';
   }
 
