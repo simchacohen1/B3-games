@@ -355,7 +355,7 @@
     const config = getConfiguredFirebaseOptions();
     if (!config || !window.firebase || !window.firebase.database) return null;
 
-    if (!window.firebase.apps.length) window.firebase.initializeApp(config);
+    if (!window.firebase.apps.some(function(app){return app.name === "[DEFAULT]";})) window.firebase.initializeApp(config);
     if (!firebaseDb) firebaseDb = window.firebase.database();
     if (window.firebase.auth && !firebaseAuth) firebaseAuth = window.firebase.auth();
     activeMode = "firebase";
