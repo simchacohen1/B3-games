@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script src="../game-gate.js?v=20261007-tab-login" data-game-id="rashi-letters"></script>
+<script src="../game-gate.js?v=20261008-owner-demo" data-game-id="rashi-letters"></script>
 <title>Rashi Letters</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
@@ -354,7 +354,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 
   <div class="card" id="similarScreen">
     <div class="sim-head"><h2>Look-alike letters</h2><button class="menu-link" id="simMenuBtn">⬅ Menu</button></div>
-    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them! <b>Get 7 of 8 in 🎯 Match it to unlock the next step.</b> <button class="watch-link" id="simWatchBtn">▶ Watch the lesson</button></p>
+    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them! <b>Get 7 of 8 in 🎯 Match it to unlock the next step.</b></p>
     <div class="sim-tabs">
       <button class="sim-tab" data-sim="explore">👀 Side by side</button>
       <button class="sim-tab" data-sim="match">🎯 Match it</button>
@@ -1560,7 +1560,6 @@ function renderMpResults(room){
 const LESSON_VIDEO = 'iCL_-ae4XKc';
 const LESSONS = {
   intro:      {title:'Introduction to Rashi',        start:361,  end:751},
-  similar:    {title:'Identical letters',            start:751,  end:1454},
   words2:     {title:'Two-letter words',             start:1454, end:1734},
   words3:     {title:'Three-letter words',           start:1734, end:1859},
   zayin:      {title:'Introducing Zayin',            start:1859, end:1996},
@@ -1584,7 +1583,6 @@ function closeLesson(){ document.getElementById('videoFrame').src='about:blank';
 document.getElementById('videoClose').onclick=closeLesson;
 document.getElementById('videoModal').addEventListener('click',e=>{ if(e.target.id==='videoModal') closeLesson(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !document.getElementById('videoModal').classList.contains('hidden')) closeLesson(); });
-document.getElementById('simWatchBtn').onclick=()=>openLesson('similar');
 document.getElementById('watchBtn').onclick=()=>{ const u=getActiveUnit(); openLesson(u && u.id); };
 function updateWatchBtn(){ const u=getActiveUnit(); document.getElementById('watchBtn').classList.toggle('hidden', !(u && LESSONS[u.id])); }
 
