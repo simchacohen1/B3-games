@@ -452,7 +452,7 @@ function bindReview(){
   });
   document.getElementById('startReviewBtn').onclick=startReview;
   const noHints=document.getElementById('reviewNoHints'); if(noHints) noHints.onchange=()=>{reviewNoHints=!!noHints.checked;};
-  const setMode=(mode)=>{reviewPointsMode=mode;reviewNoHints=mode==='no-hints';if(noHints)noHints.checked=reviewNoHints;document.querySelectorAll('.review-choice').forEach(x=>x.classList.toggle('active',x.id===(mode==='regular'?'regularChazaraChoice':mode==='no-hints'?'noHintsChazaraChoice':'practiceOnlyChoice')));const rec=document.getElementById('shorashimRecordBtn'),rem=document.getElementById('pointsReminder');if(rec){rec.classList.toggle('hidden',mode==='practice');rec.textContent=mode==='no-hints'?'🎙️ Start Recording — 3 Points':'🎙️ Start Recording — 2 Points';}if(rem)rem.textContent=mode==='practice'?'Practice mode selected. Press Start Review to begin.':'Press Start Review. The recording button will appear when your cards are visible.';};
+  const setMode=(mode)=>{reviewPointsMode=mode;reviewNoHints=mode==='no-hints';if(noHints)noHints.checked=reviewNoHints;document.querySelectorAll('.review-choice').forEach(x=>x.classList.toggle('active',x.id===(mode==='regular'?'regularChazaraChoice':mode==='no-hints'?'noHintsChazaraChoice':'practiceOnlyChoice')));const rec=document.getElementById('shorashimRecordBtn'),rem=document.getElementById('pointsReminder');if(rec){rec.classList.toggle('hidden',mode==='practice');rec.textContent=mode==='no-hints'?'🎙️ Start Recording — 3 Points':'🎙️ Start Recording — 2 Points';}if(rem)rem.textContent=mode==='practice'?'Press Show My Cards and say each shorash and its meaning. No recording needed.':mode==='no-hints'?'Press Show My Cards. Then press Start Recording and say each shorash and its meaning without pictures or drawings.':'Press Show My Cards. Then press Start Recording and say each shorash and its meaning. Pictures are allowed.';};
   document.getElementById('regularChazaraChoice')?.addEventListener('click',()=>setMode('regular'));
   document.getElementById('noHintsChazaraChoice')?.addEventListener('click',()=>setMode('no-hints'));
   document.getElementById('practiceOnlyChoice')?.addEventListener('click',()=>setMode('practice'));
@@ -829,14 +829,6 @@ bindCloudLogin();
 
 /* Third-grade quick review controls */
 (function(){
-  function speakReviewHelp(){
-    const mode=(typeof reviewPointsMode!=='undefined'?reviewPointsMode:'regular');
-    let words='Pick how you want to review. Then press Show My Cards.';
-    if(mode==='regular') words+=' When your cards show, press Start Recording. Pictures are allowed.';
-    if(mode==='no-hints') words+=' This is the No Hints Challenge. Your pictures will be hidden. When your cards show, press Start Recording.';
-    if(mode==='practice') words+=' This is practice only. You do not need to record.';
-    window.__speakNatural(words,{rate:.92,pitch:1.02});
-  }
   function quickStart(){
     const checks=[...document.querySelectorAll('.review-pick-check')];
     if(!checks.some(x=>x.checked)){
@@ -849,27 +841,4 @@ bindCloudLogin();
     document.getElementById('quickStartReviewBtn')?.addEventListener('click',quickStart);
     document.getElementById('reviewHelpAudioBtn')?.addEventListener('click',speakReviewHelp);
   });
-})();
-
-
-
-/* Recorded review instructions override */
-(function(){
- const files={regular:"audio/review-record-chazara.mp3","no-hints":"audio/review-no-hints.mp3",practice:"audio/review-practice.mp3"};
- function fallback(m){
-  const t=m==="no-hints"?"No Hints Challenge! Your pictures will be hidden. Press Show My Cards. Then press Start Recording and begin.":m==="practice"?"Practice time! Press Show My Cards and practice your Shorashim. You do not need to record.":"Record Chazara! Pictures are allowed. Press Show My Cards. Then press Start Recording and begin.";
-  window.__speakNatural(t,{rate:.92});
- }
- function play(){
-  const m=(typeof reviewPointsMode!=="undefined"&&reviewPointsMode)||"regular";
-  const a=new Audio(files[m]||files.regular); let failed=false;
-  const fail=()=>{if(!failed){failed=true;fallback(m)}};
-  a.addEventListener("error",fail,{once:true}); a.play().catch(fail);
- }
- window.addEventListener("DOMContentLoaded",()=>{
-  const old=document.getElementById("reviewHelpAudioBtn");
-  if(!old)return;
-  const fresh=old.cloneNode(true); old.parentNode.replaceChild(fresh,old);
-  fresh.addEventListener("click",play);
- });
 })();
