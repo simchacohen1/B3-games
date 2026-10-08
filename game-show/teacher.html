@@ -7,177 +7,347 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Game Show - Teacher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800;900&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="../firebase-config.js"></script>
 <script src="../site-settings.js?v=20261008-owner-demo"></script>
 <style>
-  body { font-family: Calibri, Arial, sans-serif; background: #fdf6ec; margin: 0; padding: 20px; color: #3a2417; }
-  h1 { text-align: center; color: #b85042; margin-bottom: 4px; }
-  .subtitle { text-align: center; color: #7d5236; margin-bottom: 20px; font-style: italic; }
-  .panel { max-width: 700px; margin: 0 auto 24px auto; background: white; border-radius: 12px; border: 1px solid #d9a85c; padding: 24px; text-align: center; }
-  .qnum { color: #7d5236; font-size: 13px; margin-bottom: 8px; }
-  .qtext { font-size: 38px; font-weight: bold; margin-bottom: 16px; white-space: pre-line; }
-  .answer { font-size: 18px; color: #3b6d11; font-weight: bold; min-height: 26px; margin-bottom: 16px; }
-  .controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
-  .controls button { font-size: 15px; padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; color: white; }
-  .btn-next { background: #7d5236; }
-  .btn-reveal { background: #d9a85c; color: #3a2417; }
-  .btn-clear { background: #999; }
-  .buzzed { max-width: 700px; margin: 0 auto 20px auto; text-align: center; }
-  .buzzed-name { font-size: 26px; font-weight: bold; color: #b85042; background: #e7e8d1; display: inline-block; padding: 10px 20px; border-radius: 10px; }
-  .link-box { max-width: 700px; margin: 0 auto 20px auto; background: #f0ece0; border-radius: 8px; padding: 10px; text-align: center; font-size: 13px; word-break: break-all; }
-  .top-controls { text-align: center; margin-bottom: 20px; }
-  .top-controls button { font-size: 15px; padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; color: white; margin: 4px; }
-  .timer-box { display: inline-flex; align-items: center; gap: 6px; background: #f0ece0; border-radius: 8px; padding: 8px 14px; margin: 4px; font-size: 14px; color: #7d5236; }
-  .timer-box input[type="number"] { width: 50px; padding: 4px; border-radius: 6px; border: 1px solid #d9a85c; }
-  .question-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; margin-top: 18px; }
-  .question-btn { font-size: 14px; padding: 8px 0; border-radius: 6px; border: 1px solid #d9a85c; background: #f0ece0; color: #3a2417; cursor: pointer; }
-  .question-btn.active { background: #b85042; color: white; border-color: #b85042; }
-  .score-panel { max-width: 900px; margin: 0 auto 24px auto; }
-  .score-controls { text-align: center; margin-bottom: 12px; }
-  .selected-label { font-size: 16px; color: #7d5236; margin-bottom: 8px; }
-  .selected-label b { color: #b85042; }
-  .score-btn { font-size: 20px; padding: 10px 24px; border-radius: 8px; border: none; cursor: pointer; color: white; margin: 0 6px; }
-  .score-plus { background: #3b6d11; }
-  .score-minus { background: #b85042; }
-  .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; max-width: 900px; margin: 0 auto; }
-  .team { background: #e7e8d1; border-radius: 12px; padding: 16px 10px; text-align: center; cursor: pointer; border: 3px solid transparent; transition: border-color 0.15s; position: relative; }
-  .team:hover { border-color: #d9a85c; }
-  .team.selected { border-color: #b85042; background: #f6e2b8; }
-  .team .name { font-weight: bold; font-size: 18px; margin-bottom: 6px; word-break: break-word; }
-  .team .score { font-size: 28px; font-weight: bold; color: #b85042; }
-  .team .remove-player {
-    position: absolute;
-    top: 4px;
-    right: 6px;
-    background: transparent;
-    border: none;
-    color: #8a5a3a;
-    font-size: 16px;
-    font-weight: bold;
-    line-height: 1;
-    cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 999px;
+  /* ===== Theme tokens (gold spotlight is the base; blue overrides) ===== */
+  :root {
+    --bg1: #3a2414; --bg2: #120904;
+    --card: #23150b; --card2: #160d06;
+    --panel: rgba(255, 240, 210, 0.06);
+    --line: rgba(255, 215, 106, 0.28);
+    --accent: #ffd76a; --accent-ink: #2a1708;
+    --glow: rgba(255, 215, 106, 0.55);
+    --hot: #ff7a4d;
+    --good: #4fcf6a; --bad: #e5533d;
+    --text: #fff7e8; --muted: #cdb48e;
+    --radius: 18px;
+    --font: "Rubik", "Segoe UI", Arial, "Noto Sans Hebrew", sans-serif;
   }
-  .team .remove-player:hover { background: rgba(184, 80, 66, 0.15); color: #b85042; }
-  .editor-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(58,36,23,0.6); z-index:1000; overflow-y:auto; padding:20px 0; }
-  .editor-panel { max-width: 780px; margin: 0 auto; background:#fdf6ec; border-radius:12px; padding:20px; }
-  .editor-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px; }
-  .editor-header h2 { color:#b85042; margin:0; font-size:20px; }
-  .editor-btn { font-size:14px; padding:9px 16px; border-radius:8px; border:none; cursor:pointer; color:white; }
-  .editor-save { background:#3b6d11; }
-  .editor-cancel { background:#999; }
-  .paste-section { background:white; border:1px solid #d9a85c; border-radius:10px; padding:14px; margin-bottom:16px; }
-  .paste-section h3 { margin:0 0 6px 0; color:#7d5236; font-size:15px; }
-  .paste-hint { font-size:13px; color:#7d5236; margin-bottom:8px; }
-  .paste-section textarea { width:100%; box-sizing:border-box; min-height:110px; font-size:14px; padding:8px; border-radius:8px; border:1px solid #d9a85c; font-family:inherit; }
-  .paste-btn-row { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
-  .paste-btn { font-size:13px; padding:8px 14px; border-radius:8px; border:none; cursor:pointer; color:white; }
-  .paste-add { background:#3a6ea5; }
-  .paste-replace { background:#b85042; }
-  .editor-add-row { background:#3a6ea5; display:block; margin:10px auto 0 auto; }
-  .editor-row { background:white; border:1px solid #d9a85c; border-radius:10px; padding:12px; margin-bottom:10px; }
-  .editor-row label { display:block; color:#7d5236; font-size:12px; margin-bottom:2px; margin-top:6px; }
-  .editor-row textarea { width:100%; box-sizing:border-box; font-size:15px; padding:6px 8px; border-radius:6px; border:1px solid #d9a85c; font-family:inherit; resize:vertical; min-height:44px; }
-  .editor-del-row { margin-top:8px; background:#999; font-size:12px; padding:5px 10px; }
-  .lock-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:#fdf6ec; z-index:2000; display:flex; align-items:center; justify-content:center; }
-  .lock-box { background:white; border:1px solid #d9a85c; border-radius:12px; padding:30px; text-align:center; max-width:340px; }
-  .lock-box h2 { color:#b85042; margin-top:0; }
-  .lock-box input { font-size:18px; padding:10px; width:80%; border-radius:8px; border:1px solid #d9a85c; margin-bottom:12px; }
-  .lock-box button { font-size:16px; padding:10px 20px; border-radius:8px; border:none; background:#7d5236; color:white; cursor:pointer; display:block; margin:0 auto; }
-  .lock-error { color:#b85042; font-size:14px; margin-top:8px; min-height:18px; }
-  .hidden { display:none; }
-  .tab-bar { display:flex; justify-content:center; gap:8px; margin-bottom:16px; }
-  .tab-btn { font-size:15px; padding:10px 24px; border-radius:8px 8px 0 0; border:none; cursor:pointer; background:#e6d5b8; color:#7d5236; font-weight:bold; }
-  .tab-btn.active { background:#b85042; color:white; }
-  .tab-panel { display:none; }
-  .tab-panel.active { display:block; }
-  .setup-section { max-width:700px; margin:0 auto 20px auto; background:white; border:1px solid #d9a85c; border-radius:12px; padding:20px; }
-  .setup-section h3 { color:#7d5236; margin-top:0; }
+  body.theme-blue {
+    --bg1: #123566; --bg2: #040b19;
+    --card: #0d2547; --card2: #06132a;
+    --panel: rgba(200, 228, 255, 0.06);
+    --line: rgba(126, 200, 255, 0.3);
+    --accent: #7ec8ff; --accent-ink: #04101f;
+    --glow: rgba(126, 200, 255, 0.55);
+    --hot: #ffcf4a;
+    --muted: #a7c3e4;
+  }
 
-  /* ---- Game-show look for the Play tab ---- */
-  body.play-mode { background: radial-gradient(ellipse at top, #3a2417 0%, #1c1108 70%); color: #fdf6ec; }
-  body.play-mode h1 { display:none; }
-  .marquee { text-align:center; padding:10px 0 6px 0; }
-  .marquee-title { display:inline-block; font-size:32px; font-weight:900; letter-spacing:2px; color:#ffd76a; text-shadow: 0 0 10px rgba(255,215,106,0.6), 0 0 2px #000; }
-  body.play-mode .tab-bar { margin-bottom:10px; }
-  body.play-mode .tab-btn { background:#5a3a24; color:#f0d9b0; }
-  body.play-mode .tab-btn.active { background:#ffd76a; color:#3a2417; }
-  body.play-mode .question-btn { background:rgba(255,255,255,0.1); border:1px solid #7d5236; color:#fdf6ec; }
-  body.play-mode .question-btn.active { background:#ffd76a; color:#3a2417; border-color:#ffd76a; }
-  body.play-mode .panel { background:linear-gradient(180deg, #2b1a10, #1c1108); border:2px solid #ffd76a; box-shadow: 0 0 30px rgba(255,215,106,0.15) inset, 0 6px 20px rgba(0,0,0,0.5); max-width:850px; padding:20px 24px; margin-bottom:14px; }
-  body.play-mode .qnum { color:#d9a85c; }
-  body.play-mode .qtext { color:#fdf6ec; font-size:52px; }
-  body.play-mode .panel .question-grid { margin-top:18px; }
-  body.play-mode .answer { color:#7ed957; }
-  body.play-mode .controls button { font-size:14px; padding:9px 16px; }
-  body.play-mode .btn-reveal { background:#ffd76a; color:#3a2417; }
-  body.play-mode .btn-clear { background:#5a3a24; color:#f0d9b0; }
-  body.play-mode .btn-next { background:#b85042; }
-  body.play-mode .buzzed { margin-bottom:12px; }
-  body.play-mode .buzzed-name { font-size:32px; background:linear-gradient(180deg,#ffe9a8,#ffd76a); color:#3a2417; padding:12px 30px; box-shadow:0 0 25px rgba(255,215,106,0.7); animation: buzzPop 0.35s ease; }
-  @keyframes buzzPop { 0% { transform:scale(0.85); } 60% { transform:scale(1.08); } 100% { transform:scale(1); } }
-  body.play-mode .score-panel { max-width:850px; }
-  body.play-mode .selected-label { color:#f0d9b0; font-size:15px; }
-  body.play-mode .selected-label b { color:#ffd76a; }
-  body.play-mode .score-btn { font-size:22px; padding:10px 28px; box-shadow:0 3px 0 rgba(0,0,0,0.3); }
-  body.play-mode .score-plus { background:#3b6d11; }
-  body.play-mode .score-minus { background:#b85042; }
-  body.play-mode .board { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap:10px; }
-  body.play-mode .team { background:rgba(255,255,255,0.07); border:2px solid #5a3a24; }
-  body.play-mode .team:hover { border-color:#ffd76a; }
-  body.play-mode .team.selected { border-color:#ffd76a; background:rgba(255,215,106,0.18); box-shadow:0 0 20px rgba(255,215,106,0.35); }
-  body.play-mode .team .name { color:#fdf6ec; font-size:16px; }
-  body.play-mode .team .score { color:#ffd76a; font-size:26px; }
-  /* ---- Alternate theme: cool blue quiz-board look ---- */
-  body.play-mode.theme-blue { background: radial-gradient(ellipse at top, #0b1f3a 0%, #04101f 70%); }
-  body.play-mode.theme-blue .marquee-title { color:#7ec8ff; text-shadow: 0 0 10px rgba(126,200,255,0.6), 0 0 2px #000; }
-  body.play-mode.theme-blue .tab-btn { background:#123056; color:#cfe8ff; }
-  body.play-mode.theme-blue .tab-btn.active { background:#7ec8ff; color:#04101f; }
-  body.play-mode.theme-blue .question-btn { border-color:#2a5a8c; }
-  body.play-mode.theme-blue .question-btn.active { background:#7ec8ff; color:#04101f; border-color:#7ec8ff; }
-  body.play-mode.theme-blue .panel { background:linear-gradient(180deg, #0f2a4a, #04101f); border-color:#7ec8ff; box-shadow: 0 0 30px rgba(126,200,255,0.2) inset, 0 6px 20px rgba(0,0,0,0.5); }
-  body.play-mode.theme-blue .qnum { color:#7ec8ff; }
-  body.play-mode.theme-blue .btn-reveal { background:#7ec8ff; color:#04101f; }
-  body.play-mode.theme-blue .buzzed-name { background:linear-gradient(180deg,#cfe8ff,#7ec8ff); color:#04101f; box-shadow:0 0 25px rgba(126,200,255,0.7); }
-  body.play-mode.theme-blue .selected-label b { color:#7ec8ff; }
-  body.play-mode.theme-blue .team { border-color:#123056; }
-  body.play-mode.theme-blue .team:hover { border-color:#7ec8ff; }
-  body.play-mode.theme-blue .team.selected { border-color:#7ec8ff; background:rgba(126,200,255,0.18); box-shadow:0 0 20px rgba(126,200,255,0.35); }
-  body.play-mode.theme-blue .team .score { color:#7ec8ff; }
-  /* Keep questions and navigation compact; give contestants the remaining height. */
-  body.play-mode { padding: 10px 16px; }
-  body.play-mode .tab-bar { margin-bottom: 6px; }
-  body.play-mode #tabPlay.active { display: flex; flex-direction: column; height: calc(100dvh - 66px); max-width: 900px; margin: 0 auto; min-height: 0; }
-  body.play-mode .marquee { padding: 2px 0 8px; flex-shrink: 0; }
-  body.play-mode .marquee-title { font-size: 24px; }
-  body.play-mode #tabPlay > .panel { box-sizing: border-box; width: 100%; padding: 12px 16px; margin: 0 auto 10px; flex-shrink: 0; }
-  body.play-mode .qnum { margin-bottom: 4px; }
-  body.play-mode .qtext { font-size: 22px; line-height: 1.35; max-height: 5.4em; overflow-y: auto; overflow-wrap: anywhere; margin-bottom: 8px; scrollbar-gutter: stable; }
-  body.play-mode .answer { font-size: 16px; line-height: 1.35; min-height: 0; max-height: 2.7em; overflow-y: auto; margin-bottom: 8px; }
-  body.play-mode .answer:empty { display: none; }
-  body.play-mode .controls { gap: 6px; }
-  body.play-mode .controls button { padding: 7px 12px; }
-  body.play-mode .panel .question-grid { margin-top: 10px; max-height: 68px; overflow-y: auto; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 4px; scrollbar-gutter: stable; }
-  body.play-mode .question-btn { padding: 5px 0; }
-  body.play-mode .buzzed { margin: 0 auto 8px; flex-shrink: 0; }
-  body.play-mode .buzzed > div:first-child { display: inline; margin-right: 8px; color: #f0d9b0 !important; }
-  body.play-mode .buzzed-name { font-size: 22px; padding: 6px 16px; }
-  body.play-mode .score-panel { display: flex; flex-direction: column; width: 100%; flex: 1; min-height: 0; margin: 0 auto; }
-  body.play-mode .score-controls { flex-shrink: 0; margin-bottom: 8px; }
-  body.play-mode .selected-label { margin-bottom: 5px; }
-  body.play-mode .score-btn { font-size: 19px; padding: 6px 24px; }
-  body.play-mode .board { width: 100%; overflow-y: auto; min-height: 0; align-content: start; scrollbar-gutter: stable; }
-  body.play-mode .team { padding: 10px 8px; }
-  body.play-mode .team .name { font-size: 15px; margin-bottom: 4px; }
-  body.play-mode .team .score { font-size: 23px; }
-  @media (max-width: 480px) {
-    body.play-mode { padding: 8px; }
-    body.play-mode .controls button { font-size: 12px; padding: 6px 8px; }
-    body.play-mode .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; font-family: var(--font); color: var(--text);
+    background:
+      radial-gradient(60% 45% at 50% -5%, var(--glow) 0%, transparent 70%),
+      radial-gradient(120% 90% at 50% 0%, var(--bg1) 0%, var(--bg2) 75%);
+    background-color: var(--bg2);
+    background-attachment: fixed;
+  }
+  button, input, select, textarea { font-family: inherit; }
+  button { cursor: pointer; }
+  .hidden { display: none !important; }
+
+  /* ===== Buttons ===== */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 15px; font-weight: 700; letter-spacing: .3px;
+    padding: 11px 18px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--text);
+    transition: transform .08s, background .15s, border-color .15s, box-shadow .15s;
+  }
+  .btn:hover { border-color: var(--accent); background: rgba(255,255,255,.1); }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 18px var(--glow); }
+  .btn-primary:hover { background: var(--accent); filter: brightness(1.08); }
+  .btn-good { background: var(--good); border-color: var(--good); color: #062a0e; box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+  .btn-bad { background: var(--bad); border-color: var(--bad); color: #fff; box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+  .btn-good:hover, .btn-bad:hover { filter: brightness(1.1); }
+  .btn-ghost { background: transparent; }
+  .btn-sm { font-size: 13px; padding: 8px 12px; border-radius: 10px; }
+
+  /* ===== Top bar ===== */
+  .topbar {
+    height: 64px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 22px; gap: 12px;
+  }
+  .logo {
+    font-weight: 900; font-size: 26px; letter-spacing: 4px; text-transform: uppercase;
+    color: var(--accent); text-shadow: 0 0 14px var(--glow), 0 2px 0 rgba(0,0,0,.5);
+    white-space: nowrap;
+  }
+  .logo .star { color: var(--hot); text-shadow: none; }
+  .tabs { display: inline-flex; background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
+  .tab-btn {
+    border: 0; background: transparent; color: var(--muted); font-weight: 700; font-size: 15px;
+    padding: 8px 22px; border-radius: 999px;
+  }
+  .tab-btn.active { background: var(--accent); color: var(--accent-ink); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ===== PLAY: the stage ===== */
+  #tabPlay.active {
+    display: flex; flex-direction: column; gap: 14px;
+    height: calc(100dvh - 64px); padding: 4px 22px 18px;
+    max-width: 1400px; margin: 0 auto;
+  }
+
+  .qcard {
+    position: relative; flex: 3 1 0; min-height: 200px;
+    display: flex; flex-direction: column;
+    background: linear-gradient(180deg, var(--card) 0%, var(--card2) 100%);
+    border: 3px solid var(--accent); border-radius: 26px;
+    box-shadow: 0 0 0 6px rgba(0,0,0,.35), 0 0 40px var(--glow), inset 0 0 60px rgba(0,0,0,.45);
+    padding: 34px 40px 22px;
+  }
+  /* Marquee light bulbs along the top and bottom edges */
+  .qcard::before, .qcard::after {
+    content: ""; position: absolute; left: 26px; right: 26px; height: 10px;
+    background: radial-gradient(circle, var(--accent) 0 3px, transparent 4px) 0 50% / 26px 10px repeat-x;
+    filter: drop-shadow(0 0 4px var(--glow));
+    animation: bulbs 1.6s steps(2) infinite;
+  }
+  .qcard::before { top: 9px; }
+  .qcard::after { bottom: 9px; animation-delay: .8s; }
+  @keyframes bulbs { 50% { opacity: .45; } }
+
+  .qnum {
+    position: absolute; top: -17px; left: 50%; transform: translateX(-50%);
+    background: var(--accent); color: var(--accent-ink);
+    font-weight: 900; font-size: 14px; letter-spacing: 2px; text-transform: uppercase;
+    padding: 6px 18px; border-radius: 999px; white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(0,0,0,.4);
+  }
+  .qnum:empty { display: none; }
+  .qtext {
+    flex: 1 1 auto; min-height: 0; overflow: auto;
+    display: flex; flex-direction: column; justify-content: safe center;
+    text-align: center; white-space: pre-line; overflow-wrap: anywhere;
+    font-weight: 700; line-height: 1.22; font-size: 64px;
+    text-shadow: 0 2px 0 rgba(0,0,0,.45);
+    scrollbar-width: thin;
+  }
+  .qtext:focus { outline: none; }
+  .answer {
+    flex-shrink: 0; margin-top: 14px; align-self: center; max-width: 100%;
+    background: rgba(79, 207, 106, .14); border: 2px solid var(--good); color: #b9f5c4;
+    border-radius: 14px; padding: 10px 22px; text-align: center;
+    font-size: clamp(20px, 2.4vw, 32px); font-weight: 700; line-height: 1.3;
+    max-height: 30%; overflow: auto;
+    animation: pop .3s ease;
+  }
+  .answer::before { content: "ANSWER"; display: block; font-size: 12px; letter-spacing: 3px; color: var(--good); margin-bottom: 2px; }
+  .answer:empty { display: none; }
+
+  /* Buzz spotlight + host console share one row */
+  .console {
+    flex-shrink: 0; display: grid; gap: 14px;
+    grid-template-columns: minmax(260px, 1fr) auto;
+    align-items: stretch;
+  }
+  .buzzed {
+    display: flex; align-items: center; gap: 16px; min-width: 0;
+    background: rgba(0,0,0,.35); border: 2px dashed var(--line); border-radius: var(--radius);
+    padding: 10px 20px; transition: all .2s;
+  }
+  .buzzed-label { font-size: 13px; font-weight: 800; letter-spacing: 3px; color: var(--muted); text-transform: uppercase; white-space: nowrap; }
+  .buzzed-name { font-size: clamp(22px, 2.6vw, 36px); font-weight: 900; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .buzzed.live { border-style: solid; border-color: var(--hot); background: linear-gradient(90deg, rgba(255,122,77,.25), rgba(0,0,0,.3)); box-shadow: 0 0 30px rgba(255,122,77,.45); }
+  .buzzed.live .buzzed-label { color: var(--hot); }
+  .buzzed.waiting { border-style: solid; border-color: var(--accent); }
+  .buzzed.waiting .buzzed-label, .buzzed.waiting .buzzed-name { color: var(--accent); }
+  .buzzed.waiting .light { background: var(--accent); box-shadow: 0 0 12px var(--glow); }
+  .buzzed.live .buzzed-name { color: #fff; animation: pop .35s ease; }
+  .buzzed .light { width: 18px; height: 18px; border-radius: 50%; background: #444; flex-shrink: 0; box-shadow: inset 0 -2px 4px rgba(0,0,0,.5); }
+  .buzzed.live .light { background: var(--hot); box-shadow: 0 0 16px var(--hot); animation: blink .6s ease-in-out infinite alternate; }
+  @keyframes blink { to { opacity: .45; } }
+  @keyframes pop { 0% { transform: scale(.85); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
+
+  .host {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
+    background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px;
+  }
+  .host .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+
+  /* Jump-to-question popover */
+  .jump { position: relative; }
+  .jump summary { list-style: none; }
+  .jump summary::-webkit-details-marker { display: none; }
+  .jump[open] summary { border-color: var(--accent); }
+  .jump-pop {
+    position: absolute; bottom: calc(100% + 10px); right: 0; z-index: 50;
+    width: min(560px, 90vw); max-height: 50vh; overflow: auto;
+    background: var(--card); border: 2px solid var(--accent); border-radius: var(--radius);
+    padding: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.6);
+  }
+  .question-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; }
+  .question-btn {
+    font-size: 15px; font-weight: 700; padding: 9px 0; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  }
+  .question-btn:hover { border-color: var(--accent); }
+  .question-btn.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+  /* Award strip */
+  .award { display: flex; align-items: center; gap: 10px; }
+  .selected-label { font-size: 14px; color: var(--muted); max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .selected-label b { color: var(--accent); font-size: 17px; }
+  .score-btn { font-size: 20px; min-width: 64px; padding: 9px 14px; }
+
+  /* Contestant podiums */
+  .score-panel { flex: 2 1 0; min-height: 110px; display: flex; flex-direction: column; }
+  .board-head { display: flex; justify-content: space-between; align-items: baseline; margin: 0 4px 8px; }
+  .board-head h2 { margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+  .board-head span { font-size: 13px; color: var(--muted); }
+  .board {
+    flex: 1; min-height: 0; overflow-y: auto; align-content: start;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px;
+    padding: 4px; scrollbar-width: thin;
+  }
+  .board-empty { grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 24px; border: 2px dashed var(--line); border-radius: var(--radius); }
+  .team {
+    position: relative; cursor: pointer; text-align: center;
+    background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.02));
+    border: 2px solid var(--line); border-radius: 16px; padding: 12px 10px 10px;
+    transition: transform .12s, border-color .15s, box-shadow .15s;
+  }
+  .team::after { /* podium base */
+    content: ""; position: absolute; left: 14px; right: 14px; bottom: -2px; height: 4px; border-radius: 4px;
+    background: var(--line);
+  }
+  .team:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .team .name { font-weight: 700; font-size: 17px; overflow-wrap: anywhere; margin: 0 14px 2px; }
+  .team .score { font-weight: 900; font-size: 38px; line-height: 1.05; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .team.selected { border-color: var(--accent); background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.04)); box-shadow: 0 0 24px var(--glow); }
+  .team.selected::after { background: var(--accent); }
+  .team.buzzed-in { border-color: var(--hot); box-shadow: 0 0 28px rgba(255,122,77,.6); animation: pop .35s ease; }
+  .team .remove-player {
+    position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; line-height: 20px;
+    background: transparent; border: 0; border-radius: 50%; color: var(--muted); font-size: 18px;
+    opacity: 0; transition: opacity .15s;
+  }
+  .team:hover .remove-player, .team .remove-player:focus-visible { opacity: 1; }
+  .team .remove-player:hover { background: rgba(229,83,61,.25); color: #fff; }
+
+  /* ===== SETUP ===== */
+  #tabSetup { padding: 10px 22px 40px; }
+  .setup-wrap { max-width: 1100px; margin: 0 auto; }
+  .setup-title { margin: 8px 4px 18px; }
+  .setup-title h1 { margin: 0; font-size: 28px; font-weight: 900; }
+  .setup-title p { margin: 4px 0 0; color: var(--muted); }
+  .setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+  .setting .label { flex: 1; min-width: 0; }
+  .card.danger { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .card.danger .hint { margin: 0; }
+  .card {
+    background: linear-gradient(180deg, var(--card), var(--card2));
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.3);
+  }
+  .card h3 { margin: 0 0 4px; font-size: 13px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); }
+  .card .hint { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.45; }
+  .card.wide { grid-column: 1 / -1; }
+  .card.danger { border-color: rgba(229,83,61,.5); }
+  .card.danger h3 { color: var(--bad); }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .row + .row { margin-top: 12px; }
+  .link-box {
+    flex: 1 1 260px; min-width: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px;
+    background: rgba(0,0,0,.4); border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .setting {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    padding: 12px 0; border-top: 1px solid rgba(255,255,255,.07);
+  }
+  .setting:first-of-type { border-top: 0; padding-top: 0; }
+  .setting .label b { display: block; font-size: 15px; }
+  .setting .label span { font-size: 13px; color: var(--muted); }
+  .setting .ctrl { display: flex; align-items: center; gap: 10px; flex-shrink: 0; color: var(--muted); font-size: 14px; }
+  /* Switch-style checkbox */
+  .switch { appearance: none; -webkit-appearance: none; width: 46px; height: 26px; border-radius: 999px; background: rgba(255,255,255,.18); position: relative; cursor: pointer; transition: background .15s; margin: 0; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  .switch:checked { background: var(--accent); }
+  .switch:checked::after { transform: translateX(20px); background: var(--accent-ink); }
+  .switch:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .num, .select {
+    background: rgba(0,0,0,.4); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px 10px; font-size: 15px;
+  }
+  .num { width: 64px; text-align: center; }
+  .select { min-width: 200px; }
+  .select option { background: var(--card); }
+  input[type="range"] { accent-color: var(--accent); width: 160px; }
+  .status-line { margin-top: 14px; min-height: 20px; font-size: 14px; color: var(--accent); }
+  .themes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .theme-opt { position: relative; cursor: pointer; }
+  .theme-opt input { position: absolute; opacity: 0; }
+  .theme-opt .swatch {
+    display: block; height: 70px; border-radius: 12px; border: 2px solid transparent;
+    display: flex; align-items: flex-end; padding: 10px 12px; font-weight: 800; color: #fff;
+  }
+  .theme-opt .gold { background: radial-gradient(120% 120% at 50% 0%, #6a4220, #120904); box-shadow: inset 0 0 0 2px #ffd76a55; }
+  .theme-opt .blue { background: radial-gradient(120% 120% at 50% 0%, #1e5296, #040b19); box-shadow: inset 0 0 0 2px #7ec8ff55; }
+  .theme-opt input:checked + .swatch { border-color: var(--accent); box-shadow: 0 0 18px var(--glow); }
+  .theme-opt input:focus-visible + .swatch { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* ===== Lock screen ===== */
+  .lock-overlay { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; background: inherit; background-color: var(--bg2); }
+  .lock-box { width: 100%; max-width: 380px; text-align: center; background: linear-gradient(180deg, var(--card), var(--card2)); border: 2px solid var(--accent); border-radius: 22px; padding: 32px 28px; box-shadow: 0 0 40px var(--glow); }
+  .lock-box h2 { margin: 6px 0 4px; font-size: 24px; }
+  .lock-box p { margin: 0 0 18px; color: var(--muted); }
+  .lock-box input { width: 100%; font-size: 18px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(0,0,0,.4); color: var(--text); margin-bottom: 12px; }
+  .lock-box .btn { width: 100%; margin-top: 4px; }
+  .lock-error { color: #ff9c8a; font-size: 14px; margin-top: 10px; min-height: 18px; }
+
+  /* ===== Question editor ===== */
+  .editor-overlay { display: none; position: fixed; inset: 0; z-index: 1000; overflow-y: auto; padding: 24px 16px; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); }
+  .editor-panel { max-width: 820px; margin: 0 auto; background: linear-gradient(180deg, var(--card), var(--card2)); border: 1px solid var(--line); border-radius: 22px; padding: 22px; }
+  .editor-header { position: sticky; top: -24px; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: -22px -22px 18px; padding: 18px 22px; background: var(--card); border-bottom: 1px solid var(--line); border-radius: 22px 22px 0 0; }
+  .editor-header h2 { margin: 0; font-size: 22px; }
+  .editor-header .row { gap: 8px; }
+  .paste-section { background: rgba(0,0,0,.3); border: 1px dashed var(--line); border-radius: 16px; padding: 16px; margin-bottom: 18px; }
+  .paste-section h3 { margin: 0 0 4px; font-size: 16px; }
+  .paste-hint { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .paste-section textarea, .editor-row textarea {
+    width: 100%; font-size: 15px; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: rgba(0,0,0,.4); color: var(--text); resize: vertical;
+  }
+  .paste-section textarea { min-height: 110px; }
+  .paste-btn-row { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .editor-row { background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; counter-increment: qrow; }
+  #editorList { counter-reset: qrow; }
+  .editor-row label { display: block; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin: 6px 0 4px; }
+  .editor-row label:first-child::before { content: "#" counter(qrow) " · "; color: var(--accent); }
+  .editor-row textarea { min-height: 44px; }
+  .editor-del-row { margin-top: 8px; }
+  .editor-add-row { display: flex; margin: 12px auto 0; }
+
+  /* ===== Small screens ===== */
+  @media (max-width: 900px) {
+    .console { grid-template-columns: 1fr; }
+    .host { justify-content: center; }
+  }
+  @media (max-width: 760px) { .setup-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 560px) {
+    .topbar { padding: 0 12px; }
+    .logo { font-size: 18px; letter-spacing: 2px; }
+    .tab-btn { padding: 7px 14px; }
+    #tabPlay.active { padding: 4px 10px 10px; height: auto; min-height: calc(100dvh - 64px); }
+    .qcard { padding: 30px 16px 18px; min-height: 260px; }
+    .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .host .sep { display: none; }
+    #tabSetup { padding: 10px 12px 30px; }
+    .setup-grid { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -185,121 +355,185 @@
 
 <div class="lock-overlay" id="lockOverlay">
   <div class="lock-box">
-    <h2>Teacher Access</h2>
-    <div>Enter the password to continue</div>
-    <input type="password" id="lockPassword" placeholder="Password" onkeydown="if(event.key==='Enter')checkPassword()">
-    <button onclick="checkPassword()" id="lockUnlock">Unlock</button>
-    <button id="lockGoogle" style="display:none">Sign in with Google</button>
+    <div class="logo"><span class="star">★</span> GAME SHOW <span class="star">★</span></div>
+    <h2>Host access</h2>
+    <p>Enter the password to run the show.</p>
+    <input type="password" id="lockPassword" placeholder="Password" aria-label="Password" onkeydown="if(event.key==='Enter')checkPassword()">
+    <button class="btn btn-primary" onclick="checkPassword()" id="lockUnlock">Unlock</button>
+    <button class="btn btn-primary" id="lockGoogle" style="display:none">Sign in with Google</button>
     <div class="lock-error" id="lockError"></div>
   </div>
 </div>
 
 <div id="mainContent" class="hidden">
 
-<h1>Game Show</h1>
+<header class="topbar">
+  <div class="logo"><span class="star">★</span> GAME SHOW <span class="star">★</span></div>
+  <nav class="tabs" aria-label="Screens">
+    <button class="tab-btn active" id="tabBtnPlay" onclick="showTab('play')">Play</button>
+    <button class="tab-btn" id="tabBtnSetup" onclick="showTab('setup')">Setup</button>
+  </nav>
+</header>
 
-<div class="tab-bar">
-  <button class="tab-btn active" id="tabBtnPlay" onclick="showTab('play')">Play</button>
-  <button class="tab-btn" id="tabBtnSetup" onclick="showTab('setup')">Setup</button>
-</div>
+<main class="tab-panel active" id="tabPlay">
 
-<div class="tab-panel active" id="tabPlay">
+  <section class="qcard" aria-label="Current question">
+    <div class="qnum" id="qnum"></div>
+    <div class="qtext" id="qtext" tabindex="0" role="region" aria-label="Question" aria-live="polite"></div>
+    <div class="answer" id="answer" aria-live="polite"></div>
+  </section>
 
-<div class="marquee"><span class="marquee-title">🎬 GAME SHOW 🎬</span></div>
-
-<div class="panel">
-  <div class="qnum" id="qnum">Question 1 of 1</div>
-  <div class="qtext" id="qtext" tabindex="0" role="region" aria-label="Question"></div>
-  <div class="answer" id="answer"></div>
-  <div class="controls">
-    <button class="btn-reveal" onclick="reveal()">Show answer</button>
-    <button class="btn-clear" onclick="clearBuzz()">Clear buzzer</button>
-    <button class="btn-next" onclick="prevQuestion()">Previous question</button>
-    <button class="btn-next" onclick="nextQuestion()">Next question</button>
+  <div class="console">
+    <div class="buzzed" id="buzzedBar" aria-live="assertive">
+      <span class="light" aria-hidden="true"></span>
+      <span class="buzzed-label">Buzzed in</span>
+      <span class="buzzed-name" id="buzzedName">Waiting...</span>
+    </div>
+    <div class="host">
+      <button class="btn" onclick="prevQuestion()" title="Previous question" aria-label="Previous question">◀</button>
+      <button class="btn btn-primary" onclick="reveal()">Show answer</button>
+      <button class="btn" onclick="clearBuzz()">Clear buzzer</button>
+      <button class="btn" onclick="nextQuestion()" title="Next question">Next ▶</button>
+      <details class="jump" id="jumpMenu">
+        <summary class="btn" title="Jump to any question">#</summary>
+        <div class="jump-pop">
+          <div class="question-grid" id="questionGrid" role="navigation" aria-label="Question numbers"></div>
+        </div>
+      </details>
+      <span class="sep" aria-hidden="true"></span>
+      <div class="award">
+        <div class="selected-label" id="selectedLabel">Pick a contestant</div>
+        <button class="btn btn-good score-btn" onclick="adjustSelectedScore(1)" aria-label="Add one point">+1</button>
+        <button class="btn btn-bad score-btn" onclick="adjustSelectedScore(-1)" aria-label="Subtract one point">−1</button>
+      </div>
+    </div>
   </div>
-  <div class="question-grid" id="questionGrid" tabindex="0" role="navigation" aria-label="Question numbers"></div>
-</div>
 
-<div class="buzzed">
-  <div style="margin-bottom:8px; color:#7d5236;">First to buzz in:</div>
-  <div class="buzzed-name" id="buzzedName">Waiting...</div>
-</div>
+  <section class="score-panel" aria-label="Contestants">
+    <div class="board-head"><h2>Contestants</h2><span>Click a name to select · × to remove</span></div>
+    <div class="board" id="board"></div>
+  </section>
 
-<div class="score-panel">
-  <div class="score-controls">
-    <div class="selected-label" id="selectedLabel">No player selected - click a name below</div>
-    <button class="score-btn score-plus" onclick="adjustSelectedScore(1)">+1</button>
-    <button class="score-btn score-minus" onclick="adjustSelectedScore(-1)">-1</button>
+</main>
+
+<main class="tab-panel" id="tabSetup">
+  <div class="setup-wrap">
+    <div class="setup-title">
+      <h1>Show setup</h1>
+      <p>Everything here saves instantly. Switch back to Play when you're ready.</p>
+    </div>
+
+    <div class="setup-grid">
+
+      <section class="card wide">
+        <h3>Students join here</h3>
+        <p class="hint">Share this link. Students sign in with their Fun Torah Tools name and passcode.</p>
+        <div class="row">
+          <div class="link-box" id="studentLinkText">loading...</div>
+          <button class="btn btn-primary" onclick="copyStudentLink()">Copy link</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Questions</h3>
+        <p class="hint">Type questions, or paste two columns (question, answer) from a spreadsheet.</p>
+        <div class="row">
+          <button class="btn btn-primary" id="editBtn" onclick="openEditor()">Edit questions</button>
+          <button class="btn btn-ghost btn-sm" id="syncBtn" onclick="syncQuestionsToDatabase()">Restore built-in questions</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Look</h3>
+        <p class="hint">Changes the Play screen on this computer.</p>
+        <div class="themes">
+          <label class="theme-opt"><input type="radio" name="playTheme" value="gold" onchange="setPlayTheme('gold')"><span class="swatch gold">Gold spotlight</span></label>
+          <label class="theme-opt"><input type="radio" name="playTheme" value="blue" onchange="setPlayTheme('blue')" checked><span class="swatch blue">Blue quiz board</span></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Buzzer rules</h3>
+        <p class="hint">Use either rule, or both together.</p>
+        <div class="setting">
+          <div class="label"><b>Wait before buzzer opens</b><span>Starts each time you go to a question. Students see a countdown.</span></div>
+          <div class="ctrl">
+            <input type="number" class="num" id="delaySeconds" value="10" min="1" max="60" onchange="saveDelaySettings()" aria-label="Wait seconds"> sec
+            <input type="checkbox" class="switch" id="delayToggle" onchange="saveDelaySettings()" aria-label="Wait before buzzer opens">
+          </div>
+        </div>
+        <div class="setting">
+          <div class="label"><b>Randomize the winner</b><span>Picks fairly among everyone who buzzes within the window. Two wins in a row sits out the next pick.</span></div>
+          <div class="ctrl">
+            <input type="number" class="num" id="revealDelaySeconds" value="3" min="1" max="30" onchange="saveDelaySettings()" aria-label="Window seconds"> sec
+            <input type="checkbox" class="switch" id="revealDelayToggle" onchange="saveDelaySettings()" aria-label="Randomize the winner">
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Sound</h3>
+        <p class="hint">Click a preview once to turn sound on for this screen.</p>
+        <div class="setting">
+          <div class="label"><b>Buzz-in sound</b><span>Student screens use it too.</span></div>
+          <div class="ctrl">
+            <select id="buzzSoundSelect" class="select" onchange="setBuzzSound(this.value)" aria-label="Buzz-in sound">
+              <option value="ding">Bell ding</option>
+                    <option value="chime">Triple chime</option>
+              <option value="zap">Laser zap</option>
+              <option value="bloop">Quiz-board bloop</option>
+              <option value="alarm">Lock-in alarm</option>
+              <option value="random">Surprise me (random)</option>
+            </select>
+          </div>
+        </div>
+        <div class="setting">
+          <div class="label"><b><label for="buzzerVolume">Volume</label></b></div>
+          <div class="ctrl">
+            <input id="buzzerVolume" type="range" min="0" max="100" value="75" oninput="setBuzzerVolume(this.value)" aria-describedby="buzzerVolumeValue">
+            <output id="buzzerVolumeValue" for="buzzerVolume">75%</output>
+          </div>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <button class="btn btn-sm" id="enableSoundBtn" onclick="enableSound()">▶ Buzz</button>
+          <button class="btn btn-sm" onclick="playApplauseSound()">▶ Correct</button>
+          <button class="btn btn-sm" onclick="playWrongSound()">▶ Wrong</button>
+        </div>
+        <div class="status-line" id="soundStatus" aria-live="polite"></div>
+      </section>
+
+      <section class="card danger wide">
+        <div><h3>New game</h3>
+        <p class="hint">Clears every contestant and score. Questions are kept.</p></div>
+        <button class="btn btn-bad" id="resetGameBtn" onclick="resetGame()">Reset game</button>
+      </section>
+
+    </div>
   </div>
-  <div class="board" id="board"></div>
-</div>
+</main>
 
-</div>
-
-<div class="tab-panel" id="tabSetup">
-
-<div class="setup-section">
-  <h3>Student access</h3>
-  <div class="link-box">Student link: <b id="studentLinkText">loading...</b> <button onclick="copyStudentLink()" style="margin-left:8px; font-size:12px; padding:5px 10px; border-radius:6px; border:none; background:#7d5236; color:white; cursor:pointer;">Copy link</button></div>
-</div>
-
-<div class="setup-section">
-  <h3>Display style</h3>
-  <div style="text-align:center;">
-    <label style="margin-right:14px;"><input type="radio" name="playTheme" value="gold" onchange="setPlayTheme('gold')"> Gold spotlight</label>
-    <label><input type="radio" name="playTheme" value="blue" onchange="setPlayTheme('blue')" checked> Blue quiz board</label>
-  </div>
-</div>
-
-<div class="setup-section">
-  <h3>Game controls</h3>
-  <div style="font-size:13px; color:#7d5236; margin-bottom:10px; text-align:center;">These two work independently and can be combined: "Wait timer" delays when the buzzer opens; "Randomize winner" hides who buzzed first for a few seconds and picks fairly among everyone who buzzed in that window (a student who wins two questions in a row sits out the random pick on the next one).</div>
-  <div class="top-controls">
-    <button id="enableSoundBtn" onclick="enableSound()" style="background:#3b6d11;">Enable / preview ding</button>
-    <button onclick="playApplauseSound()" style="background:#3b6d11;">Preview correct</button>
-    <button onclick="playWrongSound()" style="background:#b85042;">Preview wrong</button>
-    <button id="resetGameBtn" onclick="resetGame()" style="background:#b85042;">Reset game (clear all names)</button>
-    <button id="editBtn" onclick="openEditor()" style="background:#3b6d11;">Edit questions</button>
-    <button id="syncBtn" onclick="syncQuestionsToDatabase()" style="background:#999; font-size:13px;">Restore built-in questions</button>
-    <span class="timer-box">
-      <label><input type="checkbox" id="delayToggle" onchange="saveDelaySettings()"> Wait timer before buzzer opens</label>
-      <input type="number" id="delaySeconds" value="10" min="1" max="60" onchange="saveDelaySettings()"> sec
-    </span>
-    <span class="timer-box">
-      <label><input type="checkbox" id="revealDelayToggle" onchange="saveDelaySettings()"> Randomize winner (hide reveal)</label>
-      <input type="number" id="revealDelaySeconds" value="3" min="1" max="30" onchange="saveDelaySettings()"> sec
-    </span>
-    <label for="buzzerVolume">Sound volume</label>
-    <input id="buzzerVolume" type="range" min="0" max="100" value="75" oninput="setBuzzerVolume(this.value)" style="width:120px;" aria-describedby="buzzerVolumeValue">
-    <output id="buzzerVolumeValue" for="buzzerVolume">75%</output>
-    <span id="soundStatus" style="margin-left:10px; color:#7d5236;"></span>
-  </div>
-</div>
-
-</div>
-
-<div class="editor-overlay" id="editorOverlay">
+<div class="editor-overlay" id="editorOverlay" role="dialog" aria-modal="true" aria-label="Edit questions">
   <div class="editor-panel">
     <div class="editor-header">
-      <h2>Edit Questions</h2>
-      <div>
-        <button class="editor-btn editor-save" onclick="saveEditor()">Save changes</button>
-        <button class="editor-btn editor-cancel" onclick="closeEditor()">Cancel</button>
+      <h2>Edit questions</h2>
+      <div class="row">
+        <button class="btn btn-ghost" onclick="closeEditor()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEditor()">Save changes</button>
       </div>
     </div>
 
     <div class="paste-section">
-      <h3>Paste questions from a spreadsheet</h3>
-      <div class="paste-hint">Copy two columns (Question, then Answer) from Google Sheets or Excel and paste below - one question per line. You can also generate questions with Claude or ChatGPT and paste the results here.</div>
+      <h3>Paste from a spreadsheet</h3>
+      <div class="paste-hint">Copy two columns (Question, then Answer) from Google Sheets or Excel, one question per line. Questions made with Claude or ChatGPT paste in the same way.</div>
       <textarea id="pasteBox" placeholder="What does &#39;Vayeira&#39; mean?	Hashem appeared&#10;How many malachim came to Avrohom?	Three"></textarea>
       <div class="paste-btn-row">
-        <button class="paste-btn paste-add" onclick="loadPasted(false)">Add pasted questions to list</button>
-        <button class="paste-btn paste-replace" onclick="loadPasted(true)">Replace entire list with pasted questions</button>
+        <button class="btn btn-sm btn-primary" onclick="loadPasted(false)">Add to list</button>
+        <button class="btn btn-sm btn-bad" onclick="loadPasted(true)">Replace whole list</button>
       </div>
     </div>
 
     <div id="editorList"></div>
-    <button class="editor-btn editor-add-row" onclick="addQuestionRow()">+ Add one question manually</button>
+    <button class="btn editor-add-row" onclick="addQuestionRow()">+ Add a question</button>
   </div>
 </div>
 
@@ -334,7 +568,23 @@ function showTab(name) {
   document.getElementById('tabBtnPlay').classList.toggle('active', name === 'play');
   document.getElementById('tabBtnSetup').classList.toggle('active', name === 'setup');
   document.body.classList.toggle('play-mode', name === 'play');
+  if (name === 'play') requestAnimationFrame(fitQuestion);
 }
+
+// Shrinks the question text from very large until it fits the card, so short
+// questions fill the screen and long ones still fit without scrolling.
+function fitQuestion() {
+  const el = document.getElementById('qtext');
+  if (!el || !el.clientHeight) return;
+  let size = Math.max(36, Math.min(110, window.innerWidth / 12));
+  el.style.fontSize = size + 'px';
+  while (size > 26 && (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1)) {
+    size -= 2;
+    el.style.fontSize = size + 'px';
+  }
+}
+window.addEventListener('resize', () => requestAnimationFrame(fitQuestion));
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitQuestion);
 
 function setPlayTheme(theme) {
   document.body.classList.remove('theme-blue');
@@ -389,6 +639,12 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+
+// Every screen measures the wait timer against Firebase's server clock, so a
+// student whose computer clock is a few seconds off still unlocks on time.
+let serverOffset = 0;
+db.ref('.info/serverTimeOffset').on('value', snap => { serverOffset = Number(snap.val()) || 0; });
+function serverNow() { return Date.now() + serverOffset; }
 const gameRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/live' : "tentTrailTrivia");
 // While this teacher screen is open and unlocked, tell student screens the game is live.
 // Students who open the Game Show when no teacher screen is open see a waiting message
@@ -570,6 +826,7 @@ function loadQuestion(qIndex) {
   document.getElementById('qnum').textContent = 'Question ' + (qIndex + 1) + ' of ' + questions.length;
   document.getElementById('qtext').textContent = q.q;
   highlightActiveQuestion(qIndex);
+  requestAnimationFrame(fitQuestion);
 }
 
 function buildQuestionGrid() {
@@ -605,9 +862,10 @@ function saveDelaySettings() {
 
 function goToQuestion(qIndex) {
   ensureAudioAwake();
+  document.getElementById('jumpMenu').open = false;
   const delayOn = document.getElementById('delayToggle').checked;
   const delaySecs = parseInt(document.getElementById('delaySeconds').value) || 10;
-  const now = Date.now();
+  const now = serverNow();
   const unlockAt = delayOn ? (now + delaySecs * 1000) : 0;
   const updates = {
     qIndex: qIndex,
@@ -692,7 +950,7 @@ function maybeScheduleRevealPick(data, qIndex) {
     // than falling back to "now" on every single data change - that bug
     // was pushing the random pick further into the future with every buzz,
     // so it could effectively never fire.
-    gameRef.child('buzzOpenAt').set(Date.now());
+    gameRef.child('buzzOpenAt').set(serverNow());
     return;
   }
   const openAt = data.buzzOpenAt;
@@ -702,7 +960,7 @@ function maybeScheduleRevealPick(data, qIndex) {
   revealPickScheduledKey = key;
   const delaySecs = data.revealDelaySeconds || 3;
   const fireAt = openAt + delaySecs * 1000;
-  const wait = Math.max(0, fireAt - Date.now());
+  const wait = Math.max(0, fireAt - serverNow());
   revealPickTimer = setTimeout(() => pickRandomWinner(qIndex), wait);
 }
 
@@ -870,8 +1128,44 @@ async function playGameShowSound(kind) {
       osc.start(at); osc.stop(at + duration);
       sources.push(osc); gains.push(gain);
     }
+    // Pitch-sweeping voice for zaps and bloops.
+    function sweep(f0, f1, offset, duration, level, type) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      const at = start + offset;
+      osc.frequency.setValueAtTime(f0, at);
+      osc.frequency.exponentialRampToValueAtTime(f1, at + duration);
+      gain.gain.setValueAtTime(0, at);
+      gain.gain.linearRampToValueAtTime(level, at + 0.006);
+      gain.gain.setValueAtTime(level, at + duration * 0.7);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+      osc.connect(gain); gain.connect(bus);
+      osc.start(at); osc.stop(at + duration);
+      sources.push(osc); gains.push(gain);
+    }
     let duration;
-    if (kind === 'correct') {
+    if (kind === 'chime') {
+      duration = 0.95;
+      [783.99, 987.77, 1318.51].forEach((freq, i) => {
+        tone(freq, i * 0.12, 0.6, 0.28, 'sine', 0);
+        tone(freq * 2, i * 0.12, 0.3, 0.06, 'sine', 0);
+      });
+    } else if (kind === 'zap') {
+      duration = 0.5;
+      sweep(1900, 160, 0, 0.32, 0.16, 'sawtooth');
+      sweep(1400, 120, 0.02, 0.3, 0.1, 'square');
+      tone(1568, 0.32, 0.18, 0.18, 'sine', 0);
+    } else if (kind === 'bloop') {
+      duration = 0.55;
+      sweep(260, 880, 0, 0.14, 0.3, 'triangle');
+      tone(880, 0.14, 0.4, 0.26, 'triangle', 0);
+      tone(1320, 0.14, 0.25, 0.06, 'sine', 0);
+    } else if (kind === 'alarm') {
+      duration = 0.72;
+      for (let i = 0; i < 6; i++) tone(i % 2 ? 660 : 990, i * 0.11, 0.1, 0.13, 'square', 0.02);
+      tone(1320, 0.66, 0.06, 0.08, 'square', 0.02);
+    } else if (kind === 'correct') {
       duration = 1.18;
       const real = new Float32Array(9);
       const imag = new Float32Array([0, 1, 0.48, 0.24, 0.13, 0.07, 0.035, 0.02, 0.01]);
@@ -915,7 +1209,7 @@ async function playGameShowSound(kind) {
         }
       };
     });
-    document.getElementById('soundStatus').textContent = kind === 'correct' ? 'Correct-answer fanfare' : kind === 'wrong' ? 'Wrong-answer buzzer' : 'Contestant ding ready';
+    document.getElementById('soundStatus').textContent = kind === 'correct' ? 'Correct-answer fanfare' : kind === 'wrong' ? 'Wrong-answer buzzer' : 'Buzz sound: ' + (BUZZ_SOUND_LABELS[kind] || 'Bell ding');
   } catch (err) {
     document.getElementById('soundStatus').textContent = 'Sound unavailable - click Enable / preview ding to retry';
   }
@@ -979,11 +1273,12 @@ function resetGame() {
     buzzUnlockAt: 0,
     revealDelayOn: document.getElementById('revealDelayToggle').checked,
     revealDelaySeconds: parseInt(document.getElementById('revealDelaySeconds').value) || 3,
-    buzzOpenAt: Date.now(),
+    buzzOpenAt: serverNow(),
     buzzPool: null,
     lastWinner: null,
     lastWinnerStreak: 0,
-    lastWinnerRound: null
+    lastWinnerRound: null,
+    buzzSound: buzzSoundChoice
   });
   document.getElementById('soundStatus').textContent = 'Game reset - names cleared';
 }
@@ -1011,9 +1306,56 @@ function enableSound() {
   playAlertSound();
 }
 
-function playAlertSound() { return playGameShowSound('ding'); }
+// Which sound plays when a student buzzes in. Saved on this device and shared
+// through the live game so student screens play the same buzz.
+const BUZZ_SOUND_LABELS = { ding: 'Bell ding', chime: 'Triple chime', zap: 'Laser zap', bloop: 'Quiz-board bloop', alarm: 'Lock-in alarm' };
+let buzzSoundChoice = 'ding';
+try { buzzSoundChoice = localStorage.getItem('gameShowBuzzSound') || 'ding'; } catch (_) {}
+if (buzzSoundChoice !== 'random' && !BUZZ_SOUND_LABELS[buzzSoundChoice]) buzzSoundChoice = 'ding';
+document.getElementById('buzzSoundSelect').value = buzzSoundChoice;
+gameRef.child('buzzSound').set(buzzSoundChoice).catch(() => {});
+
+function setBuzzSound(value) {
+  buzzSoundChoice = value;
+  try { localStorage.setItem('gameShowBuzzSound', value); } catch (_) {}
+  gameRef.child('buzzSound').set(value).catch(() => {});
+  playAlertSound();
+}
+
+function resolveBuzzSound() {
+  if (buzzSoundChoice !== 'random') return buzzSoundChoice;
+  const kinds = Object.keys(BUZZ_SOUND_LABELS);
+  return kinds[Math.floor(Math.random() * kinds.length)];
+}
+
+function playAlertSound() { return playGameShowSound(resolveBuzzSound()); }
 
 let lastBuzzedBy = null;
+let lastGameData = {};
+let buzzBarTimer = null;
+
+// Shows who buzzed, or - while the wait timer runs - a countdown until buzzers open.
+function updateBuzzBar() {
+  const data = lastGameData || {};
+  const bar = document.getElementById('buzzedBar');
+  const label = bar.querySelector('.buzzed-label');
+  const nameEl = document.getElementById('buzzedName');
+  const left = data.buzzerDelayOn && !data.buzzedBy ? Math.ceil(((data.buzzUnlockAt || 0) - serverNow()) / 1000) : 0;
+  bar.classList.toggle('live', !!data.buzzedBy);
+  bar.classList.toggle('waiting', left > 0);
+  if (data.buzzedBy) {
+    label.textContent = 'Buzzed in';
+    nameEl.textContent = data.buzzedBy;
+  } else if (left > 0) {
+    label.textContent = 'Buzzers locked';
+    nameEl.textContent = 'Open in ' + left + '…';
+  } else {
+    label.textContent = 'Buzzers open';
+    nameEl.textContent = 'Waiting for a buzz…';
+  }
+  clearTimeout(buzzBarTimer);
+  if (left > 0) buzzBarTimer = setTimeout(updateBuzzBar, 250);
+}
 let lastPoolSize = 0;
 
 gameRef.on('value', snapshot => {
@@ -1021,8 +1363,10 @@ gameRef.on('value', snapshot => {
   const data = snapshot.val() || {};
   const qIndex = data.qIndex || 0;
   loadQuestion(qIndex);
-  document.getElementById('answer').textContent = data.revealed ? questions[qIndex].ans : '';
-  document.getElementById('buzzedName').textContent = data.buzzedBy || 'Waiting...';
+  document.getElementById('answer').textContent = data.revealed && questions[qIndex] ? (questions[qIndex].ans || '') : '';
+  requestAnimationFrame(fitQuestion);
+  lastGameData = data;
+  updateBuzzBar();
 
   document.getElementById('delayToggle').checked = !!data.buzzerDelayOn;
   if (data.buzzerDelaySeconds) {
@@ -1060,21 +1404,36 @@ gameRef.on('value', snapshot => {
   lastBuzzedBy = data.buzzedBy || null;
 
   currentSelectedPlayer = data.selectedPlayer || null;
-  document.getElementById('selectedLabel').innerHTML = currentSelectedPlayer
-    ? 'Selected: <b>' + currentSelectedPlayer + '</b>'
-    : 'No player selected - click a name below';
+  const selLabel = document.getElementById('selectedLabel');
+  selLabel.replaceChildren();
+  if (currentSelectedPlayer) {
+    const b = document.createElement('b');
+    b.textContent = currentSelectedPlayer;
+    selLabel.append(b);
+  } else {
+    selLabel.textContent = 'Pick a contestant';
+  }
 
   const scores = data.scores || {};
   const board = document.getElementById('board');
-  board.innerHTML = '';
-  Object.keys(scores).sort().forEach(name => {
+  board.replaceChildren();
+  const names = Object.keys(scores).sort();
+  if (!names.length) {
+    const empty = document.createElement('div');
+    empty.className = 'board-empty';
+    empty.textContent = 'No contestants yet. Students appear here when they open the student link.';
+    board.appendChild(empty);
+  }
+  names.forEach(name => {
     const div = document.createElement('div');
-    div.className = 'team' + (name === currentSelectedPlayer ? ' selected' : '');
-    div.innerHTML =
-      '<button class="remove-player" title="Remove player">×</button>' +
-      '<div class="name">' + name + '</div>' +
-      '<div class="score">' + scores[name] + '</div>';
+    div.className = 'team' + (name === currentSelectedPlayer ? ' selected' : '') + (name === data.buzzedBy ? ' buzzed-in' : '');
+    div.setAttribute('role', 'button');
+    div.tabIndex = 0;
+    div.innerHTML = '<button class="remove-player" title="Remove player" aria-label="Remove player">×</button><div class="name"></div><div class="score"></div>';
+    div.querySelector('.name').textContent = name;
+    div.querySelector('.score').textContent = scores[name];
     div.onclick = () => selectPlayer(name);
+    div.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPlayer(name); } };
     div.querySelector('.remove-player').onclick = (e) => {
       e.stopPropagation();
       removePlayer(name);
@@ -1111,7 +1470,7 @@ function createQuestionRow(q, ans) {
     '<textarea class="row-q">' + escapeHtml(q || '') + '</textarea>' +
     '<label>Answer</label>' +
     '<textarea class="row-ans">' + escapeHtml(ans || '') + '</textarea>' +
-    '<button class="editor-btn editor-del-row" onclick="this.parentElement.remove()">Delete this question</button>';
+    '<button class="btn btn-sm btn-ghost editor-del-row" onclick="this.parentElement.remove()">Delete this question</button>';
   return div;
 }
 
