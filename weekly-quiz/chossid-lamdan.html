@@ -55,7 +55,7 @@ td input[type=number]{max-width:94px}
 <div class="card">
 <strong>Draft only until you click Save to Nigri.</strong>
 <p class="small">The category is fixed to “A Chossid is a Lamdan” and the type is Quiz, just as on Nigri. ET and WT create separate marks. No grade or parent comment is stored in this public website's code. Unsaved entries stay in this browser.</p>
-<div class="important"><b>Important:</b> Save to Nigri creates a real gradebook assessment and submits Nigri's final Save automatically. Please review every mark and comment first.</div>
+<div class="notice"><strong>Rabbi Steinberg’s grading rules — effort and responsibility, NOT academic ability or test scores.</strong><ol style="margin:8px 0 8px 22px;padding:0"><li><b>Focus &amp; Participation:</b> Paying attention, participating appropriately, and avoiding distractions.</li><li><b>Classwork:</b> Following instructions and completing classwork with sincere effort.</li><li><b>Homework:</b> Completing assigned homework responsibly and putting in real effort.</li></ol><b>Scale:</b> 100 = Outstanding; 90–99 = Very Good to Excellent; 80–89 = Satisfactory to Good; below 80 = Needs Improvement. <b>School reward:</b> a monthly average of 85% or higher qualifies for school reward points and the monthly prize raffle. This threshold does not replace fair grading.<p style="margin:8px 0 0"><b>Timing:</b> Submit each Friday or on the last day of school for that class. Include a brief, gentle, encouraging comment for every boy. Comments go to parents; teacher-only evidence must stay separate. Do not base a lower mark merely on a boy speaking less, or a higher one merely on correct answers.</p></div><div class="important"><b>Important:</b> Save to Nigri creates a real gradebook assessment and submits Nigri's final Save automatically. Please review every mark and comment first.</div>
 <div class="controls">
 <label class="field">Class<select id="classSelect"><option value="et">B3 ET</option><option value="wt">B3 WT</option></select></label>
 <label class="field">Date of mark<input id="date" type="date"></label>
@@ -65,9 +65,9 @@ td input[type=number]{max-width:94px}
 </div>
 <div class="card">
 <h2 style="margin-top:0">Student marks and encouraging comments</h2>
-<div class="small">Fill in all scores from 0–100. Comments are optional. Keep them gentle, positive and factual. The evidence field is for your private reference and is NOT sent to Nigri.</div>
+<div class="small">Enter the final score (0–100) using all three effort-and-responsibility areas above, not test scores or academic ability. <b>A brief parent comment is required for each boy.</b> Keep it extremely gentle, positive, encouraging and based on something observed. The evidence field is private to this browser and is NOT sent to Nigri.</div>
 <div style="overflow:auto">
-<table><thead><tr><th>Student</th><th>Mark /100</th><th>Comment for Nigri</th></tr></thead><tbody id="rows"></tbody></table>
+<table><thead><tr><th>Student</th><th>Mark /100</th><th>Gentle parent comment (required)</th></tr></thead><tbody id="rows"></tbody></table>
 </div>
 </div>
 <div class="card">
@@ -176,6 +176,7 @@ function getPayload(){
  let students=ROSTERS[cls].map(function(pair){
   const r=d.students[pair[1]]||{},v=String(r.mark==null?'':r.mark).trim();
   if(v===''||!/^\d{1,3}$/.test(v)||Number(v)<0||Number(v)>100)throw Error('Enter a whole-number mark between 0 and 100 for '+pair[0]+'.');
+  if(!String(r.comment||'').trim())throw Error('Enter a brief, positive parent comment for '+pair[0]+'.');
   return {name:pair[1],mark:Number(v),attendance:'review',comment:String(r.comment||'').trim()};
  });
  return {class_section:cls==='et'?'B3 ET':'B3 WT',topic:NIGRI_TOPIC,type:'quiz',test_name:d.name.trim(),date:$('date').value,description:(d.description||'').trim(),mark_all_done:true,students:students};
