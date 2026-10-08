@@ -38,8 +38,7 @@
   function skillTopic(s) {
     if (s === 'shorashim') return 'Shoroshim';
     if (s === 'translation') return 'Chumash Translation';
-    if (s === 'integrated') return 'Chumash Havana';
-    if (s === 'mixed') return 'Chumash';
+    if (s === 'mixed' || s === 'integrated') return 'Chumash';
     return 'Chumash Comprehension';
   }
 

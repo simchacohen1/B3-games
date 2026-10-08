@@ -62,6 +62,8 @@
   header{position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 1px 8px rgba(16,40,70,.04)}
   .header-inner{max-width:1320px;margin:0 auto;padding:10px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
   .brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+  .home-link{color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:#fff;white-space:nowrap}
+  .home-link:hover{color:var(--blue);border-color:#aec6df;background:var(--light)}
   .brand-mark{width:36px;height:36px;border-radius:10px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
   h1{margin:0;font-size:19px;font-weight:700}
   .subtitle{color:var(--muted);font-size:12.5px}
@@ -459,6 +461,7 @@
 
 <header>
   <div class="header-inner">
+    <a class="home-link" href="../" title="Back to Fun Torah Tools">← Fun Torah Tools</a>
     <div class="brand">
       <div class="brand-mark">B3</div>
       <div>
@@ -584,7 +587,6 @@
               <option value="shorashim">Shoroshim</option>
               <option value="translation">Chumash Translation</option>
               <option value="comprehension">Chumash Comprehension</option>
-              <option value="integrated">Chumash Havana (skills)</option>
               <option value="mixed">Chumash (mixed)</option>
             </select>
           </label>
@@ -597,11 +599,6 @@
           <label>Source (optional)
             <input type="text" id="generatorSourceLabel" placeholder="e.g. Vayeira 18:1–5">
           </label>
-        </div>
-        <div id="integratedModeHelp" class="info-box hidden">
-          <b>Chumash Havana (skills)</b> — mostly regular translation and comprehension, with a few easy third-grade skills mixed in:
-          <b>מי אמר אל מי</b>, <b>על מי נאמר</b>, and simple <b>prefix / shoresh / suffix</b> word parts.
-          These skill questions only appear when the pasted pesukim clearly support them, so check the draft.
         </div>
         <div id="mixedCounts" class="generator-grid hidden">
           <label>Shoroshim questions<input type="number" id="mixedShoreshim" min="0" max="30" value="5"></label>
@@ -644,7 +641,6 @@
               <option value="shorashim">Shoroshim</option>
               <option value="translation">Chumash Translation</option>
               <option value="comprehension">Chumash Comprehension</option>
-              <option value="integrated">Chumash Havana</option>
               <option value="mixed">Chumash</option>
             </select>
           </label>
@@ -872,7 +868,7 @@ const CLASS_ROSTERS={
   et:{label:'East Track',students:['chaim_chaikin','yossi_gourarie','sholom_huebner','moshe_lapine','kehos_notik','yisroel_oirechman','moshe_raichman','avrohom_rosenfeld','levi_rozmarin','arik_traxler','simcha_cohen']},
   wt:{label:'West Track',students:['ari_greenberg','zev_rosenfeld','levi_schtroks','yisroel_aryeh_simmonds','leibel_vogel','leib_wolf','simcha_cohen']}
 };
-const SKILL_LABELS={shorashim:'Shoroshim',translation:'Chumash Translation',comprehension:'Chumash Comprehension',integrated:'Chumash Havana',mixed:'Chumash'};
+const SKILL_LABELS={shorashim:'Shoroshim',translation:'Chumash Translation',comprehension:'Chumash Comprehension',integrated:'Chumash',mixed:'Chumash'};
 // Quiz types whose questions each keep their own skill (shorashim/translation/comprehension).
 function isMultiSkill(t){return t==='mixed'||t==='integrated';}
 
@@ -1107,59 +1103,40 @@ function generatorReferences(sourceLabel,sourceText){
   return refs;
 }
 
-function integratedChumashCounts(count){
+// Adds the third-grade skills to the generator's directions:
+//   Comprehension also asks מי אמר אל מי / על מי נאמר (they are comprehension).
+//   Shoroshim also asks simple word parts — prefix / shoresh / suffix (dikduk).
+//   Mixed gets both. Translation is unchanged.
+function skillsSource(sourceText,type,count){
   const n=Math.max(1,Math.min(40,Number(count)||10));
-  const shorashim=n>=5?1:0;
-  let translation=Math.max(1,Math.round((n-shorashim)*0.4));
-  if(translation+shorashim>n)translation=Math.max(0,n-shorashim);
-  let comprehension=Math.max(0,n-shorashim-translation);
-  if(n>=2&&comprehension===0&&translation>1){translation--;comprehension=1;}
-  return{shorashim,translation,comprehension};
-}
-
-function integratedChumashSource(sourceText,count){
-  const n=Math.max(1,Math.min(40,Number(count)||10));
-  let specialRule='Use at most ONE newer-skill question, choosing the clearest type supported by the pesukim.';
-  if(n>=9)specialRule='Aim for THREE newer-skill questions total: ONE simple Word Parts question, ONE מי אמר אל מי question, and ONE על מי נאמר question — but only when the pesukim clearly support each one.';
-  else if(n>=5)specialRule='Aim for about TWO newer-skill questions total, choosing the clearest supported types.';
-
+  const some=Math.max(1,Math.round(n*0.3));
+  const comp=`COMPREHENSION QUESTIONS — ALSO INCLUDE THESE SKILLS:
+Most comprehension questions stay regular comprehension (what happened). In addition, about ${some} of the comprehension questions should be:
+- "מי אמר אל מי?" — only when the ACTUAL PESUKIM clearly contain speech, and both the speaker and the listener are clear. Never invent a speaker or listener. Begin whySelected with "[מי אמר אל מי]".
+- "על מי נאמר?" — quote a short phrase from the ACTUAL PESUKIM and ask who it is said about, only when that is clear. Begin whySelected with "[על מי נאמר]".
+Return skillType "comprehension" for these. If the pesukim do not clearly support them, use regular comprehension questions instead.`;
+  const shor=`SHOROSHIM QUESTIONS — ALSO INCLUDE SIMPLE WORD PARTS (DIKDUK):
+Most shoroshim questions stay "what is the shoresh". In addition, about ${some} of the shoroshim questions may be simple word-parts questions about an EXACT Hebrew word from the ACTUAL PESUKIM:
+- identify an obvious prefix (e.g. ו, ה, ב, ל, מ), the shoresh, or what an obvious suffix means.
+- Do NOT ask advanced binyan, tense, person, gender, conjugation, or complicated dikduk. Skip any word whose breakdown could be debated.
+Return skillType "shorashim" for these. Begin whySelected with "[Word Parts]".`;
+  const style=`SHORT AND DIRECT — THIS IS THE MOST IMPORTANT RULE:
+- Each question is ONE short, simple question of at most 12 words. No long setup, no quoting a whole pasuk, no two-part questions.
+- Ask plain facts from the pesukim: who, what, where, to whom. Do NOT ask "why" questions that need explaining or reasoning.
+- Each answer choice is at most 6 words.
+- Use easy words an 8-year-old knows.
+Good: "Where was Avraham sitting?" — "At the opening of the tent"
+Good: "Who did Avraham run to greet?" — "Three men"
+Bad: "Hashem asked: Should I hide from Avraham what I am about to do? Why did Hashem feel He should tell Avraham?"`;
+  const rules=(type==='comprehension'?[comp]:type==='shorashim'?[shor]:type==='mixed'?[comp,shor]:[]).concat([style]);
   return `ACTUAL PESUKIM / SOURCE TEXT BEGIN
 ${sourceText}
 ACTUAL PESUKIM / SOURCE TEXT END
 
 TEACHER GENERATOR DIRECTIONS — THESE DIRECTIONS ARE NOT TEST MATERIAL:
-Create a third-grade quiz called "Chumash Understanding & Skills." Most questions must remain ordinary, literal Words & Phrases translation and straightforward comprehension. ${specialRule}
+${rules.join('\n\n')}
 
-NEW SKILL: WORD PARTS
-- Use an EXACT Hebrew word from the ACTUAL PESUKIM section only.
-- Ask something very simple about an obvious prefix, shoresh, or suffix.
-- Good examples: identify the shoresh; identify an obvious prefix; identify what an obvious suffix means.
-- Do NOT ask advanced binyan, tense, person, gender, conjugation, or complicated dikduk.
-- If the word's breakdown could reasonably be debated, do not use that word.
-- Return skillType "shorashim" for Word Parts.
-- Begin whySelected with "[Word Parts]".
-
-NEW SKILL: מי אמר אל מי
-- Ask "מי אמר אל מי?" only when the ACTUAL PESUKIM clearly contain speech.
-- Both the speaker and the person spoken to must be clear from the ACTUAL PESUKIM.
-- Never invent a speaker or listener.
-- Return skillType "comprehension".
-- Begin whySelected with "[מי אמר אל מי]".
-
-NEW SKILL: על מי נאמר
-- Use a short phrase from the ACTUAL PESUKIM and ask who it is said about.
-- Only use it when the referent is clear from the ACTUAL PESUKIM.
-- Return skillType "comprehension".
-- Begin whySelected with "[על מי נאמר]".
-
-QUALITY AND TRANSLATION RULES
-- The newer skill types together should normally be about 30% or less of the quiz.
-- If a newer skill is not clearly supported, replace it with a normal translation/comprehension question instead of inventing material.
-- The Hebrew itself is authoritative. Prefer literal, accurate translation over loose paraphrase.
-- Preserve important Hebrew wording and images when they can be expressed simply in English.
-- If two English translations are genuinely equivalent, do not use one as a wrong answer.
-- Keep every question clear, fair, easy-to-moderate, and appropriate for an 8-year-old third grader.
-- Do not make any question about these teacher directions. Test only the ACTUAL PESUKIM section.`;
+Keep every question clear, fair, easy-to-moderate, and appropriate for an 8-year-old third grader. The Hebrew itself is authoritative. Do not make any question about these teacher directions. Test only the ACTUAL PESUKIM section.`;
 }
 
 async function generateQuizDraft(){
@@ -1176,7 +1153,7 @@ async function generateQuizDraft(){
 
   const integrated=requestedType==='integrated';
   const requestedCount=Number(document.getElementById('generatorCount').value)||10;
-  const mixedCounts=integrated?integratedChumashCounts(requestedCount):normalMixedCounts;
+  const mixedCounts=normalMixedCounts;
   const quizType=integrated?'mixed':requestedType;
   const count=integrated
     ? requestedCount
@@ -1184,7 +1161,7 @@ async function generateQuizDraft(){
         ? (mixedCounts.shorashim+mixedCounts.translation+mixedCounts.comprehension)
         : requestedCount);
 
-  const sourceText=integrated?integratedChumashSource(rawSource,count):rawSource;
+  const sourceText=skillsSource(rawSource,quizType,count);
   const references=generatorReferences(sourceLabel,rawSource);
 
   if(!rawSource){alert('Paste the pesukim/source text first.');return;}
@@ -1192,7 +1169,7 @@ async function generateQuizDraft(){
   const btn=document.getElementById('generateBtn');
   const status=document.getElementById('generatorStatus');
   btn.disabled=true;
-  status.textContent=integrated?'Generating Chumash Understanding & Skills…':'Generating…';
+  status.textContent=integrated?'Generating Chumash Havana skill questions…':'Generating…';
 
   try{
     const payload={sourceText,quizType,choiceCount,count,mixedCounts};
@@ -1223,13 +1200,24 @@ async function generateQuizDraft(){
 
     if(!generatorCandidates.length)throw new Error('No usable questions were returned.');
 
+    // Short & direct: anything over 12 words (question) or 6 words (a choice) comes back unchecked and tagged.
+    const words=t=>String(t||'').trim().split(/\s+/).filter(Boolean).length;
+    let tooLong=0;
+    generatorCandidates.forEach(x=>{if(words(x.q)>12||x.choices.some(c=>words(c)>6)){x.selected=false;x.tooLong=true;tooLong++;}});
+    // Chumash Havana: only skill questions. Anything else comes back unchecked.
+    let offType=0;
+    if(integrated){
+      const SKILL_TAG=/^\s*\[(Word Parts|מי אמר אל מי|על מי נאמר)\]/;
+      generatorCandidates.forEach(x=>{if(!SKILL_TAG.test(x.whySelected||'')){x.selected=false;offType++;}});
+    }
+
     document.getElementById('generatorReview').classList.remove('hidden');
     renderCandidates();
 
     const warning=data.warning?' '+data.warning:'';
     status.textContent=(integrated
-      ? 'Generated '+generatorCandidates.length+' Chumash Understanding & Skills question(s).'
-      : 'Generated '+generatorCandidates.length+' question(s).')+warning;
+      ? 'Generated '+(generatorCandidates.length-offType)+' Chumash Havana skill question(s).'+(offType?' '+offType+' other question(s) were unchecked because they are not skill questions.':'')
+      : 'Generated '+generatorCandidates.length+' question(s).')+(tooLong?' '+tooLong+' long question(s) were unchecked — check them or delete them.':'')+warning;
 
     if(sourceLabel)document.getElementById('editorSourceLabel').value=sourceLabel;
     document.getElementById('editorSkillType').value=integrated?'integrated':quizType;
@@ -1249,7 +1237,7 @@ function renderCandidates(){
   generatorCandidates.forEach((x,i)=>{
     const div=document.createElement('div');div.className='candidate';
     const ans=x.choices[Number(x.correctIndex)]||'';
-    div.innerHTML='<input type="checkbox" '+(x.selected?'checked':'')+' onchange="generatorCandidates['+i+'].selected=this.checked"><div><div class="focus">'+esc(x.focus||x.q)+' <span class="skill-tag">'+esc(skillLabel(x.skillType))+'</span></div><div>'+esc(x.q)+'</div><div class="answer">Correct: '+esc(ans)+'</div><div class="reason">'+esc(x.whySelected||'')+'</div></div>';
+    div.innerHTML='<input type="checkbox" '+(x.selected?'checked':'')+' onchange="generatorCandidates['+i+'].selected=this.checked"><div><div class="focus">'+esc(x.focus||x.q)+' <span class="skill-tag">'+esc(skillLabel(x.skillType))+'</span>'+(x.tooLong?'<span class="skill-tag" style="background:#fff6e0;color:#7a5200">Too long</span>':'')+'</div><div>'+esc(x.q)+'</div><div class="answer">Correct: '+esc(ans)+'</div><div class="reason">'+esc(x.whySelected||'')+'</div></div>';
     box.appendChild(div);
   });
 }
@@ -2036,7 +2024,7 @@ newQuizDraft();generatorTypeChanged();populateProgressStudents();updateLaunchTar
 
   // --- Hook existing functions so the flow moves to the right step ---
   const wrap=(name,after)=>{const orig=window[name];if(typeof orig!=='function')return;window[name]=function(){const r=orig.apply(this,arguments);try{after.apply(this,[r].concat([].slice.call(arguments)));}catch(e){console.warn(e);}return r;};};
-  wrap('loadQuizEditor',()=>{showSetupStep('edit');});
+  wrap('loadQuizEditor',()=>{const sel=$('editorSkillType');if(sel&&!sel.value){sel.value='mixed';editorSkillChanged();}showSetupStep('edit');});
   wrap('addSelectedCandidates',()=>{if(editorQuestions.length)showSetupStep('edit');});
   wrap('renderQuizList',()=>{filterQuizList();updateCurrentQuizBar();if(!Object.keys(quizzes).length)$('quizList').innerHTML='<div class="empty">No saved quizzes yet. Use one of the options above to make your first quiz.</div>';});
   wrap('renderEditorRows',()=>{updateCurrentQuizBar();if(!editorQuestions.length)$('editorRows').innerHTML='<div class="empty" style="margin-top:12px">No questions yet. Click <b>+ Add question</b>, paste from a spreadsheet, or generate from pesukim.</div>';});
@@ -2051,6 +2039,7 @@ newQuizDraft();generatorTypeChanged();populateProgressStudents();updateLaunchTar
       if(!d.contains(e.target)||e.target.closest('.menu-list button'))d.removeAttribute('open');
     });
   });
+
 
   showSetupStep('library');
   try{renderQuizList();renderEditorRows();}catch(e){}
