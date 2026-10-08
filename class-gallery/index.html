@@ -394,8 +394,8 @@ function refreshGalleryAccess(){
   galleryAccessBlocked=!B3GalleryAccess(B3SiteSettings,galleryAccessSettings,galleryVerifiedClass,studentId,isTeacher,new Date(Date.now()+galleryServerOffset));
   document.getElementById('masterBlockedOverlay').classList.toggle('show',galleryAccessBlocked);
   const message=document.querySelector('#masterBlockedOverlay .master-blocked-card');
-  if(message)message.textContent=!studentId?'Please sign in to B3 Games, then return to the gallery.':
-    !galleryVerifiedClass?'Checking your class access. If this continues, sign in again from B3 Games.':
+  if(message)message.textContent=!studentId?'Please sign in to Fun Torah Tools, then return to the gallery.':
+    !galleryVerifiedClass?'Checking your class access. If this continues, sign in again from Fun Torah Tools.':
     !galleryAccessSettings?'Loading gallery access settings. Please wait.':
     'This gallery is currently turned off. Ask your teacher.';
   if(galleryAccessBlocked){
