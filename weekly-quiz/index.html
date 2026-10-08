@@ -139,7 +139,7 @@
   }
 </style>
 <script src="../paid-api.js?v=20261008-cost-controls"></script>
-</head>
+<script src="../teacher-account.js"></script></head>
 <body>
 <header>
   <div class="header-inner">
@@ -249,6 +249,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let masterBlocked=false;
+let teacherPreview=false;
 let myStudentId='';
 let myName='';
 let myClassId='';
@@ -367,6 +368,7 @@ function studentClass(id){
 function classLabel(id){return (CLASS_ROSTERS[id]||{}).label||id||'';}
 
 function applyMasterBlocked(){
+  if(teacherPreview)masterBlocked=false;
   document.getElementById('masterBlocked').classList.toggle('hidden',!masterBlocked);
   if(masterBlocked){document.getElementById('loginCard').classList.add('hidden');document.getElementById('studentArea').classList.add('hidden');}
   else if(myStudentId){document.getElementById('loginCard').classList.add('hidden');document.getElementById('studentArea').classList.remove('hidden');}
@@ -431,6 +433,12 @@ function enterStudent(displayName,studentId,classId){
 }
 
 async function restoreLogin(){
+const account=await window.B3TeacherAccountReady;
+if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
+teacherPreview=true;myName='Teacher Preview ? sample quiz, answers not saved';myStudentId='teacher_preview';myClassId='et';
+activeLaunchId='teacher_preview';launchData={classId:'et',started:true,mode:'test',showScore:true,quizSnapshot:{title:'Teacher Preview Quiz',questions:[{q:'How many days are in a week?',choices:['Six','Seven','Eight'],correctIndex:1},{q:'Which day is Shabbos?',choices:['The first day','The seventh day','The third day'],correctIndex:1}]}};
+document.getElementById('studentNameLabel').textContent=myName;applyMasterBlocked();render();return;
+}
   const id=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
   const name=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName');
   if(!id||!name)return;
@@ -625,6 +633,7 @@ function renderNav(mode,questions){
 async function submitAnswer(){
   if(selectedChoice===null){const s=document.getElementById('answerStatus');s.textContent='Choose an answer first.';s.className='status bad';return;}
   const qs=getQuestions(),q=qs[displayedQuestion],mode=launchData&&launchData.mode||'paced',st=studentEffectiveQuestionState(displayedQuestion,mode);if(!st.open||responseFor(displayedQuestion))return;
+  if(teacherPreview){myResponses[displayedQuestion]={choiceIndex:selectedChoice,correct:Number(selectedChoice)===Number(q.correctIndex)};render();return;}
   const ref=db.ref(QROOT+'/responses/'+activeLaunchId+'/'+myStudentId+'/'+displayedQuestion);
   const correct=Number(selectedChoice)===Number(q.correctIndex);
   const answer={name:myName,choiceIndex:selectedChoice,originalCorrect:correct,correct,adjusted:false,submittedAt:firebase.database.ServerValue.TIMESTAMP};
@@ -632,6 +641,7 @@ async function submitAnswer(){
 }
 
 async function markCompletion(){
+  if(teacherPreview)return;
   if(markingComplete||!activeLaunchId||!myStudentId)return;markingComplete=true;
   try{
     const ref=db.ref(QROOT+'/completions/'+activeLaunchId+'/'+myStudentId),existing=await ref.once('value');

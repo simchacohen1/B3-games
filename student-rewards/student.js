@@ -3,6 +3,28 @@
 const C=window.StudentRewardsCommon;
 const {db,auth}=C.ensureFirebase({student:true});
 const ROOT=C.ROOT;
+let teacherPreview=false;
+const teacherAccountReady=new Promise(resolve=>{
+  const deadline=Date.now()+10000;
+  const wait=()=>{
+    if(window.B3SiteSettings)window.B3SiteSettings.onAuthStateChanged((user,authorized)=>resolve({user,authorized}));
+    else if(Date.now()<deadline)setTimeout(wait,100);
+    else resolve({authorized:false});
+  };
+  wait();setTimeout(()=>resolve({authorized:false}),10000);
+});
+async function openTeacherPreview(){
+  const account=await teacherAccountReady;
+  if(!account.user||!account.authorized||window.B3SiteSettings.getActingStudent())return false;
+  if(teacherPreview)return true;
+  teacherPreview=true;
+  const [rewards,categories]=await Promise.all([db.ref(`${ROOT}/rewards`).once('value'),db.ref(`${ROOT}/categories`).once('value')]);
+  state.studentId='teacher_preview';
+  state.student={name:'Teacher Preview — sample points',initials:'TP',color:'#24344a',rewardBalance:100};
+  state.serverRewardBalance=100;state.storeOpen=true;
+  state.root={student:state.student,ratings:{},attendance:{},awards:{},comments:{},rewards:rewards.val()||{},redemptions:{},categories:categories.val()||{},settings:{rewardStoreEnabled:true}};
+  render();C.toast('Teacher preview: trial requests do not spend student points or reach the teacher.');return true;
+}
 let state={studentId:'',student:null,tab:'Progress',root:null,busy:false,activityPointHistory:[],classGoals:[],classGoalTimer:null,storeOpen:null,serverRewardBalance:null};
 const $=s=>document.querySelector(s);
 const e=C.escapeHtml;
@@ -103,6 +125,7 @@ async function login(ev){
 }
 
 async function trySharedB3Login(){
+  if(await openTeacherPreview())return;
   const id=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId')||'';
   const name=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName')||'';
   const pin=sessionStorage.getItem('b3Games_classPin')||'';
@@ -333,6 +356,7 @@ function bindClassContributionButtons(){
 }
 function bindTab(){if(state.tab==='Rewards'){document.querySelectorAll('[data-redeem]').forEach(b=>b.onclick=()=>redeem(b.dataset.redeem));bindClassContributionButtons()}}
 async function contributeClassReward(rewardId,inputId,buttonEl){
+  if(teacherPreview){C.toast('Teacher preview: no points contributed.');return;}
   if(state.busy)return;
   const storeOpen=isStoreOpen();
   if(!storeOpen){C.toast('The Prize Store is closed right now.','error');return}
@@ -363,6 +387,13 @@ async function contributeClassReward(rewardId,inputId,buttonEl){
   finally{state.busy=false;render()}
 }
 async function redeem(rewardId){
+  if(teacherPreview){
+    const reward=state.root.rewards[rewardId],cost=Number(reward?.cost)||0;
+    if(cost>state.serverRewardBalance){C.toast('Not enough sample points.','error');return;}
+    state.serverRewardBalance-=cost;state.student.rewardBalance=state.serverRewardBalance;
+    state.root.redemptions['preview_'+Date.now()]={rewardId,cost,status:'pending'};
+    render();C.toast('Preview request added — no real request sent.');return;
+  }
   const storeOpen=isStoreOpen();
   if(!storeOpen){C.toast('The Prize Store is closed for purchases right now.','error');return}
   const reward=state.root?.rewards?.[rewardId];
@@ -387,6 +418,7 @@ function showBlocked(){$('#blockedView').classList.remove('hidden');$('#loginVie
 
 $('#loginForm').addEventListener('submit',login);
 $('#logoutBtn').onclick=async()=>{
+  if(teacherPreview){location.href='../index.html';return;}
   // Leave Student Rewards only; the Fun Torah Tools login stays active.
   await auth.signOut();
   location.href='../index.html';
@@ -394,6 +426,7 @@ $('#logoutBtn').onclick=async()=>{
 
 auth.onAuthStateChanged(async user=>{
   try{
+  if(await openTeacherPreview())return;
   if(!await websiteEnabled()){showBlocked();if(user)await auth.signOut();return}
   if(!user){
     state.studentId='';state.student=null;
@@ -412,6 +445,6 @@ auth.onAuthStateChanged(async user=>{
   }catch(error){$('#loginView').classList.remove('hidden');$('#homeSignInNote').textContent=error.message||'Could not load Student Rewards. Refresh and try again.';$('#homeSignInLink').style.display='';}
 });
 setTimeout(trySharedB3Login,0);
-setInterval(async()=>{if(document.hidden)return;try{if(!await websiteEnabled())showBlocked()}catch(error){console.warn('Rewards access check failed',error)}},15000);
+setInterval(async()=>{if(document.hidden||teacherPreview)return;try{if(!await websiteEnabled())showBlocked()}catch(error){console.warn('Rewards access check failed',error)}},15000);
 setInterval(()=>{if(state.tab==='Rewards'&&state.root&&!state.busy)renderTab()},60000);
 })();

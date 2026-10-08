@@ -85,7 +85,7 @@ button:hover:not(:disabled){transform:translateY(-2px)}
 @media(max-width:600px){h1{font-size:27px}.card{padding:16px;border-radius:19px}.question{font-size:24px}.type-grid{grid-template-columns:1fr 1fr}}
 </style>
 <script src="../paid-api.js?v=20261008-cost-controls"></script>
-</head>
+<script src="../teacher-account.js"></script></head>
 <body>
 <header>
   <div class="logo">🌈📖✨</div>
@@ -239,6 +239,7 @@ const TRANSLATION_ACCURACY_NOTES=`CLASSROOM TRANSLATION ACCURACY NOTES:
 - Preserve important Hebrew images and wording when they are understandable in simple English. If the Hebrew says "your hearts," keep "your hearts" instead of changing it to "yourselves."
 - If a phrase has two genuinely equivalent literal English translations, do not use one of them as a wrong answer.
 - If an exact literal translation is uncertain, OMIT the item rather than paraphrasing or guessing.`;
+let teacherPreview=false;
 let studentId='',studentName='',selected=new Set(),quizType='shorashim',difficulty='regular',questionCount=5,items=[],qIndex=0,selectedAnswer=null,checked=false,correct=0,results=[];
 
 function slugify(s){return String(s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');}
@@ -260,6 +261,8 @@ function enterApp(){
   document.getElementById('loginCard').classList.add('hidden');document.getElementById('app').classList.remove('hidden');document.getElementById('who').textContent=studentName;renderPosukGrid();
 }
 async function restore(){
+const account=await window.B3TeacherAccountReady;
+if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){teacherPreview=true;studentId='teacher_preview';studentName='Teacher Preview ? practice results not saved';enterApp();return;}
   const id=sessionStorage.getItem('posukPractice_studentId'),name=sessionStorage.getItem('posukPractice_studentName');
   if(!id||!name)return;
   try{const s=await db.ref('posukPractice/allowedStudents/'+id).once('value');if(!s.exists())return;studentId=id;studentName=(s.val()&&s.val().name)||name;enterApp();}catch(e){}
@@ -334,6 +337,7 @@ async function finish(){
     questionCount:items.length,correct,percent:pct,results,
     createdAt:firebase.database.ServerValue.TIMESTAMP
   };
+  if(teacherPreview)return;
   try{await db.ref('b3Quiz/practiceAttempts/'+studentId).push(attempt);}catch(e){console.warn('Practice attempt was not saved',e);}
 }
 /* ---------- Play with friends (shared B3 Race) ---------- */
@@ -354,6 +358,7 @@ async function startFriendsRace(){
   document.getElementById('builder').classList.add('hidden');document.getElementById('resultCard').classList.add('hidden');document.getElementById('quizCard').classList.add('hidden');
   document.getElementById('raceCard').classList.remove('hidden');
   const box=document.getElementById('raceBox');box.innerHTML='<p style="text-align:center;font-weight:900">Loading…</p>';
+  if(teacherPreview){box.textContent='Class races require a student account. Use solo practice in teacher preview.';return;}
   const path=await B3Race.classRoomsPath(db,studentId,'weekly-quiz');
   if(race)race.leave();
   race=B3Race.create({container:box,db,roomsPath:path,studentId,studentName:studentName||studentId,
