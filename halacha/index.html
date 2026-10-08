@@ -153,7 +153,7 @@ body.exporting .resize-width,body.exporting .resize-height{display:none!importan
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="../firebase-config.js"></script>
-<script src="../site-settings.js?v=20261007-tab-login"></script><script src="../student-class.js?v=20261007-tab-login"></script>\n<script src="../game-gate.js?v=20261007-tab-login" data-game-id="halacha" data-back-href="../index.html"></script>
+<script src="../site-settings.js?v=20261008-owner-demo"></script><script src="../student-class.js?v=20261007-tab-login"></script>\n<script src="../game-gate.js?v=20261008-owner-demo" data-game-id="halacha" data-back-href="../index.html"></script>
 </head><body><header><div class=bar><h1 id="halachaTitle">📔 My Halacha Scrapbook — סימן א</h1><button id="studentModeBtn" onclick="setHalachaMode(false)">Student</button><button id="teacherModeBtn" style="display:none;background:#fff3bf;color:#5c4300" onclick="setHalachaMode(true)">👨‍🏫 Teacher</button><a class="game-show-link" href="../game-show/teacher.html" target="_blank" rel="noopener">🏆 Game Show</a><button onclick="openExport()">Print / PDF / Slides</button><span id="cloudSaveStatus" style="font-size:12px;font-weight:800;opacity:.9">Saving on this device</span></div></header><main><div id="halachaAccessPanelMain" class="halacha-access-panel"><h3>🔒 Student Siman Access</h3><div id="halachaAccessRowsMain">Loading class access…</div><div class="halacha-access-note">Choose the furthest Siman students may open. Earlier Simanim remain open; later Simanim stay locked.</div></div><div id="simanHub" class="simanHub"></div><button id="simanBack" class="simanBack" type="button" onclick="showSimanHub()">← Back to Simanim</button><div id=tabs class="tabs siman-tabs"></div><div id=sections></div><div id=review class="section teacherOnly"></div></main><script>
 const lessons=[
 {id:"a",tab:"1 · שויתי",title:"שויתי ה׳ לנגדי תמיד",seif:"סעיף א",objective:"Develop a constant awareness that Hashem is always present, which shapes one’s behavior in public and in private.",source:"שויתי ה׳ לנגדי תמיד · הכרה תמידית בהשגחת ה׳",qs:["What is the meaning of שויתי ה׳ לנגדי תמיד?","Why is it important to remember Hashem is always with us?","How does this awareness affect how we speak and behave?"],type:"choices",pieces:[["he","שויתי ה׳ לנגדי תמיד"],["text","I remember Hashem wherever I am"],["sticker","🏠"],["sticker","🏫"],["sticker","💬"]]},
@@ -711,7 +711,7 @@ let rb=document.createElement("button");rb.dataset.id="review";rb.textContent="�
 function halachaAuthReady(){return new Promise(r=>{try{if(!window.firebase||!firebase.auth)return r(null);let done=false,t=setTimeout(()=>{if(!done){done=true;r(null)}},4000),u=firebase.auth().onAuthStateChanged(x=>{if(done)return;done=true;clearTimeout(t);u();r(x)})}catch(e){r(null)}})}
 halachaAuthReady().then(loadCloudHalacha);
 if(HALACHA_TEACHER_PREVIEW){
- document.addEventListener("DOMContentLoaded",()=>setHalachaMode(true),{once:true});
+ document.addEventListener("DOMContentLoaded",()=>setHalachaMode(HALACHA_PARAMS.get("demo")!=="1"),{once:true});
  setTimeout(()=>{
    const bar=document.querySelector(".bar");
    if(bar&&!document.getElementById("teacherPreviewBanner")){
@@ -771,7 +771,7 @@ if(window.B3SiteSettings&&typeof B3SiteSettings.onAuthStateChanged==="function")
    const btn=document.getElementById("teacherModeBtn");
    if(btn)btn.style.display=authorized?"":"none";
    if(authorized)renderHalachaTeacherAccess(access||{});
-   if(authorized&&HALACHA_TEACHER_LESSON)setHalachaMode(true);
+   if(authorized&&HALACHA_TEACHER_LESSON)setHalachaMode(HALACHA_PARAMS.get("demo")!=="1");
  });
 }
 document.addEventListener("click",function(ev){

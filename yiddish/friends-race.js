@@ -72,6 +72,7 @@
     var box = $("yiFriendsBox"), d = getDb(), id = "", name = "";
     try { id = String(sessionStorage.getItem("b3Games_studentId") || "").trim(); name = sessionStorage.getItem("b3Games_studentName") || ""; } catch (e) {}
     if (student && student.name) name = student.name;
+    if (window.YiddishAPI.preview) { box.textContent = 'Class races require student accounts. Use solo activities for demonstrations.'; return; }
     var path = await window.B3Race.classRoomsPath(d, id, "yiddish");
     if (race) race.leave();
     race = window.B3Race.create({

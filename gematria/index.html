@@ -113,7 +113,7 @@ bdi.he{unicode-bidi:isolate}.sofitList{direction:ltr;display:inline}
 <script src="../firebase-config.js"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
 <script src="../b3-race.js?v=20261007"></script>
-<script src="../game-gate.js?v=20261007-tab-login" data-game-id="gematria" data-back-href="../index.html"></script>
+<script src="../game-gate.js?v=20261008-owner-demo" data-game-id="gematria" data-back-href="../index.html"></script>
 </head>
 <body>
 <header>
@@ -248,6 +248,7 @@ bdi.he{unicode-bidi:isolate}.sofitList{direction:ltr;display:inline}
   <p class="saveNote" id="saveNote"></p>
 </main>
 
+<script src="../teacher-account.js?v=20261008"></script>
 <script>
 (function(){
 "use strict";
@@ -291,6 +292,7 @@ const pick=a=>a[rnd(a.length)];
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function safeSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 
+let teacherPreview=false;
 const studentId=String(sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId")||"").trim();
 const studentName=String(sessionStorage.getItem("b3Games_studentName")||"").trim();
 const LOCAL_KEY="gematria_progress:"+(studentId||"guest");
@@ -317,7 +319,7 @@ function merge(local,remote){ // keep the best of both copies
 }
 function setNote(t){$("saveNote").textContent=t}
 function save(){
- P.level=level;safeSet(LOCAL_KEY,JSON.stringify(P));
+ P.level=level;if(!teacherPreview)safeSet(LOCAL_KEY,JSON.stringify(P));
  $("starCount").textContent=P.stars;
  if(!progressRef){return}
  clearTimeout(saveTimer);
@@ -334,6 +336,12 @@ function record(kind,ok,letters){
 }
 
 async function connect(){
+ const account=await window.B3TeacherAccountReady;
+ if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
+  teacherPreview=true;P=blankProgress();$("starCount").textContent=0;
+  $("whoName").textContent="Teacher demonstration";
+  $("banner").classList.add("hidden");setNote("Demonstration progress stays in this tab.");return;
+ }
  $("whoName").textContent=studentName||"";
  if(!studentId){
   $("banner").innerHTML='You can practice, but your stars will not be saved. <a href="../index.html">Sign in on Fun Torah Tools</a> to save them.';
@@ -599,6 +607,7 @@ function raceQuestions(){
 }
 let race=null;
 function startRace(){
+ if(teacherPreview){$("raceBox").textContent="Class races require student accounts. Use solo games for demonstrations.";return;}
  if(!race){
   race=B3Race.create({container:$("raceBox"),db,roomsPath:classBase?classBase+"/rooms":"",studentId,studentName:studentName||studentId,
    makeQuestions:raceQuestions,roomInfo:()=>({label:"Level "+level+" ("+["","א–י","א–צ","א–ת"][level]+")"}),
