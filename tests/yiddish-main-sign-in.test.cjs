@@ -1,4 +1,4 @@
-﻿const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync('yiddish/app.js','utf8');
 const startup=source.slice(source.lastIndexOf('(async()=>{try{'));
 async function run(saved={},failure){
