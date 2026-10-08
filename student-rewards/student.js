@@ -1,6 +1,8 @@
 (function(){
 'use strict';
 const C=window.StudentRewardsCommon;
+// Restore the shared teacher account before creating the separate student app.
+C.ensureFirebase();
 const {db,auth}=C.ensureFirebase({student:true});
 const ROOT=C.ROOT;
 let teacherPreview=false;
