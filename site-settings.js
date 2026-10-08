@@ -886,8 +886,15 @@
   }
 
 
+  // Teachers no longer get a Teacher version / Student version switch.
+  // A signed-in teacher who opens a tool's student page is sent to that
+  // tool's teacher page instead. To see a student page, the teacher uses
+  // "Sign in as a student"; in that mode getActingStudent() is set and
+  // access is not authorized, so this never redirects.
   function showToolVersions(access) {
-    if (!document.body || !access.authorized || getActingStudent()) return;
+    const oldBar = document.getElementById('b3ToolVersions');
+    if (oldBar) oldBar.remove();
+    if (!access || !access.authorized || getActingStudent()) return;
     const versions = {
       yiddish:['yiddish/teacher.html','yiddish/index.html'],
       record_pesukim:['record_pesukim/teacher.html','record_pesukim/student.html'],
@@ -895,31 +902,26 @@
       shorashim:['shorashim/teacher.html','shorashim/index.html'],
       'rashi-letters':['rashi-letters/teacher.html','rashi-letters/student.html'],
       gematria:['gematria/teacher.html','gematria/index.html'],
-      halacha:['halacha/teacher.html','halacha/index.html?teacher=1'],
+      halacha:['halacha/teacher.html','halacha/index.html'],
       'weekly-quiz':['weekly-quiz/teacher.html','weekly-quiz/index.html'],
       'game-show':['game-show/teacher.html','game-show/player.html'],
       'student-rewards':['student-rewards/teacher.html','student-rewards/student.html']
     };
-    const base = new URL(SITE_BASE), current = new URL(location.href);
-    const path = current.pathname.slice(base.pathname.length), pair = versions[path.split('/')[0]];
-    if (!pair || !pair.some(p=>p.split('?')[0]===path)) return;
-    let bar = document.getElementById('b3ToolVersions');
-    if (bar) bar.remove();
-    bar = document.createElement('nav'); bar.id = 'b3ToolVersions';
-    bar.setAttribute('aria-label','Tool version');
-    bar.style.cssText='display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;padding:10px 16px;margin:0;background:#eef4f2;font:600 15px Arial;color:#163c49';
+    let base, current;
+    try { base = new URL(SITE_BASE); current = new URL(location.href); } catch (e) { return; }
+    if (current.origin !== base.origin || current.pathname.indexOf(base.pathname) !== 0) return;
+    let path = current.pathname.slice(base.pathname.length);
+    const folder = path.split('/')[0], pair = versions[folder];
+    if (!pair) return;
+    if (path === folder || path === folder + '/') path = folder + '/index.html';
+    if (path !== pair[1]) return; // only student pages redirect
+    // Halacha's teacher page opens a student's work on index.html?teacherView=ID;
+    // that is a teacher tool, so leave it alone.
+    if (current.searchParams.has('teacherView') || current.searchParams.has('teacher')) return;
+    const target = new URL(pair[0], SITE_BASE);
     const requested = current.searchParams.get('class');
-    const validClass = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(id);
-    const classId = validClass(requested) ? requested : access.classIds.find(validClass) || (access.role==='admin'?'et':'');
-    pair.forEach((path,index)=>{
-      const link = document.createElement('a'), target = new URL(path,SITE_BASE);
-      if (classId) target.searchParams.set('class',classId);
-      if (index===1) target.searchParams.set('demo','1');
-      link.href=target.href; link.textContent=index===0?'Teacher version':'Student version';
-      link.style.cssText='padding:8px 14px;border-radius:8px;background:white;color:#163c49;text-decoration:none;border:1px solid #cbd8d5';
-      bar.appendChild(link);
-    });
-    document.body.insertBefore(bar,document.body.firstChild);
+    if (requested && /^[A-Za-z0-9_-]{1,100}$/.test(requested)) target.searchParams.set('class', requested);
+    location.replace(target.href);
   }
 
   function onAuthStateChanged(callback) {
