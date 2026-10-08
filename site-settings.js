@@ -950,7 +950,7 @@
     sessionStorage.setItem("b3Games_workspaceId", WORKSPACE_ID);
     sessionStorage.removeItem("b3TeacherBypass");
     sessionStorage.setItem(ACTING_KEY, JSON.stringify({ id:studentId, name:name, classId:classId, className:String(cls.name || classId.toUpperCase()), startedAt:Date.now() }));
-    location.href = SITE_BASE + "index.html";
+    location.href = SITE_BASE + "index.html?v=20261007-tab-login";
   }
 
   function stopActingAsStudent() {
