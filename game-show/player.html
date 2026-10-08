@@ -292,23 +292,38 @@ function playBuzzSound() {
   });
 }
 
+function mustSitOut(data, name) {
+  return !!(data && data.lastWinner === name && (data.lastWinnerStreak || 0) >= 2);
+}
+
 function buzzIn() {
-  if (masterBlocked) return;
-  // Guard against buzzing during the lockout window, even if the button
-  // state hasn't refreshed yet.
+  if (masterBlocked || !myName || mustSitOut(lastData, myName)) return;
   if (lockedUntil && Date.now() < lockedUntil) return;
-  if (lastData && lastData.buzzedBy) return; // already decided
-  if (lastData && lastData.revealDelayOn) {
-    // Randomize-winner mode: don't reveal anything yet. Just quietly add
-    // myself to the pool of everyone who buzzed during this window - the
-    // teacher's screen picks a winner at random once the window closes.
-    if (lastData.buzzPool && lastData.buzzPool[myName]) return; // already in the pool
-    playBuzzSound();
-    gameRef.child('buzzPool').child(myName).set(true);
-  } else {
-    playBuzzSound();
-    gameRef.child('buzzedBy').transaction(current => current || myName);
-  }
+  if (lastData && lastData.buzzedBy) return;
+  // A root transaction keeps winner and streak together even when students
+  // buzz simultaneously or another tab has newer state.
+  gameRef.transaction(current => {
+    if (!current || current.buzzedBy || mustSitOut(current, myName)) return;
+    if (current.buzzerDelayOn && Date.now() < (current.buzzUnlockAt || 0)) return;
+    if (current.revealDelayOn) {
+      if (current.buzzPool && current.buzzPool[myName]) return;
+      current.buzzPool = current.buzzPool || {};
+      current.buzzPool[myName] = true;
+    } else {
+      const round = String(current.buzzOpenAt || 0) + ':' + (current.qIndex || 0);
+      if (current.lastWinnerRound !== round) {
+        current.lastWinnerStreak = current.lastWinner === myName ? (current.lastWinnerStreak || 0) + 1 : 1;
+        current.lastWinner = myName;
+        current.lastWinnerRound = round;
+      }
+      current.buzzedBy = myName;
+      current.selectedPlayer = myName;
+    }
+    return current;
+  }, (error, committed) => {
+    if (error) document.getElementById('status').textContent = 'Could not buzz in. Please try again.';
+    else if (committed) playBuzzSound();
+  });
 }
 
 let lockedUntil = 0;
@@ -320,6 +335,12 @@ function updateBuzzAvailability() {
   const countdownEl = document.getElementById('countdown');
   const now = Date.now();
 
+  if (mustSitOut(lastData, myName)) {
+    buzzBtn.disabled = true;
+    countdownEl.textContent = '';
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+    return;
+  }
   if (lockedUntil && now < lockedUntil) {
     buzzBtn.disabled = true;
     const secsLeft = Math.ceil((lockedUntil - now) / 1000);
@@ -406,6 +427,11 @@ gameRef.on('value', snapshot => {
   if (data.buzzedBy) {
     buzzBtn.disabled = true;
     status.textContent = data.buzzedBy === myName ? "You buzzed in first!" : data.buzzedBy + " buzzed in first.";
+    document.getElementById('countdown').textContent = '';
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+  } else if (mustSitOut(data, myName)) {
+    buzzBtn.disabled = true;
+    status.textContent = 'You won two buzz-ins in a row. Let another player have a turn!';
     document.getElementById('countdown').textContent = '';
     if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
   } else if (iAlreadyBuzzed) {
