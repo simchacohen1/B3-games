@@ -32,6 +32,16 @@
   .status { margin-top: 16px; font-size: 16px; color: #7d5236; }
   .countdown { margin-top: 16px; font-size: 20px; color: #b85042; font-weight: bold; }
   .score-display { margin-top: 20px; font-size: 18px; }
+  .scoreboard { margin-top: 20px; padding: 20px; text-align: left; }
+  .scoreboard h2 { margin: 0 0 14px; color: #7d5236; font-size: 21px; }
+  .scoreboard table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .scoreboard th, .scoreboard td { padding: 12px 8px; border-bottom: 1px solid #f0e3d0; }
+  .scoreboard th { color: #7d5236; font-size: 14px; }
+  .scoreboard th:first-child { width: 42px; }
+  .scoreboard th:last-child, .scoreboard td:last-child { width: 58px; text-align: right; font-variant-numeric: tabular-nums; }
+  .scoreboard td:nth-child(2) { overflow-wrap: anywhere; }
+  .scoreboard .your-row { background: #fff3d9; font-weight: bold; }
+  .scoreboard-empty { color: #7d5236; }
   .hidden { display: none; }
   .master-blocked { max-width: 400px; margin: 60px auto 0 auto; background: white; border-radius: 12px; border: 1px solid #d9a85c; padding: 28px; font-size: 18px; }
 </style>
@@ -69,6 +79,14 @@
     <div class="status" id="status"></div>
   </div>
   <div class="score-display">Your score: <span id="myScore">0</span></div>
+  <section class="panel scoreboard" aria-labelledby="scoreboardTitle">
+    <h2 id="scoreboardTitle">Players &amp; scores</h2>
+    <p id="scoreboardEmpty" class="scoreboard-empty">Waiting for players to join.</p>
+    <table id="scoreboardTable" class="hidden" aria-label="Live player scores">
+      <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">Score</th></tr></thead>
+      <tbody id="scoreboardRows"></tbody>
+    </table>
+  </section>
 </div>
 
 <script>
@@ -183,9 +201,7 @@ function enterGame(displayName, studentId) {
   gameRef.child('scores').child(myName).transaction(current => current || 0);
   applyMasterBlocked();
 
-  if (lastData && lastData.scores && lastData.scores[myName] !== undefined) {
-    document.getElementById('myScore').textContent = lastData.scores[myName];
-  }
+  renderScoreboard(lastData && lastData.scores);
 }
 
 async function joinGame() {
@@ -346,10 +362,36 @@ function showWaiting(waiting) {
 }
 setInterval(() => { if (lastData) showWaiting(!gameIsLive(lastData)); }, 15000);
 
+// Use the current game's score roster, so each class sees its own players.
+function renderScoreboard(scores) {
+  const players = Object.entries(scores || {}).map(([name, score]) => ({
+    name, score: Number.isFinite(Number(score)) ? Number(score) : 0
+  })).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+  const rows = document.getElementById('scoreboardRows');
+  rows.replaceChildren();
+  document.getElementById('scoreboardEmpty').classList.toggle('hidden', players.length > 0);
+  document.getElementById('scoreboardTable').classList.toggle('hidden', players.length === 0);
+  document.getElementById('myScore').textContent = (players.find(player => player.name === myName) || { score: 0 }).score;
+  let rank = 0;
+  players.forEach((player, index) => {
+    if (index === 0 || player.score !== players[index - 1].score) rank = index + 1;
+    const row = document.createElement('tr');
+    const isYou = player.name === myName;
+    row.classList.toggle('your-row', isYou);
+    [rank, player.name + (isYou ? ' (you)' : ''), player.score].forEach(value => {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+    rows.appendChild(row);
+  });
+}
+
 gameRef.on('value', snapshot => {
-  if (!questionsReady) return; // wait until questions have loaded from the database
   const data = snapshot.val() || {};
   lastData = data;
+  renderScoreboard(data.scores);
+  if (!questionsReady) return; // Scores can update while questions load.
   showWaiting(!gameIsLive(data));
   const qIndex = data.qIndex || 0;
   const q = questions[qIndex] || questions[0];
@@ -376,9 +418,7 @@ gameRef.on('value', snapshot => {
     updateBuzzAvailability();
   }
 
-  if (myName && data.scores && data.scores[myName] !== undefined) {
-    document.getElementById('myScore').textContent = data.scores[myName];
-  }
+
 });
 </script>
 
