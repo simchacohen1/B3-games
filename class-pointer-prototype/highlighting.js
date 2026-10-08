@@ -32,8 +32,10 @@ window.createClassHighlighter=function(options){
       // Earlier marks from other people win at overlaps. A student cannot paint over another layer.
       const older=entries.slice(0,index).filter(s=>s.owner!==stroke.owner);
       let mask=null;if(older.length){mask='mask-'+stroke.id;const m=svg('mask',{id:mask,maskUnits:'userSpaceOnUse',x:0,y:0,width:b.width,height:b.height});m.appendChild(svg('rect',{width:b.width,height:b.height,fill:'white'}));older.forEach(s=>m.appendChild(path(s,b.width,b.height,'black')));defs.appendChild(m)}
-      let group=owners.get(stroke.owner);if(!group){group=svg('g',{'data-owner':stroke.owner});owners.set(stroke.owner,group);layer.appendChild(group)}
-      const mark=path(stroke,b.width,b.height,stroke.color);mark.setAttribute('opacity',stroke.tool==='pencil'?'0.94':stroke.tool==='crayon'?'0.78':'0.32');mark.dataset.tool=stroke.tool;mark.dataset.stroke=stroke.id;if(mask)mark.setAttribute('mask','url(#'+mask+')');group.appendChild(mark);
+      // Transparency is applied once per owner group, so a person's overlapping marks stay one flat layer instead of darkening.
+      const kind=['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight',key=stroke.owner+'|'+kind;
+      let group=owners.get(key);if(!group){group=svg('g',{'data-owner':stroke.owner,'data-tool':kind,opacity:kind==='pencil'?'0.94':kind==='crayon'?'0.78':'0.32'});owners.set(key,group);layer.appendChild(group)}
+      const mark=path(stroke,b.width,b.height,stroke.color);mark.dataset.strokeTool=stroke.tool;mark.dataset.stroke=stroke.id;if(mask)mark.setAttribute('mask','url(#'+mask+')');group.appendChild(mark);
     });
   }
   function cancel(){if(dragId!==null&&$('stage').hasPointerCapture?.(dragId))$('stage').releasePointerCapture(dragId);draft=null;dragId=null;render()}
