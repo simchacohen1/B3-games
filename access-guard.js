@@ -7,7 +7,7 @@
   if (Array.from(document.scripts).some(script => script !== loader &&
       new URL(script.src || location.href).pathname.endsWith("/game-gate.js"))) return;
   const gate = document.createElement("script");
-  gate.src = new URL("game-gate.js?v=20261001-role-scope", loader.src).href;
+  gate.src = new URL("game-gate.js?v=20261008-tool-versions", loader.src).href;
   gate.dataset.gameId = toolId;
   document.head.appendChild(gate);
 })();
