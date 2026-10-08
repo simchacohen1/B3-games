@@ -69,7 +69,7 @@ const NO_STORY_MESSAGE='Your teacher has not added a Yiddish story for your clas
 function showNoStory(){noStory=true;round=null;flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('login').hidden=true;block(NO_STORY_MESSAGE)}
 function render(){
   if(!student||!config||noStory)return;
-  if(!round&&!flash&&!storyQuiz&&!sentenceGame&&!soundGame){$('words').hidden=false;$('toolbar').hidden=false;}
+  if(!round&&!flash&&!storyQuiz&&!sentenceGame&&!soundGame&&!window.yiddishFriendsOpen){$('words').hidden=false;$('toolbar').hidden=false;}
   $('login').hidden=true;$('lesson').hidden=false;$('who').textContent=student.name+' · '+student.classId.toUpperCase();
   const ids=[...new Set(config.sections.flatMap(s=>s.words))];
   $('stats').textContent=`${ids.filter(id=>status(progress[id])==='Learned').length} learned · ${ids.filter(id=>status(progress[id])==='Practicing').length} practicing`;
