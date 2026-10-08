@@ -1,5 +1,5 @@
 'use strict';
-const APP_BUILD='2026-10-05-story-per-step';
+const APP_BUILD='2026-10-08-main-sign-in-only';
 window.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');b.textContent='build: '+APP_BUILD;b.style.cssText='position:fixed;bottom:6px;right:8px;font:11px monospace;color:#94a3a0;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;z-index:9999;pointer-events:none';document.body.appendChild(b)});
 const C=window.YIDDISH_CONTENT,$=id=>document.getElementById(id),API=YiddishAPI;
 let group=0,part=0,round=null,showAll=false,progress={},config=null,student=null,busy=false,pending=null,advanceTimer=null,flash=null,storyQuiz=null,sentenceGame=null,soundGame=null;
@@ -91,7 +91,6 @@ function render(){
 }
 async function refresh(){const s=await API.call('status');student=s.student;config=s.config;progress=s.progress;if(s.noStory)return showNoStory();noStory=false;if(!open(group))group=Math.max(0,config.unlocked[student.classId]-1);round=null;if(s.round&&!s.round.finished&&open(s.round.group)){group=s.round.group;part=Number.isInteger(s.round.part)?s.round.part:0}render()}
 async function login(id,pin){const s=await API.call('login',{studentId:id,pin:pin.trim(),classId:sessionStorage.getItem('b3Games_studentClass')||''});sessionStorage.setItem('yiddishSession',s.token);sessionStorage.setItem('yiddishSessionClass',sessionStorage.getItem('b3Games_studentClass')||'');await refresh();if(!noStory)message('Progress connected ✓')}
-$('loginForm').onsubmit=async e=>{e.preventDefault();$('signIn').disabled=true;try{await login($('name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''),$('pin').value);$('pin').value=''}catch(e){message(e.message)}finally{$('signIn').disabled=false}};
 $('all').onclick=()=>{if(busy||pending)return;clearAdvance();showAll=!showAll;round=null;flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;render()};
 function shuffleClient(a){const b=a.slice();for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
 function focusFlash(){requestAnimationFrame(()=>$('flashcards')?.scrollIntoView({behavior:'smooth',block:'start'}))}
@@ -724,12 +723,7 @@ async function submit(answer,answers,feedback){
     const pin=sessionStorage.getItem('b3Games_classPin');
     if(id&&pin) await login(id,pin);
     else{
-      // No saved passcode on this device (for example a teacher's own student account):
-      // show the sign-in form instead of waiting forever.
-      const f=$('loginForm');f.hidden=false;f.style.display='';
-      $('name').value=sessionStorage.getItem('b3Games_studentName')||'';
-      $('login').querySelector('p').textContent='Type your name and passcode to open Yiddish.';
-      $(($('name').value?'pin':'name')).focus();
+      message('Open Fun Torah Tools and sign in to connect your Yiddish lesson.');
     }
   }
-}catch(e){block(e.message);$('login').hidden=false;const f=$('loginForm');f.hidden=false;f.style.display='';if(!$('name').value)$('name').value=sessionStorage.getItem('b3Games_studentName')||''}let statusChecking=false;setInterval(async()=>{if(!student||busy||pending||document.hidden||statusChecking)return;statusChecking=true;try{const s=await API.call('status');config=s.config;student=s.student;if(s.noStory){showNoStory();return}if(noStory){noStory=false;progress=s.progress;message('');render();return}if(round&&!open(round.group)){round=null;block('Your teacher closed this section.')}else if(!round){progress=s.progress;render()}}catch(e){block(e.message)}finally{statusChecking=false}},15000)})();
+}catch(e){block(e.message);$('login').hidden=false}let statusChecking=false;setInterval(async()=>{if(!student||busy||pending||document.hidden||statusChecking)return;statusChecking=true;try{const s=await API.call('status');config=s.config;student=s.student;if(s.noStory){showNoStory();return}if(noStory){noStory=false;progress=s.progress;message('');render();return}if(round&&!open(round.group)){round=null;block('Your teacher closed this section.')}else if(!round){progress=s.progress;render()}}catch(e){block(e.message)}finally{statusChecking=false}},15000)})();
