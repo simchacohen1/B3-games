@@ -227,7 +227,7 @@
         <div class="game-group-grid">
           <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html" target="_blank" rel="noopener"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
           <a class="game-card" data-game-id="chazara" href="chazara/index.html" target="_blank" rel="noopener"><span class="card-icon">🔁</span><span class="card-title">Chazara Chart</span></a>
-          <a class="game-card" data-game-id="shorashim" href="shorashim/index.html" target="_blank" rel="noopener"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span></a>
+          <a class="game-card" data-game-id="shorashim" href="shorashim/index.html"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span></a>
         </div>
       </section>
 
@@ -649,6 +649,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(!teacherHref)return false;
     el("versionModalTitle").textContent=game.name;
     el("versionStudentLink").href=game.element.getAttribute("href");
+    el("versionStudentLink").target=game.id==="shorashim"?"_self":"_blank";
     el("versionTeacherLink").href=teacherHref;
     el("versionModal").classList.remove("hidden");
     return true;
