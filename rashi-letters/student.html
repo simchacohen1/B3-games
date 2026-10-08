@@ -740,11 +740,33 @@ async function checkSavedAccess(id){
   if(profile.active===false)return {ok:false,reason:'Your student access is turned off. Ask your teacher.'};
   return {ok:true,slug:id,displayName:String(profile.name||sessionStorage.getItem('b3Games_studentName')||'Student')};
 }
+let teacherPreview = false;
 (async function enterWithHomepageLogin(){
   const gate=document.getElementById('nameGate'),msg=document.getElementById('gateMsg');
   ['studentNameInput','classPinInput','startBtn'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.display='none';const lab=gate.querySelector('label[for="'+id+'"]');if(lab)lab.style.display='none';}});
   const id=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId')||'';
   const sendHome=reason=>{msg.innerHTML='';msg.append(document.createTextNode(reason+' '));const a=document.createElement('a');a.href='../index.html';a.textContent='Go to Fun Torah Tools';msg.append(a);};
+  msg.textContent='Checking your account...';
+  const account = await new Promise(resolve => {
+    const deadline = Date.now() + 10000;
+    const wait = () => {
+      if(window.B3SiteSettings){
+        window.B3SiteSettings.onAuthStateChanged((user,authorized) => resolve({user,authorized}));
+      }else if(Date.now() < deadline){setTimeout(wait,100);}
+      else resolve({authorized:false});
+    };
+    wait();
+    setTimeout(() => resolve({authorized:false}),10000);
+  });
+  if(account.user && account.authorized && !window.B3SiteSettings.getActingStudent()){
+    teacherPreview=true;
+    studentId=''; studentName='Teacher Preview';
+    const banner=document.createElement('p');
+    banner.textContent='Teacher preview - no student progress is saved. ';
+    const home=document.createElement('a');home.href='../index.html';home.textContent='Back to Fun Torah Tools';
+    banner.append(home);document.querySelector('header').append(banner);
+    msg.textContent='';updateRewardHud();gate.style.display='none';showModeGate();return;
+  }
   if(!id)return sendHome('Please sign in on Fun Torah Tools first.');
   msg.textContent='Signing you in…';
   try{
@@ -1089,7 +1111,7 @@ async function handleAnswer(letter, btnEl){
       if(phase==='letter') phase='word';
       else { phase='letter'; unitIndex++; unitAdvanced = true; }
       guidedIndex=unitIndex; guidedPhase=phase;
-      writes.push(db.ref('rashiLetters/progress/'+studentId).update({currentUnitIndex:unitIndex,currentPhase:phase}));
+      if(!teacherPreview) writes.push(db.ref('rashiLetters/progress/'+studentId).update({currentUnitIndex:unitIndex,currentPhase:phase}));
     } else if(practiceModeType==='mixed'){
       if(phase==='letter') phase='word';
       else practiceFinished = true;
@@ -1639,6 +1661,7 @@ function renderWords(){
 }
 
 async function logAttempt(unitId, ph, correct){
+  if(teacherPreview || !studentId)return;
   const key = unitId + '_' + ph;
   const path = 'rashiLetters/progress/' + studentId + '/units/' + key;
   const snap = await db.ref(path).once('value');
