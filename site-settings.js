@@ -1168,6 +1168,49 @@
     });
   }
 
+  // ---------------------------------------------------------------------
+  // "Back to Fun Torah Tools" button on every teacher page.
+  // Skipped inside frames, on student pages, and on pages that already
+  // show their own visible link back to the home page.
+  // ---------------------------------------------------------------------
+  function isTeacherPage() {
+    let base, current;
+    try { base = new URL(SITE_BASE); current = new URL(location.href); } catch (e) { return false; }
+    if (current.origin !== base.origin || current.pathname.indexOf(base.pathname) !== 0) return false;
+    const path = current.pathname.slice(base.pathname.length);
+    if (/(^|\/)teacher\.html$/.test(path)) return true;
+    if (path === "class-pointer-prototype/dashboard.html") return true;
+    if (/^halacha\/(index\.html)?$/.test(path) && current.searchParams.has("teacher")) return true;
+    return false;
+  }
+
+  function pageHasHomeLink() {
+    let home;
+    try { home = new URL(SITE_BASE); } catch (e) { return false; }
+    return Array.prototype.some.call(document.querySelectorAll("a[href]"), function (a) {
+      let u;
+      try { u = new URL(a.getAttribute("href"), location.href); } catch (e) { return false; }
+      if (u.origin !== home.origin) return false;
+      if (u.pathname !== home.pathname && u.pathname !== home.pathname + "index.html") return false;
+      return a.getClientRects().length > 0; // visible on the page
+    });
+  }
+
+  function showBackToHome() {
+    if (window.top !== window || getActingStudent() || !isTeacherPage()) return;
+    if (document.getElementById("b3BackHome") || pageHasHomeLink()) return;
+    const link = document.createElement("a");
+    link.id = "b3BackHome";
+    link.href = SITE_BASE + "index.html";
+    link.textContent = "\u2190 Fun Torah Tools";
+    link.style.cssText = "position:fixed;left:14px;bottom:14px;z-index:2147483000;padding:8px 14px;border-radius:999px;" +
+      "background:#1f2937;color:#fff;font:700 13px/1.2 Arial,sans-serif;text-decoration:none;box-shadow:0 4px 14px rgba(0,0,0,.25)";
+    document.body.appendChild(link);
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", showBackToHome, { once: true });
+  else showBackToHome();
+
   window.B3SiteSettings = {
     defaultSettings: cloneDefaultSettings(),
     normalizeSettings: normalizeSettings,
