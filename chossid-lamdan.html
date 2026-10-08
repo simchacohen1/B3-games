@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A Chossid is a Lamdan — Weekly Marks</title>
+<style>
+:root{--ink:#18324a;--blue:#245d91;--line:#c9dfef;--good:#2e8b57;--muted:#667b8c}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f4f8fb;color:var(--ink)}
+.wrap{max-width:1100px;margin:20px auto;padding:0 14px 40px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin:14px 0;box-shadow:0 5px 18px rgba(30,70,100,.06)}
+h1{color:var(--blue);margin-bottom:4px}.small{font-size:13px;color:var(--muted)}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:8px;border-bottom:1px solid #dce7ef;text-align:left;vertical-align:top}th{background:#edf5fa}
+input,textarea,button{font:inherit}input,textarea{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}input[type=number]{width:85px}
+button{border:0;border-radius:9px;padding:11px 16px;font-weight:800;cursor:pointer}.good{background:var(--good);color:#fff}.secondary{background:#e8f1f7;color:var(--ink)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}.status{font-weight:700}.back{color:var(--blue);text-decoration:none;font-weight:700}
+.banner{background:#eef7fd;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+@media(max-width:700px){th:nth-child(3),td:nth-child(3){min-width:260px}}
+</style></head>
+<body><div class="wrap">
+<a class="back" href="./school-marks.html">← Back to School Marks</a>
+<h1>A Chossid is a Lamdan — Weekly Marks</h1>
+<div class="banner">These are reviewable drafts. Edit any score or comment before syncing. Nothing is saved to Nigri until you press the green button.</div>
+<div class="card">
+<label><b>Week ending</b><input id="date" type="date" style="max-width:190px;margin-left:8px"></label>
+</div>
+<div id="classes"></div>
+</div>
+<script>
+const SYNC_URL='https://nigrisync.onrender.com/sync-marks',SYNC_KEY='1qaz2wsx';
+const DEFAULT_DATA={
+ date:'2026-10-08',
+ classes:[
+  {id:'et',label:'B3 ET',students:[
+   ['Chaikin Mayer Chaim',99,'Excellent week — keep up the great work!'],
+   ['Gourarie Yossi',95,'Great participation this week — keep it up!'],
+   ['Huebner Sholom DovBer',92,'Nice job this week — keep participating and showing what you know!'],
+   ['Lapine Moshe',91,'Good improvement this week — keep pushing yourself!'],
+   ['Notik Kehos',98,'Excellent effort and participation — great job!'],
+   ['Oirechman Yisroel',97,'Great energy and participation this week!'],
+   ['Raichman Moshe Tuvia',96,'Very nice participation and effort — keep it up!'],
+   ['Rosenfeld Avrohom',97,'Great job this week — strong effort and participation!'],
+   ['Rozmarin Levi',95,'Nice work this week — keep up the good effort!'],
+   ['Traxler Arik',90,'Good effort this week — keep working on staying focused!']
+  ]},
+  {id:'wt',label:'B3 WT',students:[
+   ['Greenberg Ari',98,'Excellent week — great participation and effort!'],
+   ['Rosenfeld Zev',86,'Keep working hard and getting more involved — you can do it!'],
+   ['Schtroks Levi',98,'Excellent involvement and effort this week!'],
+   ['Simmonds Yisroel Aryeh',95,'Nice steady work this week — keep it up!'],
+   ['Vogel Leibel',92,'Good job this week — keep working on staying focused and consistent!'],
+   ['Wolf Yisroel Arye Leib',97,'Great effort and responsibility this week!']
+  ]}
+ ]
+};
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function decodePayload(){
+ const p=new URLSearchParams(location.search).get('p'); if(!p)return DEFAULT_DATA;
+ try{const b=p.replace(/-/g,'+').replace(/_/g,'/');const txt=decodeURIComponent(escape(atob(b)));const j=JSON.parse(txt);return j&&j.classes?j:DEFAULT_DATA}catch(e){console.warn('Bad prefill payload',e);return DEFAULT_DATA}
+}
+const data=decodePayload(); document.getElementById('date').value=data.date||'2026-10-08';
+function render(){
+ const host=document.getElementById('classes');host.innerHTML='';
+ data.classes.forEach(cls=>{
+  const card=document.createElement('div');card.className='card';card.dataset.classId=cls.id;
+  card.innerHTML='<h2>'+esc(cls.label)+'</h2><table><thead><tr><th>Student</th><th>Mark</th><th>Comment</th></tr></thead><tbody>'+
+  cls.students.map((s,i)=>'<tr><td><b>'+esc(s[0])+'</b></td><td><input type="number" min="0" max="100" value="'+Number(s[1])+'" data-mark="'+i+'"></td><td><textarea rows="2" data-comment="'+i+'">'+esc(s[2])+'</textarea></td></tr>').join('')+
+  '</tbody></table><div class="actions"><button class="good" onclick="syncClass(\''+cls.id+'\',this)">Sync '+esc(cls.label)+' to Nigri</button><span class="status" id="status-'+cls.id+'"></span></div>';
+  host.appendChild(card);
+ });
+}
+async function syncClass(id,btn){
+ const cls=data.classes.find(c=>c.id===id),card=document.querySelector('[data-class-id="'+id+'"]'),status=document.getElementById('status-'+id);
+ const rows=[...card.querySelectorAll('tbody tr')];
+ const students=rows.map((r,i)=>({name:cls.students[i][0],mark:Number(r.querySelector('[data-mark]').value),attendance:'present',comment:r.querySelector('[data-comment]').value.trim()||undefined}));
+ const date=document.getElementById('date').value;
+ const body={class_section:cls.label,topic:'A Chossid is a Lamdan',test_name:'A Chossid is a Lamdan — Week Ending '+date,type:'classwork',date,description:'Weekly A Chossid is a Lamdan mark for effort and responsibility.',students};
+ if(!confirm('Save '+cls.label+' A Chossid is a Lamdan marks to Nigri?'))return;
+ btn.disabled=true;status.textContent='Syncing…';
+ try{
+  const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json','X-Sync-Key':SYNC_KEY},body:JSON.stringify(body)});
+  const out=await res.json().catch(()=>({}));
+  status.textContent=res.ok&&out.status==='success'?'Saved to Nigri'+(out.test_id?' (mark #'+out.test_id+')':''):'Not saved: '+(out.detail||res.status);
+ }catch(e){status.textContent='Could not reach Nigri sync: '+e.message}finally{btn.disabled=false}
+}
+render();
+</script></body></html>
