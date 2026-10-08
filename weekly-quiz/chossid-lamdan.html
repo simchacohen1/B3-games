@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Chossid is a Lamdan | Nigri Marks</title>
+<style>
+:root{--blue:#245d91;--ink:#203a51;--muted:#607586;--line:#d4e1eb;--bg:#f3f7fb;--green:#246749;--red:#a1303c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Arial,sans-serif}
+header{background:#fff;border-bottom:1px solid var(--line);padding:16px 22px}
+header h1{font-size:24px;margin:0 0 4px}
+main{max-width:1160px;margin:18px auto;padding:0 15px 40px}
+.card{background:white;border:1px solid var(--line);border-radius:13px;padding:17px;margin-bottom:16px}
+.notice{background:#eaf3fc;border-radius:9px;padding:12px;margin:10px 0}
+.important{background:#fff5df;border-radius:9px;padding:12px;margin:10px 0}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.field{display:flex;flex-direction:column;gap:5px;min-width:180px;flex:1;font-weight:600}
+input,select,textarea,button{font:inherit}
+input,select,textarea{border:1px solid #b4c9d8;border-radius:7px;padding:8px;width:100%;background:white;color:var(--ink)}
+textarea{min-height:80px}
+button{border:0;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer;background:#e4edf4;color:var(--ink)}
+button.primary{background:var(--blue);color:white}
+button.save{background:var(--green);color:white}
+button:disabled{opacity:.5;cursor:not-allowed}
+table{width:100%;border-collapse:collapse}
+th,td{border-bottom:1px solid var(--line);padding:9px 7px;text-align:left;vertical-align:top}
+th{background:#f2f7fb}
+td .name{font-weight:700}
+td input[type=number]{max-width:94px}
+.evidence{font-size:12px;color:var(--muted);margin-top:4px}
+.small{font-size:13px;color:var(--muted)}
+.hidden{display:none!important}
+#status{white-space:pre-wrap;font-weight:600}
+#status.error{color:var(--red)}
+#status.success{color:var(--green)}
+#lock{max-width:480px;margin:50px auto}
+@media(max-width:650px){header h1{font-size:21px}table{font-size:13px}td input[type=number]{max-width:70px}td,th{padding:7px 3px}}
+</style>
+</head>
+<body>
+<header>
+<h1>A Chossid is a Lamdan → Nigri</h1>
+<div class="small">Weekly marks for B3 ET and B3 WT — draft, review, then explicitly save</div>
+</header>
+<main>
+<section id="lock" class="card">
+<h2>Teacher Access</h2>
+<p class="small">Use the same teacher password as the existing B3 School Marks Bridge.</p>
+<input id="password" type="password" autocomplete="off" placeholder="Teacher password">
+<div class="controls" style="margin-top:10px"><button class="primary" id="unlockBtn">Open weekly marks</button></div>
+<p id="lockStatus" class="small"></p>
+</section>
+<div id="app" class="hidden">
+<div class="card">
+<strong>Draft only until you click Save to Nigri.</strong>
+<p class="small">The category is fixed to “A Chossid is a Lamdan” and the type is Quiz, just as on Nigri. ET and WT create separate marks. No grade or parent comment is stored in this public website's code. Unsaved entries stay in this browser.</p>
+<div class="notice"><strong>Rabbi Steinberg’s grading rules — effort and responsibility, NOT academic ability or test scores.</strong><ol style="margin:8px 0 8px 22px;padding:0"><li><b>Focus &amp; Participation:</b> Paying attention, participating appropriately, and avoiding distractions.</li><li><b>Classwork:</b> Following instructions and completing classwork with sincere effort.</li><li><b>Homework:</b> Completing assigned homework responsibly and putting in real effort.</li></ol><b>Scale:</b> 100 = Outstanding; 90–99 = Very Good to Excellent; 80–89 = Satisfactory to Good; below 80 = Needs Improvement. <b>School reward:</b> a monthly average of 85% or higher qualifies for school reward points and the monthly prize raffle. This threshold does not replace fair grading.<p style="margin:8px 0 0"><b>Timing:</b> Submit each Friday or on the last day of school for that class. Include a brief, gentle, encouraging comment for every boy. Comments go to parents; teacher-only evidence must stay separate. Do not base a lower mark merely on a boy speaking less, or a higher one merely on correct answers.</p></div><div class="important"><b>Important:</b> Save to Nigri creates a real gradebook assessment and submits Nigri's final Save automatically. Please review every mark and comment first.</div>
+<div class="controls">
+<label class="field">Class<select id="classSelect"><option value="et">B3 ET</option><option value="wt">B3 WT</option></select></label>
+<label class="field">Date of mark<input id="date" type="date"></label>
+<label class="field">Mark name<input id="markName" placeholder="e.g. Parshas Vayeira"></label>
+</div>
+<label class="field" style="margin-top:12px">Description (optional)<textarea id="description" rows="2" placeholder="Weekly A Chossid is a Lamdan assessment"></textarea></label>
+</div>
+<div class="card">
+<h2 style="margin-top:0">Student marks and encouraging comments</h2>
+<div class="small">Enter the final score (0–100) using all three effort-and-responsibility areas above, not test scores or academic ability. <b>A brief parent comment is required for each boy.</b> Keep it extremely gentle, positive, encouraging and based on something observed. The evidence field is private to this browser and is NOT sent to Nigri.</div>
+<div style="overflow:auto">
+<table><thead><tr><th>Student</th><th>Mark /100</th><th>Gentle parent comment (required)</th></tr></thead><tbody id="rows"></tbody></table>
+</div>
+</div>
+<div class="card">
+<h2 style="margin-top:0">Paste prepared marks (optional)</h2>
+<p class="small">Paste rows copied from ChatGPT or a sheet, one student per line: Student name, numeric mark, optional comment, optional evidence; separated by tabs. Names can be the displayed names or the official Nigri names. Import changes only the current class.</p>
+<textarea id="paste" rows="5" placeholder="Student Name [TAB] 95 [TAB] Nice effort this week! [TAB] Date and time"></textarea>
+<div class="controls" style="margin-top:10px">
+<button id="importBtn">Import pasted rows</button>
+<button id="reviewBtn" class="primary">Review marks</button>
+</div>
+<div id="importStatus" class="small"></div>
+</div>
+<div id="review" class="card hidden">
+<h2 style="margin-top:0">Final review — nothing has been sent</h2>
+<div id="reviewMeta"></div>
+<div style="overflow:auto"><table><thead><tr><th>Student</th><th>Mark</th><th>Nigri comment</th></tr></thead><tbody id="reviewRows"></tbody></table></div>
+<div class="important">Pressing Save to Nigri will create and save a real mark on Nigri. It is not a preview-only operation. Do not press twice for the same class/date/name.</div>
+<button id="saveBtn" class="save">Save to Nigri</button>
+<div id="status" style="margin-top:12px"></div>
+</div>
+</div>
+</main>
+<script>
+'use strict';
+const TEACHER_PASSWORD="class123";
+const SYNC_URL="https://nigrisync.onrender.com/sync-marks";
+const SYNC_KEY="1qaz2wsx";
+const NIGRI_TOPIC='A Chossid is a Lamdan';
+const STORAGE_KEY='b3-chossid-lamdan-drafts-v1';
+const ROSTERS={
+et:[
+['Mayer Chaim Chaikin','Chaikin Mayer Chaim'],
+['Yossi Gourarie','Gourarie Yossi'],
+['Sholom DovBer Huebner','Huebner Sholom DovBer'],
+['Moshe Lapine','Lapine Moshe'],
+['Kehos Notik','Notik Kehos'],
+['Yisroel Oirechman','Oirechman Yisroel'],
+['Moshe Tuvia Raichman','Raichman Moshe Tuvia'],
+['Avrohom Rosenfeld','Rosenfeld Avrohom'],
+['Levi Rozmarin','Rozmarin Levi'],
+['Arik Traxler','Traxler Arik']
+],
+wt:[
+['Ari Greenberg','Greenberg Ari'],
+['Zev Rosenfeld','Rosenfeld Zev'],
+['Levi Schtroks','Schtroks Levi'],
+['Yisroel Aryeh Simmonds','Simmonds Yisroel Aryeh'],
+['Leibel Vogel','Vogel Leibel'],
+['Yisroel Arye Leib Wolf','Wolf Yisroel Arye Leib']
+]};
+let drafts={};
+let lastReviewSignature='';
+let currentlySending=false;
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function loadDrafts(){try{drafts=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}')||{};}catch(e){drafts={};}}
+function store(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(drafts));}catch(e){}}
+function currentKey(){return $('classSelect').value+'|'+$('date').value;}
+function currentDraft(){
+ const k=currentKey();
+ if(!drafts[k])drafts[k]={name:'',description:'',students:{}};
+ return drafts[k];
+}
+function saveCurrentFields(){
+ const d=currentDraft();
+ d.name=$('markName').value;
+ d.description=$('description').value;
+ store();
+ invalidateReview();
+}
+function invalidateReview(){
+ $('review').classList.add('hidden');
+ lastReviewSignature='';
+ $('status').textContent='';
+ $('status').className='';
+}
+function render(){
+ const d=currentDraft(),cls=$('classSelect').value;
+ $('markName').value=d.name||'';
+ $('description').value=d.description||'';
+ $('rows').innerHTML=ROSTERS[cls].map(function(pair,i){
+ const r=d.students[pair[1]]||{};
+ return '<tr data-name="'+esc(pair[1])+'"><td><div class="name">'+esc(pair[0])+'</div><div class="evidence">'+esc(pair[1])+'</div></td>'+
+ '<td><input type="number" data-field="mark" min="0" max="100" step="1" placeholder="—" value="'+esc(r.mark==null?'':r.mark)+'" aria-label="Score for '+esc(pair[0])+'"></td>'+
+ '<td><textarea data-field="comment" rows="2" placeholder="Gentle, encouraging comment" aria-label="Nigri comment for '+esc(pair[0])+'">'+esc(r.comment||'')+'</textarea>'+
+ '<details><summary class="small">Private evidence (not sent)</summary><textarea data-field="evidence" rows="2" placeholder="Transcript date, timestamp and what happened" aria-label="Private evidence for '+esc(pair[0])+'">'+esc(r.evidence||'')+'</textarea></details></td></tr>';
+ }).join('');
+ invalidateReview();
+}
+function changeRow(ev){
+ const field=ev.target.getAttribute('data-field');
+ if(!field)return;
+ const tr=ev.target.closest('tr');
+ if(!tr)return;
+ const d=currentDraft();
+ const name=tr.dataset.name;
+ const r=d.students[name]||{};
+ r[field]=ev.target.value;
+ d.students[name]=r;
+ store();invalidateReview();
+}
+function getPayload(){
+ const cls=$('classSelect').value,d=currentDraft();
+ if(!/^\d{4}-\d{2}-\d{2}$/.test($('date').value))throw Error('Choose a valid date.');
+ if(!d.name||!d.name.trim())throw Error('Enter the mark name, such as the Parsha or week.');
+ let students=ROSTERS[cls].map(function(pair){
+  const r=d.students[pair[1]]||{},v=String(r.mark==null?'':r.mark).trim();
+  if(v===''||!/^\d{1,3}$/.test(v)||Number(v)<0||Number(v)>100)throw Error('Enter a whole-number mark between 0 and 100 for '+pair[0]+'.');
+  if(!String(r.comment||'').trim())throw Error('Enter a brief, positive parent comment for '+pair[0]+'.');
+  return {name:pair[1],mark:Number(v),attendance:'review',comment:String(r.comment||'').trim()};
+ });
+ return {class_section:cls==='et'?'B3 ET':'B3 WT',topic:NIGRI_TOPIC,type:'quiz',test_name:d.name.trim(),date:$('date').value,description:(d.description||'').trim(),mark_all_done:true,students:students};
+}
+function signature(body){return JSON.stringify(body);}
+function review(){
+ try{
+ const b=getPayload();
+ lastReviewSignature=signature(b);
+ $('reviewMeta').textContent=b.class_section+' • '+b.date+' • '+b.test_name+' • '+NIGRI_TOPIC+' • Quiz';
+ $('reviewRows').innerHTML=b.students.map(function(s){return '<tr><td>'+esc(s.name)+'</td><td><b>'+s.mark+'</b></td><td>'+esc(s.comment||'—')+'</td></tr>';}).join('');
+ $('review').classList.remove('hidden');
+ $('status').textContent='';
+ $('status').className='';
+ $('review').scrollIntoView({behavior:'smooth',block:'start'});
+ }catch(e){alert(e.message);}
+}
+function normalizeName(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+function importRows(){
+ const d=currentDraft(),cls=$('classSelect').value,lines=$('paste').value.split(/\r?\n/);
+ let changed=0,unknown=[];
+ for(const raw of lines){if(!raw.trim())continue;
+ let fields=raw.split('\t');
+ if(fields.length<2){unknown.push(raw.slice(0,50)+' (needs tab separators)');continue;}
+ const who=normalizeName(fields[0]),pair=ROSTERS[cls].find(function(p){return normalizeName(p[0])===who||normalizeName(p[1])===who;});
+ if(!pair){unknown.push(fields[0]);continue;}
+ const mark=fields[1].trim();
+ if(!/^\d{1,3}$/.test(mark)||Number(mark)>100){unknown.push(fields[0]+' (invalid mark)');continue;}
+ d.students[pair[1]]={mark:String(Number(mark)),comment:(fields[2]||'').trim(),evidence:(fields[3]||'').trim()};changed++;
+ }
+ store();render();
+ $('importStatus').textContent=changed+' imported.'+(unknown.length?' Not imported: '+unknown.join('; '):'');
+}
+async function saveToNigri(){
+ if(currentlySending)return;
+ let b;
+ try{b=getPayload();}catch(e){alert(e.message);return;}
+ if(lastReviewSignature!==signature(b)){alert('One or more marks changed. Please review again.');invalidateReview();return;}
+ const id=[b.class_section,b.date,b.test_name].join('|');
+ let sent={};try{sent=JSON.parse(localStorage.getItem(STORAGE_KEY+'-saved')||'{}')||{};}catch(e){}
+ if(sent[id]){alert('This assessment was already saved from this browser (Nigri mark #'+sent[id]+'). Check Nigri before attempting another save.');return;}
+ if(!confirm('FINAL SAVE: Create a real Nigri '+NIGRI_TOPIC+' mark for '+b.class_section+' on '+b.date+' with '+b.students.length+' scores and comments?'))return;
+ currentlySending=true;
+ $('saveBtn').disabled=true;
+ $('status').className='';
+ $('status').textContent='Submitting to Nigri. Do not press Save again.';
+ try{
+ const res=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json','X-Sync-Key':SYNC_KEY},body:JSON.stringify(b)});
+ const data=await res.json().catch(function(){return {};});
+ if(res.ok&&data.status==='success'){
+  const fails=(data.results||[]).filter(function(x){return /FAILED|Could not/i.test(x);});
+  if(fails.length){
+    $('status').className='error';
+    $('status').textContent='Nigri returned mark #'+data.test_id+' but some rows may not be saved correctly: '+fails.join('; ')+'. Review on Nigri before trying again.';
+  }else{
+    sent[id]=String(data.test_id||'saved');localStorage.setItem(STORAGE_KEY+'-saved',JSON.stringify(sent));
+    $('status').className='success';
+    $('status').textContent='Saved to Nigri. Mark #'+String(data.test_id||'')+'. Check Nigri before creating another mark.';
+  }
+ }else{
+  $('status').className='error';
+  $('status').textContent='Nigri sync did not confirm success: '+(data.detail||data.error||res.status)+'. A partial mark may exist. Check Nigri before retrying.';
+ }
+ }catch(e){
+  $('status').className='error';
+  $('status').textContent='Connection failed: '+e.message+'. A partial mark may exist. Check Nigri before retrying.';
+ }finally{
+  currentlySending=false;
+  $('saveBtn').disabled=false;
+ }
+}
+$('unlockBtn').addEventListener('click',function(){
+ if($('password').value!==TEACHER_PASSWORD){$('lockStatus').textContent='Incorrect password.';return;}
+ $('password').value='';
+ $('lock').classList.add('hidden');$('app').classList.remove('hidden');
+ loadDrafts();
+ const d=new Date(),localDay=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+ $('date').value=localDay;render();
+});
+$('password').addEventListener('keydown',function(e){if(e.key==='Enter')$('unlockBtn').click();});
+$('classSelect').addEventListener('change',render);
+$('date').addEventListener('change',render);
+$('markName').addEventListener('input',saveCurrentFields);
+$('description').addEventListener('input',saveCurrentFields);
+$('rows').addEventListener('input',changeRow);
+$('importBtn').addEventListener('click',importRows);
+$('reviewBtn').addEventListener('click',review);
+$('saveBtn').addEventListener('click',saveToNigri);
+</script>
+</body>
+</html>
