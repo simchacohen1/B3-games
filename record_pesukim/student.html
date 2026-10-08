@@ -1522,6 +1522,8 @@ const SYNTHESIZE_SPEECH_URL = "https://us-central1-b3-games.cloudfunctions.net/s
    backend and awarded immediately. Each reward is paid only once per Posuk.
    ========================================================= */
 const STUDENT_REWARDS_AUTO_AWARD_URL = "https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
+// Wake the point service on page load so the reward popup is not delayed by a cold start.
+fetch(STUDENT_REWARDS_AUTO_AWARD_URL, { mode: 'no-cors' }).catch(() => {});
 
 function showRewardToast(points){
   if(!points) return;
@@ -1529,13 +1531,15 @@ function showRewardToast(points){
   if(!el){
     el = document.createElement('div');
     el.id = 'rewardPointsToast';
-    Object.assign(el.style,{position:'fixed',right:'18px',bottom:'18px',zIndex:'99999',background:'#24344A',color:'#fff',border:'3px solid #C9A227',borderRadius:'16px',padding:'13px 18px',fontFamily:"'Quicksand',sans-serif",fontWeight:'800',boxShadow:'0 8px 24px rgba(0,0,0,.25)',transition:'opacity .25s'});
+    Object.assign(el.style,{position:'fixed',left:'50%',top:'40%',transform:'translate(-50%,-50%)',zIndex:'99999',background:'#24344A',color:'#fff',border:'4px solid #C9A227',borderRadius:'20px',padding:'24px 36px',fontFamily:"'Quicksand',sans-serif",fontWeight:'800',fontSize:'28px',textAlign:'center',boxShadow:'0 10px 30px rgba(0,0,0,.35)',transition:'opacity .3s',cursor:'pointer',maxWidth:'90vw'});
+    el.onclick = () => { el.style.opacity = '0'; el.style.pointerEvents = 'none'; };
     document.body.appendChild(el);
   }
   el.textContent = '🎉 Great job! You earned ' + points + ' point' + (points === 1 ? '' : 's') + '!';
   el.style.opacity = '1';
+  el.style.pointerEvents = 'auto';
   clearTimeout(showRewardToast._timer);
-  showRewardToast._timer = setTimeout(()=>{ el.style.opacity='0'; }, 3500);
+  showRewardToast._timer = setTimeout(()=>{ el.style.opacity='0'; el.style.pointerEvents='none'; }, 6000);
 }
 
 async function requestVerifiedAward(source, awardPosukKey, evidencePosukKey){
@@ -1559,14 +1563,17 @@ async function requestVerifiedAward(source, awardPosukKey, evidencePosukKey){
   }
 }
 
-async function awardMilestoneForSelection(source){
-  if(!currentPosukKey) return;
-  const parts = (currentSelectionParts && currentSelectionParts.length)
-    ? currentSelectionParts
-    : [{ key: currentPosukKey }];
+async function awardMilestoneForSelection(source, posukKey = currentPosukKey, selectionParts = currentSelectionParts){
+  // posukKey/selectionParts are captured when the work is saved, so a student
+  // who moves to the next posuk during the upload still gets credit for the
+  // posuk he actually finished.
+  if(!posukKey) return;
+  const parts = (selectionParts && selectionParts.length)
+    ? selectionParts
+    : [{ key: posukKey }];
   let newlyAwarded = 0;
   for(const part of parts){
-    newlyAwarded += await requestVerifiedAward(source, part.key || currentPosukKey, currentPosukKey);
+    newlyAwarded += await requestVerifiedAward(source, part.key || posukKey, posukKey);
   }
   if(newlyAwarded) showRewardToast(newlyAwarded);
 }
@@ -3908,6 +3915,7 @@ function markTaskSaved(task){
    first; the other task's autosave just adds its fields to that same
    record via update() rather than overwriting it. */
 async function autosaveHebrew(){
+  const awardKey = currentPosukKey, awardParts = currentSelectionParts;
   if(!currentAudio.hebrew || hebrewScore === null || !currentPosukKey) return;
   try{
     if(!currentAttemptRef){
@@ -3934,7 +3942,7 @@ async function autosaveHebrew(){
     });
     hebrewSavedStoragePath = path;
     markTaskSaved('hebrew');
-    if(Number(hebrewScore) >= 100) await awardMilestoneForSelection('reading100');
+    if(Number(hebrewScore) >= 100) await awardMilestoneForSelection('reading100', awardKey, awardParts);
   }catch(err){
     console.error('Autosave (hebrew) failed', err);
     const gradingMsg = document.getElementById('hebrewGradingMsg');
@@ -3944,6 +3952,7 @@ async function autosaveHebrew(){
 }
 
 async function autosaveComprehension(){
+  const awardKey = currentPosukKey, awardParts = currentSelectionParts;
   if(!currentAudio.comprehension || !comprehensionVerdict || !currentPosukKey) return;
   try{
     if(!currentAttemptRef){
@@ -3971,7 +3980,7 @@ async function autosaveComprehension(){
       comprehensionFeedback: comprehensionFeedback
     });
     markTaskSaved('comprehension');
-    if(Number(comprehensionScore) >= 100) await awardMilestoneForSelection('understand100');
+    if(Number(comprehensionScore) >= 100) await awardMilestoneForSelection('understand100', awardKey, awardParts);
   }catch(err){
     console.error('Autosave (comprehension) failed', err);
     const gradingMsg = document.getElementById('comprehensionGradingMsg');
@@ -4300,6 +4309,7 @@ async function recordWordFix(index, btnEl){
 }
 
 async function applyHebrewWordFix(){
+  const awardKey = currentPosukKey, awardParts = currentSelectionParts;
   const total = hebrewWords.length;
   const matched = hebrewWords.filter(w => w.match).length;
   hebrewScore = total ? Math.round((matched / total) * 100) : hebrewScore;
@@ -4317,7 +4327,7 @@ async function applyHebrewWordFix(){
         hebrewScoreIsPercent: true,
         hebrewWords: hebrewWords
       });
-      if(Number(hebrewScore) >= 100) await awardMilestoneForSelection('reading100');
+      if(Number(hebrewScore) >= 100) await awardMilestoneForSelection('reading100', awardKey, awardParts);
     }catch(err){
       console.error('Could not save updated score after word fix', err);
     }
@@ -4634,6 +4644,7 @@ async function submitQuestionDispute(idx){
 // autosaveTranslation already uses for its per-chunk recordings), then
 // marks the comprehension task done.
 async function autosaveComprehensionQuestions(){
+  const awardKey = currentPosukKey, awardParts = currentSelectionParts;
   const idxs = Object.keys(comprehensionQResults).map(Number).sort((a,b)=>a-b);
   if(!idxs.length || !currentPosukKey) return;
   try{
@@ -4690,7 +4701,7 @@ async function autosaveComprehensionQuestions(){
 
     idxs.forEach(i => { if(comprehensionQResults[i]) comprehensionQResults[i].saving = false; });
     markTaskSaved('comprehension');
-    if(savedQuestionPercent >= 100) await awardMilestoneForSelection('understand100');
+    if(savedQuestionPercent >= 100) await awardMilestoneForSelection('understand100', awardKey, awardParts);
     renderAnsweredQuestionHistory();
   }catch(err){
     idxs.forEach(i => { if(comprehensionQResults[i]) comprehensionQResults[i].saving = false; });
@@ -5784,6 +5795,7 @@ async function saveTranslationChunkEvidence(index, level){
 // autosaveComprehension, but stores the whole set of graded chunks (not
 // just one), since a full session covers the entire posuk at once.
 async function autosaveTranslation(level){
+  const awardKey = currentPosukKey, awardParts = currentSelectionParts;
   const idxs = Object.keys(translationGradedResults).map(Number).sort((a,b) => a-b);
   if(!idxs.length || !currentPosukKey) return;
   try{
@@ -5839,7 +5851,7 @@ async function autosaveTranslation(level){
     await currentAttemptRef.update(updateData);
     if(allDone){
       markTaskSaved('translation');
-      if(correctCount === level.chunks.length) await awardMilestoneForSelection('translation100');
+      if(correctCount === level.chunks.length) await awardMilestoneForSelection('translation100', awardKey, awardParts);
     }
     showTranslationSummary(level);
   }catch(err){
