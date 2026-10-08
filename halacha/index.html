@@ -369,7 +369,9 @@ function add(id,type,text,pageIndex=0){
 }
 function clampPiece(e){
  let page=e.closest(".page"); if(!page)return;
- let maxL=Math.max(0,page.clientWidth-e.offsetWidth-8),maxT=Math.max(0,page.clientHeight-e.offsetHeight-8);
+ // Hidden lessons report 0 size; clamping them would pin every piece to the corner and save it that way.
+ if(!page.clientWidth||!page.clientHeight||!e.offsetParent)return;
+ let maxL=Math.max(8,page.clientWidth-e.offsetWidth-8),maxT=Math.max(8,page.clientHeight-e.offsetHeight-8);
  e.style.left=Math.min(Math.max(8,e.offsetLeft),maxL)+"px";
  e.style.top=Math.min(Math.max(8,e.offsetTop),maxT)+"px";
 }
