@@ -353,6 +353,71 @@
   .class-posuk-detail-inline{ margin-top:14px; }
   .class-posuk-detail-inline:empty{ margin-top:0; }
   .not-done-list{ font-size:0.85rem; color: var(--ink-soft); line-height:1.5; }
+
+  /* =========================================================
+     2026-10 layout cleanup: compact header, one-row tabs, Overview tab
+     ========================================================= */
+  .wrap{ max-width: 1280px; padding: 14px 18px 60px; }
+  header{ display:flex; align-items:baseline; gap:12px; text-align:left; margin-bottom:12px; flex-wrap:wrap; }
+  header h1{ font-size:1.3rem; margin:0; }
+  header p{ font-size:0.8rem; }
+  .students-panel{ flex: 0 0 230px; max-height: calc(100vh - 90px); position: sticky; top: 12px; }
+  .student-item{ padding: 8px 10px; margin-bottom: 4px; gap:2px; }
+  .student-item .name-row{ justify-content:space-between; width:100%; }
+  .student-item .dispute-badge{ padding:2px 8px; font-size:0.68rem; }
+  .student-item .last-active.stale{ color:#F2A6A6; opacity:1; }
+  .student-item.active .last-active.stale{ color:#7A2626; }
+  .sidebar-sort{ width:100%; margin:-4px 0 8px; padding:5px 8px; border-radius:8px; border:1px solid #3A5068;
+    background:#1c2a38; color:#E9E4D4; font-family:'Quicksand',sans-serif; font-size:0.78rem; }
+  .main-panel{ padding: 16px 20px; min-width:0; }
+  .tab-bar{ gap:4px; margin:-4px 0 16px; flex-wrap:wrap; border-bottom:2px solid #e0d3ad; padding-bottom:0; }
+  .tab-btn{ border:none; border-radius:8px 8px 0 0; background:transparent; padding:8px 12px; font-size:0.85rem;
+    margin-bottom:-2px; border-bottom:3px solid transparent; }
+  .tab-btn:hover{ color: var(--ink); background:#f7efd8; }
+  .tab-btn.active{ background:transparent; color: var(--rimon); border-bottom-color: var(--rimon); }
+  .tab-btn.tab-right{ margin-left:auto; }
+  .tab-count{ display:inline-block; min-width:18px; padding:0 6px; margin-left:4px; border-radius:999px;
+    background: var(--rimon); color:#fff; font-size:0.7rem; line-height:18px; text-align:center; }
+  .tab-count:empty{ display:none; }
+
+  .ov-cards{ display:grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap:10px; margin-bottom:18px; }
+  .ov-card{ background:#fff; border-radius:12px; padding:12px; box-shadow:0 2px 8px rgba(0,0,0,.07); border-top:4px solid #d8c9a0; }
+  .ov-card.alert{ border-top-color: var(--rimon); }
+  .ov-card.warn{ border-top-color: var(--gold); }
+  .ov-card.good{ border-top-color: #6FA544; }
+  .ov-card .num{ font-family:'Frank Ruhl Libre',serif; font-size:1.7rem; font-weight:700; color:var(--ink); line-height:1.1; }
+  .ov-card .lbl{ font-size:0.74rem; color:var(--ink-soft); font-weight:700; }
+  .ov-card.clickable{ cursor:pointer; }
+  .ov-card.clickable:hover{ background:#fffaf0; }
+  .ov-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+  @media (max-width: 900px){ .ov-grid{ grid-template-columns:1fr; } }
+  .ov-box{ background:#fff; border-radius:12px; padding:12px 14px; box-shadow:0 2px 8px rgba(0,0,0,.07); }
+  .ov-box.wide{ grid-column: 1 / -1; }
+  .ov-box h3{ font-family:'Frank Ruhl Libre',serif; color:var(--rimon); margin:0 0 8px; font-size:1.05rem;
+    display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .ov-box h3 small{ font-family:'Quicksand',sans-serif; font-size:0.74rem; color:var(--ink-soft); font-weight:600; }
+  .ov-table{ width:100%; border-collapse:collapse; font-size:0.86rem; }
+  .ov-table th{ text-align:left; font-size:0.72rem; color:var(--ink-soft); padding:4px 8px; border-bottom:2px solid var(--gold); }
+  .ov-table td{ padding:7px 8px; border-bottom:1px solid #eee3c6; vertical-align:middle; }
+  .ov-table tr.click{ cursor:pointer; }
+  .ov-table tr.click:hover td{ background:#fbf4e1; }
+  .ov-empty{ color:var(--ink-soft); font-size:0.85rem; padding:8px 0; }
+  .ov-scroll{ max-height: 340px; overflow-y:auto; }
+  .go-btn{ font-family:'Quicksand',sans-serif; font-weight:700; font-size:0.75rem; border:none; border-radius:999px;
+    padding:4px 10px; background:var(--rimon); color:#fff; cursor:pointer; white-space:nowrap; }
+  .muted{ color:var(--ink-soft); font-size:0.78rem; }
+  .days-pill{ display:inline-block; border-radius:999px; padding:2px 9px; font-size:0.74rem; font-weight:700; background:#e8e0c8; color:var(--ink-soft); }
+  .days-pill.bad{ background:#EFC1C1; color:#7A2626; }
+  .days-pill.ok{ background:#C9E4A6; color:#33511E; }
+
+  .student-summary{ display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 12px; }
+  .student-summary .chip{ background:#fff; border-radius:10px; padding:6px 12px; box-shadow:0 1px 4px rgba(0,0,0,.06); font-size:0.78rem; color:var(--ink-soft); font-weight:700; }
+  .student-summary .chip b{ display:block; font-family:'Frank Ruhl Libre',serif; font-size:1.15rem; color:var(--ink); }
+  .student-summary .chip.alert{ background:#F6E1E1; color:#7A2626; cursor:pointer; }
+  .student-summary .chip.alert b{ color:#7A2626; }
+  .admin-more{ margin-top:24px; font-size:0.8rem; color:var(--ink-soft); }
+  .admin-more summary{ cursor:pointer; font-weight:700; }
+  .admin-more .mini-tabs{ margin-top:8px; }
 </style>
 </head>
 <body>
@@ -367,8 +432,8 @@
 
   <div id="dashboard" style="display:none;">
     <header>
-      <h1>📖 Posuk Practice — Teacher Dashboard</h1>
-      <p>Review recordings and self-grades for every student</p>
+      <h1>📖 Posuk Practice — Teacher</h1>
+      <p>Disputes, progress and recordings for your class</p>
     </header>
 
     <div class="layout">
@@ -377,20 +442,26 @@
           <h2>Students</h2>
           <div id="studentCount" class="student-count">Loading…</div>
           <input id="studentSearchInput" type="text" class="student-search" placeholder="🔎 Search students…">
+          <select id="studentSortSelect" class="sidebar-sort" title="Sort students">
+            <option value="attention">Sort: needs attention first</option>
+            <option value="name">Sort: A–Z</option>
+            <option value="recent">Sort: most recently active</option>
+          </select>
         </div>
         <div id="studentList" class="loading student-list-scroll">Loading students…</div>
       </div>
 
       <div class="main-panel">
         <div class="tab-bar">
-          <button class="tab-btn active" id="studentTabBtn">👤 By Student</button>
-          <button class="tab-btn" id="rosterTabBtn">📋 Class Roster</button>
-          <button class="tab-btn" id="summaryTabBtn">📊 Class Stats</button>
+          <button class="tab-btn active" id="overviewTabBtn">🏠 Overview<span class="tab-count" id="overviewDisputeCount"></span></button>
+          <button class="tab-btn" id="studentTabBtn">👤 Student</button>
+          <button class="tab-btn" id="rosterTabBtn">📋 Roster</button>
+          <button class="tab-btn" id="summaryTabBtn">📊 By Posuk</button>
           <button class="tab-btn" id="reportsTabBtn">🧾 Reports</button>
-          <button class="tab-btn" id="chazaraRecordingsTabBtn">🎧 Chazara Recordings</button>
-          <button class="tab-btn" id="accessTabBtn">🔑 Manage Access</button>
+          <button class="tab-btn" id="chazaraRecordingsTabBtn">🎧 Chazara</button>
+          <button class="tab-btn tab-right" id="accessTabBtn">🔑 Access</button>
         </div>
-        <div id="mainContent" class="empty-msg">Select a student to view their practice history.</div>
+        <div id="mainContent"><div class="loading">Loading…</div></div>
       </div>
     </div>
   </div>
@@ -623,7 +694,11 @@ B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
   const allowed=authorized&&(access.role==='admin'||!requestedTeacherClass||access.classIds.includes(requestedTeacherClass));
   document.getElementById('gate').style.display=allowed?'none':'block';
   document.getElementById('dashboard').style.display=allowed?'block':'none';
-  if(allowed){allAttemptsCache=null;await loadStudents();}
+  if(allowed){
+    allAttemptsCache=null;
+    await loadStudents();
+    if(new URLSearchParams(location.search).get('review')!=='disputes') setTab('overview');
+  }
 });
 
 let activeStudentId = null;
@@ -803,21 +878,23 @@ async function requestTeacherMilestoneAward(studentId, source, evidencePosukKey)
   }
 }
 
-document.getElementById('studentTabBtn').onclick = () => setTab('student');
-document.getElementById('rosterTabBtn').onclick = () => setTab('roster');
-document.getElementById('summaryTabBtn').onclick = () => setTab('summary');
-document.getElementById('reportsTabBtn').onclick = () => setTab('reports');
-document.getElementById('chazaraRecordingsTabBtn').onclick = () => setTab('chazaraRecordings');
-document.getElementById('accessTabBtn').onclick = () => setTab('access');
+const TAB_BUTTONS = {
+  overview: 'overviewTabBtn', student: 'studentTabBtn', roster: 'rosterTabBtn', summary: 'summaryTabBtn',
+  reports: 'reportsTabBtn', chazaraRecordings: 'chazaraRecordingsTabBtn', access: 'accessTabBtn'
+};
+Object.entries(TAB_BUTTONS).forEach(([tab, btnId]) => {
+  document.getElementById(btnId).onclick = () => setTab(tab);
+});
+function markTab(tab){
+  Object.entries(TAB_BUTTONS).forEach(([t, btnId]) => document.getElementById(btnId).classList.toggle('active', t === tab));
+}
 
 function setTab(tab){
-  document.getElementById('studentTabBtn').classList.toggle('active', tab === 'student');
-  document.getElementById('rosterTabBtn').classList.toggle('active', tab === 'roster');
-  document.getElementById('summaryTabBtn').classList.toggle('active', tab === 'summary');
-  document.getElementById('reportsTabBtn').classList.toggle('active', tab === 'reports');
-  document.getElementById('chazaraRecordingsTabBtn').classList.toggle('active', tab === 'chazaraRecordings');
-  document.getElementById('accessTabBtn').classList.toggle('active', tab === 'access');
-  if(tab === 'summary'){
+  markTab(tab);
+  if(tab === 'overview'){
+    [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
+    loadOverview();
+  }else if(tab === 'summary'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
     loadClassSummary();
   }else if(tab === 'roster'){
@@ -836,11 +913,183 @@ function setTab(tab){
     const el = [...document.querySelectorAll('.student-item')].find(e => e.dataset.id === activeStudentId);
     if(el) selectStudent(activeStudentId, studentsMap[activeStudentId], el);
   }else{
-    document.getElementById('mainContent').innerHTML = '<div class="empty-msg">Select a student to view their practice history.</div>';
+    document.getElementById('mainContent').innerHTML = '<div class="empty-msg">Pick a student on the left to see their pesukim, scores and recordings.</div>';
+  }
+}
+
+/* ---------- Shared helpers for Overview / sidebar / roster ---------- */
+const SKILL_NAMES = { reading: '🎙️ Reading', comprehension: '🧠 Comprehension', translate: '🌐 Translate' };
+function daysSince(ts){
+  if(!ts) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(Number(ts)); d.setHours(0,0,0,0);
+  return Math.max(0, Math.round((today - d) / 86400000));
+}
+function relDayLabel(ts){
+  const n = daysSince(ts);
+  if(n === null) return 'Never';
+  if(n === 0) return 'Today';
+  if(n === 1) return 'Yesterday';
+  return n + ' days ago';
+}
+const STALE_DAYS = 3;
+function pctPill(score){
+  if(typeof score !== 'number') return '<span class="status-pill none">—</span>';
+  return `<span class="status-pill ${pctTier(score)}">${Math.round(score)}%</span>`;
+}
+// Latest timestamp we know of for a student: their lastActive flag OR their newest attempt.
+function studentLastActive(id){
+  let ts = (studentsInfo[id] && studentsInfo[id].lastActive) || 0;
+  const posukMap = allAttemptsCache && allAttemptsCache[id];
+  if(posukMap) Object.values(posukMap).forEach(m => Object.values(m || {}).forEach(a => { if(a && a.timestamp > ts) ts = a.timestamp; }));
+  return ts || null;
+}
+// Every pending dispute in the class, one row per reviewable item.
+function collectPendingDisputes(allAttempts){
+  const out = [];
+  Object.keys(studentsMap).forEach(sid => {
+    Object.entries(allAttempts[sid] || {}).forEach(([posukKey, attemptMap]) => {
+      Object.values(attemptMap || {}).forEach(a => {
+        if(!a) return;
+        const push = (tab, what) => out.push({ sid, posukKey, tab, what, ts: a.timestamp || 0 });
+        if(hasReviewableHebrewDispute(a)) push('reading', 'Reading');
+        if(hasReviewableComprehensionDispute(a)) push('comprehension', 'Comprehension');
+        questionResultValues(a.questionResults).forEach(q => { if(hasReviewableQuestionDispute(q)) push('comprehension', 'Question'); });
+        translationChunkValues(a.translationChunkResults).forEach(c => { if(hasReviewableTranslationDispute(c)) push('translate', 'Translation'); });
+      });
+    });
+  });
+  return out;
+}
+function openStudentAt(sid, posukKey, tab){
+  if(tab) studentActiveTab = tab;
+  const rowEl = document.querySelector(`.student-item[data-id="${sid}"]`);
+  selectStudent(sid, studentsMap[sid], rowEl || document.createElement('div'), posukKey || null);
+}
+
+/* ---------- Overview (default landing tab) ----------
+   One screen answering: what needs my ruling, who isn't practicing,
+   who is struggling, and what just happened. Everything is clickable
+   and jumps straight to the student / posuk. */
+async function loadOverview(){
+  const mainEl = document.getElementById('mainContent');
+  mainEl.innerHTML = '<div class="loading">Loading class overview…</div>';
+  try{
+    const all = await loadAllAttempts();
+    const ids = Object.keys(studentsMap);
+    if(!ids.length){ mainEl.innerHTML = '<div class="empty-msg">No approved students yet — add some under 🔑 Access.</div>'; return; }
+
+    const disputes = collectPendingDisputes(all).sort((a,b) => a.ts - b.ts); // oldest waiting first
+    const stats = {};
+    ids.forEach(id => { stats[id] = computeStudentStats(all[id]); stats[id].last = studentLastActive(id); });
+    const activeToday = ids.filter(id => daysSince(stats[id].last) === 0).length;
+    const stale = ids.filter(id => { const d = daysSince(stats[id].last); return d === null || d >= STALE_DAYS; })
+      .sort((a,b) => (stats[a].last||0) - (stats[b].last||0));
+    const mean = arr => { const v = arr.filter(x => typeof x === 'number'); return v.length ? v.reduce((s,x)=>s+x,0)/v.length : null; };
+    const classReading = mean(ids.map(id => stats[id].avg));
+    const classTranslate = mean(ids.map(id => stats[id].avgTranslation));
+    const classComp = mean(ids.map(id => stats[id].avgComprehension));
+    const support = ids.filter(id => {
+      const s = stats[id];
+      return [s.avg, s.avgTranslation, s.avgComprehension].some(v => typeof v === 'number' && v < 50);
+    }).sort((a,b) => {
+      const lo = s => Math.min(...[s.avg, s.avgTranslation, s.avgComprehension].filter(v => typeof v === 'number'));
+      return lo(stats[a]) - lo(stats[b]);
+    });
+
+    // Latest 12 attempts across the class
+    const recent = [];
+    ids.forEach(sid => Object.entries(all[sid] || {}).forEach(([posukKey, m]) => Object.values(m || {}).forEach(a => {
+      if(a && a.timestamp) recent.push({ sid, posukKey, a });
+    })));
+    recent.sort((x,y) => y.a.timestamp - x.a.timestamp);
+
+    const pctOrDash = v => typeof v === 'number' ? Math.round(v) + '%' : '—';
+    let html = `<div class="ov-cards">
+      <div class="ov-card ${disputes.length ? 'alert clickable' : 'good'}" id="ovCardDisputes"><div class="num">${disputes.length}</div><div class="lbl">Disputes waiting</div></div>
+      <div class="ov-card"><div class="num">${activeToday}<span class="muted"> / ${ids.length}</span></div><div class="lbl">Practiced today</div></div>
+      <div class="ov-card ${stale.length ? 'warn' : 'good'}"><div class="num">${stale.length}</div><div class="lbl">Inactive ${STALE_DAYS}+ days</div></div>
+      <div class="ov-card"><div class="num">${pctOrDash(classReading)}</div><div class="lbl">Class avg · Reading</div></div>
+      <div class="ov-card"><div class="num">${pctOrDash(classTranslate)}</div><div class="lbl">Class avg · Translate</div></div>
+      <div class="ov-card"><div class="num">${pctOrDash(classComp)}</div><div class="lbl">Class avg · Comprehension</div></div>
+    </div><div class="ov-grid">`;
+
+    // Disputes
+    html += `<div class="ov-box wide" id="ovDisputes"><h3>⚠️ Disputes waiting for your ruling <small>oldest first · click to review</small></h3>`;
+    if(!disputes.length){
+      html += '<div class="ov-empty">✅ Nothing to review — all caught up.</div>';
+    }else{
+      html += `<div class="ov-scroll"><table class="ov-table"><thead><tr><th>Student</th><th>Posuk</th><th>What</th><th>Submitted</th><th></th></tr></thead><tbody>`;
+      disputes.forEach((d, i) => {
+        html += `<tr class="click" data-dispute="${i}"><td><strong>${escapeHtml(studentsMap[d.sid])}</strong></td>
+          <td>${escapeHtml(formatRefLabel(d.posukKey))}</td><td>${d.what}</td>
+          <td class="muted">${d.ts ? relDayLabel(d.ts) : '—'}</td><td><button class="go-btn">Review →</button></td></tr>`;
+      });
+      html += '</tbody></table></div>';
+    }
+    html += '</div>';
+
+    // Not practicing
+    html += `<div class="ov-box"><h3>😴 Not practicing <small>no activity in ${STALE_DAYS}+ days</small></h3>`;
+    if(!stale.length) html += '<div class="ov-empty">Everyone has practiced in the last few days.</div>';
+    else{
+      html += '<div class="ov-scroll"><table class="ov-table"><tbody>';
+      stale.forEach(id => {
+        html += `<tr class="click" data-student="${id}"><td><strong>${escapeHtml(studentsMap[id])}</strong></td>
+          <td style="text-align:right"><span class="days-pill bad">${relDayLabel(stats[id].last)}</span></td></tr>`;
+      });
+      html += '</tbody></table></div>';
+    }
+    html += '</div>';
+
+    // Needs support
+    html += `<div class="ov-box"><h3>📉 Needs support <small>any skill average under 50%</small></h3>`;
+    if(!support.length) html += '<div class="ov-empty">No one is averaging under 50% in any skill.</div>';
+    else{
+      html += '<div class="ov-scroll"><table class="ov-table"><thead><tr><th>Student</th><th>Read</th><th>Transl.</th><th>Comp.</th></tr></thead><tbody>';
+      support.forEach(id => {
+        const s = stats[id];
+        html += `<tr class="click" data-student="${id}"><td><strong>${escapeHtml(studentsMap[id])}</strong></td>
+          <td>${pctPill(s.avg)}</td><td>${pctPill(s.avgTranslation)}</td><td>${pctPill(s.avgComprehension)}</td></tr>`;
+      });
+      html += '</tbody></table></div>';
+    }
+    html += '</div>';
+
+    // Recent activity
+    html += `<div class="ov-box wide"><h3>🕒 Latest activity <small>most recent recordings across the class</small></h3>`;
+    if(!recent.length) html += '<div class="ov-empty">No recordings yet.</div>';
+    else{
+      html += '<table class="ov-table"><thead><tr><th>Student</th><th>Posuk</th><th>Read</th><th>Transl.</th><th>Comp.</th><th>When</th></tr></thead><tbody>';
+      recent.slice(0, 12).forEach(r => {
+        const comp = effComprehensionScore(r.a);
+        html += `<tr class="click" data-student="${r.sid}" data-posuk="${escapeHtml(r.posukKey)}"><td><strong>${escapeHtml(studentsMap[r.sid])}</strong></td>
+          <td>${escapeHtml(formatRefLabel(r.posukKey))}</td>
+          <td>${pctPill(effHebrewScore(r.a))}</td><td>${pctPill(effTranslationScore(r.a))}</td><td>${pctPill(comp)}</td>
+          <td class="muted">${new Date(r.a.timestamp).toLocaleString([], { month:'numeric', day:'numeric', hour:'numeric', minute:'2-digit' })}</td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+    html += '</div></div>';
+    mainEl.innerHTML = html;
+
+    mainEl.querySelectorAll('tr[data-dispute]').forEach(tr => {
+      tr.onclick = () => { const d = disputes[Number(tr.dataset.dispute)]; openStudentAt(d.sid, d.posukKey, d.tab); };
+    });
+    mainEl.querySelectorAll('tr[data-student]').forEach(tr => {
+      tr.onclick = () => openStudentAt(tr.dataset.student, tr.dataset.posuk || null);
+    });
+    const card = document.getElementById('ovCardDisputes');
+    if(card && disputes.length) card.onclick = () => document.getElementById('ovDisputes').scrollIntoView({ behavior:'smooth' });
+  }catch(err){
+    console.error(err);
+    mainEl.innerHTML = '<div class="empty-msg">Could not load the overview.</div>';
   }
 }
 
 let studentSearchQuery = '';
+let studentSortMode = 'attention';
+let studentDisputeCounts = {}; // id -> number of pending disputes (filled once attempts load)
 
 // The sidebar roster is the complete, authoritative class list — every
 // name the teacher has APPROVED in Manage Access (posukPractice/allowedStudents),
@@ -883,6 +1132,12 @@ async function loadStudents(){
         renderStudentList();
       };
     }
+    const sortSelect = document.getElementById('studentSortSelect');
+    if(sortSelect && !sortSelect._wired){
+      sortSelect._wired = true;
+      sortSelect.value = studentSortMode;
+      sortSelect.onchange = () => { studentSortMode = sortSelect.value; renderStudentList(); };
+    }
   }catch(err){
     listEl.innerHTML = '<div class="empty-msg">Could not load students.</div>';
     console.error(err);
@@ -908,7 +1163,20 @@ function renderStudentList(){
   const q = studentSearchQuery;
   const visibleIds = allIds
     .filter(id => !q || (studentsMap[id] || '').toLowerCase().includes(q))
-    .sort((a,b) => studentsMap[a].localeCompare(studentsMap[b]));
+    .sort((a,b) => {
+      if(studentSortMode === 'recent'){
+        const d = (studentLastActive(b)||0) - (studentLastActive(a)||0);
+        if(d) return d;
+      }else if(studentSortMode === 'attention'){
+        const d = (studentDisputeCounts[b]||0) - (studentDisputeCounts[a]||0);
+        if(d) return d;
+        // then the longest-inactive students
+        const sa = daysSince(studentLastActive(a)), sb = daysSince(studentLastActive(b));
+        const staleA = sa === null || sa >= STALE_DAYS, staleB = sb === null || sb >= STALE_DAYS;
+        if(staleA !== staleB) return staleA ? -1 : 1;
+      }
+      return studentsMap[a].localeCompare(studentsMap[b]);
+    });
 
   listEl.innerHTML = '';
   if(visibleIds.length === 0){
@@ -920,11 +1188,13 @@ function renderStudentList(){
     const div = document.createElement('div');
     div.className = 'student-item' + (id === activeStudentId ? ' active' : '');
     div.dataset.id = id;
-    const lastActive = info.lastActive
-      ? 'Last activity: ' + new Date(info.lastActive).toLocaleDateString()
-      : 'No activity yet';
-    div.innerHTML = `<span class="name-row"><span>${studentsMap[id]}</span><span class="dispute-badge hidden" id="disputeBadge_${id}"></span></span><span class="last-active">${lastActive}</span>`;
-    div.onclick = () => { setTab('student'); selectStudent(id, studentsMap[id], div); };
+    const lastTs = studentLastActive(id);
+    const nDays = daysSince(lastTs);
+    const stale = nDays === null || nDays >= STALE_DAYS;
+    const lastActive = lastTs ? 'Active ' + relDayLabel(lastTs).toLowerCase() : 'No activity yet';
+    div.title = lastTs ? 'Last activity: ' + new Date(lastTs).toLocaleString() : '';
+    div.innerHTML = `<span class="name-row"><span>${studentsMap[id]}</span><span class="dispute-badge hidden" id="disputeBadge_${id}"></span></span><span class="last-active${stale ? ' stale' : ''}">${lastActive}</span>`;
+    div.onclick = () => selectStudent(id, studentsMap[id], div);
     listEl.appendChild(div);
   });
   markStudentsWithPendingDisputes();
@@ -941,6 +1211,17 @@ let pendingDisputeAutoOpened = false;
 async function markStudentsWithPendingDisputes(){
   try{
     const allAttempts = await loadAllAttempts();
+    const firstPass = !markStudentsWithPendingDisputes._done;
+    markStudentsWithPendingDisputes._done = true;
+    const newCounts = {};
+    collectPendingDisputes(allAttempts).forEach(d => { newCounts[d.sid] = (newCounts[d.sid]||0) + 1; });
+    const changed = JSON.stringify(newCounts) !== JSON.stringify(studentDisputeCounts);
+    studentDisputeCounts = newCounts;
+    const total = Object.values(newCounts).reduce((s,n) => s+n, 0);
+    const tabCount = document.getElementById('overviewDisputeCount');
+    if(tabCount) tabCount.textContent = total ? String(total) : '';
+    // Once attempts arrive, the sort order (disputes / activity) may change — re-render once.
+    if((firstPass || changed) && studentSortMode !== 'name'){ renderStudentList(); return; }
     Object.keys(studentsMap).forEach(id => {
       const posukMap = allAttempts[id];
       const badge = document.getElementById('disputeBadge_' + id);
@@ -972,7 +1253,8 @@ async function markStudentsWithPendingDisputes(){
         });
       });
       if(count > 0){
-        badge.textContent = '⚠️ ' + count + (count === 1 ? ' dispute' : ' disputes');
+        badge.textContent = '⚠️ ' + count;
+        badge.title = count + (count === 1 ? ' dispute' : ' disputes') + ' waiting — click to review';
         badge.classList.remove('hidden');
         pendingDisputeTargets[id] = firstTarget;
         badge.onclick = (ev) => {
@@ -1135,45 +1417,41 @@ async function loadRoster(){
       return a.avg - b.avg;
     });
 
-    let html = `<h2>Class Roster</h2>
-      <table class="roster-table">
+    const disputeCounts = {};
+    collectPendingDisputes(allAttempts).forEach(d => { disputeCounts[d.sid] = (disputeCounts[d.sid]||0) + 1; });
+    let html = `<h2 style="margin-bottom:4px;">Class Roster</h2>
+      <div class="muted" style="margin-bottom:10px;">Click any column header to sort · click a row to open that student. Lowest reading average is on top by default.</div>
+      <div style="overflow-x:auto;"><table class="roster-table">
         <thead><tr>
-          <th>Student</th><th>Pesukim Recorded</th><th>Avg Reading %</th><th>Avg Translation %</th><th>Comprehension</th><th>Last Active</th>
+          <th>Student</th><th>Pesukim</th><th class="col-reading">Reading</th><th class="col-translation">Translation</th><th class="col-comprehension">Comprehension</th><th>Disputes</th><th>Last active</th>
         </tr></thead><tbody>`;
     rows.forEach(r => {
-      const tier = r.avg === null ? 'none' : pctTier(r.avg);
-      const tierLabel = tier === 'high' ? 'Doing Well' : tier === 'mid' ? 'Making Progress' : tier === 'low' ? 'Needs Support' : 'No Activity';
-      const avgLabel = r.avg === null ? '—' : Math.round(r.avg) + '%';
-      const avgTranslationLabel = r.avgTranslation === null ? '—' : Math.round(r.avgTranslation) + '%';
+      const last = studentLastActive(r.id);
+      const nDays = daysSince(last);
+      const dCls = nDays === null || nDays >= STALE_DAYS ? 'bad' : (nDays === 0 ? 'ok' : '');
+      const dc = disputeCounts[r.id] || 0;
       const vc = r.verdictCounts;
-      const historicalParts = [];
-      if(vc.excellent) historicalParts.push('🌟' + vc.excellent);
-      if(vc.correct) historicalParts.push('✅' + vc.correct);
-      if(vc.partial) historicalParts.push('🤔' + vc.partial);
-      if(vc.incorrect) historicalParts.push('💡' + vc.incorrect);
-      const avgCompLabel = r.avgComprehension === null ? '—' : Math.round(r.avgComprehension) + '%';
-      const compLabel = historicalParts.length
-        ? avgCompLabel + ' · bonus ' + historicalParts.join(' ')
-        : avgCompLabel;
+      const verdictParts = [];
+      if(vc.excellent) verdictParts.push('🌟' + vc.excellent);
+      if(vc.correct) verdictParts.push('✅' + vc.correct);
+      if(vc.partial) verdictParts.push('🤔' + vc.partial);
+      if(vc.incorrect) verdictParts.push('💡' + vc.incorrect);
       html += `<tr class="roster-row" data-id="${r.id}">
         <td class="rname">${r.name}</td>
-        <td>${r.posukCount}</td>
-        <td>${avgLabel}</td>
-        <td>${avgTranslationLabel}</td>
-        <td><span class="status-pill ${tier}">${tierLabel}</span> <span style="margin-left:6px;">${compLabel}</span></td>
-        <td>${r.lastActive}</td>
+        <td data-sort="${r.posukCount}">${r.posukCount}</td>
+        <td data-sort="${r.avg ?? ''}">${pctPill(r.avg)}</td>
+        <td data-sort="${r.avgTranslation ?? ''}">${pctPill(r.avgTranslation)}</td>
+        <td data-sort="${r.avgComprehension ?? ''}">${pctPill(r.avgComprehension)} <span class="muted" title="Best verdict per posuk">${verdictParts.join(' ')}</span></td>
+        <td data-sort="${dc}">${dc ? `<span class="status-pill low">⚠️ ${dc}</span>` : '<span class="muted">—</span>'}</td>
+        <td data-sort="${last || 0}"><span class="days-pill ${dCls}">${relDayLabel(last)}</span></td>
       </tr>`;
     });
-    html += `</tbody></table>`;
+    html += `</tbody></table></div>`;
     mainEl.innerHTML = html;
+    makeSortable(mainEl.querySelector('table.roster-table'));
 
     mainEl.querySelectorAll('.roster-row').forEach(row => {
-      row.onclick = () => {
-        const id = row.dataset.id;
-        setTab('student');
-        const el = [...document.querySelectorAll('.student-item')].find(e => e.dataset.id === id);
-        if(el) selectStudent(id, studentsMap[id], el);
-      };
+      row.onclick = () => openStudentAt(row.dataset.id, null);
     });
   }catch(err){
     mainEl.innerHTML = '<div class="empty-msg">Could not build the class roster.</div>';
@@ -1738,8 +2016,16 @@ function makeSortable(table){
 
       rows.sort((a,b) => {
         const aCell = a.children[colIndex], bCell = b.children[colIndex];
-        const av = parseForSort(aCell ? aCell.textContent.trim() : '');
-        const bv = parseForSort(bCell ? bCell.textContent.trim() : '');
+        // A cell may carry an explicit data-sort value (numeric, '' = no data).
+        const readCell = cell => {
+          if(cell && cell.dataset.sort !== undefined){
+            const n = parseFloat(cell.dataset.sort);
+            return { num: isNaN(n) ? null : n, str: '' };
+          }
+          return parseForSort(cell ? cell.textContent.trim() : '');
+        };
+        const av = readCell(aCell);
+        const bv = readCell(bCell);
         let cmp;
         if(av.num !== null && bv.num !== null) cmp = av.num - bv.num;
         else if(av.num !== null) cmp = -1;
@@ -2494,6 +2780,7 @@ function formatPracticeWindow(limit){
 
 async function selectStudent(id, name, el, forcedPosukKey){
   activeStudentId = id;
+  markTab('student');
   // Normal clicks (student row, tab switch) reset to the grid view as
   // before. A dispute-badge click passes forcedPosukKey so the detail
   // panel opens directly on the actual dispute instead of the grid.
@@ -2553,6 +2840,11 @@ async function selectStudent(id, name, el, forcedPosukKey){
     });
     studentRangeData.sort((a,b) => (b.latest ? b.latest.timestamp : 0) - (a.latest ? a.latest.timestamp : 0));
 
+    const sStats = computeStudentStats(val);
+    const sDisputes = countPendingDisputesForStudent();
+    let sLast = (studentsInfo[id] && studentsInfo[id].lastActive) || 0;
+    Object.values(studentPosukData).forEach(p => { if(p.latest && p.latest.timestamp > sLast) sLast = p.latest.timestamp; });
+    const pctTxt = v => typeof v === 'number' ? Math.round(v) + '%' : '—';
     mainEl.innerHTML = `
       <div class="student-head">
         <h2>${name}</h2>
@@ -2560,12 +2852,36 @@ async function selectStudent(id, name, el, forcedPosukKey){
           <button class="mini-tab-btn ${studentActiveTab==='comprehension'?'active':''}" id="studentComprehensionBtn">🧠 Comprehension</button>
           <button class="mini-tab-btn ${studentActiveTab==='reading'?'active':''}" id="studentReadingBtn">🎙️ Reading</button>
           <button class="mini-tab-btn ${studentActiveTab==='translate'?'active':''}" id="studentTranslateBtn">🌐 Translate</button>
+        </div>
+      </div>
+      <div class="student-summary">
+        ${sDisputes ? `<div class="chip alert" id="studentReviewDisputesChip"><b>⚠️ ${sDisputes}</b>Dispute${sDisputes===1?'':'s'} — review →</div>` : ''}
+        <div class="chip"><b>${sStats.posukCount}</b>Pesukim recorded</div>
+        <div class="chip"><b>${pctTxt(sStats.avg)}</b>Avg reading</div>
+        <div class="chip"><b>${pctTxt(sStats.avgTranslation)}</b>Avg translation</div>
+        <div class="chip"><b>${pctTxt(sStats.avgComprehension)}</b>Avg comprehension</div>
+        <div class="chip"><b>${sLast ? relDayLabel(sLast) : 'Never'}</b>Last active</div>
+      </div>
+      <div class="muted" style="margin-bottom:4px;">Tap a posuk to hear the recording and see details. Colors: green ≥80%, yellow 50–79%, red &lt;50%, ⚠️ = dispute.</div>
+      <div id="studentGridWrap"></div>
+      <div id="posukDetail"></div>
+      <details class="admin-more"><summary>Student admin (reset / remove)</summary>
+        <div class="mini-tabs">
           <button class="btn small" id="resetStudentBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;">↩️ Reset Progress</button>
           <button class="btn small" id="removeStudentBtn" style="background:#8a3a3a;box-shadow:0 4px 0 #5c2626;">🗑️ Remove Student</button>
         </div>
-      </div>
-      <div id="studentGridWrap"></div>
-      <div id="posukDetail"></div>`;
+      </details>`;
+    const reviewChip = document.getElementById('studentReviewDisputesChip');
+    if(reviewChip) reviewChip.onclick = async () => {
+      const target = nextPendingDisputeTarget();
+      if(!target) return;
+      studentActiveTab = target.tab;
+      selectedPosukKey = target.posukKey;
+      await renderStudentGrid();
+      renderPosukDetail(target.posukKey);
+      const detailEl = document.getElementById('posukDetail');
+      if(detailEl) detailEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
     document.getElementById('studentComprehensionBtn').onclick = async () => {
       studentActiveTab = 'comprehension';
       await renderStudentGrid();
@@ -3269,7 +3585,8 @@ function sortPosukKeys(keys){
 
 /* ---------- Class Summary ---------- */
 let classActiveSkill = 'comprehension'; // 'comprehension' | 'reading' | 'translate' -- one global toggle for the whole tab
-let expandedPerekNum = null; // only one perek open (accordion) at a time; null = all collapsed
+let expandedPerekNum = undefined; // only one perek open (accordion) at a time; null = all collapsed, undefined = auto-pick most recent
+let classShowAllPerakim = false;
 let lastAttemptsVal = null; // cached attempts tree so toggling skill/expand doesn't need a re-fetch
 
 async function loadClassSummary(){
@@ -3283,7 +3600,7 @@ async function loadClassSummary(){
       return;
     }
 
-    let html = '<h2>Class Stats</h2>';
+    let html = '<h2>Class results by posuk</h2>';
     html += `<div class="mini-tabs" style="margin-bottom:6px;">
       <button class="mini-tab-btn ${classActiveSkill==='comprehension'?'active':''}" id="classComprehensionBtn">🧠 Comprehension</button>
       <button class="mini-tab-btn ${classActiveSkill==='reading'?'active':''}" id="classReadingBtn">🎙️ Reading</button>
@@ -3349,7 +3666,31 @@ async function renderClassPosukGrid(val){
   }
   const audioField = classActiveSkill === 'reading' ? 'hebrewAudioURL' : 'comprehensionAudioURL';
 
-  const perekNums = getAllPerekNums();
+  // Only list perakim someone has actually recorded (listing all 50 made the
+  // tab look empty and was slow — each perek length is fetched from Sefaria).
+  const activePerakim = new Set();
+  let latestTs = 0, latestPerek = null;
+  Object.keys(studentsMap).forEach(sid => Object.entries(val[sid] || {}).forEach(([posukKey, m]) => {
+    const p = parsePosukKey(posukKey).perek;
+    if(!p) return;
+    activePerakim.add(p);
+    Object.values(m || {}).forEach(a => { if(a && a.timestamp > latestTs){ latestTs = a.timestamp; latestPerek = p; } });
+  }));
+  if(expandedPerekNum === undefined) expandedPerekNum = latestPerek;
+
+  const toggle = document.createElement('div');
+  toggle.className = 'muted';
+  toggle.style.margin = '4px 0 6px';
+  toggle.innerHTML = `Each tile shows how many students did that posuk; its color is how most of them scored. Tap a tile to see who did / didn't.
+    <a href="#" id="classShowAllToggle" style="margin-left:6px;color:var(--rimon);font-weight:700;">${classShowAllPerakim ? 'Show only perakim with activity' : 'Show all perakim'}</a>`;
+  wrap.appendChild(toggle);
+  toggle.querySelector('#classShowAllToggle').onclick = (e) => { e.preventDefault(); classShowAllPerakim = !classShowAllPerakim; renderClassPosukGrid(val); };
+
+  const perekNums = getAllPerekNums().filter(p => classShowAllPerakim || activePerakim.has(p));
+  if(!perekNums.length){
+    wrap.appendChild(Object.assign(document.createElement('div'), { className: 'empty-msg', textContent: 'No recordings yet.' }));
+    return;
+  }
   for(const perekNum of perekNums){
     const range = await getPerekRange(perekNum);
     const isExpanded = expandedPerekNum === perekNum;
