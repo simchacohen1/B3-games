@@ -272,7 +272,7 @@ async function restoreSharedStudentLogin() {
 const account=await window.B3TeacherAccountReady;
 if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
 teacherPreview=true;myStudentId='teacher_preview';myName='Teacher Preview';masterBlocked=false;
-document.getElementById('signedInName').textContent='Teacher Preview ? practice buzzer, no live game changes';applyMasterBlocked();
+document.getElementById('signedInName').textContent='Teacher Preview - practice buzzer, no live game changes';applyMasterBlocked();
 if(!questions.length)questions=[{q:'How many days are in a week?'}];questionsReady=true;
 renderGameSnapshot({val:()=>({qIndex:0,hostSeenAt:Date.now(),scores:{'Teacher Preview':0}})});return;
 }

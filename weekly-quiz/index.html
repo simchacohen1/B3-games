@@ -435,7 +435,7 @@ function enterStudent(displayName,studentId,classId){
 async function restoreLogin(){
 const account=await window.B3TeacherAccountReady;
 if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
-teacherPreview=true;myName='Teacher Preview ? sample quiz, answers not saved';myStudentId='teacher_preview';myClassId='et';
+teacherPreview=true;myName='Teacher Preview - sample quiz, answers not saved';myStudentId='teacher_preview';myClassId='et';
 activeLaunchId='teacher_preview';launchData={classId:'et',started:true,mode:'test',showScore:true,quizSnapshot:{title:'Teacher Preview Quiz',questions:[{q:'How many days are in a week?',choices:['Six','Seven','Eight'],correctIndex:1},{q:'Which day is Shabbos?',choices:['The first day','The seventh day','The third day'],correctIndex:1}]}};
 document.getElementById('studentNameLabel').textContent=myName;applyMasterBlocked();render();return;
 }

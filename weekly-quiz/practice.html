@@ -262,7 +262,7 @@ function enterApp(){
 }
 async function restore(){
 const account=await window.B3TeacherAccountReady;
-if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){teacherPreview=true;studentId='teacher_preview';studentName='Teacher Preview ? practice results not saved';enterApp();return;}
+if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){teacherPreview=true;studentId='teacher_preview';studentName='Teacher Preview - practice results not saved';enterApp();return;}
   const id=sessionStorage.getItem('posukPractice_studentId'),name=sessionStorage.getItem('posukPractice_studentName');
   if(!id||!name)return;
   try{const s=await db.ref('posukPractice/allowedStudents/'+id).once('value');if(!s.exists())return;studentId=id;studentName=(s.val()&&s.val().name)||name;enterApp();}catch(e){}
