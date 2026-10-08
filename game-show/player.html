@@ -44,6 +44,33 @@
   .scoreboard-empty { color: #7d5236; }
   .hidden { display: none; }
   .master-blocked { max-width: 400px; margin: 60px auto 0 auto; background: white; border-radius: 12px; border: 1px solid #d9a85c; padding: 28px; font-size: 18px; }
+  /* Fit the play controls and scores in one screen at normal zoom. */
+  body { box-sizing: border-box; height: 100dvh; padding: 10px 14px; display: flex; flex-direction: column; }
+  h1 { margin: 0 0 3px; font-size: 26px; }
+  .subtitle { margin-bottom: 8px; font-size: 14px; }
+  #gameArea { display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%; max-width: 600px; margin: 0 auto; }
+  #gameArea.hidden { display: none; }
+  .signed-in { box-sizing: border-box; width: 100%; max-width: none; margin-bottom: 8px; flex-shrink: 0; }
+  #gameArea > .panel { box-sizing: border-box; width: 100%; max-width: none; margin: 0 0 8px; padding: 12px 16px; flex-shrink: 0; }
+  .qnum { margin-bottom: 4px; }
+  .qtext { font-size: 19px; line-height: 1.3; max-height: 5.2em; overflow-y: auto; overflow-wrap: anywhere; margin-bottom: 8px; scrollbar-gutter: stable; }
+  .buzz-btn { width: 108px; height: 108px; font-size: 20px; padding: 10px; box-shadow: 0 4px 0 #78342a; }
+  .buzz-btn:disabled { box-shadow: none; }
+  .countdown { margin-top: 8px; font-size: 17px; }
+  .status { margin-top: 8px; font-size: 15px; }
+  .countdown:empty, .status:empty { display: none; }
+  .score-display { margin: 0 0 8px; font-size: 17px; flex-shrink: 0; }
+  #gameArea > .scoreboard { display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; padding: 12px; }
+  .scoreboard h2 { margin-bottom: 8px; font-size: 18px; flex-shrink: 0; }
+  .scoreboard-list { flex: 1; min-height: 0; overflow-y: auto; }
+  .scoreboard th, .scoreboard td { padding: 8px; font-size: 14px; }
+  .scoreboard th { position: sticky; top: 0; background: white; }
+  .scoreboard-empty { margin: 0; }
+  @media (max-height: 600px) {
+    .buzz-btn { width: 88px; height: 88px; font-size: 18px; }
+    .qtext { font-size: 17px; }
+    #gameArea > .panel { padding: 8px 12px; }
+  }
 </style>
 </head>
 <body>
@@ -73,7 +100,7 @@
   </div>
   <div class="panel">
     <div class="qnum" id="qnum">Question 1 of 1</div>
-    <div class="qtext" id="qtext"></div>
+    <div class="qtext" id="qtext" tabindex="0" role="region" aria-label="Question"></div>
     <button class="buzz-btn" id="buzzBtn" onclick="buzzIn()">BUZZ IN</button>
     <div class="countdown" id="countdown"></div>
     <div class="status" id="status"></div>
@@ -82,10 +109,12 @@
   <section class="panel scoreboard" aria-labelledby="scoreboardTitle">
     <h2 id="scoreboardTitle">Players &amp; scores</h2>
     <p id="scoreboardEmpty" class="scoreboard-empty">Waiting for players to join.</p>
+    <div class="scoreboard-list" tabindex="0" role="region" aria-label="Player scoreboard">
     <table id="scoreboardTable" class="hidden" aria-label="Live player scores">
       <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">Score</th></tr></thead>
       <tbody id="scoreboardRows"></tbody>
     </table>
+    </div>
   </section>
 </div>
 
