@@ -186,3 +186,7 @@ body.teacher-view #stage:fullscreen #exitFullScreenLesson,body.teacher-view #sta
 @media(max-width:560px){.teacher-dock{gap:4px}.tb-swatches button{width:22px;height:22px}}
 .tb-swatches button:hover:enabled{background:var(--c)}
 .tb-sizes button:hover:enabled{background:#e4ecfb}
+
+body.student-dock-view .student-tool-card,body.student-dock-view .lesson-actions{display:none}
+body.student-dock-view #stage:fullscreen #exitFullScreenLesson,body.student-dock-view #stage.lesson-fullscreen #exitFullScreenLesson{display:none!important}
+.teacher-dock.floating.collapsed .tb-group:last-child [id$="tbFullscreen"]{display:inline-flex}
