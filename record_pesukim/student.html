@@ -2314,53 +2314,28 @@ async function studentRecord(path){
     return await response.json();
   }finally{clearTimeout(timer);}
 }
+// Student sign-in is checked on the server (funTorahStudentAuth), the same
+// way the main site does it. Passcodes are stored privately by the backend
+// and never reach the browser.
+const STUDENT_AUTH_URL = "https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth";
 async function checkAccess(name,pin,idHint=''){
-  const normalize=value=>String(value||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'');
-  const enteredPin=String(pin||'').trim(),typed=String(name||'').trim();
-  if(!normalize(typed)||!enteredPin)return {ok:false,reason:'Enter your name and passcode.'};
-
-  const rows=await studentRecord('b3Games/students')||{};
-  const legacyRows=await studentRecord('posukPractice/allowedStudents')||{};
-  const sameName=(sid,profile)=>normalize(profile?.name)===normalize(typed)||normalize(sid)===normalize(typed);
-
-  let id=idHint,profile=null,legacy=null;
-  if(id){
-    profile=await studentRecord('b3Games/students/'+encodeURIComponent(id)+'/profile');
-    legacy=legacyRows[id]||null;
-    if(profile&&profile.active!==false&&sameName(id,profile)){
-      const centralOk=String(profile.passcode||'').trim()===enteredPin;
-      const legacyOk=legacy&&legacy.active!==false&&String(legacy.passcode||DEFAULT_STUDENT_PASSCODE).trim()===enteredPin;
-      if(!centralOk&&!legacyOk)return {ok:false,reason:'Check your name and passcode. Sign in from the main site if needed.'};
-      return {ok:true,slug:id,accessVersion:Number(profile.passcodeUpdatedAt)||0};
-    }
+  const typed=String(name||'').trim(),enteredPin=String(pin||'').trim();
+  if(!typed.replace(/[^a-z0-9]/gi,'')||!enteredPin)return {ok:false,reason:'Enter your name and passcode.'};
+  let data;
+  try{
+    const response=await fetch(STUDENT_AUTH_URL,{method:'POST',signal:AbortSignal.timeout(15000),
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'login',name:typed,pin:enteredPin})});
+    data=await response.json().catch(()=>({}));
+    if(!response.ok)return {ok:false,reason:data.error||'Check your name and passcode. Sign in from the main site if needed.'};
+  }catch(err){
+    return {ok:false,reason:'Could not check your login. Try again.'};
   }
-
-  const named=Object.entries(rows).filter(([sid,row])=>row?.profile?.active!==false&&sameName(sid,row.profile));
-  const centralMatches=named.filter(([,row])=>String(row.profile.passcode||'').trim()===enteredPin);
-  if(centralMatches.length>1)return {ok:false,reason:'More than one account matches. Sign in from the main site.'};
-  if(centralMatches.length===1){
-    id=centralMatches[0][0];profile=centralMatches[0][1].profile;
-    return {ok:true,slug:id,accessVersion:Number(profile.passcodeUpdatedAt)||0};
-  }
-
-  const repairMatches=named.filter(([sid])=>{
-    const old=legacyRows[sid];
-    return old&&old.active!==false&&String(old.passcode||DEFAULT_STUDENT_PASSCODE).trim()===enteredPin;
-  });
-  if(repairMatches.length>1)return {ok:false,reason:'More than one account matches. Sign in from the main site.'};
-  if(repairMatches.length===1){
-    id=repairMatches[0][0];profile=repairMatches[0][1].profile;
-    return {ok:true,slug:id,accessVersion:Number(profile.passcodeUpdatedAt)||0};
-  }
-
-  const legacyMatches=Object.entries(legacyRows).filter(([sid,row])=>
-    row&&row.active!==false&&sameName(sid,row)&&String(row.passcode||DEFAULT_STUDENT_PASSCODE).trim()===enteredPin);
-  if(legacyMatches.length>1)return {ok:false,reason:'More than one account matches. Sign in from the main site.'};
-  if(legacyMatches.length===1){
-    id=legacyMatches[0][0];legacy=legacyMatches[0][1]||{};
-    return {ok:true,slug:id,accessVersion:Number(legacy.passcodeUpdatedAt)||0};
-  }
-  return {ok:false,reason:'Check your name and passcode. Sign in from the main site if needed.'};
+  const id=String(data.id||'').trim();
+  if(!data.ok||!id)return {ok:false,reason:'Check your name and passcode. Sign in from the main site if needed.'};
+  if(idHint&&idHint!==id)return {ok:false,reason:'Check your name and passcode. Sign in from the main site if needed.'};
+  const profile=await studentRecord('b3Games/students/'+encodeURIComponent(id)+'/profile').catch(()=>null);
+  if(profile&&profile.active===false)return {ok:false,reason:'Your account is turned off. Ask your teacher.'};
+  return {ok:true,slug:id,accessVersion:Number(profile&&profile.passcodeUpdatedAt)||0};
 }
 
 document.getElementById('startBtn').onclick = async () => {location.href='../index.html';return;
