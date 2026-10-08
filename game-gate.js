@@ -25,7 +25,7 @@
   } catch (error) {}
   window.B3_WORKSPACE_ID = WORKSPACE_ID;
   var TIME_ZONE = "America/New_York";
-  var POLL_INTERVAL_MS = 5000;
+  var POLL_INTERVAL_MS = 30000;
   var FETCH_TIMEOUT_MS = 4500;
   var FIRST_LOAD_FAILSAFE_MS = 5500;
 

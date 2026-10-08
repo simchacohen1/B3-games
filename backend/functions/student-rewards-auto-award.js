@@ -377,8 +377,19 @@ function classRewardGoalFromRoot(root,studentId,classId,rewardId){
   };
 }
 
+// Only the parts of studentRewards that the status check needs. Reading the
+// whole root here (with daily ratings, requests, history) on every 5-60s poll
+// was the main source of Realtime Database download charges.
+const CLASS_REWARD_STATUS_KEYS=['students','enrollments','classes','settings','classRewardCatalog','classRewardRounds'];
+async function readClassRewardStatusRoot(){
+  const snaps=await Promise.all(CLASS_REWARD_STATUS_KEYS.map(k=>rtdb.ref(`${SR_ROOT}/${k}`).get()));
+  const root={};
+  CLASS_REWARD_STATUS_KEYS.forEach((k,i)=>{const v=snaps[i].val();if(v!=null)root[k]=v;});
+  return root;
+}
+
 async function classRewardStatusForStudent(studentId,preferredClassId=''){
-  const root=(await rtdb.ref(SR_ROOT).get()).val()||{};
+  const root=await readClassRewardStatusRoot();
   const balance=Math.max(0,Number(root?.students?.[studentId]?.rewardBalance)||0);
   const classId=chooseStudentClass(root,studentId,preferredClassId);
   if(!classId) return {goals:[],storeOpen:root?.settings?.rewardStoreEnabled===true||String(root?.settings?.rewardStoreEnabled)==='true',classId:'',balance};

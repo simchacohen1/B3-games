@@ -60,7 +60,7 @@ function startClassGoalPolling(){
   state.classGoalTimer=setInterval(async()=>{
     if(!auth.currentUser||document.hidden)return;
     try{const status=await loadClassRewardStatus();state.classGoals=status.goals;state.storeOpen=status.storeOpen;render()}catch(err){console.warn('Could not refresh class reward goals',err)}
-  },5000);
+  },60000);
 }
 function nav(){const tabs=['Progress','Rewards','Comments'];$('#studentNav').innerHTML=tabs.map(t=>`<button data-tab="${t}" class="${state.tab===t?'active':''}">${t}</button>`).join('');$('#studentNav').onclick=ev=>{const b=ev.target.closest('[data-tab]');if(!b)return;state.tab=b.dataset.tab;render()}}
 
