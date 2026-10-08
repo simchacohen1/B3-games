@@ -314,7 +314,7 @@ async function enterTeacherPreview(user,access){
     catalog:normalizeCatalogUnits(catalogSnap.val()||(classSpaceId?emptyCatalog():clone(DEFAULT_CATALOG))),
     settings:{minReviewMs:500,studentSiteOpen:true,...(settingsSnap.val()||{})}};
   document.getElementById('signedInStudentName').textContent='Teacher Preview';
-  document.getElementById('switchStudentBtn').textContent='Back to B3 Games';
+  document.getElementById('switchStudentBtn').textContent='Back to Fun Torah Tools';
   setCloudStatus('Preview — no student points');
   applyStudentSiteOpen(true);
   if(!appStarted){init();appStarted=true;}
@@ -324,7 +324,7 @@ async function enterTeacherPreview(user,access){
 function bindCloudLogin(){
   document.getElementById('loginBtn').onclick=()=>{location.href='../index.html';};
   document.getElementById('switchStudentBtn').onclick=()=>{location.href='../index.html';};
-  setLoginMsg('Opening your B3 Games account…');
+  setLoginMsg('Opening your Fun Torah Tools account…');
   const waitForAccount=()=>{
     if(!window.B3SiteSettings){setTimeout(waitForAccount,100);return;}
     let restoring=false;
@@ -334,7 +334,7 @@ function bindCloudLogin(){
       try{
         if(user&&authorized){await enterTeacherPreview(user,access);return;}
         if(await trySavedStudent())return;
-        setLoginMsg('Open Shorashim from B3 Games to use your signed-in account.');
+        setLoginMsg('Open Shorashim from Fun Torah Tools to use your signed-in account.');
         document.getElementById('loginBtn').classList.remove('hidden');
       }catch(err){
         if(err?.message==='STUDENT_SITE_CLOSED'){applyStudentSiteOpen(false);return;}
