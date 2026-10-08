@@ -1437,8 +1437,45 @@ const firebaseConfig = {
   appId: "1:568530046190:web:fd765fdd27e55a3c73f7ff"
 };
 firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-const storage = firebase.storage();
+let db = firebase.database();
+let storage = firebase.storage();
+let teacherPreview = false;
+
+// Preview attempts and recordings stay in this tab, outside student records.
+function enableTeacherPreview(){
+  teacherPreview=true;
+  const liveDb=db, records={}, audio=new Map();
+  let nextId=0;
+  const read=path=>path.split('/').reduce((value,key)=>value?.[key],records)??null;
+  const write=(path,value)=>{
+    const keys=path.split('/'),last=keys.pop();let parent=records;
+    for(const key of keys)parent=parent[key]??={};
+    if(value===null)delete parent[last];else parent[last]=value;
+  };
+  const ref=path=>({
+    key:path.split('/').pop(),
+    child:key=>ref(path+'/'+key),
+    push:()=>ref(path+'/preview_'+(++nextId)),
+    set:async value=>write(path,value),
+    update:async values=>{for(const [key,value] of Object.entries(values))write(path+'/'+key,value);},
+    remove:async()=>write(path,null),
+    once:async()=>({val:()=>read(path),exists:()=>read(path)!==null})
+  });
+  db={ref:path=>{
+    if(path.startsWith('posukPractice/attempts/')||path.startsWith('posukPractice/students/'))return ref(path);
+    const live=liveDb.ref(path);
+    return {once:(...args)=>live.once(...args),on:(...args)=>live.on(...args),
+      set:async value=>write(path,value),update:async values=>ref(path).update(values),remove:async()=>write(path,null)};
+  }};
+  const audioRef=path=>({
+    put:async blob=>{if(audio.has(path))URL.revokeObjectURL(audio.get(path));audio.set(path,URL.createObjectURL(blob));},
+    getDownloadURL:async()=>audio.get(path),
+    delete:async()=>{if(audio.has(path))URL.revokeObjectURL(audio.get(path));audio.delete(path);}
+  });
+  storage={ref:audioRef,refFromURL:url=>({delete:async()=>{
+    for(const [path,value] of audio)if(value===url)await audioRef(path).delete();
+  }})};
+}
 
 /* =========================================================
    COMPREHENSION GRADING — Cloud Function URL
@@ -1502,6 +1539,7 @@ function showRewardToast(points){
 }
 
 async function requestVerifiedAward(source, awardPosukKey, evidencePosukKey){
+  if(teacherPreview)return 0;
   if(!studentId || !awardPosukKey || !evidencePosukKey) return 0;
   try{
     const response = await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{
@@ -2355,6 +2393,11 @@ function enterApp(){
   document.getElementById('nameGate').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('studentNameLabel').textContent = studentName;
+  if(teacherPreview){
+    document.getElementById('studentNameLabel').textContent='Teacher Preview — no student work or points saved';
+    practiceScopeReady=true;ownClassSpace=false;classPracticeLimit=null;
+    rebuildPerekOptionsForClassLimit();applyDeepLinkFromURL();return;
+  }
   db.ref('posukPractice/students/' + studentId).set({
     name: studentName,
     lastActive: firebase.database.ServerValue.TIMESTAMP
@@ -2429,6 +2472,18 @@ function applyDeepLinkFromURL(){
 }
 
 window.addEventListener('load', async () => {
+  const account=await new Promise(resolve=>{
+    const deadline=Date.now()+10000;
+    const wait=()=>{
+      if(window.B3SiteSettings)window.B3SiteSettings.onAuthStateChanged((user,authorized)=>resolve({user,authorized}));
+      else if(Date.now()<deadline)setTimeout(wait,100);
+      else resolve({authorized:false});
+    };
+    wait();setTimeout(()=>resolve({authorized:false}),10000);
+  });
+  if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
+    enableTeacherPreview();studentId='teacher_preview';studentName='Teacher Preview';enterApp();return;
+  }
   const sharedId=sessionStorage.getItem('b3Games_studentId'),sharedName=sessionStorage.getItem('b3Games_studentName'),sharedPin=sessionStorage.getItem('b3Games_classPin');
   if(sharedId&&sharedName&&sharedPin){
     setNameGateMsg('Checking your existing sign-in…');
