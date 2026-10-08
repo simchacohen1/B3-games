@@ -25,6 +25,7 @@ async function openTeacherPreview(){
   state.student={name:'Teacher Preview — sample points',initials:'TP',color:'#24344a',rewardBalance:100};
   state.serverRewardBalance=100;state.storeOpen=true;
   state.root={student:state.student,ratings:{},attendance:{},awards:{},comments:{},rewards:rewards.val()||{},redemptions:{},categories:categories.val()||{},settings:{rewardStoreEnabled:true}};
+  state.root.rewards=Object.fromEntries(Object.entries(state.root.rewards).map(([id,reward])=>[id,{...reward,id,available:true,quantity:null}]));
   render();C.toast('Teacher preview: trial requests do not spend student points or reach the teacher.');return true;
 }
 let state={studentId:'',student:null,tab:'Progress',root:null,busy:false,activityPointHistory:[],classGoals:[],classGoalTimer:null,storeOpen:null,serverRewardBalance:null};
