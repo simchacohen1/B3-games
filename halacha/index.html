@@ -148,6 +148,11 @@ body.exporting .resize-width,body.exporting .resize-height{display:none!importan
 .halacha-access-buttons button.locked{background:#f1f5f9;color:#64748b;border-color:#cbd5e1}
 .halacha-access-status{font-size:12px;font-weight:900;color:#173b62;margin-left:auto}
 .halacha-access-note{font-size:12px;color:#64748b;margin-top:7px}
+
+/* Show resize handles only on the selected piece */
+.scrap:not(.selected) > .resize-handle,
+.scrap:not(.selected) > .resize-width,
+.scrap:not(.selected) > .resize-height{display:none !important}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -369,7 +374,9 @@ function add(id,type,text,pageIndex=0){
 }
 function clampPiece(e){
  let page=e.closest(".page"); if(!page)return;
- let maxL=Math.max(0,page.clientWidth-e.offsetWidth-8),maxT=Math.max(0,page.clientHeight-e.offsetHeight-8);
+ // Hidden lessons report 0 size; clamping them would pin every piece to the corner and save it that way.
+ if(!page.clientWidth||!page.clientHeight||!e.offsetParent)return;
+ let maxL=Math.max(8,page.clientWidth-e.offsetWidth-8),maxT=Math.max(8,page.clientHeight-e.offsetHeight-8);
  e.style.left=Math.min(Math.max(8,e.offsetLeft),maxL)+"px";
  e.style.top=Math.min(Math.max(8,e.offsetTop),maxT)+"px";
 }
