@@ -5,6 +5,7 @@ async function run(saved={},failure){
  const values=new Map(Object.entries(saved)),calls=[],messages=[];
  const loginPanel={hidden:false};
  await vm.runInNewContext(startup,{
+ API:{ready:Promise.resolve(),preview:false},
  sessionStorage:{getItem:k=>values.get(k)||null,removeItem:k=>values.delete(k)},
  refresh:async()=>{calls.push('refresh');if(failure)throw failure;},
  login:async(id,pin)=>{calls.push([id,pin]);if(failure)throw failure;},
