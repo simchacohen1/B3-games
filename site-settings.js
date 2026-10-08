@@ -877,6 +877,8 @@
       }
       readUserAccess(user).then(function(access){
         currentAccess = access;
+        if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
+        else showToolVersions(access);
         callback(user, access.authorized, access);
         if (access.authorized && access.role === "admin") {
           services.db.ref(SETTINGS_KEY).once("value").then(function (snapshot) {
