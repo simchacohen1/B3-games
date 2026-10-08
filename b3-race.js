@@ -9,12 +9,13 @@
  *     container: element,            // where the race draws itself
  *     db, roomsPath,                 // Firebase database + path for this game's rooms (class-scoped)
  *     studentId, studentName,
- *     makeQuestions: () => [{prompt, big, bigClass, choices:[...], answer, choiceClass, explain}],
+ *     makeQuestions: () => [{prompt, big, bigClass, choices:[...], answer, choiceClass, explain}],  // may also return a Promise
  *     roomInfo: () => ({label:'Level 2'}),   // optional extra info shown on invitations
  *     onCorrect: () => {}, onFinish: ({won, score, total}) => {}, onExit: () => {}
  *   });
  *   race.start();   // opens the friends screen
  *   race.leave();   // call when the student navigates away
+ *   B3Race.classRoomsPath(db, studentId, "my-game")  // Promise of the class-scoped rooms path ("" if no class)
  */
 (function (root) {
   "use strict";
@@ -97,7 +98,7 @@
         startWatch(); renderOffers(all, msg);
       } catch (e) { console.error(e); var w2 = draw(); w2.append(el("p", "b3r-prompt", "Could not reach the game server. Try again in a minute."), backBtn()); }
     }
-    function backBtn(label) { var b = el("button", "b3r-small", label || "← Back"); b.type = "button"; b.onclick = function () { leave(); if (opts.onExit) opts.onExit(); }; return b; }
+    function backBtn(label) { var b = el("button", "b3r-small", label || "← Back"); b.type = "button"; b.onclick = function () { view++; leave(); if (opts.onExit) opts.onExit(); }; return b; }
 
     function offerList(all) {
       var offers = el("div"); offers.setAttribute("data-b3r-offers", "1");
@@ -121,6 +122,7 @@
       w.append(el("h3", null, "Friends are waiting for you!"), found, el("p", "b3r-fb no", msg || ""), backBtn(), own);
     }
 
+    function showProblem(msg) { var w = draw(); w.append(el("p", "b3r-prompt", msg || "Could not set up the race. Try again."), backBtn()); }
     async function createRoom() { if (creating) return; creating = true; try { await createInner(); } finally { creating = false; } }
     async function createInner() {
       leave();
@@ -131,11 +133,16 @@
         if (!r || (r.createdAt && now() - r.createdAt > STALE_MS)) code = c;
       }
       if (!code) throw new Error("no free code");
+      var wait = draw(); wait.append(el("p", "b3r-prompt", "Getting the questions ready…"));
       var ref = db.ref(path + "/" + code), players = {};
       players[me] = { name: myName, score: 0, q: 0 };
       var info = (opts.roomInfo && opts.roomInfo()) || {};
+      var qs, v = view;
+      try { qs = await opts.makeQuestions(); } catch (e) { qs = null; showProblem(e && e.message); return; }
+      if (!qs || !list(qs).length) { showProblem("There are no questions to race on yet."); return; }
+      if (v !== view) return;
       await ref.set({ host: me, hostName: myName, label: info.label || "", state: "lobby",
-        createdAt: firebase.database.ServerValue.TIMESTAMP, questions: opts.makeQuestions(), players: players });
+        createdAt: firebase.database.ServerValue.TIMESTAMP, questions: qs, players: players });
       ref.onDisconnect().remove();
       enter(code, true);
     }
@@ -276,5 +283,13 @@
     return { start: start, leave: leave };
   }
 
-  root.B3Race = { create: create };
+  /* Finds this student's class and returns the rooms path for a game, or "" if he has no class. */
+  function classRoomsPath(db, studentId, gameKey) {
+    if (!db || !studentId || !root.FunTorahStudentClass) return Promise.resolve("");
+    return root.FunTorahStudentClass.resolve(db, studentId).then(function (info) {
+      return info && info.classId ? "b3Games/workspaces/" + info.workspaceId + "/classes/" + info.classId + "/resources/" + gameKey + "/rooms" : "";
+    }).catch(function (e) { console.warn("B3Race: could not find class", e); return ""; });
+  }
+
+  root.B3Race = { create: create, classRoomsPath: classRoomsPath };
 })(window);
