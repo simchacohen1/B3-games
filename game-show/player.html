@@ -53,7 +53,7 @@
   .signed-in { box-sizing: border-box; width: 100%; max-width: none; margin-bottom: 8px; flex-shrink: 0; }
   #gameArea > .panel { box-sizing: border-box; width: 100%; max-width: none; margin: 0 0 8px; padding: 12px 16px; flex-shrink: 0; }
   .qnum { margin-bottom: 4px; }
-  .qtext { font-size: 19px; line-height: 1.3; max-height: 5.2em; overflow-y: auto; overflow-wrap: anywhere; margin-bottom: 8px; scrollbar-gutter: stable; }
+  .qtext { font-size: clamp(24px, 6vw, 34px); line-height: 1.3; max-height: 5.2em; overflow-y: auto; overflow-wrap: anywhere; margin-bottom: 8px; scrollbar-gutter: stable; }
   .buzz-btn { width: 108px; height: 108px; font-size: 20px; padding: 10px; box-shadow: 0 4px 0 #78342a; }
   .buzz-btn:disabled { box-shadow: none; }
   .countdown { margin-top: 8px; font-size: 17px; }
@@ -68,7 +68,7 @@
   .scoreboard-empty { margin: 0; }
   @media (max-height: 600px) {
     .buzz-btn { width: 88px; height: 88px; font-size: 18px; }
-    .qtext { font-size: 17px; }
+    .qtext { font-size: 22px; }
     #gameArea > .panel { padding: 8px 12px; }
   }
 </style>
@@ -314,20 +314,52 @@ function playBuzzSound() {
   }
   if (sharedPlayerCtx.state === "suspended") { sharedPlayerCtx.resume(); }
   const ctx = sharedPlayerCtx;
-  const notes = [523, 659, 784];
-  notes.forEach((freq, i) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.08);
-    gain.gain.setValueAtTime(0.001, ctx.currentTime + i * 0.08);
-    gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + i * 0.08 + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.08 + 0.25);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(ctx.currentTime + i * 0.08);
-    osc.stop(ctx.currentTime + i * 0.08 + 0.25);
-  });
+  const start = ctx.currentTime + 0.01;
+  const bus = ctx.createGain();
+  bus.gain.value = 0.8;
+  bus.connect(ctx.destination);
+  function tone(freq, offset, dur, level, type, hold) {
+    const osc = ctx.createOscillator(), gain = ctx.createGain(), at = start + offset;
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, at);
+    gain.gain.setValueAtTime(0, at);
+    gain.gain.linearRampToValueAtTime(level, at + 0.008);
+    if (hold) gain.gain.setValueAtTime(level, at + dur - 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    osc.connect(gain); gain.connect(bus); osc.start(at); osc.stop(at + dur);
+  }
+  function sweep(f0, f1, offset, dur, level, type) {
+    const osc = ctx.createOscillator(), gain = ctx.createGain(), at = start + offset;
+    osc.type = type;
+    osc.frequency.setValueAtTime(f0, at);
+    osc.frequency.exponentialRampToValueAtTime(f1, at + dur);
+    gain.gain.setValueAtTime(0, at);
+    gain.gain.linearRampToValueAtTime(level, at + 0.006);
+    gain.gain.setValueAtTime(level, at + dur * 0.7);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    osc.connect(gain); gain.connect(bus); osc.start(at); osc.stop(at + dur);
+  }
+  // Same buzz-in sound the teacher picked in Setup.
+  const kinds = ['ding', 'buzzer', 'chime', 'zap', 'bloop', 'alarm'];
+  let kind = (lastData && lastData.buzzSound) || 'buzzer';
+  if (kind === 'random' || !kinds.includes(kind)) kind = kinds[Math.floor(Math.random() * kinds.length)];
+  if (kind === 'buzzer') {
+    [[110, 0.2], [116.5, 0.16], [220, 0.07]].forEach(([f, l]) => tone(f, 0, 0.6, l, 'square', true));
+  } else if (kind === 'chime') {
+    [783.99, 987.77, 1318.51].forEach((f, i) => tone(f, i * 0.12, 0.6, 0.28, 'sine'));
+  } else if (kind === 'zap') {
+    sweep(1900, 160, 0, 0.32, 0.16, 'sawtooth');
+    sweep(1400, 120, 0.02, 0.3, 0.1, 'square');
+    tone(1568, 0.32, 0.18, 0.18, 'sine');
+  } else if (kind === 'bloop') {
+    sweep(260, 880, 0, 0.14, 0.3, 'triangle');
+    tone(880, 0.14, 0.4, 0.26, 'triangle');
+  } else if (kind === 'alarm') {
+    for (let i = 0; i < 6; i++) tone(i % 2 ? 660 : 990, i * 0.11, 0.1, 0.13, 'square', true);
+  } else {
+    [[880, 0.36], [1760, 0.13], [2398, 0.085]].forEach(([f, l]) => tone(f, 0, f > 2000 ? 0.28 : 0.68, l, 'sine'));
+  }
+  setTimeout(() => bus.disconnect(), 1500);
 }
 
 function mustSitOut(data, name) {
