@@ -431,7 +431,7 @@
     }
 
     if (lastSettings.siteEnabled === false && (studentClassId === "et" || studentClassId === "wt")) {
-      showClosed("B3 Games is closed", "B3 Games is locked right now. Your teacher can give you access to a specific activity.");
+      showClosed("Fun Torah Tools is closed", "Fun Torah Tools is locked right now. Your teacher can give you access to a specific activity.");
       return;
     }
 
@@ -499,4 +499,45 @@
     if (document.visibilityState === "visible") checkNow();
   });
   window.addEventListener("focus", checkNow);
+
+  // ---- "← Fun Torah Tools" home button -------------------------------------------
+  // Every student page loads this gate, so it is the one place that can make
+  // sure students always have a way back to the Fun Torah Tools home page. Pages that
+  // already show their own visible home link keep it, and this pill stays hidden.
+  function setupHomeButton() {
+    if (window.top !== window || document.getElementById("b3HomeButton")) return;
+    var homePath = new URL("index.html", rootBase).pathname;
+    var btn = document.createElement("a");
+    btn.id = "b3HomeButton";
+    btn.href = new URL("index.html", rootBase).href;
+    btn.textContent = "← Fun Torah Tools";
+    btn.setAttribute("aria-label", "Back to Fun Torah Tools home");
+    btn.style.cssText = [
+      "position:fixed", "left:10px", "bottom:10px", "z-index:2147483000",
+      "padding:7px 13px", "border-radius:999px", "background:rgba(31,41,55,.88)",
+      "color:#fff", "font:700 13px/1.2 system-ui,-apple-system,Segoe UI,sans-serif",
+      "text-decoration:none", "box-shadow:0 2px 8px rgba(0,0,0,.25)",
+      "-webkit-tap-highlight-color:transparent"
+    ].join(";");
+    document.body.appendChild(btn);
+
+    function pageHasOwnHomeLink() {
+      var links = document.querySelectorAll("a[href],[data-b3-home]");
+      for (var i = 0; i < links.length; i++) {
+        var el = links[i];
+        if (el === btn || !el.offsetParent) continue;
+        if (el.hasAttribute("data-b3-home")) return true;
+        try {
+          if (new URL(el.getAttribute("href"), location.href).pathname === homePath &&
+              /B3 Games|Fun Torah Tools|Home/i.test(el.textContent)) return true;
+        } catch (e) {}
+      }
+      return false;
+    }
+    function refresh() { btn.style.display = pageHasOwnHomeLink() ? "none" : ""; }
+    refresh();
+    setInterval(refresh, 1500);
+  }
+  if (document.body) setupHomeButton();
+  else document.addEventListener("DOMContentLoaded", setupHomeButton);
 })();

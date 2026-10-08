@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>B3 Games</title>
+<title>Fun Torah Tools</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Rashi+Hebrew:wght@600&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box}
@@ -190,7 +190,7 @@
 <script src="site-settings.js?v=20261007-tab-login"></script>
 </head>
 <body>
-  <h1>B3 Games</h1>
+  <h1>Fun Torah Tools</h1>
   <div class="subtitle">Learning games and practice tools</div>
 
   <div id="studentBar" class="student-bar hidden">
@@ -206,18 +206,18 @@
     <input id="classPinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="Passcode">
     <label for="studentNameInput">Your name</label>
     <input id="studentNameInput" type="text" autocomplete="name" placeholder="First and last name">
-    <button id="studentSignInBtn" type="button">Open B3 Games</button>
+    <button id="studentSignInBtn" type="button">Open Fun Torah Tools</button>
     <div id="loginMsg" class="login-msg" aria-live="polite"></div>
   </div>
 
   <div id="lockedCard" class="locked-card hidden">
     <div class="lock-icon">🔒</div>
-    <h2 id="lockedTitle">B3 Games is locked</h2>
-    <p id="lockedMessage">Your class cannot use B3 Games right now.</p>
+    <h2 id="lockedTitle">Fun Torah Tools is locked</h2>
+    <p id="lockedMessage">Your class cannot use Fun Torah Tools right now.</p>
   </div>
 
   <div id="gamesArea" class="hidden">
-    <div id="specialAccessNote" class="special-access-note hidden">Special access from Rabbi Cohen: while B3 Games is locked, only the activity or activities shown below are available to you.</div>
+    <div id="specialAccessNote" class="special-access-note hidden">Special access from Rabbi Cohen: while Fun Torah Tools is locked, only the activity or activities shown below are available to you.</div>
     <div class="game-container">
       <section class="game-group" data-game-group="learn">
         <div class="game-group-head">
@@ -397,7 +397,7 @@
       </div>
 
       <h3>Student access while locked</h3>
-      <p class="admin-message">Choose one student, then check only the activities that student may use while B3 Games or that student's class is locked. An activity switched off above always stays off.</p>
+      <p class="admin-message">Choose one student, then check only the activities that student may use while Fun Torah Tools or that student's class is locked. An activity switched off above always stays off.</p>
       <div class="override-box">
         <label for="overrideStudentSelect">Student</label>
         <select id="overrideStudentSelect" class="override-student-select"><option value="">Loading students…</option></select>
@@ -872,7 +872,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   function slugify(name){return String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");}
   function setLoginMsg(t){el("loginMsg").textContent=t||"";}
 
-  function showChecking(){if(isAuthorizedTeacher){renderStudentAccess();return;}el("loginCard").classList.add("checking");el("loginCard").querySelector("h2").textContent="Opening B3 Games…";setLoginMsg("Checking your sign-in. This can take a few seconds.");}
+  function showChecking(){if(isAuthorizedTeacher){renderStudentAccess();return;}el("loginCard").classList.add("checking");el("loginCard").querySelector("h2").textContent="Opening Fun Torah Tools…";setLoginMsg("Checking your sign-in. This can take a few seconds.");}
   function showLogin(){
     if(isAuthorizedTeacher){renderStudentAccess();return;}
     el("loginCard").classList.remove("checking");el("loginCard").querySelector("h2").textContent="Student Sign In";if(el("loginMsg").textContent.startsWith("Checking your sign-in"))setLoginMsg("");
@@ -1146,8 +1146,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     el("gamesArea").classList.add("hidden");
     el("specialAccessNote")?.classList.add("hidden");
     el("lockedCard").classList.remove("hidden");
-    el("lockedTitle").textContent=currentSettings.siteEnabled===false?"B3 Games is locked":classLabels[myClassId]+" is locked right now";
-    el("lockedMessage").textContent=currentSettings.siteEnabled===false?"B3 Games is closed right now. Rabbi Cohen can give you access to a specific activity.":"Your class cannot use B3 Games right now. Rabbi Cohen can give you access to a specific activity.";
+    el("lockedTitle").textContent=currentSettings.siteEnabled===false?"Fun Torah Tools is locked":classLabels[myClassId]+" is locked right now";
+    el("lockedMessage").textContent=currentSettings.siteEnabled===false?"Fun Torah Tools is closed right now. Rabbi Cohen can give you access to a specific activity.":"Your class cannot use Fun Torah Tools right now. Rabbi Cohen can give you access to a specific activity.";
   }
 
   // Student sign-in is checked on the server; passcodes never reach the browser.
@@ -1333,9 +1333,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       <div style="margin-top:12px;padding:11px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:11px">
         <label style="display:block;font-size:13px;font-weight:900;color:#1e3a8a;margin-bottom:6px" for="lockedGameOverride-${classId}">🔓 Keep one activity open while locked</label>
         <select id="lockedGameOverride-${classId}" data-locked-game-override="${classId}" style="width:100%;padding:9px 10px;border:1px solid #93c5fd;border-radius:9px;background:#fff;font-weight:800;color:#1f2937">${lockedGameOverrideOptions(classId)}</select>
-        <div style="font-size:11px;color:#475569;line-height:1.4;margin-top:6px">When B3 Games or this class is locked, only this selected activity stays available to the whole ${classLabels[classId]} class. Choose “None” to lock everything.</div>
+        <div style="font-size:11px;color:#475569;line-height:1.4;margin-top:6px">When Fun Torah Tools or this class is locked, only this selected activity stays available to the whole ${classLabels[classId]} class. Choose “None” to lock everything.</div>
       </div>
-      <details><summary>Recess Access Schedule</summary><div class="schedule-grid"><div class="schedule-help">B3 Games is OPEN by default. These are the periods when it is CLOSED. Use the simple hour / minute / AM-PM menus below. Nothing changes until you press <b>Save Schedule</b>, so the times will not jump around while you are editing.${delayNote}</div>${rows}<div class="schedule-actions"><button type="button" class="schedule-save" data-save-schedule="${classId}" disabled>Save Schedule</button><button type="button" class="schedule-reset" data-reset-schedule="${classId}">Reset to Master Schedule</button><span class="schedule-save-status" data-schedule-status="${classId}">No unsaved changes</span></div></div></details>
+      <details><summary>Recess Access Schedule</summary><div class="schedule-grid"><div class="schedule-help">Fun Torah Tools is OPEN by default. These are the periods when it is CLOSED. Use the simple hour / minute / AM-PM menus below. Nothing changes until you press <b>Save Schedule</b>, so the times will not jump around while you are editing.${delayNote}</div>${rows}<div class="schedule-actions"><button type="button" class="schedule-save" data-save-schedule="${classId}" disabled>Save Schedule</button><button type="button" class="schedule-reset" data-reset-schedule="${classId}">Reset to Master Schedule</button><span class="schedule-save-status" data-schedule-status="${classId}">No unsaved changes</span></div></div></details>
     </div>`;
   }
 

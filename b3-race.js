@@ -86,7 +86,7 @@
     async function start(msg) {
       leave(); view++;
       var w = draw();
-      if (!me) { w.append(el("p", "b3r-prompt", "Please sign in on B3 Games to play with friends."), backBtn()); return; }
+      if (!me) { w.append(el("p", "b3r-prompt", "Please sign in on Fun Torah Tools to play with friends."), backBtn()); return; }
       if (!db || !path) { w.append(el("p", "b3r-prompt", "Ask your teacher to add you to a class to play with friends."), backBtn()); return; }
       w.append(el("p", "b3r-prompt", "Looking for friends…"));
       var v = view;
