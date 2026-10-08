@@ -19,6 +19,32 @@
   const BOOTSTRAP_ADMIN_EMAIL = "simcha5770@gmail.com";
   const TIME_ZONE = "America/New_York";
 
+  // ---------------------------------------------------------------------
+  // No sign-in flash for teachers. Firebase takes a second or two to restore
+  // a saved Google sign-in, and pages showed their sign-in screen during that
+  // wait. If this browser had a teacher signed in last time, keep sign-in
+  // screens hidden until the normal check finishes. This only affects what
+  // is shown while waiting; access is still decided by the full check.
+  // ---------------------------------------------------------------------
+  const SIGNED_IN_HINT_KEY = "b3TeacherWasSignedIn";
+  let authChecking = false;
+  function setSignedInHint(on) {
+    try { if (on) localStorage.setItem(SIGNED_IN_HINT_KEY, "1"); else localStorage.removeItem(SIGNED_IN_HINT_KEY); } catch (e) {}
+  }
+  function endAuthChecking() {
+    if (!authChecking) return;
+    authChecking = false;
+    document.documentElement.classList.remove("b3-auth-checking");
+  }
+  try { authChecking = localStorage.getItem(SIGNED_IN_HINT_KEY) === "1"; } catch (e) {}
+  if (authChecking) {
+    document.documentElement.classList.add("b3-auth-checking");
+    const style = document.createElement("style");
+    style.textContent = "html.b3-auth-checking :is(#loginCard,#loginView,#signIn,#signInBtn,#signInButton,#lockGoogle,#googleBtn,#teacherLogin){visibility:hidden !important}";
+    (document.head || document.documentElement).appendChild(style);
+    setTimeout(endAuthChecking, 8000); // never hide sign-in for long
+  }
+
   function workspacePath(relativePath) {
     const clean = String(relativePath || "").replace(/^\/+/, "");
     return clean ? WORKSPACE_ROOT_KEY + "/" + clean : WORKSPACE_ROOT_KEY;
@@ -928,12 +954,15 @@
     const services = ensureFirebase();
     if (!services || !services.auth) {
       callback(null, false);
+      endAuthChecking();
       return function unsubscribe() {};
     }
     return services.auth.onAuthStateChanged(function (user) {
       if (!user) {
         currentAccess = { authorized:false, role:"", classIds:[] };
+        setSignedInHint(false);
         callback(null, false, currentAccess);
+        endAuthChecking();
         return;
       }
       // A teacher who chose "Sign in as a student" sees every page exactly as
@@ -943,13 +972,16 @@
       if (acting) {
         currentAccess = { authorized:false, role:"", classIds:[], actingAsStudent:acting };
         callback(user, false, currentAccess);
+        endAuthChecking();
         return;
       }
       readUserAccess(user).then(function(access){
         currentAccess = access;
         if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
         else showToolVersions(access);
+        setSignedInHint(access.authorized);
         callback(user, access.authorized, access);
+        endAuthChecking();
         if (access.authorized && access.role === "admin") {
           services.db.ref(SETTINGS_KEY).once("value").then(function (snapshot) {
             return mirrorWorkspaceSettings(services, normalizeSettings(snapshot.val())).then(function () {
@@ -1178,6 +1210,12 @@
     stopActingAsStudent: stopActingAsStudent,
     openActAsStudentPicker: openActAsStudentPicker
   };
+  // Pages that never ask about sign-in still need their sign-in screens shown.
+  if (authChecking) {
+    const watch = function () { try { onAuthStateChanged(function () {}); } catch (e) { endAuthChecking(); } };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watch, { once: true });
+    else setTimeout(watch, 0);
+  }
   if (getActingStudent()) {
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", showActingBanner);
     else showActingBanner();
