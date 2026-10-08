@@ -20,8 +20,8 @@
   // settings path yet. Existing ET/WT values remain the within-class tracks.
   var WORKSPACE_ID = "b3-2026";
   try {
-    WORKSPACE_ID = localStorage.getItem("b3Games_workspaceId") || WORKSPACE_ID;
-    localStorage.setItem("b3Games_workspaceId", WORKSPACE_ID);
+    WORKSPACE_ID = sessionStorage.getItem("b3Games_workspaceId") || WORKSPACE_ID;
+    sessionStorage.setItem("b3Games_workspaceId", WORKSPACE_ID);
   } catch (error) {}
   window.B3_WORKSPACE_ID = WORKSPACE_ID;
   var TIME_ZONE = "America/New_York";
@@ -208,11 +208,11 @@
   }
 
   function getStoredStudentId() {
-    return localStorage.getItem("b3Games_studentId") || localStorage.getItem("posukPractice_studentId") || "";
+    return sessionStorage.getItem("b3Games_studentId") || sessionStorage.getItem("posukPractice_studentId") || "";
   }
 
   function getStoredClass() {
-    var c = localStorage.getItem("b3Games_studentClass") || localStorage.getItem("weeklyQuiz_classId") || "";
+    var c = sessionStorage.getItem("b3Games_studentClass") || sessionStorage.getItem("weeklyQuiz_classId") || "";
     return String(c || "").trim();
   }
 

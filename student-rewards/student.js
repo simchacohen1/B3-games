@@ -74,7 +74,7 @@ async function signInB3(name,pin,idHint=''){
     method:'POST',
     headers:{'Content-Type':'application/json'},
     signal:AbortSignal.timeout(15000),
-    body:JSON.stringify({b3StudentId,name:studentName,pin:classPin,classId:localStorage.getItem('b3Games_studentClass')||''})
+    body:JSON.stringify({b3StudentId,name:studentName,pin:classPin,classId:sessionStorage.getItem('b3Games_studentClass')||''})
   });
   const j=await r.json();
   if(!r.ok) throw new Error(j.error||'Could not sign in');
@@ -82,14 +82,14 @@ async function signInB3(name,pin,idHint=''){
 
   const finalId=j.b3StudentId||b3StudentId;
   const finalName=j.b3StudentName||studentName;
-  localStorage.setItem('b3Games_studentId',finalId);
-  localStorage.setItem('b3Games_studentName',finalName);
-  localStorage.setItem('b3Games_classPin',classPin);
-  localStorage.setItem('posukPractice_studentId',finalId);
-  localStorage.setItem('posukPractice_studentName',finalName);
+  sessionStorage.setItem('b3Games_studentId',finalId);
+  sessionStorage.setItem('b3Games_studentName',finalName);
+  sessionStorage.setItem('b3Games_classPin',classPin);
+  sessionStorage.setItem('posukPractice_studentId',finalId);
+  sessionStorage.setItem('posukPractice_studentName',finalName);
   if(j.classId){
-    localStorage.setItem('b3Games_studentClass',j.classId);
-    localStorage.setItem('weeklyQuiz_classId',j.classId);
+    sessionStorage.setItem('b3Games_studentClass',j.classId);
+    sessionStorage.setItem('weeklyQuiz_classId',j.classId);
   }
 }
 
@@ -103,9 +103,9 @@ async function login(ev){
 }
 
 async function trySharedB3Login(){
-  const id=localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId')||'';
-  const name=localStorage.getItem('b3Games_studentName')||localStorage.getItem('posukPractice_studentName')||'';
-  const pin=localStorage.getItem('b3Games_classPin')||'';
+  const id=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId')||'';
+  const name=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName')||'';
+  const pin=sessionStorage.getItem('b3Games_classPin')||'';
   // Students sign in only on the Fun Torah Tools homepage; this page reuses that login.
   const note=$('#homeSignInNote'),link=$('#homeSignInLink');
   const needHome=msg=>{if(note)note.textContent=msg;if(link)link.style.display='';};
@@ -403,7 +403,7 @@ auth.onAuthStateChanged(async user=>{
     return;
   }
   const token=await user.getIdTokenResult();
-  const sharedId=localStorage.getItem('b3Games_studentId');
+  const sharedId=sessionStorage.getItem('b3Games_studentId');
   if(sharedId&&token.claims.b3StudentId!==sharedId){$('#portalView').classList.add('hidden');return;}
   const sid=token.claims.studentRewardsStudentId;
   if(!sid){await auth.signOut();return}

@@ -418,7 +418,7 @@
   const isStudentPreview=pageParams.get("preview")==="1"&&Boolean(previewStudentId);
   // Keep the whole B3 classroom identity available to every mini-app.
   // ET/WT are still the student's within-class track, not this workspace ID.
-  try{localStorage.setItem("b3Games_workspaceId",workspaceId);}catch(e){}
+  try{sessionStorage.setItem("b3Games_workspaceId",workspaceId);}catch(e){}
   // Initialize Firebase before using Database/Auth. Without this, the script
   // stops here and the Admin button never receives its click handler.
   if (!window.firebase.apps.length) {
@@ -465,7 +465,7 @@
       const row=(await readOnce("b3Games/workspaces/"+workspaceId+"/classes/"+id)).val();
       return row&&row.active!==false&&row.members?.[studentId]?.active!==false&&row.members?.[studentId]?{id,name:String(row.name||id)}:null;
     }))).filter(Boolean);
-    const stored=localStorage.getItem("b3Games_studentId")===studentId?localStorage.getItem("b3Games_studentClass"):"";
+    const stored=sessionStorage.getItem("b3Games_studentId")===studentId?sessionStorage.getItem("b3Games_studentClass"):"";
     if(studentClassChoices.length)return (studentClassChoices.find(c=>c.id===stored)||studentClassChoices[0]).id;
 
     // Migration repair: an active legacy B3 student should not be locked out
@@ -1181,12 +1181,12 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     myStudentId=r.id;myStudentName=r.name;myClassId=r.classId;myClassRecord=null;
     try{myClassRecord=(await readOnce("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId,8000)).val()||null;}catch(e){}
     if(!isStudentPreview){
-      localStorage.setItem("b3Games_studentId",myStudentId);
-      localStorage.setItem("b3Games_studentName",myStudentName);
-      localStorage.setItem("b3Games_studentClass",myClassId);
-      localStorage.setItem("posukPractice_studentId",myStudentId);
-      localStorage.setItem("posukPractice_studentName",myStudentName);
-      localStorage.setItem("weeklyQuiz_classId",myClassId);
+      sessionStorage.setItem("b3Games_studentId",myStudentId);
+      sessionStorage.setItem("b3Games_studentName",myStudentName);
+      sessionStorage.setItem("b3Games_studentClass",myClassId);
+      sessionStorage.setItem("posukPractice_studentId",myStudentId);
+      sessionStorage.setItem("posukPractice_studentName",myStudentName);
+      sessionStorage.setItem("weeklyQuiz_classId",myClassId);
     }
     let chooser=el("activeStudentClass");
     if(!chooser){chooser=document.createElement("select");chooser.id="activeStudentClass";chooser.setAttribute("aria-label","Active class");el("studentBar").appendChild(chooser);}
@@ -1199,8 +1199,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     let seenPasscodeUpdate;
     studentProfileWatch.on("value",async snap=>{const v=snap.val();if(v?.active===false){studentAccessRevoked=true;showLogin();return;}
       const stamp=v?.passcodeUpdatedAt??null;if(seenPasscodeUpdate===undefined){seenPasscodeUpdate=stamp;return;}if(stamp===seenPasscodeUpdate||isStudentPreview)return;seenPasscodeUpdate=stamp;
-      try{await studentAuthCall({action:"verify",studentId:myStudentId,pin:String(localStorage.getItem("b3Games_classPin")||"")});}
-      catch(e){if(e.status===401||e.status===403){studentAccessRevoked=true;localStorage.removeItem("b3Games_classPin");showLogin();setLoginMsg("Your passcode changed. Please sign in again.");}}});
+      try{await studentAuthCall({action:"verify",studentId:myStudentId,pin:String(sessionStorage.getItem("b3Games_classPin")||"")});}
+      catch(e){if(e.status===401||e.status===403){studentAccessRevoked=true;sessionStorage.removeItem("b3Games_classPin");showLogin();setLoginMsg("Your passcode changed. Please sign in again.");}}});
     studentMembershipWatch=db.ref("b3Games/students/"+myStudentId+"/memberships");
     studentMembershipWatch.on("value",snap=>{const rows=snap.val()||{};if(Object.keys(rows).length&&!Object.values(rows).some(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&m.classId===myClassId)){studentAccessRevoked=true;showLogin();}});
     renderStudentAccess();
@@ -1213,7 +1213,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     try{
       const r=await checkStudentAccess(el("studentNameInput").value,el("classPinInput").value);
       if(!r.ok){setLoginMsg(r.reason);return;}
-      localStorage.setItem("b3Games_classPin",el("classPinInput").value.trim());
+      sessionStorage.setItem("b3Games_classPin",el("classPinInput").value.trim());
       setLoginMsg("Opening your games…");await enterStudent(r);setLoginMsg("");
     }catch(e){console.error(e);setLoginMsg(e&&e.message?e.message:"Could not check your login. Try again.");}
     finally{btn.disabled=false;}
@@ -1221,7 +1221,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 
   async function restoreStudent(){
     if(isAuthorizedTeacher)return;
-    const id=isStudentPreview?previewStudentId:(localStorage.getItem("b3Games_studentId")||localStorage.getItem("posukPractice_studentId"));
+    const id=isStudentPreview?previewStudentId:(sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId"));
     if(!id){showLogin();return;}
     showChecking();
     try{
@@ -1239,12 +1239,12 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       // Every activity reuses the passcode saved at homepage sign-in. If it is
       // missing or out of date, ask once here instead of inside each activity.
       if(!isStudentPreview){
-        const saved=String(localStorage.getItem("b3Games_classPin")||"").trim();
+        const saved=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
         let stale=!saved;
         if(saved){try{await studentAuthCall({action:"verify",studentId:id,pin:saved});}catch(e){stale=e.status===401||e.status===403;}}
         if(isAuthorizedTeacher)return;
         if(stale){
-          localStorage.removeItem("b3Games_classPin");
+          sessionStorage.removeItem("b3Games_classPin");
           el("studentNameInput").value=d.name?String(d.name):"";
           showLogin();setLoginMsg("Please sign in once more so all your activities open automatically.");return;
         }
@@ -1252,7 +1252,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       const restoredClassId=await resolvedStudentClass(id,d);
       if(isAuthorizedTeacher)return;
       if(!restoredClassId){showLogin();return;}
-      await enterStudent({id:id,name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
+      await enterStudent({id:id,name:d.name?String(d.name):(sessionStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
     }catch(e){console.warn(e);showLogin();}
   }
 
@@ -1261,7 +1261,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(studentMembershipWatch)studentMembershipWatch.off();
     if(studentClassWatch)studentClassWatch.off();
     if(studentProfileWatch)studentProfileWatch.off();
-    ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_classPin","posukPractice_studentId","posukPractice_studentName","weeklyQuiz_classId"].forEach(k=>localStorage.removeItem(k));
+    ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_classPin","posukPractice_studentId","posukPractice_studentName","weeklyQuiz_classId"].forEach(k=>sessionStorage.removeItem(k));
     myStudentId=myStudentName=myClassId="";
     el("studentNameInput").value="";el("classPinInput").value="";setLoginMsg("");showLogin();
   }
@@ -1829,7 +1829,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     isAuthorizedTeacher=Boolean(authorized&&currentAccess.authorized);
     isAuthorizedAdmin=isAuthorizedTeacher&&currentAccess.role==="admin";
     el("ownerAdminButton").classList.toggle("hidden",!(user&&String(user.email||"").toLowerCase()==="simcha5770@gmail.com"));
-    try{if(authorized)localStorage.setItem("b3TeacherBypass","1");else localStorage.removeItem("b3TeacherBypass");}catch(e){}
+    try{if(authorized)sessionStorage.setItem("b3TeacherBypass","1");else sessionStorage.removeItem("b3TeacherBypass");}catch(e){}
     renderStudentAccess();renderAdminPanel();
     if(authorized){
       if(isAuthorizedAdmin)startApprovalCenter();else stopApprovalCenter();

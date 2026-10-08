@@ -365,8 +365,8 @@ async function getPerekRange(perekNum){
 }
 
 /* ---------- Student identity (shared with student.html via localStorage) ---------- */
-let studentId = localStorage.getItem('posukPractice_studentId');
-let studentName = localStorage.getItem('posukPractice_studentName');
+let studentId = sessionStorage.getItem('posukPractice_studentId');
+let studentName = sessionStorage.getItem('posukPractice_studentName');
 
 let activeTab = 'comprehension'; // 'comprehension' | 'reading' | 'translate'
 let perekData = {}; // perekNum -> { posukNum -> {attempts,latest} }

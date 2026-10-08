@@ -291,8 +291,8 @@ const pick=a=>a[rnd(a.length)];
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function safeSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 
-const studentId=String(safeGet("b3Games_studentId")||safeGet("posukPractice_studentId")||"").trim();
-const studentName=String(safeGet("b3Games_studentName")||"").trim();
+const studentId=String(sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId")||"").trim();
+const studentName=String(sessionStorage.getItem("b3Games_studentName")||"").trim();
 const LOCAL_KEY="gematria_progress:"+(studentId||"guest");
 let P=blankProgress();
 try{const c=JSON.parse(safeGet(LOCAL_KEY)||"null");if(c&&typeof c==="object")P=Object.assign(blankProgress(),c)}catch(e){}

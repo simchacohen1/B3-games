@@ -707,9 +707,9 @@ document.getElementById('startBtn').onclick = async () => {location.href='../ind
     msg.textContent = '';
     studentName = result.displayName || val;
     studentId = result.slug;
-    localStorage.setItem('b3Games_studentId',studentId);
-    localStorage.setItem('b3Games_studentName',studentName);
-    localStorage.setItem('b3Games_classPin',pin);
+    sessionStorage.setItem('b3Games_studentId',studentId);
+    sessionStorage.setItem('b3Games_studentName',studentName);
+    sessionStorage.setItem('b3Games_classPin',pin);
     await loadProgress();
     updateRewardHud();
     document.getElementById('nameGate').style.display = 'none';
@@ -738,12 +738,12 @@ async function checkSavedAccess(id){
     const legacy=legacySnap.val()||{};profile={name:legacy.name,active:legacy.active!==false};
   }
   if(profile.active===false)return {ok:false,reason:'Your student access is turned off. Ask your teacher.'};
-  return {ok:true,slug:id,displayName:String(profile.name||localStorage.getItem('b3Games_studentName')||'Student')};
+  return {ok:true,slug:id,displayName:String(profile.name||sessionStorage.getItem('b3Games_studentName')||'Student')};
 }
 (async function enterWithHomepageLogin(){
   const gate=document.getElementById('nameGate'),msg=document.getElementById('gateMsg');
   ['studentNameInput','classPinInput','startBtn'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.display='none';const lab=gate.querySelector('label[for="'+id+'"]');if(lab)lab.style.display='none';}});
-  const id=localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId')||'';
+  const id=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId')||'';
   const sendHome=reason=>{msg.innerHTML='';msg.append(document.createTextNode(reason+' '));const a=document.createElement('a');a.href='../index.html';a.textContent='Go to Fun Torah Tools';msg.append(a);};
   if(!id)return sendHome('Please sign in on Fun Torah Tools first.');
   msg.textContent='Signing you in…';
@@ -752,7 +752,7 @@ async function checkSavedAccess(id){
     if(!result.ok)return sendHome(result.reason);
     msg.textContent='';
     studentName=result.displayName;studentId=result.slug;
-    localStorage.setItem('b3Games_studentName',studentName);
+    sessionStorage.setItem('b3Games_studentName',studentName);
     await loadProgress();
     updateRewardHud();
     gate.style.display='none';

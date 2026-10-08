@@ -169,7 +169,7 @@ const HALACHA_PARAMS=new URLSearchParams(location.search);
 const HALACHA_TEACHER_VIEW=HALACHA_PARAMS.get("teacherView")||"";
 const HALACHA_TEACHER_LESSON=HALACHA_PARAMS.get("teacher")==="1";
 const HALACHA_TEACHER_PREVIEW=HALACHA_TEACHER_LESSON||!!HALACHA_TEACHER_VIEW;
-const HALACHA_STUDENT_ID=String(HALACHA_TEACHER_VIEW||(HALACHA_TEACHER_LESSON?"":localStorage.getItem("b3Games_studentId")||"")).trim();
+const HALACHA_STUDENT_ID=String(HALACHA_TEACHER_VIEW||(HALACHA_TEACHER_LESSON?"":sessionStorage.getItem("b3Games_studentId")||"")).trim();
 const HALACHA_LOCAL_KEY="halachaV14"+(HALACHA_STUDENT_ID?":"+HALACHA_STUDENT_ID:"");
 let S={};try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY+(HALACHA_TEACHER_LESSON?"_teacher":""))||"{}")}catch(e){}
 let halachaDb=null,cloudSaveTimer=null;

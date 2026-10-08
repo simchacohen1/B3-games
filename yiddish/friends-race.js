@@ -70,7 +70,7 @@
     sec.innerHTML = '<h2>👥 Play with Friends</h2><p class="fr-sub">Race your classmates on 10 Yiddish words. Most right answers wins!</p><div id="yiFriendsBox"><p>Loading…</p></div>';
     requestAnimationFrame(function () { sec.scrollIntoView({ behavior: "smooth", block: "start" }); });
     var box = $("yiFriendsBox"), d = getDb(), id = "", name = "";
-    try { id = String(localStorage.getItem("b3Games_studentId") || "").trim(); name = localStorage.getItem("b3Games_studentName") || ""; } catch (e) {}
+    try { id = String(sessionStorage.getItem("b3Games_studentId") || "").trim(); name = sessionStorage.getItem("b3Games_studentName") || ""; } catch (e) {}
     if (student && student.name) name = student.name;
     var path = await window.B3Race.classRoomsPath(d, id, "yiddish");
     if (race) race.leave();

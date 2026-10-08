@@ -134,7 +134,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 // A class other than B3's own (et/wt) plays its own separate game with its own questions.
-const GS_CLASS = (new URLSearchParams(location.search).get('class') || localStorage.getItem('b3Games_studentClass') || '').trim();
+const GS_CLASS = (new URLSearchParams(location.search).get('class') || sessionStorage.getItem('b3Games_studentClass') || '').trim();
 const CLASS_SPACE = /^[A-Za-z0-9_-]{1,100}$/.test(GS_CLASS) && !['et', 'wt'].includes(GS_CLASS);
 const gameRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/live' : "tentTrailTrivia");
 
@@ -223,8 +223,8 @@ function enterGame(displayName, studentId) {
   myStudentId = studentId;
   myName = sanitize(displayName);
 
-  localStorage.setItem('posukPractice_studentName', displayName);
-  localStorage.setItem('posukPractice_studentId', studentId);
+  sessionStorage.setItem('posukPractice_studentName', displayName);
+  sessionStorage.setItem('posukPractice_studentId', studentId);
 
   document.getElementById('signedInName').textContent = displayName;
   gameRef.child('scores').child(myName).transaction(current => current || 0);
@@ -267,8 +267,8 @@ async function joinGame() {
 }
 
 async function restoreSharedStudentLogin() {
-  const savedId=localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId');
-  const savedName=localStorage.getItem('b3Games_studentName')||localStorage.getItem('posukPractice_studentName');
+  const savedId=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
+  const savedName=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName');
   if(!savedId||!savedName)return;
   try{
     const profileSnap=await db.ref('b3Games/students/'+savedId+'/profile').once('value');

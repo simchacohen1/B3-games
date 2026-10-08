@@ -251,7 +251,7 @@ async function login(){location.href='../index.html';return;
     if(p.val()&&String(p.val()).trim()!==pin){setLoginMsg('That PIN is not correct.');return;}
     if(!a.exists()){setLoginMsg('Ask your teacher to add your name first.');return;}
     const d=a.val();studentId=id;studentName=d&&d.name?String(d.name):name;
-    localStorage.setItem('posukPractice_studentId',studentId);localStorage.setItem('posukPractice_studentName',studentName);
+    sessionStorage.setItem('posukPractice_studentId',studentId);sessionStorage.setItem('posukPractice_studentName',studentName);
     enterApp();
   }catch(e){console.error(e);setLoginMsg('Could not sign in. Try again.');}
 }
@@ -259,11 +259,11 @@ function enterApp(){
   document.getElementById('loginCard').classList.add('hidden');document.getElementById('app').classList.remove('hidden');document.getElementById('who').textContent=studentName;renderPosukGrid();
 }
 async function restore(){
-  const id=localStorage.getItem('posukPractice_studentId'),name=localStorage.getItem('posukPractice_studentName');
+  const id=sessionStorage.getItem('posukPractice_studentId'),name=sessionStorage.getItem('posukPractice_studentName');
   if(!id||!name)return;
   try{const s=await db.ref('posukPractice/allowedStudents/'+id).once('value');if(!s.exists())return;studentId=id;studentName=(s.val()&&s.val().name)||name;enterApp();}catch(e){}
 }
-function switchStudent(){localStorage.removeItem('posukPractice_studentId');localStorage.removeItem('posukPractice_studentName');location.reload();}
+function switchStudent(){sessionStorage.removeItem('posukPractice_studentId');sessionStorage.removeItem('posukPractice_studentName');location.reload();}
 function renderPosukGrid(){
   const g=document.getElementById('posukGrid');g.innerHTML='';
   for(let i=1;i<=33;i++){const b=document.createElement('button');b.className='posuk-btn'+(selected.has(i)?' selected':'');b.innerHTML='<b>Posuk '+HEB_NUMS[i-1]+'</b><br><span style="font-size:12px">'+i+'</span>';b.onclick=()=>{selected.has(i)?selected.delete(i):selected.add(i);renderPosukGrid();};g.appendChild(b);}

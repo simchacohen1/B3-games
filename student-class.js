@@ -19,7 +19,7 @@
         return m && m.active !== false && m.workspaceId === ws && m.classId;
       });
       var stored = '';
-      try { stored = localStorage.getItem('b3Games_studentClass') || ''; } catch (e) {}
+      try { stored = sessionStorage.getItem('b3Games_studentClass') || ''; } catch (e) {}
       var match = valid.find(function (m) { return m.classId === stored; }) ||
         valid.find(function (m) { return LEGACY_CLASS_IDS.indexOf(m.classId) >= 0; }) ||
         valid[0];

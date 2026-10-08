@@ -23,7 +23,7 @@
     return;
   }
   try{
-    const id=localStorage.getItem('b3Games_studentId'),pin=localStorage.getItem('b3Games_classPin');
+    const id=sessionStorage.getItem('b3Games_studentId'),pin=sessionStorage.getItem('b3Games_classPin');
     if(!C.validId(id)||!pin)throw Error('Sign in on the Fun Torah Tools dashboard, then click Class Pointer.');
     const response=await fetch('https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'verify',studentId:id,pin}),signal:AbortSignal.timeout(15000)});
     if(!response.ok||!(await response.json()).ok)throw Error('Your sign-in needs to be renewed. Go back to Fun Torah Tools and sign in.');
