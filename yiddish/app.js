@@ -69,7 +69,7 @@ const NO_STORY_MESSAGE='Your teacher has not added a Yiddish story for your clas
 function showNoStory(){noStory=true;round=null;flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('login').hidden=true;block(NO_STORY_MESSAGE)}
 function render(){
   if(!student||!config||noStory)return;
-  if(!round&&!flash&&!storyQuiz&&!sentenceGame&&!soundGame){$('words').hidden=false;$('toolbar').hidden=false;}
+  if(!round&&!flash&&!storyQuiz&&!sentenceGame&&!soundGame&&!window.yiddishFriendsOpen){$('words').hidden=false;$('toolbar').hidden=false;}
   $('login').hidden=true;$('lesson').hidden=false;$('who').textContent=student.name+' · '+student.classId.toUpperCase();
   const ids=[...new Set(config.sections.flatMap(s=>s.words))];
   $('stats').textContent=`${ids.filter(id=>status(progress[id])==='Learned').length} learned · ${ids.filter(id=>status(progress[id])==='Practicing').length} practicing`;
@@ -90,7 +90,7 @@ function render(){
   if(soundGame&&open(soundGame.group))soundGameRender();else if(soundGame){soundGame=null}
 }
 async function refresh(){const s=await API.call('status');student=s.student;config=s.config;progress=s.progress;if(s.noStory)return showNoStory();noStory=false;if(!open(group))group=Math.max(0,config.unlocked[student.classId]-1);round=null;if(s.round&&!s.round.finished&&open(s.round.group)){group=s.round.group;part=Number.isInteger(s.round.part)?s.round.part:0}render()}
-async function login(id,pin){const s=await API.call('login',{studentId:id,pin:pin.trim(),classId:localStorage.getItem('b3Games_studentClass')||''});sessionStorage.setItem('yiddishSession',s.token);sessionStorage.setItem('yiddishSessionClass',localStorage.getItem('b3Games_studentClass')||'');await refresh();if(!noStory)message('Progress connected ✓')}
+async function login(id,pin){const s=await API.call('login',{studentId:id,pin:pin.trim(),classId:sessionStorage.getItem('b3Games_studentClass')||''});sessionStorage.setItem('yiddishSession',s.token);sessionStorage.setItem('yiddishSessionClass',sessionStorage.getItem('b3Games_studentClass')||'');await refresh();if(!noStory)message('Progress connected ✓')}
 $('loginForm').onsubmit=async e=>{e.preventDefault();$('signIn').disabled=true;try{await login($('name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''),$('pin').value);$('pin').value=''}catch(e){message(e.message)}finally{$('signIn').disabled=false}};
 $('all').onclick=()=>{if(busy||pending)return;clearAdvance();showAll=!showAll;round=null;flash=null;storyQuiz=null;sentenceGame=null;soundGame=null;$('practice').hidden=true;$('flashcards').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;$('soundgame').hidden=true;render()};
 function shuffleClient(a){const b=a.slice();for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
@@ -717,19 +717,19 @@ async function submit(answer,answers,feedback){
   }finally{busy=false}
 }
 (async()=>{try{
-  if(sessionStorage.getItem('yiddishSessionClass')!==localStorage.getItem('b3Games_studentClass'))sessionStorage.removeItem('yiddishSession');
+  if(sessionStorage.getItem('yiddishSessionClass')!==sessionStorage.getItem('b3Games_studentClass'))sessionStorage.removeItem('yiddishSession');
   if(sessionStorage.getItem('yiddishSession')){await refresh();if(!noStory)message('Progress connected ✓')}
   else{
-    const id=localStorage.getItem('b3Games_studentId');
-    const pin=localStorage.getItem('b3Games_classPin');
+    const id=sessionStorage.getItem('b3Games_studentId');
+    const pin=sessionStorage.getItem('b3Games_classPin');
     if(id&&pin) await login(id,pin);
     else{
       // No saved passcode on this device (for example a teacher's own student account):
       // show the sign-in form instead of waiting forever.
       const f=$('loginForm');f.hidden=false;f.style.display='';
-      $('name').value=localStorage.getItem('b3Games_studentName')||'';
+      $('name').value=sessionStorage.getItem('b3Games_studentName')||'';
       $('login').querySelector('p').textContent='Type your name and passcode to open Yiddish.';
       $(($('name').value?'pin':'name')).focus();
     }
   }
-}catch(e){block(e.message);$('login').hidden=false;const f=$('loginForm');f.hidden=false;f.style.display='';if(!$('name').value)$('name').value=localStorage.getItem('b3Games_studentName')||''}setInterval(async()=>{if(!student||busy||pending)return;try{const s=await API.call('status');config=s.config;student=s.student;if(s.noStory){showNoStory();return}if(noStory){noStory=false;progress=s.progress;message('');render();return}if(round&&!open(round.group)){round=null;block('Your teacher closed this section.')}else if(!round){progress=s.progress;render()}}catch(e){block(e.message)}},15000)})();
+}catch(e){block(e.message);$('login').hidden=false;const f=$('loginForm');f.hidden=false;f.style.display='';if(!$('name').value)$('name').value=sessionStorage.getItem('b3Games_studentName')||''}setInterval(async()=>{if(!student||busy||pending)return;try{const s=await API.call('status');config=s.config;student=s.student;if(s.noStory){showNoStory();return}if(noStory){noStory=false;progress=s.progress;message('');render();return}if(round&&!open(round.group)){round=null;block('Your teacher closed this section.')}else if(!round){progress=s.progress;render()}}catch(e){block(e.message)}},15000)})();

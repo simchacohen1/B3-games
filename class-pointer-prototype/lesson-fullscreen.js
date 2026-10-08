@@ -2,10 +2,13 @@
 (function(){
   const stage=document.getElementById('stage'),enter=document.getElementById('fullScreenLesson'),exit=document.getElementById('exitFullScreenLesson'),teacherPanel=document.getElementById('teacherPanel');
   const studentView=!!new URL(location.href).searchParams.get('room');
+  const legacyStudentView=studentView&&!document.getElementById('studentDock');
+  // Teachers use the docked toolbar from teacher-toolbar.js, which follows the lesson into full screen.
+  const teacherDock=!!document.getElementById(studentView?'studentDock':'teacherDock');
   let syncTimer=null;
   const toolbar=document.createElement('div');toolbar.id='fullscreenTeacherToolbar';toolbar.className='fullscreen-teacher-toolbar';toolbar.dataset.stageUi='true';toolbar.hidden=true;
   const top=document.createElement('div');top.className='fullscreen-toolbar-top';
-  const title=document.createElement('strong');title.textContent=studentView?'My tools · drag to move':'Teaching controls';
+  const title=document.createElement('strong');title.textContent=legacyStudentView?'My tools · drag to move':'Teaching controls';
   const collapse=document.createElement('button');collapse.type='button';collapse.className='fullscreen-toolbar-collapse';collapse.textContent='Hide controls';collapse.setAttribute('aria-expanded','true');
   top.append(title,collapse);
   const body=document.createElement('div');body.className='fullscreen-toolbar-body';toolbar.append(top,body);
@@ -14,7 +17,7 @@
   const rosterHome=document.createComment('roster-home');
   const rosterPanel=document.createElement('div');rosterPanel.className='fullscreen-roster-panel';rosterPanel.hidden=true;
   const rosterToggle=document.createElement('button');rosterToggle.type='button';rosterToggle.className='fullscreen-roster-toggle';rosterToggle.textContent='Students';rosterToggle.setAttribute('aria-expanded','false');
-  if(!studentView&&rosterEl){
+  if(!legacyStudentView&&!teacherDock&&rosterEl){
     rosterEl.parentNode.insertBefore(rosterHome,rosterEl);
     const panelTitle=document.createElement('strong');panelTitle.textContent='Students · admit, pointer, writing';
     rosterPanel.append(panelTitle);toolbar.append(rosterPanel);
@@ -23,12 +26,12 @@
   }
   function setRosterOpen(open){rosterPanel.hidden=!open||toolbar.classList.contains('collapsed');rosterToggle.setAttribute('aria-expanded',String(open));rosterToggle.classList.toggle('active',open)}
   function placeRoster(inFullscreen){
-    if(studentView||!rosterEl)return;
+    if(legacyStudentView||teacherDock||!rosterEl)return;
     if(inFullscreen){if(rosterEl.parentNode!==rosterPanel)rosterPanel.appendChild(rosterEl)}
     else if(rosterHome.parentNode&&rosterEl.parentNode!==rosterHome.parentNode){rosterHome.parentNode.insertBefore(rosterEl,rosterHome.nextSibling);setRosterOpen(false)}
   }
   function updateRosterToggle(){
-    if(studentView||!rosterEl)return;
+    if(legacyStudentView||teacherDock||!rosterEl)return;
     const waiting=Array.from(rosterEl.querySelectorAll('button')).filter(b=>b.textContent.startsWith('Admit ')).length;
     const admittedCount=rosterEl.querySelectorAll('.roster-row').length-waiting;
     rosterToggle.textContent=waiting?`Students · ${waiting} waiting`:`Students (${admittedCount})`;
@@ -36,7 +39,7 @@
   }
   stage.appendChild(toolbar);exit.dataset.stageUi='true';
 
-  const proxySpecs=studentView?[
+  const proxySpecs=legacyStudentView?[
     {source:'studentTool',label:'Tool',type:'select'},
     {source:'studentColor',label:'Color',type:'select'},
     {source:'studentSize',label:'Size',type:'select'},
@@ -103,14 +106,14 @@
     updateRosterToggle();
   }
   function expanded(){return document.fullscreenElement===stage||stage.classList.contains('lesson-fullscreen')}
-  function teacherView(){return teacherPanel&&!teacherPanel.hidden}
+  function teacherView(){return !teacherDock&&teacherPanel&&!teacherPanel.hidden}
   function startSync(){clearInterval(syncTimer);syncTimer=setInterval(syncControls,200)}
   function stopSync(){clearInterval(syncTimer);syncTimer=null}
   function sync(){
     const active=expanded();exit.hidden=!active;enter.setAttribute('aria-expanded',String(active));
-    toolbar.hidden=!(studentView||(active&&teacherView()));
+    toolbar.hidden=!(legacyStudentView||(active&&teacherView()));
     placeRoster(active&&teacherView());
-    if(studentView||(active&&teacherView())){build();startSync()}else{stopSync();if(!active)enter.focus()}
+    if(legacyStudentView||(active&&teacherView())){build();startSync()}else{stopSync();if(!active)enter.focus()}
   }
   function fallback(){stage.classList.add('lesson-fullscreen');document.body.classList.add('lesson-expanded');sync()}
   enter.addEventListener('click',async()=>{
@@ -131,7 +134,7 @@
     ['pointerdown','pointermove','pointerup','pointercancel','click'].forEach(type=>control.addEventListener(type,event=>event.stopPropagation()));
   });
   exit.addEventListener('click',event=>{event.stopPropagation();close()});
-  if(studentView){
+  if(legacyStudentView){
     toolbar.classList.add('student-floating-toolbar');
     let drag=null;
     top.addEventListener('pointerdown',event=>{

@@ -23,7 +23,7 @@ function studentFixture({verified=true,enabled=true,classEnabled=true,classLocke
  const db={ref:path=>({child:key=>db.ref(path+'/'+key),once:async()=>({val:()=>path.endsWith('/profile')?{name:'Canonical Boy'}:path.endsWith('/siteSettings')?{siteEnabled:enabled}:row}),on:(event,callback)=>{listener=callback}})};
  const firebase={apps:[{}],database:()=>db};
  const context=vm.createContext({window:{B3_APP_CONTEXT:{workspaceId:'b3-2026'},FunTorahStudentClass:{resolve:async()=>({workspaceId:'b3-2026',classId:'one'})}},firebase,document:{getElementById:element},location:{href:'https://example.test/dashboard.html',replace:value=>redirect=value},URL,AbortSignal,
- localStorage:{getItem:key=>({'b3Games_studentId':'test-boy','b3Games_classPin':'test-only-pin','b3Games_studentName':'Wrong cached name'})[key]},sessionStorage:{setItem:(key,value)=>stored=JSON.parse(value)},fetch:async(url,options)=>{request=JSON.parse(options.body);return {ok:true,json:async()=>({ok:verified})}}});
+ sessionStorage:{getItem:key=>({'b3Games_studentId':'test-boy','b3Games_classPin':'test-only-pin','b3Games_studentName':'Wrong cached name'})[key],setItem:(key,value)=>stored=JSON.parse(value)},fetch:async(url,options)=>{request=JSON.parse(options.body);return {ok:true,json:async()=>({ok:verified})}}});
  vm.runInContext(source('dashboard-core.js'),context);
  return {run:()=>vm.runInContext(source('dashboard.js'),context),element,get listener(){return listener},get redirect(){return redirect},get stored(){return stored},get request(){return request}};
 }

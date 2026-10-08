@@ -33,7 +33,7 @@ async function resolveStudentSpace(studentId){
     const memberships=(await cloudDb.ref('b3Games/students/'+studentId+'/memberships').once('value')).val()||{};
     const ws=window.B3_WORKSPACE_ID||'b3-2026';
     const valid=Object.values(memberships).filter(m=>m&&m.active!==false&&m.workspaceId===ws&&m.classId);
-    const stored=localStorage.getItem('b3Games_studentClass')||'';
+    const stored=sessionStorage.getItem('b3Games_studentClass')||'';
     const match=valid.find(m=>m.classId===stored)||valid.find(m=>LEGACY_CLASS_IDS.includes(m.classId))||valid[0];
     classId=match?String(match.classId):'';
   }catch(err){console.warn('Could not read class membership',err);}
@@ -45,7 +45,7 @@ async function resolveStudentSpace(studentId){
 const STUDENT_REWARDS_AUTO_AWARD_URL='https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
 let studentSiteOpen=true;
 function applyStudentSiteOpen(open){
-  studentSiteOpen=open!==false;
+  studentSiteOpen=teacherPreview||open!==false;
   const closed=document.getElementById('studentSiteClosed');
   const login=document.getElementById('loginGate');
   const app=document.getElementById('appShell');
@@ -54,7 +54,7 @@ function applyStudentSiteOpen(open){
   if(!studentSiteOpen){
     if(login)login.classList.add('hidden');
     if(app)app.classList.add('hidden');
-  }else if(cloudEnabled){
+  }else if(cloudEnabled||teacherPreview){
     if(login)login.classList.add('hidden');
     if(app)app.classList.remove('hidden');
   }else{
@@ -109,6 +109,7 @@ function startMasterToggleWatcher(){
 let cloudStudentId = null;
 let cloudStudentName = '';
 let cloudEnabled = false;
+let teacherPreview = false;
 let cloudSaveTimer = null;
 let appStarted = false;
 let classMatchLeaderboard = {};
@@ -176,7 +177,7 @@ function loadDB(){
   if(old){try{const o=JSON.parse(old);o.catalog=normalizeCatalogUnits(clone(DEFAULT_CATALOG));o.settings={minReviewMs:500,studentSiteOpen:true};Object.values(o.students||{}).forEach(normalizeStudent);saveRaw(o);return o;}catch(e){console.warn(e);}}
   const students={};DEFAULT_STUDENTS.forEach(n=>students[n]=blankStudent());return {students,currentStudent:DEFAULT_STUDENTS[0],catalog:normalizeCatalogUnits(clone(DEFAULT_CATALOG)),settings:{minReviewMs:500,studentSiteOpen:true}};
 }
-function saveRaw(d){localStorage.setItem(DB_KEY,JSON.stringify(d));}
+function saveRaw(d){if(!teacherPreview)localStorage.setItem(DB_KEY,JSON.stringify(d));}
 function setCloudStatus(text,kind=''){const el=document.getElementById('cloudStatus');if(!el)return;el.textContent=text;el.classList.toggle('syncing',kind==='syncing');el.classList.toggle('error',kind==='error');}
 function scheduleCloudStudentSave(){
   if(!cloudEnabled||!cloudStudentId||!db.students[currentStudent]) return;
@@ -278,25 +279,72 @@ async function enterCloudStudent(name,studentId){
   showMode('student');setCloudStatus('☁️ Saved');scheduleCloudStudentSave();startCloudListeners();await loadClassLeaderboard();renderGamesLock();
 }
 async function trySavedStudent(){
-  const savedId=localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId');
-  const savedName=localStorage.getItem('b3Games_studentName')||localStorage.getItem('posukPractice_studentName');
-  if(!savedId||!savedName)return;
-  try{
-    const profile=await cloudDb.ref('b3Games/students/'+savedId+'/profile').once('value');
-    if(!profile.exists()){
-      const allowed=await cloudDb.ref('posukPractice/allowedStudents/'+savedId).once('value');
-      if(!allowed.exists()){localStorage.removeItem('posukPractice_studentId');localStorage.removeItem('posukPractice_studentName');return;}
-    }else if(profile.val()?.active===false)return;
-    await enterCloudStudent(savedName,savedId);
-  }catch(err){console.warn('Could not restore student automatically',err);}
+  const savedId=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
+  if(!savedId)return false;
+  const profile=await cloudDb.ref('b3Games/students/'+savedId+'/profile').once('value');
+  let record=profile.val();
+  if(!profile.exists()){
+    record=(await cloudDb.ref('posukPractice/allowedStudents/'+savedId).once('value')).val();
+  }
+  if(!record||record.active===false)return false;
+  const name=record.name||sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName')||'Student';
+  await enterCloudStudent(name,savedId);
+  return true;
+}
+
+// Teachers opening the student version use their existing verified B3 account.
+// Preview activity stays in memory and never writes a student's cloud record.
+async function enterTeacherPreview(user,access){
+  const selected=new URLSearchParams(location.search).get('class')||sessionStorage.getItem('b3Games_studentClass')||'';
+  if(access.role!=='admin'&&!(access.classIds||[]).includes(selected))throw new Error('Open Shorashim from your assigned class on the homepage.');
+  if(selected){
+    const workspace=window.B3_WORKSPACE_ID||'b3-2026';
+    const cls=(await cloudDb.ref(`b3Games/workspaces/${workspace}/classes/${selected}`).once('value')).val();
+    if(!cls||cls.active===false||(access.role!=='admin'&&cls.toolGrants?.shorashim!==true))throw new Error('Shorashim is not enabled for this class.');
+  }
+  classSpaceId=selected&&!LEGACY_CLASS_IDS.includes(selected)?selected:'';
+  CLOUD_ROOT=classSpaceId?`${SHORASHIM_BASE_ROOT}/classes/${classSpaceId}`:SHORASHIM_BASE_ROOT;
+  const [catalogSnap,settingsSnap]=await Promise.all([
+    cloudDb.ref(`${CLOUD_ROOT}/catalog`).once('value'),
+    cloudDb.ref(`${CLOUD_ROOT}/settings`).once('value')
+  ]);
+  teacherPreview=true;
+  currentStudent='Teacher Preview';
+  db={students:{[currentStudent]:blankStudent()},currentStudent,
+    catalog:normalizeCatalogUnits(catalogSnap.val()||(classSpaceId?emptyCatalog():clone(DEFAULT_CATALOG))),
+    settings:{minReviewMs:500,studentSiteOpen:true,...(settingsSnap.val()||{})}};
+  document.getElementById('signedInStudentName').textContent='Teacher Preview';
+  document.getElementById('switchStudentBtn').textContent='Back to Fun Torah Tools';
+  setCloudStatus('Preview — no student points');
+  applyStudentSiteOpen(true);
+  if(!appStarted){init();appStarted=true;}
+  showMode('student');
 }
 
 function bindCloudLogin(){
-  const btn=document.getElementById('loginBtn'),nameEl=document.getElementById('studentNameInput'),pinEl=document.getElementById('classPinInput');
-  const submit=async()=>{location.href='../index.html';return;const name=nameEl.value.trim(),pin=pinEl.value.trim();if(!name){setLoginMsg('Please type your name.');return;}btn.disabled=true;setLoginMsg('Checking…');try{const result=await checkStudentAccess(name,pin);if(!result.ok){setLoginMsg(result.reason);return;}const displayName=result.displayName||name;localStorage.setItem('b3Games_studentId',result.slug);localStorage.setItem('b3Games_studentName',displayName);localStorage.setItem('b3Games_classPin',pin);localStorage.setItem('posukPractice_studentName',displayName);localStorage.setItem('posukPractice_studentId',result.slug);await enterCloudStudent(displayName,result.slug);setLoginMsg('');}catch(err){if(err&&err.message==='STUDENT_SITE_CLOSED'){applyStudentSiteOpen(false);setLoginMsg('');}else{console.error('Login failed',err);setLoginMsg('Could not connect. Check the internet and try again.');}}finally{btn.disabled=false;}};
-  btn.onclick=submit;[nameEl,pinEl].forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();submit();}}));
+  document.getElementById('loginBtn').onclick=()=>{location.href='../index.html';};
   document.getElementById('switchStudentBtn').onclick=()=>{location.href='../index.html';};
-  trySavedStudent();
+  setLoginMsg('Opening your Fun Torah Tools account…');
+  const waitForAccount=()=>{
+    if(!window.B3SiteSettings){setTimeout(waitForAccount,100);return;}
+    let restoring=false;
+    window.B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
+      if(restoring||appStarted)return;
+      restoring=true;
+      try{
+        if(user&&authorized){await enterTeacherPreview(user,access);return;}
+        if(await trySavedStudent())return;
+        setLoginMsg('Open Shorashim from Fun Torah Tools to use your signed-in account.');
+        document.getElementById('loginBtn').classList.remove('hidden');
+      }catch(err){
+        if(err?.message==='STUDENT_SITE_CLOSED'){applyStudentSiteOpen(false);return;}
+        console.warn('Could not open saved account',err);
+        setLoginMsg(err?.message||'Could not connect. Please try again.');
+        document.getElementById('loginBtn').classList.remove('hidden');
+      }finally{restoring=false;}
+    });
+  };
+  waitForAccount();
 }
 
 function init(){
@@ -452,7 +500,7 @@ function bindReview(){
   });
   document.getElementById('startReviewBtn').onclick=startReview;
   const noHints=document.getElementById('reviewNoHints'); if(noHints) noHints.onchange=()=>{reviewNoHints=!!noHints.checked;};
-  const setMode=(mode)=>{reviewPointsMode=mode;reviewNoHints=mode==='no-hints';if(noHints)noHints.checked=reviewNoHints;document.querySelectorAll('.review-choice').forEach(x=>x.classList.toggle('active',x.id===(mode==='regular'?'regularChazaraChoice':mode==='no-hints'?'noHintsChazaraChoice':'practiceOnlyChoice')));const rec=document.getElementById('shorashimRecordBtn'),rem=document.getElementById('pointsReminder');if(rec){rec.classList.toggle('hidden',mode==='practice');rec.textContent=mode==='no-hints'?'🎙️ Start Recording — 3 Points':'🎙️ Start Recording — 2 Points';}if(rem)rem.textContent=mode==='practice'?'Practice mode selected. Press Start Review to begin.':'Press Start Review. The recording button will appear when your cards are visible.';};
+  const setMode=(mode)=>{reviewPointsMode=mode;reviewNoHints=mode==='no-hints';if(noHints)noHints.checked=reviewNoHints;document.querySelectorAll('.review-choice').forEach(x=>x.classList.toggle('active',x.id===(mode==='regular'?'regularChazaraChoice':mode==='no-hints'?'noHintsChazaraChoice':'practiceOnlyChoice')));const rec=document.getElementById('shorashimRecordBtn'),rem=document.getElementById('pointsReminder');if(rec){rec.classList.toggle('hidden',mode==='practice');rec.textContent=mode==='no-hints'?'🎙️ Start Recording — 3 Points':'🎙️ Start Recording — 2 Points';}if(rem)rem.textContent=mode==='practice'?'Press Show My Cards and say each shorash and its meaning. No recording needed.':mode==='no-hints'?'Press Show My Cards. Then press Start Recording and say each shorash and its meaning without pictures or drawings.':'Press Show My Cards. Then press Start Recording and say each shorash and its meaning. Pictures are allowed.';};
   document.getElementById('regularChazaraChoice')?.addEventListener('click',()=>setMode('regular'));
   document.getElementById('noHintsChazaraChoice')?.addEventListener('click',()=>setMode('no-hints'));
   document.getElementById('practiceOnlyChoice')?.addEventListener('click',()=>setMode('practice'));
@@ -829,14 +877,6 @@ bindCloudLogin();
 
 /* Third-grade quick review controls */
 (function(){
-  function speakReviewHelp(){
-    const mode=(typeof reviewPointsMode!=='undefined'?reviewPointsMode:'regular');
-    let words='Pick how you want to review. Then press Show My Cards.';
-    if(mode==='regular') words+=' When your cards show, press Start Recording. Pictures are allowed.';
-    if(mode==='no-hints') words+=' This is the No Hints Challenge. Your pictures will be hidden. When your cards show, press Start Recording.';
-    if(mode==='practice') words+=' This is practice only. You do not need to record.';
-    window.__speakNatural(words,{rate:.92,pitch:1.02});
-  }
   function quickStart(){
     const checks=[...document.querySelectorAll('.review-pick-check')];
     if(!checks.some(x=>x.checked)){
@@ -849,27 +889,4 @@ bindCloudLogin();
     document.getElementById('quickStartReviewBtn')?.addEventListener('click',quickStart);
     document.getElementById('reviewHelpAudioBtn')?.addEventListener('click',speakReviewHelp);
   });
-})();
-
-
-
-/* Recorded review instructions override */
-(function(){
- const files={regular:"audio/review-record-chazara.mp3","no-hints":"audio/review-no-hints.mp3",practice:"audio/review-practice.mp3"};
- function fallback(m){
-  const t=m==="no-hints"?"No Hints Challenge! Your pictures will be hidden. Press Show My Cards. Then press Start Recording and begin.":m==="practice"?"Practice time! Press Show My Cards and practice your Shorashim. You do not need to record.":"Record Chazara! Pictures are allowed. Press Show My Cards. Then press Start Recording and begin.";
-  window.__speakNatural(t,{rate:.92});
- }
- function play(){
-  const m=(typeof reviewPointsMode!=="undefined"&&reviewPointsMode)||"regular";
-  const a=new Audio(files[m]||files.regular); let failed=false;
-  const fail=()=>{if(!failed){failed=true;fallback(m)}};
-  a.addEventListener("error",fail,{once:true}); a.play().catch(fail);
- }
- window.addEventListener("DOMContentLoaded",()=>{
-  const old=document.getElementById("reviewHelpAudioBtn");
-  if(!old)return;
-  const fresh=old.cloneNode(true); old.parentNode.replaceChild(fresh,old);
-  fresh.addEventListener("click",play);
- });
 })();

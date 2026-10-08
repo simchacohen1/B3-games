@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="../game-gate.js?v=20261006-lockoverride" data-game-id="weekly-quiz"></script>
+  <script src="../game-gate.js?v=20261007-tab-login" data-game-id="weekly-quiz"></script>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -331,7 +331,7 @@ async function checkStudentAccess(name,pin){
   const rows=memberships.val()||{};
   const membership=Object.values(rows).find(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&String(m.classId||'').trim());
   if(membership)classId=String(membership.classId).trim();
-  if(!classId)classId=String(d.classId||localStorage.getItem('b3Games_studentClass')||studentClass(slug)||'').trim();
+  if(!classId)classId=String(d.classId||sessionStorage.getItem('b3Games_studentClass')||studentClass(slug)||'').trim();
   if(!classId)return{ok:false,reason:'Your class is not assigned yet. Ask your teacher.'};
   return{ok:true,slug,displayName:String(d.name||name.trim()),classId};
 }
@@ -350,9 +350,9 @@ async function joinQuiz(){
 function enterStudent(displayName,studentId,classId){
   myName=displayName;myStudentId=studentId;myClassId=classId;
   QROOT=/^[A-Za-z0-9_-]{1,100}$/.test(classId)&&!['et','wt'].includes(classId)?'b3Quiz/classes/'+classId:'b3Quiz';
-  localStorage.setItem('posukPractice_studentName',displayName);
-  localStorage.setItem('posukPractice_studentId',studentId);
-  localStorage.setItem('weeklyQuiz_classId',classId);
+  sessionStorage.setItem('posukPractice_studentName',displayName);
+  sessionStorage.setItem('posukPractice_studentId',studentId);
+  sessionStorage.setItem('weeklyQuiz_classId',classId);
   document.getElementById('studentNameLabel').textContent=displayName;
   applyMasterBlocked();
   listenForLaunches();
@@ -360,8 +360,8 @@ function enterStudent(displayName,studentId,classId){
 }
 
 async function restoreLogin(){
-  const id=localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId');
-  const name=localStorage.getItem('b3Games_studentName')||localStorage.getItem('posukPractice_studentName');
+  const id=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
+  const name=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName');
   if(!id||!name)return;
   try{
     const profileSnap=await db.ref('b3Games/students/'+id+'/profile').once('value');
@@ -376,14 +376,14 @@ async function restoreLogin(){
     const memberships=await db.ref('b3Games/students/'+id+'/memberships').once('value');
     const rows=memberships.val()||{};
     const membership=Object.values(rows).find(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&String(m.classId||'').trim());
-    const classId=membership?String(membership.classId).trim():String(localStorage.getItem('b3Games_studentClass')||d.classId||localStorage.getItem('weeklyQuiz_classId')||studentClass(id)||'').trim();
+    const classId=membership?String(membership.classId).trim():String(sessionStorage.getItem('b3Games_studentClass')||d.classId||sessionStorage.getItem('weeklyQuiz_classId')||studentClass(id)||'').trim();
     if(!classId)return switchStudent(false);
     enterStudent(d&&d.name?String(d.name):name,id,classId);
   }catch(e){console.warn(e);}
 }
 
 function switchStudent(reload=true){
-  localStorage.removeItem('posukPractice_studentId');localStorage.removeItem('posukPractice_studentName');localStorage.removeItem('weeklyQuiz_classId');
+  sessionStorage.removeItem('posukPractice_studentId');sessionStorage.removeItem('posukPractice_studentName');sessionStorage.removeItem('weeklyQuiz_classId');
   if(reload)location.reload();
 }
 

@@ -11,7 +11,7 @@ function fixture({teacher=false,missing=false,verify}={}){
   let resolveRead,reads=0,entered=0;
   const firstRead=new Promise(resolve=>resolveRead=resolve);
   const context=vm.createContext({isAuthorizedTeacher:teacher,isStudentPreview:false,previewStudentId:'',myStudentId:'',myStudentName:'',myClassId:'',workspaceId:'b3-2026',
-    localStorage:{getItem:key=>saved.get(key)||null,removeItem:key=>saved.delete(key)},document:{querySelectorAll:()=>[]},el:classes,
+    sessionStorage:{getItem:key=>saved.get(key)||null,removeItem:key=>saved.delete(key)},document:{querySelectorAll:()=>[]},el:classes,
     db:{ref:()=>({once:()=>{reads++;return firstRead}})},studentAuthCall:verify||(()=>Promise.resolve({ok:true})),resolvedStudentClass:async()=> 'et',
     enterStudent:async()=>entered++,console,renderStudentAccess:()=>{classes('loginCard').classList.add('hidden');classes('gamesArea').classList.remove('hidden')}
   });

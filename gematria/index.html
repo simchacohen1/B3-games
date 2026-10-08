@@ -111,9 +111,9 @@ bdi.he{unicode-bidi:isolate}.sofitList{direction:ltr;display:inline}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
 <script src="../firebase-config.js"></script>
-<script src="../student-class.js"></script>
+<script src="../student-class.js?v=20261007-tab-login"></script>
 <script src="../b3-race.js?v=20261007"></script>
-<script src="../game-gate.js?v=20261007-gematria" data-game-id="gematria" data-back-href="../index.html"></script>
+<script src="../game-gate.js?v=20261007-tab-login" data-game-id="gematria" data-back-href="../index.html"></script>
 </head>
 <body>
 <header>
@@ -291,8 +291,8 @@ const pick=a=>a[rnd(a.length)];
 function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function safeSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 
-const studentId=String(safeGet("b3Games_studentId")||safeGet("posukPractice_studentId")||"").trim();
-const studentName=String(safeGet("b3Games_studentName")||"").trim();
+const studentId=String(sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId")||"").trim();
+const studentName=String(sessionStorage.getItem("b3Games_studentName")||"").trim();
 const LOCAL_KEY="gematria_progress:"+(studentId||"guest");
 let P=blankProgress();
 try{const c=JSON.parse(safeGet(LOCAL_KEY)||"null");if(c&&typeof c==="object")P=Object.assign(blankProgress(),c)}catch(e){}
@@ -336,7 +336,7 @@ function record(kind,ok,letters){
 async function connect(){
  $("whoName").textContent=studentName||"";
  if(!studentId){
-  $("banner").innerHTML='You can practice, but your stars will not be saved. <a href="../index.html">Sign in on B3 Games</a> to save them.';
+  $("banner").innerHTML='You can practice, but your stars will not be saved. <a href="../index.html">Sign in on Fun Torah Tools</a> to save them.';
   $("banner").classList.remove("hidden");return;
  }
  try{

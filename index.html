@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>B3 Games</title>
+<title>Fun Torah Tools</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Rashi+Hebrew:wght@600&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box}
@@ -187,16 +187,16 @@
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
 <script src="firebase-config.js?v=20261001-teacherauth"></script>
-<script src="site-settings.js?v=20261007-act-as-student"></script>
+<script src="site-settings.js?v=20261007-tab-login"></script>
 </head>
 <body>
-  <h1>B3 Games</h1>
+  <h1>Fun Torah Tools</h1>
   <div class="subtitle">Learning games and practice tools</div>
 
   <div id="studentBar" class="student-bar hidden">
     <div><strong id="studentNameLabel"></strong><br><span id="studentClassLabel"></span></div>
     <button id="switchStudentBtn" type="button">Switch student</button>
-    <a id="classPointerStudentLink" href="class-pointer-prototype/dashboard.html" target="_blank" rel="noopener" style="padding:10px 14px;border-radius:8px;background:#2563eb;color:white;font-weight:700;text-decoration:none">👆 Class Pointer</a>
+    <a id="classPointerStudentLink" href="class-pointer-prototype/dashboard.html" style="padding:10px 14px;border-radius:8px;background:#2563eb;color:white;font-weight:700;text-decoration:none">👆 Class Pointer</a>
   </div>
 
   <div id="loginCard" class="login-card">
@@ -206,18 +206,18 @@
     <input id="classPinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="Passcode">
     <label for="studentNameInput">Your name</label>
     <input id="studentNameInput" type="text" autocomplete="name" placeholder="First and last name">
-    <button id="studentSignInBtn" type="button">Open B3 Games</button>
+    <button id="studentSignInBtn" type="button">Open Fun Torah Tools</button>
     <div id="loginMsg" class="login-msg" aria-live="polite"></div>
   </div>
 
   <div id="lockedCard" class="locked-card hidden">
     <div class="lock-icon">🔒</div>
-    <h2 id="lockedTitle">B3 Games is locked</h2>
-    <p id="lockedMessage">Your class cannot use B3 Games right now.</p>
+    <h2 id="lockedTitle">Fun Torah Tools is locked</h2>
+    <p id="lockedMessage">Your class cannot use Fun Torah Tools right now.</p>
   </div>
 
   <div id="gamesArea" class="hidden">
-    <div id="specialAccessNote" class="special-access-note hidden">Special access from Rabbi Cohen: while B3 Games is locked, only the activity or activities shown below are available to you.</div>
+    <div id="specialAccessNote" class="special-access-note hidden">Special access from Rabbi Cohen: while Fun Torah Tools is locked, only the activity or activities shown below are available to you.</div>
     <div class="game-container">
       <section class="game-group" data-game-group="learn">
         <div class="game-group-head">
@@ -225,9 +225,9 @@
           <div><div class="game-group-title">Learn &amp; Practice</div><div class="game-group-subtitle">Build your skills and review what you learned</div></div>
         </div>
         <div class="game-group-grid">
-          <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html" target="_blank" rel="noopener"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
-          <a class="game-card" data-game-id="chazara" href="chazara/index.html" target="_blank" rel="noopener"><span class="card-icon">🔁</span><span class="card-title">Chazara Chart</span></a>
-          <a class="game-card" data-game-id="shorashim" href="shorashim/index.html" target="_blank" rel="noopener"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span></a>
+          <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
+          <a class="game-card" data-game-id="chazara" href="chazara/index.html"><span class="card-icon">🔁</span><span class="card-title">Chazara Chart</span></a>
+          <a class="game-card" data-game-id="shorashim" href="shorashim/index.html"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span></a>
         </div>
       </section>
 
@@ -237,10 +237,10 @@
           <div><div class="game-group-title">More Learning</div><div class="game-group-subtitle">Rashi, Yiddish, Halacha, and Gematria</div></div>
         </div>
         <div class="game-group-grid">
-          <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html" target="_blank" rel="noopener"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
-          <a class="game-card" data-game-id="yiddish" href="yiddish/index.html" target="_blank" rel="noopener"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
-          <a class="game-card" data-game-id="halacha" href="halacha/index.html?v=20261007-teacher-sync" target="_blank" rel="noopener"><span class="card-icon">📔</span><span class="card-title">Halacha</span></a>
-          <a class="game-card" data-game-id="gematria" href="gematria/index.html" target="_blank" rel="noopener"><span class="card-icon">🔢</span><span class="card-title">Gematria</span></a>
+          <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
+          <a class="game-card" data-game-id="yiddish" href="yiddish/index.html"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
+          <a class="game-card" data-game-id="halacha" href="halacha/index.html?v=20261007-teacher-sync"><span class="card-icon">📔</span><span class="card-title">Halacha</span></a>
+          <a class="game-card" data-game-id="gematria" href="gematria/index.html"><span class="card-icon">🔢</span><span class="card-title">Gematria</span></a>
         </div>
       </section>
 
@@ -250,8 +250,8 @@
           <div><div class="game-group-title">My Class</div><div class="game-group-subtitle">Your class work, gallery, and rewards</div></div>
         </div>
         <div class="game-group-grid">
-          <a class="game-card" data-game-id="class-gallery" href="class-gallery/index.html" target="_blank" rel="noopener"><span class="card-icon">🖼️</span><span class="card-title">Class Gallery</span></a>
-          <a class="game-card" data-game-id="student-rewards" href="student-rewards/student.html" target="_blank" rel="noopener"><span class="card-icon">🌟</span><span class="card-title">Student Rewards</span></a>
+          <a class="game-card" data-game-id="class-gallery" href="class-gallery/index.html"><span class="card-icon">🖼️</span><span class="card-title">Class Gallery</span></a>
+          <a class="game-card" data-game-id="student-rewards" href="student-rewards/student.html"><span class="card-icon">🌟</span><span class="card-title">Student Rewards</span></a>
         </div>
       </section>
 
@@ -261,8 +261,8 @@
           <div><div class="game-group-title">Tests &amp; Challenges</div><div class="game-group-subtitle">Quizzes and class challenges</div></div>
         </div>
         <div class="game-group-grid">
-          <a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html" target="_blank" rel="noopener"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz &amp; Practice</span></a>
-          <a class="game-card" data-game-id="game-show" href="game-show/player.html" target="_blank" rel="noopener"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a>
+          <a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz &amp; Practice</span></a>
+          <a class="game-card" data-game-id="game-show" href="game-show/player.html"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a>
         </div>
       </section>
     </div>
@@ -300,7 +300,7 @@
       <h2 id="versionModalTitle">Open activity</h2>
       <p>Which version would you like to open?</p>
       <div class="version-choice">
-        <a id="versionStudentLink" class="student-version-choice" href="#" target="_blank" rel="noopener"><span class="version-choice-icon">🎓</span><span>Student Version</span></a>
+        <a id="versionStudentLink" class="student-version-choice" href="#"><span class="version-choice-icon">🎓</span><span>Student Version</span></a>
         <a id="versionTeacherLink" class="teacher-version-choice" href="#" target="_blank" rel="noopener"><span class="version-choice-icon">👨‍🏫</span><span>Teacher Version</span></a>
       </div>
       <button id="versionModalClose" class="version-modal-close" type="button">Cancel</button>
@@ -397,7 +397,7 @@
       </div>
 
       <h3>Student access while locked</h3>
-      <p class="admin-message">Choose one student, then check only the activities that student may use while B3 Games or that student's class is locked. An activity switched off above always stays off.</p>
+      <p class="admin-message">Choose one student, then check only the activities that student may use while Fun Torah Tools or that student's class is locked. An activity switched off above always stays off.</p>
       <div class="override-box">
         <label for="overrideStudentSelect">Student</label>
         <select id="overrideStudentSelect" class="override-student-select"><option value="">Loading students…</option></select>
@@ -418,7 +418,7 @@
   const isStudentPreview=pageParams.get("preview")==="1"&&Boolean(previewStudentId);
   // Keep the whole B3 classroom identity available to every mini-app.
   // ET/WT are still the student's within-class track, not this workspace ID.
-  try{localStorage.setItem("b3Games_workspaceId",workspaceId);}catch(e){}
+  try{sessionStorage.setItem("b3Games_workspaceId",workspaceId);}catch(e){}
   // Initialize Firebase before using Database/Auth. Without this, the script
   // stops here and the Admin button never receives its click handler.
   if (!window.firebase.apps.length) {
@@ -465,7 +465,7 @@
       const row=(await readOnce("b3Games/workspaces/"+workspaceId+"/classes/"+id)).val();
       return row&&row.active!==false&&row.members?.[studentId]?.active!==false&&row.members?.[studentId]?{id,name:String(row.name||id)}:null;
     }))).filter(Boolean);
-    const stored=localStorage.getItem("b3Games_studentId")===studentId?localStorage.getItem("b3Games_studentClass"):"";
+    const stored=sessionStorage.getItem("b3Games_studentId")===studentId?sessionStorage.getItem("b3Games_studentClass"):"";
     if(studentClassChoices.length)return (studentClassChoices.find(c=>c.id===stored)||studentClassChoices[0]).id;
 
     // Migration repair: an active legacy B3 student should not be locked out
@@ -649,6 +649,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(!teacherHref)return false;
     el("versionModalTitle").textContent=game.name;
     el("versionStudentLink").href=game.element.getAttribute("href");
+    el("versionStudentLink").target="_self";
     el("versionTeacherLink").href=teacherHref;
     el("versionModal").classList.remove("hidden");
     return true;
@@ -871,7 +872,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   function slugify(name){return String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");}
   function setLoginMsg(t){el("loginMsg").textContent=t||"";}
 
-  function showChecking(){if(isAuthorizedTeacher){renderStudentAccess();return;}el("loginCard").classList.add("checking");el("loginCard").querySelector("h2").textContent="Opening B3 Games…";setLoginMsg("Checking your sign-in. This can take a few seconds.");}
+  function showChecking(){if(isAuthorizedTeacher){renderStudentAccess();return;}el("loginCard").classList.add("checking");el("loginCard").querySelector("h2").textContent="Opening Fun Torah Tools…";setLoginMsg("Checking your sign-in. This can take a few seconds.");}
   function showLogin(){
     if(isAuthorizedTeacher){renderStudentAccess();return;}
     el("loginCard").classList.remove("checking");el("loginCard").querySelector("h2").textContent="Student Sign In";if(el("loginMsg").textContent.startsWith("Checking your sign-in"))setLoginMsg("");
@@ -1145,8 +1146,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     el("gamesArea").classList.add("hidden");
     el("specialAccessNote")?.classList.add("hidden");
     el("lockedCard").classList.remove("hidden");
-    el("lockedTitle").textContent=currentSettings.siteEnabled===false?"B3 Games is locked":classLabels[myClassId]+" is locked right now";
-    el("lockedMessage").textContent=currentSettings.siteEnabled===false?"B3 Games is closed right now. Rabbi Cohen can give you access to a specific activity.":"Your class cannot use B3 Games right now. Rabbi Cohen can give you access to a specific activity.";
+    el("lockedTitle").textContent=currentSettings.siteEnabled===false?"Fun Torah Tools is locked":classLabels[myClassId]+" is locked right now";
+    el("lockedMessage").textContent=currentSettings.siteEnabled===false?"Fun Torah Tools is closed right now. Rabbi Cohen can give you access to a specific activity.":"Your class cannot use Fun Torah Tools right now. Rabbi Cohen can give you access to a specific activity.";
   }
 
   // Student sign-in is checked on the server; passcodes never reach the browser.
@@ -1181,12 +1182,12 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     myStudentId=r.id;myStudentName=r.name;myClassId=r.classId;myClassRecord=null;
     try{myClassRecord=(await readOnce("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId,8000)).val()||null;}catch(e){}
     if(!isStudentPreview){
-      localStorage.setItem("b3Games_studentId",myStudentId);
-      localStorage.setItem("b3Games_studentName",myStudentName);
-      localStorage.setItem("b3Games_studentClass",myClassId);
-      localStorage.setItem("posukPractice_studentId",myStudentId);
-      localStorage.setItem("posukPractice_studentName",myStudentName);
-      localStorage.setItem("weeklyQuiz_classId",myClassId);
+      sessionStorage.setItem("b3Games_studentId",myStudentId);
+      sessionStorage.setItem("b3Games_studentName",myStudentName);
+      sessionStorage.setItem("b3Games_studentClass",myClassId);
+      sessionStorage.setItem("posukPractice_studentId",myStudentId);
+      sessionStorage.setItem("posukPractice_studentName",myStudentName);
+      sessionStorage.setItem("weeklyQuiz_classId",myClassId);
     }
     let chooser=el("activeStudentClass");
     if(!chooser){chooser=document.createElement("select");chooser.id="activeStudentClass";chooser.setAttribute("aria-label","Active class");el("studentBar").appendChild(chooser);}
@@ -1199,8 +1200,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     let seenPasscodeUpdate;
     studentProfileWatch.on("value",async snap=>{const v=snap.val();if(v?.active===false){studentAccessRevoked=true;showLogin();return;}
       const stamp=v?.passcodeUpdatedAt??null;if(seenPasscodeUpdate===undefined){seenPasscodeUpdate=stamp;return;}if(stamp===seenPasscodeUpdate||isStudentPreview)return;seenPasscodeUpdate=stamp;
-      try{await studentAuthCall({action:"verify",studentId:myStudentId,pin:String(localStorage.getItem("b3Games_classPin")||"")});}
-      catch(e){if(e.status===401||e.status===403){studentAccessRevoked=true;localStorage.removeItem("b3Games_classPin");showLogin();setLoginMsg("Your passcode changed. Please sign in again.");}}});
+      try{await studentAuthCall({action:"verify",studentId:myStudentId,pin:String(sessionStorage.getItem("b3Games_classPin")||"")});}
+      catch(e){if(e.status===401||e.status===403){studentAccessRevoked=true;sessionStorage.removeItem("b3Games_classPin");showLogin();setLoginMsg("Your passcode changed. Please sign in again.");}}});
     studentMembershipWatch=db.ref("b3Games/students/"+myStudentId+"/memberships");
     studentMembershipWatch.on("value",snap=>{const rows=snap.val()||{};if(Object.keys(rows).length&&!Object.values(rows).some(m=>m&&m.active!==false&&m.workspaceId===workspaceId&&m.classId===myClassId)){studentAccessRevoked=true;showLogin();}});
     renderStudentAccess();
@@ -1213,7 +1214,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     try{
       const r=await checkStudentAccess(el("studentNameInput").value,el("classPinInput").value);
       if(!r.ok){setLoginMsg(r.reason);return;}
-      localStorage.setItem("b3Games_classPin",el("classPinInput").value.trim());
+      sessionStorage.setItem("b3Games_classPin",el("classPinInput").value.trim());
       setLoginMsg("Opening your games…");await enterStudent(r);setLoginMsg("");
     }catch(e){console.error(e);setLoginMsg(e&&e.message?e.message:"Could not check your login. Try again.");}
     finally{btn.disabled=false;}
@@ -1221,7 +1222,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 
   async function restoreStudent(){
     if(isAuthorizedTeacher)return;
-    const id=isStudentPreview?previewStudentId:(localStorage.getItem("b3Games_studentId")||localStorage.getItem("posukPractice_studentId"));
+    const id=isStudentPreview?previewStudentId:(sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId"));
     if(!id){showLogin();return;}
     showChecking();
     try{
@@ -1239,12 +1240,12 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       // Every activity reuses the passcode saved at homepage sign-in. If it is
       // missing or out of date, ask once here instead of inside each activity.
       if(!isStudentPreview){
-        const saved=String(localStorage.getItem("b3Games_classPin")||"").trim();
+        const saved=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
         let stale=!saved;
         if(saved){try{await studentAuthCall({action:"verify",studentId:id,pin:saved});}catch(e){stale=e.status===401||e.status===403;}}
         if(isAuthorizedTeacher)return;
         if(stale){
-          localStorage.removeItem("b3Games_classPin");
+          sessionStorage.removeItem("b3Games_classPin");
           el("studentNameInput").value=d.name?String(d.name):"";
           showLogin();setLoginMsg("Please sign in once more so all your activities open automatically.");return;
         }
@@ -1252,7 +1253,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       const restoredClassId=await resolvedStudentClass(id,d);
       if(isAuthorizedTeacher)return;
       if(!restoredClassId){showLogin();return;}
-      await enterStudent({id:id,name:d.name?String(d.name):(localStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
+      await enterStudent({id:id,name:d.name?String(d.name):(sessionStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});
     }catch(e){console.warn(e);showLogin();}
   }
 
@@ -1261,7 +1262,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(studentMembershipWatch)studentMembershipWatch.off();
     if(studentClassWatch)studentClassWatch.off();
     if(studentProfileWatch)studentProfileWatch.off();
-    ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_classPin","posukPractice_studentId","posukPractice_studentName","weeklyQuiz_classId"].forEach(k=>localStorage.removeItem(k));
+    ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_classPin","posukPractice_studentId","posukPractice_studentName","weeklyQuiz_classId"].forEach(k=>sessionStorage.removeItem(k));
     myStudentId=myStudentName=myClassId="";
     el("studentNameInput").value="";el("classPinInput").value="";setLoginMsg("");showLogin();
   }
@@ -1332,9 +1333,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       <div style="margin-top:12px;padding:11px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:11px">
         <label style="display:block;font-size:13px;font-weight:900;color:#1e3a8a;margin-bottom:6px" for="lockedGameOverride-${classId}">🔓 Keep one activity open while locked</label>
         <select id="lockedGameOverride-${classId}" data-locked-game-override="${classId}" style="width:100%;padding:9px 10px;border:1px solid #93c5fd;border-radius:9px;background:#fff;font-weight:800;color:#1f2937">${lockedGameOverrideOptions(classId)}</select>
-        <div style="font-size:11px;color:#475569;line-height:1.4;margin-top:6px">When B3 Games or this class is locked, only this selected activity stays available to the whole ${classLabels[classId]} class. Choose “None” to lock everything.</div>
+        <div style="font-size:11px;color:#475569;line-height:1.4;margin-top:6px">When Fun Torah Tools or this class is locked, only this selected activity stays available to the whole ${classLabels[classId]} class. Choose “None” to lock everything.</div>
       </div>
-      <details><summary>Recess Access Schedule</summary><div class="schedule-grid"><div class="schedule-help">B3 Games is OPEN by default. These are the periods when it is CLOSED. Use the simple hour / minute / AM-PM menus below. Nothing changes until you press <b>Save Schedule</b>, so the times will not jump around while you are editing.${delayNote}</div>${rows}<div class="schedule-actions"><button type="button" class="schedule-save" data-save-schedule="${classId}" disabled>Save Schedule</button><button type="button" class="schedule-reset" data-reset-schedule="${classId}">Reset to Master Schedule</button><span class="schedule-save-status" data-schedule-status="${classId}">No unsaved changes</span></div></div></details>
+      <details><summary>Recess Access Schedule</summary><div class="schedule-grid"><div class="schedule-help">Fun Torah Tools is OPEN by default. These are the periods when it is CLOSED. Use the simple hour / minute / AM-PM menus below. Nothing changes until you press <b>Save Schedule</b>, so the times will not jump around while you are editing.${delayNote}</div>${rows}<div class="schedule-actions"><button type="button" class="schedule-save" data-save-schedule="${classId}" disabled>Save Schedule</button><button type="button" class="schedule-reset" data-reset-schedule="${classId}">Reset to Master Schedule</button><span class="schedule-save-status" data-schedule-status="${classId}">No unsaved changes</span></div></div></details>
     </div>`;
   }
 
@@ -1829,7 +1830,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     isAuthorizedTeacher=Boolean(authorized&&currentAccess.authorized);
     isAuthorizedAdmin=isAuthorizedTeacher&&currentAccess.role==="admin";
     el("ownerAdminButton").classList.toggle("hidden",!(user&&String(user.email||"").toLowerCase()==="simcha5770@gmail.com"));
-    try{if(authorized)localStorage.setItem("b3TeacherBypass","1");else localStorage.removeItem("b3TeacherBypass");}catch(e){}
+    try{if(authorized)sessionStorage.setItem("b3TeacherBypass","1");else sessionStorage.removeItem("b3TeacherBypass");}catch(e){}
     renderStudentAccess();renderAdminPanel();
     if(authorized){
       if(isAuthorizedAdmin)startApprovalCenter();else stopApprovalCenter();

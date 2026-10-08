@@ -27,7 +27,7 @@ tr.none td{color:#94a3b8}
 .toolbar button{border:0;border-radius:9px;padding:8px 12px;background:#173b62;color:#fff;font-weight:bold;cursor:pointer}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
-<script src="../firebase-config.js"></script><script src="../site-settings.js?v=20261007-act-as-student"></script>
+<script src="../firebase-config.js"></script><script src="../site-settings.js?v=20261007-tab-login"></script>
 </head>
 <body>
 <header><h1>🔢 Gematria — Teacher Dashboard</h1><p>Each student's stars, accuracy, best scores, and the letters they miss most.</p></header>
@@ -107,7 +107,7 @@ function drawSummary(c){
 document.querySelectorAll("th[data-sort]").forEach(th=>th.onclick=()=>{const k=th.dataset.sort;sortDir=(sortKey===k)?-sortDir:(k==="name"?1:-1);sortKey=k;drawRows()});
 $("refresh").onclick=loadClass;
 async function start(user,authorized,access){
- if(!user){$("status").textContent="Please sign in from the B3 Games Teacher area first.";return}
+ if(!user){$("status").textContent="Please sign in from the Fun Torah Tools Teacher area first.";return}
  if(!authorized){$("status").textContent="This Google account is not authorized for Teacher Tools.";return}
  try{
   classes=await classList(access||{});
@@ -118,7 +118,7 @@ async function start(user,authorized,access){
 }
 if(api&&typeof api.onAuthStateChanged==="function")api.onAuthStateChanged(start);
 else $("status").textContent="Teacher access could not start. Please refresh the page.";
-setTimeout(()=>{if($("status").textContent==="Checking teacher access…")$("status").textContent="Teacher sign-in is taking too long. Refresh this page from B3 Games.";},8000);
+setTimeout(()=>{if($("status").textContent==="Checking teacher access…")$("status").textContent="Teacher sign-in is taking too long. Refresh this page from Fun Torah Tools.";},8000);
 })();
 </script>
 </body></html>

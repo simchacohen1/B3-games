@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>B3 Practice Quiz — Perek י״ח</title>
-<script src="../game-gate.js" data-game-id="weekly-quiz"></script>
+<script src="../game-gate.js?v=20261007-tab-login" data-game-id="weekly-quiz"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="../student-class.js?v=20261007-tab-login"></script>
+<script src="../b3-race.js?v=20261007b"></script>
 <style>
 :root{--ink:#19324d;--purple:#6c4fd3;--blue:#3197e3;--green:#35b86b;--yellow:#ffd85b;--orange:#ff9b4a;--pink:#ff6fae;--line:#cfe0ef;}
 *{box-sizing:border-box}
@@ -77,6 +79,9 @@ button:hover:not(:disabled){transform:translateY(-2px)}
 .answer-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
 .answer-audio{min-width:50px;padding:12px 10px;background:#fff1a8;color:#5b4a00;border:2px solid #e7ca50;border-radius:12px;font-size:20px;box-shadow:none}
 .audio-tip{background:#fff8d2;border:2px dashed #e2c64d;border-radius:14px;padding:10px 12px;text-align:center;font-weight:900;margin-bottom:14px}
+#raceCard .b3r-prompt.qtext,#raceCard .b3r-prompt{font-size:22px;color:var(--ink)}#raceCard .b3r-big:empty{display:none}
+#raceCard .b3r-choices{grid-template-columns:1fr;max-width:620px}#raceCard .b3r-choices button{font-size:19px;text-align:left;padding:14px 16px}
+.race-btn{background:linear-gradient(135deg,#ff9b4a,#ff6fae);color:white;box-shadow:0 5px 0 #c94f84}
 @media(max-width:600px){h1{font-size:27px}.card{padding:16px;border-radius:19px}.question{font-size:24px}.type-grid{grid-template-columns:1fr 1fr}}
 </style>
 </head>
@@ -139,6 +144,8 @@ button:hover:not(:disabled){transform:translateY(-2px)}
           <button class="count-btn" data-count="15" onclick="pickCount(15)">15 Questions</button>
         </div>
         <button class="green big-btn" style="width:100%;margin-top:20px" onclick="generatePractice()">🚀 Make My Practice Quiz!</button>
+        <button class="race-btn big-btn" style="width:100%;margin-top:12px" onclick="startFriendsRace()">👥 Race My Friends!</button>
+        <div class="small-note" style="text-align:center;margin-top:6px">Everyone in the race gets the same questions. If a friend already started a race, you can join his.</div>
         <div id="builderMsg" class="login-msg"></div>
       </div>
     </div>
@@ -153,6 +160,11 @@ button:hover:not(:disabled){transform:translateY(-2px)}
       <div id="feedback" class="feedback">Choose your answer.</div>
       <button id="checkBtn" class="primary big-btn" style="width:100%;margin-top:14px" onclick="checkAnswer()" disabled>Check My Answer</button>
       <button id="nextBtn" class="green big-btn hidden" style="width:100%;margin-top:14px" onclick="nextQuestion()">Next Question ➜</button>
+    </div>
+
+    <div id="raceCard" class="card hidden">
+      <div class="step-title"><span class="step-bubble">👥</span> Race My Friends</div>
+      <div id="raceBox"></div>
     </div>
 
     <div id="resultCard" class="card result hidden">
@@ -239,7 +251,7 @@ async function login(){location.href='../index.html';return;
     if(p.val()&&String(p.val()).trim()!==pin){setLoginMsg('That PIN is not correct.');return;}
     if(!a.exists()){setLoginMsg('Ask your teacher to add your name first.');return;}
     const d=a.val();studentId=id;studentName=d&&d.name?String(d.name):name;
-    localStorage.setItem('posukPractice_studentId',studentId);localStorage.setItem('posukPractice_studentName',studentName);
+    sessionStorage.setItem('posukPractice_studentId',studentId);sessionStorage.setItem('posukPractice_studentName',studentName);
     enterApp();
   }catch(e){console.error(e);setLoginMsg('Could not sign in. Try again.');}
 }
@@ -247,11 +259,11 @@ function enterApp(){
   document.getElementById('loginCard').classList.add('hidden');document.getElementById('app').classList.remove('hidden');document.getElementById('who').textContent=studentName;renderPosukGrid();
 }
 async function restore(){
-  const id=localStorage.getItem('posukPractice_studentId'),name=localStorage.getItem('posukPractice_studentName');
+  const id=sessionStorage.getItem('posukPractice_studentId'),name=sessionStorage.getItem('posukPractice_studentName');
   if(!id||!name)return;
   try{const s=await db.ref('posukPractice/allowedStudents/'+id).once('value');if(!s.exists())return;studentId=id;studentName=(s.val()&&s.val().name)||name;enterApp();}catch(e){}
 }
-function switchStudent(){localStorage.removeItem('posukPractice_studentId');localStorage.removeItem('posukPractice_studentName');location.reload();}
+function switchStudent(){sessionStorage.removeItem('posukPractice_studentId');sessionStorage.removeItem('posukPractice_studentName');location.reload();}
 function renderPosukGrid(){
   const g=document.getElementById('posukGrid');g.innerHTML='';
   for(let i=1;i<=33;i++){const b=document.createElement('button');b.className='posuk-btn'+(selected.has(i)?' selected':'');b.innerHTML='<b>Posuk '+HEB_NUMS[i-1]+'</b><br><span style="font-size:12px">'+i+'</span>';b.onclick=()=>{selected.has(i)?selected.delete(i):selected.add(i);renderPosukGrid();};g.appendChild(b);}
@@ -323,6 +335,33 @@ async function finish(){
   };
   try{await db.ref('b3Quiz/practiceAttempts/'+studentId).push(attempt);}catch(e){console.warn('Practice attempt was not saved',e);}
 }
+/* ---------- Play with friends (shared B3 Race) ---------- */
+let race=null;
+async function raceQuestions(){
+  if(!selected.size)throw new Error('Pick at least one posuk first, then tap Race My Friends.');
+  const body={sourceText:sourceText(),references:selectedSefariaRefs(),quizType,difficulty,choiceCount:3,count:questionCount,mixedCounts:quizType==='mixed'?mixedCounts(questionCount):{shorashim:0,translation:0,comprehension:0}};
+  const r=await fetch(GENERATE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(data.error||'Could not make the quiz. Try again.');
+  const list=(Array.isArray(data.items)?data.items:[]).filter(q=>Array.isArray(q.choices)&&q.choices.length>1);
+  if(!list.length)throw new Error(data.warning||'No questions were made. Try a few more pesukim.');
+  return list.map(q=>{const ch=q.choices.map(String),ans=ch[Number(q.correctIndex)||0];return {prompt:String(q.question||''),big:'',choices:ch,answer:ans,explain:'The answer is: '+ans}});
+}
+function closeRace(){if(race)race.leave();document.getElementById('raceCard').classList.add('hidden');document.getElementById('builder').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});}
+async function startFriendsRace(){
+  document.getElementById('builderMsg').textContent='';
+  document.getElementById('builder').classList.add('hidden');document.getElementById('resultCard').classList.add('hidden');document.getElementById('quizCard').classList.add('hidden');
+  document.getElementById('raceCard').classList.remove('hidden');
+  const box=document.getElementById('raceBox');box.innerHTML='<p style="text-align:center;font-weight:900">Loading…</p>';
+  const path=await B3Race.classRoomsPath(db,studentId,'weekly-quiz');
+  if(race)race.leave();
+  race=B3Race.create({container:box,db,roomsPath:path,studentId,studentName:studentName||studentId,
+    makeQuestions:raceQuestions,
+    roomInfo:()=>({label:typeLabel(quizType)+' • '+difficultyLabel(difficulty)+' • '+selected.size+' posuk'+(selected.size===1?'':'im')}),
+    onExit:closeRace});
+  race.start();window.scrollTo({top:0,behavior:'smooth'});
+}
+window.addEventListener('pagehide',()=>{if(race)race.leave()});
 function sameAgain(){document.getElementById('resultCard').classList.add('hidden');generatePractice();}
 function backToBuilder(){items=[];document.getElementById('resultCard').classList.add('hidden');document.getElementById('quizCard').classList.add('hidden');document.getElementById('builder').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});}
 renderPosukGrid();restore();

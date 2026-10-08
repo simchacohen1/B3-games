@@ -170,7 +170,12 @@ async function shareScreen(){
   clearError();if(!navigator.mediaDevices?.getDisplayMedia){fail('Use Chrome or Edge on a computer to share your teaching screen.');return}
   $('shareScreen').disabled=true;const currentPeer=peer;let captured=null,processor=null,outgoing=null;
   try{
-    captured=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:2560},height:{ideal:1440},frameRate:{ideal:8,max:10}},audio:false});
+    // Keep the teacher on the Class Pointer page after picking a tab/window to share (Chrome/Edge 109+).
+    let captureController=null;
+    if(typeof window.CaptureController==='function'){try{captureController=new CaptureController();captureController.setFocusBehavior?.('no-focus-change')}catch(_){captureController=null}}
+    const displayOptions={video:{width:{ideal:2560},height:{ideal:1440},frameRate:{ideal:8,max:10}},audio:false};
+    if(captureController)displayOptions.controller=captureController;
+    captured=await navigator.mediaDevices.getDisplayMedia(displayOptions);
     if(peer!==currentPeer||!started){captured.getTracks().forEach(track=>track.stop());return}
     if(window.ClassPointerViewport?.create){
       processor=await window.ClassPointerViewport.create({rawStream:captured,stage:$('stage'),lesson:$('lesson'),onBeforeViewChange:resetOverlaysForViewChange,onStatus:status,onError:fail});

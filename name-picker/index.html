@@ -255,6 +255,14 @@
     color:var(--accent);
     margin:6px 0 8px;
   }
+  /* ---- big winner overlay: stays until clicked ---- */
+  #winnerOverlay{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center;background:rgba(27,18,53,0.94);cursor:pointer;}
+  #winnerOverlay[hidden]{display:none;}
+  #winnerOverlayLabel{font-family:'Baloo 2',sans-serif;font-size:clamp(20px,4vw,36px);color:var(--muted);}
+  #winnerOverlayName{font-family:'Baloo 2',sans-serif;font-weight:800;font-size:clamp(64px,15vw,220px);line-height:1.05;color:var(--accent);overflow-wrap:anywhere;text-shadow:0 0 40px rgba(242,183,5,0.35);animation:winnerPop .5s cubic-bezier(.2,1.6,.4,1);}
+  #winnerOverlayHint{color:var(--muted);font-size:15px;}
+  @keyframes winnerPop{from{transform:scale(.3);opacity:0;}to{transform:scale(1);opacity:1;}}
+  @media (prefers-reduced-motion: reduce){#winnerOverlayName{animation:none;}}
   #displayFairnessNote{color:var(--muted);font-size:13px;margin-top:14px;}
   #resetCycleBtn{margin-top:10px;font-size:12px;padding:5px 10px;}
 
@@ -395,6 +403,11 @@
     <button id="resetCycleBtn" class="ghost" hidden>Reset this round</button>
   </section>
 
+</div>
+<div id="winnerOverlay" hidden>
+  <div id="winnerOverlayLabel"></div>
+  <div id="winnerOverlayName"></div>
+  <div id="winnerOverlayHint">Click anywhere to close</div>
 </div>
 <canvas id="confettiCanvas"></canvas>
 
@@ -1281,6 +1294,7 @@ spinBtn.addEventListener('click', () => {
   spinning = true;
   spinBtn.disabled = true;
   winnerBanner.hidden = true;
+  document.getElementById('winnerOverlay').hidden = true;
 
   const { winner, entry } = pickWinner(purpose, names);
   if (!winner) {
@@ -1298,10 +1312,18 @@ spinBtn.addEventListener('click', () => {
   }
 });
 
+document.getElementById('winnerOverlay').addEventListener('click', () => {
+  document.getElementById('winnerOverlay').hidden = true;
+});
+
 function finishSpin(purpose, entry, winner, names) {
   commitWinner(purpose, entry, winner);
   winnerBanner.hidden = false;
   winnerBanner.textContent = winner;
+  const winnerOverlay = document.getElementById('winnerOverlay');
+  document.getElementById('winnerOverlayLabel').textContent = purpose.headline || purpose.name || '';
+  document.getElementById('winnerOverlayName').textContent = winner;
+  winnerOverlay.hidden = false;
   playFanfare();
   burstConfetti(confettiCanvas, currentTheme());
   const picked = pickedSetFor(purpose, names);

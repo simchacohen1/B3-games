@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script src="../game-gate.js?v=20261006-lockoverride" data-game-id="posuk-practice-scroll"></script>
+<script src="../game-gate.js?v=20261007-tab-login" data-game-id="posuk-practice-scroll"></script>
 <title>Posuk Practice Scroll</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
@@ -1419,12 +1419,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-<script src="../student-class.js?v=20261005"></script>
+<script src="../student-class.js?v=20261007-tab-login"></script>
 
 <script>
 /* =========================================================
    FIREBASE CONFIG — paste the SAME config object you use in
-   your other B3 Games files (Tent Trail Trivia, etc.)
+   your other Fun Torah Tools files (Tent Trail Trivia, etc.)
    ========================================================= */
 const firebaseConfig = {
   apiKey: "AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",
@@ -2347,9 +2347,9 @@ document.getElementById('startBtn').onclick = async () => {location.href='../ind
     setNameGateMsg('');
     studentName = val;
     studentId = result.slug;
-    localStorage.setItem('posukPractice_studentName', studentName);
-    localStorage.setItem('posukPractice_studentId', studentId);
-    localStorage.setItem('posukPractice_studentAccessVersion', String(result.accessVersion || 0));
+    sessionStorage.setItem('posukPractice_studentName', studentName);
+    sessionStorage.setItem('posukPractice_studentId', studentId);
+    sessionStorage.setItem('posukPractice_studentAccessVersion', String(result.accessVersion || 0));
     enterApp();
   }catch(e){
     console.error('Access check failed:', e);
@@ -2440,24 +2440,24 @@ function applyDeepLinkFromURL(){
 }
 
 window.addEventListener('load', async () => {
-  const sharedId=localStorage.getItem('b3Games_studentId'),sharedName=localStorage.getItem('b3Games_studentName'),sharedPin=localStorage.getItem('b3Games_classPin');
+  const sharedId=sessionStorage.getItem('b3Games_studentId'),sharedName=sessionStorage.getItem('b3Games_studentName'),sharedPin=sessionStorage.getItem('b3Games_classPin');
   if(sharedId&&sharedName&&sharedPin){
     setNameGateMsg('Checking your existing sign-in…');
     try{
       const result=await checkAccess(sharedName,sharedPin,sharedId);
       if(result.ok){
         studentId=result.slug;studentName=sharedName;
-        localStorage.setItem('posukPractice_studentId',studentId);
-        localStorage.setItem('posukPractice_studentName',studentName);
-        localStorage.setItem('posukPractice_studentAccessVersion',String(result.accessVersion));
+        sessionStorage.setItem('posukPractice_studentId',studentId);
+        sessionStorage.setItem('posukPractice_studentName',studentName);
+        sessionStorage.setItem('posukPractice_studentAccessVersion',String(result.accessVersion));
         setNameGateMsg('');enterApp();return;
       }
       setNameGateMsg(result.reason);return;
     }catch(error){setNameGateMsg('Could not check your sign-in. Refresh and try again.');return;}
   }
-  const savedId = localStorage.getItem('posukPractice_studentId');
-  const savedName = localStorage.getItem('posukPractice_studentName');
-  const savedAccessVersion = localStorage.getItem('posukPractice_studentAccessVersion') || '0';
+  const savedId = sessionStorage.getItem('posukPractice_studentId');
+  const savedName = sessionStorage.getItem('posukPractice_studentName');
+  const savedAccessVersion = sessionStorage.getItem('posukPractice_studentAccessVersion') || '0';
   if(savedId && savedName){
     // Re-check both roster membership and the passcode version on every visit.
     // If the teacher changed this student's passcode, an old remembered login
@@ -2467,23 +2467,23 @@ window.addEventListener('load', async () => {
       if(!row)row=await studentRecord('posukPractice/allowedStudents/'+encodeURIComponent(savedId));
       const allowedSnap={exists:()=>!!row,val:()=>row};
       if(!allowedSnap.exists()){
-        localStorage.removeItem('posukPractice_studentName');
-        localStorage.removeItem('posukPractice_studentId');
-        localStorage.removeItem('posukPractice_studentAccessVersion');
+        sessionStorage.removeItem('posukPractice_studentName');
+        sessionStorage.removeItem('posukPractice_studentId');
+        sessionStorage.removeItem('posukPractice_studentAccessVersion');
         return;
       }
       const allowedInfo = allowedSnap.val() || {};
       if(allowedInfo.active === false){
-        localStorage.removeItem('posukPractice_studentName');
-        localStorage.removeItem('posukPractice_studentId');
-        localStorage.removeItem('posukPractice_studentAccessVersion');
+        sessionStorage.removeItem('posukPractice_studentName');
+        sessionStorage.removeItem('posukPractice_studentId');
+        sessionStorage.removeItem('posukPractice_studentAccessVersion');
         return;
       }
       const currentAccessVersion = String(Number(allowedInfo.passcodeUpdatedAt) || 0);
       if(savedAccessVersion !== currentAccessVersion){
-        localStorage.removeItem('posukPractice_studentName');
-        localStorage.removeItem('posukPractice_studentId');
-        localStorage.removeItem('posukPractice_studentAccessVersion');
+        sessionStorage.removeItem('posukPractice_studentName');
+        sessionStorage.removeItem('posukPractice_studentId');
+        sessionStorage.removeItem('posukPractice_studentAccessVersion');
         setNameGateMsg('Please enter your passcode.');
         return;
       }

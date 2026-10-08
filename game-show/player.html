@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<script src="../game-gate.js?v=20261006-lockoverride" data-game-id="game-show"></script>
+<script src="../game-gate.js?v=20261007-tab-login" data-game-id="game-show"></script>
 <title>Game Show - Play</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -32,8 +32,45 @@
   .status { margin-top: 16px; font-size: 16px; color: #7d5236; }
   .countdown { margin-top: 16px; font-size: 20px; color: #b85042; font-weight: bold; }
   .score-display { margin-top: 20px; font-size: 18px; }
+  .scoreboard { margin-top: 20px; padding: 20px; text-align: left; }
+  .scoreboard h2 { margin: 0 0 14px; color: #7d5236; font-size: 21px; }
+  .scoreboard table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .scoreboard th, .scoreboard td { padding: 12px 8px; border-bottom: 1px solid #f0e3d0; }
+  .scoreboard th { color: #7d5236; font-size: 14px; }
+  .scoreboard th:first-child { width: 42px; }
+  .scoreboard th:last-child, .scoreboard td:last-child { width: 58px; text-align: right; font-variant-numeric: tabular-nums; }
+  .scoreboard td:nth-child(2) { overflow-wrap: anywhere; }
+  .scoreboard .your-row { background: #fff3d9; font-weight: bold; }
+  .scoreboard-empty { color: #7d5236; }
   .hidden { display: none; }
   .master-blocked { max-width: 400px; margin: 60px auto 0 auto; background: white; border-radius: 12px; border: 1px solid #d9a85c; padding: 28px; font-size: 18px; }
+  /* Fit the play controls and scores in one screen at normal zoom. */
+  body { box-sizing: border-box; height: 100dvh; padding: 10px 14px; display: flex; flex-direction: column; }
+  h1 { margin: 0 0 3px; font-size: 26px; }
+  .subtitle { margin-bottom: 8px; font-size: 14px; }
+  #gameArea { display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%; max-width: 600px; margin: 0 auto; }
+  #gameArea.hidden { display: none; }
+  .signed-in { box-sizing: border-box; width: 100%; max-width: none; margin-bottom: 8px; flex-shrink: 0; }
+  #gameArea > .panel { box-sizing: border-box; width: 100%; max-width: none; margin: 0 0 8px; padding: 12px 16px; flex-shrink: 0; }
+  .qnum { margin-bottom: 4px; }
+  .qtext { font-size: 19px; line-height: 1.3; max-height: 5.2em; overflow-y: auto; overflow-wrap: anywhere; margin-bottom: 8px; scrollbar-gutter: stable; }
+  .buzz-btn { width: 108px; height: 108px; font-size: 20px; padding: 10px; box-shadow: 0 4px 0 #78342a; }
+  .buzz-btn:disabled { box-shadow: none; }
+  .countdown { margin-top: 8px; font-size: 17px; }
+  .status { margin-top: 8px; font-size: 15px; }
+  .countdown:empty, .status:empty { display: none; }
+  .score-display { margin: 0 0 8px; font-size: 17px; flex-shrink: 0; }
+  #gameArea > .scoreboard { display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; padding: 12px; }
+  .scoreboard h2 { margin-bottom: 8px; font-size: 18px; flex-shrink: 0; }
+  .scoreboard-list { flex: 1; min-height: 0; overflow-y: auto; }
+  .scoreboard th, .scoreboard td { padding: 8px; font-size: 14px; }
+  .scoreboard th { position: sticky; top: 0; background: white; }
+  .scoreboard-empty { margin: 0; }
+  @media (max-height: 600px) {
+    .buzz-btn { width: 88px; height: 88px; font-size: 18px; }
+    .qtext { font-size: 17px; }
+    #gameArea > .panel { padding: 8px 12px; }
+  }
 </style>
 </head>
 <body>
@@ -63,12 +100,22 @@
   </div>
   <div class="panel">
     <div class="qnum" id="qnum">Question 1 of 1</div>
-    <div class="qtext" id="qtext"></div>
+    <div class="qtext" id="qtext" tabindex="0" role="region" aria-label="Question"></div>
     <button class="buzz-btn" id="buzzBtn" onclick="buzzIn()">BUZZ IN</button>
     <div class="countdown" id="countdown"></div>
     <div class="status" id="status"></div>
   </div>
   <div class="score-display">Your score: <span id="myScore">0</span></div>
+  <section class="panel scoreboard" aria-labelledby="scoreboardTitle">
+    <h2 id="scoreboardTitle">Players &amp; scores</h2>
+    <p id="scoreboardEmpty" class="scoreboard-empty">Waiting for players to join.</p>
+    <div class="scoreboard-list" tabindex="0" role="region" aria-label="Player scoreboard">
+    <table id="scoreboardTable" class="hidden" aria-label="Live player scores">
+      <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">Score</th></tr></thead>
+      <tbody id="scoreboardRows"></tbody>
+    </table>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -87,7 +134,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 // A class other than B3's own (et/wt) plays its own separate game with its own questions.
-const GS_CLASS = (new URLSearchParams(location.search).get('class') || localStorage.getItem('b3Games_studentClass') || '').trim();
+const GS_CLASS = (new URLSearchParams(location.search).get('class') || sessionStorage.getItem('b3Games_studentClass') || '').trim();
 const CLASS_SPACE = /^[A-Za-z0-9_-]{1,100}$/.test(GS_CLASS) && !['et', 'wt'].includes(GS_CLASS);
 const gameRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/live' : "tentTrailTrivia");
 
@@ -176,16 +223,14 @@ function enterGame(displayName, studentId) {
   myStudentId = studentId;
   myName = sanitize(displayName);
 
-  localStorage.setItem('posukPractice_studentName', displayName);
-  localStorage.setItem('posukPractice_studentId', studentId);
+  sessionStorage.setItem('posukPractice_studentName', displayName);
+  sessionStorage.setItem('posukPractice_studentId', studentId);
 
   document.getElementById('signedInName').textContent = displayName;
   gameRef.child('scores').child(myName).transaction(current => current || 0);
   applyMasterBlocked();
 
-  if (lastData && lastData.scores && lastData.scores[myName] !== undefined) {
-    document.getElementById('myScore').textContent = lastData.scores[myName];
-  }
+  renderScoreboard(lastData && lastData.scores);
 }
 
 async function joinGame() {
@@ -222,8 +267,8 @@ async function joinGame() {
 }
 
 async function restoreSharedStudentLogin() {
-  const savedId=localStorage.getItem('b3Games_studentId')||localStorage.getItem('posukPractice_studentId');
-  const savedName=localStorage.getItem('b3Games_studentName')||localStorage.getItem('posukPractice_studentName');
+  const savedId=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
+  const savedName=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName');
   if(!savedId||!savedName)return;
   try{
     const profileSnap=await db.ref('b3Games/students/'+savedId+'/profile').once('value');
@@ -276,23 +321,38 @@ function playBuzzSound() {
   });
 }
 
+function mustSitOut(data, name) {
+  return !!(data && data.lastWinner === name && (data.lastWinnerStreak || 0) >= 2);
+}
+
 function buzzIn() {
-  if (masterBlocked) return;
-  // Guard against buzzing during the lockout window, even if the button
-  // state hasn't refreshed yet.
+  if (masterBlocked || !myName || mustSitOut(lastData, myName)) return;
   if (lockedUntil && Date.now() < lockedUntil) return;
-  if (lastData && lastData.buzzedBy) return; // already decided
-  if (lastData && lastData.revealDelayOn) {
-    // Randomize-winner mode: don't reveal anything yet. Just quietly add
-    // myself to the pool of everyone who buzzed during this window - the
-    // teacher's screen picks a winner at random once the window closes.
-    if (lastData.buzzPool && lastData.buzzPool[myName]) return; // already in the pool
-    playBuzzSound();
-    gameRef.child('buzzPool').child(myName).set(true);
-  } else {
-    playBuzzSound();
-    gameRef.child('buzzedBy').transaction(current => current || myName);
-  }
+  if (lastData && lastData.buzzedBy) return;
+  // A root transaction keeps winner and streak together even when students
+  // buzz simultaneously or another tab has newer state.
+  gameRef.transaction(current => {
+    if (!current || current.buzzedBy || mustSitOut(current, myName)) return;
+    if (current.buzzerDelayOn && Date.now() < (current.buzzUnlockAt || 0)) return;
+    if (current.revealDelayOn) {
+      if (current.buzzPool && current.buzzPool[myName]) return;
+      current.buzzPool = current.buzzPool || {};
+      current.buzzPool[myName] = true;
+    } else {
+      const round = String(current.buzzOpenAt || 0) + ':' + (current.qIndex || 0);
+      if (current.lastWinnerRound !== round) {
+        current.lastWinnerStreak = current.lastWinner === myName ? (current.lastWinnerStreak || 0) + 1 : 1;
+        current.lastWinner = myName;
+        current.lastWinnerRound = round;
+      }
+      current.buzzedBy = myName;
+      current.selectedPlayer = myName;
+    }
+    return current;
+  }, (error, committed) => {
+    if (error) document.getElementById('status').textContent = 'Could not buzz in. Please try again.';
+    else if (committed) playBuzzSound();
+  });
 }
 
 let lockedUntil = 0;
@@ -304,6 +364,12 @@ function updateBuzzAvailability() {
   const countdownEl = document.getElementById('countdown');
   const now = Date.now();
 
+  if (mustSitOut(lastData, myName)) {
+    buzzBtn.disabled = true;
+    countdownEl.textContent = '';
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+    return;
+  }
   if (lockedUntil && now < lockedUntil) {
     buzzBtn.disabled = true;
     const secsLeft = Math.ceil((lockedUntil - now) / 1000);
@@ -346,10 +412,36 @@ function showWaiting(waiting) {
 }
 setInterval(() => { if (lastData) showWaiting(!gameIsLive(lastData)); }, 15000);
 
+// Use the current game's score roster, so each class sees its own players.
+function renderScoreboard(scores) {
+  const players = Object.entries(scores || {}).map(([name, score]) => ({
+    name, score: Number.isFinite(Number(score)) ? Number(score) : 0
+  })).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+  const rows = document.getElementById('scoreboardRows');
+  rows.replaceChildren();
+  document.getElementById('scoreboardEmpty').classList.toggle('hidden', players.length > 0);
+  document.getElementById('scoreboardTable').classList.toggle('hidden', players.length === 0);
+  document.getElementById('myScore').textContent = (players.find(player => player.name === myName) || { score: 0 }).score;
+  let rank = 0;
+  players.forEach((player, index) => {
+    if (index === 0 || player.score !== players[index - 1].score) rank = index + 1;
+    const row = document.createElement('tr');
+    const isYou = player.name === myName;
+    row.classList.toggle('your-row', isYou);
+    [rank, player.name + (isYou ? ' (you)' : ''), player.score].forEach(value => {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+    rows.appendChild(row);
+  });
+}
+
 gameRef.on('value', snapshot => {
-  if (!questionsReady) return; // wait until questions have loaded from the database
   const data = snapshot.val() || {};
   lastData = data;
+  renderScoreboard(data.scores);
+  if (!questionsReady) return; // Scores can update while questions load.
   showWaiting(!gameIsLive(data));
   const qIndex = data.qIndex || 0;
   const q = questions[qIndex] || questions[0];
@@ -366,6 +458,11 @@ gameRef.on('value', snapshot => {
     status.textContent = data.buzzedBy === myName ? "You buzzed in first!" : data.buzzedBy + " buzzed in first.";
     document.getElementById('countdown').textContent = '';
     if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+  } else if (mustSitOut(data, myName)) {
+    buzzBtn.disabled = true;
+    status.textContent = 'You won two buzz-ins in a row. Let another player have a turn!';
+    document.getElementById('countdown').textContent = '';
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
   } else if (iAlreadyBuzzed) {
     buzzBtn.disabled = true;
     status.textContent = "You buzzed in! Waiting...";
@@ -376,9 +473,7 @@ gameRef.on('value', snapshot => {
     updateBuzzAvailability();
   }
 
-  if (myName && data.scores && data.scores[myName] !== undefined) {
-    document.getElementById('myScore').textContent = data.scores[myName];
-  }
+
 });
 </script>
 

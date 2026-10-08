@@ -831,7 +831,7 @@
       }
       // A teacher who chose "Sign in as a student" sees every page exactly as
       // that student does until they press Exit. This only ever removes
-      // teacher access in this browser; it never grants anything.
+      // teacher access in this tab; it never grants anything.
       const acting = getActingStudent();
       if (acting) {
         currentAccess = { authorized:false, role:"", classIds:[], actingAsStudent:acting };
@@ -859,7 +859,7 @@
   // The teacher's Google sign-in stays in place. We fetch the student's
   // passcode through the existing teacher-only funTorahManageStudents "list"
   // action (which already checks the teacher owns that class), save the same
-  // values a normal student sign-in saves, and mark this browser as acting.
+  // values a normal student sign-in saves, and mark this tab as acting.
   // ---------------------------------------------------------------------
   const ACTING_KEY = "b3ActingAsStudent";
   const ACTING_ID = /^[A-Za-z0-9_-]{1,100}$/;
@@ -877,14 +877,14 @@
 
   function getActingStudent() {
     try {
-      const raw = JSON.parse(localStorage.getItem(ACTING_KEY) || "null");
+      const raw = JSON.parse(sessionStorage.getItem(ACTING_KEY) || "null");
       if (!raw || !ACTING_ID.test(String(raw.id || "")) || !ACTING_ID.test(String(raw.classId || ""))) return null;
       return { id:String(raw.id), name:String(raw.name || raw.id), classId:String(raw.classId), className:String(raw.className || raw.classId), startedAt:raw.startedAt || null };
     } catch (e) { return null; }
   }
 
   function clearStudentStorage() {
-    try { STUDENT_STORAGE_KEYS.forEach(function (k) { localStorage.removeItem(k); }); } catch (e) {}
+    try { STUDENT_STORAGE_KEYS.forEach(function (k) { sessionStorage.removeItem(k); }); } catch (e) {}
     // Per-tab caches (Yiddish session, Halacha view, etc.) belong to the old identity.
     try { sessionStorage.clear(); } catch (e) {}
   }
@@ -940,22 +940,22 @@
     if (!pin) throw new Error("This student doesn't have a passcode yet. Set one in Manage Class first.");
     const name = String(member.name || studentId);
     clearStudentStorage();
-    localStorage.setItem("b3Games_studentId", studentId);
-    localStorage.setItem("b3Games_studentName", name);
-    localStorage.setItem("b3Games_studentClass", classId);
-    localStorage.setItem("b3Games_classPin", pin);
-    localStorage.setItem("posukPractice_studentId", studentId);
-    localStorage.setItem("posukPractice_studentName", name);
-    localStorage.setItem("weeklyQuiz_classId", classId);
-    localStorage.setItem("b3Games_workspaceId", WORKSPACE_ID);
-    localStorage.removeItem("b3TeacherBypass");
-    localStorage.setItem(ACTING_KEY, JSON.stringify({ id:studentId, name:name, classId:classId, className:String(cls.name || classId.toUpperCase()), startedAt:Date.now() }));
-    location.href = SITE_BASE + "index.html";
+    sessionStorage.setItem("b3Games_studentId", studentId);
+    sessionStorage.setItem("b3Games_studentName", name);
+    sessionStorage.setItem("b3Games_studentClass", classId);
+    sessionStorage.setItem("b3Games_classPin", pin);
+    sessionStorage.setItem("posukPractice_studentId", studentId);
+    sessionStorage.setItem("posukPractice_studentName", name);
+    sessionStorage.setItem("weeklyQuiz_classId", classId);
+    sessionStorage.setItem("b3Games_workspaceId", WORKSPACE_ID);
+    sessionStorage.removeItem("b3TeacherBypass");
+    sessionStorage.setItem(ACTING_KEY, JSON.stringify({ id:studentId, name:name, classId:classId, className:String(cls.name || classId.toUpperCase()), startedAt:Date.now() }));
+    location.href = SITE_BASE + "index.html?v=20261007-tab-login";
   }
 
   function stopActingAsStudent() {
     clearStudentStorage();
-    try { localStorage.removeItem(ACTING_KEY); } catch (e) {}
+    try { sessionStorage.removeItem(ACTING_KEY); } catch (e) {}
     location.href = SITE_BASE + "teacher-home.html";
   }
 
@@ -987,7 +987,7 @@
     const field = "width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font:15px Arial,sans-serif;margin-top:6px;background:#fff;color:#1f2937";
     wrap.innerHTML = '<div style="background:#fff;color:#1f2937;border-radius:18px;padding:22px;width:100%;max-width:420px;box-shadow:0 20px 50px rgba(0,0,0,.3)">' +
       '<h2 style="margin:0 0 6px;font-size:21px">Sign in as a student</h2>' +
-      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">See Fun Torah Tools exactly as this student does. Anything you do counts as their work. Press <strong>Exit student view</strong> to come back.</p>' +
+      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">See Fun Torah Tools exactly as this student does. Anything you do counts as their work. This tab keeps its own student login; other tabs stay as they are. Press <strong>Exit student view</strong> to come back.</p>' +
       '<label style="display:block;font-weight:700;font-size:14px">Class<select id="b3ActAsClass" style="' + field + '"><option>Loading\u2026</option></select></label>' +
       '<label style="display:block;font-weight:700;font-size:14px;margin-top:12px">Student<select id="b3ActAsStudent" style="' + field + '"></select></label>' +
       '<p id="b3ActAsMsg" style="min-height:20px;margin:12px 0 0;color:#b91c1c;font-size:14px"></p>' +

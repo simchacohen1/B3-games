@@ -35,7 +35,7 @@
       if (!HALACHA_STUDENT_ID || !halachaDb) throw new Error('Please sign in as a student from the home page first.');
       const info = await FunTorahStudentClass.resolve(halachaDb, HALACHA_STUDENT_ID);
       if (!info.classId) throw new Error('Please choose your class on the home page first.');
-      const studentName = String(localStorage.getItem('b3Games_studentName') || '').trim();
+      const studentName = String(sessionStorage.getItem('b3Games_studentName') || '').trim();
       if (!studentName) throw new Error('Please sign in with your name on the home page first.');
       closeCustomizer(); persist(id); saveDrawing(id);
       await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');

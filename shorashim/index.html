@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="../game-gate.js?v=20261006-lockoverride" data-game-id="shorashim"></script>
+  <script src="../game-gate.js?v=20261007-shared-account-v2" data-game-id="shorashim"></script>
   <title>Shorashim Learning Lab</title>
   <style>
 :root{
@@ -1045,14 +1045,14 @@ body.shorashim-review-active #activeReviewRecording{display:flex!important}
   gap:20px!important
 }
 .review-choice{
-  min-height:235px!important;border:4px solid transparent!important;border-radius:28px!important;
-  padding:22px 16px!important;display:flex!important;flex-direction:column!important;
+  min-height:180px!important;border:4px solid transparent!important;border-radius:28px!important;
+  padding:16px 12px!important;display:flex!important;flex-direction:column!important;
   align-items:center!important;justify-content:center!important;gap:10px!important;
   text-align:center!important;box-shadow:0 10px 24px rgba(23,32,51,.10)!important;
   transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease!important
 }
 .review-choice:hover{transform:translateY(-4px)}
-.review-choice .choice-icon{font-size:64px!important;line-height:1!important}
+.review-choice .choice-icon{font-size:32px!important;line-height:1!important}
 .review-choice strong{font-size:clamp(24px,2.5vw,32px)!important;line-height:1.05!important}
 .review-choice span:not(.choice-icon){font-size:20px!important;font-weight:800!important}
 .review-choice b{font-size:25px!important;padding:7px 14px;border-radius:999px;background:#fff!important}
@@ -1063,9 +1063,9 @@ body.shorashim-review-active #activeReviewRecording{display:flex!important}
   border-color:#4f46e5!important;box-shadow:0 0 0 6px rgba(79,70,229,.13),0 16px 35px rgba(23,32,51,.16)!important;
   transform:translateY(-3px)
 }
-.review-choice.active::after{content:"✓";position:absolute;margin-top:-185px;margin-left:190px;
-  width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#4f46e5;color:white;
-  font-size:28px;font-weight:950}
+.review-choice.active::after{content:"✓";position:absolute;top:10px;right:10px;
+  width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#4f46e5;color:white;
+  font-size:20px;font-weight:950}
 .review-choice{position:relative}
 
 .kid-review-actions{display:flex;justify-content:center;align-items:center;gap:14px;flex-wrap:wrap;margin-top:24px}
@@ -1073,10 +1073,6 @@ body.shorashim-review-active #activeReviewRecording{display:flex!important}
   border:0;border-radius:22px;padding:20px 34px;min-width:330px;
   font-size:clamp(24px,3vw,34px);font-weight:950;background:#4f46e5;color:#fff;
   box-shadow:0 12px 28px rgba(79,70,229,.30);cursor:pointer
-}
-.kid-audio-help{
-  border:3px solid #cbd5e1;border-radius:20px;padding:17px 22px;background:#fff;
-  font-size:19px;font-weight:900;color:#334155;cursor:pointer
 }
 .kid-short-reminder{text-align:center!important;font-size:18px!important;font-weight:850!important;margin:14px 0 0!important;color:#475569!important}
 
@@ -1123,9 +1119,7 @@ body.shorashim-review-active #editReviewBtn{display:none!important}
 @media(max-width:760px){
   .review-choice-grid{grid-template-columns:1fr!important}
   .review-choice{min-height:160px!important}
-  .review-choice.active::after{margin-top:-112px;margin-left:75%}
   .kid-start-review{width:100%;min-width:0}
-  .kid-audio-help{width:100%}
 }
 </style>
 
@@ -1170,15 +1164,9 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
     <div class="login-card">
       <div class="login-icon">🌱</div>
       <div class="eyebrow">Shorashim Learning Lab</div>
-      <h1>Ready to learn?</h1>
-      <p>Use the same class PIN and student name you use for Posuk Practice.</p>
-      <label>Class PIN
-        <input id="classPinInput" type="password" inputmode="numeric" maxlength="20" placeholder="Ask your teacher" autocomplete="off" />
-      </label>
-      <label>Your name
-        <input id="studentNameInput" type="text" maxlength="30" placeholder="Type your name" autocomplete="name" />
-      </label>
-      <button id="loginBtn" class="primary big">Start Learning</button>
+      <h1>Opening Shorashim…</h1>
+      <p>Using your Fun Torah Tools sign-in.</p>
+      <button id="loginBtn" class="primary big hidden">Back to Fun Torah Tools</button>
       <div id="loginMsg" class="login-msg" aria-live="polite"></div>
     </div>
   </section>
@@ -1399,9 +1387,8 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
             </div>
             <div class="kid-review-actions">
   <button type="button" id="quickStartReviewBtn" class="kid-start-review">▶ SHOW MY CARDS</button>
-  <button type="button" id="reviewHelpAudioBtn" class="kid-audio-help" aria-label="Hear what to do">🔊 HEAR WHAT TO DO</button>
 </div>
-<div id="pointsReminder" class="points-reminder kid-short-reminder">Pick one. Then show your cards!</div>
+<div id="pointsReminder" aria-live="polite" class="points-reminder kid-short-reminder">Press Show My Cards. Then press Start Recording and say each shorash and its meaning. Pictures are allowed.</div>
           </div>
 
           <details class="review-options card-panel">
@@ -1540,11 +1527,11 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-  <script src="app.js?v=20261006-no-hints"></script>
+  <script src="app.js?v=20261007-shared-account-v2"></script>
   <script src="review-categories.js?v=20260917-picturefix1"></script>
-  <script src="../student-class.js"></script>
+  <script src="../student-class.js?v=20261007-shared-account-v2"></script>
   <script src="../b3-race.js?v=20261007"></script>
-  <script src="friends-race.js?v=20261007"></script>
+  <script src="friends-race.js?v=20261007-shared-account-v2"></script>
 
 <script data-shorashim-workspace-ux="v1">
 (() => {
