@@ -647,11 +647,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   function openVersionModal(game){
     const teacherHref=teacherVersionByGame[game.id];
     if(!teacherHref)return false;
-    el("versionModalTitle").textContent=game.name;
-    el("versionStudentLink").href=game.element.getAttribute("href");
-    el("versionStudentLink").target="_self";
-    el("versionTeacherLink").href=teacherHref;
-    el("versionModal").classList.remove("hidden");
+    // Teachers go straight to the Teacher Version — no Student/Teacher chooser.
+    window.open(teacherHref,"_blank","noopener");
     return true;
   }
 
