@@ -324,7 +324,12 @@
 
   function classHasLockedGameOverride(settings, classId) {
     if (!settings || !classId || !settings.classLockedGameOverride) return false;
-    return String(settings.classLockedGameOverride[classId] || "").split(",").map(function (v) { return v.trim(); }).indexOf(String(gameId || "")) !== -1;
+    var listed = String(settings.classLockedGameOverride[classId] || "").split(",").map(function (v) { return v.trim(); }).indexOf(String(gameId || "")) !== -1;
+    if (!listed) return false;
+    // Stars switch themselves off after their saved time (see site-settings.js).
+    var until = settings.classLockedGameOverrideUntil && settings.classLockedGameOverrideUntil[classId];
+    var ms = until && typeof until === "object" ? Number(until[gameId]) : 0;
+    return !(ms > 0 && ms <= Date.now());
   }
 
   // Match the B3 homepage's ET/WT activity switches.

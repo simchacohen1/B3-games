@@ -893,7 +893,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   function classHasLockedGameOverride(gameId,classId=myClassId){
     if(!classId||!gameId)return false;
     if(typeof settingsApi.classHasLockedGameOverride==="function")return settingsApi.classHasLockedGameOverride(currentSettings,classId,gameId);
-    return String(currentSettings.classLockedGameOverride?.[classId]||"").split(",").map(v=>v.trim()).includes(String(gameId));
+    if(!String(currentSettings.classLockedGameOverride?.[classId]||"").split(",").map(v=>v.trim()).includes(String(gameId)))return false;
+    const until=Number(currentSettings.classLockedGameOverrideUntil?.[classId]?.[gameId])||0;
+    return !(until>0&&until<=Date.now());
   }
 
   function studentNudgeVisitKey(gameId){

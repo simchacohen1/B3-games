@@ -327,6 +327,19 @@
       et: typeof sourceClassLockedGameOverride.et === "string" ? sourceClassLockedGameOverride.et.trim() : "",
       wt: typeof sourceClassLockedGameOverride.wt === "string" ? sourceClassLockedGameOverride.wt.trim() : ""
     };
+    const sourceUntil = source.classLockedGameOverrideUntil && typeof source.classLockedGameOverrideUntil === "object"
+      ? source.classLockedGameOverrideUntil
+      : {};
+    normalized.classLockedGameOverrideUntil = {};
+    ["et", "wt"].forEach(function (classId) {
+      const raw = sourceUntil[classId] && typeof sourceUntil[classId] === "object" ? sourceUntil[classId] : {};
+      const clean = {};
+      lockedGameList(normalized.classLockedGameOverride[classId]).forEach(function (id) {
+        const ms = Number(raw[id]);
+        if (ms > 0) clean[id] = ms;
+      });
+      normalized.classLockedGameOverrideUntil[classId] = clean;
+    });
 
     const fallbackAccess = cloneDefaultSettings().classAccess;
     normalized.classAccess = {
@@ -665,10 +678,65 @@
     return String(value || "").split(",").map(function (v) { return v.trim(); }).filter(Boolean);
   }
 
-  function classHasLockedGameOverride(settings, classId, gameId) {
-    if (!["et", "wt"].includes(classId) || !gameId) return false;
+  // Each star remembers when it should switch itself off, so a star that is
+  // forgotten does not keep a game open through later locks.
+  // classLockedGameOverrideUntil = { et: { gameId: epochMs }, wt: {...} }.
+  // A star with no saved time (from before this change) never expires.
+  function lockedGameExpiry(settings, classId, gameId) {
+    const map = settings && settings.classLockedGameOverrideUntil && settings.classLockedGameOverrideUntil[classId];
+    const value = map && typeof map === "object" ? Number(map[gameId]) : 0;
+    return value > 0 ? value : 0;
+  }
+
+  function activeLockedGameList(settings, classId, date) {
+    const nowMs = (date instanceof Date ? date : new Date()).getTime();
+    const raw = settings && settings.classLockedGameOverride ? settings.classLockedGameOverride[classId] : "";
+    return lockedGameList(raw).filter(function (id) {
+      const until = lockedGameExpiry(settings, classId, id);
+      return !until || until > nowMs;
+    });
+  }
+
+  // When a new star should switch itself off: at the end of the lock that is
+  // happening now, or of the next lock later today; otherwise at midnight.
+  function lockedGameExpiryFor(settings, classId, date) {
+    const d = date instanceof Date ? date : new Date();
+    const now = getNewYorkNow(d);
+    const startOfMinute = d.getTime() - (d.getTime() % 60000);
+    const at = function (minutesAhead) { return startOfMinute + minutesAhead * 60000; };
+    const midnight = at(1440 - now.minutes);
     const normalized = normalizeSettings(settings);
-    return lockedGameList(normalized.classLockedGameOverride[classId]).indexOf(String(gameId)) !== -1;
+    const access = normalized.classAccess[classId];
+    if (normalized.siteEnabled === false || !access || access.mode === "locked") return midnight;
+    const ranges = Array.isArray(access.lockWindows[now.day]) ? access.lockWindows[now.day] : [];
+    let best = 0;
+    ranges.forEach(function (range) {
+      const start = timeToMinutes(range.start), end = timeToMinutes(range.end);
+      if (start === end) return; // all-day lock: midnight
+      let ahead = null;
+      if (minuteIsInRange(now.minutes, range)) ahead = (end - now.minutes + 1440) % 1440;
+      else if (start > now.minutes && start < end) ahead = end - now.minutes;
+      if (ahead !== null && ahead > 0 && (!best || ahead < best)) best = ahead;
+    });
+    return best ? at(best) : midnight;
+  }
+
+  function classHasLockedGameOverride(settings, classId, gameId, date) {
+    if (!["et", "wt"].includes(classId) || !gameId) return false;
+    return activeLockedGameList(settings, classId, date).indexOf(String(gameId)) !== -1;
+  }
+
+  // Rewrites one class's stars: drops expired ones, then adds/removes gameId.
+  function writeLockedGames(settings, classId, ids, addId) {
+    const date = new Date();
+    settings.classLockedGameOverride = settings.classLockedGameOverride || { et: "", wt: "" };
+    settings.classLockedGameOverrideUntil = settings.classLockedGameOverrideUntil || {};
+    const oldUntil = settings.classLockedGameOverrideUntil[classId] || {};
+    const until = {};
+    ids.forEach(function (id) { if (oldUntil[id]) until[id] = oldUntil[id]; });
+    if (addId) until[addId] = lockedGameExpiryFor(settings, classId, date);
+    settings.classLockedGameOverride[classId] = ids.join(",");
+    settings.classLockedGameOverrideUntil[classId] = until;
   }
 
   function setClassLockedGame(classId, gameId, keepOpen) {
@@ -676,10 +744,9 @@
     gameId = String(gameId || "").trim();
     if (!gameId) return Promise.reject(new Error("Activity is required."));
     return readOnce().then(function (settings) {
-      settings.classLockedGameOverride = settings.classLockedGameOverride || { et: "", wt: "" };
-      const list = lockedGameList(settings.classLockedGameOverride[classId]).filter(function (id) { return id !== gameId; });
+      const list = activeLockedGameList(settings, classId).filter(function (id) { return id !== gameId; });
       if (keepOpen) list.push(gameId);
-      settings.classLockedGameOverride[classId] = list.join(",");
+      writeLockedGames(settings, classId, list, keepOpen ? gameId : "");
       return save(settings);
     });
   }
@@ -688,8 +755,7 @@
     if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
     const value = String(gameId || "").trim();
     return readOnce().then(function (settings) {
-      settings.classLockedGameOverride = settings.classLockedGameOverride || { et: "", wt: "" };
-      settings.classLockedGameOverride[classId] = value;
+      writeLockedGames(settings, classId, lockedGameList(value), value);
       return save(settings);
     });
   }
@@ -1083,6 +1149,8 @@
     studentHasGameOverride: studentHasGameOverride,
     updateClassLockedGameOverride: updateClassLockedGameOverride,
     classHasLockedGameOverride: classHasLockedGameOverride,
+    activeLockedGameList: activeLockedGameList,
+    lockedGameExpiry: lockedGameExpiry,
     setClassLockedGame: setClassLockedGame,
     lockedGameList: lockedGameList,
     updateClassMode: updateClassMode,

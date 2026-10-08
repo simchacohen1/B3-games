@@ -43,7 +43,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}.student
 .cp-games{background:#fff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden}
 .cp-games-head{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;border-bottom:1px solid #e2e8f0;font-weight:900;color:#334155}
 .cp-games-head span{font-size:12px;color:#64748b;font-weight:700}
-.cp-row{display:grid;grid-template-columns:44px minmax(0,1fr) 118px;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid #f1f5f9}
+.cp-row{display:grid;grid-template-columns:44px minmax(0,1fr) 132px;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid #f1f5f9}
 .cp-row:first-of-type{border-top:0}
 .cp-name{font-weight:800;font-size:16px;color:#1f2937;overflow:hidden;text-overflow:ellipsis}
 .cp-name small{display:block;font-size:11px;color:#b45309;font-weight:800}
@@ -51,6 +51,10 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}.student
 .cp-toggle{border:0;border-radius:999px;padding:11px 8px;font-size:15px;font-weight:900;cursor:pointer}
 .cp-toggle.open{background:#dcfce7;color:#166534}.cp-toggle.closed{background:#fee2e2;color:#991b1b}
 .cp-row button:disabled,.cp-modes button:disabled{opacity:.5;cursor:wait}
+.cp-cls{display:inline-block;border-radius:6px;padding:1px 6px;margin-right:6px;font-size:12px;font-weight:900;color:#fff;vertical-align:2px}
+.cp-cls.et{background:#2563eb}.cp-cls.wt{background:#9333ea}
+.cp-wrap.cls-et .cp-games{border-left:6px solid #2563eb}.cp-wrap.cls-wt .cp-games{border-left:6px solid #9333ea}
+.cp-wrap.cls-et .cp-modes button.on{background:#2563eb;border-color:#2563eb}.cp-wrap.cls-wt .cp-modes button.on{background:#9333ea;border-color:#9333ea}
 .cp-msg{min-height:22px;margin-top:10px;font-weight:800;color:#475569;text-align:center}
 </style>
 </head>
@@ -188,27 +192,29 @@ function renderOwnerControl(){
   const panel=document.getElementById("ownerControlPanel"),api=cpApi();
   if(!cpSettings||!api){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">Loading your classes…</div></div>';return}
   const s=cpSettings,cls=cpClass,info=api.describeClassAccess(s,cls),access=s.classAccess?.[cls]||{mode:"auto"};
-  const stars=String(s.classLockedGameOverride?.[cls]||"").split(",").map(v=>v.trim()).filter(Boolean);
+  const stars=api.activeLockedGameList?api.activeLockedGameList(s,cls):String(s.classLockedGameOverride?.[cls]||"").split(",").map(v=>v.trim()).filter(Boolean);
+  const starUntil=id=>{const ms=api.lockedGameExpiry?api.lockedGameExpiry(s,cls,id):0;return ms?" · until "+new Date(ms).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}):""};
   let detail;
   if(s.siteEnabled===false)detail="Emergency lock is on";
   else if(access.mode==="open")detail="Opened by you · stays open until you press Automatic";
   else if(access.mode==="locked")detail="Locked by you · stays locked until you press Automatic";
   else detail="Following recess schedule · "+cpNextChange(access.lockWindows,!info.open);
   const tabsHtml=CP_CLASSES.map(c=>{const o=api.isClassOpen(s,c.id);return '<button type="button" data-cp-class="'+c.id+'" class="'+(c.id===cls?"on":"")+'"><span class="cp-dot '+(o?"open":"locked")+'"></span>'+c.name+'</button>'}).join("");
-  const modes=[["auto","⏰ Automatic"],["open","🔓 Open now"],["locked","🔒 Lock now"]].map(([m,l])=>'<button type="button" data-cp-mode="'+m+'" class="'+(access.mode===m?"on":"")+'"'+(cpBusy?" disabled":"")+'>'+l+'</button>').join("");
+  const CL=cls.toUpperCase(),badge='<span class="cp-cls '+cls+'">'+CL+'</span>';
+  const modes=[["auto","⏰ "+CL+" Automatic"],["open","🔓 Open "+CL+" now"],["locked","🔒 Lock "+CL+" now"]].map(([m,l])=>'<button type="button" data-cp-mode="'+m+'" class="'+(access.mode===m?"on":"")+'"'+(cpBusy?" disabled":"")+'>'+l+'</button>').join("");
   const games=cpGames().filter(g=>s.games?.[g.id]!==false);
   const rows=games.map(g=>{
     const open=s.classGames?.[cls]?.[g.id]!==false,starred=stars.includes(g.id);
-    const note=starred?(info.open?"⭐ stays open during lock":"⭐ open now even though class is locked"):"";
-    return '<div class="cp-row"><button type="button" class="cp-star'+(starred?" on":"")+'" data-cp-star="'+cpEsc(g.id)+'" title="'+(starred?"Remove star":"Keep this game open while the class is locked")+'" aria-label="Star '+cpEsc(g.name)+'"'+(cpBusy?" disabled":"")+'>⭐</button>'
-      +'<div class="cp-name">'+cpEsc(g.name)+(note?'<small>'+note+'</small>':"")+'</div>'
-      +'<button type="button" class="cp-toggle '+(open?"open":"closed")+'" data-cp-game="'+cpEsc(g.id)+'"'+(cpBusy?" disabled":"")+'>'+(open?"✅ Open":"⛔ Closed")+'</button></div>';
+    const note=starred?(info.open?"⭐ stays open during lock":"⭐ open now even though class is locked")+starUntil(g.id):"";
+    return '<div class="cp-row"><button type="button" class="cp-star'+(starred?" on":"")+'" data-cp-star="'+cpEsc(g.id)+'" title="'+(starred?"Remove "+CL+" star":"Keep this game open for "+CL+" while "+CL+" is locked")+'" aria-label="Star '+cpEsc(g.name)+' for '+CL+'"'+(cpBusy?" disabled":"")+'>⭐</button>'
+      +'<div class="cp-name">'+badge+cpEsc(g.name)+(note?'<small>'+note+'</small>':"")+'</div>'
+      +'<button type="button" class="cp-toggle '+(open?"open":"closed")+'" data-cp-game="'+cpEsc(g.id)+'"'+(cpBusy?" disabled":"")+'>'+(open?"✅ "+CL+" Open":"⛔ "+CL+" Closed")+'</button></div>';
   }).join("");
-  panel.innerHTML='<div class="cp-wrap"><div class="cp-switch">'+tabsHtml+'</div>'
+  panel.innerHTML='<div class="cp-wrap cls-'+cls+'"><div class="cp-switch">'+tabsHtml+'</div>'
     +(s.siteEnabled===false?'<div class="cp-emergency"><span>🚨 Emergency lock is ON — every class is locked.</span><button type="button" id="cpEmergencyOff">Turn emergency lock off</button></div>':"")
     +'<div class="cp-status '+(info.open?"open":"locked")+'"><div>'+(info.open?"✅ "+cls.toUpperCase()+" is OPEN":"🔒 "+cls.toUpperCase()+" is LOCKED")+'<small>'+cpEsc(detail)+'</small></div></div>'
     +'<div class="cp-modes">'+modes+'</div>'
-    +'<div class="cp-games"><div class="cp-games-head">Games for '+cls.toUpperCase()+'<span>Tap to open/close · ⭐ = stays open during lock</span></div>'+(rows||'<div class="cp-row"><div></div><div class="cp-name">No games yet.</div><div></div></div>')+'</div>'
+    +'<div class="cp-games"><div class="cp-games-head">Games for '+cls.toUpperCase()+'<span>Tap to open/close · ⭐ = stays open during lock (turns itself off when the lock ends)</span></div>'+(rows||'<div class="cp-row"><div></div><div class="cp-name">No games yet.</div><div></div></div>')+'</div>'
     +'<div class="cp-msg" id="cpMsg">'+cpEsc(cpMsg)+'</div></div>';
   panel.querySelectorAll("[data-cp-class]").forEach(b=>b.onclick=()=>{cpClass=b.dataset.cpClass;cpMsg="";try{localStorage.setItem("b3ControlClass",cpClass)}catch(e){}renderOwnerControl()});
   panel.querySelectorAll("[data-cp-mode]").forEach(b=>b.onclick=()=>cpSave(()=>api.updateClassMode(cls,b.dataset.cpMode),{auto:"Back on the recess schedule ✓",open:cls.toUpperCase()+" opened ✓",locked:cls.toUpperCase()+" locked ✓"}[b.dataset.cpMode]));
@@ -216,7 +222,7 @@ function renderOwnerControl(){
     cpSave(async()=>{await api.updateClassGameEnabled(cls,id,!open);if(open&&stars.includes(id))await api.setClassLockedGame(cls,id,false);},name+(open?" closed":" opened")+" for "+cls.toUpperCase()+" ✓")});
   panel.querySelectorAll("[data-cp-star]").forEach(b=>b.onclick=()=>{const id=b.dataset.cpStar,name=games.find(g=>g.id===id)?.name||id;
     if(stars.includes(id))return cpSave(()=>api.setClassLockedGame(cls,id,false),name+" will lock with the class ✓");
-    cpSave(async()=>{if(s.classGames?.[cls]?.[id]===false)await api.updateClassGameEnabled(cls,id,true);await api.setClassLockedGame(cls,id,true);},name+" will stay open during lock ✓");});
+    cpSave(async()=>{if(s.classGames?.[cls]?.[id]===false)await api.updateClassGameEnabled(cls,id,true);await api.setClassLockedGame(cls,id,true);},name+" will stay open until this lock ends ✓");});
   const em=document.getElementById("cpEmergencyOff");if(em)em.onclick=()=>{if(confirm("Turn the emergency lock off? Classes go back to their normal settings."))cpSave(()=>api.updateSiteEnabled(true),"Emergency lock off ✓")};
 }
 async function cpSave(fn,okMsg){
