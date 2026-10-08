@@ -190,3 +190,8 @@ body.teacher-view #stage:fullscreen #exitFullScreenLesson,body.teacher-view #sta
 body.student-dock-view .student-tool-card,body.student-dock-view .lesson-actions{display:none}
 body.student-dock-view #stage:fullscreen #exitFullScreenLesson,body.student-dock-view #stage.lesson-fullscreen #exitFullScreenLesson{display:none!important}
 .teacher-dock.floating.collapsed .tb-group:last-child [id$="tbFullscreen"]{display:inline-flex}
+
+.tab-controls{display:inline-flex;flex-wrap:wrap;gap:8px}
+.tab-controls[hidden]{display:none}
+#tabScroll[aria-pressed="true"]{background:#e8f0ff;color:#1f4fbf;border-color:#1f4fbf}
+#stage.tab-scrolling{outline:3px dashed #1f4fbf;outline-offset:-3px}

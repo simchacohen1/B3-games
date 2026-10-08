@@ -4,6 +4,7 @@ const room=new URL(location.href).searchParams.get('room'),isTeacher=!room;   co
    if((isTeacher&&entry!=='teacher')||(!isTeacher&&entry!=='student')){document.body.innerHTML='<main style="padding:2rem;font:1rem system-ui">Open Class Pointer from Fun Torah Tools.</main>';throw Error('Class Pointer must be opened from the dashboard.')}
 const members=new Map();
 let peer=null,teacherConnection=null,screen=null,mediaCall=null,viewportController=null,state={sharing:false,mode:'nobody',members:[],points:{}},started=false,admitted=false,joining=false,joinTimer=null;
+let captureControl=null,tabScrollOn=false;
 let generation=0,colorIndex=0,pendingPoint=null,hoverTimer=null,lastHover=0;
 const pointerNodes=new Map();
 const highlightStore=new C.HighlightStore();let highlighter=null;
@@ -161,17 +162,57 @@ function stopSharing(){
   const oldViewport=viewportController;viewportController=null;const oldScreen=screen;screen=null;
   oldViewport?.stop();oldScreen?.getTracks().forEach(track=>track.stop());
   for(const member of members.values()){clearStudentHover(member);member.call?.close();member.call=null;member.videoReady=false;clearTimeout(member.mediaTimer)}
-  state.sharing=false;state.points={};$('lesson').srcObject=null;$('placeholder').hidden=false;$('stopScreen').disabled=true;$('shareScreen').disabled=!started;publish();
+  resetTabControls();state.sharing=false;state.points={};$('lesson').srcObject=null;$('placeholder').hidden=false;$('stopScreen').disabled=true;$('shareScreen').disabled=!started;publish();
 }
 function resetOverlaysForViewChange(){
   cancelHover();highlighter?.cancel();state.points={};highlightStore.reset();publishHighlights();publish();
+}
+// Captured Surface Control (Chrome 136+): scroll and zoom a shared *tab* from this page.
+function tabControlSupported(controller,captured){
+  return !!controller&&typeof controller.forwardWheel==='function'&&captured.getVideoTracks()[0]?.getSettings?.().displaySurface==='browser';
+}
+function setupTabControls(controller,captured){
+  if(!isTeacher||!tabControlSupported(controller,captured)){resetTabControls();return}
+  captureControl=controller;tabScrollOn=false;$('tabControls').hidden=false;updateTabControls();
+  controller.addEventListener?.('zoomlevelchange',updateTabControls);
+}
+function resetTabControls(){
+  const old=captureControl;captureControl=null;tabScrollOn=false;
+  if(old)old.forwardWheel(null).catch(()=>{});
+  const box=$('tabControls');if(box){box.hidden=true;updateTabControls()}
+}
+function updateTabControls(){
+  const on=!!captureControl&&tabScrollOn,btn=$('tabScroll');if(!btn)return;
+  btn.textContent=on?'🖱 Scroll tab: on':'🖱 Scroll tab: off';btn.setAttribute('aria-pressed',String(on));
+  $('stage').classList.toggle('tab-scrolling',on);
+  let level=null;try{level=captureControl?.zoomLevel??null}catch(_){}
+  const levels=window.CaptureController?.getSupportedZoomLevels?.()||[];
+  $('tabZoomOut').disabled=!captureControl||(level!=null&&levels.length&&level<=levels[0]);
+  $('tabZoomIn').disabled=!captureControl||(level!=null&&levels.length&&level>=levels[levels.length-1]);
+  if(level!=null)$('tabZoomIn').title='Zoom the shared tab in (now '+level+'%)';
+}
+function tabControlError(error){
+  fail(error?.name==='NotAllowedError'?'Chrome did not allow controlling the shared tab. Click the button again and choose Allow.':'Could not control the shared tab. Try sharing a Chrome tab (not a window or whole screen).');
+}
+async function toggleTabScroll(){
+  if(!captureControl)return;clearError();
+  try{
+    if(tabScrollOn){await captureControl.forwardWheel(null);tabScrollOn=false;status('Scroll tab is off. The mouse wheel no longer moves the shared tab.')}
+    else{await captureControl.forwardWheel($('stage'));tabScrollOn=true;status('Scroll tab is on. Use your mouse wheel over the lesson to scroll the shared tab.')}
+  }catch(error){tabScrollOn=false;tabControlError(error)}
+  updateTabControls();
+}
+async function zoomTab(direction){
+  if(!captureControl)return;clearError();
+  try{await(direction>0?captureControl.increaseZoomLevel():captureControl.decreaseZoomLevel())}catch(error){tabControlError(error)}
+  updateTabControls();
 }
 async function shareScreen(){
   clearError();if(!navigator.mediaDevices?.getDisplayMedia){fail('Use Chrome or Edge on a computer to share your teaching screen.');return}
   $('shareScreen').disabled=true;const currentPeer=peer;let captured=null,processor=null,outgoing=null;
   try{
     // Keep the teacher on the Class Pointer page after picking a tab/window to share (Chrome/Edge 109+).
-    let captureController=null;
+    let captureController=null;captureControl=null;
     if(typeof window.CaptureController==='function'){try{captureController=new CaptureController();captureController.setFocusBehavior?.('no-focus-change')}catch(_){captureController=null}}
     const displayOptions={video:{width:{ideal:2560},height:{ideal:1440},frameRate:{ideal:8,max:10}},audio:false};
     if(captureController)displayOptions.controller=captureController;
@@ -183,7 +224,7 @@ async function shareScreen(){
       viewportController=processor;outgoing=processor.stream||captured;
     }else outgoing=captured;
     screen=outgoing;generation++;state.sharing=true;state.points={};$('lesson').srcObject=screen;$('placeholder').hidden=true;$('stopScreen').disabled=false;
-    captured.getVideoTracks()[0]?.addEventListener('ended',()=>{if(screen===outgoing)stopSharing()},{once:true});
+    setupTabControls(captureController,captured);captured.getVideoTracks()[0]?.addEventListener('ended',()=>{if(screen===outgoing)stopSharing()},{once:true});
     await $('lesson').play();if(screen!==outgoing)return;publish();for(const member of members.values())if(member.admitted)callStudent(member);
     status(viewportController?.active?'Teaching screen is sharing. Use Choose shared area, Zoom +, and Move view to focus the lesson.':'Teaching screen is sharing. Move your mouse over the picture to point as Teacher.');
   }catch(error){
@@ -276,6 +317,7 @@ $('clearTeacher').addEventListener('click',()=>{cancelHover();delete state.point
 $('clearAll').addEventListener('click',()=>{cancelHover();state.points={};publish()});
 $('copyLink').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('joinLink').value);status('Join link copied. Send it to your students.')}catch{$('joinLink').select();status('Select and copy the student join link.')}});
 $('startClass').addEventListener('click',startClass);$('endClass').addEventListener('click',endClass);$('shareScreen').addEventListener('click',shareScreen);$('stopScreen').addEventListener('click',stopSharing);
+if($('tabScroll')){$('tabScroll').addEventListener('click',toggleTabScroll);$('tabZoomIn').addEventListener('click',()=>zoomTab(1));$('tabZoomOut').addEventListener('click',()=>zoomTab(-1))}
 $('joinForm').addEventListener('submit',joinClass);$('leaveClass').addEventListener('click',leaveClass);
 new ResizeObserver(drawPointers).observe($('stage'));$('lesson').addEventListener('loadedmetadata',drawPointers);$('lesson').addEventListener('resize',drawPointers);
 function publishHighlights(){highlighter?.receive(highlightStore.strokes);for(const member of members.values())if(member.admitted)send(member.connection,{type:'highlights',strokes:highlightStore.strokes})}
