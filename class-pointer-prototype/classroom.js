@@ -210,7 +210,7 @@ async function zoomTab(direction){
 }
 async function captureBrowserTab(){
   if(!started)return;
-  if(!navigator.mediaDevices?.getDisplayMedia){fail('Use Chrome or Edge on a computer to capture a browser tab.');return}
+  if(!navigator.mediaDevices?.getDisplayMedia){fail('Use Chrome or Edge on a computer to capture a tab, window, or screen.');return}
   clearError();$('openBrowserTab').disabled=true;
   let stream=null,video=null;
   try{
@@ -223,21 +223,21 @@ async function captureBrowserTab(){
     // Chrome/Edge may otherwise switch focus to the source tab after Share.
     try{controller?.setFocusBehavior?.('focus-capturing-application')}catch(_){try{controller?.setFocusBehavior?.('no-focus-change')}catch(__){}}
     const track=stream.getVideoTracks()[0];
-    if(track?.getSettings?.().displaySurface!=='browser')throw Error('Choose a browser tab (not a window or screen), then try again.');
+    if(!track)throw Error('No screen or window was selected.');
     video=document.createElement('video');video.muted=true;video.playsInline=true;video.srcObject=stream;
     await video.play();
     if(!video.videoWidth||!video.videoHeight)await new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>reject(Error('The browser tab did not provide a picture.')),7000);
+      const timer=setTimeout(()=>reject(Error('The selected source did not provide a picture.')),7000);
       video.addEventListener('loadeddata',()=>{clearTimeout(timer);resolve()},{once:true});
     });
-    if(!video.videoWidth||!video.videoHeight)throw Error('The selected tab is not ready to capture.');
+    if(!video.videoWidth||!video.videoHeight)throw Error('The selected source is not ready to capture.');
     const width=Math.min(1800,video.videoWidth),height=Math.round(width*video.videoHeight/video.videoWidth);
     const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
     canvas.getContext('2d',{alpha:false}).drawImage(video,0,0,width,height);
     const dataUrl=canvas.toDataURL('image/jpeg',0.82);
     track.stop();stream=null;video.srcObject=null;
     await window.ClassPointerPdf.openSnapshot(dataUrl,width,height);
-  }catch(error){fail(error.name==='NotAllowedError'?'Tab capture was canceled.':error.message||'Could not capture the browser tab.')}
+  }catch(error){fail(error.name==='NotAllowedError'?'Capture was canceled.':error.message||'Could not capture the selected source.')}
   finally{stream?.getTracks().forEach(t=>t.stop());if(video)video.srcObject=null;$('openBrowserTab').disabled=!started}
 }
 async function shareScreen(preferTab=false){
