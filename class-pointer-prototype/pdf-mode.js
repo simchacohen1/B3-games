@@ -12,6 +12,8 @@
   const pdfjs=window.pdfjsLib;
 
   let doc=null,docId=null,docName='',bytes=null,lay=null,pageEls=[],rendered=new Map();
+  // Page-by-page mode (big files): the teacher sends page pictures; students keep them in pageUrls.
+  let paged=false,ratiosList=[],pageUrls=new Map(),pageTransfers=new Map(),pageCache=new Map(),pageJobs=new Map(),renderChain=Promise.resolve();
   let zoom=1,W=0,H=0,loadToken=0,strokes=[],draft=null,dragId=null,transfer=null,pendingView=null;
   let renderTimer=0,viewTimer=0,lastViewSent=0,frame=0,quietUntil=0;
 
@@ -52,7 +54,7 @@
   }
 
   // ---------- Layout ----------
-  function notReady(){return !doc||!lay}
+  function notReady(){return !lay}
   function currentView(){
     if(notReady()||!H)return{zoom,top:0,left:0};
     return{zoom,top:P.clamp(scroller.scrollTop/H,0,1),left:W>scroller.clientWidth?P.clamp(scroller.scrollLeft/W,0,1):0};
@@ -111,7 +113,7 @@
   // ---------- Drawing the pages ----------
   function scheduleRender(){clearTimeout(renderTimer);renderTimer=setTimeout(renderVisible,90)}
   function renderVisible(){
-    if(notReady())return;
+    if(notReady()||!doc)return;
     const top=scroller.scrollTop,height=scroller.clientHeight,dpr=window.devicePixelRatio||1;
     for(let i=0;i<lay.count;i++){
       const y0=lay.tops[i]*W,y1=y0+lay.heights[i]*W;
@@ -188,12 +190,12 @@
   [toolId,colorId,sizeId].forEach(id=>$(id).addEventListener('change',cancelDraft));
 
   // ---------- Opening and closing ----------
-  async function loadDoc(data){
+  async function loadDoc(data,noCopy){
     if(!pdfjs)throw new Error('The PDF reader could not load. Refresh the page and try again.');
     pdfjs.GlobalWorkerOptions.workerSrc='vendor/pdf.worker.min.js?v=3.11.174';
     const token=++loadToken;unload(false);loadToken=token;
     // pdf.js takes ownership of the bytes it is given, so give it a copy.
-    const task=pdfjs.getDocument({data:data.slice(),isEvalSupported:false,enableXfa:false});
+    const task=pdfjs.getDocument({data:noCopy?data:data.slice(),isEvalSupported:false,enableXfa:false});
     const loaded=await task.promise;if(token!==loadToken){loaded.destroy();return false}
     const ratios=[];
     for(let i=1;i<=loaded.numPages;i++){
@@ -201,7 +203,7 @@
       ratios.push(Math.round((v.height/v.width)*10000)/10000);
       if(token!==loadToken){loaded.destroy();return false}
     }
-    doc=loaded;lay=P.layout(ratios);zoom=1;
+    doc=loaded;ratiosList=ratios;lay=P.layout(ratios);zoom=1;
     pageEls=ratios.map(()=>{const node=el('div',null,'pdf-page');content.insertBefore(node,ink);return node});
     scroller.hidden=false;stage.classList.add('pdf-open');$('placeholder').hidden=true;
     relayout();scroller.scrollTop=0;scroller.scrollLeft=0;scheduleRender();updateControls();
@@ -211,6 +213,7 @@
     loadToken++;rendered.forEach(item=>item.task?.cancel());rendered.clear();
     pageEls.forEach(node=>node.remove());pageEls=[];
     try{doc?.destroy()}catch(_){}doc=null;lay=null;draft=null;dragId=null;W=H=0;
+    paged=false;ratiosList=[];pageUrls.forEach(url=>URL.revokeObjectURL(url));pageUrls.clear();pageTransfers.clear();pageCache.clear();pageJobs.clear();renderChain=Promise.resolve();
     if(hide){scroller.hidden=true;stage.classList.remove('pdf-open');showNote('');if(nav)nav.hidden=true;drawInk();B.redraw()}
   }
 
@@ -218,16 +221,18 @@
   async function openFile(file){
     if(!isTeacher||!file)return;
     if(!/pdf$/i.test(file.type)&&!/\.pdf$/i.test(file.name)){B.fail('Please choose a PDF file.');return}
-    if(file.size>P.MAX_BYTES){B.fail('That PDF is bigger than 80 MB. Try a smaller copy, or save just the pages you need.');return}
-    B.clearError();showNote('Opening '+file.name+'…');
+    if(file.size>P.PAGED_MAX_BYTES){B.fail('That PDF is bigger than 500 MB. Save just the pages you need as a smaller PDF.');return}
+    const big=file.size>P.SMALL_BYTES;
+    B.clearError();showNote(big?'Opening a large PDF… this can take a little while.':'Opening '+file.name+'…');
     try{
       if(B.sharing())B.stopSharing();
       const data=new Uint8Array(await file.arrayBuffer());
-      const ok=await loadDoc(data);if(!ok)return;
-      bytes=data;docName=P.cleanName(file.name.replace(/\.pdf$/i,''));docId=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());
+      const ok=await loadDoc(data,big);if(!ok)return;
+      paged=big;bytes=big?null:data;docName=P.cleanName(file.name.replace(/\.pdf$/i,''));docId=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());
       showNote('');B.setPdf(true);
-      B.status('PDF open. Students receive it automatically. Use the buttons at the bottom of the lesson to zoom and turn pages.');
-      for(const member of B.members().values())if(member.admitted)sendFile(member);
+      B.status(big?'Large PDF open. Students receive the pages you teach on, so the first page may take a moment.':'PDF open. Students receive it automatically. Use the buttons at the bottom of the lesson to zoom and turn pages.');
+      for(const member of B.members().values())if(member.admitted)deliver(member);
+      if(big)scheduleViewSend(true);
     }catch(error){
       unload(true);bytes=null;docId=null;showNote('');
       B.fail(error&&error.name==='PasswordException'?'That PDF needs a password. Save an unprotected copy and try again.':'Could not open that PDF. Try another copy of the file.');
@@ -235,7 +240,7 @@
   }
   function closePdf(quiet){
     if(!isTeacher){return}
-    const had=!!doc||!!bytes;
+    const had=!!doc;
     if(had)for(const member of B.members().values())B.send(member.connection,{type:'pdf-close'});
     docId=null;bytes=null;unload(true);strokes=[];
     if(had||!quiet)B.setPdf(false);
@@ -257,13 +262,72 @@
     }
     if(docId===token&&connection.open)B.send(connection,{type:'pdf-view',id:token,...currentView()});
   }
+  function deliver(member){if(paged){sendInfo(member);pumpPages(member)}else sendFile(member)}
+  function sendInfo(member){B.send(member.connection,{type:'pdf-info',id:docId,name:docName,ratios:ratiosList})}
+  function wantedPages(){
+    if(notReady()||!H)return[];
+    const view=currentView();
+    return P.pagesNear(lay.count,P.pageAt(lay,view.top),P.pageAt(lay,view.top+scroller.clientHeight/H));
+  }
+  // Teacher: turn one page into a picture (JPEG) once, and reuse it for every student.
+  async function renderJpeg(i,token){
+    if(!doc||token!==docId)throw new Error('closed');
+    const page=await doc.getPage(i+1),base=page.getViewport({scale:1});
+    let scale=P.PAGE_IMAGE_WIDTH/base.width;const pixels=base.width*scale*base.height*scale;if(pixels>14e6)scale*=Math.sqrt(14e6/pixels);
+    const viewport=page.getViewport({scale}),canvas=document.createElement('canvas');
+    canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+    // 'print' intent renders without waiting for screen refreshes, so it keeps working even if this tab is covered or hidden.
+    await page.render({canvasContext:canvas.getContext('2d',{alpha:false}),viewport,intent:'print'}).promise;
+    for(const quality of [0.85,0.65,0.45]){
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',quality));
+      if(blob&&blob.size<=P.PAGE_MAX){canvas.width=0;return new Uint8Array(await blob.arrayBuffer())}
+    }
+    canvas.width=0;throw new Error('page too large');
+  }
+  function pageImage(i){
+    if(pageCache.has(i)){const data=pageCache.get(i);pageCache.delete(i);pageCache.set(i,data);return Promise.resolve(data)}
+    if(pageJobs.has(i))return pageJobs.get(i);
+    const token=docId;
+    const job=renderChain.then(()=>renderJpeg(i,token)).then(data=>{
+      pageJobs.delete(i);
+      if(token===docId){pageCache.set(i,data);while(pageCache.size>40)pageCache.delete(pageCache.keys().next().value)}
+      return data;
+    },error=>{pageJobs.delete(i);throw error});
+    renderChain=job.catch(()=>{});pageJobs.set(i,job);return job;
+  }
+  async function sendPage(connection,token,i,data){
+    const chunks=P.chunkCount(data.length);
+    B.send(connection,{type:'pdf-page-offer',id:token,i,size:data.length,chunks});
+    for(let c=0;c<chunks;c++){
+      if(docId!==token||!connection.open)return false;
+      while(buffered(connection)>1500000){await sleep(40);if(docId!==token||!connection.open)return false}
+      B.send(connection,{type:'pdf-page-chunk',id:token,i,c,data:data.slice(c*P.CHUNK,(c+1)*P.CHUNK)});
+      if(c%16===15)await sleep(0);
+    }
+    return true;
+  }
+  // One sender per student; it keeps going until that student has every page near the teacher's view.
+  async function pumpPages(member){
+    if(!paged||member.pdfPump||!member.connection?.open)return;
+    member.pdfPump=true;const token=docId;
+    if(member.pdfHaveId!==token){member.pdfHave=new Set();member.pdfHaveId=token}
+    try{
+      for(;;){
+        if(docId!==token||!member.connection.open)return;
+        const want=wantedPages().find(i=>!member.pdfHave.has(i));if(want==null)return;
+        const data=await pageImage(want);if(docId!==token||!member.connection.open)return;
+        if(await sendPage(member.connection,token,want,data))member.pdfHave.add(want);else return;
+      }
+    }catch(_){/* page could not be made; the next view change tries again */}
+    finally{member.pdfPump=false}
+  }
   function scheduleViewSend(immediate){
     if(!isTeacher||!docId)return;
     const wait=immediate?0:Math.max(0,90-(Date.now()-lastViewSent));
     clearTimeout(viewTimer);
     viewTimer=setTimeout(()=>{
       lastViewSent=Date.now();const view=currentView();
-      for(const member of B.members().values())if(member.admitted&&member.pdfReady!==false)B.send(member.connection,{type:'pdf-view',id:docId,...view});
+      for(const member of B.members().values())if(member.admitted){B.send(member.connection,{type:'pdf-view',id:docId,...view});if(paged)pumpPages(member)}
     },wait);
   }
 
@@ -290,12 +354,33 @@
         if(transfer.received>=transfer.size)studentFinish();
         else if(message.i%8===0)showNote('Receiving '+transfer.name+'… '+Math.floor(100*transfer.received/transfer.size)+'%');
       }
+    }else if(message.type==='pdf-info'){
+      const info=P.cleanInfo(message);if(!info)return true;
+      studentReset();paged=true;docId=info.id;docName=info.name;ratiosList=info.ratios;lay=P.layout(info.ratios);zoom=1;
+      pageEls=info.ratios.map((_,i)=>{const node=el('div',null,'pdf-page');node.dataset.label='Loading page '+(i+1)+'…';content.insertBefore(node,ink);return node});
+      scroller.hidden=false;stage.classList.add('pdf-open');$('placeholder').hidden=true;showNote('');
+      relayout();if(pendingView&&pendingView.id===docId)applyView(pendingView);
+      B.status('Following your teacher in '+info.name+'. Pages appear as your teacher turns to them.');
+    }else if(message.type==='pdf-page-offer'){
+      if(!paged||!lay)return true;
+      const offer=P.cleanPageOffer(message,{id:docId,count:lay.count});if(!offer)return true;
+      if(pageTransfers.size>=8)pageTransfers.clear();
+      pageTransfers.set(offer.i,{...offer,parts:new Array(offer.chunks),received:0});
+    }else if(message.type==='pdf-page-chunk'){
+      const transfer=Number.isInteger(message.i)?pageTransfers.get(message.i):null;
+      if(paged&&P.acceptPageChunk(transfer,message)&&transfer.received>=transfer.size){pageTransfers.delete(transfer.i);const data=P.assemble(transfer);if(data)showPageImage(transfer.i,data)}
     }else if(message.type==='pdf-view'){
       const view=P.cleanView(message);if(!view||typeof message.id!=='string')return true;
       pendingView={...view,id:message.id};
-      if(doc&&docId===message.id)applyView(view);
+      if(lay&&docId===message.id)applyView(view);
     }else if(message.type==='pdf-close'){studentReset()}
     return true;
+  }
+  function showPageImage(i,data){
+    if(!pageEls[i])return;
+    const url=URL.createObjectURL(new Blob([data],{type:'image/jpeg'})),image=document.createElement('img'),old=pageUrls.get(i);
+    image.alt='';image.draggable=false;image.src=url;pageUrls.set(i,url);
+    pageEls[i].dataset.label='';pageEls[i].replaceChildren(image);if(old)setTimeout(()=>URL.revokeObjectURL(old),2000);
   }
   function studentReset(){transfer=null;pendingView=null;docId=null;unload(true);strokes=[];drawInk()}
 
@@ -305,8 +390,8 @@
     if(open&&file){open.addEventListener('click',()=>file.click());file.addEventListener('change',()=>{const chosen=file.files&&file.files[0];file.value='';if(chosen)openFile(chosen)})}
   }
   window.ClassPointerPdf={
-    active:()=>!!doc&&!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,
-    studentJoined:member=>{if(isTeacher&&docId&&bytes)sendFile(member)},
-    close:closePdf,reset:studentReset,isOpen:()=>!!doc
+    active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,
+    studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
+    close:closePdf,reset:studentReset,isOpen:()=>!!lay
   };
 })();

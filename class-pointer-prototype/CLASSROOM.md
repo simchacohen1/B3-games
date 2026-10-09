@@ -46,7 +46,7 @@ Browser verification uses separate teacher and student tabs, the real PeerJS sig
 
 ## PDF mode
 
-The teacher page has **Open PDF** beside Share teaching screen. The PDF is read in the teacher's browser with pdf.js (vendor/pdf.min.js, legacy build 3.11.174, Apache-2.0) and sent in 64 KB pieces over the existing PeerJS data connection to each admitted student. Nothing is uploaded or stored online. Limit 80 MB; each student downloads the whole file, so a small PDF is faster. Students who join later receive it automatically.
+The teacher page has **Open PDF** beside Share teaching screen. The PDF is read in the teacher's browser with pdf.js (vendor/pdf.min.js, legacy build 3.11.174, Apache-2.0) and sent in 64 KB pieces over the existing PeerJS data connection to each admitted student. Nothing is uploaded or stored online. PDFs up to 25 MB are sent whole to each student. Bigger PDFs (up to 500 MB, for example scanned books) use page-by-page mode: the teacher's browser turns only the pages near the current view (the pages in view, three ahead, one behind) into 2400-px-wide JPEG pictures and sends those; students see the pictures and the first page of a big file may take a moment. Pictures are made with pdf.js print intent so they still work when the teacher tab is hidden. Students who join later receive what they need automatically.
 
 Every browser draws the pages itself (sharp text, right-to-left Hebrew shows as in the file). The teacher's zoom, scroll position and page are copied to students (students follow; they do not scroll). Teacher buttons sit at the bottom of the lesson (so they also work in full screen): Previous, page box + Go, Next, zoom out/in, Fit width, Hide, Close PDF; Ctrl+mouse wheel also zooms.
 

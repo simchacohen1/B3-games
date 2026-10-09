@@ -4,6 +4,8 @@
   // Every page is laid out one width unit wide. The whole PDF is one tall "document" whose
   // vertical position (0..1) is shared by teacher and students, so marks and pointers stay on the words.
   const GAP=0.02,MIN_ZOOM=0.5,MAX_ZOOM=4,MAX_BYTES=80*1024*1024,CHUNK=64*1024;
+  // Files up to SMALL_BYTES are sent whole. Bigger files (up to PAGED_MAX_BYTES) are sent one page picture at a time, only for the pages near the teacher's view.
+  const SMALL_BYTES=25*1024*1024,PAGED_MAX_BYTES=500*1024*1024,PAGE_MAX=8*1024*1024,MAX_PAGES=5000,PAGE_IMAGE_WIDTH=2400;
   const ZOOM_STEPS=[0.5,0.75,1,1.25,1.5,1.75,2,2.5,3,4];
   function clamp(value,low,high){return Math.min(high,Math.max(low,value))}
   function layout(ratios,gap=GAP){
@@ -48,6 +50,34 @@
     if(transfer.received!==transfer.size||transfer.parts.some(part=>!part))return null;
     const out=new Uint8Array(transfer.size);let at=0;for(const part of transfer.parts){out.set(part,at);at+=part.length}return out;
   }
-  const api={GAP,MIN_ZOOM,MAX_ZOOM,MAX_BYTES,CHUNK,ZOOM_STEPS,clamp,layout,pageAt,pageTop,nextZoom,cleanView,cleanName,chunkCount,cleanOffer,acceptChunk,assemble};
+  // Student side checks for page-by-page mode.
+  function cleanInfo(info){
+    if(!info||typeof info.id!=='string'||info.id.length>64||!Array.isArray(info.ratios))return null;
+    const ratios=info.ratios;
+    if(ratios.length<1||ratios.length>MAX_PAGES||!ratios.every(r=>typeof r==='number'&&Number.isFinite(r)&&r>0.05&&r<20))return null;
+    return{id:info.id,name:cleanName(info.name),ratios:ratios.slice()};
+  }
+  function cleanPageOffer(offer,current){
+    if(!offer||!current||offer.id!==current.id||!Number.isInteger(offer.i)||offer.i<0||offer.i>=current.count)return null;
+    const size=Number(offer.size),chunks=Number(offer.chunks);
+    if(!Number.isInteger(size)||size<=0||size>PAGE_MAX||chunks!==chunkCount(size))return null;
+    return{id:offer.id,i:offer.i,size,chunks};
+  }
+  function acceptPageChunk(transfer,message){
+    if(!transfer||!message||message.id!==transfer.id||message.i!==transfer.i||!Number.isInteger(message.c)||message.c<0||message.c>=transfer.chunks)return false;
+    const data=message.data instanceof Uint8Array?message.data:message.data instanceof ArrayBuffer?new Uint8Array(message.data):null;
+    if(!data||data.length>CHUNK||transfer.parts[message.c])return false;
+    transfer.parts[message.c]=data;transfer.received+=data.length;return true;
+  }
+  // Pages the teacher should have sent: the ones in view first, then a few ahead and one behind.
+  function pagesNear(count,first,last,ahead=3,behind=1){
+    const out=[],add=i=>{if(i>=0&&i<count&&!out.includes(i))out.push(i)};
+    first=clamp(first,0,count-1);last=clamp(last,first,count-1);
+    for(let i=first;i<=last;i++)add(i);
+    for(let i=1;i<=ahead;i++)add(last+i);
+    for(let i=1;i<=behind;i++)add(first-i);
+    return out;
+  }
+  const api={SMALL_BYTES,PAGED_MAX_BYTES,PAGE_MAX,MAX_PAGES,PAGE_IMAGE_WIDTH,cleanInfo,cleanPageOffer,acceptPageChunk,pagesNear,GAP,MIN_ZOOM,MAX_ZOOM,MAX_BYTES,CHUNK,ZOOM_STEPS,clamp,layout,pageAt,pageTop,nextZoom,cleanView,cleanName,chunkCount,cleanOffer,acceptChunk,assemble};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ClassPointerPdfCore=api;
 })(typeof window==='undefined'?{}:window);

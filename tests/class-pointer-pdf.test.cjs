@@ -51,3 +51,32 @@ test('classroom.js keeps its permission checks when a PDF is open',()=>{
   assert.ok(src.includes('function live(){return state.sharing||state.pdf===true}'));
   assert.ok(!/message\.type==='point'&&state\.sharing/.test(src));
 });
+
+test('big files: info and page offers are checked, pages are rebuilt exactly',()=>{
+  const info=P.cleanInfo({id:'a',name:'Big',ratios:[1.4,1.5,1.4]});
+  assert.deepEqual(info,{id:'a',name:'Big',ratios:[1.4,1.5,1.4]});
+  assert.equal(P.cleanInfo({id:'a',ratios:[]}),null);assert.equal(P.cleanInfo({id:'a',ratios:['1.4']}),null);
+  assert.equal(P.cleanInfo({id:'a',ratios:[NaN]}),null);assert.equal(P.cleanInfo({id:'a',ratios:new Array(P.MAX_PAGES+1).fill(1.4)}),null);
+  assert.equal(P.cleanInfo({id:5,ratios:[1.4]}),null);assert.equal(P.cleanInfo(null),null);
+  const cur={id:'a',count:3};
+  assert.deepEqual(P.cleanPageOffer({id:'a',i:2,size:150000,chunks:P.chunkCount(150000)},cur),{id:'a',i:2,size:150000,chunks:P.chunkCount(150000)});
+  assert.equal(P.cleanPageOffer({id:'a',i:3,size:10,chunks:1},cur),null);        // page past the end
+  assert.equal(P.cleanPageOffer({id:'b',i:0,size:10,chunks:1},cur),null);        // some other file
+  assert.equal(P.cleanPageOffer({id:'a',i:0,size:P.PAGE_MAX+1,chunks:P.chunkCount(P.PAGE_MAX+1)},cur),null);
+  assert.equal(P.cleanPageOffer({id:'a',i:0,size:10,chunks:5},cur),null);
+  const data=new Uint8Array(P.CHUNK+500).map((_,n)=>n%199),offer=P.cleanPageOffer({id:'a',i:1,size:data.length,chunks:P.chunkCount(data.length)},cur);
+  const t={...offer,parts:new Array(offer.chunks),received:0};
+  assert.equal(P.acceptPageChunk(t,{id:'a',i:0,c:0,data:data.slice(0,5)}),false);   // wrong page
+  assert.equal(P.acceptPageChunk(t,{id:'a',i:1,c:9,data:data.slice(0,5)}),false);
+  assert.equal(P.acceptPageChunk(t,{id:'a',i:1,c:1,data:data.slice(P.CHUNK)}),true);
+  assert.equal(P.acceptPageChunk(t,{id:'a',i:1,c:1,data:data.slice(P.CHUNK)}),false); // no repeats
+  assert.equal(P.acceptPageChunk(t,{id:'a',i:1,c:0,data:data.slice(0,P.CHUNK).buffer}),true);
+  assert.deepEqual(Array.from(P.assemble(t)),Array.from(data));
+});
+test('the teacher sends the pages in view first, then a few ahead and one behind',()=>{
+  assert.deepEqual(P.pagesNear(100,10,11),[10,11,12,13,14,9]);
+  assert.deepEqual(P.pagesNear(5,0,0),[0,1,2,3]);
+  assert.deepEqual(P.pagesNear(5,4,4),[4,3]);
+  assert.deepEqual(P.pagesNear(1,0,0),[0]);
+  assert.ok(P.SMALL_BYTES<P.PAGED_MAX_BYTES);
+});
