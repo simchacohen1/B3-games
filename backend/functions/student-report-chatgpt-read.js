@@ -13,6 +13,16 @@ function constantTimeEqual(a,b){
  return aa.length>0&&aa.length===bb.length&&crypto.timingSafeEqual(aa,bb);
 }
 const number=v=>Number(v)||0;
+function score(v){const n=Number(String(v??"").replace("%",""));return Number.isFinite(n)?n:null;}
+function verdictPercent(collection,index,totalHint){
+ const entries=Object.entries(asObject(collection));
+ if(!entries.length)return null;
+ const correct=entries.filter(([,v])=>String(v?.finalVerdict||v?.verdict||"").toLowerCase()==="correct").length;
+ const max=Math.max(...entries.map(([key,v])=>Number.isInteger(v?.[index])?v[index]:Number(key)||0))+1;
+ return Math.round(correct/Math.max(Number(totalHint)||0,max,entries.length)*100);
+}
+function translation(a){return verdictPercent(a.translationChunkResults,"chunkIndex",a.translationTotal)??score(a.translationScore);}
+function comprehension(a){return verdictPercent(a.questionResults,"questionIndex",a.questionTotal)??score(a.comprehensionScore??a.questionScore);}
 function summarizeStudent(id,name,raw,since){
  const attempts=asObject(raw.attempts), info=asObject(raw.info);
  let posukTries=0, mastered=0, translated=0, understood=0, last=number(info.lastActive);
@@ -23,9 +33,9 @@ function summarizeStudent(id,name,raw,since){
      const timestamp=number(a.timestamp);
      last=Math.max(last,timestamp);
      if(timestamp>=since)posukTries++;
-     read=read||number(a.hebrewFinalScore??a.hebrewScore)>=100;
-     trans=trans||number(a.translationScore)>=100;
-     comp=comp||number(a.comprehensionScore??a.questionScore)>=100;
+     read=read||score(a.hebrewFinalScore??a.hebrewScore)===100;
+     trans=trans||translation(a)===100;
+     comp=comp||comprehension(a)===100;
    }
    if(read)mastered++;if(trans)translated++;if(comp)understood++;
  }
@@ -78,8 +88,9 @@ exports.studentReportChatGPTRead=onRequest({
    const db=admin.database();
    const memberSnap=await db.ref("b3Games/workspaces/"+WS+"/classes/"+cl+"/members").get();
    const members=asObject(memberSnap.val());
+   if(!memberSnap.exists())return res.status(404).json({error:"Class data not found"});
    const ids=Object.keys(members).filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&members[id]&&members[id].active!==false);
-   const quizPath=cl==="et"||cl==="wt"?"b3Quiz":"b3Quiz/classes/"+cl;
+   const quizPath="b3Quiz";
    const q=await db.ref(quizPath).get(),quiz=asObject(q.val());
    const students=await Promise.all(ids.map(async id=>{
      const prefix="posukPractice/";
