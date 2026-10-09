@@ -77,7 +77,7 @@
 
   // Drag handle remains visible even when the dock is collapsed.
   const moveHandle=document.createElement('button');
-  moveHandle.type='button';moveHandle.textContent='⠿ Move';
+  moveHandle.type='button';moveHandle.className='tb-move-handle';moveHandle.textContent='⠿ Move';
   moveHandle.title='Drag to reposition the teaching toolbar';
   moveHandle.setAttribute('aria-label','Drag to move the toolbar');
   moveHandle.style.cssText='order:-1;flex:0 0 auto;cursor:grab;touch-action:none;padding:6px 9px;border-radius:7px';
