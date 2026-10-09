@@ -3,7 +3,7 @@
 // receive passcodes; they send what the student typed and get back only the
 // student's id and name.
 const crypto=require('node:crypto');
-const {clean,key,equal,readPasscode,passcodeWrites}=require('./student-passcodes.cjs');
+const {PRIVATE,clean,key,equal,readPasscode,passcodeWrites}=require('./student-passcodes.cjs');
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code});};
 const normalize=s=>String(s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'');
 const hash=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
@@ -18,7 +18,7 @@ async function rateLimit(store,ip,now){
 async function studentAuth(store,body,ip='unknown',now=Date.now()){
  const get=store.get;
  const action=String(body?.action||'');
- if(action==='login'){
+ if(action==='login'||action==='choosePin'){
   const typed=clean(body.name),pin=clean(body.pin);
   if(!normalize(typed))fail(400,'Please type your name.');
   if(!pin||pin.length>100)fail(400,'Please enter your passcode.');
@@ -42,7 +42,39 @@ async function studentAuth(store,body,ip='unknown',now=Date.now()){
    if(!profile){updates['b3Games/students/'+id+'/profile/id']=id;updates['b3Games/students/'+id+'/profile/name']=name;updates['b3Games/students/'+id+'/profile/active']=true;if(legacy?.classId)updates['b3Games/students/'+id+'/profile/classId']=legacy.classId;}
    await store.update(updates);
   }
-  return {ok:true,id,name,classId:profile?.classId||legacy?.classId||null};
+  if(action==='choosePin'){
+   const next=clean(body.newPin);
+   if(!/^[0-9]{4,8}$/.test(next))fail(400,'Choose a PIN with 4 to 8 numbers.');
+   if(!equal(next,clean(body.confirmPin)))fail(400,'The two new PINs do not match.');
+   if(equal(next,pin)||next==='5770')fail(400,'Choose a new PIN, different from your old one.');
+   // Check legacy accounts too. Private values are rechecked inside a single
+   // transaction so two boys cannot claim the same PIN at the same time.
+   const fallback={};
+   for(const other of new Set([...Object.keys(central||{}),...Object.keys(legacyRows||{})].filter(key))){
+    fallback[other]=(await readPasscode(get,other,{allowLegacyDefault:true})).passcode;
+   }
+   let reason=null;
+   const transaction=await store.tx('b3Private/passcodes',rows=>{
+    // RTDB may first call with an empty local cache; returning a value lets
+    // it retry with the server's current data instead of aborting locally.
+    if(!rows){reason='stale';return {};}
+    reason=null;
+    if(!equal(rows[id]?.passcode,pin)){reason='stale';return undefined;}
+    if(rows[id]?.chosenPinVersion===1){reason='approval';return undefined;}
+    const ids=new Set([...Object.keys(fallback),...Object.keys(rows)]);
+    if([...ids].some(other=>other!==id&&equal(clean(rows[other]?.passcode)||fallback[other],next))){reason='taken';return undefined;}
+    return {...rows,[id]:{...rows[id],passcode:next,updatedAt:now,chosenPinVersion:1}};
+   });
+   if(reason==='stale')fail(401,'Your passcode changed. Please sign in again.');
+   if(reason==='taken')fail(409,'That PIN is already in use. Choose a different PIN.');
+   if(reason==='approval')fail(403,'Ask your teacher to approve a PIN reset before changing your PIN.');
+   if(transaction?.committed===false)fail(409,'Could not save your PIN. Please try again.');
+   // Do not overwrite the private transaction with passcodeWrites here.
+   const updates={['b3Games/students/'+id+'/profile/passcode']:null,['b3Games/students/'+id+'/profile/passcodeUpdatedAt']:now,['posukPractice/allowedStudents/'+id+'/passcode']:null};
+   await store.update(updates);
+  }
+  const privateCode=await get(PRIVATE+id);
+  return {ok:true,id,name,classId:profile?.classId||legacy?.classId||null,requiresPinChange:privateCode?.chosenPinVersion!==1};
  }
  if(action==='verify'){
   const id=clean(body.studentId),pin=clean(body.pin);
@@ -51,7 +83,8 @@ async function studentAuth(store,body,ip='unknown',now=Date.now()){
   if(profile?.active===false)fail(403,'Your access is turned off. Ask your teacher.');
   const code=await readPasscode(get,id,{allowLegacyDefault:true});
   if(!equal(code.passcode,pin))fail(401,'Your passcode changed. Please sign in again.');
-  return {ok:true};
+  const privateCode=await get(PRIVATE+id);
+  return {ok:true,requiresPinChange:privateCode?.chosenPinVersion!==1};
  }
  fail(400,'Unknown action.');
 }

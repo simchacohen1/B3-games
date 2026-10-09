@@ -45,3 +45,45 @@ test('teachers list passcodes only for their own class; owner can list all',asyn
 test('creating a student stores the passcode privately only',async()=>{const d=seed();const r=await manageStudents(d,owner,{action:'create',classId:'et',name:'New Boy',passcode:'4444'});assert.equal(d.tree.b3Private.passcodes[r.studentId].passcode,'4444');assert.equal(d.tree.b3Games.students[r.studentId].profile.passcode,undefined);assert.equal((await readPasscode(d.get,r.studentId)).passcode,'4444')});
 test('an active site administrator can run the owner migration',async()=>{const d=seed();d.tree.b3Games.admins={t:{active:true}};const r=await manageStudents(d,teacher,{action:'migratePasscodes',deletePublic:true});assert.ok(r.ok);d.tree.b3Games.admins.t.active=false;await assert.rejects(manageStudents(d,teacher,{action:'migratePasscodes'}),{code:403})});
 test('homepage sign-in refuses a blocked central profile even with an old-list passcode',async()=>{const d=seed();d.tree.posukPractice.allowedStudents.off={name:'Blocked Boy',passcode:'5555'};await assert.rejects(login(d,'Blocked Boy','5555'));await assert.rejects(login(d,'Blocked Boy','2222'))});
+
+const choose=(d,newPin='4567',extra={})=>studentAuth(d,{action:'choosePin',name:'Moshe Levi',pin:'1111',newPin,confirmPin:newPin,...extra},'1.2.3.4',2000);
+test('every existing boy must choose once, then old PIN is rejected and new PIN restores normally',async()=>{
+ const d=seed();assert.equal((await login(d,'Moshe Levi','1111')).requiresPinChange,true);
+ assert.equal((await studentAuth(d,{action:'verify',studentId:'moshe',pin:'1111'})).requiresPinChange,true);
+ const r=await choose(d);assert.equal(r.requiresPinChange,false);assert.equal(JSON.stringify(r).includes('4567'),false);
+ await assert.rejects(login(d,'Moshe Levi','1111'),{code:401});
+ assert.equal((await login(d,'Moshe Levi','4567')).requiresPinChange,false);
+ assert.equal((await studentAuth(d,{action:'verify',studentId:'moshe',pin:'4567'})).requiresPinChange,false);
+});
+test('choosing a PIN requires the existing credentials and matching 4 to 8 digit PINs',async()=>{
+ const d=seed();await assert.rejects(choose(d,'4567',{pin:'wrong'}),{code:401});
+ for(const pin of ['123','123456789','abcd','1111','5770'])await assert.rejects(choose(d,pin),{code:400});
+ await assert.rejects(choose(d,'4567',{confirmPin:'4568'}),{code:400});
+ assert.equal((await login(d,'Moshe Levi','1111')).requiresPinChange,true);
+});
+test('PINs held in legacy or private storage cannot be selected; error reveals no owner',async()=>{
+ const d=seed();await assert.rejects(choose(d,'3333'),{code:409,message:'That PIN is already in use. Choose a different PIN.'});
+ d.tree.b3Private.passcodes.dovid={passcode:'6789',chosenPinVersion:1};
+ await assert.rejects(choose(d,'6789'),{code:409});
+ assert.equal(d.tree.b3Private.passcodes.moshe.passcode,'1111');
+});
+test('future changes are refused until the teacher approves a reset using a temporary passcode',async()=>{
+ const d=seed();await choose(d);
+ await assert.rejects(choose(d,'5678',{pin:'4567'}),{code:403});
+ await assert.rejects(manageStudents(d,teacher,{action:'passcode',classId:'et',studentId:'moshe',passcode:'8765'}),{code:403});
+ await manageStudents(d,owner,{action:'passcode',classId:'et',studentId:'moshe',passcode:'8765'});
+ assert.equal((await login(d,'Moshe Levi','8765')).requiresPinChange,true);
+ assert.equal((await choose(d,'5678',{pin:'8765'})).requiresPinChange,false);
+ await assert.rejects(choose(d,'6789',{pin:'5678'}),{code:403});
+});
+test('transaction rechecks concurrent PIN reservations and teacher resets',async()=>{
+ const d=seed(),tx=d.tx;let collide=true;
+ d.tx=async(path,fn)=>{if(path==='b3Private/passcodes'&&collide){d.tree.b3Private.passcodes.dovid={passcode:'4567'};collide=false;}return tx(path,fn);};
+ await assert.rejects(choose(d),{code:409});assert.equal(d.tree.b3Private.passcodes.moshe.passcode,'1111');
+ d.tx=async(path,fn)=>{if(path==='b3Private/passcodes')d.tree.b3Private.passcodes.moshe={passcode:'8888'};return tx(path,fn);};
+ await assert.rejects(choose(d,'5678'),{code:401});assert.equal(d.tree.b3Private.passcodes.moshe.passcode,'8888');
+});
+test('empty RTDB local cache is retried before approving the server-side PIN change',async()=>{
+ const d=seed(),tx=d.tx;d.tx=async(path,fn)=>{if(path==='b3Private/passcodes')assert.deepEqual(fn(null),{});return tx(path,fn);};
+ assert.equal((await choose(d)).requiresPinChange,false);
+});

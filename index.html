@@ -207,6 +207,16 @@
     <label for="studentNameInput">Your name</label>
     <input id="studentNameInput" type="text" autocomplete="name" placeholder="First and last name">
     <button id="studentSignInBtn" type="button">Open Fun Torah Tools</button>
+    <div id="choosePinForm" class="hidden">
+      <h3>Choose your own PIN</h3>
+      <p>Choose 4 to 8 numbers that you can remember. Your PIN must be different from everyone else's. Keep it private. After this, ask your teacher if you forget it or need to change it.</p>
+      <label for="newStudentPin">New PIN</label>
+      <input id="newStudentPin" type="password" inputmode="numeric" autocomplete="new-password" minlength="4" maxlength="8" placeholder="4 to 8 numbers">
+      <label for="confirmStudentPin">Type your new PIN again</label>
+      <input id="confirmStudentPin" type="password" inputmode="numeric" autocomplete="new-password" minlength="4" maxlength="8" placeholder="Repeat new PIN">
+      <button id="chooseStudentPinBtn" type="button">Save my PIN and open Fun Torah Tools</button>
+      <button id="cancelStudentPinBtn" type="button">Back to sign in</button>
+    </div>
     <div id="loginMsg" class="login-msg" aria-live="polite"></div>
   </div>
 
@@ -346,6 +356,7 @@
 
       <h3>Class management</h3>
       <p class="admin-message">Choose a class to see its students. Passcodes and access can be managed right from the list.</p>
+      <p class="admin-message">Each boy chooses his own PIN at his next sign-in. For a forgotten PIN or a later change, save a temporary passcode below to approve a reset. Give it privately to the boy; he will choose a new PIN when he signs in.</p>
       <div class="override-box" id="classManagementBox">
         <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
           <div style="flex:1;min-width:180px"><label for="manageClassSelect">Class</label><select id="manageClassSelect" class="override-student-select"></select></div>
@@ -1169,8 +1180,44 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     try{classId=await resolvedStudentClass(r.id,{id:r.id,name:r.name,active:true,classId:r.classId||legacyMigrationClass(r.id)});}
     catch(e){return{ok:false,reason:e.message||"The connection is slow. Please try again."}}
     if(!classId)return{ok:false,reason:"Your class is not assigned yet. Ask your teacher."};
-    return{ok:true,id:r.id,name:r.name,classId};
+    return{ok:true,id:r.id,name:r.name,classId,requiresPinChange:r.requiresPinChange===true};
   }
+
+  let pendingPinLogin=null;
+  function resetPinForm(){
+    pendingPinLogin=null;
+    el("choosePinForm").classList.add("hidden");
+    el("studentSignInBtn").classList.remove("hidden");
+    el("studentNameInput").disabled=false;el("classPinInput").disabled=false;
+    el("newStudentPin").value="";el("confirmStudentPin").value="";
+  }
+  function showPinChoice(r,pin){
+    pendingPinLogin={...r,pin};
+    showLogin();
+    el("choosePinForm").classList.remove("hidden");
+    el("studentSignInBtn").classList.add("hidden");
+    el("studentNameInput").value=r.name;el("studentNameInput").disabled=true;el("classPinInput").disabled=true;
+    setLoginMsg("Before opening your games, choose your own new PIN.");
+    el("newStudentPin").focus();
+  }
+  async function chooseStudentPin(){
+    const btn=el("chooseStudentPinBtn"),pending=pendingPinLogin;
+    if(!pending||btn.disabled)return;
+    const next=el("newStudentPin").value.trim(),confirm=el("confirmStudentPin").value.trim();
+    if(!/^[0-9]{4,8}$/.test(next)){setLoginMsg("Choose a PIN with 4 to 8 numbers.");return;}
+    if(next!==confirm){setLoginMsg("The two new PINs do not match.");return;}
+    btn.disabled=true;el("cancelStudentPinBtn").disabled=true;setLoginMsg("Saving your new PIN…");
+    try{
+      const r=await studentAuthCall({action:"choosePin",name:pending.name,pin:pending.pin,newPin:next,confirmPin:confirm});
+      sessionStorage.setItem("b3Games_classPin",next);
+      el("classPinInput").value="";resetPinForm();
+      await enterStudent({...pending,...r,classId:pending.classId});setLoginMsg("");
+    }catch(e){setLoginMsg(e.message);}
+    finally{btn.disabled=false;el("cancelStudentPinBtn").disabled=false;}
+  }
+  el("chooseStudentPinBtn").addEventListener("click",chooseStudentPin);
+  el("cancelStudentPinBtn").addEventListener("click",()=>{resetPinForm();el("classPinInput").value="";setLoginMsg("");});
+  el("confirmStudentPin").addEventListener("keydown",e=>{if(e.key==="Enter")chooseStudentPin();});
 
   let studentClassWatch=null,studentProfileWatch=null,studentMembershipWatch=null;
   let studentAccessRevoked=false;
@@ -1208,12 +1255,14 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   async function studentSignIn(){
+    if(pendingPinLogin)return;
     const btn=el("studentSignInBtn");
     if(btn.disabled)return;
     btn.disabled=true;setLoginMsg("Checking…");
     try{
       const r=await checkStudentAccess(el("studentNameInput").value,el("classPinInput").value);
       if(!r.ok){setLoginMsg(r.reason);return;}
+      if(r.requiresPinChange){showPinChoice(r,el("classPinInput").value.trim());return;}
       sessionStorage.setItem("b3Games_classPin",el("classPinInput").value.trim());
       setLoginMsg("Opening your games…");await enterStudent(r);setLoginMsg("");
     }catch(e){console.error(e);setLoginMsg(e&&e.message?e.message:"Could not check your login. Try again.");}
@@ -1242,7 +1291,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       if(!isStudentPreview){
         const saved=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
         let stale=!saved;
-        if(saved){try{await studentAuthCall({action:"verify",studentId:id,pin:saved});}catch(e){stale=e.status===401||e.status===403;}}
+        if(saved){try{const verified=await studentAuthCall({action:"verify",studentId:id,pin:saved});stale=verified.requiresPinChange===true;}catch(e){stale=e.status===401||e.status===403;}}
         if(isAuthorizedTeacher)return;
         if(stale){
           sessionStorage.removeItem("b3Games_classPin");
@@ -1258,6 +1307,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   function switchStudent(){
+    resetPinForm();
     studentAccessRevoked=false;
     if(studentMembershipWatch)studentMembershipWatch.off();
     if(studentClassWatch)studentClassWatch.off();
