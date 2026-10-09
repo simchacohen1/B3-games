@@ -228,3 +228,13 @@ body.student-dock-view #stage:fullscreen #exitFullScreenLesson,body.student-dock
 .pdf-page[data-label]:not([data-label='']):before{content:attr(data-label);position:absolute;inset:0;display:grid;place-items:center;color:#7b8498;font-size:22px;font-weight:700}
 #pdfNav .pdf-btn.on{background:#2557d6;color:#fff;border-color:#7ba2ff}
 #pdfNav .pdf-btn[hidden]{display:none}
+.lesson-webpage{position:absolute;left:0;top:0;border:0;transform-origin:top left;pointer-events:none;background:white}
+.webpage-measure{position:fixed;left:-20000px;top:0;visibility:hidden;transform:none}
+#webpageDialog{max-width:620px;width:calc(100% - 40px);border:1px solid #cbd5e1;border-radius:16px;padding:24px;color:#172033}
+#webpageDialog::backdrop{background:#17203399}
+#webpageDialog input[type=url]{display:block;width:100%;margin:8px 0 16px;box-sizing:border-box}
+#webpageDialog p{font-size:14px;line-height:1.5;color:#56637a}
+#pdfNav [hidden]{display:none!important}
+#stage.mouse-navigation #pdfView,#stage.mouse-navigation #pdfContent{cursor:grab}
+#stage.mouse-navigation #pdfContent:active{cursor:grabbing}
+#navigationHint{margin:8px 0;font-size:14px}

@@ -6,6 +6,7 @@ const members=new Map();
 let peer=null,teacherConnection=null,screen=null,mediaCall=null,viewportController=null,state={sharing:false,mode:'nobody',members:[],points:{}},started=false,admitted=false,joining=false,joinTimer=null;
 let captureControl=null,tabScrollOn=false;
 let generation=0,colorIndex=0,pendingPoint=null,hoverTimer=null,lastHover=0;
+let navigating=false;
 const pointerNodes=new Map();
 const highlightStore=new C.HighlightStore();let highlighter=null;
 const pointerIcons={
@@ -23,7 +24,7 @@ function ownMember(){return state.members.find(member=>member.id==='student:'+pe
 function allowed(){return isTeacher||C.canPoint(state.mode,ownMember())}
 function writingAllowed(){return isTeacher||C.canWrite(state.mode,ownMember())}
 function pointerPermission(){
-  const mayPoint=allowed(),mayWrite=writingAllowed();$('stage').style.cursor=mayPoint?'crosshair':'not-allowed';
+  const mayPoint=allowed(),mayWrite=writingAllowed();$('stage').style.cursor=navigating?'default':mayPoint?'crosshair':'not-allowed';
   if(!mayPoint){cancelHover();highlighter?.cancel()}
   if(!isTeacher){
     const tool=$('studentTool');if(tool){for(const option of tool.options)if(C.highlightTools.includes(option.value))option.disabled=!mayWrite;if(!mayWrite&&C.highlightTools.includes(tool.value)){tool.value='target';tool.dispatchEvent(new Event('change',{bubbles:true}))}}
@@ -260,7 +261,7 @@ function joinClass(event){
       if(message.type==='waiting'){clearTimeout(joinTimer);joining=false;$('joinForm').hidden=true;$('leaveClass').hidden=false;status('Connected. Waiting for your teacher to admit you.');pointerPermission()}
       if(message.type==='state'){
         clearTimeout(joinTimer);joining=false;admitted=true;$('joinForm').hidden=true;$('leaveClass').hidden=false;state=message.state;
-        if(!live()){highlighter?.cancel();highlighter?.receive([]);clearStudentVideo();window.ClassPointerPdf?.reset()}else if(!state.sharing)clearStudentVideo();status(state.sharing?'Class connected.':state.pdf?'Class connected. Following your teacher in the PDF.':'Admitted. Waiting for the teaching screen.');pointerPermission();drawPointers();
+        if(!live()){highlighter?.cancel();highlighter?.receive([]);clearStudentVideo();window.ClassPointerPdf?.reset()}else if(!state.sharing)clearStudentVideo();status(state.sharing?'Class connected.':state.pdf?'Class connected. Following your teacher in the '+(state.documentKind==='webpage'?'webpage.':'PDF.'):'Admitted. Waiting for the teaching screen.');pointerPermission();drawPointers();
       }
       if(['ended','removed','full'].includes(message.type)){leaveClass();fail(message.type==='ended'?'Your teacher ended the class.':message.type==='full'?'This first test supports up to 12 students.':'Your teacher removed you from the class.')}
     });
@@ -282,12 +283,12 @@ function hideOwnPointer(){
   if(isTeacher){if(state.points.teacher){delete state.points.teacher;publish()}}else send(teacherConnection,{type:'pointer-hide'});
 }
 function sendHover(){
-  hoverTimer=null;const point=pendingPoint;pendingPoint=null;if(!point||!live()||!allowed())return;
+  hoverTimer=null;const point=pendingPoint;pendingPoint=null;if(navigating||!point||!live()||!allowed())return;
   lastHover=Date.now();
   if(isTeacher){state.points.teacher=point;publish()}else send(teacherConnection,{type:'point',point});
 }
 function pointAt(event,immediate=false){
-  if(!live())return;
+  if(navigating||!live())return;
   if(!allowed()){if(immediate)$('pointerStatus').textContent='Your teacher has not enabled your pointer.';return}
   const pdfOpen=window.ClassPointerPdf?.active();const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=pdfOpen?{left:0,top:0,w:1,h:1}:C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight);if(!box)return;
   const pdfPoint=pdfOpen?window.ClassPointerPdf.normalized(event):null;if(pdfOpen&&!pdfPoint){hideOwnPointer();return}
@@ -326,7 +327,7 @@ function publishHighlights(){highlighter?.receive(highlightStore.strokes);for(co
 function submitStroke(stroke){if(isTeacher){if(highlightStore.add('teacher',stroke))publishHighlights();else fail('Highlight limit reached. Undo or clear some highlights.')}else send(teacherConnection,{type:'highlight',stroke})}
 function live(){return state.sharing||state.pdf===true}
 if(window.createClassHighlighter)highlighter=window.createClassHighlighter({
-  teacher:isTeacher,allowed:writingAllowed,sharing:()=>state.sharing,owner:()=>isTeacher?'teacher':'student:'+peer?.id,
+  teacher:isTeacher,allowed:()=>!navigating&&writingAllowed(),sharing:()=>state.sharing,owner:()=>isTeacher?'teacher':'student:'+peer?.id,
   ownerName:owner=>owner==='teacher'?'Teacher':state.members.find(m=>m.id===owner)?.name||'Student',
   color:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   submit:submitStroke,
@@ -335,9 +336,25 @@ if(window.createClassHighlighter)highlighter=window.createClassHighlighter({
 if(highlighter){const baseReceive=highlighter.receive;highlighter.receive=next=>{baseReceive(next);window.ClassPointerPdf?.setStrokes(next)}}
 // Small, fixed doorway used by PDF mode (pdf-mode.js). Nothing else reaches into this file.
 window.ClassPointerBridge={isTeacher,send,fail,clearError,status,live,allowed,writingAllowed,submitStroke,redraw:drawPointers,members:()=>members,sharing:()=>state.sharing,stopSharing,
+  navigating:()=>navigating,
+  highlights:()=>highlightStore.strokes,
   owner:()=>isTeacher?'teacher':'student:'+peer?.id,ownColor:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
-  setPdf(on){state.pdf=on;state.points={};if(!on){highlightStore.reset();publishHighlights()}publish()},
+  setPdf(on,kind='pdf'){state.pdf=on;state.documentKind=on?kind:null;state.points={};if(!on){highlightStore.reset();publishHighlights()}publish()},
   resetMarks(){state.points={};highlightStore.reset();publishHighlights();publish()}};
+function setNavigation(on){
+  if(navigating===on)return;
+  navigating=on;cancelHover();hideOwnPointer();highlighter?.cancel();
+  $('stage').classList.toggle('mouse-navigation',on);pointerPermission();
+  const hint=$('navigationHint');if(hint)hint.textContent=on?'🖱 Mouse mode — release Shift to return to your tool':'Hold Shift for mouse navigation';
+  document.dispatchEvent(new Event('class-pointer-navigation'));
+}
+document.addEventListener('keydown',event=>{
+  if(event.key!=='Shift'||event.repeat||event.target.closest?.('input,select,textarea,[contenteditable],dialog[open]'))return;
+  setNavigation(true);
+});
+document.addEventListener('keyup',event=>{if(event.key==='Shift'||!event.shiftKey)setNavigation(false)});
+window.addEventListener('blur',()=>setNavigation(false));
+document.addEventListener('visibilitychange',()=>{if(document.hidden)setNavigation(false)});
 $('teacherPanel').hidden=!isTeacher;$('studentPanel').hidden=isTeacher;if(!isTeacher)status('Join your teacher’s class.');
 window.addEventListener('pagehide',()=>{if(isTeacher)endClass();else leaveClass()});
 if(!isTeacher&&new URL(location.href).searchParams.get('dashboard')==='student'){

@@ -10,6 +10,8 @@
   if(!B||!P||!C)return;
   const $=id=>document.getElementById(id),stage=$('stage'),isTeacher=B.isTeacher,ns='http://www.w3.org/2000/svg';
   const pdfjs=window.pdfjsLib;
+  const Web=window.ClassPointerWebpageCore;
+  let webMode=false,opening=0;
 
   let doc=null,docId=null,docName='',bytes=null,lay=null,pageEls=[],rendered=new Map();
   // Page-by-page mode (big files): the teacher sends page pictures; students keep them in pageUrls.
@@ -50,11 +52,15 @@
     shiftBtn=button('◧ Page 1 alone','Show page 1 by itself and start the pairs at page 2',()=>changeLayout({shift:!layoutOpts.shift}),'pdf-btn pdf-spread-only');
     nav.appendChild(el('span',null,'pdf-sep'));
     button('✕ Close PDF','Close the PDF for everyone',()=>closePdf(),'pdf-btn pdf-close');
-    const toggle=button('▾ Hide','Hide these buttons (for example while sharing this tab on Zoom)',()=>{const min=nav.classList.toggle('min');toggle.textContent=min?'▴ PDF controls':'▾ Hide'},'pdf-btn pdf-toggle');
+    const toggle=button('▾ Hide','Hide these buttons (for example while sharing this tab on Zoom)',()=>{const min=nav.classList.toggle('min');toggle.textContent=min?(webMode?'▴ Webpage controls':'▴ PDF controls'):'▾ Hide'},'pdf-btn pdf-toggle');
     ['pointerdown','pointermove','pointerup','pointercancel','click','dblclick','wheel'].forEach(type=>nav.addEventListener(type,event=>event.stopPropagation()));
     stage.appendChild(nav);
     // Ctrl + mouse wheel (or trackpad pinch) zooms the PDF instead of the whole page.
-    scroller.addEventListener('wheel',event=>{if(!doc||!event.ctrlKey)return;event.preventDefault();setZoom(P.nextZoom(zoom,event.deltaY<0?1:-1))},{passive:false});
+    scroller.addEventListener('wheel',event=>{
+      if(!doc)return;
+      if(event.ctrlKey){event.preventDefault();setZoom(P.nextZoom(zoom,event.deltaY<0?1:-1))}
+      else if(event.shiftKey){event.preventDefault();const unit=event.deltaMode===1?16:event.deltaMode===2?scroller.clientHeight:1;scroller.scrollTop+=event.deltaY*unit;scroller.scrollLeft+=event.deltaX*unit}
+    },{passive:false});
   }
 
   // ---------- Layout ----------
@@ -68,6 +74,7 @@
     const cw=Math.max(80,scroller.clientWidth);W=cw*zoom;H=W*lay.total;
     content.style.width=W+'px';content.style.height=H+'px';
     pageEls.forEach((node,i)=>{node.style.top=(lay.tops[i]*W)+'px';node.style.height=(lay.heights[i]*W)+'px';node.style.left=(lay.lefts[i]*W)+'px';node.style.width=(lay.widths[i]*W)+'px'});
+    if(webMode){const iframe=pageEls[0]?.querySelector('iframe');if(iframe)iframe.style.transform='scale('+(W/Web.WIDTH)+')'}
     ink.setAttribute('width',W);ink.setAttribute('height',H);ink.setAttribute('viewBox','0 0 '+W+' '+H);
     drawInk();
   }
@@ -100,11 +107,15 @@
   function updateControls(){
     if(!isTeacher||!nav)return;
     nav.hidden=!doc;if(!doc)return;
+    nav.setAttribute('aria-label',webMode?'Webpage controls':'PDF controls');
+    if(nav.classList.contains('min'))nav.querySelector('.pdf-toggle').textContent=webMode?'▴ Webpage controls':'▴ PDF controls';
+    nav.querySelectorAll('.pdf-jump,.pdf-two,.pdf-spread-only').forEach(node=>node.hidden=webMode);
+    nav.querySelectorAll('button').forEach(node=>{if(node.title==='Previous page'||node.title==='Next page'||node.title==='Jump to this page')node.hidden=webMode;if(node.classList.contains('pdf-close')){node.textContent=webMode?'✕ Close webpage':'✕ Close PDF';node.title=webMode?'Close the webpage for everyone':'Close the PDF for everyone'}});
     pageTotal.textContent=' of '+lay.count;pageInput.max=String(lay.count);
     if(document.activeElement!==pageInput)pageInput.value=String(currentPage()+1);
     zoomLabel.textContent=Math.round(zoom*100)+'%';
     twoBtn.textContent=layoutOpts.spread?'⧉ Two pages: on':'⧉ Two pages';twoBtn.classList.toggle('on',layoutOpts.spread);
-    flipBtn.hidden=shiftBtn.hidden=!layoutOpts.spread;
+    flipBtn.hidden=shiftBtn.hidden=webMode||!layoutOpts.spread;
     flipBtn.textContent=layoutOpts.rtl?'⇄ Page 1 on right':'⇄ Page 1 on left';
     shiftBtn.textContent=layoutOpts.shift?'◧ Page 1 alone: on':'◧ Page 1 alone';shiftBtn.classList.toggle('on',layoutOpts.shift);
   }
@@ -133,7 +144,7 @@
   // ---------- Drawing the pages ----------
   function scheduleRender(){clearTimeout(renderTimer);renderTimer=setTimeout(renderVisible,90)}
   function renderVisible(){
-    if(notReady()||!doc)return;
+    if(notReady()||!doc||webMode)return;
     const top=scroller.scrollTop,height=scroller.clientHeight,dpr=window.devicePixelRatio||1;
     for(let i=0;i<lay.count;i++){
       const y0=lay.tops[i]*W,y1=y0+lay.heights[i]*W;
@@ -188,7 +199,7 @@
   function cancelDraft(){if(dragId!==null&&content.hasPointerCapture?.(dragId))content.releasePointerCapture(dragId);draft=null;dragId=null;drawInk()}
   content.addEventListener('pointerdown',event=>{
     const tool=$(toolId).value;
-    if(notReady()||event.button!==0||!C.highlightTools.includes(tool)||!B.live()||!B.writingAllowed())return;
+    if(B.navigating()||notReady()||event.button!==0||!C.highlightTools.includes(tool)||!B.live()||!B.writingAllowed())return;
     const p=normalized(event);if(!p)return;
     event.preventDefault();dragId=event.pointerId;
     draft={tool,color:$(colorId).value||B.ownColor(),size:Number($(sizeId).value),points:[p,p]};
@@ -224,15 +235,83 @@
       if(token!==loadToken){loaded.destroy();return false}
     }
     doc=loaded;ratiosList=ratios;lay=P.layout(ratios,layoutOpts);zoom=1;
+    scroller.setAttribute('aria-label','Lesson PDF');
     pageEls=ratios.map(()=>{const node=el('div',null,'pdf-page');content.insertBefore(node,ink);return node});
     scroller.hidden=false;stage.classList.add('pdf-open');$('placeholder').hidden=true;
     relayout();scroller.scrollTop=0;scroller.scrollLeft=0;scheduleRender();updateControls();
     return true;
   }
+  function makeWebFrame(html,height){
+    const iframe=el('iframe',null,'lesson-webpage');iframe.title='Static lesson webpage';
+    iframe.setAttribute('sandbox','allow-same-origin');iframe.referrerPolicy='no-referrer';
+    iframe.style.width=Web.WIDTH+'px';iframe.style.height=height+'px';
+    iframe.srcdoc=html;return iframe;
+  }
+  async function measureWeb(html){
+    const iframe=makeWebFrame(html,1000);iframe.classList.add('webpage-measure');
+    const loaded=new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Page took too long to load.')),15000);iframe.onload=()=>{clearTimeout(timer);resolve()}});
+    document.body.appendChild(iframe);
+    try{
+      await loaded;const inner=iframe.contentDocument;if(!inner)throw Error('Could not read this page.');
+      await Promise.race([Promise.all([inner.fonts?.ready,...Array.from(inner.images).map(image=>image.complete?Promise.resolve():new Promise(resolve=>{image.onload=image.onerror=resolve}))]),new Promise(resolve=>setTimeout(resolve,5000))]);
+      const height=Math.max(1000,inner.documentElement.scrollHeight,inner.body?.scrollHeight||0);
+      if(height>Web.MAX_HEIGHT)throw Error('This page is too long. Save the section you need as HTML or PDF.');
+      return height;
+    }finally{iframe.remove()}
+  }
+  async function loadWebDoc(data){
+    const raw=Web.cleanPayload(JSON.parse(new TextDecoder().decode(data)));if(!raw)throw Error('Invalid lesson webpage.');
+    const token=++loadToken;unload(false);loadToken=token;
+    // Sanitize on receipt as well as on opening. The teacher and every student use
+    // the same fixed document width/height, independent of their screen dimensions.
+    const html=Web.prepare(raw.html,new DOMParser().parseFromString(raw.html,'text/html').querySelector('base')?.href);
+    webMode=true;layoutOpts={spread:false,rtl:true,shift:false};
+    scroller.setAttribute('aria-label','Lesson webpage');
+    doc={destroy(){}};ratiosList=[raw.height/Web.WIDTH];lay=P.layout(ratiosList);zoom=1;
+    const node=el('div',null,'pdf-page webpage-page');node.appendChild(makeWebFrame(html,raw.height));pageEls=[node];content.insertBefore(node,ink);
+    scroller.hidden=false;stage.classList.add('pdf-open');$('placeholder').hidden=true;
+    relayout();scroller.scrollTop=0;scroller.scrollLeft=0;updateControls();return true;
+  }
+  async function openWebpage(source,file){
+    if(!isTeacher||!Web)return;
+    const token=++opening;B.clearError();showNote('Opening webpage…');
+    $('openWebpage').disabled=true;
+    try{
+      let html,base,name;
+      if(file){
+        if(!/\.html?$/i.test(file.name))throw Error('Please choose an HTML file (.html or .htm).');
+        if(file.size>Web.MAX_BYTES)throw Error('Please choose an HTML file smaller than 8 MB.');
+        html=await file.text();base='https://invalid.invalid/';name=file.name.replace(/\.html?$/i,'');
+      }else{
+        base=Web.cleanUrl(source);if(!base)throw Error('Enter a full http:// or https:// webpage URL.');
+        const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+        try{
+          const response=await fetch(base,{credentials:'omit',signal:controller.signal});
+          if(!response.ok)throw Error('The webpage could not be loaded.');
+          if(!/text\/html|application\/xhtml\+xml/i.test(response.headers.get('content-type')||''))throw Error('This address must point to an HTML webpage.');
+          if(Number(response.headers.get('content-length'))>Web.MAX_BYTES)throw Error('This webpage is too large.');
+          html=await response.text();base=response.url;
+        }catch(error){if(error.name==='TypeError'||error.name==='AbortError')throw Error('This website blocks direct loading or did not respond. Save a complete HTML copy and use Open HTML file, or use Share teaching screen.');throw error}
+        finally{clearTimeout(timer)}
+        name=new URL(base).hostname;
+      }
+      if(new TextEncoder().encode(html).length>Web.MAX_BYTES)throw Error('This webpage is larger than 8 MB.');
+      const prepared=Web.prepare(html,base),height=await measureWeb(prepared);
+      const data=new TextEncoder().encode(JSON.stringify({html:prepared,width:Web.WIDTH,height}));
+      if(data.length>Web.MAX_BYTES)throw Error('This webpage is larger than 8 MB.');
+      if(token!==opening)return;
+      closePdf(true);const committed=opening;if(B.sharing())B.stopSharing();
+      await loadWebDoc(data);if(opening!==committed)return;bytes=data;docName=P.cleanName(name);docId=crypto.randomUUID();
+      showNote('');B.resetMarks();B.setPdf(true,'webpage');
+      B.status('Webpage open. Students follow your scrolling and zoom. Use the lesson tools to point and highlight.');
+      for(const member of B.members().values())if(member.admitted)deliver(member);
+    }catch(error){showNote('');B.fail(error.message||'Could not open this webpage.')}
+    finally{$('openWebpage').disabled=false}
+  }
   function unload(hide){
     loadToken++;rendered.forEach(item=>item.task?.cancel());rendered.clear();
     pageEls.forEach(node=>node.remove());pageEls=[];
-    try{doc?.destroy()}catch(_){}doc=null;lay=null;draft=null;dragId=null;W=H=0;
+    try{doc?.destroy()}catch(_){}doc=null;lay=null;draft=null;dragId=null;W=H=0;webMode=false;
     paged=false;ratiosList=[];pageUrls.forEach(url=>URL.revokeObjectURL(url));pageUrls.clear();pageTransfers.clear();pageCache.clear();pageJobs.clear();renderChain=Promise.resolve();
     if(hide){scroller.hidden=true;stage.classList.remove('pdf-open');showNote('');if(nav)nav.hidden=true;drawInk();B.redraw()}
   }
@@ -240,6 +319,7 @@
   // Teacher: choose a PDF from this computer.
   async function openFile(file){
     if(!isTeacher||!file)return;
+    opening++;
     if(!/pdf$/i.test(file.type)&&!/\.pdf$/i.test(file.name)){B.fail('Please choose a PDF file.');return}
     if(file.size>P.PAGED_MAX_BYTES){B.fail('That PDF is bigger than 500 MB. Save just the pages you need as a smaller PDF.');return}
     const big=file.size>P.SMALL_BYTES;
@@ -249,7 +329,7 @@
       const data=new Uint8Array(await file.arrayBuffer());
       const ok=await loadDoc(data,big);if(!ok)return;
       paged=big;bytes=big?null:data;docName=P.cleanName(file.name.replace(/\.pdf$/i,''));docId=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());
-      showNote('');B.setPdf(true);
+      showNote('');B.resetMarks();B.setPdf(true);
       B.status(big?'Large PDF open. Students receive the pages you teach on, so the first page may take a moment.':'PDF open. Students receive it automatically. Use the buttons at the bottom of the lesson to zoom and turn pages.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
       if(big)scheduleViewSend(true);
@@ -260,10 +340,12 @@
   }
   function closePdf(quiet){
     if(!isTeacher){return}
+    opening++;
     const had=!!doc;
     if(had)for(const member of B.members().values())B.send(member.connection,{type:'pdf-close'});
     docId=null;bytes=null;unload(true);strokes=[];
     if(had||!quiet)B.setPdf(false);
+    if(had)$('placeholder').hidden=B.sharing();
   }
 
   // Teacher: send the file to a student (in small pieces, so a slow connection never freezes the page).
@@ -273,16 +355,16 @@
     const connection=member.connection,token=docId,data=bytes;
     if(!data||!connection?.open)return;
     const chunks=P.chunkCount(data.length);
-    B.send(connection,{type:'pdf-offer',id:token,name:docName,size:data.length,chunks});
+    B.send(connection,{type:'pdf-offer',id:token,name:docName,size:data.length,chunks,kind:webMode?'webpage':'pdf'});
     for(let i=0;i<chunks;i++){
       if(docId!==token||!connection.open)return;
       while(buffered(connection)>1500000){await sleep(40);if(docId!==token||!connection.open)return}
       B.send(connection,{type:'pdf-chunk',id:token,i,data:data.slice(i*P.CHUNK,(i+1)*P.CHUNK)});
       if(i%16===15)await sleep(0);
     }
-    if(docId===token&&connection.open)B.send(connection,{type:'pdf-view',id:token,...currentView()});
+    if(docId===token&&connection.open){B.send(connection,{type:'pdf-view',id:token,...currentView()});B.send(connection,{type:'highlights',strokes:B.highlights()})}
   }
-  function deliver(member){if(paged){sendInfo(member);B.send(member.connection,{type:'pdf-view',id:docId,...currentView()});pumpPages(member)}else sendFile(member)}
+  function deliver(member){if(paged){sendInfo(member);B.send(member.connection,{type:'pdf-view',id:docId,...currentView()});B.send(member.connection,{type:'highlights',strokes:B.highlights()});pumpPages(member)}else sendFile(member)}
   function sendInfo(member){B.send(member.connection,{type:'pdf-info',id:docId,name:docName,ratios:ratiosList})}
   function wantedPages(){
     if(notReady()||!H)return[];
@@ -354,21 +436,23 @@
 
   // Student: receive messages from the teacher.
   function studentFinish(){
-    const data=P.assemble(transfer),id=transfer.id,name=transfer.name;transfer=null;
-    if(!data){showNote('The PDF did not arrive completely. Leave and rejoin the class.');return}
+    const data=P.assemble(transfer),id=transfer.id,name=transfer.name,transferKind=transfer.kind;transfer=null;
+    if(!data){showNote('The lesson file did not arrive completely. Leave and rejoin the class.');return}
     showNote('Opening '+name+'…');
-    loadDoc(data).then(ok=>{
+    (transferKind==='webpage'?loadWebDoc(data):loadDoc(data)).then(ok=>{
       if(!ok)return;docId=id;docName=name;showNote('');
       if(pendingView&&pendingView.id===id)applyView(pendingView);
       B.status('Following your teacher in '+name+'.');
-    }).catch(()=>showNote('Could not open the PDF. Leave and rejoin the class.'));
+    }).catch(()=>showNote('Could not open the lesson file. Leave and rejoin the class.'));
   }
   function handleMessage(message){
     if(!message||typeof message.type!=='string'||!message.type.startsWith('pdf-'))return false;
     if(isTeacher)return true;
     if(message.type==='pdf-offer'){
       const offer=P.cleanOffer(message);if(!offer)return true;
-      studentReset();transfer={...offer,parts:new Array(offer.chunks),received:0};
+      if(message.kind==='webpage'&&offer.size>Web.MAX_BYTES)return true;
+      studentReset();transfer={...offer,kind:message.kind==='webpage'?'webpage':'pdf',parts:new Array(offer.chunks),received:0};
+      scroller.setAttribute('aria-label',transfer.kind==='webpage'?'Lesson webpage':'Lesson PDF');
       scroller.hidden=false;stage.classList.add('pdf-open');$('placeholder').hidden=true;showNote('Receiving '+offer.name+'… 0%');
     }else if(message.type==='pdf-chunk'){
       if(P.acceptChunk(transfer,message)){
@@ -403,12 +487,37 @@
     image.alt='';image.draggable=false;image.src=url;pageUrls.set(i,url);
     pageEls[i].dataset.label='';pageEls[i].replaceChildren(image);if(old)setTimeout(()=>URL.revokeObjectURL(old),2000);
   }
-  function studentReset(){layoutOpts={spread:false,rtl:true,shift:false};transfer=null;pendingView=null;docId=null;unload(true);strokes=[];drawInk()}
+  function studentReset(){layoutOpts={spread:false,rtl:true,shift:false};transfer=null;pendingView=null;docId=null;unload(true);strokes=[];drawInk();$('placeholder').hidden=B.sharing()}
+
+  // Navigation mode keeps the selected tool intact. Dragging moves the document;
+  // students still follow the teacher's view and cannot change it for the class.
+  let pan=null;
+  scroller.addEventListener('pointerdown',event=>{
+    if(!isTeacher||!B.navigating()||notReady()||event.button!==0)return;
+    cancelDraft();event.preventDefault();pan={id:event.pointerId,x:event.clientX,y:event.clientY,left:scroller.scrollLeft,top:scroller.scrollTop};scroller.setPointerCapture(event.pointerId);
+  });
+  scroller.addEventListener('pointermove',event=>{if(pan&&event.pointerId===pan.id){scroller.scrollLeft=pan.left+pan.x-event.clientX;scroller.scrollTop=pan.top+pan.y-event.clientY}});
+  function stopPan(){if(pan&&scroller.hasPointerCapture(pan.id))scroller.releasePointerCapture(pan.id);pan=null}
+  scroller.addEventListener('pointerup',stopPan);scroller.addEventListener('pointercancel',stopPan);scroller.addEventListener('lostpointercapture',()=>{pan=null});
+  document.addEventListener('class-pointer-navigation',()=>{cancelDraft();stopPan()});
+  document.addEventListener('keydown',event=>{
+    if(!isTeacher||!B.navigating()||notReady()||event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.('input,select,textarea,[contenteditable],dialog[open]'))return;
+    const moves={ArrowDown:80,ArrowUp:-80,PageDown:scroller.clientHeight*0.8,PageUp:-scroller.clientHeight*0.8};
+    if(event.key in moves){event.preventDefault();scroller.scrollTop+=moves[event.key]}
+    else if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();scroller.scrollLeft+=event.key==='ArrowLeft'?-80:80}
+    else if(event.key==='Home'||event.key==='End'){event.preventDefault();scroller.scrollTop=event.key==='Home'?0:H}
+  });
 
   // ---------- Wiring ----------
   if(isTeacher){
     const file=$('pdfFile'),open=$('openPdf');
     if(open&&file){open.addEventListener('click',()=>file.click());file.addEventListener('change',()=>{const chosen=file.files&&file.files[0];file.value='';if(chosen)openFile(chosen)})}
+    const dialog=$('webpageDialog'),webFile=$('webpageFile');
+    $('openWebpage')?.addEventListener('click',()=>dialog.showModal());
+    $('cancelWebpage')?.addEventListener('click',()=>dialog.close());
+    $('webpageForm')?.addEventListener('submit',event=>{event.preventDefault();const url=$('webpageUrl').value;dialog.close();openWebpage(url)});
+    $('chooseWebpageFile')?.addEventListener('click',()=>webFile.click());
+    webFile?.addEventListener('change',()=>{const chosen=webFile.files?.[0];webFile.value='';if(chosen){dialog.close();openWebpage(null,chosen)}});
   }
   window.ClassPointerPdf={
     active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,
