@@ -308,6 +308,25 @@
     }catch(error){showNote('');B.fail(error.message||'Could not open this webpage.')}
     finally{$('openWebpage').disabled=false}
   }
+  async function openSnapshot(dataUrl,width,height){
+    if(!isTeacher||!Web||typeof dataUrl!=='string'||!/^data:image\/jpeg;base64,/.test(dataUrl))throw Error('Invalid captured tab image.');
+    if(!Number.isFinite(width)||!Number.isFinite(height)||width<100||height<100)throw Error('Invalid snapshot size.');
+    const token=++opening;B.clearError();showNote('Preparing captured tab…');
+    try{
+      const h=Math.max(100,Math.round(Web.WIDTH*height/width));
+      const html='<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden}img{display:block;width:1000px;height:'+h+'px}</style></head><body><img alt="Captured browser tab" src="'+dataUrl+'"></body></html>';
+      const prepared=Web.prepare(html,null);
+      const data=new TextEncoder().encode(JSON.stringify({html:prepared,width:Web.WIDTH,height:h}));
+      if(data.length>Web.MAX_BYTES)throw Error('Snapshot is too large. Try a smaller browser window.');
+      if(token!==opening)return;
+      closePdf(true);const committed=opening;if(B.sharing())B.stopSharing();
+      await loadWebDoc(data);if(opening!==committed)return;
+      bytes=data;docName='Browser tab snapshot';docId=crypto.randomUUID();
+      showNote('');B.resetMarks();B.setPdf(true,'webpage');
+      B.status('Static tab snapshot open. Zoom, drag and highlight here without changing the original tab.');
+      for(const member of B.members().values())if(member.admitted)deliver(member);
+    }catch(error){showNote('');B.fail(error.message||'Could not open the captured tab.')}
+  }
   function unload(hide){
     loadToken++;rendered.forEach(item=>item.task?.cancel());rendered.clear();
     pageEls.forEach(node=>node.remove());pageEls=[];
@@ -522,6 +541,6 @@
   window.ClassPointerPdf={
     active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,
     studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
-    close:closePdf,reset:studentReset,isOpen:()=>!!lay
+    close:closePdf,openSnapshot,reset:studentReset,isOpen:()=>!!lay
   };
 })();
