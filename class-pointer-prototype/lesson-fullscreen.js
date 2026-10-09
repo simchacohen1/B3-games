@@ -106,7 +106,7 @@
     updateRosterToggle();
   }
   function expanded(){return document.fullscreenElement===stage||stage.classList.contains('lesson-fullscreen')}
-  function teacherView(){return !teacherDock&&teacherPanel&&!teacherPanel.hidden}
+  function teacherView(){return !studentView&&(teacherDock||!!(teacherPanel&&!teacherPanel.hidden))}
   function startSync(){clearInterval(syncTimer);syncTimer=setInterval(syncControls,200)}
   function stopSync(){clearInterval(syncTimer);syncTimer=null}
   function sync(){
