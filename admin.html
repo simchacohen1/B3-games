@@ -14,8 +14,8 @@ nav{display:grid;gap:7px}.nav-btn{width:100%;border:0;border-radius:11px;backgro
 .back{display:block;margin-top:24px;color:#cbd5e1;text-decoration:none;font-size:13px;font-weight:800;padding:11px 13px;border-top:1px solid #334155}
 main{min-width:0}.topbar{height:72px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;padding:0 28px}.workspace{position:relative;height:calc(100vh - 72px)}
 .topbar h1{font-size:23px;margin:0}.topbar p{font-size:12px;color:#64748b;margin:4px 0 0}
-iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}.student-preview{display:none;position:absolute;right:18px;top:18px;bottom:18px;width:min(430px,38vw);background:#fff;border:1px solid #cbd5e1;border-radius:16px;box-shadow:0 12px 35px rgba(15,23,42,.18);overflow:hidden;z-index:5}.student-preview.visible{display:flex;flex-direction:column}.preview-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid #e2e8f0;font-weight:900}.preview-head button{border:0;background:#eef2f7;border-radius:8px;padding:6px 9px;cursor:pointer;font-weight:800}.preview-viewport{position:relative;flex:1;overflow:auto;background:#e2e8f0}.student-preview iframe{position:absolute;left:0;top:0;width:1280px;height:900px;background:#fff;transform-origin:top left;border:0}.preview-resizer{display:none;position:absolute;top:18px;bottom:18px;width:12px;z-index:6;cursor:col-resize;transform:translateX(-6px)}.preview-resizer::after{content:"";position:absolute;left:5px;top:0;bottom:0;width:2px;background:#94a3b8;border-radius:2px}.workspace.preview-open .preview-resizer{display:block}.workspace.preview-open>#adminFrame{width:calc(100% - var(--preview-space,448px))}
-@media(max-width:760px){body{grid-template-columns:1fr}aside{position:static;height:auto;padding:14px}.brand-sub{margin-bottom:12px}nav{grid-template-columns:repeat(2,1fr)}.back{margin-top:12px}.topbar{display:none}.workspace{height:calc(100vh - 270px)}.student-preview{right:8px;left:8px;top:8px;bottom:8px;width:auto}.workspace.preview-open>#adminFrame{width:100%}}
+iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}
+@media(max-width:760px){body{grid-template-columns:1fr}aside{position:static;height:auto;padding:14px}.brand-sub{margin-bottom:12px}nav{grid-template-columns:repeat(2,1fr)}.back{margin-top:12px}.topbar{display:none}.workspace{height:calc(100vh - 270px)}}
 .ta-panel{display:none;position:absolute;inset:0;overflow:auto;background:#f1f5f9;padding:28px 20px;z-index:4}
 .ta-wrap{max-width:640px;margin:0 auto}.ta-card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:24px;box-shadow:0 4px 14px rgba(15,23,42,.06);margin-bottom:16px}
 .ta-card h2{margin:0 0 6px;font-size:24px}.ta-hint{color:#64748b;font-size:16px;line-height:1.45;margin:6px 0 0}
@@ -76,10 +76,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}.student
     <div id="teacherAccessPanel" class="ta-panel"></div>
     <div id="ownerControlPanel" class="ta-panel"></div>
     <iframe id="adminFrame" src="index.html?adminPage=1" title="B3 administration"></iframe>
-    <div class="preview-resizer" id="previewResizer" title="Drag to resize preview"></div><aside class="student-preview" id="studentPreview">
-      <div class="preview-head"><span>👀 Student Preview</span><span style="display:flex;gap:7px;align-items:center"><select id="previewStudentSelect" aria-label="Student to preview" style="max-width:190px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-weight:700"><option value="">Choose student…</option></select><button id="refreshPreview" type="button">Refresh</button></span></div>
-      <div class="preview-viewport" id="previewViewport"><iframe id="studentPreviewFrame" src="index.html?preview=1" title="Student view preview"></iframe></div>
-    </aside>
+
   </div>
 </main>
 <script>
@@ -295,10 +292,6 @@ function organize(){
 }
 function showTab(tab){
   currentTab=tab;
-  const preview=document.getElementById("studentPreview"),workspace=document.getElementById("workspace");
-  const showing=tab==="settings";
-  preview.classList.toggle("visible",showing);workspace.classList.toggle("preview-open",showing);
-  if(showing){ populatePreviewStudents(); setTimeout(scaleStudentPreview,0); }
   const d=frame.contentDocument;if(!d)return;
   const owner=isOwnerNow();
   const teacherPanel=document.getElementById("teacherAccessPanel"),isTeacherAccess=tab==="access"&&!owner;
@@ -315,106 +308,6 @@ function showTab(tab){
   frame.contentWindow.scrollTo(0,0);
 }
 document.querySelectorAll(".nav-btn").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
-const previewFrame=document.getElementById("studentPreviewFrame"),previewViewport=document.getElementById("previewViewport"),previewPanel=document.getElementById("studentPreview"),previewResizer=document.getElementById("previewResizer"),workspaceEl=document.getElementById("workspace");
-function setPreviewWidth(width){
-  const min=300,max=Math.max(320,workspaceEl.clientWidth-360);
-  const w=Math.max(min,Math.min(max,width));
-  previewPanel.style.width=w+"px";
-  previewResizer.style.right=(18+w)+"px";
-  workspaceEl.style.setProperty("--preview-space",(w+36)+"px");
-  scaleStudentPreview();
-}
-let resizingPreview=false;
-previewResizer.addEventListener("pointerdown",e=>{resizingPreview=true;previewResizer.setPointerCapture(e.pointerId);document.body.style.userSelect="none";});
-previewResizer.addEventListener("pointermove",e=>{if(!resizingPreview)return;const rect=workspaceEl.getBoundingClientRect();setPreviewWidth(rect.right-e.clientX-18);});
-previewResizer.addEventListener("pointerup",()=>{resizingPreview=false;document.body.style.userSelect="";});
-setPreviewWidth(Math.min(430,workspaceEl.clientWidth*.38));
-async function populatePreviewStudents(){
-  const select=document.getElementById("previewStudentSelect");
-  if(!select)return;
-  const previous=select.value;
-  select.innerHTML='<option value="">Loading students…</option>';
-  try{
-    const w=frame.contentWindow;
-    const db=w?.firebase?.database?.();
-    const access=w?.B3SiteSettings?.getCurrentAccess?.()||{authorized:false,role:"",classIds:[]};
-    const workspaceId=w?.B3SiteSettings?.workspaceId||"b3-2026";
-    if(!db)throw new Error("Firebase is not ready");
-    if(!access.authorized)throw new Error("Teacher access is not ready");
-
-    let studentIds=new Set();
-    if(access.role==="admin"){
-      // Owner/admin using the B3 center may preview the current B3 workspace roster.
-      const classesSnap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");
-      const classes=classesSnap.val()||{};
-      Object.values(classes).forEach(cls=>Object.keys((cls&&cls.members)||{}).forEach(id=>studentIds.add(id)));
-    }else{
-      // Regular teachers may preview only students in classes assigned to them.
-      const classIds=(access.classIds||[]).filter(Boolean);
-      const snaps=await Promise.all(classIds.map(id=>db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id+"/members").once("value")));
-      snaps.forEach(snap=>Object.keys(snap.val()||{}).forEach(id=>studentIds.add(id)));
-    }
-
-    const ids=[...studentIds];
-    const records=await Promise.all(ids.map(id=>db.ref("b3Games/students/"+id).once("value")));
-    const unique=records.map((snap,i)=>{
-      const record=snap.val()||{},profile=record.profile||record||{};
-      return {id:ids[i],name:String(profile.name||ids[i]),active:profile.active!==false};
-    }).filter(x=>x.active).sort((x,y)=>x.name.localeCompare(y.name));
-
-    select.innerHTML='<option value="">Choose student…</option>'+unique.map(x=>'<option value="'+x.id+'">'+x.name+'</option>').join("");
-    if(previous&&unique.some(x=>x.id===previous))select.value=previous;
-    else if(unique.length)select.value=unique[0].id;
-    if(unique.length)loadSelectedStudentPreview();
-    else{
-      previewFrame.src="about:blank";
-      select.innerHTML='<option value="">No students in your class yet</option>';
-    }
-  }catch(e){
-    console.warn("Could not load preview students",e);
-    select.innerHTML='<option value="">No class students available</option>';
-    previewFrame.src="about:blank";
-  }
-}
-function loadSelectedStudentPreview(){
-  const id=document.getElementById("previewStudentSelect").value;
-  previewFrame.src=id?"index.html?preview=1&previewStudent="+encodeURIComponent(id):"about:blank";
-}
-function syncStudentPreview(){ /* Preview renders its own class/student permissions. */ }
-function scaleStudentPreview(){
-  const desktopWidth=1280, desktopHeight=900;
-  const scale=Math.min(previewViewport.clientWidth/desktopWidth,previewViewport.clientHeight/desktopHeight);
-  previewFrame.style.transform="scale("+scale+")";
-  previewFrame.style.width=desktopWidth+"px";
-  previewFrame.style.height=desktopHeight+"px";
-}
-previewFrame.addEventListener("load",()=>{
-  try{
-    const d=previewFrame.contentDocument;
-    const style=d.createElement("style");
-    style.textContent=`#adminAccessButton,#adminPanel,#teacherToolsSection,#approvalCenterButton,.version-modal,.approval-center-modal{display:none!important}`;
-    d.head.appendChild(style);
-    const panel=d.getElementById("adminPanel"); if(panel) panel.classList.add("hidden");
-    const tools=d.getElementById("teacherToolsSection"); if(tools) tools.classList.add("hidden");
-    d.body.classList.remove("admin-panel-open");
-    // Preview is display-only: never let the teacher session navigate into an activity.
-    d.addEventListener("click",(e)=>{
-      const card=e.target.closest(".game-card");
-      if(card){e.preventDefault();e.stopImmediatePropagation();}
-    },true);
-    d.addEventListener("submit",(e)=>{e.preventDefault();e.stopImmediatePropagation();},true);
-    d.querySelectorAll(".game-card").forEach(card=>{
-      card.style.cursor="default";
-      card.setAttribute("aria-disabled","true");
-      card.querySelectorAll("a,button").forEach(el=>el.setAttribute("tabindex","-1"));
-    });
-  }catch(e){console.warn("Could not apply student preview mode",e);}
-  syncStudentPreview();
-  scaleStudentPreview();
-});
-window.addEventListener("resize",scaleStudentPreview);
-document.getElementById("previewStudentSelect").addEventListener("change",loadSelectedStudentPreview);
-document.getElementById("refreshPreview").addEventListener("click",loadSelectedStudentPreview);
 frame.addEventListener("load",()=>{
   const d=frame.contentDocument;
   const style=d.createElement("style");
@@ -440,14 +333,12 @@ frame.addEventListener("load",()=>{
   `;
   d.head.appendChild(style);
   organize();
-  populatePreviewStudents();
-  syncStudentPreview();
   // Do not observe/rewrite the panel class here. The embedded page legitimately
   // changes it during login/auth rendering; forcing it back synchronously caused
   // a MutationObserver loop that froze the entire Teacher Center.
   const panel=d.getElementById("adminPanel");
   if(panel) panel.classList.remove("hidden");
-  setTimeout(()=>{applyRoleView();populatePreviewStudents();},700);
+  setTimeout(applyRoleView,700);
   setTimeout(applyRoleView,1800);
   // Sign-in finishes at its own pace; keep the owner/teacher view in sync.
   if(!window.__b3RoleTimer)window.__b3RoleTimer=setInterval(applyRoleView,2500);
