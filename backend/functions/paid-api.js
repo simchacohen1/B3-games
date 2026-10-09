@@ -3,7 +3,7 @@ const admin = require('firebase-admin');
 const crypto = require('node:crypto');
 const { authenticate, reserve, hash } = require('./paid-api-core.cjs');
 if (!admin.apps.length) admin.initializeApp();
-const ALLOWED_ORIGINS = ['https://simchacohen1.github.io'];
+const ALLOWED_ORIGINS = ['https://simchacohen1.github.io', 'https://funtorahtools.com', 'https://www.funtorahtools.com'];
 const speechCache = new Map();
 const inflight = new Map();
 let speechCacheBytes = 0;

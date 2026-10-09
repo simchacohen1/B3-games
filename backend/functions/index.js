@@ -641,9 +641,7 @@ function setCors(req, res) {
 
 // Only these origins may call this function â€” update if you serve the
 // site from a different GitHub Pages URL or a custom domain.
-const ALLOWED_ORIGINS = [
-  "https://simchacohen1.github.io",
-];
+const ALLOWED_ORIGINS = PAID_ORIGINS;
 
 /* Parses a multipart/form-data request (audio file + text fields) using
    busboy. Returns { fields, audioBuffer, audioFilename }. Firebase
