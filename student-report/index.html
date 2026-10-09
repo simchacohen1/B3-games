@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Student Report — Fun Torah Tools</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#1f2937}
+header{background:#172033;color:#fff;padding:20px 26px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:24px}.sub{color:#b9c6da;font-size:13px;margin-top:5px}
+button,select{font:inherit}
+.btn{border:0;border-radius:10px;padding:9px 13px;font-weight:700;cursor:pointer;background:#334155;color:#fff}
+.btn.light{background:#fff;color:#1f2937;border:1px solid #cbd5e1}
+.btn.blue{background:#2563eb}
+.wrap{max-width:1400px;margin:22px auto;padding:0 16px}
+.gate{text-align:center;padding:70px 20px;font-size:17px}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:7px 14px;font-weight:700;cursor:pointer}
+.tabs button.on{background:#172033;color:#fff;border-color:#172033}
+.bar select{padding:7px 10px;border-radius:9px;border:1px solid #cbd5e1;background:#fff}
+.status{color:#64748b;font-size:14px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.stat{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px}
+.stat .v{font-size:24px;font-weight:800}.stat .l{font-size:13px;color:#64748b;margin-top:3px}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 5px 18px rgba(15,23,42,.05)}
+.tablebox{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:10px 10px;border-bottom:1px solid #eef2f7;text-align:left;vertical-align:top;white-space:nowrap}
+th{background:#f8fafc;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:#475569;cursor:pointer;position:sticky;top:0}
+th:hover{color:#0f172a}
+td .m{display:block;font-size:12px;color:#64748b;margin-top:2px}
+td.none{color:#cbd5e1}
+.name{font-weight:800;color:#1d4ed8;background:none;border:0;padding:0;cursor:pointer;text-align:left}
+.name:hover{text-decoration:underline}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.g{color:#15803d}.y{color:#b45309}.r{color:#b91c1c}
+.dg{background:#16a34a}.dy{background:#f59e0b}.dr{background:#dc2626}.dn{background:#cbd5e1}
+.legend{font-size:12px;color:#64748b;margin:10px 4px}
+/* student report */
+#report{display:none}
+.rhead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;padding:20px 22px;border-bottom:1px solid #eef2f7}
+.rhead h2{margin:0;font-size:26px}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;padding:18px 22px}
+.tool{border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;break-inside:avoid}
+.tool h3{margin:0 0 8px;font-size:16px;display:flex;justify-content:space-between;gap:8px}
+.tool h3 small{font-weight:400;color:#64748b;font-size:12px}
+.tool ul{margin:6px 0 0;padding-left:18px}.tool li{margin:3px 0;font-size:14px}
+.tool .empty{color:#94a3b8;font-size:14px}
+.attn{margin:0 22px 6px;padding:14px 16px;border-radius:14px;background:#fff7ed;border:1px solid #fed7aa}
+.attn h3{margin:0 0 6px;font-size:16px}
+.good{margin:0 22px 6px;padding:14px 16px;border-radius:14px;background:#f0fdf4;border:1px solid #bbf7d0}
+.good h3{margin:0 0 6px;font-size:16px}
+.attn ul,.good ul{margin:0;padding-left:18px}
+.he{direction:rtl;unicode-bidi:isolate}
+@media print{
+ header,.bar,.stats,#classView,.noprint{display:none!important}
+ body{background:#fff}.wrap{margin:0;max-width:none}
+ .card{box-shadow:none;border:0}
+ #report{display:block!important}
+}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="../firebase-config.js?v=20261001-teacherauth"></script>
+<script src="../site-settings.js?v=20261008-owner-demo"></script>
+<script src="../yiddish/api.js"></script>
+</head><body>
+<header>
+ <div><h1>📈 Student Report</h1><div class="sub">Every tool, one place — by student or whole class</div></div>
+ <div class="noprint" style="display:flex;gap:8px"><button class="btn" id="refresh">↻ Refresh</button><button class="btn" id="csv">⬇ Download CSV</button></div>
+</header>
+<div class="wrap">
+ <div id="gate" class="gate">Checking your teacher account…</div>
+ <div id="app" style="display:none">
+  <div class="bar">
+   <div class="tabs" id="classTabs"></div>
+   <label>Time period
+    <select id="period">
+     <option value="0">All time</option>
+     <option value="30">Last 30 days</option>
+     <option value="14">Last 14 days</option>
+     <option value="7" selected>Last 7 days</option>
+    </select>
+   </label>
+   <span class="status" id="status"></span>
+  </div>
+  <div class="stats" id="summary"></div>
+  <div id="classView" class="card">
+   <div class="tablebox"><table><thead id="thead"></thead><tbody id="rows"></tbody></table></div>
+   <div class="legend"><span class="dot dg"></span>active in last 3 days <span class="dot dy" style="margin-left:12px"></span>4–7 days <span class="dot dr" style="margin-left:12px"></span>more than a week <span class="dot dn" style="margin-left:12px"></span>never. Click a student's name for the full report. Period applies to Posuk Practice, Chazara, Shorashim and Weekly Quiz; the other tools show overall progress.</div>
+  </div>
+  <div id="report" class="card"></div>
+ </div>
+</div>
+<script>
+(function(){
+'use strict';
+const api=window.B3SiteSettings,WS=(api&&api.workspaceId)||'b3-2026';
+if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+const db=firebase.database(),$=id=>document.getElementById(id);
+const DAY=86400000,LEGACY=['et','wt'];
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const obj=v=>v&&typeof v==='object'?v:{};
+const num=v=>{if(typeof v==='number'&&isFinite(v))return v;const n=parseFloat(String(v??'').replace('%',''));return isFinite(n)?n:null};
+const pctOf=(c,t)=>t?Math.round(c/t*100):null;
+const get=async p=>{try{return (await db.ref(p).once('value')).val()}catch(e){return undefined}};
+function ago(t){if(!t)return'never';const d=(Date.now()-t)/1000;if(d<3600)return Math.max(1,Math.round(d/60))+' min ago';if(d<86400)return Math.round(d/3600)+' hr ago';const days=Math.round(d/86400);return days===1?'yesterday':days+' days ago'}
+function dotFor(t){if(!t)return'dn';const d=(Date.now()-t)/DAY;return d<=3?'dg':d<=7?'dy':'dr'}
+function tone(p){return p===null?'':p>=80?'g':p>=60?'y':'r'}
+
+let access=null,user=null,classes=[],current='',loaded={},sortKey='name',sortDir=1,openId='';
+
+/* ---------- Tool summaries ---------- */
+const RASHI_UNITS=[['zayin','ז'],['bet','בּ/ב'],['tsadi','צ'],['alef','א'],['tsadisofit','ץ'],['memsofit','ם'],['shin','שׁ/שׂ'],['samech','ס'],['finalreview','שׁ/שׂ review']];
+const HALACHA_IDS=["a","b","c","d","e","f","s2a","s2b","s2c","s2d","s3a","s3b","s3c","s3d","s3e","s4a","s4b","s4c","s4d","s4e","s4f","s6a","s6b","s6c","s6d","s6e","s6f","s6g","s6h","s6i","s6j","s6k"];
+function entries(v){if(Array.isArray(v))return v.map((x,i)=>[i,x]).filter(([,x])=>x&&typeof x==='object');return Object.entries(obj(v)).filter(([,x])=>x&&typeof x==='object')}
+function verdictPct(list,idxKey,totalHint){if(!list.length)return null;const correct=list.filter(([,c])=>String(c.finalVerdict||c.verdict||'').toLowerCase()==='correct').length;const hi=Math.max(...list.map(([i,c])=>Number.isInteger(c[idxKey])?c[idxKey]:Number(i)||0))+1;const total=Math.max(Number(totalHint)||0,hi,list.length);return pctOf(correct,total)}
+const readScore=a=>a?num(a.hebrewFinalScore??a.hebrewScore):null;
+const transScore=a=>{if(!a)return null;const c=entries(a.translationChunkResults);return c.length?verdictPct(c,'chunkIndex',a.translationTotal):num(a.translationScore)};
+const compScore=a=>{if(!a)return null;const q=entries(a.questionResults);return q.length?verdictPct(q,'questionIndex',a.questionTotal):num(a.comprehensionScore??a.questionScore)};
+function posukLabel(key){const m=String(key).match(/(\d+)\D+(\d+)/);return m?('Perek '+m[1]+':'+m[2]):String(key)}
+
+function sumPosuk(attempts,info,since){
+ const units=obj(attempts);let tries=0,last=num(info&&info.lastActive)||0;const per=[];
+ Object.entries(units).forEach(([key,map])=>{
+  const all=Object.values(obj(map)).filter(a=>a&&typeof a==='object');
+  all.forEach(a=>{const t=num(a.timestamp)||0;if(t>last)last=t;if(!since||t>=since)tries++});
+  const best=f=>all.reduce((b,a)=>{const s=f(a);return typeof s==='number'&&(b===null||s>b)?s:b},null);
+  per.push({key,read:best(readScore),trans:best(transScore),comp:best(compScore),n:all.length});
+ });
+ if(!per.length&&!last)return null;
+ const mastered=per.filter(p=>p.read===100).length;
+ const weak=per.filter(p=>(p.read!==null&&p.read<70)||(p.trans!==null&&p.trans<70)).map(p=>posukLabel(p.key));
+ const scores=per.map(p=>p.read).filter(x=>x!==null);
+ return {tries,pesukim:per.length,mastered,trans100:per.filter(p=>p.trans===100).length,comp100:per.filter(p=>p.comp===100).length,avgRead:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null,weak,last};
+}
+function sumChazara(row,events,since){
+ row=obj(row);const reviews=obj(row.reviews);let total=0,last=0,due=0;const goal=+row.goal||10;let atGoal=0;
+ Object.values(reviews).forEach(r=>{const c=+(r&&r.count)||0;total+=c;const t=+(r&&r.lastAt)||0;if(t>last)last=t;if(c>=goal)atGoal++;if(c>0&&t&&Date.now()-t>=14*DAY)due++});
+ const ev=Object.values(obj(events)).filter(e=>e&&e.reviewApplied===true&&e.removed!==true&&e.teacherRejected!==true&&e.pointRequestStatus!=='rejected');
+ ev.forEach(e=>{const t=+e.createdAt||0;if(t>last)last=t});
+ const inPeriod=since?ev.filter(e=>(+e.createdAt||0)>=since).length:total;
+ const reviewed=Object.values(reviews).filter(r=>(+(r&&r.count)||0)>0).length;
+ if(!reviewed&&!ev.length)return null;
+ return {total,inPeriod,reviewed,atGoal,goal,due,last};
+}
+function sumShorashim(s,since){
+ s=obj(s);const cards=Object.values(obj(s.cards)).filter(c=>c&&c.learnedAt);
+ if(!cards.length&&!s.gamesPlayed&&!s.totalActiveSeconds&&!s.lastActive)return null;
+ const recent=since?cards.filter(c=>+c.learnedAt>=since).length:cards.length;
+ let last=num(s.lastActive)||0;cards.forEach(c=>{if(+c.learnedAt>last)last=+c.learnedAt});
+ return {cards:cards.length,recent,games:+s.gamesPlayed||0,secs:+s.totalActiveSeconds||0,last};
+}
+function sumRashi(p){
+ if(!p)return null;p=obj(p);const u=obj(p.units);let a=0,c=0;const weak=[];
+ RASHI_UNITS.forEach(([id,label])=>{let ua=0,uc=0;['_letter','_word'].forEach(s=>{const x=obj(u[id+s]);ua+=+x.attempts||0;uc+=+x.correct||0});a+=ua;c+=uc;if(ua>=5&&uc/ua<0.6)weak.push(label)});
+ const idx=typeof p.currentUnitIndex==='number'?p.currentUnitIndex:0;
+ return {unit:Math.min(idx+1,RASHI_UNITS.length),of:RASHI_UNITS.length,acc:pctOf(c,a),attempts:a,weak,last:num(p.lastActive)||0};
+}
+function sumGematria(p){
+ if(!p)return null;let a=0,c=0;['learn','words','numbers'].forEach(k=>{a+=+(p[k]&&p[k].attempts)||0;c+=+(p[k]&&p[k].correct)||0});
+ const played=(+p.stars||0)>0||a>0||(+(p.speed&&p.speed.plays)||0)>0||(+(p.match&&p.match.plays)||0)>0||(+(p.race&&p.race.plays)||0)>0;
+ if(!played)return null;
+ const tricky=Object.entries(obj(p.missed)).filter(([,n])=>n>0).sort((x,y)=>y[1]-x[1]).slice(0,4).map(([h])=>h);
+ return {stars:+p.stars||0,level:+p.level||1,acc:pctOf(c,a),tricky,last:num(p.lastActive)||0};
+}
+function sumHalacha(h){
+ if(!h||!h.state)return null;const n=HALACHA_IDS.filter(x=>h.state[x+'_done']).length;
+ return {done:n,of:HALACHA_IDS.length,last:num(h.updatedAt)||0};
+}
+function sumYiddish(d){
+ if(!d)return null;const w=obj(d.words);const vals=Object.values(w).filter(Boolean);
+ if(!vals.length&&!d.lastActive)return null;
+ return {learned:vals.filter(x=>(+x.credits||0)>=2).length,practicing:vals.filter(x=>(+x.credits||0)<2).length,last:num(d.lastActive)||0};
+}
+function quizRows(root,studentId){
+ root=obj(root);const launches=obj(root.launches),responses=obj(root.responses),completions=obj(root.completions),out=[];
+ Object.entries(launches).forEach(([lid,l])=>{
+  const ans=Object.values(obj(obj(responses[lid])[studentId])).filter(x=>x&&typeof x==='object');if(!ans.length)return;
+  const qs=Array.isArray(l&&l.quizSnapshot&&l.quizSnapshot.questions)?l.quizSnapshot.questions:Object.values(obj(l&&l.quizSnapshot&&l.quizSnapshot.questions));
+  const total=qs.length||ans.length,correct=ans.filter(a=>a.correct===true).length;
+  out.push({title:String((l.quizSnapshot&&l.quizSnapshot.title)||'Quiz'),correct,total,done:!!(completions[lid]&&completions[lid][studentId]),pct:pctOf(correct,total),t:+(l.startedAt||l.createdAt||l.updatedAt||0)});
+ });
+ return out.sort((a,b)=>b.t-a.t);
+}
+function sumQuiz(rows,since){
+ if(!rows.length)return null;const r=since?rows.filter(x=>x.t>=since):rows;
+ const scored=r.filter(x=>x.pct!==null);
+ return {count:r.length,all:rows.length,avg:scored.length?Math.round(scored.reduce((a,x)=>a+x.pct,0)/scored.length):null,recent:rows.slice(0,6),last:rows[0].t};
+}
+
+/* ---------- Loading ---------- */
+async function classIdsFor(acc,u){
+ const all=obj(await get('b3Games/workspaces/'+WS+'/classes'));
+ let ids;
+ if(acc.role==='admin')ids=Object.keys(all);
+ else{
+  ids=(acc.classIds||[]).filter(Boolean);
+  if(!ids.length&&u){const row=obj(await get('b3Games/workspaces/'+WS+'/teachers/'+u.uid));ids=Object.keys(obj(row.classIds)).filter(id=>id!=='*'&&row.classIds[id]===true)}
+ }
+ return ids.filter(id=>all[id]&&all[id].active!==false).map(id=>({id,name:String(all[id].name||id.toUpperCase()),members:obj(all[id].members)}));
+}
+async function loadClass(c){
+ const legacy=LEGACY.includes(c.id);
+ const ids=Object.entries(c.members).filter(([id,m])=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&(!m||m.active!==false)).map(([id])=>id);
+ const shRoot=legacy?'posukPractice/shorashimLearning/students/':'posukPractice/shorashimLearning/classes/'+c.id+'/students/';
+ const [gem,quiz,yid]=await Promise.all([
+  get('b3Games/workspaces/'+WS+'/classes/'+c.id+'/resources/gematria/progress'),
+  (async()=>{const q=legacy?'b3Quiz':'b3Quiz/classes/'+c.id;const [launches,responses,completions]=await Promise.all([get(q+'/launches'),get(q+'/responses'),get(q+'/completions')]);return {launches,responses,completions}})(),
+  (async()=>{try{if(!user||!window.YiddishAPI)return null;const r=await YiddishAPI.call('teacherLoad',{classId:legacy?'':c.id,idToken:await user.getIdToken()});return r&&r.storyGranted!==false?obj(r.students):null}catch(e){console.warn('Yiddish',e);return null}})()
+ ]);
+ const students=await Promise.all(ids.map(async id=>{
+  const m=obj(c.members[id]);
+  const [profile,att,pinfo,chz,chzEv,sh,rashi,hal,rew]=await Promise.all([
+   m.name?null:get('b3Games/students/'+id+'/profile'),
+   get('posukPractice/attempts/'+id),get('posukPractice/students/'+id),
+   get('posukPractice/chazara/students/'+id),get('posukPractice/chazara/events/'+id),
+   get(shRoot+id),get('rashiLetters/progress/'+id),get('b3Games/students/'+id+'/halacha/siman1'),
+   get('studentRewards/students/'+id)
+  ]);
+  const name=String(m.name||(profile&&profile.name)||(pinfo&&pinfo.name)||id);
+  return {id,name,raw:{att,pinfo,chz,chzEv,sh,rashi,hal,gem:obj(gem)[id],yid:yid?yid[id]:null,quiz:quizRows(quiz,id),rew}};
+ }));
+ return {students:students.sort((a,b)=>a.name.localeCompare(b.name)),yiddishOk:!!yid,rewardsOk:students.some(s=>s.raw.rew!==undefined&&s.raw.rew!==null)};
+}
+function summarize(s){
+ const days=+$('period').value,since=days?Date.now()-days*DAY:0,r=s.raw;
+ const t={
+  posuk:sumPosuk(r.att,r.pinfo,since),chazara:sumChazara(r.chz,r.chzEv,since),shorashim:sumShorashim(r.sh,since),
+  rashi:sumRashi(r.rashi),gematria:sumGematria(r.gem),yiddish:sumYiddish(r.yid),halacha:sumHalacha(r.hal),quiz:sumQuiz(r.quiz,since)
+ };
+ const rew=r.rew&&typeof r.rew==='object'?{balance:+(r.rew.rewardBalance||r.rew.currentBalance||0)}:null;
+ const last=Math.max(0,...Object.values(t).map(x=>x&&x.last||0));
+ const toolsUsed=Object.values(t).filter(Boolean).length;
+ return {...s,t,rew,last,toolsUsed};
+}
+
+/* ---------- Class table ---------- */
+const COLS=[
+ ['name','Student'],['last','Last active'],['posuk','📜 Posuk Practice'],['chazara','🔁 Chazara'],['shorashim','🌳 Shorashim'],
+ ['rashi','אב Rashi Letters'],['gematria','🔢 Gematria'],['yiddish','Yiddish'],['halacha','📔 Halacha'],['quiz','📝 Weekly Quiz'],['rewards','🌟 Points']
+];
+function sortVal(s,k){const t=s.t;switch(k){
+ case'name':return s.name.toLowerCase();case'last':return s.last||0;
+ case'posuk':return t.posuk?t.posuk.mastered*1000+t.posuk.tries:-1;case'chazara':return t.chazara?t.chazara.inPeriod:-1;
+ case'shorashim':return t.shorashim?t.shorashim.cards:-1;case'rashi':return t.rashi?t.rashi.unit*1000+(t.rashi.acc||0):-1;
+ case'gematria':return t.gematria?t.gematria.stars:-1;case'yiddish':return t.yiddish?t.yiddish.learned:-1;
+ case'halacha':return t.halacha?t.halacha.done:-1;case'quiz':return t.quiz&&t.quiz.avg!==null?t.quiz.avg:-1;
+ case'rewards':return s.rew?s.rew.balance:-1;}return 0}
+function cell(k,s){
+ const t=s.t,none='<td class="none">—</td>',pl=$('period').selectedOptions[0].text.toLowerCase();
+ switch(k){
+  case'name':return '<td><button class="name" data-id="'+esc(s.id)+'">'+esc(s.name)+'</button><span class="m">'+s.toolsUsed+' of 8 tools used</span></td>';
+  case'last':return '<td><span class="dot '+dotFor(s.last)+'"></span>'+esc(ago(s.last))+'</td>';
+  case'posuk':return t.posuk?'<td>'+t.posuk.mastered+' of '+t.posuk.pesukim+' pesukim at 100%<span class="m">'+t.posuk.tries+' tries '+esc(pl)+'</span></td>':none;
+  case'chazara':return t.chazara?'<td>'+t.chazara.inPeriod+' chazaras <span class="m">'+esc(pl)+' · '+t.chazara.reviewed+' pesukim reviewed</span></td>':none;
+  case'shorashim':return t.shorashim?'<td>'+t.shorashim.cards+' cards<span class="m">+'+t.shorashim.recent+' '+esc(pl)+' · '+Math.round(t.shorashim.secs/60)+' min</span></td>':none;
+  case'rashi':return t.rashi?'<td>Unit '+t.rashi.unit+' / '+t.rashi.of+'<span class="m '+tone(t.rashi.acc)+'">'+(t.rashi.acc===null?'—':t.rashi.acc+'% correct')+'</span></td>':none;
+  case'gematria':return t.gematria?'<td>⭐ '+t.gematria.stars+' · level '+t.gematria.level+'<span class="m '+tone(t.gematria.acc)+'">'+(t.gematria.acc===null?'—':t.gematria.acc+'% correct')+'</span></td>':none;
+  case'yiddish':return t.yiddish?'<td>'+t.yiddish.learned+' words learned<span class="m">'+t.yiddish.practicing+' practicing</span></td>':none;
+  case'halacha':return t.halacha?'<td>'+t.halacha.done+' / '+t.halacha.of+' sections</td>':none;
+  case'quiz':return t.quiz&&t.quiz.count?'<td class="'+tone(t.quiz.avg)+'"><b>'+(t.quiz.avg===null?'—':t.quiz.avg+'%')+'</b> avg<span class="m">'+t.quiz.count+' quiz'+(t.quiz.count===1?'':'zes')+' '+esc(pl)+'</span></td>':none;
+  case'rewards':return s.rew?'<td>'+s.rew.balance+'</td>':none;
+ }
+}
+function visibleCols(){const d=loaded[current]||{};return COLS.filter(([k])=>(k!=='yiddish'||d.yiddishOk)&&(k!=='rewards'||d.rewardsOk))}
+function drawTable(){
+ const d=loaded[current];if(!d)return;
+ const rows=d.students.map(summarize);d.view=rows;
+ const cols=visibleCols();
+ $('thead').innerHTML='<tr>'+cols.map(([k,l])=>'<th data-k="'+k+'">'+esc(l)+(sortKey===k?(sortDir>0?' ▲':' ▼'):'')+'</th>').join('')+'</tr>';
+ $('thead').querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;sortDir=sortKey===k?-sortDir:(k==='name'?1:-1);sortKey=k;drawTable()});
+ const list=rows.slice().sort((a,b)=>{const x=sortVal(a,sortKey),y=sortVal(b,sortKey);return (x>y?1:x<y?-1:0)*sortDir});
+ $('rows').innerHTML=list.map(s=>'<tr>'+cols.map(([k])=>cell(k,s)).join('')+'</tr>').join('')||'<tr><td colspan="11" class="none">No students in this class yet.</td></tr>';
+ $('rows').querySelectorAll('.name').forEach(b=>b.onclick=()=>openReport(b.dataset.id));
+ const week=Date.now()-7*DAY,active=rows.filter(s=>s.last>=week).length,quiet=rows.filter(s=>s.last<week);
+ const qa=rows.map(s=>s.t.quiz&&s.t.quiz.avg).filter(x=>x!==null&&x!==undefined&&x!==false);
+ const chz=rows.reduce((a,s)=>a+(s.t.chazara?s.t.chazara.inPeriod:0),0);
+ const pl=$('period').selectedOptions[0].text.toLowerCase();
+ $('summary').innerHTML=
+  '<div class="stat"><div class="v">'+active+' / '+rows.length+'</div><div class="l">Active in the last 7 days</div></div>'+
+  '<div class="stat"><div class="v">'+chz+'</div><div class="l">Chazaras '+esc(pl)+'</div></div>'+
+  '<div class="stat"><div class="v">'+(qa.length?Math.round(qa.reduce((a,b)=>a+b,0)/qa.length)+'%':'—')+'</div><div class="l">Class Weekly Quiz average ('+esc(pl)+')</div></div>'+
+  '<div class="stat"><div class="v" style="font-size:16px">'+(quiet.length?quiet.slice(0,6).map(s=>esc(s.name.split(' ')[0])).join(', ')+(quiet.length>6?' +'+(quiet.length-6):''):'Everyone ✓')+'</div><div class="l">Not active this week</div></div>';
+ if(openId)openReport(openId,true);
+}
+
+/* ---------- Single student report ---------- */
+function attention(s){
+ const t=s.t,a=[],g=[];
+ if(!s.last)a.push('Has not used any tool yet.');
+ else if(Date.now()-s.last>7*DAY)a.push('Not active in any tool for '+Math.round((Date.now()-s.last)/DAY)+' days.');
+ if(t.posuk&&t.posuk.weak.length)a.push('Posuk Practice: needs more work on '+t.posuk.weak.slice(0,5).join(', ')+(t.posuk.weak.length>5?' and '+(t.posuk.weak.length-5)+' more':'')+'.');
+ if(t.chazara&&t.chazara.due)a.push('Chazara: '+t.chazara.due+(t.chazara.due===1?' posuk':' pesukim')+' not reviewed in 2+ weeks.');
+ if(t.rashi&&t.rashi.weak.length)a.push('Rashi Letters: mixing up <span class="he">'+esc(t.rashi.weak.join(' '))+'</span>.');
+ if(t.gematria&&t.gematria.tricky.length&&t.gematria.acc!==null&&t.gematria.acc<80)a.push('Gematria: often misses <span class="he">'+esc(t.gematria.tricky.join(' '))+'</span>.');
+ if(t.quiz&&t.quiz.avg!==null&&t.quiz.avg<70)a.push('Weekly Quiz average is '+t.quiz.avg+'%.');
+ if(t.posuk&&t.posuk.mastered)g.push(t.posuk.mastered+(t.posuk.mastered===1?' posuk':' pesukim')+' read at 100%.');
+ if(t.chazara&&t.chazara.atGoal)g.push(t.chazara.atGoal+(t.chazara.atGoal===1?' posuk':' pesukim')+' reached the chazara goal ('+t.chazara.goal+'×).');
+ if(t.quiz&&t.quiz.avg!==null&&t.quiz.avg>=85)g.push('Strong Weekly Quiz average: '+t.quiz.avg+'%.');
+ if(t.shorashim&&t.shorashim.cards>=10)g.push(t.shorashim.cards+' Shorashim cards learned.');
+ if(t.rashi&&t.rashi.acc!==null&&t.rashi.acc>=85)g.push('Rashi Letters accuracy '+t.rashi.acc+'%.');
+ if(t.yiddish&&t.yiddish.learned>=10)g.push(t.yiddish.learned+' Yiddish words learned.');
+ return {a,g};
+}
+function box(title,data,body){return '<div class="tool"><h3>'+title+(data&&data.last?'<small>'+esc(ago(data.last))+'</small>':'')+'</h3>'+(data?body:'<div class="empty">Not started yet</div>')+'</div>'}
+function li(x){return '<li>'+x+'</li>'}
+function openReport(id,silent){
+ const d=loaded[current];const s=d&&d.view&&d.view.find(x=>x.id===id);if(!s)return;openId=id;
+ const t=s.t,pl=$('period').selectedOptions[0].text.toLowerCase(),{a,g}=attention(s);
+ const cls=classes.find(c=>c.id===current);
+ let h='<div class="rhead"><div><h2>'+esc(s.name)+'</h2><div class="status">'+esc(cls?cls.name:'')+' · Report for '+esc(pl)+' · '+new Date().toLocaleDateString()+' · Last active '+esc(ago(s.last))+'</div></div>'+
+  '<div class="noprint" style="display:flex;gap:8px"><button class="btn blue" id="printBtn">🖨 Print / Save PDF</button><button class="btn light" id="closeBtn">✕ Back to class</button></div></div>';
+ if(a.length)h+='<div class="attn" style="margin-top:16px"><h3>⚠️ Needs attention</h3><ul>'+a.map(li).join('')+'</ul></div>';
+ if(g.length)h+='<div class="good" style="margin-top:10px"><h3>✅ Going well</h3><ul>'+g.map(li).join('')+'</ul></div>';
+ h+='<div class="rgrid">';
+ h+=box('📜 Posuk Practice',t.posuk,t.posuk?'<ul>'+li('<b>'+t.posuk.mastered+'</b> of '+t.posuk.pesukim+' pesukim read at 100%')+li(t.posuk.trans100+' translated at 100% · '+t.posuk.comp100+' questions at 100%')+li('Average best reading score: '+(t.posuk.avgRead===null?'—':t.posuk.avgRead+'%'))+li(t.posuk.tries+' tries '+esc(pl))+'</ul>':'');
+ h+=box('🔁 Chazara',t.chazara,t.chazara?'<ul>'+li('<b>'+t.chazara.inPeriod+'</b> chazaras '+esc(pl)+(+$('period').value?' ('+t.chazara.total+' all time)':''))+li(t.chazara.reviewed+' pesukim reviewed · '+t.chazara.atGoal+' at goal')+li(t.chazara.due?t.chazara.due+' due for review':'Nothing overdue')+'</ul>':'');
+ h+=box('🌳 Shorashim',t.shorashim,t.shorashim?'<ul>'+li('<b>'+t.shorashim.cards+'</b> cards learned'+(+$('period').value?' (+'+t.shorashim.recent+' '+esc(pl)+')':''))+li(t.shorashim.games+' games played')+li(Math.round(t.shorashim.secs/60)+' minutes of study')+'</ul>':'');
+ h+=box('<span class="he">אב</span> Rashi Letters',t.rashi,t.rashi?'<ul>'+li('On unit <b>'+t.rashi.unit+'</b> of '+t.rashi.of)+li('Accuracy: <span class="'+tone(t.rashi.acc)+'">'+(t.rashi.acc===null?'—':t.rashi.acc+'%')+'</span> over '+t.rashi.attempts+' answers')+(t.rashi.weak.length?li('Tricky: <span class="he">'+esc(t.rashi.weak.join(' '))+'</span>'):'')+'</ul>':'');
+ h+=box('🔢 Gematria',t.gematria,t.gematria?'<ul>'+li('⭐ <b>'+t.gematria.stars+'</b> stars · level '+t.gematria.level)+li('Accuracy: <span class="'+tone(t.gematria.acc)+'">'+(t.gematria.acc===null?'—':t.gematria.acc+'%')+'</span>')+(t.gematria.tricky.length?li('Misses most: <span class="he">'+esc(t.gematria.tricky.join(' '))+'</span>'):'')+'</ul>':'');
+ if(d.yiddishOk)h+=box('Yiddish',t.yiddish,t.yiddish?'<ul>'+li('<b>'+t.yiddish.learned+'</b> words learned')+li(t.yiddish.practicing+' words still practicing')+'</ul>':'');
+ h+=box('📔 Halacha',t.halacha,t.halacha?'<ul>'+li('<b>'+t.halacha.done+'</b> of '+t.halacha.of+' scrapbook sections done')+'</ul>':'');
+ h+=box('📝 Weekly Quiz',t.quiz,t.quiz?'<ul>'+li('Average '+esc(pl)+': <b class="'+tone(t.quiz.avg)+'">'+(t.quiz.avg===null?'—':t.quiz.avg+'%')+'</b> ('+t.quiz.count+' of '+t.quiz.all+' quizzes)')+t.quiz.recent.map(q=>li(esc(q.title)+': '+q.correct+'/'+q.total+(q.done?'':' <span class="m">(not finished)</span>')+' <span class="status">'+(q.t?new Date(q.t).toLocaleDateString():'')+'</span>')).join('')+'</ul>':'');
+ if(d.rewardsOk)h+=box('🌟 Student Rewards',s.rew,s.rew?'<ul>'+li('Current points: <b>'+s.rew.balance+'</b>')+'</ul>':'');
+ h+='</div>';
+ $('report').innerHTML=h;$('report').style.display='block';$('classView').style.display='none';$('summary').style.display='none';
+ $('printBtn').onclick=()=>window.print();
+ $('closeBtn').onclick=closeReport;
+ if(!silent)window.scrollTo(0,0);
+}
+function closeReport(){openId='';$('report').style.display='none';$('classView').style.display='';$('summary').style.display=''}
+
+/* ---------- CSV ---------- */
+function csv(){
+ const d=loaded[current];if(!d||!d.view)return;const pl=$('period').selectedOptions[0].text;
+ const head=['Student','Last active','Tools used','Posuk pesukim at 100%','Posuk pesukim tried','Posuk tries ('+pl+')','Chazaras ('+pl+')','Chazara pesukim reviewed','Shorashim cards','Rashi unit','Rashi accuracy %','Gematria stars','Gematria accuracy %','Yiddish words learned','Halacha sections','Quiz average % ('+pl+')','Quizzes ('+pl+')','Points'];
+ const rows=d.view.map(s=>{const t=s.t;return [s.name,s.last?new Date(s.last).toLocaleDateString():'',s.toolsUsed,t.posuk?.mastered??'',t.posuk?.pesukim??'',t.posuk?.tries??'',t.chazara?.inPeriod??'',t.chazara?.reviewed??'',t.shorashim?.cards??'',t.rashi?.unit??'',t.rashi?.acc??'',t.gematria?.stars??'',t.gematria?.acc??'',t.yiddish?.learned??'',t.halacha?.done??'',t.quiz?.avg??'',t.quiz?.count??'',s.rew?.balance??'']});
+ const text=[head,...rows].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+text],{type:'text/csv'}));
+ const cls=classes.find(c=>c.id===current);a.download='student-report-'+(cls?cls.name:current).replace(/\W+/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+
+/* ---------- Wiring ---------- */
+function drawTabs(){
+ $('classTabs').innerHTML=classes.map(c=>'<button type="button" data-c="'+esc(c.id)+'" class="'+(c.id===current?'on':'')+'">'+esc(c.name)+'</button>').join('');
+ $('classTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{current=b.dataset.c;closeReport();drawTabs();show(false)});
+}
+async function show(force){
+ const c=classes.find(x=>x.id===current);if(!c)return;
+ if(force||!loaded[current]){
+  $('status').textContent='Loading '+c.name+' from all tools…';$('rows').innerHTML='';$('summary').innerHTML='';
+  try{loaded[current]=await loadClass(c)}catch(e){console.error(e);$('status').textContent='Could not load: '+(e.message||e);return}
+ }
+ drawTable();
+ $('status').textContent='Updated '+new Date().toLocaleTimeString();
+}
+async function start(u,authorized,acc){
+ user=u;access=acc||{authorized};
+ if(access.actingAsStudent){$('gate').textContent='You are viewing as a student. Exit student view to see reports.';return}
+ if(!u||!access.authorized){
+  $('app').style.display='none';$('gate').style.display='';
+  $('gate').innerHTML='Sign in with your teacher Google account to see student reports.<br><button class="btn" id="login" style="margin-top:14px">Sign in with Google</button>';
+  $('login').onclick=()=>api.signInWithGoogle();return;
+ }
+ try{
+  classes=await classIdsFor(access,u);
+  if(!classes.length){$('gate').textContent='No classes are assigned to this teacher account yet.';return}
+  const want=new URLSearchParams(location.search).get('class');
+  current=classes.some(c=>c.id===want)?want:classes[0].id;
+  $('gate').style.display='none';$('app').style.display='';
+  drawTabs();show(false);
+  const sid=new URLSearchParams(location.search).get('student');if(sid)openId=sid;
+ }catch(e){console.error(e);$('gate').textContent='Could not load your classes: '+(e.message||e)}
+}
+$('period').onchange=()=>drawTable();
+$('refresh').onclick=()=>show(true);
+$('csv').onclick=csv;
+if(api&&typeof api.onAuthStateChanged==='function')api.onAuthStateChanged(start);
+else $('gate').textContent='Teacher access could not start. Please refresh the page.';
+})();
+</script>
+</body></html>
