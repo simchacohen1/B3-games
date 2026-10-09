@@ -508,6 +508,28 @@
   }
   function studentReset(){layoutOpts={spread:false,rtl:true,shift:false};transfer=null;pendingView=null;docId=null;unload(true);strokes=[];drawInk();$('placeholder').hidden=B.sharing()}
 
+  // Static snapshots may be inside a sandboxed frame. Capture panning at the
+  // lesson surface before the frame or annotation layers can swallow a drag.
+  let snapshotPan=null;
+  stage.addEventListener('pointerdown',event=>{
+    if(!webMode||!isTeacher||!B.navigating()||notReady()||event.button!==0||scroller.hidden||!stage.contains(event.target))return;
+    if(event.target.closest?.('[data-stage-ui],button,input,select,textarea'))return;
+    event.preventDefault();event.stopPropagation();cancelDraft();
+    snapshotPan={id:event.pointerId,x:event.clientX,y:event.clientY,left:scroller.scrollLeft,top:scroller.scrollTop};
+    stage.setPointerCapture(event.pointerId);
+  },true);
+  stage.addEventListener('pointermove',event=>{
+    if(!snapshotPan||event.pointerId!==snapshotPan.id)return;
+    event.preventDefault();event.stopPropagation();
+    scroller.scrollLeft=snapshotPan.left+snapshotPan.x-event.clientX;
+    scroller.scrollTop=snapshotPan.top+snapshotPan.y-event.clientY;
+  },true);
+  function stopSnapshotPan(){
+    if(snapshotPan&&stage.hasPointerCapture(snapshotPan.id))stage.releasePointerCapture(snapshotPan.id);
+    snapshotPan=null;
+  }
+  ['pointerup','pointercancel','lostpointercapture'].forEach(type=>stage.addEventListener(type,stopSnapshotPan,true));
+  document.addEventListener('class-pointer-navigation',stopSnapshotPan);
   // Navigation mode keeps the selected tool intact. Dragging moves the document;
   // students still follow the teacher's view and cannot change it for the class.
   let pan=null;
