@@ -2564,3 +2564,6 @@ exports.studentRewardsTeacher = require("./rewards-teacher").studentRewardsTeach
 
 // Preserve the deployed picture-choice helper; it now shares paid API protection.
 exports.generateShorashimArt = require("./shorashim-art").generateShorashimArt;
+
+// Read-only owner ChatGPT student report (ET/WT only).
+exports.studentReportChatGPTRead = require("./student-report-chatgpt-read").studentReportChatGPTRead;
