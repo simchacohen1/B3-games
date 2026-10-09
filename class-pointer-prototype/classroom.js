@@ -208,6 +208,32 @@ async function zoomTab(direction){
   try{await(direction>0?captureControl.increaseZoomLevel():captureControl.decreaseZoomLevel())}catch(error){tabControlError(error)}
   updateTabControls();
 }
+async function captureBrowserTab(){
+  if(!started)return;
+  if(!navigator.mediaDevices?.getDisplayMedia){fail('Use Chrome or Edge on a computer to capture a browser tab.');return}
+  clearError();$('openBrowserTab').disabled=true;
+  let stream=null,video=null;
+  try{
+    const opts={video:{frameRate:1},audio:false,preferCurrentTab:false,selfBrowserSurface:'exclude'};
+    stream=await navigator.mediaDevices.getDisplayMedia(opts);
+    const track=stream.getVideoTracks()[0];
+    if(track?.getSettings?.().displaySurface!=='browser')throw Error('Choose a browser tab (not a window or screen), then try again.');
+    video=document.createElement('video');video.muted=true;video.playsInline=true;video.srcObject=stream;
+    await video.play();
+    if(!video.videoWidth||!video.videoHeight)await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(Error('The browser tab did not provide a picture.')),7000);
+      video.addEventListener('loadeddata',()=>{clearTimeout(timer);resolve()},{once:true});
+    });
+    if(!video.videoWidth||!video.videoHeight)throw Error('The selected tab is not ready to capture.');
+    const width=Math.min(1800,video.videoWidth),height=Math.round(width*video.videoHeight/video.videoWidth);
+    const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    canvas.getContext('2d',{alpha:false}).drawImage(video,0,0,width,height);
+    const dataUrl=canvas.toDataURL('image/jpeg',0.82);
+    track.stop();stream=null;video.srcObject=null;
+    await window.ClassPointerPdf.openSnapshot(dataUrl,width,height);
+  }catch(error){fail(error.name==='NotAllowedError'?'Tab capture was canceled.':error.message||'Could not capture the browser tab.')}
+  finally{stream?.getTracks().forEach(t=>t.stop());if(video)video.srcObject=null;$('openBrowserTab').disabled=!started}
+}
 async function shareScreen(preferTab=false){
   clearError();window.ClassPointerPdf?.close(true);if(!navigator.mediaDevices?.getDisplayMedia){fail('Use Chrome or Edge on a computer to share your teaching screen.');return}
   $('shareScreen').disabled=true;$('openBrowserTab').disabled=true;const currentPeer=peer;let captured=null,processor=null,outgoing=null;
@@ -325,7 +351,7 @@ $('spotlight').addEventListener('change',()=>{state.spotlight=$('spotlight').che
 $('clearTeacher').addEventListener('click',()=>{cancelHover();delete state.points.teacher;publish()});
 $('clearAll').addEventListener('click',()=>{cancelHover();state.points={};publish()});
 $('copyLink').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('joinLink').value);status('Join link copied. Send it to your students.')}catch{$('joinLink').select();status('Select and copy the student join link.')}});
-$('startClass').addEventListener('click',startClass);$('endClass').addEventListener('click',endClass);$('shareScreen').addEventListener('click',()=>shareScreen(false));$('openBrowserTab').addEventListener('click',()=>shareScreen(true));$('stopScreen').addEventListener('click',stopSharing);
+$('startClass').addEventListener('click',startClass);$('endClass').addEventListener('click',endClass);$('shareScreen').addEventListener('click',()=>shareScreen(false));$('openBrowserTab').addEventListener('click',captureBrowserTab);$('stopScreen').addEventListener('click',stopSharing);
 if($('tabScroll')){$('tabScroll').addEventListener('click',toggleTabScroll);$('tabZoomIn').addEventListener('click',()=>zoomTab(1));$('tabZoomOut').addEventListener('click',()=>zoomTab(-1))}
 $('joinForm').addEventListener('submit',joinClass);$('leaveClass').addEventListener('click',leaveClass);
 new ResizeObserver(drawPointers).observe($('stage'));$('lesson').addEventListener('loadedmetadata',drawPointers);$('lesson').addEventListener('resize',drawPointers);
