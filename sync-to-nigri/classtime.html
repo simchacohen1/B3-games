@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Classtime → Nigri</title>
+<style>
+:root{font-family:system-ui,Arial,sans-serif;color:#152c44;background:#f5f8fd}
+*{box-sizing:border-box}body{margin:0}.wrap{max-width:800px;margin:36px auto;padding:0 18px}
+.card{background:#fff;border:1px solid #d8e2ee;border-radius:15px;padding:24px;box-shadow:0 4px 16px #172b4d0a}
+h1{margin:12px 0 8px}p{line-height:1.55;color:#425466}.back{color:#215da0;text-decoration:none;font-weight:600}
+label{display:block;font-weight:650;margin:16px 0 6px}input,select{width:100%;padding:12px;border:1px solid #b8c8d9;border-radius:9px;background:#fff;font:inherit}
+button{padding:13px 18px;border:0;border-radius:9px;font:inherit;font-weight:700}button:disabled{cursor:not-allowed;opacity:.55;background:#366ca6;color:#fff}
+.notice{background:#fff8e7;border:1px solid #e7cd8a;padding:12px 14px;border-radius:9px;margin:18px 0}
+.small{font-size:13px}a{color:#215da0}
+</style></head><body><main class="wrap"><a class="back" href="./index.html">← Back to Sync choices</a>
+<div class="card"><h1>Classtime → Nigri</h1>
+<p>Select the Classtime test session you want to submit. This will be a <strong>manual, button-triggered sync</strong>, not a scheduled transfer.</p>
+<div class="notice"><strong>Connection setup in progress.</strong> The existing Nigri destination is known, but automatic access to Classtime sessions has not yet been verified. The sync button is disabled to prevent accidental or misleading submissions. No student data is transferred from this page yet.</div>
+<label for="cls">Nigri class</label><select id="cls"><option value="B3 ET">B3 ET</option><option value="B3 WT">B3 WT</option></select>
+<label for="session">Classtime session name or code</label><input id="session" placeholder="e.g. B3 ET Shorashim Week 4" autocomplete="off">
+<p class="small">Different sessions of the same quiz have different codes. Verify both the name and session code before syncing. We will add a student-by-student review of scores and PDF attachments here before enabling submission.</p>
+<button disabled aria-disabled="true" title="Classtime connection not configured">Sync to Nigri — setup required</button>
+<p class="small">You can access your <a href="https://www.classtime.com/" target="_blank" rel="noopener">Classtime account</a> to locate a session. Do not enter your Classtime password here.</p>
+</div></main></body></html>
