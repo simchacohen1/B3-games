@@ -85,7 +85,7 @@
     if(inside&&dock.parentNode!==stage)stage.appendChild(dock);
     else if(!inside&&dock.parentNode===stage){home.parentNode.insertBefore(dock,home.nextSibling);dock.classList.remove('collapsed')}
     dock.classList.toggle('floating',inside);
-    $('tbFullscreen').textContent=inside?'✕':'⛶';$('tbFullscreen').title=inside?'Exit full screen':'Full screen';
+    $('tbFullscreen').textContent=inside?'⤢ Exit fullscreen':'⛶ Fullscreen';$('tbFullscreen').title=inside?'Exit fullscreen lesson':'Expand lesson to fullscreen';
   }
 
   function sync(){
