@@ -908,6 +908,24 @@ paidSignInButton.onclick = async () => {
 document.getElementById('mainContent').prepend(paidSignInButton);
 
 // ---------- Shared data listeners ----------
+// Reuse the verified owner account for the original shared B3 quiz.
+// Other teachers still use their assigned class and its existing grant checks.
+if (!CLASS_SPACE) {
+  window.B3SiteSettings.onAuthStateChanged((user, authorized, access) => {
+    const owner = !!(user && authorized && access && access.role === 'admin'
+      && !window.B3SiteSettings.getActingStudent());
+    if (owner) {
+      document.getElementById('lockOverlay').style.display = 'none';
+      document.getElementById('mainContent').classList.remove('hidden');
+      window.weeklyQuizOwnerUnlocked = true;
+    } else if (window.weeklyQuizOwnerUnlocked) {
+      document.getElementById('lockOverlay').style.display = '';
+      document.getElementById('mainContent').classList.add('hidden');
+      window.weeklyQuizOwnerUnlocked = false;
+    }
+  });
+}
+
 if(CLASS_SPACE){
   // This class's own students replace the B3 East/West lists everywhere on the page.
   delete CLASS_ROSTERS.et;delete CLASS_ROSTERS.wt;

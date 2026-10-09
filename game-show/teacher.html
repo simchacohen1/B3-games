@@ -662,6 +662,24 @@ const ACTIVE_SET_ID = "vayeira18";
 const ACTIVE_SET_TITLE = "Game Show";
 const setRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/set' : "questionSets/" + ACTIVE_SET_ID);
 
+// Reuse the verified owner account for the original shared B3 show.
+// Other teachers still use their assigned class and its existing grant checks.
+if (!CLASS_SPACE) {
+  window.B3SiteSettings.onAuthStateChanged((user, authorized, access) => {
+    const owner = !!(user && authorized && access && access.role === 'admin'
+      && !window.B3SiteSettings.getActingStudent());
+    if (owner) {
+      document.getElementById('lockOverlay').style.display = 'none';
+      document.getElementById('mainContent').classList.remove('hidden');
+      window.gameShowOwnerUnlocked = true;
+    } else if (window.gameShowOwnerUnlocked) {
+      document.getElementById('lockOverlay').style.display = '';
+      document.getElementById('mainContent').classList.add('hidden');
+      window.gameShowOwnerUnlocked = false;
+    }
+  });
+}
+
 if (CLASS_SPACE) {
   document.getElementById('lockPassword').style.display = 'none';
   document.getElementById('lockUnlock').style.display = 'none';
