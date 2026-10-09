@@ -3,20 +3,36 @@
   // Pure helpers for Class Pointer PDF mode (no browser needed, so they can be tested with node).
   // Every page is laid out one width unit wide. The whole PDF is one tall "document" whose
   // vertical position (0..1) is shared by teacher and students, so marks and pointers stay on the words.
-  const GAP=0.02,MIN_ZOOM=0.5,MAX_ZOOM=4,MAX_BYTES=80*1024*1024,CHUNK=64*1024;
+  const GAP=0.02,COL_GAP=0.012,MIN_ZOOM=0.5,MAX_ZOOM=4,MAX_BYTES=80*1024*1024,CHUNK=64*1024;
   // Files up to SMALL_BYTES are sent whole. Bigger files (up to PAGED_MAX_BYTES) are sent one page picture at a time, only for the pages near the teacher's view.
   const SMALL_BYTES=25*1024*1024,PAGED_MAX_BYTES=500*1024*1024,PAGE_MAX=8*1024*1024,MAX_PAGES=5000,PAGE_IMAGE_WIDTH=2400;
   const ZOOM_STEPS=[0.5,0.75,1,1.25,1.5,1.75,2,2.5,3,4];
   function clamp(value,low,high){return Math.min(high,Math.max(low,value))}
-  function layout(ratios,gap=GAP){
-    const tops=[],heights=[];let y=0;
-    ratios.forEach((ratio,i)=>{const r=Number.isFinite(ratio)&&ratio>0.05&&ratio<20?ratio:1.4;tops.push(y);heights.push(r);y+=r+(i<ratios.length-1?gap:0)});
-    return{tops,heights,total:y||1,count:ratios.length};
+  // opts: spread (two pages side by side), rtl (first page on the right, like a Hebrew book),
+  // shift (the first page stands alone, so the pairs start at page 2). All sizes are in units of the content width.
+  function layout(ratios,opts={}){
+    const gap=Number.isFinite(opts.gap)?opts.gap:GAP,spread=opts.spread===true,rtl=opts.rtl===true,shift=opts.shift===true&&spread;
+    const n=ratios.length,rs=ratios.map(r=>Number.isFinite(r)&&r>0.05&&r<20?r:1.4);
+    const pw=spread?(1-COL_GAP)/2:1,rows=[];
+    if(!spread)for(let i=0;i<n;i++)rows.push([i]);
+    else{let i=0;if(shift&&n>0){rows.push([0]);i=1}for(;i<n;i+=2)rows.push(i+1<n?[i,i+1]:[i])}
+    const tops=[],heights=[],lefts=[],widths=[];let y=0;
+    rows.forEach((row,r)=>{
+      let rowHeight=0;
+      row.forEach((i,slot)=>{
+        // A lone first page sits on the opposite side from the pairs, like the front page of a printed book (left for Hebrew).
+        const col=spread?(shift&&i===0?(rtl?0:1):(rtl?1-slot:slot)):0;
+        tops[i]=y;heights[i]=rs[i]*pw;widths[i]=pw;lefts[i]=col*(pw+COL_GAP);rowHeight=Math.max(rowHeight,heights[i]);
+      });
+      y+=rowHeight+(r<rows.length-1?gap:0);
+    });
+    return{tops,heights,lefts,widths,total:y||1,count:n,spread};
   }
   // Which page is at document position y (0..1)? Gaps belong to the page above.
   function pageAt(lay,y){
     if(!lay.count)return 0;const units=clamp(y,0,1)*lay.total;let low=0,high=lay.count-1;
     while(low<high){const mid=(low+high+1)>>1;if(lay.tops[mid]<=units)low=mid;else high=mid-1}
+    while(low>0&&lay.tops[low-1]===lay.tops[low])low--; // side by side: the first page of the pair
     return low;
   }
   function pageTop(lay,page){return lay.count?lay.tops[clamp(page,0,lay.count-1)]/lay.total:0}
@@ -29,7 +45,7 @@
     if(!view||typeof view!=='object')return null;
     const zoom=Number(view.zoom),top=Number(view.top),left=Number(view.left);
     if(![zoom,top,left].every(Number.isFinite))return null;
-    return{zoom:clamp(zoom,MIN_ZOOM,MAX_ZOOM),top:clamp(top,0,1),left:clamp(left,0,1)};
+    return{zoom:clamp(zoom,MIN_ZOOM,MAX_ZOOM),top:clamp(top,0,1),left:clamp(left,0,1),spread:view.spread===true,rtl:view.rtl===true,shift:view.shift===true};
   }
   function cleanName(value){return typeof value==='string'?value.replace(/[\u0000-\u001f\u007f<>]/g,'').trim().slice(0,80)||'Lesson PDF':'Lesson PDF'}
   function chunkCount(size){return Math.max(1,Math.ceil(size/CHUNK))}

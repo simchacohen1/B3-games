@@ -14,7 +14,7 @@
   let doc=null,docId=null,docName='',bytes=null,lay=null,pageEls=[],rendered=new Map();
   // Page-by-page mode (big files): the teacher sends page pictures; students keep them in pageUrls.
   let paged=false,ratiosList=[],pageUrls=new Map(),pageTransfers=new Map(),pageCache=new Map(),pageJobs=new Map(),renderChain=Promise.resolve();
-  let zoom=1,W=0,H=0,loadToken=0,strokes=[],draft=null,dragId=null,transfer=null,pendingView=null;
+  let layoutOpts={spread:false,rtl:true,shift:false},zoom=1,W=0,H=0,loadToken=0,strokes=[],draft=null,dragId=null,transfer=null,pendingView=null;
   let renderTimer=0,viewTimer=0,lastViewSent=0,frame=0,quietUntil=0;
 
   function el(tag,id,cls,text){const node=document.createElement(tag);if(id)node.id=id;if(cls)node.className=cls;if(text!=null)node.textContent=text;return node}
@@ -28,7 +28,7 @@
   function showNote(text){note.textContent=text||'';note.hidden=!text}
 
   // ---------- Teacher controls (inside the lesson so they also work in full screen) ----------
-  let nav=null,pageInput=null,pageTotal=null,zoomLabel=null;
+  let nav=null,pageInput=null,pageTotal=null,zoomLabel=null,twoBtn=null,flipBtn=null,shiftBtn=null;
   if(isTeacher){
     nav=el('div','pdfNav');nav.hidden=true;nav.dataset.stageUi='true';nav.setAttribute('role','toolbar');nav.setAttribute('aria-label','PDF controls');
     const button=(label,title,onClick,cls)=>{const b=el('button',null,cls||'pdf-btn',label);b.type='button';b.title=title;b.addEventListener('click',onClick);nav.appendChild(b);return b};
@@ -45,6 +45,10 @@
     button('＋','Zoom in',()=>setZoom(P.nextZoom(zoom,1)),'pdf-btn pdf-zoom');
     button('↔ Fit width','Fit the page to the width of the lesson',()=>setZoom(1,true));
     nav.appendChild(el('span',null,'pdf-sep'));
+    twoBtn=button('⧉ Two pages','Show two pages side by side (drawings are cleared when you switch)',()=>changeLayout({spread:!layoutOpts.spread,shift:!layoutOpts.spread}),'pdf-btn pdf-two');
+    flipBtn=button('⇄ Flip sides','Swap which side the first page of each pair is on',()=>changeLayout({rtl:!layoutOpts.rtl}),'pdf-btn pdf-spread-only');
+    shiftBtn=button('◧ Page 1 alone','Show page 1 by itself and start the pairs at page 2',()=>changeLayout({shift:!layoutOpts.shift}),'pdf-btn pdf-spread-only');
+    nav.appendChild(el('span',null,'pdf-sep'));
     button('✕ Close PDF','Close the PDF for everyone',()=>closePdf(),'pdf-btn pdf-close');
     const toggle=button('▾ Hide','Hide these buttons (for example while sharing this tab on Zoom)',()=>{const min=nav.classList.toggle('min');toggle.textContent=min?'▴ PDF controls':'▾ Hide'},'pdf-btn pdf-toggle');
     ['pointerdown','pointermove','pointerup','pointercancel','click','dblclick','wheel'].forEach(type=>nav.addEventListener(type,event=>event.stopPropagation()));
@@ -56,20 +60,22 @@
   // ---------- Layout ----------
   function notReady(){return !lay}
   function currentView(){
-    if(notReady()||!H)return{zoom,top:0,left:0};
-    return{zoom,top:P.clamp(scroller.scrollTop/H,0,1),left:W>scroller.clientWidth?P.clamp(scroller.scrollLeft/W,0,1):0};
+    if(notReady()||!H)return{zoom,top:0,left:0,...layoutOpts};
+    return{zoom,top:P.clamp(scroller.scrollTop/H,0,1),left:W>scroller.clientWidth?P.clamp(scroller.scrollLeft/W,0,1):0,...layoutOpts};
   }
   function relayout(){
     if(notReady())return;
     const cw=Math.max(80,scroller.clientWidth);W=cw*zoom;H=W*lay.total;
     content.style.width=W+'px';content.style.height=H+'px';
-    pageEls.forEach((node,i)=>{node.style.top=(lay.tops[i]*W)+'px';node.style.height=(lay.heights[i]*W)+'px'});
+    pageEls.forEach((node,i)=>{node.style.top=(lay.tops[i]*W)+'px';node.style.height=(lay.heights[i]*W)+'px';node.style.left=(lay.lefts[i]*W)+'px';node.style.width=(lay.widths[i]*W)+'px'});
     ink.setAttribute('width',W);ink.setAttribute('height',H);ink.setAttribute('viewBox','0 0 '+W+' '+H);
     drawInk();
   }
   function applyView(view){
     if(notReady())return;
-    quietUntil=Date.now()+150;zoom=view.zoom;relayout();
+    quietUntil=Date.now()+150;zoom=view.zoom;
+    if(!isTeacher&&'spread' in view&&(view.spread!==layoutOpts.spread||view.rtl!==layoutOpts.rtl||view.shift!==layoutOpts.shift)){layoutOpts={spread:view.spread,rtl:view.rtl,shift:view.shift};lay=P.layout(ratiosList,layoutOpts)}
+    relayout();
     scroller.scrollTop=view.top*H;scroller.scrollLeft=view.left*W;
     // scroll events caused by this move must not be sent back out (quietUntil)
     afterMove();
@@ -97,6 +103,20 @@
     pageTotal.textContent=' of '+lay.count;pageInput.max=String(lay.count);
     if(document.activeElement!==pageInput)pageInput.value=String(currentPage()+1);
     zoomLabel.textContent=Math.round(zoom*100)+'%';
+    twoBtn.textContent=layoutOpts.spread?'⧉ Two pages: on':'⧉ Two pages';twoBtn.classList.toggle('on',layoutOpts.spread);
+    flipBtn.hidden=shiftBtn.hidden=!layoutOpts.spread;
+    flipBtn.textContent=layoutOpts.rtl?'⇄ Page 1 on right':'⇄ Page 1 on left';
+    shiftBtn.textContent=layoutOpts.shift?'◧ Page 1 alone: on':'◧ Page 1 alone';shiftBtn.classList.toggle('on',layoutOpts.shift);
+  }
+  // Teacher: switch between one page and two pages. Old drawings sit on the old layout, so they are cleared.
+  function changeLayout(patch){
+    if(!isTeacher||notReady())return;
+    const anchor=currentPage();
+    layoutOpts={...layoutOpts,...patch};if(!layoutOpts.spread)layoutOpts.shift=false; // turning Two pages on starts with page 1 alone, like the printed book
+    lay=P.layout(ratiosList,layoutOpts);
+    quietUntil=Date.now()+150;relayout();
+    scroller.scrollTop=lay.tops[anchor]*W;scroller.scrollLeft=0;
+    B.resetMarks();afterMove(true);
   }
   function afterMove(forceSend){
     scheduleRender();updateControls();B.redraw();
@@ -122,11 +142,11 @@
     }
   }
   function renderPage(i,dpr){
-    const key=Math.round(W)+'@'+dpr,old=rendered.get(i);if(old&&old.key===key)return;
+    const pageW=W*lay.widths[i],key=Math.round(pageW)+'@'+dpr,old=rendered.get(i);if(old&&old.key===key)return;
     old?.task?.cancel();const token=loadToken,entry={key,task:null};rendered.set(i,entry);
     doc.getPage(i+1).then(page=>{
       if(token!==loadToken||rendered.get(i)!==entry)return;
-      const base=page.getViewport({scale:1});let scale=(W*Math.min(dpr,2))/base.width;
+      const base=page.getViewport({scale:1});let scale=(pageW*Math.min(dpr,2))/base.width;
       const pixels=base.width*scale*base.height*scale;if(pixels>14e6)scale*=Math.sqrt(14e6/pixels);
       const viewport=page.getViewport({scale}),canvas=document.createElement('canvas');
       canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
@@ -203,7 +223,7 @@
       ratios.push(Math.round((v.height/v.width)*10000)/10000);
       if(token!==loadToken){loaded.destroy();return false}
     }
-    doc=loaded;ratiosList=ratios;lay=P.layout(ratios);zoom=1;
+    doc=loaded;ratiosList=ratios;lay=P.layout(ratios,layoutOpts);zoom=1;
     pageEls=ratios.map(()=>{const node=el('div',null,'pdf-page');content.insertBefore(node,ink);return node});
     scroller.hidden=false;stage.classList.add('pdf-open');$('placeholder').hidden=true;
     relayout();scroller.scrollTop=0;scroller.scrollLeft=0;scheduleRender();updateControls();
@@ -262,12 +282,13 @@
     }
     if(docId===token&&connection.open)B.send(connection,{type:'pdf-view',id:token,...currentView()});
   }
-  function deliver(member){if(paged){sendInfo(member);pumpPages(member)}else sendFile(member)}
+  function deliver(member){if(paged){sendInfo(member);B.send(member.connection,{type:'pdf-view',id:docId,...currentView()});pumpPages(member)}else sendFile(member)}
   function sendInfo(member){B.send(member.connection,{type:'pdf-info',id:docId,name:docName,ratios:ratiosList})}
   function wantedPages(){
     if(notReady()||!H)return[];
     const view=currentView();
-    return P.pagesNear(lay.count,P.pageAt(lay,view.top),P.pageAt(lay,view.top+scroller.clientHeight/H));
+    const last=P.pageAt(lay,view.top+scroller.clientHeight/H);
+    return P.pagesNear(lay.count,P.pageAt(lay,view.top),lay.spread?Math.min(lay.count-1,last+1):last);
   }
   // Teacher: turn one page into a picture (JPEG) once, and reuse it for every student.
   async function renderJpeg(i,token){
@@ -356,7 +377,7 @@
       }
     }else if(message.type==='pdf-info'){
       const info=P.cleanInfo(message);if(!info)return true;
-      studentReset();paged=true;docId=info.id;docName=info.name;ratiosList=info.ratios;lay=P.layout(info.ratios);zoom=1;
+      studentReset();paged=true;docId=info.id;docName=info.name;ratiosList=info.ratios;layoutOpts={spread:false,rtl:true,shift:false};lay=P.layout(info.ratios,layoutOpts);zoom=1;
       pageEls=info.ratios.map((_,i)=>{const node=el('div',null,'pdf-page');node.dataset.label='Loading page '+(i+1)+'…';content.insertBefore(node,ink);return node});
       scroller.hidden=false;stage.classList.add('pdf-open');$('placeholder').hidden=true;showNote('');
       relayout();if(pendingView&&pendingView.id===docId)applyView(pendingView);
@@ -382,7 +403,7 @@
     image.alt='';image.draggable=false;image.src=url;pageUrls.set(i,url);
     pageEls[i].dataset.label='';pageEls[i].replaceChildren(image);if(old)setTimeout(()=>URL.revokeObjectURL(old),2000);
   }
-  function studentReset(){transfer=null;pendingView=null;docId=null;unload(true);strokes=[];drawInk()}
+  function studentReset(){layoutOpts={spread:false,rtl:true,shift:false};transfer=null;pendingView=null;docId=null;unload(true);strokes=[];drawInk()}
 
   // ---------- Wiring ----------
   if(isTeacher){

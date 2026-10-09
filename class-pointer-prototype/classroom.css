@@ -226,3 +226,5 @@ body.student-dock-view #stage:fullscreen #exitFullScreenLesson,body.student-dock
 #pdfView.follow{overflow:hidden}
 .pdf-page img{display:block;width:100%;height:100%;pointer-events:none;-webkit-user-drag:none}
 .pdf-page[data-label]:not([data-label='']):before{content:attr(data-label);position:absolute;inset:0;display:grid;place-items:center;color:#7b8498;font-size:22px;font-weight:700}
+#pdfNav .pdf-btn.on{background:#2557d6;color:#fff;border-color:#7ba2ff}
+#pdfNav .pdf-btn[hidden]{display:none}

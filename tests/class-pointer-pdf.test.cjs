@@ -21,8 +21,9 @@ test('zoom steps move one at a time and stay inside the limits',()=>{
   assert.equal(P.nextZoom(1.1,1),1.25);assert.equal(P.nextZoom(1.1,-1),1);
 });
 test('a student only accepts a sane view from the teacher',()=>{
-  assert.deepEqual(P.cleanView({zoom:2,top:0.5,left:0.25}),{zoom:2,top:0.5,left:0.25});
-  assert.deepEqual(P.cleanView({zoom:99,top:-4,left:9}),{zoom:4,top:0,left:1});
+  assert.deepEqual(P.cleanView({zoom:2,top:0.5,left:0.25}),{zoom:2,top:0.5,left:0.25,spread:false,rtl:false,shift:false});
+  assert.deepEqual(P.cleanView({zoom:99,top:-4,left:9}),{zoom:4,top:0,left:1,spread:false,rtl:false,shift:false});
+  assert.deepEqual(P.cleanView({zoom:1,top:0,left:0,spread:true,rtl:true,shift:'yes'}),{zoom:1,top:0,left:0,spread:true,rtl:true,shift:false});
   assert.equal(P.cleanView({zoom:'x',top:0,left:0}),null);assert.equal(P.cleanView(null),null);assert.equal(P.cleanView({zoom:1,top:NaN,left:0}),null);
 });
 test('file offers are checked for size and chunk count',()=>{
@@ -79,4 +80,23 @@ test('the teacher sends the pages in view first, then a few ahead and one behind
   assert.deepEqual(P.pagesNear(5,4,4),[4,3]);
   assert.deepEqual(P.pagesNear(1,0,0),[0]);
   assert.ok(P.SMALL_BYTES<P.PAGED_MAX_BYTES);
+});
+
+test('side by side: pairs share a row, Hebrew order puts page 1 on the right, page 1 can stand alone',()=>{
+  const r=[1.4,1.4,1.4,1.4,1.4];
+  const ltr=P.layout(r,{spread:true});
+  assert.equal(ltr.tops[0],ltr.tops[1]);assert.ok(ltr.tops[2]>ltr.tops[0]);assert.equal(ltr.lefts[0],0);assert.ok(ltr.lefts[1]>0.49);
+  assert.ok(Math.abs(ltr.widths[0]*2+0.012-1)<1e-9);
+  const rtl=P.layout(r,{spread:true,rtl:true});
+  assert.ok(rtl.lefts[0]>rtl.lefts[1]);assert.equal(rtl.lefts[1],0);
+  assert.equal(rtl.tops[4],rtl.tops[4]);assert.ok(rtl.lefts[4]>0.49);           // lone last page stays on the first-page side
+  const shifted=P.layout(r,{spread:true,rtl:true,shift:true});
+  assert.equal(shifted.lefts[0],0);assert.ok(shifted.lefts[1]>0.49);assert.equal(shifted.lefts[2],0); // page 1 alone on the left, then 2 on the right with 3 on the left
+  assert.ok(P.layout(r,{spread:true,rtl:false,shift:true}).lefts[0]>0.49);
+  assert.ok(shifted.tops[1]>shifted.tops[0]);assert.equal(shifted.tops[1],shifted.tops[2]);assert.equal(shifted.tops[3],shifted.tops[4]);
+  assert.equal(P.pageAt(rtl,rtl.tops[3]/rtl.total+0.0001),2);                      // first page of the pair
+  assert.equal(P.pageAt(rtl,0),0);
+  const one=P.layout(r);assert.equal(one.lefts[3],0);assert.equal(one.widths[3],1);assert.ok(Math.abs(one.tops[1]-1.42)<1e-9);
+  // a taller page makes its row taller, so pages never overlap
+  const mix=P.layout([1.4,2,1.4,1.4],{spread:true});assert.ok(Math.abs(mix.tops[2]-(mix.heights[1]+0.02))<1e-9);
 });
