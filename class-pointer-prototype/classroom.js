@@ -153,7 +153,7 @@ async function startClass(){
   peer.on('open',async id=>{
     if(peer!==current)return;
     try{if(window.ClassPointerDashboard)await window.ClassPointerDashboard.publish(id)}catch(error){if(peer===current){endClass();fail('Could not open the lesson on student dashboards. '+error.message)}return}
-    if(peer!==current)return;clearTimeout(joinTimer);started=true;$('endClass').disabled=false;$('shareScreen').disabled=false;
+    if(peer!==current)return;clearTimeout(joinTimer);started=true;$('endClass').disabled=false;$('shareScreen').disabled=false;$('openBrowserTab').disabled=false;
     const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status(window.ClassPointerDashboard?'Class open. Students click Class Pointer on Fun Torah Tools and join automatically.':'Class open. Send the join link. Students join automatically.');roster();
   });
   peer.on('connection',receiveStudent);peer.on('call',call=>call.close());
@@ -163,7 +163,7 @@ function stopSharing(){
   const oldViewport=viewportController;viewportController=null;const oldScreen=screen;screen=null;
   oldViewport?.stop();oldScreen?.getTracks().forEach(track=>track.stop());
   for(const member of members.values()){clearStudentHover(member);member.call?.close();member.call=null;member.videoReady=false;clearTimeout(member.mediaTimer)}
-  resetTabControls();state.sharing=false;state.points={};$('lesson').srcObject=null;$('placeholder').hidden=false;$('stopScreen').disabled=true;$('shareScreen').disabled=!started;publish();
+  resetTabControls();state.sharing=false;state.points={};$('lesson').srcObject=null;$('placeholder').hidden=false;$('stopScreen').disabled=true;$('shareScreen').disabled=!started;$('openBrowserTab').disabled=!started;publish();
 }
 function resetOverlaysForViewChange(){
   cancelHover();highlighter?.cancel();state.points={};highlightStore.reset();publishHighlights();publish();
@@ -208,16 +208,22 @@ async function zoomTab(direction){
   try{await(direction>0?captureControl.increaseZoomLevel():captureControl.decreaseZoomLevel())}catch(error){tabControlError(error)}
   updateTabControls();
 }
-async function shareScreen(){
+async function shareScreen(preferTab=false){
   clearError();window.ClassPointerPdf?.close(true);if(!navigator.mediaDevices?.getDisplayMedia){fail('Use Chrome or Edge on a computer to share your teaching screen.');return}
-  $('shareScreen').disabled=true;const currentPeer=peer;let captured=null,processor=null,outgoing=null;
+  $('shareScreen').disabled=true;$('openBrowserTab').disabled=true;const currentPeer=peer;let captured=null,processor=null,outgoing=null;
   try{
     // Keep the teacher on the Class Pointer page after picking a tab/window to share (Chrome/Edge 109+).
     let captureController=null;captureControl=null;
     if(typeof window.CaptureController==='function'){try{captureController=new CaptureController();captureController.setFocusBehavior?.('no-focus-change')}catch(_){captureController=null}}
     const displayOptions={video:{width:{ideal:2560},height:{ideal:1440},frameRate:{ideal:8,max:10}},audio:false};
     if(captureController)displayOptions.controller=captureController;
+    if(preferTab){displayOptions.preferCurrentTab=false;displayOptions.selfBrowserSurface='exclude';displayOptions.surfaceSwitching='include';}
     captured=await navigator.mediaDevices.getDisplayMedia(displayOptions);
+    if(preferTab&&captured.getVideoTracks()[0]?.getSettings?.().displaySurface!=='browser'){
+      captured.getTracks().forEach(track=>track.stop());captured=null;
+      fail('Choose a browser tab in the sharing picker, not a window or entire screen.');
+      $('shareScreen').disabled=!started;$('openBrowserTab').disabled=!started;return;
+    }
     if(peer!==currentPeer||!started){captured.getTracks().forEach(track=>track.stop());return}
     if(window.ClassPointerViewport?.create){
       processor=await window.ClassPointerViewport.create({rawStream:captured,stage:$('stage'),lesson:$('lesson'),onBeforeViewChange:resetOverlaysForViewChange,onStatus:status,onError:fail});
@@ -227,7 +233,7 @@ async function shareScreen(){
     screen=outgoing;generation++;state.sharing=true;state.points={};$('lesson').srcObject=screen;$('placeholder').hidden=true;$('stopScreen').disabled=false;
     setupTabControls(captureController,captured);captured.getVideoTracks()[0]?.addEventListener('ended',()=>{if(screen===outgoing)stopSharing()},{once:true});
     await $('lesson').play();if(screen!==outgoing)return;publish();for(const member of members.values())if(member.admitted)callStudent(member);
-    status(viewportController?.active?'Teaching screen is sharing. Use Choose shared area, Zoom +, and Move view to focus the lesson.':'Teaching screen is sharing. Move your mouse over the picture to point as Teacher.');
+    status(preferTab?'Browser tab is sharing. Use Scroll tab and Tab A−/A+ when supported; hold Shift to navigate without marking.':viewportController?.active?'Teaching screen is sharing. Use Choose shared area, Zoom +, and Move view to focus the lesson.':'Teaching screen is sharing. Move your mouse over the picture to point as Teacher.');
   }catch(error){
     if(peer!==currentPeer||(error.name==='AbortError'&&!screen)){processor?.stop();captured?.getTracks().forEach(track=>track.stop());return}
     processor?.stop();if(viewportController===processor)viewportController=null;captured?.getTracks().forEach(track=>track.stop());stopSharing();
@@ -319,7 +325,7 @@ $('spotlight').addEventListener('change',()=>{state.spotlight=$('spotlight').che
 $('clearTeacher').addEventListener('click',()=>{cancelHover();delete state.points.teacher;publish()});
 $('clearAll').addEventListener('click',()=>{cancelHover();state.points={};publish()});
 $('copyLink').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('joinLink').value);status('Join link copied. Send it to your students.')}catch{$('joinLink').select();status('Select and copy the student join link.')}});
-$('startClass').addEventListener('click',startClass);$('endClass').addEventListener('click',endClass);$('shareScreen').addEventListener('click',shareScreen);$('stopScreen').addEventListener('click',stopSharing);
+$('startClass').addEventListener('click',startClass);$('endClass').addEventListener('click',endClass);$('shareScreen').addEventListener('click',()=>shareScreen(false));$('openBrowserTab').addEventListener('click',()=>shareScreen(true));$('stopScreen').addEventListener('click',stopSharing);
 if($('tabScroll')){$('tabScroll').addEventListener('click',toggleTabScroll);$('tabZoomIn').addEventListener('click',()=>zoomTab(1));$('tabZoomOut').addEventListener('click',()=>zoomTab(-1))}
 $('joinForm').addEventListener('submit',joinClass);$('leaveClass').addEventListener('click',leaveClass);
 new ResizeObserver(drawPointers).observe($('stage'));$('lesson').addEventListener('loadedmetadata',drawPointers);$('lesson').addEventListener('resize',drawPointers);
