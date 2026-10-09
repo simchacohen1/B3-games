@@ -125,7 +125,103 @@ function getActivityPointRequests(){
     .sort((a,b)=>(Number(b.item.createdAt)||0)-(Number(a.item.createdAt)||0));
 }
 function pendingActivityPointRequests(){return getActivityPointRequests().filter(x=>x.item.status==="pending")}
-function pendingCount(){return getRedemptions().filter(x=>x.item.status==="pending"||x.item.status==="ready").length+pendingActivityPointRequests().length}
+function pendingCount(){return getRedemptions().filter(x=>x.item.status==="pending"||x.item.status==="ready").length+pendingActivityPointRequests().length+pendingRefundRequests().length}
+// REFUND REQUESTS - 2026-10-08
+// Students ask for points back on any purchase or class contribution; nothing
+// moves until the owner approves. Stored at refundRequests/<studentId>/<itemKey>.
+function pendingRefundRequests(){
+  if(state.teacherMode)return [];
+  const out=[];
+  for(const [sid,rows] of Object.entries(state.root?.refundRequests||{}))for(const [key,item] of Object.entries(rows||{}))if(item&&(item.status==="pending"||item.status==="processing"))out.push({sid,key,item});
+  return out.sort((a,b)=>timeMs(a.item.requestedAt)-timeMs(b.item.requestedAt));
+}
+function refundItemInfo(sid,key,kind){
+  if(kind==="contribution"){
+    const c=state.root?.classRewardContributionsByStudent?.[sid]?.[key]||null;
+    return {record:c,amount:Math.abs(Number(c?.amount)||0),name:`${c?.rewardName||"Class reward"}${Array.isArray(c?.modeNames)&&c.modeNames.length?" — "+c.modeNames.join(", "):""}`,label:"Class contribution",classId:c?.classId||"",when:timeMs(c?.createdAt)};
+  }
+  const p=state.root?.redemptionsByStudent?.[sid]?.[key]||null;
+  return {record:p,amount:Number(p?.cost)||0,name:state.root?.rewards?.[p?.rewardId]?.name||"Reward",label:`Personal reward · ${String(p?.status||"pending")}`,classId:"",when:timeMs(p?.requestedAt)};
+}
+function refundQueueHTML(){
+  const rows=pendingRefundRequests();if(!rows.length)return "";
+  return `<section class="activity-queue refund-queue"><div class="activity-head"><div><h2>Refund requests</h2><p>Students asking for points back. Approving returns the points and, for class contributions, takes them off the class reward bar if that round is still open.</p></div><div class="activity-head-actions"><b>${rows.length}</b></div></div>${rows.map(x=>{const s=state.root.students?.[x.sid]||{},info=refundItemInfo(x.sid,x.key,x.item.kind),when=timeMs(x.item.requestedAt),busy=x.item.status==="processing";return `<div class="activity-request"><em style="background:${esc(safeColor(s))}">${esc(s.initials||initials(s.name||"?"))}</em><span><strong>${esc(s.name||x.sid)}</strong><small>${esc(info.label)} · ${esc(info.name)}${info.classId?` · ${esc(pointClassName(info.classId))}`:""}${when?` · asked ${esc(new Date(when).toLocaleString())}`:""}</small>${x.item.reason?`<small>“${esc(x.item.reason)}”</small>`:""}${x.item.error?`<small style="color:#b42318">${esc(x.item.error)}</small>`:""}</span><b class="activity-amount">+${info.amount} ★</b>${busy?`<small>Working…</small>`:`<button class="deny" data-refund-decline="${esc(x.sid)}|${esc(x.key)}" title="Decline refund">×</button><button class="approve" data-refund-approve="${esc(x.sid)}|${esc(x.key)}" title="Approve refund">✓</button>`}</div>`}).join("")}</section>`;
+}
+async function removeContributionFromRound(sid,key,item){
+  const amount=Math.abs(Number(item.amount)||0),created=timeMs(item.createdAt);
+  if(!item.classId||!item.rewardId||!amount)return "no-round";
+  const others=Object.entries(state.root?.classRewardContributionsByStudent?.[sid]||{}).filter(([k,c])=>k!==key&&c&&!c.refundedAt&&c.classId===item.classId&&c.rewardId===item.rewardId).map(([,c])=>c);
+  let outcome="not-in-round";
+  await db.ref(`${ROOT}/classRewardRounds/${item.classId}/${item.rewardId}`).transaction(round=>{
+    outcome="not-in-round";
+    if(!round)return null;
+    const started=timeMs(round.startedAt);
+    if(started&&created&&created<started)return; // round was reset after this contribution
+    if(!round.modeVoting&&(String(round.status||"")==="completed"||String(round.status||"")==="cooldown"||Number(round.totalContributed||0)>=Number(round.goalPoints||Infinity)))return; // prize already earned
+    round.byStudent=round.byStudent||{};
+    round.byStudent[sid]=Math.max(0,(Number(round.byStudent[sid])||0)-amount);
+    if(round.modeVoting){
+      const w=round.lastWinner||null,wonAt=timeMs(w?.wonAt||w?.at||w?.completedAt||w?.createdAt);
+      round.modeTotals=round.modeTotals||{};
+      for(const [mode,alloc] of Object.entries(item.modeAllocations||{})){
+        if(w&&String(w.id||"")===mode&&(!wonAt||wonAt>=created))continue; // that bar already won and reset
+        round.modeTotals[mode]=Math.max(0,(Number(round.modeTotals[mode])||0)-Number(alloc||0));
+        const stillVoting=others.some(c=>timeMs(c.createdAt)>=(started||0)&&Number(c.modeAllocations?.[mode]||0)>0);
+        if(!stillVoting&&round.modeVoters?.[mode])round.modeVoters[mode][sid]=null;
+      }
+      round.totalContributed=Math.max(0,...Object.values(round.modeTotals).map(v=>Number(v)||0));
+    }else{
+      round.totalContributed=Math.max(0,(Number(round.totalContributed)||0)-amount);
+    }
+    round.updatedAt=Date.now();outcome="removed";
+    return round;
+  });
+  return outcome;
+}
+async function decideRefund(sid,key,decision){
+  if(state.teacherMode){toast("Only the administrator can approve refunds.","error");return}
+  const reqPath=`${ROOT}/refundRequests/${sid}/${key}`,req=state.root?.refundRequests?.[sid]?.[key];
+  if(!req||req.status!=="pending"){toast("That refund request was already handled or withdrawn.","error");return}
+  const info=refundItemInfo(sid,key,req.kind),s=state.root.students?.[sid]||{};
+  if(decision==="decline"){
+    if(!confirm(`Decline ${s.name||"this student"}’s refund request for ${info.name}? No points will move.`))return;
+    const t=await db.ref(`${reqPath}/status`).transaction(cur=>cur==="pending"?"declined":undefined);
+    if(!t.committed){toast("That refund request was already handled or withdrawn.","error");return}
+    await db.ref(reqPath).update({reviewedAt:now(),reviewedBy:state.user.email,error:null});
+    toast("Refund declined");return;
+  }
+  if(!info.record){toast("Could not find the original purchase or contribution.","error");return}
+  if(!confirm(`Return ${info.amount} ★ to ${s.name||"this student"} for ${info.name}?`))return;
+  const claim=await db.ref(`${reqPath}/status`).transaction(cur=>cur==="pending"?"processing":undefined);
+  if(!claim.committed){toast("That refund request was already handled or withdrawn.","error");return}
+  let marked=false;
+  try{
+    const stamp=now();let amount=info.amount,roundNote="";
+    if(req.kind==="contribution"){
+      const t=await db.ref(`${ROOT}/classRewardContributionsByStudent/${sid}/${key}/refundedAt`).transaction(cur=>cur?undefined:stamp);
+      if(!t.committed)throw new Error("This contribution was already refunded.");
+      marked=true;
+      await db.ref(`${ROOT}/classRewardContributionsByStudent/${sid}/${key}`).update({refundedBy:state.user.email,refundedAmount:amount});
+      const outcome=await removeContributionFromRound(sid,key,info.record);
+      roundNote=outcome==="removed"?" and removed from the class bar":" (class bar left as is — that round already finished)";
+    }else{
+      const t=await db.ref(`${ROOT}/redemptionsByStudent/${sid}/${key}/status`).transaction(cur=>["declined","canceled","refunded"].includes(String(cur||"pending"))?undefined:"refunded");
+      if(!t.committed)throw new Error("This purchase was already returned.");
+      marked=true;
+      await db.ref(`${ROOT}/redemptionsByStudent/${sid}/${key}`).update({refundedAt:stamp,refundedBy:state.user.email,statusBeforeRefund:String(info.record.status||"pending")});
+    }
+    let balanceAfter=null;
+    const bal=await db.ref(`${ROOT}/students/${sid}/rewardBalance`).transaction(cur=>{const next=Math.max(0,Number(cur||0)+amount);balanceAfter=next;return next});
+    if(!bal.committed)throw new Error("Could not update the balance.");
+    await db.ref(reqPath).update({status:"approved",amount,balanceAfter,reviewedAt:stamp,reviewedBy:state.user.email,error:null});
+    toast(`${amount} ★ returned to ${s.name||"student"}${roundNote}`);
+  }catch(err){
+    console.error(err);
+    // If the original record was never touched, put the request back in the queue.
+    await db.ref(reqPath).update(marked?{error:`Partly done — check balance: ${err.message||err}`}:{status:"pending",error:err.message||String(err)}).catch(()=>{});
+    toast(err.message||String(err),"error");
+  }
+}
 function savedTodayIds(){return new Set(roster().filter(s=>state.root?.dailyAwards?.[s.id]?.[state.classId]?.[state.date]).map(s=>s.id))}
 function classAverage(){const r=roster();return r.length?Math.round(r.reduce((a,s)=>a+scoreFor(s),0)/r.length):0}
 function safeColor(s){return s?.color||"#6849df"}
@@ -284,9 +380,9 @@ function allPointLedger(includeGaps=true){
       const rewardName=state.root?.rewards?.[item.rewardId]?.name||"Reward";
       const requested=pointTime(item.requestedAt);
       if(requested)add({id:`redeem:${s.id}:${key}:request`,sid:s.id,amount:-cost,when:requested,source:"reward-store",sourceGroup:"store",sourceLabel:"Prize Store",reason:`Reward requested — ${rewardName}`,detail:`${String(item.status||"requested")} · ${cost} ★`,status:"posted",counts:true});
-      if(["declined","canceled"].includes(String(item.status||""))){
-        const reviewed=pointTime(item.reviewedAt);
-        if(reviewed)add({id:`redeem:${s.id}:${key}:return`,sid:s.id,amount:cost,when:reviewed,source:"reward-return",sourceGroup:"store",sourceLabel:"Prize Store",reason:`Points returned — ${rewardName}`,detail:item.status==="canceled"?"Canceled by student":"Request declined",status:"posted",counts:true});
+      if(["declined","canceled","refunded"].includes(String(item.status||""))){
+        const reviewed=pointTime(item.status==="refunded"?(item.refundedAt||item.reviewedAt):item.reviewedAt);
+        if(reviewed)add({id:`redeem:${s.id}:${key}:return`,sid:s.id,amount:cost,when:reviewed,source:"reward-return",sourceGroup:"store",sourceLabel:"Prize Store",reason:`Points returned — ${rewardName}`,detail:item.status==="canceled"?"Canceled by student":item.status==="refunded"?"Refund approved by teacher":"Request declined",status:"posted",counts:true});
       }
     }
   }
@@ -296,6 +392,7 @@ function allPointLedger(includeGaps=true){
     for(const [key,item0] of Object.entries(state.root?.classRewardContributionsByStudent?.[s.id]||{})){
       const item=item0||{}, amount=Math.abs(Number(item.amount||0));if(!amount)continue;
       add({id:`class-contribution:${s.id}:${key}`,sid:s.id,amount:-amount,when:pointTime(item.createdAt),source:"class-reward-contribution",sourceGroup:"class",sourceLabel:"Class Reward",reason:`Class contribution — ${item.rewardName||"Class Reward"}`,detail:`${item.className||pointClassName(item.classId)} · ${amount} ★ contributed`,status:"posted",counts:true,classId:item.classId||"",balanceAfter:item.balanceAfter});
+      if(item.refundedAt)add({id:`class-contribution:${s.id}:${key}:refund`,sid:s.id,amount:Math.abs(Number(item.refundedAmount??amount)),when:pointTime(item.refundedAt),source:"class-reward-refund",sourceGroup:"class",sourceLabel:"Class Reward",reason:`Points returned — ${item.rewardName||"Class Reward"}`,detail:"Refund approved by teacher",status:"posted",counts:true,classId:item.classId||""});
     }
   }
 
@@ -341,7 +438,7 @@ function redeemedPointsForStudent(studentId){
   let redeemed=0;
   for(const item0 of Object.values(state.root?.redemptionsByStudent?.[studentId]||{})){
     const item=item0||{}, cost=Number(item.cost||0), status=String(item.status||"requested").toLowerCase();
-    if(cost>0&&status!=="declined"&&status!=="canceled")redeemed+=cost;
+    if(cost>0&&status!=="declined"&&status!=="canceled"&&status!=="refunded")redeemed+=cost;
   }
   return redeemed;
 }
@@ -562,6 +659,7 @@ function rewardsPage(){
   return `<section class="workspace"><div class="workhead"><div><p class="eyebrow">REWARDS${isTeacherStore(state.classId)?" · "+esc((cls()?.name||"").toUpperCase())+" STORE":""}</p><h1>Reward Store</h1><p>Personal rewards are bought by one student. Class rewards are shared goals funded by contributions.</p></div><a class="primary linkbutton" href="student.html">Open student portal</a></div>
   <div class="storecontrol ${storeOpen?"open":"closed"}"><div><strong>Prize Store Purchasing: ${storeOpen?"OPEN":"CLOSED"}</strong><small>${storeOpen?"Students can buy personal rewards and contribute to class goals.":"Students can browse rewards and progress, but cannot spend points."}</small></div><button class="primary" id="storeToggle">${storeOpen?"Close Prize Store":"Open Prize Store"}</button></div>
   ${pointReq.length?`<section class="activity-queue"><div class="activity-head"><div><h2>Activity points awaiting approval</h2><p>Posuk Practice and Chazara requests. Nothing below has been added yet.</p></div><div class="activity-head-actions"><b>${pointReq.length}</b><button class="primary" id="approveAllActivity">Approve all</button></div></div>${pointReq.map(activityPointRow).join("")}</section>`:""}
+  ${refundQueueHTML()}
   <div class="reward-type-stack">
     <section class="teacher-reward-section personal-rewards"><div class="teacher-reward-heading"><span>👤</span><div><h2>Personal Rewards</h2><p>One boy spends his points and receives this reward himself. Each reward can also have its own time cooldown.</p></div><button class="primary" id="addReward">+ Add personal reward</button></div><div class="rewardgrid">${rewards.length?rewards.map(r=>{const available=r.available!==false,cd=personalCooldownInfo(r);return `<article class="${available?"reward-open":"reward-closed"}"><div class="reward-availability ${available?"open":"closed"}">${available?"OPEN":"CLOSED"}</div><div class="rewardicon" style="background:${esc(r.color||"#ede9fe")}">${esc(r.icon||"🎁")}</div><h3>${esc(r.name)}</h3><p>${Number(r.cost)||0} ★ · ${Number(r.quantity)<0?"unlimited":`${r.quantity} left`}</p><p><strong>${esc(cd.label)}</strong></p><div class="rewardactions"><button class="reward-toggle ${available?"close":"open"}" data-toggle-reward="${esc(r.id)}">${available?"Close":"Open"}</button><button data-editreward="${esc(r.id)}">Edit</button><button class="rewarddelete" data-deletereward="${esc(r.id)}">Delete</button></div></article>`}).join(""):`<div class="empty"><h3>No personal rewards</h3></div>`}</div></section>
     <section class="teacher-reward-section class-rewards"><div class="teacher-reward-heading"><span>👥</span><div><h2>Class Rewards — ${esc(cls()?.name||"Class")}</h2><p>Prices are set per student, so ET and WT goals scale automatically. You can set a cooldown (for example 14 days) after the class earns each prize.</p></div><button class="primary" id="addClassReward">+ Add class reward</button></div><div class="teacher-class-goal-grid">${classRewards.length?classRewards.map(x=>{const g=classRewardSnapshot(x),available=x.available!==false,cdLabel=g.cooling?`Available again in ${cooldownText(g.cooldownUntil)}`:(g.cooldownDays?`Cooldown: ${g.cooldownDays} day${g.cooldownDays===1?"":"s"}`:"No cooldown");return `<article class="teacher-class-goal ${g.status==="completed"||g.status==="cooldown"?"complete":""} ${available?"reward-open":"reward-closed"}"><div class="reward-availability ${available?"open":"closed"}">${available?"OPEN":"CLOSED"}</div><div class="teacher-class-goal-top"><span>${esc(x.icon||"⭐")}</span><div><h3>${esc(x.name)}</h3><p>${g.perStudent} ★ per student · ${g.count} students · goal ${g.goal} ★</p><p><strong>${esc(cdLabel)}</strong></p></div><strong>${g.total} / ${g.goal} ★</strong></div><div class="teacher-class-progress"><i style="width:${g.pct}%"></i></div>${gimkitTeacherModesHTML(g)}<div class="teacher-class-meta"><span>${g.contributors} contributor${g.contributors===1?"":"s"}</span><span>Max per boy: ${g.cap} ★</span><span>${g.status==="cooldown"?`⏳ ${esc(cdLabel)}`:g.status==="completed"?"✓ Goal reached":`${Math.max(0,g.goal-g.total)} ★ still needed`}</span></div><div class="rewardactions"><button class="reward-toggle ${available?"close":"open"}" data-toggle-class-reward="${esc(x.id)}">${available?"Close":"Open"}</button><button data-editclassreward="${esc(x.id)}">Edit</button>${g.live?`<button data-resetclassreward="${esc(x.id)}">${isGimkitClassReward(x)?(g.cooling?"End cooldown":"Reset all mode bars"):(g.cooling?"End cooldown / start new goal":"Reset goal")}</button>`:""}<button class="rewarddelete" data-deleteclassreward="${esc(x.id)}">Delete</button></div></article>`}).join(""):`<div class="empty"><h3>No class rewards</h3></div>`}</div></section>
@@ -805,7 +903,7 @@ function bindPage(){
   if(state.tab==="Students"){$("#studentPicker").onchange=e=>{state.selectedId=e.target.value;render()};$("#adjustPoints").onclick=adjustPoints}
   if(state.tab==="Categories"){$("#addCategory").onclick=addCategory;document.querySelectorAll("[data-catdelete]").forEach(b=>b.onclick=()=>removeCategory(b.dataset.catdelete))}
   if(state.tab==="Comments"){if($("#commentPicker"))$("#commentPicker").onchange=e=>{state.selectedId=e.target.value;render()};if($("#commentForm"))$("#commentForm").onsubmit=addComment}
-  if(state.tab==="Rewards"){$("#addReward").onclick=()=>editReward();if($("#addClassReward"))$("#addClassReward").onclick=()=>editClassReward();$("#storeToggle").onclick=toggleRewardStore;if($("#approveAllActivity"))$("#approveAllActivity").onclick=approveAllActivityPoints;document.querySelectorAll("[data-point-approve]").forEach(b=>b.onclick=()=>approveActivityPoint(b.dataset.pointApprove));document.querySelectorAll("[data-point-reject]").forEach(b=>b.onclick=()=>rejectActivityPoint(b.dataset.pointReject));document.querySelectorAll("[data-toggle-reward]").forEach(b=>b.onclick=()=>toggleRewardAvailability(b.dataset.toggleReward));document.querySelectorAll("[data-editreward]").forEach(b=>b.onclick=()=>editReward(b.dataset.editreward));document.querySelectorAll("[data-deletereward]").forEach(b=>b.onclick=()=>deleteReward(b.dataset.deletereward));document.querySelectorAll("[data-toggle-class-reward]").forEach(b=>b.onclick=()=>toggleClassRewardAvailability(b.dataset.toggleClassReward));document.querySelectorAll("[data-editclassreward]").forEach(b=>b.onclick=()=>editClassReward(b.dataset.editclassreward));document.querySelectorAll("[data-deleteclassreward]").forEach(b=>b.onclick=()=>deleteClassReward(b.dataset.deleteclassreward));document.querySelectorAll("[data-resetclassreward]").forEach(b=>b.onclick=()=>resetClassReward(b.dataset.resetclassreward));document.querySelectorAll("[data-approve]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.approve.split("|");review(s,k,"approve")});document.querySelectorAll("[data-decline]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.decline.split("|");review(s,k,"decline")});document.querySelectorAll("[data-collect]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.collect.split("|");review(s,k,"collect")})}
+  if(state.tab==="Rewards"){$("#addReward").onclick=()=>editReward();if($("#addClassReward"))$("#addClassReward").onclick=()=>editClassReward();$("#storeToggle").onclick=toggleRewardStore;if($("#approveAllActivity"))$("#approveAllActivity").onclick=approveAllActivityPoints;document.querySelectorAll("[data-point-approve]").forEach(b=>b.onclick=()=>approveActivityPoint(b.dataset.pointApprove));document.querySelectorAll("[data-point-reject]").forEach(b=>b.onclick=()=>rejectActivityPoint(b.dataset.pointReject));document.querySelectorAll("[data-toggle-reward]").forEach(b=>b.onclick=()=>toggleRewardAvailability(b.dataset.toggleReward));document.querySelectorAll("[data-editreward]").forEach(b=>b.onclick=()=>editReward(b.dataset.editreward));document.querySelectorAll("[data-deletereward]").forEach(b=>b.onclick=()=>deleteReward(b.dataset.deletereward));document.querySelectorAll("[data-toggle-class-reward]").forEach(b=>b.onclick=()=>toggleClassRewardAvailability(b.dataset.toggleClassReward));document.querySelectorAll("[data-editclassreward]").forEach(b=>b.onclick=()=>editClassReward(b.dataset.editclassreward));document.querySelectorAll("[data-deleteclassreward]").forEach(b=>b.onclick=()=>deleteClassReward(b.dataset.deleteclassreward));document.querySelectorAll("[data-resetclassreward]").forEach(b=>b.onclick=()=>resetClassReward(b.dataset.resetclassreward));document.querySelectorAll("[data-approve]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.approve.split("|");review(s,k,"approve")});document.querySelectorAll("[data-decline]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.decline.split("|");review(s,k,"decline")});document.querySelectorAll("[data-collect]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.collect.split("|");review(s,k,"collect")});document.querySelectorAll("[data-refund-approve]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.refundApprove.split("|");decideRefund(s,k,"approve")});document.querySelectorAll("[data-refund-decline]").forEach(b=>b.onclick=()=>{const [s,k]=b.dataset.refundDecline.split("|");decideRefund(s,k,"decline")})}
   if(state.tab==="Approvals"){if($("#approveAllActivity"))$("#approveAllActivity").onclick=approveAllActivityPoints;document.querySelectorAll("[data-point-approve]").forEach(b=>b.onclick=()=>approveActivityPoint(b.dataset.pointApprove));document.querySelectorAll("[data-point-reject]").forEach(b=>b.onclick=()=>rejectActivityPoint(b.dataset.pointReject))}
   if(state.tab==="Reports"){$("#csvBtn").onclick=exportCSV;$("#printBtn").onclick=()=>window.print()}
   if(state.tab==="People & Classes"){document.querySelectorAll("[data-openclass]").forEach(b=>b.onclick=()=>{state.classId=b.dataset.openclass;renderClassSelect();prepareDraft();render()});$("#addStudentForm").onsubmit=addStudent;$("#addClassForm").onsubmit=addClass}
