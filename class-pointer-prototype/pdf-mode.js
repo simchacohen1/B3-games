@@ -325,7 +325,8 @@
       showNote('');B.resetMarks();B.setPdf(true,'webpage');
       B.status('Static tab snapshot open. Zoom, drag and highlight here without changing the original tab.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
-    }catch(error){showNote('');B.fail(error.message||'Could not open the captured tab.')}
+      return true;
+    }catch(error){showNote('');B.fail(error.message||'Could not open the captured tab.');return false}
   }
   function unload(hide){
     loadToken++;rendered.forEach(item=>item.task?.cancel());rendered.clear();
