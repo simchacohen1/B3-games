@@ -236,7 +236,7 @@ async function captureBrowserTab(){
     canvas.getContext('2d',{alpha:false}).drawImage(video,0,0,width,height);
     const dataUrl=canvas.toDataURL('image/jpeg',0.82);
     track.stop();stream=null;video.srcObject=null;
-    await window.ClassPointerPdf.openSnapshot(dataUrl,width,height);
+    if(await window.ClassPointerPdf.openSnapshot(dataUrl,width,height))document.dispatchEvent(new Event('class-pointer-capture-ready'));
   }catch(error){fail(error.name==='NotAllowedError'?'Capture was canceled.':error.message||'Could not capture the selected source.')}
   finally{stream?.getTracks().forEach(t=>t.stop());if(video)video.srcObject=null;$('openBrowserTab').disabled=!started}
 }
@@ -264,7 +264,7 @@ async function shareScreen(preferTab=false){
     }else outgoing=captured;
     screen=outgoing;generation++;state.sharing=true;state.points={};$('lesson').srcObject=screen;$('placeholder').hidden=true;$('stopScreen').disabled=false;
     setupTabControls(captureController,captured);captured.getVideoTracks()[0]?.addEventListener('ended',()=>{if(screen===outgoing)stopSharing()},{once:true});
-    await $('lesson').play();if(screen!==outgoing)return;publish();for(const member of members.values())if(member.admitted)callStudent(member);
+    await $('lesson').play();if(screen!==outgoing)return;document.dispatchEvent(new Event('class-pointer-capture-ready'));publish();for(const member of members.values())if(member.admitted)callStudent(member);
     status(preferTab?'Browser tab is sharing. Use Scroll tab and Tab A−/A+ when supported; hold Shift to navigate without marking.':viewportController?.active?'Teaching screen is sharing. Use Choose shared area, Zoom +, and Move view to focus the lesson.':'Teaching screen is sharing. Move your mouse over the picture to point as Teacher.');
   }catch(error){
     if(peer!==currentPeer||(error.name==='AbortError'&&!screen)){processor?.stop();captured?.getTracks().forEach(track=>track.stop());return}
