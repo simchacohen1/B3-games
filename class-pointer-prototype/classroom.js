@@ -221,7 +221,7 @@ async function captureBrowserTab(){
     }
     stream=await navigator.mediaDevices.getDisplayMedia(opts);
     // Chrome/Edge may otherwise switch focus to the source tab after Share.
-    try{controller?.setFocusBehavior?.('no-focus-change')}catch(_){}
+    try{controller?.setFocusBehavior?.('focus-capturing-application')}catch(_){try{controller?.setFocusBehavior?.('no-focus-change')}catch(__){}}
     const track=stream.getVideoTracks()[0];
     if(track?.getSettings?.().displaySurface!=='browser')throw Error('Choose a browser tab (not a window or screen), then try again.');
     video=document.createElement('video');video.muted=true;video.playsInline=true;video.srcObject=stream;
