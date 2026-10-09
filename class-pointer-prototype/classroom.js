@@ -31,9 +31,9 @@ function pointerPermission(){
   }
 }
 function drawPointers(){
-  const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight);
+  const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=window.ClassPointerPdf?.active()?window.ClassPointerPdf.box():C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight);
   const visible=new Set();$('spotlightCircle').hidden=true;
-  if(state.sharing&&box)Object.entries(state.points).forEach(([id,point])=>{
+  if(live()&&box)Object.entries(state.points).forEach(([id,point])=>{
     if(!C.validPoint(point))return;
     const member=id==='teacher'?{name:'Teacher',color:'#ffcc00'}:state.members.find(person=>person.id===id);
     if(!member)return;
@@ -80,7 +80,7 @@ function removeMember(member){
 function clearStudentHover(member){clearTimeout(member.pointTimer);member.pointTimer=null;member.pendingPoint=null}
 function commitStudentHover(member){
   member.pointTimer=null;const point=member.pendingPoint;member.pendingPoint=null;
-  if(!point||members.get(member.id)!==member||!state.sharing||!C.canPoint(state.mode,member))return;
+  if(!point||members.get(member.id)!==member||!live()||!C.canPoint(state.mode,member))return;
   member.lastPoint=Date.now();state.points[member.id]=point;publish();
 }
 function favorTextDetail(call){
@@ -111,14 +111,14 @@ function receiveStudent(connection){
     if(message.type==='join'&&!member){
       const name=C.cleanName(message.name);if(!name){connection.close();return}
       if(members.size>=12){send(connection,{type:'full'});connection.close();return}
-      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,color:C.colors[colorIndex++%C.colors.length],allowed:false,writeAllowed:false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);return;
+      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,color:C.colors[colorIndex++%C.colors.length],allowed:false,writeAllowed:false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);window.ClassPointerPdf?.studentJoined(member);return;
     }
     if(!member||members.get(member.id)!==member)return;
-    if(message.type==='highlight'&&state.sharing&&C.canWrite(state.mode,member)){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
+    if(message.type==='highlight'&&live()&&C.canWrite(state.mode,member)){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
     if(message.type==='edit-highlights'&&member.admitted){if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}return}
     if(message.type==='video-ready'&&member.admitted){member.videoReady=true;clearTimeout(member.mediaTimer)}
     if(message.type==='pointer-hide'&&member.admitted){clearStudentHover(member);delete state.points[member.id];member.lastPoint=0;publish()}
-    if(message.type==='point'&&state.sharing&&C.canPoint(state.mode,member)&&C.validPoint(message.point)){
+    if(message.type==='point'&&live()&&C.canPoint(state.mode,member)&&C.validPoint(message.point)){
       // Identity comes from this connection, never from a student-supplied name or ID.
       member.pendingPoint={x:message.point.x,y:message.point.y,...C.pointStyle(message.point)};
       const delay=75-(Date.now()-member.lastPoint);
@@ -208,7 +208,7 @@ async function zoomTab(direction){
   updateTabControls();
 }
 async function shareScreen(){
-  clearError();if(!navigator.mediaDevices?.getDisplayMedia){fail('Use Chrome or Edge on a computer to share your teaching screen.');return}
+  clearError();window.ClassPointerPdf?.close(true);if(!navigator.mediaDevices?.getDisplayMedia){fail('Use Chrome or Edge on a computer to share your teaching screen.');return}
   $('shareScreen').disabled=true;const currentPeer=peer;let captured=null,processor=null,outgoing=null;
   try{
     // Keep the teacher on the Class Pointer page after picking a tab/window to share (Chrome/Edge 109+).
@@ -234,13 +234,13 @@ async function shareScreen(){
   }
 }
 function endClass(){
-  window.ClassPointerDashboard?.end().catch(()=>fail('Could not remove the dashboard lesson. Refresh before starting another class.'));
+  window.ClassPointerPdf?.close(true);window.ClassPointerDashboard?.end().catch(()=>fail('Could not remove the dashboard lesson. Refresh before starting another class.'));
   clearTimeout(joinTimer);started=false;stopSharing();for(const member of members.values()){send(member.connection,{type:'ended'});member.connection.close()}
   members.clear();const oldPeer=peer;peer=null;oldPeer?.destroy();state={sharing:false,mode:'nobody',members:[],points:{}};$('accessMode').value='nobody';$('spotlight').checked=false;$('startClass').disabled=false;$('endClass').disabled=true;$('invitePanel').hidden=true;roster();status('Class ended. Start a new class for a new join link.');
 }
 function clearStudentVideo(){const oldCall=mediaCall;mediaCall=null;oldCall?.close();$('lesson').srcObject=null;$('placeholder').hidden=false;drawPointers()}
 function leaveClass(){
-  cancelHover();highlighter?.cancel();highlighter?.receive([]);clearTimeout(joinTimer);joining=false;admitted=false;clearStudentVideo();const oldConnection=teacherConnection;teacherConnection=null;oldConnection?.close();const oldPeer=peer;peer=null;oldPeer?.destroy();
+  window.ClassPointerPdf?.reset();cancelHover();highlighter?.cancel();highlighter?.receive([]);clearTimeout(joinTimer);joining=false;admitted=false;clearStudentVideo();const oldConnection=teacherConnection;teacherConnection=null;oldConnection?.close();const oldPeer=peer;peer=null;oldPeer?.destroy();
   state={sharing:false,mode:'nobody',members:[],points:{}};$('joinForm').hidden=false;$('joinClass').disabled=false;$('leaveClass').hidden=true;$('pointerLayer').replaceChildren();$('permissionText').textContent='Enter your name to join your class.';status('Not connected.');
 }
 function joinClass(event){
@@ -254,12 +254,13 @@ function joinClass(event){
     connection.on('open',()=>{if(teacherConnection===connection)send(connection,{type:'join',name})});
     connection.on('data',message=>{
       if(teacherConnection!==connection||!message)return;
+      if(window.ClassPointerPdf?.handleMessage(message))return;
       if(message.type==='highlights'){highlighter?.receive(message.strokes);return}
       if(message.type==='highlight-error'){fail('Could not add the highlight. Try a shorter stroke or clear some of your highlights.');return}
       if(message.type==='waiting'){clearTimeout(joinTimer);joining=false;$('joinForm').hidden=true;$('leaveClass').hidden=false;status('Connected. Waiting for your teacher to admit you.');pointerPermission()}
       if(message.type==='state'){
         clearTimeout(joinTimer);joining=false;admitted=true;$('joinForm').hidden=true;$('leaveClass').hidden=false;state=message.state;
-        if(!state.sharing){highlighter?.cancel();highlighter?.receive([]);clearStudentVideo()}status(state.sharing?'Class connected.':'Admitted. Waiting for the teaching screen.');pointerPermission();drawPointers();
+        if(!live()){highlighter?.cancel();highlighter?.receive([]);clearStudentVideo();window.ClassPointerPdf?.reset()}else if(!state.sharing)clearStudentVideo();status(state.sharing?'Class connected.':state.pdf?'Class connected. Following your teacher in the PDF.':'Admitted. Waiting for the teaching screen.');pointerPermission();drawPointers();
       }
       if(['ended','removed','full'].includes(message.type)){leaveClass();fail(message.type==='ended'?'Your teacher ended the class.':message.type==='full'?'This first test supports up to 12 students.':'Your teacher removed you from the class.')}
     });
@@ -281,15 +282,16 @@ function hideOwnPointer(){
   if(isTeacher){if(state.points.teacher){delete state.points.teacher;publish()}}else send(teacherConnection,{type:'pointer-hide'});
 }
 function sendHover(){
-  hoverTimer=null;const point=pendingPoint;pendingPoint=null;if(!point||!state.sharing||!allowed())return;
+  hoverTimer=null;const point=pendingPoint;pendingPoint=null;if(!point||!live()||!allowed())return;
   lastHover=Date.now();
   if(isTeacher){state.points.teacher=point;publish()}else send(teacherConnection,{type:'point',point});
 }
 function pointAt(event,immediate=false){
-  if(!state.sharing)return;
+  if(!live())return;
   if(!allowed()){if(immediate)$('pointerStatus').textContent='Your teacher has not enabled your pointer.';return}
-  const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight);if(!box)return;
-  const point={x:(event.clientX-rect.left-box.left)/box.w,y:(event.clientY-rect.top-box.top)/box.h,...C.pointStyle({tool:$(isTeacher?'teacherTool':'studentTool').value,color:$(isTeacher?'teacherColor':'studentColor').value})};
+  const pdfOpen=window.ClassPointerPdf?.active();const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=pdfOpen?{left:0,top:0,w:1,h:1}:C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight);if(!box)return;
+  const pdfPoint=pdfOpen?window.ClassPointerPdf.normalized(event):null;if(pdfOpen&&!pdfPoint){hideOwnPointer();return}
+  const point={x:pdfOpen?pdfPoint.x:(event.clientX-rect.left-box.left)/box.w,y:pdfOpen?pdfPoint.y:(event.clientY-rect.top-box.top)/box.h,...C.pointStyle({tool:$(isTeacher?'teacherTool':'studentTool').value,color:$(isTeacher?'teacherColor':'studentColor').value})};
   if(!C.validPoint(point)){hideOwnPointer();return}
   pendingPoint=point;
   // Keep a trailing update, so the final hover location is never lost between sends.
@@ -321,13 +323,20 @@ if($('tabScroll')){$('tabScroll').addEventListener('click',toggleTabScroll);$('t
 $('joinForm').addEventListener('submit',joinClass);$('leaveClass').addEventListener('click',leaveClass);
 new ResizeObserver(drawPointers).observe($('stage'));$('lesson').addEventListener('loadedmetadata',drawPointers);$('lesson').addEventListener('resize',drawPointers);
 function publishHighlights(){highlighter?.receive(highlightStore.strokes);for(const member of members.values())if(member.admitted)send(member.connection,{type:'highlights',strokes:highlightStore.strokes})}
+function submitStroke(stroke){if(isTeacher){if(highlightStore.add('teacher',stroke))publishHighlights();else fail('Highlight limit reached. Undo or clear some highlights.')}else send(teacherConnection,{type:'highlight',stroke})}
+function live(){return state.sharing||state.pdf===true}
 if(window.createClassHighlighter)highlighter=window.createClassHighlighter({
   teacher:isTeacher,allowed:writingAllowed,sharing:()=>state.sharing,owner:()=>isTeacher?'teacher':'student:'+peer?.id,
   ownerName:owner=>owner==='teacher'?'Teacher':state.members.find(m=>m.id===owner)?.name||'Student',
   color:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
-  submit(stroke){if(isTeacher){if(highlightStore.add('teacher',stroke))publishHighlights();else fail('Highlight limit reached. Undo or clear some highlights.')}else send(teacherConnection,{type:'highlight',stroke})},
+  submit:submitStroke,
   edit(action){if(isTeacher){if(action==='all')highlightStore.reset();else highlightStore.edit('teacher',action);publishHighlights()}else send(teacherConnection,{type:'edit-highlights',action})}
 });
+if(highlighter){const baseReceive=highlighter.receive;highlighter.receive=next=>{baseReceive(next);window.ClassPointerPdf?.setStrokes(next)}}
+// Small, fixed doorway used by PDF mode (pdf-mode.js). Nothing else reaches into this file.
+window.ClassPointerBridge={isTeacher,send,fail,clearError,status,live,allowed,writingAllowed,submitStroke,redraw:drawPointers,members:()=>members,sharing:()=>state.sharing,stopSharing,
+  owner:()=>isTeacher?'teacher':'student:'+peer?.id,ownColor:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
+  setPdf(on){state.pdf=on;state.points={};if(!on){highlightStore.reset();publishHighlights()}publish()}};
 $('teacherPanel').hidden=!isTeacher;$('studentPanel').hidden=isTeacher;if(!isTeacher)status('Join your teacher’s class.');
 window.addEventListener('pagehide',()=>{if(isTeacher)endClass();else leaveClass()});
 if(!isTeacher&&new URL(location.href).searchParams.get('dashboard')==='student'){

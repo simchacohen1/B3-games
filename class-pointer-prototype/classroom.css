@@ -195,3 +195,32 @@ body.student-dock-view #stage:fullscreen #exitFullScreenLesson,body.student-dock
 .tab-controls[hidden]{display:none}
 #tabScroll[aria-pressed="true"]{background:#e8f0ff;color:#1f4fbf;border-color:#1f4fbf}
 #stage.tab-scrolling{outline:3px dashed #1f4fbf;outline-offset:-3px}
+
+/* PDF mode: the teacher's PDF is shown inside the lesson for everyone. */
+#stage.pdf-open:not(.lesson-fullscreen):not(:fullscreen){aspect-ratio:auto;height:min(80vh,920px);min-height:320px}
+#pdfView{position:absolute;inset:0;z-index:1;overflow:auto;background:#4b4f58;touch-action:none;cursor:crosshair;overscroll-behavior:contain}
+#pdfView[hidden]{display:none}
+#pdfContent{position:relative;margin:0 auto;touch-action:none;-webkit-user-select:none;user-select:none}
+.pdf-page{position:absolute;left:0;width:100%;background:#fff;box-shadow:0 0 0 1px #0003,0 2px 10px #0005;overflow:hidden}
+.pdf-page canvas{display:block;width:100%;height:100%;pointer-events:none}
+#pdfInk{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+#pdfNote{position:absolute;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);max-width:80%;padding:14px 20px;border-radius:12px;background:#172033ee;color:#fff;font-size:20px;font-weight:700;text-align:center;pointer-events:none}
+#pdfNav{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX(-50%);display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;max-width:calc(100% - 24px);padding:10px 12px;background:#101827ee;border:1px solid #ffffff38;border-radius:16px;box-shadow:0 8px 28px #0008;cursor:default;color:#fff}
+#pdfNav[hidden]{display:none}
+#pdfNav .pdf-btn{min-height:48px;min-width:48px;padding:8px 16px;border-radius:12px;font-size:18px;font-weight:800;background:#f8fafc;color:#172033;border:2px solid #cbd5e1;cursor:pointer;touch-action:manipulation}
+#pdfNav .pdf-btn:hover{background:#e0ebff}
+#pdfNav .pdf-zoom{min-width:56px;font-size:26px;line-height:1;padding:6px 12px}
+#pdfNav .pdf-close{background:#8f2630;color:#fff;border-color:#d7646e}
+#pdfNav .pdf-close:hover{background:#a8303b}
+#pdfNav .pdf-jump{display:inline-flex;align-items:center;gap:6px;font-size:18px;font-weight:700}
+#pdfNav .pdf-label{color:#dbeafe}
+#pdfNav .pdf-page-input{width:84px;min-height:48px;padding:6px 8px;border-radius:12px;font-size:20px;font-weight:800;text-align:center;background:#fff;color:#172033;border:2px solid #cbd5e1}
+#pdfNav .pdf-page-total{color:#dbeafe;white-space:nowrap}
+#pdfNav .pdf-zoom-label{min-width:64px;text-align:center;font-size:20px;font-weight:800;color:#dbeafe}
+#pdfNav .pdf-sep{width:1px;align-self:stretch;background:#ffffff40;margin:0 4px}
+@media(max-width:720px){#pdfNav{gap:6px;padding:8px}#pdfNav .pdf-btn{min-height:44px;padding:6px 10px;font-size:16px}}
+#pdfNav .pdf-toggle{background:#334155;color:#fff;border-color:#ffffff40}
+#pdfNav.min{padding:6px;left:12px;transform:none;bottom:12px}
+#pdfNav.min>:not(.pdf-toggle){display:none}
+#pdfNav.min .pdf-toggle{min-height:40px;font-size:15px}
+#pdfView.follow{overflow:hidden}

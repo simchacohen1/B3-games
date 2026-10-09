@@ -43,3 +43,13 @@ References: [PeerJS getting started](https://peerjs.com/client/getting-started),
 Run `node --test tests/class-pointer.test.cjs tests/class-pointer-viewport.test.cjs`. Tests cover admission, allow-one/several/everyone/nobody policy, malformed coordinates, letterboxing and resize math, connection-bound identity, forged teacher identity, revocation, disconnect cleanup, bounded highlight payloads, and owner-only undo/clear.
 
 Browser verification uses separate teacher and student tabs, the real PeerJS signaling service, real WebRTC media/data connections, and a synthetic animated teaching-screen stream instead of capturing private desktop content. Same-computer tabs do not prove connectivity from a student's school network.
+
+## PDF mode
+
+The teacher page has **Open PDF** beside Share teaching screen. The PDF is read in the teacher's browser with pdf.js (vendor/pdf.min.js, legacy build 3.11.174, Apache-2.0) and sent in 64 KB pieces over the existing PeerJS data connection to each admitted student. Nothing is uploaded or stored online. Limit 80 MB; each student downloads the whole file, so a small PDF is faster. Students who join later receive it automatically.
+
+Every browser draws the pages itself (sharp text, right-to-left Hebrew shows as in the file). The teacher's zoom, scroll position and page are copied to students (students follow; they do not scroll). Teacher buttons sit at the bottom of the lesson (so they also work in full screen): Previous, page box + Go, Next, zoom out/in, Fit width, Hide, Close PDF; Ctrl+mouse wheel also zooms.
+
+Pointers and drawings use one document position (x across the page width, y 0..1 down the whole PDF), so they stay on the words at any zoom or screen size. Existing permissions (nobody / selected / everyone, Writing checkbox) are unchanged and still checked by the teacher. Opening a PDF stops screen sharing, and starting screen sharing closes the PDF. Helpers: pdf-core.js (math, tested in tests/class-pointer-pdf.test.cjs), pdf-mode.js (screen). classroom.js exposes a small window.ClassPointerBridge for it.
+
+Limits: pointers/drawings are not text-based (no text selection); overlapping marks from different people are not layered as in screen-share mode; teacher touch-scrolling is not supported (use wheel/buttons); password-protected PDFs are refused.
