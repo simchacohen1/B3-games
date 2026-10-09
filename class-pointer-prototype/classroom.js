@@ -236,7 +236,13 @@ async function captureBrowserTab(){
     canvas.getContext('2d',{alpha:false}).drawImage(video,0,0,width,height);
     const dataUrl=canvas.toDataURL('image/jpeg',0.82);
     track.stop();stream=null;video.srcObject=null;
-    if(await window.ClassPointerPdf.openSnapshot(dataUrl,width,height))document.dispatchEvent(new Event('class-pointer-capture-ready'));
+    if(await window.ClassPointerPdf.openSnapshot(dataUrl,width,height)){
+      document.dispatchEvent(new Event('class-pointer-capture-ready'));
+      // Best effort: after the still image is captured, ask the browser to
+      // return to Class Pointer. Browsers may ignore focus requests.
+      try{window.focus()}catch(_){}
+      requestAnimationFrame(()=>{try{window.focus()}catch(_){}});
+    }
   }catch(error){fail(error.name==='NotAllowedError'?'Capture was canceled.':error.message||'Could not capture the selected source.')}
   finally{stream?.getTracks().forEach(t=>t.stop());if(video)video.srcObject=null;$('openBrowserTab').disabled=!started}
 }
