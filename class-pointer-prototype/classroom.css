@@ -238,3 +238,18 @@ body.student-dock-view #stage:fullscreen #exitFullScreenLesson,body.student-dock
 #stage.mouse-navigation #pdfView,#stage.mouse-navigation #pdfContent{cursor:grab}
 #stage.mouse-navigation #pdfContent:active{cursor:grabbing}
 #navigationHint{margin:8px 0;font-size:14px}
+
+/* Fullscreen teacher tools: narrow, movable side rail instead of a top banner. */
+#stage .teacher-dock.floating{
+  top:12px;left:12px;right:auto;bottom:auto;transform:none;
+  width:fit-content;max-width:190px;max-height:calc(100% - 24px);
+  display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;
+  overflow:visible;
+}
+#stage .teacher-dock.floating>.tb-group{justify-content:center;flex-wrap:wrap}
+#stage .teacher-dock.floating>.tb-spacer{display:none}
+#stage .teacher-dock.floating .tb-menu{top:0;left:calc(100% + 6px);right:auto;max-height:75vh;overflow:auto}
+#stage .teacher-dock.floating.collapsed{width:auto;max-width:190px}
+#stage .teacher-dock.floating.collapsed>.tb-move-handle{display:inline-flex}
+#stage .teacher-dock.floating.collapsed .tb-group:last-child{display:flex}
+#stage .teacher-dock.floating.collapsed .tb-menu{display:none}
