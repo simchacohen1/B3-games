@@ -116,6 +116,7 @@
     if(legacyStudentView||(active&&teacherView())){build();startSync()}else{stopSync();if(!active)enter.focus()}
   }
   function fallback(){stage.classList.add('lesson-fullscreen');document.body.classList.add('lesson-expanded');sync()}
+  document.addEventListener('class-pointer-capture-ready',()=>{if(teacherView()&&!expanded())fallback()});
   enter.addEventListener('click',async()=>{
     if(expanded())return;
     if(stage.requestFullscreen){try{await stage.requestFullscreen();sync();return}catch{}}
