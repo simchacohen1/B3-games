@@ -71,7 +71,7 @@ async function syncClass(id,btn){
  const rows=[...card.querySelectorAll('tbody tr')];
  const students=rows.map((r,i)=>({name:cls.students[i][0],mark:Number(r.querySelector('[data-mark]').value),attendance:'present',comment:r.querySelector('[data-comment]').value.trim()||undefined}));
  const date=document.getElementById('date').value;
- const body={class_section:cls.label,topic:'A Chossid is a Lamdan',test_name:'A Chossid is a Lamdan — Week Ending '+date,type:'classwork',date,description:'Weekly A Chossid is a Lamdan mark for effort and responsibility.',students};
+ const body={class_section:cls.label,topic:'A Chossid is a Lamdan',test_name:'A Chossid is a Lamdan — Week Ending '+date,type:'test',date,description:'Weekly A Chossid is a Lamdan mark for effort and responsibility.',students};
  if(!confirm('Save '+cls.label+' A Chossid is a Lamdan marks to Nigri?'))return;
  btn.disabled=true;status.textContent='Syncing…';
  try{
