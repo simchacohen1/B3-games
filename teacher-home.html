@@ -54,7 +54,7 @@ async function render(user,access){
    q('who').textContent='Viewing as '+user.email;
    const welcome=q('who').parentElement;
    welcome.querySelector('.sub').textContent='Read-only preview of this teacher’s assigned classes and enabled tools. You remain signed in as the owner.';
-   if(!q('exitTeacherPreview')){const exit=document.createElement('a');exit.id='exitTeacherPreview';exit.href='admin.html';exit.className='manage';exit.textContent='Exit teacher view';exit.style.cssText='display:inline-block;margin-top:14px';welcome.append(exit);}
+   if(!q('exitTeacherPreview')){const exit=document.createElement('a');exit.id='exitTeacherPreview';exit.href='admin.html?v=20261008-teacher-preview';exit.className='manage';exit.textContent='Exit teacher view';exit.style.cssText='display:inline-block;margin-top:14px';welcome.append(exit);}
    q('classes').querySelectorAll('a').forEach(link=>{link.removeAttribute('href');link.removeAttribute('target');link.setAttribute('aria-disabled','true');link.title='Read-only teacher preview';link.style.cursor='default';});
  }
 }
