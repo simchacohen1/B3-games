@@ -36,6 +36,7 @@
 
   // Quiz type -> Nigri topic (quiz types are named after the Nigri topics).
   function skillTopic(s) {
+    if (s === 'general') return '';
     if (s === 'shorashim') return 'Shoroshim';
     if (s === 'translation') return 'Chumash Translation';
     if (s === 'mixed' || s === 'integrated') return 'Chumash';
@@ -217,7 +218,7 @@
       '<div class="ng-grid">' +
         '<label>Nigri Section<input id="nigriSection" type="text" value="Shluchim OS"></label>' +
         '<label>Grade<input id="nigriGrade" type="text"></label>' +
-        '<label>Nigri Topic<select id="nigriTopic">' + NIGRI_TOPICS.map((t) => '<option>' + h(t) + '</option>').join('') + '</select></label>' +
+        '<label>Nigri Topic<select id="nigriTopic"><option value="">Choose a topic</option>' + NIGRI_TOPICS.map((t) => '<option>' + h(t) + '</option>').join('') + '</select></label>' +
         '<label>Nigri Type<select id="nigriType"><option>Quiz</option><option>Test/Project</option><option>Classwork</option><option>Homework</option></select></label>' +
         '<label>Date<input id="nigriDate" type="date"></label>' +
         '<label>Name<input id="nigriName" type="text"></label>' +

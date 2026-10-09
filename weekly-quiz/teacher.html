@@ -561,7 +561,7 @@
         <div class="start-tiles">
           <button type="button" class="start-tile ai" onclick="showSetupStep('generate')">
             <span class="tile-ico">✨</span>
-            <span><span class="tile-title" style="display:block">Generate from pesukim</span><span class="tile-desc">Paste the pesukim, pick a quiz type, and get draft questions to review.</span></span>
+            <span><span class="tile-title" style="display:block">Generate from source text</span><span class="tile-desc">Paste a lesson or source text, pick a quiz type, and get draft questions to review.</span></span>
           </button>
           <button type="button" class="start-tile" onclick="uiNewQuiz()">
             <span class="tile-ico">✎</span>
@@ -582,10 +582,11 @@
     <div class="setup-step hidden" id="stepGenerate">
       <button type="button" class="link-btn back-link" onclick="showSetupStep('library')">← Back to quizzes</button>
       <div class="card">
-        <div class="card-head"><div><h2>Generate a quiz from pesukim</h2><div class="small">Nothing is saved or given to students until you review it.</div></div></div>
+        <div class="card-head"><div><h2>Generate a quiz from source text</h2><div class="small">Nothing is saved or given to students until you review it.</div></div></div>
         <div class="generator-grid">
           <label>Quiz type
             <select id="generatorType" onchange="generatorTypeChanged()">
+              <option value="general">Any subject</option>
               <option value="shorashim">Shoroshim</option>
               <option value="translation">Chumash Translation</option>
               <option value="comprehension">Chumash Comprehension</option>
@@ -607,8 +608,8 @@
           <label>Translation questions<input type="number" id="mixedTranslation" min="0" max="30" value="5"></label>
           <label>Comprehension questions<input type="number" id="mixedComprehension" min="0" max="30" value="5"></label>
         </div>
-        <label for="generatorSource">Pesukim / source text</label>
-        <textarea id="generatorSource" dir="auto" placeholder="Paste the pesukim here…" style="margin-top:5px"></textarea>
+        <label for="generatorSource">Lesson / source text</label>
+        <textarea id="generatorSource" dir="auto" placeholder="Paste any lesson, notes, or source text here…" style="margin-top:5px"></textarea>
         <div class="controls" style="margin-top:12px">
           <button id="generateBtn" class="purple btn-lg" onclick="generateQuizDraft()">✨ Generate draft</button>
           <span id="generatorStatus" class="small"></span>
@@ -640,6 +641,7 @@
           </label>
           <label>Quiz type (Nigri topic)
             <select id="editorSkillType" onchange="editorSkillChanged()">
+              <option value="general">Any subject</option>
               <option value="shorashim">Shoroshim</option>
               <option value="translation">Chumash Translation</option>
               <option value="comprehension">Chumash Comprehension</option>
@@ -870,7 +872,7 @@ const CLASS_ROSTERS={
   et:{label:'East Track',students:['chaim_chaikin','yossi_gourarie','sholom_huebner','moshe_lapine','kehos_notik','yisroel_oirechman','moshe_raichman','avrohom_rosenfeld','levi_rozmarin','arik_traxler','simcha_cohen']},
   wt:{label:'West Track',students:['ari_greenberg','zev_rosenfeld','levi_schtroks','yisroel_aryeh_simmonds','leibel_vogel','leib_wolf','simcha_cohen']}
 };
-const SKILL_LABELS={shorashim:'Shoroshim',translation:'Chumash Translation',comprehension:'Chumash Comprehension',integrated:'Chumash',mixed:'Chumash'};
+const SKILL_LABELS={general:'Any subject',shorashim:'Shoroshim',translation:'Chumash Translation',comprehension:'Chumash Comprehension',integrated:'Chumash',mixed:'Chumash'};
 // Quiz types whose questions each keep their own skill (shorashim/translation/comprehension).
 function isMultiSkill(t){return t==='mixed'||t==='integrated';}
 
@@ -1121,6 +1123,7 @@ function generatorReferences(sourceLabel,sourceText){
 //   Shoroshim also asks simple word parts — prefix / shoresh / suffix (dikduk).
 //   Mixed gets both. Translation is unchanged.
 function skillsSource(sourceText,type,count){
+  if(type==='general')return sourceText;
   const n=Math.max(1,Math.min(40,Number(count)||10));
   const some=Math.max(1,Math.round(n*0.3));
   const comp=`COMPREHENSION QUESTIONS — ALSO INCLUDE THESE SKILLS:
@@ -1175,9 +1178,9 @@ async function generateQuizDraft(){
         : requestedCount);
 
   const sourceText=skillsSource(rawSource,quizType,count);
-  const references=generatorReferences(sourceLabel,rawSource);
+  const references=quizType==='general'?[]:generatorReferences(sourceLabel,rawSource);
 
-  if(!rawSource){alert('Paste the pesukim/source text first.');return;}
+  if(!rawSource){alert('Paste the lesson/source text first.');return;}
 
   const btn=document.getElementById('generateBtn');
   const status=document.getElementById('generatorStatus');
@@ -1493,7 +1496,7 @@ function renderQuizList(){
   ids.forEach(id=>{const q=quizzes[id]||{},div=document.createElement('div');div.className='quiz-item'+(id===currentQuizId?' active':'');div.innerHTML='<div class="quiz-item-title">'+esc(q.title||'Untitled')+'</div><div class="small">'+esc(skillLabel(q.skillType||'comprehension'))+' • '+asArray(q.questions).length+' questions</div>';div.onclick=()=>loadQuizEditor(id);box.appendChild(div);});
 }
 function newQuizDraft(){
-  currentQuizId='';document.getElementById('editorTitle').value='';document.getElementById('editorSkillType').value='shorashim';document.getElementById('editorSourceLabel').value='';editorQuestions=[];renderEditorRows();document.getElementById('deleteQuizBtn').disabled=true;setupMsg('New quiz draft.');renderQuizList();
+  currentQuizId='';document.getElementById('editorTitle').value='';document.getElementById('editorSkillType').value='general';document.getElementById('editorSourceLabel').value='';editorQuestions=[];renderEditorRows();document.getElementById('deleteQuizBtn').disabled=true;setupMsg('New quiz draft.');renderQuizList();
 }
 function loadQuizEditor(id){
   currentQuizId=id;const q=quizzes[id]||{};document.getElementById('editorTitle').value=q.title||'';document.getElementById('editorSkillType').value=q.skillType||'comprehension';document.getElementById('editorSourceLabel').value=q.sourceLabel||'';
@@ -1507,7 +1510,7 @@ function renderEditorRows(){
   editorQuestions.forEach((r,i)=>{
     if(!Array.isArray(r.choices))r.choices=[];while(r.choices.length<3)r.choices.push('');if(r.choices.length>4)r.choices=r.choices.slice(0,4);
     const d=document.createElement('div');d.className='editor-row';
-    d.innerHTML='<div class="editor-head"><b>Question '+(i+1)+'</b><div class="controls"><select onchange="editorQuestions['+i+'].skillType=this.value" '+(!isMultiSkill(quizSkill)?'disabled':'')+'><option value="shorashim" '+(r.skillType==='shorashim'?'selected':'')+'>Shoroshim</option><option value="translation" '+(r.skillType==='translation'?'selected':'')+'>Chumash Translation</option><option value="comprehension" '+(r.skillType==='comprehension'?'selected':'')+'>Chumash Comprehension</option></select><button class="danger" style="padding:5px 9px" onclick="removeEditorRow('+i+')">Remove</button></div></div><input type="text" dir="auto" value="'+esc(r.q)+'" oninput="editorQuestions['+i+'].q=this.value" placeholder="Question"><div class="choice-grid">'+r.choices.map((c,ci)=>'<div><label style="font-size:12px">'+String.fromCharCode(65+ci)+(Number(r.correctIndex)===ci?' ✓ correct':'')+'</label><input type="text" dir="auto" value="'+esc(c)+'" oninput="editorQuestions['+i+'].choices['+ci+']=this.value"></div>').join('')+'</div><div class="controls" style="margin-top:7px"><label style="font-size:12px">Correct answer <select onchange="editorQuestions['+i+'].correctIndex=Number(this.value);renderEditorRows()">'+r.choices.map((_,ci)=>'<option value="'+ci+'" '+(Number(r.correctIndex)===ci?'selected':'')+'>'+String.fromCharCode(65+ci)+'</option>').join('')+'</select></label>'+(r.choices.length<4?'<button class="secondary" onclick="addChoice('+i+')">+ 4th choice</button>':'<button class="secondary" onclick="removeFourthChoice('+i+')">Use 3 choices</button>')+'</div>';
+    d.innerHTML='<div class="editor-head"><b>Question '+(i+1)+'</b><div class="controls"><select onchange="editorQuestions['+i+'].skillType=this.value" '+(!isMultiSkill(quizSkill)?'disabled':'')+'><option value="general" '+(r.skillType==='general'?'selected':'')+'>Any subject</option><option value="shorashim" '+(r.skillType==='shorashim'?'selected':'')+'>Shoroshim</option><option value="translation" '+(r.skillType==='translation'?'selected':'')+'>Chumash Translation</option><option value="comprehension" '+(r.skillType==='comprehension'?'selected':'')+'>Chumash Comprehension</option></select><button class="danger" style="padding:5px 9px" onclick="removeEditorRow('+i+')">Remove</button></div></div><input type="text" dir="auto" value="'+esc(r.q)+'" oninput="editorQuestions['+i+'].q=this.value" placeholder="Question"><div class="choice-grid">'+r.choices.map((c,ci)=>'<div><label style="font-size:12px">'+String.fromCharCode(65+ci)+(Number(r.correctIndex)===ci?' ✓ correct':'')+'</label><input type="text" dir="auto" value="'+esc(c)+'" oninput="editorQuestions['+i+'].choices['+ci+']=this.value"></div>').join('')+'</div><div class="controls" style="margin-top:7px"><label style="font-size:12px">Correct answer <select onchange="editorQuestions['+i+'].correctIndex=Number(this.value);renderEditorRows()">'+r.choices.map((_,ci)=>'<option value="'+ci+'" '+(Number(r.correctIndex)===ci?'selected':'')+'>'+String.fromCharCode(65+ci)+'</option>').join('')+'</select></label>'+(r.choices.length<4?'<button class="secondary" onclick="addChoice('+i+')">+ 4th choice</button>':'<button class="secondary" onclick="removeFourthChoice('+i+')">Use 3 choices</button>')+'</div>';
     box.appendChild(d);
   });
 }
@@ -1954,7 +1957,7 @@ function studentLaunchRecords(studentId){
   const records=[];Object.entries(allLaunches).forEach(([lid,l])=>{const targets=l.targetStudents&&Object.keys(l.targetStudents).filter(k=>l.targetStudents[k]);const belongs=targets&&targets.length?targets.includes(studentId):((CLASS_ROSTERS[l.classId]||{}).students||[]).includes(studentId);if(!belongs)return;const qs=launchQuestions(l),sr=(allResponses[lid]||{})[studentId]||{};if(!Object.keys(sr).length)return;const bySkill={};qs.forEach((q,i)=>{const skill=q.skillType||(l.quizSnapshot&&l.quizSnapshot.skillType)||'comprehension',r=sr[i]||sr[String(i)];if(!bySkill[skill])bySkill[skill]={correct:0,total:0,answered:0};bySkill[skill].total++;if(r){bySkill[skill].answered++;if(r.correct)bySkill[skill].correct++;}});const adjusted=Object.values(sr).filter(r=>r&&r.adjusted).length;records.push({launchId:lid,launch:l,title:l.quizSnapshot&&l.quizSnapshot.title||'Untitled',date:Number(l.createdAt)||0,attemptGroupId:l.attemptGroupId||lid,attemptNumber:Number(l.attemptNumber)||1,retake:!!l.retakeOf,bySkill,adjusted});});return records.sort((a,b)=>a.date-b.date);
 }
 function currentSkillStats(studentId){
-  const records=studentLaunchRecords(studentId),latestByGroup={};records.forEach(r=>{const g=r.attemptGroupId;if(!latestByGroup[g]||r.attemptNumber>=latestByGroup[g].attemptNumber)latestByGroup[g]=r;});const stats={shorashim:{correct:0,total:0,groups:0},translation:{correct:0,total:0,groups:0},comprehension:{correct:0,total:0,groups:0}};Object.values(latestByGroup).forEach(r=>Object.entries(r.bySkill).forEach(([skill,v])=>{if(!stats[skill])return;stats[skill].correct+=v.correct;stats[skill].total+=v.total;stats[skill].groups++;}));Object.values(stats).forEach(s=>s.pct=s.total?Math.round(s.correct/s.total*100):null);return{stats,records,latestByGroup};
+  const records=studentLaunchRecords(studentId),latestByGroup={};records.forEach(r=>{const g=r.attemptGroupId;if(!latestByGroup[g]||r.attemptNumber>=latestByGroup[g].attemptNumber)latestByGroup[g]=r;});const stats={general:{correct:0,total:0,groups:0},shorashim:{correct:0,total:0,groups:0},translation:{correct:0,total:0,groups:0},comprehension:{correct:0,total:0,groups:0}};Object.values(latestByGroup).forEach(r=>Object.entries(r.bySkill).forEach(([skill,v])=>{if(!stats[skill])return;stats[skill].correct+=v.correct;stats[skill].total+=v.total;stats[skill].groups++;}));Object.values(stats).forEach(s=>s.pct=s.total?Math.round(s.correct/s.total*100):null);return{stats,records,latestByGroup};
 }
 function makeParentSummary(name,stats){
   const available=Object.entries(stats).filter(([,v])=>v.pct!==null).sort((a,b)=>b[1].pct-a[1].pct);if(!available.length)return'No quiz data is available yet for '+name+'.';
@@ -1964,8 +1967,8 @@ function makeParentSummary(name,stats){
 }
 function renderStudentProgress(){
   const sel=document.getElementById('progressStudent');if(!sel||!sel.value){document.getElementById('skillCards').innerHTML='';document.getElementById('parentSummary').textContent='Choose a student.';document.getElementById('progressHistory').innerHTML='';return;}const sid=sel.value,name=(roster[sid]&&roster[sid].name)||sel.options[sel.selectedIndex].textContent||sid,{stats,records}=currentSkillStats(sid);document.getElementById('progressStudentName').textContent=name+' — Progress';
-  document.getElementById('skillCards').innerHTML=['shorashim','translation','comprehension'].map(k=>'<div class="skill-card"><div>'+skillLabel(k)+'</div><div class="big">'+(stats[k].pct===null?'—':stats[k].pct+'%')+'</div><div class="small">'+stats[k].groups+' assessment'+(stats[k].groups===1?'':'s')+'</div></div>').join('');document.getElementById('parentSummary').textContent=makeParentSummary(name,stats);
-  let html='<thead><tr><th>Date</th><th>Quiz</th><th>Class</th><th>Attempt</th><th>Shoreshim</th><th>Words/Phrases</th><th>Comprehension</th><th>Adjusted</th></tr></thead><tbody>';records.slice().reverse().forEach(r=>{function cell(skill){const v=r.bySkill[skill];return v&&v.total?Math.round(v.correct/v.total*100)+'%':'—';}html+='<tr><td>'+esc(fmtDate(r.date))+'</td><td>'+esc(r.title)+'</td><td>'+esc(classLabel(r.launch.classId))+'</td><td>'+(r.retake?'Retake '+r.attemptNumber:'First')+'</td><td>'+cell('shorashim')+'</td><td>'+cell('translation')+'</td><td>'+cell('comprehension')+'</td><td>'+(r.adjusted?r.adjusted:'—')+'</td></tr>';});document.getElementById('progressHistory').innerHTML=html+'</tbody>';
+  document.getElementById('skillCards').innerHTML=['general','shorashim','translation','comprehension'].map(k=>'<div class="skill-card"><div>'+skillLabel(k)+'</div><div class="big">'+(stats[k].pct===null?'—':stats[k].pct+'%')+'</div><div class="small">'+stats[k].groups+' assessment'+(stats[k].groups===1?'':'s')+'</div></div>').join('');document.getElementById('parentSummary').textContent=makeParentSummary(name,stats);
+  let html='<thead><tr><th>Date</th><th>Quiz</th><th>Class</th><th>Attempt</th><th>Shoreshim</th><th>Words/Phrases</th><th>Comprehension</th><th>Adjusted</th></tr></thead><tbody>';records.slice().reverse().forEach(r=>{function cell(skill){const v=r.bySkill[skill];return v&&v.total?Math.round(v.correct/v.total*100)+'%':'—';}html+='<tr><td>'+esc(fmtDate(r.date))+'</td><td>'+esc(r.title)+'</td><td>'+esc(classLabel(r.launch.classId))+'</td><td>'+(r.retake?'Retake '+r.attemptNumber:'First')+'</td><td>'+cell('general')+'</td><td>'+cell('shorashim')+'</td><td>'+cell('translation')+'</td><td>'+cell('comprehension')+'</td><td>'+(r.adjusted?r.adjusted:'—')+'</td></tr>';});document.getElementById('progressHistory').innerHTML=html+'</tbody>';
 }
 async function copyParentSummary(){const text=document.getElementById('parentSummary').textContent;if(!text)return;try{await navigator.clipboard.writeText(text);alert('Parent summary copied.');}catch(e){prompt('Copy parent summary:',text);}}
 
@@ -2040,7 +2043,7 @@ newQuizDraft();generatorTypeChanged();populateProgressStudents();updateLaunchTar
   wrap('loadQuizEditor',()=>{const sel=$('editorSkillType');if(sel&&!sel.value){sel.value='mixed';editorSkillChanged();}showSetupStep('edit');});
   wrap('addSelectedCandidates',()=>{if(editorQuestions.length)showSetupStep('edit');});
   wrap('renderQuizList',()=>{filterQuizList();updateCurrentQuizBar();if(!Object.keys(quizzes).length)$('quizList').innerHTML='<div class="empty">No saved quizzes yet. Use one of the options above to make your first quiz.</div>';});
-  wrap('renderEditorRows',()=>{updateCurrentQuizBar();if(!editorQuestions.length)$('editorRows').innerHTML='<div class="empty" style="margin-top:12px">No questions yet. Click <b>+ Add question</b>, paste from a spreadsheet, or generate from pesukim.</div>';});
+  wrap('renderEditorRows',()=>{updateCurrentQuizBar();if(!editorQuestions.length)$('editorRows').innerHTML='<div class="empty" style="margin-top:12px">No questions yet. Click <b>+ Add question</b>, paste from a spreadsheet, or generate from source text.</div>';});
   wrap('deleteCurrentQuiz',r=>{if(r&&r.then)r.then(()=>{if(!currentQuizId)showSetupStep('library');});});
   wrap('openMakeupFromResults',()=>{showSetupStep('assign');});
   wrap('showTab',(r,name)=>{if(name==='setup')showSetupStep(setupStep);});
