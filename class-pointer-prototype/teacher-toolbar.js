@@ -75,6 +75,34 @@
   }
   new MutationObserver(adoptViewControls).observe(document.body,{childList:true,subtree:true});
 
+  // Drag handle remains visible even when the dock is collapsed.
+  const moveHandle=document.createElement('button');
+  moveHandle.type='button';moveHandle.textContent='⠿ Move';
+  moveHandle.title='Drag to reposition the teaching toolbar';
+  moveHandle.setAttribute('aria-label','Drag to move the toolbar');
+  moveHandle.style.cssText='order:-1;flex:0 0 auto;cursor:grab;touch-action:none;padding:6px 9px;border-radius:7px';
+  dock.prepend(moveHandle);
+  let moving=null;
+  moveHandle.addEventListener('pointerdown',event=>{
+    if(event.button!==0||!isExpanded())return;
+    event.preventDefault();event.stopPropagation();
+    const rect=dock.getBoundingClientRect(),bounds=stage.getBoundingClientRect();
+    moving={id:event.pointerId,dx:event.clientX-rect.left,dy:event.clientY-rect.top};
+    dock.style.right='auto';dock.style.bottom='auto';
+    dock.style.left=(rect.left-bounds.left)+'px';dock.style.top=(rect.top-bounds.top)+'px';
+    moveHandle.setPointerCapture(event.pointerId);moveHandle.style.cursor='grabbing';
+  });
+  moveHandle.addEventListener('pointermove',event=>{
+    if(!moving||event.pointerId!==moving.id)return;
+    const bounds=stage.getBoundingClientRect();
+    dock.style.left=Math.max(0,Math.min(stage.clientWidth-dock.offsetWidth,event.clientX-bounds.left-moving.dx))+'px';
+    dock.style.top=Math.max(0,Math.min(stage.clientHeight-dock.offsetHeight,event.clientY-bounds.top-moving.dy))+'px';
+  });
+  const stopMoving=()=>{moving=null;moveHandle.style.cursor='grab'};
+  ['pointerup','pointercancel','lostpointercapture'].forEach(type=>moveHandle.addEventListener(type,stopMoving));
+  moveHandle.addEventListener('click',event=>event.stopPropagation());
+  new ResizeObserver(()=>{if(!isExpanded()||!dock.style.left)return;dock.style.left=Math.max(0,Math.min(stage.clientWidth-dock.offsetWidth,parseFloat(dock.style.left)||0))+'px';dock.style.top=Math.max(0,Math.min(stage.clientHeight-dock.offsetHeight,parseFloat(dock.style.top)||0))+'px'}).observe(stage);
+
   // Inside the lesson the toolbar must never place a pointer or start a drawing.
   ['pointerdown','pointermove','pointerup','pointercancel','click'].forEach(type=>dock.addEventListener(type,event=>{if(stage.contains(dock))event.stopPropagation()}));
   dock.addEventListener('pointerenter',()=>{if(stage.contains(dock))stage.dispatchEvent(new PointerEvent('pointerleave'))});
