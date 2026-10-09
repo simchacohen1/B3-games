@@ -765,7 +765,23 @@ if(CLASS_MODE){
     $('teacherGoogleSignIn').onclick=()=>window.B3SiteSettings.signInWithGoogle().catch(err=>{$('teacherGateMsg').textContent=err?.message||'Google sign-in did not complete.'});
     window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>checkClassTeacher(user,access).catch(err=>{console.error(err);$('teacherGateMsg').textContent='Could not check your teacher account.'}));
   }
-}else if(sessionStorage.getItem('shorashimTeacher')==='1')openTeacherApp();
+}else{
+  // Plain link and B3's own classes (et/wt): a signed-in Google teacher skips the passcode.
+  // The passcode still works as a fallback for anyone not signed in.
+  if(sessionStorage.getItem('shorashimTeacher')==='1')openTeacherApp();
+  const B3_CLASSES=CLASS_ID?[CLASS_ID]:['et','wt'];
+  $('teacherGoogleSignIn').classList.remove('hidden');
+  $('teacherGoogleSignIn').onclick=()=>window.B3SiteSettings.signInWithGoogle().catch(err=>{$('teacherGateMsg').textContent=err?.message||'Google sign-in did not complete.'});
+  window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>{
+    if(!user||!access?.authorized)return;
+    const ids=access.classIds||[];
+    if(access.role==='admin'||ids.includes('*')||B3_CLASSES.some(id=>ids.includes(id))){
+      sessionStorage.setItem('shorashimTeacher','1');
+      $('teacherGoogleSignIn').classList.add('hidden');
+      openTeacherApp();
+    }
+  });
+}
 
 db.ref(SPACE).on('value',snap=>{
   if($('teacherApp').classList.contains('hidden'))return;
