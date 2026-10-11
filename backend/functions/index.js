@@ -2575,3 +2575,4 @@ const billingStripe = require("./billing-stripe");
 exports.funTorahCreateCheckout = billingStripe.funTorahCreateCheckout;
 exports.funTorahStripeWebhook = billingStripe.funTorahStripeWebhook;
 exports.funTorahBillingPortal = billingStripe.funTorahBillingPortal;
+exports.funTorahUpgradeTool = billingStripe.funTorahUpgradeTool;
