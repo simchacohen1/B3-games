@@ -2574,3 +2574,4 @@ exports.studentReportChatGPTRead = require("./student-report-chatgpt-read").stud
 const billingStripe = require("./billing-stripe");
 exports.funTorahCreateCheckout = billingStripe.funTorahCreateCheckout;
 exports.funTorahStripeWebhook = billingStripe.funTorahStripeWebhook;
+exports.funTorahBillingPortal = billingStripe.funTorahBillingPortal;
