@@ -373,7 +373,7 @@ async function speakStudentText(text,rootEl){
         if(el)el.classList.remove('tts-highlight');
       }else if(/[A-Za-z0-9]/.test(seg.text)) await playStudentAudioChunk(seg.text);
     }
-  }catch(e){console.error('Natural voice playback failed:',e);alert('The voice could not play right now. Please try the speaker again.');}
+  }catch(e){console.warn('Natural voice unavailable, using free browser speech:',e);if(window.FTTAudio)window.FTTAudio.speak(text,{force:true});}
 }
 function asArray(v){if(!v)return[];if(Array.isArray(v))return v;return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]);}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
