@@ -64,6 +64,7 @@ function verifyWebhook(raw,header,secret,atMs=Date.now()){
 function stripeClient(secret){
  return {
   checkout:{sessions:{create:(data,opts)=>request(secret,'POST','/checkout/sessions',data,opts)}},
+  billingPortal:{sessions:{create:(data,opts)=>request(secret,'POST','/billing_portal/sessions',data,opts)}},
   subscriptions:{retrieve:(id,query)=>request(secret,'GET','/subscriptions/'+encodeURIComponent(id),query)},
   webhooks:{constructEvent:(raw,header,whsec)=>verifyWebhook(raw,header,whsec)}
  };
