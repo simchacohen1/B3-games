@@ -300,7 +300,7 @@ function renderOwnerPlatformClass(panel){
    return '<div class="cp-row"><div></div><div class="cp-name">'+cpEsc(t.name)+'</div><button type="button" class="cp-toggle '+(on?"open":"closed")+'" data-cp-grant="'+cpEsc(t.id)+'"'+(cpBusy?" disabled":"")+'>'+(on?"✅ Enabled":"⛔ Disabled")+'</button></div>';
  }).join("");
  panel.innerHTML='<div class="cp-wrap"><div class="cp-switch">'+cpClassTabs()+'</div>'
-  +(cpSettings?.siteEnabled===false?'<div class="cp-emergency">🚨 The global emergency lock is on for all classes.</div>':"")
+  +(cpSettings?.siteEnabled===false?'<div class="cp-emergency">🚨 The global emergency lock is on for all classes. <button type="button" id="cpEmergencyOffNew">Turn emergency lock off</button></div>':"")
   +'<div class="cp-status '+(isOpen?"open":"locked")+'"><div>'+(isOpen?"✅ ":"🔒 ")+cpEsc(name)+(isOpen?" is OPEN":" is LOCKED")+'<small>Only this class is affected by the controls below.</small></div></div>'
   +'<div class="cp-modes"><button type="button" data-cp-new-mode="open" class="'+(mode==="open"?"on":"")+'"'+(cpBusy?" disabled":"")+'>🔓 Open this class</button><button type="button" data-cp-new-mode="locked" class="'+(mode==="locked"?"on":"")+'"'+(cpBusy?" disabled":"")+'>🔒 Lock this class</button></div>'
   +'<div class="cp-games"><div class="cp-games-head">Tools for '+cpEsc(name)+'<span>Each tool is enabled or disabled for this class independently. Only enabled tools are available to students and teachers.</span></div>'
@@ -308,9 +308,20 @@ function renderOwnerPlatformClass(panel){
   +'<div class="cp-msg">'+cpEsc(cpMsg)+'</div></div>';
  cpBindClassTabs(panel);
  const db=w?.firebase?.database?.(),ws=w?.B3SiteSettings?.workspaceId||"b3-2026",base="b3Games/workspaces/"+ws+"/classes/"+id;
- panel.querySelectorAll("[data-cp-new-mode]").forEach(b=>b.onclick=()=>cpSave(
-   ()=>db.ref(base+"/access/mode").set(b.dataset.cpNewMode),
-   name+(b.dataset.cpNewMode==="locked"?" locked ✓":" opened ✓")));
+ panel.querySelectorAll("[data-cp-new-mode]").forEach(b=>b.onclick=()=>cpSave(()=>{
+   if(b.dataset.cpNewMode==="open"){
+     const updates={};
+     updates[base+"/access/mode"]="open";
+     updates[base+"/siteEnabled"]=true;
+     return db.ref().update(updates);
+   }
+   return db.ref(base+"/access/mode").set("locked");
+ },name+(b.dataset.cpNewMode==="locked"?" locked ✓":" opened ✓")));
+ const emergency=document.getElementById("cpEmergencyOffNew");
+ if(emergency)emergency.onclick=()=>{
+   if(confirm("Turn off the emergency lock for every class?"))
+     cpSave(()=>cpApi().updateSiteEnabled(true),"Emergency lock off ✓");
+ };
  panel.querySelectorAll("[data-cp-grant]").forEach(b=>b.onclick=()=>{
    const tool=b.dataset.cpGrant,on=row.toolGrants?.[tool]===true;
    cpSave(()=>db.ref(base+"/toolGrants/"+tool).set(!on),
