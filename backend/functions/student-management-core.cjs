@@ -27,7 +27,7 @@ async function migratePasscodes(store,deletePublic,now){
 }
 
 async function manageStudents(store,identity,body,now=Date.now()){
- if(!identity?.uid||identity.email_verified!==true||identity.firebase?.sign_in_provider!=='google.com')fail(403,'Verified Google teacher sign-in required.');
+ if(!require('./teacher-auth-identity.cjs').verifiedTeacherIdentity(identity))fail(403,'Verified teacher sign-in required.');
  const root='b3Games/workspaces/b3-2026',classId=body.classId;
  // The owner account and any active site administrator count as owner here.
  const owner=String(identity.email||'').toLowerCase()==='simcha5770@gmail.com'||(await store.get('b3Games/admins/'+identity.uid))?.active===true;
