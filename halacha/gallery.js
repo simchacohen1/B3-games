@@ -46,7 +46,7 @@
         scale: Math.min(1, 1400 / spread.offsetWidth), useCORS: true, backgroundColor: '#976442', logging: false,
         onclone(doc) { doc.body.classList.add('exporting'); doc.querySelectorAll('.scrap.selected').forEach(el => el.classList.remove('selected')); }
       });
-      const image = canvas.toDataURL('image/jpeg', 0.85);
+      const image = canvas.toDataURL('image/jpeg', 0.67);
       draft = { studentId: HALACHA_STUDENT_ID, workspaceId: info.workspaceId, classId: info.classId,
         studentName, className: info.classId === 'et' ? 'B3 ET' : info.classId === 'wt' ? 'B3 WT' : info.classId,
         category: 'Halacha', galleryRoom: 'hallway', description: 'My Halacha scrapbook — ' + lesson.title,
@@ -62,9 +62,17 @@
     if (!title) { status.textContent = 'Please enter a project title.'; return; }
     busy = true; send.disabled = true; cancel.disabled = true; status.textContent = 'Sending…';
     try {
-      const path = ['et', 'wt'].includes(draft.classId) ? 'classGallery/posts' :
-        'b3Games/workspaces/' + draft.workspaceId + '/classes/' + draft.classId + '/resources/gallery/posts';
-      await halachaDb.ref(path).push().set({ ...draft, title, createdAt: new Date().toISOString() });
+      const pin = sessionStorage.getItem('b3Games_classPin') || '';
+      if (!pin) throw new Error('Please sign in again from the home page.');
+      const response = await fetch('https://us-central1-b3-games.cloudfunctions.net/classGallerySubmit', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        signal: AbortSignal.timeout(30000),
+        body: JSON.stringify({studentId:draft.studentId, studentName:draft.studentName,
+          classId:draft.classId, pin, title, description:draft.description,
+          source:'halacha', image:draft.image})
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) throw new Error(result.error || 'Could not send your pages.');
       draft = null;
       status.textContent = '✓ Sent to your teacher! Your pages will appear in Class Gallery after approval.';
       cancel.textContent = 'Done';
