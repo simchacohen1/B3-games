@@ -43,4 +43,26 @@ function latestInvoicePaid(subscription){
  return !!(invoice&&typeof invoice==='object'&&
   invoice.paid===true&&invoice.status==='paid');
 }
-module.exports={subscriptionPlan,planMatchesOrder,latestInvoicePaid};
+
+// The base subscription item determines the paid annual access period.
+// Do not extend access based on an unpaid renewal's new period end.
+function paidPeriodEnd(subscription){
+ const base=(subscription?.items?.data||[]).find(item=>item?.price?.product?.metadata?.fttKind==='base');
+ const end=Number(base?.current_period_end||subscription?.current_period_end);
+ if(!Number.isSafeInteger(end)||end<Math.floor(Date.now()/1000)-400*86400)
+  invalid('Missing paid subscription period end.');
+ return end;
+}
+function reconcilePaidAccess(order,subscription,now=Date.now()){
+ let last=order.paidPlan&&typeof order.paidPlan==='object'?order.paidPlan:null;
+ if(latestInvoicePaid(subscription)&&subscription?.status==='active'&&!subscription.pending_update){
+  const plan=subscriptionPlan(subscription);
+  const periodEnd=paidPeriodEnd(subscription);
+  last={...plan,paidThrough:periodEnd};
+ }
+ const good=last&&Number.isSafeInteger(last.paidThrough)&&last.paidThrough*1000>now;
+ const allowed=['active','past_due'].includes(subscription?.status);
+ return {paid:!!(good&&allowed),plan:last,verifiedNow:!!(last&&latestInvoicePaid(subscription)&&
+  subscription?.status==='active'&&!subscription.pending_update)};
+}
+module.exports={subscriptionPlan,planMatchesOrder,latestInvoicePaid,paidPeriodEnd,reconcilePaidAccess};
