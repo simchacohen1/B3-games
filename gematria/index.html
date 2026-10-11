@@ -131,7 +131,9 @@ bdi.he{unicode-bidi:isolate}.sofitList{direction:ltr;display:inline}
 .saveNote{font-size:12px;color:var(--muted);text-align:center;margin-top:18px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
 <script src="../firebase-config.js"></script>
+<script src="../effort-points.js"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
 <script src="../b3-race.js?v=20261007"></script>
 <script src="../guest-mode.js?v=20261011-guest"></script>
@@ -358,6 +360,7 @@ function record(kind,ok,letters){
  P[kind].attempts++;if(ok){P[kind].correct++;star()}
  else (letters||[]).forEach(c=>{c=baseLetter(c);if(VAL[c])P.missed[c]=num(P.missed[c])+1});
  save();
+ window.FunTorahEffort?.note("gematria",{disabled:teacherPreview});
 }
 
 async function connect(){
@@ -566,6 +569,7 @@ function speedQuestion(){
  askQuestion(q,{prompt:"spPrompt",big:"spBig",choices:"spChoices"},(ok,b,c)=>{
   if(!spRunning)return;
   markChoices(c,q.answer,b,ok);
+  window.FunTorahEffort?.note("gematria",{disabled:teacherPreview});
   if(ok){spScore++;$("spScore").textContent=spScore;star()}else q.letters.forEach(h=>{h=baseLetter(h);P.missed[h]=num(P.missed[h])+1});
   setTimeout(()=>{if(spRunning)speedQuestion()},ok?350:900);
  });
@@ -606,6 +610,7 @@ function flip(b,card){
  b.classList.add("up");if(card.he)b.classList.add("he");b.textContent=card.face;b.setAttribute("aria-label",card.face);
  if(!mFirst){mFirst={b,card};return}
  mMoves++;$("mMoves").textContent=mMoves;
+ window.FunTorahEffort?.note("gematria",{disabled:teacherPreview});
  const a=mFirst;mFirst=null;
  if(a.card.k===card.k&&a.card.he!==card.he){
   [a.b,b].forEach(x=>{x.classList.remove("up");x.classList.add("done")});mPairs++;star();
