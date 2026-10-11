@@ -25,6 +25,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Rashi+Hebrew:wght@600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#1f2937}header{background:#172033;color:#fff;padding:22px 28px;display:flex;justify-content:space-between;align-items:center}h1{margin:0;font-size:26px}.sub{color:#b9c6da;font-size:13px;margin-top:5px}button,a{font:inherit}.sign{border:0;border-radius:10px;padding:9px 12px;font-weight:800;cursor:pointer;background:#334155;color:#fff}.wrap{max-width:1000px;margin:28px auto;padding:0 18px}.welcome{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:20px;box-shadow:0 5px 18px rgba(15,23,42,.06);margin-bottom:18px}.classes{display:grid;gap:18px}.class-card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:20px}.class-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.manage{background:#2563eb;color:#fff;text-decoration:none;padding:9px 12px;border-radius:9px;font-weight:800}.tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:16px}.tool{flex-direction:column;gap:9px;display:flex;align-items:center;justify-content:center;min-height:125px;padding:24px 12px;border:1px solid #dbe3ee;border-radius:14px;text-decoration:none;color:#1f2937;background:#fff;font-size:17px;font-weight:bold;text-align:center;box-shadow:0 4px 10px rgba(0,0,0,.1)}.tool-icon{display:block;font-size:40px;line-height:1}.tool-icon img{width:74px;height:74px;object-fit:contain}.tool-icon.rashi{font-family:"Noto Rashi Hebrew",serif;font-size:44px;font-weight:600;direction:rtl}.tool:hover{background:#eef2ff}.empty{color:#64748b;padding:15px 0}.gate{text-align:center;padding:70px 20px}.hidden{display:none!important}
+#upgradeDialog{max-width:460px;width:calc(100vw - 24px);border:0;border-radius:16px;padding:23px;box-shadow:0 12px 55px #0f172a60;color:#1f2937}#upgradeDialog::backdrop{background:#0f172a88}#upgradeDialog h2{font-size:22px;margin:0 0 10px}#upgradeDialog .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}#upgradeDialog p{line-height:1.55}#upgradeDialog .sign{background:#2563eb}#upgradeDialog .sign.secondary{background:#475569}#upgradeDialog #upgradePrice{font-size:26px;font-weight:800;margin:12px 0}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script><script src="firebase-config.js?v=20261001-teacherauth"></script><script src="site-settings.js?v=20261008-owner-demo"></script>
 <script src="teacher-preview.js?v=20261008-1"></script>
@@ -33,6 +34,13 @@
 </head><body>
 <header><div><h1>Fun Torah Tools</h1><div class="sub">Your classes and teaching tools</div></div><div style="display:flex;gap:8px"><button id="actAsStudent" class="sign hidden" style="background:#15803d">👀 Sign in as a student</button><button id="signOut" class="sign hidden">Sign out</button></div></header>
 <div class="wrap"><div id="gate" class="gate">Checking your teacher account…</div><div id="app" class="hidden"><div class="welcome"><strong id="who"></strong><div class="sub" style="color:#64748b">Choose a class or open one of the tools enabled for it.</div></div><div id="classes" class="classes"></div></div></div>
+<dialog id="upgradeDialog" aria-labelledby="upgradeTitle">
+<h2 id="upgradeTitle">Add Shorashim Lab</h2>
+<p id="upgradeStatus" role="status">Asking Stripe to calculate the amount for the remainder of your annual subscription…</p>
+<div id="upgradePrice"></div>
+<p id="upgradeDetails"></p>
+<div class="actions"><button type="button" class="sign hidden" id="upgradeApprove">Confirm prorated purchase</button><button type="button" class="sign secondary" id="upgradeCancel">Close</button></div>
+</dialog>
 <script>
 (function(){
 const api=window.B3SiteSettings,WS=api.workspaceId||"b3-2026";
@@ -81,9 +89,61 @@ async function render(user,access){
  if(generation!==renderGeneration)return;
  q("classes").innerHTML=snaps.map((s,i)=>{const id=ids[i],row=s.val()||{},grants=row.toolGrants||{},enabled=Object.entries(grants).filter(x=>x[1]===true&&TOOLS[x[0]]);if(grants["student-rewards"]===true&&!enabled.some(([tool])=>tool==="daily-points"))enabled.push(["daily-points",true]);const tools=enabled.map(([tool])=>{const teacherHref=TOOLS[tool][1]+(TOOLS[tool][1].includes('?')?'&':'?')+'class='+encodeURIComponent(id);const studentPath=STUDENT_TOOLS[tool];const studentHref=studentPath?studentPath+(studentPath.includes('?')?'&':'?')+'demo=1&class='+encodeURIComponent(id):'';return '<div class="tool"><span class="tool-icon '+(tool==='rashi-letters'?'rashi':'')+'" aria-hidden="true">'+(ICONS[tool]||'')+'</span><span>'+esc(TOOLS[tool][0])+'</span><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px"><a href="'+teacherHref+'" target="_blank" rel="noopener">'+'Open'+'</a></div></div>';}).join("");
  if(!s.exists()||row.active===false)return "";
- return '<section class="class-card"><div class="class-head"><h2>'+esc(row.name||id)+'</h2><span style="display:flex;gap:8px;flex-wrap:wrap"><a class="manage" style="background:#15803d" href="student-report/index.html?class='+encodeURIComponent(id)+'" target="_blank" rel="noopener">📈 Student Report</a><a class="manage" href="admin.html?tab=students&class='+encodeURIComponent(id)+'">Manage Class</a>'+(row.billing?.managed===true&&access.role==='teacher'&&!previewActive?'<button type="button" class="manage" data-billing-class="'+esc(id)+'">💳 Manage Billing</button>':'')+'</span></div><div class="tools">'+(tools||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>'
+ return '<section class="class-card"><div class="class-head"><h2>'+esc(row.name||id)+'</h2><span style="display:flex;gap:8px;flex-wrap:wrap"><a class="manage" style="background:#15803d" href="student-report/index.html?class='+encodeURIComponent(id)+'" target="_blank" rel="noopener">📈 Student Report</a><a class="manage" href="admin.html?tab=students&class='+encodeURIComponent(id)+'">Manage Class</a>'+(row.billing?.managed===true&&access.role==='teacher'&&!previewActive?'<button type="button" class="manage" data-billing-class="'+esc(id)+'">💳 Manage Billing</button>'+(grants.shorashim!==true?' <button type="button" class="manage" style="background:#15803d" data-add-shorashim="'+esc(id)+'">＋ Add Shorashim</button>':''):'')+'</span></div><div class="tools">'+(tools||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>'
  }).join("")||'<div class="welcome">No classes are assigned to this teacher yet.</div>';
  if(!previewActive&&window.B3StudentToolControls)window.B3StudentToolControls.bind(q("classes"));
+ if(!previewActive){
+  q('classes').querySelectorAll('[data-add-shorashim]').forEach(button=>{
+   button.addEventListener('click',async()=>{
+    const dialog=q('upgradeDialog');
+    if(typeof dialog.showModal!=='function'){alert('Please use an up-to-date browser.');return;}
+    q('upgradePrice').textContent='';q('upgradeDetails').textContent='';
+    q('upgradeStatus').textContent='Calculating your exact prorated cost through Stripe…';
+    q('upgradeApprove').classList.add('hidden');
+    dialog.showModal();
+    const classId=button.getAttribute('data-add-shorashim');
+    const callUpgrade=async params=>{
+     const current=firebase.auth().currentUser;
+     if(!current)throw Error('Sign in with your authorized teacher Google account.');
+     const response=await fetch('https://us-central1-b3-games.cloudfunctions.net/funTorahUpgradeTool',{
+      method:'POST',headers:{'Content-Type':'application/json',
+        Authorization:'Bearer '+await current.getIdToken()},
+      body:JSON.stringify(params)
+     });
+     const data=await response.json().catch(()=>({}));
+     if(!response.ok)throw Error(data.error||'Stripe upgrade is unavailable.');
+     return data;
+    };
+    try{
+     const quote=await callUpgrade({action:'preview',classId,toolId:'shorashim'});
+     if(!dialog.open)return;
+     const usd=cents=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(cents/100);
+     q('upgradeStatus').textContent='Stripe has calculated your payment:';
+     q('upgradePrice').textContent=usd(quote.chargeNowCents)+' due now';
+     q('upgradeDetails').textContent='Shorashim Lab will cost '+usd(quote.annualRenewalPriceCents)+
+      ' per year at your existing renewal date. It unlocks only after payment succeeds.';
+     const approve=q('upgradeApprove');
+     approve.classList.remove('hidden');approve.disabled=false;
+     approve.onclick=async()=>{
+      approve.disabled=true;q('upgradeStatus').textContent='Sending your approved purchase to Stripe…';
+      try{
+       const result=await callUpgrade({action:'confirm',quoteId:quote.quoteId,
+        acknowledge:true,confirmedAmountCents:quote.chargeNowCents});
+       q('upgradeStatus').textContent=result.message||'Stripe is processing your payment.';
+       q('upgradeDetails').textContent='Your existing learning tools remain available. Check Manage Billing if Stripe needs additional payment confirmation.';
+       approve.classList.add('hidden');
+      }catch(error){
+       q('upgradeStatus').textContent=error.message||'Unable to confirm. You have not been told that a charge succeeded.';
+       approve.disabled=false;
+      }
+     };
+    }catch(error){
+     if(dialog.open)q('upgradeStatus').textContent=error.message||'Stripe could not preview this upgrade.';
+    }
+   });
+  });
+ }
+
  if(!previewActive){
   q('classes').querySelectorAll('[data-billing-class]').forEach(button=>{
    button.addEventListener('click',async()=>{
@@ -118,6 +178,7 @@ async function render(user,access){
    q('classes').querySelectorAll('a').forEach(link=>{link.removeAttribute('href');link.removeAttribute('target');link.setAttribute('aria-disabled','true');link.title='Read-only teacher preview';link.style.cursor='default';});
  }
 }
+q('upgradeCancel').onclick=()=>q('upgradeDialog').close();
 q("actAsStudent").onclick=()=>api.openActAsStudentPicker();
 q("signOut").onclick=()=>api.signOut().then(()=>location.reload());
 showTeacherSignIn();
