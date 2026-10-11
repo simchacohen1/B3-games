@@ -41,13 +41,13 @@ test('owner class controls discover the registry and change only a selected clas
  assert.match(src,/base\+"\/toolGrants\/"\+tool/);
  assert.match(src,/base\+"\/access\/mode"/);
 });
-test('new classes honor global emergency lock and inactive activities',()=>{
+test('new classes honor emergency lock but use independent activity grants',()=>{
  const src=fs.readFileSync('game-gate.js','utf8');
  const start=src.indexOf('if(studentClassId!=="et"&&studentClassId!=="wt")');
  const end=src.indexOf('showOpen();return;',start);
  assert.ok(start>=0&&end>start);
  const branch=src.slice(start,end);
  assert.match(branch,/lastSettings\.siteEnabled===false/);
- assert.match(branch,/lastSettings\.games\?\.\[gameId\]===false/);
+ assert.doesNotMatch(branch,/lastSettings\.games\?\.\[gameId\]===false/);
  assert.match(branch,/assignedClass\.access\?\.mode==="locked"/);
 });
