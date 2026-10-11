@@ -44,7 +44,7 @@ const SAVED={saved:true,partial_mark_may_exist:false,do_not_retry:false,test_id:
 test('files are valid; the old Sync button stays disabled; scripts load in order',()=>{
   new vm.Script(src);
   assert.match(page,/<button disabled aria-disabled="true">Sync to Nigri/);
-  assert.match(page,/classtime-preview\.js"><\/script>\s*<script src="\.\/classtime-save\.js">/);
+  assert.match(page,/classtime-preview\.js(?:\?[^\"]*)?"><\/script>\s*<script src="\.\/classtime-save\.js">/);
   assert.equal((page.match(/id="saveBtn"/g)||[]).length,1);
   assert.match(page,/<div id="savePanel" hidden>/);
 });

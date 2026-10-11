@@ -40,7 +40,7 @@ test('files are valid and the real-save button is still disabled',()=>{
   new vm.Script(src);
   assert.match(page,/<button disabled aria-disabled="true">Sync to Nigri/);
   assert.equal((page.match(/id="previewBtn"/g)||[]).length,1);
-  assert.match(page,/<script src="\.\/classtime-review\.js"><\/script>[\s\S]*<script src="\.\/classtime-preview\.js"><\/script>/);
+  assert.match(page,/<script src="\.\/classtime-review\.js"><\/script>[\s\S]*<script src="\.\/classtime-preview\.js(?:\?[^\"]*)?"><\/script>/);
 });
 test('the preview code has no key, no write route, no fallback, and never builds HTML from names',()=>{
   assert.doesNotMatch(src,/X-Sync-Key|sync-marks|sync-points|innerHTML|insertAdjacentHTML|eval\(/);
