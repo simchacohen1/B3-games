@@ -2992,11 +2992,12 @@ async function goToPosuk(direction){
 
     // 2) Out of pesukim in this direction within this perek — move to the
     //    adjacent perek and land on its first (or last) posuk.
-    const allowedPerakim = ALL_PERAKIM.filter(perekAllowedByClassLimit);
-    const perekIdx = allowedPerakim.indexOf(perekNum);
-    const targetPerekIdx = perekIdx + direction;
-    if(perekIdx > -1 && targetPerekIdx >= 0 && targetPerekIdx < allowedPerakim.length){
-      perekSelect.value = allowedPerakim[targetPerekIdx];
+    const chapters=allowedChapters();
+    const idx=chapters.findIndex(c=>c.sefer===selectedSefer&&c.perek===perekNum);
+    const target=chapters[idx+direction];
+    if(idx>=0&&target){
+      if(target.sefer!==selectedSefer){seferSelect.value=target.sefer;seferSelect.onchange();}
+      perekSelect.value=String(target.perek);
       await perekSelect.onchange();
       const opts = Array.from(posukSelect.options).filter(o => o.value !== '');
       const edgeOpt = direction === 1 ? opts[0] : opts[opts.length - 1];
@@ -3040,10 +3041,10 @@ function updateNavArrows(){
   const perekNum = parseInt(perekSelect.value);
   const posukOpts = Array.from(posukSelect.options).filter(o => o.value !== '');
   const curPosukIdx = posukOpts.findIndex(o => parseInt(o.value) === parseInt(posukSelect.value));
-  const allowedPerakim = ALL_PERAKIM.filter(perekAllowedByClassLimit);
-  const perekIdx = allowedPerakim.indexOf(perekNum);
-  prevBtn.disabled = (perekIdx === 0 && curPosukIdx === 0);
-  nextBtn.disabled = (perekIdx === allowedPerakim.length - 1 && curPosukIdx === posukOpts.length - 1);
+  const chapters=allowedChapters();
+  const idx=chapters.findIndex(c=>c.sefer===selectedSefer&&c.perek===perekNum);
+  prevBtn.disabled=(idx<=0&&curPosukIdx<=0);
+  nextBtn.disabled=(idx<0||(idx===chapters.length-1&&curPosukIdx===posukOpts.length-1));
   if(nextBtn.disabled && classPracticeLimit){
     nextBtn.title = 'Your teacher has not opened the next posuk yet';
   }
@@ -3094,29 +3095,30 @@ const LOCAL_TEXT = {
 };
 
 async function fetchChapter(perekNum){
-  if(chapterCache[perekNum]) return chapterCache[perekNum];
+  const cid=chapterId(selectedSefer,perekNum);
+  if(chapterCache[cid]) return chapterCache[cid];
 
-  if(LOCAL_TEXT[perekNum]){
+  if(selectedSefer===DEFAULT_SEFER && LOCAL_TEXT[perekNum]){
     const pesukim = LOCAL_TEXT[perekNum].map((raw, idx) => {
       let text = abbreviateShaimos(raw);
       text = applyManualCorrections(text, perekNum, idx + 1);
       text = stripMeteg(text);
       return text;
     });
-    chapterCache[perekNum] = pesukim;
+    chapterCache[cid] = pesukim;
     return pesukim;
   }
 
   // v2 cache key: bumped so students' browsers refetch corrected text instead of
   // serving an old cached copy from before the shaimos/nikud fixes were added.
-  const cacheKey = 'posukPractice_ch_v7_' + perekNum;
+  const cacheKey = 'posukPractice_ch_v7_' + cid;
   const localCached = localStorage.getItem(cacheKey);
   if(localCached){
     const arr = JSON.parse(localCached);
-    chapterCache[perekNum] = arr;
+    chapterCache[cid] = arr;
     return arr;
   }
-  const res = await fetch('https://www.sefaria.org/api/texts/Genesis.' + perekNum + '?context=0&pad=0');
+  const res = await fetch('https://www.sefaria.org/api/texts/' + sefariaBook(selectedSefer) + '.' + perekNum + '?context=0&pad=0');
   const data = await res.json();
   const pesukim = (data.he || []).map((html, idx) => {
     let text = stripTags(html);
@@ -3124,7 +3126,7 @@ async function fetchChapter(perekNum){
     text = applyManualCorrections(text, perekNum, idx + 1);
     return text;
   });
-  chapterCache[perekNum] = pesukim;
+  chapterCache[cid] = pesukim;
   localStorage.setItem(cacheKey, JSON.stringify(pesukim));
   return pesukim;
 }
@@ -3142,10 +3144,11 @@ async function fetchChapter(perekNum){
    Each value can be either a plain string or {translation:"..."}.
    Missing entries simply fall back to the existing Metsudah/Sefaria flow. */
 async function fetchClassroomReferenceChapter(perekNum){
-  if(classroomReferenceCache[perekNum]) return classroomReferenceCache[perekNum];
+  const cid=chapterId(selectedSefer,perekNum);
+  if(classroomReferenceCache[cid]) return classroomReferenceCache[cid];
   try{
     const snap = await promiseWithTimeout(
-      db.ref('posukPractice/classroomTranslations/' + perekNum).once('value'),
+      db.ref('posukPractice/classroomTranslations/' + cid).once('value'),
       10000,
       'Classroom translation reference'
     );
@@ -3157,11 +3160,11 @@ async function fetchClassroomReferenceChapter(perekNum){
       const text = typeof value === 'string' ? value : (value && value.translation) || '';
       arr[n - 1] = String(text || '').trim();
     });
-    classroomReferenceCache[perekNum] = arr;
+    classroomReferenceCache[cid] = arr;
     return arr;
   }catch(err){
     console.warn('Could not load Baer Hetev classroom references', err);
-    classroomReferenceCache[perekNum] = [];
+    classroomReferenceCache[cid] = [];
     return [];
   }
 }
@@ -3178,15 +3181,16 @@ async function getClassroomReferenceForPart(part){
 const KEHOT_SEFARIA_VERSION = 'The Kehot Chumash; Chabad House Publications, Los Angeles';
 
 async function fetchKehotChapterTranslation(perekNum){
-  if(kehotTranslationCache[perekNum]) return kehotTranslationCache[perekNum];
+  const cid=chapterId(selectedSefer,perekNum);
+  if(kehotTranslationCache[cid]) return kehotTranslationCache[cid];
 
-  const cacheKey = 'posukPractice_kehot_translation_v1_' + perekNum;
+  const cacheKey = 'posukPractice_kehot_translation_v1_' + cid;
   try{
     const localCached = localStorage.getItem(cacheKey);
     if(localCached){
       const arr = JSON.parse(localCached);
       if(Array.isArray(arr) && arr.length){
-        kehotTranslationCache[perekNum] = arr;
+        kehotTranslationCache[cid] = arr;
         return arr;
       }
     }
@@ -3195,7 +3199,7 @@ async function fetchKehotChapterTranslation(perekNum){
   }
 
   try{
-    const sectionRef = 'Genesis ' + perekNum;
+    const sectionRef = sefariaBook(selectedSefer) + ' ' + perekNum;
     const url = 'https://www.sefaria.org/api/v3/texts/' +
       encodeURIComponent(sectionRef) + '?version=' +
       encodeURIComponent('english|' + KEHOT_SEFARIA_VERSION);
@@ -3209,32 +3213,33 @@ async function fetchKehotChapterTranslation(perekNum){
     const version = Array.isArray(data.versions) ? data.versions[0] : null;
     const raw = version && Array.isArray(version.text) ? version.text : [];
     const cleaned = raw.map(stripTags);
-    kehotTranslationCache[perekNum] = cleaned;
+    kehotTranslationCache[cid] = cleaned;
     try{ localStorage.setItem(cacheKey, JSON.stringify(cleaned)); }catch(_err){}
     return cleaned;
   }catch(err){
     // Kehot is supplementary. If it cannot load, the existing Metsudah /
     // classroom-reference grading continues normally.
     console.warn('Could not load Kehot Chumash comprehension reference', err);
-    kehotTranslationCache[perekNum] = [];
+    kehotTranslationCache[cid] = [];
     return [];
   }
 }
 
 async function fetchChapterTranslation(perekNum){
-  if(translationCache[perekNum]) return translationCache[perekNum];
+  const cid=chapterId(selectedSefer,perekNum);
+  if(translationCache[cid]) return translationCache[cid];
 
-  const cacheKey = 'posukPractice_translation_v1_' + perekNum;
+  const cacheKey = 'posukPractice_translation_v1_' + cid;
   const localCached = localStorage.getItem(cacheKey);
   if(localCached){
     const arr = JSON.parse(localCached);
-    translationCache[perekNum] = arr;
+    translationCache[cid] = arr;
     return arr;
   }
 
   let english = [];
   try{
-    const res = await fetch('https://www.sefaria.org/api/texts/Genesis.' + perekNum +
+    const res = await fetch('https://www.sefaria.org/api/texts/' + sefariaBook(selectedSefer) + '.' + perekNum +
       '?context=0&pad=0&ven=Metsudah_Chumash,_Metsudah_Publications,_2009');
     const data = await res.json();
     english = data.text || [];
@@ -3245,13 +3250,13 @@ async function fetchChapterTranslation(perekNum){
   // Fallback: Metsudah has no coverage for this perek (empty/missing text) —
   // use whatever default English translation Sefaria has instead.
   if(!english.length || english.every(t => !t || !stripTags(t).trim())){
-    const res = await fetch('https://www.sefaria.org/api/texts/Genesis.' + perekNum + '?context=0&pad=0');
+    const res = await fetch('https://www.sefaria.org/api/texts/' + sefariaBook(selectedSefer) + '.' + perekNum + '?context=0&pad=0');
     const data = await res.json();
     english = data.text || [];
   }
 
   const cleaned = english.map(stripTags);
-  translationCache[perekNum] = cleaned;
+  translationCache[cid] = cleaned;
   localStorage.setItem(cacheKey, JSON.stringify(cleaned));
   return cleaned;
 }
@@ -4026,6 +4031,7 @@ async function autosaveHebrew(){
     const url = await storage.ref(path).getDownloadURL();
     await currentAttemptRef.update({
       timestamp: Date.now(),
+      sefer: currentSefer,
       parsha: currentParshaName || null,
       perek: currentPerekNum,
       posukStart: currentPosukNum,
@@ -4065,6 +4071,7 @@ async function autosaveComprehension(){
 
     await currentAttemptRef.update({
       timestamp: Date.now(),
+      sefer: currentSefer,
       parsha: currentParshaName || null,
       perek: currentPerekNum,
       posukStart: currentPosukNum,
@@ -4791,6 +4798,7 @@ async function autosaveComprehensionQuestions(){
     const savedQuestionPercent = Math.round((correctCount / comprehensionQuestions.length) * 100);
     await currentAttemptRef.update({
       timestamp: Date.now(),
+      sefer: currentSefer,
       parsha: currentParshaName || null,
       perek: currentPerekNum,
       posukStart: currentPosukNum,
@@ -5926,6 +5934,7 @@ async function autosaveTranslation(level){
     const allDone = idxs.length === level.chunks.length && idxs.every((v, i) => v === i);
     const updateData = {
       timestamp: Date.now(),
+      sefer: currentSefer,
       parsha: currentParshaName || null,
       perek: currentPerekNum,
       posukStart: currentPosukNum,
