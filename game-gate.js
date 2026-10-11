@@ -117,7 +117,11 @@
   var assignedClass = null;
   var verifiedTeacherAccess = null;
   var teacherClassRecord = null;
+  // Class Gallery review links may open before Firebase restores an existing
+  // teacher session. Do not mistake that brief pending state for a failed login.
+  var galleryTeacherCheckPending = gameId === "class-gallery" && !isGuestPreview();
   var requestInFlight = false;
+  var refreshRequested = false;
   var firstDecisionMade = false;
   var firstLoadFailsafe = setTimeout(function () {
     if (firstDecisionMade) return;
@@ -213,9 +217,15 @@
       if(!window.B3_FIREBASE_CONFIG) await loadAuthScript(new URL("firebase-config.js",rootBase).href);
       if(!window.B3SiteSettings) await loadAuthScript(new URL("site-settings.js?v=20261008-owner-demo",rootBase).href);
       window.B3SiteSettings.onAuthStateChanged(function(user,authorized,access){
-        verifiedTeacherAccess=authorized?access:null;checkNow();
+        galleryTeacherCheckPending=false;
+        verifiedTeacherAccess=authorized?access:null;
+        checkNow();
       });
-    } catch(error){console.warn("Teacher access could not be verified",error);}
+    } catch(error){
+      galleryTeacherCheckPending=false;
+      console.warn("Teacher access could not be verified",error);
+      checkNow();
+    }
   }
 
   function getStoredStudentId() {
@@ -400,7 +410,14 @@
       if(!teacherClassRecord||teacherClassRecord.active===false||(teacherClassRecord.toolGrants?.[teacherGrantId]!==true&&!(gameId==="class-gallery"&&(teacherClassRecord.toolGrants?.tag===true||teacherClassRecord.toolGrants?.["class-gallery"]===true)))){showClosed("Teacher class access", "This tool is not enabled for your assigned class.");return;}
       showOpen();return;
     }
-    if(!studentActive){showClosed("Please sign in again", "Your student access or class membership could not be verified.");return;}
+    if(!studentActive){
+      // A missing student session is normal for teachers. Wait for the Firebase
+      // teacher check before displaying a misleading "sign in again" message.
+      // The existing fail-safe shows a neutral checking message if this is slow.
+      if(galleryTeacherCheckPending)return;
+      showClosed("Please sign in again", "Your student access or class membership could not be verified.");
+      return;
+    }
     if(!window.B3StudentTools || !window.B3StudentTools.allowed(assignedClass,getStoredStudentId(),gameId)){
       showClosed("This activity is turned off for you", "Your teacher can change your tool access.");return;
     }
@@ -477,7 +494,7 @@
   function checkNow() {
     // Guest Mode: a preview, no student to check. guest-mode.js blocks all saving.
     if (isGuestPreview()) { showOpen(); return; }
-    if (requestInFlight) return;
+    if (requestInFlight) { refreshRequested = true; return; }
     requestInFlight = true;
 
     Promise.resolve().then(async function () {
@@ -508,6 +525,9 @@
       }
     }).finally(function () {
       requestInFlight = false;
+      // The sign-in callback may arrive while the first student check is in
+      // flight. Recheck immediately instead of waiting for the 30s poll.
+      if(refreshRequested){refreshRequested=false;checkNow();}
     });
   }
 
