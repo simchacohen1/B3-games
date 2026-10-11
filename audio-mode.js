@@ -35,9 +35,7 @@
       const match=english.find(v=>v.name===preference || v.name.startsWith(preference+" -"));
       if(match)return match;
     }
-    return english.find(v=>MALE_HINT.test(v.name))||
-      english.find(v=>!FEMALE_HINT.test(v.name)&&/natural|neural|enhanced|premium/i.test(v.name))||
-      english.find(v=>!FEMALE_HINT.test(v.name))||english[0]||null;
+    return english.find(v=>MALE_HINT.test(v.name)&&!FEMALE_HINT.test(v.name))||null;
   }
   function cleanText(value){
     return String(value||"").replace(/\s+/g," ").replace(/[🔊🎙🎉⭐✅]/gu,"").trim().slice(0,700);
@@ -52,7 +50,9 @@
       stop();
       const u=new SpeechSynthesisUtterance(text);
       u.lang="en-US";u.rate=0.9;u.pitch=1;
-      const voice=bestVoice();if(voice)u.voice=voice;
+      const voice=bestVoice();
+      if(!voice){stop();console.info("Audio Mode: no identified male English voice available on this device");return false;}
+      u.voice=voice;
       root.speechSynthesis.speak(u);
       return true;
     }catch(e){console.warn("Audio Mode unavailable",e);return false;}
