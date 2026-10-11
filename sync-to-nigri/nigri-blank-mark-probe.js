@@ -37,6 +37,17 @@
         const safeNames = Array.isArray(d.safe_unknown_parameter_names) ? d.safe_unknown_parameter_names : [];
         if (safeNames.length) flags.push('Extra parameter names (values hidden): ' + safeNames.join(', '));
         if (d.redacted_parameter_name_count) flags.push('Other parameter names hidden: ' + d.redacted_parameter_name_count);
+        const types = d.selection_parameter_kinds || {};
+        const permitted = ['testCoursTypeSelect', 'testGradeSelect', 'testID', 'testTopicSelect'];
+        const descriptions = {blank:'blank', zero:'zero', nonzero_number:'nonzero number (hidden)',
+                              other_redacted:'other value (hidden)',
+                              repeated_or_missing:'ambiguous/multiple'};
+        const labels = permitted.filter(k => typeof types[k] === 'string')
+          .map(k => k + ': ' + (descriptions[types[k]] || 'unknown'));
+        if (labels.length) flags.push('Value types: ' + labels.join(', '));
+        if (d.test_id_may_reference_existing_mark === true) {
+          flags.push('Warning: testID is not confirmed blank/zero; link stays blocked');
+        }
         if (typeof d.unsupported_action_key_count === 'number') flags.push('Unsafe/unknown actions: ' + d.unsupported_action_key_count);
         status.textContent = 'The New Mark link was not opened for safety. ' + flags.join('; ') + '. No marks changed.';
       } else {
