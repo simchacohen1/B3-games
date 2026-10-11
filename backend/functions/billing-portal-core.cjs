@@ -5,7 +5,7 @@ const {PRIVATE,paths,ROOT}=require('./billing-fulfillment.cjs');
 const fail=(status,message)=>{throw Object.assign(new Error(message),{status})};
 const KEY=/^paid_[a-f0-9]{32}$/;
 async function getPurchaserOrder(store,identity,classId){
- if(!identity?.uid||identity.email_verified!==true||identity.firebase?.sign_in_provider!=='google.com')
+ if(!require('./teacher-auth-identity.cjs').verifiedTeacherIdentity(identity))
   fail(403,'Verified Google teacher sign-in required.');
  if(!KEY.test(String(classId||'')))fail(400,'Choose a paid classroom.');
  const email=String(identity.email||'').trim().toLowerCase();
