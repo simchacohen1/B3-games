@@ -7,11 +7,14 @@ async function roster(get,access,selected,tool='chazara'){
  const owner=access.role==='admin';
  if(selected&&!validKey(selected))fail('Choose a valid class.');
  if(!owner&&selected&&!(access.classIds||[]).includes(selected))fail('This class is not assigned to your teacher account.');
- const ids=selected?[selected]:owner?['et','wt']:(access.classIds||[]);
+ // The owner can inspect every active class without another teacher account.
+ // Ordinary teachers must explicitly select a single assigned class.
+ const registry=owner&&!selected?(await get('b3Games/workspaces/'+WS+'/classes')||{}):null;
+ const ids=selected?[selected]:owner?Object.keys(registry).filter(id=>validKey(id)&&registry[id]?.active!==false):(access.classIds||[]);
  if(!owner&&ids.length!==1)fail('Choose a class from your teacher dashboard.');
  const result={students:{},classes:{},selected:selected||(!owner?ids[0]:''),owner};
  for(const classId of ids){
-  const cls=await get('b3Games/workspaces/'+WS+'/classes/'+classId);
+  const cls=registry?registry[classId]:await get('b3Games/workspaces/'+WS+'/classes/'+classId);
   if(!cls||cls.active===false||(!owner&&cls.toolGrants?.[tool]!==true))fail('This class or tool is not available to your account.');
   result.classes[classId]={name:cls.name||classId};
   for(const [id,member] of Object.entries(cls.members||{})){
