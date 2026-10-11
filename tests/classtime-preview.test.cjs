@@ -113,3 +113,10 @@ test('an answer for an old review is dropped if a new review was loaded meanwhil
   t.open({...RESULT,session_code:'ZZZ999'});release();await click;
   assert.equal(texts(t.els.previewResult),'');
 });
+
+ test('disabled duplicate lookup is honestly described without claiming a clear result',()=>{
+  const {api}=load();
+  const text=api.summarize({...SAMPLE,duplicate_check:{status:'skipped'}}).map(l=>l.text).join(' ');
+  assert.match(text,/Duplicates are not checked in Nigri/);
+  assert.doesNotMatch(text,/Not saved yet|would refuse until/);
+});

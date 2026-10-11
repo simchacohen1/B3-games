@@ -161,3 +161,10 @@ test('a locked review stays locked if its Save section is shown again, and other
   assert.equal(t.els.saveBtn.textContent,'Save to Nigri');assert.equal(t.els.saveBtn.disabled,false);
   t.open(PREVIEW,'rev1');assert.equal(t.els.saveBtn.textContent,'Saved, mark #4242');
 });
+
+test('skipping the remote duplicate lookup does not require Save anyway or enable whole class',async()=>{
+  const t=load();t.open(withStatus('skipped'));await t.pick('Ann Nigri');
+  assert.equal(t.els.saveAnywayRow.hidden,true);
+  assert.equal(t.els.saveBtn.disabled,false);
+  await t.pick('__class__');assert.equal(t.els.saveBtn.disabled,true);
+});
