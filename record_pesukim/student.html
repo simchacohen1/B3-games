@@ -2297,7 +2297,8 @@ async function speakText(text){
     await ttsAudioEl.play();
   }catch(e){
     console.error('TTS Cloud Function error, falling back to browser voice:', e);
-    speakTextBrowserFallback(text);
+    if(window.FTTAudio)window.FTTAudio.speak(text,{force:true});
+    else speakTextBrowserFallback(text);
   }
 }
 
