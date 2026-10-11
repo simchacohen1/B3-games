@@ -79,14 +79,50 @@ Verified paid teachers can click **Manage Billing** for their own classroom,
 which calls `funTorahBillingPortal` and creates a short-lived Stripe customer
 portal session. Stripe Dashboard configuration must be reviewed before enabling
 cancellations. The portal handles billing details and subscription cancellation;
-**it does not yet add or remove purchased learning tools**. The webhook keeps
-access until an active paid subscription actually ends (including when
-`cancel_at_period_end` is true).
+**tool removals and seat upgrades remain planned**. The teacher dashboard
+now has a **Shorashim Lab add-on** flow, which previews the actual prorated
+amount with Stripe, asks for explicit teacher confirmation, and only grants
+access after a verified payment. The quote expires after five minutes and
+uses a Stripe idempotency key. The webhook preserves already paid tools
+while an upgrade charge is outstanding and limits access to the verified
+paid-through date. All of this remains disabled/unproven in a sandbox
+end-to-end test.
 
 A shared Gallery/Tag purchase is blocked in the checkout handler and
 subscription parser until app permissions are separated. They may still appear
 in the visual registration preview, and must be removed or disabled before
 publishing real registration.
+
+## Prorated add-on setup (sandbox only)
+
+A school/teacher keeps one annual renewal date. In the new draft Teacher Center,
+a paid teacher lacking Shorashim Lab can click **Add Shorashim**.
+
+The first signed-in request previews Stripe's proration using the subscription's
+current item IDs, unchanged billing anchor and a saved proration timestamp.
+The teacher is shown **the actual Stripe-generated amount due** before
+confirmation. Confirmation repeats the preview at the same timestamp and
+requires the displayed charge to match exactly. A short-lived quote,
+transactional upgrade lock and idempotency key prevent accidental duplicate
+changes. Stripe is asked to invoice immediately using
+`proration_behavior=always_invoice` and
+`payment_behavior=pending_if_incomplete`. Unpaid upgrades should not
+unlock additional tools or revoke tools already purchased.
+
+Set `FTT_STRIPE_UPGRADE_PRICES_JSON` on the **staging Cloud Function environment**
+to a JSON mapping from catalog tool ID to an account-specific **active annual
+Stripe Price ID**, e.g. `{"shorashim":"price_TEST_ACCOUNT_VALUE"}`.
+This mapping is server-only; never accept arbitrary price IDs from browsers.
+Prices require an active Product with metadata `fttKind=tool` and
+`fttToolId=shorashim`, price USD 3900 cents, annual interval. The
+previously created **inactive** sandbox Shorashim price/product needs metadata
+and activation reviewed before end-to-end testing. For other tools, first
+confirm their owner-approved annual prices and separate entitlements.
+
+**Important:** The current proration quote and upgrade flow has **unit tests
+only**. A true sandbox test must verify the Stripe invoice preview,
+payment methods requiring customer action, Stripe invoice paid/failed events,
+and exact grant updates through Firebase. Keep billing disabled until then.
 
 ## Tests
 
@@ -121,10 +157,10 @@ Firebase/Stripe integration.
    verify webhook event replay handling in production.
 9. Prefer stable Stripe catalog products/prices rather than creating new
    inline Price/Product objects for every checkout.
-10. Build an authenticated customer subscription-change flow for purchasing
-    or removing tools and adding seats mid-year; define proration and renewal
-    behavior and test webhooks for those changes. The current checkout
-    supports only initial plan purchases.
+10. Expand the Shorashim-only prorated tool-addition draft to other
+    owner-approved product prices, and implement tool removal and seat changes
+    with agreed renewal/proration behavior. Current subscription additions
+    are untested against real Stripe sandbox checkout and invoice events.
 11. Implement refund workflows: refunding an initial purchase must also
     cancel the subscription, revoke paid access and avoid later renewal charges.
 12. Obtain final owner approval before configuring live secrets, publishing
