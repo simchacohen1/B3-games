@@ -8,9 +8,10 @@
   const endpoint = 'https://us-central1-b3-games.cloudfunctions.net/classGallerySubmit';
   const excluded = /\/(?:class-gallery|admin|owner-admin|teacher-home|student-report|sync-to-nigri)(?:\/|\.html|$)/i;
   if (excluded.test(location.pathname) || /(?:^|[/-])teacher(?:[/.?]|$)/i.test(location.pathname)) return;
-  if (new URLSearchParams(location.search).has('previewStudentId')) return;
+  const params = new URLSearchParams(location.search);
+  if (['previewStudentId','teacherPreview','teacher_preview'].some(key => params.has(key))) return;
 
-  let ready = false, checking = false, busy = false, image = null, dialog = null;
+  let ready = false, checking = false, busy = false, image = null, dialog = null, nextReadyCheck = 0;
   const source = (() => {
     const p = location.pathname.toLowerCase();
     if (p.includes('shorashim')) return 'shorashim';
@@ -23,17 +24,25 @@
     if (p.includes('chumash')) return 'chumash';
     return 'other';
   })();
-  const credentials = () => {
+  // Some older activities store their student identity under the Posuk Practice
+  // keys. A student may also sign in after this script first starts.
+  const studentContext = () => {
     try {
-      if (window.B3Guest?.isGuest?.()) return null;
+      if (window.B3Guest?.isGuest?.() || sessionStorage.getItem('b3Games_guest') === '1') return null;
       if (document.body?.classList.contains('teacherMode')) return null;
-      const studentId = sessionStorage.getItem('b3Games_studentId') || '';
-      const studentName = sessionStorage.getItem('b3Games_studentName') || '';
-      const classId = sessionStorage.getItem('b3Games_studentClass') || '';
-      const pin = sessionStorage.getItem('b3Games_classPin') || '';
-      return studentId && studentName && classId && pin ?
-        {studentId, studentName, classId, pin} : null;
+      const studentId = sessionStorage.getItem('b3Games_studentId') ||
+        sessionStorage.getItem('posukPractice_studentId') || '';
+      const studentName = sessionStorage.getItem('b3Games_studentName') ||
+        sessionStorage.getItem('posukPractice_studentName') || '';
+      const classId = sessionStorage.getItem('b3Games_studentClass') ||
+        sessionStorage.getItem('weeklyQuiz_classId') || '';
+      if (!studentId || !studentName) return null;
+      return {studentId, studentName, classId, pin:sessionStorage.getItem('b3Games_classPin') || ''};
     } catch (_) { return null; }
+  };
+  const credentials = () => {
+    const context = studentContext();
+    return context?.classId && context.pin ? context : null;
   };
 
   const css = document.createElement('style');
@@ -81,7 +90,7 @@
       '<p role="status" aria-live="polite"></p>' +
       '<div class="ftt-gallery-actions"><button type="button" data-send>Send for Approval</button>' +
       '<button type="button" data-close>Cancel</button></div>';
-    document.body.append(dialog);
+    (document.fullscreenElement || document.body).append(dialog);
     dialog.querySelector('[data-close]').onclick = () => { if (!busy) dialog.close(); };
     dialog.addEventListener('cancel', event => { if (busy) event.preventDefault(); });
     dialog.querySelector('[data-send]').onclick = submit;
@@ -100,7 +109,15 @@
   }
   async function capture() {
     const button = document.getElementById('fttGalleryShareButton');
-    if (busy || !credentials() || !button) return;
+    if (busy || !button) return;
+    if (!credentials()) {
+      alert('Please sign in as a student from the Fun Torah Tools home page first.');
+      return;
+    }
+    if (!ready && !(await checkReady(true))) {
+      alert('The gallery connection is unavailable right now. Please try again soon.');
+      return;
+    }
     busy = true;
     button.style.visibility = 'hidden';
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -160,22 +177,41 @@
       send.disabled = false;
     } finally { busy = false; close.disabled = false; }
   }
-  function updateButton() {
+  // Fullscreen learning activities only display elements inside the active
+  // fullscreen container. Move the button (and closed dialog) into it.
+  function attachToVisibleSurface() {
+    const surface = document.fullscreenElement || document.body;
     const button = document.getElementById('fttGalleryShareButton');
-    if (button) button.hidden = !ready || !credentials();
+    if (surface && button && button.parentElement !== surface) surface.append(button);
+    if (surface && dialog && !dialog.open && dialog.parentElement !== surface) surface.append(dialog);
   }
-  async function checkReady() {
-    if (ready || checking) return;
+  function updateButton() {
+    attachToVisibleSurface();
+    const button = document.getElementById('fttGalleryShareButton');
+    // Keep the option visible for signed-in boys, even if the network is
+    // briefly offline or the PIN still needs refreshing. Explain on click.
+    if (button) button.hidden = !studentContext();
+  }
+  async function checkReady(force = false) {
+    if (ready) return true;
+    if (checking) return false;
+    if (!force && Date.now() < nextReadyCheck) return false;
     checking = true;
+    nextReadyCheck = Date.now() + 20000;
     try {
       const response = await fetch(endpoint, {method:'GET', signal:AbortSignal.timeout(6000)});
       const data = await response.json().catch(() => ({}));
       ready = response.ok && data.ok === true && data.ready === true;
     } catch (_) { ready = false; }
     finally { checking = false; updateButton(); }
+    return ready;
+  }
+  function refresh() {
+    updateButton();
+    if (credentials() && !ready) checkReady();
   }
   function start() {
-    if (!document.body) return;
+    if (!document.body || document.getElementById('fttGalleryShareButton')) return;
     const button = document.createElement('button');
     button.id = 'fttGalleryShareButton';
     button.type = 'button';
@@ -183,17 +219,14 @@
     button.hidden = true;
     button.addEventListener('click',capture);
     document.body.append(button);
-    updateButton();
-    if (credentials()) checkReady();
-    setInterval(() => {
-      updateButton();
-      if (!ready && credentials()) checkReady();
-    }, 45000);
-    window.addEventListener('focus', () => { updateButton(); if (!ready && credentials()) checkReady(); });
-    // Student login on the main home page does not navigate or reload.
-    if (location.pathname.endsWith('/index.html') || location.pathname === '/') {
-      setTimeout(() => {updateButton(); if (!ready && credentials()) checkReady();},2500);
-    }
+    refresh();
+    // A boy can sign in *after* the home page loads. Check promptly rather
+    // than leaving the button missing for up to 45 seconds.
+    setInterval(refresh, 2000);
+    window.addEventListener('focus',refresh);
+    window.addEventListener('pageshow',refresh);
+    document.addEventListener('visibilitychange',refresh);
+    document.addEventListener('fullscreenchange',refresh);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',start,{once:true});
   else start();
