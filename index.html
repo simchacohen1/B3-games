@@ -557,16 +557,22 @@
     const allClasses=classesSnap.val()||{};
     const classes={};
     Object.entries(allClasses).forEach(([id,row])=>{
-      // The owner's B3 Teacher Center is only the legacy B3 ET/WT classroom.
-      // Platform classes created in Owner Admin belong to Fun Torah Tools and
-      // must not bleed into Rabbi Cohen's personal B3 class selector.
-      const ownerB3Class=isOwner&&["et","wt"].includes(id);
-      if(ownerB3Class||(!isOwner&&allowedClassIds.has(id)))classes[id]=row||{};
+      // The owner can manage students in every active platform class.
+      // Keep the original ET/WT classes available even if their status changes.
+      // Regular teachers remain limited to their assigned classes.
+      const ownerClass=isOwner&&(["et","wt"].includes(id)||row?.active!==false);
+      if(ownerClass||(!isOwner&&allowedClassIds.has(id)))classes[id]=row||{};
     });
 
     const classSel=el("manageClassSelect"), studentSel=el("classStudentSelect");
     const prior=classSel.value, priorStudent=studentSel.value;
-    const classIds=Object.keys(classes).sort();
+    const classIds=Object.keys(classes).sort((a,b)=>{
+      if(isOwner){
+        const priority=id=>id==="et"?0:id==="wt"?1:2;
+        if(priority(a)!==priority(b))return priority(a)-priority(b);
+      }
+      return a.localeCompare(b);
+    });
     classSel.innerHTML=classIds.map(id=>'<option value="'+id+'">'+((classes[id]&&classes[id].name)||id)+'</option>').join("");
     if(prior&&classes[prior])classSel.value=prior;
     if(!classSel.value&&classIds.length)classSel.value=classIds[0];
