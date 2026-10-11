@@ -8,6 +8,8 @@ const {form,verifyWebhook}=require('./billing-stripe-client.cjs');
 const {slots,reserveSeat,releaseSeat}=require('./billing-seats.cjs');
 const {subscriptionPlan,planMatchesOrder,latestInvoicePaid}=require('./billing-entitlements.cjs');
 const {portalSessionForTeacher}=require('./billing-portal-core.cjs');
+const {previewUpgrade,confirmUpgrade}=require('./billing-upgrade-core.cjs');
+const {reconcilePaidAccess}=require('./billing-entitlements.cjs');
 
 test('Annual base covers five seats, Shorashim $39',()=>{
  assert.equal(quote({seats:5,tools:['shorashim']}).amountCents,13900);
@@ -183,4 +185,83 @@ test('Stripe billing portal belongs only to verified claimed purchaser teacher',
  await assert.rejects(portalSessionForTeacher(store,{...identity,email_verified:false},cid,stripe,'https://funtorahtools.com/teacher-home.html'),/Verified/);
  await assert.rejects(portalSessionForTeacher(store,identity,'et',stripe,'https://funtorahtools.com/teacher-home.html'),/paid classroom/);
  assert.equal(calls,1);
+});
+
+
+test('Unpaid renewal never extends paid-through access; failed upgrade keeps existing tools',()=>{
+ const now=Date.now(),end=Math.ceil(now/1000)+150*86400;
+ let sub=stripeSub(['shorashim'],5,{paid:true});
+ sub.items.data[0].current_period_end=end;
+ const plan=subscriptionPlan(sub),order={paidPlan:{...plan,paidThrough:end}};
+ assert.equal(reconcilePaidAccess(order,sub,now).paid,true);
+ const retry=stripeSub(['shorashim'],5,{paid:false});
+ retry.status='active';retry.items.data[0].current_period_end=end+365*86400;
+ const safe=reconcilePaidAccess(order,retry,now);
+ assert.equal(safe.paid,true);
+ assert.deepEqual(safe.plan.tools,['shorashim']);
+ assert.equal(safe.verifiedNow,false);
+ assert.equal(reconcilePaidAccess(order,retry,end*1000+1).paid,false);
+});
+test('Teacher sees real Stripe proration before explicitly approving annual tool upgrade',async()=>{
+ const id='53ff5477-a71b-4cf4-a7c8-81c2af782894',cid='paid_'+id.replaceAll('-',''),
+  root='b3Games/workspaces/b3-2026',p='b3Private/billing';
+ const identity={uid:'uid',email:'teacher@example.com',email_verified:true,firebase:{sign_in_provider:'google.com'}};
+ const sub=stripeSub(['shorashim'],5);
+ sub.id='sub_sample';sub.cancel_at_period_end=false;sub.pending_update=null;
+ sub.items.data.forEach((x,i)=>{x.id='si_'+(i+1);x.price.id='price_current_'+i;});
+ sub.items.data[0].current_period_end=Math.ceil(Date.now()/1000)+160*86400;
+ const paidPlan={...subscriptionPlan(sub),paidThrough:sub.items.data[0].current_period_end};
+ const order={id,teacherEmail:identity.email,teacherName:'Rabbi Sample',activatedAt:100,
+  subscriptionId:sub.id,seats:5,tools:['shorashim'],paidPlan};
+ const data={
+  [root+'/teachers/uid']:{active:true,inviteId:cid,classIds:{[cid]:true}},
+  [root+'/teacherInvites/'+cid]:{claimedUid:'uid'},
+  [p+'/orders/'+id]:order
+ };
+ const store={
+  get:async path=>data[path],
+  set:async(path,value)=>{data[path]=value;},
+  transaction:async(path,fn)=>{
+   const updated=fn(data[path]);
+   if(updated===undefined)return {committed:false};
+   data[path]=updated;return {committed:true};
+  }
+ };
+ let previewCalls=0,updateCalls=0,upgradeArgs;
+ const stripe={
+  subscriptions:{
+   retrieve:async()=>structuredClone(sub),
+   update:async(id,args,options)=>{updateCalls++;upgradeArgs={id,args,options};return {...sub,pending_update:{}};}
+  },
+  prices:{retrieve:async()=>({
+   id:'price_new_posuk',active:true,currency:'usd',unit_amount:7900,
+   recurring:{interval:'year',interval_count:1},
+   product:{active:true,metadata:{fttKind:'tool',fttToolId:'posuk'}}
+  })},
+  invoices:{createPreview:async()=>{previewCalls++;return {currency:'usd',amount_due:3950};}}
+ };
+ const allowedPrices={posuk:'price_new_posuk'};
+ const now=Date.now();
+ const quote=await previewUpgrade(store,identity,{classId:cid,toolId:'posuk'},stripe,allowedPrices,now);
+ assert.equal(quote.chargeNowCents,3950);
+ assert.equal(quote.annualRenewalPriceCents,7900);
+ assert.equal(updateCalls,0);
+ assert.equal(previewCalls,1);
+ await assert.rejects(confirmUpgrade(store,identity,{quoteId:quote.quoteId,acknowledge:true,
+  confirmedAmountCents:1},stripe,allowedPrices,now),/expired or changed/);
+ assert.equal(updateCalls,0);
+ const result=await confirmUpgrade(store,identity,{quoteId:quote.quoteId,acknowledge:true,
+  confirmedAmountCents:3950},stripe,allowedPrices,now+1000);
+ assert.equal(result.status,'payment_pending');
+ assert.equal(updateCalls,1);
+ assert.equal(upgradeArgs.args.proration_behavior,'always_invoice');
+ assert.equal(upgradeArgs.args.payment_behavior,'pending_if_incomplete');
+ assert.equal(upgradeArgs.args.billing_cycle_anchor,'unchanged');
+ assert.equal(upgradeArgs.args.proration_date,Math.floor(now/1000));
+ assert.equal(upgradeArgs.args.items[0].price,'price_new_posuk');
+ assert.ok(upgradeArgs.options.idempotencyKey.includes(quote.quoteId));
+ assert.equal(data[p+'/upgradeQuotes/'+quote.quoteId+'/status'],'submitted');
+ await assert.rejects(confirmUpgrade(store,identity,{quoteId:quote.quoteId,acknowledge:true,
+  confirmedAmountCents:3950},stripe,allowedPrices,now+2000),/expired or changed/);
+ assert.equal(updateCalls,1);
 });
