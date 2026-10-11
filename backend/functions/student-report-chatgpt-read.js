@@ -6,7 +6,7 @@ const crypto=require("crypto");
 if(!admin.apps.length)admin.initializeApp();
 const credential=defineSecret("STUDENT_REPORT_CHATGPT_READ_TOKEN");
 const WS="b3-2026";
-const classes=["et","wt"];
+const legacyClasses=new Set(["et","wt"]);
 const asObject=v=>v&&typeof v==="object"?v:{};
 function constantTimeEqual(a,b){
  const aa=Buffer.from(String(a||"")), bb=Buffer.from(String(b||""));
@@ -80,24 +80,25 @@ exports.studentReportChatGPTRead=onRequest({
  const token=header.startsWith("Bearer ")?header.slice(7).trim():"";
  if(!constantTimeEqual(token,credential.value()))return res.status(401).json({error:"Unauthorized"});
  const cl=String(req.query.class||"et").toLowerCase();
- if(!classes.includes(cl))return res.status(400).json({error:"Class must be et or wt"});
+ if(!/^[a-z0-9_-]{1,100}$/.test(cl))return res.status(400).json({error:"Choose a valid class"});
  const days=Number(req.query.days??7);
  if(![7,14,30].includes(days))return res.status(400).json({error:"days must be 7, 14, or 30"});
  const since=Date.now()-days*86400000;
  try{
    const db=admin.database();
-   const memberSnap=await db.ref("b3Games/workspaces/"+WS+"/classes/"+cl+"/members").get();
-   const members=asObject(memberSnap.val());
-   if(!memberSnap.exists())return res.status(404).json({error:"Class data not found"});
+   const classSnap=await db.ref("b3Games/workspaces/"+WS+"/classes/"+cl).get();
+   if(!classSnap.exists()||classSnap.val()?.active===false)return res.status(404).json({error:"Active class not found"});
+   const members=asObject(classSnap.val()?.members);
    const ids=Object.keys(members).filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&members[id]&&members[id].active!==false);
-   const quizPath="b3Quiz";
+   const legacy=legacyClasses.has(cl),quizPath=legacy?"b3Quiz":"b3Quiz/classes/"+cl;
+   const shorashimRoot=legacy?"posukPractice/shorashimLearning/students/":"posukPractice/shorashimLearning/classes/"+cl+"/students/";
    const q=await db.ref(quizPath).get(),quiz=asObject(q.val());
    const students=await Promise.all(ids.map(async id=>{
      const prefix="posukPractice/";
      const ps=await Promise.all([
        db.ref(prefix+"attempts/"+id).get(),db.ref(prefix+"students/"+id).get(),
        db.ref(prefix+"chazara/students/"+id).get(),db.ref(prefix+"chazara/events/"+id).get(),
-       db.ref(prefix+"shorashimLearning/students/"+id).get(),
+       db.ref(shorashimRoot+id).get(),
        db.ref("rashiLetters/progress/"+id).get(),
        db.ref("b3Games/students/"+id+"/halacha/siman1").get()
      ]);
