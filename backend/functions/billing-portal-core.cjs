@@ -21,8 +21,8 @@ async function portalSessionForTeacher(store,identity,classId,stripe,returnUrl){
  if(teacher.inviteId!==paths(order).inviteId)
   fail(403,'The teacher invitation does not match this subscription.');
  const invite=await store.get(paths(order).invitePath);
- if(invite?.claimedUid!==identity.uid||invite.active!==true)
-  fail(403,'The teacher billing invitation is not active.');
+ if(invite?.claimedUid!==identity.uid)
+  fail(403,'The teacher billing invitation was not claimed by this account.');
  const subscription=await stripe.subscriptions.retrieve(order.subscriptionId);
  const customer=typeof subscription?.customer==='string'
   ?subscription.customer:subscription?.customer?.id;
