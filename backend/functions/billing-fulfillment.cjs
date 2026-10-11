@@ -9,7 +9,7 @@ function paths(order){
 }
 function activationUpdates(order,subscription,paid,now=Date.now()){
  const p=paths(order),updates={};
- const active=paid && subscription.status==='active';
+ const active=paid && ['active','past_due'].includes(subscription.status);
  // Only billing-created class IDs are modified; existing B3 classes are untouched.
  updates[p.classPath+'/name']=order.className;
  updates[p.classPath+'/active']=active;
