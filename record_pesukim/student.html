@@ -3316,6 +3316,7 @@ const MANUAL_CORRECTIONS = {
   ]
 };
 function applyManualCorrections(text, perekNum, posukNum){
+  if(selectedSefer !== DEFAULT_SEFER) return text; // Existing vowel corrections are Bereishis-only.
   const key = perekNum + '_' + posukNum;
   const fixes = MANUAL_CORRECTIONS[key];
   if(!fixes) return text;
