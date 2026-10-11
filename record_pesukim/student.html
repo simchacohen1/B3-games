@@ -166,6 +166,7 @@
     color:var(--ink-soft);
     margin-bottom:8px;
   }
+  #seferSelect{direction:ltr;min-width:190px;}
   .selectors{
     display:flex;
     justify-content:center;
@@ -947,7 +948,8 @@
     .selectors{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
     .selectors select{ width:100%; max-width:none; min-width:0; }
     .selectors.range-active{ grid-template-columns:1fr 1fr; }
-    .selectors.range-active #perekSelect{ grid-column:1 / -1; }
+    .selectors:not(.range-active) #seferSelect{grid-column:1 / -1;}
+    .selectors.range-active #perekSelect{grid-column:auto;}
     .selection-summary{ margin-top:10px; }
     .scroll.range-selection{ max-height:235px; min-height:145px; }
     .wrap{ padding-left:12px; padding-right:12px; }
@@ -1246,6 +1248,7 @@
           <select id="endPosukSelect" class="hidden" disabled><option value="">עד פסוק</option></select>
           <select id="posukSelect" disabled><option value="">פסוק</option></select>
           <select id="perekSelect"><option value="">פרק</option></select>
+          <select id="seferSelect" aria-label="Choose Sefer"></select>
         </div>
       </div>
     </div>
@@ -1696,6 +1699,7 @@ function warmQuestionGradingService(){
 }
 
 function getQuestionsForPosuk(perekNum, posukNum){
+  if(selectedSefer!==DEFAULT_SEFER)return null;
   const perekBank = QUESTION_BANK[String(perekNum)];
   if(!perekBank) return null;
   const qs = perekBank[String(posukNum)];
@@ -1843,31 +1847,79 @@ async function getGeneratedQuestionsForPart(part){
 /* =========================================================
    PARSHA / PEREK / POSUK MAP (Sefaria "Genesis" chapters)
    ========================================================= */
-const PARSHA_CONFIG = {
-  "Bereishis": [ {num:1}, {num:2}, {num:3}, {num:4}, {num:5}, {num:6, maxPosuk:8} ],
-  "Noach": [ {num:6, minPosuk:9}, {num:7}, {num:8}, {num:9}, {num:10}, {num:11} ],
-  "Lech Lecha": [ {num:12}, {num:13}, {num:14}, {num:15}, {num:16}, {num:17} ],
-  "Vayeira": [ {num:18}, {num:19}, {num:20}, {num:21}, {num:22} ],
-  "Chayei Sarah": [ {num:23}, {num:24}, {num:25, maxPosuk:18} ],
-  "Toldos": [ {num:25, minPosuk:19}, {num:26}, {num:27}, {num:28, maxPosuk:9} ],
-  "Vayeitzei": [ {num:28, minPosuk:10}, {num:29}, {num:30}, {num:31}, {num:32, maxPosuk:3} ],
-  "Vayishlach": [ {num:32, minPosuk:4}, {num:33}, {num:34}, {num:35}, {num:36} ],
-  "Vayeishev": [ {num:37}, {num:38}, {num:39}, {num:40} ],
-  "Mikeitz": [ {num:41}, {num:42}, {num:43}, {num:44, maxPosuk:17} ],
-  "Vayigash": [ {num:44, minPosuk:18}, {num:45}, {num:46}, {num:47, maxPosuk:27} ],
-  "Vayechi": [ {num:47, minPosuk:28}, {num:48}, {num:49}, {num:50} ]
+const SEFORIM = {
+  "Bereishis": { sefaria:"Genesis", hebrew:"בראשית", parshiyos:{
+    "Bereishis": [ {num:1}, {num:2}, {num:3}, {num:4}, {num:5}, {num:6, maxPosuk:8} ],
+    "Noach": [ {num:6, minPosuk:9}, {num:7}, {num:8}, {num:9}, {num:10}, {num:11} ],
+    "Lech Lecha": [ {num:12}, {num:13}, {num:14}, {num:15}, {num:16}, {num:17} ],
+    "Vayeira": [ {num:18}, {num:19}, {num:20}, {num:21}, {num:22} ],
+    "Chayei Sarah": [ {num:23}, {num:24}, {num:25, maxPosuk:18} ],
+    "Toldos": [ {num:25, minPosuk:19}, {num:26}, {num:27}, {num:28, maxPosuk:9} ],
+    "Vayeitzei": [ {num:28, minPosuk:10}, {num:29}, {num:30}, {num:31}, {num:32, maxPosuk:3} ],
+    "Vayishlach": [ {num:32, minPosuk:4}, {num:33}, {num:34}, {num:35}, {num:36} ],
+    "Vayeishev": [ {num:37}, {num:38}, {num:39}, {num:40} ],
+    "Mikeitz": [ {num:41}, {num:42}, {num:43}, {num:44, maxPosuk:17} ],
+    "Vayigash": [ {num:44, minPosuk:18}, {num:45}, {num:46}, {num:47, maxPosuk:27} ],
+    "Vayechi": [ {num:47, minPosuk:28}, {num:48}, {num:49}, {num:50} ]
+  }},
+  "Shemos": { sefaria:"Exodus", hebrew:"שמות", parshiyos:{
+    "Shemos": [ {num:1}, {num:2}, {num:3}, {num:4}, {num:5}, {num:6, maxPosuk:1} ],
+    "Vaeira": [ {num:6, minPosuk:2}, {num:7}, {num:8}, {num:9} ],
+    "Bo": [ {num:10}, {num:11}, {num:12}, {num:13, maxPosuk:16} ],
+    "Beshalach": [ {num:13, minPosuk:17}, {num:14}, {num:15}, {num:16}, {num:17} ],
+    "Yisro": [ {num:18}, {num:19}, {num:20} ],
+    "Mishpatim": [ {num:21}, {num:22}, {num:23}, {num:24} ],
+    "Terumah": [ {num:25}, {num:26}, {num:27, maxPosuk:19} ],
+    "Tetzaveh": [ {num:27, minPosuk:20}, {num:28}, {num:29}, {num:30, maxPosuk:10} ],
+    "Ki Sisa": [ {num:30, minPosuk:11}, {num:31}, {num:32}, {num:33}, {num:34} ],
+    "Vayakhel": [ {num:35}, {num:36}, {num:37}, {num:38, maxPosuk:20} ],
+    "Pekudei": [ {num:38, minPosuk:21}, {num:39}, {num:40} ]
+  }},
+  "Vayikra": { sefaria:"Leviticus", hebrew:"ויקרא", parshiyos:{
+    "Vayikra": [ {num:1}, {num:2}, {num:3}, {num:4}, {num:5} ],
+    "Tzav": [ {num:6}, {num:7}, {num:8} ],
+    "Shemini": [ {num:9}, {num:10}, {num:11} ],
+    "Tazria": [ {num:12}, {num:13} ],
+    "Metzora": [ {num:14}, {num:15} ],
+    "Acharei Mos": [ {num:16}, {num:17}, {num:18} ],
+    "Kedoshim": [ {num:19}, {num:20} ],
+    "Emor": [ {num:21}, {num:22}, {num:23}, {num:24} ],
+    "Behar": [ {num:25}, {num:26, maxPosuk:2} ],
+    "Bechukosai": [ {num:26, minPosuk:3}, {num:27} ]
+  }},
+  "Bamidbar": { sefaria:"Numbers", hebrew:"במדבר", parshiyos:{
+    "Bamidbar": [ {num:1}, {num:2}, {num:3}, {num:4, maxPosuk:20} ],
+    "Naso": [ {num:4, minPosuk:21}, {num:5}, {num:6}, {num:7} ],
+    "Behaaloscha": [ {num:8}, {num:9}, {num:10}, {num:11}, {num:12} ],
+    "Shelach": [ {num:13}, {num:14}, {num:15} ],
+    "Korach": [ {num:16}, {num:17}, {num:18} ],
+    "Chukas": [ {num:19}, {num:20}, {num:21}, {num:22, maxPosuk:1} ],
+    "Balak": [ {num:22, minPosuk:2}, {num:23}, {num:24}, {num:25, maxPosuk:9} ],
+    "Pinchas": [ {num:25, minPosuk:10}, {num:26}, {num:27}, {num:28}, {num:29}, {num:30, maxPosuk:1} ],
+    "Matos": [ {num:30, minPosuk:2}, {num:31}, {num:32} ],
+    "Masei": [ {num:33}, {num:34}, {num:35}, {num:36} ]
+  }},
+  "Devarim": { sefaria:"Deuteronomy", hebrew:"דברים", parshiyos:{
+    "Devarim": [ {num:1}, {num:2}, {num:3, maxPosuk:22} ],
+    "Vaeschanan": [ {num:3, minPosuk:23}, {num:4}, {num:5}, {num:6}, {num:7, maxPosuk:11} ],
+    "Eikev": [ {num:7, minPosuk:12}, {num:8}, {num:9}, {num:10}, {num:11, maxPosuk:25} ],
+    "Reeh": [ {num:11, minPosuk:26}, {num:12}, {num:13}, {num:14}, {num:15}, {num:16, maxPosuk:17} ],
+    "Shoftim": [ {num:16, minPosuk:18}, {num:17}, {num:18}, {num:19}, {num:20}, {num:21, maxPosuk:9} ],
+    "Ki Seitzei": [ {num:21, minPosuk:10}, {num:22}, {num:23}, {num:24}, {num:25} ],
+    "Ki Savo": [ {num:26}, {num:27}, {num:28}, {num:29, maxPosuk:8} ],
+    "Nitzavim": [ {num:29, minPosuk:9}, {num:30} ],
+    "Vayeilech": [ {num:31} ],
+    "Haazinu": [ {num:32} ],
+    "Vezos Habracha": [ {num:33}, {num:34} ]
+  }}
 };
-
-/* Flattened, ordered list of every perek across all three parshas, with
-   perek 25 (which is split between Chayei Sarah and Toldos) appearing
-   only once — lets the student pick a perek directly without first
-   picking a parsha. */
-const ALL_PERAKIM = [];
-Object.values(PARSHA_CONFIG).forEach(chapters => {
-  chapters.forEach(ch => {
-    if(!ALL_PERAKIM.includes(ch.num)) ALL_PERAKIM.push(ch.num);
-  });
-});
+const SEFER_ORDER=Object.keys(SEFORIM),DEFAULT_SEFER='Bereishis';
+function validSefer(s){return SEFORIM[s]?s:DEFAULT_SEFER;}
+function sefariaBook(s){return SEFORIM[validSefer(s)].sefaria;}
+function chapterId(s,p){return s===DEFAULT_SEFER?String(p):s+'_'+p;}
+function perakimOfSefer(s){const out=[];Object.values(SEFORIM[validSefer(s)].parshiyos).forEach(cs=>cs.forEach(c=>{if(!out.includes(c.num))out.push(c.num)}));return out;}
+function chumashPosition(s,p,v){return SEFER_ORDER.indexOf(validSefer(s))*1000000+Number(p)*1000+Number(v||0);}
+let selectedSefer=DEFAULT_SEFER, PARSHA_CONFIG=SEFORIM[selectedSefer].parshiyos, ALL_PERAKIM=perakimOfSefer(selectedSefer);
 
 /* Given a perek + posuk, figures out which parsha it belongs to — needed
    because perek 25 itself spans two parshas (1-18 is Chayei Sarah,
@@ -1964,6 +2016,7 @@ let translationSavedStoragePath = null;
 let currentPosukKey = null; // "Parsha_perek_posuk" or "Parsha_perek_from-to"
 let currentPosukNum = null; // first verse number; the reading scorer still receives exact expected text separately
 let currentPosukEndNum = null;
+let currentSefer=DEFAULT_SEFER;
 let currentPerekNum = null; // perek number — needed alongside posuk since posuk numbers repeat across perakim
 let currentPosukText = "";
 let currentPosukTranslation = ""; // accepted English translation, used as the grading "answer key"
@@ -2459,6 +2512,8 @@ function applyDeepLinkFromURL(){
   const requestedTab = ['reading','translate','comprehension'].includes(params.get('tab'))
     ? params.get('tab')
     : null;
+  const s=validSefer(params.get('sefer')||DEFAULT_SEFER);
+  if(s!==selectedSefer){seferSelect.value=s;if(seferSelect.value!==s)return;seferSelect.onchange();}
   if(!perekParam || !ALL_PERAKIM.includes(perekParam)) return;
   if(!perekAllowedByClassLimit(perekParam) ||
      (posukParam && !isWithinClassPracticeLimit(perekParam, posukParam)) ||
@@ -2564,6 +2619,7 @@ window.addEventListener('load', async () => {
    (needed because perek 25 itself is split between Chayei Sarah and
    Toldos, so a posuk's parsha can depend on which posuk within perek 25
    is picked, not just the perek number). */
+const seferSelect=document.getElementById('seferSelect');
 const perekSelect = document.getElementById('perekSelect');
 const posukSelect = document.getElementById('posukSelect');
 const endPosukSelect = document.getElementById('endPosukSelect');
@@ -2600,59 +2656,56 @@ async function resolveLegacyClassId(cls){
   return '';
 }
 
-function normalizedPracticeWindow(limit){
-  if(!limit) return null;
-  const endPerek=parseInt(limit.endPerek||limit.perek);
-  const endPosuk=parseInt(limit.endPosuk||limit.posuk);
-  if(!endPerek||!endPosuk) return null;
-  return {
-    startPerek:parseInt(limit.startPerek||1),
-    startPosuk:parseInt(limit.startPosuk||1),
-    endPerek,endPosuk
-  };
+function normalizedPracticeWindow(l){
+  if(!l)return null;if(l.closed)return {closed:true};
+  const endPerek=parseInt(l.endPerek||l.perek),endPosuk=parseInt(l.endPosuk||l.posuk);
+  return endPerek&&endPosuk?{startSefer:validSefer(l.startSefer),startPerek:parseInt(l.startPerek||1),
+    startPosuk:parseInt(l.startPosuk||1),endSefer:validSefer(l.endSefer),endPerek,endPosuk}:null;
 }
-
-function isWithinClassPracticeLimit(perekNum, posukNum){
-  if(!practiceScopeReady) return false;
-  if(!classPracticeLimit) return !ownClassSpace;
-  const p=parseInt(perekNum), v=parseInt(posukNum);
-  const afterStart=p>classPracticeLimit.startPerek||(p===classPracticeLimit.startPerek&&v>=classPracticeLimit.startPosuk);
-  const beforeEnd=p<classPracticeLimit.endPerek||(p===classPracticeLimit.endPerek&&v<=classPracticeLimit.endPosuk);
-  return afterStart&&beforeEnd;
+function perekAllowedByClassLimit(p,s=selectedSefer){
+  if(!practiceScopeReady)return false;
+  if(!classPracticeLimit)return !ownClassSpace;
+  if(classPracticeLimit.closed)return false;
+  const l=classPracticeLimit;
+  return chumashPosition(s,p,999)>=chumashPosition(l.startSefer,l.startPerek,l.startPosuk)
+    &&chumashPosition(s,p,1)<=chumashPosition(l.endSefer,l.endPerek,l.endPosuk);
 }
-
-function perekAllowedByClassLimit(perekNum){
-  if(!practiceScopeReady) return false;
-  if(!classPracticeLimit) return !ownClassSpace;
-  const p=parseInt(perekNum);
-  return p>=classPracticeLimit.startPerek&&p<=classPracticeLimit.endPerek;
+function isWithinClassPracticeLimit(p,v,s=selectedSefer){
+  if(!practiceScopeReady)return false;
+  if(!classPracticeLimit)return !ownClassSpace;
+  if(classPracticeLimit.closed)return false;
+  const l=classPracticeLimit,k=chumashPosition(s,p,v);
+  return k>=chumashPosition(l.startSefer,l.startPerek,l.startPosuk)
+    &&k<=chumashPosition(l.endSefer,l.endPerek,l.endPosuk);
 }
-
+function allowedChapters(){return SEFER_ORDER.flatMap(s=>perakimOfSefer(s).filter(p=>perekAllowedByClassLimit(p,s)).map(p=>({sefer:s,perek:p})));}
 function rebuildPerekOptionsForClassLimit(){
-  const current = parseInt(perekSelect.value);
-  perekSelect.innerHTML = '<option value="">פרק</option>';
-  ALL_PERAKIM.filter(perekAllowedByClassLimit).forEach(num => {
-    const opt = document.createElement('option');
-    opt.value = num;
-    opt.textContent = 'פרק ' + hebrewNumeral(num);
-    perekSelect.appendChild(opt);
-  });
-
-  if(current && perekAllowedByClassLimit(current)){
-    perekSelect.value = String(current);
-  }else if(current){
-    // The teacher tightened the limit while this page was open.
-    perekSelect.value = '';
-    posukSelect.innerHTML = '<option value="">פסוק</option>';
-    posukSelect.disabled = true;
-    endPosukSelect.innerHTML = '<option value="">עד פסוק</option>';
-    endPosukSelect.disabled = true;
-    resetScroll();
-    document.getElementById('fetchMsg').textContent = '🔒 Your teacher has not opened that section yet.';
-  }else if(practiceScopeReady && ownClassSpace && !classPracticeLimit){
-    document.getElementById('fetchMsg').textContent = '📖 Your teacher has not opened any pesukim yet.';
-  }
+  const old=selectedSefer,current=parseInt(perekSelect.value);
+  const books=SEFER_ORDER.filter(s=>perakimOfSefer(s).some(p=>perekAllowedByClassLimit(p,s)));
+  seferSelect.innerHTML='';
+  books.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s+' · '+SEFORIM[s].hebrew;seferSelect.appendChild(o);});
+  if(!books.includes(selectedSefer))selectedSefer=books[0]||DEFAULT_SEFER;
+  seferSelect.value=books.includes(selectedSefer)?selectedSefer:'';
+  seferSelect.disabled=!books.length;
+  PARSHA_CONFIG=SEFORIM[selectedSefer].parshiyos;ALL_PERAKIM=perakimOfSefer(selectedSefer);
+  perekSelect.innerHTML='<option value="">פרק</option>';
+  ALL_PERAKIM.filter(p=>perekAllowedByClassLimit(p)).forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent='פרק '+hebrewNumeral(p);perekSelect.appendChild(o);});
+  if(old===selectedSefer&&current&&perekAllowedByClassLimit(current))perekSelect.value=String(current);
+  else if(current){
+    posukSelect.innerHTML='<option value="">פסוק</option>';posukSelect.disabled=true;
+    endPosukSelect.innerHTML='<option value="">עד פסוק</option>';endPosukSelect.disabled=true;
+    resetScroll();document.getElementById('fetchMsg').textContent='🔒 Your teacher has not opened that section yet.';
+  }else if(practiceScopeReady&&((ownClassSpace&&!classPracticeLimit)||(classPracticeLimit&&classPracticeLimit.closed)))
+    document.getElementById('fetchMsg').textContent='📖 Your teacher has not opened any pesukim yet.';
 }
+seferSelect.onchange=()=>{
+  if(!SEFORIM[seferSelect.value])return;
+  selectedSefer=seferSelect.value;perekSelect.value='';
+  posukSelect.innerHTML='<option value="">פסוק</option>';posukSelect.disabled=true;
+  endPosukSelect.innerHTML='<option value="">עד פסוק</option>';endPosukSelect.disabled=true;
+  resetScroll();document.getElementById('fetchMsg').textContent='';
+  rebuildPerekOptionsForClassLimit();
+};
 
 function startPracticeLimitListener(){
   if(practiceLimitListenerStarted) return;
@@ -2670,6 +2723,7 @@ async function applyPracticeLimitChange(){
     const fetchMsgEl = document.getElementById('fetchMsg');
     if(classPracticeLimit && fetchMsgEl.textContent.startsWith('📖 Your teacher has not opened')) fetchMsgEl.textContent = '';
 
+    const oldSefer=selectedSefer;
     const selectedPerek = parseInt(perekSelect.value);
     const selectedPosuk = parseInt(posukSelect.value);
 
@@ -2677,7 +2731,7 @@ async function applyPracticeLimitChange(){
 
     // If the current perek is still allowed, rebuild its posuk list so a
     // newly opened/closed boundary is reflected immediately.
-    if(selectedPerek && perekAllowedByClassLimit(selectedPerek)){
+    if(oldSefer===selectedSefer&&selectedPerek && perekAllowedByClassLimit(selectedPerek)){
       const previousPosuk = selectedPosuk;
       await perekSelect.onchange();
       if(previousPosuk && isWithinClassPracticeLimit(selectedPerek, previousPosuk)){
@@ -2721,7 +2775,7 @@ function collapseSelectionPicker(){
   const rangeText = currentIsRange
     ? ('פסוקים ' + hebrewNumeral(currentPosukNum) + '–' + hebrewNumeral(currentPosukEndNum))
     : ('פסוק ' + hebrewNumeral(currentPosukNum));
-  selectionSummaryText.textContent = 'פרק ' + hebrewNumeral(currentPerekNum) + ' • ' + rangeText;
+  selectionSummaryText.textContent = SEFORIM[currentSefer].hebrew+' • פרק ' + hebrewNumeral(currentPerekNum) + ' • ' + rangeText;
   selectionShell.classList.add('hidden');
   selectionSummary.classList.remove('hidden');
 }
@@ -2938,11 +2992,12 @@ async function goToPosuk(direction){
 
     // 2) Out of pesukim in this direction within this perek — move to the
     //    adjacent perek and land on its first (or last) posuk.
-    const allowedPerakim = ALL_PERAKIM.filter(perekAllowedByClassLimit);
-    const perekIdx = allowedPerakim.indexOf(perekNum);
-    const targetPerekIdx = perekIdx + direction;
-    if(perekIdx > -1 && targetPerekIdx >= 0 && targetPerekIdx < allowedPerakim.length){
-      perekSelect.value = allowedPerakim[targetPerekIdx];
+    const chapters=allowedChapters();
+    const idx=chapters.findIndex(c=>c.sefer===selectedSefer&&c.perek===perekNum);
+    const target=chapters[idx+direction];
+    if(idx>=0&&target){
+      if(target.sefer!==selectedSefer){seferSelect.value=target.sefer;seferSelect.onchange();}
+      perekSelect.value=String(target.perek);
       await perekSelect.onchange();
       const opts = Array.from(posukSelect.options).filter(o => o.value !== '');
       const edgeOpt = direction === 1 ? opts[0] : opts[opts.length - 1];
@@ -2986,10 +3041,10 @@ function updateNavArrows(){
   const perekNum = parseInt(perekSelect.value);
   const posukOpts = Array.from(posukSelect.options).filter(o => o.value !== '');
   const curPosukIdx = posukOpts.findIndex(o => parseInt(o.value) === parseInt(posukSelect.value));
-  const allowedPerakim = ALL_PERAKIM.filter(perekAllowedByClassLimit);
-  const perekIdx = allowedPerakim.indexOf(perekNum);
-  prevBtn.disabled = (perekIdx === 0 && curPosukIdx === 0);
-  nextBtn.disabled = (perekIdx === allowedPerakim.length - 1 && curPosukIdx === posukOpts.length - 1);
+  const chapters=allowedChapters();
+  const idx=chapters.findIndex(c=>c.sefer===selectedSefer&&c.perek===perekNum);
+  prevBtn.disabled=(idx<=0&&curPosukIdx<=0);
+  nextBtn.disabled=(idx<0||(idx===chapters.length-1&&curPosukIdx===posukOpts.length-1));
   if(nextBtn.disabled && classPracticeLimit){
     nextBtn.title = 'Your teacher has not opened the next posuk yet';
   }
@@ -3040,29 +3095,30 @@ const LOCAL_TEXT = {
 };
 
 async function fetchChapter(perekNum){
-  if(chapterCache[perekNum]) return chapterCache[perekNum];
+  const cid=chapterId(selectedSefer,perekNum);
+  if(chapterCache[cid]) return chapterCache[cid];
 
-  if(LOCAL_TEXT[perekNum]){
+  if(selectedSefer===DEFAULT_SEFER && LOCAL_TEXT[perekNum]){
     const pesukim = LOCAL_TEXT[perekNum].map((raw, idx) => {
       let text = abbreviateShaimos(raw);
       text = applyManualCorrections(text, perekNum, idx + 1);
       text = stripMeteg(text);
       return text;
     });
-    chapterCache[perekNum] = pesukim;
+    chapterCache[cid] = pesukim;
     return pesukim;
   }
 
   // v2 cache key: bumped so students' browsers refetch corrected text instead of
   // serving an old cached copy from before the shaimos/nikud fixes were added.
-  const cacheKey = 'posukPractice_ch_v7_' + perekNum;
+  const cacheKey = 'posukPractice_ch_v7_' + cid;
   const localCached = localStorage.getItem(cacheKey);
   if(localCached){
     const arr = JSON.parse(localCached);
-    chapterCache[perekNum] = arr;
+    chapterCache[cid] = arr;
     return arr;
   }
-  const res = await fetch('https://www.sefaria.org/api/texts/Genesis.' + perekNum + '?context=0&pad=0');
+  const res = await fetch('https://www.sefaria.org/api/texts/' + sefariaBook(selectedSefer) + '.' + perekNum + '?context=0&pad=0');
   const data = await res.json();
   const pesukim = (data.he || []).map((html, idx) => {
     let text = stripTags(html);
@@ -3070,7 +3126,7 @@ async function fetchChapter(perekNum){
     text = applyManualCorrections(text, perekNum, idx + 1);
     return text;
   });
-  chapterCache[perekNum] = pesukim;
+  chapterCache[cid] = pesukim;
   localStorage.setItem(cacheKey, JSON.stringify(pesukim));
   return pesukim;
 }
@@ -3088,10 +3144,11 @@ async function fetchChapter(perekNum){
    Each value can be either a plain string or {translation:"..."}.
    Missing entries simply fall back to the existing Metsudah/Sefaria flow. */
 async function fetchClassroomReferenceChapter(perekNum){
-  if(classroomReferenceCache[perekNum]) return classroomReferenceCache[perekNum];
+  const cid=chapterId(selectedSefer,perekNum);
+  if(classroomReferenceCache[cid]) return classroomReferenceCache[cid];
   try{
     const snap = await promiseWithTimeout(
-      db.ref('posukPractice/classroomTranslations/' + perekNum).once('value'),
+      db.ref('posukPractice/classroomTranslations/' + cid).once('value'),
       10000,
       'Classroom translation reference'
     );
@@ -3103,11 +3160,11 @@ async function fetchClassroomReferenceChapter(perekNum){
       const text = typeof value === 'string' ? value : (value && value.translation) || '';
       arr[n - 1] = String(text || '').trim();
     });
-    classroomReferenceCache[perekNum] = arr;
+    classroomReferenceCache[cid] = arr;
     return arr;
   }catch(err){
     console.warn('Could not load Baer Hetev classroom references', err);
-    classroomReferenceCache[perekNum] = [];
+    classroomReferenceCache[cid] = [];
     return [];
   }
 }
@@ -3124,15 +3181,16 @@ async function getClassroomReferenceForPart(part){
 const KEHOT_SEFARIA_VERSION = 'The Kehot Chumash; Chabad House Publications, Los Angeles';
 
 async function fetchKehotChapterTranslation(perekNum){
-  if(kehotTranslationCache[perekNum]) return kehotTranslationCache[perekNum];
+  const cid=chapterId(selectedSefer,perekNum);
+  if(kehotTranslationCache[cid]) return kehotTranslationCache[cid];
 
-  const cacheKey = 'posukPractice_kehot_translation_v1_' + perekNum;
+  const cacheKey = 'posukPractice_kehot_translation_v1_' + cid;
   try{
     const localCached = localStorage.getItem(cacheKey);
     if(localCached){
       const arr = JSON.parse(localCached);
       if(Array.isArray(arr) && arr.length){
-        kehotTranslationCache[perekNum] = arr;
+        kehotTranslationCache[cid] = arr;
         return arr;
       }
     }
@@ -3141,7 +3199,7 @@ async function fetchKehotChapterTranslation(perekNum){
   }
 
   try{
-    const sectionRef = 'Genesis ' + perekNum;
+    const sectionRef = sefariaBook(selectedSefer) + ' ' + perekNum;
     const url = 'https://www.sefaria.org/api/v3/texts/' +
       encodeURIComponent(sectionRef) + '?version=' +
       encodeURIComponent('english|' + KEHOT_SEFARIA_VERSION);
@@ -3155,32 +3213,33 @@ async function fetchKehotChapterTranslation(perekNum){
     const version = Array.isArray(data.versions) ? data.versions[0] : null;
     const raw = version && Array.isArray(version.text) ? version.text : [];
     const cleaned = raw.map(stripTags);
-    kehotTranslationCache[perekNum] = cleaned;
+    kehotTranslationCache[cid] = cleaned;
     try{ localStorage.setItem(cacheKey, JSON.stringify(cleaned)); }catch(_err){}
     return cleaned;
   }catch(err){
     // Kehot is supplementary. If it cannot load, the existing Metsudah /
     // classroom-reference grading continues normally.
     console.warn('Could not load Kehot Chumash comprehension reference', err);
-    kehotTranslationCache[perekNum] = [];
+    kehotTranslationCache[cid] = [];
     return [];
   }
 }
 
 async function fetchChapterTranslation(perekNum){
-  if(translationCache[perekNum]) return translationCache[perekNum];
+  const cid=chapterId(selectedSefer,perekNum);
+  if(translationCache[cid]) return translationCache[cid];
 
-  const cacheKey = 'posukPractice_translation_v1_' + perekNum;
+  const cacheKey = 'posukPractice_translation_v1_' + cid;
   const localCached = localStorage.getItem(cacheKey);
   if(localCached){
     const arr = JSON.parse(localCached);
-    translationCache[perekNum] = arr;
+    translationCache[cid] = arr;
     return arr;
   }
 
   let english = [];
   try{
-    const res = await fetch('https://www.sefaria.org/api/texts/Genesis.' + perekNum +
+    const res = await fetch('https://www.sefaria.org/api/texts/' + sefariaBook(selectedSefer) + '.' + perekNum +
       '?context=0&pad=0&ven=Metsudah_Chumash,_Metsudah_Publications,_2009');
     const data = await res.json();
     english = data.text || [];
@@ -3191,13 +3250,13 @@ async function fetchChapterTranslation(perekNum){
   // Fallback: Metsudah has no coverage for this perek (empty/missing text) —
   // use whatever default English translation Sefaria has instead.
   if(!english.length || english.every(t => !t || !stripTags(t).trim())){
-    const res = await fetch('https://www.sefaria.org/api/texts/Genesis.' + perekNum + '?context=0&pad=0');
+    const res = await fetch('https://www.sefaria.org/api/texts/' + sefariaBook(selectedSefer) + '.' + perekNum + '?context=0&pad=0');
     const data = await res.json();
     english = data.text || [];
   }
 
   const cleaned = english.map(stripTags);
-  translationCache[perekNum] = cleaned;
+  translationCache[cid] = cleaned;
   localStorage.setItem(cacheKey, JSON.stringify(cleaned));
   return cleaned;
 }
@@ -3257,6 +3316,7 @@ const MANUAL_CORRECTIONS = {
   ]
 };
 function applyManualCorrections(text, perekNum, posukNum){
+  if(selectedSefer !== DEFAULT_SEFER) return text; // Existing vowel corrections are Bereishis-only.
   const key = perekNum + '_' + posukNum;
   const fixes = MANUAL_CORRECTIONS[key];
   if(!fixes) return text;
@@ -3301,7 +3361,7 @@ function showPosuk(parsha, perekNum, posukNum, text, translation, endPosukNum = 
   currentPosukKey = parsha.replace(/\s+/g,'') + '_' + perekNum + '_' + posukPart;
   currentPosukNum = posukNum;
   currentPosukEndNum = endPosukNum;
-  currentPerekNum = perekNum;
+  currentPerekNum = perekNum;currentSefer=selectedSefer;
   currentPosukText = text;
   currentPosukTranslation = translation || "";
   currentIsRange = isRange;
@@ -3972,6 +4032,7 @@ async function autosaveHebrew(){
     const url = await storage.ref(path).getDownloadURL();
     await currentAttemptRef.update({
       timestamp: Date.now(),
+      sefer: currentSefer,
       parsha: currentParshaName || null,
       perek: currentPerekNum,
       posukStart: currentPosukNum,
@@ -4011,6 +4072,7 @@ async function autosaveComprehension(){
 
     await currentAttemptRef.update({
       timestamp: Date.now(),
+      sefer: currentSefer,
       parsha: currentParshaName || null,
       perek: currentPerekNum,
       posukStart: currentPosukNum,
@@ -4737,6 +4799,7 @@ async function autosaveComprehensionQuestions(){
     const savedQuestionPercent = Math.round((correctCount / comprehensionQuestions.length) * 100);
     await currentAttemptRef.update({
       timestamp: Date.now(),
+      sefer: currentSefer,
       parsha: currentParshaName || null,
       perek: currentPerekNum,
       posukStart: currentPosukNum,
@@ -5872,6 +5935,7 @@ async function autosaveTranslation(level){
     const allDone = idxs.length === level.chunks.length && idxs.every((v, i) => v === i);
     const updateData = {
       timestamp: Date.now(),
+      sefer: currentSefer,
       parsha: currentParshaName || null,
       perek: currentPerekNum,
       posukStart: currentPosukNum,
