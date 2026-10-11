@@ -18,3 +18,11 @@ test('regular students and impersonated students do not receive teacher version 
 test('halacha student demonstration uses the teacher copy',()=>{const link=render('halacha/teacher.html')[0].children[1];assert.equal(new URL(link.href).searchParams.get('teacher'),'1');});
 
 test('owner version links use ET rather than the all-classes wildcard',()=>{const bars=render('yiddish/index.html',{role:'admin',classIds:['*']});for(const link of bars[0].children)assert.equal(new URL(link.href).searchParams.get('class'),'et');});
+
+test('Posuk student entry stays available to verified teachers without redirecting',()=>{
+ const links=render('record_pesukim/student.html?class=mine')[0].children;
+ assert.equal(new URL(links[0].href).pathname,'/B3-games/record_pesukim/teacher.html');
+ assert.equal(new URL(links[1].href).pathname,'/B3-games/record_pesukim/student.html');
+ assert.equal(new URL(links[1].href).searchParams.get('demo'),'1');
+ assert.equal(new URL(links[1].href).searchParams.get('class'),'mine');
+});

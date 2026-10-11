@@ -2613,30 +2613,7 @@ function printReport(){
 
   const win = window.open('', '_blank');
   win.document.write(`<!DOCTYPE html><html><head>
-<script>
-  (function() {
-    // Automatically read Firebase session or saved login
-    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
-    idbReq.onsuccess = function(e) {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
-      const tx = db.transaction('firebaseLocalStorage', 'readonly');
-      const store = tx.objectStore('firebaseLocalStorage');
-      const getAll = store.getAll();
-      getAll.onsuccess = function() {
-        if (getAll.result && getAll.result.length > 0) {
-          const user = getAll.result[0].value;
-          window.currentUserSession = user;
-          // Hide login/pin modal if present
-          document.addEventListener('DOMContentLoaded', function() {
-            const pinModal = document.querySelector('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
-            if (pinModal) pinModal.style.display = 'none';
-          });
-        }
-      };
-    };
-  })();
-</script><title>Posuk Practice Report</title>
+<title>Posuk Practice Report</title>
     <style>
       body{ font-family: Arial, sans-serif; padding: 24px; color:#222; }
       h1{ font-size:1.3rem; margin-bottom:4px; }
