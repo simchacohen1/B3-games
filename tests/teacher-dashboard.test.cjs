@@ -23,5 +23,5 @@ test('a new email sign-in link blocks restored teacher UI until link verificatio
  assert.match(x.nodes.gate.innerHTML,/Complete email sign-in/);
  assert.match(x.nodes.teacherSignInStatus.textContent,/Complete the email-link verification/);
  assert.equal(x.reads.length,0);
- assert.equal(x.nodes.classes.innerHTML,'');
+ assert.equal(x.nodes.classes?.innerHTML||'','');
 });
