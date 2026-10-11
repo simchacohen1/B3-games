@@ -8,7 +8,7 @@ function memory(init={}){
  };
 }
 function fixture({users={},pending=false,authenticatedUser=null,loginUser,verified=true}={}){
- const activity=[],localStorage=memory(),sessionStorage=memory();
+ const activity=[],localStorage=memory(),sessionStorage=memory(),authCallbacks=[];
  const auth={
   currentUser:authenticatedUser,
   isSignInWithEmailLink:url=>pending&&url.includes('oobCode='),
@@ -18,9 +18,9 @@ function fixture({users={},pending=false,authenticatedUser=null,loginUser,verifi
    return {user:loginUser||{uid:'teacher-uid',email,emailVerified:verified}};
   },
   signOut:async()=>{activity.push(['signOut']);auth.currentUser=null;},
-  onAuthStateChanged:()=>()=>{}
+  onAuthStateChanged:cb=>{authCallbacks.push(cb);return ()=>{};}
  };
- const db={ref:path=>({once:async()=>({val:()=>users[path]??null})})};
+ const db={ref:path=>({once:async()=>({val:()=>await users[path]??null})})};
  const firebase={apps:[{}],database:()=>db,auth:()=>auth};
  const window={firebase,B3_FIREBASE_CONFIG:Object.fromEntries(
   ['apiKey','authDomain','databaseURL','projectId','storageBucket','messagingSenderId','appId'].map(k=>[k,'fake']))};
@@ -31,7 +31,7 @@ function fixture({users={},pending=false,authenticatedUser=null,loginUser,verifi
  const sandbox={window,document,localStorage,sessionStorage,location,history,
   URL,console,Intl,Date,setTimeout:()=>1,clearTimeout:()=>{},fetch:async()=>({ok:false,status:503})};
  vm.runInNewContext(fs.readFileSync('site-settings.js','utf8'),sandbox);
- return {api:window.B3SiteSettings,activity,localStorage,auth};
+ return {api:window.B3SiteSettings,activity,localStorage,auth,emit(user){auth.currentUser=user;authCallbacks.forEach(cb=>cb(user));}};
 }
 const teacherRecord={'b3Games/workspaces/b3-2026/teachers/teacher-uid':{active:true,classIds:{classA:true}}};
 test('Passwordless email action sends a link without embedding a teacher email in its URL',async()=>{
@@ -81,4 +81,24 @@ test('Previously granted teacher UID is denied access if Firebase email is unver
  }});
  await assert.rejects(y.api.completeTeacherEmailLink('teacher@example.org'));
  assert.equal(y.api.getCurrentAccess().authorized,false);
+});
+
+test('A pending teacher access lookup cannot restore privileged UI after Firebase sign-out',async()=>{
+ let unlock;
+ const blocker=new Promise(resolve=>{unlock=resolve;});
+ const x=fixture({users:{
+  'b3Games/admins/teacher-uid':blocker,
+  'b3Games/workspaces/b3-2026/teachers/teacher-uid':{
+    active:true,classIds:{classA:true}
+  }
+ }});
+ const callbacks=[];
+ x.api.onAuthStateChanged((_user,authorized)=>callbacks.push(authorized));
+ x.emit({uid:'teacher-uid',email:'teacher@example.org',emailVerified:true});
+ x.emit(null);
+ unlock(null);
+ await new Promise(setImmediate);
+ assert.equal(x.api.getCurrentAccess().authorized,false);
+ assert.equal(callbacks.includes(true),false);
+ assert.equal(callbacks.at(-1),false);
 });
