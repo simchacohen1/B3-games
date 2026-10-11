@@ -192,6 +192,48 @@
     if (m) m.textContent = message || "Your class cannot use this activity right now.";
   }
 
+  // Direct Gallery links select from verified teacher assignments, never B3 defaults.
+  function galleryAssignedIds() {
+    return verifiedTeacherAccess && verifiedTeacherAccess.authorized &&
+      verifiedTeacherAccess.role === "teacher"
+      ? (verifiedTeacherAccess.classIds || []).filter(function(id){return /^[A-Za-z0-9_-]{1,100}$/.test(id);})
+      : [];
+  }
+  function resolveGalleryTeacherClass() {
+    if(gameId!=="class-gallery" || !verifiedTeacherAccess ||
+       !verifiedTeacherAccess.authorized || verifiedTeacherAccess.role!=="teacher") return false;
+    var ids=galleryAssignedIds(), chosen=new URLSearchParams(location.search).get("class")||"";
+    if(ids.includes(chosen))return false;
+    if(ids.length===1){
+      var target=new URL(location.href);
+      target.searchParams.set("class",ids[0]);
+      location.replace(target.href);
+      return true;
+    }
+    return false;
+  }
+  function showGalleryClassChoices() {
+    var ids=galleryAssignedIds();
+    showClosed("Choose your class",ids.length?"Select one of your assigned classes to open Class Gallery.":"No classes are assigned to this teacher.");
+    var panel=overlay&&overlay.querySelector("#b3GateMessage");
+    if(!panel)return;
+    var wrap=document.createElement("div");
+    wrap.style.cssText="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:15px";
+    ids.forEach(function(id){
+      var btn=document.createElement("button");
+      btn.type="button";
+      btn.textContent=id==="et"?"ET":id==="wt"?"WT":id.replace(/[-_]/g," ");
+      btn.style.cssText="border:0;border-radius:10px;padding:12px 18px;background:#2563eb;color:white;font:bold 16px Arial;cursor:pointer";
+      btn.addEventListener("click",function(){
+        var target=new URL(location.href);
+        target.searchParams.set("class",id);
+        location.assign(target.href);
+      });
+      wrap.appendChild(btn);
+    });
+    panel.appendChild(wrap);
+  }
+
   function storedTeacherBypass() {
     return Boolean(verifiedTeacherAccess && verifiedTeacherAccess.authorized &&
       verifiedTeacherAccess.role === "admin");
@@ -228,6 +270,7 @@
       window.B3SiteSettings.onAuthStateChanged(function(user,authorized,access){
         galleryTeacherCheckPending=false;
         verifiedTeacherAccess=authorized?access:null;
+        if(resolveGalleryTeacherClass())return;
         checkNow();
       });
     } catch(error){
@@ -412,6 +455,7 @@
     if(verifiedTeacherAccess&&verifiedTeacherAccess.authorized){
       var selected=new URLSearchParams(location.search).get("class")||getStoredClass();
       if(!(verifiedTeacherAccess.classIds||[]).includes(selected)){
+        if(gameId==="class-gallery"){showGalleryClassChoices();return;}
         showClosed("Choose an assigned class", "Open this tool from your Teacher Center.");return;
       }
       // Tool grants are checked against the selected class, never another teacher's class.
