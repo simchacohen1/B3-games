@@ -10,6 +10,10 @@ exports.funTorahManageStudents=onRequest({region:'us-central1',cors:['https://si
  try{
   const token=String(req.headers.authorization||'').replace(/^Bearer /,'');
   const identity=await admin.auth().verifyIdToken(token,true),db=admin.database();
-  res.json(await manageStudents({get:async path=>(await db.ref(path).once('value')).val(),update:updates=>db.ref().update(updates)},identity,req.body||{}));
+  res.json(await manageStudents({
+   get:async path=>(await db.ref(path).once('value')).val(),
+   update:updates=>db.ref().update(updates),
+   transaction:(path,updater)=>db.ref(path).transaction(updater,undefined,false)
+  },identity,req.body||{}));
  }catch(error){res.status(Number.isInteger(error.code)?error.code:403).json({error:Number.isInteger(error.code)?error.message:'Teacher student management could not be authorized.'});}
 });
