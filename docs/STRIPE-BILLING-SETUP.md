@@ -37,7 +37,9 @@ cancellation. Taxes and compliance must be reviewed separately.
   and do not overwrite the owner’s B3 ET/WT classes. The private order is
   stored under `b3Private/billing`. Only a verified paid, active Stripe
   subscription creates a teacher invitation and per-class tool entitlements.
-  Subsequent subscription events reconcile to Stripe's current state.
+  Subsequent subscription events reconcile only to **paid annual Stripe line items**\
+  with matching server-side price, tool ID and seat-count metadata; revoked\
+  purchases are explicitly locked.
 - A teacher claims a paid invitation by signing in with the matching, verified
   Google email via the existing teacher-claim endpoint.
 - Student seat admission now uses a Firebase transaction on each paid
@@ -73,6 +75,19 @@ Webhook endpoint: `funTorahStripeWebhook`; register events:
 Checkout function: `funTorahCreateCheckout`. Checkout always recomputes price
 on the server and returns only a Stripe-hosted URL.
 
+Verified paid teachers can click **Manage Billing** for their own classroom,
+which calls `funTorahBillingPortal` and creates a short-lived Stripe customer
+portal session. Stripe Dashboard configuration must be reviewed before enabling
+cancellations. The portal handles billing details and subscription cancellation;
+**it does not yet add or remove purchased learning tools**. The webhook keeps
+access until an active paid subscription actually ends (including when
+`cancel_at_period_end` is true).
+
+A shared Gallery/Tag purchase is blocked in the checkout handler and
+subscription parser until app permissions are separated. They may still appear
+in the visual registration preview, and must be removed or disabled before
+publishing real registration.
+
 ## Tests
 
 `node --test backend/functions/billing.test.cjs`
@@ -97,8 +112,9 @@ Firebase/Stripe integration.
 5. Integration-test sandbox card success, failed payment, expired/canceled
    checkout, duplicate and reordered webhooks, renewal, nonpayment,
    cancellations, refunds within seven days and renewal terms.
-6. Build school-friendly subscription management and a documented cancellation
-   / refund process; review applicable sales taxes.
+6. Configure and verify Stripe's hosted Billing Portal for billing details
+   and end-of-period cancellations; add an authenticated tool-change purchase
+   flow and document refunds. Review applicable sales taxes.
 7. Confirm authorization for the teacher after payment, email ownership,
    teacher invite claiming, and class/student access after cancellation.
 8. Add rate limiting/abuse controls for unauthenticated checkout, and
