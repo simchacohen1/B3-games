@@ -20,7 +20,7 @@ function fixture({users={},pending=false,authenticatedUser=null,loginUser,verifi
   signOut:async()=>{activity.push(['signOut']);auth.currentUser=null;},
   onAuthStateChanged:cb=>{authCallbacks.push(cb);return ()=>{};}
  };
- const db={ref:path=>({once:async()=>({val:()=>await users[path]??null})})};
+ const db={ref:path=>({once:async()=>{const value=await users[path];return {val:()=>value??null};}})};
  const firebase={apps:[{}],database:()=>db,auth:()=>auth};
  const window={firebase,B3_FIREBASE_CONFIG:Object.fromEntries(
   ['apiKey','authDomain','databaseURL','projectId','storageBucket','messagingSenderId','appId'].map(k=>[k,'fake']))};
