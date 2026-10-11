@@ -12,7 +12,7 @@
     "Microsoft Guy","Microsoft Aria","Microsoft Jenny",
     "Google US English","Samantha","Daniel","Alex","Karen"
   ];
-  let voices=[],button=null,replayButton=null,lastContext="",lastContent="",timer=null;
+  let voices=[],button=null,replayButton=null,lastContext="",lastContent="",timer=null,previousStudentId="";
   const currentId=()=>{
     try{return sessionStorage.getItem("b3Games_studentId")||
       sessionStorage.getItem("posukPractice_studentId")||"device";}catch(_){return "device";}
@@ -160,6 +160,13 @@
     if(context)speak(context[1],{force:true});
   }
   function tick(){
+    // The sign-in page can switch students without a full reload.
+    const activeId=currentId();
+    if(activeId!==previousStudentId){
+      previousStudentId=activeId;lastContext="";lastContent="";
+      refreshButton();
+      if(!enabled())stop();
+    }
     if(!enabled()||document.hidden)return;
     const context=getContext();
     if(context&&context[0]!==lastContext){
