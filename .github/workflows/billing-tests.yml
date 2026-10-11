@@ -19,6 +19,17 @@ on:
       - 'backend/functions/billing-*.cjs'
       - 'backend/functions/billing-stripe.js'
       - 'backend/functions/billing.test.cjs'
+      - 'backend/functions/teacher-auth-identity.cjs'
+      - 'backend/functions/teacher-claim-core.cjs'
+      - 'backend/functions/student-management-core.cjs'
+      - 'backend/functions/rewards-teacher-core.cjs'
+      - 'backend/functions/paid-api-core.cjs'
+      - 'backend/functions/billing-portal-core.cjs'
+      - 'tests/shared-device-switch.test.cjs'
+      - 'shared-device-session.js'
+      - 'teacher-home.html'
+      - 'index.html'
+      - 'site-settings.js'
       - '.github/workflows/billing-tests.yml'
 permissions:
   contents: read
