@@ -115,11 +115,11 @@
         if(visible(e))return ["review-meaning:"+$("#reviewCounter")?.textContent+":"+e.textContent, "The English meaning is "+e.textContent];
       }
       if(screen==="learnScreen"){
-        // The editor explicitly shows the English meaning; do not speak hidden/back-side text.
-        const next=$(".word-row.current");
-        if(visible(next)&&next.querySelector(".meta span")){
-          const text=next.querySelector(".meta span").textContent.replace(/NEXT/g,"").trim();
-          return ["learn-word:"+text,"The next English meaning is "+text];
+        // Read only the currently selected card's English meaning, not every item in the list.
+        const label=$("#editorTitle");
+        if(visible(label)&&label.textContent.includes(" — ")){
+          const text=label.textContent.split(" — ").slice(1).join(" — ").trim();
+          if(text)return ["learn-word:"+text,"The English meaning is "+text];
         }
       }
     }
