@@ -35,7 +35,7 @@ must match a verified active teacher invitation, not merely be typed in.
 The app does not place the email address in URL parameters and removes
 one-time links from browser history after successful use.
 
-Firebase staging project setup (not yet completed):
+Firebase project configuration (the owner enabled passwordless email links and\nconfirmed the authorized domains in the console on 2026-10-11; actual link\ndelivery and return path still require a real end-to-end test):
 
 1. In Authentication > Sign-in method, enable Email/Password and
    Email link (passwordless).
@@ -48,11 +48,10 @@ Firebase staging project setup (not yet completed):
 
 ## Security tests and pending blockers
 
-Node unit tests include sign-out sequencing, failure safety, stale session
-removal and acceptance of verified Google or email-link Firebase ID tokens.
+Node unit tests include sign-out sequencing, failure safety, stale session\nremoval, matching verified email addresses, denial of unverified or unassigned\naccounts, race protection for delayed sign-outs, and acceptance of verified\nGoogle or email-link Firebase ID tokens.
 Run:
 
-node --test backend/functions/billing.test.cjs tests/shared-device-switch.test.cjs
+node --test backend/functions/billing.test.cjs tests/shared-device-switch.test.cjs tests/email-link-auth.test.cjs tests/teacher-dashboard.test.cjs
 
 These are not substitutes for real browser and Firebase emulator tests.
 The legacy site currently has other pending class-isolation and migration
