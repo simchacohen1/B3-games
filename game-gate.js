@@ -509,6 +509,9 @@
     }).then(function () {
       return fetchJson(DATABASE_URL + "/" + SETTINGS_PATH + ".json");
     }).then(function (settings) {
+      // When teacher auth finishes during a student-first check, ignore that
+      // stale decision; the queued pass will load the teacher's class record.
+      if(refreshRequested && gameId==="class-gallery")return;
       decide(settings || {});
     }).catch(function (err) {
       console.warn("B3 game gate could not refresh settings:", err);
