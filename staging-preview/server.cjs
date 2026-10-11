@@ -30,7 +30,7 @@ const server=http.createServer((req,res)=>{
   'X-Frame-Options':'DENY',
   'X-Content-Type-Options':'nosniff',
   'Permissions-Policy':'camera=(), microphone=(), geolocation=()',
-  'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; connect-src 'none'; frame-ancestors 'none'"
+  'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline' https://www.gstatic.com; style-src 'unsafe-inline'; base-uri 'none'; form-action 'self'; connect-src https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; frame-ancestors 'none'; img-src 'self' data:"
  };
  for(const [k,v] of Object.entries(headers))res.setHeader(k,v);
  if(req.url==='/health'){
@@ -49,3 +49,4 @@ const server=http.createServer((req,res)=>{
 });
 const port=Number(process.env.PORT)||10000;
 server.listen(port,'0.0.0.0',()=>console.log('Isolated staging preview listening on '+port));
+
