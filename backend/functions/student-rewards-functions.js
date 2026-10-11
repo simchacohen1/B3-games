@@ -14,6 +14,7 @@ const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 const {resolveStudent}=require("./student-login-core.cjs");
+const studentTools=require('./student-tool-policy.js');
 const rewardsStore=require('./rewards-store.cjs');
 const {cancelRedemption}=require("./rewards-cancel-core.cjs");
 if (!admin.apps.length) admin.initializeApp();
@@ -106,6 +107,7 @@ exports.studentRewardsLogin = onRequest(
         const get=async path=>(await rtdb.ref(path).get()).val();
         const identity=await resolveStudent(get,{...req.body,name:enteredName,pin,b3StudentId:suppliedB3Id});
         const b3StudentId=identity.id,allowed=identity.profile,classId=identity.classId;
+        if(!studentTools.allowed(identity.cls,b3StudentId,'student-rewards'))return res.status(403).json({error:'Your teacher has turned off Student Rewards for you.'});
         if(!['et','wt'].includes(classId)&&identity.cls.toolGrants?.['student-rewards']!==true)
           return res.status(403).json({error:'Student Rewards is not enabled for your class.'});
         const rows=await get(`${SR_ROOT}/students`)||{};

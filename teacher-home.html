@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head>
+<html lang="en"><head><script src="guest-mode.js?v=20261011-guest" data-guest="block"></script>
 <script>
   (function() {
     const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
@@ -28,6 +28,8 @@
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script><script src="firebase-config.js?v=20261001-teacherauth"></script><script src="site-settings.js?v=20261008-owner-demo"></script>
 <script src="teacher-preview.js?v=20261008-1"></script>
+<script src="backend/functions/student-tool-policy.js"></script>
+<script src="student-tool-controls.js"></script>
 </head><body>
 <header><div><h1>Fun Torah Tools</h1><div class="sub">Your classes and teaching tools</div></div><div style="display:flex;gap:8px"><button id="actAsStudent" class="sign hidden" style="background:#15803d">👀 Sign in as a student</button><button id="signOut" class="sign hidden">Sign out</button></div></header>
 <div class="wrap"><div id="gate" class="gate">Checking your teacher account…</div><div id="app" class="hidden"><div class="welcome"><strong id="who"></strong><div class="sub" style="color:#64748b">Choose a class or open one of the tools enabled for it.</div></div><div id="classes" class="classes"></div></div></div>
@@ -46,6 +48,12 @@ TOOLS['class-gallery']=TOOLS.gallery;
 function esc(s){const d=document.createElement("div");d.textContent=String(s||"");return d.innerHTML}
 const previewParams=new URLSearchParams(location.search),previewTeacherId=previewParams.get('previewTeacher');
 let renderGeneration=0,previewActive=false;
+function showTeacherSignIn(message){
+ q('app').classList.add('hidden');q('gate').classList.remove('hidden');
+ q('gate').innerHTML='<h2>Teacher &amp; administrator sign in</h2><p id="teacherSignInStatus" role="status"></p><button type="button" class="sign" id="login">Sign in with Google</button>';
+ q('teacherSignInStatus').textContent=message||'Use your authorized teacher or administrator Google account.';
+ q('login').onclick=async()=>{q('login').disabled=true;q('teacherSignInStatus').textContent='Signing in…';try{await api.signInWithGoogle();}catch(error){showTeacherSignIn(error.message||'Could not sign in. Please try again.');}};
+}
 async function render(user,access){
  const generation=++renderGeneration;
  if(previewTeacherId){
@@ -60,16 +68,22 @@ async function render(user,access){
    }catch(error){q('app').classList.add('hidden');q('gate').classList.remove('hidden');q('gate').textContent=error.message;return;}
  }
  if(access?.actingAsStudent){q("app").classList.add("hidden");q("gate").classList.remove("hidden");q("gate").textContent="You are viewing Fun Torah Tools as "+access.actingAsStudent.name+". Press “Exit student view” at the bottom to return to your teacher account.";return}
- if(!access?.authorized){q("app").classList.add("hidden");q("gate").classList.remove("hidden");q("gate").innerHTML='This Google account is not assigned as a Fun Torah Tools teacher. <br><button class="sign" id="login" style="margin-top:14px">Sign in with Google</button>';q("login").onclick=()=>api.signInWithGoogle();return}
- if(access.role==="admin"){location.replace("index.html");return}
+ if(!access?.authorized){showTeacherSignIn(user?'This Google account is not assigned as a Fun Torah Tools teacher. Choose your authorized account.':'');return}
+ if(access.role==="admin"){
+   if(previewParams.get('manageStudentTools')!=='1'){location.replace("index.html");return}
+   const allClasses=(await db.ref("b3Games/workspaces/"+WS+"/classes").once("value")).val()||{};
+   if(generation!==renderGeneration)return;
+   access={...access,classIds:Object.keys(allClasses).filter(id=>allClasses[id]&&allClasses[id].active!==false)};
+ }
  q("gate").classList.add("hidden");q("app").classList.remove("hidden");q("signOut").classList.remove("hidden");q("actAsStudent").classList.remove("hidden");q("who").textContent=user?.email||"Teacher";
  if(access.claimPending){const pending=document.createElement("p");pending.textContent="Your invitation is recognized. The owner still needs to deploy teacher account linking before class changes can be saved.";q("who").parentElement.appendChild(pending);}
  const ids=access.classIds||[],snaps=await Promise.all(ids.map(id=>db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value")));
  if(generation!==renderGeneration)return;
  q("classes").innerHTML=snaps.map((s,i)=>{const id=ids[i],row=s.val()||{},grants=row.toolGrants||{},enabled=Object.entries(grants).filter(x=>x[1]===true&&TOOLS[x[0]]);if(grants["student-rewards"]===true&&!enabled.some(([tool])=>tool==="daily-points"))enabled.push(["daily-points",true]);const tools=enabled.map(([tool])=>{const teacherHref=TOOLS[tool][1]+(TOOLS[tool][1].includes('?')?'&':'?')+'class='+encodeURIComponent(id);const studentPath=STUDENT_TOOLS[tool];const studentHref=studentPath?studentPath+(studentPath.includes('?')?'&':'?')+'demo=1&class='+encodeURIComponent(id):'';return '<div class="tool"><span class="tool-icon '+(tool==='rashi-letters'?'rashi':'')+'" aria-hidden="true">'+(ICONS[tool]||'')+'</span><span>'+esc(TOOLS[tool][0])+'</span><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px"><a href="'+teacherHref+'" target="_blank" rel="noopener">'+'Open'+'</a></div></div>';}).join("");
  if(!s.exists()||row.active===false)return "";
- return '<section class="class-card"><div class="class-head"><h2>'+esc(row.name||id)+'</h2><span style="display:flex;gap:8px;flex-wrap:wrap"><a class="manage" style="background:#15803d" href="student-report/index.html?class='+encodeURIComponent(id)+'" target="_blank" rel="noopener">📈 Student Report</a><a class="manage" href="admin.html?tab=students&class='+encodeURIComponent(id)+'">Manage Class</a></span></div><div class="tools">'+(tools||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div></section>'
+ return '<section class="class-card"><div class="class-head"><h2>'+esc(row.name||id)+'</h2><span style="display:flex;gap:8px;flex-wrap:wrap"><a class="manage" style="background:#15803d" href="student-report/index.html?class='+encodeURIComponent(id)+'" target="_blank" rel="noopener">📈 Student Report</a><a class="manage" href="admin.html?tab=students&class='+encodeURIComponent(id)+'">Manage Class</a></span></div><div class="tools">'+(tools||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>'
  }).join("")||'<div class="welcome">No classes are assigned to this teacher yet.</div>';
+ if(!previewActive&&window.B3StudentToolControls)window.B3StudentToolControls.bind(q("classes"));
  if(previewActive){
    q('signOut').classList.add('hidden');q('actAsStudent').classList.add('hidden');
    q('who').textContent='Viewing as '+user.email;
@@ -81,6 +95,7 @@ async function render(user,access){
 }
 q("actAsStudent").onclick=()=>api.openActAsStudentPicker();
 q("signOut").onclick=()=>api.signOut().then(()=>location.reload());
+showTeacherSignIn();
 api.onAuthStateChanged((user,authorized,access)=>render(user,access||{authorized}));
 })();
 </script></body></html>

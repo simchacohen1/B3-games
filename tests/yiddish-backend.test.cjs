@@ -14,6 +14,14 @@ test('Yiddish accepts central individual passcodes and rejects old shared PIN',a
 test('blocked student is denied with an existing Yiddish session',async()=>{const x=setup(),{token}=await login(x);x.data['b3Games/students/student_unique/profile'].active=false;await assert.rejects(x.service({action:'status',token}),/turned off/)});
 test('changed passcode invalidates a previously issued session',async()=>{const x=setup(),{token}=await login(x);x.data['b3Games/students/student_unique/profile'].passcode='9999';await assert.rejects(x.service({action:'status',token}),/passcode changed/)});
 test('class tool revocation blocks Yiddish sessions',async()=>{const x=setup(),{token}=await login(x);x.data['b3Games/workspaces/b3-2026/classes/alpha'].toolGrants.yiddish=false;await assert.rejects(x.service({action:'status',token}),/closed/)});
+
+test('individual Yiddish restriction blocks existing sessions and can be restored',async()=>{
+ for(const classId of ['alpha','et']){
+  const x=setup(classId),{token}=await login(x,classId),member=x.data['b3Games/workspaces/b3-2026/classes/'+classId].members.student_unique;
+  member.toolAccess={yiddish:false};await assert.rejects(x.service({action:'status',token}),/turned off Yiddish/);
+  delete member.toolAccess.yiddish;await x.service({action:'status',token});
+ }
+});
 test('Yiddish rounds support retried answers without advancing twice',async()=>{const x=setup(),{token}=await login(x),{round}=await x.service({action:'start',token,group:0});const body={action:'answer',token,roundId:round.id,index:0,answer:round.question.wordId,requestId:'12345678-1234-1234-1234-123456789012'};const first=await x.service(body),retry=await x.service(body);assert.equal(first.round.index,1);assert.deepEqual(retry,first);assert.ok(x.data['yiddishPrivate/classes/b3-2026/alpha/students/student_unique']);assert.equal(x.data['yiddishPrivate/students/student_unique'],undefined)});
 test('B3 retains its legacy progress path with individual passcodes',async()=>{const x=setup('et'),{token}=await login(x,'et');await x.service({action:'start',token,group:0});assert.ok(x.data['yiddishPrivate/students/student_unique'])});
 test('teacher cannot load another class Yiddish progress',async()=>{const x=setup();x.data['b3Games/workspaces/b3-2026/teachers/teacher']={active:true,classIds:{beta:true}};await assert.rejects(x.service({action:'teacherLoad',idToken:'teacher',classId:'alpha'}),/not assigned/)});

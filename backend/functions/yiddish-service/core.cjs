@@ -1,6 +1,7 @@
 'use strict';
 const crypto=require('node:crypto');
 const words=require('./words.json');
+const studentTools=require('../student-tool-policy.js');
 const vm=require('node:vm'),fs=require('node:fs');
 const sandbox={window:{},Intl,Date,console};vm.runInNewContext(fs.readFileSync(__dirname+'/site-policy.js','utf8'),sandbox);const policy=sandbox.window.B3SiteSettings;
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
@@ -57,6 +58,7 @@ async function studentRecord(id,classId){
  if(!selected)fail(403,'Choose an active class on Fun Torah Tools before opening Yiddish.');
  const c=await get('b3Games/workspaces/'+WORKSPACE+'/classes/'+selected.classId);
  if(!c||c.active===false||!c.members?.[id]||c.members[id].active===false)fail(403,'Your class membership is inactive. Ask your teacher.');
+ if(!studentTools.allowed(c,id,'yiddish'))fail(403,'Your teacher has turned off Yiddish for you.');
  return {profile,classId:selected.classId,classRecord:c};
 }
 async function identity(body){

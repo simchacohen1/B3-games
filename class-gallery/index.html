@@ -24,6 +24,8 @@
 </script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<script src="../guest-mode.js?v=20261011-guest"></script>
+<script src="guest-demo.js?v=20261011-guest"></script>
 <script src="../game-gate.js?v=20261008-owner-demo" data-game-id="class-gallery"></script>
 <title>Our Wall of Learning</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -372,7 +374,9 @@ const CLASSROOMS = [
   {id:'parsha', label:'Parsha', subtitle:'Weekly Parsha'},
   {id:'halacha', label:'Halacha', subtitle:'Halacha & Yahadus'}
 ];
-const dbRef = window.firebase ? firebase.database().ref(legacyGallery?'classGallery/posts':galleryResourcePath+'/posts') : null;
+// Guest Mode shows made-up students and posts, never the real gallery.
+const isGuestGallery=!!(window.B3Guest&&window.B3Guest.isGuest()&&window.B3GalleryDemo);
+const dbRef = isGuestGallery ? window.B3GalleryDemo.makeRef() : window.firebase ? firebase.database().ref(legacyGallery?'classGallery/posts':galleryResourcePath+'/posts') : null;
 let posts = [];
 let isTeacher = false;
 let sceneMode = 'hallway';
@@ -410,6 +414,7 @@ function refreshGalleryIdentity(){
     .finally(()=>{galleryIdentityPending=false;refreshGalleryAccess();});
 }
 function refreshGalleryAccess(){
+  if(isGuestGallery){galleryAccessBlocked=false;document.getElementById('masterBlockedOverlay').classList.remove('show');return;}
   const studentId=String(sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId')||'');
   refreshGalleryIdentity();
   galleryAccessBlocked=!B3GalleryAccess(B3SiteSettings,galleryAccessSettings,galleryVerifiedClass,studentId,isTeacher,new Date(Date.now()+galleryServerOffset));
@@ -2012,7 +2017,7 @@ document.getElementById('avatarOverlay').addEventListener('click',e=>{if(e.targe
 
 /* ---------- submission modal ---------- */
 document.getElementById('classSelect').addEventListener('change',e=>{const s=document.getElementById('studentName'),roster=ROSTERS[e.target.value];s.innerHTML=roster?'<option value="">Choose your name...</option>'+roster.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join(''):'<option value="">Choose your class first...</option>';});
-const overlay=document.getElementById('overlay');document.getElementById('openModalBtn').onclick=()=>overlay.classList.add('show');document.getElementById('closeModalBtn').onclick=()=>overlay.classList.remove('show');document.getElementById('cancelBtn').onclick=()=>overlay.classList.remove('show');overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.classList.remove('show')});
+const overlay=document.getElementById('overlay');document.getElementById('openModalBtn').onclick=()=>{if(isGuestGallery){window.B3Guest.unlock('Sign in to unlock','Pinning your own project is for signed-in students. These are sample projects from made-up students.');return;}overlay.classList.add('show')};document.getElementById('closeModalBtn').onclick=()=>overlay.classList.remove('show');document.getElementById('cancelBtn').onclick=()=>overlay.classList.remove('show');overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.classList.remove('show')});
 document.getElementById('projectForm').addEventListener('submit',async e=>{
   e.preventDefault();const submit=document.getElementById('submitBtn'),status=document.getElementById('statusMsg');submit.disabled=true;status.textContent='Pinning...';status.style.color='#5b4632';
   const className=document.getElementById('classSelect').value,studentName=document.getElementById('studentName').value.trim(),title=document.getElementById('title').value.trim(),category=document.getElementById('category').value,galleryRoom=document.getElementById('galleryRoom').value||'hallway',description=document.getElementById('description').value.trim(),link=document.getElementById('link').value.trim(),photo=document.getElementById('photo').files[0],audio=document.getElementById('audio').files[0],video=document.getElementById('video').files[0];

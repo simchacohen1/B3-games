@@ -56,7 +56,6 @@
   .teacher-tool-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#fffbeb;border:1px solid #fde68a;box-shadow:0 4px 10px rgba(0,0,0,.08);padding:22px 12px;border-radius:16px;text-decoration:none;transition:transform .15s,box-shadow .15s;min-height:125px}
   .teacher-tool-card:hover{transform:translateY(-4px);box-shadow:0 8px 18px rgba(0,0,0,.15)}
   .teacher-tool-card .card-title{color:#92400e}
-  .owner-admin-button{position:fixed;top:12px;right:128px;z-index:9999;border:0;border-radius:999px;padding:10px 16px;background:#7c3aed;color:white;font-weight:bold;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.15)}
   .admin-button{position:fixed;top:12px;right:12px;z-index:9999;border:0;border-radius:999px;padding:10px 16px;background:#1f2937;color:white;font-weight:bold;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.15)}
   .admin-panel{position:fixed;top:58px;right:12px;width:min(440px,calc(100vw - 24px));background:white;border-radius:18px;box-shadow:0 14px 38px rgba(0,0,0,.22);padding:18px;text-align:left;z-index:9999;max-height:86vh;overflow-y:auto}
   .admin-panel h2{margin:0 0 4px}.admin-panel h3{font-size:16px;margin:18px 0 8px}.admin-message{font-size:13px;line-height:1.4;color:#64748b;margin:0 0 12px}.admin-action{width:100%;border:0;border-radius:10px;padding:10px 12px;margin-top:8px;background:#1f2937;color:white;font-weight:bold;cursor:pointer}.admin-action.secondary{background:#e5e7eb;color:#111827}
@@ -184,6 +183,17 @@
 .card-lock{position:absolute;right:7px;top:7px;width:42px;height:42px;border:0;border-radius:10px;font-size:24px;cursor:pointer;z-index:2;font-weight:900}.card-lock.is-open{background:#dcfce7;color:#166534}.card-lock.is-locked{background:#fee2e2;color:#b91c1c}.card-lock:disabled{opacity:.65;cursor:default}
 .card-lock-menu{position:absolute;right:6px;top:38px;z-index:20;display:flex;gap:6px;padding:8px;background:#fff;border:1px solid #94a3b8;border-radius:10px;box-shadow:0 4px 15px #0003}
 .card-lock-menu button{white-space:nowrap;padding:7px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;cursor:pointer;font-weight:bold}.card-lock-menu small{max-width:150px}
+/* Keep both destinations visible while moving activities, even with a long list. */
+.activity-manager{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.activity-zone{height:min(65vh,620px);min-height:220px;overflow-y:auto;overscroll-behavior:contain;padding:12px;min-width:0}
+.activity-zone-head{position:sticky;top:-12px;z-index:1;background:#f8fafc;padding:12px 0;margin-top:-12px;border-bottom:1px solid #e2e8f0}
+.activity-zone-title{font-size:18px;line-height:1.2}
+.activity-zone-count{font-size:13px}
+.activity-manage-row{grid-template-columns:minmax(0,1fr);padding:13px 12px;gap:10px}
+.activity-manage-name{font-size:17px;line-height:1.35;overflow-wrap:anywhere}
+.activity-manage-hint{font-size:12px;line-height:1.4;color:#64748b}
+.activity-class-controls{flex-wrap:wrap}
+@media(max-width:480px){.activity-manager{gap:8px}.activity-zone{padding:8px}.activity-zone-head{top:-8px;margin-top:-8px}.activity-zone-title{font-size:16px}.activity-manage-row{padding:10px 8px}.activity-manage-name{font-size:16px}.activity-zone-head{flex-wrap:wrap}}
 </style>
 <script>
   window.__b3Errors = [];
@@ -208,6 +218,8 @@
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
 <script src="firebase-config.js?v=20261001-teacherauth"></script>
+<script src="backend/functions/student-tool-policy.js"></script>
+<script src="student-tool-controls.js"></script>
 <script src="guest-mode.js?v=20261011-guest"></script>
 <script src="site-settings.js?v=20261008-owner-demo"></script>
 </head>
@@ -307,6 +319,7 @@
     <p class="teacher-tools-subtitle">Always available to you, regardless of student toggle state.</p>
     <div class="teacher-tools-container">
       <button type="button" id="actAsStudentCard" class="teacher-tool-card" style="cursor:pointer;font:inherit;border:1px solid #bbf7d0;background:#f0fdf4"><span class="card-icon">👀</span><span class="card-title" style="color:#166534">Sign in as a Student</span></button>
+      <a class="teacher-tool-card" href="admin.html?tab=students"><span class="card-icon">🎛️</span><span class="card-title">Student tool access</span></a>
       <a class="teacher-tool-card" href="student-rewards/teacher.html" target="_blank" rel="noopener"><span class="card-icon">✓</span><span class="card-title">Daily Points</span></a>
       <a class="teacher-tool-card" href="class-pointer-prototype/dashboard.html?teacher=1" target="_blank" rel="noopener"><span class="card-icon">👆</span><span class="card-title">Class Pointer — Start a lesson</span></a>
       <a class="teacher-tool-card" href="game-show/teacher.html" target="_blank" rel="noopener"><span class="card-icon">🏆</span><span class="card-title">Game Show — Host</span></a>
@@ -354,8 +367,7 @@
     </div>
   </div>
 
-  <button id="ownerAdminButton" class="owner-admin-button hidden" type="button">Owner Admin</button>
-  <button id="adminAccessButton" class="admin-button">Admin</button>
+  <button id="adminAccessButton" class="admin-button">Teacher Tools</button>
   <div id="adminPanel" class="admin-panel hidden">
     <h2>B3 Access Controls</h2>
     <p id="adminStatus" class="admin-message">Enter the admin password to continue.</p>
@@ -377,6 +389,7 @@
 
       <div id="classControls"></div>
 
+      <section id="classManagementSection">
       <h3>Class management</h3>
       <p class="admin-message">Choose a class to see its students. Passcodes and access can be managed right from the list.</p>
       <p class="admin-message">Each boy chooses his own PIN at his next sign-in. For a forgotten PIN or a later change, save a temporary passcode in the student list to approve a reset. Give it privately to the boy; he will choose a new PIN when he signs in.</p>
@@ -384,15 +397,9 @@
         <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
           <div style="flex:1;min-width:180px"><label for="manageClassSelect">Class</label><select id="manageClassSelect" class="override-student-select"></select></div>
           <button id="showAddStudentButton" class="admin-action" type="button" style="margin:0">+ Add Student</button>
-          <button id="showClassToolsButton" class="admin-action secondary" type="button" style="margin:0">Class Options</button>
+
         </div>
-        <div id="classToolsArea" class="hidden" style="margin-top:12px;padding-top:12px;border-top:1px solid #e5e7eb">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <input id="newClassName" type="text" placeholder="New class name" style="padding:9px;border:1px solid #cbd5e1;border-radius:9px">
-            <button id="addClassButton" class="admin-action" type="button" style="margin:0">Add class</button>
-          </div>
-          <button id="securePasscodesButton" class="admin-action secondary" type="button" style="margin-top:10px">Make all passcodes private</button>
-        </div>
+        <details id="classToolsArea" class="hidden"><summary>Passcode privacy</summary><button id="securePasscodesButton" class="admin-action secondary" type="button">Make all passcodes private</button></details>
         <div id="addStudentArea" class="hidden" style="margin-top:12px;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px">
           <strong>Add a student</strong>
           <div style="display:grid;grid-template-columns:1fr 110px;gap:8px;margin-top:9px">
@@ -407,16 +414,11 @@
         <div style="overflow-x:auto"><div id="studentListHeading" style="min-width:480px;display:grid;grid-template-columns:minmax(150px,1fr) 120px 90px 80px 90px;gap:8px;padding:14px 10px 7px;margin-top:12px;color:#64748b;font-size:12px;font-weight:900;text-transform:uppercase"><span>Name</span><span>Passcode</span><span>Access</span><span></span><span></span></div>
         <div id="classMemberList" style="min-width:480px"></div></div>
         <div style="display:none"><input id="editManagedStudentPasscode"><button id="saveManagedStudentPasscodeButton" type="button"></button></div>
+        <div id="studentToolChoices"></div>
         <div id="classManagementStatus" class="override-saving" aria-live="polite"></div>
       </div>
 
-      <h3>Teacher accounts</h3>
-      <p class="admin-message">Add a teacher's Google email and assign that teacher to one or more classes. The account becomes active after the teacher signs in.</p>
-      <div class="override-box">
-        <input id="teacherEmailInput" type="email" placeholder="teacher@example.com" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid #cbd5e1;border-radius:9px">
-        <button id="addTeacherButton" class="admin-action secondary" type="button">Add teacher</button>
-        <div id="teacherList" style="margin-top:10px"></div>
-      </div>
+      </section>
 
       <h3>Student activities</h3>
       <p class="activity-manager-help">Drag activities between Active and Inactive. Active activities stay on the students' page; use ET/WT to make each one Open or Closed. Inactive activities disappear completely.</p>
@@ -606,15 +608,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     // Teacher-account administration belongs only in Owner Admin.
     if(el("teacherList"))el("teacherList").innerHTML="";
   }
-  async function addManagedClass(){
-    if(!isAuthorizedAdmin)throw new Error("Only an administrator can create classes.");
-    const name=el("newClassName").value.trim(), id=slugId(name);
-    if(!name||!id)return;
-    const user=window.firebase.auth().currentUser, now=new Date().toISOString();
-    await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id).update({id,name,active:true,createdAt:now});
-    if(user)await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id+"/teacherIds/"+user.uid).set(true);
-    el("newClassName").value=""; await loadClassManagement(); el("manageClassSelect").value=id; await loadClassManagement();
-  }
   async function trustedStudentAction(action,data={}){
     try{
       const user=firebase.auth().currentUser;
@@ -654,15 +647,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     updates["b3Games/students/"+studentId+"/memberships/"+workspaceId+"_"+classId]=null;
     await db.ref().update(updates); await loadClassManagement();
   }
-  async function addManagedTeacher(){
-    if(!isAuthorizedAdmin)throw new Error("Only an administrator can invite teachers.");
-    const email=el("teacherEmailInput").value.trim().toLowerCase();if(!email)return;
-    const key=slugId(email.replace("@","-at-")), now=new Date().toISOString();
-    await db.ref("b3Games/workspaces/"+workspaceId+"/teacherInvites/"+key).set({email,role:"teacher",active:true,createdAt:now});
-    el("teacherEmailInput").value="";
-    el("classManagementStatus").textContent="Teacher invitation saved. Account will link when teacher sign-in is enabled.";
-  }
-
   function setTeacherToolPairVisibility(){
     document.querySelectorAll(".teacher-tool-card").forEach(card=>{
       const raw=card.getAttribute("href")||"";
@@ -1111,6 +1095,18 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       game.element.querySelector(".activity-closed-badge")?.remove();
     });
     updateGameGroupVisibility();
+    // Tools without a guest preview: show a friendly "Sign in to unlock" instead.
+    const NO_GUEST_PREVIEW={"halacha":"Halacha lessons and the work students hand in are for signed-in students.","weekly-quiz":"The weekly quiz and practice quizzes are for signed-in students.","game-show":"The live Game Show is played by signed-in students during class."};
+    gameDefinitions.forEach(game=>{
+      const why=NO_GUEST_PREVIEW[game.id];
+      if(!why||game.element.dataset.guestWired)return;
+      game.element.dataset.guestWired="1";
+      game.element.addEventListener("click",e=>{
+        if(!isGuest())return;
+        e.preventDefault();e.stopPropagation();
+        window.B3Guest.unlock(game.name,why+" Sign in to try it.");
+      },true);
+    });
     // Teacher Tools: shown as a preview only. Anything with student data or
     // student/passcode management is hidden completely.
     el("teacherToolsSection").classList.remove("hidden");
@@ -1118,7 +1114,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(sub)sub.textContent="Preview only: these tools are for signed-in teachers.";
     document.querySelectorAll("#teacherToolsSection .teacher-tool-card").forEach(card=>{
       const base=(card.getAttribute("href")||"").split("?")[0];
-      const hide=card.id==="actAsStudentCard"||/^(sync-to-nigri|student-report)\//.test(base);
+      const hide=card.id==="actAsStudentCard"||/^(sync-to-nigri|student-report)\//.test(base)||/^(admin|owner-admin|teacher-home)\.html$/.test(base);
       card.classList.toggle("hidden",hide);
       if(hide||card.dataset.guestWired)return;
       card.dataset.guestWired="1";
@@ -1131,7 +1127,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       },true);
     });
     el("approvalCenterButton").classList.add("hidden");
-    el("ownerAdminButton").classList.add("hidden");
   }
   function startGuestTour(){
     window.B3Guest.tour([
@@ -1192,7 +1187,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       const grants=myClassRecord?.toolGrants||{};
       let visible=0;
       gameDefinitions.forEach(game=>{
-        const show=grants[game.id]===true||(game.id==="class-gallery"&&(grants.gallery===true||grants.tag===true));
+        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&(grants[game.id]===true||(game.id==="class-gallery"&&(grants.gallery===true||grants.tag===true)));
         game.element.classList.toggle("hidden",!show);
         game.element.classList.remove("activity-closed");
         game.element.querySelector(".activity-closed-badge")?.remove();
@@ -1214,7 +1209,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       const globallyActive=currentSettings.games?.[game.id]!==false;
       const classOpen=currentSettings.classGames?.[myClassId]?.[game.id]!==false;
       const exceptionAllowed=studentHasOverride(game.id)||classHasLockedGameOverride(game.id,myClassId);
-      const show=globallyActive&&(info.open||exceptionAllowed);
+      const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&globallyActive&&(info.open||exceptionAllowed);
       const closed=show&&!classOpen;
 
       game.element.classList.toggle("hidden",!show);
@@ -1338,8 +1333,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     chooser.replaceChildren(...studentClassChoices.map(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;return o;}));
     chooser.value=myClassId;chooser.classList.toggle("hidden",studentClassChoices.length<2);
     chooser.onchange=()=>enterStudent({id:myStudentId,name:myStudentName,classId:chooser.value});
-    if(studentClassWatch)studentClassWatch.off();if(studentProfileWatch)studentProfileWatch.off();if(studentMembershipWatch)studentMembershipWatch.off();studentClassWatch=db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId+"/members/"+myStudentId+"/active");
-    studentClassWatch.on("value",snap=>{myClassRecord=snap.val();if(snap.val()===false){studentAccessRevoked=true;showLogin();return;}renderStudentAccess();});
+    if(studentClassWatch)studentClassWatch.off();if(studentProfileWatch)studentProfileWatch.off();if(studentMembershipWatch)studentMembershipWatch.off();studentClassWatch=db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId);
+    studentClassWatch.on("value",snap=>{myClassRecord=snap.val();if(!myClassRecord||myClassRecord.active===false||!myClassRecord.members?.[myStudentId]||myClassRecord.members[myStudentId].active===false){studentAccessRevoked=true;showLogin();return;}renderStudentAccess();});
     studentProfileWatch=db.ref("b3Games/students/"+myStudentId+"/profile");
     let seenPasscodeUpdate;
     studentProfileWatch.on("value",async snap=>{const v=snap.val();if(v?.active===false){studentAccessRevoked=true;showLogin();return;}
@@ -1560,7 +1555,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(!dedicatedAdminPage)el("adminPanel").classList.add("hidden");
     else el("adminPanel").classList.remove("hidden");
     syncAdminPanelLayout();
-    el("adminAccessButton").textContent=isAuthorizedTeacher ? "Teacher Tools" : "Admin";
+    el("adminAccessButton").textContent="Teacher Tools";
 
     const passwordUnlocked=isAuthorizedTeacher||adminPasswordUnlocked();
     el("adminPasswordGate").classList.toggle("hidden",passwordUnlocked);
@@ -1881,11 +1876,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 
   el("switchStudentBtn").addEventListener("click",switchStudent);
   el("adminAccessButton").addEventListener("click",()=>{
-    window.location.href="admin.html";
+    window.location.href=isAuthorizedTeacher?"admin.html":"teacher-home.html?signin=1";
   });
-  el("ownerAdminButton").addEventListener("click",()=>{
-    window.location.href="owner-admin.html";
-  });
+
   el("adminPasswordButton").addEventListener("click",unlockAdminPassword);
   el("manageClassSelect").addEventListener("change",loadClassManagement);
   el("classStudentSelect").addEventListener("change",loadClassManagement);
@@ -1896,11 +1889,11 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     const r=await trustedStudentAction("migratePasscodes",{deletePublic:true});
     if(r)el("classManagementStatus").textContent="Done: "+r.copied+" passcodes moved to private storage, "+r.cleared+" public copies removed.";
   });
-  el("addClassButton").addEventListener("click",addManagedClass);
+
   el("addStudentToClassButton").addEventListener("click",addStudentToManagedClass);
-  el("addTeacherButton").addEventListener("click",addManagedTeacher);
+
   el("showAddStudentButton").addEventListener("click",()=>el("addStudentArea").classList.toggle("hidden"));
-  el("showClassToolsButton").addEventListener("click",()=>el("classToolsArea").classList.toggle("hidden"));
+
   el("classMemberList").addEventListener("click",async e=>{
     const save=e.target.closest("[data-save-student]");
     const toggle=e.target.closest("[data-toggle-student]");
@@ -1979,7 +1972,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     isAuthorizedAdmin=isAuthorizedTeacher&&currentAccess.role==="admin";
     // A verified teacher always wins over a guest preview.
     if(isAuthorizedTeacher&&isGuest())window.B3Guest.stop();
-    el("ownerAdminButton").classList.toggle("hidden",!(user&&String(user.email||"").toLowerCase()==="simcha5770@gmail.com"));
     try{if(authorized)sessionStorage.setItem("b3TeacherBypass","1");else sessionStorage.removeItem("b3TeacherBypass");}catch(e){}
     renderStudentAccess();renderAdminPanel();
     if(authorized){

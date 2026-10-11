@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head>
+<head><script src="guest-mode.js?v=20261011-guest" data-guest="block"></script>
 <script>
   (function() {
     const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
@@ -38,6 +38,9 @@ main{min-width:0}.topbar{height:72px;background:#fff;border-bottom:1px solid #e2
 iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}
 @media(max-width:760px){body{grid-template-columns:1fr}aside{position:static;height:auto;padding:14px}.brand-sub{margin-bottom:12px}nav{grid-template-columns:repeat(2,1fr)}.back{margin-top:12px}.topbar{display:none}.workspace{height:calc(100vh - 270px)}}
 .ta-panel{display:none;position:absolute;inset:0;overflow:auto;background:#f1f5f9;padding:28px 20px;z-index:4}
+#ownerControlPanel{position:relative;inset:auto;overflow:visible}
+.workspace{overflow:auto}
+.nav-btn small{display:block;font-size:12px;line-height:1.4;font-weight:400;opacity:.8;margin-top:5px}
 .ta-wrap{max-width:640px;margin:0 auto}.ta-card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:24px;box-shadow:0 4px 14px rgba(15,23,42,.06);margin-bottom:16px}
 .ta-card h2{margin:0 0 6px;font-size:24px}.ta-hint{color:#64748b;font-size:16px;line-height:1.45;margin:6px 0 0}
 .ta-pill{display:inline-block;margin:16px 0 4px;padding:12px 26px;border-radius:999px;font-size:26px;font-weight:900}
@@ -81,14 +84,16 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}
 </head>
 <body>
 <aside>
-  <div class="brand">B3 Teacher Center</div>
-  <div class="brand-sub">Everything for your class, organized in one place.</div>
+  <div class="brand">Teacher Tools</div>
+  <div class="brand-sub">Your classes, students, and activities.</div>
   <nav>
-    <button class="nav-btn active" data-tab="access" id="classAccessNav">🎛️ Control</button>
-    <button class="nav-btn" data-tab="students">👥 Students &amp; Classes</button>
-    <button class="nav-btn" data-tab="settings">⚙️ Settings</button>
+    <button class="nav-btn active" data-tab="access" id="classAccessNav">🔐 Class Access<small>Lock / unlock · schedules · exceptions</small></button>
+    <button class="nav-btn" data-tab="students">👥 Students<small>Roster · passcodes · each student's tools</small></button>
+    <button class="nav-btn" data-tab="activities" id="activitiesNav" style="display:none">🎮 Activities<small>Show / hide games for everyone</small></button>
+    <button class="nav-btn" data-tab="administration" id="administrationNav" style="display:none">⚙️ Administration<small>Teachers · classes · permitted tools</small></button>
   </nav>
-  <button id="viewAsTeacher" class="nav-btn" type="button" style="display:none;margin-top:18px">👀 View as teacher</button>
+  <button id="viewAsTeacher" class="nav-btn" type="button" style="display:none;margin-top:18px">👀 View as Teacher<small>Preview another teacher's account</small></button>
+  <button id="teacherCenterSignOut" class="nav-btn" type="button" style="display:none">Sign out</button>
   <a class="back" id="backToTools" href="index.html">← Back to Fun Torah Tools</a>
 </aside>
 <main>
@@ -97,21 +102,24 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}
     <div id="teacherAccessPanel" class="ta-panel"></div>
     <div id="ownerControlPanel" class="ta-panel"></div>
     <iframe id="adminFrame" src="index.html?adminPage=1" title="B3 administration"></iframe>
+    <iframe id="administrationFrame" title="Teachers, classes, and platform permissions" style="display:none"></iframe>
 
   </div>
 </main>
 <script>
 const tabs={
-  access:["Control","Open or lock a class and its games."],
-  students:["Students & Classes","Add students, change passcodes, and choose class memberships."],
-  settings:["Settings","Recess schedule, special access, adding/removing games, emergency lock and teacher accounts."]
+  access:["Class Access","Lock or unlock classes and games, set schedules, and manage access exceptions."],
+  students:["Students","Manage your class roster, passcodes, and each student's tools."],
+  activities:["Activities","Show or hide activities for all students. Drag between Active and Inactive."],
+  administration:["Administration","Add teachers and classes, assign teachers, and set their permitted tools and content."]
 };
 const adminParams=new URLSearchParams(location.search);
 const requestedClassId=String(adminParams.get("class")||"").trim();
 let currentTab=String(adminParams.get("tab")||"access").trim()||"access";
-if(currentTab==="activities"||currentTab==="special")currentTab="settings";
+if(currentTab==="settings"||currentTab==="special")currentTab="access";
 if(!tabs[currentTab])currentTab="access";
 const frame=document.getElementById("adminFrame");
+document.getElementById('teacherCenterSignOut').onclick=()=>frame.contentWindow.B3SiteSettings.signOut().then(()=>location.href='index.html');
 const backToTools=document.getElementById("backToTools");
 backToTools.addEventListener("click",e=>{
   e.preventDefault();
@@ -140,7 +148,12 @@ function taEsc(v){const d=document.createElement("div");d.textContent=String(v==
 async function renderTeacherAccess(msg){
   const panel=document.getElementById("teacherAccessPanel");
   const w=frame.contentWindow,db=w?.firebase?.database?.(),access=w?.B3SiteSettings?.getCurrentAccess?.()||{},ws=w?.B3SiteSettings?.workspaceId||"b3-2026";
-  if(!db||!access.authorized){panel.innerHTML='<div class="ta-wrap"><div class="ta-card">Loading your class…</div></div>';setTimeout(()=>{if(currentTab==="access"&&!isOwnerNow())renderTeacherAccess()},900);return}
+  if(!db||!w?.B3SiteSettings){panel.innerHTML='<div class="ta-wrap"><div class="ta-card">Loading teacher sign-in…</div></div>';setTimeout(()=>{if(currentTab==="access"&&!isOwnerNow())renderTeacherAccess()},900);return}
+  if(!access.authorized){
+    panel.innerHTML='<div class="ta-wrap"><div class="ta-card"><h2>Teacher &amp; administrator sign in</h2><p>Sign in with your authorized Google account to open your classes.</p><button type="button" id="taSignIn">Sign in with Google</button><p role="status" id="taSignInStatus"></p></div></div>';
+    document.getElementById('taSignIn').onclick=async()=>{try{await w.B3SiteSettings.signInWithGoogle();applyRoleView();showTab(currentTab);}catch(error){document.getElementById('taSignInStatus').textContent=error.message||'Could not sign in. Please try again.';}};
+    return;
+  }
   const ids=(access.classIds||[]).filter(Boolean);
   if(!ids.length){panel.innerHTML='<div class="ta-wrap"><div class="ta-card"><h2>No class yet</h2><p class="ta-hint">No class is assigned to your account yet.</p></div></div>';return}
   if(!teacherAccessClass||!ids.includes(teacherAccessClass))teacherAccessClass=ids.includes(requestedClassId)?requestedClassId:ids[0];
@@ -255,6 +268,9 @@ function applyRoleView(){
     const access=w?.B3SiteSettings?.getCurrentAccess?.()||{};
     const owner=access.role==="admin";
     document.getElementById('viewAsTeacher').style.display=owner?'':'none';
+    document.getElementById('activitiesNav').style.display=owner?'':'none';
+    document.getElementById('administrationNav').style.display=owner?'':'none';
+    document.getElementById('teacherCenterSignOut').style.display=access.authorized?'':'none';
     const teacherPanel=document.getElementById("teacherAccessPanel");
     // Auth resolves asynchronously inside the embedded page. If this page was
     // initially rendered as a regular-teacher view, make sure the stale
@@ -262,9 +278,9 @@ function applyRoleView(){
     // role becomes available.
     d.body.classList.toggle("b3-owner-view",owner);
     if(owner&&teacherPanel&&teacherPanel.style.display!=="none")showTab(currentTab);
-    document.querySelector(".brand").textContent=owner?"B3 Teacher Center":"Fun Torah Tools Teacher Center";
+    document.querySelector(".brand").textContent="Teacher Tools";
     const accessNav=document.getElementById("classAccessNav");
-    if(accessNav){accessNav.style.display="";accessNav.textContent=owner?"🎛️ Control":"🔐 Open / Lock My Class";}
+    if(accessNav){accessNav.style.display="";accessNav.innerHTML='🔐 Class Access<small>'+(owner?'Lock / unlock · schedules · exceptions':'Lock or unlock your assigned class')+'</small>';}
     if(!owner){d.querySelectorAll("p,div,span").forEach(n=>{if(n.children.length===0&&/Turn this off only when you want both ET and WT/.test(n.textContent))n.style.display="none"});}
     // Teacher-account creation is platform-owner administration only.
     const teacherHeading=[...d.querySelectorAll("#adminControls h3")].find(h=>h.textContent.trim()==="Teacher accounts");
@@ -280,9 +296,10 @@ function organize(){
   const panel=d.getElementById("adminPanel"),controls=d.getElementById("adminControls");if(!panel||!controls)return;
   panel.classList.remove("hidden");
 
-  if(!d.getElementById("admin-section-settings")){
-    const students=makeSection(d,"students"),settings=makeSection(d,"settings");
-    const ch=findHeading(d,"Class management");if(ch)moveRange(ch,3,students);
+  if(!d.getElementById("admin-section-activities")){
+    const students=makeSection(d,"students"),settings=makeSection(d,"access"),activities=makeSection(d,"activities");
+    const classManagement=d.getElementById("classManagementSection");
+    if(classManagement)students.appendChild(classManagement);
     const add=(title,help,ownerOnly)=>{const h=d.createElement("h3");h.textContent=title;settings.appendChild(h);let p=null;if(help){p=d.createElement("p");p.className="admin-message";p.textContent=help;settings.appendChild(p);}if(ownerOnly){h.classList.add("b3-owner-only");if(p)p.classList.add("b3-owner-only");}};
     // 1. Recess schedule (the Automatic times)
     add("⏰ Recess schedule","These are the times each class is LOCKED when it is set to Automatic. Open a class below to change its times.",true);
@@ -290,16 +307,15 @@ function organize(){
     // 2. One-student exceptions
     const sh=findHeading(d,"Student access while locked");if(sh){sh.textContent="⭐ Special access for one student";moveRange(sh,4,settings);}
     // 3. Add / remove games for everyone
-    const ah=findHeading(d,"Student activities");if(ah){ah.textContent="🎮 Add or remove games";moveRange(ah,3,settings);
-      const help=settings.querySelector(".activity-manager-help");if(help)help.textContent="Drag a game to Inactive to remove it for everyone. Open and close games for a class on the Control page.";}
+    const ah=findHeading(d,"Student activities");if(ah){ah.textContent="Active & Inactive Activities";moveRange(ah,3,activities);
+      const help=activities.querySelector(".activity-manager-help");if(help)help.textContent="Active activities appear for students. Inactive activities are hidden from everyone. Drag between the columns. Use Class Access to open or close an active game temporarily.";}
     // 4. Emergency lock
     add("🚨 Emergency lock","Turning off Emergency master access locks every class at once.",true);
     const master=controls.querySelector(".master-row");if(master){const p=master.nextElementSibling;master.classList.add("b3-owner-only");settings.appendChild(master);if(p&&p.classList.contains("admin-message")){p.classList.add("b3-owner-only");settings.appendChild(p)}}
     if(classControls)classControls.classList.add("b3-owner-only");
-    // 5. Teacher accounts + sign out
-    const th=findHeading(d,"Teacher accounts");if(th)moveRange(th,3,settings);
+    // Teacher accounts and class creation live in Owner Admin.
     const status=d.getElementById("adminStatus"),out=d.getElementById("signOutButton");
-    if(status)settings.appendChild(status);if(out)settings.appendChild(out);
+    if(status)status.style.display='none';if(out)out.style.display='none';
   }
   applyRoleView();
   if(requestedClassId){
@@ -312,9 +328,14 @@ function organize(){
   showTab(currentTab);
 }
 function showTab(tab){
+  if((tab==="administration"||tab==="activities")&&!isOwnerNow())tab="access";
   currentTab=tab;
   const d=frame.contentDocument;if(!d)return;
   const owner=isOwnerNow();
+  const adminView=document.getElementById('administrationFrame'),isAdministration=tab==='administration'&&owner;
+  adminView.style.display=isAdministration?'block':'none';
+  frame.style.display=isAdministration?'none':'block';
+  if(isAdministration&&!adminView.getAttribute('src'))adminView.src='owner-admin.html?embedded=1';
   const teacherPanel=document.getElementById("teacherAccessPanel"),isTeacherAccess=tab==="access"&&!owner;
   teacherPanel.style.display=isTeacherAccess?"block":"none";
   if(isTeacherAccess)renderTeacherAccess();
@@ -325,10 +346,10 @@ function showTab(tab){
   document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
   document.getElementById("pageTitle").textContent=tabs[tab][0];
   document.getElementById("pageSub").textContent=isTeacherAccess?"Lock or unlock your class for your students.":tabs[tab][1];
-  if(isTeacherAccess)document.getElementById("pageTitle").textContent="Open / Lock My Class";
+  if(isTeacherAccess)document.getElementById("pageTitle").textContent="Class Access";
   frame.contentWindow.scrollTo(0,0);
 }
-document.querySelectorAll(".nav-btn").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
+document.querySelectorAll(".nav-btn[data-tab]").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
 frame.addEventListener("load",()=>{
   const d=frame.contentDocument;
   const style=d.createElement("style");
@@ -348,11 +369,13 @@ frame.addEventListener("load",()=>{
     body.b3-owner-view #classControls .mode-buttons,
     body.b3-owner-view #classControls .class-card>div:has(>[data-locked-game-override]),
     body.b3-owner-view .activity-class-controls{display:none!important}
-    #admin-section-settings>h3{margin-top:26px!important}#admin-section-settings>h3:first-child{margin-top:0!important}
-    #admin-section-settings #adminStatus{margin-top:22px!important}
+    #admin-section-access>h3{margin-top:26px!important}#admin-section-access>h3:first-child{margin-top:0!important}
     @media(max-width:650px){body{padding:12px!important}.admin-dashboard-section{padding:14px}.mode-buttons{grid-template-columns:1fr!important}}
   `;
   d.head.appendChild(style);
+  const resize=()=>{const height=d.body.offsetHeight;if(frame.style.height!==height+'px')frame.style.height=height+'px';};
+  new ResizeObserver(resize).observe(d.body);
+  resize();
   organize();
   // Do not observe/rewrite the panel class here. The embedded page legitimately
   // changes it during login/auth rendering; forcing it back synchronously caused

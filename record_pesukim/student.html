@@ -25,6 +25,7 @@
 </script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="../guest-mode.js?v=20261011-guest"></script>
 <script src="../game-gate.js?v=20261008-owner-demo" data-game-id="posuk-practice-scroll"></script>
 <title>Posuk Practice Scroll</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2452,7 +2453,7 @@ function enterApp(){
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('studentNameLabel').textContent = studentName;
   if(teacherPreview){
-    document.getElementById('studentNameLabel').textContent='Teacher Preview — no student work or points saved';
+    document.getElementById('studentNameLabel').textContent=(window.B3Guest&&B3Guest.isGuest())?'Guest preview — try 3 pesukim, nothing is saved':'Teacher Preview — no student work or points saved';
     practiceScopeReady=true;ownClassSpace=false;classPracticeLimit=null;
     rebuildPerekOptionsForClassLimit();applyDeepLinkFromURL();return;
   }
@@ -2543,6 +2544,10 @@ function applyDeepLinkFromURL(){
 }
 
 window.addEventListener('load', async () => {
+  // Guest Mode: same in-memory preview a teacher gets, plus a 3-posuk limit.
+  if(window.B3Guest&&B3Guest.isGuest()){
+    enableTeacherPreview();studentId='guest_preview';studentName='Guest';enterApp();return;
+  }
   const account=await new Promise(resolve=>{
     const deadline=Date.now()+10000;
     const wait=()=>{
@@ -2917,6 +2922,15 @@ async function loadSelectedPesukim(){
     return;
   }
 
+  // Guest Mode: only 3 different pesukim, then "Sign in to unlock".
+  if(window.B3Guest&&B3Guest.isGuest()){
+    const keys=[];for(let n=startPosuk;n<=endPosuk;n++)keys.push(perekNum+':'+n);
+    if(!B3Guest.allowItems('posuk',keys,3,'pesukim')){
+      posukSelect.value='';endPosukSelect.value='';resetScroll();
+      document.getElementById('fetchMsg').textContent='🔓 Sign in to unlock more pesukim.';
+      return;
+    }
+  }
   wakeScorer();
   warmTranslationServices();
   warmQuestionGradingService();

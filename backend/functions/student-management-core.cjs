@@ -1,6 +1,7 @@
 'use strict';
 const {randomUUID}=require('node:crypto');
 const {PRIVATE,clean,readPasscode,passcodeWrites}=require('./student-passcodes.cjs');
+const tools=require('./student-tool-policy.js');
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const key=s=>typeof s==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(s);
 // Owner-only: copy every passcode into private storage, and optionally erase
@@ -64,6 +65,15 @@ async function manageStudents(store,identity,body,now=Date.now()){
   updates[PRIVATE+id]={passcode,updatedAt:now};
   updates[memberPath]={studentId:id,name,active:true};
   updates[membershipPath]={workspaceId:'b3-2026',classId,active:true};
+ }else if(body.action==='studentTools'){
+  if(profile.active===false||cls.members[id].active===false)fail(403,'This student is inactive.');
+  const choices=body.toolAccess;
+  if(!choices||typeof choices!=='object'||Array.isArray(choices)||!Object.keys(choices).length||Object.keys(choices).length>50)fail(400,'Choose student tools.');
+  for(const [tool,enabled] of Object.entries(choices)){
+   const ownerLegacy=owner&&['et','wt'].includes(classId)&&tools.studentActivities.includes(tool);
+   if(!key(tool)||typeof enabled!=='boolean'||(!tools.granted(cls,tool)&&!ownerLegacy))fail(403,'Only tools enabled by the administrator can be assigned.');
+   for(const alias of tools.aliases(tool))updates[memberPath+'/toolAccess/'+alias]=enabled?null:false;
+  }
  }else if(body.action==='passcode'){
   const passcode=String(body.passcode||'').trim();if(!passcode||passcode.length>100)fail(400,'Enter an individual passcode.');
   Object.assign(updates,passcodeWrites(id,passcode,now));

@@ -356,6 +356,33 @@
     main { padding: 16px; }
     .clock-panel { text-align: left; }
   }
+
+  /* City discovery and precise home-map actions (owner-only student data). */
+  .location-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:7px; }
+  .location-action { display:inline-flex; align-items:center; justify-content:center; gap:4px;
+    color:#72551c; background:#fff7e4; border:1px solid #d8c293; border-radius:8px;
+    padding:7px 9px; text-decoration:none; cursor:pointer; font:600 .8rem "Segoe UI",sans-serif; }
+  .location-action:hover, .location-action:focus-visible { background:#ffedc0; outline-color:#a37825; }
+  .location-action[disabled] { opacity:.7; cursor:progress; }
+  .place-explorer { margin-top:4px; border:1px solid #decda8; border-radius:10px;
+    background:#fffcf4; overflow:hidden; }
+  .place-explorer summary { padding:11px 12px; font-size:.89rem; font-weight:700;
+    cursor:pointer; color:#76591d; }
+  .place-explorer[open] summary { border-bottom:1px solid #eee1c7; }
+  .explorer-body { padding:11px 13px 15px; display:grid; gap:12px; }
+  .explorer-section { display:grid; gap:5px; }
+  .explorer-heading { font-size:.84rem; font-weight:800; color:#624812; }
+  .explorer-copy { font-size:.85rem; line-height:1.45; color:#4a4031; margin:0; }
+  .explorer-caption { color:#726854; font-size:.74rem; }
+  .explorer-link { color:#705318; font-size:.82rem; text-decoration:underline; text-underline-offset:2px; }
+  .news-items { list-style:none; margin:2px 0 0; padding:0; display:grid; gap:10px; }
+  .news-items li { font-size:.84rem; line-height:1.4; }
+  .news-items small { display:block; font-size:.73rem; color:#6e6254; }
+  .place-loading { font-size:.85rem; color:#776a55; }
+  .map-notice { position:fixed; bottom:14px; left:50%; transform:translateX(-50%);
+    width:min(560px,calc(100% - 28px)); z-index:1100; border-radius:12px;
+    padding:13px 16px; background:#3a2f22; color:#fff; font-size:.88rem;
+    box-shadow:0 6px 22px #0003; }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -363,6 +390,7 @@
 <script src="../firebase-config.js"></script>
 </head>
 <body>
+<script src="../guest-mode.js?v=20261011-guest"></script>
 <div id="privateGate" style="position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:#f8fafc;font-family:system-ui,sans-serif">
   <div style="background:#fff;border-radius:18px;padding:28px 32px;box-shadow:0 10px 30px rgba(15,23,42,.12);text-align:center;max-width:420px">
     <div style="font-size:42px">🔒</div>
@@ -394,7 +422,7 @@
 
 <main id="main"></main>
 
-<footer>Built for Mr. Cohen's B3 classes · Weather via Open-Meteo</footer>
+<footer>Built for Mr. Cohen's B3 classes · Weather: Open-Meteo · City facts: Wikipedia · News: GDELT · House address lookup on Street View click: © OpenStreetMap contributors</footer>
 
 <script>
 /* =========================================================
@@ -693,19 +721,288 @@ function renderGrid() {
   applySearchFilter();
 }
 
+
+/* =========================================================
+   PRECISE MAPS + PLACE DISCOVERY
+   Locations/parent contact details continue to come ONLY from the
+   owner's private Firebase data. News requests contain city/country
+   only, never a student's identity or home address.
+   ========================================================= */
+function safeHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function safeCoordinate(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+function fullStudentAddress(s) {
+  const location = [s.city, s.region, s.country].filter(Boolean).join(', ');
+  return [s.street, location].filter(Boolean).join(', ');
+}
+function googleAddressUrl(address) {
+  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(address);
+}
+function streetViewUrl(lat, lon) {
+  return 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' +
+    encodeURIComponent(lat + ',' + lon);
+}
+// Important: s.lat / s.lon are CITY centers in the original data,
+// so they must NOT be used for a house Street View.
+function savedHouseCoordinates(s) {
+  const pairs = [
+    [s.streetViewLat,s.streetViewLon], [s.homeLat,s.homeLon],
+    [s.houseLat,s.houseLon], [s.homeLatitude,s.homeLongitude],
+    [s.homeLocation && s.homeLocation.lat,s.homeLocation && s.homeLocation.lon]
+  ];
+  for (const pair of pairs) {
+    const lat = safeCoordinate(pair[0]), lon = safeCoordinate(pair[1]);
+    if (pair[0] != null && pair[1] != null && String(pair[0]).trim() !== '' && String(pair[1]).trim() !== '' && lat !== null && lon !== null &&
+        lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) return {lat,lon};
+  }
+  return null;
+}
+function showMapNotice(message) {
+  let notice = document.querySelector('.map-notice');
+  if (notice) notice.remove();
+  notice = document.createElement('div');
+  notice.className = 'map-notice';
+  notice.setAttribute('role','status');
+  notice.textContent = message;
+  document.body.appendChild(notice);
+  setTimeout(() => { if (notice.isConnected) notice.remove(); }, 8000);
+}
+const HOUSE_POSITION_CACHE = new Map();
+let lastGeocodeRequest = 0;
+function approxDistanceKm(lat1,lon1,lat2,lon2) {
+  const rad = Math.PI/180;
+  const dLat=(lat2-lat1)*rad, dLon=(lon2-lon1)*rad;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*rad)*Math.cos(lat2*rad)*Math.sin(dLon/2)**2;
+  return 6371*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+async function geocodeHouseOnce(s) {
+  const key = fullStudentAddress(s);
+  if (HOUSE_POSITION_CACHE.has(key)) return HOUSE_POSITION_CACHE.get(key);
+  const numberMatch = String(s.street || '').match(/^\s*(\d+[a-zA-Z]?(?:\s*[-/]\s*\d+[a-zA-Z]?)?)/);
+  if (!numberMatch) return null;
+  // Limit browser requests to the community service (one request per >1s).
+  const pause = Math.max(0, lastGeocodeRequest + 1300 - Date.now());
+  if (pause) await new Promise(resolve => setTimeout(resolve,pause));
+  lastGeocodeRequest = Date.now();
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=3&q=' +
+      encodeURIComponent(key);
+    const resp = await fetch(url, {headers:{'Accept':'application/json'}});
+    if (!resp.ok) throw new Error('Geocoding unavailable');
+    const options = await resp.json();
+    const requestedNumber = numberMatch[1].replace(/\s/g,'').toLowerCase();
+    const best = (Array.isArray(options) ? options : []).find(item => {
+      const foundNumber = String(item.address && item.address.house_number || '').replace(/\s/g,'').toLowerCase();
+      const lat=Number(item.lat), lon=Number(item.lon);
+      const centerLat=safeCoordinate(s.lat), centerLon=safeCoordinate(s.lon);
+      const nearCity = centerLat === null || centerLon === null ||
+        approxDistanceKm(centerLat,centerLon,lat,lon)<100;
+      return foundNumber === requestedNumber && nearCity &&
+        Number.isFinite(lat) && Number.isFinite(lon);
+    });
+    const point = best ? {lat:Number(best.lat),lon:Number(best.lon)} : null;
+    HOUSE_POSITION_CACHE.set(key,point); // Session cache; never store home addresses or coordinates in public HTML.
+    return point;
+  } catch (error) {
+    console.info('Precise house geocode unavailable', error);
+    return null;
+  }
+}
+async function openStreetViewForStudent(s, button) {
+  const address = fullStudentAddress(s);
+  if (!s.street) {
+    showMapNotice('No street address is saved. Opening the city map instead.');
+    window.open(googleAddressUrl(address),'_blank','noopener');
+    return;
+  }
+  let home = savedHouseCoordinates(s);
+  if (home) {
+    window.open(streetViewUrl(home.lat,home.lon),'_blank','noopener');
+    return;
+  }
+  // Open Maps immediately during the click, so browsers do not block the new tab.
+  // If a precise address match is found, update that tab to direct Street View.
+  const tab = window.open(googleAddressUrl(address),'_blank');
+  if (tab) { try { tab.opener = null; } catch(e) {} }
+  button.disabled = true;
+  const original = button.textContent;
+  button.textContent = '🔎 Locating house…';
+  try {
+    home = await geocodeHouseOnce(s);
+    if (home) {
+      if (tab && !tab.closed) tab.location.href = streetViewUrl(home.lat,home.lon);
+      else showMapNotice('House located. Allow pop-ups to launch Street View.');
+    } else {
+      showMapNotice('Exact house coordinates were not verified. Opened the saved address in Google Maps; choose Street View there if available.');
+    }
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
+
+const PLACE_INFO_CACHE = new Map();
+function wikipediaApiUrl(params) {
+  const url = new URL('https://en.wikipedia.org/w/api.php');
+  Object.entries({format:'json',origin:'*',...params}).forEach(([k,v])=>url.searchParams.set(k,v));
+  return url.toString();
+}
+async function wikipediaOverview(phrase) {
+  const search = await fetch(wikipediaApiUrl({action:'query',list:'search',srsearch:phrase,
+    srlimit:'3',srnamespace:'0'}));
+  if (!search.ok) throw new Error('Wikipedia search unavailable');
+  const searchJson = await search.json();
+  const matches = (searchJson.query && searchJson.query.search) || [];
+  if (!matches.length) return null;
+  const hit = matches[0];
+  const request = await fetch(wikipediaApiUrl({action:'query',prop:'extracts',exintro:'1',
+    explaintext:'1',exsentences:'4',pageids:String(hit.pageid)}));
+  if (!request.ok) throw new Error('Wikipedia summary unavailable');
+  const json = await request.json();
+  const page = json.query && json.query.pages && json.query.pages[hit.pageid];
+  if (!page || !page.extract) return null;
+  const text = page.extract.replace(/\s+/g,' ').trim();
+  const clipped = text.length>530 ? text.slice(0,527).replace(/\s+\S*$/,'')+'…' : text;
+  return {title:page.title,text:clipped,url:'https://en.wikipedia.org/?curid='+hit.pageid};
+}
+function newsSearchUrl(s) {
+  const phrase = [s.city,s.region,s.country].filter(Boolean).join(' ');
+  return 'https://news.google.com/search?q='+encodeURIComponent(phrase)+
+    '&hl=en-US&gl=US&ceid=US%3Aen';
+}
+function gdeltIndexedDate(value) {
+  const m = String(value||'').match(/^(\d{4})(\d\d)(\d\d)T(\d\d)(\d\d)(\d\d)Z$/);
+  if (!m) return null;
+  const d = new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]));
+  return Number.isNaN(d.valueOf()) ? null : d;
+}
+async function recentPlaceNews(s) {
+  const city=s.city || '', region=s.region || '', country=s.country || '';
+  const query = '"'+city.replace(/"/g,'')+'" "'+(region||country).replace(/"/g,'')+'" sourcelang:english';
+  const params = new URLSearchParams({query,mode:'artlist',maxrecords:'6',
+    format:'json',sort:'datedesc',timespan:'7d'});
+  const controller = new AbortController();
+  const timeout = setTimeout(()=>controller.abort(),11000);
+  try {
+    const response = await fetch('https://api.gdeltproject.org/api/v2/doc/doc?'+params,
+      {signal:controller.signal});
+    if (!response.ok) throw new Error('Recent news unavailable');
+    const json = await response.json();
+    return (Array.isArray(json.articles) ? json.articles : [])
+      .filter(a=>a.title && /^https:\/\//i.test(a.url||''))
+      .slice(0,4).map(a=>({title:String(a.title),url:a.url,
+        source:String(a.domain||'News source'),date:gdeltIndexedDate(a.seendate)}));
+  } finally {clearTimeout(timeout);}
+}
+function appendText(parent,tag,text,cls) {
+  const node=document.createElement(tag);
+  if (cls) node.className=cls;
+  node.textContent=text;
+  parent.appendChild(node);
+  return node;
+}
+function appendSafeLink(parent,text,url,cls) {
+  const link=document.createElement('a');
+  link.className=cls||'explorer-link';
+  link.textContent=text;
+  link.href=url;
+  link.target='_blank';link.rel='noopener noreferrer';
+  parent.appendChild(link);
+  return link;
+}
+async function loadPlaceExplorer(s,container,force=false) {
+  const key=[s.city,s.region,s.country].join('|').toLowerCase();
+  const current=PLACE_INFO_CACHE.get(key);
+  let promise;
+  if (!force && current && Date.now()-current.when<10*60*1000) {
+    promise=current.promise;
+  } else {
+    promise=Promise.allSettled([
+      wikipediaOverview([s.city,s.region,s.country].filter(Boolean).join(' ')),
+      wikipediaOverview(s.country === 'USA' ? 'United States' : s.country),
+      recentPlaceNews(s)
+    ]);
+    PLACE_INFO_CACHE.set(key,{promise,when:Date.now()});
+  }
+  container.replaceChildren();
+  appendText(container,'div','Getting city facts and recent headlines…','place-loading');
+  const results=await promise;
+  if (!container.isConnected) return;
+  container.replaceChildren();
+  const sections=[{name:'🏙️ City: '+s.city,result:results[0]},
+    {name:'🌍 Country: '+s.country,result:results[1]}];
+  for (const section of sections) {
+    const wrapper=appendText(container,'section','','explorer-section');
+    appendText(wrapper,'div',section.name,'explorer-heading');
+    if (section.result.status==='fulfilled' && section.result.value) {
+      appendText(wrapper,'p',section.result.value.text,'explorer-copy');
+      appendSafeLink(wrapper,'Read more on Wikipedia ('+section.result.value.title+')',section.result.value.url);
+    } else {
+      appendText(wrapper,'p','Details could not be loaded right now.','explorer-copy');
+      appendSafeLink(wrapper,'Search Wikipedia',
+        'https://en.wikipedia.org/w/index.php?search='+encodeURIComponent(section.name.slice(3)));
+    }
+  }
+  const sights=appendText(container,'section','','explorer-section');
+  appendText(sights,'div','⭐ Famous places and landmarks','explorer-heading');
+  appendSafeLink(sights,'Discover landmarks in '+s.city,
+    googleAddressUrl('famous landmarks and attractions in '+[s.city,s.region,s.country].filter(Boolean).join(', ')));
+  const news=appendText(container,'section','','explorer-section');
+  appendText(news,'div','📰 Recent local news · past 7 days','explorer-heading');
+  const newsResult=results[2];
+  const articles=newsResult.status==='fulfilled' ? newsResult.value : [];
+  if (articles.length) {
+    const list=appendText(news,'ul','','news-items');
+    for (const a of articles) {
+      const item=appendText(list,'li','');
+      appendSafeLink(item,a.title,a.url);
+      appendText(item,'small',a.source+(a.date ? ' · Indexed '+a.date.toLocaleDateString('en-US') : ''));
+    }
+  } else {
+    appendText(news,'p','No recent headlines could be retrieved for this location.','explorer-copy');
+  }
+  appendSafeLink(news,'See latest results in Google News ↗',newsSearchUrl(s));
+  const control=appendText(container,'div','','explorer-section');
+  appendText(control,'span','Information: Wikipedia · Headlines: GDELT news index','explorer-caption');
+  const refresh=appendText(control,'button','↻ Refresh facts and news','location-action');
+  refresh.type='button';
+  refresh.addEventListener('click',()=>loadPlaceExplorer(s,container,true));
+}
+function wirePlaceCardActions(grid,students) {
+  Array.from(grid.querySelectorAll('.card')).forEach((card,index)=>{
+    const s=students[index];
+    const streetBtn=card.querySelector('.streetview-button');
+    if(streetBtn) streetBtn.addEventListener('click',()=>openStreetViewForStudent(s,streetBtn));
+    const detail=card.querySelector('.place-explorer');
+    if (detail) detail.addEventListener('toggle',()=>{
+      if (detail.open && !detail.dataset.loaded) {
+        detail.dataset.loaded='true';
+        loadPlaceExplorer(s,detail.querySelector('.explorer-body'));
+      }
+    });
+  });
+}
+
 function buildCardHTML(s) {
   const waFatherNum = normalizePhone(s.fatherPhone);
   const waMotherNum = normalizePhone(s.motherPhone);
   const locationLabel = s.region ? `${s.city}, ${s.region}, ${s.country}` : `${s.city}, ${s.country}`;
-  const fullAddress = s.street ? `${s.street}, ${locationLabel}` : locationLabel;
+  const fullAddress = fullStudentAddress(s);
 
   return `
     <div class="card" id="${cardId(s)}" data-name="${(s.first + ' ' + s.last).toLowerCase()}" data-city="${s.city.toLowerCase()}">
       <div class="card-name">${s.first} ${s.last}</div>
       <div class="card-location">
         ${s.flag} ${locationLabel}
-        <a class="map-link" href="https://www.google.com/maps/place/${encodeURIComponent(fullAddress)}/@${s.lat},${s.lon},700m/data=!3m1!1e3" target="_blank" rel="noopener" title="View on Google Earth (satellite)">🌍</a>
-        <a class="map-link" href="https://www.google.com/maps?q=&layer=c&cbll=${s.lat},${s.lon}&cbp=0,0,0,0,0" target="_blank" rel="noopener" title="Street View (if available)">🧍</a>
+      </div>
+      <div class="location-actions">
+        <a class="location-action" href="${googleAddressUrl(fullAddress)}" target="_blank" rel="noopener noreferrer" title="Locate the saved street address on Google Maps">🏠 House map</a>
+        <button class="location-action streetview-button" type="button" title="Try Street View at this house. If an exact match is unavailable, open its Google Maps address instead.">👁 Street View</button>
       </div>
       <div class="card-birthday">🎂 Age ${s.age} &nbsp;·&nbsp; Hebrew Bday: ${s.hebBday}</div>
 
@@ -720,6 +1017,10 @@ function buildCardHTML(s) {
         ${waFatherNum ? `<a class="wa-btn" href="https://wa.me/${waFatherNum}" target="_blank" rel="noopener">💬 ${s.father}</a>` : ""}
         ${waMotherNum ? `<a class="wa-btn" href="https://wa.me/${waMotherNum}" target="_blank" rel="noopener">💬 ${s.mother}</a>` : ""}
       </div>
+      <details class="place-explorer">
+        <summary>🌎 About ${safeHtml(s.city)} · 📰 Latest news</summary>
+        <div class="explorer-body" aria-live="polite"></div>
+      </details>
     </div>`;
 }
 
@@ -728,6 +1029,7 @@ function buildAllCards() {
     const grid = document.getElementById("grid-" + cls.replace(/\s+/g, ""));
     const students = STUDENTS.filter(s => s.cls === cls);
     grid.innerHTML = students.map(buildCardHTML).join("");
+    wirePlaceCardActions(grid,students);
   });
 }
 
@@ -860,6 +1162,28 @@ document.getElementById("privateImportFile").onchange=async e=>{
     location.reload();
   }catch(err){console.warn(err);gateMsg.textContent=(err&&err.message)||"Could not load that file.";}
 };
+// Guest Mode: made-up students in made-up places. Nothing real is read.
+function startGuestDemo(){
+  const mk=(id,first,last,city,region,country,flag,tz,lat,lon,cls,age,heb)=>({id,first,last,city,region,country,flag,tz,lat,lon,cls,age,hebBday:heb,street:"",father:"",mother:"",fatherPhone:"",motherPhone:""});
+  STUDENTS=[
+    mk("demo_1","Sample","Student A","New York","NY","USA","🇺🇸","America/New_York",40.7128,-74.006,"B3 ET",9,"3 Cheshvan 5787"),
+    mk("demo_2","Sample","Student B","Chicago","IL","USA","🇺🇸","America/Chicago",41.8781,-87.6298,"B3 ET",8,"12 Kislev 5787"),
+    mk("demo_3","Sample","Student C","Denver","CO","USA","🇺🇸","America/Denver",39.7392,-104.9903,"B3 ET",9,"25 Teves 5787"),
+    mk("demo_4","Sample","Student D","Los Angeles","CA","USA","🇺🇸","America/Los_Angeles",34.0522,-118.2437,"B3 ET",8,"9 Shevat 5787"),
+    mk("demo_5","Sample","Student E","Mexico City","","Mexico","🇲🇽","America/Mexico_City",19.4326,-99.1332,"B3 WT",9,"17 Adar 5787"),
+    mk("demo_6","Sample","Student F","Vancouver","BC","Canada","🇨🇦","America/Vancouver",49.2827,-123.1207,"B3 WT",8,"2 Nissan 5787"),
+    mk("demo_7","Sample","Student G","New York","NY","USA","🇺🇸","America/New_York",40.7128,-74.006,"B3 WT",9,"21 Iyar 5787"),
+    mk("demo_8","Sample","Student H","Chicago","IL","USA","🇺🇸","America/Chicago",41.8781,-87.6298,"B3 WT",8,"14 Sivan 5787")
+  ];
+  GROUP_INFO={};SCHOOL_EMAIL="";GROUP_BCC_EMAILS={};
+  gateEl.style.display="none";
+  const tag=document.createElement("div");
+  tag.textContent="DEMO · made-up sample students, places and birthdays";
+  tag.style.cssText="background:#7c3aed;color:#fff;text-align:center;padding:8px 12px;font:700 14px system-ui";
+  document.body.insertBefore(tag,document.querySelector("header"));
+  dashboardStarted=true;startDashboard();
+}
+if(window.B3Guest&&window.B3Guest.isGuest()){startGuestDemo();}else
 firebase.auth().onAuthStateChanged(async user=>{
   if(!user){gateMsg.textContent="This page has private student details. Sign in with the owner Google account.";return;}
   try{

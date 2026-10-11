@@ -33,6 +33,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="recording-save.js?v=20261002-fast-save"></script>
 <script src="../firebase-config.js"></script>
+<script src="../guest-mode.js?v=20261011-guest"></script>
 <script src="../game-gate.js?v=20261008-owner-demo" data-game-id="chazara" data-back-href="../index.html"></script>
 </head>
 <body>
@@ -357,7 +358,8 @@ setInterval(()=>{if(sid)render()},60000);
 // Students switch accounts on the Fun Torah Tools homepage only.
 $('switchStudentBtn').onclick=()=>{location.href='../index.html'};
 (async()=>{
-const account=await new Promise(resolve=>{
+const guestPreview=!!(window.B3Guest&&window.B3Guest.isGuest());
+const account=guestPreview?{authorized:false}:await new Promise(resolve=>{
   const deadline=Date.now()+10000;
   const wait=()=>{
     if(window.B3SiteSettings)window.B3SiteSettings.onAuthStateChanged((user,authorized)=>resolve({user,authorized}));
@@ -366,7 +368,13 @@ const account=await new Promise(resolve=>{
   };
   wait();setTimeout(()=>resolve({authorized:false}),10000);
 });
-if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
+if(guestPreview){
+  // Guest Mode: 3 sample pesukim, everything stays in this tab and nothing is saved.
+  enableTeacherPreview();sid='guest_preview';sname='Guest preview - 3 sample pesukim, nothing is saved';
+  const sampleAttempt={demo:{hebrewScore:100,translationTotal:1,translationChunkResults:[{verdict:'correct'}]}};
+  attemptsRoot={'preview_1_1':sampleAttempt,'preview_1_2':sampleAttempt,'preview_1_3':sampleAttempt};
+  await db.ref('posukPractice/attempts/'+sid).set(attemptsRoot);
+}else if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
   enableTeacherPreview();sid='teacher_preview';sname='Teacher Preview - sample chart, no student work or points saved';
   attemptsRoot={'preview_1_1':{demo:{hebrewScore:100,translationTotal:1,translationChunkResults:[{verdict:'correct'}]}},'preview_1_2':{demo:{hebrewScore:100,translationTotal:1,translationChunkResults:[{verdict:'correct'}]}}};
   await db.ref('posukPractice/attempts/'+sid).set(attemptsRoot);

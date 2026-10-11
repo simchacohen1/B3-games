@@ -401,6 +401,9 @@
       showOpen();return;
     }
     if(!studentActive){showClosed("Please sign in again", "Your student access or class membership could not be verified.");return;}
+    if(!window.B3StudentTools || !window.B3StudentTools.allowed(assignedClass,getStoredStudentId(),gameId)){
+      showClosed("This activity is turned off for you", "Your teacher can change your tool access.");return;
+    }
     if(studentClassId!=="et"&&studentClassId!=="wt"){
       var grantId=gameId==="class-gallery"?"gallery":gameId;
       if(!assignedClass||(assignedClass.toolGrants?.[grantId]!==true&&!(gameId==="class-gallery"&&(assignedClass.toolGrants?.tag===true||assignedClass.toolGrants?.["class-gallery"]===true)))){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
@@ -475,6 +478,7 @@
     requestInFlight = true;
 
     Promise.resolve().then(async function () {
+      if(!window.B3StudentTools)await loadOneScript(new URL('backend/functions/student-tool-policy.js',rootBase).href);
       if(storedTeacherBypass())return;
       if(verifiedTeacherAccess?.authorized){
         var selected=new URLSearchParams(location.search).get("class")||getStoredClass();

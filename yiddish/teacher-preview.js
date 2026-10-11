@@ -8,6 +8,17 @@
     index:round.index, total:round.items.length, finished:round.index===round.items.length,
     question:round.items[round.index] || null});
   api.ready = (async function () {
+    // Guest Mode: sample Step 1 of the story, built here; no server, nothing saved.
+    if (window.B3Guest && window.B3Guest.isGuest()) {
+      const C = window.YIDDISH_CONTENT;
+      const sections = [0,1,2,3].map(g => ({start:g*300, end:g===3?1194:(g+1)*300,
+        first:[0,10,17,26][g], last:[9,16,25,35][g], verified:g===0,
+        words:C.words.filter(w => w.group===g).map(w => w.id)}));
+      state = {student:{id:'guest_preview', name:'Guest preview', classId:'demo'},
+        config:{version:0, unlocked:{demo:1}, unlockedSteps:{demo:1}, sections}, progress:{}, noStory:false, storyTimes:null};
+      api.preview = true;
+      return;
+    }
     const account = await window.B3TeacherAccountReady;
     if (!account.user || !account.authorized || B3SiteSettings.getActingStudent()) return;
     const requested = new URLSearchParams(location.search).get('class');

@@ -15,7 +15,26 @@ const teacherAccountReady=new Promise(resolve=>{
   };
   wait();setTimeout(()=>resolve({authorized:false}),10000);
 });
+// Guest Mode: a made-up student with made-up points. Nothing is read or saved.
+async function openGuestPreview(){
+  if(teacherPreview)return true;
+  teacherPreview=true;
+  const days=[];for(let d=new Date(),n=0;days.length<5&&n<14;d.setDate(d.getDate()-1),n++){if(d.getDay()>=1&&d.getDay()<=5)days.push(d.toISOString().slice(0,10))}
+  const ratings={demo:{}},awards={demo:{}},attendance={demo:{}};
+  const marks=[['Davening','Great',90],['Learning','Excellent',100],['Behavior','Good',80]];
+  days.forEach((date,i)=>{ratings.demo[date]={};marks.forEach(([category,rating,points],j)=>{ratings.demo[date]['r'+j]={category,rating,points:Math.max(60,points-i*3)}});awards.demo[date]={points:10-(i%3)*2};attendance.demo[date]={status:'present'}});
+  const rewards={r1:{id:'r1',name:'Pick the next song (DEMO)',cost:20,active:true,available:true,quantity:null,rewardType:'personal'},
+    r2:{id:'r2',name:'Sit in the teacher chair (DEMO)',cost:40,active:true,available:true,quantity:null,rewardType:'personal'},
+    r3:{id:'r3',name:'Sticker pack (DEMO)',cost:60,active:true,available:true,quantity:null,rewardType:'personal'}};
+  const comments={c1:{body:'Great focus in learning this week! (Sample comment)',createdAt:new Date().toISOString(),visibleToStudent:true}};
+  state.studentId='guest_preview';
+  state.student={name:'Sample Student (DEMO)',initials:'SS',color:'#7c3aed',rewardBalance:85};
+  state.serverRewardBalance=85;state.storeOpen=true;
+  state.root={student:state.student,ratings,attendance,awards,comments,rewards,redemptions:{},contributions:{},refundRequests:{},categories:{},settings:{rewardStoreEnabled:true}};
+  render();C.toast('DEMO: a made-up student. Nothing here is real or saved.');return true;
+}
 async function openTeacherPreview(){
+  if(window.B3Guest&&window.B3Guest.isGuest())return openGuestPreview();
   const account=await teacherAccountReady;
   if(!account.user||!account.authorized||window.B3SiteSettings.getActingStudent())return false;
   if(teacherPreview)return true;

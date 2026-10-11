@@ -33,6 +33,7 @@
       sessionStorage.setItem(FLAG, "1");
     } catch (e) {}
     on = true;
+    if (api.activate) api.activate();
   }
   function stop() {
     try {
@@ -41,6 +42,8 @@
         .forEach(function (k) { sessionStorage.removeItem(k); });
     } catch (e) {}
     on = false;
+    var b = document.getElementById("b3GuestBanner");
+    if (b) b.remove();
   }
 
   var api = window.B3Guest = {
@@ -50,7 +53,11 @@
     exit: function () { stop(); location.href = homeHref; },
     homeHref: homeHref
   };
-  if (!on) return; // Everything below only runs for guests.
+  // Everything below only runs once guest mode is on (at load, or when start() is called).
+  var activated = false;
+  function activate() {
+  if (activated) return;
+  activated = true;
 
   /* ---- 1. Nothing is saved ------------------------------------------------ */
   var blockedCount = 0;
@@ -67,7 +74,9 @@
     var Ref = fb.database.Reference.prototype;
     ["set", "update", "remove", "setPriority", "setWithPriority", "transaction"].forEach(function (name) {
       if (typeof Ref[name] !== "function") return;
+      var orig = Ref[name];
       Ref[name] = function () {
+        if (!on) return orig.apply(this, arguments);
         noteBlocked("database " + name);
         var done = arguments[1];
         if (name === "transaction" && typeof arguments[1] === "function") { try { arguments[1](null, false, null); } catch (e) {} }
@@ -78,6 +87,7 @@
     var origPush = Ref.push;
     if (typeof origPush === "function") {
       Ref.push = function (value, cb) {
+        if (!on) return origPush.apply(this, arguments);
         noteBlocked("database push");
         var child = origPush.call(this); // no value => only a local key, no network write
         var p = Promise.resolve(child);
@@ -89,30 +99,53 @@
     if (fb.database.OnDisconnect) {
       ["set", "update", "remove", "setWithPriority"].forEach(function (name) {
         var D = fb.database.OnDisconnect.prototype;
-        if (typeof D[name] === "function") D[name] = function () { noteBlocked("onDisconnect " + name); return Promise.resolve(); };
+        var origD = D[name];
+        if (typeof origD === "function") D[name] = function () { if (!on) return origD.apply(this, arguments); noteBlocked("onDisconnect " + name); return Promise.resolve(); };
       });
     }
     fb.database.Reference.__b3Guest = true;
     return true;
   }
-  // Pages load Firebase at different moments, so keep trying until it is patched.
-  if (!patchFirebase()) {
-    var tries = 0;
-    var timer = setInterval(function () {
-      tries++;
-      if (patchFirebase() || tries > 400) clearInterval(timer);
-    }, 25);
-    document.addEventListener("DOMContentLoaded", patchFirebase);
-    window.addEventListener("load", patchFirebase);
+  // File uploads (recordings, drawings) are writes too.
+  function patchStorage() {
+    var fb = window.firebase;
+    if (!fb || !fb.storage || !fb.storage.Reference || fb.storage.Reference.__b3Guest) return !!(fb && fb.storage && fb.storage.Reference && fb.storage.Reference.__b3Guest);
+    var S = fb.storage.Reference.prototype;
+    ["put", "putString", "delete", "updateMetadata"].forEach(function (name) {
+      var orig = S[name];
+      if (typeof orig !== "function") return;
+      S[name] = function () {
+        if (!on) return orig.apply(this, arguments);
+        noteBlocked("storage " + name);
+        return Promise.reject(new Error("Guest Mode: uploads are not saved."));
+      };
+    });
+    fb.storage.Reference.__b3Guest = true;
+    return true;
   }
+  // Pages load Firebase at different moments, so keep trying until it is patched.
+  var tries = 0;
+  var timer = setInterval(function () {
+    tries++;
+    patchFirebase(); patchStorage();
+    if (tries > 400) clearInterval(timer);
+  }, 25);
+  patchFirebase(); patchStorage();
+  document.addEventListener("DOMContentLoaded", function () { patchFirebase(); patchStorage(); });
+  window.addEventListener("load", function () { patchFirebase(); patchStorage(); });
 
   // Server calls: guests may only read. Any POST/PUT/PATCH/DELETE is refused.
   var origFetch = window.fetch;
   if (typeof origFetch === "function") {
     window.fetch = function (input, init) {
       var method = String((init && init.method) || (input && input.method) || "GET").toUpperCase();
-      if (method !== "GET" && method !== "HEAD") {
+      if (on && method !== "GET" && method !== "HEAD") {
         noteBlocked("fetch " + method);
+        var now = Date.now();
+        if (now - (api.lastNudge || 0) > 8000) {
+          api.lastNudge = now;
+          api.unlock("Sign in to unlock", "Recording, scoring, answers and rewards need a signed-in student. You are previewing as a guest.");
+        }
         return Promise.resolve(new Response(JSON.stringify({ error: "guest_mode", message: "Sign in to unlock this." }),
           { status: 403, headers: { "Content-Type": "application/json" } }));
       }
@@ -126,11 +159,14 @@
       return origOpen.apply(this, arguments);
     };
     XMLHttpRequest.prototype.send = function () {
-      if (this.__b3GuestBlocked) { noteBlocked("xhr"); try { this.abort(); } catch (e) {} return; }
+      if (on && this.__b3GuestBlocked) { noteBlocked("xhr"); try { this.abort(); } catch (e) {} return; }
       return origSend.apply(this, arguments);
     };
   }
-  if (navigator.sendBeacon) navigator.sendBeacon = function () { noteBlocked("beacon"); return true; };
+  if (navigator.sendBeacon) {
+    var origBeacon = navigator.sendBeacon.bind(navigator);
+    navigator.sendBeacon = function () { if (!on) return origBeacon.apply(null, arguments); noteBlocked("beacon"); return true; };
+  }
 
   /* ---- 2. Friendly "Sign in to unlock" popup ------------------------------ */
   function el(tag, css, html) {
@@ -178,6 +214,20 @@
       return false;
     }
     try { sessionStorage.setItem("b3GuestUse_" + toolId, String(n + 1)); } catch (e) {}
+    return true;
+  };
+
+  // Counts distinct items (e.g. "1:3" = perek 1 posuk 3) in this tab only.
+  // Returns true if every key was already tried or there is room for the new ones.
+  api.allowItems = function (toolId, keys, limit, label) {
+    var seen = [];
+    try { seen = JSON.parse(sessionStorage.getItem("b3GuestUse_" + toolId) || "[]"); } catch (e) {}
+    var fresh = keys.filter(function (k) { return seen.indexOf(k) < 0; });
+    if (seen.length + fresh.length > limit) {
+      api.unlock("Sign in to unlock", "You tried the " + limit + " free sample " + (label || "items") + ". Sign in to keep going.");
+      return false;
+    }
+    try { sessionStorage.setItem("b3GuestUse_" + toolId, JSON.stringify(seen.concat(fresh))); } catch (e) {}
     return true;
   };
 
@@ -273,4 +323,7 @@
     window.addEventListener("resize", place); window.addEventListener("scroll", place, true);
     show();
   };
+  }
+  if (on) activate();
+  api.activate = activate;
 })();

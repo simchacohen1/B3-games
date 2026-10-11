@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head>
+<html lang="en"><head><script src="guest-mode.js?v=20261011-guest" data-guest="block"></script>
 <script>
   (function() {
     const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
@@ -103,6 +103,10 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 <script>
 (function(){
 const OWNER="simcha5770@gmail.com",WS=(window.B3_APP_CONTEXT&&window.B3_APP_CONTEXT.workspaceId)||"b3-2026";
+if(new URLSearchParams(location.search).get('embedded')==='1'){
+ document.querySelector('header').style.display='none';
+ document.querySelector('.notice').textContent='Set up teachers and classes, assign teachers to classes, then choose the tools and content each class may use.';
+}
 if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 const auth=firebase.auth(),db=firebase.database(),q=id=>document.getElementById(id);let teacherData={},classData={};
 const PLATFORM_TOOLS=[

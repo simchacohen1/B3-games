@@ -24,6 +24,7 @@
 </script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="../guest-mode.js?v=20261011-guest"></script>
 <script src="../game-gate.js?v=20261008-owner-demo" data-game-id="rashi-letters"></script>
 <title>Rashi Letters</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -768,7 +769,8 @@ let teacherPreview = false;
   const id=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId')||'';
   const sendHome=reason=>{msg.innerHTML='';msg.append(document.createTextNode(reason+' '));const a=document.createElement('a');a.href='../index.html';a.textContent='Go to Fun Torah Tools';msg.append(a);};
   msg.textContent='Checking your account...';
-  const account = await new Promise(resolve => {
+  const guestPreview = !!(window.B3Guest && window.B3Guest.isGuest());
+  const account = guestPreview ? {authorized:false} : await new Promise(resolve => {
     const deadline = Date.now() + 10000;
     const wait = () => {
       if(window.B3SiteSettings){
@@ -779,6 +781,16 @@ let teacherPreview = false;
     wait();
     setTimeout(() => resolve({authorized:false}),10000);
   });
+  if(guestPreview){
+    // Guest Mode: the first 3 steps only, nothing is saved.
+    teacherPreview=true;
+    studentId=''; studentName='Guest';
+    const banner=document.createElement('p');
+    banner.textContent='Guest preview - try the first 3 steps. Nothing is saved. ';
+    document.querySelector('header').append(banner);
+    await new Promise(r=>setTimeout(r,0)); // let the rest of the page script finish defining STEPS
+    msg.textContent='';updateRewardHud();gate.style.display='none';showModeGate();return;
+  }
   if(account.user && account.authorized && !window.B3SiteSettings.getActingStudent()){
     teacherPreview=true;
     studentId=''; studentName='Teacher Preview';
@@ -861,7 +873,12 @@ function firstUnmasteredBefore(idx){ for(let j=0;j<idx;j++) if(!stepMastered(j))
 function currentStep(){ return STEPS.findIndex((_,j)=>!stepMastered(j)); }
 function stepIndexOf(k,v){ return STEPS.findIndex(st=>st.k===k && (k==='similar' || st.n===v || st.i===v)); }
 
+const GUEST_STEPS=3;
 function goStep(idx){
+  if(window.B3Guest && window.B3Guest.isGuest() && idx>=GUEST_STEPS){
+    window.B3Guest.unlock('Sign in to unlock','You tried the first '+GUEST_STEPS+' free steps. Sign in to continue the whole Rashi letters quest.');
+    showModeGate(); return;
+  }
   const st=STEPS[idx];
   if(st.k==='similar'){ openSimilar(); return; }
   if(st.k==='words'){ openSimilar(); pendingWordLevel=st.n; setSimTab('words'); return; }
@@ -927,6 +944,7 @@ document.querySelectorAll('.mode-type-btn').forEach(b => {
 
 document.getElementById('startPracticeBtn').onclick = () => {
   if(!practiceUnitId) return;
+  if(window.B3Guest && window.B3Guest.isGuest() && !window.B3Guest.allowItems('rashi-practice',[String(practiceUnitId)],3,'letters')) return;
   mode = 'practice';
   streak = 0; attemptsThisStep = 0; retryQuestion = null;
   phase = (practiceModeType === 'word') ? 'word' : 'letter';

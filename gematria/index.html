@@ -134,6 +134,7 @@ bdi.he{unicode-bidi:isolate}.sofitList{direction:ltr;display:inline}
 <script src="../firebase-config.js"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
 <script src="../b3-race.js?v=20261007"></script>
+<script src="../guest-mode.js?v=20261011-guest"></script>
 <script src="../game-gate.js?v=20261008-owner-demo" data-game-id="gematria" data-back-href="../index.html"></script>
 </head>
 <body>
@@ -314,6 +315,9 @@ function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function safeSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 
 let teacherPreview=false;
+// Guest Mode: 6 practice questions and ONE timed round, nothing saved.
+const isGuest=()=>!!(window.B3Guest&&window.B3Guest.isGuest());
+function guestStop(tool,limit,label){return isGuest()&&!window.B3Guest.allow(tool,limit,label)}
 const studentId=String(sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId")||"").trim();
 const studentName=String(sessionStorage.getItem("b3Games_studentName")||"").trim();
 const LOCAL_KEY="gematria_progress:"+(studentId||"guest");
@@ -357,6 +361,11 @@ function record(kind,ok,letters){
 }
 
 async function connect(){
+ if(isGuest()){
+  teacherPreview=true;P=blankProgress();$("starCount").textContent=0;
+  $("whoName").textContent="Guest";
+  $("banner").classList.add("hidden");setNote("Guest preview — try 6 questions and 1 round. Nothing is saved.");return;
+ }
  const account=await window.B3TeacherAccountReady;
  if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
   teacherPreview=true;P=blankProgress();$("starCount").textContent=0;
@@ -449,6 +458,7 @@ function markChoices(c,answer,clicked,ok){
  if(!ok)clicked.classList.add("wrong");
 }
 function learnQuestion(){
+ if(guestStop("q",6,"questions"))return;
  const q=makeLetterQuestion();
  $("lqFeedback").textContent="";$("lqFeedback").className="feedback";$("lqNext").classList.add("hidden");
  askQuestion(q,{prompt:"lqPrompt",big:"lqBig",choices:"lqChoices"},(ok,b,c)=>{
@@ -469,6 +479,7 @@ function wordsForLevel(){
  return Math.random()<.75||!lower.length?exact:lower;
 }
 function nextWord(){
+ if(guestStop("q",6,"questions"))return;
  let pool=wordsForLevel().filter(([w])=>w!==lastWord);curWord=pick(pool);lastWord=curWord[0];
  const [w,mean]=curWord,val=wordValue(w);
  $("wTiles").innerHTML=[...w].map(c=>'<div class="tile2"><div class="h">'+c+'</div><div class="n" data-v="'+VAL[c]+'"></div></div>').join("");
@@ -496,6 +507,7 @@ $("wNext").onclick=nextWord;
 /* ---------- Number -> letters ---------- */
 let nTarget=0,nBuilt=[],nDone=false,lastN=0;
 function nextNumber(){
+ if(guestStop("q",6,"questions"))return;
  const max=LEVEL_NUM_MAX[level];
  let n;
  if(level===3&&Math.random()<.12)n=787; // this year: תשפ״ז
@@ -559,6 +571,7 @@ function speedQuestion(){
  });
 }
 $("spStart").onclick=$("spAgain").onclick=()=>{
+ if(guestStop("round",1,"round"))return;
  spLeft=60;spScore=0;spRunning=true;$("spScore").textContent=0;$("spTime").textContent=60;$("spBar").style.width="100%";
  $("spIntro").classList.add("hidden");$("spDone").classList.add("hidden");$("spGame").classList.remove("hidden");
  speedQuestion();
@@ -576,6 +589,7 @@ function endSpeed(){
 /* ---------- Memory match ---------- */
 let mFirst=null,mLock=false,mMoves=0,mPairs=0,mStart=0,mClock=null;
 function startMatch(){
+ if(guestStop("round",1,"round"))return;
  clearInterval(mClock);mFirst=null;mLock=false;mMoves=0;mPairs=0;mStart=0;
  $("mMoves").textContent=0;$("mTime").textContent=0;$("mBest").textContent=P.match.bestSeconds?P.match.bestSeconds+"s":"—";
  $("mDone").classList.add("hidden");$("mGrid").classList.remove("hidden");
@@ -628,6 +642,7 @@ function raceQuestions(){
 }
 let race=null;
 function startRace(){
+ if(isGuest()){$("raceBox").textContent="Playing with friends needs a signed-in student account.";window.B3Guest.unlock("Sign in to unlock","Racing classmates needs a signed-in student account.");return;}
  if(teacherPreview){$("raceBox").textContent="Class races require student accounts. Use solo games for demonstrations.";return;}
  if(!race){
   race=B3Race.create({container:$("raceBox"),db,roomsPath:classBase?classBase+"/rooms":"",studentId,studentName:studentName||studentId,

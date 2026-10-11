@@ -83,6 +83,7 @@ function render(){
   for(const id of visible){const w=word(id);if(!w)continue;const card=node('article','','word'),st=status(progress[id]);card.append(node('span',st,'status '+st.toLowerCase()));const yi=node('div',w.yi,'yi');yi.lang='yi';card.append(yi,node('div',w.en));$('words').append(card)}
   if(!visible.length)$('words').append(node('p','Your teacher will open your next section soon.'));
   else if(!showAll&&earlierWords(group,part).length)$('words').append(node('p','The games will also mix in some review words from earlier steps.','note'));
+  if(window.B3Guest&&window.B3Guest.isGuest())$('words').append(node('p','🔓 Guest preview: Step 1 only. Sign in to unlock all 8 steps.','note'));
   if(round&&open(round.group))question();
   if(flash&&open(flash.group))flashRender();else if(flash){flash=null}
   if(storyQuiz&&open(storyQuiz.group))storyQuizRender();else if(storyQuiz){storyQuiz=null}
@@ -717,7 +718,7 @@ async function submit(answer,answers,feedback){
 }
 (async()=>{try{
   await API.ready;
-  if(API.preview){await refresh();if(!noStory)message('Teacher demonstration - practice stays in this tab.')}
+  if(API.preview){await refresh();if(!noStory)message(window.B3Guest&&window.B3Guest.isGuest()?'Guest preview - practice stays in this tab, nothing is saved.':'Teacher demonstration - practice stays in this tab.')}
   else {
   if(sessionStorage.getItem('yiddishSessionClass')!==sessionStorage.getItem('b3Games_studentClass'))sessionStorage.removeItem('yiddishSession');
   if(sessionStorage.getItem('yiddishSession')){await refresh();if(!noStory)message('Progress connected ✓')}

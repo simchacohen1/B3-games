@@ -321,10 +321,26 @@ async function enterTeacherPreview(user,access){
   showMode('student');
 }
 
+// Guest Mode: a few sample cards, held in memory only (nothing is saved anywhere).
+const isGuestPreview=()=>!!(window.B3Guest&&window.B3Guest.isGuest());
+function enterGuestPreview(){
+  const cat=clone(DEFAULT_CATALOG);
+  const sample={shorashim:cat.shorashim.slice(0,4),prefix:cat.prefix.slice(0,2),suffix:cat.suffix.slice(0,2)};
+  teacherPreview=true;
+  currentStudent='Guest';
+  db={students:{[currentStudent]:blankStudent()},currentStudent,catalog:normalizeCatalogUnits(sample),settings:{minReviewMs:500,studentSiteOpen:true}};
+  document.getElementById('signedInStudentName').textContent='Guest';
+  document.getElementById('switchStudentBtn').textContent='Back to Fun Torah Tools';
+  setCloudStatus('Guest preview — nothing is saved');
+  applyStudentSiteOpen(true);
+  if(!appStarted){init();appStarted=true;}
+  showMode('student');
+}
 function bindCloudLogin(){
   document.getElementById('loginBtn').onclick=()=>{location.href='../index.html';};
   document.getElementById('switchStudentBtn').onclick=()=>{location.href='../index.html';};
   setLoginMsg('Opening your Fun Torah Tools account…');
+  if(isGuestPreview()){enterGuestPreview();return;}
   const waitForAccount=()=>{
     if(!window.B3SiteSettings){setTimeout(waitForAccount,100);return;}
     let restoring=false;
@@ -470,6 +486,7 @@ const drawing=await saveDrawingToCloud(selectedItemKey,drawingData);
 const d={hebrewSize:+document.getElementById('hebrewSize').value,hebrewFont:document.getElementById('hebrewFont').value,hebrewColor:document.getElementById('hebrewColor').value,englishSize:+document.getElementById('englishSize').value,englishFont:document.getElementById('englishFont').value,englishColor:document.getElementById('englishColor').value,backgroundColor:document.getElementById('backgroundColor').value,hebrewPos:stylePos(document.getElementById('hebrewText'),document.getElementById('frontCard')),englishPos:stylePos(document.getElementById('englishText'),document.getElementById('backCard')),arts:serializeArts(),drawing};
 s.cards[selectedItemKey]={itemKey:selectedItemKey,itemType:existing?.itemType||currentTrack,itemId:item.id,createdAt:existing?.createdAt||Date.now(),learnedAt:existing?.learnedAt||Date.now(),sessionId:existing?.sessionId||null,design:d};
 s.lastActive=Date.now();saveDB();renderWordList();renderStudentStats();window.__shorashimEditorDirty=false;
+if(isGuestPreview()&&!nextUncreated('shorashim')&&!nextUncreated('prefix')&&!nextUncreated('suffix'))setTimeout(()=>window.B3Guest.unlock('Sign in to unlock','You tried all the free sample cards. Sign in to learn the full list of shorashim.'),700);
 if(redesigning){document.getElementById('sessionStatus').textContent='Changes saved ✓';renderGallery();return;}
 const next=nextUncreated(currentTrack,s);if(next)loadEditorItem(keyFor(currentTrack,next.id));else showNoMoreItems();
 }finally{btn.disabled=false;btn.textContent=oldLabel;}
@@ -544,6 +561,7 @@ function toggleShorashimPause(){
 
 async function toggleShorashimRecording(){
   const btn=document.getElementById('shorashimRecordBtn'), status=document.getElementById('shorashimRecordStatus');
+  if(isGuestPreview()){window.B3Guest.unlock('Sign in to unlock','Recording your review and earning points are for signed-in students.');return;}
   if(!cloudEnabled||!cloudStudentId){if(status)status.textContent='Please sign in first.';return;}
   if(shorashimRecorder&&['recording','paused'].includes(shorashimRecorder.state)){
     if(!qualifyCurrentCard())return;

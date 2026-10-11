@@ -11,7 +11,7 @@
       const teachers=await B3TeacherPreview.list(w.firebase.database(),api.workspaceId||'b3-2026',api.getCurrentAccess(),w.firebase.auth().currentUser?.uid);
       if(!isOwnerNow()){dialog.close();return;}
       list.replaceChildren();
-      if(!teachers.length){list.textContent='No other active teachers yet. Add a teacher in Owner Admin first.';return;}
+      if(!teachers.length){list.textContent='No other active teachers yet. Add a teacher under Administration first.';return;}
       teachers.forEach(teacher=>{
         const item=document.createElement('button');item.type='button';item.className='teacher-preview-choice';
         const title=document.createElement('strong');title.textContent=teacher.name;
