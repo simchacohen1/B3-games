@@ -416,7 +416,7 @@
   let currentAccess = { authorized: false, role: "", classIds: [] };
 
   function isBootstrapAdmin(user) {
-    return Boolean(user && user.email && user.email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase());
+    return Boolean(user && user.emailVerified === true && user.email && user.email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase());
   }
 
   function readUserAccess(user) {
@@ -905,6 +905,54 @@
     });
   }
 
+
+  const EMAIL_LINK_HINT="b3TeacherEmailLinkPending";
+  function emailLinkPendingEmail(){
+    try{
+      const record=JSON.parse(localStorage.getItem(EMAIL_LINK_HINT)||"null");
+      return record&&Date.now()-record.time<20*60*1000?record.email:"";
+    }catch(_){return "";}
+  }
+  function isEmailSignInLink(){
+    const services=ensureFirebase();
+    return Boolean(services?.auth?.isSignInWithEmailLink &&
+      services.auth.isSignInWithEmailLink(location.href));
+  }
+  async function sendTeacherEmailLink(email){
+    const services=ensureFirebase();
+    if(!services?.auth?.sendSignInLinkToEmail)
+      throw new Error("Email sign-in is not available on this device.");
+    email=String(email||"").trim().toLowerCase();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254)
+      throw new Error("Enter your email address.");
+    await services.auth.sendSignInLinkToEmail(email,{
+      url:SITE_BASE+"teacher-home.html",handleCodeInApp:true
+    });
+    // This is only a display convenience, never proof of identity.
+    // The email address is not included in the link itself.
+    try{localStorage.setItem(EMAIL_LINK_HINT,JSON.stringify({email,time:Date.now()}));}catch(_){}
+    return true;
+  }
+  async function completeTeacherEmailLink(email){
+    if(!isEmailSignInLink())return false;
+    const services=ensureFirebase();
+    email=String(email||emailLinkPendingEmail()||"").trim().toLowerCase();
+    if(!email)throw new Error("Enter the email address that received the sign-in link.");
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      throw new Error("Enter the email address that received the sign-in link.");
+    const userCredential=await services.auth.signInWithEmailLink(email,location.href);
+    try{localStorage.removeItem(EMAIL_LINK_HINT);}catch(_){}
+    // Never leave one-time sign-in codes in browser history or copied URLs.
+    try{history.replaceState(null,"",SITE_BASE+"teacher-home.html");}catch(_){}
+    const access=await readUserAccess(userCredential.user);
+    if(!access.authorized){
+      await services.auth.signOut();
+      throw new Error("This email has no active Fun Torah Tools teacher invitation.");
+    }
+    currentAccess=access;
+    return true;
+  }
+
   function signOut() {
     const services = ensureFirebase();
     if (!services || !services.auth) return Promise.resolve();
@@ -1243,6 +1291,9 @@
     isClassOpen: isClassOpen,
     describeClassAccess: describeClassAccess,
     signInWithGoogle: signInWithGoogle,
+    sendTeacherEmailLink: sendTeacherEmailLink,
+    isEmailSignInLink: isEmailSignInLink,
+    completeTeacherEmailLink: completeTeacherEmailLink,
     signOut: signOut,
     onAuthStateChanged: onAuthStateChanged,
     isAuthorizedUser: isAuthorizedUser,
