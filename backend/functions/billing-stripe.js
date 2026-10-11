@@ -13,6 +13,7 @@ const {normalizeOrder,stripeLineItems}=require('./billing-catalog.cjs');
 const {PRIVATE,activationUpdates}=require('./billing-fulfillment.cjs');
 const {subscriptionPlan,planMatchesOrder,reconcilePaidAccess}=require('./billing-entitlements.cjs');
 const {portalSessionForTeacher}=require('./billing-portal-core.cjs');
+const {configuredPrices,previewUpgrade,confirmUpgrade}=require('./billing-upgrade-core.cjs');
 if(!admin.apps.length)admin.initializeApp();
 const secretKey=defineSecret('FTT_STRIPE_SECRET_KEY');
 const webhookKey=defineSecret('FTT_STRIPE_WEBHOOK_SECRET');
@@ -179,5 +180,42 @@ exports.funTorahBillingPortal=onRequest({
   console.error('Stripe billing portal request denied',err.status||err.code||'unexpected');
   return error(res,Number.isInteger(err.status)?err.status:503,
    Number.isInteger(err.status)?err.message:'Unable to open billing management.');
+ }
+});
+
+
+// Preview, then explicitly confirm a prorated add-on. No charge or grant from
+// the preview. Any successful update waits for a verified Stripe invoice.
+exports.funTorahUpgradeTool=onRequest({
+ region:'us-central1',cors:ORIGINS,secrets:[secretKey],
+ maxInstances:3,timeoutSeconds:40
+},async(req,res)=>{
+ res.set('Cache-Control','no-store');
+ if(req.method!=='POST')return error(res,405,'Use POST.');
+ if(!ON())return error(res,503,'Paid upgrades are not available yet.');
+ if(Buffer.byteLength(JSON.stringify(req.body||{}),'utf8')>1500)
+  return error(res,413,'Request too large.');
+ try{
+  const bearer=String(req.headers.authorization||'');
+  if(!/^Bearer [^\s]+$/.test(bearer))return error(res,403,'Teacher sign-in required.');
+  const identity=await admin.auth().verifyIdToken(bearer.slice(7),true);
+  const db=admin.database(),store={
+   get:async path=>(await db.ref(path).once('value')).val(),
+   set:(path,value)=>db.ref(path).set(value),
+   transaction:(path,fn)=>db.ref(path).transaction(fn,undefined,false)
+  };
+  const prices=configuredPrices(process.env.FTT_STRIPE_UPGRADE_PRICES_JSON);
+  const action=req.body?.action;
+  const outcome=action==='preview'
+   ?await previewUpgrade(store,identity,req.body,stripeClient(),prices)
+   :action==='confirm'
+    ?await confirmUpgrade(store,identity,req.body,stripeClient(),prices)
+    :null;
+  if(!outcome)return error(res,400,'Choose preview or confirm.');
+  res.json(outcome);
+ }catch(err){
+  console.error('Stripe tool upgrade denied',err.status||err.code||'unexpected');
+  return error(res,Number.isInteger(err.status)?err.status:503,
+   Number.isInteger(err.status)?err.message:'Secure upgrade is temporarily unavailable.');
  }
 });
