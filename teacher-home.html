@@ -28,11 +28,12 @@
 #upgradeDialog{max-width:460px;width:calc(100vw - 24px);border:0;border-radius:16px;padding:23px;box-shadow:0 12px 55px #0f172a60;color:#1f2937}#upgradeDialog::backdrop{background:#0f172a88}#upgradeDialog h2{font-size:22px;margin:0 0 10px}#upgradeDialog .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}#upgradeDialog p{line-height:1.55}#upgradeDialog .sign{background:#2563eb}#upgradeDialog .sign.secondary{background:#475569}#upgradeDialog #upgradePrice{font-size:26px;font-weight:800;margin:12px 0}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script><script src="firebase-config.js?v=20261001-teacherauth"></script><script src="site-settings.js?v=20261008-owner-demo"></script>
+<script src="shared-device-session.js?v=20261011-safe-switch"></script>
 <script src="teacher-preview.js?v=20261008-1"></script>
 <script src="backend/functions/student-tool-policy.js"></script>
 <script src="student-tool-controls.js"></script>
 </head><body>
-<header><div><h1>Fun Torah Tools</h1><div class="sub">Your classes and teaching tools</div></div><div style="display:flex;gap:8px"><button id="actAsStudent" class="sign hidden" style="background:#15803d">👀 Sign in as a student</button><button id="signOut" class="sign hidden">Sign out</button></div></header>
+<header><div><h1>Fun Torah Tools</h1><div class="sub">Your classes and teaching tools</div></div><div style="display:flex;gap:8px"><button id="switchToStudent" class="sign hidden" style="background:#15803d">🔄 Switch to Student</button><button id="actAsStudent" class="sign hidden" style="background:#475569" title="Teacher preview only — not safe when handing the computer to a student">👀 Preview Student (teacher stays signed in)</button><button id="signOut" class="sign hidden">Sign out</button></div></header>
 <div class="wrap"><div id="gate" class="gate">Checking your teacher account…</div><div id="app" class="hidden"><div class="welcome"><strong id="who"></strong><div class="sub" style="color:#64748b">Choose a class or open one of the tools enabled for it.</div></div><div id="classes" class="classes"></div></div></div>
 <dialog id="upgradeDialog" aria-labelledby="upgradeTitle">
 <h2 id="upgradeTitle">Add Shorashim Lab</h2>
@@ -65,7 +66,7 @@ function showTeacherSignIn(message){
 async function render(user,access){
  const generation=++renderGeneration;
  if(previewTeacherId){
-   q('signOut').classList.add('hidden');q('actAsStudent').classList.add('hidden');
+   q('signOut').classList.add('hidden');q('actAsStudent').classList.add('hidden');q('switchToStudent').classList.add('hidden');
    if(!access?.authorized||access.role!=='admin'){q('app').classList.add('hidden');q('gate').classList.remove('hidden');q('gate').textContent='Only the owner can preview another teacher.';return;}
    try{
      const choices=await B3TeacherPreview.list(db,WS,access,user?.uid);
@@ -83,7 +84,7 @@ async function render(user,access){
    if(generation!==renderGeneration)return;
    access={...access,classIds:Object.keys(allClasses).filter(id=>allClasses[id]&&allClasses[id].active!==false)};
  }
- q("gate").classList.add("hidden");q("app").classList.remove("hidden");q("signOut").classList.remove("hidden");q("actAsStudent").classList.remove("hidden");q("who").textContent=user?.email||"Teacher";
+ q("gate").classList.add("hidden");q("app").classList.remove("hidden");q("signOut").classList.remove("hidden");q("actAsStudent").classList.remove("hidden");q("switchToStudent").classList.remove("hidden");q("who").textContent=user?.email||"Teacher";
  if(access.claimPending){const pending=document.createElement("p");pending.textContent="Your invitation is recognized. The owner still needs to deploy teacher account linking before class changes can be saved.";q("who").parentElement.appendChild(pending);}
  const ids=access.classIds||[],snaps=await Promise.all(ids.map(id=>db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value")));
  if(generation!==renderGeneration)return;
@@ -179,6 +180,14 @@ async function render(user,access){
  }
 }
 q('upgradeCancel').onclick=()=>q('upgradeDialog').close();
+q('switchToStudent').onclick=async()=>{
+ const button=q('switchToStudent');
+ if(!window.confirm('Switch to Student? This signs the teacher out on this computer. You will need to sign in again to access Teacher Center. Close any other open teacher tabs before giving the device to a student.'))return;
+ button.disabled=true;button.textContent='Locking teacher session…';
+ try{
+  await B3SharedDevice.switchToStudent(firebase.auth());
+ }catch(error){button.disabled=false;button.textContent='🔄 Switch to Student';alert(error.message||'Could not securely sign out. Do not hand the device to a student yet.');}
+};
 q("actAsStudent").onclick=()=>api.openActAsStudentPicker();
 q("signOut").onclick=()=>api.signOut().then(()=>location.reload());
 showTeacherSignIn();
