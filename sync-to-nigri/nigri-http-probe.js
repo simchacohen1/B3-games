@@ -6,45 +6,36 @@
   if (!button || !status) return;
 
   const messages = {
-    marks_listing_found: 'Browser-free Nigri sign-in worked, and the marks listing was found. No marks were changed.',
-    marks_page_unconfirmed: 'Nigri replied, but its marks listing could not yet be identified. No marks were changed.',
-    login_not_accepted: 'Nigri did not accept the browser-free login. No marks were changed.',
-    login_form_not_found: 'Nigri’s login form has a different structure than expected. No marks were changed.',
-    unsupported_login_method: 'Nigri uses an unexpected login method. No marks were changed.',
-    credentials_missing: 'Nigri credentials are not configured on the server.',
-    probe_stopped: 'The read-only check stopped safely. No marks were changed.'
+    hybrid_marks_found: 'Success: Nigri was accessed using a brief browser sign-in followed by HTTP. The browser was closed before School Marks was read. No grades were changed.',
+    hybrid_marks_unconfirmed: 'The browser sign-in completed, but the HTTP marks page was not confirmed. No grades were changed.',
+    hybrid_starting_browser_stopped: 'The browser could not start safely. No grades were changed.',
+    hybrid_browser_signin_stopped: 'The short browser sign-in failed or stopped safely. No grades were changed.',
+    hybrid_http_marks_stopped: 'The short browser sign-in completed, but the HTTP marks check stopped. No grades were changed.',
+    hybrid_stopped_by_memory_guard: 'Render stopped the read-only test to protect memory. No grades were changed.',
+    credentials_missing: 'Nigri credentials are not configured on the server.'
   };
 
   button.addEventListener('click', async () => {
     button.disabled = true;
-    status.textContent = 'Checking Nigri using HTTP (no browser)…';
+    status.textContent = 'Checking a short Nigri browser login, then HTTP…';
     try {
       if (!window.NigriAuth || !(await window.NigriAuth.getToken())) {
         status.textContent = 'Sign in to your owner account first.';
         return;
       }
-      const {response} = await window.NigriAuth.request('/classtime/nigri-http-probe', {method: 'POST'});
+      const {response} = await window.NigriAuth.request('/classtime/nigri-hybrid-probe', {method: 'POST'});
       const data = await response.json().catch(() => ({}));
       if (response.status === 401) {
         status.textContent = 'Owner Google sign-in was refused.';
       } else if (!response.ok) {
         status.textContent = 'Nigri check unavailable (HTTP ' + response.status + '). No marks were changed.';
       } else {
-        if (data.status === 'login_not_accepted' && typeof data.cookies_sent_to_marks === 'boolean') {
-          let reason = 'Nigri returned its sign-in form again.';
-          if (data.cookies_after_login_count === 0) {
-            reason = 'No persistent cookies were present after the HTTP login.';
-          } else if (!data.cookies_sent_to_marks) {
-            reason = 'Login cookies existed but were not attached to the School Marks request.';
-          } else if (data.login_form_at_teacher_home === true) {
-            reason = 'Cookies were sent, but even the teacher home page still showed the login form.';
-          } else if (data.login_form_at_teacher_home === false) {
-            reason = 'Cookies were sent and the teacher home had no login form, but School Marks did.';
-          }
-          status.textContent = reason + ' Login redirects: ' + Number(data.login_post_redirect_count || 0) +
-            '; marks redirects: ' + Number(data.marks_redirect_count || 0) + '. No grades changed.';
-        } else {
-          status.textContent = messages[data.status] || 'Nigri reported: ' + String(data.status || 'unknown') + '. No marks were changed.';
+        const base = messages[data.status] || 'Nigri check returned: ' + String(data.status || 'unknown') + '. No grades were changed.';
+        status.textContent = base;
+        if (data.status === 'hybrid_marks_unconfirmed') {
+          status.textContent += data.cookies_sent_to_marks
+            ? ' The login cookies were sent, but School Marks did not show the expected controls.'
+            : ' The browser login did not produce cookies usable for the HTTP marks page.';
         }
       }
     } catch (error) {
