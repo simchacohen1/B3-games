@@ -1,6 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+  (function() {
+    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    idbReq.onsuccess = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
+      const tx = db.transaction('firebaseLocalStorage', 'readonly');
+      const store = tx.objectStore('firebaseLocalStorage');
+      const getAll = store.getAll();
+      getAll.onsuccess = function() {
+        if (getAll.result && getAll.result.length > 0) {
+          window.currentUserSession = getAll.result[0].value;
+          document.addEventListener('DOMContentLoaded', function() {
+            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
+            modals.forEach(m => m.style.display = 'none');
+          });
+        }
+      };
+    };
+  })();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fun Torah Tools</title>
@@ -187,6 +208,7 @@
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
 <script src="firebase-config.js?v=20261001-teacherauth"></script>
+<script src="guest-mode.js?v=20261011-guest"></script>
 <script src="site-settings.js?v=20261008-owner-demo"></script>
 </head>
 <body>
@@ -207,6 +229,7 @@
     <label for="studentNameInput">Your name</label>
     <input id="studentNameInput" type="text" autocomplete="name" placeholder="First and last name">
     <button id="studentSignInBtn" type="button">Open Fun Torah Tools</button>
+    <button id="exploreGuestBtn" type="button" style="margin-top:10px;background:#fff;color:#1d4ed8;border:2px solid #1d4ed8">👀 Explore as Guest</button>
     <div id="choosePinForm" class="hidden">
       <h3>Choose your own PIN</h3>
       <p>Choose 4 to 8 numbers that you can remember. Your PIN must be different from everyone else's. Keep it private. After this, ask your teacher if you forget it or need to change it.</p>
@@ -1055,6 +1078,79 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     });
   }
 
+  // ---- Guest Mode: a preview of the site, never a login. See guest-mode.js. ----
+  function isGuest(){return Boolean(window.B3Guest&&window.B3Guest.isGuest());}
+  const GUEST_TOOL_INFO={
+    "student-rewards/teacher.html":"Teachers award daily points and rewards to their students here.",
+    "class-pointer-prototype/dashboard.html":"Teachers start a live lesson and point at the screen together with the class.",
+    "game-show/teacher.html":"Teachers host a live trivia game show for the class.",
+    "record_pesukim/teacher.html":"Teachers see who recorded pesukim and approve the recordings.",
+    "shorashim/teacher.html":"Teachers see each student's shorashim progress.",
+    "chazara/teacher.html":"Teachers see each student's chazara chart.",
+    "rashi-letters/teacher.html":"Teachers see each student's Rashi letters progress.",
+    "gematria/teacher.html":"Teachers see each student's gematria practice.",
+    "weekly-quiz/teacher.html":"Teachers build and release the weekly quiz.",
+    "halacha/index.html":"Teachers teach a Halacha lesson together with the class.",
+    "halacha/teacher.html":"Teachers review the Halacha work students handed in.",
+    "chavrusa/index.html":"Teachers pick a chavrusa (learning partner) for each student each day.",
+    "name-picker/index.html":"Teachers spin a wheel to pick a student fairly."
+  };
+  function renderGuest(){
+    el("classPointerStudentLink").classList.add("hidden");
+    el("loginCard").classList.add("hidden");
+    el("lockedCard").classList.add("hidden");
+    el("studentBar").classList.remove("hidden");
+    el("studentNameLabel").textContent="Guest";
+    el("studentClassLabel").textContent="Previewing Fun Torah Tools · nothing is saved";
+    el("switchStudentBtn").classList.add("hidden");
+    el("gamesArea").classList.remove("hidden");
+    el("specialAccessNote")?.classList.add("hidden");
+    el("disabledMessage").classList.add("hidden");
+    gameDefinitions.forEach(game=>{
+      game.element.classList.remove("hidden","activity-closed");
+      game.element.querySelector(".activity-closed-badge")?.remove();
+    });
+    updateGameGroupVisibility();
+    // Teacher Tools: shown as a preview only. Anything with student data or
+    // student/passcode management is hidden completely.
+    el("teacherToolsSection").classList.remove("hidden");
+    const sub=document.querySelector("#teacherToolsSection .teacher-tools-subtitle");
+    if(sub)sub.textContent="Preview only: these tools are for signed-in teachers.";
+    document.querySelectorAll("#teacherToolsSection .teacher-tool-card").forEach(card=>{
+      const base=(card.getAttribute("href")||"").split("?")[0];
+      const hide=card.id==="actAsStudentCard"||/^(sync-to-nigri|student-report)\//.test(base);
+      card.classList.toggle("hidden",hide);
+      if(hide||card.dataset.guestWired)return;
+      card.dataset.guestWired="1";
+      if(base==="class-dashboard/index.html")return; // opens its own demo version
+      card.addEventListener("click",e=>{
+        if(!isGuest())return;
+        e.preventDefault();e.stopPropagation();
+        const title=card.querySelector(".card-title")?.textContent||"This tool";
+        window.B3Guest.unlock(title,(GUEST_TOOL_INFO[base]||"This is a teacher tool.")+" Sign in as a teacher to use it.");
+      },true);
+    });
+    el("approvalCenterButton").classList.add("hidden");
+    el("ownerAdminButton").classList.add("hidden");
+  }
+  function startGuestTour(){
+    window.B3Guest.tour([
+      {selector:'[data-game-group="learn"]',title:"Learn & Practice",text:"Daily practice: record pesukim, keep a chazara chart, and learn shorashim."},
+      {selector:'[data-game-group="more-learning"]',title:"More Learning",text:"Rashi letters, Yiddish stories and words, Halacha, and Gematria."},
+      {selector:'[data-game-group="class"]',title:"My Class",text:"The Class Gallery shows the class's work, and Student Rewards shows points earned. In Guest Mode these show sample students."},
+      {selector:'[data-game-group="challenge"]',title:"Tests & Challenges",text:"The weekly quiz, practice quizzes, and the live Game Show."},
+      {selector:'#teacherToolsSection',title:"Teacher Tools",text:"What teachers use: a live class pointer, dashboards, a name picker, and more. Guests can look, but these open only for signed-in teachers."}
+    ]);
+  }
+  function enterGuest(){
+    window.B3Guest.start();
+    studentAccessRevoked=false;myStudentId=myStudentName=myClassId="";
+    setLoginMsg("");
+    renderStudentAccess();
+    try{if(!sessionStorage.getItem("b3GuestTourDone"))setTimeout(startGuestTour,400);}catch(e){}
+  }
+  el("exploreGuestBtn").addEventListener("click",()=>{if(!isAuthorizedTeacher)enterGuest();});
+
   function renderStudentAccess(){
     el("classPointerStudentLink").classList.toggle("hidden",isAuthorizedTeacher||isStudentPreview);
     queueMicrotask(renderStudentNudges);
@@ -1080,6 +1176,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       return;
     }
 
+    if(isGuest()){renderGuest();return;}
     el("teacherToolsSection").classList.add("hidden");
     if(studentAccessRevoked||!myStudentId||!myClassId){showLogin();return;}
     el("loginCard").classList.add("hidden");
@@ -1271,6 +1368,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 
   async function restoreStudent(){
     if(isAuthorizedTeacher)return;
+    if(isGuest()&&!isStudentPreview){renderStudentAccess();return;}
     const id=isStudentPreview?previewStudentId:(sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId"));
     if(!id){showLogin();return;}
     showChecking();
@@ -1879,6 +1977,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     currentAccess=access||{authorized:false,role:"",classIds:[]};
     isAuthorizedTeacher=Boolean(authorized&&currentAccess.authorized);
     isAuthorizedAdmin=isAuthorizedTeacher&&currentAccess.role==="admin";
+    // A verified teacher always wins over a guest preview.
+    if(isAuthorizedTeacher&&isGuest())window.B3Guest.stop();
     el("ownerAdminButton").classList.toggle("hidden",!(user&&String(user.email||"").toLowerCase()==="simcha5770@gmail.com"));
     try{if(authorized)sessionStorage.setItem("b3TeacherBypass","1");else sessionStorage.removeItem("b3TeacherBypass");}catch(e){}
     renderStudentAccess();renderAdminPanel();
@@ -1895,5 +1995,6 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 </script>
 </body>
 </html>
+
 
 

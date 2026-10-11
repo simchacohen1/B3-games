@@ -2,6 +2,30 @@
 <!-- Posuk Practice individual-delete fix v2 — 2026-09-22 -->
 <html lang="en">
 <head>
+<script>
+  (function() {
+    // Automatically read Firebase session or saved login
+    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    idbReq.onsuccess = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
+      const tx = db.transaction('firebaseLocalStorage', 'readonly');
+      const store = tx.objectStore('firebaseLocalStorage');
+      const getAll = store.getAll();
+      getAll.onsuccess = function() {
+        if (getAll.result && getAll.result.length > 0) {
+          const user = getAll.result[0].value;
+          window.currentUserSession = user;
+          // Hide login/pin modal if present
+          document.addEventListener('DOMContentLoaded', function() {
+            const pinModal = document.querySelector('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
+            if (pinModal) pinModal.style.display = 'none';
+          });
+        }
+      };
+    };
+  })();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Posuk Practice — Teacher Dashboard</title>
@@ -707,6 +731,7 @@ B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
 let activeStudentId = null;
 let studentsMap = {}; // id -> name
 let studentsInfo = {}; // id -> { name, lastActive }
+let studentClassIds = {}; // id -> class id ('et' / 'wt' / own-space id)
 
 // Filled in below from SEFORIM, in Chumash order (parsha slug -> index).
 const PARSHA_ORDER = {};
@@ -1232,6 +1257,7 @@ async function loadStudents(){
     const activeVal = activeSnap.val() || {};
     studentsMap = {};
     studentsInfo = {};
+    studentClassIds = {};
     if(!allowedVal){
       if(countEl) countEl.textContent = '0 Students';
       listEl.innerHTML = '<div class="empty-msg">No approved students yet — add some in Manage Access.</div>';
@@ -1240,6 +1266,7 @@ async function loadStudents(){
     Object.entries(allowedVal).forEach(([id, info]) => {
       const approvedName = (info && info.name) || id;
       studentsMap[id] = approvedName;
+      studentClassIds[id] = (info && info.classId) || '';
       // Prefer the live posukPractice/students record (has lastActive) when
       // it exists; otherwise fall back to a bare record so this student
       // still renders correctly with "no activity yet" everywhere.
@@ -2585,7 +2612,31 @@ function printReport(){
   }
 
   const win = window.open('', '_blank');
-  win.document.write(`<!DOCTYPE html><html><head><title>Posuk Practice Report</title>
+  win.document.write(`<!DOCTYPE html><html><head>
+<script>
+  (function() {
+    // Automatically read Firebase session or saved login
+    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    idbReq.onsuccess = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
+      const tx = db.transaction('firebaseLocalStorage', 'readonly');
+      const store = tx.objectStore('firebaseLocalStorage');
+      const getAll = store.getAll();
+      getAll.onsuccess = function() {
+        if (getAll.result && getAll.result.length > 0) {
+          const user = getAll.result[0].value;
+          window.currentUserSession = user;
+          // Hide login/pin modal if present
+          document.addEventListener('DOMContentLoaded', function() {
+            const pinModal = document.querySelector('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
+            if (pinModal) pinModal.style.display = 'none';
+          });
+        }
+      };
+    };
+  })();
+</script><title>Posuk Practice Report</title>
     <style>
       body{ font-family: Arial, sans-serif; padding: 24px; color:#222; }
       h1{ font-size:1.3rem; margin-bottom:4px; }
@@ -2758,29 +2809,43 @@ async function loadAccessTab(){
   const classId=requestedTeacherClass||teacherAccess.classIds.find(id=>id!=='*')||'et';
   mainEl.innerHTML='<h2>Students &amp; Classes</h2><p>Names, individual passcodes, and memberships are managed centrally in Teacher Center.</p><a class="btn gold" href="../admin.html?tab=students&class='+encodeURIComponent(classId)+'" target="_blank" rel="noopener">Open Class Management</a>';
   }
+// B3's own classes (et/wt) share a default practice window at
+// posukPractice/settings/practiceLimit. Each class can override it at
+// posukPractice/settings/classPracticeLimits/<classId> with either a window
+// or {allowAll:true}. No override = the class follows the default.
+const LEGACY_CLASS_LABELS={et:'B3 EastTrack',wt:'B3 WestTrack'};
+const CLASS_LIMITS_PATH='posukPractice/settings/classPracticeLimits';
+async function effectiveLegacyPracticeLimit(classId){
+  if(classId&&!LEGACY_CLASS_IDS.includes(classId)){
+    const v=(await db.ref('b3Games/workspaces/'+teacherWorkspace+'/classes/'+classId+'/posukPracticeLimit').once('value')).val();
+    return v||{closed:true};
+  }
+  const [defSnap,ovSnap]=await Promise.all([
+    db.ref('posukPractice/settings/practiceLimit').once('value'),
+    classId?db.ref(CLASS_LIMITS_PATH+'/'+classId).once('value'):Promise.resolve(null)
+  ]);
+  const ov=ovSnap?ovSnap.val():null;
+  if(ov)return ov.allowAll?null:ov;
+  return defSnap.val()||null;
+}
+
 async function loadLegacyAccessTab(){
   if(teacherAccess.role!=='admin')throw new Error('Owner access required for legacy B3 settings.');
   const mainEl = document.getElementById('mainContent');
   mainEl.innerHTML = '<div class="loading">Loading access settings…</div>';
+  const selectStyle="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;";
   try{
-    const [allowedSnap, practiceLimitSnap] = await Promise.all([
-      scopedRosterSnapshot(),
-      db.ref('posukPractice/settings/practiceLimit').once('value')
+    const [defaultSnap, overridesSnap, ...nameSnaps] = await Promise.all([
+      db.ref('posukPractice/settings/practiceLimit').once('value'),
+      db.ref(CLASS_LIMITS_PATH).once('value'),
+      ...LEGACY_CLASS_IDS.map(id=>db.ref('b3Games/workspaces/'+teacherWorkspace+'/classes/'+id+'/name').once('value').catch(()=>null))
     ]);
-    const allowedVal = allowedSnap.val() || {};
-    const practiceLimit = practiceLimitSnap.val() || null;
-    const approvedNames = Object.entries(allowedVal)
-      .map(([slug, info]) => ({
-        slug,
-        name: (info && info.name) || slug,
-        classSection: (info && info.classSection) || '',
-        passcode: (info && info.passcode !== undefined && info.passcode !== null && String(info.passcode).trim())
-          ? String(info.passcode).trim()
-          : DEFAULT_STUDENT_PASSCODE
-      }))
-      .sort((a,b) => a.name.localeCompare(b.name));
+    let defaultLimit = defaultSnap.val() || null;
+    const overrides = overridesSnap.val() || {};
+    const classNames = {};
+    LEGACY_CLASS_IDS.forEach((id,i)=>{ classNames[id]=(nameSnaps[i]&&nameSnaps[i].val())||LEGACY_CLASS_LABELS[id]||id; });
 
-    let html = `<h2>🔑 Manage Access</h2>
+    mainEl.innerHTML = `<h2>🔑 Manage Access</h2>
 
       <div style="margin-bottom:26px;padding:16px;border-radius:12px;background:#fff;border:2px solid var(--gold);">
         <div style="font-weight:700;margin-bottom:4px;">📖 Student Practice Limit</div>
@@ -2789,24 +2854,31 @@ async function loadLegacyAccessTab(){
         </div>
         <div style="display:grid;gap:10px;">
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <strong style="min-width:58px;">Apply to</strong>
+            <select id="practiceTarget" style="${selectStyle}font-weight:700;">
+              <option value="">All classes (default)</option>
+              ${LEGACY_CLASS_IDS.map(id=>`<option value="${id}">${escapeHtml(classNames[id])}</option>`).join('')}
+            </select>
+            <span id="practiceTargetHint" style="font-size:0.8rem;color:var(--ink-soft);"></span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <strong style="min-width:58px;">From</strong>
-            <select id="practiceStartPerek" style="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;"><option value="">Choose Perek</option></select>
-            <select id="practiceStartPosuk" disabled style="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;"><option value="">Choose Posuk</option></select>
+            <select id="practiceStartPerek" style="${selectStyle}"><option value="">Choose Perek</option></select>
+            <select id="practiceStartPosuk" disabled style="${selectStyle}"><option value="">Choose Posuk</option></select>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <strong style="min-width:58px;">Through</strong>
-            <select id="practiceEndPerek" style="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;"><option value="">Choose Perek</option></select>
-            <select id="practiceEndPosuk" disabled style="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;"><option value="">Choose Posuk</option></select>
+            <select id="practiceEndPerek" style="${selectStyle}"><option value="">Choose Perek</option></select>
+            <select id="practiceEndPosuk" disabled style="${selectStyle}"><option value="">Choose Posuk</option></select>
           </div>
           <div>
             <button class="btn small gold" id="savePracticeLimitBtn">Save Practice Window</button>
             <button class="btn small" id="clearPracticeLimitBtn" style="background:var(--navy);box-shadow:0 4px 0 #0f1822;margin-left:6px;">Allow All</button>
+            <button class="btn small hidden" id="useDefaultLimitBtn" style="background:#fff;color:var(--ink);border:2px solid var(--ink-soft);box-shadow:none;margin-left:6px;">Use Default</button>
           </div>
         </div>
         <div id="practiceLimitMsg" style="font-size:0.85rem;margin-top:8px;"></div>
-        <div style="font-size:0.8rem;color:var(--ink-soft);margin-top:6px;">
-          Current: <strong id="practiceLimitCurrent">${formatPracticeWindow(practiceLimit)}</strong>
-        </div>
+        <div id="practiceLimitCurrent" style="font-size:0.8rem;color:var(--ink-soft);margin-top:6px;line-height:1.6;"></div>
       </div>
 
       <div style="padding:16px;border-radius:12px;background:#fff;border:2px solid var(--ink-soft);">
@@ -2814,14 +2886,16 @@ async function loadLegacyAccessTab(){
         <div style="font-size:0.84rem;color:var(--ink-soft);margin-bottom:10px;">Add students, change passcodes, and assign classes in Teacher Center.</div>
         <a class="btn gold" href="../admin.html?tab=students">Open Teacher Center →</a>
       </div>`;
-    mainEl.innerHTML = html;
 
-    // Practice window: exact first and last posuk visible to the class.
+    const targetSel = document.getElementById('practiceTarget');
+    const targetHint = document.getElementById('practiceTargetHint');
     const practiceStartPerek = document.getElementById('practiceStartPerek');
     const practiceStartPosuk = document.getElementById('practiceStartPosuk');
     const practiceEndPerek = document.getElementById('practiceEndPerek');
     const practiceEndPosuk = document.getElementById('practiceEndPosuk');
     const practiceLimitMsg = document.getElementById('practiceLimitMsg');
+    const useDefaultBtn = document.getElementById('useDefaultLimitBtn');
+    const say=(text,ok)=>{practiceLimitMsg.style.color=ok?'#397839':'#8a3a3a';practiceLimitMsg.textContent=text;};
 
     [practiceStartPerek, practiceEndPerek].forEach(fillChumashPerekOptions);
 
@@ -2841,42 +2915,83 @@ async function loadLegacyAccessTab(){
     practiceStartPerek.onchange=()=>fillPracticePosuk(practiceStartPerek.value,practiceStartPosuk,null);
     practiceEndPerek.onchange=()=>fillPracticePosuk(practiceEndPerek.value,practiceEndPosuk,null);
 
-    if(practiceLimit){
-      const sp=practiceLimit.startPerek||1, sv=practiceLimit.startPosuk||1;
-      const ep=practiceLimit.endPerek||practiceLimit.perek, ev=practiceLimit.endPosuk||practiceLimit.posuk;
-      if(ep&&ev){
-        setChumashPerek(practiceStartPerek,practiceLimit.startSefer,sp); setChumashPerek(practiceEndPerek,practiceLimit.endSefer,ep);
-        await fillPracticePosuk(practiceStartPerek.value,practiceStartPosuk,sv);
-        await fillPracticePosuk(practiceEndPerek.value,practiceEndPosuk,ev);
+    function clearPickers(){
+      [practiceStartPerek,practiceEndPerek].forEach(s=>s.value='');
+      [practiceStartPosuk,practiceEndPosuk].forEach(s=>{s.innerHTML='<option value="">Choose Posuk</option>';s.disabled=true;});
+    }
+    async function showWindowInPickers(limit){
+      clearPickers();
+      if(!limit||limit.allowAll) return;
+      const sp=limit.startPerek||1, sv=limit.startPosuk||1;
+      const ep=limit.endPerek||limit.perek, ev=limit.endPosuk||limit.posuk;
+      if(!ep||!ev) return;
+      setChumashPerek(practiceStartPerek,limit.startSefer,sp); setChumashPerek(practiceEndPerek,limit.endSefer,ep);
+      await fillPracticePosuk(practiceStartPerek.value,practiceStartPosuk,sv);
+      await fillPracticePosuk(practiceEndPerek.value,practiceEndPosuk,ev);
+    }
+    function describeClass(id){
+      const ov=overrides[id];
+      if(!ov) return formatPracticeWindow(defaultLimit)+' <em>(uses default)</em>';
+      return (ov.allowAll?'All pesukim available':formatPracticeWindow(ov))+' <em>(own setting)</em>';
+    }
+    function renderCurrent(){
+      document.getElementById('practiceLimitCurrent').innerHTML =
+        `Current — <strong>Default:</strong> ${escapeHtml(formatPracticeWindow(defaultLimit))}<br>`+
+        LEGACY_CLASS_IDS.map(id=>`<strong>${escapeHtml(classNames[id])}:</strong> ${describeClass(id)}`).join('<br>');
+    }
+    async function onTargetChange(){
+      const id=targetSel.value;
+      practiceLimitMsg.textContent='';
+      useDefaultBtn.classList.toggle('hidden', !(id && overrides[id]));
+      if(!id){
+        targetHint.textContent='Classes without their own setting follow this.';
+        await showWindowInPickers(defaultLimit);
+      }else{
+        targetHint.textContent=overrides[id]?'This class has its own setting.':'This class follows the default right now.';
+        await showWindowInPickers(overrides[id]||defaultLimit);
       }
     }
+    targetSel.onchange=onTargetChange;
 
     document.getElementById('savePracticeLimitBtn').onclick=async()=>{
+      const id=targetSel.value;
       const s0=parseChumashPerek(practiceStartPerek.value), e0=parseChumashPerek(practiceEndPerek.value);
       const startPosuk=parseInt(practiceStartPosuk.value), endPosuk=parseInt(practiceEndPosuk.value);
-      if(!s0||!startPosuk||!e0||!endPosuk){
-        practiceLimitMsg.style.color='#8a3a3a'; practiceLimitMsg.textContent='Choose both the starting and ending posuk.'; return;
-      }
-      if(chumashPosition(e0.sefer,e0.perek,endPosuk)<chumashPosition(s0.sefer,s0.perek,startPosuk)){
-        practiceLimitMsg.style.color='#8a3a3a'; practiceLimitMsg.textContent='The ending posuk must come after the starting posuk.'; return;
-      }
-      const next={
-        startSefer:s0.sefer,startPerek:s0.perek,startPosuk,endSefer:e0.sefer,endPerek:e0.perek,endPosuk,updatedAt:firebase.database.ServerValue.TIMESTAMP
-      };
-      await db.ref('posukPractice/settings/practiceLimit').set(next);
-      practiceLimitMsg.style.color='#397839';
-      practiceLimitMsg.textContent='Saved — student menus update automatically.';
-      document.getElementById('practiceLimitCurrent').textContent=formatPracticeWindow(next);
+      if(!s0||!startPosuk||!e0||!endPosuk) return say('Choose both the starting and ending posuk.');
+      if(chumashPosition(e0.sefer,e0.perek,endPosuk)<chumashPosition(s0.sefer,s0.perek,startPosuk)) return say('The ending posuk must come after the starting posuk.');
+      const next={startSefer:s0.sefer,startPerek:s0.perek,startPosuk,endSefer:e0.sefer,endPerek:e0.perek,endPosuk,updatedAt:firebase.database.ServerValue.TIMESTAMP};
+      try{
+        if(id){ await db.ref(CLASS_LIMITS_PATH+'/'+id).set(next); overrides[id]=next; }
+        else { await db.ref('posukPractice/settings/practiceLimit').set(next); defaultLimit=next; }
+      }catch(err){ console.error(err); return say('Could not save. Please try again.'); }
+      await onTargetChange();
+      say(id?`Saved for ${classNames[id]} — their menus update automatically.`:'Saved as the default — student menus update automatically.',true);
+      renderCurrent();
     };
 
     document.getElementById('clearPracticeLimitBtn').onclick=async()=>{
-      await db.ref('posukPractice/settings/practiceLimit').remove();
-      [practiceStartPerek,practiceEndPerek].forEach(s=>s.value='');
-      [practiceStartPosuk,practiceEndPosuk].forEach(s=>{s.innerHTML='<option value="">Choose Posuk</option>';s.disabled=true;});
-      practiceLimitMsg.style.color='#397839';
-      practiceLimitMsg.textContent='Restriction removed — all pesukim are available.';
-      document.getElementById('practiceLimitCurrent').textContent='All pesukim available';
+      const id=targetSel.value;
+      try{
+        if(id){ const v={allowAll:true,updatedAt:firebase.database.ServerValue.TIMESTAMP}; await db.ref(CLASS_LIMITS_PATH+'/'+id).set(v); overrides[id]=v; }
+        else { await db.ref('posukPractice/settings/practiceLimit').remove(); defaultLimit=null; }
+      }catch(err){ console.error(err); return say('Could not save. Please try again.'); }
+      await onTargetChange();
+      say(id?`All pesukim are now open for ${classNames[id]}.`:'Default restriction removed — classes following the default can practice all pesukim.',true);
+      renderCurrent();
     };
+
+    useDefaultBtn.onclick=async()=>{
+      const id=targetSel.value;
+      if(!id) return;
+      try{ await db.ref(CLASS_LIMITS_PATH+'/'+id).remove(); delete overrides[id]; }
+      catch(err){ console.error(err); return say('Could not save. Please try again.'); }
+      await onTargetChange();
+      say(`${classNames[id]} now follows the default.`,true);
+      renderCurrent();
+    };
+
+    renderCurrent();
+    await onTargetChange();
 
   }catch(err){
     mainEl.innerHTML = '<div class="empty-msg">Could not load access settings.</div>';
@@ -2891,7 +3006,8 @@ let studentRangeData = []; // comprehension-range attempts (posuk grid can't sho
 let selectedPosukKey = null;
 
 function formatPracticeWindow(limit){
-  if(!limit) return 'All pesukim available';
+  if(!limit||limit.allowAll) return 'All pesukim available';
+  if(limit.closed) return 'No pesukim open yet';
   const sp=limit.startPerek||1, sv=limit.startPosuk||1;
   const ep=limit.endPerek||limit.perek, ev=limit.endPosuk||limit.posuk;
   const ss=validSefer(limit.startSefer), es=validSefer(limit.endSefer);
@@ -2958,12 +3074,11 @@ async function selectStudent(id, name, el, forcedPosukKey){
   mainEl.innerHTML = '<div class="loading">Loading ' + name + '\'s practice history…</div>';
 
   try{
-    const [snap, practiceLimitSnap] = await Promise.all([
+    const [snap, studentPracticeLimit] = await Promise.all([
       db.ref('posukPractice/attempts/' + id).once('value'),
-      db.ref('posukPractice/settings/practiceLimit').once('value')
+      effectiveLegacyPracticeLimit(studentClassIds[id])
     ]);
     const val = snap.val();
-    const studentPracticeLimit = practiceLimitSnap.val() || null;
     if(!val){
       mainEl.innerHTML = `
         <div class="student-head">
@@ -4054,3 +4169,4 @@ function renderClassPosukDetail(posukKey, bodyEl){
 </script>
 </body>
 </html>
+

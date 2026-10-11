@@ -1,4 +1,25 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="../game-gate.js?v=20261008-owner-demo" data-game-id="student-rewards" data-back-href="../index.html"></script><title>Student Rewards</title><link rel="stylesheet" href="styles.css">
+<!doctype html><html><head>
+<script>
+  (function() {
+    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    idbReq.onsuccess = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
+      const tx = db.transaction('firebaseLocalStorage', 'readonly');
+      const store = tx.objectStore('firebaseLocalStorage');
+      const getAll = store.getAll();
+      getAll.onsuccess = function() {
+        if (getAll.result && getAll.result.length > 0) {
+          window.currentUserSession = getAll.result[0].value;
+          document.addEventListener('DOMContentLoaded', function() {
+            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
+            modals.forEach(m => m.style.display = 'none');
+          });
+        }
+      };
+    };
+  })();
+</script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="../game-gate.js?v=20261008-owner-demo" data-game-id="student-rewards" data-back-href="../index.html"></script><title>Student Rewards</title><link rel="stylesheet" href="styles.css">
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
@@ -7,3 +28,4 @@
 <main id="loginView" class="studentlogin"><section class="login-card"><div class="brand"><b>★</b><span>Student Rewards</span></div><p class="eyebrow">STUDENT REWARDS</p><h1>Welcome back</h1><p>Sign in with the username and PIN your teacher gave you.</p><form id="loginForm" class="formgrid" style="display:grid"><label class="wide">Username<input id="username" required autocomplete="username"></label><label class="wide">PIN<input id="pin" required type="password" inputmode="numeric"></label><p id="loginError" class="formerror wide"></p><button id="loginBtn" class="primary wide">Sign in</button></form><p><a href="teacher.html">Staff sign-in →</a></p></section></main>
 <main id="portalView" class="studentportal hidden"><header><div class="brand"><b>★</b><span>Student Rewards</span></div><nav id="studentNav"></nav><button id="logoutBtn">Sign out</button></header><section id="studentMain" class="studentmain"></section></main>
 <script src="student.js?v=20261007-tab-login"></script></body></html>
+

@@ -1,4 +1,25 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Halacha Scrapbook V14</title><style>
+<!doctype html><html lang="en"><head>
+<script>
+  (function() {
+    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    idbReq.onsuccess = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
+      const tx = db.transaction('firebaseLocalStorage', 'readonly');
+      const store = tx.objectStore('firebaseLocalStorage');
+      const getAll = store.getAll();
+      getAll.onsuccess = function() {
+        if (getAll.result && getAll.result.length > 0) {
+          window.currentUserSession = getAll.result[0].value;
+          document.addEventListener('DOMContentLoaded', function() {
+            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
+            modals.forEach(m => m.style.display = 'none');
+          });
+        }
+      };
+    };
+  })();
+</script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Halacha Scrapbook V14</title><style>
 *{box-sizing:border-box}body{margin:0;font-family:Trebuchet MS,Arial,sans-serif;background:#dcecf3;color:#233746}
 button{font:inherit;cursor:pointer}header{position:sticky;top:0;z-index:100;background:#173b62;color:white;padding:10px 16px;box-shadow:0 2px 10px #0003}
 .bar{max-width:1400px;margin:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.bar h1{font-size:22px;margin:0 auto 0 0}.bar button{border:0;border-radius:10px;padding:8px 11px;font-weight:800}
@@ -901,3 +922,4 @@ window.addEventListener("afterprint",()=>{
 });
 
 </script><div id="exportDlg" role="dialog" aria-label="Print or export"><div class="box"><h3>🖨️ Print / PDF / Slides</h3><div><label><input type="checkbox" id="expAll" onchange="document.querySelectorAll('.expSec').forEach(c=>c.checked=this.checked)"> All sections</label><div id="expList"></div></div><div class="row"><button onclick="printSelected()">🖨️ Print / Save as PDF</button><button onclick="exportSlides()">📊 Download slides</button></div><div class="row"><button class="ghost" onclick="closeExport()">Cancel</button></div><div class="msg" id="expMsg"></div><p style="margin:6px 0 0;font-size:12px;color:#567">Slides download as a PowerPoint file. To use Google Slides: upload it to Google Drive and open it with Google Slides.</p></div></div><div id="pieceCustomizer" class="piece-customizer"><div class="pc-title">Customize this piece</div><div class="pc-row"><label>Font</label><select id="pcFont" onchange="applyPieceStyle()"><option value="Arial, sans-serif">Arial</option><option value="Georgia, serif">Book</option><option value="'Comic Sans MS', cursive">Playful</option><option value="'Trebuchet MS', sans-serif">Rounded</option><option value="'Times New Roman', serif">Classic</option></select></div><div class="pc-row"><label>Text</label><input id="pcText" type="color" value="#243746" oninput="applyPieceStyle()"><label>Background</label><input id="pcBg" type="color" value="#fff1b8" oninput="applyPieceStyle()"></div><div class="pc-row"><label>Text size</label><input id="pcFontSize" type="range" min="12" max="42" value="18" oninput="applyPieceStyle()"><span id="pcFontSizeVal">18</span></div><div class="pc-row"><button onclick="transparentPiece()">No background</button><button onclick="resetPieceStyle()">Reset</button><button onclick="closeCustomizer()">Done ✓</button></div></div><script src="gallery.js?v=20261007-tab-login"></script></body></html>
+

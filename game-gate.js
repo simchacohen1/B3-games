@@ -37,6 +37,17 @@
   }
 
   var rootBase = new URL("./", scriptEl.src);
+
+  // Guest Mode (see guest-mode.js): one shared flag, loaded here so every page
+  // that has this gate also gets the no-saving protection and the banner.
+  function isGuestPreview() {
+    try { return sessionStorage.getItem("b3Games_guest") === "1"; } catch (e) { return false; }
+  }
+  if (isGuestPreview() && !window.B3Guest) {
+    var guestScript = document.createElement("script");
+    guestScript.src = new URL("guest-mode.js?v=20261011-guest", rootBase).href;
+    (document.head || document.documentElement).appendChild(guestScript);
+  }
   var backHref = (scriptEl && scriptEl.getAttribute("data-back-href")) || new URL("index.html", rootBase).href;
 
   // Student rosters are intentionally not embedded in application code.
@@ -458,6 +469,8 @@
   }
 
   function checkNow() {
+    // Guest Mode: a preview, no student to check. guest-mode.js blocks all saving.
+    if (isGuestPreview()) { showOpen(); return; }
     if (requestInFlight) return;
     requestInFlight = true;
 
@@ -497,7 +510,7 @@
       event.preventDefault();event.stopImmediatePropagation();
     },true);
   });
-  watchTeacherAccess();
+  if (!isGuestPreview()) watchTeacherAccess();
   checkNow();
   setInterval(checkNow, POLL_INTERVAL_MS);
   document.addEventListener("visibilitychange", function () {

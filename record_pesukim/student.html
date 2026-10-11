@@ -2,6 +2,27 @@
 <!-- Posuk Practice individual-delete fix v2 — 2026-09-22 -->
 <html lang="en">
 <head>
+<script>
+  (function() {
+    const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
+    idbReq.onsuccess = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('firebaseLocalStorage')) return;
+      const tx = db.transaction('firebaseLocalStorage', 'readonly');
+      const store = tx.objectStore('firebaseLocalStorage');
+      const getAll = store.getAll();
+      getAll.onsuccess = function() {
+        if (getAll.result && getAll.result.length > 0) {
+          window.currentUserSession = getAll.result[0].value;
+          document.addEventListener('DOMContentLoaded', function() {
+            const modals = document.querySelectorAll('#pinModal, #loginModal, .auth-overlay, .modal-backdrop');
+            modals.forEach(m => m.style.display = 'none');
+          });
+        }
+      };
+    };
+  })();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="../game-gate.js?v=20261008-owner-demo" data-game-id="posuk-practice-scroll"></script>
@@ -2396,14 +2417,25 @@ function enterApp(){
     if(cls.ownSpace){
       ownClassSpace = true;
       practiceLimitPath = 'b3Games/workspaces/' + cls.workspaceId + '/classes/' + cls.classId + '/posukPracticeLimit';
+      return null;
     }
+    // B3's own classes (et/wt): a class may have its own window that
+    // overrides the shared default one.
+    return resolveLegacyClassId(cls).then(id => {
+      if(id) classOverridePath = 'posukPractice/settings/classPracticeLimits/' + id;
+    });
+  }).then(() => {
     startPracticeLimitListener();
     // Load the boundary explicitly before honoring a deep link. The live
     // listener above keeps it updated afterward, but this one-time read avoids
     // a race where a bookmarked future posuk could open before the limit arrives.
-    return db.ref(practiceLimitPath).once('value').then(snap => {
-      const limit = snap.val();
-      classPracticeLimit = normalizedPracticeWindow(limit);
+    return Promise.all([
+      db.ref(practiceLimitPath).once('value'),
+      classOverridePath ? db.ref(classOverridePath).once('value').catch(() => null) : Promise.resolve(null)
+    ]).then(([snap, ovSnap]) => {
+      defaultLimitVal = snap.val();
+      overrideLimitVal = ovSnap ? ovSnap.val() : null;
+      classPracticeLimit = normalizedPracticeWindow(effectiveRawLimit());
       practiceScopeReady = true;
       rebuildPerekOptionsForClassLimit();
       applyDeepLinkFromURL();
@@ -2545,6 +2577,28 @@ let practiceLimitListenerStarted = false;
 let practiceLimitPath = 'posukPractice/settings/practiceLimit';
 let ownClassSpace = false;
 let practiceScopeReady = true;
+// Per-class override for B3's own classes (set in teacher Manage Access).
+// {allowAll:true} means everything open for that class; missing = use default.
+let classOverridePath = null;
+let defaultLimitVal = null;
+let overrideLimitVal = null;
+function effectiveRawLimit(){
+  if(overrideLimitVal) return overrideLimitVal.allowAll ? null : overrideLimitVal;
+  return defaultLimitVal;
+}
+async function resolveLegacyClassId(cls){
+  const legacy = ['et','wt'];
+  if(cls && legacy.includes(cls.classId)) return cls.classId;
+  const ws = (cls && cls.workspaceId) || (window.B3SiteSettings && window.B3SiteSettings.workspaceId);
+  if(!ws || !studentId) return '';
+  for(const id of legacy){
+    try{
+      const m = (await db.ref('b3Games/workspaces/' + ws + '/classes/' + id + '/members/' + studentId).once('value')).val();
+      if(m && m.active !== false) return id;
+    }catch(err){ /* not readable — fall back to the shared default */ }
+  }
+  return '';
+}
 
 function normalizedPracticeWindow(limit){
   if(!limit) return null;
@@ -2603,9 +2657,15 @@ function rebuildPerekOptionsForClassLimit(){
 function startPracticeLimitListener(){
   if(practiceLimitListenerStarted) return;
   practiceLimitListenerStarted = true;
-  db.ref(practiceLimitPath).on('value', async snap => {
-    const nextLimit = snap.val();
-    classPracticeLimit = normalizedPracticeWindow(nextLimit);
+  db.ref(practiceLimitPath).on('value', snap => { defaultLimitVal = snap.val(); applyPracticeLimitChange(); });
+  if(classOverridePath){
+    db.ref(classOverridePath).on('value', snap => { overrideLimitVal = snap.val(); applyPracticeLimitChange(); },
+      err => console.error('Could not watch class practice window', err));
+  }
+}
+async function applyPracticeLimitChange(){
+  {
+    classPracticeLimit = normalizedPracticeWindow(effectiveRawLimit());
     practiceScopeReady = true;
     const fetchMsgEl = document.getElementById('fetchMsg');
     if(classPracticeLimit && fetchMsgEl.textContent.startsWith('📖 Your teacher has not opened')) fetchMsgEl.textContent = '';
@@ -2626,7 +2686,7 @@ function startPracticeLimitListener(){
       }
     }
     updateNavArrows();
-  });
+  }
 }
 const selectionModeSelect = document.getElementById('selectionModeSelect');
 const selectionShell = document.getElementById('selectionShell');
@@ -6406,3 +6466,4 @@ async function deleteAttempt(attempt, btnEl){
 </script>
 </body>
 </html>
+
