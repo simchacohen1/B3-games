@@ -292,7 +292,7 @@ button,input,select,textarea{font:inherit}
     <button class="close-x" id="closeReviewBtn">&times;</button>
     <h2>Teacher Review</h2>
     <div id="reviewLoginArea">
-      <p>Sign in with the Google account assigned to this class.</p>
+      <p id="reviewLoginPrompt">Checking your existing Fun Torah Tools teacher sign-in…</p>
       <div class="status-msg" id="loginStatus"></div>
       <div class="modal-actions"><button type="button" class="btn-primary" id="loginSubmitBtn">Log in</button></div>
     </div>
@@ -2031,9 +2031,11 @@ function showReviewLogin(){
   document.getElementById('reviewListArea').style.display='none';
   document.getElementById('reviewLoginArea').style.display='block';
   document.getElementById('loginSubmitBtn').style.display=reviewAuthChecked?'':'none';
-  document.getElementById('loginStatus').textContent=!reviewAuthChecked
-    ?'Checking your teacher session…'
-    :(reviewSignedInWithoutClass?'This Google account is not assigned to this class.':'');
+  document.getElementById('reviewLoginPrompt').textContent=reviewAuthChecked
+    ?'Sign in with the Google account assigned to this class.'
+    :'Checking your existing Fun Torah Tools teacher sign-in…';
+  document.getElementById('loginStatus').textContent=reviewSignedInWithoutClass&&reviewAuthChecked
+    ?'This Google account is not assigned to this class.':'';
 }
 document.getElementById('teacherReviewBtn').onclick=()=>{
   reviewOverlay.classList.add('show');
