@@ -41,6 +41,17 @@ async function manageStudents(store,identity,body,now=Date.now()){
  if(!owner&&(!teacher||teacher.active===false||teacher.classIds?.[classId]!==true))fail(403,'This class is not assigned to your teacher account.');
  const cls=await store.get(root+'/classes/'+classId);
  if(!cls||cls.active===false)fail(403,'This class is inactive.');
+ // Paid classes cannot add more active members than the subscribed seat limit.
+ // NOTE: concurrent creates require an atomic reservation before launch.
+ if(cls.billing?.managed===true&&(body.action==='create'||body.action==='add')){
+  if(cls.billing.active!==true)fail(403,'This subscription is inactive.');
+  const limit=cls.billing.seatLimit;
+  if(!Number.isSafeInteger(limit)||limit<1)fail(403,'Invalid paid class seat limit.');
+  const activeCount=Object.values(cls.members||{}).filter(m=>m&&m.active!==false).length;
+  if((body.action==='create'||!cls.members?.[body.studentId])&&activeCount>=limit)
+   fail(409,'All purchased student accounts are in use. Contact the school to add seats.');
+ }
+
  if(body.action==='list'){
   const passcodes={};for(const id of Object.keys(cls.members||{}).filter(key))passcodes[id]=(await readPasscode(store.get,id,{allowLegacyDefault:true})).passcode;
   return {ok:true,passcodes};
