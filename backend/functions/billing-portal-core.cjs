@@ -4,7 +4,7 @@
 const {PRIVATE,paths,ROOT}=require('./billing-fulfillment.cjs');
 const fail=(status,message)=>{throw Object.assign(new Error(message),{status})};
 const KEY=/^paid_[a-f0-9]{32}$/;
-async function portalSessionForTeacher(store,identity,classId,stripe,returnUrl){
+async function getPurchaserOrder(store,identity,classId){
  if(!identity?.uid||identity.email_verified!==true||identity.firebase?.sign_in_provider!=='google.com')
   fail(403,'Verified Google teacher sign-in required.');
  if(!KEY.test(String(classId||'')))fail(400,'Choose a paid classroom.');
@@ -23,6 +23,10 @@ async function portalSessionForTeacher(store,identity,classId,stripe,returnUrl){
  const invite=await store.get(paths(order).invitePath);
  if(invite?.claimedUid!==identity.uid)
   fail(403,'The teacher billing invitation was not claimed by this account.');
+ return order;
+}
+async function portalSessionForTeacher(store,identity,classId,stripe,returnUrl){
+ const order=await getPurchaserOrder(store,identity,classId);
  const subscription=await stripe.subscriptions.retrieve(order.subscriptionId);
  const customer=typeof subscription?.customer==='string'
   ?subscription.customer:subscription?.customer?.id;
@@ -34,4 +38,4 @@ async function portalSessionForTeacher(store,identity,classId,stripe,returnUrl){
   fail(503,'Unexpected billing portal link.');
  return {ok:true,url:portal.url};
 }
-module.exports={portalSessionForTeacher};
+module.exports={portalSessionForTeacher,getPurchaserOrder};
