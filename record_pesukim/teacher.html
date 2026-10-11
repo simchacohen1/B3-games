@@ -521,11 +521,15 @@ const requestedTeacherClass=new URLSearchParams(location.search).get('class')||'
 async function scopedRosterSnapshot(){
   if(!teacherAccess.authorized)throw new Error('Teacher sign-in required.');
   const owner=teacherAccess.role==='admin';
-  const ids=requestedTeacherClass?[requestedTeacherClass]:(owner?['et','wt']:teacherAccess.classIds);
+  const registry=owner&&!requestedTeacherClass?
+    (await db.ref('b3Games/workspaces/'+teacherWorkspace+'/classes').once('value')).val()||{}:null;
+  const ids=requestedTeacherClass?[requestedTeacherClass]:
+    owner?Object.keys(registry).filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&registry[id]?.active!==false):
+    teacherAccess.classIds;
   if(!owner&&ids.some(id=>!teacherAccess.classIds.includes(id)))throw new Error('This class is not assigned to you.');
   const roster={};
   for(const id of ids){
-    const row=(await db.ref('b3Games/workspaces/'+teacherWorkspace+'/classes/'+id).once('value')).val();
+    const row=registry?registry[id]:(await db.ref('b3Games/workspaces/'+teacherWorkspace+'/classes/'+id).once('value')).val();
     if(!row||row.active===false||(!owner&&row.toolGrants?.['posuk-practice-scroll']!==true))continue;
     Object.entries(row.members||{}).forEach(([sid,m])=>{if(m&&m.active!==false)roster[sid]={...m,classId:id,classSection:row.name||id};});
   }
@@ -2812,15 +2816,25 @@ async function loadLegacyAccessTab(){
   mainEl.innerHTML = '<div class="loading">Loading access settings…</div>';
   const selectStyle="padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;";
   try{
-    const [defaultSnap, overridesSnap, ...nameSnaps] = await Promise.all([
+    const [defaultSnap, overridesSnap, classesSnap] = await Promise.all([
       db.ref('posukPractice/settings/practiceLimit').once('value'),
       db.ref(CLASS_LIMITS_PATH).once('value'),
-      ...LEGACY_CLASS_IDS.map(id=>db.ref('b3Games/workspaces/'+teacherWorkspace+'/classes/'+id+'/name').once('value').catch(()=>null))
+      db.ref('b3Games/workspaces/'+teacherWorkspace+'/classes').once('value')
     ]);
     let defaultLimit = defaultSnap.val() || null;
     const overrides = overridesSnap.val() || {};
+    const classes = classesSnap.val() || {};
+    const extraClassIds = Object.keys(classes).filter(id=>!LEGACY_CLASS_IDS.includes(id)&&classes[id]?.active!==false).sort((a,b)=>
+      String(classes[a]?.name||a).localeCompare(String(classes[b]?.name||b))
+    );
+    const allClassIds = [...LEGACY_CLASS_IDS,...extraClassIds];
     const classNames = {};
-    LEGACY_CLASS_IDS.forEach((id,i)=>{ classNames[id]=(nameSnaps[i]&&nameSnaps[i].val())||LEGACY_CLASS_LABELS[id]||id; });
+    LEGACY_CLASS_IDS.forEach(id=>{classNames[id]=classes[id]?.name||LEGACY_CLASS_LABELS[id]||id;});
+    extraClassIds.forEach(id=>{classNames[id]=classes[id]?.name||id;});
+    // New classes have independent windows, not the B3 ET/WT default.
+    const classLimits = Object.fromEntries(extraClassIds.map(id=>[id,classes[id]?.posukPracticeLimit||null]));
+    const isOwnSpace=id=>!!id&&!LEGACY_CLASS_IDS.includes(id)&&extraClassIds.includes(id);
+    const ownLimitPath=id=>'b3Games/workspaces/'+teacherWorkspace+'/classes/'+id+'/posukPracticeLimit';
 
     mainEl.innerHTML = `<h2>🔑 Manage Access</h2>
 
@@ -2833,8 +2847,8 @@ async function loadLegacyAccessTab(){
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <strong style="min-width:58px;">Apply to</strong>
             <select id="practiceTarget" style="${selectStyle}font-weight:700;">
-              <option value="">All classes (default)</option>
-              ${LEGACY_CLASS_IDS.map(id=>`<option value="${id}">${escapeHtml(classNames[id])}</option>`).join('')}
+              <option value="">B3 ET/WT (default)</option>
+              ${allClassIds.map(id=>`<option value="${escapeHtml(id)}">${escapeHtml(classNames[id])}</option>`).join('')}
             </select>
             <span id="practiceTargetHint" style="font-size:0.8rem;color:var(--ink-soft);"></span>
           </div>
@@ -2872,6 +2886,7 @@ async function loadLegacyAccessTab(){
     const practiceEndPosuk = document.getElementById('practiceEndPosuk');
     const practiceLimitMsg = document.getElementById('practiceLimitMsg');
     const useDefaultBtn = document.getElementById('useDefaultLimitBtn');
+    const clearBtn = document.getElementById('clearPracticeLimitBtn');
     const say=(text,ok)=>{practiceLimitMsg.style.color=ok?'#397839':'#8a3a3a';practiceLimitMsg.textContent=text;};
 
     [practiceStartPerek, practiceEndPerek].forEach(fillChumashPerekOptions);
@@ -2907,24 +2922,32 @@ async function loadLegacyAccessTab(){
       await fillPracticePosuk(practiceEndPerek.value,practiceEndPosuk,ev);
     }
     function describeClass(id){
+      if(isOwnSpace(id)){
+        const own=classLimits[id];
+        return own?escapeHtml(formatPracticeWindow(own))+' <em>(own setting)</em>':'No pesukim open yet';
+      }
       const ov=overrides[id];
-      if(!ov) return formatPracticeWindow(defaultLimit)+' <em>(uses default)</em>';
-      return (ov.allowAll?'All pesukim available':formatPracticeWindow(ov))+' <em>(own setting)</em>';
+      if(!ov) return escapeHtml(formatPracticeWindow(defaultLimit))+' <em>(uses B3 default)</em>';
+      return escapeHtml(ov.allowAll?'All pesukim available':formatPracticeWindow(ov))+' <em>(own setting)</em>';
     }
     function renderCurrent(){
       document.getElementById('practiceLimitCurrent').innerHTML =
-        `Current — <strong>Default:</strong> ${escapeHtml(formatPracticeWindow(defaultLimit))}<br>`+
-        LEGACY_CLASS_IDS.map(id=>`<strong>${escapeHtml(classNames[id])}:</strong> ${describeClass(id)}`).join('<br>');
+        `Current — <strong>B3 ET/WT default:</strong> ${escapeHtml(formatPracticeWindow(defaultLimit))}<br>`+
+        allClassIds.map(id=>`<strong>${escapeHtml(classNames[id])}:</strong> ${describeClass(id)}`).join('<br>');
     }
     async function onTargetChange(){
-      const id=targetSel.value;
+      const id=targetSel.value,own=isOwnSpace(id);
       practiceLimitMsg.textContent='';
-      useDefaultBtn.classList.toggle('hidden', !(id && overrides[id]));
+      useDefaultBtn.classList.toggle('hidden', !(id&&!own&&overrides[id]));
+      clearBtn.textContent=own?'Close All':'Allow All';
       if(!id){
-        targetHint.textContent='Classes without their own setting follow this.';
+        targetHint.textContent='Only ET and WT use this default. New classes have independent limits.';
         await showWindowInPickers(defaultLimit);
+      }else if(own){
+        targetHint.textContent=classLimits[id]?'Only this class will be affected.':'No pesukim open yet. Save a range for this class.';
+        await showWindowInPickers(classLimits[id]);
       }else{
-        targetHint.textContent=overrides[id]?'This class has its own setting.':'This class follows the default right now.';
+        targetHint.textContent=overrides[id]?'This B3 class has its own setting.':'This B3 class follows the ET/WT default.';
         await showWindowInPickers(overrides[id]||defaultLimit);
       }
     }
@@ -2938,7 +2961,8 @@ async function loadLegacyAccessTab(){
       if(chumashPosition(e0.sefer,e0.perek,endPosuk)<chumashPosition(s0.sefer,s0.perek,startPosuk)) return say('The ending posuk must come after the starting posuk.');
       const next={startSefer:s0.sefer,startPerek:s0.perek,startPosuk,endSefer:e0.sefer,endPerek:e0.perek,endPosuk,updatedAt:firebase.database.ServerValue.TIMESTAMP};
       try{
-        if(id){ await db.ref(CLASS_LIMITS_PATH+'/'+id).set(next); overrides[id]=next; }
+        if(isOwnSpace(id)){await db.ref(ownLimitPath(id)).set(next);classLimits[id]=next;}
+        else if(id){ await db.ref(CLASS_LIMITS_PATH+'/'+id).set(next); overrides[id]=next; }
         else { await db.ref('posukPractice/settings/practiceLimit').set(next); defaultLimit=next; }
       }catch(err){ console.error(err); return say('Could not save. Please try again.'); }
       await onTargetChange();
@@ -2949,17 +2973,18 @@ async function loadLegacyAccessTab(){
     document.getElementById('clearPracticeLimitBtn').onclick=async()=>{
       const id=targetSel.value;
       try{
-        if(id){ const v={allowAll:true,updatedAt:firebase.database.ServerValue.TIMESTAMP}; await db.ref(CLASS_LIMITS_PATH+'/'+id).set(v); overrides[id]=v; }
+        if(isOwnSpace(id)){await db.ref(ownLimitPath(id)).remove();classLimits[id]=null;}
+        else if(id){ const v={allowAll:true,updatedAt:firebase.database.ServerValue.TIMESTAMP}; await db.ref(CLASS_LIMITS_PATH+'/'+id).set(v); overrides[id]=v; }
         else { await db.ref('posukPractice/settings/practiceLimit').remove(); defaultLimit=null; }
       }catch(err){ console.error(err); return say('Could not save. Please try again.'); }
       await onTargetChange();
-      say(id?`All pesukim are now open for ${classNames[id]}.`:'Default restriction removed — classes following the default can practice all pesukim.',true);
+      say(isOwnSpace(id)?`All pesukim are now closed for ${classNames[id]}.`:id?`All pesukim are now open for ${classNames[id]}.`:'B3 default restriction removed — ET and WT can practice all pesukim unless individually limited.',true);
       renderCurrent();
     };
 
     useDefaultBtn.onclick=async()=>{
       const id=targetSel.value;
-      if(!id) return;
+      if(!id||isOwnSpace(id)) return;
       try{ await db.ref(CLASS_LIMITS_PATH+'/'+id).remove(); delete overrides[id]; }
       catch(err){ console.error(err); return say('Could not save. Please try again.'); }
       await onTargetChange();

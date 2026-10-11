@@ -764,9 +764,14 @@ const HALACHA_ACCESS_ORDER=["א","ב","ג","ד","ו"];
 async function renderHalachaTeacherAccess(access){
  const host=document.getElementById("halachaAccessRowsMain");if(!host)return;
  try{
-  let classIds=(access&&access.role==="admin")?["et","wt"]:(access&&access.classIds||[]).filter(Boolean);
-  if(!classIds.length){host.textContent="No classes are assigned to this teacher.";return}
   const ws=(window.B3SiteSettings&&B3SiteSettings.workspaceId)||"b3-2026";
+  const classesSnap=await halachaDb.ref("b3Games/workspaces/"+ws+"/classes").once("value");
+  const classes=classesSnap.val()||{},owner=access&&access.role==="admin";
+  const assigned=new Set((access&&access.classIds||[]).filter(Boolean));
+  const classIds=Object.entries(classes).filter(([id,row])=>
+    row&&row.active!==false&&(owner||(assigned.has(id)&&row.toolGrants?.halacha===true))
+  ).map(([id])=>id);
+  if(!classIds.length){host.textContent="No classes have Halacha enabled for this teacher.";return}
   const rows=await Promise.all(classIds.map(async id=>{
     const cs=await halachaDb.ref("b3Games/workspaces/"+ws+"/classes/"+id).once("value");
     const as=await halachaDb.ref("b3Games/workspaces/"+ws+"/classes/"+id+"/halachaAccess/maxSiman").once("value");
