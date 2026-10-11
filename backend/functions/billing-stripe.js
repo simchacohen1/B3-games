@@ -12,6 +12,7 @@ const admin=require('firebase-admin');
 const {normalizeOrder,stripeLineItems}=require('./billing-catalog.cjs');
 const {PRIVATE,activationUpdates}=require('./billing-fulfillment.cjs');
 const {subscriptionPlan,planMatchesOrder,latestInvoicePaid}=require('./billing-entitlements.cjs');
+const {portalSessionForTeacher}=require('./billing-portal-core.cjs');
 if(!admin.apps.length)admin.initializeApp();
 const secretKey=defineSecret('FTT_STRIPE_SECRET_KEY');
 const webhookKey=defineSecret('FTT_STRIPE_WEBHOOK_SECRET');
@@ -148,5 +149,33 @@ exports.funTorahStripeWebhook=onRequest({
   console.error('Stripe webhook processing failed',event.id,event.type,err.code||err.message);
   // Non-2xx makes Stripe retry instead of silently losing an entitlement update.
   res.status(500).send('Could not reconcile subscription');
+ }
+});
+
+
+// Billing Portal is for invoices, payment-method changes and cancellation.
+// Tool-addition UI needs separately reviewed product configuration.
+exports.funTorahBillingPortal=onRequest({
+ region:'us-central1',cors:ORIGINS,secrets:[secretKey],
+ maxInstances:3,timeoutSeconds:35
+},async(req,res)=>{
+ res.set('Cache-Control','no-store');
+ if(req.method!=='POST')return error(res,405,'Use POST.');
+ if(!ON())return error(res,503,'Billing management is not available yet.');
+ if(Buffer.byteLength(JSON.stringify(req.body||{}),'utf8')>1000)
+  return error(res,413,'Request too large.');
+ try{
+  const bearer=String(req.headers.authorization||'');
+  if(!/^Bearer [^\s]+$/.test(bearer))return error(res,403,'Teacher sign-in required.');
+  const identity=await admin.auth().verifyIdToken(bearer.slice(7),true);
+  const db=admin.database();
+  const store={get:async path=>(await db.ref(path).once('value')).val()};
+  const result=await portalSessionForTeacher(store,identity,req.body?.classId,
+   stripeClient(),BASE_URL+'/teacher-home.html');
+  res.json(result);
+ }catch(err){
+  console.error('Stripe billing portal request denied',err.status||err.code||'unexpected');
+  return error(res,Number.isInteger(err.status)?err.status:503,
+   Number.isInteger(err.status)?err.message:'Unable to open billing management.');
  }
 });
