@@ -7,11 +7,12 @@
   if(root.FTTAudio) return;
   const ID_KEY="fttAudioMode:20261011:";
   const PREFER=[
-    "Microsoft Guy Online (Natural)","Microsoft Aria Online (Natural)",
-    "Microsoft Jenny Online (Natural)","Microsoft Ana Online (Natural)",
-    "Microsoft Guy","Microsoft Aria","Microsoft Jenny",
-    "Google US English","Samantha","Daniel","Alex","Karen"
+    "Microsoft Guy Online (Natural)","Microsoft Guy",
+    "Microsoft David","Microsoft Mark","Microsoft Christopher",
+    "Daniel","Alex","Fred","Google UK English Male"
   ];
+  const MALE_HINT=/\b(guy|david|mark|christopher|daniel|alex|fred|james|george|ryan|thomas|oliver|male)\b/i;
+  const FEMALE_HINT=/\b(aria|jenny|ana|samantha|karen|zira|hazel|susan|female)\b/i;
   let voices=[],button=null,replayButton=null,lastContext="",lastContent="",timer=null,previousStudentId="";
   const currentId=()=>{
     try{return sessionStorage.getItem("b3Games_studentId")||
@@ -34,8 +35,9 @@
       const match=english.find(v=>v.name===preference || v.name.startsWith(preference+" -"));
       if(match)return match;
     }
-    return english.find(v=>/online.*natural|natural|neural|enhanced|premium/i.test(v.name))||
-      english.find(v=>!/compact/i.test(v.name))||english[0]||null;
+    return english.find(v=>MALE_HINT.test(v.name))||
+      english.find(v=>!FEMALE_HINT.test(v.name)&&/natural|neural|enhanced|premium/i.test(v.name))||
+      english.find(v=>!FEMALE_HINT.test(v.name))||english[0]||null;
   }
   function cleanText(value){
     return String(value||"").replace(/\s+/g," ").replace(/[🔊🎙🎉⭐✅]/gu,"").trim().slice(0,700);
