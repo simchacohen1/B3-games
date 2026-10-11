@@ -13,8 +13,11 @@ function activationUpdates(order,subscription,paid,now=Date.now()){
  // Only billing-created class IDs are modified; existing B3 classes are untouched.
  updates[p.classPath+'/name']=order.className;
  updates[p.classPath+'/active']=active;
- updates[p.classPath+'/billing']={managed:true,seatLimit:order.seats,active,
-   updatedAt:now};
+ // Update individual paths. Never overwrite seatAllocations on renewals.
+ updates[p.classPath+'/billing/managed']=true;
+ updates[p.classPath+'/billing/seatLimit']=order.seats;
+ updates[p.classPath+'/billing/active']=active;
+ updates[p.classPath+'/billing/updatedAt']=now;
  for(const id of order.tools){
   const product=PRODUCTS[id];
   if(!product)throw Error('Unrecognized stored product: '+id);
