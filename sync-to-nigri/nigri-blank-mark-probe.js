@@ -21,6 +21,28 @@
       if (result.status === 'blank_form_found') {
         status.textContent = 'New Mark form located. Fields: ' +
           (result.field_names || []).join(', ') + '. No mark created or saved.';
+        const s = result.header_form_structure || {};
+        if (s.status === 'header_form_structure_found') {
+          const knownMethods = {get:'GET',post:'POST',other:'other'};
+          const kinds = {
+            same_host_teacher_asp: 'Nigri teacher ASP page',
+            same_host_other_page: 'other Nigri page',
+            current_blank_form_url: 'current blank-form page',
+            external_or_untrusted: 'outside the approved Nigri host',
+            script_or_fragment: 'script/fragment'
+          };
+          const method = knownMethods[s.method] || 'unknown';
+          const action = kinds[s.action_kind] || 'unknown';
+          const hasSubmit = s.create_button_present === true ? 'yes' : 'not confirmed';
+          status.textContent += ' Read-only submission details: form method ' + method +
+            '; declared destination ' + action +
+            '; hidden fields ' + Number(s.hidden_input_count || 0) +
+            '; selection fields ' + Number(s.select_input_count || 0) +
+            '; Create Mark! button ' + hasSubmit +
+            '. Actual POST acceptance is untested.';
+        } else {
+          status.textContent += ' Submission details are unavailable or ambiguous.';
+        }
       } else if (result.status === 'blank_form_unconfirmed') {
         status.textContent = 'The page opened but a blank New Mark form could not be confirmed. No marks changed.';
       } else if (result.status === 'blank_form_get_not_200') {
