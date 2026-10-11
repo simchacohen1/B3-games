@@ -12,6 +12,7 @@
     try {
       localStorage.removeItem("b3TeacherWasSignedIn");
       localStorage.removeItem("b3TeacherBypass");
+      localStorage.removeItem("b3TeacherEmailLinkPending");
     } catch(_) {}
   }
   async function switchUser(target,auth){
