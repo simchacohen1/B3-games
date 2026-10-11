@@ -19,19 +19,29 @@
         status.textContent = 'Blocked trace unavailable (HTTP ' + response.status + ').';
         return;
       }
-      if (data.status === 'requests_blocked_and_class_change_inspected' &&
-          data.all_change_requests_blocked === true &&
-          data.nigri_writes === false) {
-        const kinds = Array.isArray(data.attempted_methods)
+      if ((data.status === 'requests_blocked_and_class_change_inspected' ||
+           data.status === 'no_class_change_requests_observed') &&
+          data.all_change_requests_blocked === true && data.nigri_writes === false) {
+        const observed = Number(data.attempted_request_count_capped || 0);
+        const methods = Array.isArray(data.attempted_methods)
           ? data.attempted_methods.filter(x => ['GET', 'POST', 'OTHER'].includes(x)) : [];
-        const methodText = kinds.length ? kinds.join(' and ') : 'none observed';
-        status.textContent = 'Safety trace complete: ' +
-          Number(data.attempted_request_count_capped || 0) +
-          ' request attempts intercepted; methods ' + methodText + '; ' +
-          (data.post_blocked ? 'a POST was blocked; ' : '') +
-          (data.attempted_xhr_or_fetch ? 'AJAX/fetch detected; ' : '') +
-          'every class-change request was blocked. No mark created or saved. ' +
-          'Shoroshim after an actual refresh is STILL unverified.';
+        const yesNo = flag => flag === true ? 'yes' : 'no';
+        const before = Number(data.topic_options_initial_count || 0);
+        const after = Number(data.topic_options_after_count || 0);
+        let message = observed
+          ? 'Blocked trace: ' + observed + ' attempted requests cancelled. Methods: ' +
+             methods.join(' and ') + '. '
+          : 'No class-change network requests were observed. GET versus POST is still unknown. ';
+        message += 'Class-change event observed: ' + yesNo(data.change_event_observed) +
+          '; B3 ET selected afterward: ' + yesNo(data.b3_et_selected_after) +
+          '; Shoroshim remains in the local dropdown: ' +
+          yesNo(data.shoroshim_present_after_blocked_change) +
+          '; topic options before/after: ' + before + '/' + after +
+          '; scripts blocked while opening form: ' +
+          Number(data.blocked_scripts_before_change || 0) +
+          '; script errors observed: ' + Number(data.script_errors_seen_capped || 0) +
+          '. The server-refreshed Shoroshim list is NOT verified. No grades were changed.';
+        status.textContent = message;
       } else if (data.status === 'insufficient_memory' ||
                  data.status === 'insufficient_memory_after_login' ||
                  data.status === 'insufficient_memory_after_form' ||
