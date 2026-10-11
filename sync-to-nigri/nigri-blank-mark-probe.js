@@ -25,6 +25,17 @@
         status.textContent = 'The page opened but a blank New Mark form could not be confirmed. No marks changed.';
       } else if (result.status === 'blank_form_get_not_200') {
         status.textContent = 'The form request returned HTTP ' + result.http_status + '. Redirects were not followed.';
+      } else if (result.link_diagnostics) {
+        const d = result.link_diagnostics;
+        const flags = [];
+        if (d.link_kind) flags.push('Link type: ' + d.link_kind);
+        if (typeof d.expected_asp_path === 'boolean') flags.push('Expected page: ' + (d.expected_asp_path ? 'yes' : 'no'));
+        if (typeof d.section_is_teachers === 'boolean') flags.push('Teacher section: ' + (d.section_is_teachers ? 'yes' : 'no'));
+        if (typeof d.tests_section_present === 'boolean') flags.push('Tests section: ' + (d.tests_section_present ? 'yes' : 'no'));
+        if (Array.isArray(d.recognized_query_keys)) flags.push('Recognized parameters: ' + (d.recognized_query_keys.join(', ') || 'none'));
+        if (typeof d.unknown_query_key_count === 'number') flags.push('Unrecognized parameters: ' + d.unknown_query_key_count);
+        if (typeof d.unsupported_action_key_count === 'number') flags.push('Unsafe/unknown actions: ' + d.unsupported_action_key_count);
+        status.textContent = 'The New Mark link was not opened for safety. ' + flags.join('; ') + '. No marks changed.';
       } else {
         status.textContent = 'Inspection stopped safely (' + String(result.status || data.status || 'unknown') + '). No marks changed.';
       }
