@@ -1016,7 +1016,11 @@
       endAuthChecking();
       return function unsubscribe() {};
     }
+    // Firebase sign-out is asynchronous across tabs. An older profile read
+    // must never restore teacher UI after a newer signed-out auth event.
+    let authGeneration=0;
     return services.auth.onAuthStateChanged(function (user) {
+      const generation=++authGeneration;
       if (!user) {
         currentAccess = { authorized:false, role:"", classIds:[] };
         setSignedInHint(false);
@@ -1035,6 +1039,9 @@
         return;
       }
       readUserAccess(user).then(function(access){
+        // Block stale profile/invitation responses after sign-out or user switch.
+        const current=services.auth.currentUser;
+        if(generation!==authGeneration || !current || current.uid!==user.uid) return;
         currentAccess = access;
         if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
         else showToolVersions(access);
