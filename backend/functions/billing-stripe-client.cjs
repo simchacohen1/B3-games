@@ -65,7 +65,10 @@ function stripeClient(secret){
  return {
   checkout:{sessions:{create:(data,opts)=>request(secret,'POST','/checkout/sessions',data,opts)}},
   billingPortal:{sessions:{create:(data,opts)=>request(secret,'POST','/billing_portal/sessions',data,opts)}},
-  subscriptions:{retrieve:(id,query)=>request(secret,'GET','/subscriptions/'+encodeURIComponent(id),query)},
+  subscriptions:{retrieve:(id,query)=>request(secret,'GET','/subscriptions/'+encodeURIComponent(id),query),
+    update:(id,data,opts)=>request(secret,'POST','/subscriptions/'+encodeURIComponent(id),data,opts)},
+  invoices:{createPreview:(data)=>request(secret,'POST','/invoices/create_preview',data)},
+  prices:{retrieve:(id,query)=>request(secret,'GET','/prices/'+encodeURIComponent(id),query)},
   webhooks:{constructEvent:(raw,header,whsec)=>verifyWebhook(raw,header,whsec)}
  };
 }
