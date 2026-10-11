@@ -18,13 +18,10 @@ function activationUpdates(order,subscription,paid,now=Date.now()){
  updates[p.classPath+'/billing/seatLimit']=order.seats;
  updates[p.classPath+'/billing/active']=active;
  updates[p.classPath+'/billing/updatedAt']=now;
- for(const id of order.tools){
-  const product=PRODUCTS[id];
-  if(!product)throw Error('Unrecognized stored product: '+id);
-  updates[p.classPath+'/toolGrants/'+product.grant]=active;
+ // Explicitly close every unpurchased tool. Downgrades never leave stale grants.
+ for(const [id,product] of Object.entries(PRODUCTS)){
+  updates[p.classPath+'/toolGrants/'+product.grant]=active&&order.tools.includes(id);
  }
- // Class Gallery and Tag Game currently share a tool-policy alias.
- // Do not offer real checkout until their grants are isolated.
  updates[p.invitePath+'/email']=order.teacherEmail;
  updates[p.invitePath+'/name']=order.teacherName;
  updates[p.invitePath+'/role']='teacher';
