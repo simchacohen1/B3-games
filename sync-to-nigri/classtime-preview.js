@@ -17,6 +17,7 @@
   function today() { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
 
   function plainDuplicate(check) {
+    if (check.status === 'skipped') return {text: 'Duplicates are not checked in Nigri. Check Nigri yourself before saving this session again.', kind: 'warn'};
     if (check.status === 'clear') return {text: 'Not saved yet: no mark for this session was found in Nigri.', kind: 'good'};
     if (check.status === 'duplicate') return {text: 'Already saved: Nigri already has a mark for this session' + (check.matches && check.matches.length ? ' ("' + check.matches[0] + '")' : '') + '. A real save would refuse.', kind: 'warn'};
     return {text: 'Could not check whether this session is already saved' + (check.detail ? ' (' + check.detail + ')' : '') + '. A real save would refuse until it can check.', kind: 'warn'};

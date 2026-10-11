@@ -40,7 +40,7 @@ test('files are valid and the real-save button is still disabled',()=>{
   new vm.Script(src);
   assert.match(page,/<button disabled aria-disabled="true">Sync to Nigri/);
   assert.equal((page.match(/id="previewBtn"/g)||[]).length,1);
-  assert.match(page,/<script src="\.\/classtime-review\.js"><\/script>[\s\S]*<script src="\.\/classtime-preview\.js"><\/script>/);
+  assert.match(page,/<script src="\.\/classtime-review\.js"><\/script>[\s\S]*<script src="\.\/classtime-preview\.js(?:\?[^\"]*)?"><\/script>/);
 });
 test('the preview code has no key, no write route, no fallback, and never builds HTML from names',()=>{
   assert.doesNotMatch(src,/X-Sync-Key|sync-marks|sync-points|innerHTML|insertAdjacentHTML|eval\(/);
@@ -112,4 +112,11 @@ test('an answer for an old review is dropped if a new review was loaded meanwhil
   t.open(RESULT);const click=t.els.previewBtn.click();await new Promise(r=>setTimeout(r,0));
   t.open({...RESULT,session_code:'ZZZ999'});release();await click;
   assert.equal(texts(t.els.previewResult),'');
+});
+
+ test('disabled duplicate lookup is honestly described without claiming a clear result',()=>{
+  const {api}=load();
+  const text=api.summarize({...SAMPLE,duplicate_check:{status:'skipped'}}).map(l=>l.text).join(' ');
+  assert.match(text,/Duplicates are not checked in Nigri/);
+  assert.doesNotMatch(text,/Not saved yet|would refuse until/);
 });

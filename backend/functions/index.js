@@ -2559,6 +2559,8 @@ exports.funTorahTeacherClaim = require("./teacher-claim").funTorahTeacherClaim;
 exports.funTorahManageStudents = require("./student-management").funTorahManageStudents;
 // Server-side student sign-in (passcodes never reach the browser).
 exports.funTorahStudentAuth = require("./student-auth").funTorahStudentAuth;
+// Server-verified student screenshot submissions, pending teacher approval.
+exports.classGallerySubmit = require("./class-gallery-submit").classGallerySubmit;
 // Student Rewards for every teacher (class-scoped, server-checked).
 exports.studentRewardsTeacher = require("./rewards-teacher").studentRewardsTeacher;
 
