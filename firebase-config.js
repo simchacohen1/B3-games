@@ -64,3 +64,17 @@ window.B3_DATA_MODEL = Object.freeze({
     return "b3Games/workspaces/" + String(workspaceId || "") + "/sharedResources/" + String(resourceId || "");
   }
 });
+
+
+// Load the shared student-only Add to Gallery button in every activity that
+// already loads Firebase configuration. Button waits for a live verified API.
+(function () {
+  if (typeof document === 'undefined' || window.__fttGalleryShareLoading) return;
+  window.__fttGalleryShareLoading = true;
+  const current = document.currentScript;
+  if (!current || !current.src) return;
+  const loader = document.createElement('script');
+  loader.src = new URL('gallery-share.js?v=20261011a', current.src).href;
+  loader.async = true;
+  (document.head || document.documentElement).appendChild(loader);
+})();
