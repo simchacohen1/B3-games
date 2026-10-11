@@ -52,6 +52,22 @@
         } else {
           status.textContent += ' Submission details are unavailable or ambiguous.';
         }
+        const dep = result.readonly_form_dependencies || {};
+        if (dep.status === 'form_controls_observed' &&
+            dep.read_only === true &&
+            dep.no_grade_selected === true && dep.no_ajax_called === true) {
+          const display = yes => yes === true ? 'found' : 'not found initially';
+          status.textContent +=
+            ' Additional read-only inspection: B3 ET ' + display(dep.b3_et_option_present) +
+            '; B3 WT ' + display(dep.b3_wt_option_present) +
+            '; Shoroshim topic ' + display(dep.shoroshim_topic_option_initially_present) +
+            '; quiz option ' + display(dep.quiz_type_radio_present) +
+            '; hidden fields ' + Number(dep.hidden_input_count || 0) +
+            ' (empty ' + Number(dep.hidden_blank_count || 0) +
+            ', zero ' + Number(dep.hidden_zero_count || 0) +
+            ', other values hidden ' + Number(dep.hidden_nonblank_redacted_count || 0) +
+            '). Selecting a class and its AJAX topic refresh remain untested. No selections were made.';
+        }
       } else if (result.status === 'blank_form_unconfirmed') {
         status.textContent = 'The page opened but a blank New Mark form could not be confirmed. No marks changed.';
       } else if (result.status === 'blank_form_get_not_200') {
