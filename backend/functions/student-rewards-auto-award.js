@@ -1314,7 +1314,7 @@ async function awardEffortEvent(student,body){
   const now=Date.now(),day=effort.dayKey(now),ref=rtdb.ref(SR_ROOT+'/effortPoints/'+student.studentId+'/'+day);
   let outcome=null;
   const transaction=await ref.transaction(current=>{
-    const result=effort.recordEvent(current,now,tool,classId,eventId);
+    const result=effort.recordEvent(current,now,tool,classId,eventId,body.breakBefore===true);
     if(!result.changed)return;
     outcome=result;
     return result.state;
