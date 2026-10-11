@@ -12,3 +12,11 @@ test('Chazara backend rejects changing another student before any write',async()
 test('Chazara backend rejects approving another class request',async()=>{const d=data();d['studentRewards/pointRequests/request']={source:'chazara',practiceStudentId:'mine',workspaceClassId:'beta',status:'pending'};const x=backend(d,claims),r=await x.run({action:'approve-point-request',classId:'alpha',requestId:'request'});assert.equal(r.code,403);assert.equal(x.writes.length,0)});
 test('Chazara teacher access never enables global rewards administration',async()=>{const x=backend(data(),claims),r=await x.run({action:'read-rewards-data',classId:'all'});assert.equal(r.code,401);assert.equal(x.writes.length,0);assert.ok(!x.reads.includes('studentRewards'))});
 test('browser and backend use the same class scope policy',()=>assert.equal(fs.readFileSync('teacher-class-scope.js','utf8'),fs.readFileSync('backend/functions/teacher-class-scope.js','utf8')));
+
+test('owner Chazara roster includes all active classes, not only ET and WT',async()=>{
+ const root='b3Games/workspaces/b3-2026/classes',d=data();
+ d[root]={et:{active:true,name:'ET',members:{}},wt:{active:true,name:'WT',members:{}},alpha:d[root+'/alpha'],disabled:{active:false,members:{}}};
+ const records=await scopeApi.roster(async p=>d[p],{authorized:true,role:'admin'},'');
+ assert.deepEqual(Object.keys(records.classes).sort(),['alpha','et','wt']);
+ assert.deepEqual(Object.keys(records.students),['mine']);
+});
