@@ -12,6 +12,7 @@
     hybrid_browser_signin_stopped: 'The short browser sign-in failed or stopped safely. No grades were changed.',
     hybrid_http_marks_stopped: 'The short browser sign-in completed, but the HTTP marks check stopped. No grades were changed.',
     hybrid_stopped_by_memory_guard: 'Render stopped the read-only test to protect memory. No grades were changed.',
+    hybrid_insufficient_headroom: 'Chromium started with too little safe memory available, so the test stopped before opening Nigri. No grades were changed. Please do not repeatedly retry.',
     credentials_missing: 'Nigri credentials are not configured on the server.'
   };
 
