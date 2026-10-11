@@ -150,7 +150,7 @@ async function renderTeacherAccess(msg){
   const w=frame.contentWindow,db=w?.firebase?.database?.(),access=w?.B3SiteSettings?.getCurrentAccess?.()||{},ws=w?.B3SiteSettings?.workspaceId||"b3-2026";
   if(!db||!w?.B3SiteSettings){panel.innerHTML='<div class="ta-wrap"><div class="ta-card">Loading teacher sign-in…</div></div>';setTimeout(()=>{if(currentTab==="access"&&!isOwnerNow())renderTeacherAccess()},900);return}
   if(!access.authorized){
-    panel.innerHTML='<div class="ta-wrap"><div class="ta-card"><h2>Teacher &amp; administrator sign in</h2><p>Sign in with your authorized Google account to open your classes.</p><button type="button" id="taSignIn">Sign in with Google</button><p role="status" id="taSignInStatus"></p></div></div>';
+    panel.innerHTML='<div class="ta-wrap"><div class="ta-card"><h2>Teacher &amp; administrator sign in</h2><p>Use your authorized school email or Google account to open your classes.</p><button type="button" id="taSignIn">Continue with Google</button><p><a href="teacher-home.html">Sign in with email instead</a></p><p role="status" id="taSignInStatus"></p></div></div>';
     document.getElementById('taSignIn').onclick=async()=>{try{await w.B3SiteSettings.signInWithGoogle();applyRoleView();showTab(currentTab);}catch(error){document.getElementById('taSignInStatus').textContent=error.message||'Could not sign in. Please try again.';}};
     return;
   }
