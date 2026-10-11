@@ -33,8 +33,11 @@ function esc(s){return String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&l
 const HALACHA_SECTION_IDS=["a","b","c","d","e","f","s2a","s2b","s2c","s2d","s3a","s3b","s3c","s3d","s3e","s4a","s4b","s4c","s4d","s4e","s4f","s6a","s6b","s6c","s6d","s6e","s6f","s6g","s6h","s6i","s6j","s6k"];const SIMAN_ORDER=["א","ב","ג","ד","ו"];
 function doneCount(st){return HALACHA_SECTION_IDS.filter(x=>st&&st[x+"_done"]).length}
 async function editableClassIds(access){
- if(access?.role==="admin"){const snap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");return Object.entries(snap.val()||{}).filter(([,r])=>r?.active!==false).map(([id])=>id)}
- return (access?.classIds||[]).filter(Boolean);
+ const snap=await db.ref("b3Games/workspaces/"+workspaceId+"/classes").once("value");
+ const classes=snap.val()||{};
+ if(access?.role==="admin")return Object.entries(classes).filter(([,row])=>row?.active!==false).map(([id])=>id);
+ const assigned=new Set((access?.classIds||[]).filter(Boolean));
+ return Object.entries(classes).filter(([id,row])=>assigned.has(id)&&row?.active!==false&&row?.toolGrants?.halacha===true).map(([id])=>id);
 }
 async function renderSimanAccess(access){
  const box=document.getElementById("accessRows");if(!box)return;
@@ -57,7 +60,7 @@ async function authorizedRoster(access){
   const unique=new Map();groups.flat().forEach(x=>{if(!unique.has(x.id))unique.set(x.id,x)});
   return [...unique.values()].sort((a,b)=>a.name.localeCompare(b.name));
  }
- const ids=(access?.classIds||[]).filter(Boolean);
+ const ids=await editableClassIds(access);
  const groups=await Promise.all(ids.map(classMembers));
  const unique=new Map();groups.flat().forEach(x=>{if(!unique.has(x.id))unique.set(x.id,x)});
  return [...unique.values()].sort((a,b)=>a.name.localeCompare(b.name));
