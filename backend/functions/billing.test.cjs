@@ -234,13 +234,13 @@ test('Teacher sees real Stripe proration before explicitly approving annual tool
    update:async(id,args,options)=>{updateCalls++;upgradeArgs={id,args,options};return {...sub,pending_update:{}};}
   },
   prices:{retrieve:async()=>({
-   id:'price_new_posuk',active:true,currency:'usd',unit_amount:7900,
+   id:'price_newposuk123',active:true,currency:'usd',unit_amount:7900,
    recurring:{interval:'year',interval_count:1},
    product:{active:true,metadata:{fttKind:'tool',fttToolId:'posuk'}}
   })},
   invoices:{createPreview:async()=>{previewCalls++;return {currency:'usd',amount_due:3950};}}
  };
- const allowedPrices={posuk:'price_new_posuk'};
+ const allowedPrices={posuk:'price_newposuk123'};
  const now=Date.now();
  const quote=await previewUpgrade(store,identity,{classId:cid,toolId:'posuk'},stripe,allowedPrices,now);
  assert.equal(quote.chargeNowCents,3950);
@@ -258,7 +258,7 @@ test('Teacher sees real Stripe proration before explicitly approving annual tool
  assert.equal(upgradeArgs.args.payment_behavior,'pending_if_incomplete');
  assert.equal(upgradeArgs.args.billing_cycle_anchor,'unchanged');
  assert.equal(upgradeArgs.args.proration_date,Math.floor(now/1000));
- assert.equal(upgradeArgs.args.items[0].price,'price_new_posuk');
+ assert.equal(upgradeArgs.args.items[0].price,'price_newposuk123');
  assert.ok(upgradeArgs.options.idempotencyKey.includes(quote.quoteId));
  assert.equal(data[p+'/upgradeQuotes/'+quote.quoteId+'/status'],'submitted');
  await assert.rejects(confirmUpgrade(store,identity,{quoteId:quote.quoteId,acknowledge:true,
