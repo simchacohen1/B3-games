@@ -81,9 +81,34 @@ async function render(user,access){
  if(generation!==renderGeneration)return;
  q("classes").innerHTML=snaps.map((s,i)=>{const id=ids[i],row=s.val()||{},grants=row.toolGrants||{},enabled=Object.entries(grants).filter(x=>x[1]===true&&TOOLS[x[0]]);if(grants["student-rewards"]===true&&!enabled.some(([tool])=>tool==="daily-points"))enabled.push(["daily-points",true]);const tools=enabled.map(([tool])=>{const teacherHref=TOOLS[tool][1]+(TOOLS[tool][1].includes('?')?'&':'?')+'class='+encodeURIComponent(id);const studentPath=STUDENT_TOOLS[tool];const studentHref=studentPath?studentPath+(studentPath.includes('?')?'&':'?')+'demo=1&class='+encodeURIComponent(id):'';return '<div class="tool"><span class="tool-icon '+(tool==='rashi-letters'?'rashi':'')+'" aria-hidden="true">'+(ICONS[tool]||'')+'</span><span>'+esc(TOOLS[tool][0])+'</span><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px"><a href="'+teacherHref+'" target="_blank" rel="noopener">'+'Open'+'</a></div></div>';}).join("");
  if(!s.exists()||row.active===false)return "";
- return '<section class="class-card"><div class="class-head"><h2>'+esc(row.name||id)+'</h2><span style="display:flex;gap:8px;flex-wrap:wrap"><a class="manage" style="background:#15803d" href="student-report/index.html?class='+encodeURIComponent(id)+'" target="_blank" rel="noopener">📈 Student Report</a><a class="manage" href="admin.html?tab=students&class='+encodeURIComponent(id)+'">Manage Class</a></span></div><div class="tools">'+(tools||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>'
+ return '<section class="class-card"><div class="class-head"><h2>'+esc(row.name||id)+'</h2><span style="display:flex;gap:8px;flex-wrap:wrap"><a class="manage" style="background:#15803d" href="student-report/index.html?class='+encodeURIComponent(id)+'" target="_blank" rel="noopener">📈 Student Report</a><a class="manage" href="admin.html?tab=students&class='+encodeURIComponent(id)+'">Manage Class</a>'+(row.billing?.managed===true&&access.role==='teacher'&&!previewActive?'<button type="button" class="manage" data-billing-class="'+esc(id)+'">💳 Manage Billing</button>':'')+'</span></div><div class="tools">'+(tools||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>'
  }).join("")||'<div class="welcome">No classes are assigned to this teacher yet.</div>';
  if(!previewActive&&window.B3StudentToolControls)window.B3StudentToolControls.bind(q("classes"));
+ if(!previewActive){
+  q('classes').querySelectorAll('[data-billing-class]').forEach(button=>{
+   button.addEventListener('click',async()=>{
+    button.disabled=true;button.textContent='Opening Stripe…';
+    try{
+     const current=firebase.auth().currentUser;
+     if(!current)throw Error('Please sign in with your Google teacher account.');
+     const reply=await fetch('https://us-central1-b3-games.cloudfunctions.net/funTorahBillingPortal',{
+      method:'POST',headers:{'Content-Type':'application/json',
+       Authorization:'Bearer '+await current.getIdToken()},
+      body:JSON.stringify({classId:button.getAttribute('data-billing-class')})
+     });
+     const data=await reply.json().catch(()=>({}));
+     if(!reply.ok)throw Error(data.error||'Billing management is unavailable.');
+     if(!/^https:\/\/billing\.stripe\.com\//.test(data.url||''))
+      throw Error('Unexpected Stripe billing link.');
+     location.assign(data.url);
+    }catch(error){
+     button.disabled=false;button.textContent='💳 Manage Billing';
+     alert(error?.message||'Could not open Stripe billing.');
+    }
+   });
+  });
+ }
+
  if(previewActive){
    q('signOut').classList.add('hidden');q('actAsStudent').classList.add('hidden');
    q('who').textContent='Viewing as '+user.email;
