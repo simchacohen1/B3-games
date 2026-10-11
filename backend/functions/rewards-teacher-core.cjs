@@ -15,7 +15,7 @@ const categoryKey=n=>String(n||'category').replace(/[^A-Za-z0-9_-]+/g,'_').repla
 const pick=(obj,ids)=>Object.fromEntries(ids.filter(id=>obj&&obj[id]!==undefined).map(id=>[id,obj[id]]));
 
 async function teacherAccess(store,identity){
- if(!identity?.uid||identity.email_verified!==true||identity.firebase?.sign_in_provider!=='google.com')fail(403,'Verified Google teacher sign-in required.');
+ if(!require('./teacher-auth-identity.cjs').verifiedTeacherIdentity(identity))fail(403,'Verified teacher sign-in required.');
  const email=String(identity.email||'').toLowerCase();
  const admin=await store.get('b3Games/admins/'+identity.uid);
  const owner=email===ADMIN_EMAIL||Boolean(admin&&admin.active!==false);
