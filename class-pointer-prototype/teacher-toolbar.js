@@ -47,7 +47,7 @@
   dock.addEventListener('click',event=>{
     const b=event.target.closest('button');if(!b||!dock.contains(b))return;
     if(b.dataset.mode==='point')setSource(toolSel,lastShape);
-    else if(['highlight','box'].includes(b.dataset.mode))setSource(toolSel,b.dataset.mode);
+    else if(['highlight','box','pen'].includes(b.dataset.mode))setSource(toolSel,b.dataset.mode);
     else if(b.dataset.shape){lastShape=b.dataset.shape;setSource(toolSel,lastShape);closeMenus()}
     else if(b.hasAttribute('data-color'))setSource(colorSel,b.dataset.color);
     else if(b.dataset.size){setSource(sizeSel,b.dataset.size);if(!window.ClassPointerCore.highlightTools.includes(toolSel.value))setSource(toolSel,'highlight')}
@@ -62,7 +62,7 @@
   document.addEventListener('keydown',event=>{
     if(dock.hidden||event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.('input,select,textarea'))return;
     const k=event.key.toLowerCase();
-    if(k==='p')setSource(toolSel,lastShape);else if(k==='h')setSource(toolSel,'highlight');else if(k==='b')setSource(toolSel,'box');else if(k==='u'){$(studentView?'undoStudentHighlight':'undoTeacherHighlight').click()}else return;
+    if(k==='p')setSource(toolSel,lastShape);else if(k==='h')setSource(toolSel,'highlight');else if(k==='b')setSource(toolSel,'box');else if(k==='d')setSource(toolSel,'pen');else if(k==='u'){$(studentView?'undoStudentHighlight':'undoTeacherHighlight').click()}else return;
     sync();
   });
 

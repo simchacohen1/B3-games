@@ -11,7 +11,8 @@
   const $=id=>document.getElementById(id),stage=$('stage'),isTeacher=B.isTeacher,ns='http://www.w3.org/2000/svg';
   const pdfjs=window.pdfjsLib;
   const Web=window.ClassPointerWebpageCore;
-  let webMode=false,opening=0;
+  let webMode=false,opening=0,docLabel='webpage';
+  function navWord(){return webMode?(docLabel==='whiteboard'?'Whiteboard':'Webpage'):'PDF'}
 
   let doc=null,docId=null,docName='',bytes=null,lay=null,pageEls=[],rendered=new Map();
   // Page-by-page mode (big files): the teacher sends page pictures; students keep them in pageUrls.
@@ -52,7 +53,7 @@
     shiftBtn=button('◧ Page 1 alone','Show page 1 by itself and start the pairs at page 2',()=>changeLayout({shift:!layoutOpts.shift}),'pdf-btn pdf-spread-only');
     nav.appendChild(el('span',null,'pdf-sep'));
     button('✕ Close PDF','Close the PDF for everyone',()=>closePdf(),'pdf-btn pdf-close');
-    const toggle=button('▾ Hide','Hide these buttons (for example while sharing this tab on Zoom)',()=>{const min=nav.classList.toggle('min');toggle.textContent=min?(webMode?'▴ Webpage controls':'▴ PDF controls'):'▾ Hide'},'pdf-btn pdf-toggle');
+    const toggle=button('▾ Hide','Hide these buttons (for example while sharing this tab on Zoom)',()=>{const min=nav.classList.toggle('min');toggle.textContent=min?'▴ '+navWord()+' controls':'▾ Hide'},'pdf-btn pdf-toggle');
     ['pointerdown','pointermove','pointerup','pointercancel','click','dblclick','wheel'].forEach(type=>nav.addEventListener(type,event=>event.stopPropagation()));
     stage.appendChild(nav);
     // Ctrl + mouse wheel (or trackpad pinch) zooms the PDF instead of the whole page.
@@ -107,10 +108,10 @@
   function updateControls(){
     if(!isTeacher||!nav)return;
     nav.hidden=!doc;if(!doc)return;
-    nav.setAttribute('aria-label',webMode?'Webpage controls':'PDF controls');
-    if(nav.classList.contains('min'))nav.querySelector('.pdf-toggle').textContent=webMode?'▴ Webpage controls':'▴ PDF controls';
+    nav.setAttribute('aria-label',navWord()+' controls');
+    if(nav.classList.contains('min'))nav.querySelector('.pdf-toggle').textContent='▴ '+navWord()+' controls';
     nav.querySelectorAll('.pdf-jump,.pdf-two,.pdf-spread-only').forEach(node=>node.hidden=webMode);
-    nav.querySelectorAll('button').forEach(node=>{if(node.title==='Previous page'||node.title==='Next page'||node.title==='Jump to this page')node.hidden=webMode;if(node.classList.contains('pdf-close')){node.textContent=webMode?'✕ Close webpage':'✕ Close PDF';node.title=webMode?'Close the webpage for everyone':'Close the PDF for everyone'}});
+    nav.querySelectorAll('button').forEach(node=>{if(node.title==='Previous page'||node.title==='Next page'||node.title==='Jump to this page')node.hidden=webMode;if(node.classList.contains('pdf-close')){node.textContent='✕ Close '+navWord().toLowerCase().replace('pdf','PDF');node.title='Close the '+navWord().toLowerCase().replace('pdf','PDF')+' for everyone'}});
     pageTotal.textContent=' of '+lay.count;pageInput.max=String(lay.count);
     if(document.activeElement!==pageInput)pageInput.value=String(currentPage()+1);
     zoomLabel.textContent=Math.round(zoom*100)+'%';
@@ -171,15 +172,15 @@
     const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
     if(stroke.tool==='box')return svg('rect',{x:Math.min(first.x,last.x)*W,y:Math.min(first.y,last.y)*H,width:Math.abs(last.x-first.x)*W,height:Math.abs(last.y-first.y)*H,fill:color});
     const pts=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
-    return svg('path',{d:pts.map((p,i)=>(i?'L':'M')+(p.x*W).toFixed(1)+' '+(p.y*H).toFixed(1)).join(' '),fill:'none',stroke:color,'stroke-width':stroke.size*W,'stroke-linecap':'round','stroke-linejoin':'round'});
+    return svg('path',{d:pts.map((p,i)=>(i?'L':'M')+(p.x*W).toFixed(1)+' '+(p.y*H).toFixed(1)).join(' '),fill:'none',stroke:color,'stroke-width':stroke.size*W*(stroke.tool==='pen'?0.45:1),'stroke-linecap':'round','stroke-linejoin':'round'});
   }
   function drawInk(){
     ink.replaceChildren();if(notReady())return;
     const all=draft?[...strokes,{...draft,owner:B.owner()}]:strokes,groups=new Map();
     for(const stroke of all){
-      const kind=['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight',key=stroke.owner+'|'+kind;
+      const kind=['pencil','crayon','pen'].includes(stroke.tool)?stroke.tool:'highlight',key=stroke.owner+'|'+kind;
       let group=groups.get(key);
-      if(!group){group=svg('g',{'data-owner':stroke.owner,'data-tool':kind,opacity:kind==='pencil'?'0.94':kind==='crayon'?'0.78':'0.32'});groups.set(key,group);ink.appendChild(group)}
+      if(!group){group=svg('g',{'data-owner':stroke.owner,'data-tool':kind,opacity:kind==='pen'?'1':kind==='pencil'?'0.94':kind==='crayon'?'0.78':'0.32'});groups.set(key,group);ink.appendChild(group)}
       group.appendChild(inkPath(stroke,stroke.color));
     }
   }
@@ -207,7 +208,7 @@
   });
   function extend(event){
     if(!draft||event.pointerId!==dragId)return;const p=normalized(event);if(!p)return;
-    if(draft.tool!=='highlight'){draft.points=[draft.points[0],p];return}
+    if(!['highlight','pen'].includes(draft.tool)){draft.points=[draft.points[0],p];return}
     const last=draft.points[draft.points.length-1];
     if(Math.hypot((p.x-last.x)*W,(p.y-last.y)*H)>4&&draft.points.length<256)draft.points.push(p);
   }
@@ -301,17 +302,19 @@
       if(data.length>Web.MAX_BYTES)throw Error('This webpage is larger than 8 MB.');
       if(token!==opening)return;
       closePdf(true);const committed=opening;if(B.sharing())B.stopSharing();
-      await loadWebDoc(data);if(opening!==committed)return;bytes=data;docName=P.cleanName(name);docId=crypto.randomUUID();
+      docLabel='webpage';await loadWebDoc(data);if(opening!==committed)return;bytes=data;docName=P.cleanName(name);docId=crypto.randomUUID();
       showNote('');B.resetMarks();B.setPdf(true,'webpage');
       B.status('Webpage open. Students follow your scrolling and zoom. Use the lesson tools to point and highlight.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
     }catch(error){showNote('');B.fail(error.message||'Could not open this webpage.')}
     finally{$('openWebpage').disabled=false}
   }
-  async function openSnapshot(dataUrl,width,height){
+  // opts (optional): {name, label:'whiteboard', kind:'whiteboard', status} — used by the blank whiteboard in student-boards.js.
+  async function openSnapshot(dataUrl,width,height,opts={}){
+    const board=opts.label==='whiteboard';
     if(!isTeacher||!Web||typeof dataUrl!=='string'||!/^data:image\/jpeg;base64,/.test(dataUrl))throw Error('Invalid captured tab image.');
     if(!Number.isFinite(width)||!Number.isFinite(height)||width<100||height<100)throw Error('Invalid snapshot size.');
-    const token=++opening;B.clearError();showNote('Preparing captured tab…');
+    const token=++opening;B.clearError();showNote(board?'Opening whiteboard…':'Preparing captured tab…');
     try{
       const h=Math.max(100,Math.round(Web.WIDTH*height/width));
       const html='<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden}img{display:block;width:1000px;height:'+h+'px}</style></head><body><img alt="Captured browser tab" src="'+dataUrl+'"></body></html>';
@@ -321,9 +324,9 @@
       if(token!==opening)return;
       closePdf(true);const committed=opening;if(B.sharing())B.stopSharing();
       await loadWebDoc(data);if(opening!==committed)return;
-      bytes=data;docName='Browser tab snapshot';docId=crypto.randomUUID();
-      showNote('');B.resetMarks();B.setPdf(true,'webpage');
-      B.status('Static tab snapshot open. Zoom, drag and highlight here without changing the original tab.');
+      bytes=data;docName=board?P.cleanName(opts.name||'Whiteboard'):'Browser tab snapshot';docLabel=board?'whiteboard':'webpage';docId=crypto.randomUUID();
+      showNote('');B.resetMarks();B.setPdf(true,board?'whiteboard':'webpage');updateControls();
+      B.status(board?(opts.status||'Whiteboard open.'):'Static tab snapshot open. Zoom, drag and highlight here without changing the original tab.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
       return true;
     }catch(error){showNote('');B.fail(error.message||'Could not open the captured tab.');return false}
