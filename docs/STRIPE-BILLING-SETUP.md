@@ -40,9 +40,13 @@ cancellation. Taxes and compliance must be reviewed separately.
   Subsequent subscription events reconcile to Stripe's current state.
 - A teacher claims a paid invitation by signing in with the matching, verified
   Google email via the existing teacher-claim endpoint.
-- Initial seat-count validation has been added to student management for
-  paid classes, **but it still needs an atomic reservation** to prevent two
-  concurrent creates at the seat boundary.
+- Student seat admission now uses a Firebase transaction on each paid
+  class's `billing.seatAllocations` map. Creates, adds and reactivations
+  reserve before writing and removals/deactivations release afterward.
+  Renewals only update specific `billing` fields and preserve allocations.
+  Unit tests cover concurrent requests. **End-to-end emulator checks are
+  still needed for failed writes, races with subscription cancellation, and
+  capacity reconciliation.**
 
 ## Secrets and deployment (only after launch blockers are resolved)
 
@@ -88,8 +92,8 @@ Firebase/Stripe integration.
    existing legacy roots contain public read/write permissions. Ensure every
    teacher/student API uses authenticated per-class access and that B3 legacy
    data isn't exposed cross-school.
-4. Make paid student seat limits **atomic/transactional** across create, add
-   and reactivate, with tests for concurrent requests.
+4. Verify the new transactional seat limits end-to-end in Firebase
+   emulator with concurrent requests, update failures and reconciliation.
 5. Integration-test sandbox card success, failed payment, expired/canceled
    checkout, duplicate and reordered webhooks, renewal, nonpayment,
    cancellations, refunds within seven days and renewal terms.
@@ -101,7 +105,13 @@ Firebase/Stripe integration.
    verify webhook event replay handling in production.
 9. Prefer stable Stripe catalog products/prices rather than creating new
    inline Price/Product objects for every checkout.
-10. Obtain final owner approval before configuring live secrets, publishing
+10. Build an authenticated customer subscription-change flow for purchasing
+    or removing tools and adding seats mid-year; define proration and renewal
+    behavior and test webhooks for those changes. The current checkout
+    supports only initial plan purchases.
+11. Implement refund workflows: refunding an initial purchase must also
+    cancel the subscription, revoke paid access and avoid later renewal charges.
+12. Obtain final owner approval before configuring live secrets, publishing
     the registration entry point or turning on billing.
 
 The owner’s existing teacher login and B3 classes are intentionally unchanged
