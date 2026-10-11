@@ -22,7 +22,6 @@ test('verify every tool page has a functional UI back button to the dashboard', 
   };
 
   const dismissModals = async (targetPage) => {
-    // Dismiss avatar selector / modal popups if present
     const modalButtons = targetPage.locator('button').filter({
       hasText: /(Use This Avatar|Close|Skip|OK|Continue|x)/i
     });
@@ -70,7 +69,7 @@ test('verify every tool page has a functional UI back button to the dashboard', 
 
       const pagesBefore = context.pages();
       await itemButton.click();
-      await page.waitForTimeout(1200);
+      await page.waitForTimeout(1500);
 
       const pagesAfter = context.pages();
       let activePage = page;
@@ -92,7 +91,7 @@ test('verify every tool page has a functional UI back button to the dashboard', 
           lower.includes('dashboard') ||
           lower.includes('return') ||
           lower.includes('fun torah tools') ||
-          text.includes('←') ||
+          text.includes('?') ||
           text.includes('<-')
         );
       });
@@ -100,20 +99,18 @@ test('verify every tool page has a functional UI back button to the dashboard', 
       if (isBackPresent) {
         await test.step('[UI BACK PRESENT] ' + itemName, async () => {
           const backBtn = activePage.locator('button, a, header, nav, div, span').filter({
-            hasText: /(Back|Home|Dashboard|Return)/i
+            hasText: /(Fun Torah Tools|Back|Home|Dashboard|Return)/i
           }).first();
 
           if (await backBtn.isVisible().catch(() => false)) {
             await backBtn.click().catch(() => {});
+            await activePage.waitForTimeout(1000);
           }
-          await activePage.waitForTimeout(1000);
         });
       } else {
         await test.step('[MISSING UI BACK] ' + itemName, async () => {
           if (activePage !== page) {
             await activePage.close();
-          } else {
-            await page.goBack();
           }
         });
       }
@@ -125,9 +122,7 @@ test('verify every tool page has a functional UI back button to the dashboard', 
       }
 
       await page.bringToFront();
-      if (!page.url().includes('index.html')) {
-        await page.goto('https://funtorahtools.com/index.html');
-      }
+      await page.goto('https://funtorahtools.com/index.html');
       await dismissModals(page);
       await expect(userLabel).toBeVisible({ timeout: 10000 });
     });
