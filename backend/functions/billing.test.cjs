@@ -260,7 +260,7 @@ test('Teacher sees real Stripe proration before explicitly approving annual tool
  assert.equal(upgradeArgs.args.proration_date,Math.floor(now/1000));
  assert.equal(upgradeArgs.args.items[0].price,'price_newposuk123');
  assert.ok(upgradeArgs.options.idempotencyKey.includes(quote.quoteId));
- assert.equal(data[p+'/upgradeQuotes/'+quote.quoteId+'/status'],'submitted');
+ assert.equal(data[p+'/upgradeQuotes/'+quote.quoteId].status,'submitted');
  await assert.rejects(confirmUpgrade(store,identity,{quoteId:quote.quoteId,acknowledge:true,
   confirmedAmountCents:3950},stripe,allowedPrices,now+2000),/expired or changed/);
  assert.equal(updateCalls,1);
