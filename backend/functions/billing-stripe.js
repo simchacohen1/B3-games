@@ -18,7 +18,7 @@ const ORIGINS=['https://funtorahtools.com','https://www.funtorahtools.com',
  'https://simchacohen1.github.io'];
 const BASE_URL='https://funtorahtools.com';
 const ON=()=>process.env.FTT_BILLING_ENABLED==='true';
-const stripeClient=()=>require('stripe')(secretKey.value());
+const stripeClient=()=>require('./billing-stripe-client.cjs').stripeClient(secretKey.value());
 const error=(res,code,message)=>res.status(code).json({error:message});
 exports.funTorahCreateCheckout=onRequest({
  region:'us-central1',cors:ORIGINS,secrets:[secretKey],maxInstances:4,
@@ -49,7 +49,6 @@ exports.funTorahCreateCheckout=onRequest({
   const session=await stripe.checkout.sessions.create({
    mode:'subscription',
    payment_method_types:['card'],
-   customer_creation:'always',
    line_items:stripeLineItems(order.quote),
    success_url:BASE_URL+'/teacher-registration-preview.html?checkout=success&session_id={CHECKOUT_SESSION_ID}',
    cancel_url:BASE_URL+'/teacher-registration-preview.html?checkout=canceled',
@@ -129,7 +128,7 @@ exports.funTorahStripeWebhook=onRequest({
   const inv=subscription.latest_invoice;
   const latestPaid=!!(inv&&typeof inv==='object'&&inv.paid===true);
   const paid=subscription.status==='active'&&
-   (isFirstCheckout||latestPaid)&&event.type!=='invoice.payment_failed';
+   (isFirstCheckout||latestPaid);
   const now=Date.now();
   const change=activationUpdates(order,subscription,paid,now);
   if(isFirstCheckout)change.updates[path+'/activatedAt']=now;
