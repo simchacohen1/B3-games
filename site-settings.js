@@ -1179,8 +1179,8 @@
     wrap.style.cssText = "position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.55);font-family:Arial,sans-serif";
     const field = "width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font:15px Arial,sans-serif;margin-top:6px;background:#fff;color:#1f2937";
     wrap.innerHTML = '<div style="background:#fff;color:#1f2937;border-radius:18px;padding:22px;width:100%;max-width:420px;box-shadow:0 20px 50px rgba(0,0,0,.3)">' +
-      '<h2 style="margin:0 0 6px;font-size:21px">Sign in as a student</h2>' +
-      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">See Fun Torah Tools exactly as this student does. Anything you do counts as their work. This tab keeps its own student login; other tabs stay as they are. Press <strong>Exit student view</strong> to come back.</p>' +
+      '<h2 style="margin:0 0 6px;font-size:21px">Teacher-only student preview</h2>' +
+      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">This is a teacher demo. Your teacher Google or email login stays active, so NEVER hand this preview to a student. For a shared device, use the secure Switch to Student button in Teacher Center instead. Demo work may count as the student\u2019s work.</p>' +
       '<label style="display:block;font-weight:700;font-size:14px">Class<select id="b3ActAsClass" style="' + field + '"><option>Loading\u2026</option></select></label>' +
       '<label style="display:block;font-weight:700;font-size:14px;margin-top:12px">Student<select id="b3ActAsStudent" style="' + field + '"></select></label>' +
       '<p id="b3ActAsMsg" style="min-height:20px;margin:12px 0 0;color:#b91c1c;font-size:14px"></p>' +
