@@ -5,6 +5,12 @@ on:
       - 'backend/functions/billing-*.cjs'
       - 'backend/functions/billing-stripe.js'
       - 'backend/functions/billing.test.cjs'
+      - 'backend/functions/teacher-auth-identity.cjs'
+      - 'tests/shared-device-switch.test.cjs'
+      - 'shared-device-session.js'
+      - 'teacher-home.html'
+      - 'index.html'
+      - 'site-settings.js'
       - '.github/workflows/billing-tests.yml'
   push:
     branches:
@@ -24,4 +30,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test backend/functions/billing.test.cjs
+      - run: node --test backend/functions/billing.test.cjs tests/shared-device-switch.test.cjs
