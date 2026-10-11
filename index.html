@@ -222,6 +222,7 @@
 <script src="student-tool-controls.js"></script>
 <script src="guest-mode.js?v=20261011-guest"></script>
 <script src="site-settings.js?v=20261008-owner-demo"></script>
+<script src="shared-device-session.js?v=20261011-safe-switch"></script>
 </head>
 <body>
   <h1>Fun Torah Tools</h1>
@@ -230,6 +231,7 @@
   <div id="studentBar" class="student-bar hidden">
     <div><strong id="studentNameLabel"></strong><br><span id="studentClassLabel"></span></div>
     <button id="switchStudentBtn" type="button">Switch student</button>
+    <button id="switchToTeacherBtn" type="button" style="background:#1e40af;color:#fff">🔄 Switch to Teacher</button>
     <a id="classPointerStudentLink" href="class-pointer-prototype/dashboard.html" style="padding:10px 14px;border-radius:8px;background:#2563eb;color:white;font-weight:700;text-decoration:none">👆 Class Pointer</a>
   </div>
 
@@ -241,6 +243,7 @@
     <label for="studentNameInput">Your name</label>
     <input id="studentNameInput" type="text" autocomplete="name" placeholder="First and last name">
     <button id="studentSignInBtn" type="button">Open Fun Torah Tools</button>
+    <button id="switchToTeacherLogin" type="button" style="margin-top:10px;background:#1e40af;color:#fff">👨‍🏫 Switch to Teacher</button>
     <button id="exploreGuestBtn" type="button" style="margin-top:10px;background:#fff;color:#1d4ed8;border:2px solid #1d4ed8">👀 Explore as Guest</button>
     <div id="choosePinForm" class="hidden">
       <h3>Choose your own PIN</h3>
@@ -1093,6 +1096,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     el("studentNameLabel").textContent="Guest";
     el("studentClassLabel").textContent="Previewing Fun Torah Tools · nothing is saved";
     el("switchStudentBtn").classList.add("hidden");
+      el("switchToTeacherBtn").classList.add("hidden");
     el("gamesArea").classList.remove("hidden");
     el("specialAccessNote")?.classList.add("hidden");
     el("disabledMessage").classList.add("hidden");
@@ -1183,6 +1187,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     el("loginCard").classList.add("hidden");
     el("studentBar").classList.remove("hidden");
     el("switchStudentBtn").classList.remove("hidden");
+    el("switchToTeacherBtn").classList.remove("hidden");
     el("studentNameLabel").textContent=myStudentName||"Student";
 
     const legacyB3Class=["et","wt"].includes(myClassId);
@@ -1881,6 +1886,18 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }));
 
   el("switchStudentBtn").addEventListener("click",switchStudent);
+  async function handDeviceToTeacher(button){
+    if(button.disabled)return;
+    button.disabled=true;const previous=button.textContent;button.textContent="Closing student session…";
+    try{
+      await B3SharedDevice.switchToTeacher(firebase.auth());
+    }catch(error){
+      button.disabled=false;button.textContent=previous;
+      alert(error.message||"Could not switch users securely. Please try again.");
+    }
+  }
+  el("switchToTeacherBtn").addEventListener("click",()=>handDeviceToTeacher(el("switchToTeacherBtn")));
+  el("switchToTeacherLogin").addEventListener("click",()=>handDeviceToTeacher(el("switchToTeacherLogin")));
   el("adminAccessButton").addEventListener("click",()=>{
     window.location.href=isAuthorizedTeacher?"admin.html":"teacher-home.html?signin=1";
   });
