@@ -52,6 +52,22 @@
         } else {
           status.textContent += ' Submission details are unavailable or ambiguous.';
         }
+        const refresh = result.topic_refresh_preflight || {};
+        if (refresh.status === 'trigger_inspected') {
+          const kinds = {
+            possible_form_submit: 'possible form submission; blocked pending review',
+            inline_ajax_or_fetch: 'AJAX or fetch indicated',
+            named_or_inline_handler: 'class-change handler found; transport not verified',
+            script_ajax_possible: 'page scripts reference grades and AJAX',
+            external_script_handler_possible: 'external JavaScript may control refresh',
+            handler_not_identified: 'refresh handler not identified'
+          };
+          const description = kinds[refresh.class_change_handler_kind] || 'unrecognized handler';
+          status.textContent += ' Class-change safety preflight: ' + description +
+            '; ' + Number(refresh.external_script_count || 0) +
+            ' external scripts referenced; NO class change or AJAX was executed. ' +
+            'B3 ET/Shoroshim after refresh remain unverified.';
+        }
         const dep = result.readonly_form_dependencies || {};
         if (dep.status === 'form_controls_observed' &&
             dep.read_only === true &&
