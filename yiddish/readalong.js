@@ -34,7 +34,7 @@
   /* ---------- toolbar (next to Speed / Back 10 sec) ---------- */
   const bar = document.querySelector('header .bar') || document.querySelector('.bar');
   const tools = document.createElement('div'); tools.className = 'ra-tools';
-  tools.innerHTML = '<button type="button" id="raBack">◀ Back</button><button type="button" id="raAgain">Again</button><button type="button" id="raNext">Next ▶</button><label><input type="checkbox" id="raStep"> Stop after each sentence</label>';
+  tools.innerHTML = '<button type="button" id="raBack">\u25C0 Back</button><button type="button" id="raAgain">Again</button><button type="button" id="raNext">Next \u25B6</button><label><input type="checkbox" id="raStep"> Stop after each sentence</label>';
   bar.append(tools);
   const stepBox = document.getElementById('raStep');
   stepBox.checked = !!settings.step;
@@ -42,7 +42,7 @@
   document.body.classList.add('ra-tap');
 
   /* ---------- words of the visible paragraphs ---------- */
-  let words = [], phrases = [];   // words: {p, k, s, e, ph}; phrases: {s, e, first, last}
+  let words = [], phrases = [];
   function collect() {
     words = []; phrases = [];
     document.querySelectorAll('#text .para').forEach(el => {
@@ -63,7 +63,7 @@
     words.sort((a, b) => a.s - b.s);
   }
 
-  /* ---------- text ranges (computed fresh, so other scripts may re-wrap the text) ---------- */
+  /* ---------- text ranges ---------- */
   function tokenSpans(el) {
     const txt = el.textContent, out = [], re = /\S+/g; let m;
     while ((m = re.exec(txt))) out.push([m.index, m.index + m[0].length]);
@@ -110,7 +110,7 @@
     const wr = curWord && wordRange(curWord), pr = curPh >= 0 && phraseRange(curPh);
     const hp = pr ? new Highlight(pr) : new Highlight();
     const hw = wr ? new Highlight(wr) : new Highlight();
-    hp.priority = 0; hw.priority = 1;   // the word paints on top of its phrase
+    hp.priority = 0; hw.priority = 1;
     CSS.highlights.set('ra-phrase', hp);
     CSS.highlights.set('ra-word', hw);
   }
@@ -147,7 +147,7 @@
 
   /* ---------- tap a word ---------- */
   let card = null;
-  const bareYi = s => s.normalize('NFD').replace(/ײ/g, 'יי').replace(/װ/g, 'וו').replace(/[^א-ת]/g, '');
+  const bareYi = s => s.normalize('NFD').replace(/\u05F2/g, '\u05D9\u05D9').replace(/\u05F0/g, '\u05D5\u05D5').replace(/[^\u05D0-\u05EA]/g, '');
   function caretAt(x, y) {
     if (document.caretPositionFromPoint) { const c = document.caretPositionFromPoint(x, y); return c && { node: c.offsetNode, off: c.offset }; }
     if (document.caretRangeFromPoint) { const r = document.caretRangeFromPoint(x, y); return r && { node: r.startContainer, off: r.startOffset }; }
@@ -159,7 +159,6 @@
     while ((n = walker.nextNode())) { if (n === c.node) break; pos += n.data.length; }
     const at = pos + c.off, sp = tokenSpans(el);
     for (let k = 0; k < sp.length; k++) if (at >= sp[k][0] && at <= sp[k][1]) {
-      // make sure the click really landed on this word, not in the gap after it
       const r = rangeFor(el, sp[k][0], sp[k][1]);
       if (r && [...r.getClientRects()].some(b => x >= b.left - 2 && x <= b.right + 2 && y >= b.top - 2 && y <= b.bottom + 2)) return k;
       return -1;
@@ -170,10 +169,11 @@
   function showCard(w, token, el) {
     if (card) card.remove();
     const vocab = [...el.querySelectorAll('.vw')].find(v => token.includes(v.textContent));
-    const en = (vocab && vocab.title) || W.gloss[bareYi(token.replace('עולם', ''))] || 'Listen again and guess from the story!';
+    const AUD = '\u05E2\u05D5\u05DC\u05DD';
+    const en = (vocab && vocab.title) || W.gloss[bareYi(token.replace(AUD, ''))] || 'Listen again and guess from the story!';
     card = document.createElement('div'); card.className = 'ra-card'; card.setAttribute('role', 'dialog');
-    const yi = document.createElement('div'); yi.className = 'yi'; yi.textContent = token.replace(/^\(עולם:?/, '').replace(/[\\.,?!:;()"]+/g, '');
-    const x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', 'Close'); x.onclick = () => { card.remove(); card = null; };
+    const yi = document.createElement('div'); yi.className = 'yi'; yi.textContent = token.replace(new RegExp('^\\(' + AUD + ':?'), '').replace(/[\\.,?!:;()"]+/g, '');
+    const x = document.createElement('button'); x.className = 'x'; x.textContent = '\u00D7'; x.setAttribute('aria-label', 'Close'); x.onclick = () => { card.remove(); card = null; };
     const e = document.createElement('div'); e.className = 'en'; e.textContent = en;
     const b = document.createElement('div'); b.className = 'btns';
     const hear = document.createElement('button'); hear.textContent = 'Hear it again'; hear.onclick = () => playWord(w);
@@ -185,15 +185,34 @@
     const el = ev.target.closest('.para'); if (!el || !el.classList.contains('ra-on')) return;
     const k = tokenAtPoint(el, ev.clientX, ev.clientY); if (k < 0) return;
     const p = +el.id.slice(1), w = words.find(x => x.p === p && x.k === k); if (!w) return;
-    ev.stopPropagation(); ev.preventDefault();   // keep the paragraph's own click (jump to its start) from firing
+    ev.stopPropagation(); ev.preventDefault();
     showCard(w, el.textContent.slice(...tokenSpans(el)[k]), el);
     playWord(w);
   }, true);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && card) { card.remove(); card = null; } });
 
-  /* ---------- start once the reader has opened the section ---------- */
+  /* ---------- layout: fit the picture and text cards into the window ---------- */
   const main = document.querySelector('main');
-  function ready() { collect(); curWord = null; curPh = -1; tick(); }
+  const BOTTOM_GAP = 64;
+  function fit() {
+    const notice = document.querySelector('header + p');
+    if (notice) { notice.style.padding = '8px 18px'; notice.style.fontSize = '16px'; notice.style.margin = '0'; }
+    if (!main || main.hidden) return;
+    if (innerWidth <= 850) { main.style.height = ''; return; }
+    const top = main.getBoundingClientRect().top + scrollY;
+    main.style.height = Math.max(420, innerHeight - top - BOTTOM_GAP) + 'px';
+    main.style.minHeight = '0';
+  }
+  addEventListener('resize', fit);
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(document.querySelector('header'));
+
+  /* ---------- start once the reader has opened the section ---------- */
+  function ready() {
+    fit(); collect(); curWord = null; curPh = -1; tick();
+    document.querySelectorAll('.hint').forEach(h => {
+      for (const n of h.childNodes) if (n.nodeType === 3 && /Click a paragraph/.test(n.data)) n.data = 'Original wording preserved. Tap any word to hear it and see what it means. ';
+    });
+  }
   if (main && main.hidden) {
     const mo = new MutationObserver(() => { if (!main.hidden) { mo.disconnect(); setTimeout(ready, 300); } });
     mo.observe(main, { attributes: true, attributeFilter: ['hidden'] });
