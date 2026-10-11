@@ -11,7 +11,7 @@ const {randomUUID}=require('node:crypto');
 const admin=require('firebase-admin');
 const {normalizeOrder,stripeLineItems}=require('./billing-catalog.cjs');
 const {PRIVATE,activationUpdates}=require('./billing-fulfillment.cjs');
-const {subscriptionPlan,planMatchesOrder,latestInvoicePaid}=require('./billing-entitlements.cjs');
+const {subscriptionPlan,planMatchesOrder,reconcilePaidAccess}=require('./billing-entitlements.cjs');
 const {portalSessionForTeacher}=require('./billing-portal-core.cjs');
 if(!admin.apps.length)admin.initializeApp();
 const secretKey=defineSecret('FTT_STRIPE_SECRET_KEY');
@@ -130,20 +130,21 @@ exports.funTorahStripeWebhook=onRequest({
    // They must not create a free account before verified first payment.
    return res.json({received:true,awaitingCheckout:true});
   }
-  const paid=subscription.status==='active'&&latestInvoicePaid(subscription);
-  // The currently billed subscription items are authoritative, but only after
-  // a successful invoice payment. Do not grant unbilled/pending changes.
-  const plan=subscriptionPlan(subscription);
-  if(isFirstCheckout&&(!paid||!planMatchesOrder(plan,order)))
-   return res.status(503).send('Subscription payment or plan not verified');
+  // Never revoke already paid tools just because a mid-cycle upgrade's
+  // proration payment is pending. Also never extend access on an unpaid renewal.
   const now=Date.now();
-  const actual={...order,seats:paid?plan.seats:order.seats,tools:paid?plan.tools:order.tools};
-  const change=activationUpdates(actual,subscription,paid,now);
+  const settled=reconcilePaidAccess(order,subscription,now);
+  if(isFirstCheckout&&(!settled.paid||!settled.verifiedNow||
+     !planMatchesOrder(settled.plan,order)))
+   return res.status(503).send('Subscription payment or plan not verified');
+  if(!settled.plan)return res.json({received:true,awaitingFirstPayment:true});
+  const plan=settled.plan;
+  const actual={...order,seats:plan.seats,tools:plan.tools};
+  const change=activationUpdates(actual,subscription,settled.paid,now);
   if(isFirstCheckout)change.updates[path+'/activatedAt']=now;
-  if(paid){
-   change.updates[path+'/seats']=plan.seats;
-   change.updates[path+'/tools']=plan.tools;
-  }
+  if(settled.verifiedNow)change.updates[path+'/paidPlan']=plan;
+  change.updates[path+'/seats']=plan.seats;
+  change.updates[path+'/tools']=plan.tools;
   await db.ref().update(change.updates);
   res.json({received:true});
  }catch(err){
