@@ -157,7 +157,7 @@ async function startClass(){
     if(peer!==current)return;clearTimeout(joinTimer);started=true;$('endClass').disabled=false;$('shareScreen').disabled=false;$('openBrowserTab').disabled=false;
     const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status(window.ClassPointerDashboard?'Class open. Students click Class Pointer on Fun Torah Tools and join automatically.':'Class open. Send the join link. Students join automatically.');roster();
   });
-  peer.on('connection',receiveStudent);peer.on('call',call=>call.close());
+  peer.on('connection',receiveStudent);peer.on('call',call=>{if(!window.ClassPointerBoards?.incomingCall(call))call.close()});
 }
 function stopSharing(){
   cancelHover();highlighter?.cancel();highlightStore.reset();publishHighlights();generation++;
@@ -382,7 +382,9 @@ if(window.createClassHighlighter)highlighter=window.createClassHighlighter({
 if(highlighter){const baseReceive=highlighter.receive;highlighter.receive=next=>{baseReceive(next);window.ClassPointerPdf?.setStrokes(next)}}
 // Small, fixed doorway used by PDF mode (pdf-mode.js). Nothing else reaches into this file.
 window.ClassPointerBridge={isTeacher,send,fail,
-  sendTeacher:message=>send(teacherConnection,message),started:()=>started,clearError,status,live,allowed,writingAllowed,submitStroke,redraw:drawPointers,members:()=>members,sharing:()=>state.sharing,stopSharing,
+  sendTeacher:message=>send(teacherConnection,message),started:()=>started,
+  // Student → teacher screen (Student boards, Screens mode). One-way: the teacher answers without sending video back.
+  callTeacher:stream=>!isTeacher&&peer&&teacherConnection?.open?peer.call(room,stream,{metadata:{kind:'student-screen'}}):null,clearError,status,live,allowed,writingAllowed,submitStroke,redraw:drawPointers,members:()=>members,sharing:()=>state.sharing,stopSharing,
   navigating:()=>navigating,
   highlights:()=>highlightStore.strokes,
   owner:()=>isTeacher?'teacher':'student:'+peer?.id,ownColor:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
