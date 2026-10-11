@@ -421,7 +421,7 @@
 
   function readUserAccess(user) {
     const services = ensureFirebase();
-    if (!services || !services.db || !user) return Promise.resolve({ authorized:false, role:"", classIds:[] });
+    if (!services || !services.db || !user || user.emailVerified !== true) return Promise.resolve({ authorized:false, role:"", classIds:[] });
     if (isBootstrapAdmin(user)) return Promise.resolve({ authorized:true, role:"admin", classIds:["*"] });
 
     // Established admins/teachers are the common case. Resolve those two small
@@ -941,6 +941,13 @@
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       throw new Error("Enter the email address that received the sign-in link.");
     const userCredential=await services.auth.signInWithEmailLink(email,location.href);
+    // Confirm the email-link result matches the address the teacher entered.
+    // A Firebase login alone never grants access without a verified teacher record.
+    if(userCredential?.user?.emailVerified!==true ||
+       String(userCredential.user.email||"").trim().toLowerCase()!==email){
+      await services.auth.signOut();
+      throw new Error("The sign-in email did not match the verified account.");
+    }
     try{localStorage.removeItem(EMAIL_LINK_HINT);}catch(_){}
     // Never leave one-time sign-in codes in browser history or copied URLs.
     try{history.replaceState(null,"",SITE_BASE+"teacher-home.html");}catch(_){}
