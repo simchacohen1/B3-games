@@ -1260,8 +1260,10 @@
     document.body.appendChild(link);
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", showBackToHome, { once: true });
-  else showBackToHome();
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", showBackToHome, { once: true });
+    else showBackToHome();
+  }
 
   window.B3SiteSettings = {
     defaultSettings: cloneDefaultSettings(),
@@ -1314,7 +1316,7 @@
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watch, { once: true });
     else setTimeout(watch, 0);
   }
-  if (getActingStudent()) {
+  if (typeof document !== "undefined" && getActingStudent()) {
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", showActingBanner);
     else showActingBanner();
   }
