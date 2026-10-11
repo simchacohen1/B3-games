@@ -104,14 +104,14 @@ async function confirmUpgrade(store,identity,body,stripe,priceIds,now=Date.now()
  if(!lock?.committed)fail(409,lockMessage);
  // Set an immutable idempotency key *before* charging Stripe. On uncertain
  // network failures, support can reconcile rather than double-charge.
- await store.set(PRIVATE+'/upgradeQuotes/'+quote.quoteId+'/status','submitting');
+ await store.set(PRIVATE+'/upgradeQuotes/'+quote.quoteId,{...quote,status:'submitting'});
  try{
   const updated=await stripe.subscriptions.update(subscription.id,{
    items:[{price:priceId,quantity:1}],
    billing_cycle_anchor:'unchanged',proration_behavior:'always_invoice',
    proration_date:quote.prorationDate,payment_behavior:'pending_if_incomplete'
   },{idempotencyKey:'ftt_add_tool_'+quote.quoteId});
-  await store.set(PRIVATE+'/upgradeQuotes/'+quote.quoteId+'/status','submitted');
+  await store.set(PRIVATE+'/upgradeQuotes/'+quote.quoteId,{...quote,status:'submitted'});
   return {ok:true,status:updated.pending_update?'payment_pending':'processing',
    message:'Your new tool will unlock only after Stripe confirms payment.'};
  }catch(err){
