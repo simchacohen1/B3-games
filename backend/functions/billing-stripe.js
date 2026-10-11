@@ -74,8 +74,9 @@ exports.funTorahCreateCheckout=onRequest({
 });
 
 function invoiceSubscriptionId(invoice){
- return typeof invoice.subscription==='string'?invoice.subscription:
-   invoice.parent?.subscription_details?.subscription||null;
+ const sub=invoice.subscription||invoice.parent?.subscription_details?.subscription;
+ return typeof sub==='string'?sub:
+   (sub&&typeof sub.id==='string'?sub.id:null);
 }
 exports.funTorahStripeWebhook=onRequest({
  region:'us-central1',cors:false,secrets:[secretKey,webhookKey],
