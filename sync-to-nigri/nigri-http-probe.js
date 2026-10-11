@@ -30,10 +30,19 @@
       } else if (!response.ok) {
         status.textContent = 'Nigri check unavailable (HTTP ' + response.status + '). No marks were changed.';
       } else {
-        if (data.status === 'login_not_accepted' && typeof data.login_form_returned_after_post === 'boolean') {
-          status.textContent = 'Browser-free login still not accepted: Nigri showed the login page ' +
-            (data.login_form_returned_after_post ? 'immediately after login.' : 'when the marks page opened.') +
-            ' No marks were changed.';
+        if (data.status === 'login_not_accepted' && typeof data.cookies_sent_to_marks === 'boolean') {
+          let reason = 'Nigri returned its sign-in form again.';
+          if (data.cookies_after_login_count === 0) {
+            reason = 'No persistent cookies were present after the HTTP login.';
+          } else if (!data.cookies_sent_to_marks) {
+            reason = 'Login cookies existed but were not attached to the School Marks request.';
+          } else if (data.login_form_at_teacher_home === true) {
+            reason = 'Cookies were sent, but even the teacher home page still showed the login form.';
+          } else if (data.login_form_at_teacher_home === false) {
+            reason = 'Cookies were sent and the teacher home had no login form, but School Marks did.';
+          }
+          status.textContent = reason + ' Login redirects: ' + Number(data.login_post_redirect_count || 0) +
+            '; marks redirects: ' + Number(data.marks_redirect_count || 0) + '. No grades changed.';
         } else {
           status.textContent = messages[data.status] || 'Nigri reported: ' + String(data.status || 'unknown') + '. No marks were changed.';
         }
