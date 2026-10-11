@@ -37,6 +37,15 @@
   }
 
   var rootBase = new URL("./", scriptEl.src);
+  // One free, opt-in audio switch shared by student activities.
+  // Audio Mode never makes a paid synthesis request.
+  if (!document.querySelector('script[data-ftt-audio-mode]')) {
+    var audioScript = document.createElement("script");
+    audioScript.src = new URL("audio-mode.js?v=20261011-audio-mode", rootBase).href;
+    audioScript.defer = true;
+    audioScript.setAttribute("data-ftt-audio-mode", "1");
+    (document.head || document.documentElement).appendChild(audioScript);
+  }
 
   // Guest Mode (see guest-mode.js): one shared flag, loaded here so every page
   // that has this gate also gets the no-saving protection and the banner.
