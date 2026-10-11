@@ -34,6 +34,9 @@
         if (typeof d.tests_section_present === 'boolean') flags.push('Tests section: ' + (d.tests_section_present ? 'yes' : 'no'));
         if (Array.isArray(d.recognized_query_keys)) flags.push('Recognized parameters: ' + (d.recognized_query_keys.join(', ') || 'none'));
         if (typeof d.unknown_query_key_count === 'number') flags.push('Unrecognized parameters: ' + d.unknown_query_key_count);
+        const safeNames = Array.isArray(d.safe_unknown_parameter_names) ? d.safe_unknown_parameter_names : [];
+        if (safeNames.length) flags.push('Extra parameter names (values hidden): ' + safeNames.join(', '));
+        if (d.redacted_parameter_name_count) flags.push('Other parameter names hidden: ' + d.redacted_parameter_name_count);
         if (typeof d.unsupported_action_key_count === 'number') flags.push('Unsafe/unknown actions: ' + d.unsupported_action_key_count);
         status.textContent = 'The New Mark link was not opened for safety. ' + flags.join('; ') + '. No marks changed.';
       } else {
