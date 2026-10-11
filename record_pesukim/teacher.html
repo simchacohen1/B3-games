@@ -521,11 +521,15 @@ const requestedTeacherClass=new URLSearchParams(location.search).get('class')||'
 async function scopedRosterSnapshot(){
   if(!teacherAccess.authorized)throw new Error('Teacher sign-in required.');
   const owner=teacherAccess.role==='admin';
-  const ids=requestedTeacherClass?[requestedTeacherClass]:(owner?['et','wt']:teacherAccess.classIds);
+  const registry=owner&&!requestedTeacherClass?
+    (await db.ref('b3Games/workspaces/'+teacherWorkspace+'/classes').once('value')).val()||{}:null;
+  const ids=requestedTeacherClass?[requestedTeacherClass]:
+    owner?Object.keys(registry).filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&registry[id]?.active!==false):
+    teacherAccess.classIds;
   if(!owner&&ids.some(id=>!teacherAccess.classIds.includes(id)))throw new Error('This class is not assigned to you.');
   const roster={};
   for(const id of ids){
-    const row=(await db.ref('b3Games/workspaces/'+teacherWorkspace+'/classes/'+id).once('value')).val();
+    const row=registry?registry[id]:(await db.ref('b3Games/workspaces/'+teacherWorkspace+'/classes/'+id).once('value')).val();
     if(!row||row.active===false||(!owner&&row.toolGrants?.['posuk-practice-scroll']!==true))continue;
     Object.entries(row.members||{}).forEach(([sid,m])=>{if(m&&m.active!==false)roster[sid]={...m,classId:id,classSection:row.name||id};});
   }
