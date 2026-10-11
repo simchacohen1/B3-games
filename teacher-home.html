@@ -97,6 +97,14 @@ function showTeacherSignIn(message){
 }
 async function render(user,access){
  const generation=++renderGeneration;
+ // An incoming one-time link must be completed against its own email before
+ // any restored Google/password session can show teacher data on this page.
+ if(typeof api.isEmailSignInLink==='function'&&api.isEmailSignInLink()){
+  q('signOut').classList.add('hidden');q('actAsStudent').classList.add('hidden');
+  q('switchToStudent').classList.add('hidden');
+  showTeacherSignIn('Complete the email-link verification before opening Teacher Center.');
+  return;
+ }
  if(previewTeacherId){
    q('signOut').classList.add('hidden');q('actAsStudent').classList.add('hidden');q('switchToStudent').classList.add('hidden');
    if(!access?.authorized||access.role!=='admin'){q('app').classList.add('hidden');q('gate').classList.remove('hidden');q('gate').textContent='Only the owner can preview another teacher.';return;}
