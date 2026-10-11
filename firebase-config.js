@@ -74,7 +74,7 @@ window.B3_DATA_MODEL = Object.freeze({
   const current = document.currentScript;
   if (!current || !current.src) return;
   const loader = document.createElement('script');
-  loader.src = new URL('gallery-share.js?v=20261011a', current.src).href;
+  loader.src = new URL('gallery-share.js?v=20261011b', current.src).href;
   loader.async = true;
   (document.head || document.documentElement).appendChild(loader);
 })();
