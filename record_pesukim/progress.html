@@ -519,7 +519,7 @@ async function loadProgress(){
         perekData[chapterKey][posukNum] = { attempts, latest };
       }
 
-      if(!(perekNum in expandedState)) expandedState[chapterKey] = true;
+      if(!(chapterKey in expandedState)) expandedState[chapterKey] = true;
     });
     Object.values(rangeData).forEach(list => list.sort((a,b) => (b.latest.timestamp || 0) - (a.latest.timestamp || 0)));
 
