@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>Fun Torah Tools — Staging Auth Test</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#12253b;background:#f3f7fb}*{box-sizing:border-box}body{margin:0;min-height:100vh}header{background:#0b3560;color:#fff;padding:16px max(20px,calc((100vw - 920px)/2));display:flex;align-items:center;justify-content:space-between;gap:10px}.logo{font-weight:850;font-size:21px}.pill{background:#fae7a1;color:#463100;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:800}main{max-width:850px;margin:38px auto;padding:0 16px}.alert{border:1px solid #8bb9d4;background:#eaf5fc;border-radius:12px;padding:14px 18px;margin-bottom:22px;line-height:1.5}section{background:#fff;border-radius:19px;padding:32px;box-shadow:0 8px 28px #16314d13;border:1px solid #e0eaf3}h1{font-size:28px;margin:0 0 8px}h2{font-size:19px;margin:0 0 14px}p{color:#41536a;line-height:1.55}button{font-family:inherit;font-size:15px;font-weight:750;cursor:pointer;border:0;border-radius:11px;padding:12px 18px}.primary{background:#1670bf;color:white}.student{background:#16834f;color:white}.secondary{background:#ebf3fc;color:#164875}.actions{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}label{display:block;font-weight:700;margin:12px 0 6px}input{width:100%;padding:13px 12px;font-size:16px;border-radius:9px;border:1px solid #b8cddd}.field{max-width:425px}.hidden{display:none}.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(172px,1fr));gap:12px;margin:16px 0}.tile{background:#f1f7fe;border:1px solid #d6e9fd;padding:20px 12px;border-radius:13px;text-align:center;font-weight:760}.tile span{display:block;font-size:30px;margin-bottom:12px}.subtle{font-size:14px;color:#60728a}.status{font-weight:700;color:#1b6447;min-height:24px}.error{color:#a32020}footer{padding:24px;text-align:center;color:#76899c;font-size:13px}@media(max-width:520px){section{padding:22px}header{flex-wrap:wrap}}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+</head>
+<body>
+<header><div class="logo">📘 Fun Torah Tools</div><span class="pill">PRIVATE STAGING · AUTH TEST ONLY</span></header>
+<main>
+<div class="alert"><strong>Staging authentication test.</strong> Teacher sign-in uses Firebase Authentication in the separate staging project. The student screen is demo-only. This page does not connect to Realtime Database, load student records, or connect to Stripe.</div>
+<section>
+<div id="teacherLogin">
+  <h1>Teacher Sign In</h1><p>Enter the test teacher email to receive a one-time sign-in link. Only use an address you control.</p>
+  <div class="field"><label for="teacherEmail">Teacher email</label><input id="teacherEmail" type="email" placeholder="teacher@school.org" autocomplete="email"></div>
+  <div class="actions"><button id="email" class="primary">Email me a sign-in link</button></div>
+  <p id="loginStatus" class="status" role="status"></p>
+</div>
+<div id="emailCheck" class="hidden">
+  <h1>Check your email</h1><p>A one-time Firebase sign-in link was requested for <strong id="emailTo"></strong>. Open that link in this same browser to complete sign-in.</p>
+  <p id="emailStatus" class="status" role="status">Waiting for the sign-in link…</p>
+  <button id="emailBack" class="secondary">Back</button>
+</div>
+<div id="teacherHome" class="hidden">
+  <h1>👨‍🏫 Teacher Center</h1><p>Signed in with staging Firebase as <strong id="teacherIdentity"></strong>.</p>
+  <h2>Switching test</h2><p>Switch to Student signs out the Firebase account before showing the demo student screen. Returning to Teacher requires a new email link.</p>
+  <div class="actions"><button id="toStudent" class="student">🔄 Switch to Student</button><button id="teacherSignOut" class="secondary">Sign out</button></div>
+  <p id="teacherStatus" class="status" role="status"></p>
+</div>
+<div id="studentLogin" class="hidden">
+  <h1>🎓 Student Sign In (demo)</h1><p>The teacher has been signed out of Firebase. Enter a sample name and code; no real student account or record is used.</p>
+  <div class="field"><label for="studentName">Sample name</label><input id="studentName" value="Demo Student" autocomplete="off"><label for="studentPin">Sample code</label><input id="studentPin" type="password" inputmode="numeric" autocomplete="off" placeholder="4–8 demo digits"></div>
+  <div class="actions"><button id="studentEnter" class="student">Continue to demo</button><button id="studentToTeacher" class="secondary">🔄 Switch to Teacher</button></div><p id="studentMessage" role="status" class="status"></p>
+</div>
+<div id="studentHome" class="hidden">
+  <h1>🎓 Student Demo</h1><p>Welcome <strong id="studentIdentity"></strong>. This is sample content only.</p>
+  <div class="tiles"><div class="tile"><span>🔤</span>Shorashim demo</div><div class="tile"><span>📕</span>Posuk Practice demo</div><div class="tile"><span>🎯</span>Chazara demo</div></div>
+  <div class="actions"><button id="changeStudent" class="student">Switch Student</button><button id="backToTeacher" class="secondary">🔄 Switch to Teacher</button></div>
+</div>
+</section></main>
+<footer>Isolated staging Auth test. No student data, Realtime Database, or Stripe connection.</footer>
+<script>
+(function(){
+'use strict';
+const firebaseConfig={apiKey:'AIzaSyDP_yX-qqj1RRG7urdmXVePh7OuxRTCvEg',authDomain:'fun-torah-tools-staging.firebaseapp.com',databaseURL:'https://fun-torah-tools-staging-default-rtdb.firebaseio.com',projectId:'fun-torah-tools-staging',storageBucket:'fun-torah-tools-staging.firebasestorage.app',messagingSenderId:'644865469135',appId:'1:644865469135:web:1beaf0a455acbb40d6e5ba'};
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth(),pendingKey='fttStagingEmailLinkAddress',panels=['teacherLogin','emailCheck','teacherHome','studentLogin','studentHome'],el=id=>document.getElementById(id);
+function show(id){panels.forEach(p=>el(p).classList.toggle('hidden',p!==id));}
+function setStatus(id,message,error=false){const n=el(id);n.textContent=message;n.classList.toggle('error',error);}
+function resetStudent(){el('studentPin').value='';el('studentMessage').textContent='';}
+async function backToTeacher(){
+ try{if(auth.currentUser)await auth.signOut();}catch(e){setStatus('studentMessage','Firebase sign-out failed. Do not hand this browser to a student. '+(e.message||''),true);return;}
+ resetStudent();el('loginStatus').textContent='Sign in again to open Teacher Center.';show('teacherLogin');
+}
+el('email').onclick=async()=>{
+ const email=el('teacherEmail').value.trim().toLowerCase();
+ if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){setStatus('loginStatus','Enter a valid test email address.',true);return;}
+ const button=el('email');button.disabled=true;setStatus('loginStatus','Sending a staging sign-in link…');
+ try{
+  await auth.sendSignInLinkToEmail(email,{url:location.origin+'/',handleCodeInApp:true});
+  localStorage.setItem(pendingKey,email);el('emailTo').textContent=email;show('emailCheck');
+ }catch(e){setStatus('loginStatus',e.message||'Firebase could not send the sign-in link.',true);}
+ finally{button.disabled=false;}
+};
+el('emailBack').onclick=()=>show('teacherLogin');
+el('toStudent').onclick=async()=>{
+ const button=el('toStudent');button.disabled=true;setStatus('teacherStatus','Signing out of Firebase…');
+ try{await auth.signOut();resetStudent();show('studentLogin');}
+ catch(e){setStatus('teacherStatus','Firebase sign-out failed. Do not hand this browser to a student. '+(e.message||''),true);}
+ finally{button.disabled=false;}
+};
+el('teacherSignOut').onclick=backToTeacher;
+el('studentToTeacher').onclick=backToTeacher;el('backToTeacher').onclick=backToTeacher;
+el('studentEnter').onclick=()=>{const name=el('studentName').value.trim(),pin=el('studentPin').value.trim();if(!name||!/^\d{4,8}$/.test(pin)){setStatus('studentMessage','Enter a sample name and a 4–8 digit demo code.',true);return;}el('studentIdentity').textContent=name;resetStudent();show('studentHome');};
+el('changeStudent').onclick=()=>{resetStudent();show('studentLogin');};
+async function consumeEmailLink(){
+ if(!auth.isSignInWithEmailLink(location.href))return false;
+ let email=localStorage.getItem(pendingKey);
+ if(!email){email=window.prompt('For security, enter the same email address that received this sign-in link:');}
+ if(!email){setStatus('emailStatus','Email is required to complete sign-in.',true);show('emailCheck');return true;}
+ try{
+  const result=await auth.signInWithEmailLink(email,location.href);localStorage.removeItem(pendingKey);history.replaceState({},document.title,location.pathname);el('teacherIdentity').textContent=result.user.email||email;show('teacherHome');return true;
+ }catch(e){setStatus('emailStatus',e.message||'This Firebase sign-in link could not be completed.',true);show('emailCheck');return true;}
+}
+auth.onAuthStateChanged(async user=>{
+ if(user){el('teacherIdentity').textContent=user.email||'staging teacher';show('teacherHome');return;}
+ if(await consumeEmailLink())return;
+ if(el('studentLogin').classList.contains('hidden')&&el('studentHome').classList.contains('hidden'))show('teacherLogin');
+});
+})();
+</script>
+</body></html>
+

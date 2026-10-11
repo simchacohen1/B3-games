@@ -2569,3 +2569,10 @@ exports.generateShorashimArt = require("./shorashim-art").generateShorashimArt;
 
 // Read-only owner ChatGPT student report (ET/WT only).
 exports.studentReportChatGPTRead = require("./student-report-chatgpt-read").studentReportChatGPTRead;
+
+// Stripe teacher subscriptions (disabled unless FTT_BILLING_ENABLED=true).
+const billingStripe = require("./billing-stripe");
+exports.funTorahCreateCheckout = billingStripe.funTorahCreateCheckout;
+exports.funTorahStripeWebhook = billingStripe.funTorahStripeWebhook;
+exports.funTorahBillingPortal = billingStripe.funTorahBillingPortal;
+exports.funTorahUpgradeTool = billingStripe.funTorahUpgradeTool;

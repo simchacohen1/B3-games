@@ -8,7 +8,7 @@ function settings(data,user){
  const source=fs.readFileSync('site-settings.js','utf8').replace('  window.B3SiteSettings = {','  window.readAccessForTest=readUserAccess;window.migrateForTest=migrateWorkspaceData;\n  window.B3SiteSettings = {');
  vm.runInNewContext(source,ctx);return {window,writes,db};
 }
-const teacher={uid:'regular',email:'teacher@example.test',getIdToken:async()=>''};
+const teacher={uid:'regular',email:'teacher@example.test',emailVerified:true,getIdToken:async()=>''};
 test('teacher record cannot confer admin role or wildcard class access',async()=>{const t=settings({'b3Games/workspaces/b3-2026/teachers/regular':{active:true,role:'admin',classIds:{own:true,'*':true,other:false}}},teacher);const a=await t.window.readAccessForTest(teacher);assert.equal(a.role,'teacher');assert.deepEqual(Array.from(a.classIds),['own'])});
 test('disabled teacher cannot regain access through an old invitation',async()=>{const t=settings({'b3Games/workspaces/b3-2026/teachers/regular':{active:false},'b3Games/workspaces/b3-2026/teacherInvites':{old:{email:teacher.email,active:true}}},teacher);assert.equal((await t.window.readAccessForTest(teacher)).authorized,false)});
 test('ordinary teacher cannot save global activity settings',async()=>{const t=settings({'b3Games/workspaces/b3-2026/teachers/regular':{active:true,classIds:{own:true}}},teacher);await assert.rejects(t.window.B3SiteSettings.updateGameEnabled('yiddish',false),/administrator/);assert.equal(t.writes.length,0)});

@@ -416,12 +416,12 @@
   let currentAccess = { authorized: false, role: "", classIds: [] };
 
   function isBootstrapAdmin(user) {
-    return Boolean(user && user.email && user.email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase());
+    return Boolean(user && user.emailVerified === true && user.email && user.email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase());
   }
 
   function readUserAccess(user) {
     const services = ensureFirebase();
-    if (!services || !services.db || !user) return Promise.resolve({ authorized:false, role:"", classIds:[] });
+    if (!services || !services.db || !user || user.emailVerified !== true) return Promise.resolve({ authorized:false, role:"", classIds:[] });
     if (isBootstrapAdmin(user)) return Promise.resolve({ authorized:true, role:"admin", classIds:["*"] });
 
     // Established admins/teachers are the common case. Resolve those two small
@@ -905,6 +905,61 @@
     });
   }
 
+
+  const EMAIL_LINK_HINT="b3TeacherEmailLinkPending";
+  function emailLinkPendingEmail(){
+    try{
+      const record=JSON.parse(localStorage.getItem(EMAIL_LINK_HINT)||"null");
+      return record&&Date.now()-record.time<20*60*1000?record.email:"";
+    }catch(_){return "";}
+  }
+  function isEmailSignInLink(){
+    const services=ensureFirebase();
+    return Boolean(services?.auth?.isSignInWithEmailLink &&
+      services.auth.isSignInWithEmailLink(location.href));
+  }
+  async function sendTeacherEmailLink(email){
+    const services=ensureFirebase();
+    if(!services?.auth?.sendSignInLinkToEmail)
+      throw new Error("Email sign-in is not available on this device.");
+    email=String(email||"").trim().toLowerCase();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254)
+      throw new Error("Enter your email address.");
+    await services.auth.sendSignInLinkToEmail(email,{
+      url:SITE_BASE+"teacher-home.html",handleCodeInApp:true
+    });
+    // This is only a display convenience, never proof of identity.
+    // The email address is not included in the link itself.
+    try{localStorage.setItem(EMAIL_LINK_HINT,JSON.stringify({email,time:Date.now()}));}catch(_){}
+    return true;
+  }
+  async function completeTeacherEmailLink(email){
+    if(!isEmailSignInLink())return false;
+    const services=ensureFirebase();
+    email=String(email||emailLinkPendingEmail()||"").trim().toLowerCase();
+    if(!email)throw new Error("Enter the email address that received the sign-in link.");
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      throw new Error("Enter the email address that received the sign-in link.");
+    const userCredential=await services.auth.signInWithEmailLink(email,location.href);
+    // Confirm the email-link result matches the address the teacher entered.
+    // A Firebase login alone never grants access without a verified teacher record.
+    if(userCredential?.user?.emailVerified!==true ||
+       String(userCredential.user.email||"").trim().toLowerCase()!==email){
+      await services.auth.signOut();
+      throw new Error("The sign-in email did not match the verified account.");
+    }
+    try{localStorage.removeItem(EMAIL_LINK_HINT);}catch(_){}
+    // Never leave one-time sign-in codes in browser history or copied URLs.
+    try{history.replaceState(null,"",SITE_BASE+"teacher-home.html");}catch(_){}
+    const access=await readUserAccess(userCredential.user);
+    if(!access.authorized){
+      await services.auth.signOut();
+      throw new Error("This email has no active Fun Torah Tools teacher invitation.");
+    }
+    currentAccess=access;
+    return true;
+  }
+
   function signOut() {
     const services = ensureFirebase();
     if (!services || !services.auth) return Promise.resolve();
@@ -961,7 +1016,11 @@
       endAuthChecking();
       return function unsubscribe() {};
     }
+    // Firebase sign-out is asynchronous across tabs. An older profile read
+    // must never restore teacher UI after a newer signed-out auth event.
+    let authGeneration=0;
     return services.auth.onAuthStateChanged(function (user) {
+      const generation=++authGeneration;
       if (!user) {
         currentAccess = { authorized:false, role:"", classIds:[] };
         setSignedInHint(false);
@@ -980,6 +1039,9 @@
         return;
       }
       readUserAccess(user).then(function(access){
+        // Block stale profile/invitation responses after sign-out or user switch.
+        const current=services.auth.currentUser;
+        if(generation!==authGeneration || !current || current.uid!==user.uid) return;
         currentAccess = access;
         if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
         else showToolVersions(access);
@@ -1131,8 +1193,8 @@
     wrap.style.cssText = "position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.55);font-family:Arial,sans-serif";
     const field = "width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font:15px Arial,sans-serif;margin-top:6px;background:#fff;color:#1f2937";
     wrap.innerHTML = '<div style="background:#fff;color:#1f2937;border-radius:18px;padding:22px;width:100%;max-width:420px;box-shadow:0 20px 50px rgba(0,0,0,.3)">' +
-      '<h2 style="margin:0 0 6px;font-size:21px">Sign in as a student</h2>' +
-      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">See Fun Torah Tools exactly as this student does. Anything you do counts as their work. This tab keeps its own student login; other tabs stay as they are. Press <strong>Exit student view</strong> to come back.</p>' +
+      '<h2 style="margin:0 0 6px;font-size:21px">Teacher-only student preview</h2>' +
+      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">This is a teacher demo. Your teacher Google or email login stays active, so NEVER hand this preview to a student. For a shared device, use the secure Switch to Student button in Teacher Center instead. Demo work may count as the student\u2019s work.</p>' +
       '<label style="display:block;font-weight:700;font-size:14px">Class<select id="b3ActAsClass" style="' + field + '"><option>Loading\u2026</option></select></label>' +
       '<label style="display:block;font-weight:700;font-size:14px;margin-top:12px">Student<select id="b3ActAsStudent" style="' + field + '"></select></label>' +
       '<p id="b3ActAsMsg" style="min-height:20px;margin:12px 0 0;color:#b91c1c;font-size:14px"></p>' +
@@ -1212,8 +1274,10 @@
     document.body.appendChild(link);
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", showBackToHome, { once: true });
-  else showBackToHome();
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", showBackToHome, { once: true });
+    else showBackToHome();
+  }
 
   window.B3SiteSettings = {
     defaultSettings: cloneDefaultSettings(),
@@ -1243,6 +1307,9 @@
     isClassOpen: isClassOpen,
     describeClassAccess: describeClassAccess,
     signInWithGoogle: signInWithGoogle,
+    sendTeacherEmailLink: sendTeacherEmailLink,
+    isEmailSignInLink: isEmailSignInLink,
+    completeTeacherEmailLink: completeTeacherEmailLink,
     signOut: signOut,
     onAuthStateChanged: onAuthStateChanged,
     isAuthorizedUser: isAuthorizedUser,
@@ -1263,7 +1330,7 @@
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watch, { once: true });
     else setTimeout(watch, 0);
   }
-  if (getActingStudent()) {
+  if (typeof document !== "undefined" && getActingStudent()) {
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", showActingBanner);
     else showActingBanner();
   }

@@ -15,7 +15,7 @@
       row.querySelector('[data-save]').onclick=async()=>{
         const buttons=[...row.querySelectorAll('button,input')];buttons.forEach(b=>b.disabled=true);status.textContent='Saving…';
         try{
-          const user=firebase.auth().currentUser;if(!user)throw Error('Sign in with your teacher Google account.');
+          const user=firebase.auth().currentUser;if(!user)throw Error('Sign in with your verified teacher account.');
           const response=await fetch('https://us-central1-b3-games.cloudfunctions.net/funTorahManageStudents',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+await user.getIdToken()},body:JSON.stringify({action:'studentTools',classId:panel.dataset.class,studentId:row.dataset.student,toolAccess:Object.fromEntries(checks().map(input=>[input.dataset.tool,input.checked]))})});
           const data=await response.json();if(!response.ok||!data.ok)throw Error(data.error||'Could not save tools.');
           status.textContent='Saved. Student access will update automatically.';

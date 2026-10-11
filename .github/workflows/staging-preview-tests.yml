@@ -1,0 +1,22 @@
+name: Isolated staging security checks
+on:
+  pull_request:
+    paths:
+      - 'staging-preview/**'
+      - '.github/workflows/staging-preview-tests.yml'
+  push:
+    branches: [preview/teacher-registration-pricing-2026-10-11]
+    paths:
+      - 'staging-preview/**'
+      - '.github/workflows/staging-preview-tests.yml'
+permissions:
+  contents: read
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test staging-preview/server.test.cjs

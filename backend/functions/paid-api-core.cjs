@@ -23,8 +23,8 @@ async function authenticate(store, verifyToken, headers) {
       if (!profile || profile.active === false) fail(403, 'Your student account is unavailable.');
       return { id: 'student:' + token.b3StudentId };
     }
-    if (token.email_verified !== true || token.firebase?.sign_in_provider !== 'google.com')
-      fail(403, 'Use your teacher Google account.');
+    if (!require('./teacher-auth-identity.cjs').verifiedTeacherIdentity(token))
+      fail(403, 'Sign in with your verified teacher email or Google account.');
     const [admin, teacher] = await Promise.all([
       store.get('b3Games/admins/' + token.uid),
       store.get('b3Games/workspaces/b3-2026/teachers/' + token.uid)

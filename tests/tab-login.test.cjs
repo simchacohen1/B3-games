@@ -3,7 +3,7 @@ const source=fs.readFileSync('site-settings.js','utf8');
 function storage(){const m=new Map();return {getItem:k=>m.get(k)||null,setItem:(k,v)=>m.set(k,String(v)),removeItem:k=>m.delete(k),clear:()=>m.clear()};}
 const shared=storage();
 function tab(session=storage()){
- const user={uid:'teacher',email:'simcha5770@gmail.com',getIdToken:async()=> 'test-token'};
+ const user={uid:'teacher',email:'simcha5770@gmail.com',emailVerified:true,getIdToken:async()=> 'test-token'};
  const cls={name:'Class',active:true,members:{alice:{name:'Alice'},bob:{name:'Bob'}}};
  const db={ref:path=>({once:async()=>({val:()=>path.endsWith('/classes/et')?cls:null})})};
  const auth={currentUser:user,onAuthStateChanged:fn=>{fn(user);return ()=>{};}};

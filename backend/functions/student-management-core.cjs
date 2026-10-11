@@ -2,6 +2,7 @@
 const {randomUUID}=require('node:crypto');
 const {PRIVATE,clean,readPasscode,passcodeWrites}=require('./student-passcodes.cjs');
 const tools=require('./student-tool-policy.js');
+const {reserveSeat,releaseSeat}=require('./billing-seats.cjs');
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const key=s=>typeof s==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(s);
 // Owner-only: copy every passcode into private storage, and optionally erase
@@ -26,7 +27,7 @@ async function migratePasscodes(store,deletePublic,now){
 }
 
 async function manageStudents(store,identity,body,now=Date.now()){
- if(!identity?.uid||identity.email_verified!==true||identity.firebase?.sign_in_provider!=='google.com')fail(403,'Verified Google teacher sign-in required.');
+ if(!require('./teacher-auth-identity.cjs').verifiedTeacherIdentity(identity))fail(403,'Verified teacher sign-in required.');
  const root='b3Games/workspaces/b3-2026',classId=body.classId;
  // The owner account and any active site administrator count as owner here.
  const owner=String(identity.email||'').toLowerCase()==='simcha5770@gmail.com'||(await store.get('b3Games/admins/'+identity.uid))?.active===true;
@@ -41,6 +42,14 @@ async function manageStudents(store,identity,body,now=Date.now()){
  if(!owner&&(!teacher||teacher.active===false||teacher.classIds?.[classId]!==true))fail(403,'This class is not assigned to your teacher account.');
  const cls=await store.get(root+'/classes/'+classId);
  if(!cls||cls.active===false)fail(403,'This class is inactive.');
+ // Verify subscription state before processing any request.
+ // Seat changes are reserved atomically at commit time below.
+ if(cls.billing?.managed===true){
+  if(cls.billing.active!==true)fail(403,'This subscription is inactive.');
+  if(!Number.isSafeInteger(cls.billing.seatLimit)||cls.billing.seatLimit<1)
+   fail(403,'Invalid paid class seat limit.');
+ }
+
  if(body.action==='list'){
   const passcodes={};for(const id of Object.keys(cls.members||{}).filter(key))passcodes[id]=(await readPasscode(store.get,id,{allowLegacyDefault:true})).passcode;
   return {ok:true,passcodes};
@@ -90,6 +99,23 @@ async function manageStudents(store,identity,body,now=Date.now()){
   updates[membershipPath]={workspaceId:'b3-2026',classId,active:true};
  }else fail(400,'Unknown student management action.');
  updates[root+'/classes/'+classId+'/managementAudit/'+randomUUID()]={action:body.action,studentId:id,teacherUid:identity.uid,at:now};
- await store.update(updates);return {ok:true,studentId:id};
+ const paid=cls.billing?.managed===true,existing=cls.members?.[id];
+ const needsSeat=paid&&(body.action==='create'||
+  (body.action==='add'&&(!existing||existing.active===false))||
+  (body.action==='active'&&body.active===true&&existing?.active===false));
+ let reserved=false;
+ if(needsSeat){await reserveSeat(store,classId,id);reserved=true;}
+ try{await store.update(updates);}
+ catch(error){
+  if(reserved){
+   try{await releaseSeat(store,classId,id);}
+   catch(rollbackError){console.error('Paid student seat rollback needs reconciliation',classId,id,rollbackError?.code);}
+  }
+  throw error;
+ }
+ if(paid&&(body.action==='remove'||(body.action==='active'&&body.active===false))){
+  await releaseSeat(store,classId,id);
+ }
+ return {ok:true,studentId:id};
 }
 module.exports={manageStudents};

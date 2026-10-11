@@ -1,7 +1,7 @@
 'use strict';
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 async function claimTeacher(store,identity,workspaceId='b3-2026',now=Date.now()){
- if(!identity?.uid||identity.email_verified!==true||identity.firebase?.sign_in_provider!=='google.com')fail(403,'Sign in with your verified Google account.');
+ if(!require('./teacher-auth-identity.cjs').verifiedTeacherIdentity(identity))fail(403,'Sign in with a verified Google account or secure email link.');
  const email=String(identity.email||'').trim().toLowerCase();
  if(!email)fail(403,'A verified email is required.');
  const root='b3Games/workspaces/'+workspaceId;
