@@ -1241,8 +1241,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     chooser.replaceChildren(...studentClassChoices.map(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;return o;}));
     chooser.value=myClassId;chooser.classList.toggle("hidden",studentClassChoices.length<2);
     chooser.onchange=()=>enterStudent({id:myStudentId,name:myStudentName,classId:chooser.value});
-    studentClassWatch=db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId);
-    studentClassWatch.on("value",snap=>{myClassRecord=snap.val();if(!myClassRecord||myClassRecord.active===false||!myClassRecord.members?.[myStudentId]||myClassRecord.members?.[myStudentId]?.active===false){studentAccessRevoked=true;showLogin();return;}renderStudentAccess();});
+    if(studentClassWatch)studentClassWatch.off();if(studentProfileWatch)studentProfileWatch.off();if(studentMembershipWatch)studentMembershipWatch.off();studentClassWatch=db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId+"/members/"+myStudentId+"/active");
+    studentClassWatch.on("value",snap=>{myClassRecord=snap.val();if(snap.val()===false){studentAccessRevoked=true;showLogin();return;}renderStudentAccess();});
     studentProfileWatch=db.ref("b3Games/students/"+myStudentId+"/profile");
     let seenPasscodeUpdate;
     studentProfileWatch.on("value",async snap=>{const v=snap.val();if(v?.active===false){studentAccessRevoked=true;showLogin();return;}
@@ -1895,3 +1895,5 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 </script>
 </body>
 </html>
+
+

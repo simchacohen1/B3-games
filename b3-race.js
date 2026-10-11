@@ -160,13 +160,13 @@
     }
     function enter(code, isHost) {
       view++;
-      room = { code: code, ref: db.ref(path + "/" + code), isHost: isHost, data: null, started: false, qi: 0, score: 0, finished: false, shown: null };
+      var ref = db.ref(path + "/" + code), cb = ref.on("value", function (s) { if (room && room.code === code) onRoom(s.val() || null); }); room = { code: code, ref: ref, cb: cb, isHost: isHost, data: null, started: false, qi: 0, score: 0, finished: false, shown: null };
       startWatch();
-      db.ref(path).once("value").then(function (s) { var all = s.val() || {}; if (room && room.code === code) onRoom(all[code] || null, all); });
+      stopWatch();
     }
     function leave() {
       stopWatch();
-      var r = room; if (!r) return; room = null;
+      var r = room; if (!r) return; if (r.ref && r.cb) r.ref.off("value", r.cb); room = null;
       try {
         var st = r.data && r.data.state;
         if (r.isHost && (st === "lobby" || r.shown === "results")) { r.ref.onDisconnect().cancel(); r.ref.remove().catch(function () {}); }
@@ -293,3 +293,6 @@
 
   root.B3Race = { create: create, classRoomsPath: classRoomsPath };
 })(window);
+
+
+

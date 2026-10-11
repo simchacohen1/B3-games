@@ -1962,6 +1962,8 @@ let currentSelectionParts = []; // [{posukNum, text, translation, key}] for tran
 let comprehensionQuestions = [];
 let comprehensionQIndex = 0;
 let comprehensionQResults = {};
+let questionTryCounts = {}; // question index -> how many graded tries this visit
+function questionDisputeUnlocked(i){ const r = comprehensionQResults[i]; return !!r && (r.tries || 0) >= 2; }
 let comprehensionMode = 'freehand-only';
 
 
@@ -3369,6 +3371,7 @@ async function completeGeneratedComprehensionQuestions(loadToken){
     comprehensionQuestions = combined;
     comprehensionQIndex = 0;
     comprehensionQResults = {};
+    questionTryCounts = {};
     comprehensionMode = 'questions';
     renderComprehensionQuestionUI();
     await restoreSavedQuestionResults();
@@ -3499,7 +3502,11 @@ function renderAnsweredQuestionHistory(){
         }else if(r && r.disputeStatus === 'resolved' && r.finalVerdict){
           disputeHtml = '<div style="font-size:0.8rem;color:var(--ink-soft);margin-top:5px;">✔️ Teacher reviewed — final: ' + (r.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</div>';
         }else if(disputesAllowedForCurrentSelection()){
-          disputeHtml = '<button type="button" class="btn small ghost-delete history-dispute-btn" data-q-index="' + i + '" style="margin-top:6px;">⚠️ Dispute this answer</button>';
+          if(questionDisputeUnlocked(i)){
+            disputeHtml = '<button type="button" class="btn small ghost-delete history-dispute-btn" data-q-index="' + i + '" style="margin-top:6px;">⚠️ Dispute this answer</button>';
+          }else{
+            disputeHtml = '<div style="font-size:0.8rem;color:var(--ink-soft);margin-top:5px;">Listen to the feedback, then record this one again. If it is still marked wrong after your second try, you can dispute it.</div>';
+          }
         }
       }
       const audioSrc = questionResultAudioSrc(r);
@@ -3561,6 +3568,7 @@ async function restoreSavedQuestionResults(){
           audioURL:r.audioURL||null,
           disputeStatus:r.disputeStatus||null,
           finalVerdict:r.finalVerdict||null,
+          tries:Number(r.tries)||1,
           attemptId:saved.attemptId,
           savedQuestionIndex:savedIndex,
           questionTotal:Number(saved.questionTotal)||questionResultEntriesStudent(saved.questionResults).length
@@ -3569,6 +3577,7 @@ async function restoreSavedQuestionResults(){
     });
     if(!Object.keys(restored).length) return false;
     comprehensionQResults=restored;
+    Object.keys(restored).forEach(k=>{ questionTryCounts[k]=restored[k].tries||1; });
     const first=comprehensionQuestions.findIndex((_,i)=>!comprehensionQResults[i]);
     comprehensionQIndex=first>=0?first:Math.max(0,comprehensionQuestions.length-1);
     renderComprehensionQuestionUI();
@@ -3586,6 +3595,7 @@ function resetComprehensionQuestionState(){
   buildComprehensionQuestions();
   comprehensionQIndex = 0;
   comprehensionQResults = {};
+  questionTryCounts = {};
   comprehensionMode = comprehensionQuestions.length ? 'questions' : 'freehand-only';
   renderComprehensionQuestionUI();
   if(comprehensionQuestions.length) restoreSavedQuestionResults();
@@ -4504,7 +4514,9 @@ async function gradeCurrentQuestionAnswer(){
       return;
     }
 
+    questionTryCounts[idx] = (questionTryCounts[idx] || 0) + 1;
     comprehensionQResults[idx] = {
+      tries: questionTryCounts[idx],
       verdict: data.verdict,
       feedback: data.feedback || '',
       transcript: data.transcript || '',
@@ -4567,6 +4579,8 @@ function renderQuestionResult(idx, verdict, feedback, transcript, disputeStatus,
       disputeRowHtml = '<div class="dispute-row" style="font-size:0.85rem;color:var(--ink-soft);">⚠️ Dispute pending — your teacher will review it.</div>';
     }else if(disputeStatus === 'resolved' && finalVerdict){
       disputeRowHtml = '<div class="dispute-row" style="font-size:0.85rem;color:var(--ink-soft);">✔️ Teacher reviewed — final: ' + (finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</div>';
+    }else if(disputesAllowedForCurrentSelection() && !questionDisputeUnlocked(idx)){
+      disputeRowHtml = '<div class="dispute-row" style="font-size:0.85rem;color:var(--ink-soft);">Listen to the feedback, then record this one again. If it is still marked wrong after your second try, you can dispute it.</div>';
     }else if(disputesAllowedForCurrentSelection()){
       disputeRowHtml = '<div class="dispute-row" id="questionDisputeRow"><button class="btn small ghost-delete" id="questionDisputeBtn">⚠️ Dispute this answer</button></div>';
     }
@@ -4655,7 +4669,8 @@ async function autosaveComprehensionQuestions(){
         transcript: r.transcript,
         audioURL: url,
         disputeStatus: r.disputeStatus || null,
-        finalVerdict: r.finalVerdict || null
+        finalVerdict: r.finalVerdict || null,
+        tries: r.tries || 1
       };
     }
 
@@ -5363,7 +5378,7 @@ function gradeSingleTranslationSegment(idx, level){
       if(data.verdict === 'no_speech'){
         translationGradedResults[idx] = { verdict:'incorrect', feedback:"Didn't catch that piece — try recording again.", transcript:'', evidenceSaved:false };
       } else {
-        translationGradedResults[idx] = { verdict: data.verdict, feedback: data.feedback || '', transcript: data.transcript || '', evidenceSaved:false };
+        translationGradedResults[idx] = { verdict: data.verdict, feedback: data.feedback || '', transcript: data.transcript || '', evidenceSaved:false, tries: ((translationGradedResults[idx] && translationGradedResults[idx].tries) || 0) + 1 };
       }
 
       // Save this individual piece now, not only after the entire posuk is
@@ -5486,7 +5501,11 @@ function showTranslationSummary(level){
         helpHtml = '<div class="translation-review-note">✔️ Teacher reviewed — final: ' +
           (r.finalVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</div>';
       }else if(disputesAllowedForCurrentSelection()){
-        if(r.evidenceSaved){
+        if((r.tries || 0) < 2){
+          // A dispute is only unlocked after a second try that is still
+          // marked wrong, so he first has to listen and fix it himself.
+          helpHtml = '<div class="translation-review-note">Listen to the feedback, then record this one again. If it is still marked wrong after your second try, you can dispute it.</div>';
+        }else if(r.evidenceSaved){
           // Only offer a dispute once the recording + transcript + grade for
           // this exact piece are safely in Firebase. That guarantees the
           // teacher has evidence to review.
@@ -5681,7 +5700,7 @@ async function recordChunkFix(index, btnEl){
         }
 
         translationSegments[index] = { blob, ext };
-        translationGradedResults[index] = { verdict: data.verdict, feedback: data.feedback || '', transcript: data.transcript || '' };
+        translationGradedResults[index] = { verdict: data.verdict, feedback: data.feedback || '', transcript: data.transcript || '', tries: ((translationGradedResults[index] && translationGradedResults[index].tries) || 0) + 1 };
         // Save this replacement piece immediately at its real chunk index.
         // If the full posuk is already complete, refresh the normal full
         // translation autosave as well; otherwise do not pack sparse chunks.
@@ -6361,6 +6380,7 @@ async function deleteAttempt(attempt, btnEl){
       clearCurrentFreehandUIAfterDelete();
       Object.values(comprehensionQResults).forEach(releaseQuestionObjectURL);
       comprehensionQResults = {};
+      questionTryCounts = {};
       translationSegments = {};
       translationGradedResults = {};
       translationGradingPromises = {};
