@@ -405,6 +405,12 @@
       showClosed("This activity is turned off for you", "Your teacher can change your tool access.");return;
     }
     if(studentClassId!=="et"&&studentClassId!=="wt"){
+      if(lastSettings.siteEnabled===false){
+        showClosed("Fun Torah Tools is closed", "The administrator has activated the emergency lock.");return;
+      }
+      if(lastSettings.games?.[gameId]===false){
+        showClosed("This activity is inactive", "The administrator has disabled this activity for everyone.");return;
+      }
       var grantId=gameId==="class-gallery"?"gallery":gameId;
       if(!assignedClass||(assignedClass.toolGrants?.[grantId]!==true&&!(gameId==="class-gallery"&&(assignedClass.toolGrants?.tag===true||assignedClass.toolGrants?.["class-gallery"]===true)))){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
       if(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked"){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
