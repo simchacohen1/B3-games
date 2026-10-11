@@ -37,6 +37,17 @@
             ? ' The login cookies were sent, but School Marks did not show the expected controls.'
             : ' The browser login did not produce cookies usable for the HTTP marks page.';
         }
+        if (data.status === 'hybrid_marks_found' && data.mark_entry_readonly) {
+          const structure = data.mark_entry_readonly;
+          let info = ' Mark-entry navigation: ' + String(structure.entry_link_kind || 'unknown');
+          if (structure.entry_link_action_kind && structure.entry_link_action_kind !== 'unknown') {
+            info += ' (action ' + structure.entry_link_action_kind + ')';
+          }
+          const fields = Array.isArray(structure.known_form_field_names) ? structure.known_form_field_names : [];
+          if (fields.length) info += '; known fields on listing: ' + fields.join(', ');
+          info += '. The New Mark form was NOT opened.';
+          status.textContent += info;
+        }
       }
     } catch (error) {
       status.textContent = 'Could not contact the NigriSync server. No marks were changed.';
