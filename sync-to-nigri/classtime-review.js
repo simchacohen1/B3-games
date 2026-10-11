@@ -6,7 +6,7 @@
   let user = null, loading = false, generation = 0;
   const urls = [];
   function status(message, error = false) { $('status').textContent = message; $('status').classList.toggle('error', error); }
-  function clearReview() { urls.splice(0).forEach(URL.revokeObjectURL); $('review').hidden = true; $('students').replaceChildren(); }
+  function clearReview() { urls.splice(0).forEach(URL.revokeObjectURL); $('review').hidden = true; $('students').replaceChildren(); document.dispatchEvent(new CustomEvent('classtime:review-cleared')); }
   async function api(path, options = {}) {
     if (!user) throw new Error('Please sign in with your owner account.');
     const response = await fetch(base + path, { ...options, headers: { 'Authorization': 'Bearer ' + await user.getIdToken(), ...(options.body ? {'Content-Type': 'application/json'} : {}) }, cache: 'no-store' });
@@ -47,6 +47,7 @@
       $('students').append(row);
     }
     $('review').hidden = false;
+    document.dispatchEvent(new CustomEvent('classtime:review', {detail: {id, result}}));
     status(verified === result.students.length && mapped === result.students.length ? 'Review ready. All student matches and PDF identities verified.' : 'Review loaded. Check any students with missing matches or reports.');
   }
   auth.onAuthStateChanged(current => {
