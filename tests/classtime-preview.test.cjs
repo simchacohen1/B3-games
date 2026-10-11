@@ -20,12 +20,12 @@ function load({token='fake-token',reply}={}){
   const ids=['preview','previewTopic','previewType','previewDate','previewName','previewBtn','previewStatus','previewResult'];
   const els=Object.fromEntries(ids.map(i=>[i,el()]));els.preview.hidden=true;
   els.previewTopic.append=function(o){this.children.push(o)};els.previewType.append=els.previewTopic.append;
-  const docListeners={},requests=[];
-  const sandbox={window:{},document:{getElementById:i=>els[i],createElement:()=>el(),addEventListener:(t,f)=>{docListeners[t]=f}},
+  const docListeners={},requests=[],events=[];
+  const sandbox={window:{},document:{getElementById:i=>els[i],createElement:()=>el(),addEventListener:(t,f)=>{docListeners[t]=f},dispatchEvent:e=>{events.push(e)}},
     Option:function(label,value){this.label=label;this.value=value},CustomEvent:function(t,o){this.type=t;this.detail=o&&o.detail},encodeURIComponent,String,Date,Array,Object,Promise,JSON};
   sandbox.window.NigriAuth={getToken:async()=>token,request:async(path,opt,key)=>{requests.push({path,opt,key,args:arguments.length});return reply?reply():{response:{ok:true,status:200,json:async()=>({})},via:'signin'}}};
   vm.createContext(sandbox);vm.runInContext(src,sandbox);
-  return {els,requests,api:sandbox.window.ClasstimePreview,docListeners,
+  return {els,requests,events,api:sandbox.window.ClasstimePreview,docListeners,
     open(result,id='rev1'){docListeners['classtime:review']({detail:{id,result}})},close(){docListeners['classtime:review-cleared']()}};
 }
 const RESULT={session_code:'ABC123',session_name:'B3 ET Shoroshim Test Quiz',class_section:'B3 ET'};

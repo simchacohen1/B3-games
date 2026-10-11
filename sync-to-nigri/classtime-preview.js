@@ -68,7 +68,8 @@
 
   async function run() {
     if (busy || !current) return;
-    busy = true; const mine = generation; $('previewBtn').disabled = true; $('previewResult').replaceChildren();
+    busy = true; const mine = generation, review = current; $('previewBtn').disabled = true; $('previewResult').replaceChildren();
+    document.dispatchEvent(new CustomEvent('classtime:preview-start'));
     try {
       if (!window.NigriAuth || !(await window.NigriAuth.getToken())) { say('Not signed in. Use "Sign in with Google" above first.', 'warn'); return; }
       say('Checking Nigri… this can take up to a minute.', 'muted');
@@ -80,6 +81,9 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok) { say(errorText(response.status, data), 'warn'); return; }
       say('', 'muted'); show(data);
+      // Tell the Save section which review and which choices this successful preview was for.
+      if (data.dry_run === true) document.dispatchEvent(new CustomEvent('classtime:preview-ok', {detail: {id: review.id, result: review.result,
+        choices: {topic: body.topic, type: body.type, date: body.date, test_name: body.test_name || ''}, data}}));
     } catch (error) { if (mine === generation) say('Could not reach the server.', 'warn'); }
     finally { busy = false; $('previewBtn').disabled = false; }
   }
