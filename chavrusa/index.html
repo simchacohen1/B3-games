@@ -156,6 +156,15 @@ body.fullscreen .app{width:min(1450px,98vw);padding-top:8px}
 body.fullscreen .subtitle,body.fullscreen .footer,body.fullscreen .settings{display:none}
 </style>
 <script defer src="../gallery-share.js?v=20261011b"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\\/script>')</script>
+<script src="../firebase-config.js?v=20261001-teacherauth"></script>
+<script src="../site-settings.js?v=20261011-owner-class-rosters"></script>
+<script src="../teacher-class-rosters.js?v=20261011"></script>
 </head>
 <body>
 <div class="app">
@@ -167,10 +176,7 @@ body.fullscreen .subtitle,body.fullscreen .footer,body.fullscreen .settings{disp
     <div class="controls">
       <div class="control">
         <label>Class</label>
-        <select id="classSelect">
-          <option value="ET">ET — Morning</option>
-          <option value="WT">WT — Afternoon</option>
-        </select>
+        <select id="classSelect"><option value="">Loading class…</option></select>
       </div>
       <div class="control">
         <label>School Date</label>
@@ -231,34 +237,10 @@ body.fullscreen .subtitle,body.fullscreen .footer,body.fullscreen .settings{disp
 </div>
 
 <script>
-const classes = {
-  ET: {
-    label: "ET — Morning",
-    students: [
-      "Mayer Chaim Chaikin",
-      "Yossi Gourarie",
-      "Sholom DovBer Huebner",
-      "Moshe Lapine",
-      "Kehos Notik",
-      "Yisroel Oirechman",
-      "Moshe Tuvia Raichman",
-      "Avrohom Rosenfeld",
-      "Levi Rozmarin",
-      "Arik Traxler"
-    ]
-  },
-  WT: {
-    label: "WT — Afternoon",
-    students: [
-      "Ari Greenberg",
-      "Zev Rosenfeld",
-      "Levi Schtroks",
-      "Yisroel Aryeh Simmonds",
-      "Leibel Vogel",
-      "Leib Wolf"
-    ]
-  }
-};
+// Authorized live classes only; do not embed a school's students in the page.
+const classes = Object.create(null);
+let teacherScope = '';
+let preferredClassId = '';
 
 const SCHOOL_START = "2026-08-25";
 const SCHOOL_END   = "2027-06-30";
@@ -407,11 +389,6 @@ function makeRoundRobin(names){
   }
   return out;
 }
-const schedules={
-  ET:makeRoundRobin(classes.ET.students),
-  WT:makeRoundRobin(classes.WT.students)
-};
-
 function seededShuffle(items,seed){
   const out=[...items];
   let state=(seed>>>0)||1;
@@ -493,7 +470,11 @@ function makeGroups(names,targetSize,schoolIndex){
 }
 
 function absenceKey(){
-  return "chavrusaAbsent_"+classSelect.value+"_"+dateSelect.value;
+  // Retain the owner's original ET/WT absence records; isolate other teachers.
+  const id = classSelect.value;
+  if (teacherScope === 'owner' && (id === 'et' || id === 'wt'))
+    return "chavrusaAbsent_" + id.toUpperCase() + "_" + dateSelect.value;
+  return "chavrusaAbsent_" + teacherScope + "_" + id + "_" + dateSelect.value;
 }
 function getAbsent(){
   try{return JSON.parse(localStorage.getItem(absenceKey())||"[]")}catch(e){return[]}
@@ -557,7 +538,6 @@ function renderPairs(){
   const normal=makeGroups(cls.students,targetSize,schoolIndex);
   const absent=new Set(getAbsent());
   const present=cls.students.filter(n=>!absent.has(n));
-  const presentSet=new Set(present);
 
   document.getElementById("classLabel").textContent=cls.label;
   const d=dateFromISO(iso);
@@ -573,12 +553,6 @@ function renderPairs(){
   }else{
     groups=normal.map(g=>[...g]);
     backupNotice.classList.remove("show");
-  }
-
-  // One-day teacher-requested exception. All other dates use the normal rotation.
-  if(key==="WT" && iso==="2026-09-16" &&
-     presentSet.has("Leib Wolf") && presentSet.has("Ari Greenberg")){
-    groups=keepTogether(groups,"Leib Wolf","Ari Greenberg",targetSize);
   }
 
   pairsEl.innerHTML="";
@@ -644,7 +618,7 @@ function renderHolidayList(){
 function renderAll(){
   if(!dateSelect.value)return;
   renderAbsentControls(); renderPairs();
-  localStorage.setItem("chavrusaClass",classSelect.value);
+  localStorage.setItem("chavrusaClass_"+teacherScope,classSelect.value);
   localStorage.setItem("chavrusaDate",dateSelect.value);
 }
 
@@ -688,8 +662,9 @@ document.getElementById("fullBtn").addEventListener("click",async()=>{
 });
 
 function startPage(){
-  const savedClass=localStorage.getItem("chavrusaClass");
-  if(savedClass&&classes[savedClass])classSelect.value=savedClass;
+  const savedClass=localStorage.getItem("chavrusaClass_"+teacherScope);
+  if(preferredClassId && classes[preferredClassId]) classSelect.value=preferredClassId;
+  else if(savedClass && classes[savedClass]) classSelect.value=savedClass;
 
   // Always open to today's school date. If today is not a listed school day,
   // open to the next available school date instead.
@@ -698,29 +673,32 @@ function startPage(){
   renderAll();
 }
 
-// Opened from a teacher's home page as ?class=<id>: any class other than B3's own
-// (et/wt) pairs that class's own students instead of the ET/WT lists above.
-const CLASS_ID=(new URLSearchParams(location.search).get("class")||"").trim();
-if(/^[A-Za-z0-9_-]{1,100}$/.test(CLASS_ID)&&!["et","wt"].includes(CLASS_ID)){
-  const key="C_"+CLASS_ID;
-  delete classes.ET;delete classes.WT;
-  classes[key]={label:CLASS_ID,students:[]};
-  classSelect.innerHTML="";
-  fetch("https://b3-games-default-rtdb.firebaseio.com/b3Games/workspaces/b3-2026/classes/"+CLASS_ID+".json")
-    .then(r=>r.json())
-    .then(cls=>{
-      cls=cls||{};
-      classes[key].label=cls.name||CLASS_ID;
-      classes[key].students=Object.values(cls.members||{}).filter(m=>m&&m.active!==false&&m.name).map(m=>String(m.name)).sort((a,b)=>a.localeCompare(b));
-    })
-    .catch(err=>console.error("Could not load class list",err))
-    .then(()=>{
-      const opt=document.createElement("option");opt.value=key;opt.textContent=classes[key].label;classSelect.append(opt);
-      startPage();
-    });
-}else{
-  startPage();
-}
+// Load only classes assigned to the signed-in teacher, or all classes for owner/admin.
+(async function startAuthorizedChavrusa() {
+  try {
+    const session = await window.B3TeacherClassRosters.load();
+    teacherScope = session.role === 'admin' ? 'owner' : session.uid;
+    preferredClassId = session.selectedId;
+    classSelect.replaceChildren();
+    for (const cls of session.classes) {
+      classes[cls.id] = { label: cls.name, students: cls.students.slice() };
+      const opt = document.createElement('option');
+      opt.value = cls.id;
+      opt.textContent = cls.name;
+      classSelect.appendChild(opt);
+    }
+    startPage();
+  } catch (error) {
+    console.error('Chavrusa class access:', error);
+    const app = document.querySelector('.app');
+    app.replaceChildren();
+    const notice = document.createElement('div');
+    notice.className = 'notice';
+    notice.textContent = (error.message || 'Could not load your class.') +
+      ' Open Teacher Center to sign in or choose an assigned class.';
+    app.appendChild(notice);
+  }
+})();
 </script>
 </body>
 </html>
