@@ -2025,7 +2025,22 @@ document.getElementById('projectForm').addEventListener('submit',async e=>{
 });
 
 /* ---------- review ---------- */
-const reviewOverlay=document.getElementById('reviewOverlay');document.getElementById('teacherReviewBtn').onclick=()=>{reviewOverlay.classList.add('show');isTeacher?showReviewList():(document.getElementById('reviewLoginArea').style.display='block',document.getElementById('reviewListArea').style.display='none')};document.getElementById('closeReviewBtn').onclick=()=>reviewOverlay.classList.remove('show');reviewOverlay.addEventListener('click',e=>{if(e.target===reviewOverlay)reviewOverlay.classList.remove('show')});
+const reviewOverlay=document.getElementById('reviewOverlay');
+let reviewAuthChecked=false,reviewSignedInWithoutClass=false;
+function showReviewLogin(){
+  document.getElementById('reviewListArea').style.display='none';
+  document.getElementById('reviewLoginArea').style.display='block';
+  document.getElementById('loginSubmitBtn').style.display=reviewAuthChecked?'':'none';
+  document.getElementById('loginStatus').textContent=!reviewAuthChecked
+    ?'Checking your teacher session…'
+    :(reviewSignedInWithoutClass?'This Google account is not assigned to this class.':'');
+}
+document.getElementById('teacherReviewBtn').onclick=()=>{
+  reviewOverlay.classList.add('show');
+  if(isTeacher)showReviewList();else showReviewLogin();
+};
+document.getElementById('closeReviewBtn').onclick=()=>reviewOverlay.classList.remove('show');
+reviewOverlay.addEventListener('click',e=>{if(e.target===reviewOverlay)reviewOverlay.classList.remove('show')});
 if(new URLSearchParams(window.location.search).get('review')==='pending'){setTimeout(()=>{const btn=document.getElementById('teacherReviewBtn');if(btn)btn.click()},0)}
 document.getElementById('loginSubmitBtn').textContent='Sign in with Google';
 document.getElementById('loginSubmitBtn').onclick=async()=>{
@@ -2035,13 +2050,20 @@ document.getElementById('loginSubmitBtn').onclick=async()=>{
 };
 B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
   const allowed=authorized&&(access?.role==='admin'||(access?.classIds||[]).includes(galleryClassId));
+  reviewAuthChecked=true;
+  reviewSignedInWithoutClass=!!user&&!allowed;
   teacherUser=allowed?user:null;isTeacher=!!allowed;teacherPresenceViewer=!!allowed;
   refreshGalleryAccess();
   if(allowed){
+    // Firebase restored the existing session: the open review should unlock automatically.
+    if(reviewOverlay.classList.contains('show'))showReviewList();
     PRESENCE_STUDENTS[currentTagStudentKey()]={name:user.displayName||user.email||'Teacher',classId:galleryClassId};
     if(!legacyGallery)presenceProfile={name:user.displayName||'Teacher',classId:galleryClassId};
     await loadGenericPresenceRoster();
-  }else{document.getElementById('reviewListArea').style.display='none';document.getElementById('reviewLoginArea').style.display='block';}
+  }else{
+    document.getElementById('reviewListArea').style.display='none';
+    if(reviewOverlay.classList.contains('show'))showReviewLogin();
+  }
   stopLivePresence(true);startLivePresence();
 });
 
