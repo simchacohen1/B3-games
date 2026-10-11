@@ -32,3 +32,22 @@ test('owner seeding never writes passcodes into public profiles',async()=>{
   assert.equal(t.writes[0][1]['b3Games/students/child/profile'],undefined);
  }
 });
+
+test('owner class controls discover the registry and change only a selected class',()=>{
+ const src=fs.readFileSync('admin.html','utf8');
+ assert.match(src,/cpWatchClasses\(\)/);
+ assert.match(src,/cpRecords=snapshot\.val\(\)/);
+ assert.match(src,/data-cp-new-mode/);
+ assert.match(src,/base\+"\/toolGrants\/"\+tool/);
+ assert.match(src,/base\+"\/access\/mode"/);
+});
+test('new classes honor global emergency lock and inactive activities',()=>{
+ const src=fs.readFileSync('game-gate.js','utf8');
+ const start=src.indexOf('if(studentClassId!=="et"&&studentClassId!=="wt")');
+ const end=src.indexOf('showOpen();return;',start);
+ assert.ok(start>=0&&end>start);
+ const branch=src.slice(start,end);
+ assert.match(branch,/lastSettings\.siteEnabled===false/);
+ assert.match(branch,/lastSettings\.games\?\.\[gameId\]===false/);
+ assert.match(branch,/assignedClass\.access\?\.mode==="locked"/);
+});
