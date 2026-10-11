@@ -5,6 +5,7 @@ const {createHmac}=require('node:crypto');
 const {quote,normalizeOrder,stripeLineItems}=require('./billing-catalog.cjs');
 const {paths,activationUpdates}=require('./billing-fulfillment.cjs');
 const {form,verifyWebhook}=require('./billing-stripe-client.cjs');
+const {slots,reserveSeat,releaseSeat}=require('./billing-seats.cjs');
 
 test('Annual base covers five seats, Shorashim $39',()=>{
  assert.equal(quote({seats:5,tools:['shorashim']}).amountCents,13900);
@@ -59,9 +60,51 @@ test('Grant class access only after verified paid active subscription',()=>{
  const active=activationUpdates(order,sub,true,1000);
  assert.equal(active.updates[p.classPath+'/toolGrants/shorashim'],true);
  assert.equal(active.updates[p.invitePath+'/active'],true);
- assert.equal(active.updates[p.classPath+'/billing'].seatLimit,5);
+ assert.equal(active.updates[p.classPath+'/billing/seatLimit'],5);
+ assert.equal(active.updates[p.classPath+'/billing/active'],true);
+ assert.equal(active.updates[p.classPath+'/billing/seatAllocations'],undefined);
  const canceled=activationUpdates(order,{id:'sub_123',status:'canceled'},false,2000);
  assert.equal(canceled.updates[p.classPath+'/active'],false);
  assert.equal(canceled.updates[p.invitePath+'/active'],false);
  assert.equal(canceled.updates[p.classPath+'/toolGrants/shorashim'],false);
+});
+
+test('Transactionally reserve and release a limited number of seats',async()=>{
+ let b={managed:true,active:true,seatLimit:2};
+ const store={transaction:async(path,fn)=>{
+  const candidate=fn(structuredClone(b));
+  if(candidate===undefined)return {committed:false};
+  b=candidate;return {committed:true};
+ }};
+ await reserveSeat(store,'paid_abc','one');
+ await reserveSeat(store,'paid_abc','two');
+ assert.equal(slots(b),2);
+ await assert.rejects(reserveSeat(store,'paid_abc','three'),/in use/);
+ await releaseSeat(store,'paid_abc','one');
+ assert.equal(slots(b),1);
+ await reserveSeat(store,'paid_abc','three');
+ assert.equal(slots(b),2);
+ b.active=false;
+ await assert.rejects(reserveSeat(store,'paid_abc','four'),/inactive/);
+ await releaseSeat(store,'paid_abc','two');
+ assert.equal(slots(b),1);
+});
+test('Concurrent requests cannot exceed the paid seat cap',async()=>{
+ let billing={managed:true,active:true,seatLimit:1};
+ let queue=Promise.resolve();
+ const store={transaction:(path,fn)=>{
+  const next=queue.then(async()=>{
+   const candidate=fn(structuredClone(billing));
+   if(candidate===undefined)return {committed:false};
+   billing=candidate;return {committed:true};
+  });
+  queue=next.then(()=>{},()=>{});
+  return next;
+ }};
+ const results=await Promise.allSettled([
+  reserveSeat(store,'paid_class','a'),reserveSeat(store,'paid_class','b')
+ ]);
+ assert.equal(results.filter(x=>x.status==='fulfilled').length,1);
+ assert.equal(results.filter(x=>x.status==='rejected').length,1);
+ assert.equal(slots(billing),1);
 });
