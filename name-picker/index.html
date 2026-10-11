@@ -297,6 +297,16 @@
   }
 </style>
 <script defer src="../gallery-share.js?v=20261011b"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\\/script>')</script>
+<script src="../firebase-config.js?v=20261001-teacherauth"></script>
+<script src="../site-settings.js?v=20261011-owner-class-rosters"></script>
+<script src="../teacher-class-rosters.js?v=20261011"></script>
+
 </head>
 <body>
 <div class="app">
@@ -313,11 +323,7 @@
 
     <div class="panel">
       <h2>Class list</h2>
-      <div class="list-choice">
-        <button data-list="east">East Track</button>
-        <button data-list="west">West Track</button>
-        <button data-list="custom">Quick list</button>
-      </div>
+      <div class="list-choice" id="rosterListButtons"><button data-list="custom">Quick list</button></div>
       <textarea id="rosterEditor" placeholder="One name per line"></textarea>
       <div class="hint" id="rosterHint">One name per line.</div>
     </div>
@@ -448,57 +454,48 @@ const DEFAULT_PURPOSES = [
   { id: 'p_fun',       name: 'Just for Fun',        headline: 'Spinning for fun!',    noRepeat: false },
 ];
 
-const FIXED_ROSTERS = {
-  east: [
-    'Mayer Chaim Chaikin',
-    'Yossi Gourarie',
-    'Sholom DovBer Huebner',
-    'Moshe Lapine',
-    'Kehos Notik',
-    'Yisroel Oirechman',
-    'Moshe Tuvia Raichman',
-    'Avrohom Rosenfeld',
-    'Levi Rozmarin',
-    'Arik Traxler'
-  ],
-  west: [
-    'Ari Greenberg',
-    'Zev Rosenfeld',
-    'Levi Schtroks',
-    'Yisroel Aryeh Simmonds',
-    'Leibel Vogel',
-    'Leib Wolf'
-  ]
-};
+// Class lists are never embedded in this file. Load only authorized live rosters.
+let liveRosters = Object.create(null);
+let classLabels = Object.create(null);
+let availableLists = [];
+let authorizedSession = null;
+const rosterListKey = id => id === 'et' ? 'east' : id === 'wt' ? 'west' : 'class_' + id;
 
-// Opened from a teacher's home page as ?class=<id>: any class other than B3's own
-// (et/wt) uses that class's student list instead of the East/West lists above.
-const CLASS_ID = (new URLSearchParams(location.search).get('class') || '').trim();
-const CLASS_MODE = /^[A-Za-z0-9_-]{1,100}$/.test(CLASS_ID) && !['et', 'wt'].includes(CLASS_ID);
-let classLabel = '';
-async function loadClassRoster() {
-  const url = 'https://b3-games-default-rtdb.firebaseio.com/b3Games/workspaces/b3-2026/classes/' + CLASS_ID + '.json';
-  const cls = await (await fetch(url)).json() || {};
-  classLabel = cls.name || CLASS_ID;
-  FIXED_ROSTERS.east = Object.values(cls.members || {}).filter(m => m && m.active !== false && m.name).map(m => String(m.name)).sort((a, b) => a.localeCompare(b));
-  FIXED_ROSTERS.west = [];
-  document.querySelector('[data-list="east"]').textContent = classLabel;
-  document.querySelector('[data-list="west"]').hidden = true;
-}
-
-// This page used to rely on a storage feature that only exists inside Claude, so
-// nothing was ever saved on the real website. Use this browser's own storage
-// instead, kept separate for each class.
-if (typeof window.storage === 'undefined') {
-  const prefix = 'namePicker:' + (CLASS_MODE ? CLASS_ID : 'b3') + ':';
+function configureStorage(session) {
+  // Keep the owner's existing Name Picker counts; separate all other teachers.
+  const prefix = session.role === 'admin' ? 'namePicker:b3:' : 'namePicker:teacher:' + session.uid + ':';
   window.storage = {
-    async get(key) { const value = localStorage.getItem(prefix + key); return value == null ? null : { value }; },
-    async set(key, value) { localStorage.setItem(prefix + key, value); return { value }; }
+    async get(key) {
+      const value = localStorage.getItem(prefix + key);
+      return value === null ? null : { value };
+    },
+    async set(key, value) {
+      localStorage.setItem(prefix + key, value);
+      return { value };
+    }
   };
+}
+function configureClassButtons(session) {
+  const container = document.getElementById('rosterListButtons');
+  container.replaceChildren();
+  availableLists = session.classes.map(cls => {
+    const key = rosterListKey(cls.id);
+    liveRosters[key] = cls.students.slice();
+    classLabels[key] = cls.name;
+    const btn = document.createElement('button');
+    btn.dataset.list = key;
+    btn.textContent = cls.name;
+    container.appendChild(btn);
+    return key;
+  });
+  const custom = document.createElement('button');
+  custom.dataset.list = 'custom';
+  custom.textContent = 'Quick list';
+  container.appendChild(custom);
 }
 
 let state = {
-  rosters: { east: FIXED_ROSTERS.east.slice(), west: FIXED_ROSTERS.west.slice() },
+  rosters: {},
   customNames: [],
   activeList: 'east',
   excludedByList: { east: [], west: [], custom: [] },
@@ -525,13 +522,14 @@ async function loadState() {
       // key not found yet, keep default
     }
   }
-  // East and West rosters are built into this file permanently.
-  // Saved browser data can never overwrite them.
-  state.rosters = { east: FIXED_ROSTERS.east.slice(), west: FIXED_ROSTERS.west.slice() };
-  if (state.activeList !== 'east' && state.activeList !== 'west' && state.activeList !== 'custom') state.activeList = 'east';
-  if (CLASS_MODE && state.activeList === 'west') state.activeList = 'east';
+  // The live roster is authoritative. Saved or restored names cannot replace it.
+  state.rosters = Object.fromEntries(Object.entries(liveRosters).map(([key, names]) => [key, names.slice()]));
+  if (!availableLists.includes(state.activeList) && state.activeList !== 'custom') state.activeList = availableLists[0];
+  const requested = (new URLSearchParams(location.search).get('class') || '').trim();
+  if (requested) state.activeList = rosterListKey(authorizedSession.selectedId);
+  if (state.activeList === 'custom' && !state.customNames.length) state.activeList = availableLists[0];
   if (!state.excludedByList || typeof state.excludedByList !== 'object') state.excludedByList = { east: [], west: [], custom: [] };
-  ['east', 'west', 'custom'].forEach(k => {
+  [...availableLists, 'custom'].forEach(k => {
     if (!Array.isArray(state.excludedByList[k])) state.excludedByList[k] = [];
   });
   if (!state.purposes || state.purposes.length === 0) state.purposes = DEFAULT_PURPOSES.slice();
@@ -561,9 +559,7 @@ function parseNameBlock(text) {
 }
 
 function getActiveNames() {
-  if (state.activeList === 'east') return state.rosters.east || FIXED_ROSTERS.east;
-  if (state.activeList === 'west') return state.rosters.west || FIXED_ROSTERS.west;
-  return state.customNames || [];
+  return state.activeList === 'custom' ? (state.customNames || []) : (state.rosters[state.activeList] || []);
 }
 
 function getExcludedNames() {
@@ -850,7 +846,7 @@ const displayTab = el('#displayTab');
 const tabSetupBtn = el('#tabSetupBtn');
 const tabDisplayBtn = el('#tabDisplayBtn');
 
-const listButtons = els('.list-choice button');
+let listButtons = [];
 const rosterEditor = el('#rosterEditor');
 const rosterHint = el('#rosterHint');
 const excludePicker = el('#excludePicker');
@@ -929,10 +925,7 @@ function showTab(name) {
 // ---------- Roster editor ----------
 function loadRosterEditor() {
   listButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.list === state.activeList));
-  let text = '';
-  if (state.activeList === 'east') text = (state.rosters.east || FIXED_ROSTERS.east).join('\n');
-  else if (state.activeList === 'west') text = (state.rosters.west || FIXED_ROSTERS.west).join('\n');
-  else text = (state.customNames || []).join('\n');
+  const text = getActiveNames().join('\n');
   rosterEditor.value = text;
   rosterEditor.readOnly = false;
   updateRosterHint();
@@ -943,7 +936,7 @@ function updateRosterHint() {
   if (state.activeList === 'custom') {
     rosterHint.textContent = n === 0 ? 'One name per line.' : `${n} name${n === 1 ? '' : 's'} loaded.`;
   } else {
-    rosterHint.textContent = `${n} name${n === 1 ? '' : 's'} active. Temporary edits only — the full ${CLASS_MODE ? classLabel : state.activeList === 'east' ? 'East Track' : 'West Track'} list returns when the page refreshes.`;
+    rosterHint.textContent = `${n} name${n === 1 ? '' : 's'} active. Temporary edits only — the full ${classLabels[state.activeList] || 'class'} list returns when the page refreshes.`;
   }
 }
 
@@ -954,7 +947,7 @@ function commitRosterEditor() {
     persist('customNames');
   } else {
     state.rosters[state.activeList] = names;
-    // East/West changes are intentionally session-only and are not persisted.
+    // Changes to a live class roster are temporary; refresh restores current class members.
   }
   updateRosterHint();
   renderExcludePicker();
@@ -962,15 +955,17 @@ function commitRosterEditor() {
   renderChazzanCounts();
 }
 
-listButtons.forEach(btn => {
-  btn.addEventListener('click', () => {
-    state.activeList = btn.dataset.list;
-    persist('activeList');
-    loadRosterEditor();
-    renderExcludePicker();
-    renderFairnessStatus();
-    renderChazzanCounts();
-  });
+document.getElementById('rosterListButtons').addEventListener('click', event => {
+  const btn = event.target.closest('button[data-list]');
+  if (!btn || ![...availableLists, 'custom'].includes(btn.dataset.list)) return;
+  state.activeList = btn.dataset.list;
+  persist('activeList');
+  loadRosterEditor();
+  renderExcludePicker();
+  renderFairnessStatus();
+  renderChazzanCounts();
+  renderStatsScopeOptions();
+  renderStats();
 });
 rosterEditor.addEventListener('input', commitRosterEditor);
 rosterEditor.addEventListener('blur', commitRosterEditor);
@@ -1233,7 +1228,8 @@ restoreFileInput.addEventListener('change', () => {
           persist(k);
         }
       });
-      state.rosters = { east: FIXED_ROSTERS.east.slice(), west: FIXED_ROSTERS.west.slice() };
+      state.rosters = Object.fromEntries(Object.entries(liveRosters).map(([key, names]) => [key, names.slice()]));
+      if (state.activeList !== 'custom' && !availableLists.includes(state.activeList)) state.activeList = availableLists[0];
       refreshAllUi();
       backupStatus.textContent = 'Backup restored.';
     } catch (e) {
@@ -1421,13 +1417,23 @@ async function init() {
   showTab('setup');
 }
 
-if (CLASS_MODE) {
-  // Never fall back to B3's names for another class, even if loading fails.
-  FIXED_ROSTERS.east = []; FIXED_ROSTERS.west = [];
-  loadClassRoster().catch(err => console.error('Could not load class list', err)).then(init);
-} else {
-  init();
-}
+(async function startAuthenticatedPicker() {
+  try {
+    authorizedSession = await window.B3TeacherClassRosters.load();
+    configureStorage(authorizedSession);
+    configureClassButtons(authorizedSession);
+    listButtons = els('#rosterListButtons button');
+    await init();
+  } catch (error) {
+    console.error('Name Picker class access:', error);
+    const app = document.querySelector('.app');
+    app.replaceChildren();
+    const message = document.createElement('div');
+    message.className = 'notice';
+    message.textContent = (error.message || 'Could not load your class.') + ' Open Teacher Center to sign in or choose an assigned class.';
+    app.appendChild(message);
+  }
+})();
 </script>
 </body>
 </html>
