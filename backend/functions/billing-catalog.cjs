@@ -50,9 +50,15 @@ function normalizeOrder(raw){
  return {teacherName,teacherEmail,school,className,quote:quote(raw)};
 }
 function stripeLineItems(quote){
+ const kind=line=>line.name==='Teacher account and first 5 students'
+   ?{fttKind:'base'}
+   :line.name==='Additional student account'
+    ?{fttKind:'extra'}
+    :{fttKind:'tool',fttToolId:Object.keys(PRODUCTS)
+       .find(id=>PRODUCTS[id].name===line.name)};
  return quote.lines.map(line=>({
   price_data:{currency:'usd',unit_amount:line.unit_amount,
-   product_data:{name:line.name},recurring:{interval:'year'}},
+   product_data:{name:line.name,metadata:kind(line)},recurring:{interval:'year'}},
   quantity:line.quantity
  }));
 }
