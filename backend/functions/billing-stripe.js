@@ -11,6 +11,7 @@ const {randomUUID}=require('node:crypto');
 const admin=require('firebase-admin');
 const {normalizeOrder,stripeLineItems}=require('./billing-catalog.cjs');
 const {PRIVATE,activationUpdates}=require('./billing-fulfillment.cjs');
+const {subscriptionPlan,planMatchesOrder,latestInvoicePaid}=require('./billing-entitlements.cjs');
 if(!admin.apps.length)admin.initializeApp();
 const secretKey=defineSecret('FTT_STRIPE_SECRET_KEY');
 const webhookKey=defineSecret('FTT_STRIPE_WEBHOOK_SECRET');
@@ -33,6 +34,8 @@ exports.funTorahCreateCheckout=onRequest({
  try{
   if(req.body.acknowledge!==true)return error(res,400,'Accept the annual subscription terms first.');
   order=normalizeOrder(req.body);
+  if(order.quote.toolIds.some(id=>id==='gallery'||id==='tag'))
+   return error(res,400,'Gallery and Tag are not available for separate purchase yet.');
  }catch(err){return error(res,err.status||400,err.message);}
  const id=randomUUID();
  const db=admin.database();
@@ -50,8 +53,8 @@ exports.funTorahCreateCheckout=onRequest({
    mode:'subscription',
    payment_method_types:['card'],
    line_items:stripeLineItems(order.quote),
-   success_url:BASE_URL+'/teacher-registration-preview.html?checkout=success&session_id={CHECKOUT_SESSION_ID}',
-   cancel_url:BASE_URL+'/teacher-registration-preview.html?checkout=canceled',
+   success_url:BASE_URL+'/teacher-registration.html?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+   cancel_url:BASE_URL+'/teacher-registration.html?checkout=canceled',
    client_reference_id:id,
    subscription_data:{metadata:{fttOrderId:id}},
    metadata:{fttOrderId:id},
@@ -104,7 +107,7 @@ exports.funTorahStripeWebhook=onRequest({
    subId=invoiceSubscriptionId(data);
   }else subId=data.id;
   if(!subId)return res.json({received:true});
-  const subscription=await stripe.subscriptions.retrieve(subId,{expand:['latest_invoice']});
+  const subscription=await stripe.subscriptions.retrieve(subId,{expand:['latest_invoice','items.data.price.product']});
   if(!orderId)orderId=subscription.metadata?.fttOrderId||
     (await db.ref(PRIVATE+'/subscriptions/'+subId).once('value')).val()?.orderId;
   if(!/^[0-9a-f-]{36}$/.test(String(orderId||'')))
@@ -125,13 +128,20 @@ exports.funTorahStripeWebhook=onRequest({
    // They must not create a free account before verified first payment.
    return res.json({received:true,awaitingCheckout:true});
   }
-  const inv=subscription.latest_invoice;
-  const latestPaid=!!(inv&&typeof inv==='object'&&inv.paid===true);
-  const paid=subscription.status==='active'&&
-   (isFirstCheckout||latestPaid);
+  const paid=subscription.status==='active'&&latestInvoicePaid(subscription);
+  // The currently billed subscription items are authoritative, but only after
+  // a successful invoice payment. Do not grant unbilled/pending changes.
+  const plan=subscriptionPlan(subscription);
+  if(isFirstCheckout&&(!paid||!planMatchesOrder(plan,order)))
+   return res.status(503).send('Subscription payment or plan not verified');
   const now=Date.now();
-  const change=activationUpdates(order,subscription,paid,now);
+  const actual={...order,seats:paid?plan.seats:order.seats,tools:paid?plan.tools:order.tools};
+  const change=activationUpdates(actual,subscription,paid,now);
   if(isFirstCheckout)change.updates[path+'/activatedAt']=now;
+  if(paid){
+   change.updates[path+'/seats']=plan.seats;
+   change.updates[path+'/tools']=plan.tools;
+  }
   await db.ref().update(change.updates);
   res.json({received:true});
  }catch(err){
