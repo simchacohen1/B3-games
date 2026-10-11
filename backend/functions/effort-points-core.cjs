@@ -17,13 +17,13 @@ function dayKey(now){
   return val('year')+val('month')+val('day');
 }
 function validEventId(id){return typeof id==='string'&&/^[A-Za-z0-9_-]{16,90}$/.test(id)}
-function recordEvent(prior,now,tool,classId,eventId){
+function recordEvent(prior,now,tool,classId,eventId,breakBefore=false){
   if(!Object.hasOwn(TOOLS,tool)||!validEventId(eventId)||!/^[A-Za-z0-9_-]{1,100}$/.test(classId))return {changed:false,state:prior||null};
   const state=prior&&typeof prior==='object'?prior:{};
   const seen=Array.isArray(state.recentEventIds)?state.recentEventIds:[];
   if(seen.includes(eventId))return {changed:false,state};
   const last=Number(state.lastAt)||0,ms=last>0&&state.lastClass===classId?now-last:0;
-  const credited=ms>=8000&&ms<=MAX_GAP_MS?ms:0;
+  const credited=!breakBefore&&ms>=8000&&ms<=MAX_GAP_MS?ms:0;
   const activeMs=Math.min(MAX_DAILY_POINTS*POINT_INTERVAL_MS,Math.max(0,Number(state.activeMs)||0)+credited);
   const perTool={...(state.perTool||{})};
   perTool[tool]=Math.min(MAX_DAILY_POINTS*POINT_INTERVAL_MS,Math.max(0,Number(perTool[tool])||0)+credited);
