@@ -182,9 +182,36 @@ async function renderTeacherAccess(msg){
 // One class at a time: status, Automatic / Open now / Lock now, and every
 // game with a one-tap Open/Closed switch. Starred games stay open while the
 // class is locked.
-const CP_CLASSES=[{id:"et",name:"ET"},{id:"wt",name:"WT"}];
-let cpClass=(()=>{try{const v=localStorage.getItem("b3ControlClass");return CP_CLASSES.some(c=>c.id===v)?v:"et"}catch(e){return "et"}})();
+let CP_CLASSES=[{id:"et",name:"ET"},{id:"wt",name:"WT"}];
+let cpRecords={},cpClassesUnsub=false;
+let cpClass=(()=>{try{return localStorage.getItem("b3ControlClass")||"et"}catch(e){return "et"}})();
 let cpSettings=null,cpUnsub=null,cpTimer=null,cpBusy=false,cpMsg="";
+function cpClassTabs(){
+ return CP_CLASSES.map(c=>'<button type="button" data-cp-class="'+cpEsc(c.id)+'" class="'+(c.id===cpClass?'on':'')+'"><span class="cp-dot"></span>'+cpEsc(c.name)+'</button>').join('');
+}
+function cpBindClassTabs(panel){
+ panel.querySelectorAll("[data-cp-class]").forEach(b=>b.onclick=()=>{
+   cpClass=b.dataset.cpClass;cpMsg="";
+   try{localStorage.setItem("b3ControlClass",cpClass)}catch(e){}
+   renderOwnerControl();
+ });
+}
+function cpWatchClasses(){
+ const w=frame.contentWindow,db=w?.firebase?.database?.(),ws=w?.B3SiteSettings?.workspaceId||"b3-2026";
+ if(!db||cpClassesUnsub)return;
+ cpClassesUnsub=true;
+ db.ref("b3Games/workspaces/"+ws+"/classes").on("value",snapshot=>{
+   cpRecords=snapshot.val()||{};
+   const all=Object.entries(cpRecords).filter(([id,row])=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&row&&row.active!==false);
+   all.sort(([a,ar],[b,br])=>{
+     const priority=id=>id==="et"?0:id==="wt"?1:2;
+     return priority(a)-priority(b)||String(ar.name||a).localeCompare(String(br.name||b));
+   });
+   CP_CLASSES=all.map(([id,row])=>({id,name:String(row.name||id)}));
+   if(!CP_CLASSES.some(c=>c.id===cpClass))cpClass=CP_CLASSES[0]?.id||"";
+   if(currentTab==="access"&&isOwnerNow())renderOwnerControl();
+ },e=>{console.error("Could not load class registry",e);cpClassesUnsub=false});
+}
 function cpApi(){return frame.contentWindow?.B3SiteSettings}
 function cpGames(){
   const d=frame.contentDocument;if(!d)return [];
@@ -214,6 +241,7 @@ function cpNextChange(lockWindows,isLockedNow){
 }
 function cpEsc(v){const d=document.createElement("div");d.textContent=String(v==null?"":v);return d.innerHTML}
 function startOwnerControl(){
+  cpWatchClasses();
   const api=cpApi();
   if(!api){document.getElementById("ownerControlPanel").innerHTML='<div class="cp-wrap"><div class="ta-card">Loading…</div></div>';setTimeout(()=>{if(currentTab==="access"&&isOwnerNow())startOwnerControl()},700);return}
   if(!cpUnsub){cpUnsub=true;api.subscribe(s=>{cpSettings=api.normalizeSettings?api.normalizeSettings(s):s;if(currentTab==="access")renderOwnerControl();});}
@@ -223,6 +251,8 @@ function startOwnerControl(){
 function renderOwnerControl(){
   const panel=document.getElementById("ownerControlPanel"),api=cpApi();
   if(!cpSettings||!api){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">Loading your classes…</div></div>';return}
+  if(!CP_CLASSES.length){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">No active classes yet. Add one in Administration.</div></div>';return}
+  if(!["et","wt"].includes(cpClass))return renderOwnerPlatformClass(panel);
   const s=cpSettings,cls=cpClass,info=api.describeClassAccess(s,cls),access=s.classAccess?.[cls]||{mode:"auto"};
   const stars=api.activeLockedGameList?api.activeLockedGameList(s,cls):String(s.classLockedGameOverride?.[cls]||"").split(",").map(v=>v.trim()).filter(Boolean);
   const starUntil=id=>{const ms=api.lockedGameExpiry?api.lockedGameExpiry(s,cls,id):0;return ms?" · until "+new Date(ms).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}):""};
@@ -231,7 +261,7 @@ function renderOwnerControl(){
   else if(access.mode==="open")detail="Opened by you · stays open until you press Automatic";
   else if(access.mode==="locked")detail="Locked by you · stays locked until you press Automatic";
   else detail="Following recess schedule · "+cpNextChange(access.lockWindows,!info.open);
-  const tabsHtml=CP_CLASSES.map(c=>{const o=api.isClassOpen(s,c.id);return '<button type="button" data-cp-class="'+c.id+'" class="'+(c.id===cls?"on":"")+'"><span class="cp-dot '+(o?"open":"locked")+'"></span>'+c.name+'</button>'}).join("");
+  const tabsHtml=cpClassTabs();
   const CL=cls.toUpperCase(),badge='<span class="cp-cls '+cls+'">'+CL+'</span>';
   const modes=[["auto","⏰ "+CL+" Automatic"],["open","🔓 Open "+CL+" now"],["locked","🔒 Lock "+CL+" now"]].map(([m,l])=>'<button type="button" data-cp-mode="'+m+'" class="'+(access.mode===m?"on":"")+'"'+(cpBusy?" disabled":"")+'>'+l+'</button>').join("");
   const games=cpGames().filter(g=>s.games?.[g.id]!==false);
@@ -248,7 +278,7 @@ function renderOwnerControl(){
     +'<div class="cp-modes">'+modes+'</div>'
     +'<div class="cp-games"><div class="cp-games-head">Games for '+cls.toUpperCase()+'<span>Tap to open/close · ⭐ = stays open during lock (turns itself off when the lock ends)</span></div>'+(rows||'<div class="cp-row"><div></div><div class="cp-name">No games yet.</div><div></div></div>')+'</div>'
     +'<div class="cp-msg" id="cpMsg">'+cpEsc(cpMsg)+'</div></div>';
-  panel.querySelectorAll("[data-cp-class]").forEach(b=>b.onclick=()=>{cpClass=b.dataset.cpClass;cpMsg="";try{localStorage.setItem("b3ControlClass",cpClass)}catch(e){}renderOwnerControl()});
+  cpBindClassTabs(panel);
   panel.querySelectorAll("[data-cp-mode]").forEach(b=>b.onclick=()=>cpSave(()=>api.updateClassMode(cls,b.dataset.cpMode),{auto:"Back on the recess schedule ✓",open:cls.toUpperCase()+" opened ✓",locked:cls.toUpperCase()+" locked ✓"}[b.dataset.cpMode]));
   panel.querySelectorAll("[data-cp-game]").forEach(b=>b.onclick=()=>{const id=b.dataset.cpGame,open=s.classGames?.[cls]?.[id]!==false,name=games.find(g=>g.id===id)?.name||id;
     cpSave(async()=>{await api.updateClassGameEnabled(cls,id,!open);if(open&&stars.includes(id))await api.setClassLockedGame(cls,id,false);},name+(open?" closed":" opened")+" for "+cls.toUpperCase()+" ✓")});
@@ -256,6 +286,36 @@ function renderOwnerControl(){
     if(stars.includes(id))return cpSave(()=>api.setClassLockedGame(cls,id,false),name+" will lock with the class ✓");
     cpSave(async()=>{if(s.classGames?.[cls]?.[id]===false)await api.updateClassGameEnabled(cls,id,true);await api.setClassLockedGame(cls,id,true);},name+" will stay open until this lock ends ✓");});
   const em=document.getElementById("cpEmergencyOff");if(em)em.onclick=()=>{if(confirm("Turn the emergency lock off? Classes go back to their normal settings."))cpSave(()=>api.updateSiteEnabled(true),"Emergency lock off ✓")};
+}
+// New classes use their own access and tool grants, never B3's shared ET/WT settings.
+function renderOwnerPlatformClass(panel){
+ const id=cpClass,row=cpRecords[id],w=frame.contentWindow;
+ if(!row){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">Loading class settings…</div></div>';return}
+ const name=String(row.name||id),mode=row.access?.mode==="locked"?"locked":"open",isOpen=row.siteEnabled!==false&&mode!=="locked"&&cpSettings?.siteEnabled!==false;
+ const tools=cpGames().map(t=>({id:t.id==="class-gallery"?"gallery":t.id,name:t.name}));
+ tools.push({id:"tag",name:"Tag Game"});
+ const known=new Set(),distinct=tools.filter(t=>{if(known.has(t.id))return false;known.add(t.id);return true});
+ const rows=distinct.map(t=>{
+   const on=row.toolGrants?.[t.id]===true;
+   return '<div class="cp-row"><div></div><div class="cp-name">'+cpEsc(t.name)+'</div><button type="button" class="cp-toggle '+(on?"open":"closed")+'" data-cp-grant="'+cpEsc(t.id)+'"'+(cpBusy?" disabled":"")+'>'+(on?"✅ Enabled":"⛔ Disabled")+'</button></div>';
+ }).join("");
+ panel.innerHTML='<div class="cp-wrap"><div class="cp-switch">'+cpClassTabs()+'</div>'
+  +(cpSettings?.siteEnabled===false?'<div class="cp-emergency">🚨 The global emergency lock is on for all classes.</div>':"")
+  +'<div class="cp-status '+(isOpen?"open":"locked")+'"><div>'+(isOpen?"✅ ":"🔒 ")+cpEsc(name)+(isOpen?" is OPEN":" is LOCKED")+'<small>Only this class is affected by the controls below.</small></div></div>'
+  +'<div class="cp-modes"><button type="button" data-cp-new-mode="open" class="'+(mode==="open"?"on":"")+'"'+(cpBusy?" disabled":"")+'>🔓 Open this class</button><button type="button" data-cp-new-mode="locked" class="'+(mode==="locked"?"on":"")+'"'+(cpBusy?" disabled":"")+'>🔒 Lock this class</button></div>'
+  +'<div class="cp-games"><div class="cp-games-head">Tools for '+cpEsc(name)+'<span>Each tool is enabled or disabled for this class independently. Only enabled tools are available to students and teachers.</span></div>'
+  +(rows||'<div class="cp-row">No class activities found.</div>')+'</div>'
+  +'<div class="cp-msg">'+cpEsc(cpMsg)+'</div></div>';
+ cpBindClassTabs(panel);
+ const db=w?.firebase?.database?.(),ws=w?.B3SiteSettings?.workspaceId||"b3-2026",base="b3Games/workspaces/"+ws+"/classes/"+id;
+ panel.querySelectorAll("[data-cp-new-mode]").forEach(b=>b.onclick=()=>cpSave(
+   ()=>db.ref(base+"/access/mode").set(b.dataset.cpNewMode),
+   name+(b.dataset.cpNewMode==="locked"?" locked ✓":" opened ✓")));
+ panel.querySelectorAll("[data-cp-grant]").forEach(b=>b.onclick=()=>{
+   const tool=b.dataset.cpGrant,on=row.toolGrants?.[tool]===true;
+   cpSave(()=>db.ref(base+"/toolGrants/"+tool).set(!on),
+     tool+(on?" disabled":" enabled")+" for "+name+" ✓");
+ });
 }
 async function cpSave(fn,okMsg){
   if(cpBusy)return;cpBusy=true;cpMsg="Saving…";renderOwnerControl();
