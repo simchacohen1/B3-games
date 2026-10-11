@@ -1,0 +1,27 @@
+name: Stripe Billing Tests
+on:
+  pull_request:
+    paths:
+      - 'backend/functions/billing-*.cjs'
+      - 'backend/functions/billing-stripe.js'
+      - 'backend/functions/billing.test.cjs'
+      - '.github/workflows/billing-tests.yml'
+  push:
+    branches:
+      - 'preview/teacher-registration-pricing-2026-10-11'
+    paths:
+      - 'backend/functions/billing-*.cjs'
+      - 'backend/functions/billing-stripe.js'
+      - 'backend/functions/billing.test.cjs'
+      - '.github/workflows/billing-tests.yml'
+permissions:
+  contents: read
+jobs:
+  billing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test backend/functions/billing.test.cjs
