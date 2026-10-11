@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fun Torah Tools — Protected Staging</title>
+<meta name="robots" content="noindex,nofollow,noarchive">
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#12253b;background:#f3f7fb}
+*{box-sizing:border-box}body{margin:0;min-height:100vh}
+header{background:#0b3560;color:#fff;padding:16px max(20px,calc((100vw - 920px)/2));display:flex;align-items:center;justify-content:space-between;gap:10px}
+.logo{font-weight:850;font-size:21px}.pill{background:#fae7a1;color:#463100;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:800}
+main{max-width:850px;margin:38px auto;padding:0 16px}
+.alert{border:1px solid #e6bd6d;background:#fff7dd;border-radius:12px;padding:14px 18px;margin-bottom:22px;line-height:1.5}
+section{background:white;border-radius:19px;padding:32px;box-shadow:0 8px 28px #16314d13;border:1px solid #e0eaf3}
+h1{font-size:28px;margin:0 0 8px}h2{font-size:19px;margin:0 0 14px}
+p{color:#41536a;line-height:1.55}button{font-family:inherit;cursor:pointer;border:0;border-radius:11px;padding:12px 18px;font-weight:750;font-size:15px}
+.primary{background:#1670bf;color:white}.student{background:#16834f;color:white}
+.secondary{background:#ebf3fc;color:#164875}.light{background:white;color:#185587;border:1px solid #b8cddd}
+.actions{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}
+label{display:block;font-weight:700;margin:12px 0 6px}input{width:100%;padding:13px 12px;font-size:16px;border-radius:9px;border:1px solid #b8cddd}
+.field{max-width:425px}.hidden{display:none}.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(172px,1fr));gap:12px;margin:16px 0}
+.tile{background:#f1f7fe;border:1px solid #d6e9fd;padding:20px 12px;border-radius:13px;text-align:center;font-weight:760}
+.tile span{display:block;font-size:30px;margin-bottom:12px}
+.subtle{font-size:14px;color:#60728a}.status{font-weight:700;color:#1b6447;min-height:24px}
+footer{padding:24px;text-align:center;color:#76899c;font-size:13px}
+@media(max-width:520px){section{padding:22px}header{flex-wrap:wrap}}
+</style></head>
+<body>
+<header><div class="logo">📘 Fun Torah Tools</div><span class="pill">PRIVATE STAGING · DEMO DATA ONLY</span></header>
+<main>
+<div class="alert"><strong>Isolated staging demonstration.</strong> This version makes no Firebase, student-record, billing or email-service requests. Sign-ins and switches below are local simulations, not security validation. No purchases can be made.</div>
+<section>
+<div id="teacherLogin">
+  <h1>Teacher Sign In</h1><p>Preview both teacher sign-in options. This demo does not send any real email.</p>
+  <div class="field"><label for="teacherEmail">Teacher email</label><input id="teacherEmail" type="email" placeholder="teacher@school.org" autocomplete="off" value="teacher@school.org"></div>
+  <div class="actions"><button id="google" class="primary">Continue with Google (demo)</button><button id="email" class="secondary">Preview email-link sign-in</button></div>
+  <p id="loginStatus" class="status" role="status"></p>
+</div>
+<div id="emailCheck" class="hidden">
+  <h1>Email link verification</h1><p>In the real system a one-time link is emailed to the teacher. Here, the button simply simulates opening that link.</p>
+  <p id="emailTo"></p>
+  <div class="actions"><button id="completeEmail" class="primary">Simulate opening verified email link</button><button id="emailBack" class="light">Back</button></div>
+</div>
+<div id="teacherHome" class="hidden">
+  <h1>👨‍🏫 Teacher Center</h1><p>Signed in as <strong id="teacherIdentity"></strong> (simulated). Real access requires a verified email and assigned teacher account.</p>
+  <h2>Your learning tools — demonstration</h2>
+  <div class="tiles"><div class="tile"><span>📖</span>Posuk Practice</div><div class="tile"><span>🌱</span>Shorashim Lab</div><div class="tile"><span>⭐</span>Student Rewards</div></div>
+  <div class="actions"><button id="toStudent" class="student">🔄 Switch to Student</button><button id="teacherSignOut" class="light">Sign out</button></div>
+  <p class="subtle">The real version signs out Firebase before opening the student login. A teacher-only preview is different and is not safe to hand to a student.</p>
+</div>
+<div id="studentLogin" class="hidden">
+  <h1>🎓 Student Sign In</h1><p>The teacher session has been cleared from this demo. Enter sample values; no live student passcode is checked.</p>
+  <div class="field"><label for="studentName">Student name</label><input id="studentName" value="Demo Student" autocomplete="off"><label for="studentPin">Sample passcode</label><input id="studentPin" type="password" inputmode="numeric" autocomplete="off" placeholder="Demo digits only"></div>
+  <div class="actions"><button id="studentEnter" class="student">Enter student dashboard (demo)</button><button id="studentToTeacher" class="secondary">🔄 Switch to Teacher</button></div><p id="studentMessage" role="status" class="status"></p>
+</div>
+<div id="studentHome" class="hidden">
+  <h1>🎓 Student Dashboard</h1><p>Welcome <strong id="studentIdentity"></strong>. This is test content; no grades, points or progress are recorded.</p>
+  <div class="tiles"><div class="tile"><span>🔤</span>Shorashim</div><div class="tile"><span>📕</span>Posuk Practice</div><div class="tile"><span>🎯</span>Chazara</div></div>
+  <div class="actions"><button id="changeStudent" class="student">Switch Student</button><button id="backToTeacher" class="secondary">🔄 Switch to Teacher</button></div>
+  <p class="subtle">Teacher controls are not available in the student demo. Returning to Teacher Center requires a new teacher sign-in.</p>
+</div>
+</section>
+</main>
+<footer>Fun Torah Tools — isolated UI smoke-test preview. No live data, authentication or Stripe connected.</footer>
+<script>
+(function(){
+'use strict';
+const panels=['teacherLogin','emailCheck','teacherHome','studentLogin','studentHome'], el=id=>document.getElementById(id);
+let teacher='',student='';
+function show(id){panels.forEach(p=>el(p).classList.toggle('hidden',p!==id));}
+function resetStudent(){student='';el('studentPin').value='';el('studentMessage').textContent='';}
+function backTeacher(){resetStudent();teacher='';el('loginStatus').textContent='Sign in again to open Teacher Center (demo).';show('teacherLogin');}
+el('google').onclick=()=>{teacher='teacher@school.org';el('teacherIdentity').textContent=teacher;show('teacherHome');};
+el('email').onclick=()=>{
+  const email=el('teacherEmail').value.trim();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){el('loginStatus').textContent='Enter a valid sample email.';return;}
+  teacher=email;el('emailTo').textContent='Simulated one-time link for: '+email;show('emailCheck');
+};
+el('emailBack').onclick=()=>show('teacherLogin');
+el('completeEmail').onclick=()=>{el('teacherIdentity').textContent=teacher;show('teacherHome');};
+el('toStudent').onclick=()=>{teacher='';resetStudent();show('studentLogin');};
+el('teacherSignOut').onclick=backTeacher;
+el('studentEnter').onclick=()=>{
+  const name=el('studentName').value.trim(),pin=el('studentPin').value.trim();
+  if(!name||!/^[0-9]{4,8}$/.test(pin)){el('studentMessage').textContent='Enter a sample name and a 4–8 digit test code.';return;}
+  student=name;el('studentIdentity').textContent=name;el('studentPin').value='';show('studentHome');
+};
+el('studentToTeacher').onclick=backTeacher;
+el('backToTeacher').onclick=backTeacher;
+el('changeStudent').onclick=()=>{resetStudent();show('studentLogin');};
+})();
+</script>
+</body></html>
