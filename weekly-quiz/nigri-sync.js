@@ -229,6 +229,7 @@
       '<div style="overflow:auto"><table><thead><tr><th>Student</th><th>Final mark</th><th>Used attempt</th><th>Nigri attendance</th></tr></thead><tbody id="nigriStudents"></tbody></table></div>' +
       '<div class="modal-actions" style="justify-content:flex-start"><button type="button" class="good" id="nigriSyncBtn" style="font-size:17px;padding:12px 20px">Save to Nigri</button></div>' +
       '<div id="nigriStatus" class="small" style="margin-top:8px"></div>' +
+      '<div id="nigriVia" class="small muted" style="margin-top:2px"></div>' +
       '<div class="small" style="margin-top:8px">This creates a new mark on Nigri, fills in every student\'s score, attendance and PDF report, sets "Marking done", and saves. It usually takes 20–40 seconds. Once it says <b>Saved</b>, the marks are on the real Nigri gradebook.</div>' +
     '</div>';
   document.body.appendChild(modal);
@@ -249,7 +250,7 @@
     $('nigriName').value = snap.title || 'Weekly Quiz';
     $('nigriDescription').value = '';
     $('nigriComment').value = '';
-    $('nigriStatus').textContent = ''; $('nigriStatus').className = 'small';
+    $('nigriStatus').textContent = ''; $('nigriStatus').className = 'small'; $('nigriVia').textContent = '';
     const body = $('nigriStudents'); body.innerHTML = '';
     (NIGRI_ROSTERS[l.classId] || []).forEach((sid) => {
       const f = finalForStudent(nigriBaseId, sid), missing = f.mark === null, tr = document.createElement('tr');
@@ -311,7 +312,15 @@
 
     status.textContent = 'Saving to Nigri… this can take under a minute, please wait.';
     try {
-      const res = await fetch(SYNC_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Sync-Key': SYNC_KEY }, body: JSON.stringify(body) });
+      // Google sign-in first; the old key is used only if there is no sign-in or the server refuses it (401, before doing anything).
+      let res, via = 'key';
+      if (window.NigriAuth) {
+        const sent = await window.NigriAuth.request('/sync-marks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, SYNC_KEY);
+        res = sent.response; via = sent.via;
+      } else {
+        res = await fetch(SYNC_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Sync-Key': SYNC_KEY }, body: JSON.stringify(body) });
+      }
+      $('nigriVia').textContent = via === 'signin' ? 'Signed in' : 'Used key';
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.status === 'success') {
         const failed = (data.results || []).filter((r) => String(r).includes('FAILED'));
