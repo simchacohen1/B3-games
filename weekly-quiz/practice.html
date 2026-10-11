@@ -245,8 +245,8 @@ async function speakStudentText(text){
     ttsAudioEl.src=audioUrl;
     await ttsAudioEl.play();
   }catch(e){
-    console.error('Natural voice playback failed:',e);
-    alert('The voice could not play right now. Please try the speaker again.');
+    console.warn('Natural voice unavailable, using free browser speech:',e);
+    if(window.FTTAudio)window.FTTAudio.speak(text,{force:true});
   }
 }
 
