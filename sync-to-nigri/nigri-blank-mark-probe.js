@@ -40,6 +40,15 @@
             '; selection fields ' + Number(s.select_input_count || 0) +
             '; Create Mark! button ' + hasSubmit +
             '. Actual POST acceptance is untested.';
+          const rehearse = result.offline_header_rehearsal || {};
+          if (rehearse.status === 'offline_header_shape_prepared' &&
+              rehearse.mock_request_prepared === true &&
+              rehearse.mock_request_sent === false &&
+              rehearse.nigri_post_attempted === false) {
+            status.textContent += ' A fictional six-field header POST was prepared in memory only; no request was sent. Hidden fields and topic AJAX still need review.';
+          } else {
+            status.textContent += ' Offline header preparation is not yet confirmed.';
+          }
         } else {
           status.textContent += ' Submission details are unavailable or ambiguous.';
         }
