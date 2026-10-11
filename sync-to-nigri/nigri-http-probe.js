@@ -30,7 +30,13 @@
       } else if (!response.ok) {
         status.textContent = 'Nigri check unavailable (HTTP ' + response.status + '). No marks were changed.';
       } else {
-        status.textContent = messages[data.status] || 'Nigri reported: ' + String(data.status || 'unknown') + '. No marks were changed.';
+        if (data.status === 'login_not_accepted' && typeof data.login_form_returned_after_post === 'boolean') {
+          status.textContent = 'Browser-free login still not accepted: Nigri showed the login page ' +
+            (data.login_form_returned_after_post ? 'immediately after login.' : 'when the marks page opened.') +
+            ' No marks were changed.';
+        } else {
+          status.textContent = messages[data.status] || 'Nigri reported: ' + String(data.status || 'unknown') + '. No marks were changed.';
+        }
       }
     } catch (error) {
       status.textContent = 'Could not contact the NigriSync server. No marks were changed.';
