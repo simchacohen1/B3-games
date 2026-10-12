@@ -8,4 +8,6 @@ Cycle repeats every 339 days, starting April 29, 1984. Four introductory days ha
 
 Hebrew dates use the browser's Hebrew calendar implementation. The classroom date follows Kingston, PA (America/New_York), advancing at computed sunset; it does not request a student's location. Sunset calculation: SunCalc https://github.com/mourner/suncalc, license included. Date navigation remains local to this activity.
 
-Cartoon artwork replacements: 475, 476, 477. Remaining pages retain the original outlines until individually redesigned. Coloring is local to the student browser and existing class access controls remain authoritative.
+Cartoon artwork replacements: 475–481. Remaining pages retain the original outlines until individually redesigned. Coloring is local to the student browser and existing class access controls remain authoritative.
+
+Week of October 12, 2026: 3 Cheshvan / Oct 14 P194 (478); 4 Cheshvan / Oct 15 N269 (479) and P204 (480); 5–6 Cheshvan / Oct 16–17 P236 (481). New artwork follows the existing approved cartoon style.

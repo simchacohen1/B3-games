@@ -42,7 +42,12 @@ test('date navigation selects daily cards, can return to Today, and makes every 
  els.get('yesterday').onclick();assert.equal(els.get('outline').src,'coloring-v2/475.png?v=20261012-full');
  els.get('tomorrow').onclick();els.get('tomorrow').onclick();assert.equal(els.get('outline').src,'coloring-v2/477.png?v=20261012-full');
  els.get('today').onclick();assert.equal(els.get('outline').src,'coloring-v2/476.png?v=20261012-full');
- for(let i=0;i<6;i++)els.get('tomorrow').onclick();assert.equal(els.get('dayCards').children.length,3);
+ for(let i=0;i<2;i++)els.get('tomorrow').onclick();assert.equal(els.get('outline').src,'coloring-v2/478.png?v=20261012-full');
+ els.get('tomorrow').onclick();assert.equal(els.get('dayCards').children.length,2);assert.equal(els.get('outline').src,'coloring-v2/479.png?v=20261012-full');
+ els.get('dayCards').children[1].onclick();assert.equal(els.get('outline').src,'coloring-v2/480.png?v=20261012-full');
+ els.get('tomorrow').onclick();assert.equal(els.get('outline').src,'coloring-v2/481.png?v=20261012-full');
+ els.get('tomorrow').onclick();assert.equal(els.get('outline').src,'coloring-v2/481.png?v=20261012-full');
+ els.get('tomorrow').onclick();assert.equal(els.get('dayCards').children.length,3);
  els.get('dayCards').children[2].onclick();assert.equal(Number(els.get('card').value),calendar.cardMap(days).N296);
  assert.match(html,/mix-blend-mode:multiply/);assert.match(source,/globalCompositeOperation='multiply'/);
  assert.match(html,/game-gate.js" data-game-id="sefer-hamitzvos"/);
