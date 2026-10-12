@@ -45,8 +45,8 @@ test('balanced teams rotate every student through a turn before repeating', () =
 });
 
 test('Team Mode and Multiple Choice are separately persisted switches', () => {
-  assert.match(teacherSource, /id="teamModeToggle"/);
-  assert.match(teacherSource, /id="multipleChoiceToggle"/);
+  assert.match(teamSource, /id="teamModeToggle"/);
+  assert.match(teamSource, /id="multipleChoiceToggle"/);
   assert.match(teamSource, /teamMode:\s*document\.getElementById\("teamModeToggle"\)\.checked/);
   assert.match(teamSource, /multipleChoice:\s*document\.getElementById\("multipleChoiceToggle"\)\.checked/);
 });
