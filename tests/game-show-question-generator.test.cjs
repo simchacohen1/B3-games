@@ -22,8 +22,8 @@ test("open questions preserve the retrieved source text and canonical citation",
   const core=loadCore();
   const source={ref:"Genesis 18:1",text:"The Lord appeared to him by the terebinths of Mamre."};
   const [item]=core.makeItems([source],"open","");
-  assert.equal(item.ans,"The Lord appeared to him by the terebinths of Mamre. (Source: Genesis 18:1)");
-  assert.match(item.q,/Genesis 18:1/);
+  assert.equal(item.ans,"Hashem appeared to him by the terebinths of Mamre. (Source: Bereishis 18:1)");
+  assert.match(item.q,/Bereishis 18:1/);
 });
 
 test("multiple-choice answers point to one of the verified references",()=>{
@@ -36,21 +36,43 @@ test("multiple-choice answers point to one of the verified references",()=>{
   ];
   const items=core.makeItems(sources,"mc","");
   assert.equal(items.length,4);
-  for(const item of items){
+  for(const [index,item] of items.entries()){
     assert.equal(item.choices.length,4);
-    assert.equal(item.choices[item.correctIndex],core.phrase(sources.find(s=>item.ans.includes(s.ref)).text));
-    const answerSource=sources.find(s=>item.ans.includes("(Source: "+s.ref+")"));
-    assert.ok(answerSource);
-    assert.ok(item.choices.every(choice=>sources.some(s=>core.phrase(s.text)===choice)));
+    assert.equal(item.choices[item.correctIndex],core.localizeText(core.phrase(sources[index].text)));
+    assert.match(item.ans,new RegExp("Source: Bereishis 18:"+(index+1)));
+    assert.ok(item.choices.every(choice=>sources.some(s=>core.localizeText(core.phrase(s.text))===choice)));
   }
 });
 
 test("multiple choice refuses to fabricate distractor citations",()=>{
   const core=loadCore();
-  assert.throws(()=>core.makeItems([{ref:"Genesis 18:1",text:"A source."},{ref:"Genesis 18:2",text:"A source."},{ref:"Genesis 18:3",text:"A source."},{ref:"Genesis 18:4",text:"A source."}],"mc",""),/four distinct source excerpts/);
+  assert.throws(()=>core.makeItems([{ref:"Genesis 18:1",text:"A source."},{ref:"Genesis 18:2",text:"A source."},{ref:"Genesis 18:3",text:"A source."},{ref:"Genesis 18:4",text:"A source."}],"mc",""),/four distinct Sefaria excerpts/);
 });
 
 test("source text is reduced to a short, readable excerpt for a choice question",()=>{
   const core=loadCore();
   assert.equal(core.phrase(core.cleanText("One <b>two</b> three four five six seven eight.")),"One two three four five six seven");
+});
+
+
+test("teacher-friendly wording localizes common Torah names and divine names",()=>{
+  const core=loadCore();
+  assert.equal(core.localizeText("Moses spoke to God about Abraham, Isaac, Jacob, Joseph, Aaron, and Pharaoh."),"Moshe spoke to Hashem about Avraham, Yitzchak, Yaakov, Yosef, Aharon, and Paroh.");
+  assert.equal(core.localizeText("My lord said"),"My lord said");
+});
+
+test("chapter selections are distributed across the full requested range",()=>{
+  const core=loadCore();
+  assert.deepEqual(Array.from(core.evenlyPick(Array.from({length:33},(_,i)=>i+1),5)),[1,9,17,25,33]);
+  assert.equal(core.evenlyPick(Array.from({length:33},(_,i)=>i+1),33).length,33);
+});
+
+
+test("question count can exceed the number of selected pesukim and stays spread across them",()=>{
+  const core=loadCore();
+  const distributed=core.distribute([{ref:"Bereishis 1:1",text:"First source."},{ref:"Bereishis 1:2",text:"Second source."}],5);
+  assert.equal(distributed.length,5);
+  assert.equal(distributed[0].ref,"Bereishis 1:1");
+  assert.equal(distributed.at(-1).ref,"Bereishis 1:2");
+  assert.equal(core.makeItems(distributed,"open","").length,5);
 });
