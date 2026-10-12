@@ -1845,7 +1845,8 @@ async function getGeneratedQuestionsForPart(part){
         posukTranslation: part.translation || '',
         classroomReferenceTranslation: await getClassroomReferenceForPart(part),
         perekNum: currentPerekNum,
-        posukNum: part.posukNum
+        posukNum: part.posukNum,
+        staticQuestions: Array.isArray(staticQs) ? staticQs : []
       })
     });
     if(!res.ok) throw new Error('Question generation request failed');
@@ -3761,14 +3762,14 @@ function resetComprehensionQuestionState(){
   renderComprehensionQuestionUI();
   if(comprehensionQuestions.length) restoreSavedQuestionResults();
 
-  const hasMissing = (currentSelectionParts || []).some(part => !getQuestionsForPosuk(currentPerekNum, part.posukNum));
-  if(hasMissing){
-    const msg = document.getElementById('comprehensionGradingMsg');
-    if(msg && !comprehensionQuestions.length) msg.textContent = 'Preparing detail questions…';
-    completeGeneratedComprehensionQuestions(loadToken).finally(() => {
-      if(loadToken === generatedQuestionLoadToken && msg && msg.textContent === 'Preparing detail questions…') msg.textContent = '';
-    });
-  }
+  // Every question now needs a Hebrew word answer key, including the
+  // hand-authored question bank. Ask the backend to preserve those question
+  // wordings and attach acceptable answerWordSets before students answer.
+  const msg = document.getElementById('comprehensionGradingMsg');
+  if(msg) msg.textContent = 'Preparing detail questions…';
+  completeGeneratedComprehensionQuestions(loadToken).finally(() => {
+    if(loadToken === generatedQuestionLoadToken && msg && msg.textContent === 'Preparing detail questions…') msg.textContent = '';
+  });
 }
 
 // Small inline progress indicator, e.g. "Question 2 of 4  ✅✅⬜⬜" — cheap
