@@ -412,6 +412,7 @@
     </div>
     <div class="host">
       <button class="btn" onclick="prevQuestion()" title="Previous question" aria-label="Previous question">◀</button>
+      <button class="btn btn-good" id="startQuestionBtn" onclick="startQuestion()">Start Question</button>
       <button class="btn btn-primary" onclick="reveal()">Show answer</button>
       <button class="btn" onclick="clearBuzz()">Clear buzzer</button>
       <button class="btn" onclick="nextQuestion()" title="Next question">Next ▶</button>
@@ -908,6 +909,7 @@ function goToQuestion(qIndex) {
   const unlockAt = delayOn ? (now + delaySecs * 1000) : 0;
   const updates = {
     qIndex: qIndex,
+    roundActive: false,
     revealed: false,
     buzzedBy: null,
     selectedPlayer: null,
@@ -916,9 +918,32 @@ function goToQuestion(qIndex) {
     // The real moment the buzzer becomes live - either right away, or once
     // the wait timer above finishes. The randomize-winner window (if on)
     // is measured from this moment.
-    buzzOpenAt: delayOn ? unlockAt : now
+    buzzOpenAt: null
   };
   gameRef.update(updates);
+}
+
+// Each round stays closed until the teacher explicitly starts it. The delay
+// option, when enabled, begins only after this click.
+function startQuestion() {
+  ensureAudioAwake();
+  const qIndex = Number(lastGameData && lastGameData.qIndex) || 0;
+  if (!questions[qIndex]) {
+    document.getElementById('soundStatus').textContent = 'Add a question before starting the round.';
+    return;
+  }
+  const delayOn = document.getElementById('delayToggle').checked;
+  const now = serverNow();
+  const unlockAt = delayOn ? now + (parseInt(document.getElementById('delaySeconds').value) || 10) * 1000 : now;
+  gameRef.update({
+    roundActive: true,
+    revealed: false,
+    buzzedBy: null,
+    selectedPlayer: null,
+    buzzPool: null,
+    buzzUnlockAt: unlockAt,
+    buzzOpenAt: unlockAt
+  });
 }
 
 function nextQuestion() {
@@ -1303,6 +1328,7 @@ function resetGame() {
   if (!sure) return;
   gameRef.set({
     qIndex: 0,
+    roundActive: false,
     revealed: false,
     buzzedBy: null,
     scores: null,
@@ -1402,6 +1428,8 @@ gameRef.on('value', snapshot => {
   const data = snapshot.val() || {};
   const qIndex = data.qIndex || 0;
   loadQuestion(qIndex);
+  document.getElementById('startQuestionBtn').disabled = !!data.roundActive;
+  document.getElementById('startQuestionBtn').textContent = data.roundActive ? 'Question Started' : 'Start Question';
   document.getElementById('answer').textContent = data.revealed && questions[qIndex] ? (questions[qIndex].ans || '') : '';
   requestAnimationFrame(fitQuestion);
   lastGameData = data;
