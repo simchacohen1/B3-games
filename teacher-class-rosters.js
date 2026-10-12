@@ -42,8 +42,12 @@
       const entries = Object.entries(cls.members || {}).filter(([studentId, member]) =>
         SAFE_ID.test(studentId) && member && member.active !== false);
       const checked = await Promise.all(entries.map(async ([studentId, member]) => {
-        const profile = (await db.ref("b3Games/students/" + studentId + "/profile").once("value")).val();
-        if (!profile || profile.active === false) return null;
+        const student = (await db.ref("b3Games/students/" + studentId).once("value")).val();
+        const profile = student?.profile;
+        const membership = student?.memberships?.["b3-2026_" + id];
+        // Require both sides of an active class membership: a removed student
+        // may retain their central profile for other classes or past work.
+        if (!profile || profile.active === false || !membership || membership.active === false || membership.classId !== id) return null;
         return String(profile.name || member.name || "").trim() || null;
       }));
       const students = checked.filter(Boolean).sort((a, b) => a.localeCompare(b));
