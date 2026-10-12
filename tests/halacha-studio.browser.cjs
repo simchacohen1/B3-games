@@ -1,0 +1,56 @@
+/* Run: HALACHA_TEST_CHROMIUM=/path/to/chromium node --test tests/halacha-studio.browser.cjs
+   Isolated browser: account/gate scripts are stubbed; no real student or cloud writes. */
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {chromium}=require(require.resolve('playwright',{paths:[process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES||process.cwd()]}));
+const root=path.resolve(__dirname,'..');let browser;
+test.before(async()=>{browser=await chromium.launch({headless:true,executablePath:process.env.HALACHA_TEST_CHROMIUM||undefined,args:['--no-sandbox','--disable-gpu']});});
+test.after(async()=>browser?.close());
+async function open(query='',legacy=false,student=''){
+ const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.route('**/*',route=>{let u=new URL(route.request().url());if(u.origin==='http://studio.test'&&u.pathname.startsWith('/halacha/')&&!u.pathname.endsWith('gallery.js')){const file=path.join(root,u.pathname.endsWith('/')?u.pathname+'index.html':u.pathname);return route.fulfill({body:fs.readFileSync(file),contentType:file.endsWith('.html')?'text/html':file.endsWith('.css')?'text/css':'application/javascript'});}return route.fulfill({body:'',contentType:'application/javascript'});});
+ if(student)await page.addInitScript(id=>sessionStorage.setItem('b3Games_studentId',id),student);
+ if(legacy)await page.addInitScript(()=>{
+  const c=document.createElement('canvas');c.width=400;c.height=700;const ctx=c.getContext('2d');ctx.fillStyle='#e53935';ctx.fillRect(30,30,100,100);
+  const old={a_scrap_pages:['<div class="scrap textbox" style="left:20px;top:100px;width:220px"><div class="tb-text" contenteditable="true">My old artwork</div></div>',''],a_draw:[c.toDataURL(),''],a_theme:'blue',a_done:true,b_got:['keep lesson progress']};
+  localStorage.setItem('halachaV14',JSON.stringify(old));localStorage.setItem('halachaV14:demo',JSON.stringify(old));
+ });
+ await page.goto('http://studio.test/halacha/'+query);await page.getByRole('button',{name:/סימן א/}).click();await page.waitForFunction(()=>{const c=document.querySelector('#a .draw-layer');return c._w&&!c._loading;});return{page,errors};
+}
+async function pixel(p,x,y){return p.evaluate(([x,y])=>{const c=document.querySelector('#a .draw-layer');return Array.from(c.getContext('2d').getImageData(Math.round(x*c.width/c.clientWidth),Math.round(y*c.height/c.clientHeight),1,1).data);},[x,y]);}
+async function stroke(p,mode,x1,y1,x2,y2){await p.locator('#a [data-mode="'+mode+'"]').first().click();await p.locator('#a .draw-layer').first().scrollIntoViewIfNeeded();const r=await p.locator('#a .draw-layer').first().boundingBox();await p.mouse.move(r.x+x1,r.y+y1);await p.mouse.down();await p.mouse.move(r.x+x2,r.y+y2,{steps:10});await p.mouse.up();}
+test('legacy pieces, drawings and lesson progress survive load and resize',async()=>{
+ const {page:p,errors}=await open('',true);assert.equal(await p.locator('#a .tb-text').textContent(),'My old artwork');assert.ok((await pixel(p,50,50))[3]>0);await p.setViewportSize({width:1200,height:900});assert.ok((await pixel(p,40,50))[3]>0);assert.deepEqual(await p.evaluate(()=>S.b_got),['keep lesson progress']);await p.evaluate(()=>saveDrawing('a'));await p.reload();await p.getByRole('button',{name:/סימן א/}).click();await p.waitForFunction(()=>!document.querySelector('#a .draw-layer')._loading);assert.equal(await p.locator('#a .tb-text').textContent(),'My old artwork');assert.ok((await pixel(p,40,50))[3]>0);assert.deepEqual(errors,[]);await p.close();
+});
+test('drawing, eraser, undo, redo and shape fill use the saved bitmap',async()=>{
+ const {page:p,errors}=await open();await stroke(p,'pen',40,450,180,450);assert.ok((await pixel(p,100,450))[3]>0);
+ await stroke(p,'erase',95,445,105,455);assert.equal((await pixel(p,100,450))[3],0);
+ await p.locator('#a [data-history=undo]').click();await p.waitForFunction(()=>!document.querySelector('#a .draw-layer')._loading);assert.ok((await pixel(p,100,450))[3]>0);
+ await p.locator('#a [data-history=redo]').click();await p.waitForFunction(()=>!document.querySelector('#a .draw-layer')._loading);assert.equal((await pixel(p,100,450))[3],0);
+ await stroke(p,'rect',220,430,320,530);await p.locator('#a [data-color="#e53935"]').first().click();await stroke(p,'fill',270,480,270,480);assert.deepEqual((await pixel(p,270,480)).slice(0,3),[229,57,53]);assert.equal((await pixel(p,190,480))[3],0);
+ assert.ok(await p.evaluate(()=>S.a_draw[0].startsWith('data:image/png')));assert.deepEqual(errors,[]);await p.close();
+});
+test('text, Torah stickers, picture actions and backgrounds persist with undo',async()=>{
+ const {page:p,errors}=await open();await p.getByRole('button',{name:'Add text box'}).click();await p.locator('#a .tb-text').fill('My mitzvah');await p.getByRole('button',{name:'Torah',exact:true}).click();assert.equal(await p.locator('#a .studio-sticker img').getAttribute('alt'),'Torah');
+ await p.evaluate(()=>openCustomizer(document.querySelector('#a .studio-sticker')));await p.getByRole('button',{name:'Flip picture',exact:true}).click();assert.equal(await p.locator('#a .studio-sticker img').evaluate(e=>e.style.transform),'scaleX(-1)');await p.getByRole('button',{name:'Copy',exact:false}).last().click();assert.equal(await p.locator('#a .studio-sticker').count(),2);await p.getByRole('button',{name:'Done',exact:false}).click();
+ await p.getByRole('button',{name:'Sky',exact:false}).click();assert.equal(await p.locator('#a .page').first().getAttribute('data-studio-bg'),'sky');await p.locator('#a [data-history=undo]').click();assert.equal(await p.locator('#a .page').first().getAttribute('data-studio-bg'),'');await p.reload();await p.getByRole('button',{name:/סימן א/}).click();assert.equal(await p.locator('#a .tb-text').textContent(),'My mitzvah');assert.equal(await p.locator('#a .studio-sticker').count(),2);assert.deepEqual(errors,[]);await p.screenshot({path:process.env.HALACHA_TEST_SCREENSHOT||'/tmp/halacha-studio.png',fullPage:true});await p.close();
+});
+test('teacher student-work inspection is read only',async()=>{
+ const {page:p,errors}=await open('?teacherView=demo',true);const before=await p.evaluate(()=>JSON.stringify(S));assert.equal(await p.getByRole('button',{name:'Add text box'}).isEnabled(),false);await p.evaluate(()=>{studioSticker('a','torah');studioText('a');studioBackground('a','sky');studioMode('a',0,'pen');});assert.equal(await p.evaluate(()=>JSON.stringify(S)),before);assert.equal(await p.locator('#a .tb-text').getAttribute('contenteditable'),'false');assert.deepEqual(errors,[]);await p.close();
+});
+test('student Siman locks, all lessons and existing exports remain available',async()=>{
+ const {page:p}=await open();assert.equal(await p.locator('.section[data-studio]').count(),await p.evaluate(()=>lessons.length));assert.ok(await p.evaluate(()=>lessons.length===32));assert.equal(await p.evaluate(()=>isSimanUnlocked('ב')),false);await p.evaluate(()=>openSiman('ב'));assert.equal(await p.locator('.section.on').getAttribute('id'),'a');await p.getByRole('button',{name:'Print / PDF / Slides'}).click();assert.ok(await p.locator('#exportDlg').isVisible());assert.ok((await p.locator('.expSec').count())>=6);await p.close();
+});
+
+test('reset is reversible and student account autosave retains the existing path and state',async()=>{
+ const {page:p,errors}=await open('',false,'studio-test-only');
+ await p.evaluate(()=>{window.testWrites=[];halachaDb={ref:path=>({set:value=>{window.testWrites.push({path,value:JSON.parse(JSON.stringify(value))});return Promise.resolve();}})};window.firebase={database:{ServerValue:{TIMESTAMP:123}}};});
+ await p.getByRole('button',{name:'Add text box'}).click();await p.locator('#a .tb-text').fill('Keep my work');
+ await stroke(p,'pen',50,450,150,450);
+ await p.waitForFunction(()=>window.testWrites.length>0);
+ assert.equal(await p.evaluate(()=>window.testWrites.at(-1).path),'b3Games/students/studio-test-only/halacha/siman1');
+ assert.ok(await p.evaluate(()=>window.testWrites.at(-1).value.state.a_scrap_pages[0].includes('Keep my work')));
+ assert.ok(await p.evaluate(()=>window.testWrites.at(-1).value.state.a_draw[0].startsWith('data:image/png')));
+ await p.evaluate(()=>resetScrapbookPage('a'));assert.equal(await p.locator('#a .scrap').count(),0);
+ await p.locator('#a [data-history=undo]').click();await p.waitForFunction(()=>!document.querySelector('#a .draw-layer')._loading);
+ assert.equal(await p.locator('#a .tb-text').textContent(),'Keep my work');assert.ok((await pixel(p,100,450))[3]>0);assert.deepEqual(errors,[]);await p.close();
+});
