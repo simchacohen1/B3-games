@@ -344,6 +344,7 @@ function sendHover(){
   if(isTeacher){state.points.teacher=point;publish()}else send(teacherConnection,{type:'point',point});
 }
 function pointAt(event,immediate=false){
+  if(isTeacher&&$('teacherTool').value==='eraser'){hideOwnPointer();return}
   if(navigating||!live())return;
   if(!allowed()){if(immediate)$('pointerStatus').textContent='Your teacher has not enabled your pointer.';return}
   const pdfOpen=window.ClassPointerPdf?.active();const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=pdfOpen?{left:0,top:0,w:1,h:1}:C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight);if(!box)return;
