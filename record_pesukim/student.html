@@ -4641,7 +4641,7 @@ async function gradeCurrentQuestionAnswer(){
 function getQuestionPosukWords(question){
   const part=(currentSelectionParts||[]).find(p=>Number(p.posukNum)===Number(question&&question.posukNum));
   const text=part&&part.text||(Number(question&&question.posukNum)===Number(currentPosukNum)?currentPosukText:'');
-  return String(text||'').trim().split(/\\s+/).filter(Boolean);
+  return String(text||'').trim().split(/\s+/).filter(Boolean);
 }
 function renderQuestionWordChoices(question,existing){
   const host=document.getElementById('questionWordChoices'),check=document.getElementById('checkWordSelectionBtn');
