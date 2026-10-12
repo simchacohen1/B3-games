@@ -1848,7 +1848,6 @@ QUALITY CHECK BEFORE RETURNING: every item must be supported by the accepted tra
                     items: {
                       type: "array",
                       minItems: 1,
-                      maxItems: staticQuestions.length || 20,
 items: {
                         type: "object",
                         properties: {
@@ -1858,8 +1857,7 @@ items: {
                           answerWordSets: {
                             type: "array",
                             minItems: 1,
-                            maxItems: 3,
-                            items: { type: "array", minItems: 1, items: { type: "integer", minimum: 0 } }
+                            items: { type: "array", minItems: 1, items: { type: "integer" } }
                           }
                         },
                         required: ["sourceFact", "question", "expectedAnswer", "answerWordSets"],
@@ -1907,7 +1905,7 @@ items: {
           question: applyFrumBiblicalNames(String(item?.question || "").trim()),
           expectedAnswer: applyFrumBiblicalNames(String(item?.expectedAnswer || "").trim()),
           answerWordSets: Array.isArray(item?.answerWordSets)
-            ? item.answerWordSets.map((set) => Array.isArray(set) ? [...new Set(set.map(Number).filter(Number.isInteger))] : []).filter((set) => set.length)
+            ? item.answerWordSets.map((set) => Array.isArray(set) ? [...new Set(set.map(Number).filter(Number.isInteger))] : []).filter((set) => set.length).slice(0, 3)
             : [],
         }))
         .filter((item) => item.question && item.expectedAnswer && item.answerWordSets.length &&
@@ -1918,7 +1916,7 @@ items: {
           seen.add(key);
           return true;
         })
-        .slice(0, 20);
+        .slice(0, staticQuestions.length || 20);
 
       if (!items.length) {
         res.status(502).json({ error: "No usable questions generated" });
