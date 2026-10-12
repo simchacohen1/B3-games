@@ -26,7 +26,41 @@
   }
 
   // Expose the pure helpers for regression tests and diagnostics.
-  window.GameShowTeamModeLogic = { teamsFor, teamFor, contestantsFor, canAnswerChoice };
+    function applyChoice(current, actor, choiceIndex, correctIndex, now = Date.now()) {
+    if (!canAnswerChoice(current, actor)) return null;
+    const team = teamFor(actor, current);
+    if (current.teamMode && !team) return null;
+    const correct = Number(choiceIndex) === Number(correctIndex);
+    const next = { ...current };
+    if (current.teamMode) {
+      next.teamScores = { ...(current.teamScores || { A: 0, B: 0 }) };
+      next.teamScores[team] = (Number(next.teamScores[team]) || 0) + (correct ? 10 : -5);
+    } else {
+      next.scores = { ...(current.scores || {}) };
+      next.scores[actor] = (Number(next.scores[actor]) || 0) + (correct ? 10 : -5);
+    }
+    const outcome = { outcome: correct ? "correct" : "incorrect", by: actor, team: team || null, choice: Number(choiceIndex), at: now };
+    next.answerState = outcome;
+    if (correct) {
+      next.revealed = true;
+      next.stealTeam = null;
+    } else if (current.teamMode && !current.stealUsed) {
+      next.lastAnswerState = outcome;
+      next.answerState = null;
+      next.stealTeam = team === "A" ? "B" : "A";
+      next.stealUsed = true;
+      next.buzzedBy = null;
+      next.selectedPlayer = null;
+      next.helperName = null;
+    } else {
+      next.revealed = true;
+      next.stealTeam = null;
+    }
+    return next;
+  }
+
+  // Expose pure helpers for regression tests and diagnostics.
+  window.GameShowTeamModeLogic = { teamsFor, teamFor, contestantsFor, canAnswerChoice, applyChoice };
   function questionAt(data) {
     return Array.isArray(questions) ? questions[Number(data?.qIndex)||0] : null;
   }
@@ -108,7 +142,7 @@
         roundActive:true,revealed:false,buzzedBy:null,selectedPlayer:null,buzzPool:null,
         buzzUnlockAt:unlockAt,buzzOpenAt:unlockAt,teamMode,multipleChoice:mc,contestants,
         teamRoundCount:teamMode?rotation+1:(Number(data.teamRoundCount)||0),
-        helperName:null,answerState:null,stealTeam:null,stealUsed:false
+        helperName:null,answerState:null,lastAnswerState:null,stealTeam:null,stealUsed:false
       });
     };
     const originalGo=window.goToQuestion;
@@ -187,24 +221,8 @@
       const q=questionAt(lastData);
       if(!q||!Number.isInteger(q.correctIndex))return;
       gameRef.transaction(current=>{
-        if(!canAnswerChoice(current,myName)||
-           Number(current.qIndex)!==Number(lastData?.qIndex))return;
-        const team=teamFor(myName,current);
-        const correct=Number(index)===Number(q.correctIndex);
-        if(current.teamMode){
-          current.teamScores=current.teamScores||{A:0,B:0};
-          current.teamScores[team]=(Number(current.teamScores[team])||0)+(correct?10:-5);
-        }else{
-          current.scores=current.scores||{};
-          current.scores[myName]=(Number(current.scores[myName])||0)+(correct?10:-5);
-        }
-        current.answerState={outcome:correct?"correct":"incorrect",by:myName,team:team||null,choice:Number(index),at:Date.now()};
-        if(correct){current.revealed=true;current.stealTeam=null;}
-        else if(current.teamMode&&!current.stealUsed){
-          current.stealTeam=team==="A"?"B":"A";current.stealUsed=true;
-          current.buzzedBy=null;current.selectedPlayer=null;current.helperName=null;
-        }else{current.revealed=true;current.stealTeam=null;}
-        return current;
+        if(Number(current?.qIndex)!==Number(lastData?.qIndex))return;
+        return applyChoice(current,myName,index,q.correctIndex);
       },(err,committed)=>{if(err)document.getElementById("answerFeedback").textContent="Could not submit. Try again.";});
     }
 
