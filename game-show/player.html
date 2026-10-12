@@ -535,25 +535,23 @@ document.addEventListener('keydown', e => {
   if (btn && !btn.disabled && !document.getElementById('gameArea').classList.contains('hidden')) { e.preventDefault(); btn.click(); }
 });
 
-function mustSitOut(data, name) {
-  return !!(data && data.lastWinner === name && (data.lastWinnerStreak || 0) >= 2);
-}
+function mustSitOut(data, name) { return false; }
 
 function buzzIn() {
   if(teacherPreview){renderGameSnapshot({val:()=>({...lastData,buzzedBy:myName})});playBuzzSound();return;}
-  if (masterBlocked || !myName || mustSitOut(lastData, myName)) return;
+  if (masterBlocked || !myName) return;
   if (!lastData || lastData.roundActive !== true) return;
   if (lockedUntil && serverNow() < lockedUntil) return;
   if (lastData && lastData.buzzedBy) return;
   // A root transaction keeps winner and streak together even when students
   // buzz simultaneously or another tab has newer state.
   gameRef.transaction(current => {
-    if (!current || current.roundActive !== true || current.buzzedBy || mustSitOut(current, myName)) return;
+    if (!current || current.roundActive !== true || current.buzzedBy) return;
     if (current.buzzerDelayOn && serverNow() < (current.buzzUnlockAt || 0)) return;
     if (current.revealDelayOn) {
       if (current.buzzPool && current.buzzPool[myName]) return;
       current.buzzPool = current.buzzPool || {};
-      current.buzzPool[myName] = true;
+      current.buzzPool[myName] = serverNow();
     } else {
       const round = String(current.buzzOpenAt || 0) + ':' + (current.qIndex || 0);
       if (current.lastWinnerRound !== round) {
@@ -569,7 +567,7 @@ function buzzIn() {
     return current;
   }, (error, committed) => {
     if (error) document.getElementById('status').textContent = 'Could not buzz in. Please try again.';
-    else if (committed) playBuzzSound();
+    else if (committed && !lastData?.revealDelayOn) playBuzzSound();
   });
 }
 
@@ -583,12 +581,6 @@ function updateBuzzAvailability() {
   const now = serverNow();
 
   if (!lastData || lastData.roundActive !== true) {
-    buzzBtn.disabled = true;
-    countdownEl.textContent = '';
-    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-    return;
-  }
-  if (mustSitOut(lastData, myName)) {
     buzzBtn.disabled = true;
     countdownEl.textContent = '';
     if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
@@ -697,11 +689,6 @@ function renderGameSnapshot(snapshot){
   if (data.buzzedBy) {
     buzzBtn.disabled = true;
     status.textContent = data.buzzedBy === myName ? "🎉 You're first! Get ready to answer." : data.buzzedBy + " buzzed in first.";
-    document.getElementById('countdown').textContent = '';
-    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-  } else if (mustSitOut(data, myName)) {
-    buzzBtn.disabled = true;
-    status.textContent = 'You won two buzz-ins in a row. Let another player have a turn!';
     document.getElementById('countdown').textContent = '';
     if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
   } else if (iAlreadyBuzzed) {
