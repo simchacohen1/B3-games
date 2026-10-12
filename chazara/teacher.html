@@ -273,11 +273,15 @@ function refreshScopedViews(){
   D[id]={name:student.name,goal:10,reviews};
  }
  populateManualStudents();render();renderRecordings();renderApprovals();renderManualMatches();}
+// In the verified owner preview, the selected teacher's class was already checked
+// by the parent shell. The logged-in Firebase UID is the owner, not that teacher.
+// Normal teacher sessions must still reload their own live assignments.
+function needsTeacherAssignmentRefresh(access){return access.role!=='admin'&&!(window.B3_READ_ONLY_TEACHER_PREVIEW===true&&access.preview===true)}
 async function loadClassScope(user,access){
  const generation=++scopeGeneration;clearStudentListeners();teacherAccess=access;teacherScope=null;D={};R={};E={};P={};pendingPointRequests={};$('teacherApp').classList.add('hidden');$('detail').classList.add('hidden');$('teacherGate').classList.remove('hidden');
  if(!access?.authorized){$('teacherGate').innerHTML='Sign in with your assigned teacher Google account. <button id="teacherLogin">Sign in with Google</button>';$('teacherLogin').onclick=()=>window.B3SiteSettings.signInWithGoogle();return;}
  try{
-  if(access.role!=='admin'){
+  if(needsTeacherAssignmentRefresh(access)){
    const row=(await db.ref('b3Games/workspaces/b3-2026/teachers/'+user.uid).once('value')).val();
    if(!row||row.active===false)throw new Error('Your teacher account is not active.');
    access={...access,classIds:Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true)};teacherAccess=access;
@@ -301,7 +305,7 @@ async function quietScopeCheck(){
  const sig=s=>JSON.stringify([Object.keys(s.classes||{}).sort(),Object.keys(s.students||{}).sort(),Object.values(s.students||{}).map(x=>x.classId).sort()]);
  try{
   let access=teacherAccess;
-  if(access.role!=='admin'){
+  if(needsTeacherAssignmentRefresh(access)){
    const row=(await db.ref('b3Games/workspaces/b3-2026/teachers/'+auth.currentUser.uid).once('value')).val();
    if(!row||row.active===false)return loadClassScope(auth.currentUser,teacherAccess);
    access={...access,classIds:Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true)};
