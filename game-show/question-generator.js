@@ -135,35 +135,67 @@
     }
     return item;
   }
+  function questionAndAnswer(source, topic) {
+    const text = localizeText(source.text).replace(/\\s+/g, " ").trim();
+    if (topic) return { q: "What does this source say about " + topic + "?", answer: text };
+    if (source.isRashi) return { q: "What does Rashi explain about this pasuk?", answer: text };
+
+    const subject = "(Hashem|Moshe|Avraham|Yitzchak|Yaakov|Yosef|Aharon|Sarah|Rivkah|Leah|Rachel|Noach|Esav|Paroh|Reuven|Shimon|Yehudah|Naftali|Gad|Asher|Yissachar|Zevulun|Binyamin|Ephraim|Menashe|Miriam|Yehoshua|Bilam|Lavan|Yisro)";
+    const verbs = {
+      saw: "see", said: "say", spoke: "say", called: "call", divided: "separate",
+      separated: "separate", created: "create", made: "make", blessed: "bless",
+      commanded: "command", took: "take", gave: "give", brought: "bring",
+      asked: "ask", answered: "answer", found: "find", heard: "hear",
+      built: "build", opened: "open", closed: "close", sent: "send",
+      placed: "place", put: "put", ate: "eat", drank: "drink"
+    };
+    const verbPattern = Object.keys(verbs).join("|");
+    const match = text.match(new RegExp("(?:^|[;.!?]\\s*)(?:And\\s+)?"+subject+"\\s+("+verbPattern+")\\s+(.+)", "i"));
+    if (!match) return { q: "What happens in this pasuk?", answer: text };
+
+    const name = match[1], verb = match[2].toLowerCase();
+    let clause = match[3].split(/[;.!?]/)[0].trim();
+    clause = clause.replace(/,\\s+and\\s+(?:Hashem|Moshe|Avraham|Yitzchak|Yaakov|Yosef|Aharon|Sarah|Rivkah|Leah|Rachel|Noach|Esav|Paroh)\\b[\\s\\S]*$/i, "").trim();
+    if (!clause) return { q: "What happens in this pasuk?", answer: text };
+
+    if (verb === "called") {
+      const called = clause.match(/^(?:the\\s+)?(light|darkness)\\s+([A-Z][A-Za-z]+)/i);
+      if (called) return { q: "What did " + name + " call the " + called[1].toLowerCase() + "?", answer: called[2] };
+      return { q: "What name did " + name + " give?", answer: clause };
+    }
+    return { q: "What did " + name + " " + verbs[verb] + "?", answer: clause };
+  }
+
+  function shortChoice(value) {
+    const words = String(value || "").replace(/\\s+/g, " ").trim().split(" ").filter(Boolean);
+    return words.length > 12 ? words.slice(0, 12).join(" ") + "…" : words.join(" ");
+  }
+
   function makeItems(sources, mode, topic, count, distractors) {
     const out = [];
     const selected = sources.slice(0, count);
     const choiceSources = distractors && distractors.length ? distractors : sources;
     selected.forEach((source, index) => {
       const ref = source.displayRef || displayRef(source.ref);
-      const variation = index % 3;
-      const prompt = topic
-        ? (variation === 1 ? "Which detail does this halacha give about " : "According to ") + topic + (variation === 1 ? "?" : ", what does this halacha say?")
-        : (source.isRashi ? "What does Rashi explain about " + ref.replace(/^Rashi on /, "") + "?" : variation === 0 ? "What does " + ref + " say happened?" : variation === 1 ? "What detail is mentioned in " + ref + "?" : "According to " + ref + ", what was said?");
+      const qa = questionAndAnswer(source, topic);
       if (mode === "open") {
-        out.push({ q: localizeText(prompt), ans: localizeText(source.text) + " (Source: " + ref + ")" });
+        out.push({ q: qa.q, ans: qa.answer + " (Source: " + ref + ")" });
       } else {
-        const optionRows = [];
-        const correctExcerpt = localizeText(phrase(source.text));
-        if (correctExcerpt) optionRows.push({ excerpt: correctExcerpt, ref: source.ref });
+        const correctExcerpt = localizeText(shortChoice(qa.answer));
+        const optionRows = correctExcerpt ? [{ excerpt: correctExcerpt, ref: source.ref }] : [];
         for (let offset = 1; offset <= choiceSources.length && optionRows.length < 4; offset++) {
           const candidate = choiceSources[(index + offset) % choiceSources.length];
           if (candidate.ref === source.ref) continue;
-          const excerpt = localizeText(phrase(candidate.text));
+          const candidateAnswer = questionAndAnswer(candidate, topic).answer;
+          const excerpt = localizeText(shortChoice(candidateAnswer));
           if (excerpt && !optionRows.some(row => row.excerpt === excerpt)) optionRows.push({ excerpt, ref: candidate.ref });
         }
         if (optionRows.length < 4) throw new Error("Multiple choice needs four distinct Sefaria excerpts. Select at least four pesukim or sources.");
-        const answerText = localizeText(phrase(source.text));
-        const correctIndex = optionRows.findIndex(row => row.ref === source.ref || row.excerpt === answerText);
+        const correctIndex = optionRows.findIndex(row => row.ref === source.ref || row.excerpt === correctExcerpt);
         if (correctIndex < 0) throw new Error("Could not match this question to its verified source. Please try again.");
         out.push({
-          q: localizeText(topic ? "Which phrase appears in a Sefaria source about " + topic + "?" : "Which phrase appears in " + ref + "?"),
-          ans: localizeText(source.text) + " (Source: " + ref + ")",
+          q: qa.q,
+          ans: qa.answer + " (Source: " + ref + ")",
           choices: optionRows.map(row => row.excerpt),
           correctIndex
         });
@@ -337,7 +369,7 @@
       } finally { button.disabled = false; }
     });
   }
-  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, questionRecord, phrase, cleanText, localizeText, displayRef, evenlyPick, distribute });
+  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, questionAndAnswer, questionRecord, phrase, cleanText, localizeText, displayRef, evenlyPick, distribute });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", inject, { once: true });
   else inject();
 })();
