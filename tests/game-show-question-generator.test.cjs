@@ -38,15 +38,15 @@ test("multiple-choice answers point to one of the verified references",()=>{
   assert.equal(items.length,4);
   for(const item of items){
     assert.equal(item.choices.length,4);
-    assert.equal(item.choices[item.correctIndex],item.ans);
+    assert.equal(item.choices[item.correctIndex],core.phrase(sources.find(s=>item.ans.includes(s.ref)).text));
     assert.ok(sources.some(s=>s.ref===item.ans));
-    assert.ok(item.choices.every(ref=>sources.some(s=>s.ref===ref)));
+    assert.ok(item.choices.every(choice=>sources.some(s=>core.phrase(s.text)===choice)));
   }
 });
 
 test("multiple choice refuses to fabricate distractor citations",()=>{
   const core=loadCore();
-  assert.throws(()=>core.makeItems([{ref:"Genesis 18:1",text:"A source."}],"mc",""),/four verified source references/);
+  assert.throws(()=>core.makeItems([{ref:"Genesis 18:1",text:"A source."},{ref:"Genesis 18:2",text:"A source."},{ref:"Genesis 18:3",text:"A source."},{ref:"Genesis 18:4",text:"A source."}],"mc",""),/four distinct source excerpts/);
 });
 
 test("source text is reduced to a short, readable excerpt for a choice question",()=>{
