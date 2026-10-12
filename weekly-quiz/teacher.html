@@ -783,7 +783,7 @@
             </label>
           </div>
           <label class="score-toggle" style="margin-top:12px">
-            <input type="checkbox" id="launchShowScore">
+            <input type="checkbox" id="launchShowScore" checked>
             <span>Show students their score and right/wrong review when they finish</span>
           </label>
           <div id="launchTypeHelp" class="launch-help">Live Class Test: you start it and control opening, locking, and revealing questions during class.</div>
@@ -1831,7 +1831,7 @@ async function toggleScoreRelease(){
 }
 async function stopLaunch(){
   if(!activeLaunchId||!liveLaunch)return;const targets=liveLaunch.targetStudents?Object.keys(liveLaunch.targetStudents).filter(k=>liveLaunch.targetStudents[k]):[];const who=targets.length?((roster[targets[0]]&&roster[targets[0]].name)||targets[0]):classLabel(liveLaunch.classId);if(!confirm('End this '+who+' launch? All data stays saved.'))return;
-  await db.ref(QROOT+'/launches/'+activeLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP});
+  await db.ref(QROOT+'/launches/'+activeLaunchId).update({started:false,endedAt:firebase.database.ServerValue.TIMESTAMP,showScore:true});
   if(targets.length){for(const sid of targets){const snap=await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).once('value');if(snap.val()===activeLaunchId)await db.ref(QROOT+'/settings/studentActiveLaunch/'+sid).remove();}}
   else if(activeLaunchByClass[liveLaunch.classId]===activeLaunchId)await db.ref(QROOT+'/settings/activeLaunchByClass/'+liveLaunch.classId).remove();
 }
