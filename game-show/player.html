@@ -563,6 +563,8 @@ function buzzIn() {
       }
       current.buzzedBy = myName;
       current.selectedPlayer = myName;
+      current.answeredPlayers = current.answeredPlayers || {};
+      current.answeredPlayers[myName] = true;
     }
     return current;
   }, (error, committed) => {
