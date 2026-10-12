@@ -4861,11 +4861,11 @@ document.getElementById('checkWordSelectionBtn').onclick = gradeCurrentQuestionA
 function buildQuestionHint(question){
   const q=String(question&&question.question||'').trim().toLowerCase();
   let clue='Think about what the question is asking, then look for those words in the pasuk.';
-  if(/^who\\b/.test(q)) clue='The answer is a person’s name. Listen for a name in the pasuk.';
-  else if(/^where\\b/.test(q)) clue='The answer tells where. Listen for a place in the pasuk.';
-  else if(/^when\\b/.test(q)) clue='The answer tells when. Listen for a time word in the pasuk.';
-  else if(/^how many\\b/.test(q)) clue='The answer is a number. Listen for the number in the pasuk.';
-  else if(/^what (?:did|does|was|were|is|are|happened)\\b/.test(q)) clue='Think about the action or thing the question asks about. Listen for those words in the pasuk.';
+  if(/^who\b/.test(q)) clue='The answer is a person’s name. Listen for a name in the pasuk.';
+  else if(/^where\b/.test(q)) clue='The answer tells where. Listen for a place in the pasuk.';
+  else if(/^when\b/.test(q)) clue='The answer tells when. Listen for a time word in the pasuk.';
+  else if(/^how many\b/.test(q)) clue='The answer is a number. Listen for the number in the pasuk.';
+  else if(/^what (?:did|does|was|were|is|are|happened)\b/.test(q)) clue='Think about the action or thing the question asks about. Listen for those words in the pasuk.';
   const indices=Array.isArray(question&&question.answerWordIndices)?question.answerWordIndices.map(Number).filter(Number.isInteger):[];
   const wordCount=getQuestionPosukWords(question).length;
   if(indices.length&&wordCount>1){
