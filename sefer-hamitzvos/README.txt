@@ -1,0 +1,1 @@
+Sefer HaMitzvos activity: 613 original JPG cards and coloring PNGs. Uses the shared Fun Torah Tools game gate and sefer-hamitzvos class grants. Coloring is saved only in this browser, separately by workspace, class, student and card. Daily date mapping remains unverified. Card 476 is verified as Lo Saaseh 265.

@@ -51,6 +51,7 @@
   }
 
   const GAME_DEFAULTS = {
+    "sefer-hamitzvos": true,
     "tzitzis-game": true,
     "tzitzis-quest-arcade": true,
     "kahoot-word-quiz": true,
