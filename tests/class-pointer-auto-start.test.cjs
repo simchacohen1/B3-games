@@ -12,7 +12,7 @@ const dashboard=fs.readFileSync(path.join(__dirname,'../class-pointer-prototype/
 // fixture, avoiding access to actual Firebase accounts and student sessions.
 const startCode=src.slice(src.indexOf('async function startClass(){'),src.indexOf('\nfunction stopSharing()'));
 assert.ok(startCode.startsWith('async function startClass()'));
-assert.ok(startCode.endsWith('}\n'));
+assert.ok(startCode.trimEnd().endsWith('}'));
 
 function fixture({ready=Promise.resolve(),publish=async()=>{},makePeer=true}={}){
   const items=new Map(),events={},reports=[],calls=[];
