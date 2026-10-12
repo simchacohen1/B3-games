@@ -31,13 +31,38 @@
     return (match[1] || "") + title + String(ref).slice(match[0].length);
   };
   const bookNames = Object.keys(books);
+  let jsonpCounter = 0;
+  function jsonp(url) {
+    return new Promise((resolve, reject) => {
+      const callback = "__sefariaJsonp" + (++jsonpCounter);
+      const script = document.createElement("script");
+      const timer = setTimeout(() => finish(new Error("Sefaria request timed out.")), 15000);
+      function finish(error, data) {
+        clearTimeout(timer);
+        delete window[callback];
+        script.remove();
+        if (error) reject(error); else resolve(data);
+      }
+      window[callback] = data => finish(null, data);
+      script.onerror = () => finish(new Error("Sefaria could not return source data."));
+      script.src = url + (url.includes("?") ? "&" : "?") + "callback=" + callback;
+      document.head.appendChild(script);
+    });
+  }
+  async function sefariaJson(url) {
+    try {
+      const response = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!response.ok) throw new Error("Sefaria request failed.");
+      return await response.json();
+    } catch (_) {
+      return jsonp(url);
+    }
+  }
   const indexCache = new Map();
   const chapterCache = new Map();
   async function getBookIndex(book) {
     if (indexCache.has(book)) return indexCache.get(book);
-    const response = await fetch(api + "/api/v2/raw/index/" + encodeURIComponent(book), { headers: { Accept: "application/json" } });
-    if (!response.ok) throw new Error("Sefaria could not load the perek list for " + books[book].label + ".");
-    const data = await response.json();
+    const data = await sefariaJson(api + "/api/v2/raw/index/" + encodeURIComponent(book));
     const chapters = Number(data?.schema?.lengths?.[0]);
     if (!Number.isInteger(chapters) || chapters < 1) throw new Error("Sefaria did not return valid perek information.");
     const result = { chapters };
@@ -48,9 +73,7 @@
     const key = book + ":" + chapter;
     if (chapterCache.has(key)) return chapterCache.get(key);
     const ref = book + " " + chapter;
-    const response = await fetch(api + "/api/v3/texts/" + encodeURIComponent(ref) + "?version=english", { headers: { Accept: "application/json" } });
-    if (!response.ok) throw new Error("Sefaria could not load " + books[book].label + " " + chapter + ".");
-    const data = await response.json();
+    const data = await sefariaJson(api + "/api/v3/texts/" + encodeURIComponent(ref) + "?version=english");
     const version = (data?.versions || []).find(v => v.language === "en") || (data?.versions || [])[0];
     const raw = version?.text ?? data?.text;
     const verses = Array.isArray(raw) ? raw.flat(Infinity).map(cleanText) : [];
@@ -93,11 +116,7 @@
     return version ? cleanText(version.text) : "";
   };
   async function getText(ref) {
-    const response = await fetch(api + "/api/v3/texts/" + encodeURIComponent(ref) + "?version=english", {
-      headers: { Accept: "application/json" }
-    });
-    if (!response.ok) throw new Error("Sefaria could not load " + ref + ".");
-    const data = await response.json();
+    const data = await sefariaJson(api + "/api/v3/texts/" + encodeURIComponent(ref) + "?version=english");
     const text = versionsText(data);
     if (!text) throw new Error("No English text is available for " + ref + ".");
     return { ref: data.ref || ref, text };
