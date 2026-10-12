@@ -133,3 +133,102 @@ test('teacher broadcasts a shoresh, keeps boards independent, and sends a colori
     if (context.browser()) await context.close().catch(() => {});
   }
 });
+
+
+test('paste Ctrl+V to everyone and edit Hebrew text independently per student', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const teacher = await context.newPage(), ari = await context.newPage(), levi = await context.newPage();
+  try {
+    await openBoard(teacher, true);
+    await openBoard(ari, false);
+    await openBoard(levi, false);
+    const students = { a: ari, b: levi };
+    await teacher.locator('#studentBoards').click();
+    await deliver(teacher, students);
+
+    // Teacher pastes text from an ordinary clipboard outside text-entry fields.
+    await teacher.evaluate(() => {
+      const data = new DataTransfer();
+      data.setData('text/plain', 'בראשית');
+      const event = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', { value: data });
+      document.dispatchEvent(event);
+    });
+    const sent = await deliver(teacher, students);
+    expect(sent.filter((e: any) => e.message?.activity?.text === 'בראשית')).toHaveLength(2);
+    await expect(ari.getByLabel('Edit Hebrew text')).toHaveValue('בראשית');
+    await expect(levi.getByLabel('Edit Hebrew text')).toHaveValue('בראשית');
+
+    // Ari edits only his word and settings. None of Levi's state changes.
+    await ari.getByLabel('Edit Hebrew text').fill('שלום');
+    await ari.getByRole('button', { name: 'A+', exact: true }).click();
+    await ari.getByLabel('Hebrew text color').fill('#c62828');
+    const messages = await ari.evaluate(() => (window as any).__out.splice(0));
+    const changed = messages.filter((m: any) => m.type === 'board-text');
+    expect(changed.length).toBeGreaterThan(0);
+    expect(changed.at(-1).text).toMatchObject({ value: 'שלום', size: 0.35, color: '#c62828' });
+    for (const message of messages) {
+      await teacher.evaluate((msg) => {
+        (window as any).ClassPointerBoards.fromStudent((window as any).__members.get('a'), msg);
+      }, message);
+    }
+    await expect(levi.getByLabel('Edit Hebrew text')).toHaveValue('בראשית');
+
+    // Word repositioning is drag-based and broadcast only for Ari.
+    await ari.getByRole('button', { name: '↔ Move' }).click();
+    const rect = await ari.locator('#myBoard canvas').boundingBox();
+    expect(rect).toBeTruthy();
+    await ari.mouse.move(rect!.x + rect!.width * .5, rect!.y + rect!.height * .5);
+    await ari.mouse.down();
+    await ari.mouse.move(rect!.x + rect!.width * .7, rect!.y + rect!.height * .7, { steps: 8 });
+    await ari.mouse.up();
+    const moved = await ari.evaluate(() => (window as any).__out.splice(0));
+    expect(moved.some((m: any) => m.type === 'board-text' && m.text.x > .6 && m.text.y > .6)).toBeTruthy();
+    for(const msg of moved) {
+      await teacher.evaluate((message) => {
+        (window as any).ClassPointerBoards.fromStudent((window as any).__members.get('a'), message);
+      }, msg);
+    }
+    // Teacher focus board receives Ari's personalized text.
+    await teacher.locator('.board-tile').first().click();
+    await expect(teacher.getByLabel('Edit Hebrew text')).toHaveValue('שלום');
+    await teacher.getByLabel('Edit Hebrew text').fill('תורה');
+    const teacherMessage = await deliver(teacher, students);
+    expect(teacherMessage.filter((m: any) => m.id === 'a' && m.message?.type === 'board-text').at(-1)?.message.text.value).toBe('תורה');
+    expect(teacherMessage.some((m: any) => m.id === 'b' && m.message?.type === 'board-text')).toBeFalsy();
+    await expect(ari.getByLabel('Edit Hebrew text')).toHaveValue('תורה');
+    await expect(levi.getByLabel('Edit Hebrew text')).toHaveValue('בראשית');
+
+    // A pasted image from another application opens the coloring activity.
+    await teacher.getByRole('button', { name: '◀ All students' }).click();
+    teacher.on('dialog', async dialog => await dialog.accept());
+    await teacher.evaluate(async () => {
+      const c = document.createElement('canvas'); c.width = 80; c.height = 60;
+      const ctx = c.getContext('2d')!; ctx.fillStyle = '#dc3030'; ctx.fillRect(0, 0, 80, 60);
+      const image = await new Promise<Blob>((resolve) => c.toBlob(b => resolve(b!), 'image/png'));
+      const data = new DataTransfer();
+      data.items.add(new File([image], 'clipboard.png', { type: 'image/png' }));
+      const event = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', { value: data });
+      document.dispatchEvent(event);
+    });
+    await expect.poll(() => teacher.evaluate(() => (window as any).__out.filter((m: any) =>
+      m.message?.activity?.kind === 'image').length)).toBeGreaterThanOrEqual(2);
+    const imageMessages = await deliver(teacher, students);
+    expect(imageMessages.filter((m: any) => m.message?.activity?.kind === 'image')).toHaveLength(2);
+    await expect.poll(async () => ari.locator('#myBoard canvas').evaluate((canvas: HTMLCanvasElement) => {
+      const data = canvas.getContext('2d')!.getImageData(
+        Math.floor(canvas.width/2), Math.floor(canvas.height/2), 1, 1).data;
+      return data[0] > data[1] * 1.5 && data[0] > data[2] * 1.5;
+    })).toBeTruthy();
+    await expect.poll(async () => levi.locator('#myBoard canvas').evaluate((canvas: HTMLCanvasElement) => {
+      const data = canvas.getContext('2d')!.getImageData(
+        Math.floor(canvas.width/2), Math.floor(canvas.height/2), 1, 1).data;
+      return data[0] > data[1] * 1.5 && data[0] > data[2] * 1.5;
+    })).toBeTruthy();
+
+    expect(await teacher.evaluate(() => (window as any).__failures)).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
