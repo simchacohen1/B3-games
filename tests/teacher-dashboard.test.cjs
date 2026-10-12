@@ -10,7 +10,12 @@ test('administrator student tool entry lists active classes without using wildca
  assert.deepEqual(x.reads,[root,root+'/et']);assert.match(x.nodes.classes.innerHTML,/ET/);
 });
 
-test('teacher entry presents Google sign-in before auth resolves and for signed-out visitors',async()=>{
- const x=dashboard({});assert.match(x.nodes.gate.innerHTML,/Sign in with Google/);
- await x.run({authorized:false,role:'',classIds:[]});assert.match(x.nodes.gate.innerHTML,/Sign in with Google/);assert.equal(x.reads.length,0);
+test('teacher entry waits for auth before showing Google sign-in to signed-out visitors',async()=>{
+ const x=dashboard({});
+ // The actual page initially displays a neutral loading gate, not a login form.
+ assert.equal(x.nodes.gate,undefined);
+ assert.match(fs.readFileSync('teacher-home.html','utf8'),/id="gate" class="gate">Checking your teacher account/);
+ await x.run({authorized:false,role:'',classIds:[]});
+ assert.match(x.nodes.gate.innerHTML,/Sign in with Google/);
+ assert.equal(x.reads.length,0);
 });
