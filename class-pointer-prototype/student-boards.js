@@ -394,7 +394,7 @@
   });
   const sendImage=button('🖼 Coloring page','Upload a picture or coloring page for every student to color',()=>imageFile.click());
   const removeActivity=button('✕ Blank boards','Remove the shared word or picture and clear the current drawings',()=>sendActivity(null));
-  activityBar.append(el('strong',null,'Send to all boards:'),wordInput,instructionInput,sendWord,sendImage,removeActivity,imageFile,activityLabel);
+  activityBar.append(el('strong',null,'Send to all boards:'),wordInput,instructionInput,sendWord,sendImage,removeActivity,imageFile,activityLabel,el('span','boards-paste-hint','📋 Ctrl+V here to send copied text or pictures'));
   wordInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendWord.click()}});
   imageFile.addEventListener('change',async()=>{
     const file=imageFile.files?.[0];imageFile.value='';
@@ -470,7 +470,6 @@
   const pausedBox=el('div','board-panel');pausedBox.append(el('p','board-panel-text','⏸ Paused'),el('p','board-panel-note','This student is paused. Click ✅ Allow to turn his board or screen back on.'));
   focus.append(surface,screenBox,pausedBox);
   const tools=makeTools(drawGroup,COLORS[2],st=>{drawer?.cancel();surface.classList.toggle('erasing',st.tool==='eraser');surface.classList.toggle('moving',st.tool==='move')});
-  const focusWord=wordEditor(focusBar,()=>focusBoard(),text=>act({type:'board-text',text}),tools);
   drawGroup.append(el('span','boards-spacer'),
     button('↶ Undo','Undo my last mark on this board',()=>{const b=focusBoard();if(!b)return;const mine=b.strokes.filter(s=>s.by==='teacher');const last=mine[mine.length-1];if(last)act({type:'board-remove',ids:[last.id]})}),
     button('🧽 Clear mine','Erase only my marks on this board',()=>act({type:'board-clear'})),
@@ -489,6 +488,7 @@
   const isBlocked=m=>blocked.has(keyFor(m));
   const focusMember=()=>focusId?B.members().get(focusId)||null:null;
   const focusBoard=()=>{const m=focusMember();return m?boardFor(m):null};
+  const focusWord=wordEditor(focusBar,()=>focusBoard(),text=>act({type:'board-text',text}),tools);
   function closeScreen(m){const c=m.screenCall;m.screenCall=null;m.screenStream=null;try{c?.close()}catch(_){}}
   function sendMode(m){
     if(!on){closeScreen(m);B.send(m.connection,{type:'board-mode',on:false});return}
