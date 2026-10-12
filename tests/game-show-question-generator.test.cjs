@@ -44,6 +44,14 @@ test("multiple-choice answers point to one of the verified references",()=>{
   }
 });
 
+test("saving a reviewed multiple-choice question preserves wrong answers and the marked correct choice",()=>{
+  const core=loadCore();
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(core.questionRecord(" Which detail? "," Correct source text ",["Wrong one","Correct source text","Wrong three","Wrong four"],2))),
+    {q:"Which detail?",ans:"Correct source text",choices:["Wrong one","Correct source text","Wrong three","Wrong four"],correctIndex:1}
+  );
+});
+
 test("multiple choice refuses to fabricate distractor citations",()=>{
   const core=loadCore();
   assert.throws(()=>core.makeItems([{ref:"Genesis 18:1",text:"A source."},{ref:"Genesis 18:2",text:"A source."},{ref:"Genesis 18:3",text:"A source."},{ref:"Genesis 18:4",text:"A source."}],"mc",""),/four distinct Sefaria excerpts/);
