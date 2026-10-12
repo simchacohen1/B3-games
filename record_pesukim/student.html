@@ -804,6 +804,14 @@
     line-height:1.35;
     color:var(--ink-soft);
   }
+  .question-audio-controls{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    flex:0 0 auto;
+    flex-wrap:wrap;
+  }
   .listen-btn{
     flex:0 0 auto;
     border:2px solid var(--gold);
@@ -1375,7 +1383,10 @@
             <div class="instruction-copy">
               <strong id="questionText">Loading question…</strong>
             </div>
-            <button class="listen-btn" id="questionListenBtn" type="button">🔊 Listen</button>
+            <div class="question-audio-controls">
+              <button class="listen-btn" id="questionListenBtn" type="button" aria-label="Hear the question aloud">🔊 Hear question</button>
+              <button class="listen-btn" id="questionHintBtn" type="button" aria-label="Hear a hint">💡 Hear hint</button>
+            </div>
           </div>
           <div style="margin:12px 0 8px;text-align:center;color:var(--ink-soft);font-weight:800;">Tap all the Hebrew words that answer the question.</div>
           <div class="word-selection-board" id="questionWordChoices" dir="rtl"></div>
@@ -3773,7 +3784,7 @@ function renderComprehensionQuestionUI(){
   const backBtn = document.getElementById('backToQuestionsBtn');
   const caption = document.getElementById('comprehensionRecordCaption');
   const allAnswered = comprehensionQuestions.length > 0 &&
-    comprehensionQuestions.every((_, i) => !!comprehensionQResults[i]);
+    comprehensionQuestions.every((_, i) => comprehensionQResults[i] && comprehensionQResults[i].verdict === 'correct');
   const micStage=document.querySelector('.record-stage');
   if(micStage) micStage.classList.toggle('hidden', comprehensionMode === 'questions');
 
@@ -4622,19 +4633,28 @@ async function gradeCurrentQuestionAnswer(){
   if(!selected.length){document.getElementById('comprehensionGradingMsg').textContent='Tap one or more words first.';return;}
   const words=getQuestionPosukWords(current), target=(current.answerWordIndices||[]).slice().sort((a,b)=>a-b);
   const correct=target.length>0&&selected.length===target.length&&selected.every((n,i)=>n===target[i]);
-  const picked=selected.map(i=>words[i]).join(' '), answer=target.map(i=>words[i]).join(' ');
-  questionTryCounts[idx]=(questionTryCounts[idx]||0)+1;
-  comprehensionQResults[idx]={tries:questionTryCounts[idx],verdict:correct?'correct':'incorrect',feedback:correct?'You found the right words!':'Look for: '+answer,transcript:picked,selectionIndices:selected,saving:true};
-  renderQuestionResult(idx,comprehensionQResults[idx].verdict,comprehensionQResults[idx].feedback,picked);
-  document.getElementById('comprehensionStatus').textContent=correct?'Correct!':'Try again next time';
+  const picked=selected.map(i=>words[i]).join(' ');
+  const previous=comprehensionQResults[idx];
+  questionTryCounts[idx]=Math.max(questionTryCounts[idx]||0,Number(previous&&previous.tries)||0)+1;
   document.getElementById('comprehensionGradingMsg').textContent='';
-  const allAnswered=comprehensionQuestions.every((_,i)=>!!comprehensionQResults[i]);
+  if(!correct){
+    const feedback='Not quite. Change your choices and check again.';
+    renderQuestionResult(idx,'incorrect',feedback,picked,null,null,false);
+    document.getElementById('comprehensionStatus').textContent='Try again. Change your choices and check again.';
+    document.getElementById('questionsDoneBlock').classList.add('hidden');
+    renderQuestionWordChoices(current,null);
+    return;
+  }
+  comprehensionQResults[idx]={tries:questionTryCounts[idx],verdict:'correct',feedback:'You found the right words!',transcript:picked,selectionIndices:selected,saving:true};
+  renderQuestionResult(idx,'correct',comprehensionQResults[idx].feedback,picked);
+  document.getElementById('comprehensionStatus').textContent='Correct!';
+  const allAnswered=comprehensionQuestions.every((_,i)=>comprehensionQResults[i]&&comprehensionQResults[i].verdict==='correct');
   document.getElementById('questionsDoneBlock').classList.toggle('hidden',!allAnswered);
   renderAnsweredQuestionHistory();renderQuestionFinalScore();renderQuestionWordChoices(current,comprehensionQResults[idx]);
   await autosaveComprehensionQuestions();
   if(!allAnswered)setTimeout(()=>{
     if(comprehensionMode!=='questions')return;
-    const next=comprehensionQuestions.findIndex((_,i)=>i>idx&&!comprehensionQResults[i]);
+    const next=comprehensionQuestions.findIndex((_,i)=>i>idx&&(!comprehensionQResults[i]||comprehensionQResults[i].verdict!=='correct'));
     if(next>=0){comprehensionQIndex=next;renderComprehensionQuestionUI();}
   },1300);
 }
@@ -4650,25 +4670,27 @@ function renderQuestionWordChoices(question,existing){
   if(!words.length||!Array.isArray(targets)||!targets.length||targets.some(i=>i<0||i>=words.length)){
     host.innerHTML='<div class="comp-status">Word choices are not ready. Please retry.</div>';check.disabled=true;return;
   }
-  const saved=existing&&Array.isArray(existing.selectionIndices)?existing.selectionIndices:questionSelectionDrafts[comprehensionQIndex]||[];
+  const locked=!!existing&&existing.verdict==='correct';
+  const saved=questionSelectionDrafts[comprehensionQIndex]||
+    (existing&&Array.isArray(existing.selectionIndices)?existing.selectionIndices:[]);
   const selected=new Set(saved.map(Number));host.innerHTML='';
   words.forEach((word,index)=>{
     const button=document.createElement('button');button.type='button';
     button.className='word-choice'+(selected.has(index)?' selected':'');button.textContent=word;
-    button.setAttribute('aria-pressed',selected.has(index)?'true':'false');button.disabled=!!existing;
-    button.onclick=()=>{if(existing)return;if(selected.has(index))selected.delete(index);else selected.add(index);
+    button.setAttribute('aria-pressed',selected.has(index)?'true':'false');button.disabled=locked;
+    button.onclick=()=>{if(locked)return;if(selected.has(index))selected.delete(index);else selected.add(index);
       questionSelectionDrafts[comprehensionQIndex]=Array.from(selected);button.classList.toggle('selected',selected.has(index));
       button.setAttribute('aria-pressed',selected.has(index)?'true':'false');};
     host.appendChild(button);
   });
-  check.disabled=!!existing;
+  check.disabled=locked;
 }
 
 // Renders one question's correct/incorrect result — deliberately simpler
 // than showComprehensionResult (no score %, no dispute button) since a
 // single factual question is just right or not, and disputing individual
 // questions would add a lot of UI for little benefit at this scale.
-function renderQuestionResult(idx, verdict, feedback, transcript, disputeStatus, finalVerdict){
+function renderQuestionResult(idx, verdict, feedback, transcript, disputeStatus, finalVerdict, allowDispute=true){
   const resultEl = document.getElementById('comprehensionResult');
   const badgeText = { correct: '✅ Got it!', incorrect: '💡 Try again' }[verdict] || '';
   let transcriptHtml = "";
@@ -4679,7 +4701,7 @@ function renderQuestionResult(idx, verdict, feedback, transcript, disputeStatus,
   // right away — not only once the student has moved on to the next
   // question — so the button appears here, immediately with the result.
   let disputeRowHtml = '';
-  if(verdict !== 'correct'){
+  if(verdict !== 'correct' && allowDispute){
     if(disputeStatus === 'pending'){
       disputeRowHtml = '<div class="dispute-row" style="font-size:0.85rem;color:var(--ink-soft);">⚠️ Dispute pending — your teacher will review it.</div>';
     }else if(disputeStatus === 'resolved' && finalVerdict){
@@ -4836,9 +4858,30 @@ function switchBackToQuestions(){
 }
 
 document.getElementById('checkWordSelectionBtn').onclick = gradeCurrentQuestionAnswer;
+function buildQuestionHint(question){
+  const q=String(question&&question.question||'').trim().toLowerCase();
+  let clue='Think about what the question is asking, then look for those words in the pasuk.';
+  if(/^who\\b/.test(q)) clue='The answer is a person’s name. Listen for a name in the pasuk.';
+  else if(/^where\\b/.test(q)) clue='The answer tells where. Listen for a place in the pasuk.';
+  else if(/^when\\b/.test(q)) clue='The answer tells when. Listen for a time word in the pasuk.';
+  else if(/^how many\\b/.test(q)) clue='The answer is a number. Listen for the number in the pasuk.';
+  else if(/^what (?:did|does|was|were|is|are|happened)\\b/.test(q)) clue='Think about the action or thing the question asks about. Listen for those words in the pasuk.';
+  const indices=Array.isArray(question&&question.answerWordIndices)?question.answerWordIndices.map(Number).filter(Number.isInteger):[];
+  const wordCount=getQuestionPosukWords(question).length;
+  if(indices.length&&wordCount>1){
+    const center=indices.reduce((sum,index)=>sum+index,0)/indices.length;
+    const place=center<wordCount/3?'beginning':(center>=wordCount*2/3?'end':'middle');
+    clue+=' The answer is near the '+place+' of the pasuk.';
+  }
+  return clue;
+}
 document.getElementById('questionListenBtn').onclick = () => {
   const current = comprehensionQuestions[comprehensionQIndex];
   if(current) speakText(current.question);
+};
+document.getElementById('questionHintBtn').onclick = () => {
+  const current = comprehensionQuestions[comprehensionQIndex];
+  if(current) speakText(buildQuestionHint(current));
 };
 document.getElementById('questionPrevBtn').onclick = () => {
   if(comprehensionQIndex > 0){ comprehensionQIndex--; renderComprehensionQuestionUI(); }
