@@ -95,7 +95,9 @@ async function render(user,access){
 }
 q("actAsStudent").onclick=()=>api.openActAsStudentPicker();
 q("signOut").onclick=()=>api.signOut().then(()=>location.reload());
-showTeacherSignIn();
+// The gate already says “Checking your teacher account…”. Keep that neutral
+// state until Firebase has restored the saved Google session and verified access.
+// Calling showTeacherSignIn() before this callback flashes the login unnecessarily.
 api.onAuthStateChanged((user,authorized,access)=>render(user,access||{authorized}));
 })();
 </script></body></html>
