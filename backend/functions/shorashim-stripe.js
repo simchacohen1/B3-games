@@ -4,6 +4,7 @@ const { onRequest } = require('firebase-functions/v2/https');
 const { defineSecret, defineString } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const crypto = require('node:crypto');
+const { verifySignature, validClassId, teacherMayManageClass, activeSubscriptionStatus } = require('./shorashim-stripe-core.cjs');
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -73,10 +74,10 @@ async function identityFromRequest(req) {
 }
 
 async function assignedClass(identity, classId) {
-  if (typeof classId !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(classId)) {
+  if (!validClassId(classId)) {
     throw Object.assign(new Error('Choose a valid class.'), { status: 400 });
   }
-  const assigned = identity.admin || identity.teacher?.classIds?.[classId] === true;
+  const assigned = teacherMayManageClass({ admin: identity.admin, classIds: identity.teacher?.classIds }, classId);
   if (!assigned) throw Object.assign(new Error('This class is not assigned to your teacher account.'), { status: 403 });
   const ref = db().ref('b3Games/workspaces/' + workspaceId + '/classes/' + classId);
   const snap = await ref.get();
@@ -228,7 +229,7 @@ async function applySubscription(subscription, eventId) {
   const cls = clsSnap.val();
   const stillAssigned = authorized && !!cls && cls.active !== false &&
     (teacher?.classIds?.[classId] === true || adminOk || ownerAdmin);
-  const isActive = stillAssigned && ['active', 'trialing'].includes(subscription.status);
+  const isActive = stillAssigned && activeSubscriptionStatus(subscription.status);
   if (!saved.previousGrant && !saved.createdAt && cls) {
     saved.previousGrant = cls.toolGrants?.shorashim === true;
   }
