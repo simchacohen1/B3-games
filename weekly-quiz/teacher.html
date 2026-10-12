@@ -804,6 +804,7 @@
           <h2>Quiz history</h2>
           <select id="resultsClassFilter" onchange="renderLaunchHistory()"><option value="all">All classes</option><option value="et">ET</option><option value="wt">WT</option></select>
         </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px"><select id="resultsDateFilter" aria-label="Filter quizzes by date" onchange="renderLaunchHistory()"><option value="today">Today</option><option value="week" selected>This Week</option><option value="all">All Dates</option></select><input id="resultsQuizSearch" type="search" aria-label="Search quiz history by name" placeholder="Search quiz name…" oninput="renderLaunchHistory()" style="min-width:160px;flex:1"></div>
         <div class="small" style="margin:-4px 0 12px">Every launch is kept separately, including retakes and make-ups.</div>
         <div id="launchHistory" class="launch-list"></div>
       </div>
