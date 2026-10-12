@@ -37,10 +37,16 @@
     const rows = await Promise.all(ids.map(async id => {
       const cls = (await db.ref(ROOT + "/" + id).once("value")).val();
       if (!cls || cls.active === false) return null;
-      const students = Object.values(cls.members || {})
-        .filter(member => member && member.active !== false && member.name)
-        .map(member => String(member.name).trim()).filter(Boolean)
-        .sort((a, b) => a.localeCompare(b));
+      // Class membership can outlive a deleted student account. Always
+      // cross-check the student profile before returning the live roster.
+      const entries = Object.entries(cls.members || {}).filter(([studentId, member]) =>
+        SAFE_ID.test(studentId) && member && member.active !== false);
+      const checked = await Promise.all(entries.map(async ([studentId, member]) => {
+        const profile = (await db.ref("b3Games/students/" + studentId + "/profile").once("value")).val();
+        if (!profile || profile.active === false) return null;
+        return String(profile.name || member.name || "").trim() || null;
+      }));
+      const students = checked.filter(Boolean).sort((a, b) => a.localeCompare(b));
       return { id, name: String(cls.name || id), students };
     }));
     const classes = rows.filter(Boolean);
