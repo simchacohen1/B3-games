@@ -27,9 +27,9 @@
 
   // Expose the pure helpers for regression tests and diagnostics.
     function applyChoice(current, actor, choiceIndex, correctIndex, now = Date.now()) {
-    if (!canAnswerChoice(current, actor)) return null;
+    if (!canAnswerChoice(current, actor)) return undefined;
     const team = teamFor(actor, current);
-    if (current.teamMode && !team) return null;
+    if (current.teamMode && !team) return undefined;
     const correct = Number(choiceIndex) === Number(correctIndex);
     const next = { ...current };
     if (current.teamMode) {
@@ -250,7 +250,7 @@
       if(data.answerState){
         document.getElementById("answerFeedback").textContent=data.answerState.outcome==="correct"?"Correct! Points were added automatically.":(data.stealTeam?"Not quite. The other team may steal.":"Not quite. The answer is revealed.");
       }else if(choiceActor&&q?.choices?.length){
-        document.getElementById("answerFeedback").textContent=isHelper?"You are helping. Choose an answer for your team.":"Choose an answer, or ask one teammate to help.";
+        document.getElementById("answerFeedback").textContent=isHelper?"You are helping. Choose an answer for your team.":(data.stealTeam?"The other team missed. Choose an answer to steal.":"Choose an answer, or ask one teammate to help.");
         q.choices.forEach((choice,index)=>{
           const button=document.createElement("button");button.type="button";button.textContent=choice;
           button.addEventListener("click",()=>submitChoice(index));buttons.appendChild(button);
