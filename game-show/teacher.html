@@ -568,8 +568,9 @@ const TEACHER_PASSWORD = "class123";
 
 // Every teacher opens Game Show from their assigned class. Missing/invalid class
 // context fails closed instead of falling back to a shared ET/WT game.
-const GS_CLASS = (new URLSearchParams(location.search).get('class') || 'unassigned').trim();
-const CLASS_SPACE = /^[A-Za-z0-9_-]{1,100}$/.test(GS_CLASS);
+const REQUESTED_GS_CLASS = (new URLSearchParams(location.search).get('class') || 'unassigned').trim();
+const GS_CLASS = /^[A-Za-z0-9_-]{1,100}$/.test(REQUESTED_GS_CLASS) ? REQUESTED_GS_CLASS : 'unassigned';
+const CLASS_SPACE = true;
 
 function checkPassword() {
   if (CLASS_SPACE) return;
