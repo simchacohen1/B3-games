@@ -126,7 +126,7 @@
     return { ref: data.ref || ref, text };
   }
   function phrase(text) {
-    const words = text.replace(/[“”"]/g, "").split(/\s+/).filter(Boolean);
+    const words = text.replace(/[â€œâ€"]/g, "").split(/\s+/).filter(Boolean);
     return words.slice(0, Math.min(7, words.length)).join(" ");
   }
   function questionRecord(q, ans, choices, correctNumber) {
@@ -157,7 +157,7 @@
     const split = Math.min(9, Math.max(2, Math.floor(words.length * 0.55)));
     const lead = words.slice(0, split).join(" ");
     const answer = words.slice(split, split + 12).join(" ");
-    return answer ? { q: "Which words continue this statement: “" + lead + " …”?", answer } : null;
+    return answer ? { q: "Which words continue this statement: â€œ" + lead + " â€¦â€?", answer } : null;
   }
   function questionAndAnswer(source, topic) {
     const text = localizeText(source.text).replace(/\s+/g, " ").trim();
@@ -204,45 +204,46 @@
   }
 
   function kitzurQuestionAndAnswer(source, text) {
-    // These questions are for third graders: use one simple idea per prompt,
-    // familiar words, and short answers taken directly from the source.
-    const clean = value => String(value || "").replace(/\[[^\]]*\]/g, "").replace(/\s+/g, " ").trim().replace(/[;, ]+$/, "");
-    const short = value => clean(value).split(/\s+/).slice(0, 14).join(" ").replace(/[,:;]+$/, "");
-    let match;
-
-    match = text.match(/as soon as you awaken you should remember (the kindnesses of Hashem)/i);
-    if (match) return { q: "What should you remember when you wake up?", answer: match[1] + "." };
-
-    match = text.match(/while still in bed you should recite:\s*([^.!?]{8,180})/i);
-    if (match) return { q: "What prayer should you say while still in bed?", answer: short(match[1]) + "." };
-
-    match = text.match(/“?(bold as a leopard|light as an eagle|swift as a deer|strong as a lion)”?\s+means,?\s*([^.;]+)/i);
-    if (match) return { q: "What does being " + match[1] + " mean?", answer: short(match[2]) + "." };
-
-    match = text.match(/if you cannot ([^,.;]{4,100}),? you should (?:nevertheless )?([^,.;]{4,100})/i);
-    if (match) return { q: "If you cannot " + short(match[1]) + ", what should you do?", answer: short(match[2]) + "." };
-
-    match = text.match(/in the winter[^:]{0,100}:\s*[“"]([^”"]{8,140})[”"]/i);
-    if (match) return { q: "What excuse might make someone stay in bed on a cold winter morning?", answer: short(match[1]) + "." };
-
-    match = text.match(/however,? (?:even )?a blind person may recite them by heart/i);
-    if (match) return { q: "Who can say these words from memory?", answer: "A blind person." };
-
-    match = text.match(/the proper conclusion is:\s*[“"]([^”"]+)[”"]([^.]*)/i);
-    if (match) return { q: "Which words should you say at the end of this prayer?", answer: short(match[1]) + "." };
-
-    match = text.match(/(?:you should|a person should|one should)\s+([^,.;]{5,120})/i);
-    if (match) return { q: "What does this section teach?", answer: short(match[1]) + "." };
-
-    const sentence = (text.match(/[^.!?]{12,220}[.!?]/) || [text])[0].trim();
-    const words = sentence.replace(/[“”"]/g, "").split(/\s+/).filter(Boolean);
-    const splitAt = Math.min(8, Math.max(4, Math.ceil(words.length * 0.55)));
-    return { q: "What does this section teach?", answer: short(sentence) };
+    // Make clear, concrete prompts for third graders. Skip a seif if no
+    // specific question and short answer can be built safely from its text.
+    if (/i have set hashem before me always/i.test(text)) {
+      return { q: "What should we remember about Hashem?", answer: "Hashem is always with us." };
+    }
+    if (/as soon as you awaken you should remember the kindnesses of hashem/i.test(text)) {
+      return { q: "What should you remember when you wake up?", answer: "Thank Hashem for giving your soul back." };
+    }
+    if (/while still in bed you should recite:/i.test(text)) {
+      return { q: "What prayer do we say when we wake up?", answer: "Modeh Ani." };
+    }
+    if (/bold as a leopard[^.]*means,?\s*you should not be ashamed before people who mock you for worshipping hashem/i.test(text)) {
+      return { q: "What does it mean to be bold like a leopard?", answer: "Do what is right even if others laugh." };
+    }
+    if (/light as an eagle[^.]*close your eyes to prevent the seeing of evil/i.test(text)) {
+      return { q: "What does it mean to be light like an eagle?", answer: "Turn your eyes away from things you should not see." };
+    }
+    if (/swift as a deer[^.]*legs should run to do good things/i.test(text)) {
+      return { q: "What does it mean to be quick like a deer?", answer: "Hurry to do good things." };
+    }
+    if (/strong as a lion[^.]*true valor in serving the creator[^.]*heart/i.test(text)) {
+      return { q: "What does it mean to be strong like a lion?", answer: "Be strong in your heart to do what is right." };
+    }
+    if (/if you cannot rise at midnight/i.test(text)) {
+      return { q: "If you cannot get up at midnight, when should you get up?", answer: "Before daybreak." };
+    }
+    if (/how can you rise now so early in the morning when the weather is so cold/i.test(text)) {
+      return { q: "What excuse might make someone stay in bed on a cold day?", answer: "The weather is cold." };
+    }
+    if (/a blind person may recite them by heart/i.test(text)) {
+      return { q: "Who may say these words from memory?", answer: "A blind person." };
+    }
+    if (/the proper conclusion is:\s*[“"]blessed is the one who listens to prayer/i.test(text)) {
+      return { q: "Which words end this prayer?", answer: "Blessed is the One Who listens to prayer." };
+    }
+    return null;
   }
-
   function shortChoice(value) {
     const words = String(value || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
-    return words.length > 12 ? words.slice(0, 12).join(" ") + "…" : words.join(" ");
+    return words.length > 12 ? words.slice(0, 12).join(" ") + "â€¦" : words.join(" ");
   }
 
   function makeItems(sources, mode, topic, count, distractors) {
@@ -251,7 +252,7 @@
     const choiceSources = distractors && distractors.length ? distractors : sources;
     selected.forEach((source, index) => {
       const ref = source.displayRef || displayRef(source.ref);
-      const qa = questionAndAnswer(source, topic);
+      const qa = questionAndAnswer(source, topic);`r`n      if (!qa || !qa.q || !qa.answer || out.some(item => item.q === qa.q)) return;
       if (mode === "open") {
         out.push({ q: qa.q, ans: qa.answer });
       } else {
@@ -295,7 +296,7 @@
     const sourcePool = verseRows.slice();
     if (includeRashi) {
       for (const source of evenlyPick(verseRows, Math.min(verseRows.length, count))) {
-        status.textContent = "Checking Rashi for " + source.displayRef + "…";
+        status.textContent = "Checking Rashi for " + source.displayRef + "â€¦";
         try {
           const rashi = await getText("Rashi on " + source.ref);
           if (rashi.text) sourcePool.push({ ...rashi, displayRef: "Rashi on " + source.displayRef, isRashi: true });
@@ -324,7 +325,7 @@
     const siman = Number(form.siman.value);
     const from = Number(form.from.value), to = Number(form.to.value);
     if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to < from) throw new Error("Choose a valid se'if range.");
-    status.textContent = "Loading Kitzur Shulchan Aruch, Siman " + siman + "…";
+    status.textContent = "Loading Kitzur Shulchan Aruch, Siman " + siman + "â€¦";
     const seifim = await kitzurSeifim(siman);
     if (to > seifim.length) throw new Error("The selected se'if range does not exist in this siman.");
     const rows = [];
@@ -354,12 +355,12 @@
       '<fieldset class="sg-group"><legend>1. Choose the source</legend><div class="sg-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end">' +
       '<label>Source type<select id="sgType" class="select"><option value="chumash">Chumash</option><option value="halacha">Kitzur Shulchan Aruch</option></select></label>' +
       '<label>Sefer<select id="sgBook" class="select">' + bookNames.map(b => '<option value="' + b + '">' + books[b].label + '</option>').join("") + '</select></label>' +
-      '<label>Perek<select id="sgChapter" class="select"><option>Loading…</option></select></label>' +
-      '<label>First pasuk<select id="sgFrom" class="select"><option>Loading…</option></select></label>' +
-      '<label>Last pasuk<select id="sgTo" class="select"><option>Loading…</option></select></label>' +
+      '<label>Perek<select id="sgChapter" class="select"><option>Loadingâ€¦</option></select></label>' +
+      '<label>First pasuk<select id="sgFrom" class="select"><option>Loadingâ€¦</option></select></label>' +
+      '<label>Last pasuk<select id="sgTo" class="select"><option>Loadingâ€¦</option></select></label>' +
       '<label>Siman<select id="sgSiman" class="select">' + Array.from({length:221},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+'</option>').join("") + '</select></label>' +
-      '<label>First se’if<select id="sgSeifFrom" class="select"><option>Loading…</option></select></label>' +
-      '<label>Last se’if<select id="sgSeifTo" class="select"><option>Loading…</option></select></label>' +
+      '<label>First seâ€™if<select id="sgSeifFrom" class="select"><option>Loadingâ€¦</option></select></label>' +
+      '<label>Last seâ€™if<select id="sgSeifTo" class="select"><option>Loadingâ€¦</option></select></label>' +
       '</div></fieldset><fieldset class="sg-group"><legend>2. Choose question options</legend><div class="sg-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end">' +
       '<label>Number of questions<select id="sgCount" class="select">' + Array.from({length:33},(_,i)=>'<option value="' + (i+1) + '"' + (i===9?' selected':'') + '>' + (i+1) + '</option>').join("") + '</select></label>' +
       '<label><input id="sgRashi" type="checkbox"> Include Rashi</label>' +
@@ -395,7 +396,7 @@
       if (replace && !window.confirm("Replace all current questions with these " + items.length + " reviewed questions?")) return;
       const buttons = [...review.querySelectorAll(".sg-save-actions button")];
       buttons.forEach(button => { button.disabled = true; });
-      status.textContent = replace ? "Replacing the current question set…" : "Adding questions to the current set…";
+      status.textContent = replace ? "Replacing the current question setâ€¦" : "Adding questions to the current setâ€¦";
       try {
         const current = typeof window.getCurrentQuestionSet === "function" ? window.getCurrentQuestionSet() : [];
         const next = replace ? items : current.concat(items);
@@ -428,7 +429,7 @@
     const status = card.querySelector("#sgStatus");
     async function updateChapters() {
       try {
-        status.textContent = "Loading perek list from Sefaria…";
+        status.textContent = "Loading perek list from Sefariaâ€¦";
         const { chapters } = await getBookIndex(bookSelect.value);
         optionsFor(chapterSelect, Array.from({length:chapters},(_,i)=>i+1), 1);
         await updateVerses();
@@ -450,7 +451,7 @@
     const seifToSelect = card.querySelector("#sgSeifTo");
     async function updateSeifim() {
       seifFromSelect.disabled = seifToSelect.disabled = true;
-      status.textContent = "Loading Kitzur Siman " + simanSelect.value + "…";
+      status.textContent = "Loading Kitzur Siman " + simanSelect.value + "â€¦";
       try {
         const currentSiman = simanSelect.value;
         const seifim = await kitzurSeifim(Number(currentSiman));
@@ -458,9 +459,9 @@
         const values = Array.from({length:seifim.length},(_,i)=>i+1);
         optionsFor(seifFromSelect,values,1);
         optionsFor(seifToSelect,values,values.length);
-        status.textContent = "Siman " + currentSiman + " has " + values.length + " se’ifim.";
+        status.textContent = "Siman " + currentSiman + " has " + values.length + " seâ€™ifim.";
       } catch(error) {
-        status.textContent = error.message || "Could not load se’ifim.";
+        status.textContent = error.message || "Could not load seâ€™ifim.";
       } finally {
         seifFromSelect.disabled = seifToSelect.disabled = false;
       }
@@ -482,11 +483,11 @@
           rashi:card.querySelector("#sgRashi")
         },status,requestedCount) : await halachaSources({siman:simanSelect,from:seifFromSelect,to:seifToSelect},status,requestedCount);
         const topic = "";
-        const items = makeItems(sources, mode, topic, requestedCount, sources.distractors);
+        const items = makeItems(sources, mode, topic, requestedCount, sources.distractors);`r`n        if (!items.length) throw new Error("No clear, age-appropriate questions were found. Try another siman or a smaller seif range.");
         const list = review.querySelector("#sgQuestionList");
         list.replaceChildren(...items.map(item => window.createQuestionRow(item.q, item.ans, item.choices, item.correctIndex)));
         review.hidden = false;
-        status.textContent = items.length + " questions ready" + (type.value === "halacha" ? " (one per se’if, with no repeats)" : "") + ". Review them below; your current set is unchanged.";
+        status.textContent = items.length + " questions ready" + (type.value === "halacha" ? " (one per seâ€™if, with no repeats)" : "") + ". Review them below; your current set is unchanged.";
         review.scrollIntoView({ behavior: "smooth", block: "start" });
       } catch (error) {
         status.textContent = error.message || "Could not generate questions.";
