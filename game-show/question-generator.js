@@ -191,7 +191,9 @@
     const suffix = name.toLowerCase() === "hashem" && day ? " on " + day : "";
     if (verb === "appeared") {
       const target = clause.match(/^to\s+(.+?)(?:\s+by\s+|[,.]|$)/i);
-      if (target) return { q: "Who appeared to " + target[1] + "?", answer: name };
+      if (target && !/^(him|her|them|me|us|you|it|himself|herself|the man|the woman)$/i.test(target[1].trim())) return { q: "Who appeared to " + target[1] + "?", answer: name };
+      // Pronouns such as "him" have no clear referent when a pasuk stands alone.
+      return contentContinuation(text) || { q: "Which statement correctly describes this event?", answer: text };
     }
     if (verb === "called") {
       const called = clause.match(/^(?:the\s+)?(light|darkness)\s+([A-Z][A-Za-z]+)/i);
