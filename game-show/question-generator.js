@@ -149,6 +149,16 @@
     return day < 0 ? "" : labels[day];
   }
 
+  // Never quiz children on reference numbers. If a grammatical question cannot
+  // reliably be extracted, ask them to recognize the actual words of the text.
+  function contentContinuation(text) {
+    const words = String(text || "").split(/\s+/).filter(Boolean);
+    if (words.length < 4) return null;
+    const split = Math.min(9, Math.max(2, Math.floor(words.length * 0.55)));
+    const lead = words.slice(0, split).join(" ");
+    const answer = words.slice(split, split + 12).join(" ");
+    return answer ? { q: "Which words continue this statement: “" + lead + " …”?", answer } : null;
+  }
   function questionAndAnswer(source, topic) {
     const text = localizeText(source.text).replace(/\s+/g, " ").trim();
     const ref = source.displayRef || displayRef(source.ref);
@@ -169,13 +179,13 @@
     const match = text.match(new RegExp("(?:^|[;.!?]\\s*)(?:And\\s+)?" + subject + "\\s+(" + verbPattern + ")\\s+(.+)", "i"));
     if (!match) {
       const day = creationDay(source);
-      return { q: day ? "What happened on " + day + "?" : "What happened in " + ref + "?", answer: text };
+      return day ? { q: "What did Hashem create on " + day + "?", answer: text } : (contentContinuation(text) || { q: "Which statement correctly describes this event?", answer: text });
     }
 
     const name = match[1], verb = match[2].toLowerCase();
     let clause = match[3].split(/[;.!?]/)[0].trim();
     clause = clause.replace(/,\s+and\s+(?:Hashem|Moshe|Avraham|Yitzchak|Yaakov|Yosef|Aharon|Sarah|Rivkah|Leah|Rachel|Noach|Esav|Paroh)\b[\s\S]*$/i, "").trim();
-    if (!clause) return { q: "What happens in " + ref + "?", answer: text };
+    if (!clause) return contentContinuation(text) || { q: "Which statement correctly describes this event?", answer: text };
 
     const day = creationDay(source);
     const suffix = name.toLowerCase() === "hashem" && day ? " on " + day : "";
