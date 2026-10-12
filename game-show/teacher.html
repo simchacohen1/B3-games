@@ -1622,7 +1622,9 @@ function createQuestionRow(q, ans, choices, correctIndex) {
   div.className = 'editor-row';
   const choiceList = Array.isArray(choices) ? choices : [];
   const choiceText = choiceList.map(choice => escapeHtml(choice)).join('\n');
-  const correctNumber = Number.isInteger(Number(correctIndex)) && Number(correctIndex) >= 0 ? Number(correctIndex) + 1 : 1;
+  const correctNumber = choiceList.length
+    ? (Number.isInteger(Number(correctIndex)) && Number(correctIndex) >= 0 ? Number(correctIndex) + 1 : 1)
+    : '';
   div.innerHTML =
     '<label>Question</label>' +
     '<textarea class="row-q">' + escapeHtml(q || '') + '</textarea>' +
@@ -1723,7 +1725,7 @@ window.getCurrentQuestionSet = () => questions.map(item => ({ ...item }));
 window.saveQuestionSet = saveQuestionSet;
 </script>
 
-<script src="team-modes.js?v=20261012-1"></script>
+<script src="team-modes.js?v=20261012-2"></script>
 <script src="question-generator.js?v=20261012-11"></script>
 </body>
 </html>

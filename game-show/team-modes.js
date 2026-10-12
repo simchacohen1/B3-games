@@ -88,14 +88,7 @@
     const originalCreate=window.createQuestionRow;
     const originalSave=window.saveEditor;
     window.createQuestionRow=function(q,ans,choices,correctIndex){
-      const row=originalCreate(q||"",ans||"");
-      const list=Array.isArray(choices)?choices:[];
-      const label=document.createElement("label");label.textContent="Answer choices (one per line)";
-      const area=document.createElement("textarea");area.className="row-choices";area.value=list.join("\n");area.placeholder="Choice 1\nChoice 2\nChoice 3\nChoice 4";
-      const correctLabel=document.createElement("label");correctLabel.textContent="Correct choice number";
-      const correct=document.createElement("input");correct.type="number";correct.min="1";correct.max="8";correct.className="row-correct";correct.value=list.length?(Number(correctIndex)||0)+1:"";
-      row.append(label,area,correctLabel,correct);
-      return row;
+      return originalCreate(q||"",ans||"",choices,correctIndex);
     };
     window.renderEditor=function(data){
       const list=document.getElementById("editorList");list.replaceChildren();
