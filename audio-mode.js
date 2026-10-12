@@ -103,7 +103,7 @@
     if(/\/chazara\//i.test(url))return ["chazara","Choose the pasuk you learned and record your chazara."];
     if(/\/class-gallery\//i.test(url))return ["gallery","Explore your class gallery. Choose an activity or an item to open it."];
     if(/\/student-rewards\//i.test(url))return ["rewards","Check your points and rewards. Choose something to learn more about it."];
-    if(/\/game-show\//i.test(url))return ["gameshow","Listen for the question. Choose your answer when you are ready."];
+    if(/\/game-show\//i.test(url))return ["gameshow","Audio Mode is on. I will read each Game Show question and any answer choices aloud."];
     if(/\/gematria\//i.test(url))return ["gematria","Practice the number value of each Hebrew letter."];
     if(url==="/"||/\/index\.html$/i.test(url))return ["home","Welcome to Fun Torah Tools. Choose an activity to begin learning."];
     return ["activity","Listen to the instructions on this page. Choose an activity to begin."];
@@ -132,6 +132,21 @@
         return ["practice-question:"+q,"Question: "+q+". "+(options.length?"Choices: "+options.join(". "):"")];
       }
     }
+    if(/\/game-show\//i.test(path)){
+      const question=cleanText($("#qtext")?.textContent);
+      if(question&&visible($("#qtext"))){
+        const choiceRoot=$("#answerChoices")||$("#questionChoices")||$("#choices");
+        const choices=choiceRoot
+          ?Array.from(choiceRoot.querySelectorAll("button,[role='option'],li,.choice-option"))
+            .filter(visible).map(el=>cleanText(el.textContent)).filter(Boolean)
+          :Array.from(document.querySelectorAll("[data-answer-choice]"))
+            .filter(visible).map(el=>cleanText(el.textContent)).filter(Boolean);
+        const number=cleanText($("#qnum")?.textContent);
+        const key=[number,question,choices.join("|")].join(":");
+        return ["game-show-question:"+key,"Question: "+question+"."+
+          (choices.length?" The answer choices are: "+choices.map((choice,i)=>"Choice "+(i+1)+", "+choice).join(". ")+".":"")];
+      }
+    }
     if(/\/weekly-quiz\/index\.html/i.test(path)&&visible($("#quizCard"))){
       const q=cleanText($("#question")?.textContent);
       if(q)return ["weekly-question:"+q,"Question: "+q];
@@ -158,6 +173,10 @@
     if(context)lastContext=context[0];
   }
   function replay(){
+    if(/\/game-show\//i.test(location.pathname)){
+      const current=currentLearningText();
+      if(current){speak(current[1],{force:true});return;}
+    }
     const context=getContext();
     if(context)speak(context[1],{force:true});
   }
@@ -211,3 +230,4 @@
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});
   else init();
 })(window);
+
