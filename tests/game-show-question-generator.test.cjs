@@ -51,5 +51,5 @@ test("multiple choice refuses to fabricate distractor citations",()=>{
 
 test("source text is reduced to a short, readable excerpt for a choice question",()=>{
   const core=loadCore();
-  assert.equal(core.phrase("One <b>two</b> three four five six seven eight."),"One two three four five six seven");
+  assert.equal(core.phrase(core.cleanText("One <b>two</b> three four five six seven eight.")),"One two three four five six seven");
 });
