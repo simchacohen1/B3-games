@@ -236,6 +236,30 @@
       '<label>Question style<select id="sgMode" class="select"><option value="open">Open answer</option><option value="mc">Multiple choice</option></select></label>' +
       '</div><div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
       '<button class="btn btn-good" type="button" id="sgGenerate">Generate and review</button><span id="sgStatus" role="status" aria-live="polite"></span></div>';
+    const review = document.createElement("section");
+    review.id = "sgReview";
+    review.hidden = true;
+    review.style.cssText = "margin-top:18px;padding-top:16px;border-top:1px solid var(--line)";
+    review.innerHTML = '<h4 style="margin:0 0 6px;font-size:18px">Review generated questions</h4>' +
+      '<p class="hint">Edit or delete questions here. Save Questions replaces the current question set.</p>' +
+      '<div id="sgQuestionList"></div>' +
+      '<button class="btn btn-primary" type="button" id="sgSave">Save Questions</button>';
+    card.appendChild(review);
+    card.querySelector("#sgSave").addEventListener("click", () => {
+      const rows = [...review.querySelectorAll("#sgQuestionList > .editor-row")];
+      const items = rows.map(row => ({
+        q: row.querySelector(".row-q").value.trim(),
+        ans: row.querySelector(".row-ans").value.trim()
+      })).filter(item => item.q || item.ans);
+      if (!items.length) {
+        status.textContent = "Add at least one question before saving.";
+        return;
+      }
+      const editorList = document.getElementById("editorList");
+      editorList.replaceChildren(...items.map(item => window.createQuestionRow(item.q, item.ans)));
+      window.saveEditor();
+      status.textContent = "Saving " + items.length + " questions…";
+    });
     const setupGrid = setup.querySelector(".setup-grid");
     (setupGrid || setup).insertAdjacentElement("afterend", card);
     const type = card.querySelector("#sgType");
@@ -288,11 +312,11 @@
         },status,requestedCount) : await halachaSources({topic:card.querySelector("#sgTopic")},status,requestedCount);
         const topic = type.value === "halacha" ? card.querySelector("#sgTopic").value.trim() : "";
         const items = makeItems(sources, mode, topic, requestedCount, sources.distractors);
-        items.forEach(item => document.getElementById("editorList").appendChild(
-          window.createQuestionRow(item.q, item.ans, item.choices, item.correctIndex)
-        ));
-        status.textContent = items.length + " source-based questions added below. Edit or remove any item, then use Save Questions.";
-        document.getElementById("editorList").scrollIntoView({ behavior: "smooth", block: "start" });
+        const list = review.querySelector("#sgQuestionList");
+        list.replaceChildren(...items.map(item => window.createQuestionRow(item.q, item.ans, item.choices, item.correctIndex)));
+        review.hidden = false;
+        status.textContent = items.length + " source-based questions are ready to review below.";
+        review.scrollIntoView({ behavior: "smooth", block: "start" });
       } catch (error) {
         status.textContent = error.message || "Could not generate questions.";
       } finally { button.disabled = false; }
