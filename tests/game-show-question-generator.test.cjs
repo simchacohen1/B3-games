@@ -38,9 +38,9 @@ test("multiple-choice answers point to one of the verified references",()=>{
   assert.equal(items.length,4);
   for(const [index,item] of items.entries()){
     assert.equal(item.choices.length,4);
-    assert.equal(item.choices[item.correctIndex],core.localizeText(core.phrase(sources[index].text)));
+    assert.equal(item.choices[item.correctIndex],core.localizeText(core.shortChoice(core.questionAndAnswer(sources[index],"").answer)));
     assert.match(item.ans,new RegExp("Source: Bereishis 18:"+(index+1)));
-    assert.ok(item.choices.every(choice=>sources.some(s=>core.localizeText(core.phrase(s.text))===choice)));
+    assert.ok(item.choices.every(choice=>sources.some(s=>core.localizeText(core.shortChoice(core.questionAndAnswer(s,"").answer))===choice)));
   }
 });
 
@@ -50,6 +50,20 @@ test("saving a reviewed multiple-choice question preserves wrong answers and the
     JSON.parse(JSON.stringify(core.questionRecord(" Which detail? "," Correct source text ",["Wrong one","Correct source text","Wrong three","Wrong four"],2))),
     {q:"Which detail?",ans:"Correct source text",choices:["Wrong one","Correct source text","Wrong three","Wrong four"],correctIndex:1}
   );
+});
+
+test("Bereishis 1:4 asks a comprehension question instead of spotting a phrase",()=>{
+  const core=loadCore();
+  const sources=[
+    {ref:"Genesis 1:1",text:"In the beginning God created the heaven and the earth."},
+    {ref:"Genesis 1:2",text:"And the earth was without form, and void."},
+    {ref:"Genesis 1:3",text:"And God said, Let there be light."},
+    {ref:"Genesis 1:4",displayRef:"Bereishis 1:4",text:"And God saw the light, that it was good; and God divided the light from the darkness."}
+  ];
+  const item=core.makeItems([sources[3]],"mc","",1,sources)[0];
+  assert.equal(item.q,"What did Hashem see?");
+  assert.equal(item.choices[item.correctIndex],"the light, that it was good");
+  assert.doesNotMatch(item.q,/which phrase appears/i);
 });
 
 test("multiple choice refuses to fabricate distractor citations",()=>{
