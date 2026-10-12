@@ -3794,7 +3794,7 @@ function renderComprehensionQuestionUI(){
   const caption = document.getElementById('comprehensionRecordCaption');
   const allAnswered = comprehensionQuestions.length > 0 &&
     comprehensionQuestions.every((_, i) => comprehensionQResults[i] && comprehensionQResults[i].verdict === 'correct');
-  const micStage=document.querySelector('.record-stage');
+  const micStage=document.getElementById('comprehensionRecordCaption')?.closest('.record-stage');
   if(micStage) micStage.classList.toggle('hidden', comprehensionMode === 'questions');
 
   if(comprehensionMode === 'freehand-only'){
@@ -3826,7 +3826,7 @@ function renderComprehensionQuestionUI(){
     'Question ' + (comprehensionQIndex + 1) + ' of ' + total + '  ' + questionProgressDots();
   document.getElementById('questionText').textContent = current ? current.question : '';
   renderQuestionWordChoices(current, comprehensionQResults[comprehensionQIndex]);
-  caption.textContent = '🎙️ Tap • wait for clear question • answer • stay quiet to finish';
+  caption.textContent = 'Tap all the Hebrew words that answer the question.';
 
   navRow.classList.toggle('hidden', total <= 1 && !allAnswered);
   document.getElementById('questionPrevBtn').disabled = (comprehensionQIndex === 0);
@@ -4654,6 +4654,7 @@ async function gradeCurrentQuestionAnswer(){
     renderQuestionWordChoices(current,null);
     return;
   }
+  void speakText('Great job! You found the right words!');
   comprehensionQResults[idx]={tries:questionTryCounts[idx],verdict:'correct',feedback:'You found the right words!',transcript:picked,selectionIndices:selected,saving:true};
   renderQuestionResult(idx,'correct',comprehensionQResults[idx].feedback,picked);
   document.getElementById('comprehensionStatus').textContent='Correct!';
