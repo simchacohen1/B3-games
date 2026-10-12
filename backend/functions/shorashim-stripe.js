@@ -59,8 +59,8 @@ async function identityFromRequest(req) {
     throw Object.assign(new Error('Use your verified teacher Google account.'), { status: 403 });
   }
   const email = String(identity.email || '').toLowerCase();
-  const [ownerAdmin, adminRecord, teacher] = await Promise.all([
-    Promise.resolve(email === 'simcha5770@gmail.com'),
+  const ownerAdmin = email === 'simcha5770@gmail.com';
+  const [adminRecord, teacher] = await Promise.all([
     db().ref('b3Games/admins/' + identity.uid).get(),
     db().ref('b3Games/workspaces/' + workspaceId + '/teachers/' + identity.uid).get()
   ]);
@@ -200,15 +200,21 @@ async function applySubscription(subscription, eventId) {
   const privatePath = 'b3Private/stripeSubscriptions/' + subscription.id;
   const savedSnap = await db().ref(privatePath).get();
   let saved = savedSnap.val() || {};
-  const teacherSnap = await db().ref('b3Games/workspaces/' + workspaceId + '/teachers/' + teacherUid).get();
+  const [teacherSnap, adminSnap, authUser] = await Promise.all([
+    db().ref('b3Games/workspaces/' + workspaceId + '/teachers/' + teacherUid).get(),
+    db().ref('b3Games/admins/' + teacherUid).get(),
+    admin.auth().getUser(teacherUid).catch(() => null)
+  ]);
   const teacher = teacherSnap.val();
-  const adminSnap = await db().ref('b3Games/admins/' + teacherUid).get();
-  const authorized = teacher?.active === true || adminSnap.exists() || teacherUid === 'owner';
+  const adminData = adminSnap.val();
+  const ownerAdmin = String(authUser?.email || '').toLowerCase() === 'simcha5770@gmail.com';
+  const adminOk = adminData && adminData.active !== false;
+  const authorized = teacher?.active === true || adminOk || ownerAdmin;
   const clsRef = db().ref('b3Games/workspaces/' + workspaceId + '/classes/' + classId);
   const clsSnap = await clsRef.get();
   const cls = clsSnap.val();
   const stillAssigned = authorized && !!cls && cls.active !== false &&
-    (teacher?.classIds?.[classId] === true || adminSnap.exists());
+    (teacher?.classIds?.[classId] === true || adminOk || ownerAdmin);
   const isActive = stillAssigned && ['active', 'trialing'].includes(subscription.status);
   if (!saved.previousGrant && !saved.createdAt && cls) {
     saved.previousGrant = cls.toolGrants?.shorashim === true;
