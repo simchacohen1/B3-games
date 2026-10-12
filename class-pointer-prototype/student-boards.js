@@ -14,7 +14,7 @@
   const $=id=>document.getElementById(id),stage=$('stage'),isTeacher=B.isTeacher;
   const PALETTE=[['#1f2937','Black'],['#1d4ed8','Blue'],['#c62828','Red'],['#2e7d32','Green'],['#7b1fa2','Purple'],['#ef6c00','Orange']];
   const COLORS=PALETTE.map(item=>item[0]);
-  const SIZES=[[0.003,'Thin',5],[0.006,'Medium',9],[0.012,'Thick',14]];
+  const SIZES=[[0.003,'Thin',5],[0.006,'Medium',9],[0.012,'Thick',14],[0.03,'Color',22]];
   const SIZE_VALUES=SIZES.map(item=>item[0]);
   // Boards are 16:9. Points are 0..1 across and down the board. Line sizes are a fraction of the board width.
   const ASPECT=16/9,MAX_STROKES=400,MAX_POINTS=600,STEP=0.0015,ERASE=0.01,DRAFT_MS=80;
@@ -37,6 +37,47 @@
   function cleanStroke(s){
     if(!s||typeof s.id!=='string'||!/^[a-z0-9-]{2,40}$/i.test(s.id)||!COLORS.includes(s.color)||!SIZE_VALUES.includes(s.size)||!Array.isArray(s.points)||!s.points.length||s.points.length>MAX_POINTS||!s.points.every(validPoint))return null;
     return{id:s.id,color:s.color,size:s.size,points:s.points.map(p=>({x:round(p.x),y:round(p.y)}))};
+  }
+  // One teacher-owned activity is copied to every student's independent board.
+  // It is the locked background: boys draw on top but cannot erase or alter it.
+  const MAX_ACTIVITY_IMAGE=420000;
+  let activity=null,activityImage=null;
+  function cleanActivity(raw){
+    if(!raw||raw.kind==='blank')return null;
+    if(raw.kind==='word'&&typeof raw.text==='string'){
+      const text=raw.text.trim().slice(0,80),instruction=String(raw.instruction||'').trim().slice(0,120);
+      if(text)return{kind:'word',text,instruction};
+    }
+    if(raw.kind==='image'&&typeof raw.data==='string'&&raw.data.length<=MAX_ACTIVITY_IMAGE&&/^data:image\/jpeg;base64,[a-z0-9+/=]+$/i.test(raw.data))
+      return{kind:'image',data:raw.data};
+    return null;
+  }
+  function chooseActivity(next,done){
+    activity=cleanActivity(next);activityImage=null;
+    if(activity?.kind==='image'){
+      const img=new Image();
+      img.onload=()=>{if(activity?.data===img.src){activityImage=img;done()}};
+      img.onerror=()=>{if(activity?.data===img.src)done()};
+      img.src=activity.data;
+    }
+    done();
+  }
+  function paintActivity(ctx,w,h){
+    if(activity?.kind==='image'){
+      if(activityImage?.complete&&activityImage.naturalWidth)ctx.drawImage(activityImage,0,0,w,h);
+    }else if(activity?.kind==='word'){
+      const text=activity.text;
+      ctx.save();ctx.fillStyle='#172033';ctx.direction='rtl';ctx.textAlign='center';ctx.textBaseline='middle';
+      let size=Math.max(10,h*0.30);
+      ctx.font='700 '+size+'px Arial, sans-serif';
+      while(size>12&&ctx.measureText(text).width>w*0.86){size*=0.9;ctx.font='700 '+size+'px Arial, sans-serif'}
+      ctx.fillText(text,w/2,h*0.49,w*0.88);
+      if(activity.instruction){
+        ctx.fillStyle='#59667c';ctx.font='600 '+Math.max(9,h*0.064)+'px Arial, sans-serif';
+        ctx.fillText(activity.instruction,w/2,h*0.14,w*0.92);
+      }
+      ctx.restore();
+    }
   }
   function emptyBoard(){return{strokes:[],drafts:{student:null,teacher:null}}}
   // Student line ids start with "s", teacher line ids with "t". Each side may remove or clear only its own lines;
@@ -80,7 +121,7 @@
     const dpr=Math.min(window.devicePixelRatio||1,2),pw=Math.round(w*dpr),ph=Math.round(h*dpr);
     if(canvas.width!==pw||canvas.height!==ph){canvas.width=pw;canvas.height=ph}
     const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
-    ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);paintActivity(ctx,w,h);ctx.lineCap='round';ctx.lineJoin='round';
     for(const s of board.strokes)strokeOn(ctx,s,w,h);
     for(const s of [board.drafts.student,board.drafts.teacher,local])if(s)strokeOn(ctx,s,w,h);
   }
@@ -243,6 +284,7 @@
         const was=on,wasMode=mode,wasBlocked=blocked;
         on=message.on===true;mode=message.mode==='screens'?'screens':'boards';blocked=on&&message.blocked===true;
         if(!on||mode!=='screens'||blocked)stopShare(false);
+        chooseActivity(on&&mode==='boards'?message.activity:null,redraw);
         board=on&&mode==='boards'&&!blocked?boardFromMessage(message.strokes):emptyBoard();
         show(on);
         if(!on){if(was)B.status('Your teacher closed the boards. Back to the lesson.')}
@@ -277,6 +319,66 @@
   gridBar.append(el('strong','boards-title','🧑‍🎨 Students'),count,modes,el('span','boards-hint','Click a tile to open it · 🚫 pauses a student'),el('span','boards-spacer'),clearAll,
     button('✕ Close boards','Return everyone to the lesson. Whiteboards are kept until the class ends.',()=>setOn(false)));
 
+  // Teacher sends an identical, non-erasable activity background to all boys.
+  // Each student retains a private pen layer that only the teacher can see.
+  const activityBar=el('div','boards-activity-bar'),wordInput=el('input'),instructionInput=el('input'),activityLabel=el('span','boards-activity-label');
+  const imageFile=el('input');
+  imageFile.type='file';imageFile.accept='image/jpeg,image/png,image/webp,image/gif';imageFile.hidden=true;
+  wordInput.type='text';wordInput.dir='auto';wordInput.maxLength=80;wordInput.placeholder='Hebrew word or shoresh';wordInput.setAttribute('aria-label','Hebrew word or shoresh');
+  instructionInput.type='text';instructionInput.dir='auto';instructionInput.maxLength=120;instructionInput.placeholder='Instructions (optional)';instructionInput.setAttribute('aria-label','Activity instructions');
+  const sendWord=button('📤 Send word','Show this word on every student whiteboard',()=>{
+    const value=wordInput.value.trim();
+    if(!value){wordInput.focus();return}
+    sendActivity({kind:'word',text:value,instruction:instructionInput.value});
+  });
+  const sendImage=button('🖼 Coloring page','Upload a picture or coloring page for every student to color',()=>imageFile.click());
+  const removeActivity=button('✕ Blank boards','Remove the shared word or picture and clear the current drawings',()=>sendActivity(null));
+  activityBar.append(el('strong',null,'Send to all boards:'),wordInput,instructionInput,sendWord,sendImage,removeActivity,imageFile,activityLabel);
+  wordInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendWord.click()}});
+  imageFile.addEventListener('change',async()=>{
+    const file=imageFile.files?.[0];imageFile.value='';
+    if(!file)return;
+    if(!/^image\/(jpeg|png|webp|gif)$/.test(file.type)||file.size>8*1024*1024){B.fail('Please choose a JPG, PNG, WebP or GIF smaller than 8 MB.');return}
+    sendImage.disabled=true;activityLabel.textContent='Preparing picture…';
+    try{
+      const data=await pictureData(file);
+      if(!data)throw Error('Picture is too large to send to the class. Try a simpler or smaller image.');
+      sendActivity({kind:'image',data});
+    }catch(e){B.fail(e.message||'Could not load that picture.')}
+    finally{sendImage.disabled=false;updateActivityLabel()}
+  });
+
+  function pictureData(file){
+    return new Promise((resolve,reject)=>{
+      const url=URL.createObjectURL(file),img=new Image();
+      img.onload=()=>{
+        URL.revokeObjectURL(url);
+        try{
+          // Sending a reduced picture avoids high network usage for a class of 12.
+          // All boards have the same fixed 16:9 coordinates.
+          const c=document.createElement('canvas');c.width=1200;c.height=675;
+          const ctx=c.getContext('2d');
+          function draw(){
+            ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+            const scale=Math.min(c.width/img.width,c.height/img.height);
+            const w=img.width*scale,h=img.height*scale;
+            ctx.drawImage(img,(c.width-w)/2,(c.height-h)/2,w,h);
+          }
+          draw();let data=c.toDataURL('image/jpeg',0.76);
+          if(data.length>MAX_ACTIVITY_IMAGE){
+            c.width=900;c.height=506;draw();data=c.toDataURL('image/jpeg',0.55);
+          }
+          resolve(data.length<=MAX_ACTIVITY_IMAGE?data:null);
+        }catch(e){reject(e)}
+      };
+      img.onerror=()=>{URL.revokeObjectURL(url);reject(Error('This image could not be opened.'))};
+      img.src=url;
+    });
+  }
+  function updateActivityLabel(){
+    activityLabel.textContent=activity?.kind==='word'?'Showing: '+activity.text:activity?.kind==='image'?'Coloring page sent to all boys':'Blank boards';
+  }
+
   // Focus bar: one student large.
   const focusBar=el('div','boards-bar'),who=el('strong','boards-title'),drawGroup=el('span','boards-group');focusBar.hidden=true;
   const focusBlock=button('','',()=>{const m=focusMember();if(m)toggleBlock(m)});
@@ -295,7 +397,7 @@
     button('🗑 Clear board','Erase this whole board, including the student’s work',()=>{const m=focusMember();if(m&&confirm('Erase '+m.name+'’s whole board?'))act({type:'board-clear',all:true})},'danger'));
 
   const grid=el('div','boards-grid'),empty=el('p','boards-empty','No students have joined yet. Their tiles appear here as they join.');
-  view.append(gridBar,focusBar,grid,empty,focus);stage.appendChild(view);shield(view);
+  view.append(gridBar,activityBar,focusBar,grid,empty,focus);stage.appendChild(view);shield(view);
 
   const admitted=()=>Array.from(B.members().values()).filter(m=>m.admitted);
   // A board belongs to a student name, so a student who refreshes or rejoins gets his board (and block) back.
@@ -312,7 +414,7 @@
     if(!on){closeScreen(m);B.send(m.connection,{type:'board-mode',on:false});return}
     const paused=isBlocked(m);if(paused||mode!=='screens')closeScreen(m);
     const message={type:'board-mode',on:true,mode,blocked:paused};
-    if(mode==='boards'&&!paused){const b=boardFor(m);b.drafts={student:null,teacher:null};message.strokes=b.strokes}
+    if(mode==='boards'){message.activity=activity;if(!paused){const b=boardFor(m);b.drafts={student:null,teacher:null};message.strokes=b.strokes}}
     B.send(m.connection,message);
   }
 
@@ -383,11 +485,23 @@
   }
   function controls(){
     modeBoards.setAttribute('aria-pressed',String(mode==='boards'));modeScreens.setAttribute('aria-pressed',String(mode==='screens'));
-    clearAll.hidden=mode!=='boards';
+    clearAll.hidden=mode!=='boards';activityBar.hidden=mode!=='boards'||!!focusId;
+    updateActivityLabel();
+  }
+  function sendActivity(next){
+    if(!on||mode!=='boards')return;
+    const item=cleanActivity(next);
+    if(next&&!item){B.fail('Please enter a word or choose a valid picture.');return}
+    const hasWork=Array.from(boards.values()).some(b=>b.strokes.length);
+    if(hasWork&&!confirm('This will erase the boys\' current marks and start a new activity. Continue?'))return;
+    boards.clear();chooseActivity(item,dirtyAll);
+    for(const m of admitted())sendMode(m);
+    dirtyAll();updateActivityLabel();
+    B.status(item?.kind==='word'?'The word is on every boy\'s board. Their answers appear live.':item?.kind==='image'?'The coloring page is on every boy\'s board. Watch them color in real time.':'All boards are blank.');
   }
   function setFocus(id){
     drawer?.cancel();focusId=id&&B.members().get(id)?id:null;const m=focusMember();
-    focusBar.hidden=!m;gridBar.hidden=!!m;focus.hidden=!m;if(m)who.textContent=m.name+(mode==='screens'?'’s screen':'’s board');
+    focusBar.hidden=!m;gridBar.hidden=!!m;activityBar.hidden=!!m||mode!=='boards';focus.hidden=!m;if(m)who.textContent=m.name+(mode==='screens'?'’s screen':'’s board');
     if(!m)setVideo(screenVideo,null);
     controls();gridSize='';syncTiles();if(m)dirty(m.id);else dirtyAll();
   }
@@ -443,7 +557,7 @@
     studentLeft(m){closeScreen(m);if(m.boardKey&&boards.has(m.boardKey))boards.get(m.boardKey).drafts={student:null,teacher:null};if(on)syncTiles()},
     endClass(){
       drawer?.cancel();for(const m of B.members().values())closeScreen(m);
-      boards.clear();blocked.clear();mode='boards';controls();
+      boards.clear();blocked.clear();chooseActivity(null,dirtyAll);mode='boards';controls();
       for(const tile of tiles.values()){tile.video.srcObject=null;tile.node.remove()}tiles.clear();
       if(on){on=false;focusId=null;view.hidden=true}
       if(toggle){toggle.setAttribute('aria-pressed','false');toggle.textContent='🧑‍🎨 Student boards';toggle.disabled=true}
