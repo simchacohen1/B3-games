@@ -159,6 +159,7 @@
       } finally { button.disabled = false; }
     });
   }
+  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, phrase, cleanText });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", inject, { once: true });
   else inject();
 })();
