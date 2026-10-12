@@ -411,7 +411,7 @@ if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
 teacherPreview=true;myStudentId='teacher_preview';myName='Teacher Preview';masterBlocked=false;
 document.getElementById('signedInName').textContent='Teacher Preview - practice buzzer, no live game changes';applyMasterBlocked();
 if(!questions.length)questions=[{q:'How many days are in a week?'}];questionsReady=true;
-renderGameSnapshot({val:()=>({qIndex:0,hostSeenAt:Date.now(),scores:{'Teacher Preview':0}})});return;
+renderGameSnapshot({val:()=>({qIndex:0,roundActive:true,hostSeenAt:Date.now(),scores:{'Teacher Preview':0}})});return;
 }
   const savedId=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
   const savedName=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName');
