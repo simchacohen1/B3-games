@@ -264,7 +264,7 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-// A class other than B3's own (et/wt) plays its own separate game with its own questions.
+// Every class, including ET and WT, uses its own Game Show session and question set.
 const REQUESTED_GS_CLASS = (new URLSearchParams(location.search).get('class') || sessionStorage.getItem('b3Games_studentClass') || 'unassigned').trim();
 const GS_CLASS = /^[A-Za-z0-9_-]{1,100}$/.test(REQUESTED_GS_CLASS) ? REQUESTED_GS_CLASS : 'unassigned';
 const CLASS_SPACE = true;
