@@ -252,7 +252,8 @@
     const choiceSources = distractors && distractors.length ? distractors : sources;
     selected.forEach((source, index) => {
       const ref = source.displayRef || displayRef(source.ref);
-      const qa = questionAndAnswer(source, topic);`r`n      if (!qa || !qa.q || !qa.answer || out.some(item => item.q === qa.q)) return;
+      const qa = questionAndAnswer(source, topic);
+      if (!qa || !qa.q || !qa.answer || out.some(item => item.q === qa.q)) return;
       if (mode === "open") {
         out.push({ q: qa.q, ans: qa.answer });
       } else {
@@ -483,7 +484,8 @@
           rashi:card.querySelector("#sgRashi")
         },status,requestedCount) : await halachaSources({siman:simanSelect,from:seifFromSelect,to:seifToSelect},status,requestedCount);
         const topic = "";
-        const items = makeItems(sources, mode, topic, requestedCount, sources.distractors);`r`n        if (!items.length) throw new Error("No clear, age-appropriate questions were found. Try another siman or a smaller seif range.");
+        const items = makeItems(sources, mode, topic, requestedCount, sources.distractors);
+        if (!items.length) throw new Error("No clear, age-appropriate questions were found. Try another siman or a smaller seif range.");
         const list = review.querySelector("#sgQuestionList");
         list.replaceChildren(...items.map(item => window.createQuestionRow(item.q, item.ans, item.choices, item.correctIndex)));
         review.hidden = false;
