@@ -432,6 +432,7 @@
     type.addEventListener("change", () => {updateFields();if(type.value === "halacha")updateSeifim();});
     updateFields();
     updateChapters();
+    updateSeifim();
     card.querySelector("#sgGenerate").addEventListener("click", async () => {
       const button = card.querySelector("#sgGenerate"), status = card.querySelector("#sgStatus");
       button.disabled = true;
