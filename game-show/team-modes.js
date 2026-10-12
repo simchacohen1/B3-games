@@ -19,6 +19,8 @@
     return {A:teams.A.length?teams.A[qIndex%teams.A.length]:null,
             B:teams.B.length?teams.B[qIndex%teams.B.length]:null};
   }
+  // Expose the pure roster helpers for regression tests and diagnostics.
+  window.GameShowTeamModeLogic = { teamsFor, teamFor, contestantsFor };
   function questionAt(data) {
     return Array.isArray(questions) ? questions[Number(data?.qIndex)||0] : null;
   }
