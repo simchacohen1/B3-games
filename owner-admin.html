@@ -74,6 +74,7 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 <div id="ownerArea" class="hidden">
 <div class="notice"><strong>Owner level:</strong> Manage the Fun Torah Tools platform here. B3 is your first classroom. Work top to bottom: 1 → 4.</div>
 
+<section class="card" id="teacherRequestSection"><h2>Teacher approval requests</h2><p class="hint">Review new applicants. Approval creates a teacher invitation; assign a class separately before they can use classroom tools.</p><button type="button" id="refreshTeacherRequests">Refresh requests</button><div id="teacherRequestList" aria-live="polite">Press Refresh requests to load applications.</div></section>
 <section class="card"><div class="card-head"><div class="stepnum">1</div><h2>Teachers</h2></div>
 <p class="hint">Add a teacher by their Gmail. They can sign in with Google after you give them a class (step 3).</p>
 <div class="formrow"><input id="teacherEmail" placeholder="Teacher Gmail"><input id="teacherName" placeholder="Teacher name"><button id="addTeacher">Add teacher</button></div>
@@ -226,4 +227,33 @@ auth.onAuthStateChanged(async user=>{const owner=user&&String(user.email||"").to
 </script>
 <script>
 (function(){const t=document.getElementById("status");let timer;new MutationObserver(()=>{if(!t.textContent)return;t.classList.add("show");clearTimeout(timer);timer=setTimeout(()=>{t.classList.remove("show")},3800)}).observe(t,{childList:true,characterData:true,subtree:true})})();
-</script></body></html>
+</script><script>
+(function(){
+const API='https://us-central1-b3-games.cloudfunctions.net/funTorahTeacherRequests';
+const root=document.getElementById('teacherRequestList'),btn=document.getElementById('refreshTeacherRequests');
+if(!root||!btn)return;
+async function call(action,extra={}){
+ const user=firebase.auth().currentUser;
+ if(!user)throw Error('Please sign in as owner first.');
+ const token=await user.getIdToken();
+ const response=await fetch(API,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({action,...extra})});
+ const data=await response.json();if(!response.ok)throw Error(data.error||'Request failed');return data;
+}
+const esc=x=>{const el=document.createElement('div');el.textContent=String(x||'');return el.innerHTML};
+async function refresh(){
+ root.textContent='Loading…';try{
+ const data=await call('list');const requests=data.requests||[];
+ root.innerHTML=requests.length?requests.map(v=>'<div class="entry"><b>'+esc(v.name)+'</b><small>'+esc(v.email)+' — '+esc(v.school)+'</small><p>'+esc(v.purpose)+'</p><button data-request-uid="'+esc(v.uid)+'" data-decision="approve">Approve</button> <button class="danger" data-request-uid="'+esc(v.uid)+'" data-decision="reject">Reject</button></div>').join(''):'No pending teacher requests.';
+ }catch(error){root.textContent=error.message}
+}
+btn.onclick=refresh;
+root.addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-decision]');if(!button)return;
+ const decision=button.dataset.decision;
+ if(!confirm((decision==='approve'?'Approve':'Reject')+' this teacher request?'))return;
+ button.disabled=true;
+ try{await call('review',{uid:button.dataset.requestUid,decision});await refresh()}catch(error){root.textContent=error.message}
+});
+})();
+</script>
+</body></html>
