@@ -150,7 +150,9 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
     await teacher.evaluate(() => {
       const data = new DataTransfer();
       data.setData('text/plain', 'בראשית');
-      document.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+      const event = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', { value: data });
+      document.dispatchEvent(event);
     });
     const sent = await deliver(teacher, students);
     expect(sent.filter((e: any) => e.message?.activity?.text === 'בראשית')).toHaveLength(2);
@@ -206,7 +208,9 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
       const image = await new Promise<Blob>((resolve) => c.toBlob(b => resolve(b!), 'image/png'));
       const data = new DataTransfer();
       data.items.add(new File([image], 'clipboard.png', { type: 'image/png' }));
-      document.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+      const event = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', { value: data });
+      document.dispatchEvent(event);
     });
     await expect.poll(() => teacher.evaluate(() => (window as any).__out.filter((m: any) =>
       m.message?.activity?.kind === 'image').length)).toBeGreaterThanOrEqual(2);
