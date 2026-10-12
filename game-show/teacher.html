@@ -566,11 +566,11 @@
 const TEACHER_PASSWORD = "class123";
 // ------------------------------------------------------
 
-// Opened from a teacher's home page as ?class=<id>: any class other than B3's own
-// (et/wt) gets its own live game and its own questions, and its teacher signs in
-// with Google instead of the B3 password.
-const GS_CLASS = (new URLSearchParams(location.search).get('class') || '').trim();
-const CLASS_SPACE = /^[A-Za-z0-9_-]{1,100}$/.test(GS_CLASS) && !['et', 'wt'].includes(GS_CLASS);
+// Every teacher opens Game Show from their assigned class. Missing/invalid class
+// context fails closed instead of falling back to a shared ET/WT game.
+const REQUESTED_GS_CLASS = (new URLSearchParams(location.search).get('class') || 'unassigned').trim();
+const GS_CLASS = /^[A-Za-z0-9_-]{1,100}$/.test(REQUESTED_GS_CLASS) ? REQUESTED_GS_CLASS : 'unassigned';
+const CLASS_SPACE = true;
 
 function checkPassword() {
   if (CLASS_SPACE) return;
@@ -849,6 +849,24 @@ setRef.once('value').then(snap => {
     setRef.set({ title: ACTIVE_SET_TITLE, questions: flat }).then(() => {
       buildFromQuestions(flat);
       document.getElementById('soundStatus').textContent = 'Converted old question format automatically';
+    });
+  } else if (CLASS_SPACE && ['et', 'wt'].includes(GS_CLASS)) {
+    // Seed each original B3 class with its own copy of the previously shared
+    // question set; later edits stay isolated between the classes.
+    db.ref('questionSets/' + ACTIVE_SET_ID).once('value').then(legacySnap => {
+      const legacyQuestions = legacySnap.val()?.questions;
+      if (Array.isArray(legacyQuestions) && legacyQuestions.length) {
+        setRef.set({ title: ACTIVE_SET_TITLE, questions: legacyQuestions }).then(() => {
+          buildFromQuestions(legacyQuestions);
+          document.getElementById('soundStatus').textContent = 'Copied the existing questions into this class.';
+        });
+      } else {
+        buildFromQuestions([]);
+        document.getElementById('soundStatus').textContent = 'No questions yet. Add your own in the Setup tab.';
+      }
+    }).catch(() => {
+      buildFromQuestions([]);
+      document.getElementById('soundStatus').textContent = 'No questions yet. Add your own in the Setup tab.';
     });
   } else if (CLASS_SPACE) {
     // A new class starts with no questions; its teacher adds their own.
@@ -1620,6 +1638,8 @@ function saveEditor() {
 }
 </script>
 
+<script src="team-modes.js?v=20261012-1"></script>
+<script src="question-generator.js?v=20261012-1"></script>
 </body>
 </html>
 

@@ -135,7 +135,7 @@
     if(/\/game-show\//i.test(path)){
       const question=cleanText($("#qtext")?.textContent);
       if(question&&visible($("#qtext"))){
-        const choiceRoot=$("#answerChoices")||$("#questionChoices")||$("#choices");
+        const choiceRoot=$("#answerChoices")||$("#questionChoices")||$("#choices")||$("#choiceButtons");
         const choices=choiceRoot
           ?Array.from(choiceRoot.querySelectorAll("button,[role='option'],li,.choice-option"))
             .filter(visible).map(el=>cleanText(el.textContent)).filter(Boolean)

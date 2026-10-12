@@ -41,7 +41,7 @@
   // Audio Mode never makes a paid synthesis request.
   if (!document.querySelector('script[data-ftt-audio-mode]')) {
     var audioScript = document.createElement("script");
-    audioScript.src = new URL("audio-mode.js?v=20261011-audio-mode", rootBase).href;
+    audioScript.src = new URL("audio-mode.js?v=20261012-game-show-choices", rootBase).href;
     audioScript.defer = true;
     audioScript.setAttribute("data-ftt-audio-mode", "1");
     (document.head || document.documentElement).appendChild(audioScript);
