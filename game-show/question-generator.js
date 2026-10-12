@@ -40,21 +40,24 @@
     sources.forEach((source, index) => {
       const prompt = topic
         ? "According to " + source.ref + ", what does this halacha say about " + topic + "?"
-        : "What does " + source.ref + " say happened?";
+        : (source.isRashi ? "What does Rashi explain about " + source.ref.replace(/^Rashi on /, "") + "?" : "What does " + source.ref + " say happened?");
       if (mode === "open") {
         out.push({ q: prompt, ans: source.text + " (Source: " + source.ref + ")" });
       } else {
-        if (sources.length < 4) throw new Error("Multiple choice needs at least four verified source references. Expand the range or search for more sources.");
-        const options = [source.ref];
-        for (let offset = 1; offset < sources.length && options.length < 4; offset++) {
-          const candidate = sources[(index + offset) % sources.length].ref;
-          if (!options.includes(candidate)) options.push(candidate);
+        const optionRows = [];
+        for (let offset = 0; offset < sources.length && optionRows.length < 4; offset++) {
+          const candidate = sources[(index + offset) % sources.length];
+          const excerpt = phrase(candidate.text);
+          if (excerpt && !optionRows.some(row => row.excerpt === excerpt)) optionRows.push({ excerpt, ref: candidate.ref });
         }
+        if (optionRows.length < 4) throw new Error("Multiple choice needs four distinct source excerpts. Expand the range or search for more sources.");
+        const correctIndex = optionRows.findIndex(row => row.ref === source.ref);
+        if (correctIndex < 0) throw new Error("Could not match this question to its source. Please try again.");
         out.push({
-          q: "Which source contains the phrase “" + phrase(source.text) + "”?",
-          ans: source.ref,
-          choices: options,
-          correctIndex: options.indexOf(source.ref)
+          q: topic ? "Which phrase appears in a Sefaria source about " + topic + "?" : "Which phrase appears in " + source.ref + "?",
+          ans: source.text + " (Source: " + source.ref + ")",
+          choices: optionRows.map(row => row.excerpt),
+          correctIndex
         });
       }
     });
