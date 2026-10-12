@@ -152,6 +152,7 @@
   function questionAndAnswer(source, topic) {
     const text = localizeText(source.text).replace(/\s+/g, " ").trim();
     const ref = source.displayRef || displayRef(source.ref);
+    if (source.isKitzur) return { q: "What does Kitzur Shulchan Aruch teach in Siman " + source.siman + ", Se’if " + source.seif + "?", answer: text };
     if (topic) return { q: "What does this source say about " + topic + "?", answer: text };
     if (source.isRashi) return { q: "What does Rashi explain about this pasuk?", answer: text };
 
@@ -256,31 +257,37 @@
     selected.distractors = verseRows;
     return selected;
   }
+  const kitzurBook = "Kitzur Shulchan Arukh";
+  const kitzurCache = new Map();
+  async function kitzurSeifim(siman) {
+    if (!Number.isInteger(siman) || siman < 1 || siman > 221) throw new Error("Choose a valid Kitzur Shulchan Aruch siman.");
+    if (kitzurCache.has(siman)) return kitzurCache.get(siman);
+    const data = await sefariaJson(api + "/api/v3/texts/" + encodeURIComponent(kitzurBook + " " + siman) + "?version=english");
+    const version = (data?.versions || []).find(v => v.language === "en");
+    const raw = version?.text;
+    if (!Array.isArray(raw)) throw new Error("No English Kitzur Shulchan Aruch text is available for Siman " + siman + ".");
+    const seifim = raw.map(cleanText);
+    if (!seifim.some(Boolean)) throw new Error("No English se'if text is available for this siman.");
+    kitzurCache.set(siman, seifim);
+    return seifim;
+  }
   async function halachaSources(form, status, count) {
-    const topic = form.topic.value.trim();
-    if (topic.length < 2) throw new Error("Type a halacha topic, such as Shabbat or berachot.");
-    status.textContent = "Searching Sefaria for sources about " + topic + "…";
-    const response = await fetch(searchProxy, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ topic })
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error || "Sefaria search did not complete (HTTP " + response.status + ").");
-    }
-    const data = await response.json();
-    const refs = [...new Set(Array.isArray(data?.refs) ? data.refs : [])].slice(0, 33);
-    if (!refs.length) throw new Error("Sefaria found no source references for that topic. Try a different topic.");
+    const siman = Number(form.siman.value);
+    const from = Number(form.from.value), to = Number(form.to.value);
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to < from) throw new Error("Choose a valid se'if range.");
+    status.textContent = "Loading Kitzur Shulchan Aruch, Siman " + siman + "…";
+    const seifim = await kitzurSeifim(siman);
+    if (to > seifim.length) throw new Error("The selected se'if range does not exist in this siman.");
     const rows = [];
-    for (const ref of refs) {
-      try { rows.push(await getText(ref)); } catch (_) {}
-      status.textContent = "Checking Sefaria source " + rows.length + "…";
-      if (rows.length >= count && rows.length >= 4) break;
+    for (let seif = from; seif <= to; seif++) {
+      if (!seifim[seif-1]) continue;
+      const ref = kitzurBook + " " + siman + ":" + seif;
+      rows.push({ref, displayRef:"Kitzur Shulchan Aruch " + siman + ":" + seif, text:seifim[seif-1], siman, seif, isKitzur:true});
     }
-    if (!rows.length) throw new Error("Sefaria returned references without an English source text.");
-    rows.forEach(row => { row.displayRef = displayRef(row.ref); });
-    return rows;
+    if (!rows.length) throw new Error("No English text was found in the selected se'ifim.");
+    const selected = distribute(rows, count);
+    selected.distractors = rows;
+    return selected;
   }
   function inject() {
     const setup = document.getElementById("tabSetup");
@@ -296,12 +303,14 @@
     card.innerHTML = '<h3>Build a question set from Sefaria</h3>' +
       '<p class="hint">Choose a source and range. Review the drafts, then add them to your current questions or replace the set.</p>' +
       '<fieldset class="sg-group"><legend>1. Choose the source</legend><div class="sg-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end">' +
-      '<label>Source type<select id="sgType" class="select"><option value="chumash">Chumash</option><option value="halacha">Halacha topic</option></select></label>' +
+      '<label>Source type<select id="sgType" class="select"><option value="chumash">Chumash</option><option value="halacha">Kitzur Shulchan Aruch</option></select></label>' +
       '<label>Sefer<select id="sgBook" class="select">' + bookNames.map(b => '<option value="' + b + '">' + books[b].label + '</option>').join("") + '</select></label>' +
       '<label>Perek<select id="sgChapter" class="select"><option>Loading…</option></select></label>' +
       '<label>First pasuk<select id="sgFrom" class="select"><option>Loading…</option></select></label>' +
       '<label>Last pasuk<select id="sgTo" class="select"><option>Loading…</option></select></label>' +
-      '<label>Halacha topic<input id="sgTopic" class="input" type="search" placeholder="e.g. Shabbat"></label>' +
+      '<label>Siman<select id="sgSiman" class="select">' + Array.from({length:221},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+'</option>').join("") + '</select></label>' +
+      '<label>First se’if<select id="sgSeifFrom" class="select"><option>Loading…</option></select></label>' +
+      '<label>Last se’if<select id="sgSeifTo" class="select"><option>Loading…</option></select></label>' +
       '</div></fieldset><fieldset class="sg-group"><legend>2. Choose question options</legend><div class="sg-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end">' +
       '<label>Number of questions<select id="sgCount" class="select">' + Array.from({length:33},(_,i)=>'<option value="' + (i+1) + '"' + (i===9?' selected':'') + '>' + (i+1) + '</option>').join("") + '</select></label>' +
       '<label><input id="sgRashi" type="checkbox"> Include Rashi</label>' +
@@ -360,7 +369,7 @@
       card.querySelector("#sgChapter").parentElement.hidden = halacha;
       card.querySelector("#sgFrom").parentElement.hidden = halacha;
       card.querySelector("#sgTo").parentElement.hidden = halacha;
-      card.querySelector("#sgTopic").parentElement.hidden = !halacha;
+      ["#sgSiman","#sgSeifFrom","#sgSeifTo"].forEach(id => { card.querySelector(id).parentElement.hidden = !halacha; });
       card.querySelector("#sgRashi").parentElement.hidden = halacha;
     };
     const bookSelect = card.querySelector("#sgBook");
@@ -387,7 +396,28 @@
     }
     bookSelect.addEventListener("change", updateChapters);
     chapterSelect.addEventListener("change", updateVerses);
-    type.addEventListener("change", updateFields);
+    const simanSelect = card.querySelector("#sgSiman");
+    const seifFromSelect = card.querySelector("#sgSeifFrom");
+    const seifToSelect = card.querySelector("#sgSeifTo");
+    async function updateSeifim() {
+      seifFromSelect.disabled = seifToSelect.disabled = true;
+      status.textContent = "Loading Kitzur Siman " + simanSelect.value + "…";
+      try {
+        const currentSiman = simanSelect.value;
+        const seifim = await kitzurSeifim(Number(currentSiman));
+        if (currentSiman !== simanSelect.value) return;
+        const values = Array.from({length:seifim.length},(_,i)=>i+1);
+        optionsFor(seifFromSelect,values,1);
+        optionsFor(seifToSelect,values,values.length);
+        status.textContent = "Siman " + currentSiman + " has " + values.length + " se’ifim.";
+      } catch(error) {
+        status.textContent = error.message || "Could not load se’ifim.";
+      } finally {
+        seifFromSelect.disabled = seifToSelect.disabled = false;
+      }
+    }
+    simanSelect.addEventListener("change",updateSeifim);
+    type.addEventListener("change", () => {updateFields();if(type.value === "halacha")updateSeifim();});
     updateFields();
     updateChapters();
     card.querySelector("#sgGenerate").addEventListener("click", async () => {
@@ -400,8 +430,8 @@
           book:card.querySelector("#sgBook"),chapter:card.querySelector("#sgChapter"),
           from:card.querySelector("#sgFrom"),to:card.querySelector("#sgTo"),
           rashi:card.querySelector("#sgRashi")
-        },status,requestedCount) : await halachaSources({topic:card.querySelector("#sgTopic")},status,requestedCount);
-        const topic = type.value === "halacha" ? card.querySelector("#sgTopic").value.trim() : "";
+        },status,requestedCount) : await halachaSources({siman:simanSelect,from:seifFromSelect,to:seifToSelect},status,requestedCount);
+        const topic = "";
         const items = makeItems(sources, mode, topic, requestedCount, sources.distractors);
         const list = review.querySelector("#sgQuestionList");
         list.replaceChildren(...items.map(item => window.createQuestionRow(item.q, item.ans, item.choices, item.correctIndex)));
