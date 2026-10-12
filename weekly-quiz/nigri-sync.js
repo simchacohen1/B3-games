@@ -76,6 +76,13 @@
   }
   function relatedToBase(lid, baseId) {
     if (lid === baseId) return true;
+    // Separate sittings of the same saved quiz belong to one results group.
+    // Require the same class AND the same questions to avoid merging
+    // different revisions or unrelated tests.
+    const candidate = allLaunches[lid] || {}, baseQuiz = allLaunches[baseId] || {};
+    if (candidate.classId === baseQuiz.classId && candidate.quizId && baseQuiz.quizId &&
+        candidate.quizId === baseQuiz.quizId &&
+        JSON.stringify(questionsOf(candidate)) === JSON.stringify(questionsOf(baseQuiz))) return true;
     let cur = lid, guard = 0;
     while (guard++ < 10) {
       const l = allLaunches[cur] || {}, parent = l.retakeOf || l.makeupOf;
