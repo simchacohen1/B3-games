@@ -93,6 +93,18 @@
       if (!response.ok) throw new Error("HTTP " + response.status);
       const html = await response.text();
       const documentCopy = new DOMParser().parseFromString(html, "text/html");
+      // The owner and teacher/class/tool grants have already been verified above.
+      // The live student game-gate cannot resolve the correct teacher/class from
+      // an about:srcdoc preview URL and can cover the tool with a permanent lock.
+      // Remove that gate ONLY from this guarded, read-only iframe copy. The live
+      // HTML and its access checks are not changed.
+      const gatePath = new URL("game-gate.js", root).pathname;
+      documentCopy.querySelectorAll("script[src]").forEach(script => {
+        try {
+          const src = new URL(script.getAttribute("src"), selected);
+          if (src.origin === root.origin && src.pathname === gatePath) script.remove();
+        } catch (_) {}
+      });
       const base = documentCopy.createElement("base");
       base.href = selected.href;
       documentCopy.head.prepend(base);
