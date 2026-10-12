@@ -47,7 +47,7 @@
   dock.addEventListener('click',event=>{
     const b=event.target.closest('button');if(!b||!dock.contains(b))return;
     if(b.dataset.mode==='point')setSource(toolSel,lastShape);
-    else if(['highlight','box','pen'].includes(b.dataset.mode))setSource(toolSel,b.dataset.mode);
+    else if(['highlight','box','pen','eraser'].includes(b.dataset.mode))setSource(toolSel,b.dataset.mode);
     else if(b.dataset.shape){lastShape=b.dataset.shape;setSource(toolSel,lastShape);closeMenus()}
     else if(b.hasAttribute('data-color'))setSource(colorSel,b.dataset.color);
     else if(b.dataset.size){setSource(sizeSel,b.dataset.size);if(!window.ClassPointerCore.highlightTools.includes(toolSel.value))setSource(toolSel,'highlight')}
@@ -62,7 +62,7 @@
   document.addEventListener('keydown',event=>{
     if(dock.hidden||event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.('input,select,textarea'))return;
     const k=event.key.toLowerCase();
-    if(k==='p')setSource(toolSel,lastShape);else if(k==='h')setSource(toolSel,'highlight');else if(k==='b')setSource(toolSel,'box');else if(k==='d')setSource(toolSel,'pen');else if(k==='u'){$(studentView?'undoStudentHighlight':'undoTeacherHighlight').click()}else return;
+    if(k==='p')setSource(toolSel,lastShape);else if(k==='h')setSource(toolSel,'highlight');else if(k==='b')setSource(toolSel,'box');else if(k==='d')setSource(toolSel,'pen');else if(k==='e'&&!studentView)setSource(toolSel,'eraser');else if(k==='u'){$(studentView?'undoStudentHighlight':'undoTeacherHighlight').click()}else return;
     sync();
   });
 
@@ -121,10 +121,10 @@
     dock.hidden=!teacher;document.body.classList.toggle(studentView?'student-dock-view':'teacher-view',teacher);
     if(!teacher)return;
     place();
-    const tool=toolSel.value,highlight=window.ClassPointerCore.highlightTools.includes(tool);
+    const tool=toolSel.value,highlight=window.ClassPointerCore.highlightTools.includes(tool),erasing=tool==='eraser';
     if(!highlight)lastShape=tool;
     $('tbPointIcon').textContent=icons[lastShape]||'◎';
-    dock.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===(highlight?tool:'point'))));
+    dock.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===((highlight||erasing)?tool:'point'))));
     dock.querySelectorAll('[data-shape]').forEach(b=>b.classList.toggle('active',b.dataset.shape===lastShape));
     dock.querySelectorAll('[data-color]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.color===colorSel.value)));
     dock.querySelectorAll('[data-size]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.size===sizeSel.value)));
