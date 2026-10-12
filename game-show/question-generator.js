@@ -314,7 +314,7 @@
       '</div></fieldset><fieldset class="sg-group"><legend>2. Choose question options</legend><div class="sg-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end">' +
       '<label>Number of questions<select id="sgCount" class="select">' + Array.from({length:33},(_,i)=>'<option value="' + (i+1) + '"' + (i===9?' selected':'') + '>' + (i+1) + '</option>').join("") + '</select></label>' +
       '<label><input id="sgRashi" type="checkbox"> Include Rashi</label>' +
-      '<label>Question style<select id="sgMode" class="select"><option value="open">Open answer</option><option value="mc">Multiple choice</option></select></label>' +
+      '<label>Question style<select id="sgMode" class="select"><option value="mc">Multiple choice</option><option value="open">Open answer</option></select></label>' +
       '</div></fieldset><div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
       '<button class="btn btn-good" type="button" id="sgGenerate">Get questions to review</button><span id="sgStatus" role="status" aria-live="polite">Choose a source to begin.</span></div>';
     const review = document.createElement("section");
