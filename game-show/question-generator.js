@@ -142,7 +142,7 @@
 
     const subject = "(Hashem|Moshe|Avraham|Yitzchak|Yaakov|Yosef|Aharon|Sarah|Rivkah|Leah|Rachel|Noach|Esav|Paroh|Reuven|Shimon|Yehudah|Naftali|Gad|Asher|Yissachar|Zevulun|Binyamin|Ephraim|Menashe|Miriam|Yehoshua|Bilam|Lavan|Yisro)";
     const verbs = {
-      saw: "see", said: "say", spoke: "say", called: "call", divided: "separate",
+      saw: "see", said: "say", spoke: "say", appeared: "appear", called: "call", divided: "separate",
       separated: "separate", created: "create", made: "make", blessed: "bless",
       commanded: "command", took: "take", gave: "give", brought: "bring",
       asked: "ask", answered: "answer", found: "find", heard: "hear",
@@ -158,6 +158,10 @@
     clause = clause.replace(/,\\s+and\\s+(?:Hashem|Moshe|Avraham|Yitzchak|Yaakov|Yosef|Aharon|Sarah|Rivkah|Leah|Rachel|Noach|Esav|Paroh)\\b[\\s\\S]*$/i, "").trim();
     if (!clause) return { q: "What happens in this pasuk?", answer: text };
 
+    if (verb === "appeared") {
+      const target = clause.match(/^to\\s+(.+?)(?:\\s+by\\s+|[,.]|$)/i);
+      if (target) return { q: "Who appeared to " + target[1] + "?", answer: name };
+    }
     if (verb === "called") {
       const called = clause.match(/^(?:the\\s+)?(light|darkness)\\s+([A-Z][A-Za-z]+)/i);
       if (called) return { q: "What did " + name + " call the " + called[1].toLowerCase() + "?", answer: called[2] };
