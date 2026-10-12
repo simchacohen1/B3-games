@@ -46,7 +46,7 @@ exports.funTorahTeacherRequests=onRequest({region:'us-central1',cors:['https://s
     const inviteId=request.email.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
     const inviteRef=db.ref(ROOT+'/teacherInvites/'+inviteId);
     const old=(await inviteRef.once('value')).val();
-    if(!old||old.active===false)await inviteRef.update({email:request.email,name:request.name,role:'teacher',active:true,classIds:{},updatedAt:admin.database.ServerValue.TIMESTAMP});
+    if(!old)await inviteRef.update({email:request.email,name:request.name,role:'teacher',active:false,classIds:{},updatedAt:admin.database.ServerValue.TIMESTAMP});
    }
    return res.json({status:newStatus});
   }
