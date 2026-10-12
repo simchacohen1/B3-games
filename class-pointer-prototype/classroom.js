@@ -3,7 +3,7 @@ const C=window.ClassPointerCore,$=id=>document.getElementById(id);
 const room=new URL(location.href).searchParams.get('room'),isTeacher=!room;   const entry=new URL(location.href).searchParams.get('dashboard');
    if((isTeacher&&entry!=='teacher')||(!isTeacher&&entry!=='student')){document.body.innerHTML='<main style="padding:2rem;font:1rem system-ui">Open Class Pointer from Fun Torah Tools.</main>';throw Error('Class Pointer must be opened from the dashboard.')}
 const members=new Map();
-let peer=null,teacherConnection=null,screen=null,mediaCall=null,viewportController=null,state={sharing:false,mode:'nobody',members:[],points:{}},started=false,admitted=false,joining=false,joinTimer=null;
+let peer=null,teacherConnection=null,screen=null,mediaCall=null,viewportController=null,state={sharing:false,mode:'nobody',members:[],points:{}},started=false,openingClass=false,admitted=false,joining=false,joinTimer=null;
 let captureControl=null,tabScrollOn=false;
 let generation=0,colorIndex=0,pendingPoint=null,hoverTimer=null,lastHover=0;
 let navigating=false;
@@ -146,16 +146,26 @@ function makePeer(id){
   instance.on('disconnected',()=>{status('Connection service interrupted. Existing lesson connections may still work.');if(!instance.destroyed)instance.reconnect()});return instance;
 }
 async function startClass(){
-  clearError();$('startClass').disabled=true;status('Opening class…');
-  try{if(window.ClassPointerDashboard)await window.ClassPointerDashboard.ready}catch(error){$('startClass').disabled=false;fail(error.message);return}
-  peer=makePeer('class-pointer-'+crypto.randomUUID());if(!peer){$('startClass').disabled=false;return}
+  if(!isTeacher||started||openingClass)return;
+  openingClass=true;
+  const startButton=$('startClass');startButton.disabled=true;startButton.hidden=true;
+  clearError();status('Opening your classroom automatically…');
+  try{if(window.ClassPointerDashboard)await window.ClassPointerDashboard.ready}catch(error){
+    openingClass=false;startButton.disabled=false;startButton.hidden=false;
+    startButton.textContent='↻ Retry opening classroom';fail(error.message);return;
+  }
+  if(!openingClass)return;
+  peer=makePeer('class-pointer-'+crypto.randomUUID());if(!peer){
+    openingClass=false;startButton.disabled=false;startButton.hidden=false;startButton.textContent='↻ Retry opening classroom';return;
+  }
   const current=peer;
   joinTimer=setTimeout(()=>{if(peer===current&&!started){endClass();fail('The class could not connect. Try again or use another network.')}},20000);
   peer.on('open',async id=>{
     if(peer!==current)return;
     try{if(window.ClassPointerDashboard)await window.ClassPointerDashboard.publish(id)}catch(error){if(peer===current){endClass();fail('Could not open the lesson on student dashboards. '+error.message)}return}
-    if(peer!==current)return;clearTimeout(joinTimer);started=true;$('endClass').disabled=false;$('shareScreen').disabled=false;$('openBrowserTab').disabled=false;
-    const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status(window.ClassPointerDashboard?'Class open. Students click Class Pointer on Fun Torah Tools and join automatically.':'Class open. Send the join link. Students join automatically.');roster();
+    if(peer!==current)return;clearTimeout(joinTimer);started=true;openingClass=false;$('endClass').disabled=false;$('shareScreen').disabled=false;$('openBrowserTab').disabled=false;
+    $('startClass').hidden=true;
+    const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status('Class ready! Click Share teaching screen, or open another lesson. Students can join automatically.');roster();
   });
   peer.on('connection',receiveStudent);peer.on('call',call=>{if(!window.ClassPointerBoards?.incomingCall(call))call.close()});
 }
@@ -281,8 +291,8 @@ async function shareScreen(preferTab=false){
 }
 function endClass(){
   window.ClassPointerBoards?.endClass();window.ClassPointerPdf?.close(true);window.ClassPointerDashboard?.end().catch(()=>fail('Could not remove the dashboard lesson. Refresh before starting another class.'));
-  clearTimeout(joinTimer);started=false;stopSharing();for(const member of members.values()){send(member.connection,{type:'ended'});member.connection.close()}
-  members.clear();const oldPeer=peer;peer=null;oldPeer?.destroy();state={sharing:false,mode:'nobody',members:[],points:{}};$('accessMode').value='nobody';$('spotlight').checked=false;$('startClass').disabled=false;$('endClass').disabled=true;$('invitePanel').hidden=true;roster();status('Class ended. Start a new class for a new join link.');
+  clearTimeout(joinTimer);started=false;openingClass=false;stopSharing();for(const member of members.values()){send(member.connection,{type:'ended'});member.connection.close()}
+  members.clear();const oldPeer=peer;peer=null;oldPeer?.destroy();state={sharing:false,mode:'nobody',members:[],points:{}};$('accessMode').value='nobody';$('spotlight').checked=false;$('startClass').disabled=false;$('startClass').hidden=false;$('startClass').textContent='↻ Start another class';$('endClass').disabled=true;$('invitePanel').hidden=true;roster();status('Class ended. Click Start another class if you want to reopen it.');
 }
 function clearStudentVideo(){const oldCall=mediaCall;mediaCall=null;oldCall?.close();$('lesson').srcObject=null;$('placeholder').hidden=false;drawPointers()}
 function leaveClass(){
@@ -406,6 +416,10 @@ window.addEventListener('blur',()=>setNavigation(false));
 document.addEventListener('visibilitychange',()=>{if(document.hidden)setNavigation(false)});
 $('teacherPanel').hidden=!isTeacher;$('studentPanel').hidden=isTeacher;if(!isTeacher)status('Join your teacher’s class.');
 window.addEventListener('pagehide',()=>{if(isTeacher)endClass();else leaveClass()});
+// Open teacher classroom is the only start action needed. Wait for class-scoped
+// authorization in startClass, then establish and publish the session automatically.
+// Browser screen capture itself must still be initiated by an explicit user click.
+if(isTeacher)void startClass();
 if(!isTeacher&&new URL(location.href).searchParams.get('dashboard')==='student'){
   let saved=null;try{saved=window.ClassPointerDashboardCore.handoff(JSON.parse(sessionStorage.getItem('classPointerDashboardJoin')),room)}catch{}
   if(saved){$('studentName').value=C.cleanName(saved.name);$('studentName').readOnly=true;const welcome=document.createElement('p');welcome.textContent='Joining as '+$('studentName').value+'.';$('studentPanel').prepend(welcome);joinClass({preventDefault(){}})}

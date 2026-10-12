@@ -15,7 +15,7 @@
       }catch(error){reject(error)}
     });
   });
-  // Avoid an unhandled rejection while the teacher has not clicked Start class.
+  // startClass awaits this authorization automatically when Open teacher classroom is clicked; consume any rejection safely.
   ready.catch(()=>{});
   window.ClassPointerDashboard={ready,async publish(room){
     const current=++revision;
