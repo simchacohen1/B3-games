@@ -56,7 +56,9 @@
     "davening":["Davening Player","davening_student_app/index.html"],
     "class-pointer":["Class Pointer","class-pointer-prototype/dashboard.html?teacher=1"],
     "name-picker":["Name Picker","name-picker/index.html"],
-    "chavrusa":["Chavrusa of the Day","chavrusa/index.html"]
+    "chavrusa":["Chavrusa of the Day","chavrusa/index.html"],
+    "student-report":["Student Report","student-report/index.html"],
+    "manage-class":["Class Details",null]
   };
   const status = document.getElementById("status");
   const viewer = document.getElementById("viewer");
@@ -73,6 +75,7 @@
     viewer.style.display = "none";
   }
   function sameToolPath(url) {
+    if (!currentTool[1]) return false;
     const initial = new URL(currentTool[1], root);
     const folder = initial.pathname.slice(0, initial.pathname.lastIndexOf("/") + 1);
     return url.origin === location.origin &&
@@ -145,14 +148,24 @@
       const snap = await db.ref("b3Games/workspaces/" + (api.workspaceId || "b3-2026") + "/classes/" + classId).once("value");
       const cls = snap.val();
       if (!cls || cls.active === false) throw new Error("The class is not active.");
-      const permitted = cls.toolGrants?.[toolId] === true ||
+      const permitted = ["manage-class","student-report"].includes(toolId) || cls.toolGrants?.[toolId] === true ||
         (toolId === "daily-points" && cls.toolGrants?.["student-rewards"] === true);
       if (!permitted) throw new Error("This tool is not enabled for the selected teacher's class.");
       window.__B3_PREVIEW_CONTEXT = Object.freeze({
         verified:true,teacherName:teacher.name,classId,className:cls.name || classId
       });
       document.getElementById("heading").textContent = teacher.name + " · " + (cls.name || classId) + " · " + currentTool[0];
-      openToolPage(currentTool[1]);
+      if (toolId === "manage-class") {
+        const heading = document.createElement("h2");heading.textContent = "Class overview (read-only)";
+        const summary = document.createElement("p");summary.textContent = "Teacher: " + teacher.name + " · Class: " + (cls.name || classId);
+        const students = document.createElement("h3");students.textContent = "Assigned students";
+        const ul = document.createElement("ul");
+        Object.values(cls.members || {}).filter(m => m && m.active !== false).forEach(m => { const li=document.createElement("li");li.textContent=m.name || "Student";ul.append(li); });
+        const grants = document.createElement("p");
+        grants.textContent = "Enabled tools: " + (Object.entries(cls.toolGrants || {}).filter(([,on]) => on === true).map(([id]) => TOOLS[id]?.[0] || id).join(", ") || "None");
+        status.replaceChildren(heading,summary,students,ul,grants);
+        status.style.display = "block";viewer.style.display = "none";
+      } else openToolPage(currentTool[1]);
     } catch (error) {
       message(error.message || "The teacher preview couldn't be verified.");
     }
