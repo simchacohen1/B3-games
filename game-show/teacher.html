@@ -579,6 +579,7 @@ function checkPassword() {
     document.getElementById('lockOverlay').style.display = 'none';
     document.getElementById('mainContent').classList.remove('hidden');
     sessionStorage.setItem('teacherUnlocked', 'yes');
+    if (typeof closeRoundForTeacherSession === 'function') closeRoundForTeacherSession();
   } else {
     document.getElementById('lockError').textContent = 'Incorrect password - try again.';
   }
@@ -668,6 +669,11 @@ let serverOffset = 0;
 db.ref('.info/serverTimeOffset').on('value', snap => { serverOffset = Number(snap.val()) || 0; });
 function serverNow() { return Date.now() + serverOffset; }
 const gameRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/live' : "tentTrailTrivia");
+function closeRoundForTeacherSession() {
+  // Opening or refreshing the host console always puts students in the lobby;
+  // the teacher must explicitly start the first visible round.
+  gameRef.update({ roundActive: false, revealed: false, buzzedBy: null, buzzPool: null, buzzOpenAt: null, buzzUnlockAt: 0 }).catch(() => {});
+}
 // While this teacher screen is open and unlocked, tell student screens the game is live.
 // Students who open the Game Show when no teacher screen is open see a waiting message
 // instead of an old, finished game.
@@ -694,6 +700,7 @@ if (!CLASS_SPACE) {
       document.getElementById('lockOverlay').style.display = 'none';
       document.getElementById('mainContent').classList.remove('hidden');
       window.gameShowOwnerUnlocked = true;
+      closeRoundForTeacherSession();
     } else if (window.gameShowOwnerUnlocked) {
       document.getElementById('lockOverlay').style.display = '';
       document.getElementById('mainContent').classList.add('hidden');
@@ -721,6 +728,7 @@ if (CLASS_SPACE) {
     document.getElementById('lockGoogle').style.display = 'none';
     document.getElementById('lockOverlay').style.display = 'none';
     document.getElementById('mainContent').classList.remove('hidden');
+    closeRoundForTeacherSession();
   });
 }
 
