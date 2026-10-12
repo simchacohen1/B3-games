@@ -51,7 +51,10 @@
     #fttGalleryShareButton{position:fixed;right:18px;bottom:18px;z-index:2147479000;
       background:#1d5979;color:#fff;border:2px solid #fff;border-radius:999px;
       padding:12px 17px;box-shadow:0 5px 20px #0004;font:700 14px Arial,sans-serif;
-      cursor:pointer}#fttGalleryShareButton:focus-visible{outline:3px solid #facc15}
+      cursor:pointer}
+    /* Audio Mode also lives at the bottom right; keep both buttons tappable. */
+    body:has(#ftt-audio-mode) #fttGalleryShareButton{bottom:76px}
+    #fttGalleryShareButton:focus-visible{outline:3px solid #facc15}
     #fttGalleryShareDialog{width:min(580px,calc(100vw - 24px));max-height:92vh;
       overflow:auto;box-sizing:border-box;border:0;border-radius:16px;padding:23px;
       background:#fff;color:#1f2937;font:15px/1.45 Arial,sans-serif;
