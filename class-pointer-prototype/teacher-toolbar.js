@@ -7,6 +7,7 @@
   if(studentView){
     const copy=source('teacherDock').cloneNode(true);copy.id='studentDock';copy.setAttribute('aria-label','My lesson tools');
     copy.querySelector('.tb-toggle').closest('.tb-group').remove();
+    copy.querySelector('[data-mode="eraser"]')?.remove();
     copy.querySelector('#tbViewWrap').remove();copy.querySelector('#tbStudentsBtn').closest('.tb-menu-wrap').remove();
     const clear=copy.querySelector('#tbClearMenu');clear.replaceChildren();
     const clearButton=document.createElement('button');clearButton.type='button';clearButton.textContent='My drawings';clearButton.addEventListener('click',()=>source('clearStudentHighlights').click());clear.appendChild(clearButton);
