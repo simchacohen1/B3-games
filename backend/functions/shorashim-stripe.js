@@ -182,22 +182,6 @@ exports.createShorashimBillingPortal = onRequest(
   }
 );
 
-function verifySignature(rawBody, header, secret) {
-  const values = Object.fromEntries(String(header || '').split(',').map(part => {
-    const index = part.indexOf('=');
-    return index < 0 ? ['', ''] : [part.slice(0, index), part.slice(index + 1)];
-  }));
-  const timestamp = Number(values.t);
-  const signatures = String(header || '').split(',').filter(part => part.startsWith('v1=')).map(part => part.slice(3));
-  if (!Number.isFinite(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > 300 || !signatures.length) return false;
-  const expected = crypto.createHmac('sha256', secret).update(String(timestamp) + '.').update(rawBody).digest();
-  return signatures.some(value => {
-    if (!/^[a-f0-9]{64}$/i.test(value)) return false;
-    const actual = Buffer.from(value, 'hex');
-    return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
-  });
-}
-
 async function subscriptionForEvent(event, stripeEventObject) {
   if (event.type.startsWith('customer.subscription.')) return stripeEventObject;
   const session = stripeEventObject;
