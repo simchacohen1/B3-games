@@ -722,6 +722,41 @@ if (CLASS_SPACE) {
       return;
     }
     const admin = access && access.role === 'admin';
+    if (GS_CLASS === 'unassigned') {
+      const classesSnap = admin ? await db.ref('b3Games/workspaces/' + window.B3SiteSettings.workspaceId + '/classes').once('value') : null;
+      const rows = classesSnap ? (classesSnap.val() || {}) : {};
+      const classIds = admin ? Object.keys(rows).filter(id => rows[id] && rows[id].active !== false) : ((access && access.classIds) || []);
+      const available = classIds.filter(id => /^[A-Za-z0-9_-]{1,100}$/.test(id));
+      if (!available.length) { lockError.textContent = admin ? 'There are no active classes to open Game Show for.' : 'No class is assigned to this teacher account.'; return; }
+      const wrapper = document.createElement('div');
+      wrapper.id = 'gameShowClassChooser';
+      wrapper.style.cssText = 'display:grid;gap:12px;margin-top:14px';
+      const select = document.createElement('select');
+      select.id = 'gameShowClassSelect';
+      select.setAttribute('aria-label', 'Choose a class');
+      select.style.cssText = 'padding:12px;border-radius:10px;font-size:18px;width:100%';
+      available.forEach(id => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = rows[id]?.name || id;
+        select.appendChild(option);
+      });
+      const openButton = document.createElement('button');
+      openButton.type = 'button';
+      openButton.className = 'btn btn-primary';
+      openButton.textContent = 'Open Game Show for this class';
+      openButton.onclick = () => {
+        const url = new URL(location.href);
+        url.searchParams.set('class', select.value);
+        location.replace(url.toString());
+      };
+      wrapper.append(select, openButton);
+      document.getElementById('gameShowClassChooser')?.remove();
+      lockError.parentElement.appendChild(wrapper);
+      document.querySelector('#lockOverlay .lock-box > p').textContent = 'Choose which class will host the game.';
+      lockError.textContent = 'Select one of your active classes to continue.';
+      return;
+    }
     if (!admin && !((access && access.classIds) || []).includes(GS_CLASS)) { lockError.textContent = 'This class is not assigned to your teacher account.'; return; }
     const cls = (await db.ref('b3Games/workspaces/' + window.B3SiteSettings.workspaceId + '/classes/' + GS_CLASS).once('value')).val();
     if (!cls || cls.active === false || (!admin && !(cls.toolGrants && cls.toolGrants['game-show'] === true))) { lockError.textContent = 'Game Show is not turned on for this class. Ask the admin.'; return; }
