@@ -14,7 +14,7 @@ function loadTeamLogic() {
   const context = {
     window,
     location: { pathname: '/teacher.html' },
-    document: { querySelector: () => null },
+    document: { querySelector: () => ({ querySelectorAll: () => [] }) },
     gameRef: { on: () => {} }
   };
   vm.runInNewContext(teamSource, context, { filename: 'team-modes.js' });
