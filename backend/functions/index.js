@@ -1800,8 +1800,10 @@ QUESTION RULES:
 - Use simple, natural English suitable for an 8-year-old.
 - For Biblical proper names in the QUESTION and EXPECTED ANSWER, use the Frum/Ashkenazi classroom pronunciation spelling supplied by the application (for example Adam â†’ Odom). Do not change ordinary English words. â€œHashemâ€ is acceptable for a Divine name.
 
+WORD-SELECTION ANSWER KEY: For each question, return answerWordIndices: zero-based indexes into the supplied Hebrew verse split on whitespace. Include every exact Hebrew token needed to answer and no extra tokens. Punctuation-attached words count as one token. Omit a question if its answer is not explicitly represented by selectable words in this verse.
+
 OUTPUT: Return ONLY JSON, no markdown or commentary:
-{"items":[{"sourceFact":"one explicit fact from the accepted translation","question":"child-friendly question","expectedAnswer":"short direct answer supported by that fact"}]}
+{"items":[{"sourceFact":"one explicit fact from the accepted translation","question":"child-friendly question","expectedAnswer":"short direct answer supported by that fact","answerWordIndices":[0]}]}
 
 QUALITY CHECK BEFORE RETURNING: every item must be supported by the accepted translation; every meaningful explicit detail should be represented somewhere; remove duplicates; never invent a reason or identity.`;
 
@@ -1837,9 +1839,10 @@ items: {
                         properties: {
                           sourceFact: { type: "string" },
                           question: { type: "string" },
-                          expectedAnswer: { type: "string" }
+                          expectedAnswer: { type: "string" },
+                          answerWordIndices: { type: "array", items: { type: "integer", minimum: 0 } }
                         },
-                        required: ["sourceFact", "question", "expectedAnswer"],
+                        required: ["sourceFact", "question", "expectedAnswer", "answerWordIndices"],
                         additionalProperties: false
                       }
                     }
@@ -1883,8 +1886,10 @@ items: {
           sourceFact: String(item?.sourceFact || "").trim(),
           question: applyFrumBiblicalNames(String(item?.question || "").trim()),
           expectedAnswer: applyFrumBiblicalNames(String(item?.expectedAnswer || "").trim()),
+          answerWordIndices: Array.isArray(item?.answerWordIndices) ? item.answerWordIndices.map(Number).filter(Number.isInteger) : [],
         }))
-        .filter((item) => item.question && item.expectedAnswer)
+        .filter((item) => item.question && item.expectedAnswer && item.answerWordIndices.length &&
+          item.answerWordIndices.every((index) => index >= 0 && index < String(posukText || '').trim().split(/\s+/).filter(Boolean).length))
         .filter((item) => {
           const key = item.question.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
           if (!key || seen.has(key)) return false;
