@@ -61,7 +61,7 @@ test("Bereishis 1:4 asks a comprehension question instead of spotting a phrase",
     {ref:"Genesis 1:4",displayRef:"Bereishis 1:4",text:"And God saw the light, that it was good; and God divided the light from the darkness."}
   ];
   const item=core.makeItems([sources[3]],"mc","",1,sources)[0];
-  assert.equal(item.q,"What did Hashem see?");
+  assert.equal(item.q,"What did Hashem see on day one?");
   assert.equal(item.choices[item.correctIndex],"the light, that it was good");
   assert.doesNotMatch(item.q,/which phrase appears/i);
 });
