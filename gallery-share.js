@@ -14,6 +14,7 @@
   let ready = false, checking = false, busy = false, image = null, dialog = null, nextReadyCheck = 0;
   const source = (() => {
     const p = location.pathname.toLowerCase();
+    if (p.includes('sefer-hamitzvos')) return 'sefer-hamitzvos';
     if (p.includes('shorashim')) return 'shorashim';
     if (p.includes('halacha')) return 'halacha';
     if (p.includes('class-pointer')) return 'class-pointer';
@@ -122,15 +123,21 @@
     button.style.visibility = 'hidden';
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     try {
-      await loadCanvas();
-      const w = Math.min(window.innerWidth, 1400);
-      const h = Math.min(window.innerHeight, 900);
-      const canvas = await window.html2canvas(document.body, {
-        backgroundColor:'#ffffff', useCORS:true, logging:false,
-        x:window.scrollX, y:window.scrollY, width:w, height:h,
-        scale:Math.min(1.3, 1150 / Math.max(1, w)),
-        ignoreElements:el => !!el.closest?.('#fttGalleryShareButton,#fttGalleryShareDialog')
-      });
+      let canvas;
+      if (typeof window.FTTGalleryCaptureImage === 'function') {
+        // Activities with layered painting surfaces can supply the finished artwork.
+        canvas = await window.FTTGalleryCaptureImage();
+      } else {
+        await loadCanvas();
+        const w = Math.min(window.innerWidth, 1400);
+        const h = Math.min(window.innerHeight, 900);
+        canvas = await window.html2canvas(document.body, {
+          backgroundColor:'#ffffff', useCORS:true, logging:false,
+          x:window.scrollX, y:window.scrollY, width:w, height:h,
+          scale:Math.min(1.3, 1150 / Math.max(1, w)),
+          ignoreElements:el => !!el.closest?.('#fttGalleryShareButton,#fttGalleryShareDialog')
+        });
+      }
       image = canvas.toDataURL('image/jpeg', .72);
       if (image.length > 1150000) image = canvas.toDataURL('image/jpeg', .45);
       if (image.length > 1150000) throw Error('This picture is too large. Try making your browser window smaller.');
