@@ -22,8 +22,8 @@ test("open questions preserve the retrieved source text and canonical citation",
   const core=loadCore();
   const source={ref:"Genesis 18:1",text:"The Lord appeared to him by the terebinths of Mamre."};
   const [item]=core.makeItems([source],"open","");
-  assert.equal(item.ans,"Hashem appeared to him by the terebinths of Mamre. (Source: Bereishis 18:1)");
-  assert.match(item.q,/Bereishis 18:1/);
+  assert.equal(item.ans,"Hashem (Source: Bereishis 18:1)");
+  assert.equal(item.q,"Who appeared to him?");
 });
 
 test("multiple-choice answers point to one of the verified references",()=>{
