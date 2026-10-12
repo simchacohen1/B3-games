@@ -38,10 +38,10 @@ test('date navigation selects daily cards, can return to Today, and makes every 
  const FixedDate=class extends Date{constructor(...args){super(...(args.length?args:['2026-10-12T14:00:00Z']));}};
  const ctx={document,window:{FTTMitzvahCalendar:calendar,FTT_MITZVAH_DAYS:days,FTTSunTimes:sun},sessionStorage:storageApi,localStorage:storageApi,location:{search:''},URLSearchParams,Date:FixedDate,Intl,confirm:()=>false,setInterval(){}};
  const html=fs.readFileSync('sefer-hamitzvos/index.html','utf8');const source=html.match(/<script>([\s\S]*?)<\/script>/)[1];vm.runInNewContext(source,ctx);
- assert.equal(els.get('outline').src,'coloring-v2/476.png');
- els.get('yesterday').onclick();assert.equal(els.get('outline').src,'coloring-v2/475.png');
- els.get('tomorrow').onclick();els.get('tomorrow').onclick();assert.equal(els.get('outline').src,'coloring-v2/477.png');
- els.get('today').onclick();assert.equal(els.get('outline').src,'coloring-v2/476.png');
+ assert.equal(els.get('outline').src,'coloring-v2/476.png?v=20261012-full');
+ els.get('yesterday').onclick();assert.equal(els.get('outline').src,'coloring-v2/475.png?v=20261012-full');
+ els.get('tomorrow').onclick();els.get('tomorrow').onclick();assert.equal(els.get('outline').src,'coloring-v2/477.png?v=20261012-full');
+ els.get('today').onclick();assert.equal(els.get('outline').src,'coloring-v2/476.png?v=20261012-full');
  for(let i=0;i<6;i++)els.get('tomorrow').onclick();assert.equal(els.get('dayCards').children.length,3);
  els.get('dayCards').children[2].onclick();assert.equal(Number(els.get('card').value),calendar.cardMap(days).N296);
  assert.match(html,/mix-blend-mode:multiply/);assert.match(source,/globalCompositeOperation='multiply'/);
