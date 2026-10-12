@@ -19,8 +19,14 @@
     return {A:teams.A.length?teams.A[qIndex%teams.A.length]:null,
             B:teams.B.length?teams.B[qIndex%teams.B.length]:null};
   }
-  // Expose the pure roster helpers for regression tests and diagnostics.
-  window.GameShowTeamModeLogic = { teamsFor, teamFor, contestantsFor };
+  function canAnswerChoice(data, name) {
+    if (!data || data.roundActive !== true || data.multipleChoice !== true || data.answerState) return false;
+    if (data.teamMode) return data.helperName ? data.helperName === name : data.buzzedBy === name;
+    return data.buzzedBy === name;
+  }
+
+  // Expose the pure helpers for regression tests and diagnostics.
+  window.GameShowTeamModeLogic = { teamsFor, teamFor, contestantsFor, canAnswerChoice };
   function questionAt(data) {
     return Array.isArray(questions) ? questions[Number(data?.qIndex)||0] : null;
   }
@@ -181,13 +187,9 @@
       const q=questionAt(lastData);
       if(!q||!Number.isInteger(q.correctIndex))return;
       gameRef.transaction(current=>{
-        if(!current||current.roundActive!==true||!current.multipleChoice||current.answerState||
+        if(!canAnswerChoice(current,myName)||
            Number(current.qIndex)!==Number(lastData?.qIndex))return;
         const team=teamFor(myName,current);
-        const allowed=current.teamMode
-          ?(current.helperName?current.helperName===myName:current.buzzedBy===myName)
-          :current.buzzedBy===myName;
-        if(!allowed)return;
         const correct=Number(index)===Number(q.correctIndex);
         if(current.teamMode){
           current.teamScores=current.teamScores||{A:0,B:0};
@@ -213,7 +215,7 @@
       const isHelper=data.helperName===myName;
       const myTeamLabel=document.getElementById("myTeamLabel");
       myTeamLabel.textContent=data.teamMode?(team?"You are on Team "+team+".":"Waiting for team assignment."):"";
-      const choiceActor=data.multipleChoice&&(data.teamMode?(data.helperName?isHelper:data.buzzedBy===myName):data.buzzedBy===myName);
+      const choiceActor=canAnswerChoice(data,myName);
       const shouldShow=!!(data.multipleChoice&&data.roundActive&&data.buzzedBy&&
         (choiceActor||isHelper||data.answerState));
       area.hidden=!shouldShow;
