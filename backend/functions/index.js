@@ -1331,6 +1331,9 @@ exports.generateTranslationChunks = onRequest(
     }
 
     const { posukText, posukTranslation, perekNum, posukNum } = req.body || {};
+    const staticQuestions = Array.isArray((req.body || {}).staticQuestions)
+      ? (req.body.staticQuestions || []).map(q => String(q || '').trim()).filter(Boolean).slice(0, 20)
+      : [];
     let classroomReferenceTranslation = (req.body || {}).classroomReferenceTranslation || '';
     if (!classroomReferenceTranslation.trim() && perekNum && posukNum) {
       classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, posukNum);
@@ -1805,9 +1808,17 @@ WORD-SELECTION ANSWER KEY: For each question, return answerWordSets, a list of o
 OUTPUT: Return ONLY JSON, no markdown or commentary:
 {"items":[{"sourceFact":"one explicit fact from the accepted translation","question":"child-friendly question","expectedAnswer":"short direct answer supported by that fact","answerWordSets":[[0],[1,2]]}]}
 
-QUALITY CHECK BEFORE RETURNING: every item must be supported by the accepted translation; every meaningful explicit detail should be represented somewhere; remove duplicates; never invent a reason or identity.`;
+${staticQuestions.length ? `
+EXISTING QUESTION MODE:
+The application supplied an ordered list of hand-written questions. Return exactly one item per supplied question, in the same order. Copy each question's wording exactly into the question field. Do not create new questions or reword them. For each one, determine a short expected answer supported by the accepted translation and attach the Hebrew word index set(s) that answer that exact question. If a question cannot be answered from this verse, omit only that item.
+` : `
+QUESTION GENERATION MODE:
+No hand-written questions were supplied. Generate the exhaustive question set as described above.
+`}
 
-    const userPrompt = `Perek: ${perekNum || ""}, Posuk: ${posukNum || ""}\nAccepted English translation: "${String(posukTranslation).trim()}"${classroomReferenceTranslation && String(classroomReferenceTranslation).trim() ? `\nTorah Umesorah classroom-reference translation: "${String(classroomReferenceTranslation).trim()}"` : ""}${posukText ? `\nHebrew for reference only: ${String(posukText).trim()}` : ""}`;
+QUALITY CHECK BEFORE RETURNING: every item must be supported by the accepted translation; every meaningful explicit detail should be represented somewhere when generating new questions; remove duplicates; never invent a reason or identity.`;
+
+    const userPrompt = `Perek: ${perekNum || ""}, Posuk: ${posukNum || ""}\nAccepted English translation: "${String(posukTranslation).trim()}"${classroomReferenceTranslation && String(classroomReferenceTranslation).trim() ? `\nTorah Umesorah classroom-reference translation: "${String(classroomReferenceTranslation).trim()}"` : ""}${posukText ? `\nHebrew for reference only: ${String(posukText).trim()}` : ""}${staticQuestions.length ? `\nEXISTING QUESTIONS, in required order: ${JSON.stringify(staticQuestions)}` : ""}`;
 
     try {
       let response = null;
@@ -1834,6 +1845,7 @@ QUALITY CHECK BEFORE RETURNING: every item must be supported by the accepted tra
                     items: {
                       type: "array",
                       minItems: 1,
+                      maxItems: staticQuestions.length || 20,
 items: {
                         type: "object",
                         properties: {
