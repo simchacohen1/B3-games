@@ -2638,3 +2638,6 @@ exports.generateShorashimArt = require("./shorashim-art").generateShorashimArt;
 
 // Read-only owner ChatGPT student report (ET/WT only).
 exports.studentReportChatGPTRead = require("./student-report-chatgpt-read").studentReportChatGPTRead;
+
+// Owner-reviewed teacher registration (not deployed until tested).
+exports.funTorahTeacherRequests = require('./teacher-requests').funTorahTeacherRequests;
