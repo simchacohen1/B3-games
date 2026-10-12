@@ -135,10 +135,10 @@
     if (anchor) {
       let target;
       try { target = new URL(anchor.href, location.href); } catch (_) { return; }
-      if (target.hash && target.pathname === location.pathname && target.search === location.search) return;
+      if ((anchor.getAttribute("href") || "").startsWith("#")) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      window.parent.postMessage({type:"b3-teacher-preview-link", href:target.href}, location.origin);
+      window.parent.postMessage({type:"b3-teacher-preview-link", href:target.href}, window.parent.location.origin);
       return;
     }
     const control = event.target.closest?.("button,[role=button],input[type=submit]");
