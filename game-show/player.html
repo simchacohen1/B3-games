@@ -541,12 +541,13 @@ function mustSitOut(data, name) {
 function buzzIn() {
   if(teacherPreview){renderGameSnapshot({val:()=>({...lastData,buzzedBy:myName})});playBuzzSound();return;}
   if (masterBlocked || !myName || mustSitOut(lastData, myName)) return;
+  if (!lastData || lastData.roundActive !== true) return;
   if (lockedUntil && serverNow() < lockedUntil) return;
   if (lastData && lastData.buzzedBy) return;
   // A root transaction keeps winner and streak together even when students
   // buzz simultaneously or another tab has newer state.
   gameRef.transaction(current => {
-    if (!current || current.buzzedBy || mustSitOut(current, myName)) return;
+    if (!current || current.roundActive !== true || current.buzzedBy || mustSitOut(current, myName)) return;
     if (current.buzzerDelayOn && serverNow() < (current.buzzUnlockAt || 0)) return;
     if (current.revealDelayOn) {
       if (current.buzzPool && current.buzzPool[myName]) return;
@@ -578,6 +579,12 @@ function updateBuzzAvailability() {
   const countdownEl = document.getElementById('countdown');
   const now = serverNow();
 
+  if (!lastData || lastData.roundActive !== true) {
+    buzzBtn.disabled = true;
+    countdownEl.textContent = '';
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+    return;
+  }
   if (mustSitOut(lastData, myName)) {
     buzzBtn.disabled = true;
     countdownEl.textContent = '';
@@ -618,7 +625,7 @@ function showWaiting(waiting) {
   let w = document.getElementById('waitingMsg');
   if (!w) {
     w = document.createElement('div'); w.id = 'waitingMsg'; w.className = 'panel';
-    w.innerHTML = '<div class="qtext">⏳ Waiting for your teacher to start the Game Show.</div><div class="status">This page will start by itself when the game begins.</div>';
+    w.innerHTML = '<div class="qtext">⏳ Waiting for Teacher</div><div class="status">Your teacher will show the question when the round begins.</div>';
     panel.parentNode.insertBefore(w, panel);
   }
   w.style.display = waiting ? '' : 'none';
@@ -665,7 +672,7 @@ function renderGameSnapshot(snapshot){
   lastData = data;
   renderScoreboard(data.scores);
   if (!questionsReady) return; // Scores can update while questions load.
-  showWaiting(!gameIsLive(data));
+  showWaiting(!gameIsLive(data) || data.roundActive !== true);
   const qIndex = data.qIndex || 0;
   const q = questions[qIndex] || questions[0];
   document.getElementById('qnum').textContent = 'Question ' + (qIndex + 1) + ' of ' + questions.length;
@@ -675,6 +682,14 @@ function renderGameSnapshot(snapshot){
 
   const buzzBtn = document.getElementById('buzzBtn');
   const status = document.getElementById('status');
+  if (data.roundActive !== true) {
+    buzzBtn.disabled = true;
+    status.textContent = 'Waiting for Teacher';
+    document.getElementById('countdown').textContent = '';
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+    showBuzzResult(data, qIndex);
+    return;
+  }
   const iAlreadyBuzzed = !!(data.revealDelayOn && data.buzzPool && data.buzzPool[myName]);
   if (data.buzzedBy) {
     buzzBtn.disabled = true;
