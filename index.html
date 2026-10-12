@@ -1427,7 +1427,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(!enteredPin)return{ok:false,reason:"Please enter your passcode."};
     let r;
     try{r=await studentAuthCall({action:"login",name:typed,pin:enteredPin});}
-    catch(e){return{ok:false,reason:e.message}}
+    catch(e){return{ok:false,reason:e.message,status:e.status}}
     let classId;
     try{classId=await resolvedStudentClass(r.id,{id:r.id,name:r.name,active:true,classId:r.classId||legacyMigrationClass(r.id)});}
     catch(e){return{ok:false,reason:e.message||"The connection is slow. Please try again."}}
@@ -1470,13 +1470,43 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     renderStudentAccess();
   }
 
+  function wrongPasscodeAttemptsKey(name){
+    const normalized=String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"");
+    return normalized?"b3WrongPasscodeAttempts:"+encodeURIComponent(normalized):"";
+  }
+  function recordWrongPasscodeAttempt(name){
+    const key=wrongPasscodeAttemptsKey(name);
+    if(!key)return 0;
+    const cutoff=Date.now()-10*60*1000;
+    try{
+      const previous=JSON.parse(localStorage.getItem(key)||"[]");
+      const attempts=(Array.isArray(previous)?previous:[]).filter(t=>Number.isFinite(t)&&t>=cutoff);
+      attempts.push(Date.now());
+      localStorage.setItem(key,JSON.stringify(attempts));
+      return attempts.length;
+    }catch(e){return 6;}
+  }
+  function clearWrongPasscodeAttempts(name){
+    const key=wrongPasscodeAttemptsKey(name);
+    if(key)try{localStorage.removeItem(key);}catch(e){}
+  }
+
   async function studentSignIn(){
     const btn=el("studentSignInBtn");
     if(btn.disabled)return;
     btn.disabled=true;setLoginMsg("Checking…");
     try{
-      const r=await checkStudentAccess(el("studentNameInput").value,el("classPinInput").value);
-      if(!r.ok){setLoginMsg(r.reason);return;}
+      const studentName=el("studentNameInput").value;
+      const r=await checkStudentAccess(studentName,el("classPinInput").value);
+      if(!r.ok){
+        let message=r.reason;
+        if(r.status===401){
+          const attempts=recordWrongPasscodeAttempt(studentName);
+          if(attempts>5)message="Please stop guessing and ask your teacher for the passcode. Too many tries can temporarily block sign-in.";
+        }
+        setLoginMsg(message);return;
+      }
+      clearWrongPasscodeAttempts(studentName);
       sessionStorage.setItem("b3Games_classPin",el("classPinInput").value.trim());
       setLoginMsg("Opening your games…");await enterStudent(r);setLoginMsg("");
     }catch(e){console.error(e);setLoginMsg(e&&e.message?e.message:"Could not check your login. Try again.");}
