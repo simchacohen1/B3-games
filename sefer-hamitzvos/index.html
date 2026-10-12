@@ -16,7 +16,6 @@ function showDate(iso){
  selectedDate=iso;const study=calendar.lesson(iso,days);
  $('hebrewDate').textContent=calendar.hebrewDate(iso);$('hebrewText').textContent=calendar.hebrewDate(iso,'he-IL-u-ca-hebrew');$('civilDate').textContent=new Intl.DateTimeFormat('en-US',{dateStyle:'full',timeZone:'UTC'}).format(new Date(iso+'T12:00:00Z'));
  $('studyDay').textContent='Study day '+study.day+' of 339';
- const [year,month,day]=iso.split('-');$('dailySource').href='https://www.chabad.org/dailystudy/seferHamitzvos.asp?tdate='+encodeURIComponent(Number(month)+'/'+Number(day)+'/'+year);
  const cards=$('dayCards');cards.replaceChildren();
  const introductory=!study.mitzvos.length;$('introNotice').classList.toggle('hidden',!introductory);$('introNotice').textContent=introductory?study.reading+' — this introductory lesson has no mitzvah picture cards.':'';
  $('workspace').classList.toggle('hidden',introductory);$('colorControls').classList.toggle('hidden',introductory);
