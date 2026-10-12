@@ -178,8 +178,9 @@
 </header>
 <div class="wrap">
   <div id="masterBlocked" class="card blocked hidden">The weekly quiz is turned off right now. Please wait for your teacher.</div>
+  <div id="quizAuthLoading" class="card" style="text-align:center" role="status" aria-live="polite">⏳ Checking your sign-in…</div>
 
-  <div id="loginCard" class="card" style="text-align:center">
+  <div id="loginCard" class="card hidden" style="text-align:center">
     <div class="state-ico">👋</div>
     <h2>Sign in to take the quiz</h2>
     <p style="color:var(--muted);margin:8px 0 18px">Sign in on Fun Torah Tools with your name and passcode, then come back here.</p>
@@ -271,6 +272,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let masterBlocked=false;
+let quizAuthPending=true;
 let teacherPreview=false;
 let myStudentId='';
 let myName='';
@@ -391,7 +393,8 @@ function classLabel(id){return (CLASS_ROSTERS[id]||{}).label||id||'';}
 
 function applyMasterBlocked(){
   if(teacherPreview)masterBlocked=false;
-  document.getElementById('masterBlocked').classList.toggle('hidden',!masterBlocked);
+  document.getElementById('masterBlocked').classList.toggle('hidden',quizAuthPending||!masterBlocked);
+  if(quizAuthPending){document.getElementById('loginCard').classList.add('hidden');document.getElementById('studentArea').classList.add('hidden');return;}
   if(masterBlocked){document.getElementById('loginCard').classList.add('hidden');document.getElementById('studentArea').classList.add('hidden');}
   else if(myStudentId){document.getElementById('loginCard').classList.add('hidden');document.getElementById('studentArea').classList.remove('hidden');}
   else{document.getElementById('loginCard').classList.remove('hidden');document.getElementById('studentArea').classList.add('hidden');}
@@ -717,7 +720,11 @@ async function openPastQuiz(launchId){
 function closePastQuiz(){document.getElementById('reviewCard').classList.add('hidden');document.getElementById('pastQuizzesCard').scrollIntoView({behavior:'smooth',block:'start'});}
 
 ['classPinInput','studentNameInput'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();joinQuiz();}}));
-restoreLogin();
+restoreLogin().catch(error=>console.warn('Could not restore quiz session:',error)).finally(()=>{
+  quizAuthPending=false;
+  document.getElementById('quizAuthLoading').classList.add('hidden');
+  applyMasterBlocked();
+});
 </script>
 </body>
 </html>
