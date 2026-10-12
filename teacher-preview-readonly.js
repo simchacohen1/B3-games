@@ -15,11 +15,18 @@
   window.B3_READ_ONLY_TEACHER_PREVIEW = true;
 
   // Guard remote function calls, even when a tool bypasses Firebase.
+  // Firebase Authentication needs POST requests to refresh the owner's login;
+  // those do not change class records and must continue in read-only mode.
+  function isAuthRequest(url) {
+    try { const u = new URL(String(url), location.href); return u.protocol === "https:" &&
+      ["identitytoolkit.googleapis.com","securetoken.googleapis.com"].includes(u.hostname); }
+    catch (_) { return false; }
+  }
   const nativeFetch = window.fetch;
   if (typeof nativeFetch === "function") {
     window.fetch = function (input, init) {
       const method = String(init?.method || input?.method || "GET").toUpperCase();
-      if (!["GET", "HEAD", "OPTIONS"].includes(method)) return denied();
+      if (!["GET", "HEAD", "OPTIONS"].includes(method) && !isAuthRequest(typeof input === "string" ? input : input?.url)) return denied();
       return nativeFetch.apply(this, arguments);
     };
   }
@@ -27,10 +34,11 @@
   const xhrOpen = xhr.open, xhrSend = xhr.send;
   xhr.open = function (method) {
     this.__b3PreviewMethod = String(method || "GET").toUpperCase();
+    this.__b3PreviewUrl = arguments[1];
     return xhrOpen.apply(this, arguments);
   };
   xhr.send = function () {
-    if (!["GET", "HEAD", "OPTIONS"].includes(this.__b3PreviewMethod || "GET")) {
+    if (!["GET", "HEAD", "OPTIONS"].includes(this.__b3PreviewMethod || "GET") && !isAuthRequest(this.__b3PreviewUrl)) {
       throw new Error("Read-only teacher preview: network changes are disabled.");
     }
     return xhrSend.apply(this, arguments);
