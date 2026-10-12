@@ -164,7 +164,7 @@ body.fullscreen .subtitle,body.fullscreen .footer,body.fullscreen .settings{disp
 <script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
 <script src="../firebase-config.js?v=20261001-teacherauth"></script>
 <script src="../site-settings.js?v=20261011-owner-class-rosters"></script>
-<script src="../teacher-class-rosters.js?v=20261011"></script>
+<script src="../teacher-class-rosters.js?v=20261012-membership"></script>
 </head>
 <body>
 <div class="app">
@@ -674,7 +674,7 @@ function startPage(){
 }
 
 // Load only classes assigned to the signed-in teacher, or all classes for owner/admin.
-(async function startAuthorizedChavrusa() {
+async function startAuthorizedChavrusa() {
   try {
     const session = await window.B3TeacherClassRosters.load();
     teacherScope = session.role === 'admin' ? 'owner' : session.uid;
@@ -687,7 +687,12 @@ function startPage(){
       opt.textContent = cls.name;
       classSelect.appendChild(opt);
     }
-    startPage();
+    if (!dateSelect.options.length) startPage();
+    else {
+      const selectedDate = dateSelect.value;
+      populateDates(selectedDate);
+      renderAll();
+    }
   } catch (error) {
     console.error('Chavrusa class access:', error);
     const app = document.querySelector('.app');
@@ -698,7 +703,12 @@ function startPage(){
       ' Open Teacher Center to sign in or choose an assigned class.';
     app.appendChild(notice);
   }
-})();
+}
+// Revalidate membership when returning to an already-open calendar tab.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) startAuthorizedChavrusa();
+});
+startAuthorizedChavrusa();
 </script>
 </body>
 </html>
