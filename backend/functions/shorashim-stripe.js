@@ -108,6 +108,14 @@ exports.createShorashimCheckout = onRequest(
       if (cls.toolGrants?.shorashim === true) {
         return res.status(409).json({ error: 'Shorashim is already enabled for this class.' });
       }
+      const openRef = db().ref('b3Private/shorashimOpenCheckouts/' + identity.uid + '/' + classId);
+      const open = (await openRef.get()).val();
+      if (open?.sessionId && open.expiresAt > Date.now()) {
+        try {
+          const existing = await stripeRequest('checkout/sessions/' + encodeURIComponent(open.sessionId));
+          if (existing.status === 'open' && existing.url) return res.json({ url: existing.url });
+        } catch (_) {}
+      }
       const configuredPrice = String(priceId.value() || '');
       if (!/^price_[A-Za-z0-9]+$/.test(configuredPrice)) throw new Error('Sandbox Shorashim price is not configured.');
       const price = await stripeRequest('prices/' + encodeURIComponent(configuredPrice));
@@ -122,13 +130,14 @@ exports.createShorashimCheckout = onRequest(
       if (!lock.committed) return res.status(409).json({ error: 'A checkout is already being prepared. Please wait a moment.' });
       try {
         const metadata = { teacherUid: identity.uid, classId, workspaceId, tool: 'shorashim' };
+        const savedCustomer = (await db().ref('b3Private/stripeCustomerByTeacher/' + identity.uid).get()).val();
         const fields = {
           mode: 'subscription',
           success_url: 'https://funtorahtools.com/teacher-subscription.html?checkout=success&session_id={CHECKOUT_SESSION_ID}',
           cancel_url: 'https://funtorahtools.com/teacher-subscription.html?checkout=cancelled',
           'line_items[0][price]': configuredPrice,
           'line_items[0][quantity]': 1,
-          customer_email: identity.email,
+          ...(savedCustomer?.id ? { customer: savedCustomer.id } : { customer_email: identity.email }),
           client_reference_id: identity.uid,
           integration_identifier: makeIntegrationId(),
           allow_promotion_codes: 'true'
@@ -138,10 +147,14 @@ exports.createShorashimCheckout = onRequest(
           fields['subscription_data[metadata][' + key + ']'] = value;
         }
         const session = await stripeRequest('checkout/sessions', { method: 'POST', form: formData(fields) });
-        await db().ref('b3Private/shorashimCheckoutSessions/' + session.id).set({
-          teacherUid: identity.uid, classId, workspaceId, priceId: configuredPrice,
-          createdAt: Date.now(), expiresAt: session.expires_at ? session.expires_at * 1000 : null
-        });
+        const expiresAt = session.expires_at ? session.expires_at * 1000 : Date.now() + 86400000;
+        await Promise.all([
+          db().ref('b3Private/shorashimCheckoutSessions/' + session.id).set({
+            teacherUid: identity.uid, classId, workspaceId, priceId: configuredPrice,
+            createdAt: Date.now(), expiresAt
+          }),
+          openRef.set({ sessionId: session.id, expiresAt })
+        ]);
         return res.json({ url: session.url });
       } finally {
         await pendingRef.transaction(current => current?.nonce === lock.snapshot.val()?.nonce ? null : undefined);
@@ -262,8 +275,19 @@ exports.shorashimStripeWebhook = onRequest(
     if ((await eventRef.get()).exists()) return res.json({ received: true, duplicate: true });
     try {
       if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded' ||
-          event.type.startsWith('customer.subscription.')) {
-        const subscription = await subscriptionForEvent(event, event.data?.object || {});
+          event.type === 'checkout.session.expired' || event.type.startsWith('customer.subscription.')) {
+        const sessionData = event.data?.object || {};
+        if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded' || event.type === 'checkout.session.expired') {
+          const sessionMeta = sessionData.metadata || {};
+          if (sessionMeta.teacherUid && sessionMeta.classId) {
+            await db().ref('b3Private/shorashimOpenCheckouts/' + sessionMeta.teacherUid + '/' + sessionMeta.classId).remove();
+          }
+        }
+        if (event.type === 'checkout.session.expired') {
+          await eventRef.set({ receivedAt: Date.now(), type: event.type });
+          return res.json({ received: true });
+        }
+        const subscription = await subscriptionForEvent(event, sessionData);
         if (subscription) await applySubscription(subscription, event.id);
       }
       await eventRef.set({ receivedAt: Date.now(), type: event.type });
