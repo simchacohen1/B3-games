@@ -556,6 +556,12 @@ function render(){
   if(!activeLaunchId||!launchData){document.getElementById('noQuizCard').classList.remove('hidden');renderPastQuizzes();return;}
   if(!launchAllowsStudent()){document.getElementById('noQuizCard').classList.remove('hidden');renderPastQuizzes();return;}
   const questions=getQuestions();if(!questions.length){document.getElementById('noQuizCard').classList.remove('hidden');renderPastQuizzes();return;}
+  // A completed launch is read-only, including after a refresh or direct link.
+  if(allCompletions?.[activeLaunchId]?.[myStudentId]){
+    renderCompletionCard(questions);
+    renderPastQuizzes();
+    return;
+  }
   if(!launchData.started){
     document.getElementById('waitingCard').classList.remove('hidden');
     document.getElementById('waitingTitle').textContent='Quiz not started yet';
@@ -659,6 +665,9 @@ async function submitAnswer(){
   if(selectedChoice===null){const s=document.getElementById('answerStatus');s.textContent='Choose an answer first.';s.className='status bad';return;}
   const qs=getQuestions(),q=qs[displayedQuestion],mode=launchData&&launchData.mode||'paced',st=studentEffectiveQuestionState(displayedQuestion,mode);if(!st.open||responseFor(displayedQuestion))return;
   if(teacherPreview){myResponses[displayedQuestion]={choiceIndex:selectedChoice,correct:Number(selectedChoice)===Number(q.correctIndex)};render();return;}
+  // Never permit another submission for a finished attempt.
+  const finished=await db.ref(QROOT+'/completions/'+activeLaunchId+'/'+myStudentId).once('value');
+  if(finished.exists()){render();return;}
   const ref=db.ref(QROOT+'/responses/'+activeLaunchId+'/'+myStudentId+'/'+displayedQuestion);
   const correct=Number(selectedChoice)===Number(q.correctIndex);
   const answer={name:myName,choiceIndex:selectedChoice,originalCorrect:correct,correct,adjusted:false,submittedAt:firebase.database.ServerValue.TIMESTAMP};
