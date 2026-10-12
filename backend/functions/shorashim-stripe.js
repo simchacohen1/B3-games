@@ -29,6 +29,7 @@ async function stripeRequest(path, { method = 'GET', form } = {}) {
     method,
     headers: {
       Authorization: 'Bearer ' + stripeKey(),
+      'Stripe-Version': '2026-08-26.dahlia',
       ...(form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {})
     },
     body: form ? form.toString() : undefined,
