@@ -105,6 +105,50 @@ const path = require("path");
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
+// Search Sefaria from the server so browsers do not depend on Sefaria's
+// cross-origin POST policy. Only the topic is caller-controlled; the endpoint,
+// index, search field, sort, and result count are fixed here.
+const sefariaTopicSearchCache = new Map();
+exports.searchSefariaQuestions = onRequest(
+  { cors: PAID_ORIGINS, maxInstances: 5, minInstances: 0, region: "us-central1" },
+  async (req, res) => {
+    res.set("Cache-Control", "public, max-age=60, s-maxage=300");
+    if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
+    const topic = String(req.body?.topic || "").trim().replace(/\s+/g, " ");
+    if (topic.length < 2 || topic.length > 120) {
+      return res.status(400).json({ error: "Enter a topic between 2 and 120 characters." });
+    }
+    const key = topic.toLocaleLowerCase("en");
+    const cached = sefariaTopicSearchCache.get(key);
+    if (cached && cached.expires > Date.now()) return res.status(200).json(cached.data);
+    try {
+      const response = await fetch("https://www.sefaria.org/api/search-wrapper", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          query: topic, type: "text", field: "naive_lemmatizer", size: 33,
+          sort_method: "score", sort_fields: ["pagesheetrank"], source_proj: ["ref"]
+        }),
+        signal: AbortSignal.timeout(15000)
+      });
+      if (!response.ok) {
+        console.error("Sefaria topic search returned HTTP", response.status);
+        return res.status(502).json({ error: "Sefaria search is temporarily unavailable." });
+      }
+      const data = await response.json();
+      const hits = data?.hits?.hits || data?.hits || data?.results || [];
+      const refs = [...new Set(hits.map(hit => hit?.ref || hit?._source?.ref || hit?.source?.ref).filter(Boolean))].slice(0, 33);
+      const result = { refs };
+      sefariaTopicSearchCache.set(key, { data: result, expires: Date.now() + 5 * 60 * 1000 });
+      while (sefariaTopicSearchCache.size > 200) sefariaTopicSearchCache.delete(sefariaTopicSearchCache.keys().next().value);
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error("Sefaria topic search failed:", error?.message || error);
+      return res.status(502).json({ error: "Could not reach Sefaria search. Please try again." });
+    }
+  }
+);
+
 
 // Fetch a Kehot verse server-side so comprehension grading does not depend on
 // the student's browser being able to reach Sefaria (CORS, cache, or network

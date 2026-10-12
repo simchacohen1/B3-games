@@ -1613,19 +1613,26 @@ function renderEditor(data) {
   const list = document.getElementById('editorList');
   list.innerHTML = '';
   data.forEach(item => {
-    list.appendChild(createQuestionRow(item.q, item.ans));
+    list.appendChild(createQuestionRow(item.q, item.ans, item.choices, item.correctIndex));
   });
 }
 
-function createQuestionRow(q, ans) {
+function createQuestionRow(q, ans, choices, correctIndex) {
   const div = document.createElement('div');
   div.className = 'editor-row';
+  const choiceList = Array.isArray(choices) ? choices : [];
+  const choiceText = choiceList.map(choice => escapeHtml(choice)).join('\n');
+  const correctNumber = Number.isInteger(Number(correctIndex)) && Number(correctIndex) >= 0 ? Number(correctIndex) + 1 : 1;
   div.innerHTML =
     '<label>Question</label>' +
     '<textarea class="row-q">' + escapeHtml(q || '') + '</textarea>' +
     '<label>Answer</label>' +
     '<textarea class="row-ans">' + escapeHtml(ans || '') + '</textarea>' +
-    '<button class="btn btn-sm btn-ghost editor-del-row" onclick="this.parentElement.remove()">Delete this question</button>';
+    '<button class="btn btn-sm btn-ghost editor-del-row" onclick="this.parentElement.remove()">Delete this question</button>' +
+    '<label>Answer choices (one per line)</label>' +
+    '<textarea class="row-choices" placeholder="Choice 1&#10;Choice 2&#10;Choice 3&#10;Choice 4">' + choiceText + '</textarea>' +
+    '<label>Correct choice number</label>' +
+    '<input type="number" min="1" max="8" class="row-correct" value="' + correctNumber + '">';
   return div;
 }
 
@@ -1684,24 +1691,40 @@ function saveEditor() {
   const rows = [...document.querySelectorAll('#editorList > .editor-row')];
   const newQuestions = rows.map(row => ({
     q: row.querySelector('.row-q').value.trim(),
-    ans: row.querySelector('.row-ans').value.trim()
-  })).filter(item => item.q || item.ans);
+    ans: row.querySelector('.row-ans').value.trim(),
+    choices: (row.querySelector('.row-choices')?.value || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean),
+    correctIndex: Math.max(0, (Number(row.querySelector('.row-correct')?.value) || 1) - 1)
+  })).filter(item => item.q || item.ans).map(item => {
+    if (!item.choices.length) { delete item.choices; delete item.correctIndex; }
+    else if (item.correctIndex >= item.choices.length) item.correctIndex = 0;
+    return item;
+  });
 
   if (newQuestions.length === 0) {
     alert("There's nothing to save - add at least one question first.");
     return;
   }
-  setRef.set({ title: ACTIVE_SET_TITLE, questions: newQuestions }).then(() => {
-    document.getElementById('soundStatus').textContent = 'Saved (' + newQuestions.length + ' questions)';
+  return saveQuestionSet(newQuestions).then(() => {
     closeEditor();
   }).catch(err => {
     document.getElementById('soundStatus').textContent = 'Save error: ' + err.message;
+    throw err;
   });
 }
+
+function saveQuestionSet(items) {
+  return setRef.set({ title: ACTIVE_SET_TITLE, questions: items }).then(() => {
+    document.getElementById('soundStatus').textContent = 'Saved (' + items.length + ' questions)';
+    return items;
+  });
+}
+
+window.getCurrentQuestionSet = () => questions.map(item => ({ ...item }));
+window.saveQuestionSet = saveQuestionSet;
 </script>
 
 <script src="team-modes.js?v=20261012-1"></script>
-<script src="question-generator.js?v=20261012-9"></script>
+<script src="question-generator.js?v=20261012-11"></script>
 </body>
 </html>
 

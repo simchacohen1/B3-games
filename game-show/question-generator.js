@@ -10,6 +10,7 @@
     Deuteronomy: { label: "Devarim" }
   };
   const api = "https://www.sefaria.org";
+  const searchProxy = "https://us-central1-b3-games.cloudfunctions.net/searchSefariaQuestions";
   const nameMap = {
     "the lord": "Hashem", "god": "Hashem",
     "moses": "Moshe", "abraham": "Avraham", "isaac": "Yitzchak",
@@ -109,6 +110,9 @@
     if (typeof value !== "string") return "";
     const el = document.createElement("div");
     el.innerHTML = value;
+    // Sefaria translations can include footnote markers and the full note in
+    // the verse HTML. They are editorial notes, not words from the pasuk.
+    el.querySelectorAll(".footnote, .footnote-marker, sup.footnote-marker").forEach(node => node.remove());
     return (el.textContent || "").replace(/\s+/g, " ").trim();
   };
   const versionsText = data => {
@@ -256,15 +260,17 @@
     const topic = form.topic.value.trim();
     if (topic.length < 2) throw new Error("Type a halacha topic, such as Shabbat or berachot.");
     status.textContent = "Searching Sefaria for sources about " + topic + "…";
-    const response = await fetch(api + "/api/search-wrapper", {
+    const response = await fetch(searchProxy, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ query: topic, type: "text", field: "naive_lemmatizer", size: 33, sort_method: "score", sort_fields: ["pagesheetrank"] })
+      body: JSON.stringify({ topic })
     });
-    if (!response.ok) throw new Error("Sefaria search did not complete.");
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || "Sefaria search did not complete (HTTP " + response.status + ").");
+    }
     const data = await response.json();
-    const hits = data?.hits?.hits || data?.hits || data?.results || [];
-    const refs = [...new Set(hits.map(hit => hit?.ref || hit?._source?.ref || hit?.source?.ref).filter(Boolean))].slice(0, 33);
+    const refs = [...new Set(Array.isArray(data?.refs) ? data.refs : [])].slice(0, 33);
     if (!refs.length) throw new Error("Sefaria found no source references for that topic. Try a different topic.");
     const rows = [];
     for (const ref of refs) {
@@ -283,31 +289,37 @@
     const card = document.createElement("section");
     card.className = "card";
     card.id = "sefariaGenerator";
-    card.style.cssText = "margin:14px 0;padding:16px";
-    card.innerHTML = '<h3>Generate questions from Sefaria</h3>' +
-      '<p class="hint">Source text and references are checked against Sefaria. Review and edit every question before saving it.</p>' +
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px;align-items:end">' +
+    card.style.cssText = "margin:18px 0;padding:20px;border:2px solid var(--line);border-radius:16px";
+    const style = document.createElement("style");
+    style.textContent = "#sefariaGenerator .sg-group{margin:16px 0;padding:14px;border:1px solid var(--line,#cbd5e1);border-radius:12px}#sefariaGenerator .sg-group legend{padding:0 8px;font-weight:800}#sefariaGenerator .sg-fields label{display:flex;flex-direction:column;gap:6px;font-weight:700}#sefariaGenerator .sg-fields input:not([type=checkbox]),#sefariaGenerator .sg-fields select{box-sizing:border-box;width:100%;min-height:42px}#sefariaGenerator .sg-fields [type=checkbox]{width:18px;height:18px}#sgQuestionList .editor-row{margin:12px 0;padding:16px;border:1px solid var(--line,#cbd5e1);border-radius:12px;background:rgba(255,255,255,.04)}#sgQuestionList{counter-reset:qrow}#sgQuestionList textarea.row-choices{min-height:100px}#sgStatus{font-weight:700}#sgReplace{border:1px solid #b91c1c}#sgReplace:disabled,#sgAdd:disabled{opacity:.65;cursor:wait}";
+    document.head.appendChild(style);
+    card.innerHTML = '<h3>Build a question set from Sefaria</h3>' +
+      '<p class="hint">Choose a source and range. Review the drafts, then add them to your current questions or replace the set.</p>' +
+      '<fieldset class="sg-group"><legend>1. Choose the source</legend><div class="sg-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end">' +
       '<label>Source type<select id="sgType" class="select"><option value="chumash">Chumash</option><option value="halacha">Halacha topic</option></select></label>' +
       '<label>Sefer<select id="sgBook" class="select">' + bookNames.map(b => '<option value="' + b + '">' + books[b].label + '</option>').join("") + '</select></label>' +
       '<label>Perek<select id="sgChapter" class="select"><option>Loading…</option></select></label>' +
       '<label>First pasuk<select id="sgFrom" class="select"><option>Loading…</option></select></label>' +
       '<label>Last pasuk<select id="sgTo" class="select"><option>Loading…</option></select></label>' +
-      '<label>Question count<select id="sgCount" class="select">' + Array.from({length:33},(_,i)=>'<option value="' + (i+1) + '"' + (i===9?' selected':'') + '>' + (i+1) + '</option>').join("") + '</select></label>' +
       '<label>Halacha topic<input id="sgTopic" class="input" type="search" placeholder="e.g. Shabbat"></label>' +
+      '</div></fieldset><fieldset class="sg-group"><legend>2. Choose question options</legend><div class="sg-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end">' +
+      '<label>Number of questions<select id="sgCount" class="select">' + Array.from({length:33},(_,i)=>'<option value="' + (i+1) + '"' + (i===9?' selected':'') + '>' + (i+1) + '</option>').join("") + '</select></label>' +
       '<label><input id="sgRashi" type="checkbox"> Include Rashi</label>' +
       '<label>Question style<select id="sgMode" class="select"><option value="open">Open answer</option><option value="mc">Multiple choice</option></select></label>' +
-      '</div><div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
-      '<button class="btn btn-good" type="button" id="sgGenerate">Generate and review</button><span id="sgStatus" role="status" aria-live="polite"></span></div>';
+      '</div></fieldset><div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+      '<button class="btn btn-good" type="button" id="sgGenerate">Get questions to review</button><span id="sgStatus" role="status" aria-live="polite">Choose a source to begin.</span></div>';
     const review = document.createElement("section");
     review.id = "sgReview";
     review.hidden = true;
     review.style.cssText = "margin-top:18px;padding-top:16px;border-top:1px solid var(--line)";
     review.innerHTML = '<h4 style="margin:0 0 6px;font-size:18px">Review generated questions</h4>' +
-      '<p class="hint">Edit or delete questions here. Multiple-choice questions include four source-based options, with the correct choice preselected. Save Questions replaces the current question set.</p>' +
+      '<p class="hint">These are drafts. Edit or delete any question. Nothing is saved until you choose an option below.</p>' +
       '<div id="sgQuestionList"></div>' +
-      '<button class="btn btn-primary" type="button" id="sgSave">Save Questions</button>';
+      '<div class="sg-save-actions" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">' +
+      '<button class="btn btn-primary" type="button" id="sgAdd">Add to current questions</button>' +
+      '<button class="btn btn-bad" type="button" id="sgReplace">Replace all current questions</button></div>';
     card.appendChild(review);
-    card.querySelector("#sgSave").addEventListener("click", () => {
+    async function saveDrafts(replace) {
       const rows = [...review.querySelectorAll("#sgQuestionList > .editor-row")];
       const items = rows.map(row => {
         const choices = (row.querySelector(".row-choices")?.value || "").split(/\r?\n/);
@@ -322,11 +334,23 @@
         status.textContent = "Add at least one question before saving.";
         return;
       }
-      const editorList = document.getElementById("editorList");
-      editorList.replaceChildren(...items.map(item => window.createQuestionRow(item.q, item.ans, item.choices, item.correctIndex)));
-      window.saveEditor();
-      status.textContent = "Saving " + items.length + " questions…";
-    });
+      if (replace && !window.confirm("Replace all current questions with these " + items.length + " reviewed questions?")) return;
+      const buttons = [...review.querySelectorAll(".sg-save-actions button")];
+      buttons.forEach(button => { button.disabled = true; });
+      status.textContent = replace ? "Replacing the current question set…" : "Adding questions to the current set…";
+      try {
+        const current = typeof window.getCurrentQuestionSet === "function" ? window.getCurrentQuestionSet() : [];
+        const next = replace ? items : current.concat(items);
+        await window.saveQuestionSet(next);
+        status.textContent = replace
+          ? "Saved. Replaced the set with " + items.length + " questions."
+          : "Saved. Added " + items.length + " questions; the set now has " + next.length + ".";
+      } catch (error) {
+        status.textContent = "Could not save questions: " + (error.message || "Please try again.");
+      } finally { buttons.forEach(button => { button.disabled = false; }); }
+    }
+    card.querySelector("#sgAdd").addEventListener("click", () => saveDrafts(false));
+    card.querySelector("#sgReplace").addEventListener("click", () => saveDrafts(true));
     const setupGrid = setup.querySelector(".setup-grid");
     (setupGrid || setup).insertAdjacentElement("afterend", card);
     const type = card.querySelector("#sgType");
@@ -382,7 +406,7 @@
         const list = review.querySelector("#sgQuestionList");
         list.replaceChildren(...items.map(item => window.createQuestionRow(item.q, item.ans, item.choices, item.correctIndex)));
         review.hidden = false;
-        status.textContent = items.length + " source-based questions are ready to review below.";
+        status.textContent = items.length + " questions ready. Review them below; your current set is unchanged.";
         review.scrollIntoView({ behavior: "smooth", block: "start" });
       } catch (error) {
         status.textContent = error.message || "Could not generate questions.";
