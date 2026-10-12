@@ -241,22 +241,34 @@
     review.hidden = true;
     review.style.cssText = "margin-top:18px;padding-top:16px;border-top:1px solid var(--line)";
     review.innerHTML = '<h4 style="margin:0 0 6px;font-size:18px">Review generated questions</h4>' +
-      '<p class="hint">Edit or delete questions here. Save Questions replaces the current question set.</p>' +
+      '<p class="hint">Edit or delete questions here. Multiple-choice questions include four source-based options, with the correct choice preselected. Save Questions replaces the current question set.</p>' +
       '<div id="sgQuestionList"></div>' +
       '<button class="btn btn-primary" type="button" id="sgSave">Save Questions</button>';
     card.appendChild(review);
     card.querySelector("#sgSave").addEventListener("click", () => {
       const rows = [...review.querySelectorAll("#sgQuestionList > .editor-row")];
-      const items = rows.map(row => ({
-        q: row.querySelector(".row-q").value.trim(),
-        ans: row.querySelector(".row-ans").value.trim()
-      })).filter(item => item.q || item.ans);
+      const items = rows.map(row => {
+        const choices = (row.querySelector(".row-choices")?.value || "")
+          .split(/\r?\n/).map(choice => choice.trim()).filter(Boolean);
+        const correctNumber = Number(row.querySelector(".row-correct")?.value);
+        const item = {
+          q: row.querySelector(".row-q").value.trim(),
+          ans: row.querySelector(".row-ans").value.trim()
+        };
+        if (choices.length) {
+          item.choices = choices;
+          if (Number.isInteger(correctNumber) && correctNumber > 0 && correctNumber <= choices.length) {
+            item.correctIndex = correctNumber - 1;
+          }
+        }
+        return item;
+      }).filter(item => item.q || item.ans);
       if (!items.length) {
         status.textContent = "Add at least one question before saving.";
         return;
       }
       const editorList = document.getElementById("editorList");
-      editorList.replaceChildren(...items.map(item => window.createQuestionRow(item.q, item.ans)));
+      editorList.replaceChildren(...items.map(item => window.createQuestionRow(item.q, item.ans, item.choices, item.correctIndex)));
       window.saveEditor();
       status.textContent = "Saving " + items.length + " questions…";
     });
