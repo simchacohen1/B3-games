@@ -26,7 +26,40 @@
   function read() { try { return sessionStorage.getItem(FLAG) === "1"; } catch (e) { return false; } }
   var on = read();
 
+  // Eastern wall-clock time automatically follows daylight saving time.
+  function isAvailable(now) {
+    var parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York", weekday: "short", hour: "2-digit",
+      minute: "2-digit", hourCycle: "h23"
+    }).formatToParts(now || new Date());
+    var values = {};
+    parts.forEach(function (p) { values[p.type] = p.value; });
+    var minutes = Number(values.hour) * 60 + Number(values.minute);
+    return !( ["Mon", "Tue", "Wed", "Thu"].indexOf(values.weekday) >= 0 &&
+      minutes >= 525 && minutes < 1080 );
+  }
+  function enforceSchedule() {
+    var available = isAvailable();
+    var button = document.getElementById("exploreGuestBtn");
+    if (button) {
+      button.disabled = !available;
+      button.textContent = available ? "👀 Explore as Guest" : "Guest mode closed until 6:00 PM ET";
+      button.title = "Guest mode is closed Monday–Thursday, 8:45 AM–6:00 PM Eastern time.";
+    }
+    if (!available && (on || read())) {
+      stop();
+      location.replace(homeHref);
+    }
+    return available;
+  }
+  enforceSchedule();
+  document.addEventListener("DOMContentLoaded", enforceSchedule);
+  window.addEventListener("focus", enforceSchedule);
+  document.addEventListener("visibilitychange", enforceSchedule);
+  setInterval(enforceSchedule, 1000);
+
   function start() {
+    if (!enforceSchedule()) return false;
     try {
       STUDENT_KEYS.forEach(function (k) { sessionStorage.removeItem(k); });
       sessionStorage.removeItem("b3TeacherBypass");
@@ -34,6 +67,7 @@
     } catch (e) {}
     on = true;
     if (api.activate) api.activate();
+    return true;
   }
   function stop() {
     try {
@@ -48,6 +82,7 @@
 
   var api = window.B3Guest = {
     isGuest: function () { return on; },
+    isAvailable: isAvailable,
     start: start,
     stop: stop,
     exit: function () { stop(); location.href = homeHref; },
