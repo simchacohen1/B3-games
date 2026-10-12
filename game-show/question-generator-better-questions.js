@@ -211,7 +211,7 @@
     let match;
 
     match = text.match(/as soon as you awaken you should remember (the kindnesses of Hashem)/i);
-    if (match) return { q: "What should you remember as soon as you wake up?", answer: match[1] + "." };
+    if (match) return { q: "What should you remember when you wake up?", answer: match[1] + "." };
 
     match = text.match(/while still in bed you should recite:\s*([^.!?]{8,180})/i);
     if (match) return { q: "What prayer should you say while still in bed?", answer: short(match[1]) + "." };
@@ -232,18 +232,12 @@
     if (match) return { q: "Which words should you say at the end of this prayer?", answer: short(match[1]) + "." };
 
     match = text.match(/(?:you should|a person should|one should)\s+([^,.;]{5,120})/i);
-    if (match) return { q: "What should you do?", answer: short(match[1]) + "." };
+    if (match) return { q: "What does this section teach?", answer: short(match[1]) + "." };
 
     const sentence = (text.match(/[^.!?]{12,220}[.!?]/) || [text])[0].trim();
     const words = sentence.replace(/[“”"]/g, "").split(/\s+/).filter(Boolean);
     const splitAt = Math.min(8, Math.max(4, Math.ceil(words.length * 0.55)));
-    if (words.length > splitAt) {
-      return {
-        q: "Finish the teaching: “" + words.slice(0, splitAt).join(" ") + " …”",
-        answer: words.slice(splitAt, splitAt + 8).join(" ")
-      };
-    }
-    return { q: "Name one instruction from this section.", answer: short(sentence) };
+    return { q: "What does this section teach?", answer: short(sentence) };
   }
 
   function shortChoice(value) {
@@ -259,7 +253,7 @@
       const ref = source.displayRef || displayRef(source.ref);
       const qa = questionAndAnswer(source, topic);
       if (mode === "open") {
-        out.push({ q: qa.q, ans: qa.answer + " (Source: " + ref + ")" });
+        out.push({ q: qa.q, ans: qa.answer });
       } else {
         const correctExcerpt = localizeText(shortChoice(qa.answer));
         const optionRows = correctExcerpt ? [{ excerpt: correctExcerpt, ref: source.ref }] : [];
