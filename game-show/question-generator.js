@@ -125,6 +125,16 @@
     const words = text.replace(/[“”"]/g, "").split(/\s+/).filter(Boolean);
     return words.slice(0, Math.min(7, words.length)).join(" ");
   }
+  function questionRecord(q, ans, choices, correctNumber) {
+    const item = { q: String(q || "").trim(), ans: String(ans || "").trim() };
+    const options = Array.isArray(choices) ? choices.map(choice => String(choice || "").trim()).filter(Boolean) : [];
+    const correct = Number(correctNumber);
+    if (options.length) {
+      item.choices = options;
+      if (Number.isInteger(correct) && correct > 0 && correct <= options.length) item.correctIndex = correct - 1;
+    }
+    return item;
+  }
   function makeItems(sources, mode, topic, count, distractors) {
     const out = [];
     const selected = sources.slice(0, count);
@@ -248,20 +258,13 @@
     card.querySelector("#sgSave").addEventListener("click", () => {
       const rows = [...review.querySelectorAll("#sgQuestionList > .editor-row")];
       const items = rows.map(row => {
-        const choices = (row.querySelector(".row-choices")?.value || "")
-          .split(/\r?\n/).map(choice => choice.trim()).filter(Boolean);
-        const correctNumber = Number(row.querySelector(".row-correct")?.value);
-        const item = {
-          q: row.querySelector(".row-q").value.trim(),
-          ans: row.querySelector(".row-ans").value.trim()
-        };
-        if (choices.length) {
-          item.choices = choices;
-          if (Number.isInteger(correctNumber) && correctNumber > 0 && correctNumber <= choices.length) {
-            item.correctIndex = correctNumber - 1;
-          }
-        }
-        return item;
+        const choices = (row.querySelector(".row-choices")?.value || "").split(/\r?\n/);
+        return questionRecord(
+          row.querySelector(".row-q").value,
+          row.querySelector(".row-ans").value,
+          choices,
+          row.querySelector(".row-correct")?.value
+        );
       }).filter(item => item.q || item.ans);
       if (!items.length) {
         status.textContent = "Add at least one question before saving.";
@@ -334,7 +337,7 @@
       } finally { button.disabled = false; }
     });
   }
-  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, phrase, cleanText, localizeText, displayRef, evenlyPick, distribute });
+  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, questionRecord, phrase, cleanText, localizeText, displayRef, evenlyPick, distribute });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", inject, { once: true });
   else inject();
 })();
