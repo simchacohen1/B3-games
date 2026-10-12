@@ -387,7 +387,7 @@ if(window.createClassHighlighter)highlighter=window.createClassHighlighter({
   ownerName:owner=>owner==='teacher'?'Teacher':state.members.find(m=>m.id===owner)?.name||'Student',
   color:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   submit:submitStroke,
-  edit(action){if(isTeacher){if(action==='all')highlightStore.reset();else highlightStore.edit('teacher',action);publishHighlights()}else send(teacherConnection,{type:'edit-highlights',action})}
+  edit(action,id){if(isTeacher){if(action==='all')highlightStore.reset();else highlightStore.edit('teacher',action,id);publishHighlights()}else send(teacherConnection,{type:'edit-highlights',action})}
 });
 if(highlighter){const baseReceive=highlighter.receive;highlighter.receive=next=>{baseReceive(next);window.ClassPointerPdf?.setStrokes(next)}}
 // Small, fixed doorway used by PDF mode (pdf-mode.js). Nothing else reaches into this file.
