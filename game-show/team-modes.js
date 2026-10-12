@@ -20,7 +20,7 @@
             B:teams.B.length?teams.B[qIndex%teams.B.length]:null};
   }
   function questionAt(data) {
-    return Array.isArray(window.questions) ? window.questions[Number(data?.qIndex)||0] : null;
+    return Array.isArray(questions) ? questions[Number(data?.qIndex)||0] : null;
   }
 
   if (isTeacher) {
@@ -81,8 +81,8 @@
     // The teacher opens a round only after assigning the fair rotating contestants.
     window.startQuestion=function(){
       ensureAudioAwake();
-      const data=window.lastGameData||{};
-      const qIndex=Number(data.qIndex)||0, q=window.questions?.[qIndex];
+      const data=lastGameData||{};
+      const qIndex=Number(data.qIndex)||0, q=questions?.[qIndex];
       if(!q){document.getElementById("soundStatus").textContent="Add a question before starting the round.";return;}
       const teamMode=!!document.getElementById("teamModeToggle")?.checked;
       const mc=!!document.getElementById("multipleChoiceToggle")?.checked;
@@ -108,7 +108,7 @@
     };
     const originalAdjust=window.adjustSelectedScore;
     window.adjustSelectedScore=function(delta){
-      const data=window.lastGameData||{};
+      const data=lastGameData||{};
       if(!data.teamMode){originalAdjust(delta);return;}
       const selected=data.selectedPlayer;
       const team=teamFor(selected,data);
@@ -153,7 +153,7 @@
     }
     const originalBuzz=window.buzzIn;
     window.buzzIn=function(){
-      const data=window.lastData||{};
+      const data=lastData||{};
       if(!data.teamMode){originalBuzz();return;}
       if(!data.roundActive||!data.contestants||![data.contestants.A,data.contestants.B].includes(myName))return;
       if(data.stealTeam&&teamFor(myName,data)!==data.stealTeam)return;
@@ -174,11 +174,11 @@
     };
 
     function submitChoice(index){
-      const q=questionAt(window.lastData);
+      const q=questionAt(lastData);
       if(!q||!Number.isInteger(q.correctIndex))return;
       gameRef.transaction(current=>{
         if(!current||current.roundActive!==true||!current.multipleChoice||current.answerState||
-           Number(current.qIndex)!==Number(window.lastData?.qIndex))return;
+           Number(current.qIndex)!==Number(lastData?.qIndex))return;
         const team=teamFor(myName,current);
         const allowed=current.teamMode
           ?(current.helperName?current.helperName===myName:current.buzzedBy===myName)
@@ -241,7 +241,7 @@
     const originalAvail=window.updateBuzzAvailability;
     window.updateBuzzAvailability=function(){
       originalAvail();
-      const data=window.lastData||{};
+      const data=lastData||{};
       if(data.teamMode){
         const team=teamFor(myName,data);
         const eligible=!!(data.contestants&&data.contestants[team]===myName&&(!data.stealTeam||data.stealTeam===team));
