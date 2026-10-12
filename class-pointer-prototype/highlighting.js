@@ -6,6 +6,7 @@ window.createClassHighlighter=function(options){
   function svg(tag,attrs={}){const element=document.createElementNS(ns,tag);Object.entries(attrs).forEach(([key,value])=>element.setAttribute(key,String(value)));return element}
   function tool(){return $(options.teacher?'teacherTool':'studentTool').value}
   function drawing(){return C.highlightTools.includes(tool())}
+  function erasing(){return options.teacher&&tool()==='eraser'}
   function box(){const video=$('lesson'),rect=$('stage').getBoundingClientRect();return{rect,picture:C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight),width:video.videoWidth,height:video.videoHeight}}
   function point(event){const b=box();if(!b.picture)return null;const p={x:(event.clientX-b.rect.left-b.picture.left)/b.picture.w,y:(event.clientY-b.rect.top-b.picture.top)/b.picture.h};return C.validPoint(p)?p:null}
   function segmentDistance(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,len=dx*dx+dy*dy;if(!len)return Math.hypot(p.x-a.x,p.y-a.y);const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/len));return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy))}
@@ -44,17 +45,19 @@ window.createClassHighlighter=function(options){
     const last=draft.points[draft.points.length-1];if(Math.hypot(p.x-last.x,p.y-last.y)>0.003&&draft.points.length<256)draft.points.push(p);
   }
   $('stage').addEventListener('pointerdown',event=>{
-    if(!drawing()||!options.sharing()||!options.allowed()||event.button!==0)return;const p=point(event);if(!p)return;
+    if(!options.sharing()||!options.allowed()||event.button!==0||(!drawing()&&!erasing()))return;const p=point(event);if(!p)return;
+    if(erasing()){event.preventDefault();hideOwner();const hit=[...strokes].reverse().find(s=>s.owner===options.owner()&&hits(s,p));if(hit)options.edit('erase',hit.id);return;}
     event.preventDefault();dragId=event.pointerId;const color=$(options.teacher?'teacherColor':'studentColor').value||options.color();
     draft={tool:tool(),color,size:Number($(options.teacher?'teacherSize':'studentSize').value),points:[p,p]};$('stage').setPointerCapture(dragId);render();
   });
   $('stage').addEventListener('pointermove',event=>{if(!draft){if(event.pointerType!=='touch')showOwner(event);return}hideOwner();if(!options.allowed()){cancel();return}append(event);render()});
   $('stage').addEventListener('pointerup',event=>{if(!draft||event.pointerId!==dragId)return;append(event);const stroke=draft;const mayDraw=options.allowed()&&options.sharing();cancel();if(mayDraw&&C.cleanStroke(stroke))options.submit(stroke)});
   $('stage').addEventListener('pointercancel',()=>{hideOwner();cancel()});$('stage').addEventListener('pointerleave',hideOwner);$('stage').addEventListener('click',event=>{if(event.pointerType==='touch')showOwner(event,true)});$('stage').addEventListener('lostpointercapture',()=>{if(draft)cancel()});
-  [options.teacher?'teacherTool':'studentTool',options.teacher?'teacherColor':'studentColor',options.teacher?'teacherSize':'studentSize'].forEach(id=>$(id).addEventListener('change',cancel));
+  [options.teacher?'teacherTool':'studentTool',options.teacher?'teacherColor':'studentColor',options.teacher?'teacherSize':'studentSize'].forEach(id=>$(id).addEventListener('change',()=>{cancel();$('stage').classList.toggle('teacher-erasing',erasing())}));
   $(options.teacher?'undoTeacherHighlight':'undoStudentHighlight').addEventListener('click',()=>{cancel();options.edit('undo')});
   $(options.teacher?'clearTeacherHighlights':'clearStudentHighlights').addEventListener('click',()=>{cancel();options.edit('clear')});
   if(options.teacher)$('clearAllHighlights').addEventListener('click',()=>{cancel();options.edit('all')});
+  $('stage').classList.toggle('teacher-erasing',erasing());
   new ResizeObserver(render).observe($('stage'));$('lesson').addEventListener('loadedmetadata',render);$('lesson').addEventListener('resize',render);
   return{receive(next){strokes=next;hideOwner();render()},cancel,render,drawing};
 };
