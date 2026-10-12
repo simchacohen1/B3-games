@@ -1153,7 +1153,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     ]);
   }
   function enterGuest(){
-    window.B3Guest.start();
+    if (!window.B3Guest.start()) return;
     studentAccessRevoked=false;myStudentId=myStudentName=myClassId="";
     setLoginMsg("");
     renderStudentAccess();
