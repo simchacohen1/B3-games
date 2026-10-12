@@ -1776,6 +1776,9 @@ exports.generateComprehensionQuestions = onRequest(
     }
 
     const { posukText, posukTranslation, perekNum, posukNum } = req.body || {};
+    const staticQuestions = Array.isArray((req.body || {}).staticQuestions)
+      ? (req.body.staticQuestions || []).map((q) => String(q || '').trim()).filter(Boolean).slice(0, 20)
+      : [];
     let classroomReferenceTranslation = (req.body || {}).classroomReferenceTranslation || '';
     if (!String(classroomReferenceTranslation).trim() && perekNum && posukNum) {
       classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, posukNum);
