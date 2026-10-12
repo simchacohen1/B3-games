@@ -265,8 +265,9 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 // A class other than B3's own (et/wt) plays its own separate game with its own questions.
-const GS_CLASS = (new URLSearchParams(location.search).get('class') || sessionStorage.getItem('b3Games_studentClass') || 'unassigned').trim();
-const CLASS_SPACE = /^[A-Za-z0-9_-]{1,100}$/.test(GS_CLASS);
+const REQUESTED_GS_CLASS = (new URLSearchParams(location.search).get('class') || sessionStorage.getItem('b3Games_studentClass') || 'unassigned').trim();
+const GS_CLASS = /^[A-Za-z0-9_-]{1,100}$/.test(REQUESTED_GS_CLASS) ? REQUESTED_GS_CLASS : 'unassigned';
+const CLASS_SPACE = true;
 
 // Every screen measures the wait timer against Firebase's server clock, so a
 // student whose computer clock is a few seconds off still unlocks on time.
