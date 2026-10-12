@@ -5,7 +5,8 @@
 (function(root){
   "use strict";
   if(root.FTTAudio) return;
-  const ID_KEY="fttAudioMode:20261011:";
+  // Reset earlier saved On choices: instructions start off until explicitly enabled.
+  const ID_KEY="fttAudioMode:20261012:opt-in:";
   const PREFER=[
     "Microsoft Guy Online (Natural)","Microsoft Guy",
     "Microsoft David","Microsoft Mark","Microsoft Christopher",
