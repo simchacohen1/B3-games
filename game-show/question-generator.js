@@ -369,7 +369,7 @@
       } finally { button.disabled = false; }
     });
   }
-  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, questionAndAnswer, questionRecord, phrase, cleanText, localizeText, displayRef, evenlyPick, distribute });
+  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, questionAndAnswer, questionRecord, shortChoice, phrase, cleanText, localizeText, displayRef, evenlyPick, distribute });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", inject, { once: true });
   else inject();
 })();
