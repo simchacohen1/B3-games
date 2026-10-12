@@ -56,6 +56,35 @@ test('answer eligibility handles all four game modes and blocks non-selected stu
   assert.equal(canAnswer({ roundActive: false, teamMode: false, multipleChoice: true, buzzedBy: 'Ari' }, 'Ari'), false);
 });
 
+test('answers score automatically and an incorrect team answer opens one usable steal', () => {
+  const logic = loadTeamLogic();
+  const solo = {
+    teamMode: false, multipleChoice: true, roundActive: true, buzzedBy: 'Ari',
+    scores: { Ari: 0 }
+  };
+  const soloCorrect = logic.applyChoice(solo, 'Ari', 1, 1, 100);
+  assert.equal(soloCorrect.scores.Ari, 10);
+  assert.equal(soloCorrect.answerState.outcome, 'correct');
+
+  const team = {
+    teamMode: true, multipleChoice: true, roundActive: true, buzzedBy: 'Ari',
+    scores: { Ari: 0, Benny: 0 }, teamScores: { A: 0, B: 0 }
+  };
+  const firstWrong = logic.applyChoice(team, 'Ari', 0, 1, 101);
+  assert.equal(firstWrong.teamScores.A, -5);
+  assert.equal(firstWrong.stealTeam, 'B');
+  assert.equal(firstWrong.answerState, null);
+  assert.equal(firstWrong.lastAnswerState.outcome, 'incorrect');
+  assert.equal(logic.applyChoice(firstWrong, 'Ari', 1, 1, 102), undefined);
+
+  const stealTurn = { ...firstWrong, buzzedBy: 'Benny' };
+  const stealCorrect = logic.applyChoice(stealTurn, 'Benny', 1, 1, 103);
+  assert.equal(stealCorrect.teamScores.B, 10);
+  assert.equal(stealCorrect.answerState.outcome, 'correct');
+  assert.equal(stealCorrect.revealed, true);
+  assert.equal(stealCorrect.stealTeam, null);
+});
+
 test('Team Mode and Multiple Choice are separately persisted switches', () => {
   assert.match(teamSource, /id="teamModeToggle"/);
   assert.match(teamSource, /id="multipleChoiceToggle"/);
