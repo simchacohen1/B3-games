@@ -39,7 +39,8 @@ test("multiple-choice answers point to one of the verified references",()=>{
   for(const item of items){
     assert.equal(item.choices.length,4);
     assert.equal(item.choices[item.correctIndex],core.phrase(sources.find(s=>item.ans.includes(s.ref)).text));
-    assert.ok(sources.some(s=>s.ref===item.ans));
+    const answerSource=sources.find(s=>item.ans.includes("(Source: "+s.ref+")"));
+    assert.ok(answerSource);
     assert.ok(item.choices.every(choice=>sources.some(s=>core.phrase(s.text)===choice)));
   }
 });
