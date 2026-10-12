@@ -135,8 +135,19 @@
     }
     return item;
   }
+  function creationDay(source) {
+    const ref = String(source.ref || source.displayRef || "");
+    const match = ref.match(/(?:Genesis|Bereishis)\\s+1:(\\d+)/i);
+    const verse = match ? Number(match[1]) : 0;
+    const ranges = [[1,5],[6,8],[9,13],[14,19],[20,23],[24,31]];
+    const labels = ["day one","day two","day three","day four","day five","day six"];
+    const day = ranges.findIndex(([from,to]) => verse >= from && verse <= to);
+    return day < 0 ? "" : labels[day];
+  }
+
   function questionAndAnswer(source, topic) {
     const text = localizeText(source.text).replace(/\\s+/g, " ").trim();
+    const ref = source.displayRef || displayRef(source.ref);
     if (topic) return { q: "What does this source say about " + topic + "?", answer: text };
     if (source.isRashi) return { q: "What does Rashi explain about this pasuk?", answer: text };
 
@@ -150,24 +161,29 @@
       placed: "place", put: "put", ate: "eat", drank: "drink"
     };
     const verbPattern = Object.keys(verbs).join("|");
-    const match = text.match(new RegExp("(?:^|[;.!?]\\s*)(?:And\\s+)?"+subject+"\\s+("+verbPattern+")\\s+(.+)", "i"));
-    if (!match) return { q: "What happens in this pasuk?", answer: text };
+    const match = text.match(new RegExp("(?:^|[;.!?]\\\\s*)(?:And\\\\s+)?" + subject + "\\\\s+(" + verbPattern + ")\\\\s+(.+)", "i"));
+    if (!match) {
+      const day = creationDay(source);
+      return { q: day ? "What happened on " + day + "?" : "What happened in " + ref + "?", answer: text };
+    }
 
     const name = match[1], verb = match[2].toLowerCase();
     let clause = match[3].split(/[;.!?]/)[0].trim();
     clause = clause.replace(/,\\s+and\\s+(?:Hashem|Moshe|Avraham|Yitzchak|Yaakov|Yosef|Aharon|Sarah|Rivkah|Leah|Rachel|Noach|Esav|Paroh)\\b[\\s\\S]*$/i, "").trim();
-    if (!clause) return { q: "What happens in this pasuk?", answer: text };
+    if (!clause) return { q: "What happens in " + ref + "?", answer: text };
 
+    const day = creationDay(source);
+    const suffix = name.toLowerCase() === "hashem" && day ? " on " + day : "";
     if (verb === "appeared") {
       const target = clause.match(/^to\\s+(.+?)(?:\\s+by\\s+|[,.]|$)/i);
       if (target) return { q: "Who appeared to " + target[1] + "?", answer: name };
     }
     if (verb === "called") {
       const called = clause.match(/^(?:the\\s+)?(light|darkness)\\s+([A-Z][A-Za-z]+)/i);
-      if (called) return { q: "What did " + name + " call the " + called[1].toLowerCase() + "?", answer: called[2] };
-      return { q: "What name did " + name + " give?", answer: clause };
+      if (called) return { q: "What did " + name + " call the " + called[1].toLowerCase() + suffix + "?", answer: called[2] };
+      return { q: "What name did " + name + " give" + suffix + "?", answer: clause };
     }
-    return { q: "What did " + name + " " + verbs[verb] + "?", answer: clause };
+    return { q: "What did " + name + " " + verbs[verb] + suffix + "?", answer: clause };
   }
 
   function shortChoice(value) {
