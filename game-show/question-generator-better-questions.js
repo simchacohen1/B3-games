@@ -204,6 +204,8 @@
   }
 
   function kitzurQuestionAndAnswer(source, text) {
+    // These questions are for third graders: use one simple idea per prompt,
+    // familiar words, and short answers taken directly from the source.
     const clean = value => String(value || "").replace(/\[[^\]]*\]/g, "").replace(/\s+/g, " ").trim().replace(/[;, ]+$/, "");
     const short = value => clean(value).split(/\s+/).slice(0, 14).join(" ").replace(/[,:;]+$/, "");
     let match;
@@ -212,36 +214,36 @@
     if (match) return { q: "What should you remember as soon as you wake up?", answer: match[1] + "." };
 
     match = text.match(/while still in bed you should recite:\s*([^.!?]{8,180})/i);
-    if (match) return { q: "What prayer does the Kitzur say to recite while still in bed?", answer: short(match[1]) + "." };
+    if (match) return { q: "What prayer should you say while still in bed?", answer: short(match[1]) + "." };
 
     match = text.match(/“?(bold as a leopard|light as an eagle|swift as a deer|strong as a lion)”?\s+means,?\s*([^.;]+)/i);
-    if (match) return { q: "What does “" + match[1] + "” mean in this teaching?", answer: short(match[2]) + "." };
+    if (match) return { q: "What does being " + match[1] + " mean?", answer: short(match[2]) + "." };
 
     match = text.match(/if you cannot ([^,.;]{4,100}),? you should (?:nevertheless )?([^,.;]{4,100})/i);
-    if (match) return { q: "If you cannot " + short(match[1]) + ", what should you do instead?", answer: short(match[2]) + "." };
+    if (match) return { q: "If you cannot " + short(match[1]) + ", what should you do?", answer: short(match[2]) + "." };
 
     match = text.match(/in the winter[^:]{0,100}:\s*[“"]([^”"]{8,140})[”"]/i);
-    if (match) return { q: "What excuse might the yetzer hara give in winter?", answer: short(match[1]) + "." };
+    if (match) return { q: "What excuse might make someone stay in bed on a cold winter morning?", answer: short(match[1]) + "." };
 
     match = text.match(/however,? (?:even )?a blind person may recite them by heart/i);
-    if (match) return { q: "Who may recite these prayers or texts by heart?", answer: "A blind person." };
+    if (match) return { q: "Who can say these words from memory?", answer: "A blind person." };
 
     match = text.match(/the proper conclusion is:\s*[“"]([^”"]+)[”"]([^.]*)/i);
-    if (match) return { q: "How should this prayer be concluded?", answer: short(match[1] + match[2]) + "." };
+    if (match) return { q: "Which words should you say at the end of this prayer?", answer: short(match[1]) + "." };
 
     match = text.match(/(?:you should|a person should|one should)\s+([^,.;]{5,120})/i);
-    if (match) return { q: "According to this se’if, what should a person do?", answer: short(match[1]) + "." };
+    if (match) return { q: "What should you do?", answer: short(match[1]) + "." };
 
     const sentence = (text.match(/[^.!?]{12,220}[.!?]/) || [text])[0].trim();
     const words = sentence.replace(/[“”"]/g, "").split(/\s+/).filter(Boolean);
     const splitAt = Math.min(8, Math.max(4, Math.ceil(words.length * 0.55)));
     if (words.length > splitAt) {
       return {
-        q: "Complete this teaching from Siman " + source.siman + ", Se’if " + source.seif + ": “" + words.slice(0, splitAt).join(" ") + " …”",
+        q: "Finish the teaching: “" + words.slice(0, splitAt).join(" ") + " …”",
         answer: words.slice(splitAt, splitAt + 8).join(" ")
       };
     }
-    return { q: "What is one key instruction in this se’if?", answer: short(sentence) };
+    return { q: "Name one instruction from this section.", answer: short(sentence) };
   }
 
   function shortChoice(value) {
@@ -354,7 +356,7 @@
     style.textContent = "#sefariaGenerator .sg-group{margin:16px 0;padding:14px;border:1px solid var(--line,#cbd5e1);border-radius:12px}#sefariaGenerator .sg-group legend{padding:0 8px;font-weight:800}#sefariaGenerator .sg-fields label{display:flex;flex-direction:column;gap:6px;font-weight:700}#sefariaGenerator .sg-fields input:not([type=checkbox]),#sefariaGenerator .sg-fields select{box-sizing:border-box;width:100%;min-height:42px}#sefariaGenerator .sg-fields [type=checkbox]{width:18px;height:18px}#sgQuestionList .editor-row{margin:12px 0;padding:16px;border:1px solid var(--line,#cbd5e1);border-radius:12px;background:rgba(255,255,255,.04)}#sgQuestionList{counter-reset:qrow}#sgQuestionList textarea.row-choices{min-height:100px}#sgStatus{font-weight:700}#sgReplace{border:1px solid #b91c1c}#sgReplace:disabled,#sgAdd:disabled{opacity:.65;cursor:wait}";
     document.head.appendChild(style);
     card.innerHTML = '<h3>Build a question set from Sefaria</h3>' +
-      '<p class="hint">Choose a source and range. Review the drafts, then add them to your current questions or replace the set.</p>' +
+      '<p class="hint">Questions use simple wording and short answers for third graders. Review the drafts before adding them to your current questions or replacing the set.</p>' +
       '<fieldset class="sg-group"><legend>1. Choose the source</legend><div class="sg-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end">' +
       '<label>Source type<select id="sgType" class="select"><option value="chumash">Chumash</option><option value="halacha">Kitzur Shulchan Aruch</option></select></label>' +
       '<label>Sefer<select id="sgBook" class="select">' + bookNames.map(b => '<option value="' + b + '">' + books[b].label + '</option>').join("") + '</select></label>' +
@@ -490,7 +492,7 @@
         const list = review.querySelector("#sgQuestionList");
         list.replaceChildren(...items.map(item => window.createQuestionRow(item.q, item.ans, item.choices, item.correctIndex)));
         review.hidden = false;
-        status.textContent = items.length + " questions ready. Review them below; your current set is unchanged.";
+        status.textContent = items.length + " questions ready" + (type.value === "halacha" ? " (one per se’if, with no repeats)" : "") + ". Review them below; your current set is unchanged.";
         review.scrollIntoView({ behavior: "smooth", block: "start" });
       } catch (error) {
         status.textContent = error.message || "Could not generate questions.";
