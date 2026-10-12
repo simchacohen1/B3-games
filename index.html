@@ -199,6 +199,34 @@
 .activity-manage-hint{font-size:12px;line-height:1.4;color:#64748b}
 .activity-class-controls{flex-wrap:wrap}
 @media(max-width:480px){.activity-manager{gap:8px}.activity-zone{padding:8px}.activity-zone-head{top:-8px;margin-top:-8px}.activity-zone-title{font-size:16px}.activity-manage-row{padding:10px 8px}.activity-manage-name{font-size:16px}.activity-zone-head{flex-wrap:wrap}}
+
+/* Learning Island: visual homepage only; all original links and class gates remain active. */
+body{background:linear-gradient(180deg,#d9f4ff 0%,#eaf9fd 32%,#f4fbf4 100%);padding-inline:clamp(12px,2vw,30px)}
+#gamesArea{max-width:1190px;margin:auto}
+.island-intro{max-width:1130px;margin:12px auto 22px;padding:18px 22px;display:flex;align-items:center;justify-content:center;gap:20px;background:#fffefa;border:2px solid #bde6d5;border-radius:26px;box-shadow:0 8px 22px #164f3a12}
+.island-intro h2{font-size:clamp(25px,3vw,37px);margin:0;color:#18583e}
+.island-intro p{font-size:18px;margin:6px 0 0;color:#395b60}
+.island-sun{font-size:56px}
+.island-map{max-width:1130px;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;padding:24px;background:linear-gradient(155deg,#a8e0c5,#c8edb4 50%,#9ddbc4);border:10px solid #c3ebf7;border-radius:42% 38% 35% 32% / 8% 9% 8% 7%;box-shadow:0 16px 38px #154d6533}
+.island-place{background:#fffdf4ed;border:2px solid #ffffff;border-radius:27px;padding:20px;box-shadow:0 7px 0 #418d6552,0 12px 26px #174c3320;min-width:0}
+.island-place .game-group-head{margin-bottom:16px;align-items:center}
+.island-place .game-group-icon{font-size:clamp(44px,5vw,66px);line-height:1}
+.island-place .game-group-title{font-size:clamp(21px,2.2vw,28px);color:#214b38}
+.island-place .game-group-subtitle{font-size:15px;color:#476053;line-height:1.4;margin-top:5px}
+.island-place .game-group-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.island-place .student-card-shell{min-width:0}
+.island-place .game-card{min-height:145px;padding:18px 12px;border:2px solid #cde6dc;border-radius:21px;background:#fff;gap:12px}
+.island-place .card-icon{font-size:48px}
+.island-place .card-title{font-size:clamp(17px,1.7vw,21px);line-height:1.25;text-align:center;overflow-wrap:anywhere}
+.island-main{background:#fffcef;border-color:#f7e6a9}
+.island-main .game-card{min-height:182px;background:#fffefa}
+.island-roots .game-group-grid{grid-template-columns:minmax(0,1fr);max-width:280px;margin:auto}
+.island-roots .game-card{min-height:182px}
+.island-place .game-card:focus-visible{outline:4px solid #1d6cc7;outline-offset:3px}
+@media(min-width:850px){.island-place[data-game-group="skills"]{grid-column:1}.island-place[data-game-group="more-learning"]{grid-column:2}}
+@media(max-width:750px){.island-map{grid-template-columns:1fr;border-radius:34px;padding:14px;gap:16px;border-width:6px}.island-intro{padding:15px}.island-sun{font-size:40px}.island-place{padding:16px}.island-place .game-group-grid{gap:10px}.island-place .game-card{min-height:130px}.island-main .game-card{min-height:150px}}
+@media(max-width:380px){.island-place .game-group-grid{grid-template-columns:1fr}.island-place .game-group-icon{font-size:42px}}
+@media(prefers-reduced-motion:reduce){.island-place .game-card{transition:none}}
 </style>
 <script>
   window.__b3Errors = [];
@@ -270,53 +298,37 @@
 
   <div id="gamesArea" class="hidden">
     <div id="specialAccessNote" class="special-access-note hidden">Special access from Rabbi Cohen: while Fun Torah Tools is locked, only the activity or activities shown below are available to you.</div>
-    <div class="game-container">
-      <section class="game-group" data-game-group="learn">
-        <div class="game-group-head">
-          <span class="game-group-icon">📚</span>
-          <div><div class="game-group-title">Learn &amp; Practice</div><div class="game-group-subtitle">Build your skills and review what you learned</div></div>
-        </div>
-        <div class="game-group-grid">
-          <a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
-          <a class="game-card" data-game-id="chazara" href="chazara/index.html"><span class="card-icon">🔁</span><span class="card-title">Chazara Chart</span></a>
-          <a class="game-card" data-game-id="shorashim" href="shorashim/index.html"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span></a>
-        </div>
+    <div class="island-intro"><span class="island-sun" aria-hidden="true">☀️</span><div><h2>Welcome to Learning Island!</h2><p>Choose a place to explore.</p></div></div>
+    <div class="game-container island-map" aria-label="Learning Island destinations">
+            <section class="game-group island-place island-main" data-game-group="learn">
+        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🏫</span><div><div class="game-group-title">Chumash Schoolhouse</div><div class="game-group-subtitle">Learn your posuk, then review it</div></div></div>
+        <div class="game-group-grid"><a class="game-card" data-game-id="posuk-practice-scroll" href="record_pesukim/student.html"><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll</span></a>
+<a class="game-card" data-game-id="chazara" href="chazara/index.html"><span class="card-icon">🔁</span><span class="card-title">Chazara Chart</span></a></div>
       </section>
-
-      <section class="game-group" data-game-group="more-learning">
-        <div class="game-group-head">
-          <span class="game-group-icon">&#128218;</span>
-          <div><div class="game-group-title">More Learning</div><div class="game-group-subtitle">Rashi, Yiddish, Halacha, and Gematria</div></div>
-        </div>
-        <div class="game-group-grid">
-          <a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
-          <a class="game-card" data-game-id="yiddish" href="yiddish/index.html"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
-          <a class="game-card" data-game-id="halacha" href="halacha/index.html?v=20261007-teacher-sync"><span class="card-icon">📔</span><span class="card-title">Halacha</span></a>
-          <a class="game-card" data-game-id="sefer-hamitzvos" href="sefer-hamitzvos/index.html"><span class="card-icon">📖</span><span class="card-title">Sefer HaMitzvos</span></a>
-          <a class="game-card" data-game-id="gematria" href="gematria/index.html"><span class="card-icon">🔢</span><span class="card-title">Gematria</span></a>
-        </div>
+            <section class="game-group island-place island-main island-roots" data-game-group="roots">
+        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🌳</span><div><div class="game-group-title">Shorashim Grove</div><div class="game-group-subtitle">Grow your Hebrew word skills</div></div></div>
+        <div class="game-group-grid"><a class="game-card" data-game-id="shorashim" href="shorashim/index.html"><span class="card-icon">🌳</span><span class="card-title">Shorashim</span></a></div>
       </section>
-
-      <section class="game-group" data-game-group="class">
-        <div class="game-group-head">
-          <span class="game-group-icon">👥</span>
-          <div><div class="game-group-title">My Class</div><div class="game-group-subtitle">Your class work, gallery, and rewards</div></div>
-        </div>
-        <div class="game-group-grid">
-          <a class="game-card" data-game-id="class-gallery" href="class-gallery/index.html"><span class="card-icon">🖼️</span><span class="card-title">Class Gallery</span></a>
-          <a class="game-card" data-game-id="student-rewards" href="student-rewards/student.html"><span class="card-icon">🌟</span><span class="card-title">Student Rewards</span></a>
-        </div>
+            <section class="game-group island-place " data-game-group="skills">
+        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">📚</span><div><div class="game-group-title">Skills Library</div><div class="game-group-subtitle">Rashi letters, Yiddish, and Gematria</div></div></div>
+        <div class="game-group-grid"><a class="game-card" data-game-id="rashi-letters" href="rashi-letters/student.html"><span class="card-icon rashi-icon" lang="he" dir="rtl">אב</span><span class="card-title">Rashi Letters</span></a>
+<a class="game-card" data-game-id="yiddish" href="yiddish/index.html"><img class="yiddish-icon" src="assets/yiddish-icon-v2.png" alt="" aria-hidden="true"><span class="card-title">Yiddish</span></a>
+<a class="game-card" data-game-id="gematria" href="gematria/index.html"><span class="card-icon">🔢</span><span class="card-title">Gematria</span></a></div>
       </section>
-
-      <section class="game-group" data-game-group="challenge">
-        <div class="game-group-head">
-          <span class="game-group-icon">🏆</span>
-          <div><div class="game-group-title">Tests &amp; Challenges</div><div class="game-group-subtitle">Quizzes and class challenges</div></div>
-        </div>
-        <div class="game-group-grid">
-          <a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz &amp; Practice</span></a>
-          <a class="game-card" data-game-id="game-show" href="game-show/player.html"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a>
-        </div>
+            <section class="game-group island-place " data-game-group="more-learning">
+        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🕍</span><div><div class="game-group-title">Learning Beis Midrash</div><div class="game-group-subtitle">Halacha and Sefer HaMitzvos</div></div></div>
+        <div class="game-group-grid"><a class="game-card" data-game-id="halacha" href="halacha/index.html?v=20261007-teacher-sync"><span class="card-icon">📔</span><span class="card-title">Halacha</span></a>
+<a class="game-card" data-game-id="sefer-hamitzvos" href="sefer-hamitzvos/index.html"><span class="card-icon">📖</span><span class="card-title">Sefer HaMitzvos</span></a></div>
+      </section>
+            <section class="game-group island-place " data-game-group="class">
+        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🏡</span><div><div class="game-group-title">Class Village</div><div class="game-group-subtitle">Your gallery and rewards</div></div></div>
+        <div class="game-group-grid"><a class="game-card" data-game-id="class-gallery" href="class-gallery/index.html"><span class="card-icon">🖼️</span><span class="card-title">Class Gallery</span></a>
+<a class="game-card" data-game-id="student-rewards" href="student-rewards/student.html"><span class="card-icon">🌟</span><span class="card-title">Student Rewards</span></a></div>
+      </section>
+            <section class="game-group island-place " data-game-group="challenge">
+        <div class="game-group-head"><span class="game-group-icon" aria-hidden="true">🏆</span><div><div class="game-group-title">Challenge Playground</div><div class="game-group-subtitle">Quiz yourself or play a game</div></div></div>
+        <div class="game-group-grid"><a class="game-card" data-game-id="weekly-quiz" href="weekly-quiz/index.html"><span class="card-icon">📝</span><span class="card-title">Weekly Quiz &amp; Practice</span></a>
+<a class="game-card" data-game-id="game-show" href="game-show/player.html"><span class="card-icon">🏆</span><span class="card-title">Game Show</span></a></div>
       </section>
     </div>
     <p id="disabledMessage" class="disabled-note hidden">No activities are available right now.</p>
