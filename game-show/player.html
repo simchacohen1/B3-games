@@ -505,7 +505,7 @@ function showBuzzResult(data, qIndex) {
   document.body.classList.toggle('won', won);
   document.body.classList.toggle('lost', !!(data.buzzedBy && !won));
   const key = qIndex + '|' + (data.buzzOpenAt || 0);
-  if (won && lastCelebrated !== key) { lastCelebrated = key; launchConfetti(); }
+  if (won && lastCelebrated !== key) { lastCelebrated = key; launchConfetti(); if (data.revealDelayOn) playBuzzSound(); }
 }
 
 function launchConfetti() {
