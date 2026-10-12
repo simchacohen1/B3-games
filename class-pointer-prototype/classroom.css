@@ -253,3 +253,32 @@ body.student-dock-view #stage:fullscreen #exitFullScreenLesson,body.student-dock
 #stage .teacher-dock.floating.collapsed>.tb-move-handle{display:inline-flex}
 #stage .teacher-dock.floating.collapsed .tb-group:last-child{display:flex}
 #stage .teacher-dock.floating.collapsed .tb-menu{display:none}
+
+
+/* Compact full-screen side tab: one toolbar, no duplicate top controls. */
+#stage .teacher-dock.floating.collapsed {
+  top:12px;
+  left:0;
+  right:auto;
+  width:44px;
+  max-width:44px;
+  padding:5px;
+  border-radius:0 12px 12px 0;
+  gap:0;
+}
+#stage .teacher-dock.floating.collapsed > .tb-move-handle,
+#stage .teacher-dock.floating.collapsed > .tb-group {display:none!important}
+#stage .teacher-dock.floating.collapsed > .tb-group:last-child {display:flex!important}
+#stage .teacher-dock.floating.collapsed > .tb-group:last-child > * {display:none!important}
+#stage .teacher-dock.floating.collapsed > .tb-group:last-child > .tb-collapse {
+  display:inline-flex!important;
+  width:34px;
+  min-width:34px;
+  min-height:38px;
+  justify-content:center;
+  padding:4px;
+}
+#stage .teacher-dock.floating.collapsed .tb-collapse::after {content:'☰'!important;font-size:22px}
+#stage .teacher-dock.floating.collapsed .tb-collapse {font-size:0}
+#stage .teacher-dock.floating.collapsed .tb-menu {display:none!important}
+#stage:has(.teacher-dock.floating) > #fullscreenTeacherToolbar {display:none!important}
