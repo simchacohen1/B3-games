@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Teacher Tool Preview — Fun Torah Tools</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;background:#eef2f7;color:#203047;font-family:Arial,sans-serif}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 24px;background:#172033;color:#fff;flex-wrap:wrap}
+  header strong{font-size:21px}header a{color:white;text-decoration:none;background:#334155;padding:10px 14px;border-radius:10px}
+  main{max-width:1560px;margin:16px auto;padding:0 18px}
+  .notice{padding:15px;background:#fff8df;border:1px solid #e8c267;border-radius:12px;line-height:1.5;margin-bottom:12px}
+  #status{padding:20px;background:white;border-radius:12px}
+  #viewer{display:none;width:100%;height:calc(100vh - 230px);min-height:550px;border:1px solid #ccd4e1;border-radius:12px;background:#fff}
+  .muted{font-size:13px;color:#64748b}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="site-settings.js?v=20261008-owner-demo"></script>
+<script src="teacher-preview.js?v=20261008-1"></script>
+</head>
+<body>
+<header><strong id="heading">Teacher Tool Preview</strong><a id="back" href="admin.html">← Back to teacher view</a></header>
+<main>
+<div class="notice"><strong>Read-only teacher preview.</strong> Explore the teacher tool's screens without changing student data, awards, approvals or settings. Some older tools may still display owner-only information or may not load every interactive section correctly. This preview does not sign in as the selected teacher.</div>
+<div id="status" role="status">Verifying teacher and class access…</div>
+<iframe id="viewer" title="Read-only teacher tool" sandbox="allow-scripts allow-same-origin" referrerpolicy="same-origin"></iframe>
+<p class="muted">To make real changes, exit this preview and open your own teacher or administrator dashboard.</p>
+</main>
+<script>
+(function () {
+  "use strict";
+  const params = new URLSearchParams(location.search);
+  const teacherId = params.get("previewTeacher") || "";
+  const type = params.get("previewType") || "teacher";
+  const classId = params.get("class") || "";
+  const toolId = params.get("tool") || "";
+  const SAFE = /^[A-Za-z0-9_-]{1,100}$/;
+  const TOOLS = {
+    "halacha":["Halacha","halacha/teacher.html"],
+    "yiddish":["Yiddish","yiddish/teacher.html"],
+    "posuk-practice-scroll":["Posuk Practice","record_pesukim/teacher.html"],
+    "rashi-letters":["Rashi Letters","rashi-letters/teacher.html"],
+    "gematria":["Gematria","gematria/teacher.html"],
+    "shorashim":["Shorashim","shorashim/teacher.html?v=20260917-correct-dashboard"],
+    "chazara":["Chazara","chazara/teacher.html"],
+    "game-show":["Game Show","game-show/teacher.html"],
+    "student-rewards":["Student Rewards","student-rewards/teacher.html"],
+    "daily-points":["Daily Points","student-rewards/teacher.html?tab=Daily%20Points"],
+    "weekly-quiz":["Weekly Quiz","weekly-quiz/teacher.html"],
+    "gallery":["Class Gallery","class-gallery/index.html"],
+    "class-gallery":["Class Gallery","class-gallery/index.html"],
+    "tag":["Tag Game","class-gallery/index.html"],
+    "davening":["Davening Player","davening_student_app/index.html"],
+    "class-pointer":["Class Pointer","class-pointer-prototype/dashboard.html?teacher=1"],
+    "name-picker":["Name Picker","name-picker/index.html"],
+    "chavrusa":["Chavrusa of the Day","chavrusa/index.html"]
+  };
+  const status = document.getElementById("status");
+  const viewer = document.getElementById("viewer");
+  const back = document.getElementById("back");
+  const root = new URL(".", location.href);
+  let currentTool;
+  const api = window.B3SiteSettings;
+  if (!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+  const db = firebase.database();
+
+  function message(text) {
+    status.style.display = "block";
+    status.textContent = text;
+    viewer.style.display = "none";
+  }
+  function sameToolPath(url) {
+    const initial = new URL(currentTool[1], root);
+    const folder = initial.pathname.slice(0, initial.pathname.lastIndexOf("/") + 1);
+    return url.origin === location.origin &&
+      url.pathname.startsWith(folder) &&
+      /\.html?$/.test(url.pathname) &&
+      !url.pathname.slice(folder.length).includes("/");
+  }
+  async function openToolPage(path) {
+    const selected = new URL(path, root);
+    if (!sameToolPath(selected)) { message("That page isn't part of this teacher tool. Return to your tool list to choose another."); return; }
+    selected.searchParams.set("class", classId);
+    message("Opening the read-only screen…");
+    try {
+      const response = await fetch(selected.href, {cache:"no-store"});
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const html = await response.text();
+      const documentCopy = new DOMParser().parseFromString(html, "text/html");
+      const base = documentCopy.createElement("base");
+      base.href = selected.href;
+      documentCopy.head.prepend(base);
+      const first = documentCopy.createElement("script");
+      first.src = new URL("teacher-preview-readonly.js?v=20261012-1", root).href;
+      first.dataset.teacherPreviewGuard = "1";
+      base.after(first);
+      // Compat SDK methods need patching before the tool's own code runs.
+      documentCopy.querySelectorAll("script[src]").forEach(script => {
+        if (script === first) return;
+        if (/firebase-(?:database|storage|app)-compat\.js|firebase-config\.js|site-settings\.js/.test(script.src)) {
+          const patch = documentCopy.createElement("script");
+          patch.textContent = "window.B3PreviewProtect && window.B3PreviewProtect();";
+          script.after(patch);
+        }
+      });
+      const serialized = "<!doctype html>\n" + documentCopy.documentElement.outerHTML;
+      viewer.style.display = "block";
+      viewer.srcdoc = serialized;
+      status.style.display = "none";
+    } catch (error) {
+      console.error(error);
+      message("This tool preview could not be opened. No student data was changed.");
+    }
+  }
+  window.addEventListener("message", event => {
+    if (event.source !== viewer.contentWindow || event.origin !== location.origin ||
+        event.data?.type !== "b3-teacher-preview-link") return;
+    let target;
+    try { target = new URL(event.data.href); } catch (_) { return; }
+    if (sameToolPath(target)) openToolPage(target.href);
+    else message("This link goes outside the selected tool. Return to the teacher's dashboard to choose another tool.");
+  });
+  if (!SAFE.test(teacherId) || !SAFE.test(classId) || !TOOLS[toolId] ||
+      !["teacher", "invite"].includes(type)) {
+    message("Invalid teacher preview link.");
+    return;
+  }
+  currentTool = TOOLS[toolId];
+  const home = new URL("teacher-home.html", root);
+  home.searchParams.set("previewTeacher", teacherId);
+  home.searchParams.set("previewType", type);
+  back.href = home.href;
+  api.onAuthStateChanged(async (user, authorized, access) => {
+    if (!user || !authorized || access?.role !== "admin") {
+      message("Only the owner can open a teacher preview.");
+      return;
+    }
+    try {
+      const choices = await B3TeacherPreview.list(db, api.workspaceId || "b3-2026", access, user.uid);
+      const teacher = choices.find(item => item.id === teacherId && item.type === type);
+      if (!teacher || !teacher.classIds.includes(classId)) throw new Error("The teacher is not assigned to this class.");
+      const snap = await db.ref("b3Games/workspaces/" + (api.workspaceId || "b3-2026") + "/classes/" + classId).once("value");
+      const cls = snap.val();
+      if (!cls || cls.active === false) throw new Error("The class is not active.");
+      const permitted = cls.toolGrants?.[toolId] === true ||
+        (toolId === "daily-points" && cls.toolGrants?.["student-rewards"] === true);
+      if (!permitted) throw new Error("This tool is not enabled for the selected teacher's class.");
+      window.__B3_PREVIEW_CONTEXT = Object.freeze({
+        verified:true,teacherName:teacher.name,classId,className:cls.name || classId
+      });
+      document.getElementById("heading").textContent = teacher.name + " · " + (cls.name || classId) + " · " + currentTool[0];
+      openToolPage(currentTool[1]);
+    } catch (error) {
+      message(error.message || "The teacher preview couldn't be verified.");
+    }
+  });
+})();
+</script>
+</body>
+</html>
