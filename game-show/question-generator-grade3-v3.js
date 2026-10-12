@@ -343,7 +343,7 @@
   function inject() {
     const setup = document.getElementById("tabSetup");
     const editor = document.getElementById("editorList");
-    if (!setup || !editor || !window.createQuestionRow) return;
+    if (!setup || !editor || typeof createQuestionRow !== "function") return;
     const card = document.createElement("section");
     card.className = "card";
     card.id = "sefariaGenerator";
