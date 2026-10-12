@@ -6,7 +6,7 @@ const ROOT='b3Games/workspaces/b3-2026';
 const OWNER='simcha5770@gmail.com';
 const clean=s=>String(s||'').trim();
 const emailOf=identity=>clean(identity.email).toLowerCase();
-exports.funTorahTeacherRequests=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io'],maxInstances:5},async(req,res)=>{
+exports.funTorahTeacherRequests=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io','https://funtorahtools.com','https://www.funtorahtools.com'],maxInstances:5},async(req,res)=>{
  res.set('Cache-Control','no-store');
  if(req.method!=='POST')return res.status(405).json({error:'POST required'});
  try{
@@ -28,7 +28,7 @@ exports.funTorahTeacherRequests=onRequest({region:'us-central1',cors:['https://s
    await ref.update({uid:user.uid,email,name,school,purpose,adultConfirmed:true,status:'pending',submittedAt:current?.submittedAt||admin.database.ServerValue.TIMESTAMP,updatedAt:admin.database.ServerValue.TIMESTAMP});
    return res.json({status:'pending'});
   }
-  if(email!==OWNER)return res.status(403).json({error:'Owner access required'});
+  if(email!==OWNER||user.email_verified!==true)return res.status(403).json({error:'Owner access required'});
   if(action==='list'){
    const snap=await db.ref(ROOT+'/teacherRequests').orderByChild('status').equalTo('pending').once('value');
    return res.json({requests:Object.values(snap.val()||{})});
