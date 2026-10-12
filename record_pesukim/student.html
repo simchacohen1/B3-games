@@ -560,6 +560,10 @@
   .chunk-token.correct{ background:#E4F4E4; border-color:#4C9A4C; border-style:solid; }
   .chunk-token.incorrect{ background:#F6E1E1; border-color:var(--rimon); border-style:solid; }
   .chunk-token .sof-pasuk{ font-family:'Times New Roman', 'Liberation Serif', serif; }
+  .word-selection-board{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;padding:14px;background:var(--parchment);border-radius:14px;direction:rtl}
+  .word-choice{font-family:'Noto Serif Hebrew',serif;font-size:1.4rem;font-weight:700;padding:8px 11px;border:2px solid rgba(59,42,30,.2);border-radius:12px;background:white;color:var(--ink);cursor:pointer}
+  .word-choice.selected{background:var(--gold-light);border-color:var(--gold)}
+  .word-choice:disabled{cursor:default;opacity:.8}
   .dispute-row{
     width:100%;
     margin-top: 6px;
@@ -1373,6 +1377,9 @@
             </div>
             <button class="listen-btn" id="questionListenBtn" type="button">🔊 Listen</button>
           </div>
+          <div style="margin:12px 0 8px;text-align:center;color:var(--ink-soft);font-weight:800;">Tap all the Hebrew words that answer the question.</div>
+          <div class="word-selection-board" id="questionWordChoices" dir="rtl"></div>
+          <div style="text-align:center;margin:10px 0;"><button class="btn gold" id="checkWordSelectionBtn" type="button">Check words</button></div>
           <!-- Moved up here (right under the question itself) instead of
                after the growing answer-history list below — a student
                answering question 6 of 8 shouldn't have to scroll past
@@ -1722,19 +1729,20 @@ let comprehensionQuestionLoadFailed = false;
 // network read.
 const generatedQuestionMemoryCache = new Map();
 const generatedQuestionPromiseCache = new Map();
-const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_v1_';
+const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_wordselect_v1_';
 
 function generatedQuestionCacheKey(part){
-  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_');
+  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_') + '_wordselect_v1';
 }
 function normalizeGeneratedItems(items, posukNum){
   return (Array.isArray(items) ? items : []).map(item => ({
     question: normalizeDivineNames(item.question || ''),
     expectedAnswer: normalizeDivineNames(item.expectedAnswer || ''),
     sourceFact: normalizeDivineNames(item.sourceFact || ''),
+    answerWordIndices: Array.isArray(item.answerWordIndices) ? item.answerWordIndices.map(Number).filter(Number.isInteger) : [],
     posukNum,
     generated: true
-  })).filter(item => item.question);
+  })).filter(item => item.question && item.answerWordIndices.length);
 }
 function readLocalGeneratedQuestions(cacheKey, posukNum){
   try{
@@ -1769,10 +1777,6 @@ function normalizeDivineNames(text){
 
 async function getGeneratedQuestionsForPart(part){
   const staticQs = getQuestionsForPosuk(currentPerekNum, part.posukNum);
-  if(staticQs){
-    return staticQs.map(q => ({ question:q, posukNum:part.posukNum, expectedAnswer:'', sourceFact:'', generated:false }));
-  }
-
   if(!part || !part.translation || !part.translation.trim()) return [];
   const cacheKey = generatedQuestionCacheKey(part);
 
@@ -2038,7 +2042,8 @@ let currentSelectionParts = []; // [{posukNum, text, translation, key}] for tran
 let comprehensionQuestions = [];
 let comprehensionQIndex = 0;
 let comprehensionQResults = {};
-let questionTryCounts = {}; // question index -> how many graded tries this visit
+let questionTryCounts = {};
+let questionSelectionDrafts = {}; // question index -> how many graded tries this visit
 function questionDisputeUnlocked(i){ const r = comprehensionQResults[i]; return !!r && (r.tries || 0) >= 2; }
 let comprehensionMode = 'freehand-only';
 
@@ -3654,7 +3659,7 @@ function renderAnsweredQuestionHistory(){
         : '<button type="button" class="btn small ghost-delete question-answer-delete-btn" data-q-index="' + i + '" style="margin-top:7px;"' + deleteDisabled + '>' + deleteLabel + '</button>';
       return `<div style="padding:9px 11px;margin:5px 0;border-radius:12px;background:${ok?'#E4F4E4':'#F6E1E1'};border:1px solid ${ok?'#4C9A4C':'var(--rimon)'};">
         <strong>${ok?'✅':'❌'} ${posukTag}Question ${i+1}. ${q?q.question:''}</strong>
-        ${r&&r.transcript?`<div style="font-size:.8rem;font-style:italic;margin-top:3px;">You said: “${r.transcript}”</div>`:''}
+        ${r&&r.transcript?`<div style="font-size:.8rem;font-style:italic;margin-top:3px;">You selected: “${r.transcript}”</div>`:''}
         ${r&&r.feedback?`<div style="font-size:.8rem;margin-top:2px;">${r.feedback}</div>`:''}
         ${audioHtml}
         ${disputeHtml}
@@ -3699,6 +3704,7 @@ async function restoreSavedQuestionResults(){
           verdict:r.verdict,
           feedback:r.feedback||'',
           transcript:r.transcript||'',
+          selectionIndices:Array.isArray(r.selectionIndices)?r.selectionIndices:[],
           blob:null,
           ext:'webm',
           audioURL:r.audioURL||null,
@@ -3768,6 +3774,8 @@ function renderComprehensionQuestionUI(){
   const caption = document.getElementById('comprehensionRecordCaption');
   const allAnswered = comprehensionQuestions.length > 0 &&
     comprehensionQuestions.every((_, i) => !!comprehensionQResults[i]);
+  const micStage=document.querySelector('.record-stage');
+  if(micStage) micStage.classList.toggle('hidden', comprehensionMode === 'questions');
 
   if(comprehensionMode === 'freehand-only'){
     questionBlock.classList.add('hidden');
@@ -3797,6 +3805,7 @@ function renderComprehensionQuestionUI(){
   document.getElementById('questionProgress').textContent =
     'Question ' + (comprehensionQIndex + 1) + ' of ' + total + '  ' + questionProgressDots();
   document.getElementById('questionText').textContent = current ? current.question : '';
+  renderQuestionWordChoices(current, comprehensionQResults[comprehensionQIndex]);
   caption.textContent = '🎙️ Tap • wait for clear question • answer • stay quiet to finish';
 
   navRow.classList.toggle('hidden', total <= 1 && !allAnswered);
@@ -4607,94 +4616,52 @@ async function showComprehensionResult(verdict, score, feedback, transcript){
    recording. Two-tier verdict (correct/incorrect), matching how a single
    factual question naturally grades. */
 async function gradeCurrentQuestionAnswer(){
-  const idx = comprehensionQIndex;
-  const current = comprehensionQuestions[idx];
-  const gradingMsg = document.getElementById('comprehensionGradingMsg');
-  const retryBtn = document.getElementById('comprehensionRetryBtn');
-  const resultEl = document.getElementById('comprehensionResult');
-  resultEl.classList.add('hidden');
-  retryBtn.classList.add('hidden');
-
-  if(!currentAudio.comprehension || !current) return;
-
-  if(!GRADE_QUESTION_ANSWER_URL || GRADE_QUESTION_ANSWER_URL.indexOf('PASTE') === 0){
-    gradingMsg.textContent = "Grading isn't set up yet (Cloud Function URL missing).";
-    return;
+  const idx=comprehensionQIndex, current=comprehensionQuestions[idx];
+  if(!current)return;
+  const selected=(questionSelectionDrafts[idx]||[]).map(Number).sort((a,b)=>a-b);
+  if(!selected.length){document.getElementById('comprehensionGradingMsg').textContent='Tap one or more words first.';return;}
+  const words=getQuestionPosukWords(current), target=(current.answerWordIndices||[]).slice().sort((a,b)=>a-b);
+  const correct=target.length>0&&selected.length===target.length&&selected.every((n,i)=>n===target[i]);
+  const picked=selected.map(i=>words[i]).join(' '), answer=target.map(i=>words[i]).join(' ');
+  questionTryCounts[idx]=(questionTryCounts[idx]||0)+1;
+  comprehensionQResults[idx]={tries:questionTryCounts[idx],verdict:correct?'correct':'incorrect',feedback:correct?'You found the right words!':'Look for: '+answer,transcript:picked,selectionIndices:selected,saving:true};
+  renderQuestionResult(idx,comprehensionQResults[idx].verdict,comprehensionQResults[idx].feedback,picked);
+  document.getElementById('comprehensionStatus').textContent=correct?'Correct!':'Try again next time';
+  document.getElementById('comprehensionGradingMsg').textContent='';
+  const allAnswered=comprehensionQuestions.every((_,i)=>!!comprehensionQResults[i]);
+  document.getElementById('questionsDoneBlock').classList.toggle('hidden',!allAnswered);
+  renderAnsweredQuestionHistory();renderQuestionFinalScore();renderQuestionWordChoices(current,comprehensionQResults[idx]);
+  await autosaveComprehensionQuestions();
+  if(!allAnswered)setTimeout(()=>{
+    if(comprehensionMode!=='questions')return;
+    const next=comprehensionQuestions.findIndex((_,i)=>i>idx&&!comprehensionQResults[i]);
+    if(next>=0){comprehensionQIndex=next;renderComprehensionQuestionUI();}
+  },1300);
+}
+function getQuestionPosukWords(question){
+  const part=(currentSelectionParts||[]).find(p=>Number(p.posukNum)===Number(question&&question.posukNum));
+  const text=part&&part.text||(Number(question&&question.posukNum)===Number(currentPosukNum)?currentPosukText:'');
+  return String(text||'').trim().split(/\\s+/).filter(Boolean);
+}
+function renderQuestionWordChoices(question,existing){
+  const host=document.getElementById('questionWordChoices'),check=document.getElementById('checkWordSelectionBtn');
+  if(!host||!check)return;
+  const words=getQuestionPosukWords(question),targets=question&&question.answerWordIndices;
+  if(!words.length||!Array.isArray(targets)||!targets.length||targets.some(i=>i<0||i>=words.length)){
+    host.innerHTML='<div class="comp-status">Word choices are not ready. Please retry.</div>';check.disabled=true;return;
   }
-
-  gradingMsg.textContent = 'Listening to your answer…';
-  document.getElementById('comprehensionStatus').textContent = 'Recorded — grading…';
-
-  try{
-    const formData = new FormData();
-    formData.append('audio', currentAudio.comprehension, 'recording.' + currentAudioExt.comprehension);
-    formData.append('question', current.question);
-    if(current.expectedAnswer) formData.append('expectedAnswer', current.expectedAnswer);
-    formData.append('posukTranslation', currentPosukTranslation || '');
-    formData.append('posukText', currentPosukText || '');
-    formData.append('perekNum', String(currentPerekNum || ''));
-    formData.append('posukNum', String((current && current.posukNum) || currentPosukNum || ''));
-    formData.append('endPosukNum', String((current && current.posukNum) || currentPosukNum || ''));
-    const [classroomRefs, kehotRefs] = await Promise.all([
-      fetchClassroomReferenceChapter(currentPerekNum),
-      fetchKehotChapterTranslation(currentPerekNum)
-    ]);
-    formData.append('classroomReferenceTranslation', classroomRefs[currentPosukNum - 1] || '');
-    formData.append('kehotReferenceTranslation', kehotRefs[currentPosukNum - 1] || '');
-
-    const res = await B3PaidApi.fetch(GRADE_QUESTION_ANSWER_URL, { method: 'POST', body: formData });
-    if(!res.ok) throw new Error('Grading request failed');
-    const data = await res.json();
-
-    if(data.verdict === 'no_speech'){
-      gradingMsg.textContent = "Didn't catch that — try recording again, a little closer to the mic.";
-      document.getElementById('comprehensionStatus').textContent = 'Recorded';
-      return;
-    }
-
-    questionTryCounts[idx] = (questionTryCounts[idx] || 0) + 1;
-    comprehensionQResults[idx] = {
-      tries: questionTryCounts[idx],
-      verdict: data.verdict,
-      feedback: data.feedback || '',
-      transcript: data.transcript || '',
-      blob: currentAudio.comprehension,
-      ext: currentAudioExt.comprehension,
-      saving: true
-    };
-    renderQuestionResult(idx, data.verdict, data.feedback || '', data.transcript || '');
-    gradingMsg.textContent = '';
-    document.getElementById('comprehensionStatus').textContent = 'Recorded — listen above';
-
-    // Update the progress dots / Previous-Next / done-block state now that
-    // this question has a result, without disturbing what's on screen.
-    document.getElementById('questionProgress').textContent =
-      'Question ' + (idx + 1) + ' of ' + comprehensionQuestions.length + '  ' + questionProgressDots();
-    const allAnswered = comprehensionQuestions.every((_, i) => !!comprehensionQResults[i]);
-    document.getElementById('questionsDoneBlock').classList.toggle('hidden', !allAnswered);
-    renderAnsweredQuestionHistory();
-    renderQuestionFinalScore();
-    // Save (and upload this answer's audio) as soon as THIS question is
-    // graded, not only once every question is done — otherwise a session
-    // that ends partway through loses the audio for every answer given so
-    // far, and a dispute filed before the last question has nowhere to be
-    // stored yet.
-    await autosaveComprehensionQuestions();
-    if(allAnswered){
-      renderQuestionFinalScore();
-    }else{
-      setTimeout(()=>{
-        if(comprehensionMode!=='questions') return;
-        const next=comprehensionQuestions.findIndex((_,i)=>i>idx&&!comprehensionQResults[i]);
-        if(next>=0){ comprehensionQIndex=next; renderComprehensionQuestionUI(); }
-      },1300);
-    }
-  }catch(err){
-    console.error(err);
-    gradingMsg.textContent = 'Could not check your answer — check your internet and try again.';
-    document.getElementById('comprehensionStatus').textContent = 'Recorded';
-    retryBtn.classList.remove('hidden');
-  }
+  const saved=existing&&Array.isArray(existing.selectionIndices)?existing.selectionIndices:questionSelectionDrafts[comprehensionQIndex]||[];
+  const selected=new Set(saved.map(Number));host.innerHTML='';
+  words.forEach((word,index)=>{
+    const button=document.createElement('button');button.type='button';
+    button.className='word-choice'+(selected.has(index)?' selected':'');button.textContent=word;
+    button.setAttribute('aria-pressed',selected.has(index)?'true':'false');button.disabled=!!existing;
+    button.onclick=()=>{if(existing)return;if(selected.has(index))selected.delete(index);else selected.add(index);
+      questionSelectionDrafts[comprehensionQIndex]=Array.from(selected);button.classList.toggle('selected',selected.has(index));
+      button.setAttribute('aria-pressed',selected.has(index)?'true':'false');};
+    host.appendChild(button);
+  });
+  check.disabled=!!existing;
 }
 
 // Renders one question's correct/incorrect result — deliberately simpler
@@ -4800,6 +4767,7 @@ async function autosaveComprehensionQuestions(){
 
       questionResultsData[i] = {
         question: comprehensionQuestions[i].question,
+        selectionIndices: Array.isArray(r.selectionIndices) ? r.selectionIndices : [],
         questionIndex: i,
         posukNum: comprehensionQuestions[i].posukNum,
         verdict: r.verdict,
@@ -4867,6 +4835,7 @@ function switchBackToQuestions(){
   renderComprehensionQuestionUI();
 }
 
+document.getElementById('checkWordSelectionBtn').onclick = gradeCurrentQuestionAnswer;
 document.getElementById('questionListenBtn').onclick = () => {
   const current = comprehensionQuestions[comprehensionQIndex];
   if(current) speakText(current.question);
