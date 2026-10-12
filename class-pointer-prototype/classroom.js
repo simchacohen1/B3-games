@@ -113,8 +113,19 @@ function receiveStudent(connection){
     if(!message||typeof message!=='object')return;
     if(message.type==='join'&&!member){
       const name=C.cleanName(message.name);if(!name){connection.close();return}
-      if(members.size>=12){send(connection,{type:'full'});connection.close();return}
-      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,color:C.colors[colorIndex++%C.colors.length],allowed:false,writeAllowed:false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);window.ClassPointerPdf?.studentJoined(member);window.ClassPointerBoards?.studentJoined(member);return;
+      // Browser tabs and reconnects get new PeerJS IDs. Keep only one live
+      // connection per signed-in student name, rather than one per PeerJS ID.
+      const duplicate=Array.from(members.values()).find(existing=>existing.name.toLocaleLowerCase()===name.toLocaleLowerCase());
+      if(!duplicate&&members.size>=12){send(connection,{type:'full'});connection.close();return}
+      const previousAccess=duplicate?{allowed:duplicate.allowed,writeAllowed:duplicate.writeAllowed,color:duplicate.color}:null;
+      if(duplicate){
+        // Remove the stale entry before closing its connection; its close
+        // callback cannot subsequently remove the replacement.
+        removeMember(duplicate);
+        send(duplicate.connection,{type:'removed'});
+        duplicate.connection.close();
+      }
+      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,color:previousAccess?.color||C.colors[colorIndex++%C.colors.length],allowed:previousAccess?.allowed||false,writeAllowed:previousAccess?.writeAllowed||false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);window.ClassPointerPdf?.studentJoined(member);window.ClassPointerBoards?.studentJoined(member);return;
     }
     if(!member||members.get(member.id)!==member)return;
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
