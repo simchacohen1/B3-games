@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>document.documentElement.classList.add("b3-home-auth-pending");</script>
 <script>
   (function() {
     const idbReq = indexedDB.open('firebaseLocalStorageDb', 1);
@@ -32,6 +33,10 @@
   h1{font-size:46px;margin:8px 0 8px;color:#26364a}
   .subtitle{color:#64748b;margin-bottom:24px}
   .hidden{display:none!important}
+  /* Keep the login form hidden until saved student and teacher sessions are checked. */
+  #homeAuthLoading{display:none;max-width:520px;margin:24px auto;padding:30px;color:#475569;background:#fff;border-radius:20px;box-shadow:0 8px 24px rgba(0,0,0,.08)}
+  html.b3-home-auth-pending #homeAuthLoading{display:block!important}
+  html.b3-home-auth-pending #loginCard{display:none!important}
   .student-bar{max-width:900px;margin:0 auto 18px;background:white;border-radius:16px;padding:12px 16px;box-shadow:0 3px 12px rgba(0,0,0,.08);display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left}
   .student-bar strong{font-size:16px}.student-bar span{color:#64748b;font-size:13px}.student-bar button{border:0;border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer;background:#e2e8f0;color:#1f2937}
   .login-card,.locked-card{max-width:520px;margin:24px auto;background:white;border-radius:20px;padding:26px;box-shadow:0 8px 24px rgba(0,0,0,.10);text-align:left}
@@ -227,6 +232,7 @@
 <body>
   <h1>Fun Torah Tools</h1>
   <div class="subtitle">Learning games and practice tools</div>
+  <div id="homeAuthLoading" role="status" aria-live="polite">⏳ Checking your sign-in…</div>
 
   <div id="studentBar" class="student-bar hidden">
     <div><strong id="studentNameLabel"></strong><br><span id="studentClassLabel"></span></div>
@@ -1964,9 +1970,18 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     renderStudentOverrideControls();
   }
 
+  let homepageTeacherChecked=false,homepageStudentChecked=false;
+  function finishHomepageBootstrap(){
+    if(isAuthorizedTeacher||(homepageTeacherChecked&&homepageStudentChecked))
+      document.documentElement.classList.remove("b3-home-auth-pending");
+  }
+  // A slow or failed network should not leave the login form hidden forever.
+  setTimeout(()=>document.documentElement.classList.remove("b3-home-auth-pending"),12000);
   settingsApi.onAuthStateChanged((user,authorized,access)=>{
     currentUser=user;
     if(isStudentPreview){
+      homepageTeacherChecked=true;
+      finishHomepageBootstrap();
       currentAccess={authorized:false,role:"",classIds:[]};
       isAuthorizedTeacher=false;
       isAuthorizedAdmin=false;
@@ -1977,6 +1992,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     currentAccess=access||{authorized:false,role:"",classIds:[]};
     isAuthorizedTeacher=Boolean(authorized&&currentAccess.authorized);
     isAuthorizedAdmin=isAuthorizedTeacher&&currentAccess.role==="admin";
+    homepageTeacherChecked=true;
+    finishHomepageBootstrap();
     // A verified teacher always wins over a guest preview.
     if(isAuthorizedTeacher&&isGuest())window.B3Guest.stop();
     try{if(authorized)sessionStorage.setItem("b3TeacherBypass","1");else sessionStorage.removeItem("b3TeacherBypass");}catch(e){}
@@ -1989,7 +2006,10 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   el("actAsStudentCard").addEventListener("click",()=>settingsApi.openActAsStudentPicker());
   settingsApi.subscribe(settings=>{currentSettings=settings;renderStudentAccess();renderAdminPanel();});
   setInterval(()=>{renderStudentAccess();},15000);
-  restoreStudent();
+  Promise.resolve().then(restoreStudent).catch(console.warn).finally(()=>{
+    homepageStudentChecked=true;
+    finishHomepageBootstrap();
+  });
 })();
 </script>
 </body>
