@@ -126,9 +126,10 @@
   var assignedClass = null;
   var verifiedTeacherAccess = null;
   var teacherClassRecord = null;
-  // Class Gallery review links may open before Firebase restores an existing
-  // teacher session. Do not mistake that brief pending state for a failed login.
-  var galleryTeacherCheckPending = gameId === "class-gallery" && !isGuestPreview();
+  // Any teacher tool can open before Firebase restores the saved Google session.
+  // Keep the page on the neutral loading state rather than flashing a false
+  // student sign-in error while teacher authorization is still pending.
+  var teacherCheckPending = !isGuestPreview();
   var requestInFlight = false;
   var refreshRequested = false;
   var firstDecisionMade = false;
@@ -268,13 +269,13 @@
       if(!window.B3_FIREBASE_CONFIG) await loadAuthScript(new URL("firebase-config.js",rootBase).href);
       if(!window.B3SiteSettings) await loadAuthScript(new URL("site-settings.js?v=20261008-owner-demo",rootBase).href);
       window.B3SiteSettings.onAuthStateChanged(function(user,authorized,access){
-        galleryTeacherCheckPending=false;
+        teacherCheckPending=false;
         verifiedTeacherAccess=authorized?access:null;
         if(resolveGalleryTeacherClass())return;
         checkNow();
       });
     } catch(error){
-      galleryTeacherCheckPending=false;
+      teacherCheckPending=false;
       console.warn("Teacher access could not be verified",error);
       checkNow();
     }
@@ -467,7 +468,7 @@
       // A missing student session is normal for teachers. Wait for the Firebase
       // teacher check before displaying a misleading "sign in again" message.
       // The existing fail-safe shows a neutral checking message if this is slow.
-      if(galleryTeacherCheckPending)return;
+      if(teacherCheckPending)return;
       showClosed("Please sign in again", "Your student access or class membership could not be verified.");
       return;
     }
