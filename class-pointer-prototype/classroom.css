@@ -282,3 +282,13 @@ body.student-dock-view #stage:fullscreen #exitFullScreenLesson,body.student-dock
 #stage .teacher-dock.floating.collapsed .tb-collapse {font-size:0}
 #stage .teacher-dock.floating.collapsed .tb-menu {display:none!important}
 #stage:has(.teacher-dock.floating) > #fullscreenTeacherToolbar {display:none!important}
+
+/* One tool-permission preset shared by every selected pupil. */
+.tb-students .permission-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px;border-radius:12px;background:#edf5ff;color:#142942}
+.tb-students .permission-tools strong{flex-basis:100%;font-size:14px}
+.tb-students .permission-tools label{display:inline-flex;align-items:center;gap:5px;padding:7px 10px;border:1px solid #bed1ec;border-radius:8px;background:#fff;font-weight:700;cursor:pointer}
+.tb-students .permission-tools input{width:17px;height:17px;accent-color:#2361b2}
+.tb-students .pointer-bulk-actions{display:flex;gap:8px;margin:10px 0}
+.tb-students .pointer-bulk-actions button{flex:1;padding:9px 12px;font-weight:750;border-radius:8px}
+.tb-students .roster-row label{margin-left:auto;display:flex;align-items:center;gap:6px}
+.tb-students .roster-row label input{width:18px;height:18px}
