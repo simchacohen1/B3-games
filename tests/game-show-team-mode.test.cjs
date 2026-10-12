@@ -44,6 +44,18 @@ test('balanced teams rotate every student through a turn before repeating', () =
   });
 });
 
+test('answer eligibility handles all four game modes and blocks non-selected students', () => {
+  const canAnswer = loadTeamLogic().canAnswerChoice;
+  assert.equal(canAnswer({ roundActive: true, teamMode: false, multipleChoice: false, buzzedBy: 'Ari' }, 'Ari'), false);
+  assert.equal(canAnswer({ roundActive: true, teamMode: false, multipleChoice: true, buzzedBy: 'Ari' }, 'Ari'), true);
+  assert.equal(canAnswer({ roundActive: true, teamMode: false, multipleChoice: true, buzzedBy: 'Ari' }, 'Benny'), false);
+  assert.equal(canAnswer({ roundActive: true, teamMode: true, multipleChoice: false, buzzedBy: 'Ari' }, 'Ari'), false);
+  assert.equal(canAnswer({ roundActive: true, teamMode: true, multipleChoice: true, buzzedBy: 'Ari' }, 'Ari'), true);
+  assert.equal(canAnswer({ roundActive: true, teamMode: true, multipleChoice: true, buzzedBy: 'Ari', helperName: 'Chaim' }, 'Chaim'), true);
+  assert.equal(canAnswer({ roundActive: true, teamMode: true, multipleChoice: true, buzzedBy: 'Ari', helperName: 'Chaim' }, 'Ari'), false);
+  assert.equal(canAnswer({ roundActive: false, teamMode: false, multipleChoice: true, buzzedBy: 'Ari' }, 'Ari'), false);
+});
+
 test('Team Mode and Multiple Choice are separately persisted switches', () => {
   assert.match(teamSource, /id="teamModeToggle"/);
   assert.match(teamSource, /id="multipleChoiceToggle"/);
