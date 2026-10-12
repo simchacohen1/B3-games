@@ -91,13 +91,15 @@
       }
       const now=serverNow(),delayOn=document.getElementById("delayToggle").checked;
       const unlockAt=delayOn?now+(parseInt(document.getElementById("delaySeconds").value)||10)*1000:now;
-      const contestants=teamMode?contestantsFor(data,qIndex):null;
+      const rotation=Number(data.teamRoundCount)||0;
+      const contestants=teamMode?contestantsFor(data,rotation):null;
       if(teamMode&&(!contestants.A||!contestants.B)){
         document.getElementById("soundStatus").textContent="Team Mode needs at least two students in the game.";return;
       }
       gameRef.update({
         roundActive:true,revealed:false,buzzedBy:null,selectedPlayer:null,buzzPool:null,
         buzzUnlockAt:unlockAt,buzzOpenAt:unlockAt,teamMode,multipleChoice:mc,contestants,
+        teamRoundCount:teamMode?rotation+1:(Number(data.teamRoundCount)||0),
         helperName:null,answerState:null,stealTeam:null,stealUsed:false
       });
     };
