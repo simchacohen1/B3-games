@@ -109,6 +109,14 @@
           script.after(patch);
         }
       });
+      // srcdoc has an about:srcdoc URL. Give inline legacy scripts the selected
+      // tool's real class/query context via its base URL, without altering live files.
+      documentCopy.querySelectorAll("script:not([src])").forEach(script => {
+        if (!script.textContent || script.dataset.teacherPreviewGuard) return;
+        script.textContent = script.textContent
+          .replace(/\b(?:window\.)?location\.search\b/g, "(new URL(document.baseURI)).search")
+          .replace(/\b(?:window\.)?location\.pathname\b/g, "(new URL(document.baseURI)).pathname");
+      });
       const serialized = "<!doctype html>\n" + documentCopy.documentElement.outerHTML;
       viewer.style.display = "block";
       viewer.srcdoc = serialized;
