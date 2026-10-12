@@ -199,7 +199,7 @@ const HALACHA_TEACHER_PREVIEW=HALACHA_TEACHER_LESSON||!!HALACHA_TEACHER_VIEW;
 const HALACHA_STUDENT_ID=String(HALACHA_TEACHER_VIEW||(HALACHA_TEACHER_LESSON?"":sessionStorage.getItem("b3Games_studentId")||"")).trim();
 const HALACHA_LOCAL_KEY="halachaV14"+(HALACHA_STUDENT_ID?":"+HALACHA_STUDENT_ID:"");
 let S={};try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY+(HALACHA_TEACHER_LESSON?"_teacher":""))||"{}")}catch(e){}
-let halachaDb=null,cloudSaveTimer=null;
+let halachaDb=null,cloudSaveTimer=null,halachaCloudLoading=true,halachaDirty=false,halachaSaveRevision=0;
 let teacherAccountUid="",teacherCloudReady=false,teacherDirty=false;
 try{
  if(window.firebase&&window.B3_FIREBASE_CONFIG){
@@ -226,35 +226,40 @@ function save(){
     .catch(e=>{console.warn("Teacher cloud save failed",e);setSaveStatus("Teacher copy saved on this device ? account save failed")});
    return;
  }
+ halachaDirty=true;halachaSaveRevision++;
  try{localStorage.setItem(HALACHA_LOCAL_KEY,JSON.stringify(S))}catch(e){}
  if(!halachaDb||!cloudPath()){setSaveStatus("Saved on this device");return}
- setSaveStatus("Saving…");
+ setSaveStatus(halachaCloudLoading?"Saved on this device — checking account…":"Saving to account…");
  clearTimeout(cloudSaveTimer);
+ if(halachaCloudLoading)return;
+ const revision=halachaSaveRevision, snapshot=JSON.parse(JSON.stringify(S));
  cloudSaveTimer=setTimeout(()=>{
-   halachaDb.ref(cloudPath()).set({version:1,updatedAt:firebase.database.ServerValue.TIMESTAMP,state:S})
-    .then(()=>setSaveStatus("✓ Saved to my account"))
-    .catch(e=>{console.warn("Halacha cloud save failed",e);setSaveStatus("Saved on this device — sign in to save to your account")});
+   if(revision!==halachaSaveRevision)return;
+   halachaDb.ref(cloudPath()).set({version:1,updatedAt:firebase.database.ServerValue.TIMESTAMP,state:snapshot})
+    .then(()=>{if(revision===halachaSaveRevision){halachaDirty=false;setSaveStatus("✓ Saved to my account");}else save();})
+    .catch(e=>{console.warn("Halacha cloud save failed",e);setSaveStatus("Saved on this device — account save failed");});
  },350);
 }
 async function loadCloudHalacha(){
  if(HALACHA_TEACHER_LESSON){await loadTeacherCopy();return}
- if(!halachaDb||!cloudPath()){setSaveStatus("Saved on this device");return}
+ if(!halachaDb||!cloudPath()){halachaCloudLoading=false;setSaveStatus("Saved on this device");return}
  try{
    setSaveStatus("Loading my scrapbook…");
    const snap=await halachaDb.ref(cloudPath()).once("value"),row=snap.val();
    if(row&&row.state&&typeof row.state==="object"){
      const remote=JSON.stringify(row.state),local=JSON.stringify(S);
      if(HALACHA_TEACHER_VIEW && sessionStorage.getItem("halachaTeacherLoaded:"+HALACHA_TEACHER_VIEW)!=="1"){localStorage.setItem(HALACHA_LOCAL_KEY,remote);sessionStorage.setItem("halachaTeacherLoaded:"+HALACHA_TEACHER_VIEW,"1");location.reload();return}
-     if(remote!==local && sessionStorage.getItem("halachaCloudLoaded:"+HALACHA_STUDENT_ID)!=="1"){
+     if(remote!==local && !halachaDirty && sessionStorage.getItem("halachaCloudLoaded:"+HALACHA_STUDENT_ID)!=="1"){
        localStorage.setItem(HALACHA_LOCAL_KEY,remote);
        sessionStorage.setItem("halachaCloudLoaded:"+HALACHA_STUDENT_ID,"1");
        location.reload(); return;
      }
    }else if(Object.keys(S).length){
-     await halachaDb.ref(cloudPath()).set({version:1,updatedAt:firebase.database.ServerValue.TIMESTAMP,state:S});
+     halachaDirty=true;
    }
-   setSaveStatus("✓ Saved to my account");
- }catch(e){console.warn("Halacha cloud load failed",e);setSaveStatus("Saved on this device")}
+   halachaCloudLoading=false;
+   if(halachaDirty)save(); else setSaveStatus("✓ Saved to my account");
+ }catch(e){console.warn("Halacha cloud load failed",e);halachaCloudLoading=false;setSaveStatus("Saved on this device — account unavailable")}
 }
 
 async function loadTeacherCopy(){
