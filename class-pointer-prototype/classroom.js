@@ -3,7 +3,7 @@ const C=window.ClassPointerCore,$=id=>document.getElementById(id);
 const room=new URL(location.href).searchParams.get('room'),isTeacher=!room;   const entry=new URL(location.href).searchParams.get('dashboard');
    if((isTeacher&&entry!=='teacher')||(!isTeacher&&entry!=='student')){document.body.innerHTML='<main style="padding:2rem;font:1rem system-ui">Open Class Pointer from Fun Torah Tools.</main>';throw Error('Class Pointer must be opened from the dashboard.')}
 const members=new Map();
-let peer=null,teacherConnection=null,screen=null,mediaCall=null,viewportController=null,state={sharing:false,mode:'nobody',members:[],points:{}},started=false,openingClass=false,admitted=false,joining=false,joinTimer=null;
+let peer=null,teacherConnection=null,screen=null,mediaCall=null,viewportController=null,state={sharing:false,mode:'selected',members:[],points:{}},started=false,openingClass=false,admitted=false,joining=false,joinTimer=null;
 let captureControl=null,tabScrollOn=false;
 let generation=0,colorIndex=0,pendingPoint=null,hoverTimer=null,lastHover=0;
 let navigating=false;
@@ -292,12 +292,12 @@ async function shareScreen(preferTab=false){
 function endClass(){
   window.ClassPointerBoards?.endClass();window.ClassPointerPdf?.close(true);window.ClassPointerDashboard?.end().catch(()=>fail('Could not remove the dashboard lesson. Refresh before starting another class.'));
   clearTimeout(joinTimer);started=false;openingClass=false;stopSharing();for(const member of members.values()){send(member.connection,{type:'ended'});member.connection.close()}
-  members.clear();const oldPeer=peer;peer=null;oldPeer?.destroy();state={sharing:false,mode:'nobody',members:[],points:{}};$('accessMode').value='nobody';$('spotlight').checked=false;$('startClass').disabled=false;$('startClass').hidden=false;$('startClass').textContent='↻ Start another class';$('endClass').disabled=true;$('invitePanel').hidden=true;roster();status('Class ended. Click Start another class if you want to reopen it.');
+  members.clear();const oldPeer=peer;peer=null;oldPeer?.destroy();state={sharing:false,mode:'selected',members:[],points:{}};$('accessMode').value='selected';$('spotlight').checked=false;$('startClass').disabled=false;$('startClass').hidden=false;$('startClass').textContent='↻ Start another class';$('endClass').disabled=true;$('invitePanel').hidden=true;roster();status('Class ended. Click Start another class if you want to reopen it.');
 }
 function clearStudentVideo(){const oldCall=mediaCall;mediaCall=null;oldCall?.close();$('lesson').srcObject=null;$('placeholder').hidden=false;drawPointers()}
 function leaveClass(){
   window.ClassPointerBoards?.reset();window.ClassPointerPdf?.reset();cancelHover();highlighter?.cancel();highlighter?.receive([]);clearTimeout(joinTimer);joining=false;admitted=false;clearStudentVideo();const oldConnection=teacherConnection;teacherConnection=null;oldConnection?.close();const oldPeer=peer;peer=null;oldPeer?.destroy();
-  state={sharing:false,mode:'nobody',members:[],points:{}};$('joinForm').hidden=false;$('joinClass').disabled=false;$('leaveClass').hidden=true;$('pointerLayer').replaceChildren();$('permissionText').textContent='Enter your name to join your class.';status('Not connected.');
+  state={sharing:false,mode:'selected',members:[],points:{}};$('joinForm').hidden=false;$('joinClass').disabled=false;$('leaveClass').hidden=true;$('pointerLayer').replaceChildren();$('permissionText').textContent='Enter your name to join your class.';status('Not connected.');
 }
 function joinClass(event){
   event.preventDefault();if(joining||peer)return;const name=C.cleanName($('studentName').value);if(!name){fail('Please enter your name.');return}
@@ -363,6 +363,23 @@ $('stage').addEventListener('click',event=>{
   if(state.sharing&&$('lesson').paused)$('lesson').play().catch(()=>fail('Video playback could not resume. Leave and rejoin the class.'));
   pointAt(event,true);
 });
+function setAllPointerAccess(enabled){
+  if(!isTeacher)return;
+  state.mode='selected';
+  $('accessMode').value='selected';
+  for(const member of members.values()){
+    if(!member.admitted)continue;
+    member.allowed=enabled;
+    if(!enabled){
+      member.writeAllowed=false;
+      clearStudentHover(member);
+      delete state.points[member.id];
+    }
+  }
+  publish();roster();
+}
+$('pointerSelectAll')?.addEventListener('click',()=>setAllPointerAccess(true));
+$('pointerClearAll')?.addEventListener('click',()=>setAllPointerAccess(false));
 $('accessMode').addEventListener('change',()=>{
   state.mode=$('accessMode').value;for(const member of members.values())if(!C.canPoint(state.mode,member)){clearStudentHover(member);delete state.points[member.id];member.writeAllowed=false}publish();roster();
 });
