@@ -16,7 +16,7 @@
         if(current!==generation)return;
         for(const [id,row] of Object.entries(rows))if(C.permitted(access,id,row)){const option=document.createElement('option');option.value=id;option.textContent=row.name||id;$('classChoice').appendChild(option)}
         const requested=query.get('class');if(requested&&Array.from($('classChoice').options).some(option=>option.value===requested))$('classChoice').value=requested;
-        $('openTeacher').disabled=!$('classChoice').value;message($('classChoice').value?'Start the class, then share your teaching screen. Students click Class Pointer on their dashboard.':'No classes with Class Pointer enabled are assigned to you.');
+        $('openTeacher').disabled=!$('classChoice').value;message($('classChoice').value?'Open teacher classroom to start automatically. Then choose Share teaching screen. Students click Class Pointer on their dashboard.':'No classes with Class Pointer enabled are assigned to you.');
       }catch{message('Could not load your classes. Refresh to try again.')}
     });
     $('openTeacher').onclick=()=>{if($('classChoice').value)location.href='classroom.html?dashboard=teacher&class='+encodeURIComponent($('classChoice').value)};
