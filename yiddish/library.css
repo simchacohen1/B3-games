@@ -58,7 +58,8 @@ body.lib #segments button{aspect-ratio:1;max-height:64px;min-height:52px;padding
 body.lib #segments button:nth-child(even){transform:rotate(4deg)}
 body.lib #segments button.active{background:var(--green);color:#fff;border:3px solid var(--green);transform:none;box-shadow:0 0 0 4px rgba(31,77,58,.2)}
 body.lib #segments button:disabled{background:transparent;color:#b9a47c;border:2px dashed #ccb68a;transform:none;opacity:.65}
-body.lib #stats{position:absolute;top:-30px;right:18px;padding:0;font:800 1rem Nunito,Arial;color:var(--green);gap:6px}
+body.lib .section-map #stats{position:absolute;top:-30px;right:18px;padding:0!important;margin:0;font:800 1rem Nunito,Arial;color:var(--green)!important;gap:6px;background:none!important;border:0!important;box-shadow:none!important;border-radius:0;width:auto;min-height:0}
+body.lib .section-map #stats *{background:none!important;color:inherit!important;border:0!important;box-shadow:none!important;padding:0!important}
 body.lib #stats::before{content:"📚"}
 
 /* ---------- Story map link (moved into Story Corner) ---------- */
@@ -79,6 +80,7 @@ body.lib #words .word{position:relative;background:#7a2331;color:#fff;border:0;b
 body.lib #words .word:nth-of-type(4n+2){background:#1f4d3a}
 body.lib #words .word:nth-of-type(4n+3){background:#2f4f7a}
 body.lib #words .word:nth-of-type(4n+4){background:#8a5a1c}
+body.lib #words .word::before,body.lib #words .word::after{display:none!important}
 body.lib #words .word:hover{transform:translateY(-6px) rotate(-1deg)}
 body.lib #words .word .status{background:var(--gold);color:#3a240f;font:900 .66rem Nunito,Arial;letter-spacing:.12em;text-transform:uppercase;padding:2px 8px;border-radius:3px;margin-top:6px}
 body.lib #words .word .status.learned{background:#9fd6a8;color:#163a2b}
@@ -153,4 +155,23 @@ body.lib{padding-bottom:70px}
   body.lib > header .lib-sign b{font-size:1.1rem}
   body.lib > header a{font-size:.85rem}
   body.lib #words{grid-template-columns:repeat(2,1fr)}
+}
+
+/* Shelf fit: books share the width, no visible scrollbar */
+body.lib #toolbar .activity-grid{scrollbar-width:none;padding-top:14px}
+body.lib #toolbar .activity-grid::-webkit-scrollbar{display:none}
+body.lib #toolbar .activity-card{flex:1 1 110px;width:auto;min-width:92px;max-width:130px}
+body.lib .lib-filler{flex:0 1 auto;min-width:6px}
+body.lib #toolbar .activity-card .activity-icon{border:0;border-bottom:2px solid rgba(255,225,160,.6);border-radius:0}
+@media (max-width:1000px){
+  body.lib #toolbar .activity-grid > .lib-filler:nth-child(n+3){display:none}
+  body.lib #toolbar .activity-grid > .lib-filler:nth-last-child(-n+3){display:block}
+}
+@media (max-width:1000px){ body.lib #toolbar .activity-card{min-width:82px} }
+/* Phones: two-level bookcase instead of sideways scrolling */
+@media (max-width:600px){
+  body.lib #toolbar .activity-grid{flex-wrap:wrap;overflow:visible;row-gap:16px;column-gap:0;padding-top:0;align-items:flex-end;
+    background:repeating-linear-gradient(transparent 0 170px,#a46c3c 170px 186px)}
+  body.lib #toolbar .activity-grid > .lib-filler,body.lib #toolbar .activity-grid > .lib-bookend{display:none!important}
+  body.lib #toolbar .activity-card{flex:1 1 28%;max-width:none;min-width:0;height:170px!important;margin:0 3px}
 }
