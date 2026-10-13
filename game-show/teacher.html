@@ -1178,6 +1178,12 @@ function adjustSelectedScore(delta) {
   const scoresRef = gameRef.child('scores').child(currentSelectedPlayer);
   scoresRef.transaction(current => (current || 0) + delta);
   if (delta > 0) {
+    gameRef.child('lastCorrectAnswer').set({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+      player: currentSelectedPlayer,
+      qIndex: Number(lastGameData && lastGameData.qIndex) || 0,
+      at: firebase.database.ServerValue.TIMESTAMP
+    });
     celebrate();
   } else {
     playWrongSound();

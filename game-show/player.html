@@ -505,7 +505,7 @@ function showBuzzResult(data, qIndex) {
   document.body.classList.toggle('won', won);
   document.body.classList.toggle('lost', !!(data.buzzedBy && !won));
   const key = qIndex + '|' + (data.buzzOpenAt || 0);
-  if (won && lastCelebrated !== key) { lastCelebrated = key; launchConfetti(); if (data.revealDelayOn) playBuzzSound(); }
+  if (won && lastCelebrated !== key) { lastCelebrated = key; if (data.revealDelayOn) playBuzzSound(); }
 }
 
 function launchConfetti() {
@@ -629,6 +629,7 @@ function showWaiting(waiting) {
 setInterval(() => { if (lastData) showWaiting(!gameIsLive(lastData)); }, 15000);
 
 let lastMyScore = null;
+let lastCorrectAnswerId = null;
 
 // Use the current game's score roster, so each class sees its own players.
 function renderScoreboard(scores) {
@@ -665,6 +666,11 @@ gameRef.on('value', snapshot => {if(!teacherPreview)renderGameSnapshot(snapshot)
 function renderGameSnapshot(snapshot){
   const data = snapshot.val() || {};
   lastData = data;
+  const correctAnswer = data.lastCorrectAnswer;
+  if (correctAnswer && correctAnswer.id && correctAnswer.id !== lastCorrectAnswerId) {
+    if (lastCorrectAnswerId !== null && correctAnswer.player === myName) launchConfetti();
+    lastCorrectAnswerId = correctAnswer.id;
+  }
   renderScoreboard(data.scores);
   if (!questionsReady) return; // Scores can update while questions load.
   showWaiting(!gameIsLive(data) || data.roundActive !== true);
