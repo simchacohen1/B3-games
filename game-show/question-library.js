@@ -250,47 +250,66 @@
       sourceList.innerHTML = '<li class="ql-empty">Loading saved sets…</li>';
       const id = select.value;
       try {
-        const snap = await db.ref('questionSets/classes/' + id + '/set/library').once('value');
-        const sets = snap.val() || {};
-        const entries = Object.keys(sets).map(setId => ({ id: setId, set: sets[setId] || {} }))
+        const classRoot = db.ref('questionSets/classes/' + id);
+        const [librarySnap, activeSnap, currentSnap] = await Promise.all([
+          classRoot.child('library').once('value'),
+          classRoot.child('activeLibraryId').once('value'),
+          classRoot.child('set').once('value')
+        ]);
+        const sets = librarySnap.val() || {};
+        const currentSet = currentSnap.val() || {};
+        const activeSetId = activeSnap.val();
+        const namedEntries = Object.keys(sets).map(setId => ({ id: setId, set: sets[setId] || {}, isCurrent: false }))
           .filter(x => Array.isArray(x.set.questions) && x.set.questions.length)
           .sort((a,b) => (b.set.updatedAt || 0) - (a.set.updatedAt || 0));
+        const currentIsNamed = activeSetId && sets[activeSetId] &&
+          JSON.stringify(sets[activeSetId].questions || []) === JSON.stringify(currentSet.questions || []);
+        const entries = [
+          ...(Array.isArray(currentSet.questions) && currentSet.questions.length && !currentIsNamed
+            ? [{ id: '__current__', set: currentSet, isCurrent: true }] : []),
+          ...namedEntries
+        ];
         if (!entries.length) {
-          sourceList.innerHTML = '<li class="ql-empty">This class has no saved question sets yet.</li>';
+          sourceList.innerHTML = '<li class="ql-empty">This class has no current questions or saved sets yet.</li>';
           return;
         }
         sourceList.innerHTML = entries.map(x => {
           const n = x.set.questions.length;
-          return '<li class="ql-item"><div class="ql-meta"><div class="ql-name">' + esc(x.set.name || 'Untitled set') +
-            '</div><div class="ql-sub">' + n + ' question' + (n === 1 ? '' : 's') + '</div></div>' +
+          const label = x.isCurrent ? 'Current questions' : (x.set.name || 'Untitled set');
+          const detail = x.isCurrent ? 'Current set · ' : '';
+          return '<li class="ql-item"><div class="ql-meta"><div class="ql-name">' + esc(label) +
+            '</div><div class="ql-sub">' + detail + n + ' question' + (n === 1 ? '' : 's') + '</div></div>' +
             '<div class="ql-btns"><button class="btn btn-primary btn-sm" data-copy="' + esc(x.id) + '">Copy here</button></div></li>';
         }).join('');
         sourceList.onclick = async e => {
           const button = e.target.closest('button[data-copy]');
           if (!button) return;
           button.disabled = true;
-          const sourceSetId = button.getAttribute('data-copy');
-          const source = sets[sourceSetId];
+          const selected = entries.find(x => x.id === button.getAttribute('data-copy'));
+          const source = selected && selected.set;
           if (!source || !Array.isArray(source.questions) || !source.questions.length) {
             button.disabled = false;
             alert('That set is no longer available.');
             return;
           }
           const duplicate = Object.keys(library).some(localSetId =>
-            library[localSetId] && library[localSetId].copiedFrom && library[localSetId].copiedFrom.classId === id && library[localSetId].copiedFrom.setId === sourceSetId);
+            library[localSetId] && library[localSetId].copiedFrom &&
+            library[localSetId].copiedFrom.classId === id &&
+            JSON.stringify(library[localSetId].questions || []) === JSON.stringify(source.questions));
           if (duplicate) {
             button.disabled = false;
-            alert('This set has already been copied into this class library.');
+            alert('These questions have already been copied into this class library.');
             return;
           }
           const newRef = libRef.push();
+          const sourceSetId = selected.isCurrent ? '__current__' : selected.id;
           const copy = {
-            name: source.name || 'Imported question set',
+            name: source.name || (selected.isCurrent ? 'Current questions' : 'Imported question set'),
             questions: clean(source.questions),
             count: source.questions.length,
             createdAt: TS,
             updatedAt: TS,
-            copiedFrom: { classId: id, className: classRows[id].name || id, setId: sourceSetId }
+            copiedFrom: { classId: id, className: classRows[id].name || id, setId: sourceSetId, type: selected.isCurrent ? 'current' : 'library' }
           };
           try {
             await newRef.set(copy);
