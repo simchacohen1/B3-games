@@ -9,8 +9,7 @@ const CLASS_MODE=!!CLASS_ID&&!['et','wt'].includes(CLASS_ID);
 function withAllTracks(c){c=c||{};['shorashim','prefix','suffix'].forEach(t=>{if(!Array.isArray(c[t]))c[t]=[]});return c}
 const CLASS_ID_VALID=/^[A-Za-z0-9_-]{1,100}$/.test(CLASS_ID);
 const SPACE=CLASS_MODE&&CLASS_ID_VALID?`${ROOT}/classes/${CLASS_ID}`:ROOT;
-// Same teacher passcode used by the existing Posuk Practice teacher dashboard.
-const TEACHER_PASSCODE="vayeira5786";
+// Teacher access is verified through the signed-in Google teacher account.
 // AI picture-choice helper. Deploy the matching generateShorashimArt Cloud Function.
 const GENERATE_SHORASHIM_ART_URL="https://us-central1-b3-games.cloudfunctions.net/generateShorashimArt";
 let state={catalog:{shorashim:[],prefix:[],suffix:[]},settings:{minReviewMs:500,studentSiteOpen:true},students:{},leaderboards:{}};let currentTrack='shorashim';
@@ -800,9 +799,8 @@ function applyRequestedTeacherView(){
   }
 }
 
-$('teacherEnter').onclick=()=>{if(CLASS_MODE)return;if($('teacherPasscode').value!==TEACHER_PASSCODE){$('teacherGateMsg').textContent='Incorrect passcode.';return}$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');sessionStorage.setItem('shorashimTeacher','1');loadAll()};
-$('teacherPasscode').addEventListener('keydown',e=>{if(e.key==='Enter')$('teacherEnter').click()});
-$('teacherLogout').onclick=()=>{sessionStorage.removeItem('shorashimTeacher');location.reload()};
+$('teacherLogout').textContent='Sign out';
+$('teacherLogout').onclick=()=>window.B3SiteSettings.signOut().then(()=>location.reload());
 $('teacherTrack').onchange=()=>{refreshNamedLists();renderCatalog()};
 $('teacherListName').onchange=renderCatalog;
 $('teacherPerekFilter').onchange=renderCatalog;
@@ -883,31 +881,30 @@ async function checkClassTeacher(user,access){
   openTeacherApp();
 }
 if(CLASS_MODE){
-  // Class teachers sign in with Google; the B3 passcode and B3's student-access tab do not apply here.
-  $('teacherPasscode').classList.add('hidden');$('teacherEnter').classList.add('hidden');
-  document.querySelector('[data-tab="access"]')?.classList.add('hidden');
-  $('teacherLogout').textContent='Sign out';
-  $('teacherLogout').onclick=()=>window.B3SiteSettings.signOut().then(()=>location.reload());
-  if(!CLASS_ID_VALID){$('teacherGateMsg').textContent='This class link is not valid. Open Shorashim from your teacher home page.'}
-  else{
-    $('teacherGateMsg').textContent='Checking your teacher account…';
+  // Class teachers and B3 teachers use the same verified Google sign-in flow.
+  $('teacherGateMsg').textContent='Sign in with your teacher Google account.';
+  if(!CLASS_ID_VALID){
+    $('teacherGateMsg').textContent='This class link is not valid. Open Shorashim from your teacher home page.';
+    $('teacherGoogleSignIn').disabled=true;
+  }else{
     $('teacherGoogleSignIn').onclick=()=>window.B3SiteSettings.signInWithGoogle().catch(err=>{$('teacherGateMsg').textContent=err?.message||'Google sign-in did not complete.'});
     window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>checkClassTeacher(user,access).catch(err=>{console.error(err);$('teacherGateMsg').textContent='Could not check your teacher account.'}));
   }
 }else{
-  // Plain link and B3's own classes (et/wt): a signed-in Google teacher skips the passcode.
-  // The passcode still works as a fallback for anyone not signed in.
-  if(sessionStorage.getItem('shorashimTeacher')==='1')openTeacherApp();
   const B3_CLASSES=CLASS_ID?[CLASS_ID]:['et','wt'];
-  $('teacherGoogleSignIn').classList.remove('hidden');
+  $('teacherGateMsg').textContent='Sign in with your teacher Google account to open the dashboard.';
   $('teacherGoogleSignIn').onclick=()=>window.B3SiteSettings.signInWithGoogle().catch(err=>{$('teacherGateMsg').textContent=err?.message||'Google sign-in did not complete.'});
   window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>{
-    if(!user||!access?.authorized)return;
+    if(!user||!access?.authorized){
+      if(user)$('teacherGateMsg').textContent='This Google account is not authorized as a Fun Torah Tools teacher.';
+      return;
+    }
     const ids=access.classIds||[];
     if(access.role==='admin'||ids.includes('*')||B3_CLASSES.some(id=>ids.includes(id))){
-      sessionStorage.setItem('shorashimTeacher','1');
-      $('teacherGoogleSignIn').classList.add('hidden');
+      document.querySelector('.topbar h1').textContent='Shorashim Learning Lab';
       openTeacherApp();
+    }else{
+      $('teacherGateMsg').textContent='This Google account is not assigned to the B3 Shorashim classes.';
     }
   });
 }
