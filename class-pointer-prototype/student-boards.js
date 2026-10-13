@@ -592,12 +592,14 @@
     for(const m of admitted())sendMode(m);
     view.hidden=!on;
     if(toggle){toggle.setAttribute('aria-pressed',String(on));toggle.textContent=on?'✕ Close student screens':'🖥 Student Screens'}
+    window.ClassPointerDashboard?.setStudentScreenSharing(on&&mode==='screens').catch(error=>B.status('Could not update screen sharing permission: '+error.message));
     if(on){stage.dispatchEvent(new PointerEvent('pointerleave'));setFocus(null);B.status(mode==='screens'?'Students were asked to share their screens. Their screens appear in the tiles.':'Student whiteboards are open. Click a board to see it large and write on it. Use 🖥 Screens to see students’ screens instead.')}
     else B.status('Student boards closed. Everyone is back to the lesson. Whiteboards are kept until the class ends.');
   }
   function setMode(next){
     if(next===mode)return;
     mode=next;drawer?.cancel();
+    window.ClassPointerDashboard?.setStudentScreenSharing(on&&mode==='screens').catch(error=>B.status('Could not update screen sharing permission: '+error.message));
     for(const m of admitted())sendMode(m);
     setFocus(focusId);
     B.status(mode==='screens'?'Students were asked to share their screens. Their screens appear in the tiles (view only).':'Students are back on their whiteboards.');
@@ -638,6 +640,7 @@
     studentLeft(m){closeScreen(m);if(m.boardKey&&boards.has(m.boardKey))boards.get(m.boardKey).drafts={student:null,teacher:null};if(on)syncTiles()},
     endClass(){
       drawer?.cancel();for(const m of B.members().values())closeScreen(m);
+      window.ClassPointerDashboard?.setStudentScreenSharing(false).catch(()=>{});
       boards.clear();blocked.clear();chooseActivity(null,dirtyAll);mode='screens';controls();
       for(const tile of tiles.values()){tile.video.srcObject=null;tile.node.remove()}tiles.clear();
       if(on){on=false;focusId=null;view.hidden=true}
