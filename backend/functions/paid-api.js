@@ -67,7 +67,12 @@ function paidHandler(name, category, handler) {
       const characters = category === 'speech' ? String(req.body?.text || '').trim().length : 0;
       if (category === 'speech' && (!characters || characters > 3000))
         return res.status(400).json({ error: 'Speech text must be between 1 and 3000 characters.' });
-      const cacheKey = hash(name + ':v1:' + JSON.stringify(stable(req.body || {})));
+      // The comprehension generator's system prompt defines how questions and
+      // Hebrew answer spans are produced. Bump its cache namespace whenever
+      // that contract changes, so identical requests cannot keep returning a
+      // stale set generated under the previous prompt.
+      const cacheVersion = name === 'generateComprehensionQuestions' ? 'answerfirst_v4' : 'v1';
+      const cacheKey = hash(name + ':' + cacheVersion + ':' + JSON.stringify(stable(req.body || {})));
       if (category === 'speech' && speechCache.has(cacheKey))
         return res.status(200).json(speechCache.get(cacheKey).value);
       if (category === 'generation') {
