@@ -130,10 +130,14 @@ async function authorizeChazaraAction(teacher,body){
  if(!teacher.scope)return;
  const scope=teacher.scope,action=body.action;
  if(action==='list-chazara-pending')return;
+ if(action==='repair-shorashim-recording'){
+   if(!scope.students?.[body.studentId])throw Object.assign(new Error('Student is outside your class.'),{code:403});
+   return;
+ }
  if(action==='approve-point-request'||action==='reject-point-request'){
   if(!/^[A-Za-z0-9_-]{1,220}$/.test(String(body.requestId||'')))throw Object.assign(new Error('Invalid point request.'),{code:403});
   const item=(await rtdb.ref(`${SR_ROOT}/pointRequests/${body.requestId}`).get()).val();
-  if(!isChazaraRequest(item)||!teacherClassScope.recordAllowed(scope,item?.practiceStudentId,item))throw Object.assign(new Error('This request does not belong to your selected class.'),{code:403});
+  if(!isReviewableRequest(item)||!teacherClassScope.recordAllowed(scope,item?.practiceStudentId,item))throw Object.assign(new Error('This request does not belong to your selected class.'),{code:403});
   return;
  }
  if(!scope.students[body.studentId])throw Object.assign(new Error('This student does not belong to your selected class.'),{code:403});
@@ -1337,6 +1341,26 @@ exports.studentRewardsAutoAward = onRequest(
         if(action==="list-chazara-pending"){
           const requests=await listPendingChazaraRequests(teacher.scope);
           return res.status(200).json({ok:true,requests});
+        }
+        if(action==="repair-shorashim-recording"){
+          const studentId=String(body.studentId||"").trim(),eventId=String(body.eventId||"").trim();
+          if(!studentId||!eventId)return res.status(400).json({error:"Missing recording details."});
+          const eventSnap=await rtdb.ref(`posukPractice/shorashimLearning/recordingEvents/${studentId}/${eventId}`).get();
+          if(!eventSnap.exists())return res.status(404).json({error:"Recording not found."});
+          const event=eventSnap.val()||{};
+          if(teacher.scope && !teacherClassScope.recordAllowed(teacher.scope,studentId,event))
+            return res.status(403).json({error:"Recording belongs to another class."});
+          const source=(event.noHints===true||event.mode==="no-hints")?"shorashim-no-hints":"shorashim-recording";
+          const verified=await verifyShorashim(studentId,source,eventId);
+          if(!verified.ok)return res.status(409).json({error:verified.error});
+          const rewardStudentId=await resolveRewardStudentId(studentId);
+          if(!rewardStudentId)return res.status(404).json({error:"Student Rewards profile not found."});
+          const requestId=safeKey(`shorashim_${studentId}_${eventId}`);
+          const result=await createPendingRequest({requestId,rewardStudentId,studentId,source,amount:POINTS[source],
+            reason:source==="shorashim-no-hints"?"Shorashim No Hints recording":"Shorashim Chazara recording",
+            record:{eventId,recordingDate:event.date||null}});
+          await verified.eventRef.update({pointRequestId:requestId,pointRequestStatus:result.status});
+          return res.status(200).json({ok:true,requestId,status:result.status});
         }
         if(action==="approve-point-request"){
           const result=await approvePendingRequest(String(body.requestId||""),teacher.email);
