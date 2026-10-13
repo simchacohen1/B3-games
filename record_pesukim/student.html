@@ -1782,7 +1782,7 @@ async function getGeneratedQuestionsForPart(part){
         generated:false
       };
     }).filter(item=>item.question&&item.answerWordSets.length);
-    generatedQuestionMemoryCache.set(key,items);
+    if(items.length) generatedQuestionMemoryCache.set(key,items);
     return items;
   }catch(err){
     console.warn('Could not read approved question bank',err);
