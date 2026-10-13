@@ -14,16 +14,15 @@
     document.head.appendChild(script);
   });
   try{
+    const id=sessionStorage.getItem('b3Games_studentId');
+    const pin=sessionStorage.getItem('b3Games_classPin');
+    if(!id||!pin||!(/^[A-Za-z0-9_-]{1,100}$/).test(id))return;
     if(!window.firebase?.database){
       if(!window.firebase)await load('https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js');
       await load('https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js');
     }
     if(!window.B3_FIREBASE_CONFIG)await load(new URL('firebase-config.js',root).href);
-    if(!window.Peer)await load(new URL('class-pointer-prototype/vendor/peerjs-1.5.5.min.js',root).href);
     if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
-    const id=sessionStorage.getItem('b3Games_studentId');
-    const pin=sessionStorage.getItem('b3Games_classPin');
-    if(!id||!pin||!(/^[A-Za-z0-9_-]{1,100}$/).test(id))return;
     const auth=await fetch(studentAuth,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'verify',studentId:id,pin})});
     if(!auth.ok||!(await auth.json()).ok)return;
     // Use the same class resolver as the existing student dashboard.
@@ -77,6 +76,7 @@
         const ticket=await response.json();
         if(!response.ok||!ticket.ok)throw Error(ticket.error||'Screen sharing is not allowed.');
         if(!active||!captured.active)throw Error('The lesson ended.');
+        if(!window.Peer)await load(new URL('class-pointer-prototype/vendor/peerjs-1.5.5.min.js',root).href);
         const connection=new Peer('class-pointer-activity-'+crypto.randomUUID());
         peer=connection;
         await new Promise((resolve,reject)=>{
