@@ -26,12 +26,12 @@
     if(!id||!pin||!(/^[A-Za-z0-9_-]{1,100}$/).test(id))return;
     const auth=await fetch(studentAuth,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'verify',studentId:id,pin})});
     if(!auth.ok||!(await auth.json()).ok)return;
-    const memberships=(await firebase.database().ref('b3Games/students/'+id+'/memberships').once('value')).val()||{};
-    const member=Object.values(memberships).find(m=>m&&m.active!==false&&m.workspaceId===ws&&/^[A-Za-z0-9_-]{1,100}$/.test(m.classId));
-    // Legacy students can still have their assigned class on the profile.
-    const profile=member?null:(await firebase.database().ref('b3Games/students/'+id+'/profile').once('value')).val();
-    const classId=member?.classId||profile?.classId;
-    if(!/^[A-Za-z0-9_-]{1,100}$/.test(classId||''))return;
+    // Use the same class resolver as the existing student dashboard.
+    // It respects a selected class and never revives a removed membership.
+    if(!window.FunTorahStudentClass)await load(new URL('student-class.js',root).href);
+    const scope=await window.FunTorahStudentClass.resolve(firebase.database(),id);
+    const classId=scope.classId;
+    if(scope.workspaceId!==ws||!/^[A-Za-z0-9_-]{1,100}$/.test(classId||''))return;
     const sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
     holder.id='fttActivityScreenShare';
@@ -91,7 +91,7 @@
         captured.getVideoTracks()[0]?.addEventListener('ended',stop,{once:true});
         media.on('close',stop);media.on('error',stop);
         btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';
-        status('Sharing with teacher');
+        status('Sharing started — ask your teacher to confirm');
       }catch(error){captured?.getTracks().forEach(t=>t.stop());stop();status(error?.name==='NotAllowedError'?'Sharing canceled.':error.message||'Could not share.')}
       finally{busy=false;btn.disabled=false}
     });
