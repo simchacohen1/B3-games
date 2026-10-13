@@ -134,7 +134,7 @@ exports.createShorashimBillingPortal = onRequest(
 );
 
 async function subscriptionForEvent(event, stripeEventObject) {
-  if (event.type.startsWith('customer.subscription.')) return stripeEventObject;
+  if (event.type.startsWith('customer.subscription.')) return stripeClient().subscriptions.retrieve(stripeEventObject.id);
   const session = stripeEventObject;
   if (!session.subscription) return null;
   if (session.mode !== 'subscription' || session.payment_status !== 'paid') return null;
