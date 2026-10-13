@@ -147,25 +147,22 @@
     const ranges = [[1,5],[6,8],[9,13],[14,19],[20,23],[24,31]];
     const labels = ["day one","day two","day three","day four","day five","day six"];
     const day = ranges.findIndex(([from,to]) => verse >= from && verse <= to);
-    return day < 0 ? "" : labels[day];
-  }
+    return day < 0 ? "" : labels[day];  }
 
   // Never quiz children on reference numbers. If a grammatical question cannot
   // reliably be extracted, ask them to recognize the actual words of the text.
-  function contentContinuation(text) {
-    const words = String(text || "").split(/\s+/).filter(Boolean);
-    if (words.length < 4) return null;
-    const split = Math.min(9, Math.max(2, Math.floor(words.length * 0.55)));
-    const lead = words.slice(0, split).join(" ");
-    const answer = words.slice(split, split + 12).join(" ");
-    return answer ? { q: "Which words continue this statement: “" + lead + " …”?", answer: repairText(answer) } : null;
+  function contentContinuation() {
+    // A quote-completion prompt is hard to understand without the source in
+    // front of the student. Skip it and ask only questions with clear context.
+    return null;
   }
   function questionAndAnswer(source, topic) {
     const text = repairText(localizeText(source.text)).replace(/\s+/g, " ").trim();
     const ref = source.displayRef || displayRef(source.ref);
     if (source.isKitzur) return kitzurQuestionAndAnswer(source, text);
-    if (topic) return { q: "What does this source say about " + topic + "?", answer: text };
-    if (source.isRashi) return { q: "What does Rashi explain about this pasuk?", answer: text };
+    // Broad prompts such as “What does this source say?” do not tell an
+    // eight-year-old what to look for. Leave these for teacher-written review.
+    if (topic || source.isRashi) return null;
 
     const subject = "(Hashem|Moshe|Avraham|Yitzchak|Yaakov|Yosef|Aharon|Sarah|Rivkah|Leah|Rachel|Noach|Esav|Paroh|Reuven|Shimon|Yehudah|Naftali|Gad|Asher|Yissachar|Zevulun|Binyamin|Ephraim|Menashe|Miriam|Yehoshua|Bilam|Lavan|Yisro)";
     const verbs = {
@@ -180,13 +177,13 @@
     const match = text.match(new RegExp("(?:^|[;.!?]\\s*)(?:And\\s+)?" + subject + "\\s+(" + verbPattern + ")\\s+(.+)", "i"));
     if (!match) {
       const day = creationDay(source);
-      return day ? { q: "What did Hashem create on " + day + "?", answer: text } : (contentContinuation(text) || { q: "Which statement correctly describes this event?", answer: text });
+      return day ? { q: "What did Hashem create on " + day + "?", answer: text } : null;
     }
 
     const name = match[1], verb = match[2].toLowerCase();
     let clause = match[3].split(/[;.!?]/)[0].trim();
     clause = clause.replace(/,\s+and\s+(?:Hashem|Moshe|Avraham|Yitzchak|Yaakov|Yosef|Aharon|Sarah|Rivkah|Leah|Rachel|Noach|Esav|Paroh)\b[\s\S]*$/i, "").trim();
-    if (!clause) return contentContinuation(text) || { q: "Which statement correctly describes this event?", answer: text };
+    if (!clause) return null;
 
     const day = creationDay(source);
     const suffix = name.toLowerCase() === "hashem" && day ? " on " + day : "";
@@ -194,7 +191,7 @@
       const target = clause.match(/^to\s+(.+?)(?:\s+by\s+|[,.]|$)/i);
       if (target && !/^(him|her|them|me|us|you|it|himself|herself|the man|the woman)$/i.test(target[1].trim())) return { q: "Who appeared to " + target[1] + "?", answer: name };
       // Pronouns such as "him" have no clear referent when a pasuk stands alone.
-      return contentContinuation(text) || { q: "Which statement correctly describes this event?", answer: text };
+      return null;
     }
     if (verb === "called") {
       const called = clause.match(/^(?:the\s+)?(light|darkness)\s+([A-Z][A-Za-z]+)/i);
@@ -247,6 +244,15 @@
     return words.length > 12 ? words.slice(0, 12).join(" ") + "…" : words.join(" ");
   }
 
+  function shuffleOptions(rows) {
+    const shuffled = rows.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
   function makeItems(sources, mode, topic, count, distractors) {
     const out = [];
     const selected = sources.slice(0, count);
@@ -263,18 +269,20 @@
         for (let offset = 1; offset <= choiceSources.length && optionRows.length < 4; offset++) {
           const candidate = choiceSources[(index + offset) % choiceSources.length];
           if (candidate.ref === source.ref) continue;
-          const candidateAnswer = questionAndAnswer(candidate, topic).answer;
-          const excerpt = localizeText(shortChoice(candidateAnswer));
+          const candidateQa = questionAndAnswer(candidate, topic);
+          if (!candidateQa || !candidateQa.answer) continue;
+          const excerpt = localizeText(shortChoice(candidateQa.answer));
           if (excerpt && !optionRows.some(row => row.excerpt === excerpt)) optionRows.push({ excerpt, ref: candidate.ref });
         }
         if (optionRows.length < 4) throw new Error("Multiple choice needs four distinct Sefaria excerpts. Select at least four pesukim or sources.");
         const correctIndex = optionRows.findIndex(row => row.ref === source.ref || row.excerpt === correctExcerpt);
         if (correctIndex < 0) throw new Error("Could not match this question to its verified source. Please try again.");
+        const shuffledOptions = shuffleOptions(optionRows);
         out.push({
           q: qa.q,
           ans: qa.answer + " (Source: " + ref + ")",
-          choices: optionRows.map(row => row.excerpt),
-          correctIndex
+          choices: shuffledOptions.map(row => row.excerpt),
+          correctIndex: shuffledOptions.indexOf(optionRows[correctIndex])
         });
       }
     });
@@ -297,8 +305,7 @@
     const includeRashi = form.rashi.checked;
     const sourcePool = verseRows.slice();
     if (includeRashi) {
-      for (const source of evenlyPick(verseRows, Math.min(verseRows.length, count))) {
-        status.textContent = "Checking Rashi for " + source.displayRef + "…";
+      for (const source of evenlyPick(verseRows, Math.min(verseRows.length, count))) {        status.textContent = "Checking Rashi for " + source.displayRef + "…";
         try {
           const rashi = await getText("Rashi on " + source.ref);
           if (rashi.text) sourcePool.push({ ...rashi, displayRef: "Rashi on " + source.displayRef, isRashi: true });
@@ -447,8 +454,7 @@
       } catch (error) { status.textContent = error.message || "Could not load pasuk range."; }
     }
     bookSelect.addEventListener("change", updateChapters);
-    chapterSelect.addEventListener("change", updateVerses);
-    const simanSelect = card.querySelector("#sgSiman");
+    chapterSelect.addEventListener("change", updateVerses);    const simanSelect = card.querySelector("#sgSiman");
     const seifFromSelect = card.querySelector("#sgSeifFrom");
     const seifToSelect = card.querySelector("#sgSeifTo");
     async function updateSeifim() {
@@ -490,7 +496,11 @@
         const list = review.querySelector("#sgQuestionList");
         list.replaceChildren(...items.map(item => createQuestionRow(item.q, item.ans, item.choices, item.correctIndex)));
         review.hidden = false;
-        status.textContent = items.length + " questions ready" + (type.value === "halacha" ? " (one per se’if, with no repeats)" : "") + ". Review them below; your current set is unchanged.";
+        const skipped = Math.max(0, requestedCount - items.length);
+        status.textContent = items.length + " clear questions ready" +
+          (skipped ? "; " + skipped + " unclear item" + (skipped === 1 ? " was" : "s were") + " skipped" : "") +
+          (type.value === "halacha" ? " (one per se’if, with no repeats)" : "") +
+          ". Review them below; your current set is unchanged.";
         review.scrollIntoView({ behavior: "smooth", block: "start" });
       } catch (error) {
         status.textContent = error.message || "Could not generate questions.";
