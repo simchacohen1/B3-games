@@ -1,6 +1,6 @@
 # Shorashim Lab subscription deployment notes
 
-This code intentionally accepts only Stripe Sandbox keys and rejects live webhook events. The price is $39 USD per teacher per year, regardless of how many selected classes are covered. No real charge can be initiated until the owner explicitly approves a separate live-mode change.
+This code uses the official Stripe Node SDK, accepts only Sandbox secret or restricted keys (`sk_test_` or `rk_test_`), and rejects live webhook events. The price is $39 USD per teacher per year, regardless of how many selected classes are covered. No real charge can be initiated until the owner explicitly approves a separate live-mode change.
 
 ## Sandbox configuration
 
