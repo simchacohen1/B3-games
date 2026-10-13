@@ -23,6 +23,7 @@
   })();
 </script>
 <meta charset="UTF-8">
+<script src="text-encoding.js?v=20261013-1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -288,7 +289,7 @@ let questionsReady = false;
 setRef.on('value', snap => {
   const data = snap.val();
   if (data && data.questions) {
-    questions = data.questions;
+    questions = window.GameShowTextEncoding.repairQuestions(data.questions).questions;
     questionsReady = true;
   }
 });
