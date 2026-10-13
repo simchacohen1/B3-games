@@ -1895,7 +1895,16 @@ function getVerifiedQuestionWordSets(question, words){
     for(let end=start;end<words.length;end++){
       joined=joined?joined+' '+words[end]:words[end];
       const candidate=normalize(joined);
-      if(candidate&&candidate===expectedNorm)matches.push(Array.from({length:end-start+1},(_,i)=>start+i));
+      // Accept a short contiguous phrase around the generated expected answer.
+      // A student may reasonably include a neighboring Hebrew word or attached
+      // prefix, so requiring the selected span to equal the generated string
+      // exactly made correct responses unnecessarily brittle.
+      const candidateWords=candidate?candidate.split(' ').filter(Boolean):[];
+      const expectedWords=expectedNorm?expectedNorm.split(' ').filter(Boolean):[];
+      if(candidateWords.length>=expectedWords.length&&candidateWords.length<=expectedWords.length+2){
+        const containsExpected=expectedWords.every((word,index)=>candidateWords.slice(index,index+expectedWords.length).join(' ')===expectedNorm);
+        if(containsExpected)matches.push(Array.from({length:end-start+1},(_,i)=>start+i));
+      }
     }
   }
   return matches;
