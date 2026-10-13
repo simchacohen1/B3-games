@@ -332,7 +332,9 @@
           const excerpt = localizeText(shortChoice(candidateQa.answer));
           if (excerpt && !optionRows.some(row => row.excerpt === excerpt)) optionRows.push({ excerpt, ref: candidate.ref });
         }
-        if (optionRows.length < 4) throw new Error("Multiple choice needs four distinct Sefaria excerpts. Select at least four pesukim or sources.");
+        // A single question may not have three distinct answer excerpts among
+        // the selected sources. Skip that item instead of aborting the batch.
+        if (optionRows.length < 4) return;
         const correctIndex = optionRows.findIndex(row => row.ref === source.ref || row.excerpt === correctExcerpt);
         if (correctIndex < 0) throw new Error("Could not match this question to its verified source. Please try again.");
         const shuffledOptions = shuffleOptions(optionRows);
@@ -556,7 +558,7 @@
         review.hidden = false;
         const skipped = Math.max(0, requestedCount - items.length);
         status.textContent = items.length + " clear, short questions ready" +
-          (skipped ? "; " + skipped + " item" + (skipped === 1 ? " was" : "s were") + " skipped because it could not be turned into a clear question" : "") +
+          (skipped ? "; " + skipped + " item" + (skipped === 1 ? " was" : "s were") + " skipped because it could not be turned into a clear question with distinct answer choices" : "") +
           (type.value === "halacha" ? " (one per se’if, with no repeats)" : "") +
           ". Review them below; your current set is unchanged.";
         review.scrollIntoView({ behavior: "smooth", block: "start" });
