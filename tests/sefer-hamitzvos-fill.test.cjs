@@ -26,9 +26,10 @@ test('a white region that reaches the image edge is rejected as open',()=>{
  const image=canvas(5,5);
  assert.equal(traceRegion(image.data,5,5,2,2,{maxAreaFraction:.9}).reason,'open');
 });
-test('very large regions are rejected to prevent filling the page background',()=>{
+test('large enclosed sections remain fillable',()=>{
  const image=canvas(9,9);box(image,1,1,7,7);
- assert.equal(traceRegion(image.data,9,9,4,4,{maxAreaFraction:.2}).reason,'large');
+ const result=traceRegion(image.data,9,9,4,4);
+ assert.equal(result.pixels.length,25);
 });
 test('out-of-bounds taps are rejected',()=>{
  const image=canvas(5,5);
