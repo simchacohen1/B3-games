@@ -11,6 +11,23 @@
         if(!user||!authorized||!C.validId(classId))throw Error('Open Class Pointer from Teacher Tools and sign in with your teacher account.');
         const db=firebase.database(),ref=db.ref('b3Games/workspaces/'+ws+'/classes/'+classId),row=(await ref.once('value')).val();
         if(!C.permitted(access,classId,row))throw Error('Class Pointer is not enabled for this teacher and class.');
+        // Class selection is navigation, never a silent session transfer.
+        const picker=document.getElementById('pointerClassChoice');
+        if(picker){
+          const base=db.ref('b3Games/workspaces/'+ws+'/classes');
+          const ids=access.role==='admin'?Object.keys((await base.once('value')).val()||{}):(access.classIds||[]).filter(C.validId);
+          picker.replaceChildren();
+          for(const id of ids){
+            const classRow=id===classId?row:(await base.child(id).once('value')).val();
+            if(C.permitted(access,id,classRow)){const opt=document.createElement('option');opt.value=id;opt.textContent=classRow.name||id;picker.appendChild(opt)}
+          }
+          picker.value=classId;
+          picker.addEventListener('change',()=>{
+            if(!picker.value||picker.value===classId)return;
+            if(!document.getElementById('endClass').disabled&&!confirm('End this classroom and switch classes?')){picker.value=classId;return}
+            window.ClassPointerDashboard?.end().finally(()=>location.assign('classroom.html?dashboard=teacher&class='+encodeURIComponent(picker.value)));
+          });
+        }
         resolve({db,ref,user});
       }catch(error){reject(error)}
     });
