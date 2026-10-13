@@ -735,6 +735,18 @@ if (CLASS_SPACE) {
       return;
     }
     const admin = access && access.role === 'admin';
+    if (admin) {
+      try {
+        const classSnap = await db.ref('b3Games/workspaces/' + window.B3SiteSettings.workspaceId + '/classes').once('value');
+        const rows = classSnap.val() || {};
+        window.gameShowLibraryClassIds = Object.keys(rows).filter(id => rows[id] && rows[id].active !== false);
+      } catch (err) {
+        console.warn('Could not load classes for Game Show question sharing:', err.message);
+        window.gameShowLibraryClassIds = [];
+      }
+    } else {
+      window.gameShowLibraryClassIds = (access && access.classIds || []).slice();
+    }
     if (GS_CLASS === 'unassigned') {
       const classesSnap = admin ? await db.ref('b3Games/workspaces/' + window.B3SiteSettings.workspaceId + '/classes').once('value') : null;
       const rows = classesSnap ? (classesSnap.val() || {}) : {};
