@@ -169,6 +169,46 @@
     };
     return questions[Number(match[1])] || null;
   }
+  function bereishis18QuestionAndAnswer(source) {
+    const match = String(source.ref || source.displayRef || "").match(/(?:Genesis|Bereishis)\s+18:(\d+)/i);
+    if (!match) return null;
+    const questions = {
+      1: { q: "Where was Abraham sitting as the day grew hot?", answer: "At the entrance of the tent." },
+      2: { q: "How many visitors did Abraham see?", answer: "Three." },
+      3: { q: "What did Abraham ask the visitors not to do?", answer: "Go past his tent." },
+      4: { q: "What did Abraham ask to have brought?", answer: "A little water." },
+      5: { q: "What food did Abraham offer the visitors?", answer: "A morsel of bread." },
+      6: { q: "What did Sarah make from the flour?", answer: "Cakes." },
+      7: { q: "What animal did Abraham choose from the herd?", answer: "A calf." },
+      8: { q: "Which foods did Abraham serve the three visitors?", answer: "Curds, milk, and a calf." },
+      9: { q: "Where did Abraham say Sarah was?", answer: "In the tent." },
+      10: { q: "What did the visitor say Sarah would have?", answer: "A son." },
+      11: { q: "How did the text describe Abraham and Sarah?", answer: "They were old." },
+      12: { q: "What did Sarah do when she heard the news?", answer: "She laughed." },
+      13: { q: "What did Hashem ask Abraham about Sarah?", answer: "Why she laughed." },
+      14: { q: "What did Hashem say was too wondrous for Him?", answer: "Nothing." },
+      15: { q: "Why did Sarah say she had not laughed?", answer: "She was frightened." },
+      16: { q: "Toward which city did the visitors look?", answer: "Toward Sodom." },
+      17: { q: "What did Hashem consider hiding from Abraham?", answer: "What He was about to do." },
+      18: { q: "What would Abraham become?", answer: "A great and populous nation." },
+      19: { q: "What was Abraham to teach his children?", answer: "The way of Hashem." },
+      20: { q: "Which two cities had a grave sin?", answer: "Sodom and Gomorrah." },
+      21: { q: "What did Hashem go down to find out?", answer: "If the people acted as reported." },
+      22: { q: "Where did the visitors go?", answer: "To Sodom." },
+      23: { q: "What did Abraham ask about the innocent and guilty?", answer: "Would they be treated alike?" },
+      24: { q: "How many innocent people did Abraham first suggest?", answer: "Fifty." },
+      25: { q: "Who did Abraham call the Judge of all the earth?", answer: "Hashem." },
+      26: { q: "What would Hashem do if He found fifty innocent people?", answer: "Spare the whole place." },
+      27: { q: "What did Abraham call himself?", answer: "Dust and ashes." },
+      28: { q: "What number did Abraham suggest after fifty?", answer: "Forty-five." },
+      29: { q: "What number did Abraham suggest next?", answer: "Forty." },
+      30: { q: "What number did Abraham suggest next?", answer: "Thirty." },
+      31: { q: "What number did Abraham suggest next?", answer: "Twenty." },
+      32: { q: "What was the last number Abraham suggested?", answer: "Ten." },
+      33: { q: "Where did Abraham go after the visitors left?", answer: "Back to his place." }
+    };
+    return questions[Number(match[1])] || null;
+  }
   function bereishis19QuestionAndAnswer(source) {
     const match = String(source.ref || source.displayRef || "").match(/(?:Genesis|Bereishis)\s+19:(\d+)/i);
     if (!match) return null;
@@ -195,6 +235,8 @@
     // eight-year-old what to look for. Leave these for teacher-written review.
     if (topic) return null;
     if (source.isRashi) return rashiQuestionAndAnswer(source);
+    const Bereishis18QA = bereishis18QuestionAndAnswer(source);
+    if (Bereishis18QA) return Bereishis18QA;
     const Bereishis19QA = bereishis19QuestionAndAnswer(source);
     if (Bereishis19QA) return Bereishis19QA;
 
@@ -349,7 +391,10 @@
     const out = [];
     const choiceSources = distractors && distractors.length ? distractors : sources;
     const skipped = { unclear: 0, duplicate: 0, choices: 0 };
-    sources.forEach((source, index) => {
+    const preferred = evenlyPick(sources, count);
+    const preferredSet = new Set(preferred);
+    const candidates = preferred.concat(sources.filter(source => !preferredSet.has(source)));
+    candidates.forEach((source, index) => {
       if (out.length >= count) return;
       const ref = source.displayRef || displayRef(source.ref);
       const qa = questionAndAnswer(source, topic);
