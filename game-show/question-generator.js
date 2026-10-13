@@ -10,6 +10,7 @@
     Deuteronomy: { label: "Devarim" }
   };
   const api = "https://www.sefaria.org";
+  const repairText = value => window.GameShowTextEncoding ? window.GameShowTextEncoding.repairText(value) : String(value == null ? "" : value);
   const searchProxy = "https://us-central1-b3-games.cloudfunctions.net/searchSefariaQuestions";
   const nameMap = {
     "the lord": "Hashem", "god": "Hashem",
@@ -130,8 +131,8 @@
     return words.slice(0, Math.min(7, words.length)).join(" ");
   }
   function questionRecord(q, ans, choices, correctNumber) {
-    const item = { q: String(q || "").trim(), ans: String(ans || "").trim() };
-    const options = Array.isArray(choices) ? choices.map(choice => String(choice || "").trim()).filter(Boolean) : [];
+    const item = { q: repairText(String(q || "").trim()), ans: repairText(String(ans || "").trim()) };
+    const options = Array.isArray(choices) ? choices.map(choice => repairText(String(choice || "").trim())).filter(Boolean) : [];
     const correct = Number(correctNumber);
     if (options.length) {
       item.choices = options;
@@ -160,7 +161,7 @@
     return answer ? { q: "Which words continue this statement: “" + lead + " …”?", answer } : null;
   }
   function questionAndAnswer(source, topic) {
-    const text = localizeText(source.text).replace(/\s+/g, " ").trim();
+    const text = repairText(localizeText(source.text)).replace(/\s+/g, " ").trim();
     const ref = source.displayRef || displayRef(source.ref);
     if (source.isKitzur) return { q: "What does Kitzur Shulchan Aruch teach in Siman " + source.siman + ", Se’if " + source.seif + "?", answer: text };
     if (topic) return { q: "What does this source say about " + topic + "?", answer: text };
@@ -456,7 +457,7 @@
       } finally { button.disabled = false; }
     });
   }
-  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, questionAndAnswer, questionRecord, shortChoice, phrase, cleanText, localizeText, displayRef, evenlyPick, distribute });
+  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, questionAndAnswer, questionRecord, shortChoice, phrase, cleanText, localizeText, displayRef, evenlyPick, distribute, repairText });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", inject, { once: true });
   else inject();
 })();
