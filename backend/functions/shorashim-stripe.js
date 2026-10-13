@@ -200,8 +200,8 @@ exports.shorashimStripeWebhook = onRequest(
         const sessionData = event.data?.object || {};
         if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded' || event.type === 'checkout.session.expired') {
           const sessionMeta = sessionData.metadata || {};
-          if (sessionMeta.teacherUid && sessionMeta.classId) {
-            await db().ref('b3Private/shorashimOpenCheckouts/' + sessionMeta.teacherUid + '/' + sessionMeta.classId).remove();
+          if (sessionMeta.teacherUid) {
+            await db().ref('b3Private/shorashimOpenCheckouts/' + sessionMeta.teacherUid).remove();
           }
         }
         if (event.type === 'checkout.session.expired') {
