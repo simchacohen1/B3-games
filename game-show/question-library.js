@@ -277,7 +277,7 @@
             return;
           }
           const duplicate = Object.keys(library).some(id =>
-            library[id] && library[id].sourceClassId === id && library[id].sourceSetId === sourceSetId);
+            library[id] && library[id].copiedFrom && library[id].copiedFrom.classId === id && library[id].copiedFrom.setId === sourceSetId);
           if (duplicate) {
             button.disabled = false;
             alert('This set has already been copied into this class library.');
