@@ -24,7 +24,7 @@ test('a click on a black outline is rejected',()=>{
 });
 test('a white region that reaches the image edge is rejected as open',()=>{
  const image=canvas(5,5);
- assert.equal(traceRegion(image.data,5,5,2,2,{maxAreaFraction:.9}).reason,'open');
+ assert.equal(traceRegion(image.data,5,5,2,2).reason,'open');
 });
 test('large enclosed sections remain fillable',()=>{
  const image=canvas(9,9);box(image,1,1,7,7);
