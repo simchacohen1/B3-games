@@ -498,7 +498,31 @@ function playBuzzSound() {
   setTimeout(() => bus.disconnect(), 1500);
 }
 
-// Celebrate on this screen when you win the buzz; tint the screen when someone else does.
+// A separate success fanfare: being first to buzz is not a correct answer.
+function playCorrectAnswerSound() {
+  try {
+    if (!sharedPlayerCtx) sharedPlayerCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = sharedPlayerCtx;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const now = ctx.currentTime + 0.04;
+    [523.25, 659.25, 783.99, 1046.5].forEach((frequency, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const at = now + i * 0.13;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(frequency, at);
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(0.19, at + 0.018);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.42);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(at);
+      osc.stop(at + 0.44);
+    });
+  } catch (error) { console.warn('Correct-answer sound unavailable', error); }
+}
+
+// Show who won the buzz, without a confetti celebration.
 let lastCelebrated = '';
 function showBuzzResult(data, qIndex) {
   const won = !!(data.buzzedBy && data.buzzedBy === myName);
@@ -668,7 +692,7 @@ function renderGameSnapshot(snapshot){
   lastData = data;
   const correctAnswer = data.lastCorrectAnswer;
   if (correctAnswer && correctAnswer.id && correctAnswer.id !== lastCorrectAnswerId) {
-    if (lastCorrectAnswerId !== null && correctAnswer.player === myName) launchConfetti();
+    if (lastCorrectAnswerId !== null && correctAnswer.player === myName) { launchConfetti(); playCorrectAnswerSound(); }
     lastCorrectAnswerId = correctAnswer.id;
   }
   renderScoreboard(data.scores);
@@ -694,7 +718,7 @@ function renderGameSnapshot(snapshot){
   const iAlreadyBuzzed = !!(data.revealDelayOn && data.buzzPool && data.buzzPool[myName]);
   if (data.buzzedBy) {
     buzzBtn.disabled = true;
-    status.textContent = data.buzzedBy === myName ? "🎉 You're first! Get ready to answer." : data.buzzedBy + " buzzed in first.";
+    status.textContent = data.buzzedBy === myName ? "You're first! Get ready to answer." : data.buzzedBy + " buzzed in first.";
     document.getElementById('countdown').textContent = '';
     if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
   } else if (iAlreadyBuzzed) {
