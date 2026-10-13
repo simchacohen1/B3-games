@@ -11,7 +11,7 @@ function loadCore(){
     addEventListener(){},
     createElement(){
       let html="";
-      return {set innerHTML(value){html=String(value)},get textContent(){return html.replace(/<[^>]*>/g,"")}};
+      return {set innerHTML(value){html=String(value)},get textContent(){return html.replace(/<[^>]*>/g,"")},querySelectorAll(){return []}};
     }
   };
   vm.runInNewContext(fs.readFileSync("game-show/question-generator.js","utf8"),{window,document,fetch(){throw new Error("Unexpected fetch in pure builder test")}});
@@ -22,8 +22,8 @@ test("open questions preserve the retrieved source text and canonical citation",
   const core=loadCore();
   const source={ref:"Genesis 18:1",text:"The Lord appeared to him by the terebinths of Mamre."};
   const [item]=core.makeItems([source],"open","");
-  assert.equal(item.ans,"Hashem (Source: Bereishis 18:1)");
-  assert.equal(item.q,"Who appeared to him?");
+  assert.equal(item.ans,"by the terebinths of Mamre. (Source: Bereishis 18:1)");
+  assert.equal(item.q,"Which words continue this statement: “Hashem appeared to him …”?");
 });
 
 test("multiple-choice answers point to one of the verified references",()=>{
