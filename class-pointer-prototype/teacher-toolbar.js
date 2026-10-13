@@ -59,6 +59,44 @@
   $('tbFullscreen').addEventListener('click',()=>{if(isExpanded()){$('exitFullScreenLesson').click()}else $('fullScreenLesson').click()});
   $('tbCollapse').addEventListener('click',event=>{event.stopPropagation();dock.classList.toggle('collapsed');closeMenus();sync()});
 
+  // Share sources remain available in the floating dock, even in expanded teaching mode.
+  if(!studentView){
+    const shareWrap=document.createElement('div');shareWrap.className='tb-menu-wrap';
+    shareWrap.innerHTML='<button type="button" class="tb-btn" data-menu="tbShareMenu" aria-haspopup="true" aria-expanded="false">🖥 Share ▾</button><div class="tb-menu tb-menu-right" id="tbShareMenu" hidden><strong>Share with your class</strong></div>';
+    const menu=shareWrap.querySelector('#tbShareMenu');
+    [['shareScreen','Live tab, window or screen'],['openBrowserTab','Capture a tab, window or screen'],['openPdf','PDF'],['openWebpage','Web page'],['openWhiteboard','Whiteboard'],['stopScreen','Stop sharing']].forEach(([id,label])=>{
+      const button=document.createElement('button');button.type='button';button.textContent=label;
+      button.addEventListener('click',()=>{const original=source(id);if(original&&!original.disabled)original.click();menu.hidden=true});
+      menu.appendChild(button);
+      const original=source(id);if(original)new MutationObserver(()=>{button.disabled=original.disabled}).observe(original,{attributes:true,attributeFilter:['disabled']});
+      button.disabled=!original||original.disabled;
+    });
+    shareWrap.querySelector('[data-menu]').addEventListener('click',event=>{event.stopPropagation();const opening=menu.hidden;closeMenus(menu);menu.hidden=!opening});
+    dock.querySelector('#tbStudentsBtn').closest('.tb-menu-wrap').before(shareWrap);
+    const panel=source('tbStudentsMenu'),handle=document.createElement('div');
+    handle.className='tb-roster-handle';handle.textContent='⠿ Drag student permissions';handle.title='Drag to move this panel';
+    panel.prepend(handle);
+    let drag=null;
+    handle.addEventListener('pointerdown',event=>{
+      if(event.button!==0)return;
+      event.preventDefault();event.stopPropagation();
+      const box=panel.getBoundingClientRect();
+      panel.style.position='fixed';panel.style.left=box.left+'px';panel.style.top=box.top+'px';panel.style.right='auto';
+      drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:box.left,top:box.top};
+      handle.setPointerCapture(event.pointerId);
+    });
+    handle.addEventListener('pointermove',event=>{
+      if(!drag||drag.id!==event.pointerId)return;
+      panel.style.left=Math.max(0,Math.min(innerWidth-panel.offsetWidth,drag.left+event.clientX-drag.x))+'px';
+      panel.style.top=Math.max(0,Math.min(innerHeight-panel.offsetHeight,drag.top+event.clientY-drag.y))+'px';
+    });
+    ['pointerup','pointercancel','lostpointercapture'].forEach(type=>handle.addEventListener(type,()=>{drag=null}));
+    window.addEventListener('resize',()=>{
+      if(panel.style.left){panel.style.left=Math.max(0,Math.min(innerWidth-panel.offsetWidth,parseFloat(panel.style.left)||0))+'px';
+      panel.style.top=Math.max(0,Math.min(innerHeight-panel.offsetHeight,parseFloat(panel.style.top)||0))+'px'}
+    });
+  }
+
   // Quick keys while the mouse is anywhere on the page (ignored while typing).
   document.addEventListener('keydown',event=>{
     if(dock.hidden||event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.('input,select,textarea'))return;
