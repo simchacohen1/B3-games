@@ -100,5 +100,5 @@ q("signOut").onclick=()=>api.signOut().then(()=>location.reload());
 // Calling showTeacherSignIn() before this callback flashes the login unnecessarily.
 api.onAuthStateChanged((user,authorized,access)=>render(user,access||{authorized}));
 })();
-</script></body></html>
+</script><script src="back-nav.js" data-mode="inline" data-href="index.html" data-label="← Fun Torah Tools"></script></body></html>
 
