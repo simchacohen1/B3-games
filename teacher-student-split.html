@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Student + Teacher | Fun Torah Tools</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#172033;background:#e9eef5}
+header{display:flex;align-items:center;gap:16px;padding:10px 18px;background:#172033;color:white;flex-wrap:wrap}
+header a{color:#fff}header strong{font-size:18px}.status{padding:12px 18px;background:#fff8df}
+main{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px;height:calc(100dvh - 110px);min-height:400px}
+section{display:flex;min-width:0;flex-direction:column;background:white;border-radius:12px;overflow:hidden}
+section h2{font-size:16px;margin:0;padding:12px 16px;background:#e4edff}
+section.student h2{background:#e6f6ea}section p{margin:0;padding:8px 14px;font-size:12px;background:#fafafa}
+iframe{border:0;flex:1;min-height:0;width:100%}
+@media(max-width:760px){main{grid-template-columns:1fr;height:auto}section{height:75vh}}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script><script src="site-settings.js?v=20261008-owner-demo"></script>
+</head><body>
+<header><a href="teacher-home.html">← Teacher home</a><strong id="heading">Teacher + Student View</strong></header>
+<div class="status" id="status" role="status">Checking teacher and class access…</div>
+<main hidden id="panes">
+<section class="student"><h2>👀 Student activity — preview only</h2><p>No saved answers, awards or progress. This is not a real student account.</p><iframe id="student" title="Read-only student activity" sandbox="allow-scripts allow-same-origin"></iframe></section>
+<section><h2>Teacher tools — live</h2><p>Teacher changes on this side are real and are saved normally.</p><iframe id="teacher" title="Teacher controls" allow="microphone"></iframe></section>
+</main>
+<script>
+(function(){
+"use strict";
+const tools={
+"sefer-hamitzvos":["Sefer HaMitzvos","sefer-hamitzvos/index.html","sefer-hamitzvos/index.html"],
+"halacha":["Halacha","halacha/index.html","halacha/teacher.html"],
+"yiddish":["Yiddish","yiddish/index.html","yiddish/teacher.html"],
+"posuk-practice-scroll":["Posuk Practice","record_pesukim/student.html","record_pesukim/teacher.html"],
+"rashi-letters":["Rashi Letters","rashi-letters/student.html","rashi-letters/teacher.html"],
+"gematria":["Gematria","gematria/index.html","gematria/teacher.html"],
+"shorashim":["Shorashim","shorashim/index.html","shorashim/teacher.html"],
+"chazara":["Chazara","chazara/index.html","chazara/teacher.html"],
+"game-show":["Game Show","game-show/player.html","game-show/teacher.html"],
+"student-rewards":["Student Rewards","student-rewards/student.html","student-rewards/teacher.html"],
+"daily-points":["Daily Points","student-rewards/student.html","student-rewards/teacher.html?tab=Daily%20Points"],
+"weekly-quiz":["Weekly Quiz","weekly-quiz/index.html","weekly-quiz/teacher.html"],
+"gallery":["Gallery","class-gallery/index.html","class-gallery/index.html"],
+"class-gallery":["Gallery","class-gallery/index.html","class-gallery/index.html"],
+"tag":["Tag","class-gallery/index.html","class-gallery/index.html"],
+"davening":["Davening Player","davening_student_app/index.html","davening_student_app/index.html"],
+"class-pointer":["Class Pointer","class-pointer-prototype/dashboard.html","class-pointer-prototype/dashboard.html?teacher=1"],
+"name-picker":["Name Picker","name-picker/index.html","name-picker/index.html"],
+"chavrusa":["Chavrusa","chavrusa/index.html","chavrusa/index.html"]
+};
+const p=new URLSearchParams(location.search),tool=p.get("tool"),cls=p.get("class"),re=/^[a-zA-Z0-9_-]{1,100}$/;
+const status=document.getElementById("status"),panes=document.getElementById("panes"),left=document.getElementById("student"),right=document.getElementById("teacher");
+if(!tools[tool]||!re.test(cls||"")){status.textContent="Invalid activity or class.";return;}
+const api=window.B3SiteSettings,ws=api.workspaceId||"b3-2026";
+if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+const db=firebase.database(),root=new URL(".",location.href);
+const withClass=(path)=>{const u=new URL(path,root);u.searchParams.set("class",cls);return u};
+function sameStudentPage(url){const initial=withClass(tools[tool][1]);const folder=initial.pathname.slice(0,initial.pathname.lastIndexOf("/")+1);return url.origin===location.origin&&url.pathname.startsWith(folder)&&/\.html?$/.test(url.pathname)&&!url.pathname.slice(folder.length).includes("/");}
+async function studentPage(path){
+ try{
+ const selected=new URL(path,root);
+ if(!sameStudentPage(selected))throw Error("That page is outside this activity.");
+ selected.searchParams.set("class",cls);
+ const response=await fetch(selected.href,{cache:"no-store"});
+ if(!response.ok)throw Error("Student activity could not load.");
+ const doc=new DOMParser().parseFromString(await response.text(),"text/html");
+ // The normal live game's sign-in gate is not suitable for a synthetic
+ // read-only session. Remove it only in this guarded in-memory copy.
+ const gate=new URL("game-gate.js",root).pathname;
+ doc.querySelectorAll("script[src]").forEach(s=>{try{if(new URL(s.getAttribute("src"),selected).pathname===gate)s.remove();}catch(_){}});
+ const base=doc.createElement("base");base.href=selected.href;doc.head.prepend(base);
+ const guard=doc.createElement("script");guard.src=new URL("student-split-readonly.js?v=20261013-1",root).href;guard.dataset.teacherPreviewGuard="1";base.after(guard);
+ doc.querySelectorAll("script[src]").forEach(s=>{if(s===guard)return;if(/firebase-(?:database|storage|app)-compat\.js|firebase-config\.js|site-settings\.js/.test(s.src)){const patch=doc.createElement("script");patch.textContent="window.B3PreviewProtect && window.B3PreviewProtect();";s.after(patch);}});
+ doc.querySelectorAll("script:not([src])").forEach(s=>{if(!s.textContent||s.dataset.teacherPreviewGuard)return;s.textContent=s.textContent.replace(/\b(?:window\.)?location\.search\b/g,"(new URL(document.baseURI)).search").replace(/\b(?:window\.)?location\.pathname\b/g,"(new URL(document.baseURI)).pathname");});
+ left.srcdoc="<!doctype html>\n"+doc.documentElement.outerHTML;
+ }catch(e){status.hidden=false;status.textContent="Student preview: "+e.message;}
+}
+window.addEventListener("message",e=>{if(e.source!==left.contentWindow||e.origin!==location.origin||e.data?.type!=="b3-teacher-preview-link")return;try{const u=new URL(e.data.href);if(sameStudentPage(u))studentPage(u.href);}catch(_){}});
+api.onAuthStateChanged(async(user,authorized,access)=>{
+ if(!user||!authorized||!["admin","teacher"].includes(access?.role)){status.textContent="Sign in as an authorized teacher to use split view.";return;}
+ try{
+ const snap=await db.ref("b3Games/workspaces/"+ws+"/classes/"+cls).once("value"),row=snap.val();
+ if(!row||row.active===false)throw Error("Class is not active.");
+ if(access.role!=="admin"&&!access.classIds?.includes(cls))throw Error("This class is not assigned to your teacher account.");
+ if(row.toolGrants?.[tool]!==true&&!(tool==="daily-points"&&row.toolGrants?.["student-rewards"]===true))throw Error("This activity is not enabled for this class.");
+ window.__B3_PREVIEW_CONTEXT=Object.freeze({verified:true,teacherName:"Teacher",classId:cls,className:row.name||cls});
+ document.getElementById("heading").textContent=tools[tool][0]+" · "+(row.name||cls);
+ panes.hidden=false;status.hidden=true;
+ right.src=withClass(tools[tool][2]).href;
+ await studentPage(withClass(tools[tool][1]).href);
+ }catch(e){status.textContent=e.message;}
+});
+})();
+</script></body></html>
