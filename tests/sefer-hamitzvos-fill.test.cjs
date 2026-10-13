@@ -7,7 +7,7 @@ function canvas(width,height){
  return {width,height,data:{data}};
 }
 function box(image,left,top,right,bottom){
- const {width,height,data}=image;
+ const {width,height,data:{data}}=image;
  for(let x=left;x<=right;x++)for(const y of [top,bottom]){const i=(y*width+x)*4;data[i]=data[i+1]=data[i+2]=0;}
  for(let y=top;y<=bottom;y++)for(const x of [left,right]){const i=(y*width+x)*4;data[i]=data[i+1]=data[i+2]=0;}
 }
