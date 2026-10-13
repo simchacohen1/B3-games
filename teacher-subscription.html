@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\\/script>')</script>
 <script src="firebase-config.js"></script><script src="site-settings.js"></script>
 </head><body><header><h1>Shorashim Lab subscriptions</h1></header>
-<main><section class="panel"><div id="message" class="notice">Checking your teacher account…</div><button id="signIn" class="btn hidden">Sign in with Google</button><p class="muted">Subscriptions are billed annually through Stripe Checkout. Access is added only to the class you select and is updated after Stripe confirms payment.</p><div id="classes"></div><button id="portal" class="btn secondary hidden">Manage subscription</button><p><a href="teacher-home.html">← Back to Teacher Home</a></p></section></main>
+<main><section class="panel"><div id="message" class="notice">Checking your teacher account…</div><button id="signIn" class="btn hidden">Sign in with Google</button><p class="muted">One subscription costs $39 per teacher per year and covers only the classes you select. Access is added after Stripe confirms payment.</p><div id="classes"></div><button id="portal" class="btn secondary hidden">Manage subscription</button><p><a href="teacher-home.html">← Back to Teacher Home</a></p></section></main>
 <script>
 (function(){
 'use strict';
@@ -28,13 +28,13 @@ async function post(name,body){
 }
 function render(classIds,rows){
  q('classes').innerHTML='';
- rows.forEach(row=>{
-  const div=document.createElement('div');div.className='class';
-  const info=document.createElement('div');const title=document.createElement('strong');title.textContent=row.name;const detail=document.createElement('div');detail.className='muted';detail.textContent=row.enabled?'Shorashim is enabled for this class.':'Annual subscription; price is shown securely at Stripe Checkout.';info.append(title,detail);
-  const button=document.createElement('button');button.className='btn';button.textContent=row.enabled?'Already enabled':'Subscribe for this class';button.disabled=row.enabled;
-  button.onclick=async()=>{button.disabled=true;message('Opening secure Stripe Checkout…');try{const result=await post('createShorashimCheckout',{classId:row.id});location.assign(result.url);}catch(error){message(error.message,true);button.disabled=false;}};
-  div.append(info,button);q('classes').append(div);
- });
+ const available=rows.filter(row=>!row.enabled);
+ rows.filter(row=>row.enabled).forEach(row=>{const div=document.createElement('div');div.className='class';div.textContent=row.name+' — Shorashim is already enabled.';q('classes').append(div);});
+ if(available.length){
+  const heading=document.createElement('p');heading.textContent='Select the classes covered by this teacher subscription:';q('classes').append(heading);
+  available.forEach(row=>{const label=document.createElement('label');label.className='class';const check=document.createElement('input');check.type='checkbox';check.value=row.id;check.name='shorashimClass';const name=document.createElement('strong');name.textContent=row.name;label.append(check,name);q('classes').append(label);});
+  const button=document.createElement('button');button.className='btn';button.textContent='Continue to Stripe · $39/year';button.onclick=async()=>{const selected=[...document.querySelectorAll('input[name="shorashimClass"]:checked')].map(el=>el.value);if(!selected.length){message('Select at least one class.',true);return;}button.disabled=true;message('Opening secure Stripe Checkout…');try{const result=await post('createShorashimCheckout',{classIds:selected});location.assign(result.url);}catch(error){message(error.message,true);button.disabled=false;}};q('classes').append(button);
+ }
  q('portal').classList.toggle('hidden',!rows.some(row=>row.enabled));
 }
 async function load(user,authorized,access){
@@ -45,7 +45,7 @@ async function load(user,authorized,access){
   if(!classIds.length){message('No active classes are assigned to this account.',true);return;}
   const snaps=await Promise.all(classIds.map(id=>db.ref('b3Games/workspaces/'+ws+'/classes/'+id).once('value')));
   const rows=snaps.map((snap,i)=>({id:classIds[i],...(snap.val()||{})})).filter(row=>row.active!==false).map(row=>({id:row.id,name:row.name||row.id,enabled:row.toolGrants?.shorashim===true}));
-  render(classIds,rows);message('Choose the class for Shorashim Lab access.');
+  render(classIds,rows);message('Select the classes for this teacher subscription.');
   q('portal').onclick=async()=>{q('portal').disabled=true;try{const result=await post('createShorashimBillingPortal');location.assign(result.url);}catch(error){message(error.message,true);q('portal').disabled=false;}};
   const status=new URLSearchParams(location.search).get('checkout');
   if(status==='success')message('Checkout is complete. Stripe is confirming the subscription; refresh this page in a few seconds to see class access.');
