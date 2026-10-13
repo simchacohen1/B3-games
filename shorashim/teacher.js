@@ -154,61 +154,95 @@ function sanitizeClassArt(art){
 // These are suggestions, not teacher approvals, and only fill currently missing artwork.
 const PEREK19_ART_RULES=[
   [/^(two|angel|evening|gate)$/i,['2️⃣','👼','🌆','🚪']],
-  [/^turn away$/i,['↪️','🔄','🚶']],
-  [/^early rising$/i,['🌅','⏰','☀️']],
-  [/^street$/i,['🛣️','🏘️','🚶']],
+  [/^(two)$/i,['2️⃣','✌️','🎲']],
+  [/^angel/i,['🪽','☁️','✨']],
+  [/^evening$/i,['🌆','🌇','🌙']],
+  [/^gate$/i,['🚪','🏰','🔑']],
+  [/^turn aside|turn away$/i,['↪️','🔄','👣']],
+  [/^stay overnight$/i,['🛏️','🌙','🏠']],
+  [/^get up early|early rising$/i,['🌅','⏰','☀️']],
+  [/^street|open square$/i,['🛣️','🏘️','🏙️']],
+  [/^urge strongly|urge|hurry$/i,['📣','⚡','👣']],
   [/^feast$/i,['🍽️','🥘','🍞']],
+  [/^matzah$/i,['🫓','🍞','🌾']],
   [/^baked?$/i,['🍞','🥖','♨️']],
-  [/^lay down$/i,['🛏️','😴','🌙']],
+  [/^bake$/i,['🍞','🥖','♨️']],
+  [/^lie down|lay down$/i,['🛏️','😴','🌙']],
   [/^surround(ing)?$/i,['⭕','🔄','🏘️']],
+  [/^surround$/i,['⭕','🔄','🏘️']],
   [/^(nation|people)/i,['👥','🌍','🏘️']],
-  [/^edge$/i,['📐','🔚','🏞️']],
-  [/^went out$/i,['🚪','➡️','👣']],
+  [/^edge|end$/i,['📐','🔚','🏞️']],
+  [/^went out|go out|take out$/i,['🚪','➡️','👣']],
+  [/^door$/i,['🚪','🔑','🏠']],
   [/^closed?$/i,['🔒','🚪','🔐']],
   [/^brother$/i,['👦','👥','🤝']],
-  [/^bad$/i,['❌','👎','⚠️']],
-  [/^daughters?$/i,['🧒','🎀','🏠']],
+  [/^do evil|evil|bad$/i,['❌','⚠️','🚫']],
+  [/^daughters?$/i,['🧒','🎒','🏠']],
+  [/^roof beam|roof$/i,['🪵','🏠','📐']],
+  [/^dwell as a stranger|dwell|stranger$/i,['🏠','🧳','👣']],
+  [/^farther|onward$/i,['🛣️','➡️','👣']],
+  [/^break|broke$/i,['🔨','🧩','⚡']],
   [/^only$/i,['1️⃣','☝️','🔹']],
   [/^these$/i,['👇','👉','📍']],
   [/^shade$/i,['🌳','⛱️','☁️']],
   [/^one$/i,['1️⃣','☝️','🔹']],
   [/^now$/i,['⏰','⌚','📍']],
   [/^broke$/i,['💔','🔨','🧩']],
-  [/^hit$/i,['💥','🥊','⚡']],
+  [/^hit|strike$/i,['💥','⚡','🎯']],
+  [/^blindness$/i,['👁️','🚫','🌑']],
+  [/^become weary$/i,['😮‍💨','🪑','💤']],
   [/^until$/i,['⏳','⌛','🕰️']],
   [/^who$/i,['❓','👤','🔎']],
   [/^here$/i,['📍','👇','🏠']],
-  [/^son-in-law$/i,['👔','🏠','🤝']],
+  [/^son-in-law|bridegroom$/i,['👔','🏠','🤝']],
   [/^we$/i,['👥','🤝','🫂']],
   [/^what$/i,['❓','🔎','💭']],
   [/^dawn$/i,['🌅','☀️','🌄']],
-  [/^went up$/i,['⬆️','🪜','🌄']],
-  [/^in case$/i,['⚠️','❓','🛡️']],
+  [/^went up|rise|go up$/i,['⬆️','🪜','🌄']],
+  [/^in case|lest$/i,['⚠️','❓','🛡️']],
   [/^sin$/i,['❌','⚠️','🚫']],
+  [/^linger$/i,['⏳','🐢','⌛']],
+  [/^hold strongly$/i,['🧲','💪','🤝']],
+  [/^have compassion|compassion$/i,['❤️','🤲','🛟']],
+  [/^place|set down$/i,['📦','⬇️','🪑']],
+  [/^escape|flee$/i,['🚪','👣','➡️']],
+  [/^life|soul$/i,['❤️','🌱','🌿']],
   [/^rest$/i,['🛏️','😴','🪑']],
   [/^outside$/i,['🏞️','🚪','🌳']],
   [/^i$/i,['👤','☝️','🗣️']],
-  [/^able$/i,['💪','✅','🏆']],
+  [/^able|be able$/i,['💪','✅','🏆']],
   [/^attached$/i,['🔗','📎','🧲']],
   [/^this$/i,['👇','👉','📍']],
   [/^close$/i,['📍','🏠','↔️']],
   [/^also$/i,['➕','✅','🔗']],
-  [/^turned over$/i,['🔄','🙃','↩️']],
+  [/^turned over|overturn$/i,['🔄','📦','↩️']],
   [/^name$/i,['🏷️','📛','✍️']],
   [/^sun$/i,['☀️','🌞','🌅']],
-  [/^rain$/i,['🌧️','☔','💧']],
+  [/^rain|rain down$/i,['🌧️','☔','💧']],
+  [/^sulfur$/i,['🪨','🌋','🟡']],
   [/^heavens$/i,['🌌','☁️','🌤️']],
-  [/^grew$/i,['🌱','🌿','🌳']],
+  [/^plant|grew|growth$/i,['🌱','🌿','🌳']],
+  [/^ground$/i,['🌱','🟫','🏞️']],
+  [/^smoke$/i,['💨','🔥','🏭']],
+  [/^furnace$/i,['🔥','🧱','🏭']],
   [/^salt$/i,['🧂','🍽️','⚪']],
-  [/^remembered$/i,['🧠','💭','📸']],
+  [/^remember(ed)?$/i,['📸','🗓️','🔔']],
+  [/^remember$/i,['📸','🗓️','🔔']],
+  [/^older|firstborn$/i,['🥇','1️⃣','👶']],
+  [/^none|there is no$/i,['⬜','🚫','❌']],
+  [/^wine$/i,['🍇','🥤','🍷']],
+  [/^offspring|seed\/child$/i,['🌱','🫘','👶']],
+  [/^next day|tomorrow$/i,['📅','🌅','➡️']],
+  [/^last night$/i,['🌙','🛏️','⬅️']],
   [/^cave$/i,['🪨','⛰️','🕳️']],
+  [/plain|district/i,['🌾','🗺️','🏞️']],
   [/^cried$/i,['😢','💧','😥']],
   [/^not$/i,['❌','🚫','⛔']],
   [/^gave to drink$/i,['🥤','💧','🫗']],
-  [/^seed\\/child$/i,['🌱','🫘','👦']],
+  [/^seed\/child$/i,['🌱','🫘','👦']],
   [/^tomorrow$/i,['📅','🌅','➡️']],
   [/^last night$/i,['🌙','🛏️','⬅️']],
-  [/^pregnant$/i,['👶','🍼','🌱']]
+  [/^pregnant|become pregnant$/i,['👶','🍼','🌱']]
 ];
 const SMART_ART_RULES=[
   [/entrance|opening|door/,['🚪','🏠','⛺','↔️']],
@@ -331,65 +365,87 @@ function hasBadAutoArt(item){
   return false;
 }
 
-async function generateAiArtForItems(items){
+async function generateAiArtForItems(items,onProgress=()=>{}){
   const clean=(items||[]).filter(Boolean).map(i=>({
-    id:String(i.id||''),
-    front:String(i.front||''),
-    english:String(i.english||'')
+    id:String(i.id||''), front:String(i.front||''), english:String(i.english||'')
   })).filter(i=>i.id&&i.english);
   if(!clean.length) return new Map();
   if(!GENERATE_SHORASHIM_ART_URL) return new Map();
 
-  const out=new Map();
-  // Batch requests so a large weekly upload does not create one AI call per word.
-  for(let n=0;n<clean.length;n+=40){
-    const batch=clean.slice(n,n+40);
-    try{
-      const res=await B3PaidApi.fetch(GENERATE_SHORASHIM_ART_URL,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({items:batch})
-      });
-      if(!res.ok) throw new Error(`AI art request failed (${res.status})`);
-      const data=await res.json();
-      for(const row of (data.items||[])){
-        const art=sanitizeClassArt(row.art);
-        if(row.id&&art.length) out.set(String(row.id),art);
+  const out=new Map(),batchSize=40,totalBatches=Math.ceil(clean.length/batchSize);
+  // Two calls max per batch. The endpoint's Firebase lease/cache makes an
+  // interrupted retry idempotent and prevents duplicate paid generations.
+  for(let n=0;n<clean.length;n+=batchSize){
+    const batch=clean.slice(n,n+batchSize),batchNumber=Math.floor(n/batchSize)+1;
+    onProgress({phase:'request',done:n,total:clean.length,batch:batchNumber,batches:totalBatches});
+    for(let attempt=0;attempt<2;attempt++){
+      try{
+        const res=await B3PaidApi.fetch(GENERATE_SHORASHIM_ART_URL,{
+          method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:batch})
+        });
+        if(!res.ok) throw Object.assign(new Error(`AI art request failed (${res.status})`),{status:res.status});
+        const data=await res.json();
+        for(const row of (data.items||[])){
+          const art=sanitizeClassArt(row.art);
+          if(row.id&&art.length) out.set(String(row.id),art);
+        }
+        break;
+      }catch(err){
+        console.warn('generateShorashimArt request failed',err);
+        // Retry only transient failures. Authentication/permission failures
+        // fall through immediately to the meaning-matched local illustrations.
+        const authFailure=/sign[ -]?in|teacher Google|cannot use the learning tools|permission/i.test(String(err?.message||''));
+        const transient=!authFailure&&(!err.status||err.status===408||err.status===429||err.status>=500);
+        if(attempt===0&&transient) await new Promise(resolve=>setTimeout(resolve,900));
+        else break;
       }
-    }catch(err){
-      console.warn('generateShorashimArt failed; using local fallback for this batch',err);
     }
+    onProgress({phase:'complete',done:Math.min(n+batch.length,clean.length),total:clean.length,batch:batchNumber,batches:totalBatches});
   }
   return out;
 }
 
-async function fillArtForShorashim(items,{force=false}={}){
-  const targets=(items||[]).filter(i=>force||hasBadAutoArt(i));
+async function fillArtForShorashim(items,{onProgress=()=>{}}={}){
+  // Bulk repair is strictly fill-only. Existing choices, auto art, and approved
+  // catalog entries are never regenerated or cleared by this path.
+  const targets=(items||[]).filter(i=>i&&!sanitizeClassArt(i.art).length&&i.teacherApproved!==true);
   if(!targets.length) return 0;
-  const ai=await generateAiArtForItems(targets);
+  const ai=await generateAiArtForItems(targets,onProgress);
   let changed=0;
   for(const item of targets){
-    let art=ai.get(String(item.id));
-    // Offline/service fallback: use the local semantic rules rather than leaving a blank card.
-    if(!art||!art.length) art=smartArtFor(item.english,item.front);
-    if(art&&art.length){
-      item.art=sanitizeClassArt(art);
-      if(item.art.length){
-        item.autoArt=false;       // finished AI/fallback result; do not regenerate every login
-        item.aiArtGenerated=true;
-        item.aiArtGeneratedAt=Date.now();
-        changed++;
-      }else{
-        item.art=[];
-        item.autoArt=true;
-      }
-    }else{
-      // Keep it eligible for a future retry if both AI and local fallback fail.
-      item.art=[];
-      item.autoArt=true;
-    }
+    // Recheck immediately before assignment so overlapping tasks cannot replace art.
+    if(sanitizeClassArt(item.art).length||item.teacherApproved===true) continue;
+    const art=sanitizeClassArt(ai.get(String(item.id))||smartArtFor(item.english,item.front));
+    if(art.length){
+      item.art=art; item.autoArt=false; item.aiArtGenerated=ai.has(String(item.id));
+      item.aiArtGeneratedAt=Date.now(); changed++;
+    }else item.autoArt=true;
   }
   return changed;
+}
+
+function mergeCatalogWithoutReplacingPictures(current,local){
+  const next={...(current||{})};
+  const raw=next.shorashim;
+  const list=Array.isArray(raw)?raw.slice():raw&&typeof raw==='object'?Object.keys(raw).sort((a,b)=>Number(a)-Number(b)).map(k=>raw[k]):[];
+  const index=new Map(list.filter(Boolean).map((item,i)=>[String(item.id||''),i]));
+  const timestamp=Date.now();
+  for(const candidate of (local?.shorashim||[])){
+    const id=String(candidate?.id||''); if(!id)continue;
+    if(!index.has(id)){
+      // Migration additions only; preserve the current catalog order and append.
+      list.push({...candidate}); index.set(id,list.length-1); continue;
+    }
+    const existing=list[index.get(id)];
+    if(existing&&!existing.perek&&candidate.perek)existing.perek=candidate.perek;
+    const art=sanitizeClassArt(candidate.art);
+    if(existing&&existing.teacherApproved!==true&&!sanitizeClassArt(existing.art).length&&art.length){
+      existing.art=art; existing.autoArt=false; existing.aiArtGenerated=!!candidate.aiArtGenerated;
+      existing.aiArtGeneratedAt=candidate.aiArtGeneratedAt||timestamp;
+    }
+  }
+  next.shorashim=list;
+  return next;
 }
 
 function splitKey(k){const i=k.indexOf(':');return[k.slice(0,i),k.slice(i+1)]}function itemFor(key){const[t,id]=splitKey(key);return(state.catalog[t]||[]).find(x=>x.id===id)||null}function fmtSec(sec){sec=Math.round(sec||0);const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60);return h?`${h}h ${m}m`:m?`${m}m`:`${sec}s`}function dateLabel(ts){if(!ts)return'Never';return new Date(ts).toLocaleString()}function today(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
@@ -408,13 +464,20 @@ async function loadAll(){
   const p18Added=needsCatalogSeed?ensurePerek18FinalShorashim():[];
   const unitMigration=needsCatalogSeed?ensurePerekUnitsAnd19():{tagged:0,added:[]};
   if(needsCatalogSeed)state.settings.catalogSeedVersion=CATALOG_SEED_VERSION;
-  const needsArt=(state.catalog.shorashim||[]).filter(hasBadAutoArt);
+  const needsArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden&&!sanitizeClassArt(i.art).length&&i.teacherApproved!==true);
   let repaired=0;
   if(needsArt.length){
-    status(`☁️ Creating picture choices for ${needsArt.length} word${needsArt.length===1?'':'s'}…`,'syncing');
-    repaired=await fillArtForShorashim(needsArt);
+    status(`☁️ Picture repair 0/${needsArt.length}…`,'syncing');
+    repaired=await fillArtForShorashim(needsArt,({phase,done,total,batch,batches})=>{
+      const signedIn=!!firebase.auth().currentUser;
+      const detail=signedIn?'generating':'Google teacher sign-in unavailable; using safe meaning-matched picture cues';
+      status(`☁️ ${detail} • ${done}/${total} words • batch ${batch}/${batches}`,'syncing');
+    });
   }
-  if(repaired||p18Added.length||unitMigration.tagged||unitMigration.added.length) await db.ref(`${SPACE}/catalog`).set(state.catalog);
+  if(repaired||p18Added.length||unitMigration.tagged||unitMigration.added.length){
+    const saved=await db.ref(`${SPACE}/catalog`).transaction(current=>mergeCatalogWithoutReplacingPictures(current,state.catalog));
+    if(saved.committed)state.catalog=withAllTracks(saved.snapshot.val()||state.catalog);
+  }
   const stillMissingArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden && !sanitizeClassArt(i.art).length).length;
   if(stillMissingArt)console.warn(`${stillMissingArt} Shorashim still need pictures; AI picture generation may be unavailable. They will be retried when this dashboard reloads.`);
   if(needsCatalogSeed)await db.ref(`${SPACE}/settings/catalogSeedVersion`).set(CATALOG_SEED_VERSION);
@@ -672,10 +735,12 @@ async function saveEdit(e){
   if(currentTrack==='shorashim'){
     i.perek=Number($('tPerek').value)||18;
     i.hebrew=$('tWord').value.trim();
-    // New words and edited meanings get fresh AI-selected picture choices.
-    i.autoArt=true;
-    status('☁️ Creating picture choices…','syncing');
-    await fillArtForShorashim([i],{force:true});
+    // Fill only missing artwork; editing a translation never replaces a teacher's existing choices.
+    if(!sanitizeClassArt(i.art).length){
+      i.autoArt=true;
+      status('☁️ Creating picture choices…','syncing');
+      await fillArtForShorashim([i]);
+    }
   }else{
     if(!Array.isArray(i.art)||!i.art.length)i.art=['✨','⭐','🖍️'];
     i.examples=$('tExamples').value.split('\n').map(x=>x.trim()).filter(Boolean).map(line=>{const[a,...b]=line.split('|');return{hebrew:a.trim(),english:b.join('|').trim()}});
@@ -791,7 +856,7 @@ $('saveBulkItems').onclick=async e=>{
   renderCatalog();
   if(added.length){
     status(`☁️ Creating pictures for ${added.length} new word${added.length===1?'':'s'}…`,'syncing');
-    await fillArtForShorashim(added,{force:true});
+    await fillArtForShorashim(added,({done,total,batch,batches})=>status(`☁️ Picture repair ${done}/${total} words • batch ${batch}/${batches}`,'syncing'));
   }
   await saveCatalog();
   const missing=added.filter(i=>!sanitizeClassArt(i.art).length).length;
