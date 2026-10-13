@@ -989,6 +989,7 @@ function renderShorashimRecordings(){
         <b>${statusLabel}</b>
       </div>
       ${r.audioURL?`<div><audio controls preload="metadata" data-recording-audio src="${esc(r.audioURL)}" style="width:100%;margin:12px 0 4px"></audio><div class="mini-note" data-recording-duration aria-live="polite">Checking length…</div></div>`:'<p class="mini-note">Audio file unavailable.</p>'}
+      ${!r.pointRequestId && st==="pending"?`<button class="ghost" onclick="repairShorashimRecording('${esc(r.studentId)}','${esc(r.eventId)}')">Reconnect points request</button>`:""}
       ${pendingReady?`<div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="primary" onclick="reviewShorashimRecording('${esc(r.pointRequestId)}','approve')">✓ Approve ${recordingPoints(r)} Points</button>
         <button class="ghost" style="border-color:#dc2626;color:#b91c1c" onclick="reviewShorashimRecording('${esc(r.pointRequestId)}','reject')">✕ Reject</button>
@@ -997,6 +998,18 @@ function renderShorashimRecordings(){
   }).join('');
   updateShorashimAudioDurations();
 }
+async function repairShorashimRecording(studentId,eventId){
+  try{
+    const token=await teacherRewardsToken();
+    const resp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
+      body:JSON.stringify({action:"repair-shorashim-recording",studentId,eventId})});
+    const data=await resp.json().catch(()=>({}));
+    if(!resp.ok)throw new Error(data.error||"Could not reconnect points.");
+    await loadShorashimRecordings();
+  }catch(e){alert(e.message||"Could not reconnect points.");}
+}
+window.repairShorashimRecording=repairShorashimRecording;
 async function teacherRewardsToken(){
   let user=firebase.auth().currentUser;
   if(!user){
