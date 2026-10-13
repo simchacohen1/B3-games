@@ -1737,10 +1737,10 @@ let comprehensionQuestionLoadFailed = false;
 // network read.
 const generatedQuestionMemoryCache = new Map();
 const generatedQuestionPromiseCache = new Map();
-const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_wordselect_v3_';
+const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_answerfirst_v4_';
 
 function generatedQuestionCacheKey(part){
-  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_') + '_wordselect_v3';
+  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_') + '_answerfirst_v4';
 }
 function normalizeGeneratedItems(items, posukNum){
   return (Array.isArray(items) ? items : []).map(item => {

@@ -1850,20 +1850,25 @@ QUESTION RULES:
 - Use simple, natural English suitable for an 8-year-old.
 - For Biblical proper names in the QUESTION and EXPECTED ANSWER, use the Frum/Ashkenazi classroom pronunciation spelling supplied by the application (for example Adam â†’ Odom). Do not change ordinary English words. â€œHashemâ€ is acceptable for a Divine name.
 
-WORD-SELECTION ANSWER KEY: For each question, return answerWordSets, a list of one to three acceptable selections. Each selection is a list of zero-based indexes into the supplied Hebrew verse split on whitespace. Include every exact token needed for that answer and no extra tokens. Include separate sets only when the verse has genuinely different word combinations that each fully answer the question. Do not list partial answers or merely rearranged versions; one set is enough when there is only one reasonable answer. Punctuation-attached words count as one token. Omit a question if its answer is not explicitly represented by selectable words in this verse.
+ANSWER-FIRST DESIGN (REQUIRED): Build each question from its answer evidence, never the other way around.
+1. Read the Hebrew verse as tokens split on whitespace. Choose a short, meaningful, contiguous phrase of exact Hebrew tokens that is directly supported by the accepted English translation (and classroom-reference translation when present). This phrase is the answer evidence. Do not begin by trying to fit a prewritten question.
+2. Write a short child-friendly English question whose answer is clearly and fully expressed by that exact Hebrew phrase. A person who knows the translation should be able to see why the selected phrase answers the question. The phrase must not merely share a topic with the question.
+3. Set expectedAnswer to a concise English meaning of that selected phrase, consistent with the accepted translation. Set answerWordSets to the zero-based token indexes of the exact phrase, split on whitespace. Keep the phrase contiguous; punctuation-attached words count as one token. Include a second set only if a different contiguous phrase also clearly answers the same question.
+4. Number questions require special care: ask about a number only when the selected answer phrase itself clearly states that quantity or an unmistakable equivalent. When a quantity is not explicit, ask a question the selected words do answer instead. Never borrow a nearby number that answers a different fact.
+5. Omit any answer phrase/question pair that a reasonable independent reader could not verify from the supplied translation and verse. Prefer fewer clear questions over exhaustive but arguable ones.
 
 OUTPUT: Return ONLY JSON, no markdown or commentary:
 {"items":[{"sourceFact":"one explicit fact from the accepted translation","question":"child-friendly question","expectedAnswer":"short direct answer supported by that fact","answerWordSets":[[0],[1,2]]}]}
 
 ${staticQuestions.length ? `
-EXISTING QUESTION MODE:
-The application supplied an ordered list of hand-written questions. Return exactly one item per supplied question, in the same order. Copy each question's wording exactly into the question field. Do not create new questions or reword them. For each one, determine a short expected answer supported by the accepted translation and attach the Hebrew word index set(s) that answer that exact question. If a question cannot be answered from this verse, omit only that item.
+QUESTION TOPIC HINTS:
+The application supplied existing question wording as topic hints only. Do not copy it automatically or force an answer onto it. First choose a clear answer phrase from the verse; then keep a supplied question only if that phrase fully answers it. Otherwise write a clearer question for the chosen phrase. Omit any topic that has no unambiguous answer phrase in this verse.
 ` : `
 QUESTION GENERATION MODE:
-No hand-written questions were supplied. Generate the exhaustive question set as described above.
+No topic hints were supplied. Choose clear answer phrases first, then write questions for them as described above.
 `}
 
-QUALITY CHECK BEFORE RETURNING: every item must be supported by the accepted translation; every meaningful explicit detail should be represented somewhere when generating new questions; remove duplicates; never invent a reason or identity.`;
+QUALITY CHECK BEFORE RETURNING: For every item, inspect the exact Hebrew tokens named by answerWordSets first. Confirm they form a contiguous phrase, confirm expectedAnswer translates that phrase, and confirm the question is plainly answered by that phrase. If any link in this chain is uncertain, omit the item. Remove duplicates; never invent a reason or identity.`;
 
     const userPrompt = `Perek: ${perekNum || ""}, Posuk: ${posukNum || ""}\nAccepted English translation: "${String(posukTranslation).trim()}"${classroomReferenceTranslation && String(classroomReferenceTranslation).trim() ? `\nTorah Umesorah classroom-reference translation: "${String(classroomReferenceTranslation).trim()}"` : ""}${posukText ? `\nHebrew for reference only: ${String(posukText).trim()}` : ""}${staticQuestions.length ? `\nEXISTING QUESTIONS, in required order: ${JSON.stringify(staticQuestions)}` : ""}`;
 
@@ -1949,11 +1954,13 @@ items: {
           question: applyFrumBiblicalNames(String(item?.question || "").trim()),
           expectedAnswer: applyFrumBiblicalNames(String(item?.expectedAnswer || "").trim()),
           answerWordSets: Array.isArray(item?.answerWordSets)
-            ? item.answerWordSets.map((set) => Array.isArray(set) ? [...new Set(set.map(Number).filter(Number.isInteger))] : []).filter((set) => set.length).slice(0, 3)
+            ? item.answerWordSets.map((set) => Array.isArray(set) ? [...new Set(set.map(Number).filter(Number.isInteger))].sort((a, b) => a - b) : []).filter((set) => set.length).slice(0, 3)
             : [],
         }))
         .filter((item) => item.question && item.expectedAnswer && item.answerWordSets.length &&
-          item.answerWordSets.every((set) => set.every((index) => index >= 0 && index < String(posukText || '').trim().split(/\s+/).filter(Boolean).length)))
+          item.answerWordSets.every((set) =>
+            set.every((index, position) => index >= 0 && index < String(posukText || '').trim().split(/\s+/).filter(Boolean).length &&
+              (position === 0 || index === set[position - 1] + 1))))
         .filter((item) => {
           const key = item.question.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
           if (!key || seen.has(key)) return false;
