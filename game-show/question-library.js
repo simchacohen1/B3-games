@@ -276,8 +276,8 @@
             alert('That set is no longer available.');
             return;
           }
-          const duplicate = Object.keys(library).some(id =>
-            library[id] && library[id].copiedFrom && library[id].copiedFrom.classId === id && library[id].copiedFrom.setId === sourceSetId);
+          const duplicate = Object.keys(library).some(localSetId =>
+            library[localSetId] && library[localSetId].copiedFrom && library[localSetId].copiedFrom.classId === id && library[localSetId].copiedFrom.setId === sourceSetId);
           if (duplicate) {
             button.disabled = false;
             alert('This set has already been copied into this class library.');
