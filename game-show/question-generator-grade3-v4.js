@@ -174,11 +174,11 @@
       placed: "place", put: "put", ate: "eat", drank: "drink"
     };
     const verbPattern = Object.keys(verbs).join("|");
-    const match = text.match(new RegExp("(?:^|[;.!?]\\s*)(?:And\\s+)?" + subject + "\\s+(" + verbPattern + ")\\s+(.+)", "i"));
-    if (!match) {
-      const day = creationDay(source);
-      return day ? { q: "What did Hashem create on " + day + "?", answer: text } : null;
-    }
+    const match = text.match(new RegExp("(?:^|[;.!?]\\s*)(?:And\\s+)?" + subject + "\\s+(" + verbPattern + ")\\s*,?\\s+(.+)", "i"));
+    // Do not guess from the pasuk number: many different events occur on
+    // creation day one. If the text does not name a clear subject and action,
+    // leave it out for the teacher to review.
+    if (!match) return null;
 
     const name = match[1], verb = match[2].toLowerCase();
     let clause = match[3].split(/[;.!?]/)[0].trim();
