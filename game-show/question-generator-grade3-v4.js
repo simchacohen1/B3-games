@@ -10,6 +10,7 @@
     Deuteronomy: { label: "Devarim" }
   };
   const api = "https://www.sefaria.org";
+  const repairText = value => window.GameShowTextEncoding ? window.GameShowTextEncoding.repairText(value) : String(value == null ? "" : value);
   const searchProxy = "https://us-central1-b3-games.cloudfunctions.net/searchSefariaQuestions";
   const nameMap = {
     "the lord": "Hashem", "god": "Hashem",
@@ -126,12 +127,12 @@
     return { ref: data.ref || ref, text };
   }
   function phrase(text) {
-    const words = text.replace(/[â€œâ€"]/g, "").split(/\s+/).filter(Boolean);
+    const words = repairText(text).replace(/[“”"]/g, "").split(/\s+/).filter(Boolean);
     return words.slice(0, Math.min(7, words.length)).join(" ");
   }
   function questionRecord(q, ans, choices, correctNumber) {
-    const item = { q: String(q || "").trim(), ans: String(ans || "").trim() };
-    const options = Array.isArray(choices) ? choices.map(choice => String(choice || "").trim()).filter(Boolean) : [];
+    const item = { q: repairText(String(q || "").trim()), ans: repairText(String(ans || "").trim()) };
+    const options = Array.isArray(choices) ? choices.map(choice => repairText(String(choice || "").trim())).filter(Boolean) : [];
     const correct = Number(correctNumber);
     if (options.length) {
       item.choices = options;
@@ -157,10 +158,10 @@
     const split = Math.min(9, Math.max(2, Math.floor(words.length * 0.55)));
     const lead = words.slice(0, split).join(" ");
     const answer = words.slice(split, split + 12).join(" ");
-    return answer ? { q: "Which words continue this statement: â€œ" + lead + " â€¦â€?", answer } : null;
+    return answer ? { q: "Which words continue this statement: “" + lead + " …”?", answer: repairText(answer) } : null;
   }
   function questionAndAnswer(source, topic) {
-    const text = localizeText(source.text).replace(/\s+/g, " ").trim();
+    const text = repairText(localizeText(source.text)).replace(/\s+/g, " ").trim();
     const ref = source.displayRef || displayRef(source.ref);
     if (source.isKitzur) return kitzurQuestionAndAnswer(source, text);
     if (topic) return { q: "What does this source say about " + topic + "?", answer: text };
@@ -243,7 +244,7 @@
   }
   function shortChoice(value) {
     const words = String(value || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
-    return words.length > 12 ? words.slice(0, 12).join(" ") + "â€¦" : words.join(" ");
+    return words.length > 12 ? words.slice(0, 12).join(" ") + "…" : words.join(" ");
   }
 
   function makeItems(sources, mode, topic, count, distractors) {
@@ -297,7 +298,7 @@
     const sourcePool = verseRows.slice();
     if (includeRashi) {
       for (const source of evenlyPick(verseRows, Math.min(verseRows.length, count))) {
-        status.textContent = "Checking Rashi for " + source.displayRef + "â€¦";
+        status.textContent = "Checking Rashi for " + source.displayRef + "…";
         try {
           const rashi = await getText("Rashi on " + source.ref);
           if (rashi.text) sourcePool.push({ ...rashi, displayRef: "Rashi on " + source.displayRef, isRashi: true });
@@ -326,7 +327,7 @@
     const siman = Number(form.siman.value);
     const from = Number(form.from.value), to = Number(form.to.value);
     if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to < from) throw new Error("Choose a valid se'if range.");
-    status.textContent = "Loading Kitzur Shulchan Aruch, Siman " + siman + "â€¦";
+    status.textContent = "Loading Kitzur Shulchan Aruch, Siman " + siman + "…";
     const seifim = await kitzurSeifim(siman);
     if (to > seifim.length) throw new Error("The selected se'if range does not exist in this siman.");
     const rows = [];
@@ -356,12 +357,12 @@
       '<fieldset class="sg-group"><legend>1. Choose the source</legend><div class="sg-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end">' +
       '<label>Source type<select id="sgType" class="select"><option value="chumash">Chumash</option><option value="halacha">Kitzur Shulchan Aruch</option></select></label>' +
       '<label>Sefer<select id="sgBook" class="select">' + bookNames.map(b => '<option value="' + b + '">' + books[b].label + '</option>').join("") + '</select></label>' +
-      '<label>Perek<select id="sgChapter" class="select"><option>Loadingâ€¦</option></select></label>' +
-      '<label>First pasuk<select id="sgFrom" class="select"><option>Loadingâ€¦</option></select></label>' +
-      '<label>Last pasuk<select id="sgTo" class="select"><option>Loadingâ€¦</option></select></label>' +
+      '<label>Perek<select id="sgChapter" class="select"><option>Loading…</option></select></label>' +
+      '<label>First pasuk<select id="sgFrom" class="select"><option>Loading…</option></select></label>' +
+      '<label>Last pasuk<select id="sgTo" class="select"><option>Loading…</option></select></label>' +
       '<label>Siman<select id="sgSiman" class="select">' + Array.from({length:221},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+'</option>').join("") + '</select></label>' +
-      '<label>First seâ€™if<select id="sgSeifFrom" class="select"><option>Loadingâ€¦</option></select></label>' +
-      '<label>Last seâ€™if<select id="sgSeifTo" class="select"><option>Loadingâ€¦</option></select></label>' +
+      '<label>First se’if<select id="sgSeifFrom" class="select"><option>Loading…</option></select></label>' +
+      '<label>Last se’if<select id="sgSeifTo" class="select"><option>Loading…</option></select></label>' +
       '</div></fieldset><fieldset class="sg-group"><legend>2. Choose question options</legend><div class="sg-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end">' +
       '<label>Number of questions<select id="sgCount" class="select">' + Array.from({length:33},(_,i)=>'<option value="' + (i+1) + '"' + (i===9?' selected':'') + '>' + (i+1) + '</option>').join("") + '</select></label>' +
       '<label><input id="sgRashi" type="checkbox"> Include Rashi</label>' +
@@ -397,7 +398,7 @@
       if (replace && !window.confirm("Replace all current questions with these " + items.length + " reviewed questions?")) return;
       const buttons = [...review.querySelectorAll(".sg-save-actions button")];
       buttons.forEach(button => { button.disabled = true; });
-      status.textContent = replace ? "Replacing the current question setâ€¦" : "Adding questions to the current setâ€¦";
+      status.textContent = replace ? "Replacing the current question set…" : "Adding questions to the current set…";
       try {
         const current = typeof window.getCurrentQuestionSet === "function" ? window.getCurrentQuestionSet() : [];
         const next = replace ? items : current.concat(items);
@@ -430,7 +431,7 @@
     const status = card.querySelector("#sgStatus");
     async function updateChapters() {
       try {
-        status.textContent = "Loading perek list from Sefariaâ€¦";
+        status.textContent = "Loading perek list from Sefaria…";
         const { chapters } = await getBookIndex(bookSelect.value);
         optionsFor(chapterSelect, Array.from({length:chapters},(_,i)=>i+1), 1);
         await updateVerses();
@@ -452,7 +453,7 @@
     const seifToSelect = card.querySelector("#sgSeifTo");
     async function updateSeifim() {
       seifFromSelect.disabled = seifToSelect.disabled = true;
-      status.textContent = "Loading Kitzur Siman " + simanSelect.value + "â€¦";
+      status.textContent = "Loading Kitzur Siman " + simanSelect.value + "…";
       try {
         const currentSiman = simanSelect.value;
         const seifim = await kitzurSeifim(Number(currentSiman));
@@ -460,9 +461,9 @@
         const values = Array.from({length:seifim.length},(_,i)=>i+1);
         optionsFor(seifFromSelect,values,1);
         optionsFor(seifToSelect,values,values.length);
-        status.textContent = "Siman " + currentSiman + " has " + values.length + " seâ€™ifim.";
+        status.textContent = "Siman " + currentSiman + " has " + values.length + " se’ifim.";
       } catch(error) {
-        status.textContent = error.message || "Could not load seâ€™ifim.";
+        status.textContent = error.message || "Could not load se’ifim.";
       } finally {
         seifFromSelect.disabled = seifToSelect.disabled = false;
       }
@@ -489,14 +490,14 @@
         const list = review.querySelector("#sgQuestionList");
         list.replaceChildren(...items.map(item => createQuestionRow(item.q, item.ans, item.choices, item.correctIndex)));
         review.hidden = false;
-        status.textContent = items.length + " questions ready" + (type.value === "halacha" ? " (one per seâ€™if, with no repeats)" : "") + ". Review them below; your current set is unchanged.";
+        status.textContent = items.length + " questions ready" + (type.value === "halacha" ? " (one per se’if, with no repeats)" : "") + ". Review them below; your current set is unchanged.";
         review.scrollIntoView({ behavior: "smooth", block: "start" });
       } catch (error) {
         status.textContent = error.message || "Could not generate questions.";
       } finally { button.disabled = false; }
     });
   }
-  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, questionAndAnswer, questionRecord, shortChoice, phrase, cleanText, localizeText, displayRef, evenlyPick, distribute });
+  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, questionAndAnswer, questionRecord, shortChoice, phrase, cleanText, localizeText, displayRef, evenlyPick, distribute, repairText });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", inject, { once: true });
   else inject();
 })();
