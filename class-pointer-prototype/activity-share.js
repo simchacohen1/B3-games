@@ -28,8 +28,10 @@
     if(!auth.ok||!(await auth.json()).ok)return;
     const memberships=(await firebase.database().ref('b3Games/students/'+id+'/memberships').once('value')).val()||{};
     const member=Object.values(memberships).find(m=>m&&m.active!==false&&m.workspaceId===ws&&/^[A-Za-z0-9_-]{1,100}$/.test(m.classId));
-    const classId=member?.classId;
-    if(!classId)return;
+    // Legacy students can still have their assigned class on the profile.
+    const profile=member?null:(await firebase.database().ref('b3Games/students/'+id+'/profile').once('value')).val();
+    const classId=member?.classId||profile?.classId;
+    if(!/^[A-Za-z0-9_-]{1,100}$/.test(classId||''))return;
     const sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
     holder.id='fttActivityScreenShare';
