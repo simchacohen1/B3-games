@@ -105,66 +105,37 @@ exports.createShorashimCheckout = onRequest(
     if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST.' });
     try {
       const identity = await identityFromRequest(req);
-      const classId = String(req.body?.classId || '');
-      const { ref, cls } = await assignedClass(identity, classId);
-      if (cls.toolGrants?.shorashim === true) {
-        return res.status(409).json({ error: 'Shorashim is already enabled for this class.' });
-      }
-      const openRef = db().ref('b3Private/shorashimOpenCheckouts/' + identity.uid + '/' + classId);
+      const classIds = [...new Set(Array.isArray(req.body?.classIds) ? req.body.classIds.map(String) : [])];
+      if (!classIds.length || classIds.length > 20) return res.status(400).json({ error: 'Select between 1 and 20 classes.' });
+      const classes = await Promise.all(classIds.map(id => assignedClass(identity, id)));
+      if (classes.some(({ cls }) => cls.toolGrants?.shorashim === true)) return res.status(409).json({ error: 'Shorashim is already enabled for one or more selected classes.' });
+      const current = (await db().ref('b3Private/stripeSubscriptions').get()).val() || {};
+      if (Object.values(current).some(row => row?.teacherUid === identity.uid && row.active === true)) return res.status(409).json({ error: 'A Shorashim subscription already exists. Use Manage subscription.' });
+      const openRef = db().ref('b3Private/shorashimOpenCheckouts/' + identity.uid);
       const open = (await openRef.get()).val();
       if (open?.sessionId && open.expiresAt > Date.now()) {
-        try {
-          const existing = await stripeRequest('checkout/sessions/' + encodeURIComponent(open.sessionId));
-          if (existing.status === 'open' && existing.url) return res.json({ url: existing.url });
-        } catch (_) {}
+        try { const existing = await stripeRequest('checkout/sessions/' + encodeURIComponent(open.sessionId)); if (existing.status === 'open' && existing.url) return res.json({ url: existing.url }); } catch (_) {}
       }
       const configuredPrice = String(priceId.value() || '');
       if (!/^price_[A-Za-z0-9]+$/.test(configuredPrice)) throw new Error('Sandbox Shorashim price is not configured.');
       const price = await stripeRequest('prices/' + encodeURIComponent(configuredPrice));
-      if (!price.active || price.type !== 'recurring' || price.recurring?.interval !== 'year') {
-        throw new Error('The configured Shorashim price is not an active annual recurring price.');
-      }
-      const pendingRef = db().ref('b3Private/shorashimCheckoutLocks/' + identity.uid + '/' + classId);
-      const lock = await pendingRef.transaction(current => {
-        if (current?.expiresAt > Date.now()) return;
-        return { nonce: crypto.randomUUID(), expiresAt: Date.now() + 30000 };
-      });
+      if (!price.active || price.type !== 'recurring' || price.recurring?.interval !== 'year' || price.unit_amount !== 3900 || price.currency !== 'usd') throw new Error('Price must be the active $39 USD annual teacher subscription.');
+      const pendingRef = db().ref('b3Private/shorashimCheckoutLocks/' + identity.uid);
+      const lock = await pendingRef.transaction(current => current?.expiresAt > Date.now() ? undefined : { nonce: crypto.randomUUID(), expiresAt: Date.now() + 30000 });
       if (!lock.committed) return res.status(409).json({ error: 'A checkout is already being prepared. Please wait a moment.' });
       try {
-        const metadata = { teacherUid: identity.uid, classId, workspaceId, tool: 'shorashim' };
-        const savedCustomer = (await db().ref('b3Private/stripeCustomerByTeacher/' + identity.uid).get()).val();
-        const fields = {
-          mode: 'subscription',
-          success_url: 'https://funtorahtools.com/teacher-subscription.html?checkout=success&session_id={CHECKOUT_SESSION_ID}',
-          cancel_url: 'https://funtorahtools.com/teacher-subscription.html?checkout=cancelled',
-          'line_items[0][price]': configuredPrice,
-          'line_items[0][quantity]': 1,
-          ...(savedCustomer?.id ? { customer: savedCustomer.id } : { customer_email: identity.email }),
-          client_reference_id: identity.uid,
-          integration_identifier: makeIntegrationId(),
-          allow_promotion_codes: 'true'
-        };
-        for (const [key, value] of Object.entries(metadata)) {
-          fields['metadata[' + key + ']'] = value;
-          fields['subscription_data[metadata][' + key + ']'] = value;
-        }
+        const metadata = { teacherUid: identity.uid, classIds: JSON.stringify(classIds), workspaceId, tool: 'shorashim' };
+        const customer = (await db().ref('b3Private/stripeCustomerByTeacher/' + identity.uid).get()).val();
+        const fields = { mode: 'subscription', success_url: 'https://funtorahtools.com/teacher-subscription.html?checkout=success&session_id={CHECKOUT_SESSION_ID}', cancel_url: 'https://funtorahtools.com/teacher-subscription.html?checkout=cancelled', 'line_items[0][price]': configuredPrice, 'line_items[0][quantity]': 1, ...(customer?.id ? { customer: customer.id } : { customer_email: identity.email }), client_reference_id: identity.uid, integration_identifier: makeIntegrationId(), allow_promotion_codes: 'true' };
+        for (const [key,value] of Object.entries(metadata)) { fields['metadata['+key+']']=value; fields['subscription_data[metadata]['+key+']']=value; }
         const session = await stripeRequest('checkout/sessions', { method: 'POST', form: formData(fields) });
-        const expiresAt = session.expires_at ? session.expires_at * 1000 : Date.now() + 86400000;
-        await Promise.all([
-          db().ref('b3Private/shorashimCheckoutSessions/' + session.id).set({
-            teacherUid: identity.uid, classId, workspaceId, priceId: configuredPrice,
-            createdAt: Date.now(), expiresAt
-          }),
-          openRef.set({ sessionId: session.id, expiresAt })
-        ]);
-        return res.json({ url: session.url });
-      } finally {
-        await pendingRef.transaction(current => current?.nonce === lock.snapshot.val()?.nonce ? null : undefined);
-      }
-    } catch (error) { return sendError(res, error); }
+        const expiresAt = session.expires_at ? session.expires_at*1000 : Date.now()+86400000;
+        await Promise.all([db().ref('b3Private/shorashimCheckoutSessions/'+session.id).set({teacherUid:identity.uid,classIds,workspaceId,priceId:configuredPrice,createdAt:Date.now(),expiresAt}),openRef.set({sessionId:session.id,classIds,expiresAt})]);
+        return res.json({url:session.url});
+      } finally { await pendingRef.transaction(current => current?.nonce === lock.snapshot.val()?.nonce ? null : undefined); }
+    } catch (error) { return sendError(res,error); }
   }
 );
-
 exports.createShorashimBillingPortal = onRequest(
   { region, cors, secrets: [stripeSecret], maxInstances: 5 },
   async (req, res) => {
@@ -192,58 +163,21 @@ async function subscriptionForEvent(event, stripeEventObject) {
 }
 
 async function applySubscription(subscription, eventId) {
-  const metadata = subscription?.metadata || {};
-  const teacherUid = String(metadata.teacherUid || '');
-  const classId = String(metadata.classId || '');
-  if (!teacherUid || !classId || metadata.workspaceId !== workspaceId || metadata.tool !== 'shorashim') return;
-  const privatePath = 'b3Private/stripeSubscriptions/' + subscription.id;
-  const savedSnap = await db().ref(privatePath).get();
-  let saved = savedSnap.val() || {};
-  const [teacherSnap, adminSnap, authUser] = await Promise.all([
-    db().ref('b3Games/workspaces/' + workspaceId + '/teachers/' + teacherUid).get(),
-    db().ref('b3Games/admins/' + teacherUid).get(),
-    admin.auth().getUser(teacherUid).catch(() => null)
-  ]);
-  const teacher = teacherSnap.val();
-  const adminData = adminSnap.val();
-  const ownerAdmin = String(authUser?.email || '').toLowerCase() === 'simcha5770@gmail.com';
-  const adminOk = adminData && adminData.active !== false;
-  const authorized = teacher?.active === true || adminOk || ownerAdmin;
-  const clsRef = db().ref('b3Games/workspaces/' + workspaceId + '/classes/' + classId);
-  const clsSnap = await clsRef.get();
-  const cls = clsSnap.val();
-  const stillAssigned = authorized && !!cls && cls.active !== false &&
-    (teacher?.classIds?.[classId] === true || adminOk || ownerAdmin);
-  const isActive = stillAssigned && activeSubscriptionStatus(subscription.status);
-  if (!saved.previousGrant && !saved.createdAt && cls) {
-    saved.previousGrant = cls.toolGrants?.shorashim === true;
-  }
-  saved = {
-    ...saved, subscriptionId: subscription.id, teacherUid, classId, workspaceId,
-    customerId: subscription.customer || saved.customerId || '',
-    status: isActive ? subscription.status : String(subscription.status || 'inactive'),
-    active: isActive, cancelAtPeriodEnd: subscription.cancel_at_period_end === true,
-    currentPeriodEnd: subscription.current_period_end || null,
-    priceId: subscription.items?.data?.[0]?.price?.id || saved.priceId || '',
-    updatedAt: Date.now(), lastEventId: eventId,
-    createdAt: saved.createdAt || Date.now()
-  };
-  await db().ref(privatePath).set(saved);
-  if (saved.customerId) await db().ref('b3Private/stripeCustomerByTeacher/' + teacherUid).set({ id: saved.customerId });
-  if (!cls) return;
-  const activeSubs = await db().ref('b3Private/stripeSubscriptions').get();
-  const hasActiveForClass = Object.values(activeSubs.val() || {}).some(row =>
-    row?.active === true && row.teacherUid === teacherUid && row.classId === classId
-  );
-  if (isActive) {
-    await clsRef.child('toolGrants/shorashim').set(true);
-    await clsRef.child('subscriptionOriginalShorashimGrant').set(saved.previousGrant === true);
-  } else if (!hasActiveForClass) {
-    await clsRef.child('toolGrants/shorashim').set(saved.previousGrant === true);
-    await clsRef.child('subscriptionOriginalShorashimGrant').remove();
-  }
+  const metadata=subscription?.metadata||{}, teacherUid=String(metadata.teacherUid||''); let classIds;
+  try { classIds=JSON.parse(metadata.classIds||'[]'); } catch (_) { classIds=[]; }
+  if(!teacherUid||!Array.isArray(classIds)||!classIds.length||classIds.length>20||classIds.some(id=>!validClassId(id))||metadata.workspaceId!==workspaceId||metadata.tool!=='shorashim')return;
+  const privatePath='b3Private/stripeSubscriptions/'+subscription.id, prev=(await db().ref(privatePath).get()).val()||{};
+  const [ts,as,user]=await Promise.all([db().ref('b3Games/workspaces/'+workspaceId+'/teachers/'+teacherUid).get(),db().ref('b3Games/admins/'+teacherUid).get(),admin.auth().getUser(teacherUid).catch(()=>null)]);
+  const teacher=ts.val(), adminData=as.val(), owner=String(user?.email||'').toLowerCase()==='simcha5770@gmail.com', adminOk=adminData&&adminData.active!==false;
+  const authorized=teacher?.active===true||adminOk||owner;
+  const rows=await Promise.all(classIds.map(async id=>({id,ref:db().ref('b3Games/workspaces/'+workspaceId+'/classes/'+id),cls:(await db().ref('b3Games/workspaces/'+workspaceId+'/classes/'+id).get()).val(),assigned:teacher?.classIds?.[id]===true||adminOk||owner})));
+  const active=authorized&&rows.every(r=>r.cls&&r.cls.active!==false&&r.assigned)&&activeSubscriptionStatus(subscription.status);
+  const previousGrants={...(prev.previousGrants||{})}; for(const r of rows)if(!(r.id in previousGrants)&&r.cls)previousGrants[r.id]=r.cls.toolGrants?.shorashim===true;
+  const saved={...prev,subscriptionId:subscription.id,teacherUid,classIds,previousGrants,workspaceId,customerId:subscription.customer||prev.customerId||'',status:active?subscription.status:String(subscription.status||'inactive'),active,cancelAtPeriodEnd:subscription.cancel_at_period_end===true,currentPeriodEnd:subscription.current_period_end||null,priceId:subscription.items?.data?.[0]?.price?.id||prev.priceId||'',updatedAt:Date.now(),lastEventId:eventId,createdAt:prev.createdAt||Date.now()};
+  await db().ref(privatePath).set(saved); if(saved.customerId)await db().ref('b3Private/stripeCustomerByTeacher/'+teacherUid).set({id:saved.customerId});
+  const all=(await db().ref('b3Private/stripeSubscriptions').get()).val()||{};
+  for(const r of rows){if(!r.cls)continue;const other=Object.values(all).some(s=>s?.subscriptionId!==subscription.id&&s?.active===true&&s.teacherUid===teacherUid&&(s.classIds||[]).includes(r.id));if(active)await r.ref.child('toolGrants/shorashim').set(true);else if(!other)await r.ref.child('toolGrants/shorashim').set(previousGrants[r.id]===true);}
 }
-
 exports.shorashimStripeWebhook = onRequest(
   { region, secrets: [stripeSecret, stripeWebhookSecret], maxInstances: 10 },
   async (req, res) => {
