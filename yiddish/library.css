@@ -32,6 +32,8 @@ body.lib > header .lib-sign b{font-family:"Frank Ruhl Libre",serif;font-size:1.4
 body.lib main{max-width:1080px;margin:auto;padding:24px 16px 120px}
 body.lib #lesson{display:grid;gap:26px}
 body.lib #lesson[hidden]{display:none}
+body.lib #blastgame{border-color:var(--wood-md);background:var(--paper);box-shadow:0 10px 20px rgba(62,36,22,.15)}
+body.lib #blastgame .blast-prompt strong{font-family:Fraunces,Georgia,serif;color:var(--ink)}
 body.lib #lesson > *,body.lib #toolbar > *{min-width:0}
 
 /* ---------- Brass plaque ---------- */
@@ -137,7 +139,7 @@ body.lib #toolbar .activity-card .activity-text{display:block;margin-top:auto}
 body.lib #toolbar .activity-card strong{display:block;font:800 1.05rem/1.15 Fraunces,Georgia,serif}
 body.lib #toolbar .activity-card small{display:block;font:700 .74rem Nunito,Arial;opacity:.9;margin-top:4px;color:#fff}
 body.lib #toolbar .activity-card .activity-arrow{display:none}
-body.lib #toolbar #flashStart{background:#6a3fa0;height:196px}
+body.lib #toolbar #blastStart{background:#6a3fa0;height:196px}
 body.lib #toolbar #sentenceStart{background:#a33a5e;height:178px}
 body.lib #toolbar #soundStart{background:#a8661c;height:204px}
 body.lib #toolbar #storyQuizStart{background:#2f6497;height:186px}

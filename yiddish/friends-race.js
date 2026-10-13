@@ -5,7 +5,7 @@
   "use strict";
   var race = null, db = null;
   var $ = function (id) { return document.getElementById(id); };
-  var OTHER = ["practice", "flashcards", "storyquiz", "sentencegame", "soundgame"];
+  var OTHER = ["practice", "blastgame", "storyquiz", "sentencegame", "soundgame"];
 
   function css() {
     if ($("yiFriendsCss")) return;
@@ -62,7 +62,7 @@
   }
   async function open() {
     if (typeof busy !== "undefined" && busy) return;
-    try { if (typeof clearAdvance === "function") clearAdvance(); round = null; flash = null; storyQuiz = null; sentenceGame = null; soundGame = null; } catch (e) {}
+    try { if (typeof clearAdvance === "function") clearAdvance(); round = null; blast = null; storyQuiz = null; sentenceGame = null; soundGame = null; } catch (e) {}
     OTHER.forEach(function (id) { var x = $(id); if (x) x.hidden = true; });
     window.yiddishFriendsOpen = true;
     $("words").hidden = true; $("toolbar").hidden = true;
@@ -93,7 +93,7 @@
     b.onclick = open;
     var all = $("all"); grid.insertBefore(b, all || null);
     // Any other activity or step button closes the race.
-    ["start", "flashStart", "sentenceStart", "soundStart", "storyQuizStart", "all"].forEach(function (x) {
+    ["start", "blastStart", "sentenceStart", "soundStart", "storyQuizStart", "all"].forEach(function (x) {
       var el = $(x); if (el) el.addEventListener("click", close, true);
     });
     $("segments").addEventListener("click", close, true);

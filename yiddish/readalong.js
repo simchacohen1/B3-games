@@ -123,7 +123,7 @@
     '<button type="button" id="raNext" title="Next sentence">Next ▶</button>' +
     '<label><input type="checkbox" id="raStep"> Stop after each sentence</label>' +
     '<span class="ra-sep"></span><span class="ra-step" id="raStepName"></span>' +
-    '<button type="button" class="ra-view" id="raView"></button>';
+    '<button type="button" class="ra-view" id="raView" hidden style="display:none"></button>';
   const prog = document.createElement('div'); prog.className = 'ra-prog'; prog.innerHTML = '<i></i>'; header.append(prog);
   header.insertBefore(barEl, prog);
   const speed = $('speed'); if (speed) { const l = speed.closest('label') || speed; barEl.insertBefore(l, $('raView')); }
@@ -383,7 +383,7 @@
   function ready() {
     document.body.classList.add('ra-open');
     const follow = $('follow'); if (follow) follow.checked = true;
-    setView(!!settings.book);
+    setView(true);
     collect(); curWord = null; curPh = -1; tick(); fit();
     document.querySelectorAll('.hint').forEach(h => {
       for (const n of h.childNodes) if (n.nodeType === 3 && /Click a paragraph/.test(n.data)) n.data = 'Original wording preserved. Tap any word to hear it and see what it means. ';
