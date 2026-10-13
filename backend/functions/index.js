@@ -2690,3 +2690,6 @@ exports.generateShorashimArt = require("./shorashim-art").generateShorashimArt;
 
 // Read-only owner ChatGPT student report (ET/WT only).
 exports.studentReportChatGPTRead = require("./student-report-chatgpt-read").studentReportChatGPTRead;
+
+// Class-scoped, expiring permissions for embedded Classroom Pointer sharing.
+exports.classPointerShareAuth = require('./class-pointer-share-auth').classPointerShareAuth;
