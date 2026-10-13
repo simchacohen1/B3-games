@@ -116,14 +116,14 @@
     if(legacyStudentView||(active&&teacherView())){build();startSync()}else{stopSync();if(!active)enter.focus()}
   }
   function fallback(){stage.classList.add('lesson-fullscreen');document.body.classList.add('lesson-expanded');sync()}
-  document.addEventListener('class-pointer-capture-ready',()=>{if(teacherView()&&!expanded())fallback()});
+  // Capturing a screen must not change the teacher's layout automatically.
+  document.addEventListener('class-pointer-capture-ready',()=>sync());
   enter.addEventListener('click',async()=>{
     if(expanded())return;
-    if(stage.requestFullscreen){try{await stage.requestFullscreen();sync();return}catch{}}
+    // Maximize only within the browser viewport; preserve tabs and address bar.
     fallback();
   });
   async function close(){
-    if(document.fullscreenElement===stage){try{await document.exitFullscreen()}catch{return}}
     stage.classList.remove('lesson-fullscreen');document.body.classList.remove('lesson-expanded');sync();
   }
   collapse.addEventListener('click',event=>{
