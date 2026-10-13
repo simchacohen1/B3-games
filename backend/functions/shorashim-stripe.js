@@ -19,7 +19,7 @@ const cors = origins;
 const db = () => admin.database();
 function stripeClient() {
   const key = stripeSecret.value();
-  if (!key || !key.startsWith('sk_test_')) throw new Error('Sandbox Stripe key is not configured.');
+  if (!key || !/^(?:sk|rk)_test_/.test(key)) throw new Error('Sandbox Stripe key is not configured.');
   return new Stripe(key, { apiVersion: '2026-08-26.dahlia', maxNetworkRetries: 2 });
 }
 
