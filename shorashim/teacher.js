@@ -148,6 +148,17 @@ function sanitizeClassArtPool(art){
 function sanitizeClassArt(art){
   return sanitizeClassArtPool(art).slice(0,4);
 }
+// Teacher sees up to 20 suggested pictures per word (item.artPool);
+// students see only the up-to-4 the teacher selects (item.art).
+const ART_POOL_MAX=20;
+const ART_STUDENT_MAX=4;
+function sanitizeSuggestionPool(art){
+  return sanitizeClassArtPool(art).slice(0,ART_POOL_MAX);
+}
+function suggestionPoolOf(item){
+  // Selected pictures always stay in the pool, listed first.
+  return sanitizeSuggestionPool([...((item&&item.art)||[]),...((item&&item.artPool)||[])]);
+}
 
 // Perek 19: reliable, meaning-specific choices when the AI picture service is unavailable.
 // These are suggestions, not teacher approvals, and only fill currently missing artwork.
@@ -380,12 +391,12 @@ async function generateAiArtForItems(items,onProgress=()=>{}){
     for(let attempt=0;attempt<2;attempt++){
       try{
         const res=await B3PaidApi.fetch(GENERATE_SHORASHIM_ART_URL,{
-          method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:batch})
+          method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:batch,count:ART_POOL_MAX})
         });
         if(!res.ok) throw Object.assign(new Error(`AI art request failed (${res.status})`),{status:res.status});
         const data=await res.json();
         for(const row of (data.items||[])){
-          const art=sanitizeClassArt(row.art);
+          const art=sanitizeSuggestionPool(row.art);
           if(row.id&&art.length) out.set(String(row.id),art);
         }
         break;
@@ -414,9 +425,10 @@ async function fillArtForShorashim(items,{onProgress=()=>{}}={}){
   for(const item of targets){
     // Recheck immediately before assignment so overlapping tasks cannot replace art.
     if(sanitizeClassArt(item.art).length||item.teacherApproved===true) continue;
-    const art=sanitizeClassArt(ai.get(String(item.id))||smartArtFor(item.english,item.front));
+    const pool=sanitizeSuggestionPool([...(ai.get(String(item.id))||[]),...smartArtCandidatesFor(item.english,item.front)]);
+    const art=sanitizeClassArt(pool);
     if(art.length){
-      item.art=art; item.autoArt=false; item.aiArtGenerated=ai.has(String(item.id));
+      item.art=art; item.artPool=pool; item.autoArt=false; item.aiArtGenerated=ai.has(String(item.id));
       item.aiArtGeneratedAt=Date.now(); changed++;
     }else item.autoArt=true;
   }
@@ -517,7 +529,8 @@ function renderCatalog(){
   const perekWrap=$('teacherPerekWrap');if(perekWrap)perekWrap.classList.toggle('hidden',currentTrack!=='shorashim');
 
   $('teacherCatalog').innerHTML=list.map((i,idx)=>{
-    const art=(Array.isArray(i.art)?i.art:[]).map(a=>`<button type="button" class="teacher-art-chip" data-a="art" data-art="${esc(a)}" title="Click to remove this picture">${esc(a)}</button>`).join('');
+    const selectedArt=sanitizeClassArt(i.art||[]),pool=suggestionPoolOf(i);
+    const art=`<div class="teacher-art-count">Students see ${selectedArt.length}/${ART_STUDENT_MAX} — click a picture to select or unselect it</div>`+pool.map(a=>{const on=selectedArt.includes(a);return `<button type="button" class="teacher-art-chip${on?' selected':''}" data-a="art" data-art="${esc(a)}" aria-pressed="${on}" title="${on?'Shown to students — click to unselect':'Click to show this picture to students'}">${esc(a)}</button>`}).join('');
     const commonness=commonnessOf(i),approvalNeeded=needsTeacherApproval(i),approvalBlock=approvalNeeded?`<div class="approval-box ${i.teacherApproved===true?'approved':'pending'}"><b>Commonness ${commonness}/10</b> — ${i.teacherApproved===true?'Approved for students':'Waiting for your approval'}<button data-a="approve" class="${i.teacherApproved===true?'ghost':'primary'}">${i.teacherApproved===true?'Remove Approval':'✓ Approve Word'}</button></div>`:(commonness?`<div class="mini-note">Commonness ${commonness}/10 • Automatically included</div>`:'');
     const duplicateKeeper=duplicateKeeperFor(i),duplicateBlock=duplicateKeeper?`<div class="approval-box pending"><b>Possible duplicate</b> — another ${esc(i.front)} with the same English meaning (${esc(i.english)}) is already in this list. <button data-a="merge-duplicate" class="danger">Merge Duplicate</button> <button data-a="dismiss-duplicate" class="ghost">Dismiss Suggestion</button></div>`:'';
     const artBlock=currentTrack==='shorashim'
@@ -561,7 +574,7 @@ function renderCatalog(){
     const regen=row.querySelector('[data-a=regen]');
     if(regen) regen.onclick=()=>regeneratePictures(id);
     row.querySelectorAll('[data-a=art]').forEach(btn=>{
-      btn.onclick=()=>removePictureChoice(id,btn.dataset.art);
+      btn.onclick=()=>togglePictureChoice(id,btn.dataset.art);
     });
   });
 }
@@ -569,45 +582,30 @@ function renderCatalog(){
 async function regeneratePictures(id){
   const item=(state.catalog[currentTrack]||[]).find(x=>x.id===id);
   if(!item)return;
+  const selected=sanitizeClassArt(item.art||[]);
+  const oldPool=suggestionPoolOf(item);
+  status('☁️ Looking for more matching pictures…','syncing');
 
-  const before=sanitizeClassArt(item.art||[]);
-  status('☁️ Looking for different matching pictures…','syncing');
-
-  // First ask the AI picture helper for a fresh semantic set.
   const ai=await generateAiArtForItems([item]);
-  const aiChoices=sanitizeClassArtPool(ai.get(String(item.id))||[]);
-
-  // Then add any locally-known semantic alternatives.  Most importantly,
-  // remove pictures already showing before deciding whether regeneration worked.
-  // This prevents the button from appearing to do nothing when AI repeats itself.
-  const localChoices=smartArtCandidatesFor(item.english,item.front);
-  const fresh=[];
-  const addFresh=value=>{
-    if(!value||before.includes(value)||fresh.includes(value))return;
-    fresh.push(value);
-  };
-  aiChoices.forEach(addFresh);
-  localChoices.forEach(addFresh);
+  const candidates=sanitizeClassArtPool([
+    ...(ai.get(String(item.id))||[]),
+    ...smartArtCandidatesFor(item.english,item.front)
+  ]);
+  const fresh=candidates.filter(x=>!oldPool.includes(x));
 
   if(!fresh.length){
-    item.autoArt=false;
     status('☁️ No different matching pictures found');
-    alert(`No additional clear picture choices were found for “${item.front} — ${item.english}”.\n\nThe current pictures were kept.`);
+    alert(`No additional clear picture choices were found for “${item.front} — ${item.english}”.\n\nThe current suggestions were kept.`);
     return;
   }
-
-  // Put genuinely new choices first. If there are fewer than four good new
-  // choices, keep the strongest existing choices at the end rather than padding
-  // the set with unrelated symbols.
-  const combined=[...fresh,...before.filter(x=>!fresh.includes(x))];
-  item.art=sanitizeClassArt(combined);
-  item.autoArt=false;
+  // Teacher's selections first, then new suggestions, then older ones (max 20).
+  // Regenerating never changes what students see.
+  item.artPool=sanitizeSuggestionPool([...selected,...fresh,...oldPool]);
   item.aiArtGenerated=true;
   item.aiArtGeneratedAt=Date.now();
-
   renderCatalog();
   await saveCatalog();
-  status(`☁️ Saved • ${Math.min(fresh.length,4)} new picture choice${Math.min(fresh.length,4)===1?'':'s'}`);
+  status(`☁️ Saved • ${fresh.length} new suggestion${fresh.length===1?'':'s'}`);
 }
 
 function englishDuplicateKey(value){
@@ -932,30 +930,6 @@ function recordingModeLabel(r){
   return (r.noHints===true||r.mode==="no-hints") ? "🏆 No Hints Challenge" : "🎙️ Record Chazara";
 }
 function recordingPoints(r){return Number(r.points||((r.noHints===true||r.mode==="no-hints")?3:2));}
-
-function recordingDurationLabel(seconds){
-  if(!Number.isFinite(seconds)||seconds<=0)return "Duration unavailable";
-  const total=Math.round(seconds);
-  return "Length: "+Math.floor(total/60)+":"+String(total%60).padStart(2,"0");
-}
-function updateShorashimAudioDurations(){
-  document.querySelectorAll('#shorashimRecordingsList audio[data-recording-audio]').forEach(audio=>{
-    const label=audio.parentElement.querySelector('[data-recording-duration]');
-    if(!label)return;
-    const update=()=>{
-      let seconds=audio.duration;
-      if(!Number.isFinite(seconds)||seconds<=0){
-        const ranges=audio.seekable;
-        if(ranges&&ranges.length)seconds=ranges.end(ranges.length-1);
-      }
-      if(Number.isFinite(seconds)&&seconds>0)label.textContent=recordingDurationLabel(seconds);
-    };
-    for(const event of ['loadedmetadata','durationchange','loadeddata','progress','seeked'])audio.addEventListener(event,update);
-    audio.addEventListener('error',()=>{if(label.textContent==='Checking length…')label.textContent='Duration unavailable';});
-    update();
-  });
-}
-
 async function loadShorashimRecordings(){
   const box=$('shorashimRecordingsList'); if(!box)return;
   try{
@@ -988,28 +962,14 @@ function renderShorashimRecordings(){
         <div class="mini-note">${recordingModeLabel(r)} • <b>${recordingPoints(r)} points</b> • ${esc(recordingTime(r.createdAt))}</div></div>
         <b>${statusLabel}</b>
       </div>
-      ${r.audioURL?`<div><audio controls preload="metadata" data-recording-audio src="${esc(r.audioURL)}" style="width:100%;margin:12px 0 4px"></audio><div class="mini-note" data-recording-duration aria-live="polite">Checking length…</div></div>`:'<p class="mini-note">Audio file unavailable.</p>'}
-      ${!r.pointRequestId && st==="pending"?`<button class="ghost" onclick="repairShorashimRecording('${esc(r.studentId)}','${esc(r.eventId)}')">Reconnect points request</button>`:""}
+      ${r.audioURL?`<audio controls preload="none" src="${esc(r.audioURL)}" style="width:100%;margin:12px 0"></audio>`:'<p class="mini-note">Audio file unavailable.</p>'}
       ${pendingReady?`<div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="primary" onclick="reviewShorashimRecording('${esc(r.pointRequestId)}','approve')">✓ Approve ${recordingPoints(r)} Points</button>
         <button class="ghost" style="border-color:#dc2626;color:#b91c1c" onclick="reviewShorashimRecording('${esc(r.pointRequestId)}','reject')">✕ Reject</button>
       </div>`:''}
     </div>`;
   }).join('');
-  updateShorashimAudioDurations();
 }
-async function repairShorashimRecording(studentId,eventId){
-  try{
-    const token=await teacherRewardsToken();
-    const resp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
-      body:JSON.stringify({action:"repair-shorashim-recording",studentId,eventId})});
-    const data=await resp.json().catch(()=>({}));
-    if(!resp.ok)throw new Error(data.error||"Could not reconnect points.");
-    await loadShorashimRecordings();
-  }catch(e){alert(e.message||"Could not reconnect points.");}
-}
-window.repairShorashimRecording=repairShorashimRecording;
 async function teacherRewardsToken(){
   let user=firebase.auth().currentUser;
   if(!user){
@@ -1035,15 +995,8 @@ window.addEventListener("DOMContentLoaded",()=>{
   const sign=$('recordingsGoogleSignIn');
   if(sign)sign.onclick=async()=>{try{const token=await teacherRewardsToken();$('recordingsAuthStatus').textContent="✓ Signed in — approvals are ready.";sign.textContent="✓ Google Signed In";}catch(e){$('recordingsAuthStatus').textContent=e.message||"Sign-in failed.";}};
   firebase.auth().onAuthStateChanged(u=>{
-    const authorized=!!u&&String(u.email||"").toLowerCase()==="simcha5770@gmail.com";
-    const status=$('recordingsAuthStatus');
-    if(status)status.textContent=authorized?"✓ Teacher sign-in active — approvals are ready.":u?"This account cannot approve Shorashim rewards.":"Sign in with your teacher Google account to approve.";
-    // Reuse the existing Firebase teacher session instead of showing a second sign-in prompt.
-    if(sign){
-      sign.hidden=authorized;
-      sign.style.display=authorized?"none":"";
-      if(!authorized)sign.textContent="Sign in with Google to Approve";
-    }
+    const s=$('recordingsAuthStatus');
+    if(s)s.textContent=u&&String(u.email||"").toLowerCase()==="simcha5770@gmail.com"?"✓ Signed in — approvals are ready.":"Sign in when you are ready to approve or reject.";
   });
 });
 
@@ -1058,3 +1011,32 @@ paidTeacherSignIn.onclick = async () => {
   catch(error) { alert(error.message || 'Google sign-in did not complete.'); }
 };
 document.querySelector('.topbar-actions').appendChild(paidTeacherSignIn);
+
+
+// ---- 20-suggestion picture picker ----
+async function togglePictureChoice(id,artValue){
+  const item=(state.catalog[currentTrack]||[]).find(x=>x.id===id);
+  if(!item)return;
+  const v=String(artValue);
+  const selected=sanitizeClassArt(item.art||[]);
+  item.artPool=suggestionPoolOf(item); // an unselected picture stays as a suggestion
+  if(selected.includes(v)){
+    item.art=selected.filter(x=>x!==v);
+  }else if(selected.length>=ART_STUDENT_MAX){
+    alert(`Students can see up to ${ART_STUDENT_MAX} pictures. Unselect one first.`);
+    return;
+  }else{
+    item.art=[...selected,v];
+  }
+  item.autoArt=false;
+  renderCatalog();
+  await saveCatalog();
+}
+(function addPicturePickerStyles(){
+  const s=document.createElement('style');
+  s.textContent='.teacher-art-chip.selected{outline:3px solid #2e7d32;outline-offset:-1px;background:#e8f5e9}'
+    +'.teacher-art-preview .teacher-art-chip:not(.selected){opacity:.55}'
+    +'.teacher-art-preview .teacher-art-chip:not(.selected):hover{opacity:1}'
+    +'.teacher-art-count{width:100%;font-size:12px;color:#555;margin:0 0 2px}';
+  document.head.appendChild(s);
+})();
