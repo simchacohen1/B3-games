@@ -25,6 +25,7 @@ exports.classPointerShareAuth=onRequest({
   const [classSnap,sessionSnap]=await Promise.all([db.ref(base).once('value'),db.ref(base+'/classPointerSessions/'+room).once('value')]);
   const cls=classSnap.val(),session=sessionSnap.val();
   if(!cls||cls.active===false||!session||session.roomId!==room||session.studentScreenSharing!==true||Date.now()-session.createdAt>14400000||session.createdAt>Date.now()+60000)error(403,'Screen sharing is not enabled for this class.');
+  if(!['et','wt'].includes(classId)&&cls.toolGrants?.['class-pointer']!==true)error(403,'Class Pointer is disabled for this class.');
   if(action==='issue'){
    // Bound passcode attempts at this endpoint, independently of sign-in limits.
    const fingerprint=crypto.createHash('sha256').update(String(req.ip||'unknown')).digest('hex');
