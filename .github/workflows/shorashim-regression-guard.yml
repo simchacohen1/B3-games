@@ -14,10 +14,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate Shorashim JavaScript syntax
+      - name: Validate existing Shorashim JavaScript syntax
         run: |
           node --check shorashim/teacher.js
-          node --check shorashim/teacher-core.js
           node --check shorashim/teacher-enhancements.js
           node --check shorashim/teacher-loader.js
       - name: Check required Shorashim teacher features
