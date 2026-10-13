@@ -1765,11 +1765,7 @@ function normalizeGeneratedItems(items, posukNum){
 // Keep its answer key local and deterministic so a stale or faulty generated
 // Firebase cache cannot mark the correct phrase (אַל־נָא יִחַר) as incorrect.
 function authoritativeWordSetsForQuestion(question, posukNum){
-  const q=String(question||'').trim();
-  if(Number(posukNum)===32 && q==='What did Avraham ask Hashem not to do?') return [[1,2]];
-  // "אך הפעם" answers how many more times Avraham would speak: just this once.
-  // Accept that answer tile alone or together with the preceding "ואדברה".
-  if(Number(posukNum)===32 && q==='How many more times did Avraham say he would speak?') return [[5],[4,5]];
+  if(Number(posukNum)===32 && String(question||'').trim()==='What did Avraham ask Hashem not to do?') return [[1,2]];
   return null;
 }
 function readLocalGeneratedQuestions(cacheKey, posukNum){
