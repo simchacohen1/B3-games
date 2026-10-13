@@ -66,6 +66,22 @@ test("Bereishis 1:4 asks a comprehension question instead of spotting a phrase",
   assert.doesNotMatch(item.q,/which phrase appears/i);
 });
 
+
+test("multiple choice falls back to unique verse continuations when extracted answers repeat",()=>{
+  const core=loadCore();
+  const sources=[
+    {ref:"Genesis 18:6",text:"Abraham saw the light. This pasuk continues with special details about event alpha describing the scene."},
+    {ref:"Genesis 18:7",text:"Abraham saw the light. This pasuk continues with special details about event bravo describing the scene."},
+    {ref:"Genesis 18:8",text:"Abraham saw the light. This pasuk continues with special details about event charlie describing the scene."},
+    {ref:"Genesis 18:9",text:"Abraham saw the light. This pasuk continues with special details about event delta describing the scene."}
+  ];
+  const [item]=core.makeItems([sources[0]],"mc","",1,sources);
+  assert.equal(item.choices.length,4);
+  assert.equal(new Set(item.choices).size,4);
+  assert.match(item.q,/Which words continue this statement/);
+  assert.notEqual(item.choices[item.correctIndex],"the light.");
+});
+
 test("multiple choice refuses to fabricate distractor citations",()=>{
   const core=loadCore();
   assert.throws(()=>core.makeItems([{ref:"Genesis 18:1",text:"A source."},{ref:"Genesis 18:2",text:"A source."},{ref:"Genesis 18:3",text:"A source."},{ref:"Genesis 18:4",text:"A source."}],"mc",""),/four distinct Sefaria excerpts/);
