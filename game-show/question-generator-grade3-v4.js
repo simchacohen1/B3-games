@@ -14,7 +14,7 @@
   const searchProxy = "https://us-central1-b3-games.cloudfunctions.net/searchSefariaQuestions";
   const nameMap = {
     "the lord": "Hashem", "god": "Hashem",
-    "moses": "Moshe", "abraham": "Avraham", "isaac": "Yitzchak",
+    "moses": "Moshe", "abraham": "Avrohom", "isaac": "Yitzchak",
     "jacob": "Yaakov", "joseph": "Yosef", "aaron": "Aharon",
     "sarah": "Sarah", "rebecca": "Rivkah", "rebekah": "Rivkah",
     "leah": "Leah", "rachel": "Rachel", "noah": "Noach", "esau": "Esav",
@@ -25,7 +25,7 @@
     "manasseh": "Menashe", "miriam": "Miriam", "joshua": "Yehoshua",
     "balaam": "Bilam", "laban": "Lavan", "jethro": "Yisro"
   };
-  const localizeText = value => String(value || "").replace(/\b(the lord|god|moses|abraham|isaac|jacob|joseph|aaron|sarah|rebecca|rebekah|leah|rachel|noah|esau|pharaoh|reuben|simeon|judah|naphtali|gad|asher|issachar|zebulun|benjamin|ephraim|manasseh|miriam|joshua|balaam|laban|jethro)\b/gi, word => nameMap[word.toLowerCase()] || word);
+  const localizeText = value => String(value || "").replace(/\b(the\s+lord|g\s*od|moses|abraham|isaac|jacob|joseph|aaron|sarah|rebecca|rebekah|leah|rachel|noah|esau|pharaoh|reuben|simeon|judah|naphtali|gad|asher|issachar|zebulun|benjamin|ephraim|manasseh|miriam|joshua|balaam|laban|jethro)\b/gi, word => /^(the\s+lord|g\s*od)$/i.test(word) ? "Hashem" : nameMap[word.toLowerCase()] || word);
   const displayRef = ref => {
     const match = String(ref || "").match(/^(Rashi on )?(Genesis|Exodus|Leviticus|Numbers|Deuteronomy)(?=\s)/);
     if (!match) return ref;
@@ -397,11 +397,14 @@
     candidates.forEach((source, index) => {
       if (out.length >= count) return;
       const ref = source.displayRef || displayRef(source.ref);
-      const qa = questionAndAnswer(source, topic);
-      if (!qa || !qa.q || !qa.answer) {
+      const rawQa = questionAndAnswer(source, topic);
+      if (!rawQa || !rawQa.q || !rawQa.answer) {
         skipped.unclear++;
         return;
       }
+      // Normalize names in every generated question and answer, including
+      // fixed source-specific templates that do not pass through source text.
+      const qa = { q: localizeText(rawQa.q), answer: localizeText(rawQa.answer) };
       if (out.some(item => item.q === qa.q)) {
         skipped.duplicate++;
         return;
