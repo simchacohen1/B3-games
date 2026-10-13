@@ -42,7 +42,12 @@
     const ref=context.ref.child('classPointerSessions/'+room);activeRef=ref;
     await ref.onDisconnect().remove();
     if(current!==revision){await ref.onDisconnect().cancel();return}
-    await ref.set({roomId:room,teacherUid:context.user.uid,createdAt:firebase.database.ServerValue.TIMESTAMP});
+    await ref.set({roomId:room,teacherUid:context.user.uid,createdAt:firebase.database.ServerValue.TIMESTAMP,studentScreenSharing:false});
     if(current!==revision){await ref.remove();await ref.onDisconnect().cancel()}
+  },async setStudentScreenSharing(enabled){
+    const ref=activeRef;if(!ref)return;
+    const context=await ready;
+    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
+    await ref.child('studentScreenSharing').set(enabled===true);
   },async end(){revision++;const ref=activeRef;activeRef=null;if(ref){await ref.remove();await ref.onDisconnect().cancel()}}};
 })();
