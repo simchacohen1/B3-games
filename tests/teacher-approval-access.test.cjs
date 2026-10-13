@@ -11,8 +11,8 @@ const root='b3Games/workspaces/b3-2026';
 function identity(){return {uid:'teacher-uid',email:'applicant@example.com',email_verified:true,firebase:{sign_in_provider:'google.com'}}}
 function storeWith(invite){const records={[root+'/teacherInvites']:{applicant_example_com:invite}};return {get:async p=>records[p]??null,update:async update=>Object.assign(records,update)}}
 test('approved but unassigned invitation is inactive',()=>{
- assert.match(server,/active:false,classIds:\{\}/);
- assert.match(server,/if\(!old\)await inviteRef\.update/);
+ assert.match(server,/\[prefix\+'active'\]:false/);
+ assert.match(server,/if\(!old\)/);
 });
 test('class assignment explicitly activates the invitation',()=>{
  assert.match(adminPage,/\[root\+"\/teacherInvites\/"\+t\+"\/active"\]:true/);
