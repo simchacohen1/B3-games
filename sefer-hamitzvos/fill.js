@@ -11,7 +11,7 @@
   const start=y*width+x;
   if(!open(start))return {reason:'border'};
   if(width!==bufferWidth||height!==bufferHeight){bufferWidth=width;bufferHeight=height;queue=new Int32Array(total);seen=new Uint32Array(total);generation=0;}
-  generation++;if(generation===0){seen.fill(0);generation=1;}
+  generation=(generation+1)>>>0;if(generation===0){seen.fill(0);generation=1;}
   let head=0,tail=0,touchesEdge=false;
   queue[tail++]=start;seen[start]=generation;
   const enqueue=next=>{if(seen[next]===generation||!open(next))return;seen[next]=generation;queue[tail++]=next;};
