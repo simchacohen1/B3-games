@@ -4,7 +4,8 @@ const { onRequest } = require('firebase-functions/v2/https');
 const { defineSecret, defineString } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const crypto = require('node:crypto');
-const { verifySignature, validClassId, teacherMayManageClass, activeSubscriptionStatus } = require('./shorashim-stripe-core.cjs');
+const Stripe = require('stripe');
+const { validClassId, teacherMayManageClass, activeSubscriptionStatus } = require('./shorashim-stripe-core.cjs');
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -16,39 +17,10 @@ const workspaceId = 'b3-2026';
 const origins = ['https://funtorahtools.com', 'https://www.funtorahtools.com', 'https://simchacohen1.github.io'];
 const cors = origins;
 const db = () => admin.database();
-const base = 'https://api.stripe.com/v1/';
-
-function stripeKey() {
+function stripeClient() {
   const key = stripeSecret.value();
   if (!key || !key.startsWith('sk_test_')) throw new Error('Sandbox Stripe key is not configured.');
-  return key;
-}
-
-async function stripeRequest(path, { method = 'GET', form } = {}) {
-  const response = await fetch(base + path, {
-    method,
-    headers: {
-      Authorization: 'Bearer ' + stripeKey(),
-      'Stripe-Version': '2026-08-26.dahlia',
-      ...(form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {})
-    },
-    body: form ? form.toString() : undefined,
-    signal: AbortSignal.timeout(15000)
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    console.error('Stripe API request failed', response.status, data?.error?.type || '');
-    throw new Error('Stripe could not complete the request.');
-  }
-  return data;
-}
-
-function formData(entries) {
-  const form = new URLSearchParams();
-  for (const [key, value] of Object.entries(entries)) {
-    if (value !== undefined && value !== null) form.set(key, String(value));
-  }
-  return form;
+  return new Stripe(key, { apiVersion: '2026-08-26.dahlia', maxNetworkRetries: 2 });
 }
 
 async function identityFromRequest(req) {
@@ -94,7 +66,8 @@ function sendError(res, error) {
 }
 
 function makeIntegrationId() {
-  const suffix = crypto.randomBytes(5).toString('hex').slice(0, 8);
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+  const suffix = Array.from(crypto.randomBytes(8), byte => alphabet[byte % alphabet.length]).join('');
   return 'fun-torah-tools-' + suffix;
 }
 
@@ -114,11 +87,11 @@ exports.createShorashimCheckout = onRequest(
       const openRef = db().ref('b3Private/shorashimOpenCheckouts/' + identity.uid);
       const open = (await openRef.get()).val();
       if (open?.sessionId && open.expiresAt > Date.now()) {
-        try { const existing = await stripeRequest('checkout/sessions/' + encodeURIComponent(open.sessionId)); if (existing.status === 'open' && existing.url) return res.json({ url: existing.url }); } catch (_) {}
+        try { const existing = await stripeClient().checkout.sessions.retrieve(open.sessionId); if (existing.status === 'open' && existing.url) return res.json({ url: existing.url }); } catch (_) {}
       }
       const configuredPrice = String(priceId.value() || '');
       if (!/^price_[A-Za-z0-9]+$/.test(configuredPrice)) throw new Error('Sandbox Shorashim price is not configured.');
-      const price = await stripeRequest('prices/' + encodeURIComponent(configuredPrice));
+      const price = await stripeClient().prices.retrieve(configuredPrice);
       if (!price.active || price.type !== 'recurring' || price.recurring?.interval !== 'year' || price.unit_amount !== 3900 || price.currency !== 'usd') throw new Error('Price must be the active $39 USD annual teacher subscription.');
       const pendingRef = db().ref('b3Private/shorashimCheckoutLocks/' + identity.uid);
       const lock = await pendingRef.transaction(current => current?.expiresAt > Date.now() ? undefined : { nonce: crypto.randomUUID(), expiresAt: Date.now() + 30000 });
@@ -126,9 +99,18 @@ exports.createShorashimCheckout = onRequest(
       try {
         const metadata = { teacherUid: identity.uid, classIds: JSON.stringify(classIds), workspaceId, tool: 'shorashim' };
         const customer = (await db().ref('b3Private/stripeCustomerByTeacher/' + identity.uid).get()).val();
-        const fields = { mode: 'subscription', success_url: 'https://funtorahtools.com/teacher-subscription.html?checkout=success&session_id={CHECKOUT_SESSION_ID}', cancel_url: 'https://funtorahtools.com/teacher-subscription.html?checkout=cancelled', 'line_items[0][price]': configuredPrice, 'line_items[0][quantity]': 1, ...(customer?.id ? { customer: customer.id } : { customer_email: identity.email }), client_reference_id: identity.uid, integration_identifier: makeIntegrationId(), allow_promotion_codes: 'true' };
-        for (const [key,value] of Object.entries(metadata)) { fields['metadata['+key+']']=value; fields['subscription_data[metadata]['+key+']']=value; }
-        const session = await stripeRequest('checkout/sessions', { method: 'POST', form: formData(fields) });
+        const session = await stripeClient().checkout.sessions.create({
+          mode: 'subscription',
+          success_url: 'https://funtorahtools.com/teacher-subscription.html?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+          cancel_url: 'https://funtorahtools.com/teacher-subscription.html?checkout=cancelled',
+          line_items: [{ price: configuredPrice, quantity: 1 }],
+          ...(customer?.id ? { customer: customer.id } : { customer_email: identity.email }),
+          client_reference_id: identity.uid,
+          integration_identifier: makeIntegrationId(),
+          allow_promotion_codes: true,
+          metadata,
+          subscription_data: { metadata }
+        });
         const expiresAt = session.expires_at ? session.expires_at*1000 : Date.now()+86400000;
         await Promise.all([db().ref('b3Private/shorashimCheckoutSessions/'+session.id).set({teacherUid:identity.uid,classIds,workspaceId,priceId:configuredPrice,createdAt:Date.now(),expiresAt}),openRef.set({sessionId:session.id,classIds,expiresAt})]);
         return res.json({url:session.url});
@@ -145,10 +127,7 @@ exports.createShorashimBillingPortal = onRequest(
       const identity = await identityFromRequest(req);
       const customer = (await db().ref('b3Private/stripeCustomerByTeacher/' + identity.uid).get()).val();
       if (!customer?.id) return res.status(404).json({ error: 'No Shorashim subscription is connected to this account yet.' });
-      const portal = await stripeRequest('billing_portal/sessions', {
-        method: 'POST',
-        form: formData({ customer: customer.id, return_url: 'https://funtorahtools.com/teacher-subscription.html' })
-      });
+      const portal = await stripeClient().billingPortal.sessions.create({ customer: customer.id, return_url: 'https://funtorahtools.com/teacher-subscription.html' });
       return res.json({ url: portal.url });
     } catch (error) { return sendError(res, error); }
   }
@@ -159,7 +138,7 @@ async function subscriptionForEvent(event, stripeEventObject) {
   const session = stripeEventObject;
   if (!session.subscription) return null;
   if (session.mode !== 'subscription' || session.payment_status !== 'paid') return null;
-  return stripeRequest('subscriptions/' + encodeURIComponent(session.subscription));
+  return stripeClient().subscriptions.retrieve(session.subscription);
 }
 
 async function applySubscription(subscription, eventId) {
@@ -185,12 +164,10 @@ exports.shorashimStripeWebhook = onRequest(
     res.set('Cache-Control', 'no-store');
     if (req.method !== 'POST') return res.status(405).send('Use POST.');
     const raw = req.rawBody;
-    if (!Buffer.isBuffer(raw) || !verifySignature(raw, req.headers['stripe-signature'], stripeWebhookSecret.value())) {
-      return res.status(400).send('Invalid Stripe signature.');
-    }
+    if (!Buffer.isBuffer(raw)) return res.status(400).send('Invalid event body.');
     let event;
-    try { event = JSON.parse(raw.toString('utf8')); }
-    catch (_) { return res.status(400).send('Invalid event body.'); }
+    try { event = stripeClient().webhooks.constructEvent(raw, req.headers['stripe-signature'], stripeWebhookSecret.value()); }
+    catch (_) { return res.status(400).send('Invalid Stripe signature or event body.'); }
     if (event.livemode !== false) return res.status(400).send('Live events are disabled until approved.');
     const eventRef = db().ref('b3Private/stripeWebhookEvents/' + event.id);
     if ((await eventRef.get()).exists()) return res.json({ received: true, duplicate: true });
