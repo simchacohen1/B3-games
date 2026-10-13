@@ -315,3 +315,5 @@ body.teacher-view #pointerStatus,body.teacher-view footer{display:none}
 body.teacher-view #joinInstructions{margin:3px 0;padding:4px 8px;border:1px solid #dce4ef;border-radius:8px;font-size:13px}
 body.teacher-view #joinInstructions>summary{cursor:pointer;font-weight:650}
 body.teacher-view #connectionStatus{margin:3px 0;padding:5px 9px;font-size:13px}
+
+.pointer-class-picker{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700}.pointer-class-picker select{min-width:105px;max-width:180px;padding:6px 8px;font-size:13px}
