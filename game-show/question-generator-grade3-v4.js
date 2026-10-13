@@ -164,17 +164,26 @@
     // eight-year-old what to look for. Leave these for teacher-written review.
     if (topic || source.isRashi) return null;
 
-    const subject = "(Hashem|Moshe|Avraham|Yitzchak|Yaakov|Yosef|Aharon|Sarah|Rivkah|Leah|Rachel|Noach|Esav|Paroh|Reuven|Shimon|Yehudah|Naftali|Gad|Asher|Yissachar|Zevulun|Binyamin|Ephraim|Menashe|Miriam|Yehoshua|Bilam|Lavan|Yisro)";
+    const subject = "(Hashem|Moshe|Avraham|Yitzchak|Yaakov|Yosef|Aharon|Sarah|Rivkah|Leah|Rachel|Noach|Esav|Paroh|Reuven|Shimon|Yehudah|Naftali|Gad|Asher|Yissachar|Zevulun|Binyamin|Ephraim|Menashe|Miriam|Yehoshua|Bilam|Lavan|Yisro|Lot|Pharaoh|Melchizedek|Eliezer|Hagar|Yishmael|the angels|the angel|the men|the people|the king|the servant|the woman|the man)";
     const verbs = {
-      saw: "see", said: "say", spoke: "say", appeared: "appear", called: "call", divided: "separate",
-      separated: "separate", created: "create", made: "make", blessed: "bless",
-      commanded: "command", took: "take", gave: "give", brought: "bring",
-      asked: "ask", answered: "answer", found: "find", heard: "hear",
-      built: "build", opened: "open", closed: "close", sent: "send",
-      placed: "place", put: "put", ate: "eat", drank: "drink"
+      saw: "see", said: "say", spoke: "speak", appeared: "appear", called: "call", divided: "separate",
+      separated: "separate", created: "create", made: "make", blessed: "bless", commanded: "command",
+      took: "take", gave: "give", brought: "bring", asked: "ask", answered: "answer", found: "find",
+      heard: "hear", built: "build", opened: "open", closed: "close", sent: "send", placed: "place",
+      put: "put", ate: "eat", drank: "drink", came: "come", went: "go", stood: "stand", bowed: "bow",
+      hurried: "hurry", ran: "run", washed: "wash", prepared: "prepare", returned: "return", turned: "turn",
+      rose: "rise", entered: "enter", sat: "sit", passed: "pass", walked: "walk", stayed: "stay",
+      dwelt: "live", pitched: "pitch", offered: "offer", slaughtered: "slaughter", cooked: "cook",
+      served: "serve", laughed: "laugh", promised: "promise", knew: "know", lay: "lie", instructed: "instruct",
+      told: "tell", replied: "reply", looked: "look", lifted: "lift", stretched: "stretch", reached: "reach",
+      seized: "seize", grabbed: "grab", held: "hold", shut: "shut", locked: "lock", led: "lead",
+      followed: "follow", approached: "approach", arrived: "arrive", waited: "wait", remained: "remain",
+      watched: "watch", left: "leave", struck: "strike", blinded: "blind", pressed: "press", lingered: "stay",
+      tarried: "stay", escaped: "escape", rescued: "rescue", destroyed: "destroy", rained: "rain",
+      descended: "come down", warned: "warn", lived: "live", bought: "buy"
     };
     const verbPattern = Object.keys(verbs).join("|");
-    const match = text.match(new RegExp("(?:^|[;.!?]\\s*)(?:And\\s+)?" + subject + "\\s+(" + verbPattern + ")\\s*,?\\s+(.+)", "i"));
+    const match = text.match(new RegExp("(?:^|[;.!?]\\s*)(?:And\\s+)?" + subject + "\\s+(" + verbPattern + ")\\b\\s*,?\\s+(.+)", "i"));
     // Do not guess from the pasuk number: many different events occur on
     // creation day one. If the text does not name a clear subject and action,
     // leave it out for the teacher to review.
@@ -198,7 +207,56 @@
       if (called) return { q: "What did " + name + " call the " + called[1].toLowerCase() + suffix + "?", answer: called[2] };
       return { q: "What name did " + name + " give" + suffix + "?", answer: clause };
     }
-    return { q: "What did " + name + " " + verbs[verb] + suffix + "?", answer: clause };
+    const actionQuestions = {
+      come: "Where did " + name + " come" + suffix + "?",
+      go: "Where did " + name + " go" + suffix + "?",
+      enter: "Where did " + name + " enter" + suffix + "?",
+      arrive: "Where did " + name + " arrive" + suffix + "?",
+      sit: "Where did " + name + " sit" + suffix + "?",
+      stand: "Where did " + name + " stand" + suffix + "?",
+      bow: "Before whom did " + name + " bow" + suffix + "?",
+      hurry: "Where did " + name + " hurry" + suffix + "?",
+      run: "Where did " + name + " run" + suffix + "?",
+      return: "Where did " + name + " return" + suffix + "?",
+      leave: "What did " + name + " leave" + suffix + "?",
+      eat: "What did " + name + " eat" + suffix + "?",
+      drink: "What did " + name + " drink" + suffix + "?",
+      take: "What did " + name + " take" + suffix + "?",
+      give: "What did " + name + " give" + suffix + "?",
+      bring: "What did " + name + " bring" + suffix + "?",
+      offer: "What did " + name + " offer" + suffix + "?",
+      prepare: "What did " + name + " prepare" + suffix + "?",
+      wash: "What did " + name + " wash" + suffix + "?",
+      ask: "What did " + name + " ask" + suffix + "?",
+      tell: "What did " + name + " tell" + suffix + "?",
+      say: "What did " + name + " say" + suffix + "?",
+      speak: "What did " + name + " say" + suffix + "?",
+      answer: "What did " + name + " answer" + suffix + "?",
+      call: "What did " + name + " call" + suffix + "?",
+      look: "What did " + name + " look at" + suffix + "?",
+      see: "What did " + name + " see" + suffix + "?",
+      hear: "What did " + name + " hear" + suffix + "?",
+      bless: "Whom did " + name + " bless" + suffix + "?",
+      command: "What did " + name + " command" + suffix + "?",
+      instruct: "What did " + name + " instruct" + suffix + "?",
+      strike: "What did " + name + " strike" + suffix + "?",
+      seize: "Whom did " + name + " seize" + suffix + "?",
+      grab: "Whom did " + name + " grab" + suffix + "?",
+      hold: "Whom did " + name + " hold" + suffix + "?",
+      lead: "Where did " + name + " lead" + suffix + "?",
+      follow: "Whom did " + name + " follow" + suffix + "?",
+      approach: "Whom did " + name + " approach" + suffix + "?",
+      wait: "For whom did " + name + " wait" + suffix + "?",
+      remain: "Where did " + name + " remain" + suffix + "?",
+      escape: "Where did " + name + " escape" + suffix + "?",
+      rescue: "Whom did " + name + " rescue" + suffix + "?",
+      warn: "Whom did " + name + " warn" + suffix + "?",
+      live: "Where did " + name + " live" + suffix + "?",
+      destroy: "What did " + name + " destroy" + suffix + "?",
+      rain: "What did Hashem send" + suffix + "?"
+    };
+    if (!actionQuestions[verbs[verb]]) return null;
+    return { q: actionQuestions[verbs[verb]], answer: clause };
   }
 
   function kitzurQuestionAndAnswer(source, text) {
@@ -360,7 +418,7 @@
     style.textContent = "#sefariaGenerator .sg-group{margin:16px 0;padding:14px;border:1px solid var(--line,#cbd5e1);border-radius:12px}#sefariaGenerator .sg-group legend{padding:0 8px;font-weight:800}#sefariaGenerator .sg-fields label{display:flex;flex-direction:column;gap:6px;font-weight:700}#sefariaGenerator .sg-fields input:not([type=checkbox]),#sefariaGenerator .sg-fields select{box-sizing:border-box;width:100%;min-height:42px}#sefariaGenerator .sg-fields [type=checkbox]{width:18px;height:18px}#sgQuestionList .editor-row{margin:12px 0;padding:16px;border:1px solid var(--line,#cbd5e1);border-radius:12px;background:rgba(255,255,255,.04)}#sgQuestionList{counter-reset:qrow}#sgQuestionList textarea.row-choices{min-height:100px}#sgStatus{font-weight:700}#sgReplace{border:1px solid #b91c1c}#sgReplace:disabled,#sgAdd:disabled{opacity:.65;cursor:wait}";
     document.head.appendChild(style);
     card.innerHTML = '<h3>Build a question set from Sefaria</h3>' +
-      '<p class="hint">Questions use simple wording and short answers for third graders. Review the drafts before adding them to your current questions or replacing the set.</p>' +
+      '<p class="hint">Questions use simple wording and short answers for third graders. This describes the wording, not which Torah content may be studied. Review the drafts before adding them to your current questions or replacing the set.</p>' +
       '<fieldset class="sg-group"><legend>1. Choose the source</legend><div class="sg-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end">' +
       '<label>Source type<select id="sgType" class="select"><option value="chumash">Chumash</option><option value="halacha">Kitzur Shulchan Aruch</option></select></label>' +
       '<label>Sefer<select id="sgBook" class="select">' + bookNames.map(b => '<option value="' + b + '">' + books[b].label + '</option>').join("") + '</select></label>' +
@@ -492,13 +550,13 @@
         },status,requestedCount) : await halachaSources({siman:simanSelect,from:seifFromSelect,to:seifToSelect},status,requestedCount);
         const topic = "";
         const items = makeItems(sources, mode, topic, requestedCount, sources.distractors);
-        if (!items.length) throw new Error("No clear, age-appropriate questions were found. Try another siman or a smaller seif range.");
+        if (!items.length) throw new Error("We couldn’t make clear, short questions from this selection. Try a smaller range or another section.");
         const list = review.querySelector("#sgQuestionList");
         list.replaceChildren(...items.map(item => createQuestionRow(item.q, item.ans, item.choices, item.correctIndex)));
         review.hidden = false;
         const skipped = Math.max(0, requestedCount - items.length);
-        status.textContent = items.length + " clear questions ready" +
-          (skipped ? "; " + skipped + " unclear item" + (skipped === 1 ? " was" : "s were") + " skipped" : "") +
+        status.textContent = items.length + " clear, short questions ready" +
+          (skipped ? "; " + skipped + " item" + (skipped === 1 ? " was" : "s were") + " skipped because it could not be turned into a clear question" : "") +
           (type.value === "halacha" ? " (one per se’if, with no repeats)" : "") +
           ". Review them below; your current set is unchanged.";
         review.scrollIntoView({ behavior: "smooth", block: "start" });
