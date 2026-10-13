@@ -97,6 +97,19 @@
     });
   }
 
+  if(!studentView){
+    const screens=document.createElement('button');
+    screens.type='button';screens.className='tb-btn';screens.id='tbStudentScreensQuick';
+    screens.textContent='🖥 Student Screens';
+    screens.title='View students’ screens or choose their whiteboards';
+    screens.addEventListener('click',()=>{const original=source('studentBoards');if(original&&!original.disabled)original.click()});
+    dock.querySelector('#tbStudentsBtn').closest('.tb-menu-wrap').before(screens);
+    const update=()=>{const original=source('studentBoards');screens.disabled=!original||original.disabled;
+      screens.setAttribute('aria-pressed',original?.getAttribute('aria-pressed')||'false')};
+    new MutationObserver(update).observe(source('studentBoards'),{attributes:true,attributeFilter:['disabled','aria-pressed']});
+    update();
+  }
+
   // Quick keys while the mouse is anywhere on the page (ignored while typing).
   document.addEventListener('keydown',event=>{
     if(dock.hidden||event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.('input,select,textarea'))return;
