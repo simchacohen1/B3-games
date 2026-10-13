@@ -1737,10 +1737,10 @@ let comprehensionQuestionLoadFailed = false;
 // network read.
 const generatedQuestionMemoryCache = new Map();
 const generatedQuestionPromiseCache = new Map();
-const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_wordselect_v2_';
+const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_wordselect_v3_';
 
 function generatedQuestionCacheKey(part){
-  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_') + '_wordselect_v2';
+  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_') + '_wordselect_v3';
 }
 function normalizeGeneratedItems(items, posukNum){
   return (Array.isArray(items) ? items : []).map(item => {
@@ -1759,6 +1759,14 @@ function normalizeGeneratedItems(items, posukNum){
       generated: true
     };
   }).filter(item => item.question && item.answerWordSets.length);
+}
+
+// This hand-authored question has a fixed, unambiguous answer in the posuk.
+// Keep its answer key local and deterministic so a stale or faulty generated
+// Firebase cache cannot mark the correct phrase (אַל־נָא יִחַר) as incorrect.
+function authoritativeWordSetsForQuestion(question, posukNum){
+  if(Number(posukNum)===32 && String(question||'').trim()==='What did Avraham ask Hashem not to do?') return [[1,2]];
+  return null;
 }
 function readLocalGeneratedQuestions(cacheKey, posukNum){
   try{
@@ -1798,14 +1806,14 @@ async function getGeneratedQuestionsForPart(part){
 
   // Fastest path: this page session already loaded the shared set.
   if(generatedQuestionMemoryCache.has(cacheKey)){
-    return generatedQuestionMemoryCache.get(cacheKey);
+    return applyAuthoritativeQuestionWordSets(generatedQuestionMemoryCache.get(cacheKey), part.posukNum);
   }
 
   // Next-fastest path: this browser has seen the posuk before.
   const localItems = readLocalGeneratedQuestions(cacheKey, part.posukNum);
   if(localItems){
     generatedQuestionMemoryCache.set(cacheKey, localItems);
-    return localItems;
+    return applyAuthoritativeQuestionWordSets(localItems, part.posukNum);
   }
 
   // If two UI paths ask for the same posuk while it is still loading, share
@@ -1825,7 +1833,7 @@ async function getGeneratedQuestionsForPart(part){
         if(items.length){
           generatedQuestionMemoryCache.set(cacheKey, items);
           saveLocalGeneratedQuestions(cacheKey, cached.items);
-          return items;
+          return applyAuthoritativeQuestionWordSets(items, part.posukNum);
         }
       }
     }catch(err){
@@ -1855,7 +1863,7 @@ async function getGeneratedQuestionsForPart(part){
     const items = normalizeGeneratedItems(rawItems, part.posukNum);
     generatedQuestionMemoryCache.set(cacheKey, items);
     saveLocalGeneratedQuestions(cacheKey, rawItems);
-    return items;
+    return applyAuthoritativeQuestionWordSets(items, part.posukNum);
   })();
 
   generatedQuestionPromiseCache.set(cacheKey, loadPromise);
@@ -1864,6 +1872,33 @@ async function getGeneratedQuestionsForPart(part){
   }finally{
     generatedQuestionPromiseCache.delete(cacheKey);
   }
+}
+
+function applyAuthoritativeQuestionWordSets(items, posukNum){
+  return (Array.isArray(items)?items:[]).map(item=>{
+    const fixed=authoritativeWordSetsForQuestion(item&&item.question,posukNum);
+    return fixed?{...item,answerWordSets:fixed}:item;
+  });
+}
+
+// On a grading miss, independently verify the supplied key against the Hebrew
+// and the question's expected answer. Generated/cached word indices can be
+// wrong, so a clear phrase match should count as correct.
+function getVerifiedQuestionWordSets(question, words){
+  const expected=String(question&&question.expectedAnswer||'').trim();
+  if(!expected||!Array.isArray(words)||!words.length)return [];
+  const normalize=value=>String(value||'').normalize('NFD').replace(/[\u0591-\u05C7]/g,'').replace(/[״׳"'.,:;!?׃־-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
+  const expectedNorm=normalize(expected);
+  const matches=[];
+  for(let start=0;start<words.length;start++){
+    let joined='';
+    for(let end=start;end<words.length;end++){
+      joined=joined?joined+' '+words[end]:words[end];
+      const candidate=normalize(joined);
+      if(candidate&&candidate===expectedNorm)matches.push(Array.from({length:end-start+1},(_,i)=>start+i));
+    }
+  }
+  return matches;
 }
 
 
@@ -4640,7 +4675,15 @@ async function gradeCurrentQuestionAnswer(){
   const selected=(questionSelectionDrafts[idx]||[]).map(Number).sort((a,b)=>a-b);
   if(!selected.length){document.getElementById('comprehensionGradingMsg').textContent='Tap one or more words first.';return;}
   const words=getQuestionPosukWords(current);
-  const correct=matchesAnyAnswerWordSet(selected,current);
+  let correct=matchesAnyAnswerWordSet(selected,current);
+  if(!correct){
+    const verifiedSets=getVerifiedQuestionWordSets(current,words);
+    if(matchesAnyAnswerWordSet(selected,{answerWordSets:verifiedSets})){
+      correct=true;
+      current.answerWordSets=[...(current.answerWordSets||[]),...verifiedSets];
+      console.warn('Accepted a verified Hebrew answer after generated answer-key mismatch',current.question);
+    }
+  }
   const picked=selected.map(i=>words[i]).join(' ');
   const previous=comprehensionQResults[idx];
   questionTryCounts[idx]=Math.max(questionTryCounts[idx]||0,Number(previous&&previous.tries)||0)+1;
