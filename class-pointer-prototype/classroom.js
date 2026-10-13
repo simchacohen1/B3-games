@@ -180,7 +180,7 @@ async function startClass(){
     $('startClass').hidden=true;
     const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status('Class ready! Click Share teaching screen, or open another lesson. Students can join automatically.');roster();
   });
-  peer.on('connection',receiveStudent);peer.on('call',call=>{if(!window.ClassPointerBoards?.incomingCall(call))call.close()});
+  peer.on('connection',receiveStudent);peer.on('call',call=>{if(call.metadata?.kind==='activity-screen'){if(window.ClassPointerActivityShares)void window.ClassPointerActivityShares.incomingCall(call);else call.close();return}if(!window.ClassPointerBoards?.incomingCall(call))call.close()});
 }
 function stopSharing(){
   cancelHover();highlighter?.cancel();highlightStore.reset();publishHighlights();generation++;
@@ -303,6 +303,7 @@ async function shareScreen(preferTab=false){
   }
 }
 function endClass(){
+  window.ClassPointerActivityShares?.closeAll();
   window.ClassPointerBoards?.endClass();window.ClassPointerPdf?.close(true);window.ClassPointerDashboard?.end().catch(()=>fail('Could not remove the dashboard lesson. Refresh before starting another class.'));
   clearTimeout(joinTimer);started=false;openingClass=false;stopSharing();for(const member of members.values()){send(member.connection,{type:'ended'});member.connection.close()}
   members.clear();const oldPeer=peer;peer=null;oldPeer?.destroy();state={sharing:false,mode:'selected',tools:{pointer:true,highlight:false,pen:false},members:[],points:{}};for(const [id,tool] of [['allowPointer','pointer'],['allowHighlight','highlight'],['allowPen','pen']])$(id).checked=state.tools[tool];$('accessMode').value='selected';$('spotlight').checked=false;$('startClass').disabled=false;$('startClass').hidden=false;$('startClass').textContent='↻ Start another class';$('endClass').disabled=true;$('invitePanel').hidden=true;roster();status('Class ended. Click Start another class if you want to reopen it.');
