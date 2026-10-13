@@ -1629,9 +1629,11 @@ function renderEditor(data) {
 }
 
 function createQuestionRow(q, ans, choices, correctIndex) {
+  q = window.GameShowTextEncoding.repairText(q || '');
+  ans = window.GameShowTextEncoding.repairText(ans || '');
   const div = document.createElement('div');
   div.className = 'editor-row';
-  const choiceList = Array.isArray(choices) ? choices : [];
+  const choiceList = Array.isArray(choices) ? choices.map(choice => window.GameShowTextEncoding.repairText(choice)) : [];
   const choiceText = choiceList.map(choice => escapeHtml(choice)).join('\n');
   const correctNumber = choiceList.length
     ? (Number.isInteger(Number(correctIndex)) && Number(correctIndex) >= 0 ? Number(correctIndex) + 1 : 1)
