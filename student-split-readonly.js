@@ -131,7 +131,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     window.B3PreviewProtect();
     const banner = document.createElement("div");
-    banner.textContent = "👀 Student preview + " · " + context.className +
+    banner.textContent = "👀 Student preview · " + context.className +
       " · READ ONLY — saving, approvals and changes are blocked";
     banner.style.cssText = "position:sticky;top:0;z-index:2147483647;padding:11px 16px;background:#fff3bf;color:#543900;border-bottom:2px solid #c89127;text-align:center;font:700 14px Arial,sans-serif";
     document.body.prepend(banner);
