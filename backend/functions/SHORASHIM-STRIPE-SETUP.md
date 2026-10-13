@@ -1,6 +1,6 @@
 # Shorashim Lab subscription deployment notes
 
-This code intentionally accepts only Stripe Sandbox keys and rejects live webhook events. No real charge can be initiated until the owner explicitly approves a separate live-mode change.
+This code intentionally accepts only Stripe Sandbox keys and rejects live webhook events. The price is $39 USD per teacher per year, regardless of how many selected classes are covered. No real charge can be initiated until the owner explicitly approves a separate live-mode change.
 
 ## Sandbox configuration
 
@@ -11,7 +11,7 @@ From `backend/functions` in the Firebase project:
 3. Add `STRIPE_SHORASHIM_PRICE_ID=price_1UPRSd2QdJ1keBzqxOe9kxtL` to the functions `.env` file (Sandbox Shorashim Lab annual price).
 4. Deploy only `createShorashimCheckout`, `createShorashimBillingPortal`, and `shorashimStripeWebhook`.
 5. Register the deployed `shorashimStripeWebhook` URL in Stripe Sandbox for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.expired`, `customer.subscription.updated`, and `customer.subscription.deleted`.
-6. Run a test card through the teacher subscription page. Confirm class access is added only after a signed, paid Sandbox webhook. Cancel the test subscription from the portal and confirm access is removed.
+6. Run a test card through the teacher subscription page. Confirm access is added only to the selected classes after a signed, paid Sandbox webhook. Cancel the test subscription from the portal and confirm only subscription-granted access is removed.
 
 Never put Stripe secrets in HTML, Firebase Realtime Database, GitHub, or a chat message. Keep test and live keys, price IDs, and webhook signing secrets separate.
 
