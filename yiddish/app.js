@@ -80,7 +80,7 @@ function render(){
   $('words').replaceChildren();$('start').disabled=!stepOpen(group,part);$('blastStart').disabled=!stepOpen(group,part);$('sentenceStart').disabled=!stepOpen(group,part);$('soundStart').disabled=!stepOpen(group,part);$('storyQuizStart').disabled=!open(group);$('readStory').hidden=!stepOpen(group,part);$('readStory').href='story.html?section='+group+'&part='+part+(API.preview?'&class='+encodeURIComponent(student.classId):'');$('readStory').textContent='📖 Read the illustrated story — Step '+stepNumber(group,part);
   $('title').textContent=showAll?'My vocabulary':`Step ${stepNumber(group,part)} · new words`;
   const visible=showAll?config.sections.flatMap((s,i)=>open(i)?s.words:[]):stepOpen(group,part)?newWords(group,part):[];
-  for(const id of visible){const w=word(id);if(!w)continue;const card=node('article','','word'),st=status(progress[id]);card.append(node('span',st,'status '+st.toLowerCase()));const yi=node('div',w.yi,'yi');yi.lang='yi';card.append(yi,node('div',w.en));$('words').append(card)}
+  for(const id of visible){const w=word(id);if(!w)continue;const card=node('article','','word'),st=status(progress[id]);card.append(node('span',st,'status '+st.toLowerCase()));const yi=node('div',w.yiNikud||w.yi,'yi');yi.lang='yi';card.append(yi,node('div',w.en));$('words').append(card)}
   if(!visible.length)$('words').append(node('p','Your teacher will open your next section soon.'));
   else if(!showAll&&earlierWords(group,part).length)$('words').append(node('p','The games will also mix in some review words from earlier steps.','note'));
   if(window.B3Guest&&window.B3Guest.isGuest())$('words').append(node('p','🔓 Guest preview: Step 1 only. Sign in to unlock all 8 steps.','note'));
