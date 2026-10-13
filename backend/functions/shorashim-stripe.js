@@ -106,7 +106,7 @@ exports.createShorashimCheckout = onRequest(
     try {
       const identity = await identityFromRequest(req);
       const classIds = [...new Set(Array.isArray(req.body?.classIds) ? req.body.classIds.map(String) : [])];
-      if (!classIds.length || classIds.length > 20) return res.status(400).json({ error: 'Select between 1 and 20 classes.' });
+      if (!classIds.length || classIds.length > 20 || JSON.stringify(classIds).length > 500) return res.status(400).json({ error: 'Select up to 20 classes with valid class identifiers.' });
       const classes = await Promise.all(classIds.map(id => assignedClass(identity, id)));
       if (classes.some(({ cls }) => cls.toolGrants?.shorashim === true)) return res.status(409).json({ error: 'Shorashim is already enabled for one or more selected classes.' });
       const current = (await db().ref('b3Private/stripeSubscriptions').get()).val() || {};
@@ -165,7 +165,8 @@ async function subscriptionForEvent(event, stripeEventObject) {
 async function applySubscription(subscription, eventId) {
   const metadata=subscription?.metadata||{}, teacherUid=String(metadata.teacherUid||''); let classIds;
   try { classIds=JSON.parse(metadata.classIds||'[]'); } catch (_) { classIds=[]; }
-  if(!teacherUid||!Array.isArray(classIds)||!classIds.length||classIds.length>20||classIds.some(id=>!validClassId(id))||metadata.workspaceId!==workspaceId||metadata.tool!=='shorashim')return;
+  if(!teacherUid||!Array.isArray(classIds)||!classIds.length||classIds.length>20||JSON.stringify(classIds).length>500||classIds.some(id=>!validClassId(id))||metadata.workspaceId!==workspaceId||metadata.tool!=='shorashim')return;
+  if(subscription.items?.data?.[0]?.price?.id!==String(priceId.value()||''))return;
   const privatePath='b3Private/stripeSubscriptions/'+subscription.id, prev=(await db().ref(privatePath).get()).val()||{};
   const [ts,as,user]=await Promise.all([db().ref('b3Games/workspaces/'+workspaceId+'/teachers/'+teacherUid).get(),db().ref('b3Games/admins/'+teacherUid).get(),admin.auth().getUser(teacherUid).catch(()=>null)]);
   const teacher=ts.val(), adminData=as.val(), owner=String(user?.email||'').toLowerCase()==='simcha5770@gmail.com', adminOk=adminData&&adminData.active!==false;
