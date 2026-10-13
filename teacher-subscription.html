@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shorashim Lab Subscription · Fun Torah Tools</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f6fb;color:#172033;font:16px Arial,sans-serif}header{background:#172033;color:white;padding:18px 24px}main{max-width:850px;margin:28px auto;padding:0 16px}.panel{background:#fff;border:1px solid #dbe3ee;border-radius:16px;padding:22px;margin:16px 0;box-shadow:0 5px 18px #0f172a0d}h1{margin:0;font-size:24px}h2{margin-top:0}.class{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;border-top:1px solid #e2e8f0;padding:16px 0}.btn{border:0;border-radius:10px;padding:11px 15px;background:#2563eb;color:#fff;font-weight:800;cursor:pointer}.btn.secondary{background:#e8eef8;color:#172033}.btn:disabled{opacity:.55;cursor:wait}.muted{color:#64748b;line-height:1.5}.notice{padding:12px;border-radius:10px;background:#eff6ff;color:#1e40af}.error{background:#fef2f2;color:#991b1b}.hidden{display:none!important}
+</style>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\\/script>')</script>
+<script src="firebase-config.js"></script><script src="site-settings.js"></script>
+</head><body><header><h1>Shorashim Lab subscriptions</h1></header>
+<main><section class="panel"><div id="message" class="notice">Checking your teacher account…</div><button id="signIn" class="btn hidden">Sign in with Google</button><p class="muted">One subscription costs $39 per teacher per year and covers only the classes you select. Access is added after Stripe confirms payment.</p><div id="classes"></div><button id="portal" class="btn secondary hidden">Manage subscription</button><p><a href="teacher-home.html">← Back to Teacher Home</a></p></section></main>
+<script>
+(function(){
+'use strict';
+const FUNCTIONS='https://us-central1-b3-games.cloudfunctions.net/';
+const q=id=>document.getElementById(id), db=firebase.apps.length?firebase.database():(firebase.initializeApp(window.B3_FIREBASE_CONFIG),firebase.database());
+const api=window.B3SiteSettings, ws=api.workspaceId||'b3-2026';
+function message(text,error){q('message').textContent=text;q('message').classList.toggle('error',!!error)}
+q('signIn').onclick=()=>api.signInWithGoogle().catch(error=>message(error.message||'Google sign-in did not complete.',true));
+async function post(name,body){
+ const user=firebase.auth().currentUser;if(!user)throw new Error('Sign in with your teacher Google account first.');
+ const token=await user.getIdToken(true);
+ const response=await fetch(FUNCTIONS+name,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok)throw new Error(data.error||'The request could not be completed.');
+ return data;
+}
+function render(classIds,rows){
+ q('classes').innerHTML='';
+ const available=rows.filter(row=>!row.enabled);
+ rows.filter(row=>row.enabled).forEach(row=>{const div=document.createElement('div');div.className='class';div.textContent=row.name+' — Shorashim is already enabled.';q('classes').append(div);});
+ if(available.length){
+  const heading=document.createElement('p');heading.textContent='Select the classes covered by this teacher subscription:';q('classes').append(heading);
+  available.forEach(row=>{const label=document.createElement('label');label.className='class';const check=document.createElement('input');check.type='checkbox';check.value=row.id;check.name='shorashimClass';const name=document.createElement('strong');name.textContent=row.name;label.append(check,name);q('classes').append(label);});
+  const button=document.createElement('button');button.className='btn';button.textContent='Continue to Stripe · $39/year';button.onclick=async()=>{const selected=[...document.querySelectorAll('input[name="shorashimClass"]:checked')].map(el=>el.value);if(!selected.length){message('Select at least one class.',true);return;}button.disabled=true;message('Opening secure Stripe Checkout…');try{const result=await post('createShorashimCheckout',{classIds:selected});location.assign(result.url);}catch(error){message(error.message,true);button.disabled=false;}};q('classes').append(button);
+ }
+ q('portal').classList.toggle('hidden',!rows.some(row=>row.enabled));
+}
+async function load(user,authorized,access){
+ if(!user||!authorized||!access?.authorized){message(user?'This Google account is not an authorized teacher.':'Sign in with your authorized teacher Google account to continue.',true);q('signIn').classList.toggle('hidden',!!user);return;}
+ try{
+  const ids=access.role==='admin'?(await db.ref('b3Games/workspaces/'+ws+'/classes').once('value')).val()||{}:null;
+  const classIds=access.role==='admin'?Object.keys(ids).filter(id=>ids[id]?.active!==false):(access.classIds||[]);
+  if(!classIds.length){message('No active classes are assigned to this account.',true);return;}
+  const snaps=await Promise.all(classIds.map(id=>db.ref('b3Games/workspaces/'+ws+'/classes/'+id).once('value')));
+  const rows=snaps.map((snap,i)=>({id:classIds[i],...(snap.val()||{})})).filter(row=>row.active!==false).map(row=>({id:row.id,name:row.name||row.id,enabled:row.toolGrants?.shorashim===true}));
+  render(classIds,rows);message('Select the classes for this teacher subscription.');
+  q('portal').onclick=async()=>{q('portal').disabled=true;try{const result=await post('createShorashimBillingPortal');location.assign(result.url);}catch(error){message(error.message,true);q('portal').disabled=false;}};
+  const status=new URLSearchParams(location.search).get('checkout');
+  if(status==='success')message('Checkout is complete. Stripe is confirming the subscription; refresh this page in a few seconds to see class access.');
+  else if(status==='cancelled')message('Checkout was cancelled. No subscription was created.');
+ }catch(error){message(error.message||'Could not load your classes.',true);}
+}
+if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+api.onAuthStateChanged((user,authorized,access)=>load(user,authorized,access));
+})();
+</script></body></html>

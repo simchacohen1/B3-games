@@ -2638,3 +2638,8 @@ exports.generateShorashimArt = require("./shorashim-art").generateShorashimArt;
 
 // Read-only owner ChatGPT student report (ET/WT only).
 exports.studentReportChatGPTRead = require("./student-report-chatgpt-read").studentReportChatGPTRead;
+
+// Shorashim Lab teacher subscriptions (sandbox-only until owner approval).
+exports.createShorashimCheckout = require('./shorashim-stripe').createShorashimCheckout;
+exports.createShorashimBillingPortal = require('./shorashim-stripe').createShorashimBillingPortal;
+exports.shorashimStripeWebhook = require('./shorashim-stripe').shorashimStripeWebhook;
