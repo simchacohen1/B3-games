@@ -301,3 +301,17 @@ body.lesson-expanded #stage.lesson-fullscreen{position:fixed;inset:0;width:100%;
 .tb-roster-handle:active{cursor:grabbing}
 .teacher-dock .tb-menu-wrap{position:relative}
 @media(max-width:700px){.tb-students{max-height:70dvh!important;width:min(94vw,420px)}}
+
+/* Clean teaching workspace: no extra vertical space consumed by secondary controls. */
+body.teacher-view main{max-width:none;margin:0 auto;padding:10px 16px 18px;border-radius:0}
+body.teacher-view .app-header{padding:0 0 7px;gap:10px}
+body.teacher-view .header-badge{width:38px;height:38px;font-size:22px;border-radius:10px}
+body.teacher-view h1{font-size:20px}
+body.teacher-view .app-header p:last-child{display:none}
+body.teacher-view .session-controls{padding:2px 0;gap:6px;margin:3px 0}
+body.teacher-view .session-controls>button:not(#endClass),body.teacher-view .session-controls #tabControls{display:none}
+body.teacher-view #stage{width:100%;height:min(76dvh,calc(100vw * .5625));max-height:none;margin:4px 0;aspect-ratio:auto}
+body.teacher-view #pointerStatus,body.teacher-view footer{display:none}
+body.teacher-view #joinInstructions{margin:3px 0;padding:4px 8px;border:1px solid #dce4ef;border-radius:8px;font-size:13px}
+body.teacher-view #joinInstructions>summary{cursor:pointer;font-weight:650}
+body.teacher-view #connectionStatus{margin:3px 0;padding:5px 9px;font-size:13px}
