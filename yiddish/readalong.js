@@ -2,7 +2,6 @@
    - Book view: picture + short English description on the left page, that scene's Yiddish on the right page.
      Pages turn by themselves as the story is read. One slim control bar replaces the big header.
    - Lights up each word as it is spoken (and the phrase around it).
-   - "Stop after each sentence": the audio pauses at the end of each phrase; Play continues.
    - Tap a word: hear just that word, see its meaning, or read on from there.
    Needs word-times.js (window.YIDDISH_WORD_TIMES). Load after reader.js. Never changes the story text. */
 (() => {
@@ -13,7 +12,7 @@
   const $ = id => document.getElementById(id);
   const HL = typeof CSS !== 'undefined' && CSS.highlights && typeof Highlight !== 'undefined';
   const SETTINGS_KEY = 'yiddish-readalong-v1';
-  let settings = { step: true, book: true };
+  let settings = { book: true };
   try { settings = { ...settings, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch (e) {}
   const save = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} };
  
@@ -121,16 +120,12 @@
     '<button type="button" id="raBack" title="Previous sentence">◀ Back</button>' +
     '<button type="button" id="raAgain" title="Hear this sentence again">Again</button>' +
     '<button type="button" id="raNext" title="Next sentence">Next ▶</button>' +
-    '<label><input type="checkbox" id="raStep"> Stop after each sentence</label>' +
     '<span class="ra-sep"></span><span class="ra-step" id="raStepName"></span>' +
     '<button type="button" class="ra-view" id="raView" hidden style="display:none"></button>';
   const prog = document.createElement('div'); prog.className = 'ra-prog'; prog.innerHTML = '<i></i>'; header.append(prog);
   header.insertBefore(barEl, prog);
   const speed = $('speed'); if (speed) { const l = speed.closest('label') || speed; barEl.insertBefore(l, $('raView')); }
   const full = $('full'); if (full) barEl.insertBefore(full, $('raView'));
-  const stepBox = $('raStep');
-  stepBox.checked = !!settings.step;
-  stepBox.onchange = () => { settings.step = stepBox.checked; save(); stopAt = null; };
   document.body.classList.add('ra-tap');
   const playBtn = $('raPlay');
   playBtn.onclick = () => { if (player.paused) { stopAt = null; player.play(); } else player.pause(); };
@@ -227,10 +222,6 @@
   function tick() {
     const t = player.currentTime;
     if (stopAt !== null && t >= stopAt) { stopAt = null; player.pause(); }
-    else if (settings.step && !player.paused && stopAt === null) {
-      const i = phraseAt(t);
-      if (i >= 0 && t < phrases[i].e) stopAt = phrases[i].e + 0.15;
-    }
     const w = wordAt(t), ph = phraseAt(t);
     if (w !== curWord || ph !== curPh) {
       curWord = w; curPh = ph; paint();
@@ -251,7 +242,7 @@
     i = Math.max(0, Math.min(phrases.length - 1, i));
     curPh = i;
     player.currentTime = Math.max(0, phrases[i].s - 0.1);
-    stopAt = settings.step ? phrases[i].e + 0.15 : null;
+    stopAt = phrases[i].e + 0.15;
     player.play();
   }
   const here = () => { const i = phraseAt(player.currentTime); return i < 0 ? 0 : i; };
@@ -295,7 +286,7 @@
     const b = document.createElement('div'); b.className = 'btns';
     const hear = document.createElement('button'); hear.textContent = 'Hear it again'; hear.onclick = () => playWord(w);
     const from = document.createElement('button'); from.textContent = 'Read from here';
-    from.onclick = () => { card.remove(); card = null; player.currentTime = Math.max(0, w.s - 0.05); stopAt = settings.step ? phrases[w.ph].e + 0.15 : null; player.play(); };
+    from.onclick = () => { card.remove(); card = null; player.currentTime = Math.max(0, w.s - 0.05); stopAt = null; player.play(); };
     b.append(hear, from); card.append(yi, x, e, b); document.body.append(card);
   }
   box.addEventListener('click', ev => {
