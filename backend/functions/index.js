@@ -1886,8 +1886,8 @@ QUALITY CHECK BEFORE RETURNING: For every item, inspect the exact Hebrew tokens 
                   properties: {
                     items: {
                       type: "array",
-                      minItems: 1,
-items: {
+                      minItems: 0,
+                      items: {
                         type: "object",
                         properties: {
                           sourceFact: { type: "string" },
@@ -1937,8 +1937,68 @@ items: {
         return;
       }
 
+      // Independently audit the question/evidence/key chain. The generator's
+      // own confidence is not evidence that its selected Hebrew words answer
+      // its question. A separate model pass must approve each exact span.
+      const candidates = Array.isArray(parsed.items) ? parsed.items : [];
+      let approvedIndices = [];
+      if (candidates.length) {
+        const reviewResponse = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": ANTHROPIC_API_KEY.value(),
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-6",
+            max_tokens: 1200,
+            system: `You are an independent reviewer for a Hebrew verse comprehension activity. Review every candidate skeptically. Approve a candidate only if (1) its exact listed Hebrew tokens form a contiguous span in the supplied verse, (2) the span's meaning is directly supported by the accepted English translation, and (3) a reasonable independent reader would agree that those exact words clearly answer the question. Reject ambiguous, misleading, overbroad, under-specified, wrong-number, wrong-speaker, or merely topical matches. Do not repair candidates. Return only the zero-based candidate indexes that pass all three checks; an empty list is valid.`,
+            messages: [{ role: "user", content: JSON.stringify({
+              posukText: String(posukText || "").trim(),
+              acceptedTranslation: String(posukTranslation).trim(),
+              classroomReferenceTranslation: String(classroomReferenceTranslation || "").trim(),
+              candidates: candidates.map((item, index) => ({
+                index,
+                question: String(item?.question || ""),
+                expectedAnswer: String(item?.expectedAnswer || ""),
+                sourceFact: String(item?.sourceFact || ""),
+                answerWordSets: item?.answerWordSets,
+              })),
+            }) }],
+            output_config: {
+              format: {
+                type: "json_schema",
+                schema: {
+                  type: "object",
+                  properties: { approvedIndices: { type: "array", items: { type: "integer" } } },
+                  required: ["approvedIndices"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          }),
+        });
+        if (!reviewResponse.ok) {
+          console.error("Independent question review failed:", reviewResponse.status, await reviewResponse.text());
+          res.status(502).json({ error: "Could not verify generated questions" });
+          return;
+        }
+        const reviewData = await reviewResponse.json();
+        const reviewText = (reviewData.content || []).find((block) => block.type === "text")?.text || "";
+        try {
+          approvedIndices = JSON.parse(reviewText.replace(/```json|```/g, "").trim()).approvedIndices || [];
+        } catch (err) {
+          console.error("Could not parse independent question review:", reviewText);
+          res.status(502).json({ error: "Could not verify generated questions" });
+          return;
+        }
+      }
+
       const seen = new Set();
-      const items = (Array.isArray(parsed.items) ? parsed.items : [])
+      const approved = new Set(approvedIndices.map(Number).filter((index) => Number.isInteger(index) && index >= 0 && index < candidates.length));
+      const items = candidates
+        .filter((_, index) => approved.has(index))
         .map((item) => ({
           sourceFact: String(item?.sourceFact || "").trim(),
           question: applyFrumBiblicalNames(String(item?.question || "").trim()),
@@ -1947,7 +2007,7 @@ items: {
             ? item.answerWordSets.map((set) => Array.isArray(set) ? [...new Set(set.map(Number).filter(Number.isInteger))].sort((a, b) => a - b) : []).filter((set) => set.length).slice(0, 3)
             : [],
         }))
-        .filter((item) => item.question && item.expectedAnswer && item.answerWordSets.length &&
+        .filter((item) => item.question && item.expectedAnswer && item.sourceFact && item.answerWordSets.length &&
           item.answerWordSets.every((set) =>
             set.every((index, position) => index >= 0 && index < String(posukText || '').trim().split(/\s+/).filter(Boolean).length &&
               (position === 0 || index === set[position - 1] + 1))))
@@ -1958,11 +2018,6 @@ items: {
           return true;
         })
         .slice(0, questionLimit);
-
-      if (!items.length) {
-        res.status(502).json({ error: "No usable questions generated" });
-        return;
-      }
 
       res.status(200).json({ items });
     } catch (err) {

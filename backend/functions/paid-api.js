@@ -71,7 +71,7 @@ function paidHandler(name, category, handler) {
       // Hebrew answer spans are produced. Bump its cache namespace whenever
       // that contract changes, so identical requests cannot keep returning a
       // stale set generated under the previous prompt.
-      const cacheVersion = name === 'generateComprehensionQuestions' ? 'answerfirst_v5' : 'v1';
+      const cacheVersion = name === 'generateComprehensionQuestions' ? 'answerfirst_v6' : 'v1';
       const cacheKey = hash(name + ':' + cacheVersion + ':' + JSON.stringify(stable(req.body || {})));
       if (category === 'speech' && speechCache.has(cacheKey))
         return res.status(200).json(speechCache.get(cacheKey).value);

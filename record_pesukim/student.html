@@ -1373,7 +1373,7 @@
 
         <!-- Question-by-question mode (primary way comprehension is graded
              when this posuk/range has a question set authored for it — see
-             QUESTION_BANK). -->
+             generated question records). -->
         <div id="questionModeBlock">
           <div class="chunk-progress" id="questionProgress">Question 1 of 1</div>
           <div class="instruction-card">
@@ -1654,7 +1654,7 @@ function warmTranslationServices(){
    optional "🌟 Bonus" step after every question for the posuk/range has
    been answered, rather than as the primary/only comprehension task.
 
-   Structure: QUESTION_BANK[perekNum][posukNum] = ["question 1", ...]
+   Questions are generated from answer evidence in the selected pasuk.
    Perakim/posukim with no entry here simply fall back to the old
    freehand-only comprehension flow (so nothing breaks for parts of the
    text that don't have a question set authored yet).
@@ -1663,45 +1663,6 @@ function warmTranslationServices(){
    ========================================================= */
 const GRADE_QUESTION_ANSWER_URL = "https://us-central1-b3-games.cloudfunctions.net/gradeQuestionAnswer";
 const GENERATE_COMPREHENSION_QUESTIONS_URL = "https://us-central1-b3-games.cloudfunctions.net/generateComprehensionQuestions";
-
-const QUESTION_BANK = {
-  "18": {
-    "1": ["To whom did Hashem appear?", "Where did Hashem appear to Avraham?", "Where was Avraham sitting?", "At what part of the day was Avraham sitting at the entrance of the tent?"],
-    "2": ["What did Avraham do with his eyes?", "What did Avraham see when he lifted his eyes?", "How many men did Avraham see?", "Where were the three men standing?", "What did Avraham do when he saw them?", "From where did Avraham run to greet them?", "What did Avraham do when he reached them?", "Toward what did Avraham bow?"],
-    "3": ["How did Avraham address the guest he was speaking to?", "What did Avraham say about finding favor in his guest's eyes?", "What did Avraham ask his guest not to do?", "How did Avraham refer to himself when he spoke to his guest?"],
-    "4": ["What did Avraham offer to have brought?", "How much water did Avraham offer to have brought?", "What did Avraham ask his guests to wash?", "Where did Avraham invite his guests to rest?"],
-    "5": ["What did Avraham say he would bring for his guests to eat?", "What did Avraham say the bread would do for his guests?", "What did Avraham say the guests should do after eating?", "What reason did Avraham give for serving the guests?", "How did Avraham refer to himself in this posuk?", "How did the guests respond to Avraham's offer?", "What did the guests tell Avraham to do?"],
-    "6": ["Where did Avraham hurry to?", "To whom did Avraham hurry in the tent?", "What did Avraham tell Sarah to do first?", "How many se'ah of flour did Avraham tell Sarah to prepare?", "What kind of flour did Avraham tell Sarah to use?", "What did Avraham tell Sarah to do with the flour?", "What did Avraham tell Sarah to make?"],
-    "7": ["Where did Avraham run after speaking with Sarah?", "What did Avraham take from the cattle?", "How is the calf described?", "To whom did Avraham give the calf?", "What did the young man do after receiving the calf?", "How quickly did the young man prepare the calf?"],
-    "8": ["What did Avraham take besides the calf?", "Which two dairy foods did Avraham take?", "Which calf did Avraham serve?", "Where did Avraham place the food?", "Where did Avraham stand while the guests ate?", "What was Avraham doing while the guests ate?", "Under what did Avraham stand?", "What did the guests do with the food?"],
-    "9": ["Who asked Avraham a question?", "Whom did the guests ask about?", "How did the guests describe Sarah when asking about her?", "What did the guests ask Avraham?", "Where did Avraham say Sarah was?"],
-    "10": ["Who said he would return to Avraham?", "What did the guest say he would do?", "When did the guest say he would return?", "What did the guest say Sarah would have when he returned?", "How did the guest describe Sarah in relation to Avraham?", "What was Sarah doing while the guest spoke?", "Where was Sarah while she listened?", "Where was the tent entrance in relation to the guest who was speaking?"],
-    "11": ["How are Avraham and Sarah described in age?", "What does the posuk say about how advanced in years Avraham and Sarah were?", "What normal condition had stopped happening for Sarah?"],
-    "12": ["Who laughed in this posuk?", "Where did Sarah laugh?", "What did Sarah say about herself in her thoughts?", "What did Sarah wonder whether she would have after becoming old?", "How did Sarah describe Avraham?"],
-    "13": ["Who spoke to Avraham about Sarah's laughter?", "To whom did Hashem speak?", "What did Hashem ask about Sarah's laughter?", "What did Hashem quote Sarah as wondering whether she could do?", "How did Hashem quote Sarah describing herself?"],
-    "14": ["What question did Hashem ask about whether anything is too difficult for Him?", "When did Hashem say He would return to Avraham?", "What did Hashem say Sarah would have at that time?"],
-    "15": ["What did Sarah deny doing?", "Why did Sarah deny that she had laughed?", "What did Hashem say in response to Sarah's denial?", "What did Hashem say Sarah had in fact done?"],
-    "16": ["What did the men do first in this posuk?", "From where did the men get up?", "Toward what place did the men look?", "Who went with the men?", "What did Avraham do as the men left?"],
-    "17": ["Who spoke to Himself in this posuk?", "Whom did Hashem mention?", "What did Hashem ask whether He should hide from Avraham?", "What was Hashem planning to do?"],
-    "18": ["Who did Hashem say would surely become something great?", "What kind of nation did Hashem say Avraham would become?", "How is that nation described?", "Who did Hashem say would be blessed through Avraham?"],
-    "19": ["Whom did Hashem say He had known or chosen?", "Whom did Hashem say Avraham would command after him?", "What did Hashem say Avraham's children and household would keep?", "Whose way would they keep?", "What two things did Hashem say they would do?", "What did Hashem say He would bring upon Avraham?", "What had Hashem spoken about Avraham?"],
-    "20": ["Who spoke in this posuk?", "Which two cities did Hashem mention?", "What did Hashem say about the outcry of Sedom and Amorah?", "What did Hashem say about their sin?", "How serious did Hashem say their sin was?"],
-    "21": ["What did Hashem say He would do first?", "What did Hashem say He would see?", "What outcry did Hashem say had come to Him?", "What did Hashem say He wanted to find out about what the people had done?", "What did Hashem say He would know if they had not acted according to the outcry?"],
-    "22": ["What did the men do from there?", "Where did the men go?", "Who remained behind?", "Before whom was Avraham still standing?"],
-    "23": ["What did Avraham do before speaking?", "Who spoke in this posuk?", "Whom did Avraham ask about destroying?", "Whom did Avraham ask whether Hashem would destroy together?"],
-    "24": ["How many righteous people did Avraham suggest might be inside the city?", "Where did Avraham say the fifty righteous people might be?", "What did Avraham ask whether Hashem would do to the city?", "What did Avraham ask Hashem to do for the place for the sake of the fifty righteous people?"],
-    "25": ["What did Avraham say would be far from Hashem to do?", "Whom did Avraham say should not be killed together?", "What did Avraham say should not happen to the righteous person?", "What did Avraham say should not happen to the wicked person?", "How did Avraham refer to Hashem in his question?", "What did Avraham ask the Judge of all the earth to do?"],
-    "26": ["Who answered Avraham?", "How many righteous people did Hashem say He would need to find in Sedom?", "Where in Sedom did Hashem say He would find them?", "What did Hashem promise to do for the entire place if He found fifty righteous people?", "For whose sake did Hashem say He would spare the place?"],
-    "27": ["Who answered and continued speaking?", "To whom did Avraham say he had begun to speak?", "How did Avraham describe himself?", "What two things did Avraham compare himself to?"],
-    "28": ["How many might be missing from the fifty righteous people according to Avraham?", "How many righteous people would that leave?", "What did Avraham ask whether Hashem would do to the whole city because five were missing?", "What did Hashem answer about forty-five righteous people?", "Where did Hashem say He would need to find the forty-five?"],
-    "29": ["What did Avraham do again in this posuk?", "How many righteous people did Avraham ask about next?", "What did Hashem say He would not do for the sake of forty righteous people?"],
-    "30": ["What did Avraham ask Hashem not to do before he continued speaking?", "What did Avraham say he wanted to do after asking Hashem not to be angry?", "How many righteous people did Avraham ask about in this posuk?", "What did Hashem say He would not do if He found thirty righteous people?", "Where did Hashem say He would need to find the thirty?"],
-    "31": ["What did Avraham say about having begun to speak to Hashem?", "How many righteous people did Avraham ask about next?", "What did Hashem say He would not do for the sake of twenty righteous people?"],
-    "32": ["What did Avraham ask Hashem not to do?", "How many more times did Avraham say he would speak?", "How many righteous people did Avraham ask about last?", "What did Hashem say He would not do for the sake of ten righteous people?"],
-    "33": ["Who left after the conversation was finished?", "When did Hashem leave?", "With whom had Hashem been speaking?", "What did Avraham do after Hashem left?", "Where did Avraham return?" ]
-  }
-};
-
 
 // Warm the question-grading Cloud Function the same way the translation
 // ones are warmed, so the first question of the session doesn't eat a
@@ -1715,19 +1676,11 @@ function warmQuestionGradingService(){
   });
 }
 
-function getQuestionsForPosuk(perekNum, posukNum){
-  if(selectedSefer!==DEFAULT_SEFER)return null;
-  const perekBank = QUESTION_BANK[String(perekNum)];
-  if(!perekBank) return null;
-  const qs = perekBank[String(posukNum)];
-  return (qs && qs.length) ? qs : null;
-}
-
 /* Automatically generated question sets are cached in Firebase after the
    first successful generation. Each item keeps its source fact + expected
    answer beside the child-facing question so a teacher/developer can audit
    exactly what detail the generator intended to test. The hand-authored
-   QUESTION_BANK above always wins when an entry exists. */
+   Question pairs are generated and reviewed from the pasuk. */
 let generatedQuestionLoadToken = 0;
 let comprehensionQuestionLoadFailed = false;
 
@@ -1737,10 +1690,10 @@ let comprehensionQuestionLoadFailed = false;
 // network read.
 const generatedQuestionMemoryCache = new Map();
 const generatedQuestionPromiseCache = new Map();
-const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_answerfirst_v5_';
+const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_answerfirst_v6_';
 
 function generatedQuestionCacheKey(part){
-  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_') + '_answerfirst_v5';
+  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_') + '_answerfirst_v6';
 }
 function normalizeGeneratedItems(items, posukNum){
   return (Array.isArray(items) ? items : []).map(item => {
@@ -1761,13 +1714,6 @@ function normalizeGeneratedItems(items, posukNum){
   }).filter(item => item.question && item.answerWordSets.length);
 }
 
-// This hand-authored question has a fixed, unambiguous answer in the posuk.
-// Keep its answer key local and deterministic so a stale or faulty generated
-// Firebase cache cannot mark the correct phrase (אַל־נָא יִחַר) as incorrect.
-function authoritativeWordSetsForQuestion(question, posukNum){
-  if(Number(posukNum)===32 && String(question||'').trim()==='What did Avraham ask Hashem not to do?') return [[1,2]];
-  return null;
-}
 function readLocalGeneratedQuestions(cacheKey, posukNum){
   try{
     const raw = localStorage.getItem(GENERATED_QUESTION_LOCAL_PREFIX + cacheKey);
@@ -1800,20 +1746,19 @@ function normalizeDivineNames(text){
 }
 
 async function getGeneratedQuestionsForPart(part){
-  const staticQs = getQuestionsForPosuk(currentPerekNum, part.posukNum);
   if(!part || !part.translation || !part.translation.trim()) return [];
   const cacheKey = generatedQuestionCacheKey(part);
 
   // Fastest path: this page session already loaded the shared set.
   if(generatedQuestionMemoryCache.has(cacheKey)){
-    return applyAuthoritativeQuestionWordSets(generatedQuestionMemoryCache.get(cacheKey), part.posukNum);
+    return generatedQuestionMemoryCache.get(cacheKey);
   }
 
   // Next-fastest path: this browser has seen the posuk before.
   const localItems = readLocalGeneratedQuestions(cacheKey, part.posukNum);
   if(localItems){
     generatedQuestionMemoryCache.set(cacheKey, localItems);
-    return applyAuthoritativeQuestionWordSets(localItems, part.posukNum);
+    return localItems;
   }
 
   // If two UI paths ask for the same posuk while it is still loading, share
@@ -1833,7 +1778,7 @@ async function getGeneratedQuestionsForPart(part){
         if(items.length){
           generatedQuestionMemoryCache.set(cacheKey, items);
           saveLocalGeneratedQuestions(cacheKey, cached.items);
-          return applyAuthoritativeQuestionWordSets(items, part.posukNum);
+          return items;
         }
       }
     }catch(err){
@@ -1851,7 +1796,7 @@ async function getGeneratedQuestionsForPart(part){
         classroomReferenceTranslation: await getClassroomReferenceForPart(part),
         perekNum: currentPerekNum,
         posukNum: part.posukNum,
-        questionLimit: Math.max(1, Math.min(20, Array.isArray(staticQs) && staticQs.length ? staticQs.length : 5))
+        questionLimit: 5
       })
     });
     if(!res.ok) throw new Error('Question generation request failed');
@@ -1863,7 +1808,7 @@ async function getGeneratedQuestionsForPart(part){
     const items = normalizeGeneratedItems(rawItems, part.posukNum);
     generatedQuestionMemoryCache.set(cacheKey, items);
     saveLocalGeneratedQuestions(cacheKey, rawItems);
-    return applyAuthoritativeQuestionWordSets(items, part.posukNum);
+    return items;
   })();
 
   generatedQuestionPromiseCache.set(cacheKey, loadPromise);
@@ -1874,41 +1819,6 @@ async function getGeneratedQuestionsForPart(part){
   }
 }
 
-function applyAuthoritativeQuestionWordSets(items, posukNum){
-  return (Array.isArray(items)?items:[]).map(item=>{
-    const fixed=authoritativeWordSetsForQuestion(item&&item.question,posukNum);
-    return fixed?{...item,answerWordSets:fixed}:item;
-  });
-}
-
-// On a grading miss, independently verify the supplied key against the Hebrew
-// and the question's expected answer. Generated/cached word indices can be
-// wrong, so a clear phrase match should count as correct.
-function getVerifiedQuestionWordSets(question, words){
-  const expected=String(question&&question.expectedAnswer||'').trim();
-  if(!expected||!Array.isArray(words)||!words.length)return [];
-  const normalize=value=>String(value||'').normalize('NFD').replace(/[\u0591-\u05C7]/g,'').replace(/[״׳"'.,:;!?׃־-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
-  const expectedNorm=normalize(expected);
-  const matches=[];
-  for(let start=0;start<words.length;start++){
-    let joined='';
-    for(let end=start;end<words.length;end++){
-      joined=joined?joined+' '+words[end]:words[end];
-      const candidate=normalize(joined);
-      // Accept a short contiguous phrase around the generated expected answer.
-      // A student may reasonably include a neighboring Hebrew word or attached
-      // prefix, so requiring the selected span to equal the generated string
-      // exactly made correct responses unnecessarily brittle.
-      const candidateWords=candidate?candidate.split(' ').filter(Boolean):[];
-      const expectedWords=expectedNorm?expectedNorm.split(' ').filter(Boolean):[];
-      if(candidateWords.length>=expectedWords.length&&candidateWords.length<=expectedWords.length+2){
-        const containsExpected=expectedWords.every((word,index)=>candidateWords.slice(index,index+expectedWords.length).join(' ')===expectedNorm);
-        if(containsExpected)matches.push(Array.from({length:end-start+1},(_,i)=>start+i));
-      }
-    }
-  }
-  return matches;
-}
 
 
 /* =========================================================
@@ -2093,7 +2003,7 @@ let currentSelectionParts = []; // [{posukNum, text, translation, key}] for tran
 
 /* ---------- Comprehension questions (primary comprehension mode) ----------
    comprehensionQuestions: [{question, posukNum}] built fresh for whichever
-   posuk/range is currently loaded, from QUESTION_BANK (empty array = no
+   posuk/range is currently loaded, from generated answer evidence (empty array = no
    question set authored for this posuk/range yet, so the old freehand
    explanation becomes the only/primary comprehension task, unchanged).
    comprehensionQResults: idx -> {verdict, feedback, transcript, blob, ext}
@@ -3543,16 +3453,12 @@ function resetHebrewResult(){
 
 /* Builds comprehensionQuestions fresh for whatever posuk/range is
    currently loaded, by looking up each part of currentSelectionParts in
-   QUESTION_BANK and concatenating in posuk order (mirrors how translation
+   generated records and concatenating in posuk order (mirrors how translation
    chunks are combined across a range). Any part with no entry simply
    contributes no questions — a range that mixes an authored posuk with an
    unauthored one just asks about the authored one(s). */
 function buildComprehensionQuestions(){
   comprehensionQuestions = [];
-  (currentSelectionParts || []).forEach(part => {
-    const qs = getQuestionsForPosuk(currentPerekNum, part.posukNum);
-    if(qs) qs.forEach(q => comprehensionQuestions.push({ question:q, posukNum:part.posukNum, expectedAnswer:'', sourceFact:'', generated:false }));
-  });
 }
 
 async function completeGeneratedComprehensionQuestions(loadToken){
@@ -3579,13 +3485,17 @@ async function completeGeneratedComprehensionQuestions(loadToken){
     comprehensionMode = 'questions';
     renderComprehensionQuestionUI();
     await restoreSavedQuestionResults();
-  }else if(hadFailure){
+    }else{
     comprehensionQuestionLoadFailed = true;
     const msg = document.getElementById('comprehensionGradingMsg');
-    msg.textContent = 'Could not prepare the detail questions. Tap retry.';
+      msg.textContent = hadFailure ? 'Could not prepare reliable questions. Tap retry.' : 'No clear questions could be made from this pasuk. Please use the bonus explanation.';
     const retry = document.getElementById('comprehensionRetryBtn');
     retry.textContent = '🔁 Retry questions';
-    retry.classList.remove('hidden');
+      retry.classList.toggle('hidden', !hadFailure);
+      if(!hadFailure){
+        comprehensionMode = 'freehand-only';
+        renderComprehensionQuestionUI();
+      }
   }
 }
 
@@ -3790,10 +3700,8 @@ async function restoreSavedQuestionResults(){
   }catch(err){ console.warn('Could not restore saved comprehension answers',err); return false; }
 }
 
-// Clears everything about the question flow for a fresh posuk visit. Hand-
-// authored questions appear immediately. If any selected posuk has no hand-
-// authored set, its exhaustive fact questions are generated/cached in the
-// background and then swapped into this same UI when ready.
+// Wait for generated answer-evidence records before presenting any graded
+// question. Never show an unkeyed question beside a stale answer key.
 function resetComprehensionQuestionState(){
   comprehensionQuestionLoadFailed = false;
   const loadToken = ++generatedQuestionLoadToken;
@@ -3801,17 +3709,13 @@ function resetComprehensionQuestionState(){
   comprehensionQIndex = 0;
   comprehensionQResults = {};
   questionTryCounts = {};
-  comprehensionMode = comprehensionQuestions.length ? 'questions' : 'freehand-only';
+  comprehensionMode = 'questions';
   renderComprehensionQuestionUI();
-  if(comprehensionQuestions.length) restoreSavedQuestionResults();
 
-  // Every question now needs a Hebrew word answer key, including the
-  // hand-authored question bank. Ask the backend to preserve those question
-  // wordings and attach acceptable answerWordSets before students answer.
   const msg = document.getElementById('comprehensionGradingMsg');
-  if(msg) msg.textContent = 'Preparing detail questions…';
+  if(msg) msg.textContent = 'Preparing questions from this pasuk…';
   completeGeneratedComprehensionQuestions(loadToken).finally(() => {
-    if(loadToken === generatedQuestionLoadToken && msg && msg.textContent === 'Preparing detail questions…') msg.textContent = '';
+    if(loadToken === generatedQuestionLoadToken && msg && msg.textContent === 'Preparing questions from this pasuk…') msg.textContent = '';
   });
 }
 
@@ -4684,15 +4588,7 @@ async function gradeCurrentQuestionAnswer(){
   const selected=(questionSelectionDrafts[idx]||[]).map(Number).sort((a,b)=>a-b);
   if(!selected.length){document.getElementById('comprehensionGradingMsg').textContent='Tap one or more words first.';return;}
   const words=getQuestionPosukWords(current);
-  let correct=matchesAnyAnswerWordSet(selected,current);
-  if(!correct){
-    const verifiedSets=getVerifiedQuestionWordSets(current,words);
-    if(matchesAnyAnswerWordSet(selected,{answerWordSets:verifiedSets})){
-      correct=true;
-      current.answerWordSets=[...(current.answerWordSets||[]),...verifiedSets];
-      console.warn('Accepted a verified Hebrew answer after generated answer-key mismatch',current.question);
-    }
-  }
+  const correct=matchesAnyAnswerWordSet(selected,current);
   const picked=selected.map(i=>words[i]).join(' ');
   const previous=comprehensionQResults[idx];
   questionTryCounts[idx]=Math.max(questionTryCounts[idx]||0,Number(previous&&previous.tries)||0)+1;
