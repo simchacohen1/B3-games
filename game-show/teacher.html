@@ -858,7 +858,6 @@ function buildFromQuestions(data) {
   const repaired = window.GameShowTextEncoding.repairQuestions(data);
   questions = repaired.questions;
   if (repaired.changed) setRef.update({ questions: repaired.questions }).catch(err => console.warn("Could not migrate repaired Game Show question text:", err));
-  questions = data;
   buildQuestionGrid();
   questionsReady = true;
 }
