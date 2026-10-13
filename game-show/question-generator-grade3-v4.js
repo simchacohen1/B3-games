@@ -1,6 +1,5 @@
-/* Source-backed Game Show question generator.
- * Questions are built from Sefaria translations and references returned by its API.
- * It does not paraphrase or invent Torah claims; every generated answer keeps the cited source text for teacher review.
+/* Game Show question generator.
+ * Questions use simple wording for third-grade Chabad boys.
  */
 (function () {
   "use strict";
@@ -14,7 +13,7 @@
   const searchProxy = "https://us-central1-b3-games.cloudfunctions.net/searchSefariaQuestions";
   const nameMap = {
     "the lord": "Hashem", "god": "Hashem",
-    "moses": "Moshe", "abraham": "Avrohom", "isaac": "Yitzchak",
+    "moses": "Moshe Rabbeinu", "abraham": "Avrohom", "isaac": "Yitzchok",
     "jacob": "Yaakov", "joseph": "Yosef", "aaron": "Aharon",
     "sarah": "Sarah", "rebecca": "Rivkah", "rebekah": "Rivkah",
     "leah": "Leah", "rachel": "Rachel", "noah": "Noach", "esau": "Esav",
@@ -23,9 +22,10 @@
     "gad": "Gad", "asher": "Asher", "issachar": "Yissachar",
     "zebulun": "Zevulun", "benjamin": "Binyamin", "ephraim": "Ephraim",
     "manasseh": "Menashe", "miriam": "Miriam", "joshua": "Yehoshua",
-    "balaam": "Bilam", "laban": "Lavan", "jethro": "Yisro"
+    "balaam": "Bilam", "laban": "Lavan", "jethro": "Yisro",
+    "ishmael": "Yishmoel", "hagar": "Hagar"
   };
-  const localizeText = value => String(value || "").replace(/\b(the\s+lord|g\s*od|moses|abraham|isaac|jacob|joseph|aaron|sarah|rebecca|rebekah|leah|rachel|noah|esau|pharaoh|reuben|simeon|judah|naphtali|gad|asher|issachar|zebulun|benjamin|ephraim|manasseh|miriam|joshua|balaam|laban|jethro)\b/gi, word => /^(the\s+lord|g\s*od)$/i.test(word) ? "Hashem" : nameMap[word.toLowerCase()] || word);
+  const localizeText = value => String(value || "").replace(/\b(the\s+lord|g\s*od|moses|abraham|isaac|jacob|joseph|aaron|sarah|rebecca|rebekah|leah|rachel|noah|esau|pharaoh|reuben|simeon|judah|naphtali|gad|asher|issachar|zebulun|benjamin|ephraim|manasseh|miriam|joshua|balaam|laban|jethro|ishmael|hagar|lot)\b/gi, word => /^(the\s+lord|g\s*od)$/i.test(word) ? "Hashem" : nameMap[word.toLowerCase()] || (word.toLowerCase() === "lot" ? "Lot" : word));
   const displayRef = ref => {
     const match = String(ref || "").match(/^(Rashi on )?(Genesis|Exodus|Leviticus|Numbers|Deuteronomy)(?=\s)/);
     if (!match) return ref;
@@ -145,12 +145,11 @@
     const match = ref.match(/(?:Genesis|Bereishis)\s+1:(\d+)/i);
     const verse = match ? Number(match[1]) : 0;
     const ranges = [[1,5],[6,8],[9,13],[14,19],[20,23],[24,31]];
-    const labels = ["day one","day two","day three","day four","day five","day six"];
+    const labels = ["the first day","the second day","the third day","the fourth day","the fifth day","the sixth day"];
     const day = ranges.findIndex(([from,to]) => verse >= from && verse <= to);
     return day < 0 ? "" : labels[day];  }
 
-  // Never quiz children on reference numbers. If a grammatical question cannot
-  // reliably be extracted, ask them to recognize the actual words of the text.
+  // Never quiz children on reference numbers. Skip unclear questions.
   function contentContinuation() {
     // A quote-completion prompt is hard to understand without the source in
     // front of the student. Skip it and ask only questions with clear context.
@@ -160,12 +159,12 @@
     const match = String(source.ref || source.displayRef || "").match(/Rashi on (?:Genesis|Bereishis)\s+19:(\d+)/i);
     if (!match) return null;
     const questions = {
-      1: { q: "According to Rashi, what was one angel sent to do?", answer: "Rescue Lot." },
-      2: { q: "According to Rashi, why did Lot ask them to stay first?", answer: "So they would look newly arrived." },
-      3: { q: "According to Rashi, which holiday was it?", answer: "Passover." },
-      4: { q: "According to Rashi, did anyone protest in the city?", answer: "No, not one person." },
-      5: { q: "According to Rashi, what did the men mean by “know them”?", answer: "They wanted to abuse them." },
-      9: { q: "According to Rashi, what did “step back” mean?", answer: "Move farther away." }
+      1: { q: "According to Rashi, what did one of the malochim come to do for Lot?", answer: "Save Lot." },
+      2: { q: "When Lot welcomed the malochim in Sedom, why did Lot ask the malochim to stay first?", answer: "So people would think they had just arrived." },
+      3: { q: "According to Rashi, which Yom Tov was it when the malochim came to Lot?", answer: "Pesach." },
+      4: { q: "According to Rashi, did anyone in Sedom stand up for Lot's guests?", answer: "No one." },
+      5: { q: "When the men of Sedom came to Lot's house, what did the men want to do to Lot's guests?", answer: "Hurt Lot's guests." },
+      9: { q: "According to Rashi, when the men of Sedom told Lot to move back, what did the men mean?", answer: "Move away." }
     };
     return questions[Number(match[1])] || null;
   }
@@ -173,39 +172,39 @@
     const match = String(source.ref || source.displayRef || "").match(/(?:Genesis|Bereishis)\s+18:(\d+)/i);
     if (!match) return null;
     const questions = {
-      1: { q: "Where was Abraham sitting as the day grew hot?", answer: "At the entrance of the tent." },
-      2: { q: "How many visitors did Abraham see?", answer: "Three." },
-      3: { q: "What did Abraham ask the visitors not to do?", answer: "Go past his tent." },
-      4: { q: "What did Abraham ask to have brought?", answer: "A little water." },
-      5: { q: "What food did Abraham offer the visitors?", answer: "A morsel of bread." },
-      6: { q: "What did Sarah make from the flour?", answer: "Cakes." },
-      7: { q: "What animal did Abraham choose from the herd?", answer: "A calf." },
-      8: { q: "Which foods did Abraham serve the three visitors?", answer: "Curds, milk, and a calf." },
-      9: { q: "Where did Abraham say Sarah was?", answer: "In the tent." },
-      10: { q: "What did the visitor say Sarah would have?", answer: "A son." },
-      11: { q: "How did the text describe Abraham and Sarah?", answer: "They were old." },
-      12: { q: "What did Sarah do when she heard the news?", answer: "She laughed." },
-      13: { q: "What did Hashem ask Abraham about Sarah?", answer: "Why she laughed." },
-      14: { q: "What did Hashem say was too wondrous for Him?", answer: "Nothing." },
-      15: { q: "Why did Sarah say she had not laughed?", answer: "She was frightened." },
-      16: { q: "Toward which city did the visitors look?", answer: "Toward Sodom." },
-      17: { q: "What did Hashem consider hiding from Abraham?", answer: "What He was about to do." },
-      18: { q: "What would Abraham become?", answer: "A great and populous nation." },
-      19: { q: "What was Abraham to teach his children?", answer: "The way of Hashem." },
-      20: { q: "Which two cities had a grave sin?", answer: "Sodom and Gomorrah." },
-      21: { q: "What did Hashem go down to find out?", answer: "If the people acted as reported." },
-      22: { q: "Where did the visitors go?", answer: "To Sodom." },
-      23: { q: "What did Abraham ask about the innocent and guilty?", answer: "Would they be treated alike?" },
-      24: { q: "How many innocent people did Abraham first suggest?", answer: "Fifty." },
-      25: { q: "Who did Abraham call the Judge of all the earth?", answer: "Hashem." },
-      26: { q: "What would Hashem do if He found fifty innocent people?", answer: "Spare the whole place." },
-      27: { q: "What did Abraham call himself?", answer: "Dust and ashes." },
-      28: { q: "What number did Abraham suggest after fifty?", answer: "Forty-five." },
-      29: { q: "What number did Abraham suggest next?", answer: "Forty." },
-      30: { q: "What number did Abraham suggest next?", answer: "Thirty." },
-      31: { q: "What number did Abraham suggest next?", answer: "Twenty." },
-      32: { q: "What was the last number Abraham suggested?", answer: "Ten." },
-      33: { q: "Where did Abraham go after the visitors left?", answer: "Back to his place." }
+      1: { q: "When Hashem appeared to Avrohom Avinu, where was Avrohom sitting?", answer: "At the entrance of his tent." },
+      2: { q: "When Avrohom saw the three malochim, how many malochim did Avrohom see?", answer: "Three." },
+      3: { q: "When Avrohom welcomed the three malochim, what did Avrohom ask the malochim not to do?", answer: "Walk past Avrohom's tent." },
+      4: { q: "When Avrohom welcomed the three malochim, what did Avrohom ask his servant to bring?", answer: "A little water." },
+      5: { q: "When Avrohom welcomed the three malochim, what food did Avrohom offer the malochim?", answer: "A little bread." },
+      6: { q: "When Sarah Imeinu made food for the three malochim, what did Sarah make from the flour?", answer: "Cakes." },
+      7: { q: "When Avrohom prepared food for the three malochim, what animal did Avrohom choose?", answer: "A calf." },
+      8: { q: "When Avrohom served the three malochim, what three foods did Avrohom serve?", answer: "Butter, milk, and meat." },
+      9: { q: "When the three malochim asked where Sarah Imeinu was, where did Avrohom say Sarah was?", answer: "In the tent." },
+      10: { q: "When the three malochim spoke to Avrohom and Sarah Imeinu, what did one malach say Sarah would have?", answer: "A son." },
+      11: { q: "In Bereishis 18, how does the posuk describe Avrohom and Sarah Imeinu's age?", answer: "They were old." },
+      12: { q: "When Sarah Imeinu heard the three malochim say Sarah would have a son, what did Sarah do?", answer: "Sarah laughed." },
+      13: { q: "After Sarah Imeinu laughed, what did Hashem ask Avrohom about Sarah?", answer: "Why Sarah had laughed." },
+      14: { q: "When Hashem spoke to Avrohom about Sarah Imeinu having a son, what did Hashem say was too hard for Him?", answer: "Nothing." },
+      15: { q: "When Hashem asked Avrohom why Sarah Imeinu had laughed, why did Sarah Imeinu say she laughed?", answer: "Sarah was afraid." },
+      16: { q: "When the three malochim left Avrohom, toward which city did the three malochim look?", answer: "Sedom." },
+      17: { q: "When Hashem spoke about Avrohom, what did Hashem think of telling Avrohom?", answer: "What Hashem was going to do." },
+      18: { q: "When Hashem spoke about Avrohom, what did Hashem say Avrohom and his children would become?", answer: "A big, strong nation." },
+      19: { q: "When Hashem spoke to Avrohom, what did Hashem say Avrohom should teach his children?", answer: "To follow Hashem's ways." },
+      20: { q: "When Hashem spoke to Avrohom about the wicked cities, which two cities were very wicked?", answer: "Sedom and Amora." },
+      21: { q: "When Hashem went down to see what was happening in Sedom, what did Hashem want to find out?", answer: "If the people were acting as badly as people said." },
+      22: { q: "When the three malochim left Avrohom's tent, where did the three malochim go?", answer: "Sedom." },
+      23: { q: "When Avrohom davened for Sedom, what did Avrohom ask Hashem about the tzaddikim?", answer: "Would Hashem save the tzaddikim?" },
+      24: { q: "When Avrohom davened for Sedom, what number did Avrohom ask Hashem about first?", answer: "Fifty." },
+      25: { q: "When Avrohom davened for Sedom, whom did Avrohom call the Judge of all the earth?", answer: "Hashem." },
+      26: { q: "When Avrohom davened for Sedom, what did Hashem say Hashem would do if Hashem found fifty tzaddikim?", answer: "Save the whole place." },
+      27: { q: "When Avrohom davened to Hashem about Sedom, how did Avrohom describe himself?", answer: "Dust and ashes." },
+      28: { q: "When Avrohom davened for Sedom, what number did Avrohom ask Hashem about after fifty?", answer: "Forty-five." },
+      29: { q: "When Avrohom davened for Sedom, what number did Avrohom ask Hashem about after forty-five?", answer: "Forty." },
+      30: { q: "When Avrohom davened for Sedom, what number did Avrohom ask Hashem about after forty?", answer: "Thirty." },
+      31: { q: "When Avrohom davened for Sedom, what number did Avrohom ask Hashem about after thirty?", answer: "Twenty." },
+      32: { q: "When Avrohom davened for Sedom, what number did Avrohom ask Hashem about after twenty?", answer: "Ten." },
+      33: { q: "When Avrohom finished davening for Sedom, where did Avrohom go?", answer: "Back to his place." }
     };
     return questions[Number(match[1])] || null;
   }
@@ -213,17 +212,17 @@
     const match = String(source.ref || source.displayRef || "").match(/(?:Genesis|Bereishis)\s+19:(\d+)/i);
     if (!match) return null;
     const questions = {
-      1: { q: "Who arrived in Sodom in the evening?", answer: "The two angels." },
-      2: { q: "Where did the visitors say they would spend the night?", answer: "In the square." },
-      3: { q: "What did Lot bake for his visitors?", answer: "Unleavened bread." },
-      4: { q: "Who gathered around Lot’s house?", answer: "The men of Sodom." },
-      5: { q: "What did the men demand Lot do?", answer: "Bring the visitors outside." },
-      6: { q: "What did Lot shut after he went outside?", answer: "The door." },
-      7: { q: "What did Lot ask the men not to do?", answer: "Do something wrong." },
-      8: { q: "How many daughters did Lot say he had?", answer: "Two." },
-      9: { q: "What did the men say Lot was acting like?", answer: "Their ruler." },
-      10: { q: "What did the visitors do to Lot?", answer: "Pulled him into the house." },
-      11: { q: "What happened to the people at the entrance?", answer: "They were struck blind." }
+      1: { q: "When the two malochim came to Sedom in the evening, whom did the two malochim visit?", answer: "Lot." },
+      2: { q: "When Lot welcomed the two malochim, where did the two malochim say they would sleep?", answer: "In the town square." },
+      3: { q: "When Lot welcomed the two malochim, what did Lot bake for the malochim?", answer: "Matzos." },
+      4: { q: "When the men of Sedom came to Lot's house, who gathered there?", answer: "The men of Sedom." },
+      5: { q: "When the men of Sedom came to Lot's house, what did the men demand?", answer: "Bring Lot's guests outside." },
+      6: { q: "When Lot went outside to speak to the men of Sedom, what did Lot shut?", answer: "The door." },
+      7: { q: "When Lot spoke to the men of Sedom, what did Lot ask the men not to do?", answer: "Do something bad." },
+      8: { q: "When Lot spoke to the men of Sedom, how many daughters did Lot say Lot had?", answer: "Two." },
+      9: { q: "When Lot spoke to the men of Sedom, what did the men say Lot was acting like?", answer: "Their leader." },
+      10: { q: "When the men of Sedom tried to get Lot, what did the two malochim do?", answer: "The two malochim pulled Lot into the house." },
+      11: { q: "When the two malochim protected Lot's house, what happened to the men at Lot's door?", answer: "The men could not see." }
     };
     return questions[Number(match[1])] || null;
   }
@@ -231,7 +230,7 @@
     const text = repairText(localizeText(source.text)).replace(/\s+/g, " ").trim();
     const ref = source.displayRef || displayRef(source.ref);
     if (source.isKitzur) return kitzurQuestionAndAnswer(source, text);
-    // Broad prompts such as “What does this source say?” do not tell an
+    // Broad prompts do not tell a child what to look for.
     // eight-year-old what to look for. Leave these for teacher-written review.
     if (topic) return null;
     if (source.isRashi) return rashiQuestionAndAnswer(source);
@@ -240,7 +239,7 @@
     const Bereishis19QA = bereishis19QuestionAndAnswer(source);
     if (Bereishis19QA) return Bereishis19QA;
 
-    const subject = "(Hashem|Moshe|Avraham|Yitzchak|Yaakov|Yosef|Aharon|Sarah|Rivkah|Leah|Rachel|Noach|Esav|Paroh|Reuven|Shimon|Yehudah|Naftali|Gad|Asher|Yissachar|Zevulun|Binyamin|Ephraim|Menashe|Miriam|Yehoshua|Bilam|Lavan|Yisro|Lot|Pharaoh|Melchizedek|Eliezer|Hagar|Yishmael|the angels|the angel|the men|the people|the king|the servant|the woman|the man)";
+    const subject = "(Hashem|Moshe Rabbeinu|Moshe|Avrohom|Avraham|Yitzchok|Yitzchak|Yaakov|Yosef|Aharon|Sarah|Rivkah|Leah|Rachel|Noach|Esav|Paroh|Reuven|Shimon|Yehudah|Naftali|Gad|Asher|Yissachar|Zevulun|Binyamin|Ephraim|Menashe|Miriam|Yehoshua|Bilam|Lavan|Yisro|Lot|Pharaoh|Melchizedek|Eliezer|Hagar|Yishmoel|Yishmael|the three angels|the two angels|the angel|the angels|the malochim|the malach|the men|the people|the king|the servant|the woman|the man)";
     const verbs = {
       saw: "see", said: "say", spoke: "speak", appeared: "appear", called: "call", divided: "separate",
       separated: "separate", created: "create", made: "make", blessed: "bless", commanded: "command",
@@ -261,7 +260,7 @@
     const verbPattern = Object.keys(verbs).join("|");
     const match = text.match(new RegExp("(?:^|[;.!?]\\s*)(?:And\\s+)?" + subject + "\\s+(" + verbPattern + ")\\b\\s*,?\\s+(.+)", "i"));
     // Do not guess from the pasuk number: many different events occur on
-    // creation day one. If the text does not name a clear subject and action,
+    // creation day one. If the posuk does not name a clear subject and action,
     // leave it out for the teacher to review.
     if (!match) return null;
 
@@ -274,102 +273,102 @@
     const suffix = name.toLowerCase() === "hashem" && day ? " on " + day : "";
     if (verb === "appeared") {
       const target = clause.match(/^to\s+(.+?)(?:\s+by\s+|[,.]|$)/i);
-      if (target && !/^(him|her|them|me|us|you|it|himself|herself|the man|the woman)$/i.test(target[1].trim())) return { q: "Who appeared to " + target[1] + "?", answer: name };
+      if (target && !/^(him|her|them|me|us|you|it|himself|herself|the man|the woman)$/i.test(target[1].trim())) return { q: "In this pasuk, who appeared to " + target[1] + "?", answer: name };
       // Pronouns such as "him" have no clear referent when a pasuk stands alone.
       return null;
     }
     if (verb === "called") {
       const called = clause.match(/^(?:the\s+)?(light|darkness)\s+([A-Z][A-Za-z]+)/i);
-      if (called) return { q: "What did " + name + " call the " + called[1].toLowerCase() + suffix + "?", answer: called[2] };
-      return { q: "What name did " + name + " give" + suffix + "?", answer: clause };
+      if (called) return { q: "In this pasuk, what did " + name + " call the " + called[1].toLowerCase() + suffix + "?", answer: called[2] };
+      return { q: "In this pasuk, what name did " + name + " give" + suffix + "?", answer: clause };
     }
     const actionQuestions = {
-      come: "Where did " + name + " come" + suffix + "?",
-      go: "Where did " + name + " go" + suffix + "?",
-      enter: "Where did " + name + " enter" + suffix + "?",
-      arrive: "Where did " + name + " arrive" + suffix + "?",
-      sit: "Where did " + name + " sit" + suffix + "?",
-      stand: "Where did " + name + " stand" + suffix + "?",
-      bow: "Before whom did " + name + " bow" + suffix + "?",
-      hurry: "Where did " + name + " hurry" + suffix + "?",
-      run: "Where did " + name + " run" + suffix + "?",
-      return: "Where did " + name + " return" + suffix + "?",
-      leave: "What did " + name + " leave" + suffix + "?",
-      eat: "What did " + name + " eat" + suffix + "?",
-      drink: "What did " + name + " drink" + suffix + "?",
-      take: "What did " + name + " take" + suffix + "?",
-      give: "What did " + name + " give" + suffix + "?",
-      bring: "What did " + name + " bring" + suffix + "?",
-      offer: "What did " + name + " offer" + suffix + "?",
-      prepare: "What did " + name + " prepare" + suffix + "?",
-      wash: "What did " + name + " wash" + suffix + "?",
-      ask: "What did " + name + " ask" + suffix + "?",
-      tell: "What did " + name + " tell" + suffix + "?",
-      say: "What did " + name + " say" + suffix + "?",
-      speak: "What did " + name + " say" + suffix + "?",
-      answer: "What did " + name + " answer" + suffix + "?",
-      call: "What did " + name + " call" + suffix + "?",
-      look: "What did " + name + " look at" + suffix + "?",
-      see: "What did " + name + " see" + suffix + "?",
-      hear: "What did " + name + " hear" + suffix + "?",
-      bless: "Whom did " + name + " bless" + suffix + "?",
-      command: "What did " + name + " command" + suffix + "?",
-      instruct: "What did " + name + " instruct" + suffix + "?",
-      strike: "What did " + name + " strike" + suffix + "?",
-      seize: "Whom did " + name + " seize" + suffix + "?",
-      grab: "Whom did " + name + " grab" + suffix + "?",
-      hold: "Whom did " + name + " hold" + suffix + "?",
-      lead: "Where did " + name + " lead" + suffix + "?",
-      follow: "Whom did " + name + " follow" + suffix + "?",
-      approach: "Whom did " + name + " approach" + suffix + "?",
-      wait: "For whom did " + name + " wait" + suffix + "?",
-      remain: "Where did " + name + " remain" + suffix + "?",
-      escape: "Where did " + name + " escape" + suffix + "?",
-      rescue: "Whom did " + name + " rescue" + suffix + "?",
-      warn: "Whom did " + name + " warn" + suffix + "?",
-      live: "Where did " + name + " live" + suffix + "?",
-      destroy: "What did " + name + " destroy" + suffix + "?",
-      rain: "What did Hashem send" + suffix + "?"
+      come: "In this pasuk, where did " + name + " come" + suffix + "?",
+      go: "In this pasuk, where did " + name + " go" + suffix + "?",
+      enter: "In this pasuk, where did " + name + " go" + suffix + "?",
+      arrive: "In this pasuk, where did " + name + " arrive" + suffix + "?",
+      sit: "In this pasuk, where was " + name + " sitting" + suffix + "?",
+      stand: "In this pasuk, where was " + name + " standing" + suffix + "?",
+      bow: "In this pasuk, before whom did " + name + " bow" + suffix + "?",
+      hurry: "In this pasuk, where did " + name + " hurry" + suffix + "?",
+      run: "In this pasuk, where did " + name + " run" + suffix + "?",
+      return: "In this pasuk, where did " + name + " go back" + suffix + "?",
+      leave: "In this pasuk, what did " + name + " leave" + suffix + "?",
+      eat: "In this pasuk, what did " + name + " eat" + suffix + "?",
+      drink: "In this pasuk, what did " + name + " drink" + suffix + "?",
+      take: "In this pasuk, what did " + name + " take" + suffix + "?",
+      give: "In this pasuk, what did " + name + " give" + suffix + "?",
+      bring: "In this pasuk, what did " + name + " bring" + suffix + "?",
+      offer: "In this pasuk, what did " + name + " offer" + suffix + "?",
+      prepare: "In this pasuk, what did " + name + " make" + suffix + "?",
+      wash: "In this pasuk, what did " + name + " wash" + suffix + "?",
+      ask: "In this pasuk, what did " + name + " ask" + suffix + "?",
+      tell: "In this pasuk, what did " + name + " tell" + suffix + "?",
+      say: "In this pasuk, what did " + name + " say" + suffix + "?",
+      speak: "In this pasuk, what did " + name + " say" + suffix + "?",
+      answer: "In this pasuk, what did " + name + " answer" + suffix + "?",
+      call: "In this pasuk, what did " + name + " call" + suffix + "?",
+      look: "In this pasuk, what did " + name + " look at" + suffix + "?",
+      see: "In this pasuk, what did " + name + " see" + suffix + "?",
+      hear: "In this pasuk, what did " + name + " hear" + suffix + "?",
+      bless: "In this pasuk, whom did " + name + " bless" + suffix + "?",
+      command: "In this pasuk, what did " + name + " tell someone to do" + suffix + "?",
+      instruct: "In this pasuk, what did " + name + " teach" + suffix + "?",
+      strike: "In this pasuk, what did " + name + " hit" + suffix + "?",
+      seize: "In this pasuk, whom did " + name + " grab" + suffix + "?",
+      grab: "In this pasuk, whom did " + name + " grab" + suffix + "?",
+      hold: "In this pasuk, whom did " + name + " hold" + suffix + "?",
+      lead: "In this pasuk, where did " + name + " lead someone" + suffix + "?",
+      follow: "In this pasuk, whom did " + name + " follow" + suffix + "?",
+      approach: "In this pasuk, whom did " + name + " go near" + suffix + "?",
+      wait: "In this pasuk, for whom did " + name + " wait" + suffix + "?",
+      remain: "In this pasuk, where did " + name + " stay" + suffix + "?",
+      escape: "In this pasuk, where did " + name + " escape to" + suffix + "?",
+      rescue: "In this pasuk, whom did " + name + " save" + suffix + "?",
+      warn: "In this pasuk, whom did " + name + " warn" + suffix + "?",
+      live: "In this pasuk, where did " + name + " live" + suffix + "?",
+      destroy: "In this pasuk, what did " + name + " destroy" + suffix + "?",
+      rain: "In this pasuk, what did Hashem send" + suffix + "?"
     };
     if (!actionQuestions[verbs[verb]]) return null;
-    return { q: actionQuestions[verbs[verb]], answer: clause };
+    return { q: actionQuestions[verbs[verb]], answer: localizeText(clause) };
   }
 
   function kitzurQuestionAndAnswer(source, text) {
     // Make clear, concrete prompts for third graders. Skip a seif if no
     // specific question and short answer can be built safely from its text.
     if (/i have set hashem before me always/i.test(text)) {
-      return { q: "What should we remember about Hashem?", answer: "Hashem is always with us." };
+      return { q: "When the Kitzur teaches us to keep Hashem in mind, what should we remember?", answer: "Hashem is always with us." };
     }
     if (/as soon as you awaken you should remember the kindnesses of hashem/i.test(text)) {
-      return { q: "What should you remember when you wake up?", answer: "Thank Hashem for giving your soul back." };
+      return { q: "When the Kitzur teaches what to remember upon waking, what should we remember?", answer: "Thank Hashem for giving your soul back." };
     }
     if (/while still in bed you should recite:/i.test(text)) {
-      return { q: "What prayer do we say when we wake up?", answer: "Modeh Ani." };
+      return { q: "When the Kitzur teaches what to say upon waking, which tefillah do we say?", answer: "Modeh Ani." };
     }
     if (/bold as a leopard[^.]*means,?\s*you should not be ashamed before people who mock you for worshipping hashem/i.test(text)) {
-      return { q: "What does it mean to be bold like a leopard?", answer: "Do what is right even if others laugh." };
+      return { q: "When the Kitzur teaches us to be brave like a leopard, what should we do?", answer: "Do what is right, even if others laugh." };
     }
     if (/light as an eagle[^.]*close your eyes to prevent the seeing of evil/i.test(text)) {
-      return { q: "What does it mean to be light like an eagle?", answer: "Turn your eyes away from things you should not see." };
+      return { q: "When the Kitzur teaches us to be like an eagle, what should we do with our eyes?", answer: "Turn away from things we should not see." };
     }
     if (/swift as a deer[^.]*legs should run to do good things/i.test(text)) {
-      return { q: "What does it mean to be quick like a deer?", answer: "Hurry to do good things." };
+      return { q: "When the Kitzur teaches us to be quick like a deer, what should we hurry to do?", answer: "Good things." };
     }
     if (/strong as a lion[^.]*true valor in serving the creator[^.]*heart/i.test(text)) {
-      return { q: "What does it mean to be strong like a lion?", answer: "Be strong in your heart to do what is right." };
+      return { q: "When the Kitzur teaches us to be strong like a lion, what should our heart be strong to do?", answer: "Serve Hashem." };
     }
     if (/if you cannot rise at midnight/i.test(text)) {
-      return { q: "If you cannot get up at midnight, when should you get up?", answer: "Before daybreak." };
+      return { q: "When the Kitzur teaches about getting up at night, when should you get up if you cannot rise at midnight?", answer: "Before daybreak." };
     }
     if (/how can you rise now so early in the morning when the weather is so cold/i.test(text)) {
-      return { q: "What excuse might make someone stay in bed on a cold day?", answer: "The weather is cold." };
+      return { q: "When the Kitzur talks about getting up on a cold morning, what excuse should not stop us?", answer: "The cold weather." };
     }
     if (/a blind person may recite them by heart/i.test(text)) {
-      return { q: "Who may say these words from memory?", answer: "A blind person." };
+      return { q: "When the Kitzur teaches about saying the words by heart, who may say the words?", answer: "A blind person." };
     }
     if (/the proper conclusion is:\s*[“"]blessed is the one who listens to prayer/i.test(text)) {
-      return { q: "Which words end this prayer?", answer: "Blessed is the One Who listens to prayer." };
+      return { q: "When the Kitzur teaches how to end this tefillah, which words do we say?", answer: "Blessed is the One Who listens to tefillah." };
     }
     return null;
   }
