@@ -815,8 +815,29 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     });
   }
 
+  function splitTeacherUrl(href, gameId){
+    const mapping={
+      "student-rewards/teacher.html":"student-rewards",
+      "class-pointer-prototype/dashboard.html":"class-pointer",
+      "game-show/teacher.html":"game-show",
+      "record_pesukim/teacher.html":"posuk-practice-scroll",
+      "shorashim/teacher.html":"shorashim",
+      "chazara/teacher.html":"chazara",
+      "weekly-quiz/teacher.html":"weekly-quiz",
+      "yiddish/teacher.html":"yiddish",
+      "rashi-letters/teacher.html":"rashi-letters",
+      "gematria/teacher.html":"gematria",
+      "halacha/index.html":"halacha",
+      "sefer-hamitzvos/index.html":"sefer-hamitzvos"
+    };
+    const path=String(href||"").split("?")[0],tool=gameId||mapping[path];
+    if(!tool||!Object.values(mapping).includes(tool))return href;
+    const cls=document.getElementById("manageClassSelect")?.value||
+      (currentAccess.classIds||[])[0]||"et";
+    return "teacher-student-split.html?"+new URLSearchParams({tool,class:cls}).toString();
+  }
   function openTeacherToolInBackground(url){
-    const w=window.open(url,"_blank","noopener");
+    const w=window.open(splitTeacherUrl(url),"_blank","noopener");
     // Browsers may still choose to focus the new tab; refocus B3 Games immediately after.
     setTimeout(()=>{ try{ window.focus(); }catch(e){} },0);
     return w;
@@ -827,7 +848,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     const teacherHref=teacherVersionByGame[game.id];
     if(!teacherHref)return false;
     // Teachers go straight to the Teacher Version — no Student/Teacher chooser.
-    window.open(teacherHref,"_blank","noopener");
+    window.open(splitTeacherUrl(teacherHref,game.id),"_blank","noopener");
     return true;
   }
 
