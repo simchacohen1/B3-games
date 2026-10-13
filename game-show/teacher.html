@@ -23,6 +23,7 @@
   })();
 </script>
 <meta charset="UTF-8">
+<script src="text-encoding.js?v=20261013-1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -854,6 +855,9 @@ let questions = [];
 let questionsReady = false;
 
 function buildFromQuestions(data) {
+  const repaired = window.GameShowTextEncoding.repairQuestions(data);
+  questions = repaired.questions;
+  if (repaired.changed) setRef.update({ questions: repaired.questions }).catch(err => console.warn("Could not migrate repaired Game Show question text:", err));
   questions = data;
   buildQuestionGrid();
   questionsReady = true;
@@ -1723,7 +1727,8 @@ function saveEditor() {
 }
 
 function saveQuestionSet(items) {
-  return setRef.set({ title: ACTIVE_SET_TITLE, questions: items }).then(() => {
+  const repaired = window.GameShowTextEncoding.repairQuestions(items).questions;
+  return setRef.set({ title: ACTIVE_SET_TITLE, questions: repaired }).then(() => {
     document.getElementById('soundStatus').textContent = 'Saved (' + items.length + ' questions)';
     return items;
   });
