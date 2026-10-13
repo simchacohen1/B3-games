@@ -26,6 +26,17 @@ exports.classPointerShareAuth=onRequest({
   const cls=classSnap.val(),session=sessionSnap.val();
   if(!cls||cls.active===false||!session||session.roomId!==room||session.studentScreenSharing!==true||Date.now()-session.createdAt>14400000||session.createdAt>Date.now()+60000)error(403,'Screen sharing is not enabled for this class.');
   if(action==='issue'){
+   // Bound passcode attempts at this endpoint, independently of sign-in limits.
+   const fingerprint=crypto.createHash('sha256').update(String(req.ip||'unknown')).digest('hex');
+   const limit=db.ref('b3Private/classPointerShareLimits/'+fingerprint);
+   let denied=false;
+   await limit.transaction(previous=>{
+    const now=Date.now();
+    const row=previous&&previous.until>now?previous:{count:0,until:now+600000};
+    if(row.count>=25){denied=true;return undefined}
+    return {count:row.count+1,until:row.until};
+   });
+   if(denied)error(429,'Too many sharing attempts. Try later.');
    if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active===false)error(403,'Student not in this class.');
    const profile=(await db.ref('b3Games/students/'+studentId+'/profile').once('value')).val();
    if(!profile||profile.active===false)error(403,'Inactive student.');
