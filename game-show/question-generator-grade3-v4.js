@@ -156,6 +156,19 @@
     // front of the student. Skip it and ask only questions with clear context.
     return null;
   }
+  function rashiQuestionAndAnswer(source) {
+    const match = String(source.ref || source.displayRef || "").match(/Rashi on (?:Genesis|Bereishis)\s+19:(\d+)/i);
+    if (!match) return null;
+    const questions = {
+      1: { q: "According to Rashi, what was one angel sent to do?", answer: "Rescue Lot." },
+      2: { q: "According to Rashi, why did Lot ask them to stay first?", answer: "So they would look newly arrived." },
+      3: { q: "According to Rashi, which holiday was it?", answer: "Passover." },
+      4: { q: "According to Rashi, did anyone protest in the city?", answer: "No, not one person." },
+      5: { q: "According to Rashi, what did the men mean by “know them”?", answer: "They wanted to abuse them." },
+      9: { q: "According to Rashi, what did “step back” mean?", answer: "Move farther away." }
+    };
+    return questions[Number(match[1])] || null;
+  }
   function bereishis19QuestionAndAnswer(source) {
     const match = String(source.ref || source.displayRef || "").match(/(?:Genesis|Bereishis)\s+19:(\d+)/i);
     if (!match) return null;
@@ -164,9 +177,9 @@
       2: { q: "Where did the visitors say they would spend the night?", answer: "In the square." },
       3: { q: "What did Lot bake for his visitors?", answer: "Unleavened bread." },
       4: { q: "Who gathered around Lot’s house?", answer: "The men of Sodom." },
-      5: { q: "Whom did the men ask Lot to bring outside?", answer: "The visitors." },
+      5: { q: "What did the men demand Lot do?", answer: "Bring the visitors outside." },
       6: { q: "What did Lot shut after he went outside?", answer: "The door." },
-      7: { q: "What did Lot ask the men not to do?", answer: "Commit a wrong." },
+      7: { q: "What did Lot ask the men not to do?", answer: "Do something wrong." },
       8: { q: "How many daughters did Lot say he had?", answer: "Two." },
       9: { q: "What did the men say Lot was acting like?", answer: "Their ruler." },
       10: { q: "What did the visitors do to Lot?", answer: "Pulled him into the house." },
@@ -180,7 +193,8 @@
     if (source.isKitzur) return kitzurQuestionAndAnswer(source, text);
     // Broad prompts such as “What does this source say?” do not tell an
     // eight-year-old what to look for. Leave these for teacher-written review.
-    if (topic || source.isRashi) return null;
+    if (topic) return null;
+    if (source.isRashi) return rashiQuestionAndAnswer(source);
     const Bereishis19QA = bereishis19QuestionAndAnswer(source);
     if (Bereishis19QA) return Bereishis19QA;
 
@@ -333,12 +347,20 @@
 
   function makeItems(sources, mode, topic, count, distractors) {
     const out = [];
-    const selected = sources.slice(0, count);
     const choiceSources = distractors && distractors.length ? distractors : sources;
-    selected.forEach((source, index) => {
+    const skipped = { unclear: 0, duplicate: 0, choices: 0 };
+    sources.forEach((source, index) => {
+      if (out.length >= count) return;
       const ref = source.displayRef || displayRef(source.ref);
       const qa = questionAndAnswer(source, topic);
-      if (!qa || !qa.q || !qa.answer || out.some(item => item.q === qa.q)) return;
+      if (!qa || !qa.q || !qa.answer) {
+        skipped.unclear++;
+        return;
+      }
+      if (out.some(item => item.q === qa.q)) {
+        skipped.duplicate++;
+        return;
+      }
       if (mode === "open") {
         out.push({ q: qa.q, ans: qa.answer });
       } else {
@@ -354,7 +376,10 @@
         }
         // A single question may not have three distinct answer excerpts among
         // the selected sources. Skip that item instead of aborting the batch.
-        if (optionRows.length < 4) return;
+        if (optionRows.length < 4) {
+          skipped.choices++;
+          return;
+        }
         const correctIndex = optionRows.findIndex(row => row.ref === source.ref || row.excerpt === correctExcerpt);
         if (correctIndex < 0) throw new Error("Could not match this question to its verified source. Please try again.");
         const shuffledOptions = shuffleOptions(optionRows);
@@ -366,6 +391,7 @@
         });
       }
     });
+    out.skipped = skipped;
     return out;
   }
   async function chumashSources(form, status, count) {
@@ -383,16 +409,25 @@
     }
     if (!verseRows.length) throw new Error("Sefaria returned no English text for the selected pesukim.");
     const includeRashi = form.rashi.checked;
-    const sourcePool = verseRows.slice();
+    const sourcePool = [];
+    const rashiByRef = new Map();
     if (includeRashi) {
       for (const source of evenlyPick(verseRows, Math.min(verseRows.length, count))) {        status.textContent = "Checking Rashi for " + source.displayRef + "…";
         try {
           const rashi = await getText("Rashi on " + source.ref);
-          if (rashi.text) sourcePool.push({ ...rashi, displayRef: "Rashi on " + source.displayRef, isRashi: true });
+          if (rashi.text) rashiByRef.set(source.ref, { ...rashi, displayRef: "Rashi on " + source.displayRef, isRashi: true });
         } catch (_) {}
       }
     }
-    const selected = distribute(sourcePool, count);
+    for (const source of verseRows) {
+      sourcePool.push(source);
+      const rashi = rashiByRef.get(source.ref);
+      if (rashi) sourcePool.push(rashi);
+    }
+    // Pass all source candidates to makeItems. It fills the requested count
+    // after parsing and deduplication instead of losing slots to skipped rows.
+    sourcePool.baseSourceCount = verseRows.length;
+    const selected = sourcePool;
     selected.distractors = verseRows;
     return selected;
   }
@@ -424,7 +459,8 @@
       rows.push({ref, displayRef:"Kitzur Shulchan Aruch " + siman + ":" + seif, text:seifim[seif-1], siman, seif, isKitzur:true});
     }
     if (!rows.length) throw new Error("No English text was found in the selected se'ifim.");
-    const selected = rows.slice(0, count);
+    const selected = rows;
+    selected.baseSourceCount = rows.length;
     selected.distractors = rows;
     return selected;
   }
@@ -467,6 +503,7 @@
       '<button class="btn btn-primary" type="button" id="sgAdd">Add to current questions</button>' +
       '<button class="btn btn-bad" type="button" id="sgReplace">Replace all current questions</button></div>';
     card.appendChild(review);
+    let draftRequestedCount = null;
     async function saveDrafts(replace) {
       const rows = [...review.querySelectorAll("#sgQuestionList > .editor-row")];
       const items = rows.map(row => {
@@ -482,7 +519,11 @@
         status.textContent = "Add at least one question before saving.";
         return;
       }
-      if (replace && !window.confirm("Replace all current questions with these " + items.length + " reviewed questions?")) return;
+      if (replace) {
+        const requested = draftRequestedCount || Number(card.querySelector("#sgCount").value) || 10;
+        const countNote = items.length < requested ? " You requested " + requested + ", but this draft has " + items.length + "." : "";
+        if (!window.confirm("Replace all current questions with these " + items.length + " reviewed questions?" + countNote)) return;
+      }
       const buttons = [...review.querySelectorAll(".sg-save-actions button")];
       buttons.forEach(button => { button.disabled = true; });
       status.textContent = replace ? "Replacing the current question set…" : "Adding questions to the current set…";
@@ -572,15 +613,22 @@
         },status,requestedCount) : await halachaSources({siman:simanSelect,from:seifFromSelect,to:seifToSelect},status,requestedCount);
         const topic = "";
         const items = makeItems(sources, mode, topic, requestedCount, sources.distractors);
-        if (!items.length) throw new Error("We couldn’t make clear, short questions from this selection. Try a smaller range or another section.");
+        const shortfall = Math.max(0, requestedCount - items.length);
+        const reasons = [];
+        if (items.skipped?.unclear) reasons.push(items.skipped.unclear + " source" + (items.skipped.unclear === 1 ? " did" : "s did") + " not produce a supported factual question");
+        if (items.skipped?.duplicate) reasons.push(items.skipped.duplicate + " duplicate question" + (items.skipped.duplicate === 1 ? " was" : "s were") + " skipped");
+        if (mode !== "open" && items.skipped?.choices) reasons.push(items.skipped.choices + " question" + (items.skipped.choices === 1 ? " lacked" : "s lacked") + " three distinct answer choices");
+        const previousDraftNote = !items.length && !review.hidden ? " No new drafts were made; the previous review drafts remain unchanged." : "";
+        const resultMessage = items.length + " of " + requestedCount + " requested questions ready" +
+          (shortfall ? ". " + (reasons.length ? reasons.join("; ") + "." : "The selected range provided " + sources.length + " source text" + (sources.length === 1 ? "" : "s") + ", and each source can produce at most one question.") : "") +
+          (type.value === "halacha" ? " (one per se’if, with no repeats)" : "") +
+          previousDraftNote + " Review them below; your current set is unchanged.";
+        status.textContent = resultMessage;
+        if (!items.length) return;
+        draftRequestedCount = requestedCount;
         const list = review.querySelector("#sgQuestionList");
         list.replaceChildren(...items.map(item => createQuestionRow(item.q, item.ans, item.choices, item.correctIndex)));
         review.hidden = false;
-        const skipped = Math.max(0, requestedCount - items.length);
-        status.textContent = items.length + " clear, short questions ready" +
-          (skipped ? "; " + skipped + " item" + (skipped === 1 ? " was" : "s were") + " skipped because it could not be turned into a clear question with distinct answer choices" : "") +
-          (type.value === "halacha" ? " (one per se’if, with no repeats)" : "") +
-          ". Review them below; your current set is unchanged.";
         review.scrollIntoView({ behavior: "smooth", block: "start" });
       } catch (error) {
         status.textContent = error.message || "Could not generate questions.";
