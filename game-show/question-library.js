@@ -49,7 +49,7 @@
     .ql-sub{font-size:.82em;opacity:.7}
     .ql-btns{display:flex;gap:4px;flex-shrink:0}
     .ql-empty{opacity:.7;font-size:.95em;margin-top:10px}
-    .ql-search{margin-top:10px}
+    .ql-search{margin-top:10px}\n    #qlImportHelp{margin:8px 0 0;font-size:.82em;opacity:.72}
   `;
   document.head.appendChild(css);
 
@@ -126,7 +126,9 @@
       <p class="hint">Saved question sets. Load one to make it the current game.</p>
       <div class="row">
         <button class="btn btn-primary btn-sm" id="qlSaveCurrent">Save current questions…</button>
+        <button class="btn btn-ghost btn-sm" id="qlImportClass">Import from another class</button>
       </div>
+      <p class="ql-sub" id="qlImportHelp">Copy a saved set from another class into this class’s library. Each class keeps its own copy.</p>
       <input class="ql-input ql-search" id="qlSearch" placeholder="Search sets…" style="display:none">
       <ul class="ql-list" id="qlList"></ul>`;
     // place it right after the "Questions" card
@@ -141,6 +143,7 @@
       if (!qs.length) { alert('There are no current questions to save.'); return; }
       promptForName(qs);
     });
+    card.querySelector('#qlImportClass').addEventListener('click', openClassImport);
     listEl.addEventListener('click', onListClick);
   }
 
@@ -194,6 +197,117 @@
       libRef.child(id).remove();
       if (id === activeId) activeIdRef.remove();
     }
+  }
+
+
+  // ---------- copy a saved set from another permitted class ----------
+  async function openClassImport() {
+    const allowed = Array.isArray(window.gameShowLibraryClassIds) ? window.gameShowLibraryClassIds : [];
+    const currentClass = (typeof GS_CLASS !== 'undefined' && GS_CLASS) ? GS_CLASS : '';
+    const sourceIds = [...new Set(allowed.map(String))].filter(id => id && id !== currentClass && /^[A-Za-z0-9_-]{1,100}$/.test(id));
+    if (!sourceIds.length) {
+      alert('No other class is available to share questions with. Ask the admin to assign you to both classes.');
+      return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'ql-overlay';
+    overlay.innerHTML = `
+      <div class="ql-modal" role="dialog" aria-modal="true" aria-labelledby="qlImportTitle">
+        <h3 id="qlImportTitle">Import questions from another class</h3>
+        <p>Choose a class, then copy one of its saved sets into this class’s library. The original stays unchanged.</p>
+        <select class="ql-input" id="qlSourceClass" aria-label="Source class"></select>
+        <ul class="ql-list" id="qlSourceSets"><li class="ql-empty">Loading classes…</li></ul>
+        <div class="ql-actions"><button class="btn btn-ghost btn-sm" data-act="close">Close</button></div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay || e.target.closest('[data-act="close"]')) close(); });
+    const select = overlay.querySelector('#qlSourceClass');
+    const sourceList = overlay.querySelector('#qlSourceSets');
+    const workspaceId = window.B3SiteSettings && window.B3SiteSettings.workspaceId;
+    if (!workspaceId) {
+      sourceList.innerHTML = '<li class="ql-empty">Could not identify the teacher workspace.</li>';
+      return;
+    }
+
+    const classRows = {};
+    await Promise.all(sourceIds.map(async id => {
+      try {
+        const snap = await db.ref('b3Games/workspaces/' + workspaceId + '/classes/' + id).once('value');
+        const row = snap.val();
+        if (row && row.active !== false) classRows[id] = row;
+      } catch (err) { console.warn('[question-library] cannot read source class:', id, err.message); }
+    }));
+    const visibleIds = sourceIds.filter(id => classRows[id]);
+    if (!visibleIds.length) {
+      sourceList.innerHTML = '<li class="ql-empty">No accessible source classes were found.</li>';
+      return;
+    }
+    select.innerHTML = visibleIds.map(id => '<option value="' + esc(id) + '">' + esc(classRows[id].name || id) + '</option>').join('');
+
+    async function showSets() {
+      sourceList.innerHTML = '<li class="ql-empty">Loading saved sets…</li>';
+      const id = select.value;
+      try {
+        const snap = await db.ref('questionSets/classes/' + id + '/set/library').once('value');
+        const sets = snap.val() || {};
+        const entries = Object.keys(sets).map(setId => ({ id: setId, set: sets[setId] || {} }))
+          .filter(x => Array.isArray(x.set.questions) && x.set.questions.length)
+          .sort((a,b) => (b.set.updatedAt || 0) - (a.set.updatedAt || 0));
+        if (!entries.length) {
+          sourceList.innerHTML = '<li class="ql-empty">This class has no saved question sets yet.</li>';
+          return;
+        }
+        sourceList.innerHTML = entries.map(x => {
+          const n = x.set.questions.length;
+          return '<li class="ql-item"><div class="ql-meta"><div class="ql-name">' + esc(x.set.name || 'Untitled set') +
+            '</div><div class="ql-sub">' + n + ' question' + (n === 1 ? '' : 's') + '</div></div>' +
+            '<div class="ql-btns"><button class="btn btn-primary btn-sm" data-copy="' + esc(x.id) + '">Copy here</button></div></li>';
+        }).join('');
+        sourceList.onclick = async e => {
+          const button = e.target.closest('button[data-copy]');
+          if (!button) return;
+          button.disabled = true;
+          const sourceSetId = button.getAttribute('data-copy');
+          const source = sets[sourceSetId];
+          if (!source || !Array.isArray(source.questions) || !source.questions.length) {
+            button.disabled = false;
+            alert('That set is no longer available.');
+            return;
+          }
+          const duplicate = Object.keys(library).some(id =>
+            library[id] && library[id].sourceClassId === id && library[id].sourceSetId === sourceSetId);
+          if (duplicate) {
+            button.disabled = false;
+            alert('This set has already been copied into this class library.');
+            return;
+          }
+          const newRef = libRef.push();
+          const copy = {
+            name: source.name || 'Imported question set',
+            questions: clean(source.questions),
+            count: source.questions.length,
+            createdAt: TS,
+            updatedAt: TS,
+            copiedFrom: { classId: id, className: classRows[id].name || id, setId: sourceSetId }
+          };
+          try {
+            await newRef.set(copy);
+            close();
+            alert('Copied ' + copy.count + ' questions into this class library. Load the set when you are ready to use it.');
+          } catch (err) {
+            button.disabled = false;
+            alert('Could not copy this set: ' + err.message);
+          }
+        };
+      } catch (err) {
+        sourceList.innerHTML = '<li class="ql-empty">Could not load that class’s library.</li>';
+        console.warn('[question-library] cannot load source library:', err.message);
+      }
+    }
+    select.addEventListener('change', showSets);
+    await showSets();
   }
 
   // ---------- live data ----------
