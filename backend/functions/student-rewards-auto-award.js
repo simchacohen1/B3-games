@@ -13,6 +13,8 @@ const POINTS = Object.freeze({
   understand100: 3,
   chazara: 1,
   "chazara-recording": 2,
+  "shorashim-recording": 2,
+  "shorashim-no-hints": 3,
 });
 
 function cors(req, res) {
@@ -93,6 +95,8 @@ function reasonFor(source,perek,posuk){
 }
 
 
+function isShorashimRequest(item){return ["shorashim-recording","shorashim-no-hints"].includes(String(item?.source||""));}
+function isReviewableRequest(item){return isChazaraRequest(item)||isShorashimRequest(item);}
 function isChazaraRequest(item){
   return ["chazara","chazara-recording"].includes(String(item?.source || ""));
 }
@@ -594,6 +598,10 @@ async function contributeToClassReward(studentId,rewardId,amount,preferredClassI
 }
 
 async function mirrorChazaraPointStatus(item,status){
+  if(isShorashimRequest(item) && item.practiceStudentId && item.eventId){
+    await rtdb.ref(`posukPractice/shorashimLearning/recordingEvents/${item.practiceStudentId}/${item.eventId}`).update({pointRequestStatus:status}).catch(()=>{});
+    return;
+  }
   if(!item?.practiceStudentId || !item?.eventId) return;
   const field=Number(item.amount || 0) < 0 ? "removalPointRequestStatus" : "pointRequestStatus";
   await rtdb.ref(`posukPractice/chazara/events/${item.practiceStudentId}/${item.eventId}/${field}`).set(status).catch(err=>console.warn("Could not mirror Chazara point status",err));
@@ -706,7 +714,7 @@ async function approvePendingRequest(requestId,reviewedBy){
   const existing=await ref.get();
   if(!existing.exists()) return {ok:false,error:"Point request not found."};
   const before=existing.val() || {};
-  if(!isChazaraRequest(before)) return {ok:false,error:"Only Chazara requests can be approved here."};
+  if(!isReviewableRequest(before)) return {ok:false,error:"Only recording and Chazara requests can be approved here."};
   if(before.status !== "pending") return {ok:true,alreadyHandled:true,status:before.status};
 
   // A Realtime Database transaction can call the updater first with null when
@@ -754,7 +762,7 @@ async function rejectPendingRequest(requestId,reviewedBy){
   const snap=await ref.get();
   if(!snap.exists()) return {ok:false,error:"Point request not found."};
   const item=snap.val() || {};
-  if(!isChazaraRequest(item)) return {ok:false,error:"Only Chazara requests can be rejected here."};
+  if(!isReviewableRequest(item)) return {ok:false,error:"Only recording and Chazara requests can be rejected here."};
   if(item.status !== "pending") return {ok:true,alreadyHandled:true,status:item.status};
   await ref.update({status:"rejected",reviewedBy,reviewedAt:Date.now()});
   await mirrorChazaraPointStatus(item,"rejected");
@@ -828,6 +836,18 @@ async function verifyMilestone(studentId, source, awardPosukKey, evidencePosukKe
   return {ok:true,score};
 }
 
+async function verifyShorashim(studentId,source,eventId){
+  if(!eventId)return {ok:false,error:"Missing Shorashim recording ID."};
+  const ref=rtdb.ref(`posukPractice/shorashimLearning/recordingEvents/${studentId}/${eventId}`);
+  const snap=await ref.get();
+  if(!snap.exists())return {ok:false,error:"Shorashim recording not found."};
+  const e=snap.val()||{};
+  const isNoHints=source==="shorashim-no-hints";
+  if(String(e.studentId||studentId)!==studentId || !e.audioURL || !e.storagePath || Number(e.durationMs||0)<5000 ||
+     (isNoHints ? !(e.noHints===true||e.mode==="no-hints") : (e.noHints===true||e.mode==="no-hints")))
+    return {ok:false,error:"Shorashim recording details could not be verified."};
+  return {ok:true,event:e,eventRef:ref};
+}
 async function verifyChazara(studentId, source, eventId){
   if(!eventId) return {ok:false,error:"Missing Chazara event."};
   const ref=rtdb.ref(`posukPractice/chazara/events/${studentId}/${eventId}`);
@@ -1371,7 +1391,7 @@ exports.studentRewardsAutoAward = onRequest(
       if(!rewardStudentId) return res.status(404).json({error:"Could not match this student to Student Rewards."});
       const amount=POINTS[source];
 
-      let requestId,record={},reason="",chazaraVerification=null;
+      let requestId,record={},reason="",chazaraVerification=null,shorashimVerification=null;
       if(source === "reading100" || source === "translation100" || source === "understand100"){
         const awardPosukKey=String(body.awardPosukKey||"");
         const evidencePosukKey=String(body.evidencePosukKey||"");
@@ -1381,6 +1401,13 @@ exports.studentRewardsAutoAward = onRequest(
         requestId=safeKey(`milestone_${source}_${studentId}_${awardPosukKey}`);
         reason=reasonFor(source,parsed?.perek,parsed?.start);
         record={awardPosukKey,evidencePosukKey,verifiedScore:verified.score,perek:parsed?.perek||null,posuk:parsed?.start||null};
+      }else if(isShorashimRequest({source})){
+        const eventId=String(body.eventId||"");
+        shorashimVerification=await verifyShorashim(studentId,source,eventId);
+        if(!shorashimVerification.ok)return res.status(409).json({error:shorashimVerification.error});
+        requestId=safeKey(`shorashim_${studentId}_${eventId}`);
+        reason=source==="shorashim-no-hints"?"Shorashim No Hints recording":"Shorashim Chazara recording";
+        record={eventId,recordingDate:shorashimVerification.event.date||null};
       }else{
         const eventId=String(body.eventId||"");
         chazaraVerification=await verifyChazara(studentId,source,eventId);
@@ -1399,6 +1426,9 @@ exports.studentRewardsAutoAward = onRequest(
       }
 
       const result=await createPendingRequest({requestId,rewardStudentId,studentId,source,amount,reason,record});
+      if(shorashimVerification?.eventRef){
+        await shorashimVerification.eventRef.update({pointRequestId:requestId,pointRequestStatus:result.status,pointRequestCreatedAt:Date.now()});
+      }
       if(chazaraVerification?.eventRef){
         await chazaraVerification.eventRef.update({pointRequestId:requestId,pointRequestStatus:result.status,pointRequestCreatedAt:Date.now()});
       }
