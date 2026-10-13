@@ -39,15 +39,27 @@ exports.funTorahTeacherRequests=onRequest({region:'us-central1',cors:['https://s
    const ref=db.ref(ROOT+'/teacherRequests/'+uid),snap=await ref.once('value'),request=snap.val();
    if(!request||request.status!=='pending')return res.status(409).json({error:'Request is not pending'});
    const newStatus=decision==='approve'?'approved':'rejected';
-   // Approval alone never grants teacher permissions. Owner must assign a class
-   // through the existing invitation workflow before claimTeacher can succeed.
-   await ref.update({status:newStatus,reviewedAt:admin.database.ServerValue.TIMESTAMP,reviewedBy:user.uid});
+   // Write both decisions and invitations atomically. An approved request
+   // must not be stranded without an invitation if one write fails.
+   const updates={
+    [ROOT+'/teacherRequests/'+uid+'/status']:newStatus,
+    [ROOT+'/teacherRequests/'+uid+'/reviewedAt']:admin.database.ServerValue.TIMESTAMP,
+    [ROOT+'/teacherRequests/'+uid+'/reviewedBy']:user.uid
+   };
    if(decision==='approve'){
     const inviteId=request.email.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
     const inviteRef=db.ref(ROOT+'/teacherInvites/'+inviteId);
     const old=(await inviteRef.once('value')).val();
-    if(!old)await inviteRef.update({email:request.email,name:request.name,role:'teacher',active:false,classIds:{},updatedAt:admin.database.ServerValue.TIMESTAMP});
+    if(!old){
+     const prefix=ROOT+'/teacherInvites/'+inviteId+'/';
+     Object.assign(updates,{
+      [prefix+'email']:request.email,[prefix+'name']:request.name,
+      [prefix+'role']:'teacher',[prefix+'active']:false,
+      [prefix+'updatedAt']:admin.database.ServerValue.TIMESTAMP
+     });
+    }
    }
+   await db.ref().update(updates);
    return res.json({status:newStatus});
   }
   return res.status(400).json({error:'Unknown action'});
