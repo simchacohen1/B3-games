@@ -40,9 +40,10 @@ test("multiple-choice options move the correct answer and keep correctIndex accu
   const items = core.makeItems(sources, "mc", "", sources.length, sources);
   assert.equal(items.length, sources.length);
   for (const item of items) {
-    assert.equal(item.choices[item.correctIndex], core.localizeText(core.shortChoice(core.questionAndAnswer(
-      sources.find(source => item.ans.includes(source.ref)), ""
-    ).answer)));
+    const source = sources.find(row => core.questionAndAnswer(row, "").q === item.q);
+    assert.ok(source, "each generated question should match a source");
+    const answer = core.questionAndAnswer(source, "").answer;
+    assert.equal(item.choices[item.correctIndex], core.localizeText(core.shortChoice(answer)));
   }
   assert.ok(items.some(item => item.correctIndex !== 0), "correct answers should not all remain in the first position");
   assert.ok(items.every(item => item.choices.length === 4));
@@ -51,7 +52,7 @@ test("multiple-choice options move the correct answer and keep correctIndex accu
 test("generator skips questions without clear context instead of asking confusing quote-completion prompts", () => {
   const core = loadCore();
   assert.equal(core.questionAndAnswer({ ref: "Genesis 18:2", text: "He said, Let us bring some water." }, ""), null);
-  assert.equal(core.questionAndAnswer({ ref: "Rashi on Genesis 18:1", text: "A long explanation without a clear question." , isRashi: true}, ""), null);
+  assert.equal(core.questionAndAnswer({ ref: "Rashi on Genesis 18:1", text: "A long explanation without a clear question.", isRashi: true }, ""), null);
 });
 
 test("creation questions use short, direct wording for children", () => {
