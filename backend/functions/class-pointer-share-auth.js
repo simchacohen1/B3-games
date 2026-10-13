@@ -51,17 +51,27 @@ exports.classPointerShareAuth=onRequest({
    const auth=String(req.headers.authorization||'').match(/^Bearer (.+)$/);
    if(!auth)error(401,'Teacher sign-in required.');
    const claims=await admin.auth().verifyIdToken(auth[1]);
-   const teacher=(await db.ref('b3Games/teacherAccounts/'+claims.uid).once('value')).val();
    // The published session belongs to this exact Firebase-authenticated teacher.
    if(session.teacherUid!==claims.uid)error(403,'This session belongs to another teacher.');
    const token=String(body.token||'');
    if(!/^[a-f0-9]{64}$/.test(token))error(400,'Invalid sharing ticket.');
    const digest=crypto.createHash('sha256').update(token).digest('hex');
-   const ticketSnap=await db.ref('b3Private/classPointerShareTickets/'+digest).once('value');
-   const ticket=ticketSnap.val();
-   if(!ticket||ticket.expiresAt<Date.now()||ticket.room!==room||ticket.classId!==classId)error(403,'Sharing ticket expired or belongs to another class.');
-   await ticketSnap.ref.remove();
-   return res.json({ok:true,studentId:ticket.studentId});
+   // Consume the one-time ticket atomically: two simultaneous attempts cannot reuse it.
+   const ticketRef=db.ref('b3Private/classPointerShareTickets/'+digest);
+   let ticket=null;
+   const used=await ticketRef.transaction(row=>{
+     if(!row||row.expiresAt<Date.now()||row.room!==room||row.classId!==classId)return;
+     ticket=row;
+     return null;
+   });
+   if(!used.committed||!ticket)error(403,'Sharing ticket expired, used, or belongs to another class.');
+   const [profileSnap,memberSnap]=await Promise.all([
+     db.ref('b3Games/students/'+ticket.studentId+'/profile').once('value'),
+     db.ref(base+'/members/'+ticket.studentId).once('value')
+   ]);
+   const profile=profileSnap.val(),member=memberSnap.val();
+   if(!profile||profile.active===false||!member||member.active===false)error(403,'Student no longer belongs to this class.');
+   return res.json({ok:true,studentId:ticket.studentId,studentName:String(profile.name||'Student').slice(0,32)});
   }
   error(400,'Unknown action.');
  }catch(err){
