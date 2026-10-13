@@ -1737,10 +1737,10 @@ let comprehensionQuestionLoadFailed = false;
 // network read.
 const generatedQuestionMemoryCache = new Map();
 const generatedQuestionPromiseCache = new Map();
-const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_answerfirst_v4_';
+const GENERATED_QUESTION_LOCAL_PREFIX = 'posukPractice_generatedQuestions_answerfirst_v5_';
 
 function generatedQuestionCacheKey(part){
-  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_') + '_answerfirst_v4';
+  return (part.key || (currentPerekNum + '_' + part.posukNum)).replace(/[.#$\[\]\/]/g, '_') + '_answerfirst_v5';
 }
 function normalizeGeneratedItems(items, posukNum){
   return (Array.isArray(items) ? items : []).map(item => {
@@ -1851,7 +1851,7 @@ async function getGeneratedQuestionsForPart(part){
         classroomReferenceTranslation: await getClassroomReferenceForPart(part),
         perekNum: currentPerekNum,
         posukNum: part.posukNum,
-        staticQuestions: Array.isArray(staticQs) ? staticQs : []
+        questionLimit: Math.max(1, Math.min(20, Array.isArray(staticQs) && staticQs.length ? staticQs.length : 5))
       })
     });
     if(!res.ok) throw new Error('Question generation request failed');

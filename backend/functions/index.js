@@ -1820,9 +1820,7 @@ exports.generateComprehensionQuestions = onRequest(
     }
 
     const { posukText, posukTranslation, perekNum, posukNum } = req.body || {};
-    const staticQuestions = Array.isArray((req.body || {}).staticQuestions)
-      ? (req.body.staticQuestions || []).map((q) => String(q || '').trim()).filter(Boolean).slice(0, 20)
-      : [];
+    const questionLimit = Math.max(1, Math.min(20, Number((req.body || {}).questionLimit) || 5));
     let classroomReferenceTranslation = (req.body || {}).classroomReferenceTranslation || '';
     if (!String(classroomReferenceTranslation).trim() && perekNum && posukNum) {
       classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, posukNum);
@@ -1860,17 +1858,9 @@ ANSWER-FIRST DESIGN (REQUIRED): Build each question from its answer evidence, ne
 OUTPUT: Return ONLY JSON, no markdown or commentary:
 {"items":[{"sourceFact":"one explicit fact from the accepted translation","question":"child-friendly question","expectedAnswer":"short direct answer supported by that fact","answerWordSets":[[0],[1,2]]}]}
 
-${staticQuestions.length ? `
-QUESTION TOPIC HINTS:
-The application supplied existing question wording as topic hints only. Do not copy it automatically or force an answer onto it. First choose a clear answer phrase from the verse; then keep a supplied question only if that phrase fully answers it. Otherwise write a clearer question for the chosen phrase. Omit any topic that has no unambiguous answer phrase in this verse.
-` : `
-QUESTION GENERATION MODE:
-No topic hints were supplied. Choose clear answer phrases first, then write questions for them as described above.
-`}
-
 QUALITY CHECK BEFORE RETURNING: For every item, inspect the exact Hebrew tokens named by answerWordSets first. Confirm they form a contiguous phrase, confirm expectedAnswer translates that phrase, and confirm the question is plainly answered by that phrase. If any link in this chain is uncertain, omit the item. Remove duplicates; never invent a reason or identity.`;
 
-    const userPrompt = `Perek: ${perekNum || ""}, Posuk: ${posukNum || ""}\nAccepted English translation: "${String(posukTranslation).trim()}"${classroomReferenceTranslation && String(classroomReferenceTranslation).trim() ? `\nTorah Umesorah classroom-reference translation: "${String(classroomReferenceTranslation).trim()}"` : ""}${posukText ? `\nHebrew for reference only: ${String(posukText).trim()}` : ""}${staticQuestions.length ? `\nEXISTING QUESTIONS, in required order: ${JSON.stringify(staticQuestions)}` : ""}`;
+    const userPrompt = `Perek: ${perekNum || ""}, Posuk: ${posukNum || ""}\nAccepted English translation: "${String(posukTranslation).trim()}"${classroomReferenceTranslation && String(classroomReferenceTranslation).trim() ? `\nTorah Umesorah classroom-reference translation: "${classroomReferenceTranslation.trim()}"` : ""}${posukText ? `\nHebrew for reference only: ${String(posukText).trim()}` : ""}\nGenerate up to ${questionLimit} clear question-and-answer pairs.`;
 
     try {
       let response = null;
@@ -1967,7 +1957,7 @@ items: {
           seen.add(key);
           return true;
         })
-        .slice(0, staticQuestions.length || 20);
+        .slice(0, questionLimit);
 
       if (!items.length) {
         res.status(502).json({ error: "No usable questions generated" });
