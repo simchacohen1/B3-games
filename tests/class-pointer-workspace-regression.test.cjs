@@ -40,3 +40,20 @@ test('student capture prefers a browser tab but requires the browser permission 
  assert.match(s,/surfaceSwitching:'include'/);
  assert.match(s,/getVideoTracks\(\)\[0\]/);
 });
+
+test('activity sharing requires a verified student before opening a screen button',()=>{
+ const s=read('activity-share.js');
+ assert.match(s,/studentAuth/);
+ assert.match(s,/action:'verify'/);
+ assert.match(s,/studentScreenSharing===true/);
+ assert.match(s,/action:'issue'/);
+ assert.match(s,/getDisplayMedia\(/);
+});
+test('teacher checks activity ticket before accepting a media call',()=>{
+ const teacher=read('activity-screen-teacher.js');
+ const classroom=read('classroom.js');
+ assert.match(teacher,/action:'verify'/);
+ assert.match(teacher,/Authorization:'Bearer '/);
+ assert.match(teacher,/call\.answer\(\)/);
+ assert.match(classroom,/ClassPointerActivityShares\.incomingCall/);
+});
