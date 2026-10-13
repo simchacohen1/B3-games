@@ -1022,8 +1022,15 @@ window.addEventListener("DOMContentLoaded",()=>{
   const sign=$('recordingsGoogleSignIn');
   if(sign)sign.onclick=async()=>{try{const token=await teacherRewardsToken();$('recordingsAuthStatus').textContent="✓ Signed in — approvals are ready.";sign.textContent="✓ Google Signed In";}catch(e){$('recordingsAuthStatus').textContent=e.message||"Sign-in failed.";}};
   firebase.auth().onAuthStateChanged(u=>{
-    const s=$('recordingsAuthStatus');
-    if(s)s.textContent=u&&String(u.email||"").toLowerCase()==="simcha5770@gmail.com"?"✓ Signed in — approvals are ready.":"Sign in when you are ready to approve or reject.";
+    const authorized=!!u&&String(u.email||"").toLowerCase()==="simcha5770@gmail.com";
+    const status=$('recordingsAuthStatus');
+    if(status)status.textContent=authorized?"✓ Teacher sign-in active — approvals are ready.":u?"This account cannot approve Shorashim rewards.":"Sign in with your teacher Google account to approve.";
+    // Reuse the existing Firebase teacher session instead of showing a second sign-in prompt.
+    if(sign){
+      sign.hidden=authorized;
+      sign.style.display=authorized?"none":"";
+      if(!authorized)sign.textContent="Sign in with Google to Approve";
+    }
   });
 });
 
