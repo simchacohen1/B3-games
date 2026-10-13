@@ -1,7 +1,7 @@
 'use strict';
 const assert = require('node:assert/strict');
-const crypto = require('node:crypto');
-const { validClassId, teacherMayManageClass, activeSubscriptionStatus, verifySignature } =
+const Stripe = require('stripe');
+const { validClassId, teacherMayManageClass, activeSubscriptionStatus } =
   require('../backend/functions/shorashim-stripe-core.cjs');
 
 assert.equal(validClassId('class_9'), true);
@@ -14,13 +14,14 @@ assert.equal(activeSubscriptionStatus('trialing'), true);
 assert.equal(activeSubscriptionStatus('past_due'), false);
 assert.equal(activeSubscriptionStatus('canceled'), false);
 
+const stripe = new Stripe('sk_test_unit_test', { apiVersion: '2026-08-26.dahlia' });
 const secret = 'whsec_sandbox_test_secret';
 const raw = Buffer.from(JSON.stringify({ id: 'evt_test', livemode: false }));
-const timestamp = Math.floor(Date.now() / 1000);
-const digest = crypto.createHmac('sha256', secret).update(String(timestamp) + '.').update(raw).digest('hex');
-const header = 't=' + timestamp + ',v1=' + digest;
-assert.equal(verifySignature(raw, header, secret), true);
-assert.equal(verifySignature(raw, 't=' + timestamp + ',v1=' + '0'.repeat(64), secret), false);
-assert.equal(verifySignature(raw, header, secret, (timestamp - 301) * 1000), false);
-assert.equal(verifySignature(Buffer.from('{}'), header, 'different-secret'), false);
-console.log('Shorashim subscription authorization and webhook-signature tests passed.');
+const header = stripe.webhooks.generateTestHeaderString({ payload: raw, secret });
+assert.equal(stripe.webhooks.constructEvent(raw, header, secret).id, 'evt_test');
+assert.throws(() => stripe.webhooks.constructEvent(raw, header, 'wrong-secret'));
+const stale = stripe.webhooks.generateTestHeaderString({
+  payload: raw, secret, timestamp: Math.floor(Date.now() / 1000) - 301
+});
+assert.throws(() => stripe.webhooks.constructEvent(raw, stale, secret));
+console.log('Shorashim class authorization and Stripe SDK webhook tests passed.');
