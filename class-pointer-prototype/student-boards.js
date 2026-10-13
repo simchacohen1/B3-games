@@ -363,7 +363,7 @@
   // Teacher page: a grid of every student's board or shared screen, plus the shared whiteboard button.
   // =====================================================================
   const boards=new Map(),tiles=new Map(),blocked=new Set();
-  let on=false,mode='boards',focusId=null,drawer=null,gridSize='';
+  let on=false,mode='screens',focusId=null,drawer=null,gridSize='';
   const toggle=$('studentBoards');
   const view=el('div','boards-view');view.id='boardsView';view.dataset.stageUi='true';view.hidden=true;view.setAttribute('aria-label','Student whiteboards and screens');
 
@@ -591,7 +591,7 @@
     on=next;drawer?.cancel();focusId=null;gridSize='';
     for(const m of admitted())sendMode(m);
     view.hidden=!on;
-    if(toggle){toggle.setAttribute('aria-pressed',String(on));toggle.textContent=on?'✕ Close student boards':'🧑‍🎨 Student boards'}
+    if(toggle){toggle.setAttribute('aria-pressed',String(on));toggle.textContent=on?'✕ Close student screens':'🖥 Student Screens'}
     if(on){stage.dispatchEvent(new PointerEvent('pointerleave'));setFocus(null);B.status(mode==='screens'?'Students were asked to share their screens. Their screens appear in the tiles.':'Student whiteboards are open. Click a board to see it large and write on it. Use 🖥 Screens to see students’ screens instead.')}
     else B.status('Student boards closed. Everyone is back to the lesson. Whiteboards are kept until the class ends.');
   }
@@ -638,10 +638,10 @@
     studentLeft(m){closeScreen(m);if(m.boardKey&&boards.has(m.boardKey))boards.get(m.boardKey).drafts={student:null,teacher:null};if(on)syncTiles()},
     endClass(){
       drawer?.cancel();for(const m of B.members().values())closeScreen(m);
-      boards.clear();blocked.clear();chooseActivity(null,dirtyAll);mode='boards';controls();
+      boards.clear();blocked.clear();chooseActivity(null,dirtyAll);mode='screens';controls();
       for(const tile of tiles.values()){tile.video.srcObject=null;tile.node.remove()}tiles.clear();
       if(on){on=false;focusId=null;view.hidden=true}
-      if(toggle){toggle.setAttribute('aria-pressed','false');toggle.textContent='🧑‍🎨 Student boards';toggle.disabled=true}
+      if(toggle){toggle.setAttribute('aria-pressed','false');toggle.textContent='🖥 Student Screens';toggle.disabled=true}
     }
   };
 
