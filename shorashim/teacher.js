@@ -150,6 +150,66 @@ function sanitizeClassArt(art){
   return sanitizeClassArtPool(art).slice(0,4);
 }
 
+// Perek 19: reliable, meaning-specific choices when the AI picture service is unavailable.
+// These are suggestions, not teacher approvals, and only fill currently missing artwork.
+const PEREK19_ART_RULES=[
+  [/^(two|angel|evening|gate)$/i,['2️⃣','👼','🌆','🚪']],
+  [/^turn away$/i,['↪️','🔄','🚶']],
+  [/^early rising$/i,['🌅','⏰','☀️']],
+  [/^street$/i,['🛣️','🏘️','🚶']],
+  [/^feast$/i,['🍽️','🥘','🍞']],
+  [/^baked?$/i,['🍞','🥖','♨️']],
+  [/^lay down$/i,['🛏️','😴','🌙']],
+  [/^surround(ing)?$/i,['⭕','🔄','🏘️']],
+  [/^(nation|people)/i,['👥','🌍','🏘️']],
+  [/^edge$/i,['📐','🔚','🏞️']],
+  [/^went out$/i,['🚪','➡️','👣']],
+  [/^closed?$/i,['🔒','🚪','🔐']],
+  [/^brother$/i,['👦','👥','🤝']],
+  [/^bad$/i,['❌','👎','⚠️']],
+  [/^daughters?$/i,['🧒','🎀','🏠']],
+  [/^only$/i,['1️⃣','☝️','🔹']],
+  [/^these$/i,['👇','👉','📍']],
+  [/^shade$/i,['🌳','⛱️','☁️']],
+  [/^one$/i,['1️⃣','☝️','🔹']],
+  [/^now$/i,['⏰','⌚','📍']],
+  [/^broke$/i,['💔','🔨','🧩']],
+  [/^hit$/i,['💥','🥊','⚡']],
+  [/^until$/i,['⏳','⌛','🕰️']],
+  [/^who$/i,['❓','👤','🔎']],
+  [/^here$/i,['📍','👇','🏠']],
+  [/^son-in-law$/i,['👔','🏠','🤝']],
+  [/^we$/i,['👥','🤝','🫂']],
+  [/^what$/i,['❓','🔎','💭']],
+  [/^dawn$/i,['🌅','☀️','🌄']],
+  [/^went up$/i,['⬆️','🪜','🌄']],
+  [/^in case$/i,['⚠️','❓','🛡️']],
+  [/^sin$/i,['❌','⚠️','🚫']],
+  [/^rest$/i,['🛏️','😴','🪑']],
+  [/^outside$/i,['🏞️','🚪','🌳']],
+  [/^i$/i,['👤','☝️','🗣️']],
+  [/^able$/i,['💪','✅','🏆']],
+  [/^attached$/i,['🔗','📎','🧲']],
+  [/^this$/i,['👇','👉','📍']],
+  [/^close$/i,['📍','🏠','↔️']],
+  [/^also$/i,['➕','✅','🔗']],
+  [/^turned over$/i,['🔄','🙃','↩️']],
+  [/^name$/i,['🏷️','📛','✍️']],
+  [/^sun$/i,['☀️','🌞','🌅']],
+  [/^rain$/i,['🌧️','☔','💧']],
+  [/^heavens$/i,['🌌','☁️','🌤️']],
+  [/^grew$/i,['🌱','🌿','🌳']],
+  [/^salt$/i,['🧂','🍽️','⚪']],
+  [/^remembered$/i,['🧠','💭','📸']],
+  [/^cave$/i,['🪨','⛰️','🕳️']],
+  [/^cried$/i,['😢','💧','😥']],
+  [/^not$/i,['❌','🚫','⛔']],
+  [/^gave to drink$/i,['🥤','💧','🫗']],
+  [/^seed\\/child$/i,['🌱','🫘','👦']],
+  [/^tomorrow$/i,['📅','🌅','➡️']],
+  [/^last night$/i,['🌙','🛏️','⬅️']],
+  [/^pregnant$/i,['👶','🍼','🌱']]
+];
 const SMART_ART_RULES=[
   [/entrance|opening|door/,['🚪','🏠','⛺','↔️']],
   [/\btent\b|ohel/,['⛺','🏕️','🏠','🌵']],
@@ -249,6 +309,7 @@ function smartArtCandidatesFor(english='',front=''){
   const text=`${english} ${front}`.toLowerCase();
   const found=[];
   const add=v=>{if(v&&!found.includes(v))found.push(v)};
+  PEREK19_ART_RULES.forEach(([re,choices])=>{if(re.test(String(english||'').trim()))choices.forEach(add)});
   SMART_ART_RULES.forEach(([re,choices])=>{if(re.test(text))choices.forEach(add)});
   // Keep the full pool here so Regenerate Pictures can deliberately choose
   // alternatives that are different from the pictures already on the word.
@@ -354,6 +415,8 @@ async function loadAll(){
     repaired=await fillArtForShorashim(needsArt);
   }
   if(repaired||p18Added.length||unitMigration.tagged||unitMigration.added.length) await db.ref(`${SPACE}/catalog`).set(state.catalog);
+  const stillMissingArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden && !sanitizeClassArt(i.art).length).length;
+  if(stillMissingArt)console.warn(`${stillMissingArt} Shorashim still need pictures; AI picture generation may be unavailable. They will be retried when this dashboard reloads.`);
   if(needsCatalogSeed)await db.ref(`${SPACE}/settings/catalogSeedVersion`).set(CATALOG_SEED_VERSION);
   $('teacherMinReview').value=String(state.settings.minReviewMs||500);
   renderStudentSiteControl();
@@ -731,6 +794,8 @@ $('saveBulkItems').onclick=async e=>{
     await fillArtForShorashim(added,{force:true});
   }
   await saveCatalog();
+  const missing=added.filter(i=>!sanitizeClassArt(i.art).length).length;
+  if(missing)status(`☁️ Saved • ${missing} new word(s) still need pictures; retry when picture service is available`);
 };
 $('toggleStudentSite').onclick=toggleStudentSite;
 $('teacherMinReview').onchange=async()=>{state.settings.minReviewMs=+$('teacherMinReview').value;await db.ref(`${SPACE}/settings`).set(state.settings)};
