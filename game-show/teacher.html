@@ -414,7 +414,7 @@
     </div>
     <div class="host">
       <button class="btn" onclick="prevQuestion()" title="Previous question" aria-label="Previous question">◀</button>
-      <button class="btn btn-good" id="startQuestionBtn" onclick="startQuestion()">Start Question</button>
+      <button class="btn btn-good" id="startGameShowBtn" onclick="startGameShow()">Start Game Show</button>
       <button class="btn btn-primary" onclick="reveal()">Show answer</button>
       <button class="btn" onclick="clearBuzz()">Clear buzzer</button>
       <button class="btn" onclick="nextQuestion()" title="Next question">Next ▶</button>
@@ -679,8 +679,8 @@ function serverNow() { return Date.now() + serverOffset; }
 const gameRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/live' : "tentTrailTrivia");
 function closeRoundForTeacherSession() {
   // Opening or refreshing the host console always puts students in the lobby;
-  // the teacher must explicitly start the first visible round.
-  gameRef.update({ roundActive: false, revealed: false, buzzedBy: null, buzzPool: null, buzzOpenAt: null, buzzUnlockAt: 0 }).catch(() => {});
+  // the teacher explicitly starts the show before the first round is opened.
+  gameRef.update({ showStarted: false, roundActive: false, revealed: false, buzzedBy: null, buzzPool: null, buzzOpenAt: null, buzzUnlockAt: 0 }).catch(() => {});
 }
 // While this teacher screen is open and unlocked, tell student screens the game is live.
 // Students who open the Game Show when no teacher screen is open see a waiting message
@@ -970,32 +970,32 @@ function saveDelaySettings() {
   gameRef.child('preferUnanswered').set(document.getElementById('preferUnansweredToggle').checked);
 }
 
-function goToQuestion(qIndex) {
+function goToQuestion(qIndex, startImmediately = !!lastGameData.showStarted) {
   ensureAudioAwake();
   document.getElementById('jumpMenu').open = false;
   const delayOn = document.getElementById('delayToggle').checked;
   const delaySecs = parseInt(document.getElementById('delaySeconds').value) || 10;
   const now = serverNow();
-  const unlockAt = delayOn ? (now + delaySecs * 1000) : 0;
+  const unlockAt = startImmediately ? (delayOn ? now + delaySecs * 1000 : now) : 0;
   const updates = {
     qIndex: qIndex,
-    roundActive: false,
+    roundActive: startImmediately,
     revealed: false,
     buzzedBy: null,
     selectedPlayer: null,
     buzzPool: null,
-    buzzUnlockAt: unlockAt,
+    buzzUnlockAt: startImmediately ? unlockAt : 0,
     // The real moment the buzzer becomes live - either right away, or once
     // the wait timer above finishes. The randomize-winner window (if on)
     // is measured from this moment.
-    buzzOpenAt: null
+    buzzOpenAt: startImmediately ? unlockAt : null
   };
   gameRef.update(updates);
 }
 
-// Each round stays closed until the teacher explicitly starts it. The delay
-// option, when enabled, begins only after this click.
-function startQuestion() {
+// The first question opens only after the teacher starts the show. Later
+// questions open automatically when selected or advanced to.
+function startGameShow() {
   ensureAudioAwake();
   const qIndex = Number(lastGameData && lastGameData.qIndex) || 0;
   if (!questions[qIndex]) {
@@ -1006,6 +1006,7 @@ function startQuestion() {
   const now = serverNow();
   const unlockAt = delayOn ? now + (parseInt(document.getElementById('delaySeconds').value) || 10) * 1000 : now;
   gameRef.update({
+    showStarted: true,
     roundActive: true,
     revealed: false,
     buzzedBy: null,
@@ -1019,7 +1020,7 @@ function startQuestion() {
 function nextQuestion() {
   gameRef.child('qIndex').once('value', snap => {
     const current = snap.val() || 0;
-    goToQuestion((current + 1) % questions.length);
+    goToQuestion((current + 1) % questions.length, !!lastGameData.showStarted);
   });
 }
 
@@ -1401,6 +1402,7 @@ function resetGame() {
   if (!sure) return;
   gameRef.set({
     qIndex: 0,
+    showStarted: false,
     roundActive: false,
     revealed: false,
     buzzedBy: null,
@@ -1503,8 +1505,7 @@ gameRef.on('value', snapshot => {
   const data = snapshot.val() || {};
   const qIndex = data.qIndex || 0;
   loadQuestion(qIndex);
-  document.getElementById('startQuestionBtn').disabled = !!data.roundActive;
-  document.getElementById('startQuestionBtn').textContent = data.roundActive ? 'Question Started' : 'Start Question';
+  document.getElementById('startGameShowBtn').hidden = !!data.showStarted;
   document.getElementById('answer').textContent = data.revealed && questions[qIndex] ? (questions[qIndex].ans || '') : '';
   requestAnimationFrame(fitQuestion);
   lastGameData = data;
