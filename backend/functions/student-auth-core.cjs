@@ -74,7 +74,12 @@ async function studentAuth(store,body,ip='unknown',now=Date.now()){
    await store.update(updates);
   }
   const privateCode=await get(PRIVATE+id);
-  return {ok:true,id,name,classId:profile?.classId||legacy?.classId||null,requiresPinChange:privateCode?.chosenPinVersion!==1};
+  const memberships=central?.[id]?.memberships||{};
+  const activeMembership=Object.values(memberships).find(m=>m&&m.active!==false&&m.workspaceId==='b3-2026'&&m.classId);
+  const legacyClassId=profile?.classId||legacy?.classId||null;
+  const removedOnPurpose=legacyClassId&&memberships['b3-2026_'+legacyClassId]?.active===false;
+  const classId=activeMembership?.classId||(!removedOnPurpose?legacyClassId:null);
+  return {ok:true,id,name,classId,requiresPinChange:privateCode?.chosenPinVersion!==1};
  }
  if(action==='verify'){
   const id=clean(body.studentId),pin=clean(body.pin);

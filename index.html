@@ -662,7 +662,8 @@ body > .subtitle::after {
     // just because the newer membership mirror is missing or half-migrated.
     // Repair the ET/WT membership on successful sign-in and continue.
     const legacy=["et","wt"].includes(data?.classId)?data.classId:legacyMigrationClass(studentId);
-    if(legacy&&data?.active!==false){
+    const removedOnPurpose=memberships[workspaceId+"_"+legacy]?.active===false;
+    if(legacy&&data?.active!==false&&!removedOnPurpose){
       await persistStudentMembership(studentId,legacy,data);
       studentClassChoices=[{id:legacy,name:legacy.toUpperCase()}];
       return legacy;
@@ -804,7 +805,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(!isAuthorizedAdmin){if(await trustedStudentAction("remove",{studentId}))await loadClassManagement();return;}
     const updates={};
     updates["b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId]=null;
-    updates["b3Games/students/"+studentId+"/memberships/"+workspaceId+"_"+classId]=null;
+    updates["b3Games/students/"+studentId+"/memberships/"+workspaceId+"_"+classId]={workspaceId,classId,active:false,removedAt:Date.now()};
     await db.ref().update(updates); await loadClassManagement();
   }
   function setTeacherToolPairVisibility(){

@@ -585,10 +585,12 @@
         let classId = String(row.classId || "").toLowerCase();
         if (classId !== "et" && classId !== "wt") classId = legacyMigrationClass(studentId);
         if (classId !== "et" && classId !== "wt") return;
+        const membershipKey = WORKSPACE_ID + "_" + classId;
+        if (centralStudents[studentId]?.memberships?.[membershipKey]?.active === false) return;
         const profile = { id: studentId, name: row.name || studentId, active: row.active !== false };
         if(!centralStudents[studentId]?.profile)updates["b3Games/students/" + studentId + "/profile"] = profile;
         // Passcodes are stored privately by the backend; never write them here.
-        if(!centralStudents[studentId]?.memberships?.[WORKSPACE_ID+"_"+classId])updates["b3Games/students/" + studentId + "/memberships/" + WORKSPACE_ID + "_" + classId] = {
+        if(!centralStudents[studentId]?.memberships?.[membershipKey])updates["b3Games/students/" + studentId + "/memberships/" + membershipKey] = {
           workspaceId: WORKSPACE_ID, classId: classId, active: true
         };
         if(!existingClasses[classId]?.members?.[studentId])updates[WORKSPACE_ROOT_KEY + "/classes/" + classId + "/members/" + studentId] = {

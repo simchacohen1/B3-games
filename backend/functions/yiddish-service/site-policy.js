@@ -485,10 +485,12 @@
     if (!services || !services.db || !user || !isBootstrapAdmin(user)) return Promise.resolve();
     return Promise.all([
       services.db.ref("posukPractice/allowedStudents").once("value"),
-      services.db.ref("posukPractice/settings/classPin").once("value")
+      services.db.ref("posukPractice/settings/classPin").once("value"),
+      services.db.ref("b3Games/students").once("value")
     ]).then(function (snapshots) {
       const students = snapshots[0].val() || {};
       const legacyPin = snapshots[1].val();
+      const centralStudents = snapshots[2].val() || {};
       const updates = {};
       const now = new Date().toISOString();
 
@@ -516,9 +518,11 @@
         let classId = String(row.classId || "").toLowerCase();
         if (classId !== "et" && classId !== "wt") classId = legacyMigrationClass(studentId);
         if (classId !== "et" && classId !== "wt") return;
+        const membershipKey = WORKSPACE_ID + "_" + classId;
+        if (centralStudents[studentId]?.memberships?.[membershipKey]?.active === false) return;
         const profile = { id: studentId, name: row.name || studentId, active: row.active !== false };
         updates["b3Games/students/" + studentId + "/profile"] = profile;
-        updates["b3Games/students/" + studentId + "/memberships/" + WORKSPACE_ID + "_" + classId] = {
+        updates["b3Games/students/" + studentId + "/memberships/" + membershipKey] = {
           workspaceId: WORKSPACE_ID, classId: classId, active: true
         };
         updates[WORKSPACE_ROOT_KEY + "/classes/" + classId + "/members/" + studentId] = {

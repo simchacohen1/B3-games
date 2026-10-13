@@ -84,7 +84,7 @@ async function manageStudents(store,identity,body,now=Date.now()){
   updates[memberPath+'/active']=body.active;
   updates[membershipPath]={workspaceId:'b3-2026',classId,active:body.active};
  }else if(body.action==='remove'){
-  updates[memberPath]=null;updates[membershipPath]=null;
+  updates[memberPath]=null;updates[membershipPath]={workspaceId:'b3-2026',classId,active:false,removedAt:now};
  }else if(body.action==='add'){
   updates[memberPath]={studentId:id,name:profile.name||id,active:true};
   updates[membershipPath]={workspaceId:'b3-2026',classId,active:true};
