@@ -215,7 +215,7 @@
     const choiceSources = distractors && distractors.length ? distractors : sources;
     selected.forEach((source, index) => {
       const ref = source.displayRef || displayRef(source.ref);
-      const qa = questionAndAnswer(source, topic);
+      let qa = questionAndAnswer(source, topic);
       if (mode === "open") {
         out.push({ q: qa.q, ans: qa.answer + " (Source: " + ref + ")" });
       } else {
@@ -227,6 +227,25 @@
           const candidateAnswer = questionAndAnswer(candidate, topic).answer;
           const excerpt = localizeText(shortChoice(candidateAnswer));
           if (excerpt && !optionRows.some(row => row.excerpt === excerpt)) optionRows.push({ excerpt, ref: candidate.ref });
+        }
+        // Some source ranges produce the same short answer for several pesukim
+        // (for example, repeated actions or generic answer extraction). Keep the
+        // distractors grounded in Sefaria, then fall back to matching continuations
+        // so a valid range with four distinct pesukim does not get rejected.
+        if (optionRows.length < 4) {
+          const targetContinuation = contentContinuation(source.text);
+          if (targetContinuation) {
+            qa = targetContinuation;
+            optionRows.length = 0;
+            optionRows.push({ excerpt: localizeText(shortChoice(targetContinuation.answer)), ref: source.ref });
+            for (let offset = 1; offset <= choiceSources.length && optionRows.length < 4; offset++) {
+              const candidate = choiceSources[(index + offset) % choiceSources.length];
+              if (candidate.ref === source.ref) continue;
+              const continuation = contentContinuation(candidate.text);
+              const excerpt = continuation && localizeText(shortChoice(continuation.answer));
+              if (excerpt && !optionRows.some(row => row.excerpt === excerpt)) optionRows.push({ excerpt, ref: candidate.ref });
+            }
+          }
         }
         if (optionRows.length < 4) throw new Error("Multiple choice needs four distinct Sefaria excerpts. Select at least four pesukim or sources.");
         const correctIndex = optionRows.findIndex(row => row.ref === source.ref || row.excerpt === correctExcerpt);
