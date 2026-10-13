@@ -156,6 +156,24 @@
     // front of the student. Skip it and ask only questions with clear context.
     return null;
   }
+  function bereishis19QuestionAndAnswer(source) {
+    const match = String(source.ref || source.displayRef || "").match(/(?:Genesis|Bereishis)\s+19:(\d+)/i);
+    if (!match) return null;
+    const questions = {
+      1: { q: "Who arrived in Sodom in the evening?", answer: "The two angels." },
+      2: { q: "Where did the visitors say they would spend the night?", answer: "In the square." },
+      3: { q: "What did Lot bake for his visitors?", answer: "Unleavened bread." },
+      4: { q: "Who gathered around Lot’s house?", answer: "The men of Sodom." },
+      5: { q: "Whom did the men ask Lot to bring outside?", answer: "The visitors." },
+      6: { q: "What did Lot shut after he went outside?", answer: "The door." },
+      7: { q: "What did Lot ask the men not to do?", answer: "Commit a wrong." },
+      8: { q: "How many daughters did Lot say he had?", answer: "Two." },
+      9: { q: "What did the men say Lot was acting like?", answer: "Their ruler." },
+      10: { q: "What did the visitors do to Lot?", answer: "Pulled him into the house." },
+      11: { q: "What happened to the people at the entrance?", answer: "They were struck blind." }
+    };
+    return questions[Number(match[1])] || null;
+  }
   function questionAndAnswer(source, topic) {
     const text = repairText(localizeText(source.text)).replace(/\s+/g, " ").trim();
     const ref = source.displayRef || displayRef(source.ref);
@@ -163,6 +181,8 @@
     // Broad prompts such as “What does this source say?” do not tell an
     // eight-year-old what to look for. Leave these for teacher-written review.
     if (topic || source.isRashi) return null;
+    const Bereishis19QA = bereishis19QuestionAndAnswer(source);
+    if (Bereishis19QA) return Bereishis19QA;
 
     const subject = "(Hashem|Moshe|Avraham|Yitzchak|Yaakov|Yosef|Aharon|Sarah|Rivkah|Leah|Rachel|Noach|Esav|Paroh|Reuven|Shimon|Yehudah|Naftali|Gad|Asher|Yissachar|Zevulun|Binyamin|Ephraim|Menashe|Miriam|Yehoshua|Bilam|Lavan|Yisro|Lot|Pharaoh|Melchizedek|Eliezer|Hagar|Yishmael|the angels|the angel|the men|the people|the king|the servant|the woman|the man)";
     const verbs = {
