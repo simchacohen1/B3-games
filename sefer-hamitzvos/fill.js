@@ -18,18 +18,8 @@
   while(head<tail){
    const index=queue[head++],px=index%width,py=(index/width)|0;
    if(px===0||py===0||px===width-1||py===height-1)touchesEdge=true;
-   const neighbors=[];
-   if(px>0)neighbors.push(index-1);
-   if(px<width-1)neighbors.push(index+1);
-   if(py>0)neighbors.push(index-width);
-   if(py<height-1)neighbors.push(index+width);
-   for(const next of neighbors){
-    if(!visited[next]&&open(next)){
-     visited[next]=1;
-     if(tail>=maxArea)return {reason:'large'};
-     queue[tail++]=next;
-    }
-   }
+   const enqueue=next=>{if(visited[next]||!open(next))return true;visited[next]=1;if(tail>=maxArea)return false;queue[tail++]=next;return true;};
+   if((px>0&&!enqueue(index-1))||(px<width-1&&!enqueue(index+1))||(py>0&&!enqueue(index-width))||(py<height-1&&!enqueue(index+width)))return {reason:'large'};
   }
   if(touchesEdge)return {reason:'open'};
   return {pixels:queue.slice(0,tail)};
