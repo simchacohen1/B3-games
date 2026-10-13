@@ -1224,13 +1224,10 @@
     <p>Read the posuk. Explain what it means. See how you did!</p>
   </header>
 
-  <!-- STEP 0: Name entry (gated by individual passcode + teacher-approved name list) -->
+  <!-- Student access comes from the one-time Fun Torah Tools sign-in. -->
   <div id="nameGate" class="name-gate">
-    <div>Your Passcode</div>
-    <input id="classPinInput" type="password" placeholder="Ask your teacher" maxlength="20" inputmode="numeric">
-    <div>What's your name?</div>
-    <input id="studentNameInput" type="text" placeholder="Type your name here" maxlength="30">
-    <div><button class="btn gold" id="startBtn">Start Practicing</button></div>
+    <div>Sign in on Fun Torah Tools to start practicing.</div>
+    <a class="btn gold" href="../index.html">Go to Fun Torah Tools</a>
     <div id="nameGateMsg" style="font-size:0.85rem;margin-top:10px;color:#b33;min-height:1.2em;"></div>
   </div>
 
@@ -2442,7 +2439,7 @@ async function checkAccess(name,pin,idHint=''){
   return {ok:true,slug:id,accessVersion:Number(profile&&profile.passcodeUpdatedAt)||0};
 }
 
-document.getElementById('startBtn').onclick = async () => {location.href='../index.html';return;
+if(document.getElementById('startBtn'))document.getElementById('startBtn').onclick = async () => {location.href='../index.html';return;
   const val = document.getElementById('studentNameInput').value.trim();
   const pin = document.getElementById('classPinInput').value.trim();
   if(!val){ return; }
@@ -2642,7 +2639,9 @@ window.addEventListener('load', async () => {
     studentId = savedId;
     studentName = savedName;
     enterApp();
+    return;
   }
+  location.href='../index.html';
 });
 
 /* ---------- Perek / Posuk selectors ----------

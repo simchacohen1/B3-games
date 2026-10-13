@@ -308,11 +308,8 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
   <header class="top"><div class="brand-icon" aria-hidden="true">א</div><div><div class="eyebrow">Discover • Practice • Master</div><h1>Rashi Quest</h1><p>Little letters. Big discoveries. <span lang="he" dir="rtl">אותיות רש״י</span></p></div></header>
 <div class="hud"><span id="welcome">Your letter adventure starts here</span><span id="sessionStars">★ 0 stars this visit</span><button id="soundBtn" aria-pressed="true">Sound on</button></div>
   <div class="card name-gate" id="nameGate">
-    <div class="finish-icon" aria-hidden="true">🔎</div><h2>Become a Rashi detective!</h2><p class="intro-copy">Discover the letters. Crack the words.<br>One small step at a time!</p><label for="studentNameInput">Your name</label>
-    <input id="studentNameInput" type="text" placeholder="Type your name here" maxlength="30">
-    <label for="classPinInput">Passcode</label>
-    <input id="classPinInput" type="password" placeholder="Ask your teacher" maxlength="20" inputmode="numeric">
-    <div><button class="btn" id="startBtn">Let’s explore →</button></div>
+    <div class="finish-icon" aria-hidden="true">🔎</div><h2>Become a Rashi detective!</h2><p class="intro-copy">Discover the letters. Crack the words.<br>One small step at a time!</p><p>Sign in once on Fun Torah Tools, then open Rashi Quest.</p>
+    <div><a class="btn" href="../index.html">Go to Fun Torah Tools</a></div>
     <div id="gateMsg"></div>
   </div>
 
@@ -712,7 +709,7 @@ async function checkAccess(name, pin){
   return {ok:true,slug,displayName:String(profile.name||name)};
 }
 
-document.getElementById('startBtn').onclick = async () => {location.href='../index.html';return;
+if(document.getElementById('startBtn'))document.getElementById('startBtn').onclick = async () => {location.href='../index.html';return;
   const val = document.getElementById('studentNameInput').value.trim();
   const pin = document.getElementById('classPinInput').value.trim();
   if(!val){ return; }

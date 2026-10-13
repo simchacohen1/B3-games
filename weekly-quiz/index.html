@@ -184,13 +184,7 @@
     <div class="state-ico">👋</div>
     <h2>Sign in to take the quiz</h2>
     <p style="color:var(--muted);margin:8px 0 18px">Sign in on Fun Torah Tools with your name and passcode, then come back here.</p>
-    <div class="hidden">
-      <label for="classPinInput">Passcode</label>
-      <input type="password" id="classPinInput" maxlength="20" inputmode="numeric" autocomplete="off">
-      <label for="studentNameInput">Your name</label>
-      <input type="text" id="studentNameInput" maxlength="40" autocomplete="name">
-    </div>
-    <button id="joinBtn" class="primary" style="width:100%;max-width:360px;font-size:19px;padding:14px" onclick="joinQuiz()">Go to sign in</button>
+    <a href="../index.html">Go to Fun Torah Tools</a>
     <div id="loginMsg" class="login-msg" aria-live="polite"></div>
   </div>
 
@@ -466,7 +460,7 @@ document.getElementById('studentNameLabel').textContent=myName;applyMasterBlocke
 }
   const id=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
   const name=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName');
-  if(!id||!name)return;
+  if(!id||!name){location.href='../index.html';return;}
   try{
     const profileSnap=await db.ref('b3Games/students/'+id+'/profile').once('value');
     let d=profileSnap.val();
@@ -728,7 +722,7 @@ async function openPastQuiz(launchId){
 }
 function closePastQuiz(){document.getElementById('reviewCard').classList.add('hidden');document.getElementById('pastQuizzesCard').scrollIntoView({behavior:'smooth',block:'start'});}
 
-['classPinInput','studentNameInput'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();joinQuiz();}}));
+['classPinInput','studentNameInput'].forEach(id=>{const input=document.getElementById(id);if(input)input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();joinQuiz();}})});
 restoreLogin().catch(error=>console.warn('Could not restore quiz session:',error)).finally(()=>{
   quizAuthPending=false;
   document.getElementById('quizAuthLoading').classList.add('hidden');

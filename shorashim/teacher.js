@@ -767,7 +767,7 @@ async function toggleStudentSite(){
   await db.ref(`${SPACE}/settings/studentSiteOpen`).set(state.settings.studentSiteOpen);
   status('☁️ Saved');
 }
-async function loadAccess(){const[p,a]=await Promise.all([db.ref('posukPractice/settings/classPin').once('value'),db.ref('posukPractice/allowedStudents').once('value')]);$('accessPin').value=p.val()||'';renderRoster(a.val()||{})}
+async function loadAccess(){const a=await db.ref('posukPractice/allowedStudents').once('value');renderRoster(a.val()||{})}
 function renderRoster(v){const rows=Object.entries(v).map(([id,x])=>({id,name:x?.name||id})).sort((a,b)=>a.name.localeCompare(b.name));$('rosterList').innerHTML=rows.map(r=>`<div class="roster-row"><span>${esc(r.name)}</span><button class="danger small" data-remove="${esc(r.id)}">Remove</button></div>`).join('')||'<p>No approved students yet.</p>';[...$('rosterList').querySelectorAll('[data-remove]')].forEach(b=>b.onclick=async()=>{if(!confirm('Remove this student from approved access?'))return;await db.ref('posukPractice/allowedStudents/'+b.dataset.remove).remove();loadAccess()})}
 function slug(n){return n.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')}
 function renderLeaderboard(){const match=state.leaderboards.match||{};$('leaderboardTeacher').innerHTML=Object.keys(match).sort((a,b)=>Number(a)-Number(b)).map(k=>{const rows=Object.entries(match[k]||{}).map(([id,x])=>({id,...x})).filter(x=>Number.isFinite(Number(x.time))).sort((a,b)=>a.time-b.time);return`<h3>${esc(k)}-pair Match</h3>${rows.length?`<table class="teacher-table"><thead><tr><th>#</th><th>Student</th><th>Time</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name||r.id)}</td><td>${(r.time/1000).toFixed(2)}s</td></tr>`).join('')}</tbody></table>`:'<p class="mini-note">No scores yet.</p>'}`}).join('')||'<p>No leaderboard scores yet.</p>'}
@@ -868,7 +868,6 @@ $('teacherAddItem').onclick=()=>openEdit();
 $('tCancelItem').onclick=()=>$('teacherCatalogDialog').close();
 $('cancelBulkItems').onclick=()=>$('teacherBulkDialog').close();
 $('tSaveItem').onclick=saveEdit;
-$('saveAccessPin').onclick=async()=>{await db.ref('posukPractice/settings/classPin').set($('accessPin').value.trim());$('accessPinMsg').textContent='Saved ✓'};
 $('addAccessName').onclick=async()=>{const name=$('newAccessName').value.trim(),id=slug(name);if(!id)return;await db.ref('posukPractice/allowedStudents/'+id).set({name});$('newAccessName').value='';$('accessNameMsg').textContent='Added ✓';loadAccess()};
 bindTabs();
 let teacherAppOpened=false;

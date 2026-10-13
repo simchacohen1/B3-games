@@ -116,9 +116,8 @@ button:hover:not(:disabled){transform:translateY(-2px)}
 <div class="wrap">
   <div id="loginCard" class="card login-card">
     <div class="step-title"><span class="step-bubble">👋</span> Who are you?</div>
-    <label>Your name</label><input id="studentName" type="text" placeholder="Type your name">
-    <label>Class PIN</label><input id="classPin" type="password" inputmode="numeric" placeholder="Class PIN">
-    <button class="primary big-btn" style="width:100%;margin-top:16px" onclick="login()">Start Practicing!</button>
+    <p>Sign in once on Fun Torah Tools, then open this practice page.</p>
+    <a href="../index.html">Go to Fun Torah Tools</a>
     <div id="loginMsg" class="login-msg"></div>
   </div>
 
@@ -285,7 +284,7 @@ async function restore(){
 const account=await window.B3TeacherAccountReady;
 if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){teacherPreview=true;studentId='teacher_preview';studentName='Teacher Preview - practice results not saved';enterApp();return;}
   const id=sessionStorage.getItem('posukPractice_studentId'),name=sessionStorage.getItem('posukPractice_studentName');
-  if(!id||!name)return;
+  if(!id||!name){location.href='../index.html';return;}
   try{const s=await db.ref('posukPractice/allowedStudents/'+id).once('value');if(!s.exists())return;studentId=id;studentName=(s.val()&&s.val().name)||name;enterApp();}catch(e){}
 }
 function switchStudent(){sessionStorage.removeItem('posukPractice_studentId');sessionStorage.removeItem('posukPractice_studentName');location.reload();}

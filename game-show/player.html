@@ -212,14 +212,9 @@
 </div>
 
 <div class="card name-box" id="nameBox">
-  <h2>Student Login</h2>
-  <p class="login-note">Use the same student name and passcode as Fun Torah Tools.</p>
-  <label for="classPinInput">Passcode</label>
-  <input type="password" id="classPinInput" placeholder="Ask your teacher" maxlength="20" inputmode="numeric" autocomplete="off" />
-  <label for="studentNameInput">Your name</label>
-  <input type="text" id="studentNameInput" placeholder="Type your name" maxlength="30" autocomplete="name" />
-  <button id="joinButton" onclick="joinGame()">Join Game</button>
-  <div id="loginMsg" class="login-msg" aria-live="polite"></div>
+  <h2>Sign in on Fun Torah Tools</h2>
+  <p class="login-note">Students sign in once on the homepage, then open Game Show.</p>
+  <a href="../index.html">Go to Fun Torah Tools</a>
 </div>
 
 <div id="gameArea" class="hidden">
@@ -344,8 +339,7 @@ db.ref('b3Games/siteSettings').on('value', snap => {
   applyMasterBlocked();
 });
 
-// This is the exact same student-access source used by Posuk Practice and
-// Shorashim: one shared Class PIN plus the teacher-approved student roster.
+// Kept for the legacy button handler; student sign-in happens on the homepage.
 async function checkStudentAccess(name, pin) {
   const slug=slugify(name);if(!slug)return {ok:false,reason:'Please type your name.'};
   const profileSnap=await db.ref('b3Games/students/'+slug+'/profile').once('value');
@@ -417,7 +411,7 @@ renderGameSnapshot({val:()=>({qIndex:0,roundActive:true,hostSeenAt:Date.now(),sc
 }
   const savedId=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
   const savedName=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName');
-  if(!savedId||!savedName)return;
+  if(!savedId||!savedName){location.href='../index.html';return;}
   try{
     const profileSnap=await db.ref('b3Games/students/'+savedId+'/profile').once('value');
     let profile=profileSnap.val();
@@ -433,15 +427,6 @@ renderGameSnapshot({val:()=>({qIndex:0,roundActive:true,hostSeenAt:Date.now(),sc
 
 // Students switch accounts on the Fun Torah Tools homepage only.
 document.getElementById('switchStudentBtn').addEventListener('click', () => { location.href='../index.html'; });
-
-['classPinInput', 'studentNameInput'].forEach(id => {
-  document.getElementById(id).addEventListener('keydown', event => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      joinGame();
-    }
-  });
-});
 
 restoreSharedStudentLogin();
 

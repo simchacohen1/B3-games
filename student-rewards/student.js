@@ -529,7 +529,7 @@ async function cancelRequest(requestId){
 }
 function showBlocked(){$('#blockedView').classList.remove('hidden');$('#loginView').classList.add('hidden');$('#portalView').classList.add('hidden')}
 
-$('#loginForm').addEventListener('submit',login);
+if($('#loginForm'))$('#loginForm').addEventListener('submit',login);
 $('#logoutBtn').onclick=async()=>{
   if(teacherPreview){location.href='../index.html';return;}
   // Leave Student Rewards only; the Fun Torah Tools login stays active.
@@ -546,6 +546,8 @@ auth.onAuthStateChanged(async user=>{
     $('#portalView').classList.add('hidden');
     $('#blockedView').classList.add('hidden');
     $('#loginView').classList.remove('hidden');
+    if($('#homeSignInNote'))$('#homeSignInNote').textContent='Sign in on Fun Torah Tools first.';
+    if($('#homeSignInLink'))$('#homeSignInLink').style.display='';
     return;
   }
   const token=await user.getIdTokenResult();
