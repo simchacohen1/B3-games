@@ -1,0 +1,61 @@
+'use strict';
+// Authenticated, class-scoped authorizations for future embedded activity sharing.
+// This endpoint does not capture screens or create WebRTC connections.
+const {onRequest}=require('firebase-functions/v2/https');
+const admin=require('firebase-admin');
+const crypto=require('node:crypto');
+const {readPasscode,key,equal}=require('./student-passcodes.cjs');
+if(!admin.apps.length)admin.initializeApp();
+const validRoom=s=>typeof s==='string'&&/^class-pointer-[a-f0-9-]{36}$/.test(s);
+const validId=s=>key(s);
+const error=(code,message)=>{throw Object.assign(new Error(message),{code})};
+exports.classPointerShareAuth=onRequest({
+ region:'us-central1',
+ cors:['https://funtorahtools.com','https://www.funtorahtools.com','https://simchacohen1.github.io'],
+ maxInstances:10
+},async(req,res)=>{
+ res.set('Cache-Control','no-store');
+ if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
+ if(Buffer.byteLength(JSON.stringify(req.body||{}))>4000)return res.status(413).json({error:'Request too large.'});
+ try{
+  const db=admin.database(),body=req.body||{},action=body.action;
+  const studentId=body.studentId,room=body.room,classId=body.classId,workspaceId='b3-2026';
+  if(!validRoom(room)||!validId(classId))error(400,'Invalid class session.');
+  const base='b3Games/workspaces/'+workspaceId+'/classes/'+classId;
+  const [classSnap,sessionSnap]=await Promise.all([db.ref(base).once('value'),db.ref(base+'/classPointerSessions/'+room).once('value')]);
+  const cls=classSnap.val(),session=sessionSnap.val();
+  if(!cls||cls.active===false||!session||session.roomId!==room||session.studentScreenSharing!==true||Date.now()-session.createdAt>14400000||session.createdAt>Date.now()+60000)error(403,'Screen sharing is not enabled for this class.');
+  if(action==='issue'){
+   if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active===false)error(403,'Student not in this class.');
+   const profile=(await db.ref('b3Games/students/'+studentId+'/profile').once('value')).val();
+   if(!profile||profile.active===false)error(403,'Inactive student.');
+   const code=await readPasscode(p=>(db.ref(p).once('value')).then(s=>s.val()),studentId,{allowLegacyDefault:true});
+   if(!equal(code.passcode,body.pin))error(401,'Please sign in again.');
+   const token=crypto.randomBytes(32).toString('hex');
+   const digest=crypto.createHash('sha256').update(token).digest('hex');
+   await db.ref('b3Private/classPointerShareTickets/'+digest).set({studentId,classId,room,createdAt:Date.now(),expiresAt:Date.now()+90000});
+   return res.json({ok:true,token,studentName:String(profile.name||'Student').slice(0,32)});
+  }
+  if(action==='verify'){
+   const auth=String(req.headers.authorization||'').match(/^Bearer (.+)$/);
+   if(!auth)error(401,'Teacher sign-in required.');
+   const claims=await admin.auth().verifyIdToken(auth[1]);
+   const teacher=(await db.ref('b3Games/teacherAccounts/'+claims.uid).once('value')).val();
+   // The published session belongs to this exact Firebase-authenticated teacher.
+   if(session.teacherUid!==claims.uid)error(403,'This session belongs to another teacher.');
+   const token=String(body.token||'');
+   if(!/^[a-f0-9]{64}$/.test(token))error(400,'Invalid sharing ticket.');
+   const digest=crypto.createHash('sha256').update(token).digest('hex');
+   const ticketSnap=await db.ref('b3Private/classPointerShareTickets/'+digest).once('value');
+   const ticket=ticketSnap.val();
+   if(!ticket||ticket.expiresAt<Date.now()||ticket.room!==room||ticket.classId!==classId)error(403,'Sharing ticket expired or belongs to another class.');
+   await ticketSnap.ref.remove();
+   return res.json({ok:true,studentId:ticket.studentId});
+  }
+  error(400,'Unknown action.');
+ }catch(err){
+  const code=Number.isInteger(err.code)?err.code:500;
+  if(code===500)console.error('classPointerShareAuth',err);
+  return res.status(code).json({error:code===500?'Screen sharing authorization unavailable.':err.message});
+ }
+});
