@@ -276,11 +276,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 .mp-results{text-align:left}.mp-results .mp-row{font-size:19px;padding:8px 4px;border-bottom:1px solid #e5eafa}
 @media(max-width:600px){.mp-choose{grid-template-columns:1fr}.mp-code{font-size:48px}.mp-row{grid-template-columns:26px minmax(60px,100px) 1fr 46px;font-size:13px}}
 
-/* Video lessons + words */
-.video-card{width:min(860px,96vw)}
-.video-frame{position:relative;padding-top:56.25%;border-radius:18px;overflow:hidden;background:#000;margin-top:10px}
-.video-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
-.watch-link{border:0;background:#fff3d6;color:#7a4b00;padding:10px 14px;border-radius:12px;font:700 14px 'Quicksand',sans-serif;cursor:pointer}
+/* Word practice */
 .letter-pick-btn.similar-tile span.start-here{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#f2be32;color:#4a3200;font:800 11px 'Quicksand',sans-serif;letter-spacing:1px;padding:4px 10px;border-radius:999px;white-space:nowrap}
 .word-levels{display:flex;gap:8px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
 .word-level{border:2px solid #dbe2f1;border-bottom-width:4px;background:#fff;border-radius:12px;padding:10px 16px;font:700 15px 'Quicksand',sans-serif;color:#475675;cursor:pointer}
@@ -352,7 +348,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
     </div>
     <div class="letter-box" lang="he" dir="rtl"><span id="rashiLetter"></span></div>
     <div class="prompt" id="promptText">Which letter is this?</div>
-    <div class="help-row"><button class="helper" id="learnBtn">🔎 Show me how</button><button class="helper" id="watchBtn">▶ Watch the lesson</button></div><div id="studyPanel" class="study hidden"></div><div class="choices" id="choicesRow"></div>
+    <div class="help-row"><button class="helper" id="learnBtn">🔎 Show me how</button></div><div id="studyPanel" class="study hidden"></div><div class="choices" id="choicesRow"></div>
     <div id="feedback" role="status" aria-live="polite"></div>
     <div class="progress-track"><div id="progFill" style="width:0%"></div></div>
     <div class="streak-row" id="streakRow"></div><div class="star-note">Get 3 correct to complete this step. A mistake does not erase your stars.</div><button class="btn hidden" id="nextBtn" style="display:block;margin:18px auto 0">Next question →</button>
@@ -389,14 +385,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
   </div>
 </div>
 
-<div class="mini-overlay hidden" id="videoModal" role="dialog" aria-modal="true" aria-labelledby="videoTitle">
-  <div class="mini-card video-card">
-    <div class="mini-kicker">▶ WATCH THE LESSON</div>
-    <h2 id="videoTitle"></h2>
-    <div class="video-frame"><iframe id="videoFrame" title="Reading Rashi Made Easy Shmeezy" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
-    <div class="sim-row" style="margin-top:12px"><a id="videoLink" class="mini-skip" target="_blank" rel="noopener">Video not playing? Open it on YouTube</a><button class="btn" id="videoClose">Done watching</button></div>
-  </div>
-</div>
+
 <div class="quest-toast" id="questToast" role="status" aria-live="polite"></div>
 <div class="mini-overlay hidden" id="miniGame" role="dialog" aria-modal="true" aria-labelledby="miniTitle">
   <div class="mini-card">
@@ -1012,7 +1001,6 @@ function renderQuestion(){
     // 'mixed' leaves phase as-is so it can toggle naturally on streak completion
   }
   const unit = getActiveUnit();
-  updateWatchBtn();
   const rashiEl = document.getElementById('rashiLetter');
   const pill = document.getElementById('phasePill');
   const promptEl = document.getElementById('promptText');
@@ -1593,36 +1581,7 @@ function renderMpResults(room){
   else rewardBurst(icon,false);
 }
 
-/* ---------- Video lessons (Reading Rashi Made Easy Shmeezy) ---------- */
-const LESSON_VIDEO = 'iCL_-ae4XKc';
-const LESSONS = {
-  intro:      {title:'Introduction to Rashi',        start:361,  end:751},
-  words2:     {title:'Two-letter words',             start:1454, end:1734},
-  words3:     {title:'Three-letter words',           start:1734, end:1859},
-  zayin:      {title:'Introducing Zayin',            start:1859, end:1996},
-  bet:        {title:'Introducing Bet',              start:1996, end:2194},
-  words4:     {title:'Four-letter words',            start:2194, end:2288},
-  tsadi:      {title:'Introducing Tsadi',            start:2288, end:2356},
-  alef:       {title:'Introducing Aleph',            start:2356, end:2509},
-  tsadisofit: {title:'Final Tsadi',                  start:2509, end:2591},
-  memsofit:   {title:'Final Mem',                    start:2591, end:2702},
-  shin:       {title:'Shin and Sin',                 start:2702, end:2890},
-  finalreview:{title:'Final review and tips',        start:2890, end:3096}
-};
-function openLesson(key){
-  const L=LESSONS[key]; if(!L) return;
-  document.getElementById('videoTitle').textContent=L.title;
-  document.getElementById('videoFrame').src='https://www.youtube-nocookie.com/embed/'+LESSON_VIDEO+'?start='+L.start+'&end='+L.end+'&rel=0&modestbranding=1&autoplay=1';
-  document.getElementById('videoLink').href='https://www.youtube.com/watch?v='+LESSON_VIDEO+'&t='+L.start+'s';
-  document.getElementById('videoModal').classList.remove('hidden');
-}
-function closeLesson(){ document.getElementById('videoFrame').src='about:blank'; document.getElementById('videoModal').classList.add('hidden'); }
-document.getElementById('videoClose').onclick=closeLesson;
-document.getElementById('videoModal').addEventListener('click',e=>{ if(e.target.id==='videoModal') closeLesson(); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !document.getElementById('videoModal').classList.contains('hidden')) closeLesson(); });
-document.getElementById('watchBtn').onclick=()=>{ const u=getActiveUnit(); openLesson(u && u.id); };
-function updateWatchBtn(){ const u=getActiveUnit(); document.getElementById('watchBtn').classList.toggle('hidden', !(u && LESSONS[u.id])); }
-
+/* ---------- Word practice with only the letters learned so far ---------- */
 /* ---------- Word practice with only the letters learned so far ---------- */
 const PRACTICE_WORDS = [
   // 2 letters
@@ -1655,8 +1614,7 @@ function renderWords(){
   const g=wordGame;
   const levels=el('div','word-levels');
   [2,3,4].forEach(n=>{ const open=stepUnlocked(stepIndexOf('words',n)); const b=el('button','word-level'+(n===g.level?' selected':''),(open?'':'🔒 ')+n+'-letter words'); b.onclick=()=>{ viewVersion++; startWords(n); }; levels.appendChild(b); });
-  const watch=el('button','watch-link','▶ Watch: '+LESSONS['words'+g.level].title); watch.onclick=()=>openLesson('words'+g.level);
-  const top=el('div','sim-row'); top.append(levels, watch); top.style.justifyContent='center';
+  const top=el('div','sim-row'); top.appendChild(levels); top.style.justifyContent='center';
   area.appendChild(top);
   const si=stepIndexOf('words',g.level);
   if(!stepUnlocked(si)){
