@@ -758,6 +758,9 @@ if(HALACHA_TEACHER_PREVIEW){
 }
 review.innerHTML='<div class="qbank"><h2>Complete Review Bank — כל הסימנים</h2>'+SIMAN_ORDER.map(s=>'<h2 style="border-bottom:3px solid #173b62;padding-bottom:5px">סימן '+s+'</h2>'+lessons.filter(l=>simanOfLesson(l)===s).map(l=>'<h3>'+l.seif+' · '+l.title+'</h3><p><b>Objective:</b> '+l.objective+'</p><ol>'+l.qs.map(q=>'<li>'+q+'</li>').join('')+'</ol>').join('')).join('')+'</div>';
 buildSimanHub();showSimanHub();loadSimanAccess();
+// Restore the signed-in student's saved scrapbook on every new page session.
+// The loader keeps the existing browser copy available if account sync fails.
+loadCloudHalacha();
 
 function toggleTeacherSource(id){
  const p=document.getElementById("teacher-source-"+id);
