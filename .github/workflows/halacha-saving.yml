@@ -1,0 +1,26 @@
+name: Halacha scrapbook saving checks
+on:
+  push:
+    paths:
+      - 'halacha/index.html'
+      - 'backend/functions/student-auth.js'
+      - 'tests/halacha-saving.test.cjs'
+      - '.github/workflows/halacha-saving.yml'
+  pull_request:
+    paths:
+      - 'halacha/index.html'
+      - 'backend/functions/student-auth.js'
+      - 'tests/halacha-saving.test.cjs'
+      - '.github/workflows/halacha-saving.yml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check Halacha server syntax and saving regressions
+        run: |
+          node --check backend/functions/student-auth.js
+          node --test tests/halacha-saving.test.cjs
