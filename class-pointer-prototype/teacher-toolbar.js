@@ -33,12 +33,37 @@
     swatches.appendChild(b);
   }
 
+  // Full-screen menus must remain reachable even when the toolbar is dragged.
+  function keepMenuVisible(menu){
+    if(!menu||menu.hidden)return;
+    const stageRect=stage.contains(dock)?stage.getBoundingClientRect():null;
+    const bounds={left:Math.max(0,stageRect?.left??0)+6,
+      top:Math.max(0,stageRect?.top??0)+6,
+      right:Math.min(window.innerWidth,stageRect?.right??window.innerWidth)-6,
+      bottom:Math.min(window.innerHeight,stageRect?.bottom??window.innerHeight)-6};
+    const clamp=(n,lo,hi)=>Math.max(lo,Math.min(Math.max(lo,hi),n));
+    if(menu.style.position==='fixed'){
+      menu.style.transform='none';
+      const r=menu.getBoundingClientRect();
+      menu.style.left=clamp(r.left,bounds.left,bounds.right-r.width)+'px';
+      menu.style.top=clamp(r.top,bounds.top,bounds.bottom-r.height)+'px';
+      return;
+    }
+    menu.style.transform='';
+    const r=menu.getBoundingClientRect();
+    const dx=clamp(r.left,bounds.left,bounds.right-r.width)-r.left;
+    const dy=clamp(r.top,bounds.top,bounds.bottom-r.height)-r.top;
+    menu.style.transform='translate('+Math.round(dx)+'px,'+Math.round(dy)+'px)';
+  }
+  function keepOpenMenusVisible(){
+    for(const menu of dock.querySelectorAll('.tb-menu:not([hidden])'))keepMenuVisible(menu);
+  }
   // Menus: one open at a time, close on outside click or Escape.
   function closeMenus(except){
     dock.querySelectorAll('.tb-menu').forEach(menu=>{if(menu!==except){menu.hidden=true;dock.querySelector(`[data-menu="${menu.id}"]`)?.setAttribute('aria-expanded','false')}});
   }
   dock.querySelectorAll('[data-menu]').forEach(button=>button.addEventListener('click',event=>{
-    event.stopPropagation();const menu=$(button.dataset.menu);const open=menu.hidden;closeMenus(menu);menu.hidden=!open;button.setAttribute('aria-expanded',String(open));
+    event.stopPropagation();const menu=$(button.dataset.menu);const open=menu.hidden;closeMenus(menu);menu.hidden=!open;button.setAttribute('aria-expanded',String(open));if(open)keepMenuVisible(menu);
   }));
   document.addEventListener('click',event=>{if(!event.target.closest('.tb-menu-wrap'))closeMenus()});
   document.addEventListener('keydown',event=>{if(event.key==='Escape')closeMenus()});
@@ -71,7 +96,7 @@
       const original=source(id);if(original)new MutationObserver(()=>{button.disabled=original.disabled}).observe(original,{attributes:true,attributeFilter:['disabled']});
       button.disabled=!original||original.disabled;
     });
-    shareWrap.querySelector('[data-menu]').addEventListener('click',event=>{event.stopPropagation();const opening=menu.hidden;closeMenus(menu);menu.hidden=!opening});
+    shareWrap.querySelector('[data-menu]').addEventListener('click',event=>{event.stopPropagation();const opening=menu.hidden;closeMenus(menu);menu.hidden=!opening;if(opening)keepMenuVisible(menu)});
     dock.querySelector('#tbStudentsBtn').closest('.tb-menu-wrap').before(shareWrap);
     const panel=source('tbStudentsMenu'),handle=document.createElement('div');
     handle.className='tb-roster-handle';handle.textContent='⠿ Drag student permissions';handle.title='Drag to move this panel';
@@ -81,8 +106,9 @@
       if(event.button!==0)return;
       event.preventDefault();event.stopPropagation();
       const box=panel.getBoundingClientRect();
-      panel.style.position='fixed';panel.style.left=box.left+'px';panel.style.top=box.top+'px';panel.style.right='auto';
-      drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:box.left,top:box.top};
+      panel.style.transform='none';panel.style.position='fixed';panel.style.left=box.left+'px';panel.style.top=box.top+'px';panel.style.right='auto';
+      keepMenuVisible(panel);
+      drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:parseFloat(panel.style.left)||0,top:parseFloat(panel.style.top)||0};
       handle.setPointerCapture(event.pointerId);
     });
     handle.addEventListener('pointermove',event=>{
@@ -91,10 +117,7 @@
       panel.style.top=Math.max(0,Math.min(innerHeight-panel.offsetHeight,drag.top+event.clientY-drag.y))+'px';
     });
     ['pointerup','pointercancel','lostpointercapture'].forEach(type=>handle.addEventListener(type,()=>{drag=null}));
-    window.addEventListener('resize',()=>{
-      if(panel.style.left){panel.style.left=Math.max(0,Math.min(innerWidth-panel.offsetWidth,parseFloat(panel.style.left)||0))+'px';
-      panel.style.top=Math.max(0,Math.min(innerHeight-panel.offsetHeight,parseFloat(panel.style.top)||0))+'px'}
-    });
+    window.addEventListener('resize',keepOpenMenusVisible);
   }
 
   if(!studentView){
@@ -149,6 +172,7 @@
     const bounds=stage.getBoundingClientRect();
     dock.style.left=Math.max(0,Math.min(stage.clientWidth-dock.offsetWidth,event.clientX-bounds.left-moving.dx))+'px';
     dock.style.top=Math.max(0,Math.min(stage.clientHeight-dock.offsetHeight,event.clientY-bounds.top-moving.dy))+'px';
+    keepOpenMenusVisible();
   });
   const stopMoving=()=>{moving=null;moveHandle.style.cursor='grab'};
   ['pointerup','pointercancel','lostpointercapture'].forEach(type=>moveHandle.addEventListener(type,stopMoving));
