@@ -1786,8 +1786,14 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
     transform-style:preserve-3d;transition:transform .9s ease;
   }
   #learnWorkspace .flip-stage .sc-flipper.sc-flipped{transform:rotateY(180deg)}
-  #learnWorkspace .flip-stage .sc-flipper.sc-spinning{animation:scSpin3 4.5s ease-in-out;transition:none}
-  @keyframes scSpin3{from{transform:rotateY(0deg)}to{transform:rotateY(1080deg)}}
+  /* A fresh word settles into place. No rotating, zooming, or font enlargement. */
+  #learnWorkspace .flip-stage .sc-flipper.sc-arriving{
+    animation:scCardArrive .55s cubic-bezier(.22,1,.36,1) both;
+  }
+  @keyframes scCardArrive{
+    from{opacity:0;transform:translateY(12px)}
+    to{opacity:1;transform:translateY(0)}
+  }
   #learnWorkspace .flip-stage .sc-flipper > .flashcard.editable{
     position:absolute!important;inset:0!important;
     width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;margin:0!important;
@@ -1812,7 +1818,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
     #learnWorkspace .sc-flip-btn span{font-size:20px}
   }
   @media (prefers-reduced-motion:reduce){
-    #learnWorkspace .flip-stage .sc-flipper.sc-spinning{animation:none}
+    #learnWorkspace .flip-stage .sc-flipper.sc-arriving{animation:none}
   }
 </style>
 <script data-shorashim-single-card="v1">
@@ -1838,7 +1844,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
     btn.innerHTML = "<span>↻</span>Flip";
     btn.setAttribute("aria-label", "Flip the card");
     btn.addEventListener("click", () => {
-      if (flipper.classList.contains("sc-spinning")) return;
+      flipper.classList.remove("sc-arriving");
       flipper.classList.toggle("sc-flipped");
     });
     stage.appendChild(btn);
@@ -1855,9 +1861,8 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
     window.addEventListener("resize", fit);
     requestAnimationFrame(fit);
 
-    flipper.addEventListener("animationend", () => {
-      flipper.classList.remove("sc-spinning");
-      btn.disabled = false;
+    flipper.addEventListener("animationend", event => {
+      if (event.target === flipper) flipper.classList.remove("sc-arriving");
     });
 
     // Using any decorating tool turns the card back to the front.
@@ -1867,13 +1872,12 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
     }, true);
   }
 
-  function spin() {
+  function showNewWord() {
     if (!flipper) return;
-    flipper.classList.remove("sc-flipped", "sc-spinning");
+    flipper.classList.remove("sc-flipped", "sc-arriving");
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    void flipper.offsetWidth;          // restart the animation
-    flipper.classList.add("sc-spinning");
-    if (btn) btn.disabled = true;
+    void flipper.offsetWidth; // restart the gentle transition for this word
+    flipper.classList.add("sc-arriving");
   }
 
   function check() {
@@ -1884,7 +1888,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
     if (!editor || editor.classList.contains("hidden")) { lastKey = null; return; }
     const key = (title ? title.textContent : "") + "|" + (word ? word.textContent : "");
     if (!word || !word.textContent.trim()) return;   // wait until the word is drawn
-    if (key !== lastKey) { lastKey = key; spin(); }
+    if (key !== lastKey) { lastKey = key; showNewWord(); }
   }
 
   function boot() {
