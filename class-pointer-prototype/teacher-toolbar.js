@@ -37,27 +37,8 @@
   function closeMenus(except){
     dock.querySelectorAll('.tb-menu').forEach(menu=>{if(menu!==except){menu.hidden=true;dock.querySelector(`[data-menu="${menu.id}"]`)?.setAttribute('aria-expanded','false')}});
   }
-  // Keep popups within the visible window, whether the toolbar is docked,
-  // floating inside a maximized lesson, or near a screen edge.
-  function fitMenu(menu){
-    if(!menu||menu.hidden)return;
-    const wrap=menu.closest('.tb-menu-wrap');if(!wrap)return;
-    menu.style.removeProperty('left');menu.style.removeProperty('right');
-    menu.style.removeProperty('top');menu.style.removeProperty('bottom');
-    menu.style.position='absolute';
-    menu.style.maxWidth='calc(100vw - 16px)';
-    menu.style.maxHeight='calc(100dvh - 16px)';
-    const anchor=wrap.getBoundingClientRect();
-    const rect=menu.getBoundingClientRect();
-    const x=Math.max(8,Math.min(rect.left,innerWidth-rect.width-8));
-    const y=Math.max(8,Math.min(rect.top,innerHeight-rect.height-8));
-    menu.style.left=(x-anchor.left)+'px';
-    menu.style.top=(y-anchor.top)+'px';
-    menu.style.right='auto';
-  }
   dock.querySelectorAll('[data-menu]').forEach(button=>button.addEventListener('click',event=>{
     event.stopPropagation();const menu=$(button.dataset.menu);const open=menu.hidden;closeMenus(menu);menu.hidden=!open;button.setAttribute('aria-expanded',String(open));
-    if(open)fitMenu(menu);
   }));
   document.addEventListener('click',event=>{if(!event.target.closest('.tb-menu-wrap'))closeMenus()});
   document.addEventListener('keydown',event=>{if(event.key==='Escape')closeMenus()});
@@ -90,47 +71,29 @@
       const original=source(id);if(original)new MutationObserver(()=>{button.disabled=original.disabled}).observe(original,{attributes:true,attributeFilter:['disabled']});
       button.disabled=!original||original.disabled;
     });
-    shareWrap.querySelector('[data-menu]').addEventListener('click',event=>{
-      event.stopPropagation();
-      const opening=menu.hidden;closeMenus(menu);menu.hidden=!opening;
-      event.currentTarget.setAttribute('aria-expanded',String(opening));
-      if(opening)fitMenu(menu);
-    });
+    shareWrap.querySelector('[data-menu]').addEventListener('click',event=>{event.stopPropagation();const opening=menu.hidden;closeMenus(menu);menu.hidden=!opening});
     dock.querySelector('#tbStudentsBtn').closest('.tb-menu-wrap').before(shareWrap);
     const panel=source('tbStudentsMenu'),handle=document.createElement('div');
     handle.className='tb-roster-handle';handle.textContent='⠿ Drag student permissions';handle.title='Drag to move this panel';
     panel.prepend(handle);
-    const panelWrap=panel.closest('.tb-menu-wrap');
     let drag=null;
-    // Absolute offsets are relative to the menu wrapper. A fixed-position panel
-    // jumps when its backdrop-filtered toolbar creates a containing block.
     handle.addEventListener('pointerdown',event=>{
       if(event.button!==0)return;
       event.preventDefault();event.stopPropagation();
       const box=panel.getBoundingClientRect();
-      const anchor=panelWrap.getBoundingClientRect();
-      panel.style.position='absolute';
-      panel.style.left=(box.left-anchor.left)+'px';
-      panel.style.top=(box.top-anchor.top)+'px';
-      panel.style.right='auto';
+      panel.style.position='fixed';panel.style.left=box.left+'px';panel.style.top=box.top+'px';panel.style.right='auto';
       drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:box.left,top:box.top};
       handle.setPointerCapture(event.pointerId);
     });
     handle.addEventListener('pointermove',event=>{
       if(!drag||drag.id!==event.pointerId)return;
-      const anchor=panelWrap.getBoundingClientRect();
-      const x=Math.max(8,Math.min(innerWidth-panel.offsetWidth-8,drag.left+event.clientX-drag.x));
-      const y=Math.max(8,Math.min(innerHeight-panel.offsetHeight-8,drag.top+event.clientY-drag.y));
-      panel.style.left=(x-anchor.left)+'px';
-      panel.style.top=(y-anchor.top)+'px';
+      panel.style.left=Math.max(0,Math.min(innerWidth-panel.offsetWidth,drag.left+event.clientX-drag.x))+'px';
+      panel.style.top=Math.max(0,Math.min(innerHeight-panel.offsetHeight,drag.top+event.clientY-drag.y))+'px';
     });
     ['pointerup','pointercancel','lostpointercapture'].forEach(type=>handle.addEventListener(type,()=>{drag=null}));
     window.addEventListener('resize',()=>{
-      if(panel.hidden||!panel.style.left)return;
-      const box=panel.getBoundingClientRect();
-      const anchor=panelWrap.getBoundingClientRect();
-      panel.style.left=(Math.max(8,Math.min(innerWidth-panel.offsetWidth-8,box.left))-anchor.left)+'px';
-      panel.style.top=(Math.max(8,Math.min(innerHeight-panel.offsetHeight-8,box.top))-anchor.top)+'px';
+      if(panel.style.left){panel.style.left=Math.max(0,Math.min(innerWidth-panel.offsetWidth,parseFloat(panel.style.left)||0))+'px';
+      panel.style.top=Math.max(0,Math.min(innerHeight-panel.offsetHeight,parseFloat(panel.style.top)||0))+'px'}
     });
   }
 
