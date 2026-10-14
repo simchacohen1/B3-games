@@ -597,9 +597,11 @@ async function toggleShorashimRecording(){
           const oldEventId=oldDaily.eventId||'';
           const oldEvent=oldEventId?await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${oldEventId}`).once('value'):null;
           const oldData=oldEvent?.val?.()||{};
-          if(oldData.pointRequestId || ['pending','approved'].includes(String(oldData.pointRequestStatus||''))){
-            throw new Error('You already sent today’s Shorashim recording.');
-          }
+          // Never destroy an already uploaded recording because its separate
+          // points request failed. The teacher can safely repair that request.
+          if(oldData.audioURL&&oldData.storagePath)
+            throw new Error(oldData.pointRequestId?'You already sent today’s Shorashim recording.':'Your recording is saved. Ask your teacher to press Connect Points Request.');
+          // Only a dangling date marker without a usable recording can be replaced.
           await existingRef.remove();
         }
         const eventId=cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}`).push().key;
@@ -607,11 +609,14 @@ async function toggleShorashimRecording(){
         const ref=cloudStorage.ref(storagePath); await ref.put(blob,{contentType:blob.type||'audio/webm'}); const audioURL=await ref.getDownloadURL();
         const record={id:eventId,studentId:cloudStudentId,studentName:cloudStudentName||currentStudent,date,mode,noHints:reviewNoHints,points,durationMs,audioURL,storagePath,status:'pending',createdAt:firebase.database.ServerValue.TIMESTAMP};
         await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${eventId}`).set(record);
-        
+        // Mark the day as submitted immediately. A temporary Rewards API failure
+        // must not allow duplicates or make the pupil's recording disappear.
+        await existingRef.set({eventId,mode,points,status:'recorded',createdAt:firebase.database.ServerValue.TIMESTAMP});
+
         const source=reviewNoHints?'shorashim-no-hints':'shorashim-recording';
         const awardResp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:cloudStudentId,source,eventId})});
         const awardData=await awardResp.json().catch(()=>({}));
-        if(!awardResp.ok)throw new Error(awardData.error||'Recording saved, but the points request could not be sent. Please tell Rabbi Cohen.');
+        if(!awardResp.ok)throw new Error('Your recording is saved. Ask your teacher to connect its points request. '+(awardData.error||''));
         await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${eventId}`).update({pointRequestId:awardData.requestId||null,pointRequestStatus:awardData.status||'pending'});
         await cloudDb.ref(`${CLOUD_ROOT}/recordings/${cloudStudentId}/${date}`).set({eventId,mode,points,status:awardData.status||'pending',createdAt:firebase.database.ServerValue.TIMESTAMP});
         if(status)status.textContent=`Sent to Rabbi Cohen for approval — ${points} points if approved.`;
