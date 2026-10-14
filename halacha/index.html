@@ -199,12 +199,20 @@ const HALACHA_TEACHER_PREVIEW=HALACHA_TEACHER_LESSON||!!HALACHA_TEACHER_VIEW;
 const HALACHA_STUDENT_ID=String(HALACHA_TEACHER_VIEW||(HALACHA_TEACHER_LESSON?"":sessionStorage.getItem("b3Games_studentId")||"")).trim();
 const HALACHA_LOCAL_KEY="halachaV14"+(HALACHA_STUDENT_ID?":"+HALACHA_STUDENT_ID:"");
 let S={};try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY+(HALACHA_TEACHER_LESSON?"_teacher":""))||"{}")}catch(e){}
-let halachaDb=null,cloudSaveTimer=null,halachaCloudLoading=true,halachaDirty=false,halachaSaveRevision=0;
+let halachaDb=null,halachaAuth=null,cloudSaveTimer=null,halachaCloudLoading=true,halachaDirty=false,halachaSaveRevision=0;
+const HALACHA_PENDING_KEY="halachaPending:"+HALACHA_STUDENT_ID;
+try{if(!HALACHA_TEACHER_PREVIEW&&localStorage.getItem(HALACHA_PENDING_KEY)==="1")halachaDirty=true}catch(e){}
 let teacherAccountUid="",teacherCloudReady=false,teacherDirty=false;
 try{
  if(window.firebase&&window.B3_FIREBASE_CONFIG){
    if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
-   halachaDb=firebase.database();
+   if(!HALACHA_TEACHER_PREVIEW){
+     // A separate Firebase app prevents a pupil's custom token from logging out the teacher.
+     let app;try{app=firebase.app("HalachaStudent")}catch(e){app=firebase.initializeApp(window.B3_FIREBASE_CONFIG,"HalachaStudent")}
+     halachaDb=app.database();halachaAuth=app.auth();
+   }else{
+     halachaDb=firebase.database();
+   }
  }
 }catch(e){console.warn("Halacha cloud save unavailable",e)}
 function cloudPath(){
@@ -227,7 +235,7 @@ function save(){
    return;
  }
  halachaDirty=true;halachaSaveRevision++;
- try{localStorage.setItem(HALACHA_LOCAL_KEY,JSON.stringify(S))}catch(e){}
+ try{localStorage.setItem(HALACHA_LOCAL_KEY,JSON.stringify(S));localStorage.setItem(HALACHA_PENDING_KEY,"1")}catch(e){setSaveStatus("Device storage full — please export your scrapbook");return}
  if(!halachaDb||!cloudPath()){setSaveStatus("Saved on this device");return}
  setSaveStatus(halachaCloudLoading?"Saved on this device — checking account…":"Saving to account…");
  clearTimeout(cloudSaveTimer);
@@ -236,7 +244,7 @@ function save(){
  cloudSaveTimer=setTimeout(()=>{
    if(revision!==halachaSaveRevision)return;
    halachaDb.ref(cloudPath()).set({version:1,updatedAt:firebase.database.ServerValue.TIMESTAMP,state:snapshot})
-    .then(()=>{if(revision===halachaSaveRevision){halachaDirty=false;setSaveStatus("✓ Saved to my account");}else save();})
+    .then(()=>{if(revision===halachaSaveRevision){halachaDirty=false;try{localStorage.removeItem(HALACHA_PENDING_KEY)}catch(e){}setSaveStatus("✓ Saved to my account");}else save();})
     .catch(e=>{console.warn("Halacha cloud save failed",e);setSaveStatus("Saved on this device — account save failed");});
  },350);
 }
@@ -248,11 +256,15 @@ async function loadCloudHalacha(){
    const snap=await halachaDb.ref(cloudPath()).once("value"),row=snap.val();
    if(row&&row.state&&typeof row.state==="object"){
      const remote=JSON.stringify(row.state),local=JSON.stringify(S);
-     if(HALACHA_TEACHER_VIEW && sessionStorage.getItem("halachaTeacherLoaded:"+HALACHA_TEACHER_VIEW)!=="1"){localStorage.setItem(HALACHA_LOCAL_KEY,remote);sessionStorage.setItem("halachaTeacherLoaded:"+HALACHA_TEACHER_VIEW,"1");location.reload();return}
-     if(remote!==local && !halachaDirty && sessionStorage.getItem("halachaCloudLoaded:"+HALACHA_STUDENT_ID)!=="1"){
-       localStorage.setItem(HALACHA_LOCAL_KEY,remote);
-       sessionStorage.setItem("halachaCloudLoaded:"+HALACHA_STUDENT_ID,"1");
-       location.reload(); return;
+     if(remote!==local && !halachaDirty){
+       // Refresh from the account on EVERY visit, not just the first visit in a tab.
+       // Keep a recoverable device copy before replacing different local work.
+       if(Object.keys(S).length){try{localStorage.setItem("halachaPreviousDeviceCopy:"+HALACHA_STUDENT_ID,local)}catch(e){}}
+       S=row.state;
+       try{localStorage.setItem(HALACHA_LOCAL_KEY,remote)}catch(e){}
+       const current=document.querySelector(".section.on"),id=current?current.id:"";
+       closeCustomizer();sections.innerHTML="";lessons.forEach(render);
+       if(id&&lessons.some(l=>l.id===id)){const l=lessons.find(x=>x.id===id);CURRENT_SIMAN=simanOfLesson(l);openSiman(CURRENT_SIMAN);show(id)}else showSimanHub();
      }
    }else if(Object.keys(S).length){
      halachaDirty=true;
@@ -742,8 +754,52 @@ function render(l){let sec=document.createElement("div");sec.id=l.id;sec.classNa
 lessons.forEach(render);
 lessons.forEach(l=>{let b=document.createElement("button");b.dataset.id=l.id;b.textContent=(["b","c","f"].includes(l.id)?"📘 ":"")+l.tab;b.onclick=()=>show(l.id);b.style.display="none";tabs.appendChild(b)});
 let rb=document.createElement("button");rb.dataset.id="review";rb.textContent="🎤 Teacher Review";rb.className="teacherOnly";rb.onclick=()=>show("review");tabs.appendChild(rb);
-function halachaAuthReady(){return new Promise(r=>{try{if(!window.firebase||!firebase.auth)return r(null);let done=false,t=setTimeout(()=>{if(!done){done=true;r(null)}},4000),u=firebase.auth().onAuthStateChanged(x=>{if(done)return;done=true;clearTimeout(t);u();r(x)})}catch(e){r(null)}})}
-halachaAuthReady().then(loadCloudHalacha);
+async function halachaAuthReady(){
+ if(HALACHA_TEACHER_PREVIEW){
+   return new Promise(resolve=>{
+     if(!window.firebase||!firebase.auth)return resolve(null);
+     let finished=false,unsub=()=>{};
+     const timer=setTimeout(()=>{if(!finished){finished=true;unsub();resolve(null)}},6000);
+     unsub=firebase.auth().onAuthStateChanged(user=>{if(finished)return;finished=true;clearTimeout(timer);unsub();resolve(user)});
+   });
+ }
+ if(!halachaAuth||!HALACHA_STUDENT_ID)throw new Error("Sign in from Fun Torah Tools first.");
+ const name=String(sessionStorage.getItem("b3Games_studentName")||"").trim();
+ const pin=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
+ const classId=String(sessionStorage.getItem("b3Games_studentClass")||"").trim();
+ if(!name||!pin||!classId)throw new Error("Your Fun Torah Tools sign-in is missing.");
+ if(halachaAuth.currentUser){
+   const t=await halachaAuth.currentUser.getIdTokenResult();
+   if(t.claims.b3StudentId===HALACHA_STUDENT_ID)return halachaAuth.currentUser;
+   await halachaAuth.signOut();
+ }
+ const credentials={name,pin,studentId:HALACHA_STUDENT_ID,classId};
+ let response=await fetch("https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth",{
+   method:"POST",headers:{"Content-Type":"application/json"},signal:AbortSignal.timeout(15000),
+   body:JSON.stringify({...credentials,action:"halachaToken"})
+ });
+ let body=await response.json().catch(()=>({}));
+ if(!response.ok&&response.status===400&&/unknown action/i.test(String(body.error||""))){
+   // Existing deployed functions may be older than the site's new Halacha code.
+   // Rewards login also issues the same verified student claim, when enabled.
+   response=await fetch("https://us-central1-b3-games.cloudfunctions.net/studentRewardsLogin",{
+     method:"POST",headers:{"Content-Type":"application/json"},signal:AbortSignal.timeout(15000),
+     body:JSON.stringify({name,pin,b3StudentId:HALACHA_STUDENT_ID,classId})
+   });
+   body=await response.json().catch(()=>({}));
+ }
+ if(!response.ok||!body.customToken||String(body.b3StudentId||"")!==HALACHA_STUDENT_ID)
+   throw new Error(body.error||"Could not authenticate this student.");
+ await halachaAuth.signInWithCustomToken(body.customToken);
+ const t=await halachaAuth.currentUser.getIdTokenResult();
+ if(t.claims.b3StudentId!==HALACHA_STUDENT_ID)throw new Error("Student account did not match.");
+ return halachaAuth.currentUser;
+}
+halachaAuthReady().then(loadCloudHalacha).catch(e=>{
+ console.warn("Halacha student account sign-in unavailable",e);
+ halachaCloudLoading=false;
+ setSaveStatus("Saved only on this device — account sync unavailable");
+});
 if(HALACHA_TEACHER_PREVIEW){
  document.addEventListener("DOMContentLoaded",()=>setHalachaMode(HALACHA_PARAMS.get("demo")!=="1"),{once:true});
  setTimeout(()=>{
@@ -758,9 +814,8 @@ if(HALACHA_TEACHER_PREVIEW){
 }
 review.innerHTML='<div class="qbank"><h2>Complete Review Bank — כל הסימנים</h2>'+SIMAN_ORDER.map(s=>'<h2 style="border-bottom:3px solid #173b62;padding-bottom:5px">סימן '+s+'</h2>'+lessons.filter(l=>simanOfLesson(l)===s).map(l=>'<h3>'+l.seif+' · '+l.title+'</h3><p><b>Objective:</b> '+l.objective+'</p><ol>'+l.qs.map(q=>'<li>'+q+'</li>').join('')+'</ol>').join('')).join('')+'</div>';
 buildSimanHub();showSimanHub();loadSimanAccess();
-// Restore the signed-in student's saved scrapbook on every new page session.
-// The loader keeps the existing browser copy available if account sync fails.
-loadCloudHalacha();
+// Account restore is started only once, after authentication above.
+// A second premature load used to race the authenticated one and lose cloud work.
 
 function toggleTeacherSource(id){
  const p=document.getElementById("teacher-source-"+id);
