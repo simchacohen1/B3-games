@@ -68,7 +68,12 @@ let phase='launch';
   const options=await companion.evaluate(()=>window.captureOptions);assert.equal(options.preferCurrentTab,false);assert.equal(options.video.displaySurface,undefined);
   phase='stop sharing';await companion.getByRole('button',{name:/Stop Sharing/}).click();assert.equal(await companion.evaluate(()=>window.sampleStream.getVideoTracks()[0].readyState),'ended');
   await teacher.evaluate(()=>window.sampleCall.close());assert.equal(await teacher.locator('#activityScreenTray').isVisible(),false);
-  fs.mkdirSync('test-results/persistent-sharing',{recursive:true});fs.writeFileSync('test-results/persistent-sharing/results.json',JSON.stringify({sampleFramesReceived:true,activityNavigationPreservedCapture:true,captureRequests:1,stopEndedTrack:true,realDisplayCapture:'NOT VERIFIED',liveFirebaseAuthorization:'NOT VERIFIED'},null,2));
-  console.log('PASS: native sample video received by teacher; companion survives activity navigation; stop ends capture.');
+  phase='logout ends capture';await companion.getByRole('button',{name:/Share My Screen/}).click();
+  await companion.waitForFunction(()=>document.querySelector('#fttActivityScreenShare button').textContent.includes('Stop Sharing'));
+  await activity.evaluate(()=>sessionStorage.removeItem('b3Games_studentId'));
+  await companion.waitForFunction(()=>window.sampleStream.getVideoTracks()[0].readyState==='ended');
+  assert.equal(await companion.getByRole('button',{name:/Share My Screen/}).isDisabled(),true);
+  fs.mkdirSync('test-results/persistent-sharing',{recursive:true});fs.writeFileSync('test-results/persistent-sharing/results.json',JSON.stringify({sampleFramesReceived:true,activityNavigationPreservedCapture:true,captureRequests:1,stopEndedTrack:true,logoutEndedCapture:true,realDisplayCapture:'NOT VERIFIED',liveFirebaseAuthorization:'NOT VERIFIED'},null,2));
+  console.log('PASS: native sample video received by teacher; companion survives activity navigation; stop and logout end capture.');
  }finally{await browser.close()}
 })().catch(error=>{console.error(error);if(process.env.CI)console.error('::error file=tests/persistent-sharing.browser.cjs::'+phase+' '+error.stack.replace(/\n/g,' '));process.exitCode=1});

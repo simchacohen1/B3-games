@@ -40,7 +40,7 @@
     btn.style.cssText='background:#1d4ed8;color:#fff;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;font:inherit';
     const label=document.createElement('span');label.setAttribute('role','status');label.style.cssText='font-size:12px;color:#1e3a8a;max-width:180px';
     holder.append(btn,label);document.body.appendChild(holder);
-    let active=null,peer=null,call=null,stream=null,busy=false;
+    let active=null,peer=null,call=null,stream=null,busy=false,parentValid=true;
     const channel=typeof BroadcastChannel==='function'?new BroadcastChannel('ftt-screen-share'):null;
     const announce=()=>channel?.postMessage({studentId:id,classId,sharing:!!stream});
     if(!isCompanion&&channel)channel.onmessage=event=>{const v=event.data;if(v?.studentId===id&&v.classId===classId){btn.textContent=v.sharing?'⏹ Sharing controls':'🖥 Share My Screen';status(v.sharing?'Sharing in your companion window.':'')}};
@@ -62,7 +62,7 @@
       if(!permitted){active=null;stop();holder.style.display='none';status('Your teacher changed access. Return to Fun Torah Tools.')}
     },()=>{permitted=false;active=null;stop();holder.style.display='none'});
     sessions.on('value',snapshot=>{
-      const next=permitted?current(snapshot.val()):null;
+      const next=permitted&&parentValid?current(snapshot.val()):null;
       if(!next||!active||next.roomId!==active.roomId){if(stream)stop()}
       active=next;holder.style.display=active?'flex':'none';
     },()=>{active=null;holder.style.display='none';stop()});
@@ -81,7 +81,22 @@
       return;
     }
     holder.style.left='14px';holder.style.right='14px';holder.style.flexWrap='wrap';
+    const activityWindow=window.opener;
+    function parentSessionAllows(){
+      if(!activityWindow)return true; // Explicitly opened standalone controls.
+      if(activityWindow.closed)return false;
+      try{return activityWindow.location.origin===location.origin&&activityWindow.sessionStorage.getItem('b3Games_studentId')===id&&activityWindow.sessionStorage.getItem('b3Games_classPin')===pin&&(activityWindow.sessionStorage.getItem('b3Games_studentClass')||classId)===classId}catch{return false}
+    }
+    function checkParentSession(){
+      if(parentValid&&parentSessionAllows())return true;
+      parentValid=false;active=null;stop();sessionStorage.clear();btn.disabled=true;holder.style.display='flex';
+      status('Your student login changed. Open Sharing Controls from your activity again.');return false;
+    }
+    const parentTimer=setInterval(checkParentSession,1000);
+    window.addEventListener('pagehide',()=>clearInterval(parentTimer));
+
     btn.addEventListener('click',async()=>{
+      if(!checkParentSession())return;
       if(stream){stop();return}
       if(busy||!active)return;
       busy=true;btn.disabled=true;
@@ -123,7 +138,7 @@
           if(['failed','closed'].includes(pc.connectionState)){stop();status('Connection lost. Click Share My Screen to share again.')}
         });
       }catch(error){captured?.getTracks().forEach(t=>t.stop());stop();status(error?.name==='NotAllowedError'?'Sharing canceled.':error.message||'Could not share.')}
-      finally{busy=false;btn.disabled=false}
+      finally{busy=false;btn.disabled=!parentValid}
     });
     window.addEventListener('pagehide',()=>{stop();channel?.close()});
   }catch(error){console.warn('Class Pointer activity sharing unavailable',error)}

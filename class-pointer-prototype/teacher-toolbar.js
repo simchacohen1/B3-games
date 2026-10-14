@@ -21,7 +21,7 @@
   if(!dock||!stage||!teacherPanel)return;
   const toolSel=$(studentView?'studentTool':'teacherTool'),colorSel=$(studentView?'studentColor':'teacherColor'),sizeSel=$(studentView?'studentSize':'teacherSize');
   const home=document.createComment('teacher-dock-home');dock.parentNode.insertBefore(home,dock);
-  const icons={target:'◎',arrow:'➤',star:'★',heart:'♥',paw:'🐾',sparkle:'✦',roar:'🦁'};
+  const icons={target:'↖',arrow:'➤',star:'★',heart:'♥',paw:'🐾',sparkle:'✦',roar:'🦁'};
   let lastShape=window.ClassPointerCore.highlightTools.includes(toolSel.value)?'target':toolSel.value;
 
   function setSource(select,value){if(select.disabled||Array.from(select.options).find(o=>o.value===value)?.disabled||select.value===value)return;select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}))}

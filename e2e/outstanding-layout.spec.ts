@@ -48,6 +48,7 @@ test('Pointer menus, dragging and stop-sharing stay inside a smaller fullscreen 
  await page.mouse.move(handle!.x+40,handle!.y+15);await page.mouse.down();await page.mouse.move(handle!.x+140,handle!.y+75,{steps:5});await page.mouse.up();await inside();
  const after=await panel.boundingBox();expect(Math.abs(after!.x-before!.x)+Math.abs(after!.y-before!.y)).toBeGreaterThan(10);
  await page.keyboard.press('Escape');await page.locator('#tbFullscreen').click();await page.locator('#tbCollapse').click();await expect(page.locator('#tbStopShare')).toBeVisible();
+ const stop=await page.locator('#tbStopShare').boundingBox();expect(stop!.x).toBeGreaterThanOrEqual(0);expect(stop!.x+stop!.width).toBeLessThanOrEqual(780);
 });
 test('Posuk shows voice controls for three questions and tap controls for two',async({page})=>{
  const html=read('record_pesukim/student.html');await page.route('https://layout.test/**',route=>route.fulfill({contentType:'text/html',body:strip(html)}));await page.goto('https://layout.test/student.html');
