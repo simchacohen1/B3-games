@@ -348,6 +348,3 @@ body.sk-has-reset #learnWorkspace #resetCardBtn{display:none !important}
   #learnWorkspace .toolbox[data-ux-tool="pictures"] #illustrationChoices,
   #learnWorkspace .toolbox[data-ux-tool="pictures"] .art-edit-row{border-left:0;padding-left:0}
 }
-
-/* One Save & Next button: the header control performs the real save. */
-#learnWorkspace:has(.ux-quick-save) .editor-actions #saveCardBtn{display:none!important}
