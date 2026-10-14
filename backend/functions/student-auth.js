@@ -2,6 +2,8 @@
 const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
 const {studentAuth}=require('./student-auth-core.cjs');
+const crypto=require('node:crypto');
+const studentTools=require('./student-tool-policy.js');
 if(!admin.apps.length)admin.initializeApp();
 exports.funTorahStudentAuth=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io','https://funtorahtools.com','https://www.funtorahtools.com'],maxInstances:10},async(req,res)=>{
  res.set('Cache-Control','no-store');
@@ -14,7 +16,34 @@ exports.funTorahStudentAuth=onRequest({region:'us-central1',cors:['https://simch
    update:updates=>db.ref().update(updates),
    tx:(path,fn)=>db.ref(path).transaction(fn)
   };
-  res.json(await studentAuth(store,req.body||{},req.ip));
+  const body=req.body||{};
+  if(body.action==='halachaToken'){
+   // Check the *actual* individual passcode and rate limit before issuing credentials.
+   const student=await studentAuth(store,{action:'login',name:body.name,pin:body.pin},req.ip);
+   const studentId=String(body.studentId||'');
+   const classId=String(body.classId||student.classId||'');
+   const validId=/^[A-Za-z0-9_-]{1,100}$/;
+   if(!validId.test(studentId)||student.id!==studentId||!validId.test(classId)){
+    return res.status(403).json({error:'Please sign in to your class again.'});
+   }
+   const [memberships,profile,cls]=await Promise.all([
+    store.get('b3Games/students/'+studentId+'/memberships'),
+    store.get('b3Games/students/'+studentId+'/profile'),
+    store.get('b3Games/workspaces/b3-2026/classes/'+classId)
+   ]);
+   const member=cls?.members?.[studentId];
+   const enrolled=Object.values(memberships||{}).some(m=>m&&m.active!==false&&m.workspaceId==='b3-2026'&&m.classId===classId)
+    ||(!Object.keys(memberships||{}).length&&profile?.classId===classId);
+   if(!enrolled||!cls||cls.active===false||!member||member.active===false
+      ||!studentTools.allowed(cls,studentId,'halacha')
+      ||(!['et','wt'].includes(classId)&&!studentTools.granted(cls,'halacha'))){
+    return res.status(403).json({error:'Halacha is not available for this student and class.'});
+   }
+   const uid='halacha_'+crypto.createHash('sha256').update(studentId).digest('hex').slice(0,28);
+   const customToken=await admin.auth().createCustomToken(uid,{b3StudentId:studentId,b3ClassId:classId});
+   return res.json({ok:true,customToken,b3StudentId:studentId,classId});
+  }
+  res.json(await studentAuth(store,body,req.ip));
  }catch(error){
   const code=Number.isInteger(error.code)?error.code:500;
   if(code===500)console.error('funTorahStudentAuth',error);
