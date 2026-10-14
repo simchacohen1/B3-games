@@ -57,3 +57,16 @@ test('teacher checks activity ticket before accepting a media call',()=>{
  assert.match(teacher,/call\.answer\(\)/);
  assert.match(classroom,/ClassPointerActivityShares\.incomingCall/);
 });
+
+test('teacher can send a single class to student screen sharing while the browser still asks consent',()=>{
+  const classroom=read('classroom.js'),session=read('dashboard-session.js'),activity=read('activity-share.js'),html=read('classroom.html');
+  assert.match(html,/id="sendEveryoneShare"/);
+  assert.match(html,/activity-share\.js/);
+  assert.match(classroom,/requestEveryoneToShare/);
+  assert.match(session,/requestScreenSharing/);
+  assert.match(session,/shareRequest:\{at:firebase\.database\.ServerValue\.TIMESTAMP\}/);
+  assert.match(activity,/shareRequest\?\.at/);
+  assert.match(activity,/sessionStorage\.setItem\(inviteKey,marker\)/);
+  assert.match(activity,/dashboard\.html\?share=1/);
+  assert.match(activity,/getDisplayMedia\(/);
+});
