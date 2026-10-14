@@ -12,7 +12,7 @@
         const db=firebase.database(),ref=db.ref('b3Games/workspaces/'+ws+'/classes/'+classId),row=(await ref.once('value')).val();
         if(!C.permitted(access,classId,row))throw Error('Class Pointer is not enabled for this teacher and class.');
         // Class selection is navigation, never a silent session transfer.
-        const picker=document.getElementById('pointerClassChoice');
+        const picker=typeof document==='undefined'?null:document.getElementById('pointerClassChoice');
         if(picker){
           const base=db.ref('b3Games/workspaces/'+ws+'/classes');
           const ids=access.role==='admin'?Object.keys((await base.once('value')).val()||{}):(access.classIds||[]).filter(C.validId);
