@@ -1115,12 +1115,21 @@
     const bar = document.createElement("div");
     bar.id = "b3ActingBanner";
     bar.setAttribute("role", "status");
-    bar.style.cssText = "position:fixed;left:16px;right:16px;bottom:14px;margin:0 auto;width:fit-content;z-index:2147483647;display:flex;align-items:center;gap:12px;" +
+    bar.style.cssText = "position:fixed;left:16px;right:16px;bottom:200px;margin:0 auto;width:fit-content;z-index:2147483647;display:flex;align-items:center;gap:12px;" +
       "padding:10px 12px 10px 16px;border-radius:999px;background:#7c2d12;color:#fff;font:600 14px/1.3 Arial,sans-serif;" +
       "box-shadow:0 8px 24px rgba(0,0,0,.28)";
     bar.innerHTML = '<span>\uD83D\uDC40 Viewing as <strong>' + actingEsc(acting.name) + '</strong> \u00B7 ' + actingEsc(acting.className) + '</span>' +
       '<button type="button" style="border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#7c2d12;font:800 13px Arial,sans-serif;cursor:pointer;white-space:nowrap">Exit student view</button>';
     bar.querySelector("button").onclick = stopActingAsStudent;
+    bar.style.maxWidth="calc(100vw - 24px)";bar.style.boxSizing="border-box";bar.style.flexWrap="wrap";
+    const handle=document.createElement("button");handle.type="button";handle.textContent="⠿ Move";handle.setAttribute("aria-label","Drag student preview banner");
+    handle.style.cssText="touch-action:none;cursor:grab;border:1px solid #ffffff88;background:transparent;color:white;border-radius:8px;padding:6px";bar.prepend(handle);
+    let drag=null;
+    const place=(x,y)=>{bar.style.right="auto";bar.style.bottom="auto";bar.style.margin="0";bar.style.left=Math.max(8,Math.min(innerWidth-bar.offsetWidth-8,x))+"px";bar.style.top=Math.max(8,Math.min(innerHeight-bar.offsetHeight-8,y))+"px"};
+    handle.addEventListener("pointerdown",e=>{if(e.button!==0)return;e.preventDefault();const r=bar.getBoundingClientRect();drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:r.left,top:r.top};place(r.left,r.top);handle.setPointerCapture(e.pointerId)});
+    handle.addEventListener("pointermove",e=>{if(drag&&drag.id===e.pointerId)place(drag.left+e.clientX-drag.x,drag.top+e.clientY-drag.y)});
+    ["pointerup","pointercancel","lostpointercapture"].forEach(type=>handle.addEventListener(type,()=>{drag=null}));
+    window.addEventListener("resize",()=>{if(bar.style.top){const r=bar.getBoundingClientRect();place(r.left,r.top)}});
     document.body.appendChild(bar);
   }
 

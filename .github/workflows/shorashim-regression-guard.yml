@@ -1,9 +1,9 @@
 name: Shorashim regression guard
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feature/outstanding-improvements, fix/oct13-repairs-and-regression-tests]
   push:
-    branches: [main]
+    branches: [main, feature/outstanding-improvements, fix/oct13-repairs-and-regression-tests]
 permissions:
   contents: read
 jobs:

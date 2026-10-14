@@ -107,6 +107,29 @@
         ".read": true,
         ".write": false
       },
+      "approvedQuestionBanks": {
+        ".read": true,
+        "$workspaceId": {
+          "$sefer": {
+            "$perek": {
+              "$pasuk": {
+                ".write": "auth != null && newData.exists() && ((auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true))",
+                ".validate": "newData.hasChildren(['items','updatedAt','reviewed']) && newData.child('reviewed').val() == true && newData.child('updatedAt').isNumber() && newData.child('items').numChildren() == 2 && ($sefer == 'Bereishis' || $sefer == 'Shemos' || $sefer == 'Vayikra' || $sefer == 'Bamidbar' || $sefer == 'Devarim')",
+                "items": {
+                  "$i": {
+                    ".validate": "($i == '0' || $i == '1') && newData.hasChildren(['question','answerPhrases']) && newData.child('question').isString() && newData.child('question').val().length > 0 && newData.child('question').val().length <= 500 && newData.child('answerPhrases').numChildren() > 0 && newData.child('answerPhrases').numChildren() <= 11",
+                    "answerPhrases": {
+                      "$j": {
+                        ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "classroomTranslations": {
         ".read": true,
         ".write": false

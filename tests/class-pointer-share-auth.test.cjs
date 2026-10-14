@@ -83,3 +83,15 @@ test('a session without a valid timestamp cannot bypass lesson expiry',async()=>
     const s=setup();s.workspace.classes.et.classPointerSessions[rooms.et].createdAt=timestamp;assert.equal((await s.issue()).status,403);
   }
 });
+test('an ongoing share check revalidates class, student and teacher access without a new ticket',async()=>{
+  const s=setup();const body={action:'check',classId:'et',room:rooms.et,studentId:'student-et'};
+  assert.equal((await s.call(body,'teacher-et')).status,200);
+  assert.equal((await s.call(body,'teacher-wt')).status,403);
+  assert.equal((await s.call({...body,studentId:'student-wt'},'teacher-et')).status,403);
+  s.workspace.teachers['teacher-et'].active=false;assert.equal((await s.call(body,'teacher-et')).status,403);
+});
+test('an ongoing share is denied after membership, class grant or lesson revocation',async()=>{
+  for(const revoke of [s=>s.workspace.classes.et.members['student-et'].active=false,s=>s.workspace.classes.et.toolGrants={'class-pointer':false},s=>s.workspace.classes.et.classPointerSessions[rooms.et].studentScreenSharing=false]){
+    const s=setup();const body={action:'check',classId:'et',room:rooms.et,studentId:'student-et'};assert.equal((await s.call(body,'teacher-et')).status,200);revoke(s);assert.equal((await s.call(body,'teacher-et')).status,403);
+  }
+});

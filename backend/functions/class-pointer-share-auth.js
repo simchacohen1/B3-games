@@ -48,7 +48,7 @@ exports.classPointerShareAuth=onRequest({
    await db.ref('b3Private/classPointerShareTickets/'+digest).set({studentId,classId,room,createdAt:Date.now(),expiresAt:Date.now()+90000});
    return res.json({ok:true,token,studentName:String(profile.name||'Student').slice(0,32)});
   }
-  if(action==='verify'){
+  if(action==='verify'||action==='check'){
    const auth=String(req.headers.authorization||'').match(/^Bearer (.+)$/);
    if(!auth)error(401,'Teacher sign-in required.');
    const claims=await admin.auth().verifyIdToken(auth[1]);
@@ -63,6 +63,15 @@ exports.classPointerShareAuth=onRequest({
     ]);
     const administrator=adminSnap.val(),teacher=teacherSnap.val();
     if(!(administrator&&administrator.active!==false)&&(!teacher||teacher.active===false||teacher.classIds?.[classId]!==true))error(403,'This teacher is no longer assigned to this class.');
+   }
+   if(action==='check'){
+    if(!validId(studentId))error(400,'Invalid student.');
+    const [profileSnap,memberSnap]=await Promise.all([
+      db.ref('b3Games/students/'+studentId+'/profile').once('value'),db.ref(base+'/members/'+studentId).once('value')
+    ]);
+    const profile=profileSnap.val(),member=memberSnap.val();
+    if(!profile||profile.active===false||!member||member.active===false)error(403,'Student no longer belongs to this class.');
+    return res.json({ok:true});
    }
    const token=String(body.token||'');
    if(!/^[a-f0-9]{64}$/.test(token))error(400,'Invalid sharing ticket.');

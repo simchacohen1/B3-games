@@ -35,7 +35,7 @@ async function check(name, run) {
     await page.route('**/sample.wav',route=>route.fulfill({contentType:'audio/wav',body:wav}));
     await page.evaluate(()=>{
       window.$=id=>document.getElementById(id);window.esc=value=>String(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-      window.SPACE='test-only-recordings';window.STUDENT_REWARDS_AUTO_AWARD_URL='https://audit.test/rewards';window.shorashimRecordingRows=[];
+      window.CLASS_ID='';window.teacherRosterScope=null;window.SPACE='test-only-recordings';window.STUDENT_REWARDS_AUTO_AWARD_URL='https://audit.test/rewards';window.shorashimRecordingRows=[];
       const row={studentName:'Sample student',audioURL:'https://audit.test/sample.wav',durationMs:7500,status:'pending',createdAt:1};
       window.db={ref:()=>({once:async()=>({forEach:student=>student({key:'test-only-student',forEach:event=>event({key:'test-event',val:()=>({...row})})})})})};
       window.audit={popups:0,requests:[],alerts:[]};window.alert=message=>window.audit.alerts.push(message);
@@ -128,13 +128,14 @@ async function check(name, run) {
     for(const src of sources)await page.addScriptTag({url:'https://audit.test/game-show/'+src});
     assert.equal(await page.locator('#sefariaGenerator').count(),1);await page.close();
   });
-  await check('Activity share: options, verified class, and navigation cleanup', async()=>{
-    const page=await fixture();await page.goto('https://audit.test/fixture.html');
+  await check('Sharing companion: options, verified class, and close cleanup', async()=>{
+    const page=await fixture();await page.goto('https://audit.test/class-pointer-prototype/share-window.html');
     await page.evaluate(()=>{
+      delete window.__classPointerActivityShareLoaded;
       sessionStorage.setItem('b3Games_studentId','test-only-student');sessionStorage.setItem('b3Games_classPin','test-only-pin');
       const room='class-pointer-12345678-1234-1234-1234-123456789abc';
       window.audit={stops:0,options:null,sessionPath:null};
-      const db={ref:path=>{window.audit.sessionPath=path;return {on:(event,listener)=>listener({val:()=>({[room]:{roomId:room,createdAt:Date.now(),studentScreenSharing:true}})})}}};
+      const db={ref:path=>{if(path.endsWith('/classPointerSessions'))window.audit.sessionPath=path;return {on:(event,listener)=>listener({val:()=>path.endsWith('/classPointerSessions')?({[room]:{roomId:room,createdAt:Date.now(),studentScreenSharing:true}}):({active:true,members:{'test-only-student':{active:true}}})})}}};
       window.firebase={apps:[{}],database:()=>db};window.B3_FIREBASE_CONFIG={};
       window.FunTorahStudentClass={resolve:async()=>({workspaceId:'b3-2026',classId:'et'})};
       window.fetch=async(url,options)=>({ok:true,json:async()=>({ok:true,token:'0'.repeat(64)})});
@@ -150,7 +151,7 @@ async function check(name, run) {
     assert.equal(state.options.preferCurrentTab,false);assert.equal(state.options.video.displaySurface,undefined);
     await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));
     assert.equal(await page.evaluate(()=>window.audit.stops),1);
-    // Cleanup is correct for this page; it also demonstrates that persistence is not implemented on main.
+    // The companion owns the stream; closing that window still cleans capture up.
     await page.close();
   });
   await browser.close();fs.writeFileSync(path.join(out,'local-feature-results.json'),JSON.stringify(results,null,2));

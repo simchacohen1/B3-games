@@ -242,7 +242,9 @@
     i = Math.max(0, Math.min(phrases.length - 1, i));
     curPh = i;
     player.currentTime = Math.max(0, phrases[i].s - 0.1);
-    stopAt = phrases[i].e + 0.15;
+    // Back/Again/Next resume the story continuously, rather than pausing
+    // after each selected sentence. Word pronunciation remains a short clip.
+    stopAt = null;
     player.play();
   }
   const here = () => { const i = phraseAt(player.currentTime); return i < 0 ? 0 : i; };

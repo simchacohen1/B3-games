@@ -53,7 +53,7 @@ test('missing points requests can be reconnected without altering connected or a
 test('recording repair uses existing authentication and the verified repair endpoint', async () => {
   let request, loaded = 0, popups = 0;
   const user = { email: 'simcha5770@gmail.com', getIdToken: async () => 'test-only-token' };
-  const context = vm.createContext({ window: {}, firebase: { auth: () => ({ currentUser: user,
+  const context = vm.createContext({ CLASS_ID:'',window: {}, firebase: { auth: () => ({ currentUser: user,
     signInWithPopup: () => { popups++; throw Error('Unexpected sign-in'); } }) },
     STUDENT_REWARDS_AUTO_AWARD_URL: 'https://example.test/rewards',
     fetch: async (url, options) => { request = { url, ...options }; return { ok: true, json: async () => ({ok:true}) }; },

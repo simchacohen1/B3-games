@@ -109,16 +109,20 @@ async function requireTeacher(req){
     const email=String(decoded.email || "").trim().toLowerCase();
     if(decoded.email_verified!==true)return {ok:false,error:"Verified Google sign-in required."};
     const get=async p=>(await rtdb.ref(p).get()).val(),classId=String(req.body?.classId||'');
-    if(email===ADMIN_EMAIL){
+    const administrator=await get('b3Games/admins/'+decoded.uid);
+    if(email===ADMIN_EMAIL||(administrator&&administrator.active!==false)){
       const scope=classId?await teacherClassScope.roster(get,{authorized:true,role:'admin'},classId):null;
       return {ok:true,email,decoded,owner:true,scope};
     }
     const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
-    const actions=['list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
+    const actions=['list-shorashim-recordings','repair-shorashim-recording','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
     const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
-    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId);
+    if(['approve-point-request','reject-point-request'].includes(req.body?.action)&&!/^[A-Za-z0-9_-]{1,220}$/.test(String(req.body.requestId||'')))return {ok:false,error:'Invalid point request.'};
+    const pointRequest=['approve-point-request','reject-point-request'].includes(req.body?.action)?await get(SR_ROOT+'/pointRequests/'+req.body.requestId):null;
+    const tool=['list-shorashim-recordings','repair-shorashim-recording'].includes(req.body?.action)||isShorashimRequest(pointRequest)?'shorashim':'chazara';
+    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,tool);
     return {ok:true,email,decoded,owner:false,scope};
   }catch(err){
     console.warn("Teacher token verification failed",err);
@@ -129,7 +133,7 @@ async function requireTeacher(req){
 async function authorizeChazaraAction(teacher,body){
  if(!teacher.scope)return;
  const scope=teacher.scope,action=body.action;
- if(action==='list-chazara-pending')return;
+ if(action==='list-chazara-pending'||action==='list-shorashim-recordings')return;
  if(action==='repair-shorashim-recording'){
    if(!scope.students?.[body.studentId])throw Object.assign(new Error('Student is outside your class.'),{code:403});
    return;
@@ -1342,6 +1346,22 @@ exports.studentRewardsAutoAward = onRequest(
           const requests=await listPendingChazaraRequests(teacher.scope);
           return res.status(200).json({ok:true,requests});
         }
+        if(action==='list-shorashim-recordings'){
+          const scope=teacher.scope;
+          // Only query the selected roster for ordinary teachers. No global scan.
+          const ids=scope?Object.keys(scope.students):null;
+          const selected=scope?.selected||String(body.classId||'');
+          const space=selected&&!['et','wt'].includes(selected)?'posukPractice/shorashimLearning/classes/'+selected:'posukPractice/shorashimLearning';
+          const rows=[];
+          const add=(studentId,events)=>{for(const [eventId,event] of Object.entries(events||{})){
+            if(scope&&!teacherClassScope.recordAllowed(scope,studentId,event))continue;
+            rows.push({...event,studentId,eventId,studentName:scope?.students?.[studentId]?.name||event.studentName||studentId});
+          }};
+          if(ids)await Promise.all(ids.map(async id=>add(id,(await rtdb.ref(space+'/recordingEvents/'+id).get()).val())));
+          else{const events=(await rtdb.ref(space+'/recordingEvents').get()).val()||{};for(const [id,row]of Object.entries(events))add(id,row)}
+          rows.sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
+          return res.status(200).json({ok:true,recordings:rows});
+        }
         if(action==="repair-shorashim-recording"){
           const studentId=String(body.studentId||"").trim(),eventId=String(body.eventId||"").trim();
           if(!studentId||!eventId)return res.status(400).json({error:"Missing recording details."});
@@ -1358,7 +1378,7 @@ exports.studentRewardsAutoAward = onRequest(
           const requestId=safeKey(`shorashim_${studentId}_${eventId}`);
           const result=await createPendingRequest({requestId,rewardStudentId,studentId,source,amount:POINTS[source],
             reason:source==="shorashim-no-hints"?"Shorashim No Hints recording":"Shorashim Chazara recording",
-            record:{eventId,recordingDate:event.date||null}});
+            record:{eventId,recordingDate:event.date||null,workspaceClassId:event.workspaceClassId||null}});
           await verified.eventRef.update({pointRequestId:requestId,pointRequestStatus:result.status});
           return res.status(200).json({ok:true,requestId,status:result.status});
         }
@@ -1431,7 +1451,7 @@ exports.studentRewardsAutoAward = onRequest(
         if(!shorashimVerification.ok)return res.status(409).json({error:shorashimVerification.error});
         requestId=safeKey(`shorashim_${studentId}_${eventId}`);
         reason=source==="shorashim-no-hints"?"Shorashim No Hints recording":"Shorashim Chazara recording";
-        record={eventId,recordingDate:shorashimVerification.event.date||null};
+        record={eventId,recordingDate:shorashimVerification.event.date||null,workspaceClassId:shorashimVerification.event.workspaceClassId||null};
       }else{
         const eventId=String(body.eventId||"");
         chazaraVerification=await verifyChazara(studentId,source,eventId);

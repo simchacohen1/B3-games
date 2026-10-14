@@ -13,6 +13,11 @@ const SPACE=CLASS_MODE&&CLASS_ID_VALID?`${ROOT}/classes/${CLASS_ID}`:ROOT;
 // AI picture-choice helper. Deploy the matching generateShorashimArt Cloud Function.
 const GENERATE_SHORASHIM_ART_URL="https://us-central1-b3-games.cloudfunctions.net/generateShorashimArt";
 let state={catalog:{shorashim:[],prefix:[],suffix:[]},settings:{minReviewMs:500,studentSiteOpen:true},students:{},leaderboards:{}};let currentTrack='shorashim';
+let teacherRosterScope={students:{}};
+let teacherScopeReady=false;
+let teacherScopeGeneration=0;
+let teacherDataWatches=[];
+let teacherAccessAllowed=false;
 const CATALOG_SEED_VERSION=1; // One-time unit/Perek seed. Firebase remains authoritative afterward.
 
 /* ===== Perek 18 completion migration =====
@@ -464,7 +469,7 @@ function learned(s,type){return Object.values(s.cards||{}).filter(c=>c.learnedAt
 function status(t,k=''){const e=$('teacherCloudStatus');e.textContent=t;e.className='cloud-status '+k}
 async function loadAll(){
   status('☁️ Loading…','syncing');
-  const[a,b,c,d]=await Promise.all([db.ref(`${SPACE}/catalog`).once('value'),db.ref(`${SPACE}/settings`).once('value'),db.ref(`${SPACE}/students`).once('value'),db.ref(`${SPACE}/leaderboards`).once('value')]);
+  const[a,b,c,d]=await Promise.all([db.ref(`${SPACE}/catalog`).once('value'),db.ref(`${SPACE}/settings`).once('value'),teacherRosterScope?Promise.all(Object.keys(teacherRosterScope.students).map(async id=>[id,(await db.ref(`${SPACE}/students/${id}`).once('value')).val()])).then(rows=>({val:()=>Object.fromEntries(rows.filter(([,value])=>value))})):db.ref(`${SPACE}/students`).once('value'),db.ref(`${SPACE}/leaderboards`).once('value')]);
   state.catalog=withAllTracks(a.val()||state.catalog);
   state.settings={minReviewMs:500,studentSiteOpen:true,...(b.val()||{})};
   state.students=c.val()||{};
@@ -505,8 +510,8 @@ async function loadAll(){
   applyRequestedTeacherView();
 }
 function renderAll(){renderDashboard();renderCatalog();renderLeaderboard()}
-function renderDashboard(){const arr=Object.entries(state.students),total=arr.reduce((n,[,s])=>n+learned(s).length,0),done=arr.filter(([,s])=>reviewDone(s).complete).length,time=arr.reduce((n,[,s])=>n+(s.totalActiveSeconds||0),0);$('teacherStats').innerHTML=[['Students',arr.length],['Learned cards',total],['Class study time',fmtSec(time)],['Review complete today',`${done}/${arr.length}`]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('');const body=$('teacherStudentsBody');body.innerHTML='';arr.sort((a,b)=>(a[1].name||a[0]).localeCompare(b[1].name||b[0])).forEach(([id,s])=>{const r=reviewDone(s),tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(s.name||id)}</b></td><td>${learned(s,'shorashim').length}</td><td>${learned(s,'prefix').length+learned(s,'suffix').length}</td><td>${fmtSec(s.totalActiveSeconds)}</td><td>${r.total?`${r.seen}/${r.total}${r.complete?' ✓':''}`:'—'}</td><td>${dateLabel(s.lastActive)}</td>`;tr.onclick=()=>openStudent(id);body.appendChild(tr)})}
-function openStudent(id){const s=state.students[id];if(!s)return;const cards=learned(s);$('studentDetail').classList.remove('hidden');$('studentDetail').innerHTML=`<div class="student-detail-head"><div><div class="eyebrow">Student details</div><h2>${esc(s.name||id)}</h2></div><button id="closeStudentCloud" class="ghost">Close</button></div><div class="teacher-grid">${[['Shorashim',learned(s,'shorashim').length],['Affixes',learned(s,'prefix').length+learned(s,'suffix').length],['Study time',fmtSec(s.totalActiveSeconds)],['Sessions',(s.sessions||[]).length+(s.activeSession?1:0)]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('')}</div><h3>Learning history</h3><div>${cards.slice().sort((a,b)=>b.learnedAt-a.learnedAt).map(c=>{const i=itemFor(c.itemKey);return`<div class="history-row-cloud"><b dir="rtl">${esc(i?.front||c.itemId)}</b><span>${esc(i?.english||'')}</span><span>${esc(c.itemType)}${c.itemType==='shorashim'&&i?` • ${perekLabel(i)}`:''}</span><span>${dateLabel(c.learnedAt)}</span></div>`}).join('')||'<p>No learned cards yet.</p>'}</div><h3>Card gallery</h3><div class="teacher-gallery">${cards.map(cardHTML).join('')}</div>`;$('closeStudentCloud').onclick=()=>$('studentDetail').classList.add('hidden');$('studentDetail').scrollIntoView({behavior:'smooth'})}
+function renderDashboard(){const arr=Object.entries(state.students).filter(([id])=>!teacherRosterScope||!!teacherRosterScope.students[id]),total=arr.reduce((n,[,s])=>n+learned(s).length,0),done=arr.filter(([,s])=>reviewDone(s).complete).length,time=arr.reduce((n,[,s])=>n+(s.totalActiveSeconds||0),0);$('teacherStats').innerHTML=[['Students',arr.length],['Learned cards',total],['Class study time',fmtSec(time)],['Review complete today',`${done}/${arr.length}`]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('');const body=$('teacherStudentsBody');body.innerHTML='';arr.sort((a,b)=>(a[1].name||a[0]).localeCompare(b[1].name||b[0])).forEach(([id,s])=>{const r=reviewDone(s),tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(s.name||id)}</b></td><td>${learned(s,'shorashim').length}</td><td>${learned(s,'prefix').length+learned(s,'suffix').length}</td><td>${fmtSec(s.totalActiveSeconds)}</td><td>${r.total?`${r.seen}/${r.total}${r.complete?' ✓':''}`:'—'}</td><td>${dateLabel(s.lastActive)}</td>`;tr.onclick=()=>openStudent(id);body.appendChild(tr)})}
+function openStudent(id){if(teacherRosterScope&&!teacherRosterScope.students[id])return;const s=state.students[id];if(!s)return;const cards=learned(s);$('studentDetail').classList.remove('hidden');$('studentDetail').innerHTML=`<div class="student-detail-head"><div><div class="eyebrow">Student details</div><h2>${esc(s.name||id)}</h2></div><button id="closeStudentCloud" class="ghost">Close</button></div><div class="teacher-grid">${[['Shorashim',learned(s,'shorashim').length],['Affixes',learned(s,'prefix').length+learned(s,'suffix').length],['Study time',fmtSec(s.totalActiveSeconds)],['Sessions',(s.sessions||[]).length+(s.activeSession?1:0)]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('')}</div><h3>Learning history</h3><div>${cards.slice().sort((a,b)=>b.learnedAt-a.learnedAt).map(c=>{const i=itemFor(c.itemKey);return`<div class="history-row-cloud"><b dir="rtl">${esc(i?.front||c.itemId)}</b><span>${esc(i?.english||'')}</span><span>${esc(c.itemType)}${c.itemType==='shorashim'&&i?` • ${perekLabel(i)}`:''}</span><span>${dateLabel(c.learnedAt)}</span></div>`}).join('')||'<p>No learned cards yet.</p>'}</div><h3>Card gallery</h3><div class="teacher-gallery">${cards.map(cardHTML).join('')}</div>`;$('closeStudentCloud').onclick=()=>$('studentDetail').classList.add('hidden');$('studentDetail').scrollIntoView({behavior:'smooth'})}
 function cardHTML(c){const i=itemFor(c.itemKey);if(!i)return'';const d=c.design||{},arts=(d.arts||[]).map(a=>a.kind==='illustration'?`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;width:${(a.size||84)*.55}px;height:${(a.size||84)*.4}px"><img src="${esc(a.value)}"></div>`:`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;font-size:${(a.size||84)*.55}px">${a.value||''}</div>`).join('');return`<div class="teacher-card-mini"><div class="teacher-card-face" style="background:${d.backgroundColor||'#fff9e8'}"><div class="term" style="left:${d.hebrewPos?.left||50}%;top:${d.hebrewPos?.top||28}%;font-size:${Math.min(34,(d.hebrewSize||58)*.55)}px;color:${d.hebrewColor||'#222'}">${esc(i.front)}</div>${arts}${d.drawing?`<img class="drawing" src="${esc(d.drawing)}">`:''}</div><div class="teacher-card-meta">${esc(i.english)}${c.itemType==='shorashim'?` • ${perekLabel(i)}`:''} • ${dateLabel(c.learnedAt)}</div></div>`}
 function listNameOf(i){return i.listName||'Main List'}
 function namedLists(){
@@ -634,6 +639,7 @@ async function dismissDuplicateSuggestion(id){
 }
 
 async function mergeDuplicateWord(duplicateId){
+  if(window.B3SiteSettings.getCurrentAccess()?.role!=='admin'){alert('Only the admin can merge shared cards and student designs.');return;}
   const list=state.catalog.shorashim||[], duplicate=list.find(x=>x.id===duplicateId);
   if(!duplicate)return;
   const key=hebrewKey(duplicate.front), englishKey=englishDuplicateKey(duplicate.english);
@@ -652,7 +658,10 @@ async function mergeDuplicateWord(duplicateId){
   if(Number(duplicate.commonness||0)>Number(keeper.commonness||0))keeper.commonness=duplicate.commonness;
 
   const oldKey=`shorashim:${duplicate.id}`, newKey=`shorashim:${keeper.id}`;
-  for(const student of Object.values(state.students||{})){
+  // Merge from the current server tree, not a filtered teacher view or stale snapshot.
+  const mergeStudents=students=>{
+    if(!students)return students;
+  for(const student of Object.values(students||{})){
     if(!student||!student.cards||!student.cards[oldKey])continue;
     const oldCard=student.cards[oldKey], newCard=student.cards[newKey];
     if(!newCard){
@@ -663,11 +672,13 @@ async function mergeDuplicateWord(duplicateId){
     }
     delete student.cards[oldKey];
   }
+    return students;
+  };
   state.catalog.shorashim=list.filter(x=>x.id!==duplicate.id);
   status('☁️ Merging duplicate…','syncing');
   await Promise.all([
     db.ref(`${SPACE}/catalog`).set(state.catalog),
-    db.ref(`${SPACE}/students`).set(state.students)
+    db.ref(`${SPACE}/students`).transaction(mergeStudents)
   ]);
   renderCatalog();
   status(`☁️ Duplicate merged • ${duplicate.front}`);
@@ -767,7 +778,7 @@ async function toggleStudentSite(){
 async function loadAccess(){const a=await db.ref('posukPractice/allowedStudents').once('value');renderRoster(a.val()||{})}
 function renderRoster(v){const rows=Object.entries(v).map(([id,x])=>({id,name:x?.name||id})).sort((a,b)=>a.name.localeCompare(b.name));$('rosterList').innerHTML=rows.map(r=>`<div class="roster-row"><span>${esc(r.name)}</span><button class="danger small" data-remove="${esc(r.id)}">Remove</button></div>`).join('')||'<p>No approved students yet.</p>';[...$('rosterList').querySelectorAll('[data-remove]')].forEach(b=>b.onclick=async()=>{if(!confirm('Remove this student from approved access?'))return;await db.ref('posukPractice/allowedStudents/'+b.dataset.remove).remove();loadAccess()})}
 function slug(n){return n.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')}
-function renderLeaderboard(){const match=state.leaderboards.match||{};$('leaderboardTeacher').innerHTML=Object.keys(match).sort((a,b)=>Number(a)-Number(b)).map(k=>{const rows=Object.entries(match[k]||{}).map(([id,x])=>({id,...x})).filter(x=>Number.isFinite(Number(x.time))).sort((a,b)=>a.time-b.time);return`<h3>${esc(k)}-pair Match</h3>${rows.length?`<table class="teacher-table"><thead><tr><th>#</th><th>Student</th><th>Time</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name||r.id)}</td><td>${(r.time/1000).toFixed(2)}s</td></tr>`).join('')}</tbody></table>`:'<p class="mini-note">No scores yet.</p>'}`}).join('')||'<p>No leaderboard scores yet.</p>'}
+function renderLeaderboard(){const match=state.leaderboards.match||{};$('leaderboardTeacher').innerHTML=Object.keys(match).sort((a,b)=>Number(a)-Number(b)).map(k=>{const rows=Object.entries(match[k]||{}).filter(([id])=>!teacherRosterScope||!!teacherRosterScope.students[id]).map(([id,x])=>({id,...x})).filter(x=>Number.isFinite(Number(x.time))).sort((a,b)=>a.time-b.time);return`<h3>${esc(k)}-pair Match</h3>${rows.length?`<table class="teacher-table"><thead><tr><th>#</th><th>Student</th><th>Time</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name||r.id)}</td><td>${(r.time/1000).toFixed(2)}s</td></tr>`).join('')}</tbody></table>`:'<p class="mini-note">No scores yet.</p>'}`}).join('')||'<p>No leaderboard scores yet.</p>'}
 function bindTabs(){document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.teacher-tab').forEach(x=>x.classList.add('hidden'));$('tab-'+b.dataset.tab).classList.remove('hidden');if(b.dataset.tab==='access'){loadAccess();renderStudentSiteControl()}if(b.dataset.tab==='recordings'){loadShorashimRecordings()}})}
 function applyRequestedTeacherView(){
   const params=new URLSearchParams(window.location.search);
@@ -867,7 +878,7 @@ $('tSaveItem').onclick=saveEdit;
 $('addAccessName').onclick=async()=>{const name=$('newAccessName').value.trim(),id=slug(name);if(!id)return;await db.ref('posukPractice/allowedStudents/'+id).set({name});$('newAccessName').value='';$('accessNameMsg').textContent='Added ✓';loadAccess()};
 bindTabs();
 let teacherAppOpened=false;
-function openTeacherApp(){if(teacherAppOpened)return;teacherAppOpened=true;$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');loadAll()}
+function openTeacherApp(){if(teacherAppOpened||!teacherAccessAllowed||!teacherScopeReady)return;teacherAppOpened=true;$('teacherGate').classList.add('hidden');$('teacherApp').classList.remove('hidden');loadAll()}
 async function checkClassTeacher(user,access){
   if(!user||!access?.authorized){$('teacherGoogleSignIn').classList.remove('hidden');$('teacherGateMsg').textContent=user?'This Google account is not a Fun Torah Tools teacher.':'Sign in with your teacher Google account.';return}
   const admin=access.role==='admin';
@@ -878,6 +889,17 @@ async function checkClassTeacher(user,access){
   document.querySelector('.topbar h1').textContent=`Shorashim Learning Lab · ${cls.name||CLASS_ID}`;
   openTeacherApp();
 }
+async function refreshTeacherScope(user,authorized,access){
+  const generation=++teacherScopeGeneration;
+  teacherScopeReady=false;teacherAccessAllowed=!!user&&authorized;
+  if(!teacherAccessAllowed){teacherAppOpened=false;teacherRosterScope={students:{}};$('teacherApp').classList.add('hidden');$('teacherGate').classList.remove('hidden');return}
+  if(access.role!=='admin'&&!CLASS_ID){teacherAccessAllowed=false;teacherAppOpened=false;$('teacherApp').classList.add('hidden');$('teacherGate').classList.remove('hidden');$('teacherGateMsg').textContent='Open Shorashim from your assigned class on Teacher Home.';return}
+  try{const scope=access.role==='admin'&&!CLASS_ID?null:await window.FunTorahTeacherScope.roster(async path=>(await db.ref(path).once('value')).val(),access,CLASS_ID,'shorashim');
+    if(generation!==teacherScopeGeneration)return;teacherRosterScope=scope;teacherScopeReady=true;watchTeacherData();openTeacherApp();renderAll()}
+  catch(error){if(generation!==teacherScopeGeneration)return;teacherAccessAllowed=false;teacherRosterScope={students:{}};teacherAppOpened=false;$('teacherApp').classList.add('hidden');$('teacherGate').classList.remove('hidden');$('teacherGateMsg').textContent=error.message}
+}
+window.B3SiteSettings.onAuthStateChanged(refreshTeacherScope);
+setInterval(()=>{if(teacherAppOpened)refreshTeacherScope(firebase.auth().currentUser,window.B3SiteSettings.getCurrentAccess()?.authorized,window.B3SiteSettings.getCurrentAccess())},15000);
 if(CLASS_MODE){
   // Class teachers and B3 teachers use the same verified Google sign-in flow.
   $('teacherGateMsg').textContent='Sign in with your teacher Google account.';
@@ -907,15 +929,19 @@ if(CLASS_MODE){
   });
 }
 
-db.ref(SPACE).on('value',snap=>{
-  if($('teacherApp').classList.contains('hidden'))return;
-  const v=snap.val()||{};
-  if(v.catalog||CLASS_MODE)state.catalog=withAllTracks(v.catalog);
-  if(v.settings){state.settings={minReviewMs:500,studentSiteOpen:true,...v.settings};renderStudentSiteControl();}
-  if(v.students)state.students=v.students;
-  if(v.leaderboards)state.leaderboards=v.leaderboards;
-  renderAll()
-});
+function watchTeacherData(){
+  teacherDataWatches.forEach(([ref,callback])=>ref.off('value',callback));teacherDataWatches=[];
+  const watch=(path,callback)=>{const ref=db.ref(path);ref.on('value',callback);teacherDataWatches.push([ref,callback])};
+  watch(`${SPACE}/catalog`,snap=>{if(!teacherScopeReady)return;state.catalog=withAllTracks(snap.val()||state.catalog);renderAll()});
+  watch(`${SPACE}/settings`,snap=>{if(!teacherScopeReady)return;state.settings={minReviewMs:500,studentSiteOpen:true,...snap.val()};renderStudentSiteControl()});
+  if(!teacherRosterScope)watch(`${SPACE}/students`,snap=>{state.students=snap.val()||{};renderAll()});
+  else{
+    state.students=Object.fromEntries(Object.entries(state.students).filter(([id])=>teacherRosterScope.students[id]));
+    Object.keys(teacherRosterScope.students).forEach(id=>watch(`${SPACE}/students/${id}`,snap=>{const row=snap.val();if(row)state.students[id]=row;else delete state.students[id];renderAll()}));
+  }
+  watch(`${SPACE}/leaderboards`,snap=>{state.leaderboards=snap.val()||{};renderLeaderboard()});
+}
+
 
 
 /* ===== Shorashim recording approvals ===== */
@@ -958,12 +984,19 @@ function updateShorashimAudioDurations(){
 async function loadShorashimRecordings(){
   const box=$('shorashimRecordingsList'); if(!box)return;
   try{
-    const snap=await db.ref(`${SPACE}/recordingEvents`).once('value');
-    const rows=[];
-    snap.forEach(studentSnap=>studentSnap.forEach(eventSnap=>{
-      const r=eventSnap.val()||{};
-      rows.push({studentId:studentSnap.key,eventId:eventSnap.key,...r});
-    }));
+    const user=firebase.auth().currentUser;
+    const access=window.B3SiteSettings?.getCurrentAccess?.();
+    const owner=String(user?.email||'').toLowerCase()==='simcha5770@gmail.com';
+    let rows=[];
+    if(owner){
+      const snap=await db.ref(`${SPACE}/recordingEvents`).once('value');
+      snap.forEach(studentSnap=>studentSnap.forEach(eventSnap=>{const r=eventSnap.val()||{};rows.push({...r,studentId:studentSnap.key,eventId:eventSnap.key})}));
+      if(teacherRosterScope)rows=rows.filter(r=>window.FunTorahTeacherScope.recordAllowed(teacherRosterScope,r.studentId,r));
+    }else{
+      if(!user||!access?.authorized)throw Error('Teacher sign-in required.');
+      const response=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+await user.getIdToken()},body:JSON.stringify({action:'list-shorashim-recordings',classId:CLASS_ID})});
+      const result=await response.json();if(!response.ok||!result.ok)throw Error(result.error||'Could not load recordings.');rows=result.recordings||[];
+    }
     rows.sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
     shorashimRecordingRows=rows;
     renderShorashimRecordings();
@@ -1004,7 +1037,7 @@ async function repairShorashimRecording(studentId,eventId){
     const token=await teacherRewardsToken();
     const resp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:"POST",
       headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
-      body:JSON.stringify({action:"repair-shorashim-recording",studentId,eventId})});
+      body:JSON.stringify({action:"repair-shorashim-recording",studentId,eventId,...(CLASS_ID?{classId:CLASS_ID}:{})})});
     const data=await resp.json().catch(()=>({}));
     if(!resp.ok)throw new Error(data.error||"Could not reconnect points.");
     await loadShorashimRecordings();
@@ -1017,13 +1050,14 @@ async function teacherRewardsToken(){
     const provider=new firebase.auth.GoogleAuthProvider();
     const result=await firebase.auth().signInWithPopup(provider); user=result.user;
   }
-  if(String(user?.email||"").toLowerCase()!=="simcha5770@gmail.com")throw new Error("Please sign in with simcha5770@gmail.com.");
-  return user.getIdToken(true);
+  const access=window.B3SiteSettings?.getCurrentAccess?.();
+  if(String(user?.email||'').toLowerCase()!=='simcha5770@gmail.com'&&!access?.authorized)throw Error('This account is not an authorized teacher.');
+  return user.getIdToken();
 }
 async function reviewShorashimRecording(requestId,action){
   try{
     const token=await teacherRewardsToken();
-    const resp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({action:action==="approve"?"approve-point-request":"reject-point-request",requestId})});
+    const resp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({action:action==="approve"?"approve-point-request":"reject-point-request",requestId,...(CLASS_ID?{classId:CLASS_ID}:{})})});
     const data=await resp.json().catch(()=>({}));
     if(!resp.ok)throw new Error(data.error||"Could not update this recording.");
     const row=shorashimRecordingRows.find(x=>x.pointRequestId===requestId);
@@ -1035,8 +1069,9 @@ window.reviewShorashimRecording=reviewShorashimRecording;
 window.addEventListener("DOMContentLoaded",()=>{
   const sign=$('recordingsGoogleSignIn');
   if(sign)sign.onclick=async()=>{try{const token=await teacherRewardsToken();$('recordingsAuthStatus').textContent="✓ Signed in — approvals are ready.";sign.textContent="✓ Google Signed In";}catch(e){$('recordingsAuthStatus').textContent=e.message||"Sign-in failed.";}};
-  firebase.auth().onAuthStateChanged(u=>{
-    const authorized=!!u&&String(u.email||"").toLowerCase()==="simcha5770@gmail.com";
+  const watchAuth=callback=>window.B3SiteSettings?.onAuthStateChanged?window.B3SiteSettings.onAuthStateChanged(callback):firebase.auth().onAuthStateChanged(callback);
+  watchAuth((u,isAuthorized)=>{
+    const authorized=!!u&&(String(u.email||'').toLowerCase()==='simcha5770@gmail.com'||isAuthorized);
     const s=$('recordingsAuthStatus');
     if(s)s.textContent=authorized?"✓ Teacher sign-in active — approvals are ready.":u?"This account cannot approve Shorashim rewards.":"Sign in with your teacher Google account to approve.";
     if(sign){sign.hidden=authorized;sign.style.display=authorized?"none":"";}

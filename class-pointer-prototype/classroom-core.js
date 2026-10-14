@@ -1,7 +1,7 @@
 (function(root){
   'use strict';
   const colors=['#57b8ff','#ff7979','#75df9a','#dca0ff','#ffa65c','#7ce4dc'];
-  const tools=['target','arrow','star','heart','paw','sparkle'];
+  const tools=['target','arrow','star','heart','paw','sparkle','roar'];
   const highlightTools=['highlight','pencil','crayon','underline','box','pen'];
   // Dark ink colors read well on the whiteboard. They are allowed for pointers and marks, but are not class colors.
   const inkColors=['#1f2937','#1d4ed8'];

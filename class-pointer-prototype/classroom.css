@@ -317,3 +317,11 @@ body.teacher-view #joinInstructions>summary{cursor:pointer;font-weight:650}
 body.teacher-view #connectionStatus{margin:3px 0;padding:5px 9px;font-size:13px}
 
 .pointer-class-picker{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700}.pointer-class-picker select{min-width:105px;max-width:180px;padding:6px 8px;font-size:13px}
+/* Keep the safety control available even when the floating dock is collapsed. */
+#stage .teacher-dock.floating.collapsed .tb-group:last-child > #tbStopShare{display:inline-flex!important;font-size:13px!important}
+.teacher-dock .tb-menu{box-sizing:border-box;max-width:calc(100vw - 16px)!important;max-height:calc(100dvh - 16px)!important;overflow:auto!important;transform:none!important}
+
+/* The normal arrow uses the native cursor locally and a small arrow remotely. */
+.pointer.target{border:0;background:none;box-shadow:none;border-radius:0}
+.pointer.target::before,.pointer.target::after{content:none}
+.pointer.target .pointer-icon{width:24px;height:24px;left:0;top:0}

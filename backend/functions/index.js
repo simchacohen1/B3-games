@@ -1819,10 +1819,10 @@ exports.generateComprehensionQuestions = onRequest(
       return;
     }
 
-    const { posukText, posukTranslation, perekNum, posukNum } = req.body || {};
+    const { posukText, posukTranslation, perekNum, posukNum, sefer } = req.body || {};
     const questionLimit = Math.max(1, Math.min(20, Number((req.body || {}).questionLimit) || 5));
     let classroomReferenceTranslation = (req.body || {}).classroomReferenceTranslation || '';
-    if (!String(classroomReferenceTranslation).trim() && perekNum && posukNum) {
+    if ((!sefer||sefer==='Bereishis') && !String(classroomReferenceTranslation).trim() && perekNum && posukNum) {
       classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, posukNum);
     }
     if (!posukTranslation || !String(posukTranslation).trim()) {
@@ -2080,13 +2080,13 @@ exports.gradeQuestionAnswer = onRequest(
       return;
     }
 
-    const { question, expectedAnswer, posukTranslation, posukText, perekNum, posukNum, endPosukNum } = fields;
+    const { question, expectedAnswer, posukTranslation, posukText, perekNum, posukNum, endPosukNum, sefer } = fields;
     let classroomReferenceTranslation = fields.classroomReferenceTranslation || '';
-    if (!classroomReferenceTranslation.trim() && perekNum && posukNum) {
+    if ((!sefer||sefer==='Bereishis') && !classroomReferenceTranslation.trim() && perekNum && posukNum) {
       classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, endPosukNum || posukNum);
     }
     let kehotReferenceTranslation = fields.kehotReferenceTranslation || '';
-    if (!kehotReferenceTranslation.trim() && perekNum && posukNum) {
+    if ((!sefer||sefer==='Bereishis') && !kehotReferenceTranslation.trim() && perekNum && posukNum) {
       try {
         kehotReferenceTranslation = await fetchPosukPracticeKehotReference(perekNum, posukNum, endPosukNum || posukNum);
       } catch (err) {

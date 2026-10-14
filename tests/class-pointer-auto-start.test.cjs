@@ -17,7 +17,7 @@ assert.ok(startCode.trimEnd().endsWith('}'));
 function fixture({ready=Promise.resolve(),publish=async()=>{},makePeer=true}={}){
   const items=new Map(),events={},reports=[],calls=[];
   const $=id=>{if(!items.has(id))items.set(id,{disabled:false,hidden:false,textContent:'',value:''});return items.get(id)};
-  const candidate={on:(key,fn)=>{events[key]=fn}};
+  const candidate={on:(key,fn)=>{events[key]=fn},once:(key,fn)=>{events[key]=(...args)=>{delete events[key];return fn(...args)}}};
   const ctx=vm.createContext({
     isTeacher:true,started:false,openingClass:false,peer:null,joinTimer:null,members:new Map(),
     window:{ClassPointerDashboard:{ready,publish}},

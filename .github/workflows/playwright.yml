@@ -3,9 +3,9 @@ permissions:
   contents: read
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, feature/outstanding-improvements ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, feature/outstanding-improvements ]
 jobs:
   test:
     timeout-minutes: 60
@@ -17,14 +17,21 @@ jobs:
         node-version: '22'
     - name: Install dependencies
       run: npm ci
+    - name: Run Node regression tests
+      run: npm test
     - name: Install Playwright Browsers
-      run: npx playwright install --with-deps
+      run: npx playwright install --with-deps chromium firefox webkit chrome msedge
     - name: Run Playwright tests
       run: npx playwright test
     - name: Run isolated scrapbook browser tests
       run: npm run test:halacha
     - name: Run isolated repair preview
       run: npm run test:preview
+    - name: Verify native sample video and persistent sharing
+      run: |
+        node tests/persistent-sharing.browser.cjs
+        FTT_TEST_CHANNEL=chrome node tests/persistent-sharing.browser.cjs
+        FTT_TEST_CHANNEL=msedge node tests/persistent-sharing.browser.cjs
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:

@@ -48,12 +48,12 @@
 
   const css = document.createElement('style');
   css.textContent = `
-    #fttGalleryShareButton{position:fixed;right:18px;bottom:18px;z-index:2147479000;
+    #fttGalleryShareButton{position:fixed;right:18px;bottom:70px;z-index:2147479000;
       background:#1d5979;color:#fff;border:2px solid #fff;border-radius:999px;
       padding:12px 17px;box-shadow:0 5px 20px #0004;font:700 14px Arial,sans-serif;
       cursor:pointer}
     /* Keep Audio Mode at bottom-right; show the Gallery pin at bottom-left. */
-    body:has(#ftt-audio-mode) #fttGalleryShareButton{bottom:18px;right:auto;left:18px}
+    body:has(#ftt-audio-mode) #fttGalleryShareButton{bottom:70px;right:auto;left:18px}
     #fttGalleryShareButton:focus-visible{outline:3px solid #facc15}
     #fttGalleryShareDialog{width:min(580px,calc(100vw - 24px));max-height:92vh;
       overflow:auto;box-sizing:border-box;border:0;border-radius:16px;padding:23px;
