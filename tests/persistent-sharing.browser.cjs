@@ -18,8 +18,12 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
    window.firebase={apps:[{}],database:()=>({ref:path=>({on:(_,callback)=>callback({val:()=>path.endsWith('/classPointerSessions')?{[room]:{roomId:room,createdAt:Date.now(),studentScreenSharing:true}}:{active:true,members:{'sample-et-student':{active:true}},toolGrants:{'class-pointer':true}}})})}),auth:()=>({currentUser:{getIdToken:async()=> 'sample-token'}})};
    window.B3_FIREBASE_CONFIG={};window.FunTorahStudentClass={resolve:async()=>({workspaceId:'b3-2026',classId:'et'})};
    window.fetch=async()=>({ok:true,json:async()=>({ok:true,token:'0'.repeat(64),studentId:'sample-et-student',studentName:'Sample ET pupil'})});
+   const nativeMicrophone=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
    window.captureCount=0;
    Object.defineProperty(navigator,'mediaDevices',{value:{getDisplayMedia:async options=>{
+    // A synthetic microphone grants WebRTC device access in the isolated browser;
+    // it is never transmitted or sent to an API. Display capture remains mocked.
+    const mic=await nativeMicrophone({audio:true});mic.getTracks().forEach(track=>track.stop());
     window.captureCount++;window.captureOptions=options;
     const canvas=document.createElement('canvas');canvas.width=160;canvas.height=90;const ctx=canvas.getContext('2d');
     const paint=()=>{ctx.fillStyle='#1266dd';ctx.fillRect(0,0,160,90);ctx.fillStyle='#fff';ctx.fillRect(100,20,30,30)};paint();window.samplePaintTimer=setInterval(paint,100);
@@ -46,6 +50,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
   });
   const teacher=await context.newPage();await teacher.goto('https://sharing.test/classroom.html?dashboard=teacher&class=et');
   await teacher.setContent('<main id="stage"></main><input id="joinLink" value="https://sharing.test/classroom.html?room=class-pointer-12345678-1234-1234-1234-123456789abc"><button id="endClass">End class</button>');
+  await teacher.addStyleTag({content:fs.readFileSync('class-pointer-prototype/classroom.css','utf8')});
   await teacher.addScriptTag({content:fs.readFileSync('class-pointer-prototype/activity-screen-teacher.js','utf8')});
   const answer=await teacher.evaluate(async offer=>{
    const pc=new RTCPeerConnection({iceServers:[]}),events={};window.receiverPC=pc;

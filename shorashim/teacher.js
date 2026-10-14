@@ -16,6 +16,7 @@ let state={catalog:{shorashim:[],prefix:[],suffix:[]},settings:{minReviewMs:500,
 let teacherRosterScope={students:{}};
 let teacherScopeReady=false;
 let teacherScopeGeneration=0;
+let teacherSessionUid=null;
 let teacherDataWatches=[];
 let teacherAccessAllowed=false;
 const CATALOG_SEED_VERSION=1; // One-time unit/Perek seed. Firebase remains authoritative afterward.
@@ -891,12 +892,13 @@ async function checkClassTeacher(user,access){
 }
 async function refreshTeacherScope(user,authorized,access){
   const generation=++teacherScopeGeneration;
+  if(teacherSessionUid!==(user?.uid||null)){teacherSessionUid=user?.uid||null;stopTeacherDataWatches();teacherAppOpened=false;$('teacherApp').classList.add('hidden');$('teacherGate').classList.remove('hidden')}
   teacherScopeReady=false;teacherAccessAllowed=!!user&&authorized;
-  if(!teacherAccessAllowed){teacherAppOpened=false;teacherRosterScope={students:{}};$('teacherApp').classList.add('hidden');$('teacherGate').classList.remove('hidden');return}
-  if(access.role!=='admin'&&!CLASS_ID){teacherAccessAllowed=false;teacherAppOpened=false;$('teacherApp').classList.add('hidden');$('teacherGate').classList.remove('hidden');$('teacherGateMsg').textContent='Open Shorashim from your assigned class on Teacher Home.';return}
+  if(!teacherAccessAllowed){stopTeacherDataWatches();teacherAppOpened=false;teacherRosterScope={students:{}};$('teacherApp').classList.add('hidden');$('teacherGate').classList.remove('hidden');return}
+  if(access.role!=='admin'&&!CLASS_ID){stopTeacherDataWatches();teacherAccessAllowed=false;teacherAppOpened=false;$('teacherApp').classList.add('hidden');$('teacherGate').classList.remove('hidden');$('teacherGateMsg').textContent='Open Shorashim from your assigned class on Teacher Home.';return}
   try{const scope=access.role==='admin'&&!CLASS_ID?null:await window.FunTorahTeacherScope.roster(async path=>(await db.ref(path).once('value')).val(),access,CLASS_ID,'shorashim');
     if(generation!==teacherScopeGeneration)return;teacherRosterScope=scope;teacherScopeReady=true;watchTeacherData();openTeacherApp();renderAll()}
-  catch(error){if(generation!==teacherScopeGeneration)return;teacherAccessAllowed=false;teacherRosterScope={students:{}};teacherAppOpened=false;$('teacherApp').classList.add('hidden');$('teacherGate').classList.remove('hidden');$('teacherGateMsg').textContent=error.message}
+  catch(error){if(generation!==teacherScopeGeneration)return;stopTeacherDataWatches();teacherAccessAllowed=false;teacherRosterScope={students:{}};teacherAppOpened=false;$('teacherApp').classList.add('hidden');$('teacherGate').classList.remove('hidden');$('teacherGateMsg').textContent=error.message}
 }
 window.B3SiteSettings.onAuthStateChanged(refreshTeacherScope);
 setInterval(()=>{if(teacherAppOpened)refreshTeacherScope(firebase.auth().currentUser,window.B3SiteSettings.getCurrentAccess()?.authorized,window.B3SiteSettings.getCurrentAccess())},15000);
@@ -907,13 +909,13 @@ if(CLASS_MODE){
     $('teacherGateMsg').textContent='This class link is not valid. Open Shorashim from your teacher home page.';
     $('teacherGoogleSignIn').disabled=true;
   }else{
-    $('teacherGoogleSignIn').onclick=()=>window.B3SiteSettings.signInWithGoogle().catch(err=>{$('teacherGateMsg').textContent=err?.message||'Google sign-in did not complete.'});
+    $('teacherGoogleSignIn').onclick=()=>window.B3SiteSettings.signInWithGoogle().then(()=>refreshTeacherScope(firebase.auth().currentUser,window.B3SiteSettings.getCurrentAccess()?.authorized,window.B3SiteSettings.getCurrentAccess())).catch(err=>{$('teacherGateMsg').textContent=err?.message||'Google sign-in did not complete.'});
     window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>checkClassTeacher(user,access).catch(err=>{console.error(err);$('teacherGateMsg').textContent='Could not check your teacher account.'}));
   }
 }else{
   const B3_CLASSES=CLASS_ID?[CLASS_ID]:['et','wt'];
   $('teacherGateMsg').textContent='Sign in with your teacher Google account to open the dashboard.';
-  $('teacherGoogleSignIn').onclick=()=>window.B3SiteSettings.signInWithGoogle().catch(err=>{$('teacherGateMsg').textContent=err?.message||'Google sign-in did not complete.'});
+  $('teacherGoogleSignIn').onclick=()=>window.B3SiteSettings.signInWithGoogle().then(()=>refreshTeacherScope(firebase.auth().currentUser,window.B3SiteSettings.getCurrentAccess()?.authorized,window.B3SiteSettings.getCurrentAccess())).catch(err=>{$('teacherGateMsg').textContent=err?.message||'Google sign-in did not complete.'});
   window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>{
     if(!user||!access?.authorized){
       if(user)$('teacherGateMsg').textContent='This Google account is not authorized as a Fun Torah Tools teacher.';
@@ -929,6 +931,7 @@ if(CLASS_MODE){
   });
 }
 
+function stopTeacherDataWatches(){teacherDataWatches.forEach(([ref,callback])=>ref.off('value',callback));teacherDataWatches=[];state.students={};state.leaderboards={};}
 function watchTeacherData(){
   teacherDataWatches.forEach(([ref,callback])=>ref.off('value',callback));teacherDataWatches=[];
   const watch=(path,callback)=>{const ref=db.ref(path);ref.on('value',callback);teacherDataWatches.push([ref,callback])};

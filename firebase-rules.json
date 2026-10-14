@@ -114,16 +114,31 @@
             "$perek": {
               "$pasuk": {
                 ".write": "auth != null && newData.exists() && ((auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true))",
-                ".validate": "newData.hasChildren(['items','updatedAt','reviewed']) && newData.child('reviewed').val() == true && newData.child('updatedAt').isNumber() && newData.child('items').numChildren() == 2 && ($sefer == 'Bereishis' || $sefer == 'Shemos' || $sefer == 'Vayikra' || $sefer == 'Bamidbar' || $sefer == 'Devarim')",
+                ".validate": "newData.hasChildren(['items','updatedAt','reviewed']) && newData.child('reviewed').val() == true && newData.child('updatedAt').isNumber() && newData.child('items').hasChildren(['0','1']) && ($sefer == 'Bereishis' || $sefer == 'Shemos' || $sefer == 'Vayikra' || $sefer == 'Bamidbar' || $sefer == 'Devarim')",
                 "items": {
                   "$i": {
-                    ".validate": "($i == '0' || $i == '1') && newData.hasChildren(['question','answerPhrases']) && newData.child('question').isString() && newData.child('question').val().length > 0 && newData.child('question').val().length <= 500 && newData.child('answerPhrases').numChildren() > 0 && newData.child('answerPhrases').numChildren() <= 11",
+                    ".validate": "($i == '0' || $i == '1') && newData.hasChildren(['question','answerPhrases']) && newData.child('question').isString() && newData.child('question').val().length > 0 && newData.child('question').val().length <= 500 && newData.child('answerPhrases').hasChildren(['0'])",
                     "answerPhrases": {
                       "$j": {
-                        ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500"
+                        ".validate": "($j == '0' || $j == '1' || $j == '2' || $j == '3' || $j == '4' || $j == '5' || $j == '6' || $j == '7' || $j == '8' || $j == '9' || $j == '10') && newData.isString() && newData.val().length > 0 && newData.val().length <= 500"
                       }
+                    },
+                    "question": {
+                      ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500"
+                    },
+                    "$other": {
+                      ".validate": false
                     }
                   }
+                },
+                "updatedAt": {
+                  ".validate": "newData.isNumber()"
+                },
+                "reviewed": {
+                  ".validate": "newData.val() == true"
+                },
+                "$other": {
+                  ".validate": false
                 }
               }
             }

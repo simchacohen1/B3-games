@@ -186,7 +186,7 @@ function makePeer(id){
     if($('error').dataset.peerWarning)clearError();
     if(wasInterrupted)status(connected()?'Lesson connected. Connection service restored.':'Connection service restored. Waiting for lesson connection.');
   });
-  instance.on('close',()=>{clearTimeout(retry);retry=null});
+  instance.on('close',()=>{clearTimeout(retry);retry=null;if(peer===instance)status(connected()?'The connection service closed. Existing lesson connections may still work; new joins need a new class.':'The lesson connection closed. '+(isTeacher?'Start the class again.':'Leave and rejoin your class.'))});
   return instance;
 }
 async function startClass(){

@@ -879,6 +879,15 @@
   function signInWithGoogle() {
     const services = ensureFirebase();
     if (!services || !services.auth) return Promise.reject(new Error("Firebase Authentication is not configured."));
+    const existing=services.auth.currentUser;
+    if(existing&&currentAccess.authorized&&!getActingStudent()){
+      return existing.getIdToken().then(()=>readUserAccess(existing)).then(access=>{
+        currentAccess=access;setSignedInHint(access.authorized);
+        if(!access.authorized)throw new Error("This teacher account is no longer authorized. Sign out to choose another account.");
+        if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>showToolVersions(access),{once:true});else showToolVersions(access);
+        return existing;
+      });
+    }
     const provider = new window.firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
 

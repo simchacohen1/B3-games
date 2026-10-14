@@ -33,7 +33,7 @@ test('Posuk builds three voice and two approved tap questions, separated by Sefe
 });
 test('Posuk approved banks allow authenticated teacher writes and validate the two-question shape',()=>{
  const rules=JSON.parse(read('firebase-rules.json')).rules.posukPractice.approvedQuestionBanks;const leaf=rules.$workspaceId.$sefer.$perek.$pasuk;
- assert.equal(rules['.read'],true);assert.match(leaf['.write'],/auth != null/);assert.match(leaf['.write'],/teachers/);assert.match(leaf['.validate'],/numChildren\(\) == 2/);assert.ok(!JSON.stringify(rules).includes('".write":true'));
+ assert.equal(rules['.read'],true);assert.match(leaf['.write'],/auth != null/);assert.match(leaf['.write'],/teachers/);assert.match(leaf['.validate'],/hasChildren\(\['0','1'\]\)/);assert.ok(!JSON.stringify(rules).includes('".write":true'));
 });
 test('Yiddish has vowel marks on every vocabulary word and sentence navigation resumes continuous playback',()=>{
  const context={window:{}};vm.runInNewContext(read('yiddish/content.js'),context);const words=context.window.YIDDISH_CONTENT.words;assert.equal(words.length,32);for(const w of words)assert.match(w.yiNikud,/[\u05b0-\u05bd\u05c7]/,w.yi);
@@ -55,4 +55,10 @@ test('spoken question grading does not use Bereishis-only fallback references fo
 test('teacher-reviewed spoken answers retain their final verdict and text is escaped',()=>{
  const s=read('record_pesukim/student.html'),context=vm.createContext({});vm.runInContext(excerpt(s,'function questionIsCorrect(','function questionResultAudioSrc('),context);
  assert.equal(context.questionIsCorrect({verdict:'incorrect',finalVerdict:'correct'}),true);assert.equal(context.questionIsCorrect({verdict:'correct',finalVerdict:'incorrect'}),false);assert.equal(context.questionHtmlText('<img onerror="bad">'),'&lt;img onerror=&quot;bad&quot;&gt;');
+});
+test('Google teacher sign-in reuses a valid session and rechecks access without an authorization popup',async()=>{
+ const source=read('site-settings.js'),user={uid:'sample-teacher',getIdToken:async()=> 'sample-token'};let popups=0;
+ const context=vm.createContext({ensureFirebase:()=>({auth:{currentUser:user,signInWithPopup:()=>{popups++;throw Error('Unexpected popup')}}}),currentAccess:{authorized:true},getActingStudent:()=>null,readUserAccess:async()=>({authorized:true,role:'teacher',classIds:['et']}),setSignedInHint:()=>{},showToolVersions:()=>{},document:{readyState:'complete'},window:{firebase:{auth:{GoogleAuthProvider:class{}}}}});
+ vm.runInContext(excerpt(source,'  function signInWithGoogle()','  function signOut()'),context);assert.equal(await context.signInWithGoogle(),user);assert.equal(popups,0);
+ context.readUserAccess=async()=>({authorized:false,role:'',classIds:[]});await assert.rejects(context.signInWithGoogle(),/no longer authorized/);assert.equal(popups,0);
 });

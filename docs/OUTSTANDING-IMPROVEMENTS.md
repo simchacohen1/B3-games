@@ -31,12 +31,12 @@ This branch is based on draft PR #49 at `1226630`. PR #49 remains intact and unm
 
 ## Validation
 
-- Full Node suite: 406 passing tests at the initial review commit (no failing or skipped tests).
+- Full Node suite: 407 passing tests after the first review corrections (no failing or skipped tests).
 - Four new Chromium layout/control tests passed locally; the original four Chromium tests also passed during this batch.
 - Seven repair-preview checks and seven isolated Scrapbook checks passed locally with sample data and simulated cloud access.
 - CI now covers Chromium, Google Chrome, Microsoft Edge, Firefox and WebKit. Final run results belong in the PR description.
-- Native sample-video test uses actual RTCPeerConnections and canvas video between test windows. Firebase, screen permission and pupil identity are simulated; even a pass does not prove production video delivery. Locally, WebRTC emitted no ICE candidates, preventing connection.
-- The new rule-emulator suite tests real rules with a demo project. Local emulator started, but this cloud environment cancelled its localhost rule-upload request. It must pass in CI before the rules are ready.
+- Native sample-video test uses actual RTCPeerConnections and canvas video between test windows. Firebase, screen permission and pupil identity are simulated; even a pass does not prove production video delivery. Locally, WebRTC emitted no ICE candidates, preventing connection. The first CI run received real sample frames and preserved navigation, but its final hidden-tray assertion failed because the fixture omitted the production stylesheet; the fixture now includes that stylesheet. The repeat native-video run is required before reporting a pass.
+- The new rule-emulator suite passed real authorization/shape checks locally after correcting unsupported rules syntax and the test tools’ localhost proxy handling. The local CLI-only proxy workaround is outside tracked application code; external requests retain the configured proxy. CI installs the unmodified locked tools and must also pass.
 
 No existing failing assertion was disabled. Obsolete fixture entry points were updated for the companion window/current class constants. Logs are outside the repository or ignored. Private authentication exports remain ignored.
 

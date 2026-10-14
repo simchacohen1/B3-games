@@ -1,4 +1,7 @@
 'use strict';
+// This script connects only to the loopback demo emulator. The Firebase Node
+// SDK does not honor NO_PROXY for its WebSocket connection.
+for(const key of ['HTTP_PROXY','HTTPS_PROXY','http_proxy','https_proxy'])delete process.env[key];
 const {initializeTestEnvironment,assertSucceeds,assertFails}=require('@firebase/rules-unit-testing');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 (async()=>{
