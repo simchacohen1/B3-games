@@ -178,9 +178,21 @@ async function startClass(){
     try{if(window.ClassPointerDashboard)await window.ClassPointerDashboard.publish(id)}catch(error){if(peer===current){endClass();fail('Could not open the lesson on student dashboards. '+error.message)}return}
     if(peer!==current)return;clearTimeout(joinTimer);started=true;openingClass=false;$('endClass').disabled=false;$('shareScreen').disabled=false;$('openBrowserTab').disabled=false;
     $('startClass').hidden=true;
+    const sendButton=$('sendEveryoneShare');if(sendButton)sendButton.disabled=false;
     const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status('Class ready! Click Share teaching screen, or open another lesson. Students can join automatically.');roster();
+    if(new URL(location.href).searchParams.get('sendEveryoneShare')==='1')void requestEveryoneToShare();
   });
   peer.on('connection',receiveStudent);peer.on('call',call=>{if(call.metadata?.kind==='activity-screen'){if(window.ClassPointerActivityShares)void window.ClassPointerActivityShares.incomingCall(call);else call.close();return}if(!window.ClassPointerBoards?.incomingCall(call))call.close()});
+}
+async function requestEveryoneToShare(){
+  const button=$('sendEveryoneShare');
+  if(!isTeacher||!started||!window.ClassPointerDashboard?.requestScreenSharing)return;
+  if(button)button.disabled=true;
+  try{
+    await window.ClassPointerDashboard.requestScreenSharing();
+    status('Screen-sharing request sent to this class. Students will open Class Pointer and click Share My Screen.');
+  }catch(error){fail('Could not send screen-sharing request: '+(error?.message||error))}
+  finally{if(button&&started)button.disabled=false}
 }
 function stopSharing(){
   cancelHover();highlighter?.cancel();highlightStore.reset();publishHighlights();generation++;
@@ -407,7 +419,8 @@ $('spotlight').addEventListener('change',()=>{state.spotlight=$('spotlight').che
 $('clearTeacher').addEventListener('click',()=>{cancelHover();delete state.points.teacher;publish()});
 $('clearAll').addEventListener('click',()=>{cancelHover();state.points={};publish()});
 $('copyLink').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('joinLink').value);status('Join link copied. Send it to your students.')}catch{$('joinLink').select();status('Select and copy the student join link.')}});
-$('startClass').addEventListener('click',startClass);$('endClass').addEventListener('click',endClass);$('shareScreen').addEventListener('click',()=>shareScreen(false));$('openBrowserTab').addEventListener('click',captureBrowserTab);$('stopScreen').addEventListener('click',stopSharing);
+$('sendEveryoneShare')?.addEventListener('click',requestEveryoneToShare);
+ $('startClass').addEventListener('click',startClass);$('endClass').addEventListener('click',endClass);$('shareScreen').addEventListener('click',()=>shareScreen(false));$('openBrowserTab').addEventListener('click',captureBrowserTab);$('stopScreen').addEventListener('click',stopSharing);
 if($('tabScroll')){$('tabScroll').addEventListener('click',toggleTabScroll);$('tabZoomIn').addEventListener('click',()=>zoomTab(1));$('tabZoomOut').addEventListener('click',()=>zoomTab(-1))}
 $('joinForm').addEventListener('submit',joinClass);$('leaveClass').addEventListener('click',leaveClass);
 new ResizeObserver(drawPointers).observe($('stage'));$('lesson').addEventListener('loadedmetadata',drawPointers);$('lesson').addEventListener('resize',drawPointers);
