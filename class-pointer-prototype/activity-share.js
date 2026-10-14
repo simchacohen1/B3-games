@@ -56,7 +56,7 @@
       const request=session?.destinationRequest;
       const supported=request&&['screens','boards'].includes(request.mode);
       const at=supported?request.at:session?.shareRequest?.at;
-      if(!Number.isFinite(at)||at<loadedAt-6000||at>Date.now()+60000||Date.now()-at>45000)return;
+      if(!Number.isFinite(at)||(!supported&&at<loadedAt-6000)||at>Date.now()+60000||Date.now()-at>45000)return;
       const marker=session.roomId+':'+at+':'+(supported?request.mode:'screens');
       if(onStudentClassroom||stream)return;
       try{
