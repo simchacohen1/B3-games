@@ -17,8 +17,8 @@
         const rows=access.role==='admin'?(await classes.once('value')).val()||{}:Object.fromEntries(await Promise.all((access.classIds||[]).filter(C.validId).map(async id=>[id,(await classes.child(id).once('value')).val()])));
         if(current!==generation)return;
         for(const [id,row] of Object.entries(rows))if(C.permitted(access,id,row)){const option=document.createElement('option');option.value=id;option.textContent=row.name||id;$('classChoice').appendChild(option)}
-        const requested=query.get('class');if(requested&&Array.from($('classChoice').options).some(option=>option.value===requested))$('classChoice').value=requested;
-        if($('classChoice').value&&(!sendEveryone||requested||$('classChoice').options.length===1)){
+        const requested=query.get('class'),matchedRequested=!!requested&&Array.from($('classChoice').options).some(option=>option.value===requested);if(matchedRequested)$('classChoice').value=requested;
+        if($('classChoice').value&&(!sendEveryone||matchedRequested||$('classChoice').options.length===1)){
           location.replace('classroom.html?dashboard=teacher&class='+encodeURIComponent($('classChoice').value)+(sendEveryone?'&sendEveryoneShare=1':''));
           return;
         }
