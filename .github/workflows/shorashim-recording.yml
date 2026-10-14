@@ -1,14 +1,16 @@
-name: Shorashim recording checks
+name: Shorashim tests
 on:
   pull_request:
     paths:
       - 'shorashim/**'
       - 'tests/shorashim-recording-repair.test.cjs'
+      - 'tests/shorashim-picture-costs.test.cjs'
       - '.github/workflows/shorashim-recording.yml'
   push:
     paths:
       - 'shorashim/**'
       - 'tests/shorashim-recording-repair.test.cjs'
+      - 'tests/shorashim-picture-costs.test.cjs'
       - '.github/workflows/shorashim-recording.yml'
 jobs:
   test:
@@ -19,4 +21,4 @@ jobs:
         with:
           node-version: '22'
       - name: Shorashim saving regression
-        run: node --test tests/shorashim-recording-repair.test.cjs
+        run: node --test tests/shorashim-recording-repair.test.cjs tests/shorashim-picture-costs.test.cjs

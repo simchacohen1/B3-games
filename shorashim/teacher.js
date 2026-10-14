@@ -415,16 +415,16 @@ async function generateAiArtForItems(items,onProgress=()=>{}){
   return out;
 }
 
-async function fillArtForShorashim(items,{onProgress=()=>{}}={}){
-  // Bulk repair is strictly fill-only. Existing choices, auto art, and approved
-  // catalog entries are never regenerated or cleared by this path.
-  const targets=(items||[]).filter(i=>i&&!sanitizeClassArt(i.art).length&&i.teacherApproved!==true);
+async function fillArtForShorashim(items,{onProgress=()=>{},useAI=false}={}){
+  // Automatically fill only missing artwork, including words a teacher already
+  // approved. Never replace selected pictures and never incur API costs on login.
+  const targets=(items||[]).filter(i=>i&&!sanitizeClassArt(i.art).length);
   if(!targets.length) return 0;
-  const ai=await generateAiArtForItems(targets,onProgress);
+  const ai=useAI?await generateAiArtForItems(targets,onProgress):new Map();
   let changed=0;
   for(const item of targets){
     // Recheck immediately before assignment so overlapping tasks cannot replace art.
-    if(sanitizeClassArt(item.art).length||item.teacherApproved===true) continue;
+    if(sanitizeClassArt(item.art).length) continue;
     const pool=sanitizeSuggestionPool([...(ai.get(String(item.id))||[]),...smartArtCandidatesFor(item.english,item.front)]);
     const art=sanitizeClassArt(pool);
     if(art.length){
@@ -450,7 +450,7 @@ function mergeCatalogWithoutReplacingPictures(current,local){
     const existing=list[index.get(id)];
     if(existing&&!existing.perek&&candidate.perek)existing.perek=candidate.perek;
     const art=sanitizeClassArt(candidate.art);
-    if(existing&&existing.teacherApproved!==true&&!sanitizeClassArt(existing.art).length&&art.length){
+    if(existing&&!sanitizeClassArt(existing.art).length&&art.length){
       existing.art=art; existing.autoArt=false; existing.aiArtGenerated=!!candidate.aiArtGenerated;
       existing.aiArtGeneratedAt=candidate.aiArtGeneratedAt||timestamp;
     }
@@ -475,22 +475,18 @@ async function loadAll(){
   const p18Added=needsCatalogSeed?ensurePerek18FinalShorashim():[];
   const unitMigration=needsCatalogSeed?ensurePerekUnitsAnd19():{tagged:0,added:[]};
   if(needsCatalogSeed)state.settings.catalogSeedVersion=CATALOG_SEED_VERSION;
-  const needsArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden&&!sanitizeClassArt(i.art).length&&i.teacherApproved!==true);
+  const needsArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden&&!sanitizeClassArt(i.art).length);
   let repaired=0;
   if(needsArt.length){
-    status(`☁️ Picture repair 0/${needsArt.length}…`,'syncing');
-    repaired=await fillArtForShorashim(needsArt,({phase,done,total,batch,batches})=>{
-      const signedIn=!!firebase.auth().currentUser;
-      const detail=signedIn?'generating':'Google teacher sign-in unavailable; using safe meaning-matched picture cues';
-      status(`☁️ ${detail} • ${done}/${total} words • batch ${batch}/${batches}`,'syncing');
-    });
+    status(`☁️ Checking matching pictures for ${needsArt.length} words…`,'syncing');
+    repaired=await fillArtForShorashim(needsArt);
   }
   if(repaired||p18Added.length||unitMigration.tagged||unitMigration.added.length){
     const saved=await db.ref(`${SPACE}/catalog`).transaction(current=>mergeCatalogWithoutReplacingPictures(current,state.catalog));
     if(saved.committed)state.catalog=withAllTracks(saved.snapshot.val()||state.catalog);
   }
   const stillMissingArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden && !sanitizeClassArt(i.art).length).length;
-  if(stillMissingArt)console.warn(`${stillMissingArt} Shorashim still need pictures; AI picture generation may be unavailable. They will be retried when this dashboard reloads.`);
+  if(stillMissingArt)console.warn(`${stillMissingArt} Shorashim words need teacher-selected pictures; no paid API request was made automatically.`);
   if(needsCatalogSeed)await db.ref(`${SPACE}/settings/catalogSeedVersion`).set(CATALOG_SEED_VERSION);
   $('teacherMinReview').value=String(state.settings.minReviewMs||500);
   renderStudentSiteControl();
@@ -584,6 +580,7 @@ async function regeneratePictures(id){
   if(!item)return;
   const selected=sanitizeClassArt(item.art||[]);
   const oldPool=suggestionPoolOf(item);
+  if(!confirm('New picture suggestions use separate OpenAI API credits. They are not included in the ChatGPT subscription. Continue?'))return;
   status('☁️ Looking for more matching pictures…','syncing');
 
   const ai=await generateAiArtForItems([item]);
@@ -601,7 +598,7 @@ async function regeneratePictures(id){
   // Teacher's selections first, then new suggestions, then older ones (max 20).
   // Regenerating never changes what students see.
   item.artPool=sanitizeSuggestionPool([...selected,...fresh,...oldPool]);
-  item.aiArtGenerated=true;
+  item.aiArtGenerated=ai.has(String(item.id));
   item.aiArtGeneratedAt=Date.now();
   renderCatalog();
   await saveCatalog();
@@ -852,7 +849,7 @@ $('saveBulkItems').onclick=async e=>{
   renderCatalog();
   if(added.length){
     status(`☁️ Creating pictures for ${added.length} new word${added.length===1?'':'s'}…`,'syncing');
-    await fillArtForShorashim(added,({done,total,batch,batches})=>status(`☁️ Picture repair ${done}/${total} words • batch ${batch}/${batches}`,'syncing'));
+    await fillArtForShorashim(added);
   }
   await saveCatalog();
   const missing=added.filter(i=>!sanitizeClassArt(i.art).length).length;
