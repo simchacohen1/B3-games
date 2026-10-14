@@ -1,5 +1,6 @@
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
 const {chromium} = require('playwright');
+const {resolveFixtureFile} = require('./helpers/local-fixture-path.cjs');
 const root = path.resolve(__dirname, '..'), out = path.join(root,'test-results','oct13-preview');
 fs.mkdirSync(out,{recursive:true});
 const results = [];
@@ -13,8 +14,8 @@ async function fixture() {
     let file = decodeURIComponent(u.pathname).replace(/^\//,'');
     if (!file || file === 'fixture.html') return route.fulfill({contentType:'text/html',body:'<!doctype html><body></body>'});
     if (skipScripts.has(path.basename(file))) return route.fulfill({contentType:'application/javascript',body:''});
-    const resolved = path.resolve(root,file);
-    if (!resolved.startsWith(root+'/') || !fs.existsSync(resolved)) return route.fulfill({status:404,body:''});
+    const resolved = resolveFixtureFile(root,file);
+    if (!resolved || !fs.existsSync(resolved)) return route.fulfill({status:404,body:''});
     const type = {'.html':'text/html','.js':'application/javascript','.css':'text/css','.png':'image/png','.jpg':'image/jpeg'}[path.extname(file)];
     return route.fulfill({path:resolved,contentType:type});
   });
