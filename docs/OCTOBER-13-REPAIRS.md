@@ -12,6 +12,8 @@ This branch continues the audit at main revision `cc5589c`; it does not replace 
 
 PR #45's duration repair, source guard and workflow have been incorporated without reverting the uploaded picture-pool code. PR #46's capture-selection change has been incorporated and extended to the independent activity-sharing widget. Neither PR was merged or closed by this work.
 
+The browser checks also exposed a WebKit resize-observer loop in Teacher Tools. Iframe height changes now run in the next animation frame, preserving the panel sizing and all error assertions.
+
 ## Tests
 
 Use Node 22 and the committed lockfile:
