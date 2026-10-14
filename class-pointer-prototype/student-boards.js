@@ -645,6 +645,7 @@
   drawer=attachDrawing(canvas,{by:'teacher',tools,enabled:()=>{const m=focusMember();return on&&mode==='boards'&&!!m&&!isBlocked(m)},board:()=>focusBoard()||emptyBoard(),apply:act,
     send:op=>{const m=focusMember();if(m&&on&&mode==='boards')B.send(m.connection,op)},redraw:()=>{if(focusId)dirty(focusId)}});
 
+  document.addEventListener('classpointer:send-to-whiteboards',()=>void sendEveryone('boards'));
   toggle?.addEventListener('click',()=>setOn(!on));
   setInterval(()=>{if(toggle)toggle.disabled=!on&&!B.started();if(on)syncTiles()},700);
   new ResizeObserver(()=>{if(!on)return;layoutGrid();if(focusId)dirty(focusId)}).observe(stage);

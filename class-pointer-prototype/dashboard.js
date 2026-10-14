@@ -5,27 +5,44 @@
   const db=firebase.database(),classes=db.ref('b3Games/workspaces/'+ws+'/classes');
   const message=text=>{$('message').textContent=text};
   if(query.get('teacher')==='1'){
-    const sendEveryone=query.get('sendEveryoneShare')==='1';
-    if(sendEveryone)$('openTeacher').textContent='Send this class to Share Screen';
-    $('welcome').textContent='Choose the class you are teaching.';$('teacherChoice').hidden=false;
+    const mode=query.get('sendEveryoneBoards')==='1'?'boards':query.get('sendEveryoneShare')==='1'?'screens':'lesson';
+    const label=mode==='boards'?'Send to Whiteboards':mode==='screens'?'Send to Screen Sharing':'Start classroom';
+    $('welcome').textContent=mode==='lesson'?'Choose the class to teach.':'Choose the class for '+label+'.';
+    $('teacherChoice').hidden=false;
+    $('classChoice').hidden=true;$('openTeacher').hidden=true;
+    document.querySelector('label[for="classChoice"]')?.setAttribute('hidden','');
+    const buttons=$('teacherClassButtons');
     $('teacherSignIn').onclick=()=>window.B3SiteSettings.signInWithGoogle().catch(()=>message('Could not sign in. Please try again.'));
     let generation=0;
     window.B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
-      const current=++generation;$('openTeacher').disabled=true;$('classChoice').replaceChildren();$('teacherSignIn').hidden=!!authorized;
-      if(!authorized){message('Sign in with your teacher account.');return}
+      const current=++generation;
+      buttons.replaceChildren();$('teacherSignIn').hidden=!!authorized;
+      if(!authorized){message('Sign in with your teacher account to select a class.');return}
       try{
         const rows=access.role==='admin'?(await classes.once('value')).val()||{}:Object.fromEntries(await Promise.all((access.classIds||[]).filter(C.validId).map(async id=>[id,(await classes.child(id).once('value')).val()])));
         if(current!==generation)return;
-        for(const [id,row] of Object.entries(rows))if(C.permitted(access,id,row)){const option=document.createElement('option');option.value=id;option.textContent=row.name||id;$('classChoice').appendChild(option)}
-        const requested=query.get('class'),matchedRequested=!!requested&&Array.from($('classChoice').options).some(option=>option.value===requested);if(matchedRequested)$('classChoice').value=requested;
-        if($('classChoice').value&&(!sendEveryone||matchedRequested||$('classChoice').options.length===1)){
-          location.replace('classroom.html?dashboard=teacher&class='+encodeURIComponent($('classChoice').value)+(sendEveryone?'&sendEveryoneShare=1':''));
-          return;
+        for(const [id,row] of Object.entries(rows)){
+          if(!C.permitted(access,id,row))continue;
+          const name=String(row.name||id);
+          const btn=document.createElement('button');
+          btn.type='button';btn.className='class-launch-button';
+          btn.textContent=(mode==='boards'?'📝 ':mode==='screens'?'🖥 ':'👆 ')+name;
+          btn.setAttribute('aria-label',label+' for '+name);
+          btn.addEventListener('click',()=>{
+            buttons.querySelectorAll('button').forEach(button=>button.disabled=true);
+            const target=new URL('classroom.html',location.href);
+            target.searchParams.set('dashboard','teacher');target.searchParams.set('class',id);
+            if(mode==='screens')target.searchParams.set('sendEveryoneShare','1');
+            if(mode==='boards')target.searchParams.set('sendEveryoneBoards','1');
+            location.assign(target.href);
+          });
+          buttons.appendChild(btn);
         }
-        $('openTeacher').disabled=!$('classChoice').value;message(sendEveryone&&$('classChoice').value?'Choose the class to send to screen sharing, then press Send this class.':$('classChoice').value?'Open teacher classroom to start automatically. Then choose Share teaching screen. Students click Class Pointer on their dashboard.':'No classes with Class Pointer enabled are assigned to you.');
-      }catch{message('Could not load your classes. Refresh to try again.')}
+        message(buttons.childElementCount
+          ?(mode==='lesson'?'Nothing starts until you choose a class.':'Only the class you select will receive the request; screen sharing still requires each student’s browser permission.')
+          :'No classes with Class Pointer enabled are assigned to you.');
+      }catch{if(current===generation)message('Could not load your classes. Refresh to try again.')}
     });
-    $('openTeacher').onclick=()=>{if($('classChoice').value)location.href='classroom.html?dashboard=teacher&class='+encodeURIComponent($('classChoice').value)+(sendEveryone?'&sendEveryoneShare=1':'')};
     return;
   }
   try{

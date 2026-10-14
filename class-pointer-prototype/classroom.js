@@ -188,6 +188,7 @@ async function startClass(){
     const sendButton=$('sendEveryoneShare');if(sendButton)sendButton.disabled=false;
     const link=new URL(location.href);link.search='';link.hash='';link.searchParams.set('room',id);$('joinLink').value=link.href;$('invitePanel').hidden=false;status('Class ready! Click Share teaching screen, or open another lesson. Students can join automatically.');roster();
     if(new URL(location.href).searchParams.get('sendEveryoneShare')==='1')void requestEveryoneToShare();
+    if(new URL(location.href).searchParams.get('sendEveryoneBoards')==='1')document.dispatchEvent(new Event('classpointer:send-to-whiteboards'));
   });
   peer.on('connection',receiveStudent);peer.on('call',call=>{if(call.metadata?.kind==='activity-screen'){if(window.ClassPointerActivityShares)void window.ClassPointerActivityShares.incomingCall(call);else call.close();return}if(!window.ClassPointerBoards?.incomingCall(call))call.close()});
 }
