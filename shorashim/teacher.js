@@ -1001,17 +1001,99 @@ window.addEventListener("DOMContentLoaded",()=>{
 });
 
 
-// Existing local dashboard unlocks do not authorize paid services.
-const paidTeacherSignIn = document.createElement('button');
-paidTeacherSignIn.type = 'button';
-paidTeacherSignIn.className = 'ghost small';
-paidTeacherSignIn.textContent = 'Google teacher sign-in';
-paidTeacherSignIn.onclick = async () => {
-  try { await window.B3SiteSettings.signInWithGoogle(); }
-  catch(error) { alert(error.message || 'Google sign-in did not complete.'); }
+/* Shorashim recordings: keep recovered submissions and use the teacher session
+   that was authenticated by the dashboard gate. */
+function shorashimRecordingDuration(record){
+ const ms=Number(record.durationMs);
+ if(!Number.isFinite(ms)||ms<=0)return 'Length unavailable';
+ const sec=Math.max(1,Math.round(ms/1000));
+ return 'Length '+Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0');
+}
+function missingShorashimRequest(record){
+ return !record.pointRequestId&&!['approved','rejected'].includes(String(record.pointRequestStatus||''));
+}
+teacherRewardsToken=async function(){
+ const user=firebase.auth().currentUser;
+ if(!user)throw new Error('Your teacher sign-in expired. Sign in from Teacher Center again.');
+ return user.getIdToken();
 };
-document.querySelector('.topbar-actions').appendChild(paidTeacherSignIn);
-
+async function shorashimTeacherPointsAction(payload){
+ const token=await teacherRewardsToken();
+ const response=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{
+   method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+   body:JSON.stringify({classId:CLASS_ID||undefined,...payload})
+ });
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok)throw new Error(result.error||'Could not update Student Rewards.');
+ return result;
+}
+async function repairShorashimRecording(record){
+ const result=await shorashimTeacherPointsAction({action:'repair-shorashim-recording',studentId:record.studentId,eventId:record.eventId});
+ record.pointRequestId=result.requestId||'';
+ record.pointRequestStatus=result.status||'pending';
+ return result;
+}
+const priorShorashimRecordingsRender=renderShorashimRecordings;
+renderShorashimRecordings=function(){
+ priorShorashimRecordingsRender();
+ const box=$('shorashimRecordingsList');
+ if(!box)return;
+ const panels=Array.from(box.children);
+ shorashimRecordingRows.forEach((record,index)=>{
+   const panel=panels[index];
+   if(!panel)return;
+   const details=panel.querySelector('.mini-note');
+   if(details){
+     const len=document.createElement('span');
+     len.textContent=' • '+shorashimRecordingDuration(record);
+     details.appendChild(len);
+   }
+   if(!missingShorashimRequest(record))return;
+   const connect=document.createElement('button');
+   connect.type='button';connect.className='ghost';
+   connect.textContent='🔧 Connect Points Request';
+   connect.addEventListener('click',async()=>{
+     connect.disabled=true;connect.textContent='Connecting…';
+     try{
+       await repairShorashimRecording(record);
+       renderShorashimRecordings();
+     }catch(error){
+       connect.disabled=false;connect.textContent='🔧 Retry Connecting';
+       alert(error.message||'Could not connect points.');
+     }
+   });
+   panel.appendChild(connect);
+ });
+ const missing=shorashimRecordingRows.filter(missingShorashimRequest).length;
+ const all=$('repairShorashimRecordingRequests');
+ if(all){all.disabled=missing===0;all.textContent=missing?'🔧 Connect '+missing+' Missing Points Request'+(missing===1?'':'s'):'✓ All Points Requests Connected';}
+};
+reviewShorashimRecording=async function(requestId,action){
+ try{
+   const data=await shorashimTeacherPointsAction({action:action==='approve'?'approve-point-request':'reject-point-request',requestId});
+   const row=shorashimRecordingRows.find(r=>r.pointRequestId===requestId);
+   if(row)row.pointRequestStatus=data.status||(action==='approve'?'approved':'rejected');
+   await loadShorashimRecordings();
+ }catch(error){alert(error.message||'Could not update recording.');}
+};
+window.reviewShorashimRecording=reviewShorashimRecording;
+window.addEventListener('DOMContentLoaded',()=>{
+ const sign=$('recordingsGoogleSignIn');
+ if(sign)sign.hidden=true;
+ const bulk=$('repairShorashimRecordingRequests');
+ if(bulk)bulk.onclick=async()=>{
+   bulk.disabled=true;
+   const rows=shorashimRecordingRows.filter(missingShorashimRequest);
+   let repaired=0;const errors=[];
+   for(const record of rows){
+     try{await repairShorashimRecording(record);repaired++;}
+     catch(error){errors.push((record.studentName||record.studentId)+': '+(error.message||'Could not connect'));}
+   }
+   await loadShorashimRecordings();
+   const message=$('recordingsAuthStatus');
+   if(message)message.textContent=repaired+' connected'+(errors.length?' · '+errors.length+' need attention: '+errors.slice(0,2).join('; '):' · Ready for approval');
+ };
+});
 
 // ---- 20-suggestion picture picker ----
 async function togglePictureChoice(id,artValue){
