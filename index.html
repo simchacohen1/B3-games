@@ -1453,6 +1453,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       sessionStorage.setItem("posukPractice_studentId",myStudentId);
       sessionStorage.setItem("posukPractice_studentName",myStudentName);
       sessionStorage.setItem("weeklyQuiz_classId",myClassId);
+      // Wake the class-wide Classroom Pointer listener after the first login.
+      window.dispatchEvent(new Event("fttStudentSignedIn"));
     }
     let chooser=el("activeStudentClass");
     if(!chooser){chooser=document.createElement("select");chooser.id="activeStudentClass";chooser.setAttribute("aria-label","Active class");el("studentBar").appendChild(chooser);}

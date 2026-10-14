@@ -365,6 +365,17 @@
   const boards=new Map(),tiles=new Map(),blocked=new Set();
   let on=false,mode='screens',focusId=null,drawer=null,gridSize='';
   const toggle=$('studentBoards');
+  // Teacher can bring the whole signed-in class directly to screens or boards.
+  // These same controls remain available from the Students menu in full screen.
+  const sendScreens=button('📣 Send to Screen Sharing','Bring this class to Classroom Pointer screens; each student must approve sharing',()=>void sendEveryone('screens'));
+  const sendBoards=button('📝 Send to Whiteboards','Bring this class to individual Classroom Pointer whiteboards',()=>void sendEveryone('boards'));
+  toggle?.after(sendScreens,sendBoards);
+  const dockLaunch=el('div','pointer-bulk-actions');
+  dockLaunch.style.cssText='display:flex;gap:6px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #cbd5e1';
+  const dockScreens=button('🖥 Send screens','Ask the class to share their screens',()=>void sendEveryone('screens'));
+  const dockBoards=button('📝 Send whiteboards','Open individual whiteboards for the class',()=>void sendEveryone('boards'));
+  dockLaunch.append(dockScreens,dockBoards);
+  document.getElementById('tbStudentsMenu')?.prepend(dockLaunch);
   const view=el('div','boards-view');view.id='boardsView';view.dataset.stageUi='true';view.hidden=true;view.setAttribute('aria-label','Student whiteboards and screens');
 
   // Grid bar: mode switch for the whole class.
@@ -603,6 +614,26 @@
     for(const m of admitted())sendMode(m);
     setFocus(focusId);
     B.status(mode==='screens'?'Students were asked to share their screens. Their screens appear in the tiles (view only).':'Students are back on their whiteboards.');
+  }
+  async function sendEveryone(destination){
+    if(!B.started()){B.fail('Wait for your classroom to finish opening, then try again.');return}
+    const buttons=[sendScreens,sendBoards,dockScreens,dockBoards];
+    buttons.forEach(b=>b.disabled=true);
+    try{
+      // Publish the right mode before directing students to the classroom.
+      // Students already connected receive board-mode immediately; new arrivals
+      // receive it from studentJoined() once they enter the same class.
+      if(!on){mode=destination;setOn(true)}
+      else if(mode!==destination)setMode(destination);
+      const dashboard=window.ClassPointerDashboard;
+      if(!dashboard?.requestStudentDestination)throw Error('Classroom broadcast is not ready.');
+      await dashboard.requestStudentDestination(destination);
+      B.status(destination==='screens'
+        ?'Sent this class to Screen Sharing. Each boy clicks Share my screen and approves the browser prompt.'
+        :'Sent this class to individual Whiteboards. Their boards will appear here as they join.');
+    }catch(error){
+      B.fail('Could not send the class: '+(error?.message||'Please try again.'));
+    }finally{buttons.forEach(b=>b.disabled=false)}
   }
   function toggleBlock(m){
     const key=keyFor(m);if(blocked.has(key))blocked.delete(key);else blocked.add(key);

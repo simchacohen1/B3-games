@@ -54,6 +54,17 @@
       studentScreenSharing:true,
       shareRequest:{at:firebase.database.ServerValue.TIMESTAMP}
     });
+  },async requestStudentDestination(mode){
+    if(!['screens','boards'].includes(mode))throw Error('Choose screens or whiteboards.');
+    const ref=activeRef;if(!ref)throw Error('Open a classroom before sending students.');
+    const context=await ready;
+    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
+    // A live class session is authorized and scoped to the teacher's assigned class.
+    // Use a server timestamp: existing student pages reject old requests.
+    await ref.update({
+      studentScreenSharing:mode==='screens',
+      destinationRequest:{mode,at:firebase.database.ServerValue.TIMESTAMP}
+    });
   },async setStudentScreenSharing(enabled){
     const ref=activeRef;if(!ref)return;
     const context=await ready;
