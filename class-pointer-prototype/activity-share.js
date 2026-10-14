@@ -4,6 +4,10 @@
 (async function(){
   if(window.__classPointerActivityShareLoaded)return;
   window.__classPointerActivityShareLoaded=true;
+  const pageParams=new URL(location.href).searchParams;
+  const onStudentClassroom=/\/class-pointer-prototype\/classroom\.html$/.test(location.pathname)&&pageParams.get('dashboard')==='student';
+  if(/\/class-pointer-prototype\/classroom\.html$/.test(location.pathname)&&!onStudentClassroom)return;
+  const loadedAt=Date.now();
   const src=document.currentScript?.src||'';
   const root=new URL('../',src);
   const endpoint='https://us-central1-b3-games.cloudfunctions.net/classPointerShareAuth';
@@ -38,13 +42,32 @@
     const btn=document.createElement('button');btn.type='button';btn.textContent='🖥 Share My Screen';
     btn.style.cssText='background:#1d4ed8;color:#fff;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;font:inherit';
     const label=document.createElement('span');label.setAttribute('role','status');label.style.cssText='font-size:12px;color:#1e3a8a;max-width:180px';
+    if(onStudentClassroom){
+      holder.style.cssText='position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:2147483640;display:none;align-items:center;gap:12px;max-width:95vw;padding:14px;border-radius:16px;background:#fff;border:3px solid #2563eb;box-shadow:0 8px 30px #15284666;font:700 16px system-ui,sans-serif';
+      btn.style.cssText='background:#1d4ed8;color:#fff;border:0;border-radius:12px;padding:17px 22px;cursor:pointer;font:800 17px system-ui,sans-serif';
+      label.textContent='Click, choose your screen, then press Share.';
+    }
     holder.append(btn,label);document.body.appendChild(holder);
     let active=null,peer=null,call=null,stream=null,busy=false;
+    const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
+    function routeTeacherRequest(session){
+      const at=session?.shareRequest?.at;
+      if(!Number.isFinite(at)||at<loadedAt-6000||at>Date.now()+60000||Date.now()-at>45000)return;
+      const marker=session.roomId+':'+at;
+      try{
+        if(sessionStorage.getItem(inviteKey)===marker)return;
+        sessionStorage.setItem(inviteKey,marker);
+      }catch{return}
+      if(onStudentClassroom||stream)return;
+      // Navigate this existing tab; browsers cannot silently capture a screen.
+      location.assign(new URL('class-pointer-prototype/dashboard.html?share=1',root).href);
+    }
     function stop(){
       const prior=stream;stream=null;try{call?.close()}catch{}call=null;
       try{peer?.destroy()}catch{}peer=null;
       prior?.getTracks().forEach(t=>t.stop());
-      btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';label.textContent='';
+      btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';
+      label.textContent=onStudentClassroom?'Click, choose your screen, then press Share.':'';
     }
     function status(text){label.textContent=text}
     function current(rows){
@@ -56,6 +79,7 @@
       const next=current(snapshot.val());
       if(!next||!active||next.roomId!==active.roomId){if(stream)stop()}
       active=next;holder.style.display=active?'flex':'none';
+      if(active)routeTeacherRequest(active);
     },()=>{active=null;holder.style.display='none';stop()});
     btn.addEventListener('click',async()=>{
       if(stream){stop();return}
