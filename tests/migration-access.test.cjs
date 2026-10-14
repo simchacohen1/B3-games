@@ -1,10 +1,10 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 function gate(data={},stored={},tool="yiddish"){
  const elements=new Map(),storage=new Map(Object.entries({b3Games_studentId:'child',b3Games_studentClass:'new_class',...stored}));
- function element(){return {style:{},dataset:{},parentNode:{removeChild(){}},appendChild(){},contains(){return false},querySelector(){return {textContent:''}},remove(){},set innerHTML(v){this.html=v}}}
- const document={currentScript:{src:'https://example.test/game-gate.js',getAttribute:k=>k==='data-game-id'?tool:null},head:element(),documentElement:element(),body:element(),scripts:[],readyState:'complete',createElement:element,getElementById:id=>elements.get(id),querySelectorAll:()=>[],addEventListener(){}};
+ function element(){return {style:{},dataset:{},parentNode:{removeChild(){}},appendChild(){},setAttribute(){},contains(){return false},querySelector(){return {textContent:''}},remove(){},set innerHTML(v){this.html=v}}}
+ const document={currentScript:{src:'https://example.test/game-gate.js',getAttribute:k=>k==='data-game-id'?tool:null},head:element(),documentElement:element(),body:element(),scripts:[],readyState:'complete',createElement:element,getElementById:id=>elements.get(id),querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){}};
  const ctx={document,window:{B3StudentTools:require('../backend/functions/student-tool-policy.js'),addEventListener(){}},location:{search:''},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},URL,URLSearchParams,Intl,Date,console,setTimeout:()=>1,clearTimeout(){},setInterval(){},fetch:async url=>({ok:true,json:async()=>data[new URL(url).pathname]??null})};
- let source=fs.readFileSync('game-gate.js','utf8').replace(/\r\n/g,'\n');source=source.replace(/  (?:if \(!isGuestPreview\(\)\) )?watchTeacherAccess\(\);\s*checkNow\(\);/,`  window.testGate={resolveStudentClass,decide,state:()=>({studentClassId,studentActive}),overlay:()=>overlay,setTeacher:v=>verifiedTeacherAccess=v};`);
+ let source=fs.readFileSync('game-gate.js','utf8').replace(/\r\n/g,'\n');source=source.replace(/  (?:if \(!isGuestPreview\(\)\) )?watchTeacherAccess\(\);\s*checkNow\(\);/,`  teacherCheckPending=false;window.testGate={resolveStudentClass,decide,state:()=>({studentClassId,studentActive}),overlay:()=>overlay,setTeacher:v=>verifiedTeacherAccess=v};`);
  vm.runInNewContext(source,ctx);return ctx.window.testGate;
 }
 const base={

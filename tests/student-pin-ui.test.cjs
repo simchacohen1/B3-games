@@ -3,7 +3,7 @@ const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),
 function page(result={ok:true,id:'boy',name:'Test Boy',classId:'et',requiresPinChange:true}){
  const nodes=new Map(),saved=new Map(),entered=[],messages=[];
  const el=id=>{if(!nodes.has(id)){const classes=new Set();nodes.set(id,{value:'',disabled:false,classes,classList:{add:x=>classes.add(x),remove:x=>classes.delete(x)},focus(){},addEventListener(){}});}return nodes.get(id);};
- const ctx=vm.createContext({el,console,setLoginMsg:m=>messages.push(m),sessionStorage:{setItem:(k,v)=>saved.set(k,v)},checkStudentAccess:async()=>result,enterStudent:async r=>entered.push(r)});
+ const ctx=vm.createContext({el,console,clearWrongPasscodeAttempts(){},recordWrongPasscodeAttempt:()=>1,setLoginMsg:m=>messages.push(m),sessionStorage:{setItem:(k,v)=>saved.set(k,v)},checkStudentAccess:async()=>result,enterStudent:async r=>entered.push(r)});
  const start=html.indexOf('  async function studentSignIn(){');
  const end=html.indexOf('  async function restoreStudent(){',start);
  vm.runInContext(html.slice(start,end),ctx);

@@ -36,7 +36,12 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: process.env.FTT_TEST_CHROMIUM
+          ? { executablePath: process.env.FTT_TEST_CHROMIUM }
+          : {},
+      },
     },
 
     {

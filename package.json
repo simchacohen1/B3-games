@@ -7,7 +7,13 @@
     "doc": "docs",
     "test": "tests"
   },
-  "scripts": {},
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "test:browser": "playwright test",
+    "test:live": "playwright test --config playwright.live.config.ts",
+    "test:preview": "node tests/oct13-preview.browser.cjs",
+    "test:halacha": "node --test tests/halacha-studio.browser.cjs"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",

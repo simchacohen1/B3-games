@@ -1,4 +1,6 @@
 name: Playwright Tests
+permissions:
+  contents: read
 on:
   push:
     branches: [ main, master ]
@@ -12,13 +14,17 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
       with:
-        node-version: lts/*
+        node-version: '22'
     - name: Install dependencies
       run: npm ci
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
     - name: Run Playwright tests
       run: npx playwright test
+    - name: Run isolated scrapbook browser tests
+      run: npm run test:halacha
+    - name: Run isolated repair preview
+      run: npm run test:preview
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:

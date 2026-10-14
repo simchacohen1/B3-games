@@ -61,21 +61,22 @@
       if(stream){stop();return}
       if(busy||!active)return;
       busy=true;btn.disabled=true;
+      const selectedRoom=active.roomId;
       let captured=null;
       try{
         if(!navigator.mediaDevices?.getDisplayMedia)throw Error('Use Microsoft Edge or Chrome on a computer.');
         // Capture must be called synchronously from the user click, before any await.
         const capturePromise=navigator.mediaDevices.getDisplayMedia({
-          video:{displaySurface:'browser',frameRate:{ideal:5,max:8}},audio:false,
-          preferCurrentTab:true,surfaceSwitching:'include'
+          video:{frameRate:{ideal:5,max:8}},audio:false,
+          preferCurrentTab:false,surfaceSwitching:'include'
         });
         captured=await capturePromise;
         status('Connecting to teacher…');
         const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({action:'issue',studentId:id,pin,classId,room:active.roomId})});
+          body:JSON.stringify({action:'issue',studentId:id,pin,classId,room:selectedRoom})});
         const ticket=await response.json();
         if(!response.ok||!ticket.ok)throw Error(ticket.error||'Screen sharing is not allowed.');
-        if(!active||!captured.active)throw Error('The lesson ended.');
+        if(!active||active.roomId!==selectedRoom||!captured.active)throw Error('The lesson ended or changed. Please share again.');
         if(!window.Peer)await load(new URL('class-pointer-prototype/vendor/peerjs-1.5.5.min.js',root).href);
         const connection=new Peer('class-pointer-activity-'+crypto.randomUUID());
         peer=connection;
@@ -84,8 +85,8 @@
           connection.once('open',()=>{clearTimeout(timeout);resolve()});
           connection.once('error',e=>{clearTimeout(timeout);reject(e)});
         });
-        if(!active||!captured.active)throw Error('The lesson ended.');
-        const media=connection.call(active.roomId,captured,{metadata:{kind:'activity-screen',token:ticket.token}});
+        if(!active||active.roomId!==selectedRoom||!captured.active)throw Error('The lesson ended or changed. Please share again.');
+        const media=connection.call(selectedRoom,captured,{metadata:{kind:'activity-screen',token:ticket.token}});
         if(!media)throw Error('The teacher is not connected.');
         call=media;stream=captured;
         captured.getVideoTracks()[0]?.addEventListener('ended',stop,{once:true});

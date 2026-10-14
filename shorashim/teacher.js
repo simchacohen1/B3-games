@@ -930,6 +930,31 @@ function recordingModeLabel(r){
   return (r.noHints===true||r.mode==="no-hints") ? "🏆 No Hints Challenge" : "🎙️ Record Chazara";
 }
 function recordingPoints(r){return Number(r.points||((r.noHints===true||r.mode==="no-hints")?3:2));}
+function recordingDurationLabel(seconds){
+  if(!Number.isFinite(seconds)||seconds<=0)return "Duration unavailable";
+  const total=Math.round(seconds);
+  return "Length: "+Math.floor(total/60)+":"+String(total%60).padStart(2,"0");
+}
+function updateShorashimAudioDurations(){
+  document.querySelectorAll('#shorashimRecordingsList audio[data-recording-audio]').forEach(audio=>{
+    const label=audio.parentElement.querySelector('[data-recording-duration]');
+    if(!label)return;
+    const update=()=>{
+      let seconds=audio.duration;
+      if(!Number.isFinite(seconds)||seconds<=0){
+        const ranges=audio.seekable;
+        if(ranges&&ranges.length)seconds=ranges.end(ranges.length-1);
+      }
+      if(!Number.isFinite(seconds)||seconds<=0)seconds=Number(audio.dataset?.recordingDurationMs)/1000;
+      if(Number.isFinite(seconds)&&seconds>0)label.textContent=recordingDurationLabel(seconds);
+      else if(audio.readyState>=1)label.textContent='Duration unavailable';
+    };
+    for(const event of ['loadedmetadata','durationchange','loadeddata','progress','seeked'])audio.addEventListener(event,update);
+    audio.addEventListener('error',()=>{if(label.textContent==='Checking length…')label.textContent='Duration unavailable';});
+    update();
+  });
+}
+
 async function loadShorashimRecordings(){
   const box=$('shorashimRecordingsList'); if(!box)return;
   try{
@@ -954,7 +979,8 @@ function renderShorashimRecordings(){
   if(!shorashimRecordingRows.length){box.innerHTML='<p class="mini-note">No Shorashim recordings have been submitted yet.</p>';return;}
   box.innerHTML=shorashimRecordingRows.map(r=>{
     const st=String(r.pointRequestStatus||r.status||"pending");
-    const pendingReady=st==="pending"&&!!r.pointRequestId;
+    const validKey=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,220}$/.test(value);
+    const pendingReady=st==="pending"&&validKey(r.pointRequestId);
     const statusLabel=st==="approved"?"✅ Approved":st==="rejected"?"❌ Rejected":r.pointRequestId?"⏳ Waiting for approval":"⚠️ Points request not connected";
     return `<div class="teacher-panel" style="margin:12px 0;padding:16px">
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
@@ -962,14 +988,29 @@ function renderShorashimRecordings(){
         <div class="mini-note">${recordingModeLabel(r)} • <b>${recordingPoints(r)} points</b> • ${esc(recordingTime(r.createdAt))}</div></div>
         <b>${statusLabel}</b>
       </div>
-      ${r.audioURL?`<audio controls preload="none" src="${esc(r.audioURL)}" style="width:100%;margin:12px 0"></audio>`:'<p class="mini-note">Audio file unavailable.</p>'}
+      ${r.audioURL?`<div><audio controls preload="metadata" data-recording-audio data-recording-duration-ms="${Number(r.durationMs)||0}" src="${esc(r.audioURL)}" style="width:100%;margin:12px 0 4px"></audio><div class="mini-note" data-recording-duration aria-live="polite">Checking length…</div></div>`:'<p class="mini-note">Audio file unavailable.</p>'}
+      ${!r.pointRequestId && st==="pending"&&validKey(r.studentId)&&validKey(r.eventId)?`<button class="ghost" onclick="repairShorashimRecording('${esc(r.studentId)}','${esc(r.eventId)}')">Reconnect points request</button>`:""}
       ${pendingReady?`<div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="primary" onclick="reviewShorashimRecording('${esc(r.pointRequestId)}','approve')">✓ Approve ${recordingPoints(r)} Points</button>
         <button class="ghost" style="border-color:#dc2626;color:#b91c1c" onclick="reviewShorashimRecording('${esc(r.pointRequestId)}','reject')">✕ Reject</button>
       </div>`:''}
     </div>`;
   }).join('');
+  updateShorashimAudioDurations();
 }
+async function repairShorashimRecording(studentId,eventId){
+  try{
+    if(![studentId,eventId].every(value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,220}$/.test(value)))throw new Error('Invalid recording details. Reload the recordings list.');
+    const token=await teacherRewardsToken();
+    const resp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
+      body:JSON.stringify({action:"repair-shorashim-recording",studentId,eventId})});
+    const data=await resp.json().catch(()=>({}));
+    if(!resp.ok)throw new Error(data.error||"Could not reconnect points.");
+    await loadShorashimRecordings();
+  }catch(e){alert(e.message||"Could not reconnect points.");}
+}
+window.repairShorashimRecording=repairShorashimRecording;
 async function teacherRewardsToken(){
   let user=firebase.auth().currentUser;
   if(!user){
@@ -995,8 +1036,10 @@ window.addEventListener("DOMContentLoaded",()=>{
   const sign=$('recordingsGoogleSignIn');
   if(sign)sign.onclick=async()=>{try{const token=await teacherRewardsToken();$('recordingsAuthStatus').textContent="✓ Signed in — approvals are ready.";sign.textContent="✓ Google Signed In";}catch(e){$('recordingsAuthStatus').textContent=e.message||"Sign-in failed.";}};
   firebase.auth().onAuthStateChanged(u=>{
+    const authorized=!!u&&String(u.email||"").toLowerCase()==="simcha5770@gmail.com";
     const s=$('recordingsAuthStatus');
-    if(s)s.textContent=u&&String(u.email||"").toLowerCase()==="simcha5770@gmail.com"?"✓ Signed in — approvals are ready.":"Sign in when you are ready to approve or reject.";
+    if(s)s.textContent=authorized?"✓ Teacher sign-in active — approvals are ready.":u?"This account cannot approve Shorashim rewards.":"Sign in with your teacher Google account to approve.";
+    if(sign){sign.hidden=authorized;sign.style.display=authorized?"none":"";}
   });
 });
 
@@ -1011,6 +1054,9 @@ paidTeacherSignIn.onclick = async () => {
   catch(error) { alert(error.message || 'Google sign-in did not complete.'); }
 };
 document.querySelector('.topbar-actions').appendChild(paidTeacherSignIn);
+window.B3SiteSettings.onAuthStateChanged((user,authorized)=>{
+  paidTeacherSignIn.hidden=!!user&&authorized;
+});
 
 
 // ---- 20-suggestion picture picker ----

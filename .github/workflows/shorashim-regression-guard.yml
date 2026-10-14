@@ -1,0 +1,23 @@
+name: Shorashim regression guard
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  shorashim-regressions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate existing Shorashim JavaScript syntax
+        run: |
+          node --check shorashim/teacher.js
+          node --check shorashim/teacher-enhancements.js
+          node --check shorashim/teacher-loader.js
+      - name: Check required Shorashim teacher features
+        run: node --test tests/shorashim-regression.test.cjs tests/oct13-audit-regressions.test.cjs tests/shorashim-reward-repair.test.cjs

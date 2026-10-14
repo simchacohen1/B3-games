@@ -36,7 +36,7 @@ test('contribution uses the same spendable balance as displayed server balance',
  const src=fs.readFileSync('student-rewards/student.js','utf8');
  let submitted=null;
  const goal={rewardId:'gimkit',modeVoting:true,remainingStudentCap:200};
- const ctx={state:{serverRewardBalance:100,student:{rewardBalance:0},classGoals:[goal],busy:false},C:{toast(message,type){assert.notEqual(type,'error',message)}},isStoreOpen:()=>true,timeMs:()=>0,document:{getElementById:()=>({value:'25'})},render(){},clearContributionForms(){},loadActivityPointHistory:async()=>[],classRewardsApi:async(action,payload)=>{submitted={action,payload};return {goal,balance:75}},console};
+ const ctx={teacherPreview:false,state:{serverRewardBalance:100,student:{rewardBalance:0},classGoals:[goal],busy:false},C:{toast(message,type){assert.notEqual(type,'error',message)}},isStoreOpen:()=>true,timeMs:()=>0,document:{getElementById:()=>({value:'25'})},render(){},clearContributionForms(){},loadActivityPointHistory:async()=>[],classRewardsApi:async(action,payload)=>{submitted={action,payload};return {goal,balance:75}},console};
  vm.runInNewContext(src.slice(src.indexOf('function spendableRewardBalance(){'),src.indexOf('function classGoalProgress(')),ctx);
  assert.equal(ctx.spendableRewardBalance(),100);
  vm.runInNewContext(src.slice(src.indexOf('async function contributeClassReward('),src.indexOf('async function redeem(')),ctx);

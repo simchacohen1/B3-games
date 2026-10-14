@@ -4,9 +4,9 @@ const C=require('../class-pointer-prototype/classroom-core.js');
 const vm=require('node:vm'),fs=require('node:fs'),{EventEmitter}=require('node:events');
 function teacherFixture(){
   const elements=new Map();
-  function element(){return {value:'nobody',hidden:false,dataset:{},style:{setProperty(){}},classList:{},events:{},append(){},appendChild(){},replaceChildren(){},remove(){},addEventListener(type,fn){this.events[type]=fn},getBoundingClientRect(){return{left:0,top:0,width:800,height:450}}}}
-  const document={getElementById(id){if(!elements.has(id))elements.set(id,element());return elements.get(id)},createElement:element,createTextNode:text=>({textContent:text})};
-  const context=vm.createContext({document,window:{ClassPointerCore:C,addEventListener(){}},location:{href:'https://example.test/classroom.html'},URL,ResizeObserver:class{observe(){}},setTimeout:()=>1,clearTimeout(){},Date,console});
+  function element(){return {value:'nobody',hidden:false,dataset:{},style:{setProperty(){}},classList:{toggle(){},add(){},remove(){}},events:{},append(){},appendChild(){},setAttribute(){},replaceChildren(){},remove(){},addEventListener(type,fn){this.events[type]=fn},getBoundingClientRect(){return{left:0,top:0,width:800,height:450}}}}
+  const document={addEventListener(){},getElementById(id){if(!elements.has(id))elements.set(id,element());return elements.get(id)},createElement:element,createTextNode:text=>({textContent:text})};
+  const context=vm.createContext({document,window:{ClassPointerCore:C,ClassPointerDashboard:{ready:new Promise(()=>{})},addEventListener(){}},location:{href:'https://example.test/classroom.html?dashboard=teacher'},URL,ResizeObserver:class{observe(){}},setTimeout:()=>1,clearTimeout(){},Date,console});
   vm.runInContext(fs.readFileSync(require.resolve('../class-pointer-prototype/classroom.js'),'utf8'),context);
   const connection=new EventEmitter();connection.peer='student-a';connection.open=true;connection.sent=[];connection.send=message=>connection.sent.push(structuredClone(message));connection.close=()=>connection.emit('close');context.connection=connection;
   vm.runInContext('started=true;receiveStudent(connection)',context);connection.emit('data',{type:'join',name:'Mayer'});
@@ -84,7 +84,7 @@ test('a queued hover cannot restore a cleared pointer or survive stopped sharing
   f.run("pendingPoint={x:0.2,y:0.2};hoverTimer=1;stopSharing();sendHover()");assert.equal(f.run('state.points.teacher'),undefined);
 });
 test('network hover keeps the final position and never restores it after hiding',()=>{
-  const f=teacherFixture();f.run("members.get('student:student-a').admitted=true;state.sharing=true;state.mode='everyone'");
+  const f=teacherFixture();f.run("members.get('student:student-a').admitted=true;members.get('student:student-a').allowed=true;state.sharing=true;state.mode='selected'");
   f.connection.emit('data',{type:'point',point:{x:0.1,y:0.2}});
   f.connection.emit('data',{type:'point',point:{x:0.7,y:0.2}});f.connection.emit('data',{type:'point',point:{x:0.9,y:0.2}});
   assert.equal(f.run("members.get('student:student-a').pendingPoint.x"),0.9);
@@ -105,8 +105,8 @@ test('highlights have separate owners and undo or clear never deletes another la
 test('highlight messages enforce admission and permission and ignore forged ownership',()=>{
   const f=teacherFixture();f.run("members.get('student:student-a').admitted=false;state.sharing=true;state.mode='everyone'");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
   f.run("members.get('student:student-a').admitted=true;state.mode='nobody'");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
-  f.run("state.mode='everyone';members.get('student:student-a').writeAllowed=false");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
-  f.run("members.get('student:student-a').writeAllowed=true");f.connection.emit('data',{type:'highlight',stroke:{...sampleStroke,owner:'teacher'}});assert.equal(f.run('highlightStore.strokes[0].owner'),'student:student-a');
+  f.run("state.mode='selected';members.get('student:student-a').allowed=true;state.tools.highlight=false");f.connection.emit('data',{type:'highlight',stroke:sampleStroke});assert.equal(f.run('highlightStore.strokes.length'),0);
+  f.run("state.tools.highlight=true");f.connection.emit('data',{type:'highlight',stroke:{...sampleStroke,owner:'teacher'}});assert.equal(f.run('highlightStore.strokes[0].owner'),'student:student-a');
   f.run("highlightStore.add('teacher',{tool:'box',points:[{x:0,y:0},{x:0.5,y:0.5}]})");
   f.connection.emit('data',{type:'edit-highlights',action:'all',owner:'teacher'});assert.equal(f.run('highlightStore.strokes.length'),2);
   f.connection.emit('data',{type:'edit-highlights',action:'clear',owner:'teacher'});assert.equal(f.run('highlightStore.strokes.length'),1);assert.equal(f.run('highlightStore.strokes[0].owner'),'teacher');
@@ -122,7 +122,7 @@ test('highlight messages enforce admission and permission and ignore forged owne
   f.run('state.sharing=true');
   f.connection.emit('data',{type:'point',point:{x:0.5,y:0.5}});
   assert.equal(f.run('Object.keys(state.points).length'),0);
-  f.run("state.mode='everyone'");
+  f.run("state.mode='selected';members.get('student:student-a').allowed=true");
   f.connection.emit('data',{type:'point',point:{x:0.5,y:0.5}});
   assert.equal(f.run("state.points['student:student-a'].x"),0.5);
  });

@@ -4,7 +4,7 @@ function settings(data,user){
  const db={ref:path=>({once:async()=>({val:()=>data[path]??null}),set:async value=>writes.push([path,value]),update:async value=>writes.push([path,value])})};
  const firebase={apps:[{}],database:()=>db,auth:()=>({currentUser:user})};
  const window={firebase,B3_FIREBASE_CONFIG:Object.fromEntries(['apiKey','authDomain','databaseURL','projectId','storageBucket','messagingSenderId','appId'].map(k=>[k,'test']))};
- const ctx={window,firebase,localStorage:{getItem:()=>null,setItem(){}},console,Intl,Date};
+ const ctx={window,firebase,document:{readyState:'loading',addEventListener(){}},localStorage:{getItem:()=>null,setItem(){}},console,Intl,Date};
  const source=fs.readFileSync('site-settings.js','utf8').replace('  window.B3SiteSettings = {','  window.readAccessForTest=readUserAccess;window.migrateForTest=migrateWorkspaceData;\n  window.B3SiteSettings = {');
  vm.runInNewContext(source,ctx);return {window,writes,db};
 }
