@@ -419,12 +419,13 @@
     const ills = document.getElementById('illustrationChoices');
     if (!emojis || !ills) return originalRenderArtChoices(item);
 
-    const art = (item.autoArt || genericArt(item.art)) ? smartArt(item) : (item.art || []);
+    // The student picker never invents new images; teacher-selected art only.
+    const art = Array.isArray(item.art) ? item.art : [];
     emojis.innerHTML = '';
     ills.innerHTML = '';
 
     if (!art.length) {
-      emojis.innerHTML = '<span class="mini-note">No matching picture suggestion yet.</span>';
+      emojis.innerHTML = '<span class="mini-note">Your teacher has not approved a picture for this word yet.</span>';
     }
 
     art.forEach(value => {
@@ -436,9 +437,9 @@
       emojis.appendChild(b);
     });
 
-    const choices = smartIllustrations(item);
+    const choices = Array.isArray(item.approvedIllustrations) ? item.approvedIllustrations : [];
     if (!choices.length) {
-      ills.innerHTML = '<span class="mini-note">No illustration for this item yet.</span>';
+      ills.innerHTML = '<span class="mini-note">No teacher-approved illustration for this word yet.</span>';
       return;
     }
 
