@@ -399,6 +399,12 @@ document.addEventListener('pointerup',()=>{editorDragActive=false;},true);
   document.getElementById('saveCardBtn').onclick=saveCurrentCard;document.getElementById('resetCardBtn').onclick=resetCurrentDesign;document.getElementById('artSize').oninput=e=>setSelectedArtSize(e.target.value);document.getElementById('artSmallerBtn').onclick=()=>resizeSelectedArt(-24);document.getElementById('artBiggerBtn').onclick=()=>resizeSelectedArt(24);document.getElementById('removeArtBtn').onclick=removeSelectedArt;document.getElementById('removeAllArtBtn').onclick=()=>{document.getElementById('approvedArtLayer').innerHTML='';selectArt(null);};
   makeDraggable(document.getElementById('hebrewText'),document.getElementById('frontCard'));makeDraggable(document.getElementById('englishText'),document.getElementById('backCard'));
   document.getElementById('frontCard').addEventListener('pointerdown',e=>{if(!e.target.closest('.art-item')&&!e.target.closest('#hebrewText'))selectArt(null);});
+  // The flip-card wrapper is sized after the editor initializes. Keep the
+  // regular word size synchronized with its *actual* width after that resize.
+  if(typeof ResizeObserver!=='undefined'){
+    new ResizeObserver(()=>{if(!editor.classList.contains('hidden'))scaleEditorCardContents();})
+      .observe(document.getElementById('frontCard'));
+  }
   document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&selectedArtEl&&activeScreenId==='learnScreen'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){e.preventDefault();removeSelectedArt();}});
 }
 function bindColorSwatches(){document.querySelectorAll('.color-swatches').forEach(box=>{const id=box.dataset.colorTarget,palette=id==='backgroundColor'?BACKGROUND_SWATCHES:COLOR_SWATCHES;box.innerHTML='';palette.forEach(color=>{const b=document.createElement('button');b.type='button';b.className='color-swatch';b.style.background=color;b.title=color;b.setAttribute('aria-label',`Choose ${color}`);b.onclick=()=>{document.getElementById(id).value=color;renderColorSwatches();applyEditorControls();};box.appendChild(b);});});renderColorSwatches();}
@@ -409,7 +415,9 @@ const CARD_DESIGN_HEIGHT=360;
 
 function cardDisplayScale(card){
   const width=card?.clientWidth||CARD_DESIGN_WIDTH;
-  return width/CARD_DESIGN_WIDTH;
+  // A large monitor must never magnify the chosen text size. New Hebrew
+  // words use the normal 58px design size; smaller cards scale down to fit.
+  return Math.min(1,width/CARD_DESIGN_WIDTH);
 }
 
 function hebrewFontVisualStyle(fontFamily){
