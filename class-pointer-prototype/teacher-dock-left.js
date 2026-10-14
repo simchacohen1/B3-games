@@ -20,7 +20,7 @@
 #stage .teacher-dock:not(.floating) #tbDockLeft{display:none}
 
 /* Docked-left rail */
-#stage .teacher-dock.floating.dock-left{inset:0 auto 0 0!important;transform:none!important;width:${RAIL}px!important;max-width:${RAIL}px;max-height:none;height:100%;border-radius:0 12px 12px 0;padding:6px 4px;gap:4px;overflow-y:auto;overflow-x:visible;scrollbar-width:none;flex-wrap:nowrap}
+#stage .teacher-dock.floating.dock-left{inset:0 auto 0 0!important;transform:none!important;width:${RAIL}px!important;max-width:${RAIL}px;max-height:none;height:100%;border-radius:0 12px 12px 0;padding:6px 4px;gap:4px;overflow:visible;scrollbar-width:none;flex-wrap:nowrap}
 #stage .teacher-dock.floating.dock-left::-webkit-scrollbar{display:none}
 #stage .teacher-dock.floating.dock-left .tb-text{display:none}
 #stage .teacher-dock.floating.dock-left > .tb-group{flex-direction:column;align-items:center;gap:2px;padding:3px 0;flex-wrap:nowrap}
