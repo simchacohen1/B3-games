@@ -37,12 +37,12 @@ test('dashboard does not join when sign-in, grant or membership is unavailable',
 });
 test('teacher publishes and removes only its own random room and registers disconnect cleanup first',async()=>{
  const writes=[],C=core(),classId='one';let auth;
- const ref=path=>({child:key=>ref(path+'/'+key),once:async()=>({val:()=>({active:true,toolGrants:{'class-pointer':true}})}),onDisconnect:()=>({remove:async()=>writes.push(['disconnect',path]),cancel:async()=>writes.push(['cancel',path])}),set:async value=>writes.push(['set',path,value]),remove:async()=>writes.push(['remove',path])});
+ const ref=path=>({child:key=>ref(path+'/'+key),once:async()=>({val:()=>({active:true,toolGrants:{'class-pointer':true}})}),onDisconnect:()=>({remove:async()=>writes.push(['disconnect',path]),cancel:async()=>writes.push(['cancel',path])}),set:async value=>writes.push(['set',path,value]),update:async value=>writes.push(['update',path,value]),remove:async()=>writes.push(['remove',path])});
  const database=()=>({ref});database.ServerValue={TIMESTAMP:{'.sv':'timestamp'}};
  const context=vm.createContext({window:{ClassPointerDashboardCore:C,B3_APP_CONTEXT:{workspaceId:'b3-2026'},B3SiteSettings:{onAuthStateChanged:callback=>auth=callback}},location:{href:'https://example.test/classroom.html?dashboard=teacher&class=one'},URL,firebase:{database,auth:()=>({currentUser:{uid:'test-teacher'}})}});
  vm.runInContext(source('dashboard-session.js'),context);await auth({uid:'test-teacher'},true,{authorized:true,role:'teacher',classIds:[classId]});
- await context.window.ClassPointerDashboard.publish(room);await context.window.ClassPointerDashboard.end();
- assert.equal(writes[0][0],'disconnect');assert.equal(writes[1][0],'set');assert.equal(writes[2][0],'remove');for(const write of writes)assert.ok(write[1].endsWith('/classPointerSessions/'+room));assert.equal(writes[1][2].teacherUid,'test-teacher');
+ await context.window.ClassPointerDashboard.publish(room);await context.window.ClassPointerDashboard.requestScreenSharing();await context.window.ClassPointerDashboard.end();
+ assert.equal(writes[0][0],'disconnect');assert.equal(writes[1][0],'set');assert.equal(writes[2][0],'update');assert.equal(writes[3][0],'remove');assert.equal(writes[2][2].studentScreenSharing,true);assert.deepEqual(writes[2][2].shareRequest,{at:database.ServerValue.TIMESTAMP});for(const write of writes)assert.ok(write[1].endsWith('/classPointerSessions/'+room));assert.equal(writes[1][2].teacherUid,'test-teacher');
 });
 
 test('Class Pointer joins during global and class game locks',async()=>{
