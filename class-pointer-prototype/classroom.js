@@ -33,8 +33,15 @@ function pointerPermission(){
     $('permissionText').textContent=!admitted?'Connecting to your class.':!mayPoint?'Watch the lesson. Your teacher has not enabled your pointer.':mayWrite?'Use the tools your teacher enabled.':'Pointer only. Your teacher has not enabled writing tools.';
   }
 }
+// Before a video or PDF has loaded, the blank classroom is still a valid
+// pointer surface. Otherwise zero video dimensions made all pointers disappear.
+function pointerPictureBox(rect,video){
+ return video.videoWidth>0&&video.videoHeight>0
+  ? C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight)
+  : {left:0,top:0,w:rect.width,h:rect.height};
+}
 function drawPointers(){
-  const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=window.ClassPointerPdf?.active()?window.ClassPointerPdf.box():C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight);
+  const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=window.ClassPointerPdf?.active()?window.ClassPointerPdf.box():pointerPictureBox(rect,video);
   const visible=new Set();$('spotlightCircle').hidden=true;
   if(live()&&box)Object.entries(state.points).forEach(([id,point])=>{
     if(!C.validPoint(point))return;
@@ -373,7 +380,7 @@ function pointAt(event,immediate=false){
   if(isTeacher&&$('teacherTool').value==='eraser'){hideOwnPointer();return}
   if(navigating||!live())return;
   if(!allowed()){if(immediate)$('pointerStatus').textContent='Your teacher has not enabled your pointer.';return}
-  const pdfOpen=window.ClassPointerPdf?.active();const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=pdfOpen?{left:0,top:0,w:1,h:1}:C.pictureBox(rect.width,rect.height,video.videoWidth,video.videoHeight);if(!box)return;
+  const pdfOpen=window.ClassPointerPdf?.active();const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=pdfOpen?{left:0,top:0,w:1,h:1}:pointerPictureBox(rect,video);if(!box)return;
   const pdfPoint=pdfOpen?window.ClassPointerPdf.normalized(event):null;if(pdfOpen&&!pdfPoint){hideOwnPointer();return}
   const point={x:pdfOpen?pdfPoint.x:(event.clientX-rect.left-box.left)/box.w,y:pdfOpen?pdfPoint.y:(event.clientY-rect.top-box.top)/box.h,...C.pointStyle({tool:$(isTeacher?'teacherTool':'studentTool').value,color:$(isTeacher?'teacherColor':'studentColor').value})};
   if(!C.validPoint(point)){hideOwnPointer();return}
