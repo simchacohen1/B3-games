@@ -4,6 +4,7 @@
 (async function(){
   if(window.__classPointerActivityShareLoaded)return;
   window.__classPointerActivityShareLoaded=true;
+  const isCompanion=new URLSearchParams(location.search).get('fttShareCompanion')==='1';
   const src=document.currentScript?.src||'';
   const root=new URL('../',src);
   const endpoint='https://us-central1-b3-games.cloudfunctions.net/classPointerShareAuth';
@@ -52,11 +53,22 @@
         &&v.studentScreenSharing===true&&Number.isFinite(v.createdAt)&&Date.now()-v.createdAt<14400000&&Date.now()-v.createdAt>=-60000)
         .sort((a,b)=>b[1].createdAt-a[1].createdAt)[0]?.[1]||null;
     }
+    if(isCompanion){holder.style.right='auto';holder.style.left='14px';holder.style.bottom='24px';}
     sessions.on('value',snapshot=>{
       const next=current(snapshot.val());
       if(!next||!active||next.roomId!==active.roomId){if(stream)stop()}
       active=next;holder.style.display=active?'flex':'none';
     },()=>{active=null;holder.style.display='none';stop()});
+    if(!isCompanion){
+      btn.addEventListener('click',()=>{
+        // Keep capture in a dedicated same-origin window: changing or closing the
+        // activity page would otherwise terminate its MediaStream.
+        const url=new URL('class-pointer-prototype/share-window.html',root);
+        window.open(url.href,'fttStudentShareWindow','width=540,height=480,resizable=yes,scrollbars=yes');
+        status('In the sharing window, click Share My Screen and choose what to share. Keep that window open.');
+      });
+      return;
+    }
     btn.addEventListener('click',async()=>{
       if(stream){stop();return}
       if(busy||!active)return;
@@ -66,8 +78,8 @@
         if(!navigator.mediaDevices?.getDisplayMedia)throw Error('Use Microsoft Edge or Chrome on a computer.');
         // Capture must be called synchronously from the user click, before any await.
         const capturePromise=navigator.mediaDevices.getDisplayMedia({
-          video:{displaySurface:'browser',frameRate:{ideal:5,max:8}},audio:false,
-          preferCurrentTab:true,surfaceSwitching:'include'
+          video:{frameRate:{ideal:5,max:8}},audio:false,
+          preferCurrentTab:false,surfaceSwitching:'include'
         });
         captured=await capturePromise;
         status('Connecting to teacher…');
