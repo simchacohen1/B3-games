@@ -60,7 +60,7 @@ async function studentFixture(){
   const firebase={apps:[{}],database:()=>db};
   const location={href:'https://funtorahtools.com/shorashim/index.html',pathname:'/shorashim/index.html',assign:url=>{goTo=url}};
   const context=vm.createContext({
-    window:{firebase,B3_FIREBASE_CONFIG:{},FunTorahStudentClass:{resolve:async()=>({workspaceId:'b3-2026',classId:'et'})}},
+    window:{firebase,B3_FIREBASE_CONFIG:{},addEventListener(){},FunTorahStudentClass:{resolve:async()=>({workspaceId:'b3-2026',classId:'et'})}},
     document,location,firebase,URL,Date,console,
     sessionStorage:{getItem:key=>stored.get(key)||null,setItem:(key,v)=>stored.set(key,v)},
     fetch:async()=>({ok:true,json:async()=>({ok:true})}),
