@@ -1,0 +1,32 @@
+/* Compact at normal browser zoom; saved design coordinates remain unchanged. */
+body.shorashim-learning-active #appShell{padding:10px 14px!important}
+body.shorashim-learning-active .topbar{margin-bottom:8px!important;gap:10px!important}
+body.shorashim-learning-active .topbar h1{font-size:26px!important}
+body.shorashim-learning-active .section-head{margin:4px 0 8px!important}
+#learnWorkspace .learn-layout{grid-template-columns:200px minmax(0,1fr)!important;gap:10px!important}
+#learnWorkspace .panel,#learnWorkspace .editor-panel{padding:10px!important;min-width:0}
+#learnWorkspace .word-row{padding:6px 8px!important;min-height:0!important}
+#learnWorkspace .word-row .hebrew{font-size:24px!important}
+#learnWorkspace .tool-columns>.toolbox{padding:8px 10px!important}
+#learnWorkspace .toolbox label{margin:5px 0!important}
+#learnWorkspace .art-choice{width:54px!important;height:54px!important;font-size:32px!important}
+#learnWorkspace .ux-tool-tabs{flex-wrap:wrap!important;gap:4px!important}
+#learnWorkspace .ux-tool-tab{padding:6px 9px!important;font-size:13px!important}
+#learnWorkspace .editor-actions #saveCardBtn{display:none!important}
+#learnWorkspace .flip-stage{display:flex!important;align-items:center!important;justify-content:center!important;gap:10px!important;grid-template-columns:none!important;perspective:none!important;min-height:0!important}
+#learnWorkspace .sc-flipper{position:relative;flex:0 1 auto;width:620px;aspect-ratio:31/18;transform:none}
+#learnWorkspace .sc-flipper>.flashcard.editable{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;transform:none!important;margin:0!important;backface-visibility:visible}
+#learnWorkspace .sc-flipper>#backCard{visibility:hidden!important;pointer-events:none!important}
+#learnWorkspace .sc-flipper.sc-flipped>#frontCard{visibility:hidden!important;pointer-events:none!important}
+#learnWorkspace .sc-flipper.sc-flipped>#backCard{visibility:visible!important}
+#learnWorkspace .sc-flip-btn{flex:0 0 auto;width:58px;height:58px;border-radius:50%;border:0;background:#7c3aed;color:white;font-weight:800;cursor:pointer}
+#learnWorkspace label:has(#englishSize),#learnWorkspace label:has(#englishFont),#learnWorkspace .color-control:has(#englishColor){display:none!important}
+@media(min-width:901px){
+ body.shorashim-learning-active{overflow:auto!important;height:auto!important}
+ body.shorashim-learning-active #learnScreen.active{height:auto!important;min-height:0!important}
+ #learnWorkspace,#learnWorkspace .learn-layout,#learnWorkspace .editor-panel,#learnWorkspace #editorContent:not(.hidden){height:auto!important;overflow:visible!important;display:block!important}
+ #learnWorkspace .learn-layout{display:grid!important}
+ #learnWorkspace .flip-stage{height:auto!important}
+ #learnWorkspace .word-list{max-height:65vh!important;overflow:auto!important}
+}
+@media(max-width:700px){#learnWorkspace .learn-layout{grid-template-columns:minmax(0,1fr)!important}#learnWorkspace .word-list{max-height:160px!important}#learnWorkspace .tool-columns{grid-template-columns:minmax(0,1fr)!important}}

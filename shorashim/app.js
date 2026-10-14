@@ -25,6 +25,7 @@ const SHORASHIM_BASE_ROOT = 'posukPractice/shorashimLearning';
 // under classes/<classId>, and starts empty until its teacher adds words.
 let CLOUD_ROOT = SHORASHIM_BASE_ROOT;
 let classSpaceId = '';
+let recordingClassId = '';
 const LEGACY_CLASS_IDS = ['et','wt'];
 function emptyCatalog(){return {shorashim:[],prefix:[],suffix:[]};}
 async function resolveStudentSpace(studentId){
@@ -39,6 +40,7 @@ async function resolveStudentSpace(studentId){
   }catch(err){console.warn('Could not read class membership',err);}
   const isClassSpace=!!classId&&!LEGACY_CLASS_IDS.includes(classId)&&/^[A-Za-z0-9_-]{1,100}$/.test(classId);
   const nextRoot=isClassSpace?`${SHORASHIM_BASE_ROOT}/classes/${classId}`:SHORASHIM_BASE_ROOT;
+  recordingClassId=classId;
   classSpaceId=isClassSpace?classId:'';
   if(nextRoot!==CLOUD_ROOT){CLOUD_ROOT=nextRoot;startStudentSiteWatcher();}
 }
@@ -605,7 +607,7 @@ async function toggleShorashimRecording(){
         const eventId=cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}`).push().key;
         const storagePath=`shorashim-recordings/${cloudStudentId}/${date}/${eventId}.webm`;
         const ref=cloudStorage.ref(storagePath); await ref.put(blob,{contentType:blob.type||'audio/webm'}); const audioURL=await ref.getDownloadURL();
-        const record={id:eventId,studentId:cloudStudentId,studentName:cloudStudentName||currentStudent,date,mode,noHints:reviewNoHints,points,durationMs,audioURL,storagePath,status:'pending',createdAt:firebase.database.ServerValue.TIMESTAMP};
+        const record={id:eventId,workspaceClassId:recordingClassId||null,studentId:cloudStudentId,studentName:cloudStudentName||currentStudent,date,mode,noHints:reviewNoHints,points,durationMs,audioURL,storagePath,status:'pending',createdAt:firebase.database.ServerValue.TIMESTAMP};
         await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${eventId}`).set(record);
         
         const source=reviewNoHints?'shorashim-no-hints':'shorashim-recording';

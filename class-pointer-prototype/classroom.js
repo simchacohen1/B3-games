@@ -10,6 +10,8 @@ let navigating=false;
 const pointerNodes=new Map();
 const highlightStore=new C.HighlightStore();let highlighter=null;
 const pointerIcons={
+  target:'<path d="M3 2L3 26L10 20L15 31L21 28L16 18L26 18Z" fill="currentColor" stroke="white"/>',
+  roar:'<text x="16" y="27" text-anchor="middle" font-size="29">🦁</text>',
   arrow:'<path d="M16 16L1 8L5 16L1 24Z" fill="currentColor"/>',
   star:'<path d="M16 3L19.5 11.5L29 12L21.5 18L24 27L16 22L8 27L10.5 18L3 12L12.5 11.5Z" fill="currentColor"/>',
   heart:'<path d="M16 28S3 20 3 11.5C3 5 11 3 16 10c5-7 13-5 13 1.5C29 20 16 28 16 28Z" fill="currentColor"/>',
@@ -18,7 +20,7 @@ const pointerIcons={
 };
 function status(text){$('connectionStatus').textContent=text}
 function fail(text){$('error').textContent=text;$('error').hidden=false}
-function clearError(){$('error').hidden=true}
+function clearError(){$('error').hidden=true;delete $('error').dataset.peerWarning}
 function send(connection,message){if(connection?.open){try{connection.send(message)}catch{fail('The connection was interrupted. Please rejoin the class.')}}}
 function ownMember(){return state.members.find(member=>member.id==='student:'+peer?.id)}
 function selected(member){return !!member?.admitted&&member.allowed===true&&state.mode==='selected'}
@@ -26,7 +28,9 @@ function toolAllowed(tool,member=ownMember()){return isTeacher||selected(member)
 function allowed(){return toolAllowed('pointer')}
 function writingAllowed(tool){return toolAllowed(tool==='pen'?'pen':'highlight')}
 function pointerPermission(){
-  const mayPoint=allowed(),mayWrite=writingAllowed('highlight')||writingAllowed('pen');$('stage').style.cursor=navigating?'default':mayPoint?'crosshair':'not-allowed';
+  const mayPoint=allowed(),mayWrite=writingAllowed('highlight')||writingAllowed('pen');const tool=$(isTeacher?'teacherTool':'studentTool')?.value;
+  const special=tool&&tool!=='target'&&!C.highlightTools.includes(tool)&&tool!=='eraser';
+  $('stage').style.cursor=navigating?'default':mayPoint&&special&&live()?'none':'default';
   if(!mayPoint)cancelHover();if(!mayWrite)highlighter?.cancel()
   if(!isTeacher){
     const tool=$('studentTool');if(tool){for(const option of tool.options){if(C.highlightTools.includes(option.value))option.disabled=!writingAllowed(option.value);else option.disabled=!mayPoint}if(tool.selectedOptions[0]?.disabled){const first=Array.from(tool.options).find(o=>!o.disabled);if(first){tool.value=first.value;tool.dispatchEvent(new Event('change',{bubbles:true}))}}}
@@ -43,6 +47,7 @@ function drawPointers(){
     const style=C.pointStyle(point),left=box.left+point.x*box.w,top=box.top+point.y*box.h;visible.add(id);
     let pointer=pointerNodes.get(id);
     if(!pointer){pointer=document.createElement('div');pointer.dataset.person=id;pointerNodes.set(id,pointer);$('pointerLayer').appendChild(pointer)}
+    pointer.hidden=style.tool==='target'&&(id===(isTeacher?'teacher':'student:'+peer?.id));
     if(pointer.dataset.tool!==style.tool){
       pointer.replaceChildren();pointer.dataset.tool=style.tool;
       if(pointerIcons[style.tool]){const icon=document.createElement('span');icon.className='pointer-icon';icon.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true">'+pointerIcons[style.tool]+'</svg>';pointer.appendChild(icon)}
@@ -155,8 +160,34 @@ function peerError(error){
 }
 function makePeer(id){
   if(typeof Peer==='undefined'){fail('The classroom connection library could not load. Refresh or ask the school to allow this page.');return null}
-  const instance=new Peer(id||'class-pointer-student-'+crypto.randomUUID());instance.on('error',peerError);
-  instance.on('disconnected',()=>{status('Connection service interrupted. Existing lesson connections may still work.');if(!instance.destroyed)instance.reconnect()});return instance;
+  const instance=new Peer(id||'class-pointer-student-'+crypto.randomUUID());
+  let retry=null,attempt=0,interrupted=false;
+  const connected=()=>isTeacher?Array.from(members.values()).some(m=>m.connection?.open):!!teacherConnection?.open;
+  function reconnect(){
+    if(retry||instance.destroyed)return;
+    retry=setTimeout(()=>{retry=null;if(instance.destroyed||peer!==instance)return;
+      if(instance.disconnected){try{instance.reconnect()}catch{}}
+      if(interrupted)reconnect();
+    },Math.min(30000,1000*2**Math.min(attempt++,5)));
+  }
+  instance.on('error',error=>{
+    if(peer!==instance)return;
+    if(['network','socket-error','socket-closed','server-error'].includes(error?.type)){
+      interrupted=true;
+      // Signaling is separate from existing WebRTC drawing/video connections.
+      status(connected()?'Lesson connection is active. Reconnecting the connection service…':'Reconnecting the classroom connection service…');
+      $('error').dataset.peerWarning='true';$('error').hidden=true;reconnect();
+    }else{peerError(error);if(!$('error').hidden)$('error').dataset.peerWarning='true'}
+  });
+  instance.on('disconnected',()=>{if(peer!==instance)return;interrupted=true;
+    status(connected()?'Lesson connection is active. Reconnecting the connection service…':'Connection service interrupted. Reconnecting…');reconnect()});
+  instance.on('open',()=>{const wasInterrupted=interrupted;interrupted=false;attempt=0;clearTimeout(retry);retry=null;
+    if(peer!==instance)return;
+    if($('error').dataset.peerWarning)clearError();
+    if(wasInterrupted)status(connected()?'Lesson connected. Connection service restored.':'Connection service restored. Waiting for lesson connection.');
+  });
+  instance.on('close',()=>{clearTimeout(retry);retry=null;if(peer===instance)status(connected()?'The connection service closed. Existing lesson connections may still work; new joins need a new class.':'The lesson connection closed. '+(isTeacher?'Start the class again.':'Leave and rejoin your class.'))});
+  return instance;
 }
 async function startClass(){
   if(!isTeacher||started||openingClass)return;
@@ -173,7 +204,7 @@ async function startClass(){
   }
   const current=peer;
   joinTimer=setTimeout(()=>{if(peer===current&&!started){endClass();fail('The class could not connect. Try again or use another network.')}},20000);
-  peer.on('open',async id=>{
+  peer.once('open',async id=>{
     if(peer!==current)return;
     try{if(window.ClassPointerDashboard)await window.ClassPointerDashboard.publish(id)}catch(error){if(peer===current){endClass();fail('Could not open the lesson on student dashboards. '+error.message)}return}
     if(peer!==current)return;clearTimeout(joinTimer);started=true;openingClass=false;$('endClass').disabled=false;$('shareScreen').disabled=false;$('openBrowserTab').disabled=false;
@@ -318,7 +349,7 @@ function joinClass(event){
   clearError();joining=true;$('joinClass').disabled=true;status('Connecting to your teacher…');peer=makePeer();if(!peer){joining=false;$('joinClass').disabled=false;return}
   const current=peer;
   joinTimer=setTimeout(()=>{if(peer===current&&joining){leaveClass();fail('Could not reach your teacher. Check the join link or try another network.')}},20000);
-  peer.on('open',()=>{
+  peer.once('open',()=>{
     if(peer!==current)return;
     teacherConnection=peer.connect(room,{reliable:true});const connection=teacherConnection;
     connection.on('open',()=>{if(teacherConnection===connection)send(connection,{type:'join',name})});
@@ -457,3 +488,5 @@ if(!isTeacher&&new URL(location.href).searchParams.get('dashboard')==='student')
   if(saved){$('studentName').value=C.cleanName(saved.name);$('studentName').readOnly=true;const welcome=document.createElement('p');welcome.textContent='Joining as '+$('studentName').value+'.';$('studentPanel').prepend(welcome);joinClass({preventDefault(){}})}
   else{ $('joinClass').disabled=true;fail('Go back to Fun Torah Tools and click Class Pointer to join with your name.'); }
 }
+
+[$("teacherTool"),$("studentTool")].forEach(tool=>tool?.addEventListener("change",pointerPermission));

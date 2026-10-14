@@ -1,9 +1,10 @@
 'use strict';
 /* Standalone, optional screen-sharing button for student activities.
-   Never opens a classroom tab or changes the student's current activity. */
+   A companion window owns capture so navigating the activity keeps it alive. */
 (async function(){
   if(window.__classPointerActivityShareLoaded)return;
   window.__classPointerActivityShareLoaded=true;
+  const isCompanion=location.pathname.endsWith('/share-window.html');
   const src=document.currentScript?.src||'';
   const root=new URL('../',src);
   const endpoint='https://us-central1-b3-games.cloudfunctions.net/classPointerShareAuth';
@@ -34,17 +35,20 @@
     const sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
     holder.id='fttActivityScreenShare';
-    holder.style.cssText='position:fixed;right:14px;bottom:14px;z-index:2147483640;display:none;align-items:center;gap:8px;padding:8px;border-radius:14px;background:#f8fbff;border:2px solid #2563eb;box-shadow:0 5px 24px #15284666;font:700 15px system-ui,sans-serif';
+    holder.style.cssText='position:fixed;right:14px;bottom:130px;z-index:2147483640;display:none;align-items:center;gap:8px;padding:8px;border-radius:14px;background:#f8fbff;border:2px solid #2563eb;box-shadow:0 5px 24px #15284666;font:700 15px system-ui,sans-serif';
     const btn=document.createElement('button');btn.type='button';btn.textContent='🖥 Share My Screen';
     btn.style.cssText='background:#1d4ed8;color:#fff;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;font:inherit';
     const label=document.createElement('span');label.setAttribute('role','status');label.style.cssText='font-size:12px;color:#1e3a8a;max-width:180px';
     holder.append(btn,label);document.body.appendChild(holder);
-    let active=null,peer=null,call=null,stream=null,busy=false;
+    let active=null,peer=null,call=null,stream=null,busy=false,parentValid=true;
+    const channel=typeof BroadcastChannel==='function'?new BroadcastChannel('ftt-screen-share'):null;
+    const announce=()=>channel?.postMessage({studentId:id,classId,sharing:!!stream});
+    if(!isCompanion&&channel)channel.onmessage=event=>{const v=event.data;if(v?.studentId===id&&v.classId===classId){btn.textContent=v.sharing?'⏹ Sharing controls':'🖥 Share My Screen';status(v.sharing?'Sharing in your companion window.':'')}};
     function stop(){
-      const prior=stream;stream=null;try{call?.close()}catch{}call=null;
+      const prior=stream,oldCall=call;stream=null;call=null;try{oldCall?.close()}catch{}
       try{peer?.destroy()}catch{}peer=null;
       prior?.getTracks().forEach(t=>t.stop());
-      btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';label.textContent='';
+      btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';label.textContent='';announce();
     }
     function status(text){label.textContent=text}
     function current(rows){
@@ -52,12 +56,47 @@
         &&v.studentScreenSharing===true&&Number.isFinite(v.createdAt)&&Date.now()-v.createdAt<14400000&&Date.now()-v.createdAt>=-60000)
         .sort((a,b)=>b[1].createdAt-a[1].createdAt)[0]?.[1]||null;
     }
+    const base='b3Games/workspaces/'+ws+'/classes/'+classId;
+    let permitted=true;
+    firebase.database().ref(base).on('value',snap=>{const cls=snap.val();permitted=!!cls&&cls.active!==false&&!!cls.members?.[id]&&cls.members[id].active!==false&&cls.toolGrants?.['class-pointer']!==false;
+      if(!permitted){active=null;stop();holder.style.display='none';status('Your teacher changed access. Return to Fun Torah Tools.')}
+    },()=>{permitted=false;active=null;stop();holder.style.display='none'});
     sessions.on('value',snapshot=>{
-      const next=current(snapshot.val());
+      const next=permitted&&parentValid?current(snapshot.val()):null;
       if(!next||!active||next.roomId!==active.roomId){if(stream)stop()}
       active=next;holder.style.display=active?'flex':'none';
     },()=>{active=null;holder.style.display='none';stop()});
+    if(!isCompanion){
+      btn.addEventListener('click',()=>{
+        const url=new URL('class-pointer-prototype/share-window.html',root);
+        const companion=window.open(url.href,'fttStudentShareWindow','width=540,height=480,resizable=yes,scrollbars=yes');
+        if(!companion){status('Allow popups for Fun Torah Tools, then try again.');return}
+        // A reused named window must not retain a different pupil or class.
+        try{if(companion.location.origin===location.origin){const same=companion.sessionStorage.getItem('b3Games_studentId')===id&&companion.sessionStorage.getItem('b3Games_studentClass')===classId;
+          if(!same){companion.sessionStorage.setItem('b3Games_studentId',id);companion.sessionStorage.setItem('b3Games_classPin',pin);companion.sessionStorage.setItem('b3Games_studentClass',classId);companion.location.replace(url.href)}
+        }}catch{}
+        companion.focus();status('In the sharing window, click Share My Screen. Keep that window open while changing activities.');
+      });
+      window.addEventListener('pagehide',()=>channel?.close());
+      return;
+    }
+    holder.style.left='14px';holder.style.right='14px';holder.style.flexWrap='wrap';
+    const activityWindow=window.opener;
+    function parentSessionAllows(){
+      if(!activityWindow)return true; // Explicitly opened standalone controls.
+      if(activityWindow.closed)return false;
+      try{return activityWindow.location.origin===location.origin&&activityWindow.sessionStorage.getItem('b3Games_studentId')===id&&activityWindow.sessionStorage.getItem('b3Games_classPin')===pin&&(activityWindow.sessionStorage.getItem('b3Games_studentClass')||classId)===classId}catch{return false}
+    }
+    function checkParentSession(){
+      if(parentValid&&parentSessionAllows())return true;
+      parentValid=false;active=null;stop();sessionStorage.clear();btn.disabled=true;holder.style.display='flex';
+      status('Your student login changed. Open Sharing Controls from your activity again.');return false;
+    }
+    const parentTimer=setInterval(checkParentSession,1000);
+    window.addEventListener('pagehide',()=>clearInterval(parentTimer));
+
     btn.addEventListener('click',async()=>{
+      if(!checkParentSession())return;
       if(stream){stop();return}
       if(busy||!active)return;
       busy=true;btn.disabled=true;
@@ -92,10 +131,15 @@
         captured.getVideoTracks()[0]?.addEventListener('ended',stop,{once:true});
         media.on('close',stop);media.on('error',stop);
         btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';
-        status('Sharing started — ask your teacher to confirm');
+        status('Sending screen — waiting for teacher video confirmation.');announce();
+        const pc=media.peerConnection;
+        pc?.addEventListener('connectionstatechange',()=>{if(call!==media)return;
+          if(pc.connectionState==='connected')status('Screen connected — ask your teacher to confirm the picture.');
+          if(['failed','closed'].includes(pc.connectionState)){stop();status('Connection lost. Click Share My Screen to share again.')}
+        });
       }catch(error){captured?.getTracks().forEach(t=>t.stop());stop();status(error?.name==='NotAllowedError'?'Sharing canceled.':error.message||'Could not share.')}
-      finally{busy=false;btn.disabled=false}
+      finally{busy=false;btn.disabled=!parentValid}
     });
-    window.addEventListener('pagehide',stop);
+    window.addEventListener('pagehide',()=>{stop();channel?.close()});
   }catch(error){console.warn('Class Pointer activity sharing unavailable',error)}
 })();

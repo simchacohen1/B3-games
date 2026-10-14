@@ -21,7 +21,7 @@
   if(!dock||!stage||!teacherPanel)return;
   const toolSel=$(studentView?'studentTool':'teacherTool'),colorSel=$(studentView?'studentColor':'teacherColor'),sizeSel=$(studentView?'studentSize':'teacherSize');
   const home=document.createComment('teacher-dock-home');dock.parentNode.insertBefore(home,dock);
-  const icons={target:'◎',arrow:'➤',star:'★',heart:'♥',paw:'🐾',sparkle:'✦'};
+  const icons={target:'↖',arrow:'➤',star:'★',heart:'♥',paw:'🐾',sparkle:'✦',roar:'🦁'};
   let lastShape=window.ClassPointerCore.highlightTools.includes(toolSel.value)?'target':toolSel.value;
 
   function setSource(select,value){if(select.disabled||Array.from(select.options).find(o=>o.value===value)?.disabled||select.value===value)return;select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}))}
@@ -55,7 +55,11 @@
     else return;
     sync();
   });
-  if(!studentView)$('tbStopShare').addEventListener('click',()=>{$('stopScreen').click();closeMenus()});
+  if(!studentView){
+    const stop=$('tbStopShare');stop.classList.add('tb-btn');
+    $('tbFullscreen').before(stop);
+    stop.addEventListener('click',()=>{$('stopScreen').click();closeMenus()});
+  }
   $('tbFullscreen').addEventListener('click',()=>{if(isExpanded()){$('exitFullScreenLesson').click()}else $('fullScreenLesson').click()});
   $('tbCollapse').addEventListener('click',event=>{event.stopPropagation();dock.classList.toggle('collapsed');closeMenus();sync()});
 
@@ -77,18 +81,18 @@
     handle.className='tb-roster-handle';handle.textContent='⠿ Drag student permissions';handle.title='Drag to move this panel';
     panel.prepend(handle);
     let drag=null;
+    const placePanel=(x,y)=>{panel.style.left='0px';panel.style.top='0px';const origin=panel.getBoundingClientRect();panel.style.left=x-origin.left+'px';panel.style.top=y-origin.top+'px'};
     handle.addEventListener('pointerdown',event=>{
       if(event.button!==0)return;
       event.preventDefault();event.stopPropagation();
       const box=panel.getBoundingClientRect();
-      panel.style.position='fixed';panel.style.left=box.left+'px';panel.style.top=box.top+'px';panel.style.right='auto';
+      panel.style.position='fixed';panel.style.right='auto';panel.style.bottom='auto';placePanel(box.left,box.top);
       drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:box.left,top:box.top};
       handle.setPointerCapture(event.pointerId);
     });
     handle.addEventListener('pointermove',event=>{
       if(!drag||drag.id!==event.pointerId)return;
-      panel.style.left=Math.max(0,Math.min(innerWidth-panel.offsetWidth,drag.left+event.clientX-drag.x))+'px';
-      panel.style.top=Math.max(0,Math.min(innerHeight-panel.offsetHeight,drag.top+event.clientY-drag.y))+'px';
+      placePanel(Math.max(8,Math.min(innerWidth-panel.offsetWidth-8,drag.left+event.clientX-drag.x)),Math.max(8,Math.min(innerHeight-panel.offsetHeight-8,drag.top+event.clientY-drag.y)));
     });
     ['pointerup','pointercancel','lostpointercapture'].forEach(type=>handle.addEventListener(type,()=>{drag=null}));
     window.addEventListener('resize',()=>{

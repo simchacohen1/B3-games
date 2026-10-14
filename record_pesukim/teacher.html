@@ -486,6 +486,7 @@
           <button class="tab-btn" id="summaryTabBtn">📊 By Posuk</button>
           <button class="tab-btn" id="reportsTabBtn">🧾 Reports</button>
           <button class="tab-btn" id="chazaraRecordingsTabBtn">🎧 Chazara</button>
+          <button class="tab-btn" id="questionBankTabBtn">🧩 Understand Questions</button>
           <button class="tab-btn tab-right" id="accessTabBtn">🔑 Access</button>
         </div>
         <div id="mainContent"><div class="loading">Loading…</div></div>
@@ -499,7 +500,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="../firebase-config.js"></script>
-<script src="../site-settings.js?v=20261008-owner-demo"></script>
+<script src="../site-settings.js?v=20261014-outstanding2"></script>
 
 <script>
 /* Paste the SAME firebaseConfig used in student.html and your other B3 Games files */
@@ -1011,7 +1012,7 @@ async function requestTeacherMilestoneAward(studentId, source, evidencePosukKey)
 
 const TAB_BUTTONS = {
   overview: 'overviewTabBtn', student: 'studentTabBtn', roster: 'rosterTabBtn', summary: 'summaryTabBtn',
-  reports: 'reportsTabBtn', chazaraRecordings: 'chazaraRecordingsTabBtn', access: 'accessTabBtn'
+  reports: 'reportsTabBtn', chazaraRecordings: 'chazaraRecordingsTabBtn', questionBank: 'questionBankTabBtn', access: 'accessTabBtn'
 };
 Object.entries(TAB_BUTTONS).forEach(([tab, btnId]) => {
   document.getElementById(btnId).onclick = () => setTab(tab);
@@ -1058,6 +1059,9 @@ function setTab(tab){
   }else if(tab === 'chazaraRecordings'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
     loadChazaraRecordings();
+  }else if(tab === 'questionBank'){
+    [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
+    loadQuestionBankTab();
   }else if(tab === 'access'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
     loadAccessTab();
@@ -1066,6 +1070,129 @@ function setTab(tab){
     if(el) selectStudent(activeStudentId, studentsMap[activeStudentId], el);
   }else{
     document.getElementById('mainContent').innerHTML = '<div class="empty-msg">Pick a student on the left to see their pesukim, scores and recordings.</div>';
+  }
+}
+
+
+function loadQuestionBankTab(){
+  const mainEl = document.getElementById('mainContent');
+  if(!teacherAccess.authorized){
+    mainEl.innerHTML = '<h2>Understand Question Bank</h2><div class="empty-msg">Teacher sign-in required.</div>';
+    return;
+  }
+  mainEl.innerHTML =
+    '<h2>Understand Question Bank</h2>' +
+    '<p>Upload exactly two tap/select questions for one pasuk. The student also answers three spoken questions. The CSV must have exactly three columns: Selected Hebrew Words, Formulated Question, and Other Correct Word Variants. Separate multiple variants with semicolons.</p>' +
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;margin:16px 0;">' +
+      '<label>Perek <input id="questionBankPerek" type="number" min="1" max="50" value="18" style="width:90px;padding:8px;"></label>' +
+      '<label>Pasuk <input id="questionBankPasuk" type="number" min="1" max="200" value="1" style="width:90px;padding:8px;"></label>' +
+    '</div>' +
+    '<label style="display:block;margin:12px 0;">CSV file <input id="questionBankFile" type="file" accept=".csv,text/csv"></label>' +
+    '<button class="btn gold" id="questionBankUploadBtn">Review CSV</button>' +
+    '<div id="questionBankUploadStatus" role="status" style="margin-top:12px;font-weight:700;"></div>';
+  document.getElementById('questionBankUploadBtn').onclick = uploadTeacherQuestionCsv;
+}
+function parseTeacherQuestionCsv(text){
+  const rows=[]; let row=[], value='', quoted=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(ch === '"'){
+      if(quoted && text[i+1] === '"'){ value+='"'; i++; }
+      else quoted=!quoted;
+    }else if(ch === ',' && !quoted){
+      row.push(value); value='';
+    }else if((ch === '\n' || ch === '\r') && !quoted){
+      if(ch === '\r' && text[i+1] === '\n') i++;
+      row.push(value); value='';
+      if(row.some(cell=>String(cell).trim())) rows.push(row);
+      row=[];
+    }else value+=ch;
+  }
+  if(quoted) throw new Error('The CSV has an unfinished quoted field.');
+  if(value.length || row.length){ row.push(value); if(row.some(cell=>String(cell).trim())) rows.push(row); }
+  return rows;
+}
+function normalizeQuestionHebrewToken(word){
+  const text=String(word||'').replace(/[\u0591-\u05BD\u05BF\u05C1-\u05C2\u05C4-\u05C5\u05C7]/g,'').replace(/\u05C3/g,'').trim();
+  return text==='יהוה'||/^ה[׳']$/.test(text)?'ה׳':text;
+}
+function phraseOccursInPasuk(phrase, verseText){
+  const answer=String(phrase||'').trim().split(/\s+/).map(normalizeQuestionHebrewToken).filter(Boolean);
+  const words=String(verseText||'').trim().split(/\s+/).map(normalizeQuestionHebrewToken).filter(Boolean);
+  if(!answer.length || answer.length>words.length) return false;
+  for(let start=0;start<=words.length-answer.length;start++){
+    if(answer.every((word,index)=>word===words[start+index])) return true;
+  }
+  return false;
+}
+async function uploadTeacherQuestionCsv(){
+  const status=document.getElementById('questionBankUploadStatus');
+  const button=document.getElementById('questionBankUploadBtn');
+  const file=document.getElementById('questionBankFile').files[0];
+  const perek=Number(document.getElementById('questionBankPerek').value);
+  const pasuk=Number(document.getElementById('questionBankPasuk').value);
+  const sefer=document.getElementById('teacherSeferSelect').value;
+  const apiBooks={Bereishis:'Genesis',Shemos:'Exodus',Vayikra:'Leviticus',Bamidbar:'Numbers',Devarim:'Deuteronomy'};
+  if(!teacherAccess.authorized){status.textContent='Teacher sign-in required.';return;}
+  if(!apiBooks[sefer]){status.textContent='Choose a valid Sefer first.';return;}
+  if(!Number.isInteger(perek)||perek<1||!Number.isInteger(pasuk)||pasuk<1){status.textContent='Enter a valid perek and pasuk.';return;}
+  if(!file){status.textContent='Choose a CSV file first.';return;}
+  if(file.size>65536){status.textContent='Use a CSV smaller than 64 KB.';return;}
+  button.disabled=true; status.textContent='Checking the CSV and pasuk…';
+  try{
+    const rows=parseTeacherQuestionCsv((await file.text()).replace(/^\uFEFF/,''));
+    const expected=['Selected Hebrew Words','Formulated Question','Other Correct Word Variants'];
+    const header=(rows.shift()||[]).map(v=>String(v).trim());
+    if(header.length!==3 || !expected.every((v,i)=>header[i].toLowerCase()===v.toLowerCase())){
+      throw new Error('Use these three headers in this order: Selected Hebrew Words, Formulated Question, Other Correct Word Variants.');
+    }
+    if(rows.length!==2) throw new Error('Upload exactly two tap questions for this pasuk.');
+    if(file.size>65536)throw new Error('Use a CSV smaller than 64 KB.');
+    const items=rows.map((cells,index)=>{
+      if(cells.length!==3) throw new Error('CSV row '+(index+2)+' must have exactly three columns.');
+      const answer=String(cells[0]).trim(), question=String(cells[1]).trim();
+      const variants=String(cells[2]||'').split(';').map(v=>v.trim()).filter(Boolean);
+      if(answer.length>500||question.length>500||variants.length>10)throw new Error('Keep each question/answer under 500 characters and use at most ten variants.');
+      if(!answer||!question) throw new Error('CSV row '+(index+2)+' needs Hebrew answer words and an English question.');
+      return {question,answerPhrases:[answer,...variants]};
+    });
+    const response=await fetch('https://www.sefaria.org/api/texts/'+apiBooks[sefer]+'.'+perek+'?context=0&pad=0');
+    if(!response.ok) throw new Error('Could not verify this pasuk against the Hebrew text.');
+    const chapter=await response.json();
+    const verseHtml=Array.isArray(chapter.he)?chapter.he[pasuk-1]:null;
+    if(!verseHtml) throw new Error('That perek/pasuk was not found in the Hebrew text.');
+    const temp=document.createElement('div'); temp.innerHTML=String(verseHtml);
+    const verseText=(temp.textContent||temp.innerText||'').replace(/\s+/g,' ').trim();
+    for(let i=0;i<items.length;i++){
+      for(const phrase of items[i].answerPhrases){
+        if(!phraseOccursInPasuk(phrase,verseText)) throw new Error('The Hebrew answer in CSV row '+(i+2)+' does not match this pasuk. Check the selected perek and pasuk, or the Hebrew phrase.');
+      }
+    }
+    const workspace=String(teacherWorkspace||'').replace(/[.#$\[\]\/]/g,'_');
+    if(!workspace) throw new Error('The teacher workspace could not be identified.');
+    const ref=db.ref('posukPractice/approvedQuestionBanks/'+workspace+'/'+sefer+'/'+perek+'/'+pasuk);
+    const existing=(await ref.once('value')).val();
+    const reviewedVersion=existing?.updatedAt||0;
+    status.innerHTML='<p>Review '+escapeHtml(sefer)+' '+perek+':'+pasuk+' — two tap questions:</p>'+items.map(item=>'<p><strong>'+escapeHtml(item.question)+'</strong><br><span dir="rtl">'+item.answerPhrases.map(escapeHtml).join(' / ')+'</span></p>').join('');
+    const publish=document.createElement('button');publish.type='button';publish.className='btn gold';publish.textContent='Approve and save these two questions';status.append(publish);
+    publish.onclick=async()=>{
+      if(!teacherAccess.authorized){status.textContent='Teacher access changed. Sign in again.';return}
+      publish.disabled=true;
+      try{
+        if(existing&&!confirm('Replace the existing two tap questions for '+sefer+' '+perek+':'+pasuk+'? Past student answers are kept.')){publish.disabled=false;return}
+        const result=await ref.transaction(current=>{
+          if((current?.updatedAt||0)!==reviewedVersion)return;
+          return {items,updatedAt:Date.now(),reviewed:true};
+        });
+        if(!result.committed)throw Error('Another teacher changed this bank. Review the CSV again.');
+        status.textContent='Saved two approved tap questions for '+sefer+' '+perek+':'+pasuk+'. Spoken questions are unchanged.';
+      }catch(error){status.textContent=error.message||'Could not save. Review and retry.'}
+    };
+  }catch(err){
+    console.error('Question bank upload failed',err);
+    status.textContent=err&&err.message?err.message:'Upload failed. Please retry.';
+  }finally{
+    button.disabled=false;
   }
 }
 

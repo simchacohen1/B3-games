@@ -26,7 +26,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="../guest-mode.js?v=20261011-guest"></script>
-<script src="../game-gate.js?v=20261008-owner-demo" data-game-id="posuk-practice-scroll"></script>
+<script src="../game-gate.js?v=20261014-outstanding2" data-game-id="posuk-practice-scroll"></script>
 <title>Posuk Practice Scroll</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
@@ -1214,7 +1214,7 @@
 
 </style>
 <script src="../paid-api.js?v=20261008-cost-controls"></script>
-<script defer src="../gallery-share.js?v=20261011b"></script>
+<script defer src="../gallery-share.js?v=20261014-outstanding2"></script>
 </head>
 <body>
 <div class="wrap">
@@ -1385,7 +1385,7 @@
               <button class="listen-btn" id="questionHintBtn" type="button" aria-label="Hear a hint">💡 Hear hint</button>
             </div>
           </div>
-          <div style="margin:12px 0 8px;text-align:center;color:var(--ink-soft);font-weight:800;">Tap all the Hebrew words that answer the question.</div>
+          <div id="questionAnswerInstruction" style="margin:12px 0 8px;text-align:center;color:var(--ink-soft);font-weight:800;">Answer the question.</div>
           <div class="word-selection-board" id="questionWordChoices" dir="rtl"></div>
           <div style="text-align:center;margin:10px 0;"><button class="btn gold" id="checkWordSelectionBtn" type="button">Check words</button></div>
           <!-- Moved up here (right under the question itself) instead of
@@ -1745,6 +1745,40 @@ function normalizeDivineNames(text){
     .replace(/\bGod\b/gi, 'Hashem');
 }
 
+function normalizeQuestionHebrewToken(word){
+  const text=String(word||'').replace(/[\u0591-\u05BD\u05BF\u05C1-\u05C2\u05C4-\u05C5\u05C7]/g,'').replace(/\u05C3/g,'').trim();
+  return text==='יהוה'||/^ה[׳']$/.test(text)?'ה׳':text;
+}
+function answerPhraseWordSets(phrase, pasukText){
+  const phraseWords=String(phrase||'').trim().split(/\s+/).map(normalizeQuestionHebrewToken).filter(Boolean);
+  const words=String(pasukText||'').trim().split(/\s+/).map(normalizeQuestionHebrewToken).filter(Boolean);
+  if(!phraseWords.length||phraseWords.length>words.length)return [];
+  const sets=[];
+  for(let start=0;start<=words.length-phraseWords.length;start++){
+    if(phraseWords.every((word,index)=>word===words[start+index])){
+      sets.push(Array.from({length:phraseWords.length},(_,offset)=>start+offset));
+    }
+  }
+  return sets;
+}
+async function getComprehensionQuestionsForPart(part){
+  const workspace=window.B3SiteSettings?.workspaceId;
+  if(!workspace||!part?.posukNum)return [];
+  const sefer=currentSefer||'Bereishis';
+  if(!['Bereishis','Shemos','Vayikra','Bamidbar','Devarim'].includes(sefer))return [];
+  const snap=await db.ref('posukPractice/approvedQuestionBanks/'+workspace+'/'+sefer+'/'+currentPerekNum+'/'+part.posukNum).once('value');
+  const bank=snap.val();
+  if(!bank?.reviewed||!Array.isArray(bank.items)||bank.items.length!==2)throw Error('Two teacher-approved tap questions are needed for this pasuk.');
+  const taps=bank.items.map(item=>({question:normalizeDivineNames(item.question||''),expectedAnswer:'',sourceFact:'',
+    answerWordSets:(item.answerPhrases||[]).flatMap(phrase=>answerPhraseWordSets(phrase,part.text||'')),
+    posukNum:part.posukNum,generated:false,answerMode:'tap',bankVersion:bank.updatedAt}));
+  if(taps.some(item=>!item.question||!item.answerWordSets.length))throw Error('The teacher questions do not match this pasuk.');
+  // Check the uploaded bank first: don't pay to generate questions for an unready pasuk.
+  const spoken=(await getGeneratedQuestionsForPart(part)).slice(0,3).map(item=>({...item,answerMode:'voice'}));
+  if(spoken.length!==3)throw Error('Three reliable spoken questions are not ready. Please retry.');
+  return [...spoken,...taps];
+}
+
 async function getGeneratedQuestionsForPart(part){
   if(!part || !part.translation || !part.translation.trim()) return [];
   const cacheKey = generatedQuestionCacheKey(part);
@@ -1794,9 +1828,10 @@ async function getGeneratedQuestionsForPart(part){
         posukText: part.text || '',
         posukTranslation: part.translation || '',
         classroomReferenceTranslation: await getClassroomReferenceForPart(part),
+        sefer:currentSefer,
         perekNum: currentPerekNum,
         posukNum: part.posukNum,
-        questionLimit: 5
+        questionLimit: 3
       })
     });
     if(!res.ok) throw new Error('Question generation request failed');
@@ -3164,6 +3199,7 @@ async function fetchClassroomReferenceChapter(perekNum){
 }
 
 async function getClassroomReferenceForPart(part){
+  if(currentSefer!=='Bereishis')return '';
   if(!part || !part.posukNum) return '';
   const refs = await fetchClassroomReferenceChapter(currentPerekNum);
   return refs[part.posukNum - 1] || '';
@@ -3467,7 +3503,7 @@ async function completeGeneratedComprehensionQuestions(loadToken){
   for(const part of (currentSelectionParts || [])){
     if(loadToken !== generatedQuestionLoadToken) return;
     try{
-      const items = await getGeneratedQuestionsForPart(part);
+      const items = await getComprehensionQuestionsForPart(part);
       if(items && items.length) items.forEach(item => combined.push(item));
       else hadFailure = true;
     }catch(err){
@@ -3476,7 +3512,7 @@ async function completeGeneratedComprehensionQuestions(loadToken){
     }
   }
   if(loadToken !== generatedQuestionLoadToken) return;
-  if(combined.length){
+  if(combined.length && !hadFailure){
     comprehensionQuestionLoadFailed = false;
     comprehensionQuestions = combined;
     comprehensionQIndex = 0;
@@ -3488,14 +3524,10 @@ async function completeGeneratedComprehensionQuestions(loadToken){
     }else{
     comprehensionQuestionLoadFailed = true;
     const msg = document.getElementById('comprehensionGradingMsg');
-      msg.textContent = hadFailure ? 'Could not prepare reliable questions. Tap retry.' : 'No clear questions could be made from this pasuk. Please use the bonus explanation.';
+      msg.textContent = 'Each pasuk needs three spoken questions and two teacher-approved tap questions. Ask your teacher to review the upload, then retry.';
     const retry = document.getElementById('comprehensionRetryBtn');
     retry.textContent = '🔁 Retry questions';
-      retry.classList.toggle('hidden', !hadFailure);
-      if(!hadFailure){
-        comprehensionMode = 'freehand-only';
-        renderComprehensionQuestionUI();
-      }
+      retry.classList.remove('hidden');
   }
 }
 
@@ -3515,6 +3547,8 @@ function savedResultEntries(value){
 function questionResultEntriesStudent(value){ return savedResultEntries(value); }
 function translationChunkEntriesStudent(value){ return savedResultEntries(value); }
 
+function questionIsCorrect(result){return !!result&&(result.finalVerdict||result.verdict)==='correct';}
+function questionHtmlText(value){return String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function questionResultAudioSrc(result){
   if(!result) return '';
   if(result.audioURL){
@@ -3627,13 +3661,13 @@ function renderAnsweredQuestionHistory(){
       const deleteLabel = r && r.saving ? 'Saving…' : '🗑️ Delete this answer';
       const deleteDisabled = r && r.saving ? ' disabled' : '';
       const audioHtml = audioSrc
-        ? '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px;"><audio controls src="' + audioSrc + '"></audio>' +
+        ? '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px;"><audio controls src="' + questionHtmlText(audioSrc) + '"></audio>' +
           '<button type="button" class="btn small ghost-delete question-answer-delete-btn" data-q-index="' + i + '"' + deleteDisabled + '>' + deleteLabel + '</button></div>'
         : '<button type="button" class="btn small ghost-delete question-answer-delete-btn" data-q-index="' + i + '" style="margin-top:7px;"' + deleteDisabled + '>' + deleteLabel + '</button>';
       return `<div style="padding:9px 11px;margin:5px 0;border-radius:12px;background:${ok?'#E4F4E4':'#F6E1E1'};border:1px solid ${ok?'#4C9A4C':'var(--rimon)'};">
-        <strong>${ok?'✅':'❌'} ${posukTag}Question ${i+1}. ${q?q.question:''}</strong>
-        ${r&&r.transcript?`<div style="font-size:.8rem;font-style:italic;margin-top:3px;">You selected: “${r.transcript}”</div>`:''}
-        ${r&&r.feedback?`<div style="font-size:.8rem;margin-top:2px;">${r.feedback}</div>`:''}
+        <strong>${ok?'✅':'❌'} ${posukTag}Question ${i+1}. ${q?questionHtmlText(q.question):''}</strong>
+        ${r&&r.transcript?`<div style="font-size:.8rem;font-style:italic;margin-top:3px;">You selected: “${questionHtmlText(r.transcript)}”</div>`:''}
+        ${r&&r.feedback?`<div style="font-size:.8rem;margin-top:2px;">${questionHtmlText(r.feedback)}</div>`:''}
         ${audioHtml}
         ${disputeHtml}
       </div>`;
@@ -3650,7 +3684,7 @@ function renderQuestionFinalScore(){
   if(!el) return;
   const total=comprehensionQuestions.length, answered=Object.keys(comprehensionQResults).length;
   if(!total||answered<total){ el.classList.add('hidden'); el.innerHTML=''; return; }
-  const correct=comprehensionQuestions.filter((_,i)=>comprehensionQResults[i]&&comprehensionQResults[i].verdict==='correct').length;
+  const correct=comprehensionQuestions.filter((_,i)=>questionIsCorrect(comprehensionQResults[i])).length;
   const pct=Math.round(correct/total*100);
   el.innerHTML=`🎉 You finished! <span style="font-size:1.35rem;">${pct}%</span><br><span style="font-size:.86rem;font-weight:700;color:var(--ink-soft);">${correct} out of ${total} correct</span>`;
   el.classList.remove('hidden');
@@ -3667,11 +3701,10 @@ async function restoreSavedQuestionResults(){
     if(!saved) return false;
     const restored={};
     questionResultEntriesStudent(saved.questionResults).forEach(([savedIndex,r])=>{
-      let idx = Number.isInteger(r.questionIndex) ? r.questionIndex : -1;
-      if(idx<0 || idx>=comprehensionQuestions.length){
-        idx=comprehensionQuestions.findIndex(q=>q.question===r.question);
-      }
-      if(idx<0 && savedIndex<comprehensionQuestions.length) idx=savedIndex;
+      // Never credit an old tap answer as a new spoken answer at the same index.
+      const mode=r.answerMode||(r.audioURL?'voice':'tap');
+      const idx=comprehensionQuestions.findIndex(q=>q.question===r.question&&q.answerMode===mode&&(mode==='voice'||!r.bankVersion||q.bankVersion===r.bankVersion)&&Number(q.posukNum)===Number(r.posukNum));
+      if(idx>=0&&mode==='tap'&&!r.bankVersion&&!matchesAnyAnswerWordSet(r.selectionIndices||[],comprehensionQuestions[idx]))return;
       if(idx>=0){
         restored[idx]={
           verdict:r.verdict,
@@ -3740,9 +3773,10 @@ function renderComprehensionQuestionUI(){
   const backBtn = document.getElementById('backToQuestionsBtn');
   const caption = document.getElementById('comprehensionRecordCaption');
   const allAnswered = comprehensionQuestions.length > 0 &&
-    comprehensionQuestions.every((_, i) => comprehensionQResults[i] && comprehensionQResults[i].verdict === 'correct');
+    comprehensionQuestions.every((_, i) => questionIsCorrect(comprehensionQResults[i]));
   const micStage=document.getElementById('comprehensionRecordCaption')?.closest('.record-stage');
-  if(micStage) micStage.classList.toggle('hidden', comprehensionMode === 'questions');
+  const voice=comprehensionMode==='questions'&&comprehensionQuestions[comprehensionQIndex]?.answerMode==='voice';
+  if(micStage) micStage.classList.toggle('hidden', comprehensionMode === 'questions'&&!voice);
 
   if(comprehensionMode === 'freehand-only'){
     questionBlock.classList.add('hidden');
@@ -3773,7 +3807,9 @@ function renderComprehensionQuestionUI(){
     'Question ' + (comprehensionQIndex + 1) + ' of ' + total + '  ' + questionProgressDots();
   document.getElementById('questionText').textContent = current ? current.question : '';
   renderQuestionWordChoices(current, comprehensionQResults[comprehensionQIndex]);
-  caption.textContent = 'Tap all the Hebrew words that answer the question.';
+  caption.textContent = voice?'🎙️ Answer this question aloud.':'Tap all the Hebrew words that answer the question.';
+  document.getElementById('questionAnswerInstruction').textContent=caption.textContent;
+  document.getElementById('questionHintBtn').hidden=voice;
 
   navRow.classList.toggle('hidden', total <= 1 && !allAnswered);
   document.getElementById('questionPrevBtn').disabled = (comprehensionQIndex === 0);
@@ -4105,6 +4141,8 @@ async function toggleRecording(type, btnEl){
     return;
   }
   if(activeRecordingType) return;
+  const capturedKey=currentPosukKey,capturedQuestion=type==='comprehension'&&comprehensionMode==='questions'?comprehensionQuestions[comprehensionQIndex]:null;
+  if(capturedQuestion&&capturedQuestion.answerMode!=='voice')return;
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined'){
     alert("This browser can't record audio. Please try a newer version of Chrome or Safari."); return;
   }
@@ -4113,6 +4151,7 @@ async function toggleRecording(type, btnEl){
   document.getElementById(type+'Status').textContent='Get ready…';
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    if(currentPosukKey!==capturedKey||(capturedQuestion&&comprehensionQuestions[comprehensionQIndex]!==capturedQuestion)){stream.getTracks().forEach(t=>t.stop());btnEl.disabled=false;setRecordingCueBlur(type,false);return}
     let opts={audioBitsPerSecond:32000};
     const types=['audio/webm;codecs=opus','audio/mp4','audio/aac','audio/ogg;codecs=opus'];
     const supported=types.find(t=>MediaRecorder.isTypeSupported(t)); if(supported) opts.mimeType=supported;
@@ -4153,6 +4192,7 @@ async function toggleRecording(type, btnEl){
         recordingStartedAt=null;return;
       }
       recordingStartedAt=null;
+      if(currentPosukKey!==capturedKey||(capturedQuestion&&comprehensionQuestions[comprehensionQIndex]!==capturedQuestion))return;
       currentAudio[type]=blob;currentAudioExt[type]=mimeTypeToExtension(actual);
       const url=URL.createObjectURL(blob),audioEl=document.getElementById(type+'AudioPlayback');
       audioEl.src=url;audioEl.classList.remove('hidden');document.getElementById(type+'DeleteBtn').classList.remove('hidden');
@@ -4582,9 +4622,37 @@ async function showComprehensionResult(verdict, score, feedback, transcript){
    key" — see gradeQuestionAnswer on the backend) go along with the
    recording. Two-tier verdict (correct/incorrect), matching how a single
    factual question naturally grades. */
+async function gradeSpokenQuestionAnswer(){
+  const idx=comprehensionQIndex,question=comprehensionQuestions[idx],blob=currentAudio.comprehension,key=currentPosukKey;
+  if(!question||question.answerMode!=='voice'||!blob)return;
+  const msg=document.getElementById('comprehensionGradingMsg'),button=document.getElementById('comprehensionRecordBtn');
+  button.disabled=true;msg.textContent='Listening to your answer…';
+  try{
+    const part=currentSelectionParts.find(p=>Number(p.posukNum)===Number(question.posukNum));
+    if(!part)throw Error('Choose this pasuk again.');
+    const form=new FormData();const ext=currentAudioExt.comprehension||'webm';
+    form.append('audio',blob,'answer.'+ext);form.append('question',question.question);
+    form.append('expectedAnswer',question.expectedAnswer||question.sourceFact||'');
+    form.append('posukTranslation',part.translation||'');form.append('posukText',part.text||'');
+    form.append('perekNum',String(currentPerekNum));form.append('posukNum',String(part.posukNum));
+    form.append('sefer',currentSefer);form.append('classroomReferenceTranslation',await getClassroomReferenceForPart(part));
+    const response=await B3PaidApi.fetch(GRADE_QUESTION_ANSWER_URL,{method:'POST',body:form});
+    const result=await response.json();
+    if(!response.ok||!['correct','incorrect'].includes(result.verdict))throw Error(result.error||'Could not grade your answer.');
+    if(currentPosukKey!==key||comprehensionQuestions[idx]!==question)return;
+    questionTryCounts[idx]=(questionTryCounts[idx]||0)+1;
+    comprehensionQResults[idx]={verdict:result.verdict,feedback:result.feedback||'',transcript:result.transcript||'',blob,ext,tries:questionTryCounts[idx],saving:true};
+    msg.textContent='';renderQuestionResult(idx,result.verdict,result.feedback||'',result.transcript||'');
+    document.getElementById('comprehensionStatus').textContent=result.verdict==='correct'?'Correct!':'Listen to the feedback, then try again.';
+    await autosaveComprehensionQuestions();
+  }catch(error){if(currentPosukKey===key){msg.textContent=error.message||'Please retry this answer.';document.getElementById('comprehensionRetryBtn').classList.remove('hidden')}}
+  finally{button.disabled=false}
+}
+
 async function gradeCurrentQuestionAnswer(){
   const idx=comprehensionQIndex, current=comprehensionQuestions[idx];
   if(!current)return;
+  if(current.answerMode==='voice')return gradeSpokenQuestionAnswer();
   const selected=(questionSelectionDrafts[idx]||[]).map(Number).sort((a,b)=>a-b);
   if(!selected.length){document.getElementById('comprehensionGradingMsg').textContent='Tap one or more words first.';return;}
   const words=getQuestionPosukWords(current);
@@ -4605,13 +4673,13 @@ async function gradeCurrentQuestionAnswer(){
   comprehensionQResults[idx]={tries:questionTryCounts[idx],verdict:'correct',feedback:'You found the right words!',transcript:picked,selectionIndices:selected,saving:true};
   renderQuestionResult(idx,'correct',comprehensionQResults[idx].feedback,picked);
   document.getElementById('comprehensionStatus').textContent='Correct!';
-  const allAnswered=comprehensionQuestions.every((_,i)=>comprehensionQResults[i]&&comprehensionQResults[i].verdict==='correct');
+  const allAnswered=comprehensionQuestions.every((_,i)=>questionIsCorrect(comprehensionQResults[i]));
   document.getElementById('questionsDoneBlock').classList.toggle('hidden',!allAnswered);
   renderAnsweredQuestionHistory();renderQuestionFinalScore();renderQuestionWordChoices(current,comprehensionQResults[idx]);
   await autosaveComprehensionQuestions();
   if(!allAnswered)setTimeout(()=>{
     if(comprehensionMode!=='questions')return;
-    const next=comprehensionQuestions.findIndex((_,i)=>i>idx&&(!comprehensionQResults[i]||comprehensionQResults[i].verdict!=='correct'));
+    const next=comprehensionQuestions.findIndex((_,i)=>i>idx&&(!questionIsCorrect(comprehensionQResults[i])));
     if(next>=0){comprehensionQIndex=next;renderComprehensionQuestionUI();}
   },1300);
 }
@@ -4631,12 +4699,14 @@ function getQuestionPosukWords(question){
 function renderQuestionWordChoices(question,existing){
   const host=document.getElementById('questionWordChoices'),check=document.getElementById('checkWordSelectionBtn');
   if(!host||!check)return;
+  const voice=question?.answerMode==='voice';host.hidden=voice;check.parentElement.hidden=voice;
+  if(voice){host.replaceChildren();return}
   const words=getQuestionPosukWords(question),sets=question&&question.answerWordSets;
   const validSets=Array.isArray(sets)?sets.filter(set=>Array.isArray(set)&&set.length&&set.every(i=>i>=0&&i<words.length)):[];
   if(!words.length||!validSets.length){
     host.innerHTML='<div class="comp-status">Word choices are not ready. Please retry.</div>';check.disabled=true;return;
   }
-  const locked=!!existing&&existing.verdict==='correct';
+  const locked=questionIsCorrect(existing);
   const saved=questionSelectionDrafts[comprehensionQIndex]||
     (existing&&Array.isArray(existing.selectionIndices)?existing.selectionIndices:[]);
   const selected=new Set(saved.map(Number));host.innerHTML='';
@@ -4661,7 +4731,7 @@ function renderQuestionResult(idx, verdict, feedback, transcript, disputeStatus,
   const badgeText = { correct: '✅ Got it!', incorrect: '💡 Try again' }[verdict] || '';
   let transcriptHtml = "";
   if(transcript){
-    transcriptHtml = '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + transcript + '"</span>';
+    transcriptHtml = '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + questionHtmlText(transcript) + '"</span>';
   }
   // Only a wrong answer has anything to dispute, and it should be available
   // right away — not only once the student has moved on to the next
@@ -4681,7 +4751,7 @@ function renderQuestionResult(idx, verdict, feedback, transcript, disputeStatus,
   resultEl.className = 'comp-result ' + (verdict === 'correct' ? 'correct' : 'incorrect');
   resultEl.innerHTML =
     '<span class="comp-badge">' + badgeText + '</span>' +
-    '<span>' + feedback + '</span>' +
+    '<span>' + questionHtmlText(feedback) + '</span>' +
     transcriptHtml +
     '<button class="speak-btn" id="questionReplayBtn" title="Hear this read aloud">🔊 Hear feedback</button>' +
     disputeRowHtml;
@@ -4754,6 +4824,8 @@ async function autosaveComprehensionQuestions(){
       r.questionTotal = comprehensionQuestions.length;
 
       questionResultsData[i] = {
+        answerMode: comprehensionQuestions[i].answerMode,
+        bankVersion: comprehensionQuestions[i].bankVersion||null,
         question: comprehensionQuestions[i].question,
         selectionIndices: Array.isArray(r.selectionIndices) ? r.selectionIndices : [],
         questionIndex: i,
@@ -4785,7 +4857,7 @@ async function autosaveComprehensionQuestions(){
     });
 
     idxs.forEach(i => { if(comprehensionQResults[i]) comprehensionQResults[i].saving = false; });
-    markTaskSaved('comprehension');
+    if(savedQuestionPercent>=100)markTaskSaved('comprehension');
     if(savedQuestionPercent >= 100) await awardMilestoneForSelection('understand100', awardKey, awardParts);
     renderAnsweredQuestionHistory();
   }catch(err){
@@ -6524,7 +6596,7 @@ async function deleteAttempt(attempt, btnEl){
   }
 }
 </script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261013-repairs1"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261014-outstanding1"></script>
 </body>
 </html>
 
