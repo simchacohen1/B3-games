@@ -111,32 +111,10 @@ const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/&/g,
    the teacher dashboard loads.  Original hand-curated art is left alone. */
 const GENERIC_ART_CHOICES=new Set(['✨','⭐','🖍️']);
 
-const UNSUITABLE_ART_CHOICES=new Set([
-  '👫','👬','👭','🧑‍🤝‍🧑','👩‍❤️‍👨','👨‍❤️‍👩','👩‍❤️‍👩','👨‍❤️‍👨',
-  '💑','💏','👩‍❤️‍💋‍👨','👨‍❤️‍💋‍👩','👩‍❤️‍💋‍👩','👨‍❤️‍💋‍👨',
-  '👨‍👩‍👦','👨‍👩‍👧','👨‍👩‍👧‍👦','👨‍👩‍👦‍👦','👨‍👩‍👧‍👧',
-  '👩','👩‍🦱','👩‍🦰','👩‍🦳','👩‍🦲','👧','👵','🤰','🤱','👰','👸','🧕',
-  '👩‍👦','👩‍👧','👩‍👧‍👦','👩‍👦‍👦','👩‍👧‍👧','👨‍👧','👨‍👧‍👦'
-]);
-
+// Generated suggestions stay teacher-only. The teacher, not a fixed classroom
+// dress/gender emoji filter, decides what is appropriate to show students.
 function isClassSafeArtChoice(value){
-  const v=String(value||'').trim();
-  if(!v) return false;
-  if(UNSUITABLE_ART_CHOICES.has(v)) return false;
-
-  // A simple boy/child icon is useful for literal vocabulary such as נַעַר.
-  // Keep these two explicit teaching icons available while continuing to block
-  // the broader automatic people/couple/family emoji pool below.
-  if(['👦','🧒'].includes(v)) return true;
-
-  // Automatic Unicode people cannot reliably be shown with the required
-  // modest clothing and Jewish head covering on every device, so reject
-  // person/couple/family emoji and favor objects, symbols, scenery, etc.
-  if(/[\u{1F466}-\u{1F469}\u{1F471}-\u{1F478}\u{1F481}-\u{1F487}\u{1F575}\u{1F57A}\u{1F645}-\u{1F647}\u{1F64B}-\u{1F64F}\u{1F9D1}-\u{1F9DD}]/u.test(v)) return false;
-
-  // Explicit romance/affection symbols are not appropriate for these cards.
-  if(['🫶','💋','💌'].includes(v)) return false;
-  return true;
+  return !!String(value||'').trim();
 }
 
 function sanitizeClassArtPool(art){
@@ -266,7 +244,7 @@ const SMART_ART_RULES=[
   [/\blift\b|\blifted\b|\bcarry\b|\bcarried\b|\braise\b/,['⬆️','🙌','📦','💪']],
   [/\beye\b|\beyes\b/,['👁️','👀','🙂','🔎']],
   [/\bthree\b|\b3\b/,['3️⃣','🔺','🔢','🧩']],
-  [/\bman\b|\bmen\b|\bperson\b|\bpeople\b/,['👥','📛','🏠','🗣️']],
+  [/\bman\b|\bmen\b|\bperson\b|\bpeople\b/,['👨','🧔','🧍‍♂️','👨‍🦳','👨‍🦱','👥']],
   [/\bstand\b|\bstood\b|standing|firm/,['🧍','📍','⬆️','🚶']],
   [/\brun\b|\bran\b|running|hurr(y|ied)|quick/,['🏃','💨','👟','⚡']],
   [/\bcall\b|\bcalled\b|\bsay\b|\bsaid\b|\bspeak\b|\bspoke\b/,['🗣️','💬','📣','👄']],
@@ -375,14 +353,18 @@ function hasBadAutoArt(item){
   return false;
 }
 
-async function generateAiArtForItems(items,onProgress=()=>{}){
+async function generateAiArtForItems(items,onProgress=()=>{},{freshRequest=false}={}){
   const clean=(items||[]).filter(Boolean).map(i=>({
-    id:String(i.id||''), front:String(i.front||''), english:String(i.english||'')
+    id:String(i.id||''), front:String(i.front||''), english:String(i.english||''),
+    avoid:sanitizeSuggestionPool([...(i.art||[]),...(i.artPool||[])])
   })).filter(i=>i.id&&i.english);
   if(!clean.length) return new Map();
   if(!GENERATE_SHORASHIM_ART_URL) return new Map();
 
   const out=new Map(),batchSize=40,totalBatches=Math.ceil(clean.length/batchSize);
+  // Each confirmed button click is a NEW paid request; retries within that click
+  // reuse the same body/cache key so a network retry cannot double-charge.
+  const requestId=freshRequest?`${Date.now()}-${Math.random().toString(36).slice(2)}`:null;
   // Two calls max per batch. The endpoint's Firebase lease/cache makes an
   // interrupted retry idempotent and prevents duplicate paid generations.
   for(let n=0;n<clean.length;n+=batchSize){
@@ -391,7 +373,7 @@ async function generateAiArtForItems(items,onProgress=()=>{}){
     for(let attempt=0;attempt<2;attempt++){
       try{
         const res=await B3PaidApi.fetch(GENERATE_SHORASHIM_ART_URL,{
-          method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:batch,count:ART_POOL_MAX})
+          method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:batch,count:ART_POOL_MAX,...(requestId?{requestId}:{})})
         });
         if(!res.ok) throw Object.assign(new Error(`AI art request failed (${res.status})`),{status:res.status});
         const data=await res.json();
@@ -407,6 +389,7 @@ async function generateAiArtForItems(items,onProgress=()=>{}){
         const authFailure=/sign[ -]?in|teacher Google|cannot use the learning tools|permission/i.test(String(err?.message||''));
         const transient=!authFailure&&(!err.status||err.status===408||err.status===429||err.status>=500);
         if(attempt===0&&transient) await new Promise(resolve=>setTimeout(resolve,900));
+        else if(freshRequest) throw err; // show a genuine service failure to the teacher
         else break;
       }
     }
@@ -418,7 +401,7 @@ async function generateAiArtForItems(items,onProgress=()=>{}){
 async function fillArtForShorashim(items,{onProgress=()=>{},useAI=false}={}){
   // Automatically fill only missing artwork, including words a teacher already
   // approved. Never replace selected pictures and never incur API costs on login.
-  const targets=(items||[]).filter(i=>i&&!sanitizeClassArt(i.art).length);
+  const targets=(items||[]).filter(i=>i&&!sanitizeClassArt(i.art).length&&!sanitizeSuggestionPool(i.artPool).length);
   if(!targets.length) return 0;
   const ai=useAI?await generateAiArtForItems(targets,onProgress):new Map();
   let changed=0;
@@ -428,7 +411,8 @@ async function fillArtForShorashim(items,{onProgress=()=>{},useAI=false}={}){
     const pool=sanitizeSuggestionPool([...(ai.get(String(item.id))||[]),...smartArtCandidatesFor(item.english,item.front)]);
     const art=sanitizeClassArt(pool);
     if(art.length){
-      item.art=art; item.artPool=pool; item.autoArt=false; item.aiArtGenerated=ai.has(String(item.id));
+      // Never put generated pictures into item.art: students see ONLY teacher-selected art.
+      item.artPool=pool; item.autoArt=false; item.aiArtGenerated=ai.has(String(item.id));
       item.aiArtGeneratedAt=Date.now(); changed++;
     }else item.autoArt=true;
   }
@@ -444,14 +428,19 @@ function mergeCatalogWithoutReplacingPictures(current,local){
   for(const candidate of (local?.shorashim||[])){
     const id=String(candidate?.id||''); if(!id)continue;
     if(!index.has(id)){
-      // Migration additions only; preserve the current catalog order and append.
-      list.push({...candidate}); index.set(id,list.length-1); continue;
+      // Seeded/migrated words also start with zero approved pictures. Preserve
+      // their proposed art as teacher-only suggestions until someone selects it.
+      const pending=sanitizeSuggestionPool([...(candidate.artPool||[]),...(candidate.art||[])]);
+      list.push({...candidate,art:[],artPool:pending});
+      index.set(id,list.length-1); continue;
     }
     const existing=list[index.get(id)];
     if(existing&&!existing.perek&&candidate.perek)existing.perek=candidate.perek;
-    const art=sanitizeClassArt(candidate.art);
-    if(existing&&!sanitizeClassArt(existing.art).length&&art.length){
-      existing.art=art; existing.autoArt=false; existing.aiArtGenerated=!!candidate.aiArtGenerated;
+    const suggestions=sanitizeSuggestionPool(candidate.artPool);
+    if(existing&&!sanitizeSuggestionPool(existing.artPool).length&&suggestions.length){
+      // Fill ONLY the teacher review pool; never publish unapproved art.
+      existing.artPool=suggestions; existing.autoArt=false;
+      existing.aiArtGenerated=!!candidate.aiArtGenerated;
       existing.aiArtGeneratedAt=candidate.aiArtGeneratedAt||timestamp;
     }
   }
@@ -475,7 +464,7 @@ async function loadAll(){
   const p18Added=needsCatalogSeed?ensurePerek18FinalShorashim():[];
   const unitMigration=needsCatalogSeed?ensurePerekUnitsAnd19():{tagged:0,added:[]};
   if(needsCatalogSeed)state.settings.catalogSeedVersion=CATALOG_SEED_VERSION;
-  const needsArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden&&!sanitizeClassArt(i.art).length);
+  const needsArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden&&!sanitizeClassArt(i.art).length&&!sanitizeSuggestionPool(i.artPool).length);
   let repaired=0;
   if(needsArt.length){
     status(`☁️ Checking matching pictures for ${needsArt.length} words…`,'syncing');
@@ -485,8 +474,8 @@ async function loadAll(){
     const saved=await db.ref(`${SPACE}/catalog`).transaction(current=>mergeCatalogWithoutReplacingPictures(current,state.catalog));
     if(saved.committed)state.catalog=withAllTracks(saved.snapshot.val()||state.catalog);
   }
-  const stillMissingArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden && !sanitizeClassArt(i.art).length).length;
-  if(stillMissingArt)console.warn(`${stillMissingArt} Shorashim words need teacher-selected pictures; no paid API request was made automatically.`);
+  const stillMissingArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden&&!sanitizeClassArt(i.art).length&&!sanitizeSuggestionPool(i.artPool).length).length;
+  if(stillMissingArt)console.warn(`${stillMissingArt} Shorashim words need teacher picture suggestions or selections; no paid API request was made automatically.`);
   if(needsCatalogSeed)await db.ref(`${SPACE}/settings/catalogSeedVersion`).set(CATALOG_SEED_VERSION);
   $('teacherMinReview').value=String(state.settings.minReviewMs||500);
   renderStudentSiteControl();
@@ -496,7 +485,7 @@ async function loadAll(){
   if(p18Added.length)updates.push(`${p18Added.length} Perek 18 word${p18Added.length===1?'':'s'} added`);
   if(unitMigration.tagged)updates.push(`${unitMigration.tagged} existing word${unitMigration.tagged===1?'':'s'} tagged Perek 18`);
   if(unitMigration.added.length)updates.push(`${unitMigration.added.length} Perek 19 word${unitMigration.added.length===1?'':'s'} added`);
-  if(repaired)updates.push(`${repaired} picture set${repaired===1?'':'s'} created`);
+  if(repaired)updates.push(`${repaired} teacher-only picture suggestion set${repaired===1?'':'s'} created`);
   status(updates.length?`☁️ Connected • ${updates.join(' • ')}`:'☁️ Connected');
   applyRequestedTeacherView();
 }
@@ -526,7 +515,7 @@ function renderCatalog(){
 
   $('teacherCatalog').innerHTML=list.map((i,idx)=>{
     const selectedArt=sanitizeClassArt(i.art||[]),pool=suggestionPoolOf(i);
-    const art=`<div class="teacher-art-count">Students see ${selectedArt.length}/${ART_STUDENT_MAX} — click a picture to select or unselect it</div>`+pool.map(a=>{const on=selectedArt.includes(a);return `<button type="button" class="teacher-art-chip${on?' selected':''}" data-a="art" data-art="${esc(a)}" aria-pressed="${on}" title="${on?'Shown to students — click to unselect':'Click to show this picture to students'}">${esc(a)}</button>`}).join('');
+    const art=`<div class="teacher-art-count">Students see ${selectedArt.length}/${ART_STUDENT_MAX} — click to approve a picture for students; others are teacher-only</div>`+pool.map(a=>{const on=selectedArt.includes(a);return `<button type="button" class="teacher-art-chip${on?' selected':''}" data-a="art" data-art="${esc(a)}" aria-pressed="${on}" title="${on?'Shown to students — click to unselect':'Click to show this picture to students'}">${esc(a)}</button>`}).join('');
     const commonness=commonnessOf(i),approvalNeeded=needsTeacherApproval(i),approvalBlock=approvalNeeded?`<div class="approval-box ${i.teacherApproved===true?'approved':'pending'}"><b>Commonness ${commonness}/10</b> — ${i.teacherApproved===true?'Approved for students':'Waiting for your approval'}<button data-a="approve" class="${i.teacherApproved===true?'ghost':'primary'}">${i.teacherApproved===true?'Remove Approval':'✓ Approve Word'}</button></div>`:(commonness?`<div class="mini-note">Commonness ${commonness}/10 • Automatically included</div>`:'');
     const duplicateKeeper=duplicateKeeperFor(i),duplicateBlock=duplicateKeeper?`<div class="approval-box pending"><b>Possible duplicate</b> — another ${esc(i.front)} with the same English meaning (${esc(i.english)}) is already in this list. <button data-a="merge-duplicate" class="danger">Merge Duplicate</button> <button data-a="dismiss-duplicate" class="ghost">Dismiss Suggestion</button></div>`:'';
     const artBlock=currentTrack==='shorashim'
@@ -580,10 +569,17 @@ async function regeneratePictures(id){
   if(!item)return;
   const selected=sanitizeClassArt(item.art||[]);
   const oldPool=suggestionPoolOf(item);
-  if(!confirm('New picture suggestions use separate OpenAI API credits. They are not included in the ChatGPT subscription. Continue?'))return;
+  if(!confirm('AI picture suggestions use paid API credits, even if no new choices are found. They are separate from your ChatGPT subscription. New suggestions stay teacher-only until you select them. Continue?'))return;
   status('☁️ Looking for more matching pictures…','syncing');
 
-  const ai=await generateAiArtForItems([item]);
+  let ai;
+  try{
+    ai=await generateAiArtForItems([item],()=>{},{freshRequest:true});
+  }catch(err){
+    status('☁️ AI picture request failed — existing choices were kept');
+    alert(`Could not get new pictures for “${item.front} — ${item.english}”.\n\n${err.message||'Picture service unavailable'}\n\nNo pictures were changed.`);
+    return;
+  }
   const candidates=sanitizeClassArtPool([
     ...(ai.get(String(item.id))||[]),
     ...smartArtCandidatesFor(item.english,item.front)
@@ -730,7 +726,7 @@ async function saveEdit(e){
     i.perek=Number($('tPerek').value)||18;
     i.hebrew=$('tWord').value.trim();
     // Fill only missing artwork; editing a translation never replaces a teacher's existing choices.
-    if(!sanitizeClassArt(i.art).length){
+    if(!sanitizeClassArt(i.art).length&&!sanitizeSuggestionPool(i.artPool).length){
       i.autoArt=true;
       status('☁️ Creating picture choices…','syncing');
       await fillArtForShorashim([i]);
@@ -848,12 +844,12 @@ $('saveBulkItems').onclick=async e=>{
   $('teacherBulkDialog').close();
   renderCatalog();
   if(added.length){
-    status(`☁️ Creating pictures for ${added.length} new word${added.length===1?'':'s'}…`,'syncing');
+    status(`☁️ Finding teacher-only picture suggestions for ${added.length} new word${added.length===1?'':'s'}…`,'syncing');
     await fillArtForShorashim(added);
   }
   await saveCatalog();
-  const missing=added.filter(i=>!sanitizeClassArt(i.art).length).length;
-  if(missing)status(`☁️ Saved • ${missing} new word(s) still need pictures; retry when picture service is available`);
+  const missing=added.filter(i=>!sanitizeSuggestionPool(i.artPool).length).length;
+  if(missing)status(`☁️ Saved • ${missing} new word(s) still need picture suggestions; open the word and choose approved pictures`);
 };
 $('toggleStudentSite').onclick=toggleStudentSite;
 $('teacherMinReview').onchange=async()=>{state.settings.minReviewMs=+$('teacherMinReview').value;await db.ref(`${SPACE}/settings`).set(state.settings)};
