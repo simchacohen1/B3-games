@@ -36,7 +36,7 @@ function fixture({ready=Promise.resolve(),publish=async()=>{},makePeer=true}={})
 test('teacher classroom automatically runs the start method once; screen capture stays user-initiated',()=>{
   assert.match(src,/if\(isTeacher\)void startClass\(\);/);
   assert.match(html,/<button id="startClass"[^>]*hidden/);
-  assert.match(dashboard,/Open teacher classroom to start automatically/);
+  assert.match(dashboard,/Nothing starts until you choose a class/);
   assert.ok(!startCode.includes('getDisplayMedia('));
   assert.ok(!startCode.includes('shareScreen(false)'));
 });
