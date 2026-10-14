@@ -389,6 +389,7 @@ async function generateAiArtForItems(items,onProgress=()=>{},{freshRequest=false
         const authFailure=/sign[ -]?in|teacher Google|cannot use the learning tools|permission/i.test(String(err?.message||''));
         const transient=!authFailure&&(!err.status||err.status===408||err.status===429||err.status>=500);
         if(attempt===0&&transient) await new Promise(resolve=>setTimeout(resolve,900));
+        else if(freshRequest) throw err; // show a genuine service failure to the teacher
         else break;
       }
     }
@@ -568,10 +569,17 @@ async function regeneratePictures(id){
   if(!item)return;
   const selected=sanitizeClassArt(item.art||[]);
   const oldPool=suggestionPoolOf(item);
-  if(!confirm('New picture suggestions use separate OpenAI API credits. They are not included in the ChatGPT subscription. Continue?'))return;
+  if(!confirm('AI picture suggestions use paid API credits, even if no new choices are found. They are separate from your ChatGPT subscription. New suggestions stay teacher-only until you select them. Continue?'))return;
   status('☁️ Looking for more matching pictures…','syncing');
 
-  const ai=await generateAiArtForItems([item],()=>{},{freshRequest:true});
+  let ai;
+  try{
+    ai=await generateAiArtForItems([item],()=>{},{freshRequest:true});
+  }catch(err){
+    status('☁️ AI picture request failed — existing choices were kept');
+    alert(`Could not get new pictures for “${item.front} — ${item.english}”.\n\n${err.message||'Picture service unavailable'}\n\nNo pictures were changed.`);
+    return;
+  }
   const candidates=sanitizeClassArtPool([
     ...(ai.get(String(item.id))||[]),
     ...smartArtCandidatesFor(item.english,item.front)
