@@ -19,8 +19,15 @@
     document.head.appendChild(script);
   });
   try{
-    const id=sessionStorage.getItem('b3Games_studentId');
-    const pin=sessionStorage.getItem('b3Games_classPin');
+    // The homepage may load before a boy signs in. Start listening as soon as
+    // the confirmed sign-in completes, without requiring a page refresh.
+    let id=sessionStorage.getItem('b3Games_studentId');
+    let pin=sessionStorage.getItem('b3Games_classPin');
+    if(!id||!pin){
+      await new Promise(resolve=>window.addEventListener('fttStudentSignedIn',resolve,{once:true}));
+      id=sessionStorage.getItem('b3Games_studentId');
+      pin=sessionStorage.getItem('b3Games_classPin');
+    }
     if(!id||!pin||!(/^[A-Za-z0-9_-]{1,100}$/).test(id))return;
     if(!window.firebase?.database){
       if(!window.firebase)await load('https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js');
@@ -80,6 +87,12 @@
         .sort((a,b)=>b[1].createdAt-a[1].createdAt)[0]?.[1]||null;
     }
     sessions.on('value',snapshot=>{
+      // Student switching must never reuse another boy's classroom invitation.
+      if(sessionStorage.getItem('b3Games_studentId')!==id){
+        if(stream)stop();
+        active=null;holder.style.display='none';
+        return;
+      }
       const next=current(snapshot.val());
       const shareable=next?.studentScreenSharing===true?next:null;
       if(!shareable||!active||shareable.roomId!==active.roomId){if(stream)stop()}
