@@ -31,7 +31,7 @@ let phase='launch';
     destroy(){window.senderPC?.close();clearInterval(window.samplePaintTimer)}
     call(room,stream,options){
      const events={};const pc=new RTCPeerConnection({iceServers:[]});stream.getTracks().forEach(track=>pc.addTrack(track,stream));window.senderPC=pc;window.sentMetadata=options.metadata;
-     return {peerConnection:pc,on:(event,callback)=>{events[event]=callback},close(){pc.close();events.close?.()}};
+     return {peerConnection:pc,on:(event,callback)=>{(events[event]??=[]).push(callback)},close(){if(pc.signalingState==='closed')return;pc.close();(events.close||[]).forEach(callback=>callback())}};
     }
    };
   });
@@ -51,8 +51,8 @@ let phase='launch';
   await teacher.addScriptTag({content:fs.readFileSync('class-pointer-prototype/activity-screen-teacher.js','utf8')});
   const answer=await teacher.evaluate(async offer=>{
    const pc=new RTCPeerConnection({iceServers:[]}),events={};window.receiverPC=pc;
-   const call={metadata:{kind:'activity-screen',token:'0'.repeat(64)},on:(name,fn)=>{events[name]=fn},close(){pc.close();events.close?.()},answer(){window.sampleAnswerStarted=true}};window.sampleCall=call;
-   pc.ontrack=e=>events.stream?.(e.streams[0]);
+   const call={metadata:{kind:'activity-screen',token:'0'.repeat(64)},on:(name,fn)=>{(events[name]??=[]).push(fn)},close(){if(pc.signalingState==='closed')return;pc.close();(events.close||[]).forEach(fn=>fn())},answer(){window.sampleAnswerStarted=true}};window.sampleCall=call;
+   pc.ontrack=e=>(events.stream||[]).forEach(fn=>fn(e.streams[0]));
    await window.ClassPointerActivityShares.incomingCall(call);
    await pc.setRemoteDescription(offer);await pc.setLocalDescription(await pc.createAnswer());
    if(pc.iceGatheringState!=='complete')await new Promise(resolve=>pc.addEventListener('icegatheringstatechange',()=>{if(pc.iceGatheringState==='complete')resolve()}));
