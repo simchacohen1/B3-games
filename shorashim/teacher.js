@@ -1001,19 +1001,6 @@ window.addEventListener("DOMContentLoaded",()=>{
 });
 
 
-// Existing local dashboard unlocks do not authorize paid services.
-const paidTeacherSignIn = document.createElement('button');
-paidTeacherSignIn.type = 'button';
-paidTeacherSignIn.className = 'ghost small';
-paidTeacherSignIn.textContent = 'Google teacher sign-in';
-paidTeacherSignIn.onclick = async () => {
-  try { await window.B3SiteSettings.signInWithGoogle(); }
-  catch(error) { alert(error.message || 'Google sign-in did not complete.'); }
-};
-document.querySelector('.topbar-actions').appendChild(paidTeacherSignIn);
-
-
-
 /* Shorashim recordings: keep recovered submissions and use the teacher session
    that was authenticated by the dashboard gate. */
 function shorashimRecordingDuration(record){
