@@ -4471,7 +4471,7 @@ async function submitHebrewDispute(){
       hebrewDisputeStatus: 'pending',
       hebrewDisputeAt: Date.now()
     });
-    row.innerHTML = '<span style="font-size:0.85rem;color:var(--ink-soft);">⚠️ Dispute sent — you asked for ' + val + '%. Your teacher will review it.</span>';
+    row.innerHTML = '<span style="font-size:0.85rem;color:var(--ink-soft);">⚠️ Dispute sent — your teacher will review it.</span>';
   }catch(err){
     console.error(err);
     row.innerHTML = '<span style="font-size:0.85rem;color:var(--rimon);">Could not save your dispute — check your internet and try again.</span>';
