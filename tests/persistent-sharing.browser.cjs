@@ -65,6 +65,8 @@ let phase='launch';
   phase='navigate activity';await activity.goto('https://sharing.test/activity-two.html');
   assert.equal(await companion.evaluate(()=>window.sampleStream.getVideoTracks()[0].readyState),'live');assert.equal(await companion.evaluate(()=>window.captureCount),1);
   phase='confirm live label';await teacher.waitForFunction(()=>document.querySelector('#activityScreenTray strong').textContent.includes('Live activity screen'));
+  const firstTime=await teacher.locator('video').evaluate(video=>video.currentTime);
+  await teacher.waitForFunction(firstTime=>document.querySelector('video').currentTime>firstTime+.15,firstTime);
   const options=await companion.evaluate(()=>window.captureOptions);assert.equal(options.preferCurrentTab,false);assert.equal(options.video.displaySurface,undefined);
   phase='stop sharing';await companion.getByRole('button',{name:/Stop Sharing/}).click();assert.equal(await companion.evaluate(()=>window.sampleStream.getVideoTracks()[0].readyState),'ended');
   await teacher.evaluate(()=>window.sampleCall.close());assert.equal(await teacher.locator('#activityScreenTray').isVisible(),false);

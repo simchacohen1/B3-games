@@ -39,12 +39,12 @@
       card.style.cssText='background:#172033;color:white;padding:8px;border-radius:12px;width:min(320px,75vw);box-shadow:0 8px 28px #0006';
       const heading=document.createElement('strong');heading.textContent=verified.studentName+' · Waiting for video';
       const video=document.createElement('video');video.autoplay=true;video.playsInline=true;video.muted=true;
-      video.style.cssText='position:static;width:100%;height:180px;object-fit:contain;background:#050a16;margin-top:5px';
+      video.style.cssText='position:static;width:100%;height:180px;object-fit:contain;background:#050a16;margin-top:5px;pointer-events:auto';
       const dismiss=document.createElement('button');dismiss.textContent='Close view';dismiss.type='button';
       dismiss.onclick=()=>{close(call);clear(call)};
       card.append(heading,video,dismiss);tray.appendChild(card);tray.hidden=false;screens.set(call,card);
       call.on('stream',stream=>{if(screens.has(call)){video.srcObject=stream;
-        video.addEventListener('loadeddata',()=>{heading.textContent=verified.studentName+' · Live activity screen'},{once:true});
+        video.addEventListener('playing',()=>{heading.textContent=verified.studentName+' · Live activity screen'});
         video.play().catch(()=>{heading.textContent=verified.studentName+' · Click video to play';video.controls=true});
       }});
       let checking=false;
