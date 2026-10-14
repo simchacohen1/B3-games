@@ -427,8 +427,11 @@ function mergeCatalogWithoutReplacingPictures(current,local){
   for(const candidate of (local?.shorashim||[])){
     const id=String(candidate?.id||''); if(!id)continue;
     if(!index.has(id)){
-      // Migration additions only; preserve the current catalog order and append.
-      list.push({...candidate}); index.set(id,list.length-1); continue;
+      // Seeded/migrated words also start with zero approved pictures. Preserve
+      // their proposed art as teacher-only suggestions until someone selects it.
+      const pending=sanitizeSuggestionPool([...(candidate.artPool||[]),...(candidate.art||[])]);
+      list.push({...candidate,art:[],artPool:pending});
+      index.set(id,list.length-1); continue;
     }
     const existing=list[index.get(id)];
     if(existing&&!existing.perek&&candidate.perek)existing.perek=candidate.perek;
