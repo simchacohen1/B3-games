@@ -44,6 +44,16 @@
     if(current!==revision){await ref.onDisconnect().cancel();return}
     await ref.set({roomId:room,teacherUid:context.user.uid,createdAt:firebase.database.ServerValue.TIMESTAMP,studentScreenSharing:false});
     if(current!==revision){await ref.remove();await ref.onDisconnect().cancel()}
+  },async requestScreenSharing(){
+    const ref=activeRef;if(!ref)throw Error('Open a classroom before sending students.');
+    const context=await ready;
+    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
+    // An authenticated, class-scoped live session is the only broadcast source.
+    // Keep the existing session and use a server timestamp so stale prompts cannot replay.
+    await ref.update({
+      studentScreenSharing:true,
+      shareRequest:{at:firebase.database.ServerValue.TIMESTAMP}
+    });
   },async setStudentScreenSharing(enabled){
     const ref=activeRef;if(!ref)return;
     const context=await ready;
