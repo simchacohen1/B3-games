@@ -21,6 +21,9 @@ exports.generateShorashimArt = onRequest(
       id: String(x?.id || "").slice(0, 160),
       front: String(x?.front || "").slice(0, 120),
       english: String(x?.english || "").slice(0, 180),
+      avoid: Array.isArray(x?.avoid)
+        ? [...new Set(x.avoid.map(v => String(v || "").trim()).filter(Boolean))].slice(0, 40)
+        : [],
     })).filter((x) => x.id && x.english);
 
     if (!items.length) {
@@ -28,36 +31,20 @@ exports.generateShorashimArt = onRequest(
       return;
     }
 
+    // These candidates are visible to teachers only; nothing is published until
+    // a teacher explicitly selects it in the Shorashim catalog.
     const systemPrompt = `
-IMPORTANT CLASSROOM IMAGE RULES:
-- This is for a Chabad-Lubavitch third-grade BOYS' class.
-- If a picture contains people, use boys or men only. Do not suggest women, girls, male-female couples, or mixed-gender groups.
-- Boys and men must be modestly dressed and wear an appropriate Jewish head covering (kippah/yarmulke).
-- Never suggest romantic imagery, couples, hand-holding, hugging, kissing, or other public affection.
-- Prefer neutral objects, actions, symbols, animals, or scenery when they communicate the vocabulary clearly.
-- Every suggestion must be directly relevant to the English meaning. Never add unrelated filler merely to reach a certain number of choices.
-- Return fewer choices when fewer suitable choices exist.
-
-You choose visual picture cues for Hebrew vocabulary flashcards used by Chabad-Lubavitch 3rd-grade boys.
-
-For EACH supplied vocabulary item, choose exactly 4 Unicode emoji that help an 8-year-old remember the supplied ENGLISH meaning.
-
-STRICT RULES:
-- The English meaning is authoritative. Do not guess a different translation from the Hebrew.
-- Every emoji must have a clear, direct connection to that exact meaning. Never add filler merely to reach four.
-- Prefer concrete objects/actions/people/scenes over abstract symbols.
-- For verb phrases such as "and he ran", represent the core action (running) and, when helpful, the subject/person.
-- For pronouns and function words, direct symbolic cues are allowed (person, group, pointing hand, direction arrow), but they must actually match the meaning.
-- NEVER use 🧠 or 💡 unless the meaning itself is think/know/understand/idea.
-- NEVER use 🔎 unless the meaning is see/look/search/find.
-- NEVER use ➡️/⬅️/⬆️/⬇️ unless the meaning truly includes direction, movement, before/after, to/from, up/down, etc.
-- NEVER use ⭐/✨ merely as decoration.
-- Do not use crosses, churches, non-Jewish religious symbols, immodest imagery, weapons, frightening gore, or inappropriate content.
-- Use standard widely-supported Unicode emoji.
-- Return four DISTINCT emoji when reasonably possible. If a precise meaning genuinely has fewer useful direct cues, return 2 or 3 rather than irrelevant filler.
-
-Return ONLY valid JSON in this exact shape, with one result for every supplied id:
-{"items":[{"id":"same id","art":["emoji1","emoji2","emoji3","emoji4"]}]}`;
+Suggest clear Unicode emoji choices for each Hebrew vocabulary term. The ENGLISH
+meaning is authoritative. Choose up to four distinct, meaning-specific emoji.
+For a word such as "man" you may suggest person/man emoji directly.
+Do not apply religious dress, gender, or classroom-picture restrictions to
+teacher-only suggestions. The teacher will review every picture before students
+can use it. Follow general safety standards for an educational service.
+Each item has an "avoid" list: do not repeat those emoji. Aim for fresh visual
+alternatives when possible; return fewer than four if none remain. Do not pad
+with unrelated symbols. A teacher may retry with different suggestions.
+Return ONLY valid JSON: {"items":[{"id":"same id","art":["emoji1","emoji2"]}]}.
+`;
 
     const userPrompt = JSON.stringify({ items });
 
@@ -72,7 +59,7 @@ Return ONLY valid JSON in this exact shape, with one result for every supplied i
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 2500,
-          temperature: 0,
+          temperature: 0.7,
           system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],
         }),
@@ -99,8 +86,10 @@ Return ONLY valid JSON in this exact shape, with one result for every supplied i
         const id = String(row?.id || "");
         if (!requestedIds.has(id) || seenIds.has(id)) continue;
         seenIds.add(id);
+        const avoid = new Set(items.find(x => x.id === id)?.avoid || []);
         const art = Array.isArray(row?.art)
-          ? [...new Set(row.art.map((x) => String(x || "").trim()).filter(Boolean))].slice(0, 4)
+          ? [...new Set(row.art.map(x => String(x || "").trim())
+            .filter(x => x && !avoid.has(x)))].slice(0, 4)
           : [];
         if (art.length) safeItems.push({ id, art });
       }
