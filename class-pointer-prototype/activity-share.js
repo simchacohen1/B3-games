@@ -1,6 +1,7 @@
 'use strict';
-/* Standalone, optional screen-sharing button for student activities.
-   Never opens a classroom tab or changes the student's current activity. */
+/* Optional student activity screen sharing and verified class-wide navigation.
+   Teacher requests move a signed-in student to Classroom Pointer. Screen capture
+   always requires that student's separate browser permission. */
 (async function(){
   if(window.__classPointerActivityShareLoaded)return;
   window.__classPointerActivityShareLoaded=true;
@@ -51,16 +52,19 @@
     let active=null,peer=null,call=null,stream=null,busy=false;
     const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
     function routeTeacherRequest(session){
-      const at=session?.shareRequest?.at;
+      // Teacher directs only this student's verified class; reject stale requests.
+      const request=session?.destinationRequest;
+      const supported=request&&['screens','boards'].includes(request.mode);
+      const at=supported?request.at:session?.shareRequest?.at;
       if(!Number.isFinite(at)||at<loadedAt-6000||at>Date.now()+60000||Date.now()-at>45000)return;
-      const marker=session.roomId+':'+at;
+      const marker=session.roomId+':'+at+':'+(supported?request.mode:'screens');
+      if(onStudentClassroom||stream)return;
       try{
         if(sessionStorage.getItem(inviteKey)===marker)return;
         sessionStorage.setItem(inviteKey,marker);
       }catch{return}
-      if(onStudentClassroom||stream)return;
-      // Navigate this existing tab; browsers cannot silently capture a screen.
-      location.assign(new URL('class-pointer-prototype/dashboard.html?share=1',root).href);
+      // No capture is started automatically; each boy approves screen capture himself.
+      location.assign(new URL('class-pointer-prototype/dashboard.html',root).href);
     }
     function stop(){
       const prior=stream;stream=null;try{call?.close()}catch{}call=null;
@@ -72,14 +76,15 @@
     function status(text){label.textContent=text}
     function current(rows){
       return Object.entries(rows||{}).filter(([key,v])=>v&&v.roomId===key&&/^class-pointer-[a-f0-9-]{36}$/.test(key)
-        &&v.studentScreenSharing===true&&Number.isFinite(v.createdAt)&&Date.now()-v.createdAt<14400000&&Date.now()-v.createdAt>=-60000)
+        &&Number.isFinite(v.createdAt)&&Date.now()-v.createdAt<14400000&&Date.now()-v.createdAt>=-60000)
         .sort((a,b)=>b[1].createdAt-a[1].createdAt)[0]?.[1]||null;
     }
     sessions.on('value',snapshot=>{
       const next=current(snapshot.val());
-      if(!next||!active||next.roomId!==active.roomId){if(stream)stop()}
-      active=next;holder.style.display=active?'flex':'none';
-      if(active)routeTeacherRequest(active);
+      const shareable=next?.studentScreenSharing===true?next:null;
+      if(!shareable||!active||shareable.roomId!==active.roomId){if(stream)stop()}
+      active=shareable;holder.style.display=active?'flex':'none';
+      if(next)routeTeacherRequest(next);
     },()=>{active=null;holder.style.display='none';stop()});
     btn.addEventListener('click',async()=>{
       if(stream){stop();return}
