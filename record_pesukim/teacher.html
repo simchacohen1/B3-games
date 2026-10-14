@@ -3612,12 +3612,12 @@ function renderDisputeSection(a, posukKey, skill){
   if(skill === 'hebrew'){
     if(!a.hebrewAudioURL) return '';
     if(hasReviewableHebrewDispute(a)){
-      return `<div class="dispute-banner">⚠️ Student disputes this score — asked for ${a.hebrewDisputeRequested}%</div>
+      return `<div class="dispute-banner">⚠️ Student disputes this score — review the recording.</div>
         <div class="finalize-row" id="finalizeHebrew_${a.attemptId}">
           <span>Final score:</span>
           <input type="number" min="0" max="100" id="finalizeHebrewInput_${a.attemptId}" value="${a.hebrewDisputeRequested}">
           <span>%</span>
-          <button class="btn" id="finalizeHebrewAcceptBtn_${a.attemptId}">Accept student's number</button>
+          <button class="btn" id="finalizeHebrewAcceptBtn_${a.attemptId}">Approve disputed score</button>
           <button class="btn gold" id="finalizeHebrewSaveBtn_${a.attemptId}">Save final score</button>
           <button class="btn small" style="background:var(--ink-soft);box-shadow:none;" id="finalizeHebrewKeepBtn_${a.attemptId}">Keep original (${typeof a.hebrewScore === 'number' ? a.hebrewScore + '%' : 'no score recorded'})</button>
         </div>`;
