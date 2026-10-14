@@ -67,6 +67,7 @@ test('teacher broadcasts a shoresh, keeps boards independent, and sends a colori
     await openBoard(ari, false);
     await openBoard(levi, false);
     await teacher.locator('#studentBoards').click();
+    await teacher.getByRole('button', { name: '📝 Whiteboards', exact: true }).click();
     await deliver(teacher, students);
     await expect(teacher.locator('.board-tile')).toHaveCount(2);
 
@@ -144,6 +145,7 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
     await openBoard(levi, false);
     const students = { a: ari, b: levi };
     await teacher.locator('#studentBoards').click();
+    await teacher.getByRole('button', { name: '📝 Whiteboards', exact: true }).click();
     await deliver(teacher, students);
 
     // Teacher pastes text from an ordinary clipboard outside text-entry fields.

@@ -1,4 +1,6 @@
 name: Classroom Pointer checks
+permissions:
+  contents: read
 on:
   push:
     paths:
@@ -6,6 +8,7 @@ on:
       - 'backend/functions/class-pointer-share-auth.js'
       - 'backend/functions/index.js'
       - 'tests/class-pointer-workspace-regression.test.cjs'
+      - 'tests/class-pointer-share-auth.test.cjs'
       - '.github/workflows/class-pointer-tests.yml'
   pull_request:
     paths:
@@ -13,6 +16,7 @@ on:
       - 'backend/functions/class-pointer-share-auth.js'
       - 'backend/functions/index.js'
       - 'tests/class-pointer-workspace-regression.test.cjs'
+      - 'tests/class-pointer-share-auth.test.cjs'
       - '.github/workflows/class-pointer-tests.yml'
 jobs:
   test:
@@ -30,4 +34,4 @@ jobs:
           node --check class-pointer-prototype/student-boards.js
           node --check backend/functions/class-pointer-share-auth.js
       - name: Classroom Pointer regression tests
-        run: node --test tests/class-pointer-workspace-regression.test.cjs
+        run: node --test tests/class-pointer-workspace-regression.test.cjs tests/class-pointer-share-auth.test.cjs

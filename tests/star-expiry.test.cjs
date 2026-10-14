@@ -2,7 +2,7 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const vm = require('node:vm'), fs = require('node:fs');
 function setup(initial) {
   let saved = JSON.stringify(initial);
-  const context = {window:{},console,Intl,Date,localStorage:{getItem:()=>saved,setItem:(k,v)=>{saved=v;}}};
+  const context = {window:{},document:{readyState:'loading',addEventListener(){}},console,Intl,Date,localStorage:{getItem:key=>key==='b3SiteSettingsFallback'?saved:null,setItem:(k,v)=>{saved=v;}}};
   vm.runInNewContext(fs.readFileSync('site-settings.js','utf8'),context);
   return {api:context.window.B3SiteSettings,read:()=>JSON.parse(saved)};
 }

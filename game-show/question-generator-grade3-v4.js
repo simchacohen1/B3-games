@@ -186,7 +186,7 @@
       12: { q: "When Sarah Imeinu heard the three malochim say Sarah would have a son, what did Sarah do?", answer: "Sarah laughed." },
       13: { q: "After Sarah Imeinu laughed, what did Hashem ask Avrohom about Sarah?", answer: "Why Sarah had laughed." },
       14: { q: "When Hashem spoke to Avrohom about Sarah Imeinu having a son, what did Hashem say was too hard for Him?", answer: "Nothing." },
-      15: { q: "When Hashem asked Avrohom why Sarah Imeinu had laughed, why did Sarah Imeinu say she laughed?", answer: "Sarah was afraid." },
+      15: { q: "When Hashem asked Avrohom why Sarah Imeinu had laughed, why did Sarah Imeinu say she did not laugh?", answer: "Sarah was afraid." },
       16: { q: "When the three malochim left Avrohom, toward which city did the three malochim look?", answer: "Sedom." },
       17: { q: "When Hashem spoke about Avrohom, what did Hashem think of telling Avrohom?", answer: "What Hashem was going to do." },
       18: { q: "When Hashem spoke about Avrohom, what did Hashem say Avrohom and his children would become?", answer: "A big, strong nation." },

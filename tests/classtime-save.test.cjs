@@ -41,12 +41,14 @@ const answer=(status,data)=>()=>({response:{status,json:async()=>data},via:'sign
 const SAVED={saved:true,partial_mark_may_exist:false,do_not_retry:false,test_id:'4242',mark_name:'TEST DELETE ME - Made Up Quiz (ABC123)',message:'Saved to Nigri as mark #4242.',warnings:[],
   per_boy:[{classtime_name:'Ann Made',nigri_name:'Ann Nigri',outcome:'saved',detail:''}]};
 
-test('files are valid; the old Sync button stays disabled; scripts load in order',()=>{
+test('Classtime saving stays paused until the separate write workflow is approved',()=>{
   new vm.Script(src);
   assert.match(page,/<button disabled aria-disabled="true">Sync to Nigri/);
-  assert.match(page,/classtime-preview\.js(?:\?[^\"]*)?"><\/script>\s*<script src="\.\/classtime-save\.js">/);
-  assert.equal((page.match(/id="saveBtn"/g)||[]).length,1);
-  assert.match(page,/<div id="savePanel" hidden>/);
+  assert.match(page,/Saving paused for safety/);
+  assert.match(page,/classtime-preview\.js(?:\?[^\"]*)?"/);
+  assert.doesNotMatch(page,/<script[^>]+src="[^\"]*classtime-save\.js/);
+  assert.match(page,/<button[^>]*id="saveBtn"[^>]*\bdisabled/);
+  assert.match(page,/<div[^>]*id="savePanel"[^>]*(?:hidden|display:\s*none)/);
 });
 test('no key, no fallback, no old-route use, no HTML built from names',()=>{
   assert.doesNotMatch(src,/X-Sync-Key|sync-marks|sync-points|innerHTML|insertAdjacentHTML|eval\(/);

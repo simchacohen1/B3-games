@@ -22,7 +22,7 @@ try {
     & node --check $script
     if ($LASTEXITCODE -ne 0) { throw "Syntax check failed: $script" }
   }
-  & node --test tests/class-pointer-workspace-regression.test.cjs
+  & node --test tests/class-pointer-workspace-regression.test.cjs tests/class-pointer-share-auth.test.cjs
   if ($LASTEXITCODE -ne 0) { throw "Classroom Pointer tests failed; deployment canceled." }
   Write-Host "Installing locked Firebase function dependencies..." -ForegroundColor Cyan
   & npm --prefix backend/functions ci

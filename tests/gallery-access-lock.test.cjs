@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const ctx={window:{},console,Intl,Date,localStorage:{getItem:()=>null,setItem(){}}};
+const ctx={window:{},document:{readyState:'loading',addEventListener(){}},console,Intl,Date,localStorage:{getItem:()=>null,setItem(){}}};
 vm.runInNewContext(fs.readFileSync('site-settings.js','utf8'),ctx);
 vm.runInNewContext(fs.readFileSync('class-gallery/access.js','utf8'),ctx);
 const api=ctx.window.B3SiteSettings,allowed=ctx.window.B3GalleryAccess;

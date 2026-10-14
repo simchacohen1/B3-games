@@ -39,7 +39,7 @@ test('teacher publishes and removes only its own random room and registers disco
  const writes=[],C=core(),classId='one';let auth;
  const ref=path=>({child:key=>ref(path+'/'+key),once:async()=>({val:()=>({active:true,toolGrants:{'class-pointer':true}})}),onDisconnect:()=>({remove:async()=>writes.push(['disconnect',path]),cancel:async()=>writes.push(['cancel',path])}),set:async value=>writes.push(['set',path,value]),remove:async()=>writes.push(['remove',path])});
  const database=()=>({ref});database.ServerValue={TIMESTAMP:{'.sv':'timestamp'}};
- const context=vm.createContext({window:{ClassPointerDashboardCore:C,B3_APP_CONTEXT:{workspaceId:'b3-2026'},B3SiteSettings:{onAuthStateChanged:callback=>auth=callback}},location:{href:'https://example.test/classroom.html?dashboard=teacher&class=one'},URL,firebase:{database,auth:()=>({currentUser:{uid:'test-teacher'}})}});
+ const context=vm.createContext({window:{ClassPointerDashboardCore:C,B3_APP_CONTEXT:{workspaceId:'b3-2026'},B3SiteSettings:{onAuthStateChanged:callback=>auth=callback}},document:{getElementById:()=>null},location:{href:'https://example.test/classroom.html?dashboard=teacher&class=one'},URL,firebase:{database,auth:()=>({currentUser:{uid:'test-teacher'}})}});
  vm.runInContext(source('dashboard-session.js'),context);await auth({uid:'test-teacher'},true,{authorized:true,role:'teacher',classIds:[classId]});
  await context.window.ClassPointerDashboard.publish(room);await context.window.ClassPointerDashboard.end();
  assert.equal(writes[0][0],'disconnect');assert.equal(writes[1][0],'set');assert.equal(writes[2][0],'remove');for(const write of writes)assert.ok(write[1].endsWith('/classPointerSessions/'+room));assert.equal(writes[1][2].teacherUid,'test-teacher');

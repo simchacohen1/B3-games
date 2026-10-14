@@ -24,8 +24,8 @@ exports.classPointerShareAuth=onRequest({
   const base='b3Games/workspaces/'+workspaceId+'/classes/'+classId;
   const [classSnap,sessionSnap]=await Promise.all([db.ref(base).once('value'),db.ref(base+'/classPointerSessions/'+room).once('value')]);
   const cls=classSnap.val(),session=sessionSnap.val();
-  if(!cls||cls.active===false||!session||session.roomId!==room||session.studentScreenSharing!==true||Date.now()-session.createdAt>14400000||session.createdAt>Date.now()+60000)error(403,'Screen sharing is not enabled for this class.');
-  if(!['et','wt'].includes(classId)&&cls.toolGrants?.['class-pointer']!==true)error(403,'Class Pointer is disabled for this class.');
+  if(!cls||cls.active===false||!session||session.roomId!==room||session.studentScreenSharing!==true||!Number.isFinite(session.createdAt)||Date.now()-session.createdAt>14400000||session.createdAt>Date.now()+60000)error(403,'Screen sharing is not enabled for this class.');
+  if(cls.toolGrants?.['class-pointer']===false||(!['et','wt'].includes(classId)&&cls.toolGrants?.['class-pointer']!==true))error(403,'Class Pointer is disabled for this class.');
   if(action==='issue'){
    // Bound passcode attempts at this endpoint, independently of sign-in limits.
    const fingerprint=crypto.createHash('sha256').update(String(req.ip||'unknown')).digest('hex');
@@ -54,6 +54,16 @@ exports.classPointerShareAuth=onRequest({
    const claims=await admin.auth().verifyIdToken(auth[1]);
    // The published session belongs to this exact Firebase-authenticated teacher.
    if(session.teacherUid!==claims.uid)error(403,'This session belongs to another teacher.');
+   // A previously opened lesson must not outlive the teacher's current access.
+   const owner=claims.email_verified===true&&String(claims.email||'').toLowerCase()==='simcha5770@gmail.com';
+   if(!owner){
+    const [adminSnap,teacherSnap]=await Promise.all([
+      db.ref('b3Games/admins/'+claims.uid).once('value'),
+      db.ref('b3Games/workspaces/'+workspaceId+'/teachers/'+claims.uid).once('value')
+    ]);
+    const administrator=adminSnap.val(),teacher=teacherSnap.val();
+    if(!(administrator&&administrator.active!==false)&&(!teacher||teacher.active===false||teacher.classIds?.[classId]!==true))error(403,'This teacher is no longer assigned to this class.');
+   }
    const token=String(body.token||'');
    if(!/^[a-f0-9]{64}$/.test(token))error(400,'Invalid sharing ticket.');
    const digest=crypto.createHash('sha256').update(token).digest('hex');
@@ -61,7 +71,7 @@ exports.classPointerShareAuth=onRequest({
    const ticketRef=db.ref('b3Private/classPointerShareTickets/'+digest);
    let ticket=null;
    const used=await ticketRef.transaction(row=>{
-     if(!row||row.expiresAt<Date.now()||row.room!==room||row.classId!==classId)return;
+     if(!row||!Number.isFinite(row.expiresAt)||row.expiresAt<Date.now()||row.room!==room||row.classId!==classId)return;
      ticket=row;
      return null;
    });
