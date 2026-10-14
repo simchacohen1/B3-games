@@ -5,6 +5,8 @@
   const db=firebase.database(),classes=db.ref('b3Games/workspaces/'+ws+'/classes');
   const message=text=>{$('message').textContent=text};
   if(query.get('teacher')==='1'){
+    const sendEveryone=query.get('sendEveryoneShare')==='1';
+    if(sendEveryone)$('openTeacher').textContent='Send this class to Share Screen';
     $('welcome').textContent='Choose the class you are teaching.';$('teacherChoice').hidden=false;
     $('teacherSignIn').onclick=()=>window.B3SiteSettings.signInWithGoogle().catch(()=>message('Could not sign in. Please try again.'));
     let generation=0;
@@ -16,11 +18,14 @@
         if(current!==generation)return;
         for(const [id,row] of Object.entries(rows))if(C.permitted(access,id,row)){const option=document.createElement('option');option.value=id;option.textContent=row.name||id;$('classChoice').appendChild(option)}
         const requested=query.get('class');if(requested&&Array.from($('classChoice').options).some(option=>option.value===requested))$('classChoice').value=requested;
-        if($('classChoice').value){location.replace('classroom.html?dashboard=teacher&class='+encodeURIComponent($('classChoice').value));return}
-        $('openTeacher').disabled=!$('classChoice').value;message($('classChoice').value?'Open teacher classroom to start automatically. Then choose Share teaching screen. Students click Class Pointer on their dashboard.':'No classes with Class Pointer enabled are assigned to you.');
+        if($('classChoice').value&&(!sendEveryone||requested||$('classChoice').options.length===1)){
+          location.replace('classroom.html?dashboard=teacher&class='+encodeURIComponent($('classChoice').value)+(sendEveryone?'&sendEveryoneShare=1':''));
+          return;
+        }
+        $('openTeacher').disabled=!$('classChoice').value;message(sendEveryone&&$('classChoice').value?'Choose the class to send to screen sharing, then press Send this class.':$('classChoice').value?'Open teacher classroom to start automatically. Then choose Share teaching screen. Students click Class Pointer on their dashboard.':'No classes with Class Pointer enabled are assigned to you.');
       }catch{message('Could not load your classes. Refresh to try again.')}
     });
-    $('openTeacher').onclick=()=>{if($('classChoice').value)location.href='classroom.html?dashboard=teacher&class='+encodeURIComponent($('classChoice').value)};
+    $('openTeacher').onclick=()=>{if($('classChoice').value)location.href='classroom.html?dashboard=teacher&class='+encodeURIComponent($('classChoice').value)+(sendEveryone?'&sendEveryoneShare=1':'')};
     return;
   }
   try{
