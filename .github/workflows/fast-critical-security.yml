@@ -38,5 +38,6 @@ jobs:
             tests/firebase-security-audit.test.cjs \
             tests/student-auth.test.cjs \
             tests/student-management.test.cjs \
+            tests/passcode-migration-safety.test.cjs \
             tests/yiddish-backend.test.cjs \
             tests/chazara-teacher-scope.test.cjs
