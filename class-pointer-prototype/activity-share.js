@@ -71,8 +71,8 @@
     choose.style.cssText='display:block;width:100%;background:#205af0;color:white;border:0;border-radius:14px;padding:18px;font:bold 22px system-ui;cursor:pointer;margin-top:18px';
     const promptStatus=document.createElement('p');promptStatus.setAttribute('role','status');promptStatus.style.cssText='color:#ad2438;font-size:15px;margin:12px 0 0';
     promptPanel.append(choose,promptStatus);promptOverlay.append(promptPanel);document.body.appendChild(promptOverlay);
-    const showPrompt=()=>{promptStatus.textContent='';promptOverlay.style.display='flex';choose.focus()};
-    const hidePrompt=()=>{promptOverlay.style.display='none'};
+    const showPrompt=()=>{promptStatus.textContent='';holder.style.display='none';promptOverlay.style.display='flex';choose.focus()};
+    const hidePrompt=()=>{promptOverlay.style.display='none';holder.style.display=active?'flex':'none'};
     choose.addEventListener('click',()=>{if(active&&!busy){promptStatus.textContent='';btn.click()}});
 
     const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
