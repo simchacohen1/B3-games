@@ -2012,19 +2012,6 @@ async function loadReportsTab(){
         renderReportResults();
       });
     });
-    // Keep all existing filters; advanced controls are revealed only on demand.
-    const filters = mainEl.querySelector('.report-filters');
-    const advanced = document.createElement('details');
-    advanced.id = 'reportAdvanced';
-    advanced.innerHTML = '<summary>More filters and report options</summary>';
-    filters.after(advanced);
-    const advancedIndices = [0,4,5,7,8,9];
-    [...filters.children].filter((_,i) => advancedIndices.includes(i)).forEach(el => advanced.append(el));
-    // Put the advanced controls in their own compact grid without copying input IDs.
-    const advancedGrid = document.createElement('div');
-    advancedGrid.className = 'report-filters';
-    [...advanced.children].filter(el => el.tagName !== 'SUMMARY').forEach(el => advancedGrid.append(el));
-    advanced.append(advancedGrid);
     // Keep the original controls wired, while moving advanced options out of the way.
     const reportFiltersEl = mainEl.querySelector('.report-filters');
     reportFiltersEl.classList.add('report-compact-filters');
