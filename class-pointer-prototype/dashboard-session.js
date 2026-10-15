@@ -95,5 +95,14 @@
     const context=await ready;
     if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
     await ref.child('studentScreenSharing').set(enabled===true);
-  },async end(){revision++;const ref=activeRef;activeRef=null;if(ref){await ref.remove();await ref.onDisconnect().cancel()}}};
+  },async end(){
+    revision++;
+    const ref=activeRef;
+    if(!ref)return;
+    // Preserve the reference if cleanup fails, so a refresh/onDisconnect
+    // or another attempt can still remove the previous classroom session.
+    await ref.remove();
+    await ref.onDisconnect().cancel();
+    if(activeRef===ref)activeRef=null;
+  }};
 })();
