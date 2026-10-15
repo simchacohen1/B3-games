@@ -26,7 +26,7 @@ const root = path.join(__dirname, '..');
 test('all student tools load the corrected activity screen-sharing script without stale caches', () => {
   for (const page of pages) {
     const html = fs.readFileSync(path.join(root, page), 'utf8');
-    const refs = html.match(/activity-share\\.js\\?v=[^"']+/g) || [];
+    const refs = html.match(/activity-share[.]js[?]v=[^"']+/g) || [];
     assert.equal(refs.length, 1, page + ' must include exactly one activity-share script');
     assert.equal(refs[0], 'activity-share.js?v=20261015-sharefix1', page + ' must use the release version');
   }
@@ -34,5 +34,5 @@ test('all student tools load the corrected activity screen-sharing script withou
 
 test('the classroom loads the updated PeerJS reconnection handling', () => {
   const html = fs.readFileSync(path.join(root, 'class-pointer-prototype/classroom.html'), 'utf8');
-  assert.match(html, /classroom\\.js\\?v=20261015-sharing-reconnect1/);
+  assert.match(html, /classroom[.]js[?]v=20261015-sharing-reconnect1/);
 });
