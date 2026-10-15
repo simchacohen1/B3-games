@@ -751,7 +751,9 @@
     studentLeft(m){closeScreen(m);if(m.boardKey&&boards.has(m.boardKey))boards.get(m.boardKey).drafts={student:null,teacher:null};if(on)syncTiles()},
     endClass(){
       drawer?.cancel();for(const m of B.members().values())closeScreen(m);
-      window.ClassPointerDashboard?.setStudentScreenSharing(false).catch(()=>{});
+      // The enclosing classroom ends by deleting the entire Firebase session.
+      // Do not send an asynchronous child update here: it could recreate an
+      // orphan studentScreenSharing flag after the session is removed.
       boards.clear();blocked.clear();denied.screens.clear();denied.boards.clear();classStudents=[];permissionsLoad=null;renderPermissions();chooseActivity(null,dirtyAll);mode='screens';controls();
       for(const tile of tiles.values()){tile.video.srcObject=null;tile.node.remove()}tiles.clear();
       if(on){on=false;focusId=null;view.hidden=true}
