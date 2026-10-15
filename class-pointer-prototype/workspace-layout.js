@@ -28,6 +28,8 @@
     const hint=document.getElementById('navigationHint');
     if(hint)hint.before(tabs);else dock.before(tabs);
     function activate(id){
+      const launch=document.getElementById('studentBoards');
+      if((id==='screens'||id==='whiteboards')&&(!launch||launch.disabled))return;
       for(const [key,button] of buttons)button.setAttribute('aria-selected',String(key===id));
       if(id==='students'){
         const menu=document.getElementById('tbStudentsMenu');
@@ -55,11 +57,11 @@
       if(menu){
         menu.setAttribute('aria-label','Student permissions');
         const handle=menu.querySelector('.tb-roster-handle');
-        if(handle)handle.textContent='⠿ Student permissions — drag to reposition';
+        if(handle&&handle.textContent!=='⠿ Student permissions — drag to reposition')handle.textContent='⠿ Student permissions — drag to reposition';
       }
     }
     organize();
-    new MutationObserver(organize).observe(dock,{childList:true});
+    new MutationObserver(organize).observe(dock,{childList:true,subtree:false});
     const observer=new MutationObserver(()=>{tabs.hidden=panel.hidden});
     observer.observe(panel,{attributes:true,attributeFilter:['hidden']});
     tabs.hidden=panel.hidden;
