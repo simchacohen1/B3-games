@@ -68,7 +68,7 @@ test('teacher screens action displays the working gallery and broadcasts to the 
   const sessions=read('class-pointer-prototype/dashboard-session.js');
   assert.match(classroom,/dispatchEvent\(new Event\('classpointer:send-to-screens'\)\)/);
   assert.match(boards,/addEventListener\('classpointer:send-to-screens',[^\n]+sendEveryone\('screens'\)/);
-  assert.match(boards,/requestStudentDestination\(destination\)/);
+  assert.match(boards,/requestStudentDestination\(destination,policy\(\)\)/);
   assert.match(sessions,/const ref=activeRef/);
   assert.match(sessions,/context\.ref\.child\('classPointerSessions\/'\+room\)/);
 });
