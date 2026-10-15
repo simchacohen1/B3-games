@@ -81,7 +81,7 @@ test('screen request stays on activity, with explicit browser permission and sam
   await a.shareButton.listeners.click();
   assert.equal(a.captureCount,1);
   assert.equal(a.requests,1);
-  assert.equal(a.stopCount,2); // cleanup of the captured track, then a safe stopped state
+  assert.equal(a.stopCount,1); // permission granted but capture is stopped after network failure
   assert.match(a.label.textContent,/service unavailable/);
   assert.equal(a.fallback.hidden,false);
   a.fallback.listeners.click();
