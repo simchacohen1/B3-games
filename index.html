@@ -2054,9 +2054,34 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   el("createManagedStudentButton").addEventListener("click",createManagedStudent);
   el("saveManagedStudentPasscodeButton").addEventListener("click",saveManagedStudentPasscode);
   el("securePasscodesButton").addEventListener("click",async()=>{
-    el("classManagementStatus").textContent="Securing passcodes…";
-    const r=await trustedStudentAction("migratePasscodes",{deletePublic:true});
-    if(r)el("classManagementStatus").textContent="Done: "+r.copied+" passcodes moved to private storage, "+r.cleared+" public copies removed.";
+    const status=el("classManagementStatus"),btn=el("securePasscodesButton");
+    const protocol="passcodes-v2-preview-20261015";
+    btn.disabled=true;
+    try{
+      status.textContent="Checking migration safety. No student data will be changed during preview…";
+      // Different action name from the legacy destructive operation.
+      // An old Firebase function rejects this preview instead of erasing data.
+      const preview=await trustedStudentAction("previewPasscodeMigration",{});
+      if(!preview || preview.ok!==true || preview.dryRun!==true || preview.protocol!==protocol){
+        status.textContent="Cleanup unavailable. The verified Firebase migration backend must be deployed before this can run.";
+        return;
+      }
+      if((preview.conflicts||[]).length || (preview.unmatched||[]).length){
+        status.textContent="No changes made. Resolve "+(preview.conflicts||[]).length+" conflicting credentials and "+(preview.unmatched||[]).length+" unlinked class-only student records first.";
+        return;
+      }
+      if(!preview.copied&&!preview.cleared){
+        status.textContent="No public passcodes need to be moved or cleared.";
+        return;
+      }
+      if(!confirm("Preview complete. Copy "+preview.copied+" credentials to private storage and remove "+preview.cleared+" old public copies? Confirm that an independent encrypted Firebase database backup has been verified and tested before proceeding.")){
+        status.textContent="Cancelled. No data changed.";
+        return;
+      }
+      status.textContent="Moving passcodes to protected storage…";
+      const result=await trustedStudentAction("migratePasscodes",{deletePublic:true,migrationProtocol:protocol,backupConfirmed:true});
+      if(result)status.textContent="Completed: "+result.copied+" credentials copied, "+result.cleared+" public copies cleared. Verify student sign-in and inspect Firebase rules.";
+    }finally{btn.disabled=false;}
   });
 
   el("addStudentToClassButton").addEventListener("click",addStudentToManagedClass);

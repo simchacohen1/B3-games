@@ -33,7 +33,7 @@ const owner={uid:'o',email:'simcha5770@gmail.com',email_verified:true,firebase:{
 const teacher={uid:'t',email:'t@x',email_verified:true,firebase:{sign_in_provider:'google.com'}};
 test('owner migration copies passcodes privately, then clears every public copy',async()=>{const d=seed();
  const first=await manageStudents(d,owner,{action:'migratePasscodes',deletePublic:false},5);assert.equal(first.copied,3);assert.equal(d.tree.b3Games.students.moshe.profile.passcode,'1111');
- await manageStudents(d,owner,{action:'migratePasscodes',deletePublic:true},6);
+ await manageStudents(d,owner,{action:'migratePasscodes',deletePublic:true,migrationProtocol:'passcodes-v2-preview-20261015',backupConfirmed:true},6);
  assert.equal(d.tree.b3Private.passcodes.moshe.passcode,'1111');assert.equal(d.tree.b3Private.passcodes.dovid.passcode,'3333');
  assert.equal(JSON.stringify(d.tree.b3Games).includes('"passcode"'),false);assert.equal(JSON.stringify(d.tree.posukPractice).includes('"passcode"'),false);
  assert.equal((await login(d,'Moshe Levi','1111')).id,'moshe');assert.equal((await login(d,'Dovid','3333')).id,'dovid');assert.equal((await login(d,'Yossi','5770')).id,'yossi')});
@@ -43,7 +43,7 @@ test('teachers list passcodes only for their own class; owner can list all',asyn
  d.tree.b3Games.workspaces['b3-2026'].classes.wt={active:true,members:{}};await assert.rejects(manageStudents(d,teacher,{action:'list',classId:'wt'}),{code:403});
  const all=await manageStudents(d,owner,{action:'list',all:true});assert.equal(all.passcodes.yossi,'5770')});
 test('creating a student stores the passcode privately only',async()=>{const d=seed();const r=await manageStudents(d,owner,{action:'create',classId:'et',name:'New Boy',passcode:'4444'});assert.equal(d.tree.b3Private.passcodes[r.studentId].passcode,'4444');assert.equal(d.tree.b3Games.students[r.studentId].profile.passcode,undefined);assert.equal((await readPasscode(d.get,r.studentId)).passcode,'4444')});
-test('an active site administrator can run the owner migration',async()=>{const d=seed();d.tree.b3Games.admins={t:{active:true}};const r=await manageStudents(d,teacher,{action:'migratePasscodes',deletePublic:true});assert.ok(r.ok);d.tree.b3Games.admins.t.active=false;await assert.rejects(manageStudents(d,teacher,{action:'migratePasscodes'}),{code:403})});
+test('an active site administrator can run the owner migration',async()=>{const d=seed();d.tree.b3Games.admins={t:{active:true}};const r=await manageStudents(d,teacher,{action:'migratePasscodes',deletePublic:true,migrationProtocol:'passcodes-v2-preview-20261015',backupConfirmed:true});assert.ok(r.ok);d.tree.b3Games.admins.t.active=false;await assert.rejects(manageStudents(d,teacher,{action:'migratePasscodes'}),{code:403})});
 test('homepage sign-in refuses a blocked central profile even with an old-list passcode',async()=>{const d=seed();d.tree.posukPractice.allowedStudents.off={name:'Blocked Boy',passcode:'5555'};await assert.rejects(login(d,'Blocked Boy','5555'));await assert.rejects(login(d,'Blocked Boy','2222'))});
 
 const choose=(d,newPin='4567',extra={})=>studentAuth(d,{action:'choosePin',name:'Moshe Levi',pin:'1111',newPin,confirmPin:newPin,...extra},'1.2.3.4',2000);
