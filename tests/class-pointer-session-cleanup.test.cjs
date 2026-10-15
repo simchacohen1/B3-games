@@ -35,3 +35,32 @@ test('failed deletion retains the exact previous session reference for retry',as
  assert.equal(f.operations[0][1],f.operations[1][1]);
  assert.equal(f.operations.at(-1)[0],'cancel');
 });
+
+test('teacher can End and Restart three times; duplicate clicks never overlap cleanup',async()=>{
+ const src=fs.readFileSync(__dirname+'/../class-pointer-prototype/classroom.js','utf8');
+ const start=src.slice(src.indexOf('async function startClass(){'),src.indexOf('\nasync function requestEveryoneToShare'));
+ const end=src.slice(src.indexOf('function endClass(){'),src.indexOf('\nfunction clearStudentVideo'));
+ const items=new Map(),peers=[],errors=[];let finishCleanup,ends=0;
+ const $=id=>{if(!items.has(id))items.set(id,{hidden:false,disabled:false,value:'',textContent:''});return items.get(id)};
+ const window={ClassPointerDashboard:{ready:Promise.resolve(),publish:async()=>{},end:()=>{ends++;return new Promise(resolve=>finishCleanup=resolve)}},ClassPointerBoards:{endClass(){}},ClassPointerActivityShares:{closeAll(){}},ClassPointerPdf:{close(){}}};
+ const context=vm.createContext({isTeacher:true,started:false,openingClass:false,closingClass:false,endPromise:Promise.resolve(),peer:null,joinTimer:null,members:new Map(),state:{},window,$,
+ makePeer:()=>{const events={};const p={events,on:(name,fn)=>events[name]=fn,destroy(){this.destroyed=true}};peers.push(p);return p},
+ clearError(){},status(){},fail:message=>errors.push(message),stopSharing(){},roster(){},send(){},receiveStudent(){},
+ clearTimeout(){},setTimeout:()=>1,crypto:{randomUUID:()=>String(peers.length)},URL,location:{href:'https://example.test/classroom.html?dashboard=teacher&class=wt'}});
+ vm.runInContext(start+'\n'+end,context);
+ for(let cycle=0;cycle<3;cycle++){
+  await vm.runInContext('startClass()',context);
+  await peers.at(-1).events.open(room);
+  assert.equal(vm.runInContext('started',context),true);
+  const pending=vm.runInContext('endClass()',context);
+  assert.equal(vm.runInContext('endClass()',context),pending);
+  const before=peers.length;await vm.runInContext('startClass()',context);
+  assert.equal(peers.length,before,'no new Peer connection before cleanup');
+  await tick();assert.equal($('startClass').disabled,true);
+  finishCleanup();await pending;
+  assert.equal($('startClass').disabled,false);
+  assert.match($('startClass').textContent,/Start another class/);
+  assert.equal(peers.at(-1).destroyed,true);
+ }
+ assert.equal(ends,3);assert.equal(peers.length,3);assert.deepEqual(errors,[]);
+});
