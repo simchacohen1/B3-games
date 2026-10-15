@@ -2050,7 +2050,7 @@ async function loadReportsTab(){
     });
     const summary = document.getElementById('reportSummary');
     const results = document.getElementById('reportResults');
-    reportFiltersEl.before(summary);
+    reportFiltersEl.after(summary);
     summary.after(results);
     // "All Students" and the individual checkboxes are mutually exclusive:
     // checking "All" clears the individual picks, and picking any individual
