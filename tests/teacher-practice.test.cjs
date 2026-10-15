@@ -8,9 +8,7 @@ const code = fs.readFileSync(path.join(__dirname, '..', 'teacher-practice.js'), 
 function harness(search='?class=et') {
   const window = { B3_WORKSPACE_ID:'b3-2026', B3SiteSettings:{workspaceId:'b3-2026'} };
   const module = {exports:{}};
-  const context = {module,window,location:{search},URLSearchParams,FileReader,Promise,Map};
-  // Fake file reader is deliberately not required for path/security tests.
-  delete context.FileReader;
+  const context = {module,window,location:{search},URLSearchParams,Promise,Map};
   vm.runInNewContext(code,context,{filename:'teacher-practice.js'});
   const writes=[];
   const db={ref(name=''){
