@@ -399,6 +399,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
   </div>
 </div>
 
+<script src="../teacher-practice.js?v=20261014"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js?v=20261007-tab-login"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -750,6 +751,10 @@ async function checkSavedAccess(id){
   return {ok:true,slug:id,displayName:String(profile.name||sessionStorage.getItem('b3Games_studentName')||'Student')};
 }
 let teacherPreview = false;
+let teacherPracticeProgressPath = '';
+function progressPath() {
+  return teacherPracticeProgressPath || ('rashiLetters/progress/' + studentId);
+}
 (async function enterWithHomepageLogin(){
   const gate=document.getElementById('nameGate'),msg=document.getElementById('gateMsg');
   ['studentNameInput','classPinInput','startBtn'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.display='none';const lab=gate.querySelector('label[for="'+id+'"]');if(lab)lab.style.display='none';}});
@@ -779,10 +784,16 @@ let teacherPreview = false;
     msg.textContent='';updateRewardHud();gate.style.display='none';showModeGate();return;
   }
   if(account.user && account.authorized && !window.B3SiteSettings.getActingStudent()){
+    try {
+      const access = window.B3SiteSettings.getCurrentAccess();
+      const practice = await B3TeacherPractice.open(db, account.user, access, 'rashi-letters');
+      teacherPracticeProgressPath = practice.path('rashi/progress');
+    } catch (error) { sendHome(error.message || 'Could not open teacher practice.'); return; }
     teacherPreview=true;
-    studentId=''; studentName='Teacher Preview';
+    studentId='teacher_preview'; studentName='Teacher Practice';
+    await loadProgress();
     const banner=document.createElement('p');
-    banner.textContent='Teacher preview - no student progress is saved. ';
+    banner.textContent='Teacher practice — progress is saved privately to your account. All levels are available for testing. ';
     const home=document.createElement('a');home.href='../index.html';home.textContent='Back to Fun Torah Tools';
     banner.append(home);document.querySelector('header').append(banner);
     msg.textContent='';updateRewardHud();gate.style.display='none';showModeGate();return;
@@ -803,7 +814,7 @@ let teacherPreview = false;
 })();
 
 async function loadProgress(){
-  const snap = await db.ref('rashiLetters/progress/' + studentId).once('value');
+  const snap = await db.ref(progressPath()).once('value');
   const rec = snap.val() || {};
   const savedIndex = rec.currentUnitIndex;
   unitIndex = (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex <= UNITS.length) ? savedIndex : 0;
@@ -855,7 +866,7 @@ function stepMastered(idx){
   return !!chainFlags[flagKey(st)];   // no free passes: Look-alike and word steps must be mastered by everyone
 }
 // A step is open if it's already mastered (missions stay finished) or everything before it is mastered.
-function stepUnlocked(idx){ if(stepMastered(idx)) return true; for(let j=0;j<idx;j++) if(!stepMastered(j)) return false; return true; }
+function stepUnlocked(idx){ if(teacherPreview) return true; if(stepMastered(idx)) return true; for(let j=0;j<idx;j++) if(!stepMastered(j)) return false; return true; }
 function firstUnmasteredBefore(idx){ for(let j=0;j<idx;j++) if(!stepMastered(j)) return j; return idx; }
 function currentStep(){ return STEPS.findIndex((_,j)=>!stepMastered(j)); }
 function stepIndexOf(k,v){ return STEPS.findIndex(st=>st.k===k && (k==='similar' || st.n===v || st.i===v)); }
@@ -869,7 +880,11 @@ function goStep(idx){
   const st=STEPS[idx];
   if(st.k==='similar'){ openSimilar(); return; }
   if(st.k==='words'){ openSimilar(); pendingWordLevel=st.n; setSimTab('words'); return; }
-  mode='continue'; unitIndex=guidedIndex; phase=guidedPhase; streak=0; attemptsThisStep=0; retryQuestion=null;
+  // Teachers can inspect any mission without overwriting their saved learning path.
+  const jumpToUnit=teacherPreview && st.k==='unit' && st.i!==guidedIndex;
+  if(jumpToUnit){mode='practice';practiceUnitId=UNITS[st.i].id;phase='letter';}
+  else{mode='continue';unitIndex=guidedIndex;phase=guidedPhase;}
+  streak=0; attemptsThisStep=0; retryQuestion=null;
   document.getElementById('modeGate').style.display='none';
   document.getElementById('similarScreen').style.display='none';
   document.getElementById('app').style.display='block';
@@ -887,7 +902,7 @@ function goNextStep(){
 function markMastered(key){
   if(chainFlags[key]) return false;
   chainFlags[key]=true;
-  if(studentId) db.ref('rashiLetters/progress/'+studentId).update({[key]:true}).catch(()=>{});
+  if(studentId) db.ref(progressPath()).update({[key]:true}).catch(()=>{});
   const nxt=currentStep();
   showQuestToast('🔓 Unlocked: '+(nxt<0?'all done!':stepName(STEPS[nxt])));
   return true;
@@ -1136,7 +1151,7 @@ async function handleAnswer(letter, btnEl){
       if(phase==='letter') phase='word';
       else { phase='letter'; unitIndex++; unitAdvanced = true; }
       guidedIndex=unitIndex; guidedPhase=phase;
-      if(!teacherPreview) writes.push(db.ref('rashiLetters/progress/'+studentId).update({currentUnitIndex:unitIndex,currentPhase:phase}));
+      if(studentId) writes.push(db.ref(progressPath()).update({currentUnitIndex:unitIndex,currentPhase:phase}));
     } else if(practiceModeType==='mixed'){
       if(phase==='letter') phase='word';
       else practiceFinished = true;
@@ -1343,6 +1358,7 @@ function openGames(all){
 }
 
 async function enterMultiplayer(msgText){
+  if(teacherPreview){showQuestToast('Multiplayer uses real class rooms and is unavailable in teacher practice.');return;}
   leaveRoom(); viewVersion++;
   const area=document.getElementById('simArea');
   if(!studentId){ area.replaceChildren(el('p','prompt','Please sign in on Fun Torah Tools to play with friends.')); return; }
@@ -1654,17 +1670,17 @@ function renderWords(){
 }
 
 async function logAttempt(unitId, ph, correct){
-  if(teacherPreview || !studentId)return;
+  if(!studentId)return;
   const key = unitId + '_' + ph;
-  const path = 'rashiLetters/progress/' + studentId + '/units/' + key;
+  const path = progressPath() + '/units/' + key;
   const snap = await db.ref(path).once('value');
   const existing = snap.val() || { attempts:0, correct:0 };
   await db.ref(path).set({
     attempts: (existing.attempts||0) + 1,
     correct: (existing.correct||0) + (correct?1:0)
   });
-  await db.ref('rashiLetters/progress/' + studentId + '/lastActive').set(firebase.database.ServerValue.TIMESTAMP);
-  await db.ref('rashiLetters/progress/' + studentId + '/name').set(studentName);
+  await db.ref(progressPath() + '/lastActive').set(firebase.database.ServerValue.TIMESTAMP);
+  await db.ref(progressPath() + '/name').set(studentName);
 }
 </script>
 <script defer src="../class-pointer-prototype/activity-share.js?v=20261014-send1"></script>

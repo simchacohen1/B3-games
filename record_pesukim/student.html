@@ -1461,6 +1461,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+<script src="../teacher-practice.js?v=20261014"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
 
 <script>
@@ -1482,6 +1483,13 @@ let db = firebase.database();
 let storage = firebase.storage();
 let teacherPreview = false;
 
+// Guest demos stay in this tab. Signed-in teacher work has a private cloud record.
+async function enablePersistentTeacherPractice(user, access) {
+  const practice = await B3TeacherPractice.open(db, user, access, 'posuk-practice-scroll');
+  db = practice.dbAdapter(db);
+  storage = practice.recordingStorage();
+  teacherPreview = true; // No real reward requests or student approvals.
+}
 // Preview attempts and recordings stay in this tab, outside student records.
 function enableTeacherPreview(){
   teacherPreview=true;
@@ -2431,7 +2439,7 @@ function enterApp(){
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('studentNameLabel').textContent = studentName;
   if(teacherPreview){
-    document.getElementById('studentNameLabel').textContent=(window.B3Guest&&B3Guest.isGuest())?'Guest preview — try 3 pesukim, nothing is saved':'Teacher Preview — no student work or points saved';
+    document.getElementById('studentNameLabel').textContent=(window.B3Guest&&B3Guest.isGuest())?'Guest preview — try 3 pesukim, nothing is saved':'Teacher Practice — work saves privately, reward points are simulated';
     practiceScopeReady=true;ownClassSpace=false;classPracticeLimit=null;
     rebuildPerekOptionsForClassLimit();applyDeepLinkFromURL();return;
   }
@@ -2536,7 +2544,15 @@ window.addEventListener('load', async () => {
     wait();setTimeout(()=>resolve({authorized:false}),10000);
   });
   if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
-    enableTeacherPreview();studentId='teacher_preview';studentName='Teacher Preview';enterApp();return;
+    try {
+      await enablePersistentTeacherPractice(account.user, window.B3SiteSettings.getCurrentAccess());
+      studentId='teacher_preview';studentName='Teacher Practice';
+      enterApp();return;
+    } catch (error) {
+      console.error('Could not open teacher practice', error);
+      setNameGateMsg(error.message || 'Could not save teacher practice.');
+      return;
+    }
   }
   const sharedId=sessionStorage.getItem('b3Games_studentId'),sharedName=sessionStorage.getItem('b3Games_studentName'),sharedPin=sessionStorage.getItem('b3Games_classPin');
   if(sharedId&&sharedName&&sharedPin){

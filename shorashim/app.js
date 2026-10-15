@@ -110,6 +110,19 @@ let cloudStudentId = null;
 let cloudStudentName = '';
 let cloudEnabled = false;
 let teacherPreview = false;
+let teacherPractice = null;
+function studentCloudPath(suffix='') {
+  const base = teacherPractice ? teacherPractice.path('shorashim/student') : `${CLOUD_ROOT}/students/${cloudStudentId}`;
+  return base + suffix;
+}
+function recordingCloudPath(date='') {
+  const base = teacherPractice ? teacherPractice.path('shorashim/recordings') : `${CLOUD_ROOT}/recordings/${cloudStudentId}`;
+  return base + (date ? '/' + date : '');
+}
+function recordingEventPath(eventId='') {
+  const base = teacherPractice ? teacherPractice.path('shorashim/recordingEvents') : `${CLOUD_ROOT}/recordingEvents/${cloudStudentId}`;
+  return base + (eventId ? '/' + eventId : '');
+}
 let cloudSaveTimer = null;
 let appStarted = false;
 let classMatchLeaderboard = {};
@@ -187,7 +200,7 @@ function scheduleCloudStudentSave(){
     try{
       const payload=clone(db.students[currentStudent]);
       payload.name=cloudStudentName||currentStudent;
-      await cloudDb.ref(`${CLOUD_ROOT}/students/${cloudStudentId}`).set(payload);
+      await cloudDb.ref(studentCloudPath()).set(payload);
       setCloudStatus('☁️ Saved');
     }catch(err){
       console.error('Cloud save failed',err);
@@ -292,8 +305,8 @@ async function trySavedStudent(){
   return true;
 }
 
-// Teachers opening the student version use their existing verified B3 account.
-// Preview activity stays in memory and never writes a student's cloud record.
+// Teachers opening Student Version get their own cloud-synced practice profile.
+// This profile never appears in a real student's progress, leaderboard or rewards.
 async function enterTeacherPreview(user,access){
   const selected=new URLSearchParams(location.search).get('class')||sessionStorage.getItem('b3Games_studentClass')||'';
   if(access.role!=='admin'&&!(access.classIds||[]).includes(selected))throw new Error('Open Shorashim from your assigned class on the homepage.');
@@ -308,17 +321,23 @@ async function enterTeacherPreview(user,access){
     cloudDb.ref(`${CLOUD_ROOT}/catalog`).once('value'),
     cloudDb.ref(`${CLOUD_ROOT}/settings`).once('value')
   ]);
-  teacherPreview=true;
-  currentStudent='Teacher Preview';
-  db={students:{[currentStudent]:blankStudent()},currentStudent,
+  teacherPractice=await B3TeacherPractice.open(cloudDb,user,access,'shorashim');
+  const practiceSnap=await cloudDb.ref(teacherPractice.path('shorashim/student')).once('value');
+  const saved=practiceSnap.val()||blankStudent();
+  normalizeStudent(saved);
+  teacherPreview=true;cloudEnabled=true;
+  cloudStudentId=user.uid;cloudStudentName='Teacher Practice';
+  currentStudent='Teacher Practice';
+  db={students:{[currentStudent]:saved},currentStudent,
     catalog:normalizeCatalogUnits(catalogSnap.val()||(classSpaceId?emptyCatalog():clone(DEFAULT_CATALOG))),
     settings:{minReviewMs:500,studentSiteOpen:true,...(settingsSnap.val()||{})}};
-  document.getElementById('signedInStudentName').textContent='Teacher Preview';
+  document.getElementById('signedInStudentName').textContent='Teacher Practice';
   document.getElementById('switchStudentBtn').textContent='Back to Fun Torah Tools';
-  setCloudStatus('Preview — no student points');
+  setCloudStatus('☁️ Teacher practice saved privately — no real points');
   applyStudentSiteOpen(true);
   if(!appStarted){init();appStarted=true;}
   showMode('student');
+  startCloudListeners();scheduleCloudStudentSave();
 }
 
 // Guest Mode: a few sample cards, held in memory only (nothing is saved anywhere).
@@ -473,6 +492,7 @@ async function saveDrawingToCloud(itemKey,dataURL){
     // Keep drawings with the same student record used by the realtime database.
     // The previous path omitted `students`, which made the files land outside
     // the student's data hierarchy and could be rejected by storage rules.
+    if(teacherPractice)return dataURL; // saved in the teacher card JSON, not real student Storage
     const path=`${CLOUD_ROOT}/students/${cloudStudentId}/drawings/${safe}.png`;
     const ref=cloudStorage.ref(path);
     await ref.put(dataURLToBlob(dataURL));
@@ -598,12 +618,12 @@ async function toggleShorashimRecording(){
         const blob=new Blob(shorashimRecordingChunks,{type:shorashimRecorder.mimeType||'audio/webm'});
         if(blob.size<1000)throw new Error('The recording was too short. Please try again.');
         const date=todayKey(), mode=reviewNoHints?'no-hints':'pictures', points=reviewNoHints?3:2;
-        const existingRef=cloudDb.ref(`${CLOUD_ROOT}/recordings/${cloudStudentId}/${date}`);
+        const existingRef=cloudDb.ref(recordingCloudPath(date));
         const existing=await existingRef.once('value');
         if(existing.exists()){
           const oldDaily=existing.val()||{};
           const oldEventId=oldDaily.eventId||'';
-          const oldEvent=oldEventId?await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${oldEventId}`).once('value'):null;
+          const oldEvent=oldEventId?await cloudDb.ref(recordingEventPath(oldEventId)).once('value'):null;
           const oldData=oldEvent?.val?.()||{};
           // Never destroy an already uploaded recording because its separate
           // points request failed. The teacher can safely repair that request.
@@ -612,21 +632,34 @@ async function toggleShorashimRecording(){
           // Only a dangling date marker without a usable recording can be replaced.
           await existingRef.remove();
         }
-        const eventId=cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}`).push().key;
-        const storagePath=`shorashim-recordings/${cloudStudentId}/${date}/${eventId}.webm`;
-        const ref=cloudStorage.ref(storagePath); await ref.put(blob,{contentType:blob.type||'audio/webm'}); const audioURL=await ref.getDownloadURL();
+        const eventId=cloudDb.ref(recordingEventPath()).push().key;
+        let storagePath=null, audioURL='';
+        if(teacherPractice) {
+          // Private teacher recordings stay with this teacher, not in student Storage.
+          if(blob.size>5*1024*1024)throw new Error('Please keep teacher recordings under 5 MB.');
+          audioURL=await teacherPractice.blobDataURL(blob);
+        } else {
+          storagePath=`shorashim-recordings/${cloudStudentId}/${date}/${eventId}.webm`;
+          const ref=cloudStorage.ref(storagePath);
+          await ref.put(blob,{contentType:blob.type||'audio/webm'});
+          audioURL=await ref.getDownloadURL();
+        }
         const record={id:eventId,studentId:cloudStudentId,studentName:cloudStudentName||currentStudent,date,mode,noHints:reviewNoHints,points,durationMs,audioURL,storagePath,status:'pending',createdAt:firebase.database.ServerValue.TIMESTAMP};
-        await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${eventId}`).set(record);
+        await cloudDb.ref(recordingEventPath(eventId)).set(record);
         // Mark the day as submitted immediately. A temporary Rewards API failure
         // must not allow duplicates or make the pupil's recording disappear.
         await existingRef.set({eventId,mode,points,status:'recorded',createdAt:firebase.database.ServerValue.TIMESTAMP});
 
+        if(teacherPractice) {
+          if(status) status.textContent='☁️ Teacher practice recording saved. No real student points.';
+          return;
+        }
         const source=reviewNoHints?'shorashim-no-hints':'shorashim-recording';
         const awardResp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:cloudStudentId,source,eventId})});
         const awardData=await awardResp.json().catch(()=>({}));
         if(!awardResp.ok)throw new Error('Your recording is saved. Ask your teacher to connect its points request. '+(awardData.error||''));
-        await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${eventId}`).update({pointRequestId:awardData.requestId||null,pointRequestStatus:awardData.status||'pending'});
-        await cloudDb.ref(`${CLOUD_ROOT}/recordings/${cloudStudentId}/${date}`).set({eventId,mode,points,status:awardData.status||'pending',createdAt:firebase.database.ServerValue.TIMESTAMP});
+        await cloudDb.ref(recordingEventPath(eventId)).update({pointRequestId:awardData.requestId||null,pointRequestStatus:awardData.status||'pending'});
+        await cloudDb.ref(recordingCloudPath(date)).set({eventId,mode,points,status:awardData.status||'pending',createdAt:firebase.database.ServerValue.TIMESTAMP});
         if(status)status.textContent=`Sent to Rabbi Cohen for approval — ${points} points if approved.`;
       }catch(err){console.error(err);if(status)status.textContent=err?.message||'Could not save the recording.';}
       finally{if(btn){btn.disabled=false;btn.textContent=reviewNoHints?'🎙️ Start Recording — 3 Points':'🎙️ Start Recording — 2 Points';}const pause=document.getElementById('shorashimPauseBtn');if(pause){pause.classList.add('hidden');pause.textContent='⏸ Pause';}shorashimRecorder=null;shorashimRecordingChunks=[];shorashimPausedMs=0;}
@@ -672,7 +705,7 @@ const MATCH_PAIR_COUNT=8;
 function startMatchGame(){cleanupGameRuntime();const learned=eligibleLearnedCards();const pairCount=Math.min(MATCH_PAIR_COUNT,learned.length);if(pairCount<2){alert('Learn at least two cards before playing Match.');return;}const pool=shuffle([...learned]).slice(0,pairCount),tiles=[];pool.forEach(c=>{const item=getItem(c.itemKey);tiles.push({key:c.itemKey,type:'front',label:item.front});tiles.push({key:c.itemKey,type:'english',label:item.english});});matchState={tiles:shuffle(tiles),selected:null,matched:new Set(),moves:0,pairCount,startedAt:performance.now(),elapsedMs:null,finished:false};renderMatchGame();focusGameStage();startMatchClock();}
 function startMatchClock(){if(gameTimer)clearInterval(gameTimer);gameTimer=setInterval(()=>{const el=document.getElementById('matchTimer');if(el&&matchState&&!matchState.finished)el.textContent=formatGameTime(performance.now()-matchState.startedAt);},100);}
 function matchLeaderboardHTML(pairCount){const rows=classMatchLeaderboard[String(pairCount)]||{};const entries=Object.entries(rows).map(([id,x])=>({id,name:x.name||id,time:Number(x.time)})).filter(x=>Number.isFinite(x.time)).sort((a,b)=>a.time-b.time).slice(0,8);if(!entries.length)return '<div class="mini-note">No leaderboard times yet. Finish a round to set the first time!</div>';return `<div class="leaderboard"><div class="leaderboard-title">🏆 ${pairCount}-pair class leaderboard</div>${entries.map((x,i)=>`<div class="leaderboard-row${x.id===cloudStudentId?' current':''}"><span>${i+1}. ${escapeHTML(x.name)}</span><b>${formatGameTime(x.time)}</b></div>`).join('')}</div>`;}
-function saveMatchBest(pairCount,time){const s=student(),k=String(pairCount),old=s.gameBests.match[k],improved=!Number.isFinite(old)||time<old;if(improved)s.gameBests.match[k]=time;if(improved&&cloudEnabled&&cloudStudentId){classMatchLeaderboard[k]=classMatchLeaderboard[k]||{};classMatchLeaderboard[k][cloudStudentId]={name:cloudStudentName||currentStudent,time,updatedAt:Date.now()};cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match/${k}/${cloudStudentId}`).set(classMatchLeaderboard[k][cloudStudentId]).catch(err=>console.warn('Leaderboard save failed',err));}}
+function saveMatchBest(pairCount,time){const s=student(),k=String(pairCount),old=s.gameBests.match[k],improved=!Number.isFinite(old)||time<old;if(improved)s.gameBests.match[k]=time;if(improved&&cloudEnabled&&cloudStudentId&&!teacherPractice){classMatchLeaderboard[k]=classMatchLeaderboard[k]||{};classMatchLeaderboard[k][cloudStudentId]={name:cloudStudentName||currentStudent,time,updatedAt:Date.now()};cloudDb.ref(`${CLOUD_ROOT}/leaderboards/match/${k}/${cloudStudentId}`).set(classMatchLeaderboard[k][cloudStudentId]).catch(err=>console.warn('Leaderboard save failed',err));}}
 function renderMatchGame(){const stage=document.getElementById('gameStage');stage.classList.remove('hidden');const elapsed=matchState.finished?matchState.elapsedMs:performance.now()-matchState.startedAt;stage.innerHTML=`<div class="game-head"><div><h3>🧩 Match</h3><span class="muted">${matchState.pairCount} pairs • Match Hebrew to English as fast as you can.</span></div><div class="game-scorebox"><b id="matchTimer">${formatGameTime(elapsed)}</b><button id="newMatchRound" class="ghost">New Round</button></div></div><div class="match-layout"><div class="match-grid" id="matchGrid"></div><aside id="matchLeaderboard">${matchLeaderboardHTML(matchState.pairCount)}</aside></div>`;document.getElementById('newMatchRound').onclick=startMatchGame;const grid=document.getElementById('matchGrid');matchState.tiles.forEach((t,i)=>{const b=document.createElement('button');b.className='match-tile '+(t.type==='front'?'hebrew':'');if(matchState.matched.has(t.key))b.classList.add('matched');if(matchState.selected===i)b.classList.add('selected');b.textContent=t.label;b.disabled=matchState.finished;b.onclick=()=>pickMatch(i);grid.appendChild(b);});if(matchState.finished){stage.insertAdjacentHTML('beforeend',`<div class="game-result-banner"><h3>🎉 ${formatGameTime(matchState.elapsedMs)}</h3><p>${matchState.moves} tries. Your best time is ${formatGameTime(student().gameBests.match[String(matchState.pairCount)])}.</p><button id="againMatch" class="primary">Play Again</button></div>`);document.getElementById('againMatch').onclick=startMatchGame;}}
 function pickMatch(i){if(matchState.finished||matchState.matched.has(matchState.tiles[i].key))return;if(matchState.selected===null){matchState.selected=i;renderMatchGame();startMatchClock();return;}if(matchState.selected===i){matchState.selected=null;renderMatchGame();startMatchClock();return;}const a=matchState.tiles[matchState.selected],b=matchState.tiles[i];matchState.moves++;if(a.key===b.key&&a.type!==b.type)matchState.matched.add(a.key);matchState.selected=null;if(matchState.matched.size===matchState.pairCount){matchState.finished=true;matchState.elapsedMs=performance.now()-matchState.startedAt;cleanupGameRuntime();saveMatchBest(matchState.pairCount,matchState.elapsedMs);finishGame();}renderMatchGame();if(!matchState.finished)startMatchClock();}
 
@@ -743,7 +776,7 @@ function bindActivityTracking(){['pointerdown','keydown','mousemove','touchstart
 function saveActivityCounters(){
   const s=student();saveRaw(db);
   if(!cloudEnabled||!cloudStudentId)return;
-  cloudDb.ref(`${CLOUD_ROOT}/students/${cloudStudentId}`).update({totalActiveSeconds:s.totalActiveSeconds,lastActive:s.lastActive}).catch(err=>console.warn('Could not save activity time',err));
+  cloudDb.ref(studentCloudPath()).update({totalActiveSeconds:s.totalActiveSeconds,lastActive:s.lastActive}).catch(err=>console.warn('Could not save activity time',err));
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&appStarted)saveActivityCounters();});
 function startTicker(){clearInterval(ticker);ticker=setInterval(()=>{const s=student(),studying=['learnScreen','reviewScreen','gamesScreen'].includes(activeScreenId)&&!document.getElementById('studentView').classList.contains('hidden');if(studying&&document.visibilityState==='visible'&&Date.now()-lastInteraction<30000){s.totalActiveSeconds++;s.lastActive=Date.now();if(s.totalActiveSeconds%10===0)saveRaw(db);if(s.totalActiveSeconds%60===0)saveActivityCounters();}},1000);}
