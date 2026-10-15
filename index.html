@@ -800,12 +800,30 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     await db.ref().update(updates); await loadClassManagement();
   }
   async function removeStudentFromManagedClass(studentId){
-    const classId=el("manageClassSelect").value;if(!classId||!studentId)return;
-    if(!isAuthorizedAdmin){if(await trustedStudentAction("remove",{studentId}))await loadClassManagement();return;}
-    const updates={};
-    updates["b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId]=null;
-    updates["b3Games/students/"+studentId+"/memberships/"+workspaceId+"_"+classId]={workspaceId,classId,active:false,removedAt:Date.now()};
-    await db.ref().update(updates); await loadClassManagement();
+    const classId=el("manageClassSelect").value;
+    if(!classId||!studentId)throw new Error("Select a class and student first.");
+    const memberPath="b3Games/workspaces/"+workspaceId+"/classes/"+classId+"/members/"+studentId;
+    const membershipPath="b3Games/students/"+studentId+"/memberships/"+workspaceId+"_"+classId;
+    if(!isAuthorizedAdmin){
+      if(!await trustedStudentAction("remove",{studentId}))throw new Error("Student removal was not saved.");
+    }else{
+      const updates={};
+      updates[memberPath]=null;
+      updates[membershipPath]={workspaceId,classId,active:false,removedAt:Date.now()};
+      await db.ref().update(updates);
+    }
+    // A missing class member and an inactive membership must both persist.
+    const [member,membership]=await Promise.all([
+      db.ref(memberPath).once("value"),db.ref(membershipPath).once("value")
+    ]);
+    if(member.exists()||membership.val()?.active!==false){
+      throw new Error("The student is still in the saved class roster. Removal was not confirmed.");
+    }
+    await loadClassManagement();
+    if(el("classMemberList").querySelector('[data-remove-student="'+studentId+'"]')){
+      throw new Error("The student remains on the reloaded class roster. Please try again.");
+    }
+    return true;
   }
   function setTeacherToolPairVisibility(){
     document.querySelectorAll(".teacher-tool-card").forEach(card=>{
@@ -2052,8 +2070,17 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(remove){
       // Takes the student out of this class only. Their account and work stay, and they can be added back.
       if(!confirm("Remove "+remove.dataset.studentName+" from this class? They will no longer see this class's activities. You can add them back later."))return;
-      await removeStudentFromManagedClass(remove.dataset.removeStudent);
-      el("classManagementStatus").textContent="Student removed from this class.";
+      const status=el("classManagementStatus");
+      remove.disabled=true;
+      status.textContent="Removing student and verifying saved roster…";
+      try{
+        await removeStudentFromManagedClass(remove.dataset.removeStudent);
+        status.textContent="Student removed from this class. Saved work and account were kept.";
+      }catch(error){
+        console.error("Student removal failed",error);
+        status.textContent="Removal not confirmed: "+(error.message||"Please try again.");
+        alert(status.textContent);
+      }finally{remove.disabled=false;}
       return;
     }
     if(save){
