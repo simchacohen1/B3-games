@@ -92,7 +92,7 @@ test('proposed merged Storage rules preserve user-confirmed existing paths and n
   ]){
     const at=candidate.indexOf('match '+route);
     assert.ok(at>=0,route+' is missing');
-    assert.match(candidate.slice(at,candidate.indexOf('}',at)+1),/allow read, write: if true;/);
+    assert.match(candidate.slice(at,candidate.indexOf('\n    }',at)+6),/allow read, write: if true;/);
   }
   const at=candidate.indexOf('match /pointerPdfLibrary/{teacherUid}/{fileId}');
   assert.ok(at>=0,'Private PDF path is missing');
