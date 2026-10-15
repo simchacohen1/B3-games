@@ -36,6 +36,7 @@ jobs:
         run: |
           node --test \
             tests/firebase-security-audit.test.cjs \
+            tests/firebase-rule-permission-drift.test.cjs \
             tests/student-auth.test.cjs \
             tests/student-management.test.cjs \
             tests/yiddish-backend.test.cjs \

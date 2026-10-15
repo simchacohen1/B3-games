@@ -9,6 +9,8 @@ on:
       - 'firebase-rules.json'
       - 'scripts/security-rule-audit.cjs'
       - 'security/public-permissions-baseline.json'
+      - 'security/reviewed-permission-expressions.json'
+      - 'tests/firebase-rule-permission-drift.test.cjs'
       - 'tests/firebase-security-audit.test.cjs'
       - '.github/workflows/firebase-security-audit.yml'
   pull_request:
@@ -16,6 +18,8 @@ on:
       - 'firebase-rules.json'
       - 'scripts/security-rule-audit.cjs'
       - 'security/public-permissions-baseline.json'
+      - 'security/reviewed-permission-expressions.json'
+      - 'tests/firebase-rule-permission-drift.test.cjs'
       - 'tests/firebase-security-audit.test.cjs'
       - '.github/workflows/firebase-security-audit.yml'
 
@@ -31,6 +35,6 @@ jobs:
         with:
           node-version: '22'
       - name: Verify Firebase security-audit tests
-        run: node --test tests/firebase-security-audit.test.cjs
+        run: node --test tests/firebase-security-audit.test.cjs tests/firebase-rule-permission-drift.test.cjs
       - name: Block newly public database grants and private-path exposure
         run: node scripts/security-rule-audit.cjs --ci

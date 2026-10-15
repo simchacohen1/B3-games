@@ -6,6 +6,12 @@
 
 The `scripts/security-rule-audit.cjs` check detects newly introduced unconditional public read/write rules and exposure of selected private backend namespaces. `public-permissions-baseline.json` lists **32 existing public grants** as security debt. It does **not** bless those grants or block privilege increases inside complex expressions. Do not claim that a passing guard means data is safe.
 
+## New permission-drift tripwire (staged for review)
+
+A second static check now snapshots all **95** `.read` and `.write` database permission expressions in `security/reviewed-permission-expressions.json`. It blocks *any* added, removed, or modified permission without a corresponding baseline review, including changes to a conditional expression that the public-`true` checker would miss. The fast critical-security workflow and the rules audit workflow test this check.
+
+This is deliberately strict: **a safe tightening also requires explicit review**. A contributor can change both rules and the snapshot in the same pull request; therefore branch protection, human security review, Firebase emulator tests and deployed-rule inspection remain essential. The baseline records unsafe legacy permissions; it **does not authorize their continued use**, secure the live database, or change Firebase rules.
+
 ## Priority 0: protect existing student information without breaking the classroom
 
 1. **Check actual deployed Firebase Realtime Database and Cloud Storage rules** using authorized Firebase project access. GitHub Pages only publishes frontend assets. Comparing files in GitHub cannot establish the active server-side rules or Cloud Functions deployment.
