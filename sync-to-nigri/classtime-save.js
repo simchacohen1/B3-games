@@ -102,6 +102,10 @@
   }
 
   function open(detail) {
+    // The server keeps this feature paused until the owner separately
+    // authorizes the first real one-student test. A dry-run preview alone
+    // must never reveal an actionable save control.
+    if (!detail || !detail.data || detail.data.real_save_enabled !== true) { hide(); return; }
     const boys = chooseBoys(detail.data);
     ctx = {id: detail.id, result: detail.result, choices: detail.choices, data: detail.data, name: detail.choices.test_name || window.ClasstimePreview.defaultName(detail.result), override: needsOverride(detail.data)};
     const who = $('saveWho'); who.replaceChildren();

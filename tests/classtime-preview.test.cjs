@@ -39,6 +39,7 @@ const SAMPLE={counts:{will_save:2,left_blank_no_score:1,skipped_unmatched:1},dup
 test('files are valid and the real-save button is still disabled',()=>{
   new vm.Script(src);
   assert.match(page,/<button disabled aria-disabled="true">Sync to Nigri/);
+  assert.doesNotMatch(page,/blankMarkProbe|blank-mark-probe/);
   assert.equal((page.match(/id="previewBtn"/g)||[]).length,1);
   assert.match(page,/<script src="\.\/classtime-review\.js"><\/script>[\s\S]*<script src="\.\/classtime-preview\.js(?:\?[^\"]*)?"><\/script>/);
 });

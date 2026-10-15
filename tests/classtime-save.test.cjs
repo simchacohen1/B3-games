@@ -30,7 +30,7 @@ function load({token='fake-token',reply,confirmAnswer=true}={}){
 }
 const RESULT={session_code:'ABC123',session_name:'Made Up Quiz',class_section:'B3 ET'};
 const CHOICES={topic:'Shoroshim',type:'quiz',date:'2026-10-09',test_name:'Made Up Quiz (ABC123)'};
-const PREVIEW={dry_run:true,duplicate_check:{status:'clear'},blockers:[],counts:{},students:[
+const PREVIEW={dry_run:true,real_save_enabled:true,duplicate_check:{status:'clear'},blockers:[],counts:{},students:[
   {classtime_name:'Ann Made',nigri_name:'Ann Nigri',action:'save',mark_percent:75,report:{attached:true,kb:105}},
   {classtime_name:'Ben Made',nigri_name:'Ben Nigri',action:'blank',report:null},
   {classtime_name:'Cal Made',nigri_name:null,action:'skip',report:null},
@@ -73,6 +73,12 @@ test('the Save section appears only after a preview, lists only boys with a scor
   assert.equal(options[3].disabled,true);assert.equal(options[3].value,'__class__');
   assert.match(t.els.saveSummary.textContent,/TEST DELETE ME - Made Up Quiz \(ABC123\)/);
   assert.equal(t.els.saveBtn.disabled,true);                          // nobody chosen yet
+});
+test('a dry-run preview cannot reveal Save until the server explicitly enables it',()=>{
+  const t=load();t.open({...PREVIEW,real_save_enabled:false});
+  assert.equal(t.els.savePanel.hidden,true);
+  assert.equal(t.els.saveWho.children.length,0);
+  assert.equal(t.els.saveBtn.disabled,true);
 });
 test('choosing the disabled whole-class option never enables saving',async()=>{
   const t=load();t.open();await t.pick('__class__');assert.equal(t.els.saveBtn.disabled,true);
