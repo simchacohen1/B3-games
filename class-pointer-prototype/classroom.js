@@ -25,7 +25,7 @@ function ownMember(){return state.members.find(member=>member.id==='student:'+pe
 function selected(member){return !!member?.admitted&&member.allowed===true&&state.mode==='selected'}
 function toolAllowed(tool,member=ownMember()){return isTeacher||selected(member)&&state.tools?.[tool]===true}
 function allowed(){return toolAllowed('pointer')}
-function writingAllowed(tool){return toolAllowed(tool==='pen'?'pen':'highlight')}
+function writingAllowed(tool){return toolAllowed(['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(tool)?'pen':'highlight')}
 function pointerPermission(){
   const mayPoint=allowed(),mayWrite=writingAllowed('highlight')||writingAllowed('pen');$('stage').style.cursor=navigating?'default':mayPoint?'crosshair':'not-allowed';
   if(!mayPoint)cancelHover();if(!mayWrite)highlighter?.cancel()
@@ -137,7 +137,7 @@ function receiveStudent(connection){
     }
     if(!member||members.get(member.id)!==member)return;
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
-    if(message.type==='highlight'&&live()&&selected(member)&&state.tools?.[message.stroke?.tool==='pen'?'pen':'highlight']){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
+    if(message.type==='highlight'&&live()&&selected(member)&&state.tools?.[['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(message.stroke?.tool)?'pen':'highlight']){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
     if(message.type==='edit-highlights'&&member.admitted){if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}return}
     if(message.type==='video-ready'&&member.admitted){member.videoReady=true;clearTimeout(member.mediaTimer)}
     if(message.type==='pointer-hide'&&member.admitted){clearStudentHover(member);delete state.points[member.id];member.lastPoint=0;publish()}
