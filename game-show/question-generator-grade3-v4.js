@@ -400,7 +400,7 @@
     if (/\b(which tefillah|what tefillah|which prayer|what prayer)\b/.test(q)) return "prayer";
     return "other";
   }
-  function plausibleOptions(qa, others) {
+  function plausibleOptions(qa, others, sourceRef = '') {
     const correct = localizeText(shortChoice(qa.answer));
     if (!correct) return [];
     const kind = choiceKind(qa.q, correct);
@@ -434,6 +434,19 @@
       }
       add(other.answer);
       if (rows.length === 4) break;
+    }
+    // Creation pesukim share a tightly related subject even when their
+    // questions use different verbs (created, saw, named, separated).
+    // Keep these distractors within that story, never from unrelated passages.
+    if (rows.length < 4 && /^(Genesis|Bereishis) 1:/i.test(sourceRef)) {
+      for (const other of others) {
+        if (other?.answer) add(other.answer);
+        if (rows.length === 4) break;
+      }
+      for (const value of ["Light", "Darkness", "Day", "Night", "The heavens and the earth", "The sun and the moon", "The sea", "The trees"]) {
+        if (rows.length === 4) break;
+        add(value);
+      }
     }
     if (rows.length < 4) {
       for (const value of bank[kind] || []) {
@@ -470,7 +483,7 @@
       } else {
         const nearbyQuestions = choiceSources.filter(candidate => candidate.ref !== source.ref)
           .map(candidate => questionAndAnswer(candidate, topic)).filter(Boolean);
-        const optionRows = plausibleOptions(qa, nearbyQuestions);
+        const optionRows = plausibleOptions(qa, nearbyQuestions, source.ref);
         // Do not pad a question with unrelated or potentially duplicate answers.
         if (optionRows.length !== 4) {
           skipped.choices++;
