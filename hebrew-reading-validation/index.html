@@ -67,7 +67,7 @@ $('run').onclick=async()=>{
  $('run').disabled=true;safeText($('status'),'Analyzing…');$('result').hidden=true;
  const data=new FormData();
  data.append('name','anonymous-validation');
- data.append('perek','');data.append('posuk','');
+ data.append('perek','');data.append('posuk','0');
  data.append('posukText',text);data.append('audio',audio,audio.name);
  try{
   const res=await fetch(ENDPOINT,{method:'POST',body:data});
