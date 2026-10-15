@@ -91,3 +91,52 @@ test('Team Mode and Multiple Choice are separately persisted switches', () => {
   assert.match(teamSource, /teamMode:\s*document\.getElementById\("teamModeToggle"\)\.checked/);
   assert.match(teamSource, /multipleChoice:\s*document\.getElementById\("multipleChoiceToggle"\)\.checked/);
 });
+
+
+test('teacher announces four stable colors in order without revealing the answer key', () => {
+  const logic = loadTeamLogic();
+  const palette = Array.from(logic.choiceColors, c => c.label);
+  assert.deepEqual(palette, ['Red', 'Blue', 'Green', 'Yellow']);
+  const spoken = logic.spokenQuestion({
+    q: 'Who came to the tent?',
+    ans: 'Do not say this secret answer',
+    correctIndex: 2,
+    choices: ['Avrohom', 'Lot', 'Three malochim', 'Eliezer']
+  });
+  assert.match(spoken, /Question: Who came to the tent/);
+  assert.match(spoken, /Red: Avrohom.*Blue: Lot.*Green: Three malochim.*Yellow: Eliezer/);
+  assert.doesNotMatch(spoken, /Do not say this secret answer|correct|right answer/i);
+});
+
+test('narration lock blocks selections until teacher explicitly opens buzzer', () => {
+  const { canAnswerChoice, applyChoice } = loadTeamLogic();
+  const locked = {
+    teamMode: false, multipleChoice: true, roundActive: true,
+    buzzedBy: 'Ari', narrationLocked: true, scores: { Ari: 0 }
+  };
+  assert.equal(canAnswerChoice(locked, 'Ari'), false);
+  assert.equal(applyChoice(locked, 'Ari', 1, 1), undefined);
+  const open = { ...locked, narrationLocked: false };
+  assert.equal(canAnswerChoice(open, 'Ari'), true);
+  assert.equal(applyChoice(open, 'Ari', 1, 1).scores.Ari, 10);
+});
+
+test('teacher mode includes optional speaking and per-round narration lock', () => {
+  assert.match(teamSource, /id="readChoicesToggle"/);
+  assert.match(teamSource, /narrationLocked:narrate/);
+  assert.match(teamSource, /window\.startGameShow=function/);
+  assert.match(teamSource, /window\.goToQuestion=function/);
+  assert.match(teamSource, /current\.roundToken !== token/);
+  assert.match(teamSource, /Stop reading and open buzzers/);
+});
+
+test('question-generator uses category-matched distractors and shows no duplicate loader', () => {
+  const generator = fs.readFileSync(path.join(root, 'game-show/question-generator-grade3-v4.js'), 'utf8');
+  const player = fs.readFileSync(path.join(root, 'game-show/player.html'), 'utf8');
+  assert.match(generator, /function plausibleOptions\(/);
+  assert.match(generator, /choiceKind\(other\.q, other\.answer\) !== kind/);
+  assert.match(generator, /return rows\.length === 4 \? rows : \[\]/);
+  assert.match(generator, /correctIndex: shuffledOptions\.findIndex\(row => row\.correct\)/);
+  assert.equal((teacherSource.match(/src="question-generator-grade3-v4\.js/g) || []).length, 1);
+  assert.match(player, /current\.narrationLocked \|\| serverNow\(\)/);
+});
