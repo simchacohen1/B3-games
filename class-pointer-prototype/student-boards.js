@@ -323,8 +323,9 @@
         // Hints cannot force a source; inspect the returned track to avoid presenting
         // a tab when the student explicitly chose the entire-screen action (or vice versa).
         const options={video:{frameRate:{ideal:5,max:8},width:{ideal:1600},height:{ideal:900}},audio:false,
-          preferCurrentTab:false,selfBrowserSurface:'include',surfaceSwitching:'include'};
+          preferCurrentTab:true,selfBrowserSurface:'include',surfaceSwitching:'include'};
         options.video.displaySurface=kind==='screen'?'monitor':'browser';
+        if(kind==='screen')options.preferCurrentTab=false;
         const s=await navigator.mediaDevices.getDisplayMedia(options);
         const surface=s.getVideoTracks()[0]?.getSettings?.().displaySurface;
         if((kind==='screen'&&surface&&surface!=='monitor')||(kind==='tab'&&surface&&surface!=='browser')){
