@@ -708,6 +708,22 @@
     setFocus(focusId);
     B.status(mode==='screens'?'Students were asked to share their screens. Their screens appear in the tiles (view only).':'Students are back on their whiteboards.');
   }
+  // Teacher-facing sharing switch. Session availability and sharing permission are
+  // separate: closing the gallery is no longer necessary to revoke permission.
+  window.ClassPointerSharing={
+    enabled:()=>on&&mode==='screens',
+    enable(){
+      if(!B.started())return false;
+      if(!on)setOn(true);
+      if(mode!=='screens')setMode('screens');
+      return true;
+    },
+    disable(){
+      if(on&&mode==='screens')setOn(false);
+      else window.ClassPointerDashboard?.setStudentScreenSharing(false)?.catch(error=>B.status('Could not disable sharing: '+error.message));
+      return true;
+    }
+  };
   async function sendEveryone(destination){
     if(!B.started()){B.fail('Wait for your classroom to finish opening, then try again.');return}
     const buttons=[sendScreens,sendBoards,dockScreens,dockBoards];
