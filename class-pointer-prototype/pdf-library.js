@@ -33,7 +33,7 @@
         open.onclick=async()=>{setStatus('Opening '+name.textContent+'…');open.disabled=true;try{
           const url=await ref.getDownloadURL();const response=await fetch(url);if(!response.ok)throw Error('Could not download PDF');
           const blob=await response.blob();const file=new File([blob],name.textContent+'.pdf',{type:'application/pdf'});
-          await window.ClassPointerPdf.openFile(file);activeId=meta.name;openedPage=Number.isFinite(page)&&page>0?page:1;
+          const opened=await window.ClassPointerPdf.openFile(file);if(!opened)throw Error('PDF could not be opened');activeId=meta.name;openedPage=Number.isFinite(page)&&page>0?page:1;
           window.ClassPointerPdf.goToPage(openedPage-1);dialog.close();
         }catch(e){setStatus(errorText(e))}finally{open.disabled=false}};
         const rename=document.createElement('button');rename.textContent='Rename';rename.type='button';
@@ -53,6 +53,7 @@
     if(!currentFile){setStatus('Open a PDF from your computer first.');return}
     const displayName=(prompt('Save as:',currentFile.name.replace(/\.pdf$/i,''))||'').trim();
     if(!displayName)return;
+    if(currentFile.size>50*1024*1024){setStatus('The library supports files up to 50 MB. Larger PDFs can still be presented without saving.');return}
     save.disabled=true;setStatus('Saving…');
     try{
       const id=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)) + '.pdf';
