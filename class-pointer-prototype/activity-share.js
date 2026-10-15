@@ -1,13 +1,13 @@
 'use strict';
-/* Optional student activity screen sharing and verified class-wide navigation.
-   Teacher requests move a signed-in student to Classroom Pointer. Screen capture
-   always requires that student's separate browser permission. */
+/* Class-scoped activity sharing: keep a student on his learning page for
+   screen requests; whiteboard commands still enter the classroom.
+   Browser screen capture always requires an explicit student click. */
 (async function(){
   if(window.__classPointerActivityShareLoaded)return;
   window.__classPointerActivityShareLoaded=true;
-  const pageParams=new URL(location.href).searchParams;
-  const onStudentClassroom=/\/class-pointer-prototype\/classroom\.html$/.test(location.pathname)&&pageParams.get('dashboard')==='student';
-  if(/\/class-pointer-prototype\/classroom\.html$/.test(location.pathname)&&!onStudentClassroom)return;
+  // The student classroom already has its working central share control in Screens mode.
+  // Do not cover it with a second floating share prompt.
+  if(/\/class-pointer-prototype\/classroom\.html$/.test(location.pathname))return;
   const loadedAt=Date.now();
   const src=document.currentScript?.src||'';
   const root=new URL('../',src);
@@ -50,12 +50,13 @@
     const btn=document.createElement('button');btn.type='button';btn.textContent='🖥 Share My Screen';
     btn.style.cssText='background:#1d4ed8;color:#fff;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;font:inherit';
     const label=document.createElement('span');label.setAttribute('role','status');label.style.cssText='font-size:12px;color:#1e3a8a;max-width:180px';
-    if(onStudentClassroom){
-      holder.style.cssText='position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:2147483640;display:none;align-items:center;gap:12px;max-width:95vw;padding:14px;border-radius:16px;background:#fff;border:3px solid #2563eb;box-shadow:0 8px 30px #15284666;font:700 16px system-ui,sans-serif';
-      btn.style.cssText='background:#1d4ed8;color:#fff;border:0;border-radius:12px;padding:17px 22px;cursor:pointer;font:800 17px system-ui,sans-serif';
-      label.textContent='Click, choose your screen, then press Share.';
-    }
-    holder.append(btn,label);document.body.appendChild(holder);
+    // Fall back to the classroom's established screen-sharing path if the
+    // optional Cloud Function for sharing within activities is unavailable.
+    const fallback=document.createElement('button');fallback.type='button';
+    fallback.textContent='Open Class Pointer';fallback.hidden=true;
+    fallback.style.cssText='border:1px solid #1d4ed8;background:white;color:#1d4ed8;border-radius:9px;padding:8px 10px;cursor:pointer;font:700 13px system-ui';
+    fallback.addEventListener('click',()=>location.assign(new URL('class-pointer-prototype/dashboard.html',root).href));
+    holder.append(btn,label,fallback);document.body.appendChild(holder);
     let active=null,peer=null,call=null,stream=null,busy=false;
     const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
     function routeTeacherRequest(session){
@@ -64,21 +65,31 @@
       const supported=request&&['screens','boards'].includes(request.mode);
       const at=supported?request.at:session?.shareRequest?.at;
       if(!Number.isFinite(at)||(!supported&&at<loadedAt-6000)||at>Date.now()+60000||Date.now()-at>45000)return;
+      // Per-student exclusions belong to the active authenticated class.
+      if(supported&&request.mode==='boards'&&session.whiteboardDenied?.[id]===true)return;
+      if((!supported||request.mode==='screens')&&session.screenSharingDenied?.[id]===true)return;
       const marker=session.roomId+':'+at+':'+(supported?request.mode:'screens');
-      if(onStudentClassroom||stream)return;
+      if(stream)return;
       try{
         if(sessionStorage.getItem(inviteKey)===marker)return;
         sessionStorage.setItem(inviteKey,marker);
       }catch{return}
-      // No capture is started automatically; each boy approves screen capture himself.
-      location.assign(new URL('class-pointer-prototype/dashboard.html',root).href);
+      // Screen sharing is available here, without leaving Shorashim or Chumash.
+      // Only whiteboard mode must navigate into the student's individual board.
+      if(supported&&request.mode==='boards'){
+        location.assign(new URL('class-pointer-prototype/dashboard.html',root).href);
+        return;
+      }
+      status('Your teacher requested your screen. Click Share My Screen here.');
+      fallback.hidden=false;
     }
     function stop(){
       const prior=stream;stream=null;try{call?.close()}catch{}call=null;
       try{peer?.destroy()}catch{}peer=null;
       prior?.getTracks().forEach(t=>t.stop());
       btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';
-      label.textContent=onStudentClassroom?'Click, choose your screen, then press Share.':'';
+      label.textContent='';
+      fallback.hidden=true;
     }
     function status(text){label.textContent=text}
     function current(rows){
@@ -94,7 +105,7 @@
         return;
       }
       const next=current(snapshot.val());
-      const shareable=next?.studentScreenSharing===true?next:null;
+      const shareable=next?.studentScreenSharing===true&&next?.screenSharingDenied?.[id]!==true?next:null;
       if(!shareable||!active||shareable.roomId!==active.roomId){if(stream)stop()}
       active=shareable;holder.style.display=active?'flex':'none';
       if(next)routeTeacherRequest(next);
@@ -102,6 +113,7 @@
     btn.addEventListener('click',async()=>{
       if(stream){stop();return}
       if(busy||!active)return;
+      const lesson=active;
       busy=true;btn.disabled=true;
       let captured=null;
       try{
@@ -112,12 +124,30 @@
           preferCurrentTab:true,surfaceSwitching:'include'
         });
         captured=await capturePromise;
+        if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
         status('Connecting to teacher…');
-        const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({action:'issue',studentId:id,pin,classId,room:active.roomId})});
-        const ticket=await response.json();
-        if(!response.ok||!ticket.ok)throw Error(ticket.error||'Screen sharing is not allowed.');
-        if(!active||!captured.active)throw Error('The lesson ended.');
+        // A missing, blocked or unavailable Cloud Function can surface as a
+        // generic "Failed to fetch" after the student approves screen capture.
+        let response;
+        try{
+          response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({action:'issue',studentId:id,pin,classId,room:lesson.roomId}),
+            signal:AbortSignal.timeout(15000)});
+        }catch{
+          const error=new Error('Activity sharing service unavailable. Open Class Pointer to share your screen instead.');
+          error.code='ACTIVITY_SHARE_NETWORK';throw error;
+        }
+        let ticket;
+        try{ticket=await response.json()}catch{
+          const error=new Error('Activity sharing service returned an invalid response. Open Class Pointer instead.');
+          error.code='ACTIVITY_SHARE_NETWORK';throw error;
+        }
+        if(!response.ok||!ticket?.ok){
+          const error=new Error(ticket?.error||'Screen sharing is not allowed.');
+          if(response.status===404||response.status>=500)error.code='ACTIVITY_SHARE_NETWORK';
+          throw error;
+        }
+        if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
         if(!window.Peer)await load(new URL('class-pointer-prototype/vendor/peerjs-1.5.5.min.js',root).href);
         const connection=new Peer('class-pointer-activity-'+crypto.randomUUID());
         peer=connection;
@@ -126,17 +156,23 @@
           connection.once('open',()=>{clearTimeout(timeout);resolve()});
           connection.once('error',e=>{clearTimeout(timeout);reject(e)});
         });
-        if(!active||!captured.active)throw Error('The lesson ended.');
-        const media=connection.call(active.roomId,captured,{metadata:{kind:'activity-screen',token:ticket.token}});
+        if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
+        const media=connection.call(lesson.roomId,captured,{metadata:{kind:'activity-screen',token:ticket.token}});
         if(!media)throw Error('The teacher is not connected.');
         call=media;stream=captured;
         captured.getVideoTracks()[0]?.addEventListener('ended',stop,{once:true});
         media.on('close',stop);media.on('error',stop);
         btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';
         status('Sharing started — ask your teacher to confirm');
-      }catch(error){captured?.getTracks().forEach(t=>t.stop());stop();status(error?.name==='NotAllowedError'?'Sharing canceled.':error.message||'Could not share.')}
+      }catch(error){
+        captured?.getTracks().forEach(t=>t.stop());stop();
+        const networkFailure=error?.code==='ACTIVITY_SHARE_NETWORK';
+        status(error?.name==='NotAllowedError'?'Sharing canceled.':error.message||'Could not share.');
+        if(networkFailure)fallback.hidden=false;
+      }
       finally{busy=false;btn.disabled=false}
     });
     window.addEventListener('pagehide',stop);
   }catch(error){console.warn('Class Pointer activity sharing unavailable',error)}
 })();
+

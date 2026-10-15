@@ -87,9 +87,9 @@
   // Share sources remain available in the floating dock, even in expanded teaching mode.
   if(!studentView){
     const shareWrap=document.createElement('div');shareWrap.className='tb-menu-wrap';
-    shareWrap.innerHTML='<button type="button" class="tb-btn" data-menu="tbShareMenu" aria-haspopup="true" aria-expanded="false">🖥 Share ▾</button><div class="tb-menu tb-menu-right" id="tbShareMenu" hidden><strong>Share with your class</strong></div>';
+    shareWrap.innerHTML='<button type="button" class="tb-btn" data-menu="tbShareMenu" aria-haspopup="true" aria-expanded="false" title="Choose what to present to students">🖥 Present ▾</button><div class="tb-menu tb-menu-right" id="tbShareMenu" hidden><strong>Present to students</strong></div>';
     const menu=shareWrap.querySelector('#tbShareMenu');
-    [['shareScreen','Live tab, window or screen'],['openBrowserTab','Capture a tab, window or screen'],['openPdf','PDF'],['openWebpage','Web page'],['openWhiteboard','Whiteboard'],['stopScreen','Stop sharing']].forEach(([id,label])=>{
+    [['shareScreen','Show my screen to students'],['openBrowserTab','Capture a tab, window or screen'],['openPdf','Show a PDF'],['openWebpage','Show a web page'],['openWhiteboard','Show a whiteboard'],['stopScreen','Stop presenting']].forEach(([id,label])=>{
       const button=document.createElement('button');button.type='button';button.textContent=label;
       button.addEventListener('click',()=>{const original=source(id);if(original&&!original.disabled)original.click();menu.hidden=true});
       menu.appendChild(button);
@@ -123,14 +123,25 @@
   if(!studentView){
     const screens=document.createElement('button');
     screens.type='button';screens.className='tb-btn';screens.id='tbStudentScreensQuick';
-    screens.textContent='🖥 Student Screens';
-    screens.title='View students’ screens or choose their whiteboards';
+    screens.textContent='🖥 View Student Screens';
+    screens.title='Open the gallery of student screens and whiteboards; students must grant screen-sharing permission';
     screens.addEventListener('click',()=>{const original=source('studentBoards');if(original&&!original.disabled)original.click()});
     dock.querySelector('#tbStudentsBtn').closest('.tb-menu-wrap').before(screens);
     const update=()=>{const original=source('studentBoards');screens.disabled=!original||original.disabled;
       screens.setAttribute('aria-pressed',original?.getAttribute('aria-pressed')||'false')};
     new MutationObserver(update).observe(source('studentBoards'),{attributes:true,attributeFilter:['disabled','aria-pressed']});
     update();
+  }
+
+  if(!studentView){
+    const studentsButton=dock.querySelector('#tbStudentsBtn');
+    studentsButton.title='Choose which students may point, highlight, or write';
+    const studentLabel=dock.querySelector('#tbStudentsText');
+    if(studentLabel)studentLabel.textContent=' Student Tools';
+    const full=dock.querySelector('#tbFullscreen');
+    if(full)full.title='Expand or restore the teaching lesson';
+    const collapse=dock.querySelector('#tbCollapse');
+    if(collapse)collapse.title='Hide or show the teaching tools';
   }
 
   // Quick keys while the mouse is anywhere on the page (ignored while typing).
@@ -152,8 +163,8 @@
 
   // Drag handle remains visible even when the dock is collapsed.
   const moveHandle=document.createElement('button');
-  moveHandle.type='button';moveHandle.className='tb-move-handle';moveHandle.textContent='⠿ Move';
-  moveHandle.title='Drag to reposition the teaching toolbar';
+  moveHandle.type='button';moveHandle.className='tb-move-handle';moveHandle.textContent='⠿ Drag toolbar';
+  moveHandle.title='In full screen, hold and drag this handle to reposition the toolbar';
   moveHandle.setAttribute('aria-label','Drag to move the toolbar');
   moveHandle.style.cssText='order:-1;flex:0 0 auto;cursor:grab;touch-action:none;padding:6px 9px;border-radius:7px';
   dock.prepend(moveHandle);
@@ -225,3 +236,4 @@
   setInterval(()=>{if(!dock.hidden)sync()},300);
   sync();
 })();
+

@@ -86,5 +86,76 @@ test('teacher controls offer both class destinations',()=>{
   const src=source('student-boards.js');
   assert.match(src,/Send to Screen Sharing/);
   assert.match(src,/Send to Whiteboards/);
-  assert.match(src,/requestStudentDestination\(destination\)/);
+  // Broadcast now carries per-boy Screen / Whiteboard exclusions; the old one-argument assertion was stale.
+  assert.match(src,/requestStudentDestination\(destination,policy\(\)\)/);
+  assert.match(src,/const denied=\{screens:new Set\(\),boards:new Set\(\)\}/);
+  assert.match(src,/screenSharingDenied|excluded\(m,'screens'\)/);
 });
+
+test('teacher policy excludes only the requested pupils for each activity',async()=>{
+  const f=sessionFixture();await f.authorize();
+  const dashboard=f.context.window.ClassPointerDashboard;
+  await dashboard.publish(room);
+  const selection={screens:{'boy-one':true,'boy-two':false},boards:{'boy-three':true}};
+  await dashboard.requestStudentDestination('screens',selection);
+  await dashboard.updateActivityPermissions(selection);
+  await dashboard.requestStudentDestination('boards',selection);
+  const updates=f.writes.filter(([op])=>op==='update');
+  assert.equal(updates.length,3);
+  for(const [,path] of updates)assert.match(path,/\/classes\/et\/classPointerSessions\//);
+  const [, ,screens]=updates[0], [,,permissionChange]=updates[1], [,,boards]=updates[2];
+  assert.equal(screens.destinationRequest.mode,'screens');
+  assert.equal(screens.screenSharingDenied['boy-one'],true);
+  assert.equal(screens.screenSharingDenied['boy-two'],undefined);
+  assert.equal(screens.whiteboardDenied['boy-three'],true);
+  assert.equal(permissionChange.screenSharingDenied['boy-one'],true);
+  assert.equal(permissionChange.whiteboardDenied['boy-three'],true);
+  assert.equal(boards.destinationRequest.mode,'boards');
+  assert.equal(boards.studentScreenSharing,false);
+  assert.equal(boards.screenSharingDenied['boy-one'],true);
+  assert.equal(boards.whiteboardDenied['boy-three'],true);
+});
+
+test('unchecked student receives neither screen nor whiteboard redirect',async()=>{
+  const now=clock();
+  const s=await studentFixture();
+  s.emit({[room]:{roomId:room,createdAt:now,studentScreenSharing:true,
+    destinationRequest:{mode:'screens',at:now},screenSharingDenied:{'test-boy':true}}});
+  assert.equal(s.destination,null,'unchecked student must not open screen sharing');
+  assert.equal(s.holder.style.display,'none');
+  const w=await studentFixture();
+  w.emit({[room]:{roomId:room,createdAt:now,studentScreenSharing:false,
+    destinationRequest:{mode:'boards',at:now},whiteboardDenied:{'test-boy':true}}});
+  assert.equal(w.destination,null,'unchecked student must not open whiteboards');
+});
+
+test('screen and whiteboard checkboxes are independent; rechecking restores routing',async()=>{
+  const now=clock(),s=await studentFixture();
+  const session={roomId:room,createdAt:now,studentScreenSharing:true,
+    destinationRequest:{mode:'screens',at:now},screenSharingDenied:{'test-boy':true},
+    whiteboardDenied:{'test-boy':true}};
+  s.emit({[room]:session});
+  assert.equal(s.destination,null);
+  s.emit({[room]:{...session,screenSharingDenied:{}}});
+  assert.equal(s.destination,null,'screen requests stay in the learning activity');
+  assert.equal(s.holder.style.display,'flex','rechecking restores the consent prompt');
+  assert.match(s.holder.children[1].textContent,/teacher requested your screen/);
+  assert.equal(s.holder.children[0].disabled,undefined,'capture remains student-controlled');
+  const w=await studentFixture();
+  w.emit({[room]:{...session,destinationRequest:{mode:'boards',at:now},studentScreenSharing:false,
+    screenSharingDenied:{'test-boy':true},whiteboardDenied:{}}});
+  assert.match(w.destination||'',/class-pointer-prototype\/dashboard\.html$/,
+    'a student blocked from screens can still use his board');
+});
+
+test('connected share revocation closes the media connection rather than hiding just its tile',()=>{
+  const student=source('student-boards.js');
+  const activity=source('activity-share.js');
+  const backend=fs.readFileSync(__dirname+'/../backend/functions/class-pointer-share-auth.js','utf8');
+  assert.match(student,/if\(!on\|\|excluded\(m,mode\)\)\{closeScreen\(m\);/);
+  assert.match(student,/if\(!on\|\|mode!=='screens'\|\|blocked\)stopShare\(false\)/);
+  assert.match(activity,/if\(!shareable\|\|!active\|\|shareable.roomId!==active.roomId\)\{if\(stream\)stop\(\)\}/);
+  assert.match(backend,/session\.screenSharingDenied\?\.\[studentId\]===true/);
+  assert.match(backend,/session\.screenSharingDenied\?\.\[ticket\.studentId\]===true/);
+});
+

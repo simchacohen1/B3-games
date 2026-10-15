@@ -4,6 +4,7 @@ const room=new URL(location.href).searchParams.get('room'),isTeacher=!room;   co
    if((isTeacher&&entry!=='teacher')||(!isTeacher&&entry!=='student')){document.body.innerHTML='<main style="padding:2rem;font:1rem system-ui">Open Class Pointer from Fun Torah Tools.</main>';throw Error('Class Pointer must be opened from the dashboard.')}
 const members=new Map();
 let peer=null,teacherConnection=null,screen=null,mediaCall=null,viewportController=null,state={sharing:false,mode:'selected',tools:{pointer:true,highlight:false,pen:false},members:[],points:{}},started=false,openingClass=false,admitted=false,joining=false,joinTimer=null;
+let closingClass=false,endPromise=Promise.resolve();
 let captureControl=null,tabScrollOn=false;
 let generation=0,colorIndex=0,pendingPoint=null,hoverTimer=null,lastHover=0;
 let navigating=false;
@@ -124,7 +125,7 @@ function receiveStudent(connection){
       // connection per signed-in student name, rather than one per PeerJS ID.
       const duplicate=Array.from(members.values()).find(existing=>existing.name.toLocaleLowerCase()===name.toLocaleLowerCase());
       if(!duplicate&&members.size>=12){send(connection,{type:'full'});connection.close();return}
-      const previousAccess=duplicate?{allowed:duplicate.allowed,writeAllowed:duplicate.writeAllowed,color:duplicate.color}:null;
+      const previousAccess=duplicate?{allowed:duplicate.allowed,writeAllowed:duplicate.writeAllowed,color:duplicate.color,studentId:duplicate.studentId}:null;
       if(duplicate){
         // Remove the stale entry before closing its connection; its close
         // callback cannot subsequently remove the replacement.
@@ -132,7 +133,7 @@ function receiveStudent(connection){
         send(duplicate.connection,{type:'removed'});
         duplicate.connection.close();
       }
-      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,color:previousAccess?.color||C.colors[colorIndex++%C.colors.length],allowed:previousAccess?.allowed||false,writeAllowed:previousAccess?.writeAllowed||false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);window.ClassPointerPdf?.studentJoined(member);window.ClassPointerBoards?.studentJoined(member);return;
+      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,studentId:window.ClassPointerDashboardCore?.validId(message.studentId)?message.studentId:(previousAccess?.studentId||null),color:previousAccess?.color||C.colors[colorIndex++%C.colors.length],allowed:previousAccess?.allowed||false,writeAllowed:previousAccess?.writeAllowed||false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);window.ClassPointerPdf?.studentJoined(member);window.ClassPointerBoards?.studentJoined(member);return;
     }
     if(!member||members.get(member.id)!==member)return;
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
@@ -166,11 +167,15 @@ function makePeer(id){
   instance.on('disconnected',()=>{status('Connection service interrupted. Existing lesson connections may still work.');if(!instance.destroyed)instance.reconnect()});return instance;
 }
 async function startClass(){
-  if(!isTeacher||started||openingClass)return;
+  if(!isTeacher||started||openingClass||closingClass)return;
   openingClass=true;
   const startButton=$('startClass');startButton.disabled=true;startButton.hidden=true;
   clearError();status('Opening your classroom automatically…');
-  try{if(window.ClassPointerDashboard)await window.ClassPointerDashboard.ready}catch(error){
+  try{
+    // Wait for Firebase to delete the old room before creating another one.
+    await endPromise;
+    if(window.ClassPointerDashboard)await window.ClassPointerDashboard.ready;
+  }catch(error){
     openingClass=false;startButton.disabled=false;startButton.hidden=false;
     startButton.textContent='↻ Retry opening classroom';fail(error.message);return;
   }
@@ -193,14 +198,10 @@ async function startClass(){
   peer.on('connection',receiveStudent);peer.on('call',call=>{if(call.metadata?.kind==='activity-screen'){if(window.ClassPointerActivityShares)void window.ClassPointerActivityShares.incomingCall(call);else call.close();return}if(!window.ClassPointerBoards?.incomingCall(call))call.close()});
 }
 async function requestEveryoneToShare(){
-  const button=$('sendEveryoneShare');
-  if(!isTeacher||!started||!window.ClassPointerDashboard?.requestScreenSharing)return;
-  if(button)button.disabled=true;
-  try{
-    await window.ClassPointerDashboard.requestScreenSharing();
-    status('Screen-sharing request sent to this class. Students will open Class Pointer and click Share My Screen.');
-  }catch(error){fail('Could not send screen-sharing request: '+(error?.message||error))}
-  finally{if(button&&started)button.disabled=false}
+  if(!isTeacher||!started)return;
+  // Use the same Screens mode as the working student gallery. This enables
+  // the teacher's grid and broadcasts the class-specific navigation request.
+  document.dispatchEvent(new Event('classpointer:send-to-screens'));
 }
 function stopSharing(){
   cancelHover();highlighter?.cancel();highlightStore.reset();publishHighlights();generation++;
@@ -323,10 +324,34 @@ async function shareScreen(preferTab=false){
   }
 }
 function endClass(){
+  if(!isTeacher||closingClass)return endPromise;
+  closingClass=true;
   window.ClassPointerActivityShares?.closeAll();
-  window.ClassPointerBoards?.endClass();window.ClassPointerPdf?.close(true);window.ClassPointerDashboard?.end().catch(()=>fail('Could not remove the dashboard lesson. Refresh before starting another class.'));
-  clearTimeout(joinTimer);started=false;openingClass=false;stopSharing();for(const member of members.values()){send(member.connection,{type:'ended'});member.connection.close()}
-  members.clear();const oldPeer=peer;peer=null;oldPeer?.destroy();state={sharing:false,mode:'selected',tools:{pointer:true,highlight:false,pen:false},members:[],points:{}};for(const [id,tool] of [['allowPointer','pointer'],['allowHighlight','highlight'],['allowPen','pen']])$(id).checked=state.tools[tool];$('accessMode').value='selected';$('spotlight').checked=false;$('startClass').disabled=false;$('startClass').hidden=false;$('startClass').textContent='↻ Start another class';$('endClass').disabled=true;$('invitePanel').hidden=true;roster();status('Class ended. Click Start another class if you want to reopen it.');
+  window.ClassPointerBoards?.endClass();
+  window.ClassPointerPdf?.close(true);
+  clearTimeout(joinTimer);started=false;openingClass=false;stopSharing();
+  for(const member of members.values()){send(member.connection,{type:'ended'});member.connection.close()}
+  members.clear();
+  const oldPeer=peer;peer=null;oldPeer?.destroy();
+  state={sharing:false,mode:'selected',tools:{pointer:true,highlight:false,pen:false},members:[],points:{}};
+  for(const [id,tool] of [['allowPointer','pointer'],['allowHighlight','highlight'],['allowPen','pen']])$(id).checked=state.tools[tool];
+  $('accessMode').value='selected';$('spotlight').checked=false;
+  const button=$('startClass');
+  button.disabled=true;button.hidden=false;button.textContent='Ending class…';
+  $('endClass').disabled=true;$('invitePanel').hidden=true;roster();
+  status('Ending class and clearing its connection…');
+  // A restart must not overlap an unfinished Firebase removal. Keep the
+  // original window usable rather than requiring it to be closed and reopened.
+  endPromise=Promise.resolve().then(()=>window.ClassPointerDashboard?.end()).then(()=>{
+    closingClass=false;
+    button.disabled=false;button.textContent='↻ Start another class';
+    status('Class ended. Click Start another class to reopen it.');
+  }).catch(error=>{
+    closingClass=false;
+    button.disabled=true;button.textContent='Classroom cleanup failed';
+    fail('Could not finish ending the class. Refresh before starting again. '+(error?.message||''));
+  });
+  return endPromise;
 }
 function clearStudentVideo(){const oldCall=mediaCall;mediaCall=null;oldCall?.close();$('lesson').srcObject=null;$('placeholder').hidden=false;drawPointers()}
 function leaveClass(){
@@ -341,7 +366,7 @@ function joinClass(event){
   peer.on('open',()=>{
     if(peer!==current)return;
     teacherConnection=peer.connect(room,{reliable:true});const connection=teacherConnection;
-    connection.on('open',()=>{if(teacherConnection===connection)send(connection,{type:'join',name})});
+    connection.on('open',()=>{if(teacherConnection===connection){let studentId=null;try{const saved=JSON.parse(sessionStorage.getItem('classPointerDashboardJoin')||'null');if(window.ClassPointerDashboardCore.handoff(saved,room))studentId=saved.studentId}catch(_){}send(connection,{type:'join',name,studentId})}});
     connection.on('data',message=>{
       if(teacherConnection!==connection||!message)return;
       if(window.ClassPointerBoards?.fromTeacher(message))return;
@@ -478,3 +503,4 @@ if(!isTeacher&&new URL(location.href).searchParams.get('dashboard')==='student')
   if(saved){$('studentName').value=C.cleanName(saved.name);$('studentName').readOnly=true;const welcome=document.createElement('p');welcome.textContent='Joining as '+$('studentName').value+'.';$('studentPanel').prepend(welcome);joinClass({preventDefault(){}})}
   else{ $('joinClass').disabled=true;fail('Go back to Fun Torah Tools and click Class Pointer to join with your name.'); }
 }
+

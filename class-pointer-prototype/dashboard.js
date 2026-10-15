@@ -5,18 +5,31 @@
   const db=firebase.database(),classes=db.ref('b3Games/workspaces/'+ws+'/classes');
   const message=text=>{$('message').textContent=text};
   if(query.get('teacher')==='1'){
-    const mode=query.get('sendEveryoneBoards')==='1'?'boards':query.get('sendEveryoneShare')==='1'?'screens':'lesson';
-    const label=mode==='boards'?'Send to Whiteboards':mode==='screens'?'Send to Screen Sharing':'Start classroom';
-    $('welcome').textContent=mode==='lesson'?'Choose the class to teach.':'Choose the class for '+label+'.';
+    let mode=query.get('sendEveryoneBoards')==='1'?'boards':query.get('sendEveryoneShare')==='1'?'screens':'lesson';
     $('teacherChoice').hidden=false;
     $('classChoice').hidden=true;$('openTeacher').hidden=true;
     document.querySelector('label[for="classChoice"]')?.setAttribute('hidden','');
-    const buttons=$('teacherClassButtons');
+    const buttons=$('teacherClassButtons'),classChoices=[];
+    const modeCards=Array.from(document.querySelectorAll?.('[data-classroom-mode]')||[]);
+    function setMode(next){
+      if(!['lesson','screens','boards'].includes(next))return;
+      mode=next;
+      modeCards.forEach(btn=>btn.setAttribute('aria-pressed',String(btn.getAttribute('data-classroom-mode')===mode)));
+      const label=mode==='boards'?'Send to Whiteboards':mode==='screens'?'View Student Screens':'Start classroom';
+      $('welcome').textContent='Choose a class for '+label+'.';
+      classChoices.forEach(({btn,name})=>{
+        btn.textContent=(mode==='boards'?'📝 ':mode==='screens'?'🖥 ':'👆 ')+name;
+        btn.setAttribute('aria-label',label+' for '+name);
+      });
+      if(buttons.childElementCount)message(mode==='lesson'?'The class starts after you choose it.':'Only the class you select will receive the request; screen sharing still requires each student’s browser permission.');
+    }
+    modeCards.forEach(btn=>btn.addEventListener('click',()=>setMode(btn.getAttribute('data-classroom-mode'))));
+    setMode(mode);
     $('teacherSignIn').onclick=()=>window.B3SiteSettings.signInWithGoogle().catch(()=>message('Could not sign in. Please try again.'));
     let generation=0;
     window.B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
       const current=++generation;
-      buttons.replaceChildren();$('teacherSignIn').hidden=!!authorized;
+      buttons.replaceChildren();classChoices.length=0;$('teacherSignIn').hidden=!!authorized;
       if(!authorized){message('Sign in with your teacher account to select a class.');return}
       try{
         const rows=access.role==='admin'?(await classes.once('value')).val()||{}:Object.fromEntries(await Promise.all((access.classIds||[]).filter(C.validId).map(async id=>[id,(await classes.child(id).once('value')).val()])));
@@ -26,8 +39,9 @@
           const name=String(row.name||id);
           const btn=document.createElement('button');
           btn.type='button';btn.className='class-launch-button';
+          classChoices.push({btn,name});
           btn.textContent=(mode==='boards'?'📝 ':mode==='screens'?'🖥 ':'👆 ')+name;
-          btn.setAttribute('aria-label',label+' for '+name);
+          btn.setAttribute('aria-label',(mode==='boards'?'Send to Whiteboards':mode==='screens'?'View Student Screens':'Start classroom')+' for '+name);
           btn.addEventListener('click',()=>{
             buttons.querySelectorAll('button').forEach(button=>button.disabled=true);
             const target=new URL('classroom.html',location.href);
@@ -67,3 +81,4 @@
     },()=>message('Could not find your lesson. Refresh to try again.'));
   }catch(error){message(error.message||'Could not open the classroom. Please try again.')}
 })();
+

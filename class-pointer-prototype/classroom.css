@@ -317,3 +317,8 @@ body.teacher-view #joinInstructions>summary{cursor:pointer;font-weight:650}
 body.teacher-view #connectionStatus{margin:3px 0;padding:5px 9px;font-size:13px}
 
 .pointer-class-picker{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700}.pointer-class-picker select{min-width:105px;max-width:180px;padding:6px 8px;font-size:13px}
+
+/* Keep the restart control visible when the classroom has ended; the compact
+   teacher workspace otherwise hides its original action buttons. */
+body.teacher-view .session-controls>#startClass:not([hidden]){display:inline-flex!important;align-items:center;background:#1d4ed8;color:white}
+
