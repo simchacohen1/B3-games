@@ -63,6 +63,8 @@
         ref(original = '') {
           const ownPath = mapped(original);
           if (ownPath) return database.ref(ownPath);
+          const source = String(original || '').replace(/^\/+/, '');
+          if (source === prefix || source.startsWith(prefix + '/')) return database.ref(source);
           return readonlyReference(database.ref(original), original);
         }
       };
