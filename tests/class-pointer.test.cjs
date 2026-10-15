@@ -149,7 +149,7 @@ test('transient signaling errors during an active lesson show reconnecting inste
  f.context.peerFailure={type:'network'};
  f.run('started=true;peerError(peerFailure)');
  assert.equal(f.elements.get('error').textContent||'', '');
- assert.match(f.elements.get('status').textContent||'',/reconnect/i);
+ assert.match(f.elements.get('connectionStatus').textContent||'',/reconnect/i);
 });
 test('student connection IDs are generated locally without a server ID request',()=>{
  const f=teacherFixture();let received;const instance=new EventEmitter();
