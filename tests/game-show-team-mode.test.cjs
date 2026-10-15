@@ -14,7 +14,14 @@ function loadTeamLogic() {
   const context = {
     window,
     location: { pathname: '/teacher.html' },
-    document: { querySelector: () => ({ querySelectorAll: () => [] }) },
+    document: {
+      querySelector: selector => selector === '#tabSetup .setup-grid' ? { querySelectorAll: () => [] } : null,
+      createElement: () => ({
+        style: {}, setAttribute() {}, appendChild() {}, replaceChildren() {}, hidden: false
+      }),
+      head: { appendChild() {} },
+      getElementById: () => null
+    },
     gameRef: { on: () => {} }
   };
   vm.runInNewContext(teamSource, context, { filename: 'team-modes.js' });
