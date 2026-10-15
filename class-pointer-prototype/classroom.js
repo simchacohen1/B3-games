@@ -4,6 +4,7 @@ const room=new URL(location.href).searchParams.get('room'),isTeacher=!room;   co
    if((isTeacher&&entry!=='teacher')||(!isTeacher&&entry!=='student')){document.body.innerHTML='<main style="padding:2rem;font:1rem system-ui">Open Class Pointer from Fun Torah Tools.</main>';throw Error('Class Pointer must be opened from the dashboard.')}
 const members=new Map();
 let peer=null,teacherConnection=null,screen=null,mediaCall=null,viewportController=null,state={sharing:false,mode:'selected',tools:{pointer:true,highlight:false,pen:false},members:[],points:{}},started=false,openingClass=false,admitted=false,joining=false,joinTimer=null;
+let closingClass=false,endPromise=Promise.resolve();
 let captureControl=null,tabScrollOn=false;
 let generation=0,colorIndex=0,pendingPoint=null,hoverTimer=null,lastHover=0;
 let navigating=false;
@@ -166,11 +167,15 @@ function makePeer(id){
   instance.on('disconnected',()=>{status('Connection service interrupted. Existing lesson connections may still work.');if(!instance.destroyed)instance.reconnect()});return instance;
 }
 async function startClass(){
-  if(!isTeacher||started||openingClass)return;
+  if(!isTeacher||started||openingClass||closingClass)return;
   openingClass=true;
   const startButton=$('startClass');startButton.disabled=true;startButton.hidden=true;
   clearError();status('Opening your classroom automatically…');
-  try{if(window.ClassPointerDashboard)await window.ClassPointerDashboard.ready}catch(error){
+  try{
+    // Wait for Firebase to delete the old room before creating another one.
+    await endPromise;
+    if(window.ClassPointerDashboard)await window.ClassPointerDashboard.ready;
+  }catch(error){
     openingClass=false;startButton.disabled=false;startButton.hidden=false;
     startButton.textContent='↻ Retry opening classroom';fail(error.message);return;
   }
@@ -319,10 +324,34 @@ async function shareScreen(preferTab=false){
   }
 }
 function endClass(){
+  if(!isTeacher||closingClass)return endPromise;
+  closingClass=true;
   window.ClassPointerActivityShares?.closeAll();
-  window.ClassPointerBoards?.endClass();window.ClassPointerPdf?.close(true);window.ClassPointerDashboard?.end().catch(()=>fail('Could not remove the dashboard lesson. Refresh before starting another class.'));
-  clearTimeout(joinTimer);started=false;openingClass=false;stopSharing();for(const member of members.values()){send(member.connection,{type:'ended'});member.connection.close()}
-  members.clear();const oldPeer=peer;peer=null;oldPeer?.destroy();state={sharing:false,mode:'selected',tools:{pointer:true,highlight:false,pen:false},members:[],points:{}};for(const [id,tool] of [['allowPointer','pointer'],['allowHighlight','highlight'],['allowPen','pen']])$(id).checked=state.tools[tool];$('accessMode').value='selected';$('spotlight').checked=false;$('startClass').disabled=false;$('startClass').hidden=false;$('startClass').textContent='↻ Start another class';$('endClass').disabled=true;$('invitePanel').hidden=true;roster();status('Class ended. Click Start another class if you want to reopen it.');
+  window.ClassPointerBoards?.endClass();
+  window.ClassPointerPdf?.close(true);
+  clearTimeout(joinTimer);started=false;openingClass=false;stopSharing();
+  for(const member of members.values()){send(member.connection,{type:'ended'});member.connection.close()}
+  members.clear();
+  const oldPeer=peer;peer=null;oldPeer?.destroy();
+  state={sharing:false,mode:'selected',tools:{pointer:true,highlight:false,pen:false},members:[],points:{}};
+  for(const [id,tool] of [['allowPointer','pointer'],['allowHighlight','highlight'],['allowPen','pen']])$(id).checked=state.tools[tool];
+  $('accessMode').value='selected';$('spotlight').checked=false;
+  const button=$('startClass');
+  button.disabled=true;button.hidden=false;button.textContent='Ending class…';
+  $('endClass').disabled=true;$('invitePanel').hidden=true;roster();
+  status('Ending class and clearing its connection…');
+  // A restart must not overlap an unfinished Firebase removal. Keep the
+  // original window usable rather than requiring it to be closed and reopened.
+  endPromise=Promise.resolve().then(()=>window.ClassPointerDashboard?.end()).then(()=>{
+    closingClass=false;
+    button.disabled=false;button.textContent='↻ Start another class';
+    status('Class ended. Click Start another class to reopen it.');
+  }).catch(error=>{
+    closingClass=false;
+    button.disabled=true;button.textContent='Classroom cleanup failed';
+    fail('Could not finish ending the class. Refresh before starting again. '+(error?.message||''));
+  });
+  return endPromise;
 }
 function clearStudentVideo(){const oldCall=mediaCall;mediaCall=null;oldCall?.close();$('lesson').srcObject=null;$('placeholder').hidden=false;drawPointers()}
 function leaveClass(){
