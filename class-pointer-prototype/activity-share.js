@@ -58,6 +58,23 @@
     fallback.addEventListener('click',()=>location.assign(new URL('class-pointer-prototype/dashboard.html',root).href));
     holder.append(btn,label,fallback);document.body.appendChild(holder);
     let active=null,peer=null,call=null,stream=null,busy=false;
+    // Centered, teacher-triggered consent prompt. Browser capture remains user initiated.
+    const promptOverlay=document.createElement('div');
+    promptOverlay.id='fttShareRequestOverlay';
+    promptOverlay.style.cssText='position:fixed;inset:0;z-index:2147483639;background:rgba(8,24,49,.65);display:none;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;font-family:system-ui,sans-serif';
+    const promptPanel=document.createElement('div');
+    promptPanel.setAttribute('role','dialog');promptPanel.setAttribute('aria-modal','true');
+    promptPanel.setAttribute('aria-label','Teacher screen sharing request');
+    promptPanel.style.cssText='width:min(760px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:24px;padding:clamp(20px,4vw,42px);box-shadow:0 24px 85px #0007;text-align:center;color:#12345a;box-sizing:border-box';
+    promptPanel.innerHTML='<div style="font-size:48px" aria-hidden="true">🖥️</div><h2 style="font-size:clamp(27px,4vw,38px);margin:8px 0 12px">Your teacher would like to see your screen</h2><p style="font-size:19px;line-height:1.45">Choose what you want to share in the next window. You can stop sharing whenever you want.</p><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:22px 0"><div style="background:#eaf5ff;border-radius:14px;padding:15px 5px"><div style="font-size:36px">🌐</div><strong>Browser Tab</strong></div><div style="background:#edf8f0;border-radius:14px;padding:15px 5px"><div style="font-size:36px">🗔</div><strong>Window</strong></div><div style="background:#f1efff;border-radius:14px;padding:15px 5px"><div style="font-size:36px">🖥️</div><strong>Entire Screen</strong></div></div><p style="font-size:15px;line-height:1.5">Press the blue button, select a tab, window, or screen in Microsoft Edge, then press <strong>Share</strong>.</p>';
+    const choose=document.createElement('button');choose.type='button';choose.textContent='Choose What to Share';
+    choose.style.cssText='display:block;width:100%;background:#205af0;color:white;border:0;border-radius:14px;padding:18px;font:bold 22px system-ui;cursor:pointer;margin-top:18px';
+    const promptStatus=document.createElement('p');promptStatus.setAttribute('role','status');promptStatus.style.cssText='color:#ad2438;font-size:15px;margin:12px 0 0';
+    promptPanel.append(choose,promptStatus);promptOverlay.append(promptPanel);document.body.appendChild(promptOverlay);
+    const showPrompt=()=>{promptStatus.textContent='';promptOverlay.style.display='flex';choose.focus()};
+    const hidePrompt=()=>{promptOverlay.style.display='none'};
+    choose.addEventListener('click',()=>{if(active&&!busy){promptStatus.textContent='';btn.click()}});
+
     const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
     function routeTeacherRequest(session){
       // Teacher directs only this student's verified class; reject stale requests.
@@ -80,8 +97,7 @@
         location.assign(new URL('class-pointer-prototype/dashboard.html',root).href);
         return;
       }
-      status('Your teacher requested your screen. Click Share My Screen here.');
-      fallback.hidden=false;
+      showPrompt();
     }
     function stop(){
       const prior=stream;stream=null;try{call?.close()}catch{}call=null;
@@ -90,6 +106,7 @@
       btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';
       label.textContent='';
       fallback.hidden=true;
+      hidePrompt();
     }
     function status(text){label.textContent=text}
     function current(rows){
@@ -101,13 +118,14 @@
       // Student switching must never reuse another boy's classroom invitation.
       if(sessionStorage.getItem('b3Games_studentId')!==id){
         if(stream)stop();
-        active=null;holder.style.display='none';
+        active=null;holder.style.display='none';hidePrompt();
         return;
       }
       const next=current(snapshot.val());
       const shareable=next?.studentScreenSharing===true&&next?.screenSharingDenied?.[id]!==true?next:null;
       if(!shareable||!active||shareable.roomId!==active.roomId){if(stream)stop()}
       active=shareable;holder.style.display=active?'flex':'none';
+      if(!active)hidePrompt();
       if(next)routeTeacherRequest(next);
     },()=>{active=null;holder.style.display='none';stop()});
     btn.addEventListener('click',async()=>{
@@ -164,7 +182,9 @@
         media.on('close',stop);media.on('error',stop);
         btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';
         status('Sharing started — ask your teacher to confirm');
+        hidePrompt();
       }catch(error){
+        promptStatus.textContent=error?.name==='NotAllowedError'?'Sharing canceled. Please try again.':(error.message||'Could not share. Please try again.');
         captured?.getTracks().forEach(t=>t.stop());stop();
         const networkFailure=error?.code==='ACTIVITY_SHARE_NETWORK';
         status(error?.name==='NotAllowedError'?'Sharing canceled.':error.message||'Could not share.');
