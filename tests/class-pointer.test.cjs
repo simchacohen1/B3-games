@@ -157,3 +157,35 @@ test('student connection IDs are generated locally without a server ID request',
  f.run('makePeer()');assert.equal(received,'class-pointer-student-test-uuid');
 });
 
+
+
+test('activity share request waits for permission and shows dismissible centered consent once',()=>{
+ const script=fs.readFileSync(require.resolve('../class-pointer-prototype/activity-share.js'),'utf8');
+ assert.match(script,/cancel\.addEventListener\('click'/);
+ assert.match(script,/choose\.addEventListener\('click',event=>\{if\(active&&!busy\)beginShare\(event\)\}/);
+ const start=script.indexOf('function routeTeacherRequest(session)');
+ const end=script.indexOf('function stop()',start);
+ assert.ok(start>0&&end>start,'student request handler is present');
+ const handled=new Map(),visible=[];
+ const now=Date.now(),roomId='class-pointer-00000000-0000-0000-0000-000000000000';
+ const context=vm.createContext({
+   id:'student-a',loadedAt:now-2000,active:null,stream:null,inviteKey:'share:class',
+   Date,Number,sessionStorage:{getItem:k=>handled.get(k),setItem:(k,v)=>handled.set(k,v)},
+   location:{assign:url=>visible.push('navigate:'+url)},root:new URL('https://example.test/'),
+   showPrompt:()=>visible.push('prompt')
+ });
+ vm.runInContext(script.slice(start,end),context);
+ const request={roomId,destinationRequest:{mode:'screens',at:now}};
+ context.request=request;
+ vm.runInContext('routeTeacherRequest(request)',context);
+ assert.equal(visible.length,0,'disabled screen-sharing never shows a dialog');
+ assert.equal(handled.size,0,'disabled requests are not consumed');
+ context.active={roomId};
+ vm.runInContext('routeTeacherRequest(request)',context);
+ assert.deepEqual(visible,['prompt'],'enabled invitation opens centered consent');
+ vm.runInContext('routeTeacherRequest(request)',context);
+ assert.deepEqual(visible,['prompt'],'same invitation does not trap a student in repeated popups');
+ context.request={...request,destinationRequest:{mode:'screens',at:now+1},screenSharingDenied:{'student-a':true}};
+ vm.runInContext('routeTeacherRequest(request)',context);
+ assert.deepEqual(visible,['prompt'],'denied students receive no invitation');
+});
