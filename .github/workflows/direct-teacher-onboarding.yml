@@ -8,6 +8,7 @@ on:
       - 'owner-admin.html'
       - 'site-settings.js'
       - 'backend/functions/teacher-claim-core.cjs'
+      - 'backend/functions/teacher-claim.js'
       - 'tests/direct-teacher-onboarding.test.cjs'
       - '.github/workflows/direct-teacher-onboarding.yml'
 jobs:
@@ -22,6 +23,7 @@ jobs:
       - name: Syntax check teacher claim and tests
         run: |
           node --check backend/functions/teacher-claim-core.cjs
+          node --check backend/functions/teacher-claim.js
           node --check tests/direct-teacher-onboarding.test.cjs
       - name: Teacher onboarding regression tests
         run: node --test tests/direct-teacher-onboarding.test.cjs
