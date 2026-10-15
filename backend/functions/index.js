@@ -2693,3 +2693,6 @@ exports.studentReportChatGPTRead = require("./student-report-chatgpt-read").stud
 
 // Class-scoped, expiring permissions for embedded Classroom Pointer sharing.
 exports.classPointerShareAuth = require('./class-pointer-share-auth').classPointerShareAuth;
+
+// Owner-reviewed teacher registration. Deploy only after security review.
+exports.funTorahTeacherRequests = require('./teacher-requests').funTorahTeacherRequests;
