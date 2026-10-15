@@ -138,8 +138,7 @@
         if(!navigator.mediaDevices?.getDisplayMedia)throw Error('Use Microsoft Edge or Chrome on a computer.');
         // Capture must be called synchronously from the user click, before any await.
         const capturePromise=navigator.mediaDevices.getDisplayMedia({
-          video:{displaySurface:'browser',frameRate:{ideal:5,max:8}},audio:false,
-          preferCurrentTab:true,surfaceSwitching:'include'
+          video:{frameRate:{ideal:5,max:8}},audio:false
         });
         captured=await capturePromise;
         if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
@@ -189,6 +188,7 @@
         const networkFailure=error?.code==='ACTIVITY_SHARE_NETWORK';
         status(error?.name==='NotAllowedError'?'Sharing canceled.':error.message||'Could not share.');
         if(networkFailure)fallback.hidden=false;
+        if(active?.roomId===lesson.roomId)showPrompt();
       }
       finally{busy=false;btn.disabled=false}
     });
