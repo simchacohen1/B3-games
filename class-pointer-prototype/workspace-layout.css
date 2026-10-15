@@ -1,0 +1,14 @@
+/* Classroom workspace navigation: teacher-only, responsive, existing controls retained. */
+body.teacher-view .cp-workspace-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:8px 0 10px;padding:6px;background:#edf3fc;border:1px solid #d8e3f3;border-radius:14px}
+body.teacher-view .cp-workspace-tab{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 12px;border:1px solid transparent;border-radius:10px;background:transparent;color:#254063;font-weight:750;font-size:14px;cursor:pointer;white-space:nowrap}
+body.teacher-view .cp-workspace-tab:hover{background:#fff}
+body.teacher-view .cp-workspace-tab[aria-selected="true"]{background:#fff;border-color:#bed0ed;color:#1751af;box-shadow:0 2px 6px #17345a16}
+body.teacher-view .cp-workspace-tab:focus-visible{outline:3px solid #3b82f6;outline-offset:2px}
+body.teacher-view .cp-workspace-tab .cp-tab-icon{font-size:19px}
+body.teacher-view .cp-workspace-tabs[hidden]{display:none}
+body.teacher-view #teacherDock:not(.floating){margin:4px 0 8px;padding:7px 9px;gap:6px;border-radius:13px}
+body.teacher-view #navigationHint{font-size:12px;margin:3px 0}
+body.teacher-view .tb-students{width:min(560px,94vw)!important;max-height:min(75dvh,650px)!important;overflow:auto}
+body.teacher-view .tb-students .tb-roster-handle{position:sticky;top:0;z-index:2}
+body.teacher-view .tb-students .permission-tools{position:relative}
+@media (max-width:650px){body.teacher-view .cp-workspace-tabs{gap:3px;padding:4px}body.teacher-view .cp-workspace-tab{flex-direction:column;gap:2px;padding:7px 3px;min-height:52px;font-size:11px}body.teacher-view .cp-workspace-tab .cp-tab-icon{font-size:19px}}
