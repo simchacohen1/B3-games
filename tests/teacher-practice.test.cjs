@@ -62,3 +62,27 @@ test('private database rules exist outside publicly readable b3Games node',()=>{
   assert.ok(rules.teacherPractice.$workspaceId.$uid.$classId['.write'].includes('auth.uid == $uid'));
   assert.equal(rules.teacherPractice['.read'],undefined);
 });
+
+test('owner wildcard class defaults to ET instead of a wildcard key',async()=>{
+  const {api,db}=harness('');
+  const admin={authorized:true,role:'admin',classIds:['*']};
+  const p=await api.open(db,{uid:'owner'},admin,'chazara');
+  assert.equal(p.classId,'et');
+});
+test('practice is scoped to class as well as teacher',async()=>{
+  const first=harness('?class=et'),second=harness('?class=wt');
+  const scoped={authorized:true,role:'teacher',classIds:['et','wt']};
+  const a=await first.api.open(first.db,{uid:'teacherA'},scoped,'chazara');
+  const b=await second.api.open(second.db,{uid:'teacherA'},scoped,'chazara');
+  assert.notEqual(a.root,b.root);
+});
+test('every persistent teacher practice integration loads the guarded helper',()=>{
+  for(const file of [
+    'shorashim/index.html','rashi-letters/student.html','record_pesukim/student.html',
+    'chazara/index.html','yiddish/index.html','gematria/index.html',
+    'weekly-quiz/practice.html','sefer-hamitzvos/index.html','halacha/index.html'
+  ]){
+    const html=fs.readFileSync(path.join(__dirname,'..',file),'utf8');
+    assert.match(html,/teacher-practice\\.js/,file);
+  }
+});
