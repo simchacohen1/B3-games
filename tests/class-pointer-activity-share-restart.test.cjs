@@ -8,7 +8,7 @@ const read=name=>fs.readFileSync(path.join(__dirname,'..',name),'utf8');
 const room='class-pointer-12345678-1234-1234-1234-123456789abc';
 
 async function activityFixture({capture}={}){
-  let listener,holder,navigation=null,captureCount=0,stopCount=0,requests=0;
+  let listener,holder,overlay,navigation=null,captureCount=0,stopCount=0,requests=0;
   const sessionStorageValues=new Map([['b3Games_studentId','test-boy'],['b3Games_classPin','test-pin']]);
   const sessionStorage={
     getItem:k=>sessionStorageValues.get(k)||null,
@@ -24,7 +24,7 @@ async function activityFixture({capture}={}){
     currentScript:{src:'https://funtorahtools.com/class-pointer-prototype/activity-share.js'},
     createElement:element,
     head:{appendChild(){}},
-    body:{appendChild(node){holder=node}}
+    body:{appendChild(node){if(node.id==='fttActivityScreenShare')holder=node;if(node.id==='fttShareRequestOverlay')overlay=node}}
   };
   const db={ref:()=>({on:(_event,cb)=>{listener=cb}})};
   const firebase={apps:[{}],database:()=>db};
@@ -56,6 +56,7 @@ async function activityFixture({capture}={}){
   assert.ok(listener,'authenticated session should subscribe to teacher requests');
   assert.ok(holder,'activity sharing invitation must exist');
   const [shareButton,label,fallback]=holder.children;
+  const [choose,cancel]=overlay.children[0].children;
   const emit=(mode,denied={})=>{
     const now=Date.now();
     listener({val:()=>({[room]:{
@@ -65,7 +66,7 @@ async function activityFixture({capture}={}){
     }})});
   };
   return {
-    emit,shareButton,label,fallback,
+    emit,shareButton,label,fallback,overlay,choose,cancel,
     get navigation(){return navigation},
     get captureCount(){return captureCount},
     get stopCount(){return stopCount},
@@ -77,9 +78,9 @@ test('screen request stays on activity, with explicit browser permission and sam
   const a=await activityFixture();
   a.emit('screens');
   assert.equal(a.navigation,null);
-  assert.match(a.label.textContent,/teacher requested your screen/);
-  assert.equal(a.fallback.hidden,false);
-  await a.shareButton.listeners.click();
+  assert.equal(a.overlay.style.display,'flex','teacher request opens centered consent');
+  assert.equal(a.fallback.hidden,true);
+  await a.choose.listeners.click();
   assert.equal(a.captureCount,1);
   assert.equal(a.requests,1);
   assert.equal(a.stopCount,1); // permission granted but capture is stopped after network failure
