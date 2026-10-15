@@ -697,6 +697,7 @@
     view.hidden=!on;
     if(toggle){toggle.setAttribute('aria-pressed',String(on));toggle.textContent=on?'✕ Close student screens':'🖥 Student Screens'}
     window.ClassPointerDashboard?.setStudentScreenSharing(on&&mode==='screens').catch(error=>B.status('Could not update screen sharing permission: '+error.message));
+    document.dispatchEvent(new Event('classpointer:sharing-state'));
     if(on){stage.dispatchEvent(new PointerEvent('pointerleave'));setFocus(null);B.status(mode==='screens'?'Students were asked to share their screens. Their screens appear in the tiles.':'Student whiteboards are open. Click a board to see it large and write on it. Use 🖥 Screens to see students’ screens instead.')}
     else B.status('Student boards closed. Everyone is back to the lesson. Whiteboards are kept until the class ends.');
   }
@@ -704,10 +705,27 @@
     if(next===mode)return;
     mode=next;drawer?.cancel();
     window.ClassPointerDashboard?.setStudentScreenSharing(on&&mode==='screens').catch(error=>B.status('Could not update screen sharing permission: '+error.message));
+    document.dispatchEvent(new Event('classpointer:sharing-state'));
     for(const m of admitted())sendMode(m);
     setFocus(focusId);
     B.status(mode==='screens'?'Students were asked to share their screens. Their screens appear in the tiles (view only).':'Students are back on their whiteboards.');
   }
+  // Teacher-facing sharing switch. Session availability and sharing permission are
+  // separate: closing the gallery is no longer necessary to revoke permission.
+  window.ClassPointerSharing={
+    enabled:()=>on&&mode==='screens',
+    enable(){
+      if(!B.started())return false;
+      if(!on)setOn(true);
+      if(mode!=='screens')setMode('screens');
+      return true;
+    },
+    disable(){
+      if(on&&mode==='screens')setOn(false);
+      else window.ClassPointerDashboard?.setStudentScreenSharing(false)?.catch(error=>B.status('Could not disable sharing: '+error.message));
+      return true;
+    }
+  };
   async function sendEveryone(destination){
     if(!B.started()){B.fail('Wait for your classroom to finish opening, then try again.');return}
     const buttons=[sendScreens,sendBoards,dockScreens,dockBoards];
