@@ -6,23 +6,65 @@ const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const key=s=>typeof s==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(s);
 // Owner-only: copy every passcode into private storage, and optionally erase
 // the old public copies (profiles, class members, legacy allowedStudents).
-async function migratePasscodes(store,deletePublic,now){
- const [students,legacy,classes,priv]=await Promise.all([store.get('b3Games/students'),store.get('posukPractice/allowedStudents'),store.get('b3Games/workspaces/b3-2026/classes'),store.get('b3Private/passcodes')]);
- const updates={},ids=new Set([...Object.keys(students||{}),...Object.keys(legacy||{})].filter(key));
+async function migratePasscodes(store,deletePublic,now,{dryRun=false}={}){
+ const [students,legacy,classes,priv]=await Promise.all([
+  store.get('b3Games/students'),
+  store.get('posukPractice/allowedStudents'),
+  store.get('b3Games/workspaces/b3-2026/classes'),
+  store.get('b3Private/passcodes')
+ ]);
+ const membersByStudent={};
+ for(const [classId,cls] of Object.entries(classes||{})){
+  if(!key(classId))continue;
+  for(const [id,member] of Object.entries(cls?.members||{})){
+   if(!key(id)||!member||typeof member!=='object')continue;
+   (membersByStudent[id]??=[]).push({classId,member});
+  }
+ }
+ // Include class-only records: they can contain a passcode even without a
+ // central profile or legacy allowedStudents entry.
+ const ids=new Set([
+  ...Object.keys(students||{}),
+  ...Object.keys(legacy||{}),
+  ...Object.keys(membersByStudent),
+  ...Object.keys(priv||{})
+ ].filter(key));
+ const updates={},conflicts=[];
  let copied=0,alreadyPrivate=0,cleared=0;
  for(const id of ids){
-  const memberCodes=[...new Set(Object.values(classes||{}).map(c=>clean(c?.members?.[id]?.passcode)).filter(Boolean))];
-  const found=clean(students?.[id]?.profile?.passcode)||(memberCodes.length===1?memberCodes[0]:'')||clean(legacy?.[id]?.passcode);
-  if(clean(priv?.[id]?.passcode))alreadyPrivate++;
-  else if(found){updates[PRIVATE+id]={passcode:found,updatedAt:now};copied++;}
+  const profile=students?.[id]?.profile||null;
+  const old=legacy?.[id]||null;
+  const memberRows=membersByStudent[id]||[];
+  const saved=clean(priv?.[id]?.passcode);
+  const publicCodes=[profile?.passcode,old?.passcode,...memberRows.map(row=>row.member.passcode)]
+   .map(clean).filter(Boolean);
+  const distinct=[...new Set(publicCodes)];
+  // Do not choose arbitrarily between different public PINs. Doing so could
+  // change the credential a student needs to sign in.
+  if(!saved&&distinct.length>1){conflicts.push(id);continue;}
+  if(saved)alreadyPrivate++;
+  else if(distinct.length===1){
+   updates[PRIVATE+id]={passcode:distinct[0],updatedAt:now};copied++;
+  }
+  if(!deletePublic)continue;
+  if(profile&&Object.hasOwn(profile,'passcode')){
+   updates['b3Games/students/'+id+'/profile/passcode']=null;cleared++;
+  }
+  if(old&&Object.hasOwn(old,'passcode')){
+   updates['posukPractice/allowedStudents/'+id+'/passcode']=null;cleared++;
+  }
+  for(const row of memberRows){
+   if(Object.hasOwn(row.member,'passcode')){
+    updates['b3Games/workspaces/b3-2026/classes/'+row.classId+'/members/'+id+'/passcode']=null;cleared++;
+   }
+  }
  }
- if(deletePublic){
-  for(const [id,row] of Object.entries(students||{}))if(row?.profile&&row.profile.passcode!==undefined){updates['b3Games/students/'+id+'/profile/passcode']=null;cleared++;}
-  for(const [cid,c] of Object.entries(classes||{}))for(const [id,m] of Object.entries(c?.members||{}))if(m&&m.passcode!==undefined){updates['b3Games/workspaces/b3-2026/classes/'+cid+'/members/'+id+'/passcode']=null;cleared++;}
-  for(const [id,row] of Object.entries(legacy||{}))if(row&&row.passcode!==undefined){updates['posukPractice/allowedStudents/'+id+'/passcode']=null;cleared++;}
- }
+ // Preview does not write or expose passcode values.
+ if(dryRun)return {ok:true,dryRun:true,copied,alreadyPrivate,cleared,conflicts};
+ // Never start a destructive cleanup if any student has ambiguous credentials.
+ if(deletePublic&&conflicts.length)fail(409,'Cannot remove public passcodes: '+conflicts.length+' students have conflicting saved credentials. Run the preview and resolve those students first.');
  if(Object.keys(updates).length)await store.update(updates);
- return {ok:true,copied,alreadyPrivate,cleared};
+ return {ok:true,copied,alreadyPrivate,cleared,conflicts};
 }
 
 async function manageStudents(store,identity,body,now=Date.now()){
@@ -30,7 +72,7 @@ async function manageStudents(store,identity,body,now=Date.now()){
  const root='b3Games/workspaces/b3-2026',classId=body.classId;
  // The owner account and any active site administrator count as owner here.
  const owner=String(identity.email||'').toLowerCase()==='simcha5770@gmail.com'||(await store.get('b3Games/admins/'+identity.uid))?.active===true;
- if(body.action==='migratePasscodes'){if(!owner)fail(403,'Owner access required.');return migratePasscodes(store,body.deletePublic===true,now);}
+ if(body.action==='migratePasscodes'){if(!owner)fail(403,'Owner access required.');return migratePasscodes(store,body.deletePublic===true,now,{dryRun:body.dryRun===true});}
  if(body.action==='list'&&owner&&body.all===true){
   const [students,legacy]=await Promise.all([store.get('b3Games/students'),store.get('posukPractice/allowedStudents')]);
   const passcodes={};for(const id of new Set([...Object.keys(students||{}),...Object.keys(legacy||{})].filter(key)))passcodes[id]=(await readPasscode(store.get,id,{allowLegacyDefault:true})).passcode;
