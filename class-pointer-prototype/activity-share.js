@@ -7,7 +7,9 @@
   window.__classPointerActivityShareLoaded=true;
   const pageParams=new URL(location.href).searchParams;
   const onStudentClassroom=/\/class-pointer-prototype\/classroom\.html$/.test(location.pathname)&&pageParams.get('dashboard')==='student';
-  if(/\/class-pointer-prototype\/classroom\.html$/.test(location.pathname)&&!onStudentClassroom)return;
+  // The student classroom already has its working central share control in Screens mode.
+  // Do not cover it with a second floating share prompt.
+  if(/\/class-pointer-prototype\/classroom\.html$/.test(location.pathname))return;
   const loadedAt=Date.now();
   const src=document.currentScript?.src||'';
   const root=new URL('../',src);
