@@ -88,6 +88,9 @@
       // Per-student exclusions belong to the active authenticated class.
       if(supported&&request.mode==='boards'&&session.whiteboardDenied?.[id]===true)return;
       if((!supported||request.mode==='screens')&&session.screenSharingDenied?.[id]===true)return;
+      // Don't consume a request while student screen-sharing permission is disabled.
+      // Board requests are separate and must still navigate to individual boards.
+      if((!supported||request.mode==='screens')&&(!active||active.roomId!==session.roomId))return;
       const marker=session.roomId+':'+at+':'+(supported?request.mode:'screens');
       if(stream)return;
       try{
@@ -100,9 +103,7 @@
         location.assign(new URL('class-pointer-prototype/dashboard.html',root).href);
         return;
       }
-      // Only prompt for a screen that this teacher has explicitly enabled.
-      // Keep the large consent window requested for student screen-sharing invitations.
-      if(!active||active.roomId!==session.roomId)return;
+      // Keep the large consent window for teacher screen-sharing requests.
       showPrompt();
     }
     function stop(){
