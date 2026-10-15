@@ -12,7 +12,7 @@
 
 ## Preview and migrate student credentials (after trusted backend deployment)
 
-1. Deploy and verify the updated owner-only `funTorahManageStudents` backend. **Deploy backend before frontend**. Verify the new `previewPasscodeMigration` action exists and has a read-only implementation. Old backends reject this action; never use `migratePasscodes` to simulate a preview.
+1. Deploy and verify the updated owner-only `funTorahManageStudents` backend **before performing any migration**. The guarded frontend can be published earlier: its new `previewPasscodeMigration` action is rejected without writes by old functions, so the cleanup action stays unavailable until backend verification. Never use `migratePasscodes` to simulate a preview.
 2. Confirm `previewPasscodeMigration` returns `dryRun: true` and `protocol: "passcodes-v2-preview-20261015"` with count-only results and **no writes**. Reject any response missing the exact marker. Do not print or export individual PINs.
 3. Reject cleanup if `conflicts` or `unmatched` are nonempty. Reconcile affected records in a private administrator workflow first. Retest a fresh preview; ensure all intended students are accounted for.
 4. Reconfirm the **tested, encrypted backup** and obtain explicit owner approval for destructive cleanup. Only then allow `migratePasscodes` with `deletePublic: true`, the exact migration protocol, and explicit backup confirmation.
