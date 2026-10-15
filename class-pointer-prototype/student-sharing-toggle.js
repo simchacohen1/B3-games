@@ -18,6 +18,7 @@
   observer.observe(roomControl,{attributes:true,attributeFilter:['disabled']});
   const studentBoards=document.getElementById('studentBoards');
   if(studentBoards)observer.observe(studentBoards,{attributes:true,attributeFilter:['aria-pressed']});
+  document.addEventListener('classpointer:sharing-state',refresh);
   button.addEventListener('click',()=>{
    if(button.disabled||!window.ClassPointerSharing)return;
    const next=!window.ClassPointerSharing.enabled();
