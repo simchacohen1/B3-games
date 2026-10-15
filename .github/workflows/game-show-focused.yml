@@ -1,0 +1,28 @@
+name: Game Show focused checks
+on:
+  pull_request:
+    paths:
+      - 'game-show/**'
+      - 'tests/game-show*.test.cjs'
+      - '.github/workflows/game-show-focused.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'game-show/**'
+      - 'tests/game-show*.test.cjs'
+      - '.github/workflows/game-show-focused.yml'
+permissions:
+  contents: read
+jobs:
+  game-show:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Game Show regression tests
+        run: node --test tests/game-show*.test.cjs
+      - name: Game Show JavaScript syntax
+        run: |
+          find game-show -maxdepth 1 -type f -name '*.js' -exec node --check {} \;
