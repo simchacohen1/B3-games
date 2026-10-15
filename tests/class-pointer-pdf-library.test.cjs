@@ -81,3 +81,29 @@ test('Storage rules are an unmerged fragment; unrelated production Storage is no
   assert.match(fragment,/allow get, list, delete/);
   assert.ok(!/getDownloadURL\s*\(/.test(source));
 });
+
+
+test('proposed merged Storage rules preserve user-confirmed existing paths and narrow the PDF path',()=>{
+  const candidate=fs.readFileSync(path.join(base,'security/pointer-pdf-library-merged-storage.rules'),'utf8');
+  for(const route of [
+    '/posukPractice/{studentId}/{fileName}',
+    '/classGallery/{postId}/{fileName}',
+    '/shorashim-recordings/{studentId}/{date}/{fileName}'
+  ]){
+    const at=candidate.indexOf('match '+route);
+    assert.ok(at>=0,route+' is missing');
+    assert.match(candidate.slice(at,candidate.indexOf('}',at)+1),/allow read, write: if true;/);
+  }
+  const at=candidate.indexOf('match /pointerPdfLibrary/{teacherUid}/{fileId}');
+  assert.ok(at>=0,'Private PDF path is missing');
+  const pdf=candidate.slice(at);
+  assert.match(pdf,/allow get, list, delete: if request.auth != null\s*&& request.auth.uid == teacherUid;/);
+  assert.match(pdf,/allow create: if request.auth != null\s*&& request.auth.uid == teacherUid/);
+  assert.match(pdf,/allow update: if request.auth != null\s*&& request.auth.uid == teacherUid/);
+  assert.match(pdf,/request.resource.size <= 50 \* 1024 \* 1024/);
+  assert.match(pdf,/request.resource.contentType == 'application\/pdf'/);
+  assert.match(pdf,/resource.md5Hash == request.resource.md5Hash/);
+  assert.ok(!pdf.includes('if true'),'New private PDF rule must never allow public access');
+  assert.equal((candidate.match(/match \/pointerPdfLibrary/g)||[]).length,1);
+  assert.ok(!candidate.includes('{allPaths=**}'),'No public recursive wildcard should cover saved PDFs');
+});
