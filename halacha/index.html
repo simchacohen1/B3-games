@@ -179,7 +179,7 @@ body.exporting .resize-width,body.exporting .resize-height{display:none!importan
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="../firebase-config.js"></script>
-<script src="../site-settings.js?v=20261008-owner-demo"></script><script src="../student-class.js?v=20261007-tab-login"></script>
+<script src="../site-settings.js?v=20261008-owner-demo"></script><script src="../teacher-practice.js?v=20261014"></script><script src="../student-class.js?v=20261007-tab-login"></script>
 <script src="../game-gate.js?v=20261008-owner-demo" data-game-id="halacha" data-back-href="../index.html"></script>
 <link rel="stylesheet" href="scrapbook-editor.css?v=20261012-studio-shapes-5"></head><body><header><div class=bar><h1 id="halachaTitle">📔 My Halacha Scrapbook — סימן א</h1><button id="studentModeBtn" onclick="setHalachaMode(false)">Student</button><button id="teacherModeBtn" style="display:none;background:#fff3bf;color:#5c4300" onclick="setHalachaMode(true)">👨‍🏫 Teacher</button><a class="game-show-link" href="../game-show/teacher.html" target="_blank" rel="noopener">🏆 Game Show</a><button onclick="openExport()">Print / PDF / Slides</button><span id="cloudSaveStatus" style="font-size:12px;font-weight:800;opacity:.9">Saving on this device</span></div></header><main><div id="halachaAccessPanelMain" class="halacha-access-panel"><h3>🔒 Student Siman Access</h3><div id="halachaAccessRowsMain">Loading class access…</div><div class="halacha-access-note">Choose the furthest Siman students may open. Earlier Simanim remain open; later Simanim stay locked.</div></div><div id="simanHub" class="simanHub"></div><button id="simanBack" class="simanBack" type="button" onclick="showSimanHub()">← Back to Simanim</button><div id=tabs class="tabs siman-tabs"></div><div id=sections></div><div id=review class="section teacherOnly"></div></main><script>
 const lessons=[
@@ -198,11 +198,13 @@ const HALACHA_TEACHER_LESSON=HALACHA_PARAMS.get("teacher")==="1";
 const HALACHA_TEACHER_PREVIEW=HALACHA_TEACHER_LESSON||!!HALACHA_TEACHER_VIEW;
 const HALACHA_STUDENT_ID=String(HALACHA_TEACHER_VIEW||(HALACHA_TEACHER_LESSON?"":sessionStorage.getItem("b3Games_studentId")||"")).trim();
 const HALACHA_LOCAL_KEY="halachaV14"+(HALACHA_STUDENT_ID?":"+HALACHA_STUDENT_ID:"");
-let S={};try{S=JSON.parse(localStorage.getItem(HALACHA_LOCAL_KEY+(HALACHA_TEACHER_LESSON?"_teacher":""))||"{}")}catch(e){}
+let S={};try{S=JSON.parse(localStorage.getItem(HALACHA_TEACHER_LESSON?"__teacher_private_loading__":HALACHA_LOCAL_KEY)||"{}")}catch(e){}
 let halachaDb=null,halachaAuth=null,cloudSaveTimer=null,halachaCloudLoading=true,halachaDirty=false,halachaSaveRevision=0;
 const HALACHA_PENDING_KEY="halachaPending:"+HALACHA_STUDENT_ID;
 try{if(!HALACHA_TEACHER_PREVIEW&&localStorage.getItem(HALACHA_PENDING_KEY)==="1")halachaDirty=true}catch(e){}
-let teacherAccountUid="",teacherCloudReady=false,teacherDirty=false;
+let teacherAccountUid="",teacherCloudReady=false,teacherDirty=false,teacherPractice=null;
+function teacherSaveKey(){return teacherPractice?"halachaV14_teacher:"+teacherAccountUid+":"+teacherPractice.classId:null}
+function teacherPendingKey(){return teacherPractice?"halachaTeacherPending:"+teacherAccountUid+":"+teacherPractice.classId:null}
 try{
  if(window.firebase&&window.B3_FIREBASE_CONFIG){
    if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
@@ -216,7 +218,7 @@ try{
  }
 }catch(e){console.warn("Halacha cloud save unavailable",e)}
 function cloudPath(){
- if(HALACHA_TEACHER_LESSON)return teacherAccountUid?"b3Games/teachers/"+teacherAccountUid+"/halacha/siman1":null;
+ if(HALACHA_TEACHER_LESSON)return teacherPractice?teacherPractice.path("halacha/siman1"):null;
  return HALACHA_STUDENT_ID?"b3Games/students/"+HALACHA_STUDENT_ID+"/halacha/siman1":null;
 }
 function setSaveStatus(msg){let x=document.getElementById("cloudSaveStatus");if(x)x.textContent=msg}
@@ -224,13 +226,13 @@ function save(){
  if(HALACHA_TEACHER_VIEW){setSaveStatus("Teacher view — student work is read only");return}
  if(HALACHA_TEACHER_LESSON){
    teacherDirty=true;
-   try{localStorage.setItem(HALACHA_LOCAL_KEY+"_teacher",JSON.stringify(S));if(teacherAccountUid)localStorage.setItem("halachaTeacherPending:"+teacherAccountUid,JSON.stringify(S))}catch(e){}
-   try{localStorage.setItem(teacherAccountUid?"halachaV14_teacher:"+teacherAccountUid:HALACHA_LOCAL_KEY+"_teacher",JSON.stringify(S))}catch(e){}
+   // Never reuse another teacher's saved work from this browser.
+   try{if(teacherSaveKey()){localStorage.setItem(teacherSaveKey(),JSON.stringify(S));localStorage.setItem(teacherPendingKey(),JSON.stringify(S))}}catch(e){}
    if(!teacherCloudReady||!cloudPath()){setSaveStatus("Teacher copy saved on this device ? connecting to account?");return}
    setSaveStatus("Saving teacher copy?");clearTimeout(cloudSaveTimer);
    const state=JSON.parse(JSON.stringify(S));
    halachaDb.ref(cloudPath()).set({version:1,updatedAt:firebase.database.ServerValue.TIMESTAMP,state})
-    .then(()=>{if(JSON.stringify(S)===JSON.stringify(state)){teacherDirty=false;localStorage.removeItem("halachaTeacherPending:"+teacherAccountUid)}setSaveStatus("Teacher copy saved to my account")})
+    .then(()=>{if(JSON.stringify(S)===JSON.stringify(state)){teacherDirty=false;localStorage.removeItem(teacherPendingKey())}setSaveStatus("Teacher copy saved to my account")})
     .catch(e=>{console.warn("Teacher cloud save failed",e);setSaveStatus("Teacher copy saved on this device ? account save failed")});
    return;
  }
@@ -275,27 +277,46 @@ async function loadCloudHalacha(){
 }
 
 async function loadTeacherCopy(){
- const user=window.firebase&&firebase.auth().currentUser;
- if(!user||!halachaDb){setSaveStatus("Teacher copy saved on this device ? sign in to sync");return}
- teacherAccountUid=user.uid;
- const key="halachaV14_teacher:"+user.uid;
- setSaveStatus("Loading teacher copy from my account?");
+ if(!halachaDb||!window.B3SiteSettings){setSaveStatus("Teacher account unavailable — changes stay in this tab");return}
+ const account=await new Promise(resolve=>window.B3SiteSettings.onAuthStateChanged((user,authorized,access)=>resolve({user,authorized,access})));
+ if(!account.user||!account.authorized||!['admin','teacher'].includes(account.access?.role)){
+   setSaveStatus("Please sign in as a teacher to load your practice copy");return;
+ }
  try{
-  const snap=await halachaDb.ref(cloudPath()).once("value"),row=snap.val();
-  const pending=localStorage.getItem("halachaTeacherPending:"+user.uid);
+  teacherAccountUid=account.user.uid;
+  teacherPractice=await B3TeacherPractice.open(halachaDb,account.user,account.access,'halacha');
+  const scopeKey=teacherSaveKey(),pendingKey=teacherPendingKey();
+  setSaveStatus("Loading your private teacher scrapbook…");
+  const snap=await halachaDb.ref(cloudPath()).once("value");
+  let row=snap.val();
+  // Preserve the earlier owner teacher copy without modifying the old record.
+  if(!row?.state && account.access.role==='admin'){
+    try{
+      const legacy=(await halachaDb.ref('b3Games/teachers/'+teacherAccountUid+'/halacha/siman1').once('value')).val();
+      if(legacy?.state)row=legacy;
+    }catch(error){console.warn("Old teacher copy unavailable",error)}
+  }
+  const pending=localStorage.getItem(pendingKey);
   if(pending&&!teacherDirty){S=JSON.parse(pending);teacherDirty=true}
   if(!teacherDirty){
-   if(row&&row.state)S=row.state;
-   else{const local=localStorage.getItem(key);if(local)S=JSON.parse(local)}
-   localStorage.setItem(key,JSON.stringify(S));
-   const current=document.querySelector(".section.on"),id=current?current.id:"";
-   closeCustomizer();sections.innerHTML="";lessons.forEach(render);
-   if(id&&lessons.some(l=>l.id===id)){const l=lessons.find(x=>x.id===id);CURRENT_SIMAN=simanOfLesson(l);openSiman(CURRENT_SIMAN);show(id)}else showSimanHub();
+    if(row?.state)S=row.state;
+    else{
+      const local=localStorage.getItem(scopeKey);
+      const ownerLegacy=account.access.role==='admin'?localStorage.getItem('halachaV14_teacher:'+teacherAccountUid):null;
+      S=local?JSON.parse(local):ownerLegacy?JSON.parse(ownerLegacy):{};
+    }
+    localStorage.setItem(scopeKey,JSON.stringify(S));
+    const current=document.querySelector(".section.on"),id=current?current.id:"";
+    closeCustomizer();sections.innerHTML="";lessons.forEach(render);
+    if(id&&lessons.some(l=>l.id===id)){const l=lessons.find(x=>x.id===id);CURRENT_SIMAN=simanOfLesson(l);openSiman(CURRENT_SIMAN);show(id)}else showSimanHub();
   }
   teacherCloudReady=true;
-  if(!row||!row.state||teacherDirty)save();
-  else setSaveStatus("Teacher copy saved to my account");
- }catch(e){console.warn("Teacher cloud load failed",e);setSaveStatus("Teacher copy saved on this device ? account sync unavailable")}
+  if(!snap.exists()||teacherDirty)save();
+  else setSaveStatus("✓ Teacher scrapbook saved to my account");
+ }catch(error){
+  console.warn("Teacher scrapbook sync failed",error);
+  setSaveStatus("Teacher scrapbook account unavailable: "+(error.message||"Could not connect"));
+ }
 }
 
 function teacherSource(id){
