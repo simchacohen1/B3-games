@@ -141,8 +141,15 @@ test('highlight messages enforce admission and permission and ignore forged owne
 test('connection errors distinguish blocked service, expired rooms and unsupported browsers',()=>{
  const f=teacherFixture();
  for(const [type,expected] of [['network','0.peerjs.com'],['socket-error','port 443'],['peer-unavailable','new join link'],['browser-incompatible','Chrome or Edge'],['webrtc','WebRTC']]){
-  f.context.peerFailure={type};f.run('peerError(peerFailure)');assert.ok(f.elements.get('error').textContent.includes(expected));
+  f.context.peerFailure={type};f.run('started=false;admitted=false;peerError(peerFailure)');assert.ok(f.elements.get('error').textContent.includes(expected));
  }
+});
+test('transient signaling errors during an active lesson show reconnecting instead of a fatal error',()=>{
+ const f=teacherFixture();
+ f.context.peerFailure={type:'network'};
+ f.run('started=true;peerError(peerFailure)');
+ assert.equal(f.elements.get('error').textContent||'', '');
+ assert.match(f.elements.get('status').textContent||'',/reconnect/i);
 });
 test('student connection IDs are generated locally without a server ID request',()=>{
  const f=teacherFixture();let received;const instance=new EventEmitter();
