@@ -266,7 +266,10 @@ const SMART_ART_RULES=[
   [/\blift\b|\blifted\b|\bcarry\b|\bcarried\b|\braise\b/,['⬆️','🙌','📦','💪']],
   [/\beye\b|\beyes\b/,['👁️','👀','🙂','🔎']],
   [/\bthree\b|\b3\b/,['3️⃣','🔺','🔢','🧩']],
-  [/\bman\b|\bmen\b|\bperson\b|\bpeople\b/,['👥','📛','🏠','🗣️']],
+  // A singular man needs its own concrete teacher-preview cues. Avoid treating
+  // איש / "man" as the same as a crowd; teacher chooses what students see.
+  [/\bman\b|\bish\b|איש/u,['👤','👔','🧢','🎩','👞']],
+  [/\bmen\b|\bperson\b|\bpeople\b/,['👥','📛','🏠','🗣️']],
   [/\bstand\b|\bstood\b|standing|firm/,['🧍','📍','⬆️','🚶']],
   [/\brun\b|\bran\b|running|hurr(y|ied)|quick/,['🏃','💨','👟','⚡']],
   [/\bcall\b|\bcalled\b|\bsay\b|\bsaid\b|\bspeak\b|\bspoke\b/,['🗣️','💬','📣','👄']],
