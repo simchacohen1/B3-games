@@ -28,13 +28,36 @@
             window.ClassPointerDashboard?.end().finally(()=>location.assign('classroom.html?dashboard=teacher&class='+encodeURIComponent(picker.value)));
           });
         }
-        resolve({db,ref,user});
+        resolve({db,ref,user,row});
       }catch(error){reject(error)}
     });
   });
   // startClass awaits this authorization automatically when Open teacher classroom is clicked; consume any rejection safely.
   ready.catch(()=>{});
-  window.ClassPointerDashboard={ready,async publish(room){
+  window.ClassPointerDashboard={
+  ready,
+  async students(){
+    const context=await ready;
+    const members=context.row.members||{};
+    const ids=Object.keys(members).filter(id=>C.validId(id)&&members[id]?.active!==false);
+    const result=await Promise.all(ids.map(async id=>{
+      let name=String(members[id]?.name||'').trim();
+      try{
+        const profile=(await context.db.ref('b3Games/students/'+id+'/profile').once('value')).val();
+        if(profile?.name)name=String(profile.name).trim();
+      }catch(_){/* The class membership remains authoritative when profiles are unavailable. */}
+      return {id,name:name||id};
+    }));
+    return result.sort((a,b)=>a.name.localeCompare(b.name));
+  },
+  async updateActivityPermissions(policy){
+    const ref=activeRef;if(!ref)return;
+    const context=await ready;
+    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
+    const clean=raw=>Object.fromEntries(Object.entries(raw||{}).filter(([id,v])=>C.validId(id)&&!['__proto__','constructor','prototype'].includes(id)&&v===true));
+    await ref.update({screenSharingDenied:clean(policy?.screens),whiteboardDenied:clean(policy?.boards)});
+  },
+  async publish(room){
     const current=++revision;
     const context=await ready;
     if(!C.validRoom(room))throw Error('The classroom connection is not ready.');
@@ -54,15 +77,17 @@
       studentScreenSharing:true,
       shareRequest:{at:firebase.database.ServerValue.TIMESTAMP}
     });
-  },async requestStudentDestination(mode){
+  },async requestStudentDestination(mode,policy){
     if(!['screens','boards'].includes(mode))throw Error('Choose screens or whiteboards.');
     const ref=activeRef;if(!ref)throw Error('Open a classroom before sending students.');
     const context=await ready;
     if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
     // A live class session is authorized and scoped to the teacher's assigned class.
     // Use a server timestamp: existing student pages reject old requests.
+    const clean=raw=>Object.fromEntries(Object.entries(raw||{}).filter(([id,v])=>C.validId(id)&&!['__proto__','constructor','prototype'].includes(id)&&v===true));
     await ref.update({
       studentScreenSharing:mode==='screens',
+      screenSharingDenied:clean(policy?.screens),whiteboardDenied:clean(policy?.boards),
       destinationRequest:{mode,at:firebase.database.ServerValue.TIMESTAMP}
     });
   },async setStudentScreenSharing(enabled){
