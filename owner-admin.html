@@ -74,6 +74,7 @@ main{max-width:760px;margin:24px auto 90px;padding:0 16px}
 <div id="ownerArea" class="hidden">
 <div class="notice"><strong>Owner level:</strong> Manage the Fun Torah Tools platform here. B3 is your first classroom. Work top to bottom: 1 → 4.</div>
 
+<section class="card" id="teacherRequestSection"><h2>Teacher approval requests</h2><p class="hint">Review new applicants. Approval creates a teacher invitation; assign a class separately before they can use classroom tools.</p><button type="button" id="refreshTeacherRequests">Refresh requests</button><div id="teacherRequestList" aria-live="polite">Press Refresh requests to load applications.</div></section>
 <section class="card"><div class="card-head"><div class="stepnum">1</div><h2>Teachers</h2></div>
 <p class="hint">Add a teacher by their Gmail. They can sign in with Google after you give them a class (step 3).</p>
 <div class="formrow"><input id="teacherEmail" placeholder="Teacher Gmail"><input id="teacherName" placeholder="Teacher name"><button id="addTeacher">Add teacher</button></div>
@@ -130,7 +131,7 @@ async function load(){
 }
 q("addTeacher").onclick=async()=>{const email=q("teacherEmail").value.trim().toLowerCase(),name=q("teacherName").value.trim();if(!email.includes("@"))return;await db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+key(email)).update({email:email,name:name||email,role:"teacher",active:true,updatedAt:firebase.database.ServerValue.TIMESTAMP});q("teacherEmail").value="";q("teacherName").value="";q("status").textContent="Teacher invitation saved. Assign a class below; the teacher can then sign in with Google.";await load()};
 q("addClass").onclick=async()=>{const name=q("className").value.trim();if(!name)return;let id=key(name);const exists=await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value");if(exists.exists())id+="_"+Date.now().toString().slice(-4);await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name:name,active:true});q("className").value="";q("status").textContent="Class added ✓";await load()};
-q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=q("classSelect").value;if(!t||!c){q("status").textContent="Choose a teacher and class.";return}const root="b3Games/workspaces/"+WS,updates={[root+"/teacherInvites/"+t+"/classIds/"+c]:true},uid=teacherData[t]?.claimedUid;if(uid){updates[root+"/teachers/"+uid+"/classIds/"+c]=true;updates[root+"/classes/"+c+"/teacherIds/"+uid]=true;}await db.ref().update(updates);q("status").textContent="Assigned.";await load()};
+q("assign").onclick=async()=>{const t=q("teacherSelect").value,c=q("classSelect").value;if(!t||!c){q("status").textContent="Choose a teacher and class.";return}const root="b3Games/workspaces/"+WS,updates={[root+"/teacherInvites/"+t+"/classIds/"+c]:true,[root+"/teacherInvites/"+t+"/active"]:true},uid=teacherData[t]?.claimedUid;if(uid){updates[root+"/teachers/"+uid+"/classIds/"+c]=true;updates[root+"/classes/"+c+"/teacherIds/"+uid]=true;}await db.ref().update(updates);q("status").textContent="Assigned.";await load()};
 // ---- Unassign / delete (owner only; this page is gated to the owner account) ----
 const B3_CLASSES=["et","wt"];
 // A signed-in teacher's own record, found by their invitation's claimedUid or by matching email.
@@ -226,4 +227,33 @@ auth.onAuthStateChanged(async user=>{const owner=user&&String(user.email||"").to
 </script>
 <script>
 (function(){const t=document.getElementById("status");let timer;new MutationObserver(()=>{if(!t.textContent)return;t.classList.add("show");clearTimeout(timer);timer=setTimeout(()=>{t.classList.remove("show")},3800)}).observe(t,{childList:true,characterData:true,subtree:true})})();
-</script></body></html>
+</script><script>
+(function(){
+const API='https://us-central1-b3-games.cloudfunctions.net/funTorahTeacherRequests';
+const root=document.getElementById('teacherRequestList'),btn=document.getElementById('refreshTeacherRequests');
+if(!root||!btn)return;
+async function call(action,extra={}){
+ const user=firebase.auth().currentUser;
+ if(!user)throw Error('Please sign in as owner first.');
+ const token=await user.getIdToken();
+ const response=await fetch(API,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({action,...extra})});
+ const data=await response.json();if(!response.ok)throw Error(data.error||'Request failed');return data;
+}
+const esc=x=>{const el=document.createElement('div');el.textContent=String(x||'');return el.innerHTML};
+async function refresh(){
+ root.textContent='Loading…';try{
+ const data=await call('list');const requests=data.requests||[];
+ root.innerHTML=requests.length?requests.map(v=>'<div class="entry"><b>'+esc(v.name)+'</b><small>'+esc(v.email)+' — '+esc(v.school)+'</small><p>'+esc(v.purpose)+'</p><button data-request-uid="'+esc(v.uid)+'" data-decision="approve">Approve</button> <button class="danger" data-request-uid="'+esc(v.uid)+'" data-decision="reject">Reject</button></div>').join(''):'No pending teacher requests.';
+ }catch(error){root.textContent=error.message}
+}
+btn.onclick=refresh;
+root.addEventListener('click',async event=>{
+ const button=event.target.closest('button[data-decision]');if(!button)return;
+ const decision=button.dataset.decision;
+ if(!confirm((decision==='approve'?'Approve':'Reject')+' this teacher request?'))return;
+ button.disabled=true;
+ try{await call('review',{uid:button.dataset.requestUid,decision});await refresh()}catch(error){root.textContent=error.message}
+});
+})();
+</script>
+</body></html>
