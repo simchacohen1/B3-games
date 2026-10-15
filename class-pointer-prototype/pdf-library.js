@@ -1,0 +1,77 @@
+'use strict';
+/* Private teacher-only PDF library. Firebase Storage rules enforce ownership by auth UID. */
+(function(){
+  const panel=document.getElementById('teacherPanel');
+  if(!panel)return;
+  const trigger=document.createElement('button');trigger.id='pointerPdfLibrary';trigger.type='button';trigger.textContent='📚 My PDF Library';trigger.title='Your private saved lesson PDFs';
+  document.getElementById('openPdf')?.after(trigger);
+  const dialog=document.createElement('dialog');dialog.id='pointerPdfLibraryDialog';dialog.className='pointer-library-dialog';
+  dialog.innerHTML='<div class="pointer-library-header"><h2>My PDF Library</h2><button type="button" id="pointerLibraryClose">✕</button></div><p>Only you can browse these saved PDFs. Students see a file only when you present it.</p><div class="pointer-library-actions"><button id="pointerLibrarySave" type="button">Save current PDF</button><span id="pointerLibraryStatus" role="status"></span></div><div id="pointerLibraryItems"></div>';
+  document.body.append(dialog);
+  const close=dialog.querySelector('#pointerLibraryClose'),save=dialog.querySelector('#pointerLibrarySave'),status=dialog.querySelector('#pointerLibraryStatus'),items=dialog.querySelector('#pointerLibraryItems');
+  const style=document.createElement('style');style.textContent='.pointer-library-dialog{max-width:min(660px,94vw);width:660px;max-height:82vh;overflow:auto;border:1px solid #c9d4e4;border-radius:16px;padding:18px;box-shadow:0 15px 60px #10223a66;color:#172d49;background:#fff}.pointer-library-dialog::backdrop{background:#101d3888}.pointer-library-header,.pointer-library-row,.pointer-library-actions{display:flex;align-items:center;gap:12px;justify-content:space-between}.pointer-library-row{border-top:1px solid #e4e9f1;padding:12px 0;flex-wrap:wrap}.pointer-library-row strong{overflow-wrap:anywhere;flex:1;min-width:160px}.pointer-library-row button{white-space:nowrap}.pointer-library-actions{justify-content:flex-start;flex-wrap:wrap;margin:14px 0}.pointer-library-dialog button{cursor:pointer}';document.head.append(style);
+  const auth=()=>window.firebase?.auth?.().currentUser||null;
+  const storage=()=>window.firebase?.storage?.()||null;
+  const prefix=()=>{const user=auth();return user&&storage()?storage().ref('pointerPdfLibrary/'+user.uid+'/'):null};
+  const errorText=e=>e?.code==='storage/unauthorized'?'Library access was denied. Please sign in as your teacher account.':(e?.message||'Library unavailable. Check Firebase Storage and its security rules.');
+  let currentFile=null,activeId=null,openedPage=1;
+  const setStatus=s=>{status.textContent=s};
+  function requiresAuth(){if(!prefix()){setStatus('Please sign in to your teacher account.');return false}return true}
+  async function refresh(){
+    if(!requiresAuth())return;
+    items.replaceChildren();setStatus('Loading…');
+    try{
+      const result=await prefix().listAll();
+      const entries=await Promise.all(result.items.map(async ref=>({ref,meta:await ref.getMetadata()})));
+      entries.sort((a,b)=>new Date(b.meta.updated)-new Date(a.meta.updated));
+      if(!entries.length){items.textContent='No saved PDFs yet.';setStatus('');return}
+      for(const {ref,meta} of entries){
+        const row=document.createElement('div');row.className='pointer-library-row';
+        const name=document.createElement('strong');name.textContent=meta.customMetadata?.displayName||meta.name.replace(/\.pdf$/i,'');
+        const page=Number.parseInt(meta.customMetadata?.lastPage||'1',10);
+        const open=document.createElement('button');open.textContent='Open';open.type='button';
+        open.onclick=async()=>{setStatus('Opening '+name.textContent+'…');open.disabled=true;try{
+          const url=await ref.getDownloadURL();const response=await fetch(url);if(!response.ok)throw Error('Could not download PDF');
+          const blob=await response.blob();const file=new File([blob],name.textContent+'.pdf',{type:'application/pdf'});
+          await window.ClassPointerPdf.openFile(file);activeId=meta.name;openedPage=Number.isFinite(page)&&page>0?page:1;
+          window.ClassPointerPdf.goToPage(openedPage-1);dialog.close();
+        }catch(e){setStatus(errorText(e))}finally{open.disabled=false}};
+        const rename=document.createElement('button');rename.textContent='Rename';rename.type='button';
+        rename.onclick=async()=>{const next=prompt('New PDF name:',name.textContent);if(!next?.trim())return;try{await ref.updateMetadata({customMetadata:{...(meta.customMetadata||{}),displayName:next.trim().slice(0,100)}});await refresh()}catch(e){setStatus(errorText(e))}};
+        const remove=document.createElement('button');remove.textContent='Delete';remove.type='button';
+        remove.onclick=async()=>{if(!confirm('Delete "'+name.textContent+'" from your private library?'))return;try{await ref.delete();if(activeId===meta.name)activeId=null;await refresh()}catch(e){setStatus(errorText(e))}};
+        row.append(name,open,rename,remove);items.append(row);
+      }
+      setStatus('');
+    }catch(e){setStatus(errorText(e))}
+  }
+  trigger.onclick=()=>{dialog.showModal();refresh()};
+  close.onclick=()=>dialog.close();
+  dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()});
+  save.onclick=async()=>{
+    if(!requiresAuth())return;
+    if(!currentFile){setStatus('Open a PDF from your computer first.');return}
+    const displayName=(prompt('Save as:',currentFile.name.replace(/\.pdf$/i,''))||'').trim();
+    if(!displayName)return;
+    save.disabled=true;setStatus('Saving…');
+    try{
+      const id=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)) + '.pdf';
+      const ref=prefix().child(id);
+      await ref.put(currentFile,{contentType:'application/pdf',customMetadata:{displayName:displayName.slice(0,100),lastPage:String(Math.max(1,window.ClassPointerPdf.currentPage()+1))}});
+      activeId=id;setStatus('Saved privately.');await refresh();
+    }catch(e){setStatus(errorText(e))}finally{save.disabled=false}
+  };
+  let pageTimer;
+  window.PointerPdfLibrary={
+    onOpened(file){currentFile=file;activeId=null},
+    onPageChanged(page){
+      openedPage=page;
+      if(!activeId||!prefix())return;
+      clearTimeout(pageTimer);const id=activeId;
+      pageTimer=setTimeout(async()=>{
+        if(activeId!==id)return;
+        try{const ref=prefix().child(id);const m=await ref.getMetadata();await ref.updateMetadata({customMetadata:{...(m.customMetadata||{}),lastPage:String(page)}})}catch(_){}
+      },2500);
+    }
+  };
+})();
