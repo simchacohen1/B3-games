@@ -1,10 +1,20 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync('yiddish/teacher-preview.js','utf8');
-async function preview({authorized=true,acting=false,granted=true,classIds=['mine'],search='?class=mine'}={}){
+async function preview({authorized=true,acting=false,granted=true,classIds=['mine'],search='?class=mine',savedPractice={}}={}){
  const calls=[],words=Array.from({length:8},(_,i)=>({id:'word'+i,group:Math.floor(i/4)}));
  const config={unlocked:{mine:0},unlockedSteps:{mine:0},sections:[0,1,2,3].map(i=>({verified:false,words:words.slice(i*2,i*2+2).map(w=>w.id)}))};
  const api={call:async(action,data)=>{calls.push({action,data});return {config,storyGranted:granted};}};
- const context={window:{YiddishAPI:api,YIDDISH_CONTENT:{words},B3TeacherAccountReady:Promise.resolve({user:{getIdToken:async()=>'teacher-token'},authorized,access:{classIds}})},B3SiteSettings:{getActingStudent:()=>acting},URLSearchParams,location:{search},structuredClone,Date,Math,Set};
+ const cloud={ref:path=>({
+   once:async()=>({val:()=>savedPractice[path]||null}),
+   set:async value=>{savedPractice[path]=structuredClone(value)}
+ })};
+ const context={
+   window:{YiddishAPI:api,YIDDISH_CONTENT:{words},B3TeacherAccountReady:Promise.resolve({user:{getIdToken:async()=>'teacher-token',uid:'teacher-1'},authorized,access:{classIds,authorized,role:'teacher'}})},
+   B3SiteSettings:{getActingStudent:()=>acting},
+   firebase:{database:()=>cloud},
+   B3TeacherPractice:{open:async()=>({path:suffix=>'teacherPractice/test/'+suffix})},
+   URLSearchParams,location:{search},structuredClone,Date,Math,Set
+ };
  vm.runInNewContext(source,context);await api.ready;return {api,calls,config};
 }
 test('teacher demonstrations use authorized content and never write student results',async()=>{
@@ -24,3 +34,13 @@ test('demonstrations preserve class story grants',async()=>{const {api}=await pr
 
 test('owner direct links resolve the all-classes wildcard to ET',async()=>{const {api,calls}=await preview({classIds:['*'],search:''});assert.equal(calls[0].data.classId,'et');assert.equal((await api.call('status')).student.classId,'et');});
 test('old wildcard links also resolve to a real class',async()=>{const {calls}=await preview({classIds:['*'],search:'?class=*'});assert.equal(calls[0].data.classId,'et');});
+
+test('teacher Yiddish progress survives closing and reopening the tool',async()=>{
+ const savedPractice={};
+ const first=await preview({savedPractice});
+ let round=(await first.api.call('start',{group:0,part:0})).round;
+ const result=await first.api.call('answer',{roundId:round.id,index:round.index,answer:round.question.wordId});
+ assert.equal(result.correct,true);
+ const next=await preview({savedPractice});
+ assert.deepEqual(Object.keys((await next.api.call('status')).progress),Object.keys(result.progress));
+});
