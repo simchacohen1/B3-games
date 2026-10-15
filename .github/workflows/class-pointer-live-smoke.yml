@@ -1,7 +1,7 @@
 name: Classroom Pointer live release smoke
 on:
   push:
-    branches: [main]
+    branches: [main, fix/pointer-live-smoke-verification]
     paths:
       - 'class-pointer-prototype/**'
       - 'scripts/class-pointer-live-smoke.cjs'

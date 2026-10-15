@@ -33,7 +33,22 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   assert.equal(response.status(),200);
   await page.getByRole('heading',{name:'Classroom Sharing',exact:true}).waitFor();
   assert.equal(await page.locator('[data-classroom-mode]').count(),3);
-  await page.getByRole('button',{name:'Sign in with Google',exact:true}).waitFor({state:'visible',timeout:20000});
+  try{
+    await page.getByRole('button',{name:'Sign in with Google',exact:true}).waitFor({state:'visible',timeout:20000});
+  }catch(error){
+    console.log('Anonymous chooser diagnostics:',JSON.stringify(await page.evaluate(()=>({
+      message:document.getElementById('message')?.textContent,
+      welcome:document.getElementById('welcome')?.textContent,
+      teacherChoiceHidden:document.getElementById('teacherChoice')?.hidden,
+      teacherSignInHidden:document.getElementById('teacherSignIn')?.hidden,
+      firebaseLoaded:typeof window.firebase,
+      settingsLoaded:typeof window.B3SiteSettings,
+      contextLoaded:typeof window.B3_APP_CONTEXT,
+      visibleButtons:Array.from(document.querySelectorAll('button')).filter(b=>b.getClientRects().length).map(b=>b.textContent)
+    }))));
+    console.log('Uncaught public page errors:',JSON.stringify(errors));
+    throw error;
+  }
   assert.equal(await page.locator('#teacherClassButtons button').count(),0,'Anonymous visitors cannot select or start a class');
   for(const mode of ['screens','boards','lesson']){
    await page.locator('[data-classroom-mode="'+mode+'"]').click();
