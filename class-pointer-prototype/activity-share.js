@@ -69,11 +69,14 @@
     promptPanel.innerHTML='<div style="font-size:48px" aria-hidden="true">🖥️</div><h2 style="font-size:clamp(27px,4vw,38px);margin:8px 0 12px">Your teacher would like to see your screen</h2><p style="font-size:19px;line-height:1.45">Choose what you want to share in the next window. You can stop sharing whenever you want.</p><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:22px 0"><div style="background:#eaf5ff;border-radius:14px;padding:15px 5px"><div style="font-size:36px">🌐</div><strong>Browser Tab</strong></div><div style="background:#edf8f0;border-radius:14px;padding:15px 5px"><div style="font-size:36px">🗔</div><strong>Window</strong></div><div style="background:#f1efff;border-radius:14px;padding:15px 5px"><div style="font-size:36px">🖥️</div><strong>Entire Screen</strong></div></div><p style="font-size:15px;line-height:1.5">Press the blue button, select a tab, window, or screen in Microsoft Edge, then press <strong>Share</strong>.</p>';
     const choose=document.createElement('button');choose.type='button';choose.textContent='Choose What to Share';
     choose.style.cssText='display:block;width:100%;background:#205af0;color:white;border:0;border-radius:14px;padding:18px;font:bold 22px system-ui;cursor:pointer;margin-top:18px';
+    const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Not now';cancel.style.cssText='display:block;width:100%;padding:12px;margin-top:10px;background:#fff;border:1px solid #9baecb;border-radius:12px;color:#213654;font:700 16px system-ui;cursor:pointer';
     const promptStatus=document.createElement('p');promptStatus.setAttribute('role','status');promptStatus.style.cssText='color:#ad2438;font-size:15px;margin:12px 0 0';
-    promptPanel.append(choose,promptStatus);promptOverlay.append(promptPanel);document.body.appendChild(promptOverlay);
+    promptPanel.append(choose,cancel,promptStatus);promptOverlay.append(promptPanel);document.body.appendChild(promptOverlay);
     const showPrompt=()=>{promptStatus.textContent='';holder.style.display='none';promptOverlay.style.display='flex';choose.focus()};
     const hidePrompt=()=>{promptOverlay.style.display='none';holder.style.display=active?'flex':'none'};
-    choose.addEventListener('click',()=>{if(active&&!busy){promptStatus.textContent='';btn.click()}});
+    cancel.addEventListener('click',()=>{hidePrompt();promptStatus.textContent='';});
+    // Invoke the capture handler from a real user click, never through a synthesized button.click().
+    choose.addEventListener('click',event=>{if(active&&!busy)beginShare(event)});
 
     const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
     function routeTeacherRequest(session){
@@ -128,11 +131,11 @@
       if(!active)hidePrompt();
       if(next)routeTeacherRequest(next);
     },()=>{active=null;holder.style.display='none';stop()});
-    btn.addEventListener('click',async()=>{
+    async function beginShare(){
       if(stream){stop();return}
       if(busy||!active)return;
       const lesson=active;
-      busy=true;btn.disabled=true;
+      busy=true;btn.disabled=true;choose.disabled=true;
       let captured=null;
       try{
         if(!navigator.mediaDevices?.getDisplayMedia)throw Error('Use Microsoft Edge or Chrome on a computer.');
@@ -184,14 +187,17 @@
         hidePrompt();
       }catch(error){
         promptStatus.textContent=error?.name==='NotAllowedError'?'Sharing canceled. Please try again.':(error.message||'Could not share. Please try again.');
-        captured?.getTracks().forEach(t=>t.stop());stop();
+        captured?.getTracks().forEach(t=>t.stop());
+        // A failure must release media/peer resources without erasing the error or reopening a blocking dialog.
+        stop();
         const networkFailure=error?.code==='ACTIVITY_SHARE_NETWORK';
         status(error?.name==='NotAllowedError'?'Sharing canceled.':error.message||'Could not share.');
         if(networkFailure)fallback.hidden=false;
-        if(active?.roomId===lesson.roomId)showPrompt();
+        hidePrompt();
       }
-      finally{busy=false;btn.disabled=false}
-    });
+      finally{busy=false;btn.disabled=false;choose.disabled=false}
+    }
+    btn.addEventListener('click',beginShare);
     window.addEventListener('pagehide',stop);
   }catch(error){console.warn('Class Pointer activity sharing unavailable',error)}
 })();
