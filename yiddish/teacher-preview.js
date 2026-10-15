@@ -1,8 +1,8 @@
-/* Local demonstration state. Only teacherLoad reads the server; demo work stays here. */
+/* Teacher demonstration with cloud-saved private word progress; guest demos remain temporary. */
 (function () {
   'use strict';
   const api = window.YiddishAPI, liveCall = api.call.bind(api);
-  let state = null, round = null;
+  let state = null, round = null, practiceProgressRef = null;
   const shuffle = items => items.map(value => ({value, n:Math.random()})).sort((a,b)=>a.n-b.n).map(x=>x.value);
   const snapshot = () => round && ({id:round.id, group:round.group, part:round.part,
     index:round.index, total:round.items.length, finished:round.index===round.items.length,
@@ -29,8 +29,11 @@
     config.unlocked[classId] = 4;
     delete config.unlockedSteps;
     config.sections.forEach(section => section.verified = true);
-    state = {student:{id:'teacher_preview', name:'Teacher demonstration', classId},
-      config, progress:{}, noStory:loaded.storyGranted===false, storyTimes:loaded.storyTimes};
+    const practice = await B3TeacherPractice.open(firebase.database(), account.user, account.access, 'yiddish');
+    practiceProgressRef = firebase.database().ref(practice.path('yiddish/progress'));
+    const progressSnap = await practiceProgressRef.once('value');
+    state = {student:{id:'teacher_preview', name:'Teacher practice', classId},
+      config, progress:progressSnap.val()||{}, noStory:loaded.storyGranted===false, storyTimes:loaded.storyTimes};
     api.preview = true;
   })();
   api.call = async function (action, data = {}) {
@@ -61,6 +64,7 @@
         const old = state.progress[question.wordId] || {credits:0, rounds:0};
         state.progress[question.wordId] = {credits:Math.min(2,old.credits+(firstTry?1:0)),rounds:old.rounds+1};
         round.index++;
+        if(practiceProgressRef) await practiceProgressRef.set(state.progress);
       }
       return {correct, firstTry, round:snapshot(), progress:state.progress};
     }
