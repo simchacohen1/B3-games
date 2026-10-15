@@ -76,7 +76,7 @@
     const hidePrompt=()=>{promptOverlay.style.display='none';holder.style.display=active?'flex':'none'};
     cancel.addEventListener('click',()=>{hidePrompt();promptStatus.textContent='';});
     // Invoke the capture handler from a real user click, never through a synthesized button.click().
-    choose.addEventListener('click',event=>{if(active&&!busy)beginShare(event)});
+    choose.addEventListener('click',event=>{if(active&&!busy)return beginShare(event)});
 
     const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
     function routeTeacherRequest(session){
