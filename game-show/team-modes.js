@@ -238,7 +238,7 @@
       const unlockAt=delayOn?now+(parseInt(document.getElementById("delaySeconds").value)||10)*1000:now;
       const rotation=Number(data.teamRoundCount)||0;
       const contestants=teamMode?contestantsFor(data,rotation):null;
-      if(teamMode&&(!contestants.A||!contestants.B)){
+      if(shouldStart&&teamMode&&(!contestants.A||!contestants.B)){
         document.getElementById("soundStatus").textContent="Team Mode needs at least two students in the game.";return;
       }
       cancelSpeech();
