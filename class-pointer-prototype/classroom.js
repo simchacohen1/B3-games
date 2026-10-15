@@ -193,14 +193,10 @@ async function startClass(){
   peer.on('connection',receiveStudent);peer.on('call',call=>{if(call.metadata?.kind==='activity-screen'){if(window.ClassPointerActivityShares)void window.ClassPointerActivityShares.incomingCall(call);else call.close();return}if(!window.ClassPointerBoards?.incomingCall(call))call.close()});
 }
 async function requestEveryoneToShare(){
-  const button=$('sendEveryoneShare');
-  if(!isTeacher||!started||!window.ClassPointerDashboard?.requestScreenSharing)return;
-  if(button)button.disabled=true;
-  try{
-    await window.ClassPointerDashboard.requestScreenSharing();
-    status('Screen-sharing request sent to this class. Students will open Class Pointer and click Share My Screen.');
-  }catch(error){fail('Could not send screen-sharing request: '+(error?.message||error))}
-  finally{if(button&&started)button.disabled=false}
+  if(!isTeacher||!started)return;
+  // Use the same Screens mode as the working student gallery. This enables
+  // the teacher's grid and broadcasts the class-specific navigation request.
+  document.dispatchEvent(new Event('classpointer:send-to-screens'));
 }
 function stopSharing(){
   cancelHover();highlighter?.cancel();highlightStore.reset();publishHighlights();generation++;
