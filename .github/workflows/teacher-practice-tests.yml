@@ -1,0 +1,40 @@
+name: Teacher practice safety checks
+
+on:
+  pull_request:
+    paths:
+      - 'teacher-practice.js'
+      - 'firebase-rules.json'
+      - 'chazara/**'
+      - 'rashi-letters/**'
+      - 'shorashim/**'
+      - 'record_pesukim/**'
+      - 'yiddish/**'
+      - 'gematria/**'
+      - 'weekly-quiz/**'
+      - 'halacha/**'
+      - 'sefer-hamitzvos/**'
+      - 'tests/teacher-practice.test.cjs'
+      - 'tests/yiddish-teacher-preview.test.cjs'
+      - '.github/workflows/teacher-practice-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  teacher-practice-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify protected teacher practice routes and Yiddish persistence
+        run: node --test tests/teacher-practice.test.cjs tests/yiddish-teacher-preview.test.cjs
+      - name: Syntax check private practice scripts
+        run: |
+          node --check teacher-practice.js
+          node --check shorashim/app.js
+          node --check yiddish/teacher-preview.js
+          node --check yiddish/app.js
