@@ -308,7 +308,8 @@ async function trySavedStudent(){
 // Teachers opening Student Version get their own cloud-synced practice profile.
 // This profile never appears in a real student's progress, leaderboard or rewards.
 async function enterTeacherPreview(user,access){
-  const selected=new URLSearchParams(location.search).get('class')||sessionStorage.getItem('b3Games_studentClass')||'';
+  teacherPractice=await B3TeacherPractice.open(cloudDb,user,access,'shorashim');
+  const selected=teacherPractice.classId;
   if(access.role!=='admin'&&!(access.classIds||[]).includes(selected))throw new Error('Open Shorashim from your assigned class on the homepage.');
   if(selected){
     const workspace=window.B3_WORKSPACE_ID||'b3-2026';
@@ -321,7 +322,6 @@ async function enterTeacherPreview(user,access){
     cloudDb.ref(`${CLOUD_ROOT}/catalog`).once('value'),
     cloudDb.ref(`${CLOUD_ROOT}/settings`).once('value')
   ]);
-  teacherPractice=await B3TeacherPractice.open(cloudDb,user,access,'shorashim');
   const practiceSnap=await cloudDb.ref(teacherPractice.path('shorashim/student')).once('value');
   const saved=practiceSnap.val()||blankStudent();
   normalizeStudent(saved);
