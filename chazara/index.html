@@ -55,12 +55,19 @@
     <div class="confirm-actions"><button id="confirmNo" class="confirm-no">No — try again</button><button id="confirmYes" class="confirm-yes">Yes ✓</button></div>
   </div>
 </div>
+<script src="../teacher-practice.js?v=20261014"></script>
 <script src="teacher-preview.js"></script>
 <script>
 const fallbackConfig={apiKey:"AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",authDomain:"b3-games.firebaseapp.com",databaseURL:"https://b3-games-default-rtdb.firebaseio.com",projectId:"b3-games",storageBucket:"b3-games.firebasestorage.app",messagingSenderId:"568530046190",appId:"1:568530046190:web:fd765fdd27e55a3c73f7ff"};
 if(!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG||fallbackConfig);
 let db=firebase.database(),storage=firebase.storage();
 let teacherPreview=false;
+async function enablePersistentTeacherPractice(user, access) {
+  const practice = await B3TeacherPractice.open(db, user, access, 'chazara');
+  db = practice.dbAdapter(db);
+  storage = practice.recordingStorage();
+  teacherPreview = true; // No genuine student points or approval requests.
+}
 let sid=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId')||'';
 let sname=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName')||'Student';
 const ROOT='posukPractice/chazara/students/', EVENTS='posukPractice/chazara/events/', POINT_REQUEST_URL='https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward';
@@ -375,9 +382,16 @@ if(guestPreview){
   attemptsRoot={'preview_1_1':sampleAttempt,'preview_1_2':sampleAttempt,'preview_1_3':sampleAttempt};
   await db.ref('posukPractice/attempts/'+sid).set(attemptsRoot);
 }else if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
-  enableTeacherPreview();sid='teacher_preview';sname='Teacher Preview - sample chart, no student work or points saved';
-  attemptsRoot={'preview_1_1':{demo:{hebrewScore:100,translationTotal:1,translationChunkResults:[{verdict:'correct'}]}},'preview_1_2':{demo:{hebrewScore:100,translationTotal:1,translationChunkResults:[{verdict:'correct'}]}}};
-  await db.ref('posukPractice/attempts/'+sid).set(attemptsRoot);
+  try {
+    await enablePersistentTeacherPractice(account.user, window.B3SiteSettings.getCurrentAccess());
+    sid='teacher_preview';sname='Teacher Practice — your Chazaras and recordings are saved';
+    const help = document.querySelector('.record-help');
+    if(help) help.textContent='Teacher practice: work saves privately to your account. No real reward points or approvals are issued.';
+  } catch (error) {
+    console.error('Could not open teacher Chazara practice', error);
+    $('studentNameTop').textContent=error.message||'Practice unavailable';
+    return;
+  }
 }
 if(!sid){$('studentNameTop').textContent='Not signed in';$('switchStudentBtn').classList.add('hidden');$('noStudent').classList.remove('hidden');return}$('studentNameTop').textContent=sname;$('app').classList.remove('hidden');try{const [stateSnap,attemptSnap,eventSnap]=await Promise.all([db.ref(ROOT+sid).once('value'),db.ref('posukPractice/attempts/'+sid).once('value'),db.ref(EVENTS+sid).once('value')]);if(stateSnap.exists())d=norm(stateSnap.val());attemptsRoot=attemptSnap.val()||{};chazaraEvents=eventSnap.val()||{};rebuildUnlocked();renderRecordings();db.ref('posukPractice/attempts/'+sid).on('value',s=>{attemptsRoot=s.val()||{};rebuildUnlocked()});db.ref(EVENTS+sid).on('value',s=>{chazaraEvents=s.val()||{};render();renderRecordings()});retryPendingPointSyncs()}catch(e){console.warn(e);render();renderRecordings()}})();
 </script>
