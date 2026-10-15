@@ -463,8 +463,9 @@
             const claimed=await response.json();
             return {authorized:claimed.authorized===true,role:"teacher",classIds:(claimed.classIds||[]).filter(id=>id!=="*"),inviteId:inviteEntry.id};
           }).catch(function(error){
-            if(error.status&&error.status!==404&&error.status!==503)return {authorized:false,role:"",classIds:[]};
-            return {authorized:true,role:"teacher",classIds:classIds,inviteId:inviteEntry.id,claimPending:true,claimError:error.message};
+            // A failed or unavailable verifier must never authorize a new teacher.
+            console.warn("Teacher verification unavailable; access denied.",error);
+            return {authorized:false,role:"",classIds:[]};
           });
         }
         return { authorized:false, role:"", classIds:[] };
