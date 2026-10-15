@@ -3,7 +3,10 @@
 <title>Hebrew Reading — Grading Accuracy Lab</title>
 <style>
 :root{font-family:system-ui,Arial,sans-serif;color:#16283f;background:#edf3f7}*{box-sizing:border-box}body{margin:0}main{max-width:1050px;margin:28px auto;padding:0 18px}h1{margin-bottom:5px}p{line-height:1.5}section{background:white;border:1px solid #d9e3eb;padding:20px;border-radius:14px;margin:17px 0}label{font-weight:700;display:block;margin:12px 0 5px}textarea,input,select{font:inherit;border:1px solid #9daeba;border-radius:8px;padding:9px;width:100%}textarea{min-height:95px}.row{display:grid;grid-template-columns:1fr 1fr;gap:15px}button{background:#175781;color:white;font:inherit;font-weight:700;border:0;border-radius:8px;padding:11px 16px;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.quiet{background:#e7eff5;color:#153e56}.warning{border-left:4px solid #ae6a18;padding:12px;background:#fff5de}.words{display:flex;flex-wrap:wrap;gap:9px;direction:rtl}.word{border:1px solid #b8c8d6;border-radius:9px;padding:12px;min-width:95px;text-align:center}.word b{display:block;font-size:21px}.word.ok{background:#e9f6ee}.word.miss{background:#fff0e8}.word select{font-size:13px;margin-top:8px}.muted{color:#5d6d7b;font-size:14px}#result[hidden]{display:none}@media(max-width:650px){.row{grid-template-columns:1fr}}
-</style></head><body><main>
+</style><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script src="../firebase-config.js"></script><script src="../site-settings.js"></script>
+</head><body><div id="accessGate" style="max-width:650px;margin:15vh auto;padding:28px;background:white;border-radius:14px">Checking teacher access…</div><main id="lab" hidden>
 <h1>Hebrew Reading — Grading Accuracy Lab</h1>
 <p>Teacher-only experimental workspace. Compare existing automated Hebrew-reading grades against what you hear. <strong>Scores are not validated yet.</strong></p>
 <div class="warning"><strong>Privacy:</strong> Do not use student names or identifiable recordings for initial testing. Audio is sent to the existing Posuk Practice scorer for analysis; this page does not save audio. Teacher labels and comparison results remain in this browser until exported or cleared. Do not use this experiment to award grades or points.</div>
@@ -29,6 +32,23 @@
 'use strict';
 const ENDPOINT='https://posuk-scorer.onrender.com/score';
 const KEY='ftt-hebrew-reading-validation-v1';
+(function gate(){
+ const gateEl=document.getElementById('accessGate'),lab=document.getElementById('lab');
+ const api=window.B3SiteSettings;
+ if(!api||!window.firebase||!window.B3_FIREBASE_CONFIG){gateEl.textContent='Teacher sign-in unavailable. Return to Teacher Tools.';return;}
+ try {
+  if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+  api.onAuthStateChanged((user,authorized,access)=>{
+   if(user && (access?.authorized===true) && (access.role==='teacher'||access.role==='admin')){
+    gateEl.hidden=true;lab.hidden=false;
+   }else{
+    lab.hidden=true;gateEl.replaceChildren();
+    const message=document.createElement('p');message.textContent='This experiment is restricted to authorized teachers and administrators.';gateEl.append(message);
+    if(!user){const btn=document.createElement('button');btn.textContent='Sign in with Google';btn.onclick=()=>api.signInWithGoogle().catch(e=>{message.textContent=e.message||'Sign-in failed'});gateEl.append(btn)}
+   }
+  });
+ }catch(e){gateEl.textContent='Could not verify teacher access. Return to Teacher Tools.'}
+})();
 const $=id=>document.getElementById(id);
 let response=null;
 function saved(){try{return JSON.parse(localStorage.getItem(KEY)||'[]')}catch{return []}}
