@@ -145,6 +145,8 @@ async function unassign(inviteId,classId){
  const t=teacherData[inviteId]||{},cname=classData[classId]?.name||classId;
  if(!confirm("Take "+cname+" away from "+(t.name||t.email)+"?"))return;
  const root="b3Games/workspaces/"+WS,uid=await teacherUidFor(inviteId),updates={[root+"/teacherInvites/"+inviteId+"/classIds/"+classId]:null};
+ const remaining=Object.entries(t.classIds||{}).some(([id,granted])=>id!==classId&&granted===true);
+ if(!remaining)updates[root+"/teacherInvites/"+inviteId+"/active"]=false;
  if(uid){updates[root+"/teachers/"+uid+"/classIds/"+classId]=null;updates[root+"/classes/"+classId+"/teacherIds/"+uid]=null;}
  await db.ref().update(updates);q("status").textContent="Unassigned.";await load();
 }
