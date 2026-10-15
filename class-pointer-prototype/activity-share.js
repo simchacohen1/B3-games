@@ -56,7 +56,14 @@
     fallback.textContent='Open Class Pointer';fallback.hidden=true;
     fallback.style.cssText='border:1px solid #1d4ed8;background:white;color:#1d4ed8;border-radius:9px;padding:8px 10px;cursor:pointer;font:700 13px system-ui';
     fallback.addEventListener('click',()=>location.assign(new URL('class-pointer-prototype/dashboard.html',root).href));
-    holder.append(btn,label,fallback);document.body.appendChild(holder);
+    const tabBtn=document.createElement('button'),screenBtn=document.createElement('button');
+    tabBtn.type=screenBtn.type='button';
+    tabBtn.textContent='▣ Share a Tab';screenBtn.textContent='🖥 Entire Screen';
+    for(const option of [tabBtn,screenBtn])option.style.cssText=btn.style.cssText;
+    const preview=document.createElement('video');preview.autoplay=true;preview.muted=true;preview.playsInline=true;preview.hidden=true;
+    preview.style.cssText='width:200px;max-height:125px;border-radius:8px;background:#111';
+    const previewLabel=document.createElement('span');previewLabel.textContent='Live preview';previewLabel.hidden=true;previewLabel.style.cssText='font-size:12px;color:#1e3a8a';
+    btn.hidden=true;holder.append(tabBtn,screenBtn,btn,previewLabel,preview,label,fallback);document.body.appendChild(holder);
     let active=null,peer=null,call=null,stream=null,busy=false;
     const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
     function routeTeacherRequest(session){
@@ -87,7 +94,8 @@
       const prior=stream;stream=null;try{call?.close()}catch{}call=null;
       try{peer?.destroy()}catch{}peer=null;
       prior?.getTracks().forEach(t=>t.stop());
-      btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';
+      btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';btn.hidden=true;
+      tabBtn.hidden=false;screenBtn.hidden=false;preview.hidden=true;previewLabel.hidden=true;preview.srcObject=null;
       label.textContent='';
       fallback.hidden=true;
     }
@@ -110,18 +118,18 @@
       active=shareable;holder.style.display=active?'flex':'none';
       if(next)routeTeacherRequest(next);
     },()=>{active=null;holder.style.display='none';stop()});
-    btn.addEventListener('click',async()=>{
-      if(stream){stop();return}
+    btn.addEventListener('click',()=>{if(stream)stop()});
+    async function beginShare(surface){
       if(busy||!active)return;
       const lesson=active;
-      busy=true;btn.disabled=true;
+      busy=true;tabBtn.disabled=true;screenBtn.disabled=true;
       let captured=null;
       try{
         if(!navigator.mediaDevices?.getDisplayMedia)throw Error('Use Microsoft Edge or Chrome on a computer.');
         // Capture must be called synchronously from the user click, before any await.
         const capturePromise=navigator.mediaDevices.getDisplayMedia({
-          video:{displaySurface:'browser',frameRate:{ideal:5,max:8}},audio:false,
-          preferCurrentTab:true,surfaceSwitching:'include'
+          video:{displaySurface:surface,frameRate:{ideal:5,max:8}},audio:false,
+          preferCurrentTab:surface==='browser',selfBrowserSurface:surface==='monitor'?'exclude':'include',surfaceSwitching:'include'
         });
         captured=await capturePromise;
         if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
@@ -162,7 +170,9 @@
         call=media;stream=captured;
         captured.getVideoTracks()[0]?.addEventListener('ended',stop,{once:true});
         media.on('close',stop);media.on('error',stop);
-        btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';
+        tabBtn.hidden=true;screenBtn.hidden=true;btn.hidden=false;
+        preview.srcObject=captured;preview.hidden=false;previewLabel.hidden=false;
+        preview.play().catch(()=>{});
         status('Sharing started — ask your teacher to confirm');
       }catch(error){
         captured?.getTracks().forEach(t=>t.stop());stop();
@@ -170,8 +180,10 @@
         status(error?.name==='NotAllowedError'?'Sharing canceled.':error.message||'Could not share.');
         if(networkFailure)fallback.hidden=false;
       }
-      finally{busy=false;btn.disabled=false}
-    });
+      finally{busy=false;tabBtn.disabled=false;screenBtn.disabled=false}
+    }
+    tabBtn.addEventListener('click',()=>beginShare('browser'));
+    screenBtn.addEventListener('click',()=>beginShare('monitor'));
     window.addEventListener('pagehide',stop);
   }catch(error){console.warn('Class Pointer activity sharing unavailable',error)}
 })();
