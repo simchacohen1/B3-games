@@ -880,7 +880,11 @@ function goStep(idx){
   const st=STEPS[idx];
   if(st.k==='similar'){ openSimilar(); return; }
   if(st.k==='words'){ openSimilar(); pendingWordLevel=st.n; setSimTab('words'); return; }
-  mode='continue'; unitIndex=guidedIndex; phase=guidedPhase; streak=0; attemptsThisStep=0; retryQuestion=null;
+  // Teachers can inspect any mission without overwriting their saved learning path.
+  const jumpToUnit=teacherPreview && st.k==='unit' && st.i!==guidedIndex;
+  if(jumpToUnit){mode='practice';practiceUnitId=UNITS[st.i].id;phase='letter';}
+  else{mode='continue';unitIndex=guidedIndex;phase=guidedPhase;}
+  streak=0; attemptsThisStep=0; retryQuestion=null;
   document.getElementById('modeGate').style.display='none';
   document.getElementById('similarScreen').style.display='none';
   document.getElementById('app').style.display='block';
