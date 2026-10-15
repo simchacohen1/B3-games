@@ -1835,7 +1835,7 @@ function startLivePresence(){
   if(!scene||(!presenceProfile&&!teacherPresenceViewer)||!presenceRoot||!livePresenceEnabled||presenceStarted)return;
   presenceStarted=true;
   const combined=isLegacyB3Class&&(teacherPresenceViewer||tagOptedIn);
-  presenceClassRef=combined?presenceRoot:presenceRoot.child(presenceProfile.classId);
+  presenceClassRef=combined?presenceRoot:presenceRoot.child(galleryClassId);
   if(!teacherPresenceViewer||(isTeacher&&tagOptedIn)){
     const ownParent=teacherPresenceViewer&&legacyGallery?presenceRoot.child('all'):presenceRoot.child(galleryClassId);
     presenceOwnRef=ownParent.child(currentTagStudentKey()).child(presenceSessionId);presenceOwnRef.onDisconnect().remove();
