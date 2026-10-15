@@ -75,7 +75,20 @@ async function manageStudents(store,identity,body,now=Date.now()){
  const root='b3Games/workspaces/b3-2026',classId=body.classId;
  // The owner account and any active site administrator count as owner here.
  const owner=String(identity.email||'').toLowerCase()==='simcha5770@gmail.com'||(await store.get('b3Games/admins/'+identity.uid))?.active===true;
- if(body.action==='migratePasscodes'){if(!owner)fail(403,'Owner access required.');return migratePasscodes(store,body.deletePublic===true,now,{dryRun:body.dryRun===true});}
+ // The old deployed endpoint ignores extra request fields. Preview MUST use a
+ // distinct action so old functions cannot accidentally perform a deletion.
+ const MIGRATION_PROTOCOL='passcodes-v2-preview-20261015';
+ if(body.action==='previewPasscodeMigration'){
+  if(!owner)fail(403,'Owner access required.');
+  const preview=await migratePasscodes(store,true,now,{dryRun:true});
+  return {...preview,protocol:MIGRATION_PROTOCOL};
+ }
+ if(body.action==='migratePasscodes'){
+  if(!owner)fail(403,'Owner access required.');
+  if(body.deletePublic===true && (body.migrationProtocol!==MIGRATION_PROTOCOL || body.backupConfirmed!==true))
+   fail(409,'Preview the migration and confirm a verified backup before removing public passcodes.');
+  return migratePasscodes(store,body.deletePublic===true,now,{dryRun:body.dryRun===true});
+ }
  if(body.action==='list'&&owner&&body.all===true){
   const [students,legacy]=await Promise.all([store.get('b3Games/students'),store.get('posukPractice/allowedStudents')]);
   const passcodes={};for(const id of new Set([...Object.keys(students||{}),...Object.keys(legacy||{})].filter(key)))passcodes[id]=(await readPasscode(store.get,id,{allowLegacyDefault:true})).passcode;
