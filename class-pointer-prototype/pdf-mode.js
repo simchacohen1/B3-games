@@ -373,6 +373,7 @@
     const had=!!doc;
     if(had)for(const member of B.members().values())B.send(member.connection,{type:'pdf-close'});
     docId=null;bytes=null;unload(true);strokes=[];
+    window.PointerPdfLibrary?.onClosed();
     if(had||!quiet)B.setPdf(false);
     if(had)$('placeholder').hidden=B.sharing();
   }
