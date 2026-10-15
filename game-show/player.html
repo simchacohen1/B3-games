@@ -552,11 +552,11 @@ function buzzIn() {
   if (masterBlocked || !myName) return;
   if (!lastData || lastData.roundActive !== true) return;
   if (lockedUntil && serverNow() < lockedUntil) return;
-  if (lastData && lastData.buzzedBy) return;
+  if (lastData && (lastData.buzzedBy || lastData.narrationLocked || serverNow() < (lastData.buzzUnlockAt || 0))) return;
   // A root transaction keeps winner and streak together even when students
   // buzz simultaneously or another tab has newer state.
   gameRef.transaction(current => {
-    if (!current || current.roundActive !== true || current.buzzedBy) return;
+    if (!current || current.roundActive !== true || current.buzzedBy || current.narrationLocked || serverNow() < (current.buzzUnlockAt || 0)) return;
     if (current.buzzerDelayOn && serverNow() < (current.buzzUnlockAt || 0)) return;
     if (current.revealDelayOn) {
       if (current.buzzPool && current.buzzPool[myName]) return;
@@ -596,7 +596,11 @@ function updateBuzzAvailability() {
     if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
     return;
   }
-  if (lockedUntil && now < lockedUntil) {
+  if (lastData.narrationLocked) {
+    buzzBtn.disabled = true;
+    countdownEl.textContent = 'Listen to the question and colored choices…';
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+  } else if (lockedUntil && now < lockedUntil) {
     buzzBtn.disabled = true;
     const secsLeft = Math.ceil((lockedUntil - now) / 1000);
     countdownEl.textContent = 'Get ready… ' + secsLeft;
@@ -689,7 +693,7 @@ function renderGameSnapshot(snapshot){
   document.getElementById('qnum').textContent = 'Question ' + (qIndex + 1) + ' of ' + questions.length;
   document.getElementById('qtext').textContent = q.q;
 
-  lockedUntil = data.buzzerDelayOn ? (data.buzzUnlockAt || 0) : 0;
+  lockedUntil = data.buzzUnlockAt || 0;
 
   const buzzBtn = document.getElementById('buzzBtn');
   const status = document.getElementById('status');
@@ -722,7 +726,7 @@ function renderGameSnapshot(snapshot){
 }
 </script>
 
-<script src="team-modes.js?v=20261012-1"></script>
+<script src="team-modes.js?v=20261015-colored-choices1"></script>
 <script defer src="../class-pointer-prototype/activity-share.js?v=20261014-send1"></script>
 </body>
 </html>
