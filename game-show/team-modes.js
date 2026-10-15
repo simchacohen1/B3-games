@@ -137,7 +137,7 @@
     if (questionCard) questionCard.insertBefore(teacherBoard, questionCard.querySelector("#answer"));
     const colorsCss = choiceColors.map((c, i) => ".gs-color-choice:nth-child(" + (i + 1) + "){background:" + c.bg + ";color:" + c.fg + ";}").join("");
     const style = document.createElement("style");
-    style.textContent = ".gs-color-choice{border-radius:12px;padding:12px;min-width:0;font-weight:800;font-size:clamp(15px,1.6vw,24px);overflow-wrap:anywhere;text-align:center;border:2px solid #fff8;}" + colorsCss;
+    style.textContent = "#teacherColorChoices[hidden]{display:none!important}.gs-color-choice{border-radius:12px;padding:12px;min-width:0;font-weight:800;font-size:clamp(15px,1.6vw,24px);overflow-wrap:anywhere;text-align:center;border:2px solid #fff8;}" + colorsCss;
     document.head.appendChild(style);
     function renderTeacherChoices(data) {
       const q = questionAt(data);
