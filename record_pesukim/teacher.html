@@ -442,6 +442,61 @@
   .admin-more{ margin-top:24px; font-size:0.8rem; color:var(--ink-soft); }
   .admin-more summary{ cursor:pointer; font-weight:700; }
   .admin-more .mini-tabs{ margin-top:8px; }
+
+/* 2026-10-15 teacher workspace refresh — report filters and results */
+:root{--report-border:#dde3e9;--report-bg:#f6f8fb}
+body{background:#eef3f7;color:#203247}
+.wrap{max-width:1600px;padding:16px 22px 64px}
+header{background:#fff;border:1px solid #dee6ee;border-radius:14px;padding:14px 18px;align-items:center}
+header h1{color:#203b56;font-size:1.35rem}
+header p{color:#64748b}
+.layout{gap:16px;flex-wrap:nowrap}
+.students-panel{flex:0 0 240px;background:#fff;border:1px solid #dde4ec;border-radius:16px;max-height:calc(100vh - 110px);box-shadow:0 5px 20px #24344a0a}
+.students-panel h2{color:#233e59}
+.student-count{color:#6c7c8f}
+.student-search,.sidebar-sort{background:#f8fafc;color:#24344a;border:1px solid #dae2eb}
+.student-search::placeholder{color:#8390a0}
+.student-item{color:#293e53}
+.student-item:hover{background:#eaf0f7;border-color:#cbd8e7}
+.student-item .last-active{color:#77869a}
+.student-item .last-active.stale{color:#ad4d51}
+.student-item.active{background:#e7f0fb;color:#1b4b76;border-color:#aac9e9}
+.main-panel{flex:1 1 0;background:#fff;border:1px solid #dde4ec;border-radius:16px;padding:20px 24px;box-shadow:0 5px 20px #24344a0a}
+.main-panel h2{font-family:'Quicksand',sans-serif;color:#1c344e;font-size:1.38rem;letter-spacing:-.03em}
+.tab-bar{border-bottom:1px solid #e1e7ef;gap:2px;margin:0 0 20px;padding-bottom:8px}
+.tab-btn{border:none;background:transparent;color:#64758a;border-radius:9px;font-weight:700;padding:10px 12px}
+.tab-btn:hover{background:#f1f5f9;color:#1f3c57}
+.tab-btn.active{background:#e8f1fb;color:#1e527e;border:0;box-shadow:inset 0 -2px #3575ad}
+#mainContent:has(.report-filters)>h2{margin-bottom:4px}
+#mainContent:has(.report-filters)>h2::after{content:'Explore progress across students, pesukim and skills';display:block;font-family:'Quicksand',sans-serif;font-size:.8rem;font-weight:500;letter-spacing:0;color:#758397;margin-top:5px}
+.report-filters{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px!important;background:var(--report-bg);border:1px solid var(--report-border);border-radius:14px;padding:18px;margin:20px 0 16px!important}
+.report-filters>div{min-width:0}
+.report-filters>div:first-child{grid-column:span 2;grid-row:span 2}
+.report-filters>div:nth-child(6){grid-column:span 2}
+.report-filters>div:nth-child(10){grid-column:span 2}
+.report-filters label{font-weight:700!important;color:#526579!important;margin-bottom:7px!important}
+.report-filters select,.report-filters input[type=date]{width:100%;min-width:0;border:1px solid #cfdae5;border-radius:9px;padding:10px 9px;background:#fff;color:#233e59;font-family:inherit;font-size:.82rem;min-height:41px}
+.report-filters #reportStudentBox,.report-filters #reportPosukBox{border:1px solid #cfdae5!important;background:#fff!important;border-radius:9px!important;padding:10px!important}
+.report-filters #reportStudentBox{max-height:147px!important}
+.report-filters #reportPosukBox{max-height:90px!important}
+#mainContent:has(.report-filters)>div:has(#reportGenerateBtn){display:flex!important;flex-wrap:wrap;align-items:center;gap:10px!important;margin-bottom:22px!important}
+#reportGenerateBtn,#reportCsvBtn,#reportPrintBtn{box-shadow:none!important;border-radius:9px;padding:11px 16px;background:#23476a!important;color:#fff}
+#reportCsvBtn,#reportPrintBtn{background:#fff!important;color:#274767!important;border:1px solid #cbd7e4}
+#reportSummary>.attempt{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}
+#reportSummary>.attempt>.row{min-width:0;background:#f7fafc;border:1px solid #dde6ee;border-radius:12px;padding:16px 14px!important;display:flex;flex-direction:column-reverse;gap:9px}
+#reportSummary>.attempt>.row .label{font-size:.74rem;color:#64768a}
+#reportSummary>.attempt>.row>span:last-child{font-size:1.4rem;font-weight:800;line-height:1.2;color:#203b56;overflow-wrap:anywhere}
+#reportResults{overflow-x:auto}
+#reportResults .roster-table{width:100%;min-width:650px;border-collapse:separate;border-spacing:0}
+#reportResults .roster-table th{background:#f1f5f9;color:#53677b!important;border-bottom:1px solid #d7e2ec;padding:12px 10px;font-size:.77rem;white-space:nowrap}
+#reportResults .roster-table td{background:#fff;padding:12px 10px;border-bottom:1px solid #e8edf3}
+#reportResults .roster-table tbody tr:hover td{background:#f4f8fd}
+#reportResults .score-pill{border-left-width:3px}
+#reportResults .summary-row,#reportResults .posuk-group{border:1px solid #e0e8f0;box-shadow:none}
+@media(max-width:1250px){.report-filters{grid-template-columns:repeat(3,minmax(0,1fr))}.report-filters>div:first-child{grid-column:span 1;grid-row:span 2}.report-filters>div:nth-child(6),.report-filters>div:nth-child(10){grid-column:span 2}#reportSummary>.attempt{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:850px){.layout{flex-wrap:wrap}.students-panel{position:static;flex:1 1 100%;max-height:220px}.main-panel{flex:1 1 100%}.report-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.report-filters>div:first-child{grid-column:span 2;grid-row:auto}.report-filters>div:nth-child(6),.report-filters>div:nth-child(10){grid-column:span 2}#reportSummary>.attempt{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.wrap{padding:10px}.main-panel{padding:14px}.report-filters{grid-template-columns:1fr}.report-filters>div:first-child,.report-filters>div:nth-child(6),.report-filters>div:nth-child(10){grid-column:span 1}#reportSummary>.attempt{grid-template-columns:1fr 1fr}}
+
 </style>
 </head>
 <body>
