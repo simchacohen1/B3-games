@@ -74,6 +74,7 @@
     const b=event.target.closest('button');if(!b||!dock.contains(b))return;
     if(b.dataset.mode==='point')setSource(toolSel,lastShape);
     else if(['highlight','box','pen','eraser'].includes(b.dataset.mode))setSource(toolSel,b.dataset.mode);
+    else if(b.dataset.draw){setSource(toolSel,b.dataset.draw);closeMenus()}
     else if(b.dataset.shape){lastShape=b.dataset.shape;setSource(toolSel,lastShape);closeMenus()}
     else if(b.hasAttribute('data-color'))setSource(colorSel,b.dataset.color);
     else if(b.dataset.size){setSource(sizeSel,b.dataset.size);if(!window.ClassPointerCore.highlightTools.includes(toolSel.value))setSource(toolSel,'highlight')}
