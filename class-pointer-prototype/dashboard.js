@@ -29,7 +29,7 @@
     let generation=0;
     window.B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
       const current=++generation;
-      buttons.replaceChildren();$('teacherSignIn').hidden=!!authorized;
+      buttons.replaceChildren();classChoices.length=0;$('teacherSignIn').hidden=!!authorized;
       if(!authorized){message('Sign in with your teacher account to select a class.');return}
       try{
         const rows=access.role==='admin'?(await classes.once('value')).val()||{}:Object.fromEntries(await Promise.all((access.classIds||[]).filter(C.validId).map(async id=>[id,(await classes.child(id).once('value')).val()])));
@@ -39,8 +39,9 @@
           const name=String(row.name||id);
           const btn=document.createElement('button');
           btn.type='button';btn.className='class-launch-button';
+          classChoices.push({btn,name});
           btn.textContent=(mode==='boards'?'📝 ':mode==='screens'?'🖥 ':'👆 ')+name;
-          btn.setAttribute('aria-label',label+' for '+name);
+          btn.setAttribute('aria-label',(mode==='boards'?'Send to Whiteboards':mode==='screens'?'View Student Screens':'Start classroom')+' for '+name);
           btn.addEventListener('click',()=>{
             buttons.querySelectorAll('button').forEach(button=>button.disabled=true);
             const target=new URL('classroom.html',location.href);
