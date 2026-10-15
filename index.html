@@ -2054,9 +2054,28 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   el("createManagedStudentButton").addEventListener("click",createManagedStudent);
   el("saveManagedStudentPasscodeButton").addEventListener("click",saveManagedStudentPasscode);
   el("securePasscodesButton").addEventListener("click",async()=>{
-    el("classManagementStatus").textContent="Securing passcodes…";
-    const r=await trustedStudentAction("migratePasscodes",{deletePublic:true});
-    if(r)el("classManagementStatus").textContent="Done: "+r.copied+" passcodes moved to private storage, "+r.cleared+" public copies removed.";
+    const status=el("classManagementStatus"),btn=el("securePasscodesButton");
+    btn.disabled=true;
+    try{
+      status.textContent="Checking private passcode migration safety…";
+      const preview=await trustedStudentAction("migratePasscodes",{deletePublic:true,dryRun:true});
+      if(!preview)return;
+      if((preview.conflicts||[]).length||(preview.unmatched||[]).length){
+        status.textContent="No data changed. Resolve "+(preview.conflicts||[]).length+" conflicting credentials and "+(preview.unmatched||[]).length+" class-only student records before cleanup.";
+        return;
+      }
+      if(!preview.copied&&!preview.cleared){
+        status.textContent="No public passcodes need moving or clearing.";
+        return;
+      }
+      if(!confirm("Safety check complete. Copy "+preview.copied+" passcodes to private storage and remove "+preview.cleared+" public passcode copies? This changes student authentication records. Confirm you have a recent verified database backup before proceeding.")){
+        status.textContent="Cancelled. No data changed.";
+        return;
+      }
+      status.textContent="Moving passcodes to private storage…";
+      const result=await trustedStudentAction("migratePasscodes",{deletePublic:true});
+      if(result)status.textContent="Completed: "+result.copied+" passcodes moved privately, "+result.cleared+" public copies removed.";
+    }finally{btn.disabled=false;}
   });
 
   el("addStudentToClassButton").addEventListener("click",addStudentToManagedClass);
