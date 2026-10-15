@@ -68,7 +68,7 @@ test('teacher screens action displays the working gallery and broadcasts to the 
   const sessions=read('class-pointer-prototype/dashboard-session.js');
   assert.match(classroom,/dispatchEvent\(new Event\('classpointer:send-to-screens'\)\)/);
   assert.match(boards,/addEventListener\('classpointer:send-to-screens',[^\n]+sendEveryone\('screens'\)/);
-  assert.match(boards,/requestStudentDestination\(destination\)/);
+  assert.match(boards,/requestStudentDestination\(destination,policy\(\)\)/);
   assert.match(sessions,/const ref=activeRef/);
   assert.match(sessions,/context\.ref\.child\('classPointerSessions\/'\+room\)/);
 });
@@ -80,6 +80,8 @@ test('student classroom has no duplicate sharing banner; restart stays visible',
   assert.match(activity,/Do not cover it with a second floating share prompt/);
   assert.match(activity,/if\(\/\\\/class-pointer-prototype\\\/classroom\\\.html\$\/\.test\(location\.pathname\)\)return/);
   assert.match(classroom,/startButton\.hidden=true/);
-  assert.match(classroom,/startClass'\)\.hidden=false/);
+  assert.match(classroom,/button\.disabled=true;button\.hidden=false;button\.textContent='Ending class…'/);
+  assert.match(classroom,/button\.disabled=false;button\.textContent='↻ Start another class'/);
   assert.match(css,/#startClass:not\(\[hidden\]\)\{display:inline-flex!important/);
 });
+

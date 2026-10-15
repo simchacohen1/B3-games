@@ -98,3 +98,4 @@ body.boards-on #studentDock{display:none!important}
 .sharing-permissions-row input{width:18px;height:18px;margin:0;accent-color:#245bc9;cursor:pointer}
 #boardsView>.sharing-permissions{position:relative;z-index:2;flex:0 1 auto;max-height:45%;margin:0;padding:8px 14px;border-radius:0;overflow:auto;background:#f9fbff}
 #tbStudentsMenu>.sharing-permissions{max-height:38vh;overflow:auto}
+

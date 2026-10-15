@@ -7,7 +7,7 @@ const path=require('node:path');
 const read=name=>fs.readFileSync(path.join(__dirname,'..',name),'utf8');
 const room='class-pointer-12345678-1234-1234-1234-123456789abc';
 
-async function activityFixture(){
+async function activityFixture({capture}={}){
   let listener,holder,navigation=null,captureCount=0,stopCount=0,requests=0;
   const sessionStorageValues=new Map([['b3Games_studentId','test-boy'],['b3Games_classPin','test-pin']]);
   const sessionStorage={
@@ -40,6 +40,7 @@ async function activityFixture(){
   };
   const navigator={mediaDevices:{getDisplayMedia(){
     captureCount++;
+    if(capture)return capture();
     const track={stop(){stopCount++},addEventListener(){}};
     return Promise.resolve({active:true,getTracks:()=>[track],getVideoTracks:()=>[track]});
   }}};
@@ -119,4 +120,20 @@ test('restart is gated on cleanup, never races with prior Firebase session remov
   assert.match(src,/button\.disabled=false;button\.textContent='↻ Start another class'/);
   assert.match(session,/await ref\.remove\(\);\s*await ref\.onDisconnect\(\)\.cancel\(\);/);
   assert.match(boards,/Do not send an asynchronous child update here/);
+});
+
+
+test('permission revoked while browser picker is open stops capture before any ticket request',async()=>{
+  let finish,stops=0;
+  const a=await activityFixture({capture:()=>new Promise(resolve=>finish=resolve)});
+  a.emit('screens');
+  const sharing=a.shareButton.listeners.click();
+  a.emit('screens',{screens:{'test-boy':true}});
+  const track={stop(){stops++},addEventListener(){}};
+  finish({active:true,getTracks:()=>[track],getVideoTracks:()=>[track]});
+  await sharing;
+  assert.equal(a.requests,0);
+  assert.equal(stops,1);
+  assert.match(a.label.textContent,/permission changed/);
+  assert.equal(a.shareButton.disabled,false);
 });

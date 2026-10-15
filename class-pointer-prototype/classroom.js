@@ -503,3 +503,4 @@ if(!isTeacher&&new URL(location.href).searchParams.get('dashboard')==='student')
   if(saved){$('studentName').value=C.cleanName(saved.name);$('studentName').readOnly=true;const welcome=document.createElement('p');welcome.textContent='Joining as '+$('studentName').value+'.';$('studentPanel').prepend(welcome);joinClass({preventDefault(){}})}
   else{ $('joinClass').disabled=true;fail('Go back to Fun Torah Tools and click Class Pointer to join with your name.'); }
 }
+

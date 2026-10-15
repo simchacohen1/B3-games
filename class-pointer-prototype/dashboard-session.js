@@ -4,7 +4,17 @@
   const query=new URL(location.href).searchParams,C=window.ClassPointerDashboardCore;
   if(query.get('dashboard')!=='teacher')return;
   const classId=query.get('class'),ws=window.B3_APP_CONTEXT.workspaceId;
-  let activeRef=null,revision=0;
+  let activeRef=null,revision=0,ending=false,sessionWrites=Promise.resolve();
+  function writeSession(ref,operation){
+    if(ending)throw Error('The previous classroom is still ending.');
+    const current=revision;
+    const pending=sessionWrites.catch(()=>{}).then(()=>{
+      if(ending||activeRef!==ref||revision!==current)return;
+      return operation();
+    });
+    sessionWrites=pending;
+    return pending;
+  }
   const ready=new Promise((resolve,reject)=>{
     window.B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
       try{
@@ -55,9 +65,10 @@
     const context=await ready;
     if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
     const clean=raw=>Object.fromEntries(Object.entries(raw||{}).filter(([id,v])=>C.validId(id)&&!['__proto__','constructor','prototype'].includes(id)&&v===true));
-    await ref.update({screenSharingDenied:clean(policy?.screens),whiteboardDenied:clean(policy?.boards)});
+    await writeSession(ref,()=>ref.update({screenSharingDenied:clean(policy?.screens),whiteboardDenied:clean(policy?.boards)}));
   },
   async publish(room){
+    if(ending)throw Error('The previous classroom is still ending.');
     const current=++revision;
     const context=await ready;
     if(!C.validRoom(room))throw Error('The classroom connection is not ready.');
@@ -73,10 +84,10 @@
     if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
     // An authenticated, class-scoped live session is the only broadcast source.
     // Keep the existing session and use a server timestamp so stale prompts cannot replay.
-    await ref.update({
+    await writeSession(ref,()=>ref.update({
       studentScreenSharing:true,
       shareRequest:{at:firebase.database.ServerValue.TIMESTAMP}
-    });
+    }));
   },async requestStudentDestination(mode,policy){
     if(!['screens','boards'].includes(mode))throw Error('Choose screens or whiteboards.');
     const ref=activeRef;if(!ref)throw Error('Open a classroom before sending students.');
@@ -85,24 +96,31 @@
     // A live class session is authorized and scoped to the teacher's assigned class.
     // Use a server timestamp: existing student pages reject old requests.
     const clean=raw=>Object.fromEntries(Object.entries(raw||{}).filter(([id,v])=>C.validId(id)&&!['__proto__','constructor','prototype'].includes(id)&&v===true));
-    await ref.update({
+    await writeSession(ref,()=>ref.update({
       studentScreenSharing:mode==='screens',
       screenSharingDenied:clean(policy?.screens),whiteboardDenied:clean(policy?.boards),
       destinationRequest:{mode,at:firebase.database.ServerValue.TIMESTAMP}
-    });
+    }));
   },async setStudentScreenSharing(enabled){
     const ref=activeRef;if(!ref)return;
     const context=await ready;
     if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
-    await ref.child('studentScreenSharing').set(enabled===true);
+    await writeSession(ref,()=>ref.child('studentScreenSharing').set(enabled===true));
   },async end(){
     revision++;
     const ref=activeRef;
     if(!ref)return;
     // Preserve the reference if cleanup fails, so a refresh/onDisconnect
     // or another attempt can still remove the previous classroom session.
-    await ref.remove();
-    await ref.onDisconnect().cancel();
-    if(activeRef===ref)activeRef=null;
+    ending=true;
+    try{
+      // Drain writes already sent; queued changes are invalidated by revision.
+      // The final removal must happen after them so no child can resurrect a room.
+      await sessionWrites.catch(()=>{});
+      await ref.remove();
+      await ref.onDisconnect().cancel();
+      if(activeRef===ref)activeRef=null;
+    }finally{ending=false}
   }};
 })();
+

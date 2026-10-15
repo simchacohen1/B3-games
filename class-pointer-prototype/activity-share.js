@@ -113,6 +113,7 @@
     btn.addEventListener('click',async()=>{
       if(stream){stop();return}
       if(busy||!active)return;
+      const lesson=active;
       busy=true;btn.disabled=true;
       let captured=null;
       try{
@@ -123,13 +124,14 @@
           preferCurrentTab:true,surfaceSwitching:'include'
         });
         captured=await capturePromise;
+        if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
         status('Connecting to teacher…');
         // A missing, blocked or unavailable Cloud Function can surface as a
         // generic "Failed to fetch" after the student approves screen capture.
         let response;
         try{
           response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({action:'issue',studentId:id,pin,classId,room:active.roomId}),
+            body:JSON.stringify({action:'issue',studentId:id,pin,classId,room:lesson.roomId}),
             signal:AbortSignal.timeout(15000)});
         }catch{
           const error=new Error('Activity sharing service unavailable. Open Class Pointer to share your screen instead.');
@@ -145,7 +147,7 @@
           if(response.status===404||response.status>=500)error.code='ACTIVITY_SHARE_NETWORK';
           throw error;
         }
-        if(!active||!captured.active)throw Error('The lesson ended.');
+        if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
         if(!window.Peer)await load(new URL('class-pointer-prototype/vendor/peerjs-1.5.5.min.js',root).href);
         const connection=new Peer('class-pointer-activity-'+crypto.randomUUID());
         peer=connection;
@@ -154,8 +156,8 @@
           connection.once('open',()=>{clearTimeout(timeout);resolve()});
           connection.once('error',e=>{clearTimeout(timeout);reject(e)});
         });
-        if(!active||!captured.active)throw Error('The lesson ended.');
-        const media=connection.call(active.roomId,captured,{metadata:{kind:'activity-screen',token:ticket.token}});
+        if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
+        const media=connection.call(lesson.roomId,captured,{metadata:{kind:'activity-screen',token:ticket.token}});
         if(!media)throw Error('The teacher is not connected.');
         call=media;stream=captured;
         captured.getVideoTracks()[0]?.addEventListener('ended',stop,{once:true});
@@ -173,3 +175,4 @@
     window.addEventListener('pagehide',stop);
   }catch(error){console.warn('Class Pointer activity sharing unavailable',error)}
 })();
+

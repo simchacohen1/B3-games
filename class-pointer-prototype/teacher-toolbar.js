@@ -236,3 +236,4 @@
   setInterval(()=>{if(!dock.hidden)sync()},300);
   sync();
 })();
+

@@ -81,3 +81,4 @@
     },()=>message('Could not find your lesson. Refresh to try again.'));
   }catch(error){message(error.message||'Could not open the classroom. Please try again.')}
 })();
+

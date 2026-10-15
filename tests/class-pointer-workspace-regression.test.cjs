@@ -71,3 +71,4 @@ test('teacher can send a single class to student screen sharing while the browse
   assert.match(activity,/class-pointer-prototype\/dashboard\.html/);
   assert.match(activity,/getDisplayMedia\(/);
 });
+

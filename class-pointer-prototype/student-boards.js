@@ -776,3 +776,4 @@
     }catch(error){B.fail(error?.message||'Could not open the whiteboard.')}
   });
 })();
+

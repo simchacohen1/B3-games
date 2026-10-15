@@ -5,7 +5,7 @@ import { test, expect, type Page } from '@playwright/test';
 async function openBoard(page: Page, teacher: boolean) {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.setContent(`<!doctype html><html><body>
-    <button id="studentBoards">Student boards</button>
+    <div id="tbStudentsMenu"></div><button id="studentBoards">Student boards</button>
     <button id="openWhiteboard">Whiteboard</button>
     <select id="teacherTool"><option value="pen">Pen</option></select>
     <select id="teacherColor"><option value="#1f2937">Black</option></select>
@@ -18,10 +18,15 @@ async function openBoard(page: Page, teacher: boolean) {
     const members = new Map<string, any>();
     if (isTeacher) {
       for (const id of ['a', 'b']) {
-        members.set(id, { id, name: id === 'a' ? 'Ari' : 'Levi', admitted: true, peerId: id,
+        members.set(id, { id, studentId: id, name: id === 'a' ? 'Ari' : 'Levi', admitted: true, peerId: id,
           connection: { id } });
       }
     }
+    (window as any).ClassPointerDashboard = {
+      students: async () => [{id:'a',name:'Ari'},{id:'b',name:'Levi'}],
+      updateActivityPermissions: async (policy: any) => { (window as any).__policy = policy; },
+      setStudentScreenSharing: async () => {},
+    };
     (window as any).__out = outbound;
     (window as any).__members = members;
     (window as any).__failures = [];
@@ -67,6 +72,7 @@ test('teacher broadcasts a shoresh, keeps boards independent, and sends a colori
     await openBoard(ari, false);
     await openBoard(levi, false);
     await teacher.locator('#studentBoards').click();
+    await teacher.getByRole('button', { name: '📝 Whiteboards', exact: true }).click();
     await deliver(teacher, students);
     await expect(teacher.locator('.board-tile')).toHaveCount(2);
 
@@ -144,6 +150,7 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
     await openBoard(levi, false);
     const students = { a: ari, b: levi };
     await teacher.locator('#studentBoards').click();
+    await teacher.getByRole('button', { name: '📝 Whiteboards', exact: true }).click();
     await deliver(teacher, students);
 
     // Teacher pastes text from an ordinary clipboard outside text-entry fields.
@@ -231,4 +238,46 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
   } finally {
     await context.close();
   }
+});
+
+
+test('screen exclusions close active video, preserve classmates, and remain independent of boards', async ({ page }) => {
+  await openBoard(page, true);
+  await page.locator('#studentBoards').click();
+  await expect(page.locator('.board-tile')).toHaveCount(2);
+  await page.evaluate(() => {
+    const events: Record<string, Function> = {};
+    const call = {
+      peer: 'a', on: (name: string, fn: Function) => events[name] = fn,
+      answer: () => {}, close: () => { (window as any).__closed = true; events.close?.(); }
+    };
+    (window as any).__call = call;
+    (window as any).__accepted = (window as any).ClassPointerBoards.incomingCall(call);
+    const canvas = document.createElement('canvas'); canvas.width=160;canvas.height=90;
+    canvas.getContext('2d')!.fillRect(0,0,160,90);
+    const stream = canvas.captureStream(5);
+    (window as any).__syntheticStream = stream;
+    events.stream(stream);
+  });
+  expect(await page.evaluate(() => (window as any).__accepted)).toBe(true);
+  await expect.poll(() => page.locator('.board-tile video').evaluateAll((videos: HTMLVideoElement[]) => videos.filter(v => v.srcObject).length)).toBe(1);
+  await page.getByLabel('Screen sharing for Ari', {exact:true}).first().uncheck();
+  expect(await page.evaluate(() => (window as any).__closed)).toBe(true);
+  await expect(page.getByLabel('Screen sharing for Levi', {exact:true}).first()).toBeChecked();
+  await expect(page.getByLabel('Board sharing for Ari', {exact:true}).first()).toBeChecked();
+  expect(await page.evaluate(() => (window as any).ClassPointerBoards.incomingCall((window as any).__call))).toBe(false);
+  await page.getByLabel('Screen sharing for Ari', {exact:true}).first().check();
+  expect(await page.evaluate(() => (window as any).ClassPointerBoards.incomingCall((window as any).__call))).toBe(true);
+  await page.evaluate(() => (window as any).__out.splice(0));
+  await page.getByLabel('Board sharing for Ari', {exact:true}).first().uncheck();
+  await page.getByRole('button', { name: '📝 Whiteboards', exact:true }).click();
+  const modes = await page.evaluate(() => (window as any).__out.filter((item:any) => item.message.type==='board-mode'));
+  expect(modes.some((item:any) => item.id==='a' && item.message.on===false)).toBe(true);
+  expect(modes.some((item:any) => item.id==='b' && item.message.on===true)).toBe(true);
+  await page.evaluate(() => {
+    (window as any).ClassPointerBoards.endClass();
+    (window as any).__syntheticStream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+  });
+  await expect(page.getByLabel('Screen sharing for Ari', {exact:true}).first()).toBeChecked();
+  await expect(page.getByLabel('Board sharing for Ari', {exact:true}).first()).toBeChecked();
 });
