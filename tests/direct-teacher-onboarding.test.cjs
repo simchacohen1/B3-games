@@ -7,6 +7,7 @@ const {claimTeacher}=require('../backend/functions/teacher-claim-core.cjs');
 const ROOT='b3Games/workspaces/b3-2026';
 const ownerUi=fs.readFileSync(path.join(__dirname,'../owner-admin.html'),'utf8');
 const settings=fs.readFileSync(path.join(__dirname,'../site-settings.js'),'utf8');
+const claimEndpoint=fs.readFileSync(path.join(__dirname,'../backend/functions/teacher-claim.js'),'utf8');
 function identity(overrides={}){return {uid:'teacher-uid',email:'teacher@example.com',email_verified:true,firebase:{sign_in_provider:'google.com'},...overrides};}
 function store(invite,existing){
  const data={
@@ -51,4 +52,9 @@ test('last-class unassignment deactivates both invitation and claimed teacher',(
 test('new teacher verification failure always denies client access',()=>{
  assert.doesNotMatch(settings,/claimPending:true/);
  assert.match(settings,/A failed or unavailable verifier must never authorize a new teacher/);
+});
+
+test('custom Fun Torah Tools domains are allowed to call the teacher claim function',()=>{
+ assert.match(claimEndpoint,/https:\/\/funtorahtools\.com/);
+ assert.match(claimEndpoint,/https:\/\/www\.funtorahtools\.com/);
 });
