@@ -325,6 +325,6 @@ body.teacher-view .session-controls>#startClass:not([hidden]){display:inline-fle
 
 /* Teacher sharing is enabled or disabled; room lifecycle is automatic. */
 body.teacher-view #endClass{display:none!important}
-body.teacher-view #cpShareEnabled{display:inline-flex;align-items:center;border-radius:10px;padding:9px 15px;font-weight:800;background:#e9f1ff;color:#164b97;border:1px solid #aec9f2}
+body.teacher-view .session-controls>#cpShareEnabled{display:inline-flex!important;align-items:center;border-radius:10px;padding:9px 15px;font-weight:800;background:#e9f1ff;color:#164b97;border:1px solid #aec9f2}
 body.teacher-view #cpShareEnabled.cp-sharing-on{background:#eaf7ee;color:#12633a;border-color:#9ed4b4}
 body.teacher-view #cpShareEnabled:disabled{opacity:.52;cursor:not-allowed}
