@@ -364,6 +364,76 @@
   // =====================================================================
   const boards=new Map(),tiles=new Map(),blocked=new Set();
   let on=false,mode='screens',focusId=null,drawer=null,gridSize='';
+  // Separate, default-allow permissions: a teacher can exclude one boy without
+  // changing classmates' access or his independent Pointer/Highlight settings.
+  const denied={screens:new Set(),boards:new Set()};
+  let classStudents=[],permissionsLoad=null,permissionsWrite=Promise.resolve();
+  const policy=()=>Object.fromEntries(['screens','boards'].map(kind=>[kind,Object.fromEntries(Array.from(denied[kind],id=>[id,true]))]));
+  function personId(m){
+    if(m.studentId&&classStudents.some(student=>student.id===m.studentId&&student.name.toLowerCase()===String(m.name).toLowerCase()))return m.studentId;
+    return classStudents.find(student=>student.name.toLowerCase()===String(m.name).toLowerCase())?.id||m.studentId||null;
+  }
+  function excluded(m,kind){const id=personId(m);return !!id&&denied[kind].has(id)}
+  function savePolicy(){
+    const p=policy();
+    permissionsWrite=permissionsWrite.catch(()=>{}).then(()=>window.ClassPointerDashboard?.updateActivityPermissions(p));
+    permissionsWrite.catch(error=>B.fail('Could not update student sharing permissions: '+(error?.message||'Try again.')));
+  }
+  function updatePermission(id,kind,allowed){
+    if(!id)return;
+    if(allowed)denied[kind].delete(id);else denied[kind].add(id);
+    renderPermissions();
+    for(const m of admitted())if(personId(m)===id){if(on)sendMode(m);dirty(m.id)}
+    if(on)syncTiles();
+    savePolicy();
+  }
+  function bulkPermission(kind,allowed){
+    const ids=classStudents.length?classStudents.map(person=>person.id):admitted().map(personId).filter(Boolean);
+    for(const id of ids){if(allowed)denied[kind].delete(id);else denied[kind].add(id)}
+    renderPermissions();
+    if(on){for(const m of admitted()){sendMode(m);dirty(m.id)}syncTiles()}
+    savePolicy();
+  }
+  const permissionsPanels=[];
+  function createPermissionsPanel(){
+    const outer=el('div','sharing-permissions'),header=el('strong',null,'Student screen & whiteboard permissions');
+    outer.append(header,el('p',null,'Everyone is enabled by default. Uncheck a boy without affecting the others.'));
+    for(const [kind,title] of [['screens','Screen sharing'],['boards','Whiteboards']]){
+      const actions=el('div','sharing-permission-actions');
+      actions.append(el('strong',null,title),button('Select all','Enable '+title+' for every boy',()=>bulkPermission(kind,true)),
+        button('Clear all','Disable '+title+' for every boy',()=>bulkPermission(kind,false)));
+      outer.append(actions);
+    }
+    const list=el('div','sharing-permissions-roster');outer.append(list);
+    permissionsPanels.push(list);return outer;
+  }
+  function renderPermissions(){
+    const students=classStudents.length?classStudents:admitted().map(m=>({id:personId(m),name:m.name})).filter(m=>m.id);
+    for(const list of permissionsPanels){
+      list.replaceChildren();
+      if(!students.length){list.append(el('p',null,'Loading class roster…'));continue}
+      for(const person of students){
+        const row=el('div','sharing-permissions-row'),name=el('span',null,person.name);row.append(name);
+        for(const [kind,label] of [['screens','Screen'],['boards','Board']]){
+          const wrap=el('label'),input=el('input');input.type='checkbox';input.checked=!denied[kind].has(person.id);
+          input.setAttribute('aria-label',label+' sharing for '+person.name);
+          input.addEventListener('change',()=>updatePermission(person.id,kind,input.checked));
+          wrap.append(input,document.createTextNode(label));row.append(wrap);
+        }
+        list.append(row);
+      }
+    }
+  }
+  async function loadPermissionsRoster(){
+    if(permissionsLoad)return permissionsLoad;
+    permissionsLoad=(async()=>{
+      try{
+        classStudents=await window.ClassPointerDashboard?.students()||[];
+      }catch(error){B.fail('Could not load class roster for sharing permissions: '+(error?.message||'Try again.'))}
+      renderPermissions();
+    })();
+    return permissionsLoad;
+  }
   const toggle=$('studentBoards');
   // Teacher can bring the whole signed-in class directly to screens or boards.
   // These same controls remain available from the Students menu in full screen.
@@ -376,6 +446,8 @@
   const dockBoards=button('📝 Send whiteboards','Open individual whiteboards for the class',()=>void sendEveryone('boards'));
   dockLaunch.append(dockScreens,dockBoards);
   document.getElementById('tbStudentsMenu')?.prepend(dockLaunch);
+  const menuPermissions=createPermissionsPanel();
+  document.getElementById('tbStudentsMenu')?.append(menuPermissions);
   const view=el('div','boards-view');view.id='boardsView';view.dataset.stageUi='true';view.hidden=true;view.setAttribute('aria-label','Student whiteboards and screens');
 
   // Grid bar: mode switch for the whole class.
@@ -384,11 +456,15 @@
   const modeBoards=button('📝 Whiteboards','Every student draws on his own whiteboard',()=>setMode('boards'));
   const modeScreens=button('🖥 Screens','Every student shares his screen with you (view only)',()=>setMode('screens'));
   modes.append(modeBoards,modeScreens);
+  const chooseParticipants=button('👥 Choose students','Choose whose screens and whiteboards may participate',()=>{
+    gridPermissions.hidden=!gridPermissions.hidden;
+  });
+  const gridPermissions=createPermissionsPanel();gridPermissions.hidden=true;
   const clearAll=button('🗑 Clear all boards','Erase every student whiteboard',()=>{
     if(!confirm('Erase every student whiteboard? This cannot be undone.'))return;
     boards.clear();for(const m of admitted())sendMode(m);dirtyAll();
   },'danger');
-  gridBar.append(el('strong','boards-title','🧑‍🎨 Students'),count,modes,el('span','boards-hint','Click a tile to open it · 🚫 pauses a student'),el('span','boards-spacer'),clearAll,
+  gridBar.append(el('strong','boards-title','🧑‍🎨 Students'),count,modes,chooseParticipants,el('span','boards-hint','Click a tile to open it · 🚫 pauses a student'),el('span','boards-spacer'),clearAll,
     button('✕ Close boards','Return everyone to the lesson. Whiteboards are kept until the class ends.',()=>setOn(false)));
 
   // Teacher sends an identical, non-erasable activity background to all boys.
@@ -487,7 +563,7 @@
     button('🗑 Clear board','Erase this whole board, including the student’s work',()=>{const m=focusMember();if(m&&confirm('Erase '+m.name+'’s whole board?'))act({type:'board-clear',all:true})},'danger'));
 
   const grid=el('div','boards-grid'),empty=el('p','boards-empty','No students have joined yet. Their tiles appear here as they join.');
-  view.append(gridBar,activityBar,focusBar,grid,empty,focus);stage.appendChild(view);shield(view);
+  view.append(gridBar,gridPermissions,activityBar,focusBar,grid,empty,focus);stage.appendChild(view);shield(view);
 
   const admitted=()=>Array.from(B.members().values()).filter(m=>m.admitted);
   // A board belongs to a student name, so a student who refreshes or rejoins gets his board (and block) back.
@@ -502,7 +578,7 @@
   const focusWord=wordEditor(focusBar,()=>focusBoard(),text=>act({type:'board-text',text}),tools);
   function closeScreen(m){const c=m.screenCall;m.screenCall=null;m.screenStream=null;try{c?.close()}catch(_){}}
   function sendMode(m){
-    if(!on){closeScreen(m);B.send(m.connection,{type:'board-mode',on:false});return}
+    if(!on||excluded(m,mode)){closeScreen(m);B.send(m.connection,{type:'board-mode',on:false});return}
     const paused=isBlocked(m);if(paused||mode!=='screens')closeScreen(m);
     const message={type:'board-mode',on:true,mode,blocked:paused};
     if(mode==='boards'){message.activity=activity;if(!paused){const b=boardFor(m);b.drafts={student:null,teacher:null};message.strokes=b.strokes;message.text=b.text}}
@@ -518,11 +594,11 @@
     frame=0;
     if(!view.hidden)for(const id of dirtySet){
       const m=B.members().get(id);if(!m)continue;
-      const paused=isBlocked(m),screens=mode==='screens',tile=tiles.get(id);
+      const disabled=excluded(m,mode),paused=isBlocked(m)||disabled,screens=mode==='screens',tile=tiles.get(id);
       if(tile&&!grid.hidden){
         tile.node.classList.toggle('blocked',paused);tile.node.classList.toggle('screen',screens);
         tile.block.textContent=paused?'✅':'🚫';tile.block.title=(paused?'Allow ':'Pause ')+m.name;tile.block.setAttribute('aria-label',tile.block.title);
-        tile.note.textContent=paused?'⏸ Paused':screens&&!m.screenStream?'Waiting for his screen…':'';
+        tile.note.textContent=disabled?'Not selected for '+(screens?'screen sharing':'whiteboard'):paused?'⏸ Paused':screens&&!m.screenStream?'Waiting for his screen…':'';
         tile.canvas.hidden=screens;tile.video.hidden=!screens||paused||!m.screenStream;
         setVideo(tile.video,screens&&!paused?m.screenStream:null);
         if(!screens){const b=boardFor(m);paint(tile.canvas,b,null);tile.node.classList.toggle('drawing',!paused&&!!b.drafts.student)}else tile.node.classList.remove('drawing');
@@ -627,7 +703,9 @@
       else if(mode!==destination)setMode(destination);
       const dashboard=window.ClassPointerDashboard;
       if(!dashboard?.requestStudentDestination)throw Error('Classroom broadcast is not ready.');
-      await dashboard.requestStudentDestination(destination);
+      await loadPermissionsRoster();
+      await permissionsWrite;
+      await dashboard.requestStudentDestination(destination,policy());
       B.status(destination==='screens'
         ?'Sent this class to Screen Sharing. Each boy clicks Share my screen and approves the browser prompt.'
         :'Sent this class to individual Whiteboards. Their boards will appear here as they join.');
@@ -650,31 +728,31 @@
   toggle?.addEventListener('click',()=>setOn(!on));
   setInterval(()=>{if(toggle)toggle.disabled=!on&&!B.started();if(on)syncTiles()},700);
   new ResizeObserver(()=>{if(!on)return;layoutGrid();if(focusId)dirty(focusId)}).observe(stage);
-  controls();
+  controls();renderPermissions();void loadPermissionsRoster();
 
   window.ClassPointerBoards={
     fromStudent(m,message){
       if(!on)return;
       if(message.type==='board-screen'){if(message.sharing!==true){closeScreen(m);dirty(m.id)}return}
-      if(mode!=='boards'||isBlocked(m))return;
+      if(mode!=='boards'||isBlocked(m)||excluded(m,'boards'))return;
       if(applyOp(boardFor(m),message,'student'))dirty(m.id);
     },
     // A student's screen arrives as a one-way media call (student → teacher). Only accepted in Screens mode.
     incomingCall(call){
       const m=admitted().find(item=>item.peerId===call.peer);
-      if(!m||!on||mode!=='screens'||isBlocked(m))return false;
+      if(!m||!on||mode!=='screens'||isBlocked(m)||excluded(m,'screens'))return false;
       closeScreen(m);m.screenCall=call;
       call.on('stream',incoming=>{if(m.screenCall!==call)return;m.screenStream=incoming;dirty(m.id)});
       const end=()=>{if(m.screenCall===call){m.screenCall=null;m.screenStream=null;dirty(m.id)}};
       call.on('close',end);call.on('error',end);
       call.answer();return true;
     },
-    studentJoined(m){const b=boardFor(m);b.drafts={student:null,teacher:null};if(on){sendMode(m);syncTiles()}},
+    studentJoined(m){const b=boardFor(m);b.drafts={student:null,teacher:null};renderPermissions();if(on){sendMode(m);syncTiles()}},
     studentLeft(m){closeScreen(m);if(m.boardKey&&boards.has(m.boardKey))boards.get(m.boardKey).drafts={student:null,teacher:null};if(on)syncTiles()},
     endClass(){
       drawer?.cancel();for(const m of B.members().values())closeScreen(m);
       window.ClassPointerDashboard?.setStudentScreenSharing(false).catch(()=>{});
-      boards.clear();blocked.clear();chooseActivity(null,dirtyAll);mode='screens';controls();
+      boards.clear();blocked.clear();denied.screens.clear();denied.boards.clear();classStudents=[];permissionsLoad=null;renderPermissions();chooseActivity(null,dirtyAll);mode='screens';controls();
       for(const tile of tiles.values()){tile.video.srcObject=null;tile.node.remove()}tiles.clear();
       if(on){on=false;focusId=null;view.hidden=true}
       if(toggle){toggle.setAttribute('aria-pressed','false');toggle.textContent='🖥 Student Screens';toggle.disabled=true}
