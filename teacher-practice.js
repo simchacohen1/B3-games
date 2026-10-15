@@ -17,7 +17,10 @@
       throw new Error('Sign in with your teacher account to save practice work.');
     }
     const params = new URLSearchParams(location.search);
-    const requested = params.get('class') || (access.classIds || [])[0] || (access.role === 'admin' ? 'et' : '');
+    const requestedClass = params.get('class');
+    const assignedClass = (access.classIds || []).find(id => IDENTIFIER.test(String(id || '')));
+    const requested = requestedClass && IDENTIFIER.test(requestedClass)
+      ? requestedClass : (assignedClass || (access.role === 'admin' ? 'et' : ''));
     const classId = safeId(requested, 'class');
     const workspaceId = safeId(window.B3_WORKSPACE_ID || window.B3SiteSettings?.workspaceId || WORKSPACE, 'workspace');
     if (access.role !== 'admin' && !(access.classIds || []).includes(classId)) {
@@ -81,7 +84,17 @@
           const name = String(key);
           return {
             put(blob) {
+              if(blob.size > 5*1024*1024)throw new Error('Please keep teacher practice recordings under 5 MB.');
               const work = blobDataURL(blob).then(value => { audio.set(name, value); });
+              // Chazara's upload helper expects Firebase-style progress/cancel.
+              // Keep its successful recording flow while storing the resulting
+              // data URL inside the teacher's private database record.
+              work.on = (event, listener) => {
+                if(event === 'state_changed' && typeof listener === 'function')
+                  work.then(() => listener({bytesTransferred:blob.size,totalBytes:blob.size})).catch(() => {});
+                return () => {};
+              };
+              work.cancel = () => {};
               return work;
             },
             async getDownloadURL() {
