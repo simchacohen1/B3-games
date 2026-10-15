@@ -1,0 +1,36 @@
+name: Firebase security regression audit
+
+on:
+  push:
+    branches:
+      - main
+      - 'security/**'
+    paths:
+      - 'firebase-rules.json'
+      - 'scripts/security-rule-audit.cjs'
+      - 'security/public-permissions-baseline.json'
+      - 'tests/firebase-security-audit.test.cjs'
+      - '.github/workflows/firebase-security-audit.yml'
+  pull_request:
+    paths:
+      - 'firebase-rules.json'
+      - 'scripts/security-rule-audit.cjs'
+      - 'security/public-permissions-baseline.json'
+      - 'tests/firebase-security-audit.test.cjs'
+      - '.github/workflows/firebase-security-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Firebase security-audit tests
+        run: node --test tests/firebase-security-audit.test.cjs
+      - name: Block newly public database grants and private-path exposure
+        run: node scripts/security-rule-audit.cjs --ci
