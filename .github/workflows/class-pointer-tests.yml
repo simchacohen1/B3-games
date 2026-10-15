@@ -5,14 +5,14 @@ on:
       - 'class-pointer-prototype/**'
       - 'backend/functions/class-pointer-share-auth.js'
       - 'backend/functions/index.js'
-      - 'tests/class-pointer-workspace-regression.test.cjs'
+      - 'tests/class-pointer-*.test.cjs'
       - '.github/workflows/class-pointer-tests.yml'
   pull_request:
     paths:
       - 'class-pointer-prototype/**'
       - 'backend/functions/class-pointer-share-auth.js'
       - 'backend/functions/index.js'
-      - 'tests/class-pointer-workspace-regression.test.cjs'
+      - 'tests/class-pointer-*.test.cjs'
       - '.github/workflows/class-pointer-tests.yml'
 jobs:
   test:
@@ -30,4 +30,4 @@ jobs:
           node --check class-pointer-prototype/student-boards.js
           node --check backend/functions/class-pointer-share-auth.js
       - name: Classroom Pointer regression tests
-        run: node --test tests/class-pointer-workspace-regression.test.cjs tests/class-pointer-dashboard.test.cjs tests/class-pointer-send-everyone.test.cjs
+        run: node --test tests/class-pointer-workspace-regression.test.cjs tests/class-pointer-dashboard.test.cjs tests/class-pointer-send-everyone.test.cjs tests/class-pointer-activity-share-restart.test.cjs
