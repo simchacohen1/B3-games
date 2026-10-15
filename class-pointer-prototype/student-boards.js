@@ -290,8 +290,11 @@
     // Screens mode panel.
     const sharePanel=el('div','board-panel'),shareText=el('p','board-panel-text'),shareNote=el('p','board-panel-note'),preview=el('video','board-preview');
     preview.muted=true;preview.autoplay=true;preview.playsInline=true;preview.hidden=true;
-    const shareBtn=button('🖥 Share my screen','Choose your screen or window to show your teacher',()=>stream?stopShare(true):startShare(),'board-share-btn');
-    sharePanel.append(shareText,shareBtn,preview,shareNote);
+    const shareBtn=button('🖥 Share entire screen','Choose Entire screen in the browser preview picker',()=>stream?stopShare(true):startShare('screen'),'board-share-btn');
+    const tabBtn=button('🌐 Share a browser tab','Choose any browser tab in the browser preview picker',()=>stream?stopShare(true):startShare('tab'),'board-share-btn board-share-tab');
+    const shareChoices=el('div','board-share-choices');
+    shareChoices.append(tabBtn,shareBtn);
+    sharePanel.append(shareText,shareChoices,preview,shareNote);
     // Paused panel.
     const pausedPanel=el('div','board-panel');pausedPanel.append(el('p','board-panel-text','⏸ Your teacher paused this for you.'),el('p','board-panel-note','Please wait. Your teacher can turn it back on.'));
     surface.appendChild(canvas);focus.append(surface,sharePanel,pausedPanel);view.append(bar,focus);stage.appendChild(view);shield(view);
@@ -301,8 +304,9 @@
       title.textContent=mode==='screens'?'🖥 Share my screen':'📝 My board';
       drawGroup.hidden=!boardsOn;surface.hidden=!boardsOn;sharePanel.hidden=!screensOn;pausedPanel.hidden=!(on&&blocked);
       editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';
-      shareText.textContent=stream?'✅ Sharing your screen with your teacher. Keep working in your activity.':'Your teacher asked you to share your screen. Choose a tab in the browser prompt.';
-      shareBtn.textContent=stream?'⏹ Stop sharing':'🖥 Share my screen';shareBtn.classList.toggle('sharing',!!stream);
+      shareText.textContent=stream?'✅ Your selected tab or screen is being shared with your teacher.':'Choose what to share. Your browser will show visual previews before you approve.';
+      shareBtn.textContent=stream?'⏹ Stop sharing':'🖥 Share entire screen';shareBtn.classList.toggle('sharing',!!stream);
+      tabBtn.textContent=stream?'⏹ Stop sharing':'🌐 Share a browser tab';tabBtn.classList.toggle('sharing',!!stream);
       preview.hidden=!stream;if(stream&&preview.srcObject!==stream){preview.srcObject=stream;preview.play().catch(()=>{})}if(!stream)preview.srcObject=null;
       full.textContent=expanded()?'⤢ Exit full screen':'⛶ Full screen';
     }
@@ -310,12 +314,24 @@
     function act(op){if(!on||mode!=='boards'||blocked)return;if(applyOp(board,op,'student'))B.sendTeacher(op);redraw()}
     drawer=attachDrawing(canvas,{by:'student',tools,enabled:()=>on&&mode==='boards'&&!blocked,board:()=>board,apply:act,send:op=>{if(on&&mode==='boards'&&!blocked)B.sendTeacher(op)},redraw});
 
-    async function startShare(){
+    async function startShare(kind='tab'){
       shareNote.textContent='';
       if(!navigator.mediaDevices?.getDisplayMedia||!B.callTeacher){shareNote.textContent='Screen sharing works on a computer in Chrome or Edge.';return}
-      shareBtn.disabled=true;
+      shareBtn.disabled=true;tabBtn.disabled=true;
       try{
-        const s=await navigator.mediaDevices.getDisplayMedia({video:{displaySurface:'browser',frameRate:{ideal:5,max:8},width:{ideal:1600},height:{ideal:900}},audio:false,preferCurrentTab:true,selfBrowserSurface:'include',surfaceSwitching:'include'});
+        // The browser controls the visual picker and requires a direct student click.
+        // Hints cannot force a source; inspect the returned track to avoid presenting
+        // a tab when the student explicitly chose the entire-screen action (or vice versa).
+        const options={video:{frameRate:{ideal:5,max:8},width:{ideal:1600},height:{ideal:900}},audio:false,
+          preferCurrentTab:false,selfBrowserSurface:'include',surfaceSwitching:'include'};
+        options.video.displaySurface=kind==='screen'?'monitor':'browser';
+        const s=await navigator.mediaDevices.getDisplayMedia(options);
+        const surface=s.getVideoTracks()[0]?.getSettings?.().displaySurface;
+        if((kind==='screen'&&surface&&surface!=='monitor')||(kind==='tab'&&surface&&surface!=='browser')){
+          s.getTracks().forEach(t=>t.stop());
+          shareNote.textContent=kind==='tab'?'Please choose a browser tab in the preview window.':'Please choose Entire Screen in the preview window.';
+          return;
+        }
         if(!on||mode!=='screens'||blocked){s.getTracks().forEach(t=>t.stop());return}
         stopShare(false);
         const c=B.callTeacher(s);
@@ -325,7 +341,7 @@
         c.on?.('close',()=>{if(call===c)stopShare(false)});c.on?.('error',()=>{if(call===c){stopShare(false);shareNote.textContent='The connection to your teacher failed. Try sharing again.'}});
         B.sendTeacher({type:'board-screen',sharing:true});
       }catch(error){shareNote.textContent=error?.name==='NotAllowedError'?'Sharing was canceled. Click the button to try again.':'Could not share your screen. Try again.'}
-      finally{shareBtn.disabled=false;redraw()}
+      finally{shareBtn.disabled=false;tabBtn.disabled=false;redraw()}
     }
     function stopShare(tell){
       const s=stream,c=call;stream=null;call=null;
