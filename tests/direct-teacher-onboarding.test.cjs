@@ -58,3 +58,40 @@ test('custom Fun Torah Tools domains are allowed to call the teacher claim funct
  assert.match(claimEndpoint,/https:\/\/funtorahtools\.com/);
  assert.match(claimEndpoint,/https:\/\/www\.funtorahtools\.com/);
 });
+
+const vm=require('node:vm');
+function uiTeacherAccess(records,user){
+ const begin=settings.indexOf('  function readUserAccess(user) {');
+ const end=settings.indexOf('\n  function isAuthorizedUser(user)',begin);
+ assert.ok(begin>=0&&end>begin,'teacher access code is present');
+ const source=settings.slice(begin,end)+'\nreadUserAccess;';
+ const ctx={
+   ensureFirebase:()=>({db:{ref:pathname=>({once:async()=>({val:()=>records[pathname]??null})})}}),
+   isBootstrapAdmin:()=>false,
+   WORKSPACE_ROOT_KEY:ROOT,
+   console
+ };
+ return vm.runInNewContext(source,ctx)(user);
+}
+test('existing active teacher with no assigned classes is not authorized in Teacher Center',async()=>{
+ const user={uid:'empty',email:'teacher@example.com'};
+ const access=await uiTeacherAccess({[ROOT+'/teachers/empty']:{active:true,classIds:{}}},user);
+ assert.equal(access.authorized,false);
+ assert.deepEqual(Array.from(access.classIds),[]);
+});
+test('existing active teacher cannot use wildcard or disabled classes as an assignment',async()=>{
+ const user={uid:'empty',email:'teacher@example.com'};
+ const access=await uiTeacherAccess({[ROOT+'/teachers/empty']:{active:true,classIds:{'*':true,closed:false}}},user);
+ assert.equal(access.authorized,false);
+});
+test('existing active teacher with one assigned class retains access only to that class',async()=>{
+ const user={uid:'assigned',email:'teacher@example.com'};
+ const access=await uiTeacherAccess({[ROOT+'/teachers/assigned']:{active:true,classIds:{alpha:true,beta:false,'*':true}}},user);
+ assert.equal(access.authorized,true);
+ assert.deepEqual(Array.from(access.classIds),['alpha']);
+});
+test('unassigned invitation cannot authorize UI or attempt an implicit server claim',async()=>{
+ const user={uid:'new',email:'new@example.test',emailVerified:true,getIdToken:async()=>{throw Error('Unexpected claim attempt')}};
+ const access=await uiTeacherAccess({[ROOT+'/teacherInvites']:{new:{email:'new@example.test',active:true,classIds:{}}}},user);
+ assert.equal(access.authorized,false);
+});
