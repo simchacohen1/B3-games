@@ -86,5 +86,8 @@ test('teacher controls offer both class destinations',()=>{
   const src=source('student-boards.js');
   assert.match(src,/Send to Screen Sharing/);
   assert.match(src,/Send to Whiteboards/);
-  assert.match(src,/requestStudentDestination\(destination\)/);
+  // Broadcast now carries per-boy Screen / Whiteboard exclusions; the old one-argument assertion was stale.
+  assert.match(src,/requestStudentDestination\(destination,policy\(\)\)/);
+  assert.match(src,/const denied=\{screens:new Set\(\),boards:new Set\(\)\}/);
+  assert.match(src,/screenSharingDenied|excluded\(m,'screens'\)/);
 });
