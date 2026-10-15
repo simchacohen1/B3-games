@@ -62,3 +62,18 @@ test("creation questions use short, direct wording for children", () => {
   ], "open", "", 1);
   assert.equal(item.q, "What did Hashem see on day one?");
 });
+
+
+test("believable distractors match the question's answer type", () => {
+  const core = loadCore();
+  const people = core.plausibleOptions({ q: "Who visited Avrohom?", answer: "Lot" }, []);
+  assert.equal(people.length, 4);
+  assert.equal(people.filter(row => row.correct).length, 1);
+  assert.ok(people.every(row => ["Lot", "Avrohom", "Yitzchok", "Yaakov", "Sarah", "Rivkah", "Eliezer", "Yosef"].includes(row.excerpt)));
+  const animals = core.plausibleOptions({ q: "What animal did Avrohom choose?", answer: "A calf" }, []);
+  assert.equal(animals.length, 4);
+  assert.ok(animals.every(row => /calf|lamb|goat|sheep|donkey/i.test(row.excerpt)));
+  const unrelated = core.plausibleOptions({ q: "What did Avrohom do?", answer: "He hurried" },
+    [{ q: "What animal did he choose?", answer: "A goat" }]);
+  assert.equal(unrelated.length, 0, "do not invent unrelated answers to fill four slots");
+});
