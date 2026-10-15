@@ -65,6 +65,9 @@
       const supported=request&&['screens','boards'].includes(request.mode);
       const at=supported?request.at:session?.shareRequest?.at;
       if(!Number.isFinite(at)||(!supported&&at<loadedAt-6000)||at>Date.now()+60000||Date.now()-at>45000)return;
+      // Per-student exclusions belong to the active authenticated class.
+      if(supported&&request.mode==='boards'&&session.whiteboardDenied?.[id]===true)return;
+      if((!supported||request.mode==='screens')&&session.screenSharingDenied?.[id]===true)return;
       const marker=session.roomId+':'+at+':'+(supported?request.mode:'screens');
       if(stream)return;
       try{
@@ -102,7 +105,7 @@
         return;
       }
       const next=current(snapshot.val());
-      const shareable=next?.studentScreenSharing===true?next:null;
+      const shareable=next?.studentScreenSharing===true&&next?.screenSharingDenied?.[id]!==true?next:null;
       if(!shareable||!active||shareable.roomId!==active.roomId){if(stream)stop()}
       active=shareable;holder.style.display=active?'flex':'none';
       if(next)routeTeacherRequest(next);
