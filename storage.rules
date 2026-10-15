@@ -5,7 +5,7 @@ service firebase.storage {
     match /pointerPdfLibrary/{teacherUid}/{fileId} {
       allow read, delete: if request.auth != null && request.auth.uid == teacherUid;
       allow create: if request.auth != null && request.auth.uid == teacherUid
-        && fileId.matches('[a-zA-Z0-9-]+\\.pdf')
+        && fileId.matches('[-a-zA-Z0-9]+[.]pdf')
         && request.resource.size <= 50 * 1024 * 1024
         && request.resource.contentType == 'application/pdf';
       allow update: if request.auth != null && request.auth.uid == teacherUid
