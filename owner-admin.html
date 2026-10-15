@@ -162,9 +162,9 @@ async function deleteClass(classId){
  if(!confirm("Are you sure you want to delete the class "+cname+"? Its students are taken out of the class (their accounts stay) and its teachers lose it. This cannot be undone."))return;
  const root="b3Games/workspaces/"+WS,updates={[root+"/classes/"+classId]:null,[root+"/contentGrants/"+classId]:null};
  Object.keys(classData[classId]?.members||{}).forEach(sid=>{updates["b3Games/students/"+sid+"/memberships/"+WS+"_"+classId]=null;});
- Object.entries(teacherData).forEach(([tid,t])=>{if(t.classIds?.[classId])updates[root+"/teacherInvites/"+tid+"/classIds/"+classId]=null;});
+ Object.entries(teacherData).forEach(([tid,t])=>{if(t.classIds?.[classId]){updates[root+"/teacherInvites/"+tid+"/classIds/"+classId]=null;const hasOther=Object.entries(t.classIds||{}).some(([id,granted])=>id!==classId&&granted===true);if(!hasOther)updates[root+"/teacherInvites/"+tid+"/active"]=false;}});
  const teachers=(await db.ref(root+"/teachers").once("value")).val()||{};
- Object.entries(teachers).forEach(([uid,t])=>{if(t?.classIds?.[classId])updates[root+"/teachers/"+uid+"/classIds/"+classId]=null;});
+ Object.entries(teachers).forEach(([uid,t])=>{if(t?.classIds?.[classId]){updates[root+"/teachers/"+uid+"/classIds/"+classId]=null;const hasOther=Object.entries(t.classIds||{}).some(([id,granted])=>id!==classId&&granted===true);if(!hasOther)updates[root+"/teachers/"+uid+"/active"]=false;}});
  await db.ref().update(updates);q("status").textContent="Class deleted.";await load();
 }
 document.addEventListener("click",e=>{
