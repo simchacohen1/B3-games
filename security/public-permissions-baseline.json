@@ -1,0 +1,133 @@
+{
+  "description": "Known public read/write permissions in the October 15, 2026 repository rules. These are security debt, not an approval that access is safe. Remove entries as rules are hardened. Changes that introduce new public access fail CI.",
+  "permissions": [
+    {
+      "path": "/b3Games/classGalleryPresence",
+      "permission": ".write"
+    },
+    {
+      "path": "/b3Games/classGalleryTag",
+      "permission": ".write"
+    },
+    {
+      "path": "/b3Games/workspaces/$workspaceId/classes/$classId/resources",
+      "permission": ".write"
+    },
+    {
+      "path": "/b3Games",
+      "permission": ".read"
+    },
+    {
+      "path": "/b3Quiz",
+      "permission": ".read"
+    },
+    {
+      "path": "/b3Quiz",
+      "permission": ".write"
+    },
+    {
+      "path": "/classGallery",
+      "permission": ".read"
+    },
+    {
+      "path": "/classGallery",
+      "permission": ".write"
+    },
+    {
+      "path": "/posukPractice/allowedStudents",
+      "permission": ".read"
+    },
+    {
+      "path": "/posukPractice/attempts/$studentId",
+      "permission": ".write"
+    },
+    {
+      "path": "/posukPractice/attempts",
+      "permission": ".read"
+    },
+    {
+      "path": "/posukPractice/chazara/$section/$studentId",
+      "permission": ".write"
+    },
+    {
+      "path": "/posukPractice/chazara",
+      "permission": ".read"
+    },
+    {
+      "path": "/posukPractice/classroomTranslations",
+      "permission": ".read"
+    },
+    {
+      "path": "/posukPractice/generatedQuestions",
+      "permission": ".read"
+    },
+    {
+      "path": "/posukPractice/settings/$other",
+      "permission": ".write"
+    },
+    {
+      "path": "/posukPractice/settings",
+      "permission": ".read"
+    },
+    {
+      "path": "/posukPractice/shorashimLearning",
+      "permission": ".read"
+    },
+    {
+      "path": "/posukPractice/shorashimLearning",
+      "permission": ".write"
+    },
+    {
+      "path": "/posukPractice/students/$studentId",
+      "permission": ".write"
+    },
+    {
+      "path": "/posukPractice/students",
+      "permission": ".read"
+    },
+    {
+      "path": "/posukPractice/translationChunks",
+      "permission": ".read"
+    },
+    {
+      "path": "/questionSets",
+      "permission": ".read"
+    },
+    {
+      "path": "/questionSets",
+      "permission": ".write"
+    },
+    {
+      "path": "/rashiLetters/matchRooms/$room",
+      "permission": ".write"
+    },
+    {
+      "path": "/rashiLetters/matchRooms",
+      "permission": ".read"
+    },
+    {
+      "path": "/rashiLetters/progress/$studentId",
+      "permission": ".write"
+    },
+    {
+      "path": "/rashiLetters/progress",
+      "permission": ".read"
+    },
+    {
+      "path": "/rashiLetters/settings",
+      "permission": ".read"
+    },
+    {
+      "path": "/studentRewards/settings/studentWebsiteEnabled",
+      "permission": ".read"
+    },
+    {
+      "path": "/tentTrailTrivia",
+      "permission": ".read"
+    },
+    {
+      "path": "/tentTrailTrivia",
+      "permission": ".write"
+    }
+  ]
+}
