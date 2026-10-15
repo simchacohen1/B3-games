@@ -6,6 +6,12 @@
 
 The `scripts/security-rule-audit.cjs` check detects newly introduced unconditional public read/write rules and exposure of selected private backend namespaces. `public-permissions-baseline.json` lists **32 existing public grants** as security debt. It does **not** bless those grants or block privilege increases inside complex expressions. Do not claim that a passing guard means data is safe.
 
+## Passcode migration safety — staged code changes
+
+The owner-only "Make all passcodes private" action is being changed to **preview before cleanup**, with explicit owner confirmation. The backend now inventories class-only student records as well as central and legacy records, preserves already-private credentials as authoritative, and blocks public-PIN deletion when credentials conflict or an unlinked class-only record has no usable identity. Preview reports counts and affected IDs, never passcode values. Focused tests cover fail-closed behavior, read-only preview, and existing student login compatibility.
+
+**This is a preparation step, not a completed security repair.** The public Realtime Database parent read rule still exposes child data, and browsers with old copies may continue to display existing credentials until migration completes. Do not execute the destructive cleanup without verifying the active server endpoint, testing student sign-in on ET/WT and a new class, and ensuring safe recovery if the function fails. Confirm actual deployed RTDB rules separately; this PR does not deploy rules or Functions.
+
 ## Priority 0: protect existing student information without breaking the classroom
 
 1. **Check actual deployed Firebase Realtime Database and Cloud Storage rules** using authorized Firebase project access. GitHub Pages only publishes frontend assets. Comparing files in GitHub cannot establish the active server-side rules or Cloud Functions deployment.
