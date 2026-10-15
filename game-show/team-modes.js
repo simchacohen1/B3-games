@@ -32,7 +32,7 @@
             B:teams.B.length?teams.B[qIndex%teams.B.length]:null};
   }
   function canAnswerChoice(data, name) {
-    if (!data || data.roundActive !== true || data.multipleChoice !== true || data.answerState) return false;
+    if (!data || data.roundActive !== true || data.multipleChoice !== true || (data.answerState || data.narrationLocked)) return false;
     if (data.teamMode) return data.helperName ? data.helperName === name : data.buzzedBy === name;
     return data.buzzedBy === name;
   }
@@ -324,7 +324,7 @@
         if(!current||current.roundActive!==true||current.buzzedBy||
            !current.contestants||![current.contestants.A,current.contestants.B].includes(myName)||
            (current.stealTeam&&teamFor(myName,current)!==current.stealTeam)||
-           (current.buzzerDelayOn&&serverNow()<(current.buzzUnlockAt||0)))return;
+           (current.narrationLocked || serverNow()<(current.buzzUnlockAt||0)))return;
         const round=String(current.buzzOpenAt||0)+":"+(current.qIndex||0);
         if(current.lastWinnerRound!==round){
           current.lastWinnerStreak=current.lastWinner===myName?(current.lastWinnerStreak||0)+1:1;
@@ -352,8 +352,7 @@
       const myTeamLabel=document.getElementById("myTeamLabel");
       myTeamLabel.textContent=data.teamMode?(team?"You are on Team "+team+".":"Waiting for team assignment."):"";
       const choiceActor=canAnswerChoice(data,myName);
-      const shouldShow=!!(data.multipleChoice&&data.roundActive&&data.buzzedBy&&
-        (choiceActor||isHelper||data.answerState));
+      const shouldShow=!!(data.multipleChoice&&data.roundActive&&q?.choices?.length);
       area.hidden=!shouldShow;
       if(!shouldShow)return;
       const picker=document.getElementById("helperPicker");
@@ -365,17 +364,23 @@
         document.getElementById("askHelperBtn").disabled=!select.options.length;
       }
       const buttons=document.getElementById("choiceButtons");buttons.replaceChildren();
-      if(data.answerState){
-        document.getElementById("answerFeedback").textContent=data.answerState.outcome==="correct"?"Correct! Points were added automatically.":(data.stealTeam?"Not quite. The other team may steal.":"Not quite. The answer is revealed.");
-      }else if(choiceActor&&q?.choices?.length){
-        document.getElementById("answerFeedback").textContent=isHelper?"You are helping. Choose an answer for your team.":(data.stealTeam?"The other team missed. Choose an answer to steal.":"Choose an answer, or ask one teammate to help.");
-        q.choices.forEach((choice,index)=>{
-          const button=document.createElement("button");button.type="button";button.textContent=choice;
-          button.addEventListener("click",()=>submitChoice(index));buttons.appendChild(button);
-        });
-      }else if(choiceActor&&!q?.choices?.length){
-        document.getElementById("answerFeedback").textContent="The teacher has not added answer choices yet.";
-      }else document.getElementById("answerFeedback").textContent="Waiting for the selected teammate to answer.";
+      q.choices.forEach((choice,index)=>{
+        const button=document.createElement("button");
+        button.type="button";
+        button.textContent=choiceLabel(choice,index);
+        const color=choiceColors[index];
+        if(color){button.style.background=color.bg;button.style.color=color.fg;button.style.borderColor=color.fg;}
+        button.style.fontWeight="900";
+        button.disabled=!choiceActor;
+        button.setAttribute("aria-label",choiceLabel(choice,index));
+        button.addEventListener("click",()=>submitChoice(index));
+        buttons.appendChild(button);
+      });
+      document.getElementById("answerFeedback").textContent=data.answerState
+        ? (data.answerState.outcome==="correct"?"Correct! Points were added automatically.":"Not quite. The answer is revealed.")
+        : data.narrationLocked ? "Listen to the question and colors before buzzing."
+        : choiceActor ? (isHelper?"You are helping. Choose an answer for your team.":data.stealTeam?"The other team missed. Choose an answer to steal.":"Choose an answer, or ask one teammate to help.")
+        : data.buzzedBy ? "Waiting for the selected player to answer." : "Listen, then buzz in when the buzzer opens.";
     }
     const originalRender=window.renderGameSnapshot;
     window.renderGameSnapshot=function(snapshot){originalRender(snapshot);updateChoices(snapshot.val()||{});};
@@ -384,6 +389,11 @@
     window.updateBuzzAvailability=function(){
       originalAvail();
       const data=lastData||{};
+      if (data.narrationLocked) {
+        const b=document.getElementById("buzzBtn");
+        b.disabled=true;
+        document.getElementById("countdown").textContent="Listen to the question and colors…";
+      }
       if(data.teamMode){
         const team=teamFor(myName,data);
         const eligible=!!(data.contestants&&data.contestants[team]===myName&&(!data.stealTeam||data.stealTeam===team));
