@@ -100,9 +100,10 @@
         location.assign(new URL('class-pointer-prototype/dashboard.html',root).href);
         return;
       }
-      // Permission enables the small Share My Screen control. Never force a modal
-      // over a student's learning activity merely because the teacher sent a request.
-      holder.style.display='flex';
+      // Only prompt for a screen that this teacher has explicitly enabled.
+      // Keep the large consent window requested for student screen-sharing invitations.
+      if(!active||active.roomId!==session.roomId)return;
+      showPrompt();
     }
     function stop(){
       const prior=stream;stream=null;try{call?.close()}catch{}call=null;
