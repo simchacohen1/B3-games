@@ -44,7 +44,7 @@ test('teacher broadcasts selected mode only inside their authenticated active se
   await assert.rejects(()=>dashboard.requestStudentDestination('unapproved'));
 });
 async function studentFixture(){
-  let subscribe,goTo=null,sessionPath='',shareHolder;
+  let subscribe,goTo=null,sessionPath='',shareHolder,shareOverlay;
   const stored=new Map([['b3Games_studentId','test-boy'],['b3Games_classPin','12345']]);
   const makeElement=tag=>({
     tag,style:{cssText:''},textContent:'',children:[],
@@ -54,7 +54,7 @@ async function studentFixture(){
   const document={
     currentScript:{src:'https://funtorahtools.com/class-pointer-prototype/activity-share.js'},
     createElement:makeElement,head:{appendChild(){}},
-    body:{appendChild:v=>{shareHolder=v}}
+    body:{appendChild:v=>{if(v.id==='fttActivityScreenShare')shareHolder=v;if(v.id==='fttShareRequestOverlay')shareOverlay=v}}
   };
   const db={ref:path=>{sessionPath=path;return{on:(kind,cb)=>{subscribe=cb}}}};
   const firebase={apps:[{}],database:()=>db};
@@ -68,7 +68,7 @@ async function studentFixture(){
   vm.runInContext(source('activity-share.js'),context);
   for(let i=0;i<20&&!subscribe;i++)await new Promise(resolve=>setImmediate(resolve));
   assert.ok(subscribe,'student class subscription should be established');
-  return {emit:record=>subscribe({val:()=>record}),get destination(){return goTo},get sessionPath(){return sessionPath},holder:shareHolder};
+  return {emit:record=>subscribe({val:()=>record}),get destination(){return goTo},get sessionPath(){return sessionPath},holder:shareHolder,overlay:shareOverlay};
 }
 test('signed-in student follows whiteboard request without requiring screen-sharing permission',async()=>{
   const s=await studentFixture(),now=clock();
@@ -138,8 +138,9 @@ test('screen and whiteboard checkboxes are independent; rechecking restores rout
   assert.equal(s.destination,null);
   s.emit({[room]:{...session,screenSharingDenied:{}}});
   assert.equal(s.destination,null,'screen requests stay in the learning activity');
-  assert.equal(s.holder.style.display,'flex','rechecking restores the consent prompt');
-  assert.match(s.holder.children[1].textContent,/teacher requested your screen/);
+  assert.equal(s.holder.style.display,'none','centered consent temporarily replaces the floating control');
+  assert.equal(s.overlay.style.display,'flex','rechecking restores the centered consent prompt');
+  assert.match(s.overlay.children[0].innerHTML,/Your teacher would like to see your screen/);
   assert.equal(s.holder.children[0].disabled,undefined,'capture remains student-controlled');
   const w=await studentFixture();
   w.emit({[room]:{...session,destinationRequest:{mode:'boards',at:now},studentScreenSharing:false,
