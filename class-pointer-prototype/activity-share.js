@@ -72,7 +72,7 @@
     const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Not now';cancel.style.cssText='display:block;width:100%;padding:12px;margin-top:10px;background:#fff;border:1px solid #9baecb;border-radius:12px;color:#213654;font:700 16px system-ui;cursor:pointer';
     const promptStatus=document.createElement('p');promptStatus.setAttribute('role','status');promptStatus.style.cssText='color:#ad2438;font-size:15px;margin:12px 0 0';
     promptPanel.append(choose,cancel,promptStatus);promptOverlay.append(promptPanel);document.body.appendChild(promptOverlay);
-    const showPrompt=()=>{promptStatus.textContent='';holder.style.display='none';promptOverlay.style.display='flex';choose.focus()};
+    const showPrompt=()=>{promptStatus.textContent='';holder.style.display='none';promptOverlay.style.display='flex';choose.focus?.()};
     const hidePrompt=()=>{promptOverlay.style.display='none';holder.style.display=active?'flex':'none'};
     cancel.addEventListener('click',()=>{hidePrompt();promptStatus.textContent='';});
     // Invoke the capture handler from a real user click, never through a synthesized button.click().
