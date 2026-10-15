@@ -1,5 +1,15 @@
 {
   "rules": {
+    "teacherPractice": {
+      "$workspaceId": {
+        "$uid": {
+          "$classId": {
+            ".read": "auth != null && auth.uid == $uid && ((auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (root.child('b3Games/admins/' + $uid).exists() && root.child('b3Games/admins/' + $uid + '/active').val() != false) || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + $uid).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + $uid + '/active').val() != false && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + $uid + '/classIds/' + $classId).val() == true))",
+            ".write": "auth != null && auth.uid == $uid && ((auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (root.child('b3Games/admins/' + $uid).exists() && root.child('b3Games/admins/' + $uid + '/active').val() != false) || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + $uid).exists() && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + $uid + '/active').val() != false && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + $uid + '/classIds/' + $classId).val() == true))"
+          }
+        }
+      }
+    },
     "b3Games": {
       ".read": true,
       "admins": {
