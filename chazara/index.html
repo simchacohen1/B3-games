@@ -41,6 +41,7 @@
   <div class="top"><div><h1>🔁 Chazara Chart</h1><div class="sub">Tap the Posuk after you <b>read and translate</b> it. Record it for double points.</div><div class="student-row"><div class="student-banner">👤 <span id="studentNameTop">Student</span></div><button type="button" class="switch-student" id="switchStudentBtn">🔄 Switch Student</button></div></div><a href="../index.html">← Fun Torah Tools</a></div>
   <div id="noStudent" class="panel hidden"><h2>Sign in on Fun Torah Tools</h2><p class="note">Students sign in once on the homepage, then open Chazara.</p><div class="signin-actions"><a href="../index.html" style="font-weight:800;color:#475569;text-decoration:none;">← Fun Torah Tools</a></div></div>
   <div id="app" class="hidden">
+    <div class="panel hidden" id="teacherChazaraJump"><strong>👨‍🏫 Teacher jump — try any posuk</strong><div class="student-row"><label>Perek <input type="number" id="teacherJumpPerek" min="1" max="50" value="18" style="width:65px"></label><label>Posuk <input type="number" id="teacherJumpPosuk" min="1" max="100" value="1" style="width:65px"></label><button type="button" class="signin-btn" id="teacherJumpBtn">Open for practice</button></div><p class="note">Only your teacher practice is unlocked. Your boys’ work and classroom limits are unchanged.</p></div>
     <div class="stats"><div class="stat"><b id="total">0</b><span>Total Chazaras</span></div><div class="stat"><b id="learned">0</b><span>Pesukim Unlocked</span></div><div class="stat"><b id="goalDone">0</b><span>At 10+ Chazaras</span></div><div class="stat"><b id="streak">0</b><span>Day Streak 🔥</span></div></div>
     <div class="record-help"><b>🎙️ Recorded Chazara = 2 points.</b> A normal Chazara = 1 point. Points are sent to Rabbi Cohen for approval before they are added.</div>
     <div class="panel"><h2>⏰ Time for Chazara</h2><p class="note">An unlocked Posuk appears here if it has never been reviewed or has not been reviewed for 14 days.</p><div id="due" class="due"></div></div>
@@ -61,12 +62,26 @@
 const fallbackConfig={apiKey:"AIzaSyDaheO5K2qL8qe3rHIZY4nTd0wuEUG_DEs",authDomain:"b3-games.firebaseapp.com",databaseURL:"https://b3-games-default-rtdb.firebaseio.com",projectId:"b3-games",storageBucket:"b3-games.firebasestorage.app",messagingSenderId:"568530046190",appId:"1:568530046190:web:fd765fdd27e55a3c73f7ff"};
 if(!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG||fallbackConfig);
 let db=firebase.database(),storage=firebase.storage();
-let teacherPreview=false;
+let teacherPreview=false,teacherJumpKey=null,teacherJumpRef=null;
 async function enablePersistentTeacherPractice(user, access) {
   const practice = await B3TeacherPractice.open(db, user, access, 'chazara');
   db = practice.dbAdapter(db);
   storage = practice.recordingStorage();
+  teacherJumpRef=practice.path('chazara/settings/jumpKey');
   teacherPreview = true; // No genuine student points or approval requests.
+  const saved=await db.ref(teacherJumpRef).once('value');
+  const match=/^(\d{1,2})_(\d{1,3})$/.exec(String(saved.val()||''));
+  if(match){teacherJumpKey=match[0];}
+  const jumpBox=document.getElementById('teacherChazaraJump');
+  jumpBox.classList.remove('hidden');
+  if(match){document.getElementById('teacherJumpPerek').value=match[1];document.getElementById('teacherJumpPosuk').value=match[2];}
+  document.getElementById('teacherJumpBtn').onclick=async()=>{
+    const p=Number(document.getElementById('teacherJumpPerek').value),v=Number(document.getElementById('teacherJumpPosuk').value);
+    if(!Number.isInteger(p)||p<1||p>50||!Number.isInteger(v)||v<1||v>100){alert('Choose a valid perek and posuk.');return;}
+    const choice=K(p,v);
+    try{await db.ref(teacherJumpRef).set(choice);teacherJumpKey=choice;rebuildUnlocked();}
+    catch(error){console.error(error);showNotice('Teacher jump could not save. Please try again.');}
+  };
 }
 let sid=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId')||'';
 let sname=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName')||'Student';
@@ -83,14 +98,14 @@ function translationScore(a){if(!a)return null;const e=resultEntries(a.translati
 function understandScore(a){if(!a)return null;const e=resultEntries(a.questionResults);if(e.length){const max=Math.max(...e.map(([i,q])=>Number.isInteger(q.questionIndex)?q.questionIndex:i))+1,total=Math.max(Number(a.questionTotal)||0,max,e.length),correct=e.filter(([,q])=>(q.finalVerdict||q.verdict)==='correct').length;return total?Math.round(correct/total*100):null}if(typeof a.comprehensionScore==='number')return a.comprehensionScore;const n=parseFloat(String(a.questionScore||'').replace('%',''));return Number.isFinite(n)?n:null}
 function maxScore(attempts,reader){let b=null;attempts.forEach(a=>{const v=reader(a);if(typeof v==='number'&&(b===null||v>b))b=v});return b}
 function parsePracticeKey(key){const parts=String(key).split('_');if(parts.length<3)return null;const part=parts.pop(),perek=Number(parts.pop()),prefix=parts.join('_');const m=/^(\d+)(?:-(\d+))?$/.exec(part);if(!perek||!m)return null;return{prefix,perek,start:Number(m[1]),end:Number(m[2]||m[1])}}
-function rebuildUnlocked(){const next={};Object.entries(attemptsRoot||{}).forEach(([evidenceKey,attemptMap])=>{const parsed=parsePracticeKey(evidenceKey);if(!parsed)return;const attempts=Object.values(attemptMap||{});const read=maxScore(attempts,readingScore),trans=maxScore(attempts,translationScore),under=maxScore(attempts,understandScore);for(let posuk=parsed.start;posuk<=parsed.end;posuk++){const key=K(parsed.perek,posuk);const x=next[key]||(next[key]={perek:parsed.perek,posuk,reading:0,translation:0,understand:0,practiceKey:parsed.prefix+'_'+parsed.perek+'_'+posuk});x.reading=Math.max(x.reading,Number(read)||0);x.translation=Math.max(x.translation,Number(trans)||0);x.understand=Math.max(x.understand,Number(under)||0)}});practiceProgress=next;unlocked={};Object.entries(next).forEach(([k,x])=>{if(x.reading>=100&&x.translation>=100)unlocked[k]=x});render()}
+function rebuildUnlocked(){const next={};Object.entries(attemptsRoot||{}).forEach(([evidenceKey,attemptMap])=>{const parsed=parsePracticeKey(evidenceKey);if(!parsed)return;const attempts=Object.values(attemptMap||{});const read=maxScore(attempts,readingScore),trans=maxScore(attempts,translationScore),under=maxScore(attempts,understandScore);for(let posuk=parsed.start;posuk<=parsed.end;posuk++){const key=K(parsed.perek,posuk);const x=next[key]||(next[key]={perek:parsed.perek,posuk,reading:0,translation:0,understand:0,practiceKey:parsed.prefix+'_'+parsed.perek+'_'+posuk});x.reading=Math.max(x.reading,Number(read)||0);x.translation=Math.max(x.translation,Number(trans)||0);x.understand=Math.max(x.understand,Number(under)||0)}});practiceProgress=next;unlocked={};Object.entries(next).forEach(([k,x])=>{if(x.reading>=100&&x.translation>=100)unlocked[k]=x});if(teacherPreview&&teacherJumpKey&&!unlocked[teacherJumpKey]){const [perek,posuk]=teacherJumpKey.split("_").map(Number);unlocked[teacherJumpKey]={perek,posuk,reading:100,translation:100,understand:100,teacherJump:true};}render()}
 function ago(t){return t?Math.floor((Date.now()-t)/86400000):9999}
 function col(c,g){const x=Math.min(1,c/g);return `hsl(${52+68*x} ${95-10*x}% ${88-30*x}%)`}
 function dayKey(t=Date.now()){const x=new Date(Number(t)||Date.now()),y=x.getFullYear(),m=String(x.getMonth()+1).padStart(2,'0'),day=String(x.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
 function streak(){const s=new Set(Object.keys(d.reviewDays||{})),x=new Date();x.setHours(0,0,0,0);if(!s.has(dayKey(x.getTime())))x.setDate(x.getDate()-1);let n=0;while(s.has(dayKey(x.getTime()))){n++;x.setDate(x.getDate()-1)}return n}
 function showNotice(message){let e=document.getElementById('rewardToast');if(!e){e=document.createElement('div');e.id='rewardToast';e.className='reward-toast';document.body.appendChild(e)}e.textContent=message;e.style.opacity='1';clearTimeout(showNotice.t);showNotice.t=setTimeout(()=>e.style.opacity='0',3000)}
 function showCheer(){let e=document.getElementById('cheerBanner');if(!e){e=document.createElement('p');e.id='cheerBanner';e.className='cheer-banner';e.setAttribute('role','status');e.textContent='🎉 Great job, you finished! 🎉';document.body.appendChild(e)}e.style.opacity='1';clearTimeout(showCheer.t);showCheer.t=setTimeout(()=>{e.style.opacity='0'},4000)}
-function baseCanReview(key){if(!unlocked[key])return false;const c=Number(d.reviews[key]?.count)||0;return c<GOAL||Number(unlocked[key]?.understand)>=100}
+function baseCanReview(key){if(teacherPreview&&teacherJumpKey===key)return true;if(!unlocked[key])return false;const c=Number(d.reviews[key]?.count)||0;return c<GOAL||Number(unlocked[key]?.understand)>=100}
 function activeChazaraKeys(){return Object.keys(unlocked).sort((a,b)=>{const A=a.split('_').map(Number),B=b.split('_').map(Number);return A[0]-B[0]||A[1]-B[1]})}
 function eventDay(e){return String(e?.chazaraDate||'').trim()||dayKey(Number(e?.createdAt)||Date.now())}
 function isRejectedEvent(e){return !!(e&&(e.teacherRejected===true||e.pointRequestStatus==='rejected'))}
@@ -98,7 +113,7 @@ function todayCounts(){const today=dayKey(),counts={};Object.values(chazaraEvent
 function dailyRotationPool(){return activeChazaraKeys().filter(baseCanReview)}
 function dailyLimitReached(key){return Number(todayCounts()[key]||0)>=MAX_DAILY_CHazaras}
 function rotationAllows(key){const pool=dailyRotationPool();if(pool.length<=1)return true;if(!pool.includes(key))return false;const counts=todayCounts(),min=Math.min(...pool.map(k=>Number(counts[k]||0)));return Number(counts[key]||0)===min}
-function canReview(key){return baseCanReview(key)&&!dailyLimitReached(key)&&rotationAllows(key)}
+function canReview(key){if(teacherPreview&&teacherJumpKey===key)return true;return baseCanReview(key)&&!dailyLimitReached(key)&&rotationAllows(key)}
 function reviewLockReason(key){if(!baseCanReview(key))return '100% Understand needed after 10';if(dailyLimitReached(key))return 'Maximum 2 Chazaras for this Posuk today';if(!rotationAllows(key))return 'Review the other pesukim first';return ''}
 async function askNormalReview(key){return new Promise(resolve=>{const box=$('confirmBox');$('confirmQuestion').textContent='Did you read and translate '+R(key)+' correctly?';box.classList.remove('hidden');let done=false;const finish=v=>{if(done)return;done=true;box.classList.add('hidden');$('confirmYes').onclick=null;$('confirmNo').onclick=null;resolve(v)};$('confirmYes').onclick=()=>finish(true);$('confirmNo').onclick=()=>finish(false)})}
 async function requestPoints(source,eventId){if(teacherPreview)return null;try{const response=await fetch(POINT_REQUEST_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:sid,source,eventId}),signal:AbortSignal.timeout(15000)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||('HTTP '+response.status));if(eventId&&data.requestId)await db.ref(EVENTS+sid+'/'+eventId).update({pointRequestId:data.requestId,pointRequestStatus:data.status||'pending',pointRequestSyncedAt:firebase.database.ServerValue.TIMESTAMP});if(data.status==='pending'&&Number(data.amount)>0)showNotice('⭐ '+data.amount+' point'+(Number(data.amount)===1?'':'s')+' sent to your teacher for approval.');return data}catch(e){console.warn('Point request will be retried later',e);return null}}
