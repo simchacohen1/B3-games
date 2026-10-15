@@ -160,7 +160,7 @@
   }
 </style>
 <script src="../paid-api.js?v=20261008-cost-controls"></script>
-<script src="../teacher-account.js?v=20261008"></script><script defer src="../gallery-share.js?v=20261011b"></script>
+<script src="../teacher-practice.js?v=20261014"></script><script src="../teacher-account.js?v=20261008"></script><script defer src="../gallery-share.js?v=20261011b"></script>
 </head>
 <body>
 <header>
@@ -267,7 +267,11 @@ const db = firebase.database();
 
 let masterBlocked=false;
 let quizAuthPending=true;
-let teacherPreview=false;
+let teacherPreview=false,teacherQuizPracticeRef=null;
+async function saveTeacherQuizPreview(){
+ if(!teacherQuizPracticeRef)return;
+ await teacherQuizPracticeRef.set({responses:myResponses,updatedAt:Date.now()});
+}
 let myStudentId='';
 let myName='';
 let myClassId='';
@@ -454,9 +458,15 @@ function enterStudent(displayName,studentId,classId){
 async function restoreLogin(){
 const account=await window.B3TeacherAccountReady;
 if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
-teacherPreview=true;myName='Teacher Preview - sample quiz, answers not saved';myStudentId='teacher_preview';myClassId='et';
-activeLaunchId='teacher_preview';launchData={classId:'et',started:true,mode:'test',showScore:true,quizSnapshot:{title:'Teacher Preview Quiz',questions:[{q:'How many days are in a week?',choices:['Six','Seven','Eight'],correctIndex:1},{q:'Which day is Shabbos?',choices:['The first day','The seventh day','The third day'],correctIndex:1}]}};
-document.getElementById('studentNameLabel').textContent=myName;applyMasterBlocked();render();return;
+try {
+ const practice=await B3TeacherPractice.open(db,account.user,account.access,'weekly-quiz');
+ teacherQuizPracticeRef=db.ref(practice.path('weeklyQuiz/sampleLaunch'));
+ const saved=(await teacherQuizPracticeRef.once('value')).val()||{};
+ myResponses=saved.responses||{};
+ teacherPreview=true;myName='Teacher Practice — sample quiz saved privately';myStudentId='teacher_preview';myClassId=practice.classId;
+ activeLaunchId='teacher_preview';launchData={classId:practice.classId,started:true,mode:'test',showScore:true,quizSnapshot:{title:'Teacher Practice Quiz (sample)',questions:[{q:'How many days are in a week?',choices:['Six','Seven','Eight'],correctIndex:1},{q:'Which day is Shabbos?',choices:['The first day','The seventh day','The third day'],correctIndex:1}]}};
+ document.getElementById('studentNameLabel').textContent=myName;applyMasterBlocked();render();return;
+}catch(error){console.error('Could not load teacher quiz practice',error);setLoginMsg(error.message||'Could not open teacher quiz practice');return;}
 }
   const id=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
   const name=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName');
@@ -658,7 +668,11 @@ function renderNav(mode,questions){
 async function submitAnswer(){
   if(selectedChoice===null){const s=document.getElementById('answerStatus');s.textContent='Choose an answer first.';s.className='status bad';return;}
   const qs=getQuestions(),q=qs[displayedQuestion],mode=launchData&&launchData.mode||'paced',st=studentEffectiveQuestionState(displayedQuestion,mode);if(!st.open||responseFor(displayedQuestion))return;
-  if(teacherPreview){myResponses[displayedQuestion]={choiceIndex:selectedChoice,correct:Number(selectedChoice)===Number(q.correctIndex)};render();return;}
+  if(teacherPreview){
+  myResponses[displayedQuestion]={choiceIndex:selectedChoice,correct:Number(selectedChoice)===Number(q.correctIndex)};
+  try{await saveTeacherQuizPreview();}catch(error){console.warn('Teacher quiz sample could not save',error);}
+  render();return;
+}
   // Never permit another submission for a finished attempt.
   const finished=await db.ref(QROOT+'/completions/'+activeLaunchId+'/'+myStudentId).once('value');
   if(finished.exists()){render();return;}
