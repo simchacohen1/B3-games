@@ -237,8 +237,8 @@
     // A source-specific template is only valid when the supplied text matches
     // the event. Never infer the answer from the reference alone if source
     // content has been substituted or corrupted.
-    if (/(?:Genesis|Bereishis)\\s+18:2$/i.test(String(source.ref || "")) &&
-        !/\\b(?:saw|looked|eyes|men|three|angels|malochim)\\b/i.test(text)) return null;
+    if (/(?:Genesis|Bereishis)\s+18:2$/i.test(String(source.ref || "")) &&
+        !/\b(?:saw|looked|eyes|men|three|angels|malochim)\b/i.test(text)) return null;
     const Bereishis18QA = bereishis18QuestionAndAnswer(source);
     if (Bereishis18QA) return Bereishis18QA;
     const Bereishis19QA = bereishis19QuestionAndAnswer(source);
