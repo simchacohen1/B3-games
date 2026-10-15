@@ -7,6 +7,7 @@ on:
       - 'backend/functions/index.js'
       - 'tests/class-pointer*.test.cjs'
       - 'e2e/class-pointer-activities.spec.ts'
+      - 'e2e/class-pointer-auth-startup.spec.ts'
       - '.github/workflows/class-pointer-tests.yml'
   pull_request:
     paths:
@@ -15,6 +16,7 @@ on:
       - 'backend/functions/index.js'
       - 'tests/class-pointer*.test.cjs'
       - 'e2e/class-pointer-activities.spec.ts'
+      - 'e2e/class-pointer-auth-startup.spec.ts'
       - '.github/workflows/class-pointer-tests.yml'
 jobs:
   test:
@@ -38,7 +40,7 @@ jobs:
       - name: Install browsers
         run: npx playwright install --with-deps
       - name: Classroom Pointer browser regression
-        run: npx playwright test e2e/class-pointer-activities.spec.ts --workers=1
+        run: npx playwright test e2e/class-pointer-activities.spec.ts e2e/class-pointer-auth-startup.spec.ts --workers=1
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
