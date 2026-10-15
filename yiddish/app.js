@@ -285,12 +285,12 @@ const SOUND_PROFILES={
   ],
   'גיין':[
     {raw:'ג'},
-    {raw:'יי',answer:'יֵי',choices:['יֵי','יַי','יִי','יי']},
+    {raw:'יי',answer:'יֵי',choices:['יֵי','יַי','יִי','יָי']},
     {raw:'ן'}
   ],
   'צוויי':[
     {raw:'צוו'},
-    {raw:'יי',answer:'יֵי',choices:['יֵי','יַי','יִי','יי']}
+    {raw:'יי',answer:'יֵי',choices:['יֵי','יַי','יִי','יָי']}
   ],
   'יאר':[
     {raw:'יא',answer:'יאָ',choices:['יאָ','יאַ','יאֵ','יאְ']},
@@ -303,7 +303,7 @@ const SOUND_PROFILES={
   ],
   'קליין':[
     {raw:'קל'},
-    {raw:'יי',answer:'יֵי',choices:['יֵי','יַי','יִי','יי']},
+    {raw:'יי',answer:'יֵי',choices:['יֵי','יַי','יִי','יָי']},
     {raw:'ן'}
   ],
   'שטוב':[
@@ -360,7 +360,7 @@ const SOUND_PROFILES={
   'שרייבן':[
     {raw:'ש',answer:'שׁ',choices:['שׁ','שׂ','שָ','שְ']},
     {raw:'ר'},
-    {raw:'יי',answer:'יַי',choices:['יַי','יֵי','יִי','יי']},
+    {raw:'יי',answer:'יַי',choices:['יַי','יֵי','יִי','יָי']},
     {raw:'ב',answer:'בּ',choices:['בּ','ב','בָ','בְ']},
     {raw:'ען'}
   ],
@@ -389,7 +389,7 @@ const SOUND_PROFILES={
   ],
   'וויינען':[
     {raw:'וו'},
-    {raw:'יי',answer:'יֵי',choices:['יֵי','יַי','יִי','יי']},
+    {raw:'יי',answer:'יֵי',choices:['יֵי','יַי','יִי','יָי']},
     {raw:'נע',answer:'נעֶ',choices:['נעֶ','נעַ','נעָ','נעְ']},
     {raw:'ן'}
   ],
@@ -403,17 +403,17 @@ const SOUND_PROFILES={
   ],
   'נייעס':[
     {raw:'נ'},
-    {raw:'יי',answer:'יַי',choices:['יַי','יֵי','יִי','יי']},
+    {raw:'יי',answer:'יַי',choices:['יַי','יֵי','יִי','יָי']},
     {raw:'עס',answer:'עֶס',choices:['עֶס','עַס','עָס','עְס']}
   ],
   'היינט':[
     {raw:'ה'},
-    {raw:'יי',answer:'יַי',choices:['יַי','יֵי','יִי','יי']},
+    {raw:'יי',answer:'יַי',choices:['יַי','יֵי','יִי','יָי']},
     {raw:'נט'}
   ],
   'גלייך':[
     {raw:'גל'},
-    {raw:'יי',answer:'יַי',choices:['יַי','יֵי','יִי','יי']},
+    {raw:'יי',answer:'יַי',choices:['יַי','יֵי','יִי','יָי']},
     {raw:'כ',answer:'כ',choices:['כ','כּ']}
   ],
   'קומען':[
@@ -423,7 +423,7 @@ const SOUND_PROFILES={
   ],
   'שיינע':[
     {raw:'ש',answer:'שׁ',choices:['שׁ','שׂ','שָ','שְ']},
-    {raw:'יי',answer:'יֵי',choices:['יֵי','יַי','יִי','יי']},
+    {raw:'יי',answer:'יֵי',choices:['יֵי','יַי','יִי','יָי']},
     {raw:'נע',answer:'נעֶ',choices:['נעֶ','נעַ','נעָ','נעְ']}
   ],
   'מענטשן':[
@@ -434,7 +434,10 @@ const SOUND_PROFILES={
   ]
 };
 function soundProfile(w){
-  return SOUND_PROFILES[w.yi]||[{raw:w.yi,answer:w.yi,choices:[w.yi]}];
+  return SOUND_PROFILES[w.yi]||[{raw:w.yi}];
+}
+function soundEligibleWords(ids){
+  return [...new Set(ids)].filter(id=>{const w=word(id);return w&&soundChallengeIndexes(soundProfile(w)).length>0});
 }
 function soundChallengeIndexes(profile){
   const out=[];
@@ -448,7 +451,7 @@ $('soundStart').onclick=()=>{
   if(busy||pending||!stepOpen(group,part))return;
   clearAdvance();round=null;blast=null;storyQuiz=null;sentenceGame=null;
   $('practice').hidden=true;$('blastgame').hidden=true;$('storyquiz').hidden=true;$('sentencegame').hidden=true;
-  const ids=shuffleClient(lessonWords(group,part));
+  const ids=shuffleClient(soundEligibleWords(lessonWords(group,part)));
   soundGame={group:group,ids:ids,wordIndex:0,cursor:0,placed:new Set(),transitioning:false,lastCorrect:null,feedback:'',wrongChoice:null};
   soundGameRender();focusSoundGame();
 };
@@ -470,7 +473,7 @@ function soundGameRender(){
   const box=$('soundgame');box.hidden=false;box.replaceChildren();$('words').hidden=true;$('toolbar').hidden=true;
   if(soundGame.wordIndex>=soundGame.ids.length){
     box.append(node('div','🔤','round-check'),node('h2','Sound Builder complete!'),cheer(),node('p','You built all '+soundGame.ids.length+' Yiddish words in this step.'));
-    const again=node('button','Build them again');again.type='button';again.onclick=()=>{soundGame.ids=shuffleClient(lessonWords(group,part));soundGame.wordIndex=0;soundResetWord();soundGameRender();focusSoundGame()};
+    const again=node('button','Build them again');again.type='button';again.onclick=()=>{soundGame.ids=shuffleClient(soundEligibleWords(lessonWords(group,part)));soundGame.wordIndex=0;soundResetWord();soundGameRender();focusSoundGame()};
     const back=node('button','Back to my words');back.type='button';back.style.marginLeft='10px';back.onclick=()=>{soundGame=null;box.hidden=true;$('words').hidden=false;$('toolbar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};
     box.append(again,back);focusSoundGame();return;
   }
@@ -501,7 +504,7 @@ function soundGameRender(){
   box.append(node('p','Choose the correct version for the highlighted part. In this learning activity, ע with an “e” sound gets a segol; two yuds get patach for “ay” and tzere for “ey.”','sound-hint'));
   const opts=node('div','','sound-options');
   soundGame.choiceOrder=soundGame.choiceOrder||{};const orderKey=soundGame.wordIndex+':'+w.id+':'+activePart;
-  if(!soundGame.choiceOrder[orderKey])soundGame.choiceOrder[orderKey]=shuffleClient(part.choices);
+  if(!soundGame.choiceOrder[orderKey])soundGame.choiceOrder[orderKey]=part.choices.slice();
   for(const choice of soundGame.choiceOrder[orderKey]){
     const b=node('button',choice,'sound-option'+(soundGame.wrongChoice===choice?' wrong':''));
     b.type='button';b.lang='yi';b.dir='rtl';b.disabled=soundGame.transitioning;b.onclick=()=>soundChoose(choice);opts.append(b);
