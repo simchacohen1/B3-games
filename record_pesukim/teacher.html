@@ -523,6 +523,36 @@ header p{color:#64748b}
 #mainContent:has(#reportSkillTabs) .report-student-detail .empty-msg{padding:8px 0;text-align:left}
 @media(max-width:750px){#mainContent:has(#reportSkillTabs)>.report-filters{grid-template-columns:repeat(2,minmax(0,1fr))}#reportAdvanced[open] .report-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
+
+/* Posuk reports: skill tabs, results-first, minimal filters */
+body.reports-focused .students-panel{display:none!important}
+body.reports-focused .layout{display:block}
+body.reports-focused .main-panel{width:100%;max-width:none}
+body.reports-focused .wrap{max-width:none}
+body.reports-focused #mainContent>h2::after{content:none!important}
+.report-skill-tabs{display:flex;gap:8px;border-bottom:1px solid #e1e7ef;margin:0 0 12px;padding-bottom:9px}
+.report-skill-tab{cursor:pointer;border:1px solid #d5e0e9;background:#fff;border-radius:9px;padding:10px 22px;font:700 .94rem 'Quicksand',sans-serif;color:#536b82}
+.report-skill-tab.active{background:#214d75;border-color:#214d75;color:#fff}
+.report-skill-tab:focus-visible{outline:3px solid #7baded;outline-offset:2px}
+body.reports-focused .report-filters.report-compact-filters{display:flex!important;gap:10px!important;align-items:end!important;background:transparent;border:0;padding:0;margin:8px 0 12px!important}
+.report-compact-filters>div{flex:0 1 240px;grid-column:auto!important;grid-row:auto!important}
+.report-skill-hidden{display:none!important}
+.report-advanced{border:1px solid #dde5ed;border-radius:10px;margin:6px 0 10px;color:#4d657c;background:#fbfcfe}
+.report-advanced>summary{padding:10px 14px;font-weight:700;cursor:pointer;font-size:.83rem}
+.report-advanced-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:12px;border-top:1px solid #e4eaf0}
+.report-advanced-grid>div{min-width:0}
+.report-advanced-grid label{display:block;color:#55687d;font-size:.8rem;font-weight:700;margin-bottom:6px}
+.report-advanced-grid select,.report-advanced-grid input[type=date]{width:100%;border:1px solid #cfdbe6;border-radius:8px;padding:8px;background:#fff;min-height:36px}
+.report-advanced-grid #reportStudentBox{background:#fff!important;max-height:135px!important}
+body.reports-focused #reportSummary>.attempt{grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 12px!important}
+body.reports-focused #reportSummary>.attempt>.row{padding:12px!important}
+body.reports-focused #reportSummary>.attempt>.row>span:last-child{font-size:1.25rem}
+body.reports-focused #reportResults{margin-bottom:14px}
+body.reports-focused #reportResults .roster-table td{padding:9px 10px}
+body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:flex-end;margin-bottom:8px!important}
+@media(max-width:900px){body.reports-focused .report-filters.report-compact-filters{flex-wrap:wrap}.report-advanced-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.report-skill-tabs{overflow-x:auto}body.reports-focused #reportSummary>.attempt{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.report-skill-tab{padding:9px;font-size:.83rem}.report-advanced-grid{grid-template-columns:1fr}}
+
 </style>
 </head>
 <body>
@@ -1123,6 +1153,7 @@ function markTab(tab){
 })();
 
 function setTab(tab){
+  document.body.classList.toggle('reports-focused', tab === 'reports');
   markTab(tab);
   if(tab === 'overview'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
@@ -1994,6 +2025,33 @@ async function loadReportsTab(){
     advancedGrid.className = 'report-filters';
     [...advanced.children].filter(el => el.tagName !== 'SUMMARY').forEach(el => advancedGrid.append(el));
     advanced.append(advancedGrid);
+    // Keep the original controls wired, while moving advanced options out of the way.
+    const reportFiltersEl = mainEl.querySelector('.report-filters');
+    reportFiltersEl.classList.add('report-compact-filters');
+    const advanced = document.createElement('details');
+    advanced.className = 'report-advanced';
+    advanced.innerHTML = '<summary>More filters · Students, Pesukim, Dates & Views</summary><div class="report-advanced-grid"></div>';
+    reportFiltersEl.insertAdjacentElement('afterend', advanced);
+    const sections = [...reportFiltersEl.children];
+    [0,4,5,6,7,8,9].forEach(i => { if(sections[i]) advanced.querySelector('.report-advanced-grid').appendChild(sections[i]); });
+    const skillSelect = document.getElementById('reportScoreTypeFilter');
+    skillSelect.value = 'reading';
+    skillSelect.closest('div').classList.add('report-skill-hidden');
+    document.getElementById('reportViewMode').value = 'flat';
+    mainEl.querySelectorAll('.report-skill-tab').forEach(btn => {
+      btn.onclick = () => {
+        mainEl.querySelectorAll('.report-skill-tab').forEach(b => {
+          b.classList.toggle('active', b === btn);
+          b.setAttribute('aria-selected', String(b === btn));
+        });
+        skillSelect.value = btn.dataset.skill;
+        renderReportResults();
+      };
+    });
+    const summary = document.getElementById('reportSummary');
+    const results = document.getElementById('reportResults');
+    reportFiltersEl.before(summary);
+    summary.after(results);
     // "All Students" and the individual checkboxes are mutually exclusive:
     // checking "All" clears the individual picks, and picking any individual
     // student clears "All" so the filter reflects only what's actually checked.
