@@ -100,7 +100,9 @@
         location.assign(new URL('class-pointer-prototype/dashboard.html',root).href);
         return;
       }
-      showPrompt();
+      // Permission enables the small Share My Screen control. Never force a modal
+      // over a student's learning activity merely because the teacher sent a request.
+      holder.style.display='flex';
     }
     function stop(){
       const prior=stream;stream=null;try{call?.close()}catch{}call=null;
