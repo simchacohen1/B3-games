@@ -109,5 +109,5 @@ function connectRole(){if(window.B3SiteSettings&&typeof window.B3SiteSettings.on
 if(!connectRole()){let tries=0;const waiter=setInterval(()=>{if(connectRole()||++tries>=80)clearInterval(waiter);},250);}
 setInterval(()=>{const today=calendar.studyToday(new Date(),window.FTTSunTimes);if(followingToday&&today!==selectedDate)showDate(today);},30000);
 showDate(selectedDate);
-</script><script defer src="../class-pointer-prototype/activity-share.js?v=20261014-send1"></script>
+</script><script defer src="../class-pointer-prototype/activity-share.js?v=20261015-sharefix1"></script>
 </body></html>
