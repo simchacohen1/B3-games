@@ -99,3 +99,9 @@ body.boards-on #studentDock{display:none!important}
 #boardsView>.sharing-permissions{position:relative;z-index:2;flex:0 1 auto;max-height:45%;margin:0;padding:8px 14px;border-radius:0;overflow:auto;background:#f9fbff}
 #tbStudentsMenu>.sharing-permissions{max-height:38vh;overflow:auto}
 
+
+/* Explicit student share choices: browser preview picker remains authoritative. */
+.board-share-choices{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;width:100%}
+.board-share-choices .board-share-btn{flex:1 1 210px;max-width:290px;font-size:16px!important;min-height:54px!important;padding:10px 14px!important}
+.board-share-choices .board-share-tab{background:linear-gradient(135deg,#0d857f,#1672c5)!important}
+.board-share-choices .board-share-btn.sharing{background:#8f2630!important}
