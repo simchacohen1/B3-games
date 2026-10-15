@@ -234,6 +234,11 @@
     // eight-year-old what to look for. Leave these for teacher-written review.
     if (topic) return null;
     if (source.isRashi) return rashiQuestionAndAnswer(source);
+    // A source-specific template is only valid when the supplied text matches
+    // the event. Never infer the answer from the reference alone if source
+    // content has been substituted or corrupted.
+    if (/(?:Genesis|Bereishis)\\s+18:2$/i.test(String(source.ref || "")) &&
+        !/\\b(?:saw|looked|eyes|men|three|angels|malochim)\\b/i.test(text)) return null;
     const Bereishis18QA = bereishis18QuestionAndAnswer(source);
     if (Bereishis18QA) return Bereishis18QA;
     const Bereishis19QA = bereishis19QuestionAndAnswer(source);
@@ -271,6 +276,14 @@
 
     const day = creationDay(source);
     const suffix = name.toLowerCase() === "hashem" && day ? " on " + day : "";
+    // Short, clear questions on Creation avoid needless "in this pasuk" phrasing.
+    const creationDayLabel = day === "the first day" ? "day one" : day.replace(/^the /, "");
+    if (day && name.toLowerCase() === "hashem" && verbs[verb] === "see") {
+      return { q: "What did Hashem see on " + creationDayLabel + "?", answer: localizeText(clause) };
+    }
+    if (day && name.toLowerCase() === "hashem" && verbs[verb] === "create") {
+      return { q: "What did Hashem create on " + creationDayLabel + "?", answer: localizeText(clause) };
+    }
     if (verb === "appeared") {
       const target = clause.match(/^to\s+(.+?)(?:\s+by\s+|[,.]|$)/i);
       if (target && !/^(him|her|them|me|us|you|it|himself|herself|the man|the woman)$/i.test(target[1].trim())) return { q: "In this pasuk, who appeared to " + target[1] + "?", answer: name };
