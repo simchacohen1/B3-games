@@ -64,7 +64,7 @@
   };
   let pageTimer;
   window.PointerPdfLibrary={
-    onOpened(file){currentFile=file;activeId=null},
+    onOpened(file){currentFile=file;activeId=null;clearTimeout(pageTimer)},
     onPageChanged(page){
       openedPage=page;
       if(!activeId||!prefix())return;
