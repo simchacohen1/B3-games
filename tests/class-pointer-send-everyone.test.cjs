@@ -86,5 +86,5 @@ test('teacher controls offer both class destinations',()=>{
   const src=source('student-boards.js');
   assert.match(src,/Send to Screen Sharing/);
   assert.match(src,/Send to Whiteboards/);
-  assert.match(src,/requestStudentDestination\(destination\)/);
+  assert.match(src,/requestStudentDestination\(destination,policy\(\)\)/);
 });
