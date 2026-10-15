@@ -132,7 +132,7 @@ function receiveStudent(connection){
         send(duplicate.connection,{type:'removed'});
         duplicate.connection.close();
       }
-      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,studentId:C.validId?.(message.studentId)?message.studentId:(previousAccess?.studentId||null),color:previousAccess?.color||C.colors[colorIndex++%C.colors.length],allowed:previousAccess?.allowed||false,writeAllowed:previousAccess?.writeAllowed||false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);window.ClassPointerPdf?.studentJoined(member);window.ClassPointerBoards?.studentJoined(member);return;
+      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,studentId:window.ClassPointerDashboardCore?.validId(message.studentId)?message.studentId:(previousAccess?.studentId||null),color:previousAccess?.color||C.colors[colorIndex++%C.colors.length],allowed:previousAccess?.allowed||false,writeAllowed:previousAccess?.writeAllowed||false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);window.ClassPointerPdf?.studentJoined(member);window.ClassPointerBoards?.studentJoined(member);return;
     }
     if(!member||members.get(member.id)!==member)return;
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
