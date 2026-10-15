@@ -27,7 +27,7 @@ const fixture=()=>store({
  },
  posukPractice:{allowedStudents:{alpha:{name:'Alpha',passcode:'1111'}}}
 });
-const migrate=(s,options={})=>manageStudents(s,owner,{action:'migratePasscodes',...options},1000);
+const migrate=(s,options={})=>manageStudents(s,owner,{action:'migratePasscodes',migrationProtocol:'passcodes-v2-preview-20261015',backupConfirmed:true,...options},1000);
 
 test('dry-run lists only counts, never credentials, and performs no writes',async()=>{
  const s=fixture(),before=structuredClone(s.tree);
@@ -86,4 +86,39 @@ test('an unrelated teacher cannot preview or run the owner migration',async()=>{
  const s=fixture();
  for(const dryRun of [true,false])await assert.rejects(manageStudents(s,teacher,{action:'migratePasscodes',deletePublic:true,dryRun}),{code:403});
  assert.equal(s.writes.length,0);
+});
+
+test('the dedicated preview endpoint reads without deleting and returns protocol marker',async()=>{
+ const s=fixture(),before=structuredClone(s.tree);
+ const result=await manageStudents(s,owner,{action:'previewPasscodeMigration'},1000);
+ assert.equal(result.ok,true);
+ assert.equal(result.dryRun,true);
+ assert.equal(result.protocol,'passcodes-v2-preview-20261015');
+ assert.equal(result.cleared,3);
+ assert.deepEqual(s.tree,before);
+ assert.deepEqual(s.writes,[]);
+});
+test('legacy preview parameters on destructive action are blocked without confirmed v2 protocol',async()=>{
+ const s=fixture();
+ await assert.rejects(manageStudents(s,owner,{action:'migratePasscodes',deletePublic:true,dryRun:true},1000),{code:409});
+ await assert.rejects(manageStudents(s,owner,{action:'migratePasscodes',deletePublic:true,backupConfirmed:true},1000),{code:409});
+ await assert.rejects(manageStudents(s,owner,{action:'migratePasscodes',deletePublic:true,migrationProtocol:'passcodes-v2-preview-20261015'},1000),{code:409});
+ assert.equal(s.writes.length,0);
+});
+test('non-owner cannot call the new read-only preview endpoint',async()=>{
+ const s=fixture();
+ await assert.rejects(manageStudents(s,teacher,{action:'previewPasscodeMigration'},1000),{code:403});
+ assert.equal(s.writes.length,0);
+});
+test('owner UI cannot run legacy destructive migration before verifying new preview protocol',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const page=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+ const start=page.indexOf('el("securePasscodesButton").addEventListener');
+ const end=page.indexOf('el("addStudentToClassButton").addEventListener',start);
+ assert.ok(start>=0&&end>start);
+ const handler=page.slice(start,end);
+ assert.ok(handler.includes('trustedStudentAction("previewPasscodeMigration",{})'));
+ assert.ok(handler.includes('preview.dryRun!==true || preview.protocol!==protocol'));
+ assert.ok(handler.indexOf('previewPasscodeMigration')<handler.indexOf('trustedStudentAction("migratePasscodes"'));
+ assert.ok(handler.includes('backupConfirmed:true'));
 });
