@@ -13,7 +13,6 @@
       ]
     }
   ],
-  "storage": {"rules": "storage.rules"},
   "database": {
     "rules": "firebase-rules.json"
   }
