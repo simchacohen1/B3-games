@@ -57,7 +57,15 @@
       btn.style.cssText='background:#1d4ed8;color:#fff;border:0;border-radius:12px;padding:17px 22px;cursor:pointer;font:800 17px system-ui,sans-serif';
       label.textContent='Click, choose your screen, then press Share.';
     }
-    holder.append(btn,label);document.body.appendChild(holder);
+    // When the separately deployed activity authorization service is unavailable,
+    // keep the working in-classroom consent-based sharing path accessible.
+    const fallback=document.createElement('button');fallback.type='button';
+    fallback.textContent='Open Classroom Pointer to share';
+    fallback.title='Use the classroom screen-sharing button and select this tab in your browser';
+    fallback.style.cssText='background:#e0ecff;color:#173d85;border:1px solid #a8c5f0;border-radius:10px;padding:9px 12px;font:inherit;cursor:pointer';
+    fallback.hidden=true;
+    fallback.addEventListener('click',()=>location.assign(new URL('class-pointer-prototype/dashboard.html',root).href));
+    holder.append(btn,label,fallback);document.body.appendChild(holder);
     let active=null,peer=null,call=null,stream=null,busy=false;
     const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
     function routeTeacherRequest(session){
@@ -107,6 +115,7 @@
     btn.addEventListener('click',async()=>{
       if(stream){stop();return}
       if(busy||!active)return;
+      fallback.hidden=true;
       busy=true;btn.disabled=true;
       let captured=null;
       try{
@@ -120,8 +129,9 @@
         status('Connecting to teacher…');
         const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({action:'issue',studentId:id,pin,classId,room:active.roomId})});
-        const ticket=await response.json();
-        if(!response.ok||!ticket.ok)throw Error(ticket.error||'Screen sharing is not allowed.');
+        const ticket=await response.json().catch(()=>null);
+        if(response.status===404||response.status===405)throw Error('Sharing authorization service is not available.');
+        if(!response.ok||!ticket?.ok)throw Error(ticket?.error||'Screen sharing is not allowed.');
         if(!active||!captured.active)throw Error('The lesson ended.');
         if(!window.Peer)await load(new URL('class-pointer-prototype/vendor/peerjs-1.5.5.min.js',root).href);
         const connection=new Peer('class-pointer-activity-'+crypto.randomUUID());
@@ -139,7 +149,15 @@
         media.on('close',stop);media.on('error',stop);
         btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';
         status('Sharing started — ask your teacher to confirm');
-      }catch(error){captured?.getTracks().forEach(t=>t.stop());stop();status(error?.name==='NotAllowedError'?'Sharing canceled.':error.message||'Could not share.')}
+      }catch(error){
+        captured?.getTracks().forEach(t=>t.stop());stop();
+        const message=String(error?.message||'');
+        const serviceUnavailable=/failed to fetch|networkerror|authorization service is not available|load failed/i.test(message);
+        if(serviceUnavailable&&active){
+          status('Direct sharing is unavailable. Open Classroom Pointer, click Share my screen, and select this tab.');
+          fallback.hidden=false;
+        }else status(error?.name==='NotAllowedError'?'Sharing canceled.':message||'Could not share.');
+      }
       finally{busy=false;btn.disabled=false}
     });
     window.addEventListener('pagehide',stop);
