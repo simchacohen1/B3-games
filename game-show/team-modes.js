@@ -4,7 +4,7 @@
  */
 (function () {
   "use strict";
-  const isTeacher = /teacher\\.html$/i.test(location.pathname);
+  const isTeacher = /teacher\.html$/i.test(location.pathname);
   // Fixed colors make verbal answers unambiguous when the teacher shares the screen.
   const choiceColors = Object.freeze([
     { label: "Red", bg: "#b42332", fg: "#ffffff" },
