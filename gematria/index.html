@@ -132,6 +132,7 @@ bdi.he{unicode-bidi:isolate}.sofitList{direction:ltr;display:inline}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
 <script src="../firebase-config.js"></script>
+<script src="../teacher-practice.js?v=20261014"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
 <script src="../b3-race.js?v=20261007"></script>
 <script src="../guest-mode.js?v=20261011-guest"></script>
@@ -349,8 +350,8 @@ function save(){
  if(!progressRef){return}
  clearTimeout(saveTimer);
  saveTimer=setTimeout(()=>{
-  const payload=Object.assign({},P,{name:studentName||studentId,lastActive:firebase.database.ServerValue.TIMESTAMP});
-  progressRef.set(payload).then(()=>setNote("✓ Progress saved for your teacher")).catch(e=>{console.warn("Gematria save failed",e);setNote("Saved on this device (could not reach the server)")});
+  const payload=Object.assign({},P,{name:teacherPreview?"Teacher Practice":(studentName||studentId),lastActive:firebase.database.ServerValue.TIMESTAMP});
+  progressRef.set(payload).then(()=>setNote(teacherPreview?"✓ Teacher practice saved to your account":"✓ Progress saved for your teacher")).catch(e=>{console.warn("Gematria save failed",e);setNote("Saved on this device (could not reach the server)")});
  },1200);
 }
 function star(){P.stars++;const el=$("starCount");el.textContent=P.stars;el.parentElement.classList.remove("pop");void el.offsetWidth;el.parentElement.classList.add("pop")}
@@ -368,9 +369,24 @@ async function connect(){
  }
  const account=await window.B3TeacherAccountReady;
  if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
-  teacherPreview=true;P=blankProgress();$("starCount").textContent=0;
-  $("whoName").textContent="Teacher demonstration";
-  $("banner").classList.add("hidden");setNote("Demonstration progress stays in this tab.");return;
+  try {
+    if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+    db=firebase.database();
+    const practice=await B3TeacherPractice.open(db,account.user,account.access,'gematria');
+    progressRef=db.ref(practice.path('gematria/progress'));
+    const snapshot=await progressRef.once('value');
+    teacherPreview=true;
+    P=Object.assign(blankProgress(),snapshot.val()||{});
+    level=LEVEL_MAX[Number(P.level)]?Number(P.level):1;
+    paintLevels();
+    $("starCount").textContent=Number(P.stars)||0;
+    $("whoName").textContent="Teacher Practice";
+    $("banner").classList.add("hidden");
+    setNote("✓ Teacher progress loaded from your account");return;
+  } catch(error) {
+    setNote("Teacher practice unavailable: "+(error.message||"Could not connect"));
+    return;
+  }
  }
  $("whoName").textContent=studentName||"";
  if(!studentId){
@@ -409,7 +425,7 @@ function show(id){
 document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>show(b.dataset.go));
 $("menuBtn").onclick=()=>show("menu");
 function paintLevels(){document.querySelectorAll("[data-level]").forEach(b=>b.classList.toggle("on",Number(b.dataset.level)===level))}
-document.querySelectorAll("[data-level]").forEach(b=>b.onclick=()=>{level=Number(b.dataset.level);safeSet("gematria_level",String(level));paintLevels();save()});
+document.querySelectorAll("[data-level]").forEach(b=>b.onclick=()=>{level=Number(b.dataset.level);if(!teacherPreview)safeSet("gematria_level",String(level));paintLevels();save()});
 paintLevels();
 function levelLetters(){return LETTERS.filter(([,v])=>v<=LEVEL_MAX[level])}
 
