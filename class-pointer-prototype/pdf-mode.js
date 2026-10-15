@@ -131,8 +131,10 @@
     scroller.scrollTop=lay.tops[anchor]*W;scroller.scrollLeft=0;
     B.resetMarks();afterMove(true);
   }
+  let lastRememberedPage=0;
   function afterMove(forceSend){
     scheduleRender();updateControls();B.redraw();
+    if(isTeacher&&!webMode&&!notReady()){const page=currentPage()+1;if(page!==lastRememberedPage){lastRememberedPage=page;window.PointerPdfLibrary?.onPageChanged(page)}}
     if(isTeacher&&(forceSend||Date.now()>quietUntil))scheduleViewSend(forceSend);
   }
   scroller.addEventListener('scroll',()=>{if(Date.now()<quietUntil)return;cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>afterMove())});
@@ -351,16 +353,18 @@
     try{
       if(B.sharing())B.stopSharing();
       const data=new Uint8Array(await file.arrayBuffer());
-      const ok=await loadDoc(data,big);if(!ok)return;
+      const ok=await loadDoc(data,big);if(!ok)return false;
       paged=big;bytes=big?null:data;docName=P.cleanName(file.name.replace(/\.pdf$/i,''));docId=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());
       showNote('');B.resetMarks();B.setPdf(true);
       B.status(big?'Large PDF open. Students receive the pages you teach on, so the first page may take a moment.':'PDF open. Students receive it automatically. Use the buttons at the bottom of the lesson to zoom and turn pages.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
       if(big)scheduleViewSend(true);
       window.PointerPdfLibrary?.onOpened(file);
+      return true;
     }catch(error){
       unload(true);bytes=null;docId=null;showNote('');
       B.fail(error&&error.name==='PasswordException'?'That PDF needs a password. Save an unprotected copy and try again.':'Could not open that PDF. Try another copy of the file.');
+      return false;
     }
   }
   function closePdf(quiet){
