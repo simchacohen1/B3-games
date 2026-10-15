@@ -4,7 +4,19 @@
  */
 (function () {
   "use strict";
-  const isTeacher = /teacher\.html$/i.test(location.pathname);
+  const isTeacher = /teacher\\.html$/i.test(location.pathname);
+  // Fixed colors make verbal answers unambiguous when the teacher shares the screen.
+  const choiceColors = Object.freeze([
+    { label: "Red", bg: "#b42332", fg: "#ffffff" },
+    { label: "Blue", bg: "#2056bd", fg: "#ffffff" },
+    { label: "Green", bg: "#176b48", fg: "#ffffff" },
+    { label: "Yellow", bg: "#ffd842", fg: "#172638" }
+  ]);
+  const choiceLabel = (choice, i) => (choiceColors[i]?.label || "Choice " + (i + 1)) + ": " + String(choice);
+  function spokenQuestion(q) {
+    if (!q || !q.q || !Array.isArray(q.choices)) return "";
+    return "Question: " + q.q + ". " + q.choices.map((choice, i) => choiceLabel(choice, i)).join(". ") + ".";
+  }
   const rosterOf = data => Object.keys((data && data.scores) || {}).sort((a,b)=>a.localeCompare(b));
   function teamsFor(data) {
     const roster = rosterOf(data);
@@ -60,7 +72,7 @@
   }
 
   // Expose pure helpers for regression tests and diagnostics.
-  window.GameShowTeamModeLogic = { teamsFor, teamFor, contestantsFor, canAnswerChoice, applyChoice };
+  window.GameShowTeamModeLogic = { teamsFor, teamFor, contestantsFor, canAnswerChoice, applyChoice, choiceColors, choiceLabel, spokenQuestion };
   function questionAt(data) {
     return Array.isArray(questions) ? questions[Number(data?.qIndex)||0] : null;
   }
@@ -74,14 +86,18 @@
       card.innerHTML='<h3>Game modes</h3><p class="hint">Choose each mode independently. Team contestants rotate through the class roster.</p>'+
         '<label class="setting"><span class="label"><b>Team Mode</b><span>Two balanced teams; one contestant per team each round.</span></span><span class="ctrl"><input type="checkbox" class="switch" id="teamModeToggle" aria-label="Team Mode"></span></label>'+
         '<label class="setting"><span class="label"><b>Multiple Choice</b><span>Students choose from the answers you add to each question.</span></span><span class="ctrl"><input type="checkbox" class="switch" id="multipleChoiceToggle" aria-label="Multiple Choice"></span></label>'+
+        '<label class="setting"><span class="label"><b>Read question and colored choices aloud</b><span>Teacher reads Red, Blue, Green, Yellow. Buzzers stay locked until the reading ends.</span></span><span class="ctrl"><input type="checkbox" class="switch" id="readChoicesToggle" aria-label="Read question and colored choices aloud"></span></label>'+
+        '<button class="btn" type="button" id="stopNarrationBtn">Stop reading and open buzzers</button>'+
         '<div id="teamModeSummary" class="status-line" aria-live="polite"></div>';
       buzzerCard.insertAdjacentElement("afterend",card);
       const save=()=>gameRef.update({
         teamMode:document.getElementById("teamModeToggle").checked,
-        multipleChoice:document.getElementById("multipleChoiceToggle").checked
+        multipleChoice:document.getElementById("multipleChoiceToggle").checked,
+        readChoices:document.getElementById("readChoicesToggle").checked
       }).catch(()=>{document.getElementById("teamModeSummary").textContent="Could not save game modes.";});
       document.getElementById("teamModeToggle").addEventListener("change",save);
       document.getElementById("multipleChoiceToggle").addEventListener("change",save);
+      document.getElementById("readChoicesToggle").addEventListener("change",save);
     }
 
     // Extend the existing question editor without changing legacy questions.
@@ -113,14 +129,108 @@
       }).catch(err=>{document.getElementById("soundStatus").textContent="Save error: "+err.message;});
     };
 
+    const teacherBoard = document.createElement("div");
+    teacherBoard.id = "teacherColorChoices";
+    teacherBoard.setAttribute("aria-label", "Multiple-choice answer colors");
+    teacherBoard.style.cssText = "display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;width:100%;margin:10px auto;max-width:950px;";
+    const questionCard = document.querySelector("#tabPlay .qcard");
+    if (questionCard) questionCard.insertBefore(teacherBoard, questionCard.querySelector("#answer"));
+    const colorsCss = choiceColors.map((c, i) => ".gs-color-choice:nth-child(" + (i + 1) + "){background:" + c.bg + ";color:" + c.fg + ";}").join("");
+    const style = document.createElement("style");
+    style.textContent = ".gs-color-choice{border-radius:12px;padding:12px;min-width:0;font-weight:800;font-size:clamp(15px,1.6vw,24px);overflow-wrap:anywhere;text-align:center;border:2px solid #fff8;}" + colorsCss;
+    document.head.appendChild(style);
+    function renderTeacherChoices(data) {
+      const q = questionAt(data);
+      teacherBoard.replaceChildren();
+      teacherBoard.hidden = !(data.multipleChoice && q?.choices?.length);
+      if (teacherBoard.hidden) return;
+      q.choices.forEach((answer, i) => {
+        const cell = document.createElement("div");
+        cell.className = "gs-color-choice";
+        cell.textContent = choiceLabel(answer, i);
+        teacherBoard.appendChild(cell);
+      });
+    }
+
+    let currentSpeech = null;
+    let narrationTimeout = null;
+    function cancelSpeech() {
+      if (narrationTimeout) clearTimeout(narrationTimeout);
+      narrationTimeout = null;
+      currentSpeech = null;
+      try { window.speechSynthesis?.cancel(); } catch (_) {}
+    }
+    function releaseNarration(token) {
+      if (!token) return;
+      if (narrationTimeout) clearTimeout(narrationTimeout);
+      narrationTimeout = null;
+      currentSpeech = null;
+      const delay = document.getElementById("delayToggle")?.checked
+        ? (Number(document.getElementById("delaySeconds")?.value) || 10) * 1000 : 0;
+      gameRef.transaction(current => {
+        if (!current || current.roundToken !== token || !current.narrationLocked) return;
+        const unlockAt = serverNow() + delay;
+        current.narrationLocked = false;
+        current.buzzUnlockAt = unlockAt;
+        current.buzzOpenAt = unlockAt;
+        return current;
+      }, (err, committed) => {
+        if (err) document.getElementById("soundStatus").textContent = "Could not open buzzers after reading. Use the stop-reading button.";
+        else if (committed) document.getElementById("soundStatus").textContent = delay
+          ? "Reading complete. Buzzer countdown started." : "Reading complete. Buzzers open!";
+      });
+    }
+    function speakAndRelease(q, token) {
+      if (!token) return;
+      const status = document.getElementById("soundStatus");
+      const content = spokenQuestion(q);
+      if (!content || !window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+        status.textContent = "Speech is not available in this browser. Opening the buzzers.";
+        releaseNarration(token);
+        return;
+      }
+      cancelSpeech();
+      try {
+        const utterance = new SpeechSynthesisUtterance(content);
+        utterance.lang = "en-US";
+        utterance.rate = 0.88;
+        currentSpeech = utterance;
+        utterance.onend = () => { if (currentSpeech === utterance) releaseNarration(token); };
+        utterance.onerror = () => {
+          if (currentSpeech !== utterance) return;
+          status.textContent = "Audio could not finish. Opening buzzers.";
+          releaseNarration(token);
+        };
+        status.textContent = "Reading question and Red, Blue, Green, Yellow. Buzzers locked.";
+        narrationTimeout = setTimeout(() => {
+          if (currentSpeech !== utterance) return;
+          cancelSpeech();
+          status.textContent = "Reading timed out; buzzers will open.";
+          releaseNarration(token);
+        }, 90000);
+        window.speechSynthesis.speak(utterance);
+      } catch (_) {
+        status.textContent = "Audio could not start. Opening buzzers.";
+        releaseNarration(token);
+      }
+    }
+    document.getElementById("stopNarrationBtn")?.addEventListener("click", () => {
+      cancelSpeech();
+      const token = lastGameData?.roundToken;
+      releaseNarration(token);
+    });
+
     // The teacher opens a round only after assigning the fair rotating contestants.
-    window.startQuestion=function(){
+    window.startQuestion=function(options={}){
       ensureAudioAwake();
       const data=lastGameData||{};
-      const qIndex=Number(data.qIndex)||0, q=questions?.[qIndex];
+      const qIndex=Number.isInteger(options.qIndex)?options.qIndex:(Number(data.qIndex)||0), q=questions?.[qIndex];
       if(!q){document.getElementById("soundStatus").textContent="Add a question before starting the round.";return;}
       const teamMode=!!document.getElementById("teamModeToggle")?.checked;
       const mc=!!document.getElementById("multipleChoiceToggle")?.checked;
+      const shouldStart = options.startImmediately !== false;
+      const narrate = shouldStart && mc && !!document.getElementById("readChoicesToggle")?.checked;
+      const roundToken = serverNow() + ":" + qIndex + ":" + (Number(data.teamRoundCount)||0);
       if(mc&&(!q.choices?.length||!Number.isInteger(q.correctIndex))){
         document.getElementById("soundStatus").textContent="Add choices and mark the correct choice before starting.";return;
       }
@@ -131,17 +241,29 @@
       if(teamMode&&(!contestants.A||!contestants.B)){
         document.getElementById("soundStatus").textContent="Team Mode needs at least two students in the game.";return;
       }
+      cancelSpeech();
       gameRef.update({
-        roundActive:true,revealed:false,buzzedBy:null,selectedPlayer:null,buzzPool:null,
-        buzzUnlockAt:unlockAt,buzzOpenAt:unlockAt,teamMode,multipleChoice:mc,contestants,
-        teamRoundCount:teamMode?rotation+1:(Number(data.teamRoundCount)||0),
+        qIndex,showStarted:options.showStarted === true ? true : !!data.showStarted,
+        roundActive:shouldStart,revealed:false,buzzedBy:null,selectedPlayer:null,buzzPool:null,
+        buzzUnlockAt:narrate ? 0 : (shouldStart ? unlockAt : 0),
+        buzzOpenAt:narrate ? 0 : (shouldStart ? unlockAt : 0),
+        narrationLocked:narrate,roundToken,readChoices:!!document.getElementById("readChoicesToggle")?.checked,
+        teamMode,multipleChoice:mc,contestants:shouldStart?contestants:null,
+        teamRoundCount:teamMode&&shouldStart?rotation+1:rotation,
         helperName:null,answerState:null,lastAnswerState:null,stealTeam:null,stealUsed:false
+      }).then(() => {
+        if (narrate) speakAndRelease(q, roundToken);
+      }).catch(err => {
+        document.getElementById("soundStatus").textContent = "Could not start round: " + err.message;
       });
     };
-    const originalGo=window.goToQuestion;
+    // Do not open the next buzzer for even a moment before narration starts.
+    window.startGameShow=function(){
+      window.startQuestion({showStarted:true});
+    };
     window.goToQuestion=function(index){
-      originalGo(index);
-      gameRef.update({helperName:null,answerState:null,stealTeam:null,stealUsed:false,contestants:null});
+      if (document.getElementById("jumpMenu")) document.getElementById("jumpMenu").open=false;
+      window.startQuestion({qIndex:index,startImmediately:!!lastGameData?.showStarted});
     };
     const originalAdjust=window.adjustSelectedScore;
     window.adjustSelectedScore=function(delta){
@@ -159,6 +281,9 @@
       const team=document.getElementById("teamModeToggle");
       const mc=document.getElementById("multipleChoiceToggle");
       if(team)team.checked=!!data.teamMode;if(mc)mc.checked=!!data.multipleChoice;
+      const reader=document.getElementById("readChoicesToggle");
+      if(reader)reader.checked=!!data.readChoices;
+      renderTeacherChoices(data);
       const summary=document.getElementById("teamModeSummary");
       if(summary){
         if(data.teamMode){
