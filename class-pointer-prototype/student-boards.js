@@ -301,7 +301,7 @@
       title.textContent=mode==='screens'?'🖥 Share my screen':'📝 My board';
       drawGroup.hidden=!boardsOn;surface.hidden=!boardsOn;sharePanel.hidden=!screensOn;pausedPanel.hidden=!(on&&blocked);
       editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';
-      shareText.textContent=stream?'✅ Sharing your screen with your teacher. Keep working in your activity.':'Your teacher asked you to share your screen. Choose a tab in the browser prompt.';
+      shareText.textContent=stream?'✅ Sharing your screen with your teacher. Keep working in your activity.':'Your teacher asked you to share your screen. Choose a tab, window, or entire screen in the browser prompt.';
       shareBtn.textContent=stream?'⏹ Stop sharing':'🖥 Share my screen';shareBtn.classList.toggle('sharing',!!stream);
       preview.hidden=!stream;if(stream&&preview.srcObject!==stream){preview.srcObject=stream;preview.play().catch(()=>{})}if(!stream)preview.srcObject=null;
       full.textContent=expanded()?'⤢ Exit full screen':'⛶ Full screen';
@@ -315,7 +315,7 @@
       if(!navigator.mediaDevices?.getDisplayMedia||!B.callTeacher){shareNote.textContent='Screen sharing works on a computer in Chrome or Edge.';return}
       shareBtn.disabled=true;
       try{
-        const s=await navigator.mediaDevices.getDisplayMedia({video:{displaySurface:'browser',frameRate:{ideal:5,max:8},width:{ideal:1600},height:{ideal:900}},audio:false,preferCurrentTab:true,selfBrowserSurface:'include',surfaceSwitching:'include'});
+        const s=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:5,max:8},width:{ideal:1600},height:{ideal:900}},audio:false,preferCurrentTab:false,surfaceSwitching:'include'});
         if(!on||mode!=='screens'||blocked){s.getTracks().forEach(t=>t.stop());return}
         stopShare(false);
         const c=B.callTeacher(s);

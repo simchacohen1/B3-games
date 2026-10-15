@@ -33,10 +33,10 @@ test('class picker preserves authorization checks',()=>{
  assert.match(s,/C\.permitted\(access,id,classRow\)/);
 });
 
-test('student capture prefers a browser tab but requires the browser permission chooser',()=>{
+test('student capture does not favor the current tab and still requires browser permission',()=>{
  const s=read('student-boards.js');
  assert.match(s,/getDisplayMedia\(/);
- assert.match(s,/preferCurrentTab:true/);
+ assert.match(s,/preferCurrentTab:false/);
  assert.match(s,/surfaceSwitching:'include'/);
  assert.match(s,/getVideoTracks\(\)\[0\]/);
 });
