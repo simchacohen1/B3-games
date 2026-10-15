@@ -106,6 +106,7 @@ button:hover:not(:disabled){transform:translateY(-2px)}
 @media(max-width:600px){h1{font-size:27px}.card{padding:16px;border-radius:19px}.question{font-size:24px}.type-grid{grid-template-columns:1fr 1fr}}
 </style>
 <script src="../paid-api.js?v=20261008-cost-controls"></script>
+<script src="../teacher-practice.js?v=20261014"></script>
 <script src="../teacher-account.js?v=20261008"></script></head>
 <body>
 <header>
@@ -259,7 +260,7 @@ const TRANSLATION_ACCURACY_NOTES=`CLASSROOM TRANSLATION ACCURACY NOTES:
 - Preserve important Hebrew images and wording when they are understandable in simple English. If the Hebrew says "your hearts," keep "your hearts" instead of changing it to "yourselves."
 - If a phrase has two genuinely equivalent literal English translations, do not use one of them as a wrong answer.
 - If an exact literal translation is uncertain, OMIT the item rather than paraphrasing or guessing.`;
-let teacherPreview=false;
+let teacherPreview=false,teacherPracticeRef=null;
 let studentId='',studentName='',selected=new Set(),quizType='shorashim',difficulty='regular',questionCount=5,items=[],qIndex=0,selectedAnswer=null,checked=false,correct=0,results=[];
 
 function slugify(s){return String(s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');}
@@ -282,7 +283,20 @@ function enterApp(){
 }
 async function restore(){
 const account=await window.B3TeacherAccountReady;
-if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){teacherPreview=true;studentId='teacher_preview';studentName='Teacher Preview - practice results not saved';enterApp();return;}
+if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
+ try{
+  const practice=await B3TeacherPractice.open(db,account.user,account.access,'weekly-quiz');
+  teacherPracticeRef=db.ref(practice.path('weeklyQuiz/practice'));
+  const snap=await teacherPracticeRef.child('settings').once('value');
+  const settings=snap.val()||{};
+  if(Array.isArray(settings.pesukim))selected=new Set(settings.pesukim.filter(n=>Number.isInteger(n)&&n>=1&&n<=33));
+  if(['shorashim','translation','comprehension','mixed'].includes(settings.quizType))quizType=settings.quizType;
+  if(['easy','regular','challenge'].includes(settings.difficulty))difficulty=settings.difficulty;
+  if(Number.isInteger(settings.questionCount)&&settings.questionCount>=1&&settings.questionCount<=50)questionCount=settings.questionCount;
+  teacherPreview=true;studentId='teacher_preview';studentName='Teacher Practice — results saved privately';
+  enterApp();pickType(quizType);pickDifficulty(difficulty);pickCount(questionCount);return;
+ }catch(error){setLoginMsg(error.message||'Could not load teacher practice');return;}
+}
   const id=sessionStorage.getItem('posukPractice_studentId'),name=sessionStorage.getItem('posukPractice_studentName');
   if(!id||!name){location.href='../index.html';return;}
   try{const s=await db.ref('posukPractice/allowedStudents/'+id).once('value');if(!s.exists())return;studentId=id;studentName=(s.val()&&s.val().name)||name;enterApp();}catch(e){}
@@ -357,7 +371,17 @@ async function finish(){
     questionCount:items.length,correct,percent:pct,results,
     createdAt:firebase.database.ServerValue.TIMESTAMP
   };
-  if(teacherPreview)return;
+  if(teacherPreview){
+    try{
+      if(!teacherPracticeRef)throw new Error('Teacher account not connected');
+      await Promise.all([
+        teacherPracticeRef.child('attempts').push().set(attempt),
+        teacherPracticeRef.child('settings').set({pesukim:[...selected].sort((a,b)=>a-b),quizType,difficulty,questionCount})
+      ]);
+      document.getElementById('resultMsg').textContent+=' ✓ Saved to your teacher practice account.';
+    }catch(e){console.warn('Teacher quiz save failed',e);document.getElementById('resultMsg').textContent+=' Your results could not save.';}
+    return;
+  }
   try{await db.ref('b3Quiz/practiceAttempts/'+studentId).push(attempt);}catch(e){console.warn('Practice attempt was not saved',e);}
 }
 /* ---------- Play with friends (shared B3 Race) ---------- */
