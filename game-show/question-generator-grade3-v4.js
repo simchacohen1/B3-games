@@ -386,6 +386,63 @@
     return shuffled;
   }
 
+  // Prefer wrong answers of the same kind as the correct answer. Unrelated
+  // verses and se'ifim must not produce obviously nonsensical alternatives.
+  function choiceKind(question, answer) {
+    const q = String(question || "").toLowerCase();
+    const a = String(answer || "").toLowerCase();
+    if (/\b(how many|what number|which number)\b/.test(q)) return "number";
+    if (/\b(which|what) (animal|creature)\b/.test(q)) return "animal";
+    if (/\b(who|whom|whose)\b/.test(q) || /^(avrohom|sarah|lot|moshe|yaakov|yitzchok|yosef|rivkah|eliez|aaron|aharon)\b/.test(a)) return "person";
+    if (/\b(where|which city|what city|which place|what place|which land)\b/.test(q)) return "place";
+    if (/\b(when|which day|what day|what time)\b/.test(q)) return "time";
+    if (/\b(what (animal|food|meal|drink)|which (food|meal|drink))\b/.test(q)) return "food";
+    if (/\b(which tefillah|what tefillah|which prayer|what prayer)\b/.test(q)) return "prayer";
+    return "other";
+  }
+  function plausibleOptions(qa, others) {
+    const correct = localizeText(shortChoice(qa.answer));
+    if (!correct) return [];
+    const kind = choiceKind(qa.q, correct);
+    const rows = [{ excerpt: correct, correct: true }];
+    const normalized = value => String(value || "").toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+    const seen = new Set([normalized(correct)]);
+    const add = value => {
+      const text = localizeText(shortChoice(value));
+      const key = normalized(text);
+      if (!text || !key || seen.has(key) || key.includes(normalized(correct)) || normalized(correct).includes(key)) return;
+      seen.add(key);
+      rows.push({ excerpt: text, correct: false });
+    };
+    const bank = {
+      number: ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Ten", "Twelve"],
+      animal: ["A lamb", "A goat", "A sheep", "A donkey", "A calf"],
+      person: ["Avrohom", "Lot", "Yitzchok", "Yaakov", "Sarah", "Rivkah", "Eliezer", "Yosef"],
+      place: ["At the city gate", "Inside the tent", "Outside the house", "Near the well", "In the field", "On the road"],
+      time: ["In the morning", "At midday", "In the evening", "At night", "The next day"],
+      food: ["Bread", "Milk", "Meat", "Fruit", "Water"],
+      prayer: ["Modeh Ani", "Shema", "Birchos HaTorah", "Ashrei"]
+    };
+    // Favor distractors found in the same selected Torah text, but only when
+    // the two questions ask for the same answer category.
+    for (const other of others) {
+      if (!other || !other.answer || choiceKind(other.q, other.answer) !== kind) continue;
+      if (kind === "other") {
+        const significant = s => String(s || "").toLowerCase().split(/[^a-z]+/).filter(w => w.length > 4 && !["which","where","about","teaches","pasuk","kitzur","should","there","their","would","after","before"].includes(w));
+        const topic = new Set(significant(qa.q));
+        if (!significant(other.q).some(word => topic.has(word))) continue;
+      }
+      add(other.answer);
+      if (rows.length === 4) break;
+    }
+    if (rows.length < 4) {
+      for (const value of bank[kind] || []) {
+        add(value);
+        if (rows.length === 4) break;
+      }
+    }
+    return rows.length === 4 ? rows : [];
+  }
   function makeItems(sources, mode, topic, count, distractors) {
     const out = [];
     const choiceSources = distractors && distractors.length ? distractors : sources;
@@ -411,30 +468,20 @@
       if (mode === "open") {
         out.push({ q: qa.q, ans: qa.answer });
       } else {
-        const correctExcerpt = localizeText(shortChoice(qa.answer));
-        const optionRows = correctExcerpt ? [{ excerpt: correctExcerpt, ref: source.ref }] : [];
-        for (let offset = 1; offset <= choiceSources.length && optionRows.length < 4; offset++) {
-          const candidate = choiceSources[(index + offset) % choiceSources.length];
-          if (candidate.ref === source.ref) continue;
-          const candidateQa = questionAndAnswer(candidate, topic);
-          if (!candidateQa || !candidateQa.answer) continue;
-          const excerpt = localizeText(shortChoice(candidateQa.answer));
-          if (excerpt && !optionRows.some(row => row.excerpt === excerpt)) optionRows.push({ excerpt, ref: candidate.ref });
-        }
-        // A single question may not have three distinct answer excerpts among
-        // the selected sources. Skip that item instead of aborting the batch.
-        if (optionRows.length < 4) {
+        const nearbyQuestions = choiceSources.filter(candidate => candidate.ref !== source.ref)
+          .map(candidate => questionAndAnswer(candidate, topic)).filter(Boolean);
+        const optionRows = plausibleOptions(qa, nearbyQuestions);
+        // Do not pad a question with unrelated or potentially duplicate answers.
+        if (optionRows.length !== 4) {
           skipped.choices++;
           return;
         }
-        const correctIndex = optionRows.findIndex(row => row.ref === source.ref || row.excerpt === correctExcerpt);
-        if (correctIndex < 0) throw new Error("Could not match this question to its verified source. Please try again.");
         const shuffledOptions = shuffleOptions(optionRows);
         out.push({
           q: qa.q,
           ans: qa.answer + " (Source: " + ref + ")",
           choices: shuffledOptions.map(row => row.excerpt),
-          correctIndex: shuffledOptions.indexOf(optionRows[correctIndex])
+          correctIndex: shuffledOptions.findIndex(row => row.correct)
         });
       }
     });
@@ -682,7 +729,7 @@
       } finally { button.disabled = false; }
     });
   }
-  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, questionAndAnswer, questionRecord, shortChoice, phrase, cleanText, localizeText, displayRef, evenlyPick, distribute, repairText });
+  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, questionAndAnswer, questionRecord, shortChoice, phrase, cleanText, localizeText, displayRef, evenlyPick, distribute, repairText, choiceKind, plausibleOptions });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", inject, { once: true });
   else inject();
 })();
