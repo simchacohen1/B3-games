@@ -104,6 +104,7 @@
     if(!Number.isFinite(index)){updateControls();return}
     index=P.clamp(Math.round(index),0,lay.count-1);
     scroller.scrollTop=lay.tops[index]*W;afterMove();updateControls();
+    if(isTeacher)window.PointerPdfLibrary?.onPageChanged(index+1);
   }
   function updateControls(){
     if(!isTeacher||!nav)return;
@@ -356,6 +357,7 @@
       B.status(big?'Large PDF open. Students receive the pages you teach on, so the first page may take a moment.':'PDF open. Students receive it automatically. Use the buttons at the bottom of the lesson to zoom and turn pages.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
       if(big)scheduleViewSend(true);
+      window.PointerPdfLibrary?.onOpened(file);
     }catch(error){
       unload(true);bytes=null;docId=null;showNote('');
       B.fail(error&&error.name==='PasswordException'?'That PDF needs a password. Save an unprotected copy and try again.':'Could not open that PDF. Try another copy of the file.');
@@ -566,6 +568,7 @@
   }
   window.ClassPointerPdf={
     active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,
+    openFile,currentPage,goToPage,
     studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
     close:closePdf,openSnapshot,reset:studentReset,isOpen:()=>!!lay
   };
