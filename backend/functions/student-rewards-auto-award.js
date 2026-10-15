@@ -5,6 +5,7 @@ const rtdb = admin.database();
 
 const teacherClassScope=require("./teacher-class-scope");
 const rewardsStore=require('./rewards-store.cjs');
+const effort=require('./effort-points-core.cjs');
 const SR_ROOT = "studentRewards";
 const ADMIN_EMAIL = "simcha5770@gmail.com";
 const POINTS = Object.freeze({
@@ -1306,6 +1307,62 @@ async function readStudentRewardsData(classId="all"){
   return {readOnly:true,classId:wanted,count:result.length,students:result};
 }
 
+
+async function awardEffortEvent(student,body){
+  const studentId=String(student.decoded.b3StudentId||''),classId=String(student.decoded.b3ClassId||'');
+  const tool=String(body.tool||''),eventId=String(body.eventId||'');
+  if(!/^[A-Za-z0-9_-]{1,100}$/.test(studentId)||!/^[A-Za-z0-9_-]{1,100}$/.test(classId)||
+     !Object.hasOwn(effort.TOOLS,tool)||!effort.validEventId(eventId))
+    throw Object.assign(new Error('Invalid learning activity.'),{code:400});
+  const [profileSnap,memberSnap,classSnap,rewardSnap,settingsSnap]=await Promise.all([
+    rtdb.ref('b3Games/students/'+studentId+'/profile').get(),
+    rtdb.ref('b3Games/students/'+studentId+'/memberships/b3-2026_'+classId).get(),
+    rtdb.ref('b3Games/workspaces/b3-2026/classes/'+classId).get(),
+    rtdb.ref(SR_ROOT+'/students/'+student.studentId).get(),
+    rtdb.ref('b3Games/siteSettings').get()
+  ]);
+  const profile=profileSnap.val(),membership=memberSnap.val(),cls=classSnap.val(),reward=rewardSnap.val(),settings=settingsSnap.val()||{};
+  if(!profile||profile.active===false||!membership||membership.active===false||
+     membership.classId!==classId||!cls||cls.active===false||cls.members?.[studentId]?.active===false||
+     !cls.members?.[studentId]||!reward||reward.active===false||reward.b3StudentId!==studentId)
+    throw Object.assign(new Error('Your class membership is not active.'),{code:403});
+  if(cls.members[studentId].toolAccess?.[tool]===false||settings.siteEnabled===false)
+    throw Object.assign(new Error('This activity is not available.'),{code:403});
+  if(['et','wt'].includes(classId)){
+    if(settings.games?.[tool]===false||settings.classGames?.[classId]?.[tool]===false||
+       settings.classAccess?.[classId]?.mode==='locked')
+      throw Object.assign(new Error('This activity is currently closed.'),{code:403});
+  }else if(cls.toolGrants?.[tool]!==true||cls.siteEnabled===false||cls.access?.mode==='locked'){
+    throw Object.assign(new Error('This activity is currently closed.'),{code:403});
+  }
+  const now=Date.now(),day=effort.dayKey(now),ref=rtdb.ref(SR_ROOT+'/effortPoints/'+student.studentId+'/'+day);
+  let outcome=null;
+  const transaction=await ref.transaction(current=>{
+    const result=effort.recordEvent(current,now,tool,classId,eventId,body.breakBefore===true);
+    if(!result.changed)return;
+    outcome=result;
+    return result.state;
+  });
+  const state=transaction.snapshot.val()||{};
+  const milestone=Math.min(effort.MAX_DAILY_POINTS,Math.floor(Math.max(0,Number(state.activeMs)||0)/effort.POINT_INTERVAL_MS));
+  let newlyAwarded=0;
+  // Unique IDs prevent duplicate awards if a browser retries or a student opens two tabs.
+  for(let point=1;point<=milestone;point++){
+    const requestId=safeKey('effort_'+student.studentId+'_'+day+'_'+point);
+    const awarded=await awardMilestoneImmediately({
+      requestId,rewardStudentId:student.studentId,studentId,source:'effort',amount:1,
+      reason:'Effort Points — active learning ('+point*5+' minutes)',
+      reviewedBy:'Verified learning activity',
+      record:{classId,tool,day,effortMinutes:point*5}
+    });
+    if(!awarded.ok)throw Object.assign(new Error(awarded.error||'Points could not be credited.'),{code:409});
+    if(awarded.newlyAwarded)newlyAwarded++;
+  }
+  return {ok:true,activeMinutes:Math.floor((Number(state.activeMs)||0)/60000),
+    minutesTowardNextPoint:Math.floor(((Number(state.activeMs)||0)%effort.POINT_INTERVAL_MS)/60000),
+    dailyPoints:milestone,newlyAwarded,dailyCap:effort.MAX_DAILY_POINTS};
+}
+
 exports.studentRewardsAutoAward = onRequest(
   { cors:true, region:"us-central1", memory:"256MiB" },
   async (req,res)=>{
@@ -1315,10 +1372,11 @@ exports.studentRewardsAutoAward = onRequest(
       const body=req.body||{};
       const action=String(body.action||"").trim();
       if(action){
-        if(action==="student-point-history" || action==="class-reward-status" || action==="contribute-class-reward"){
+        if(action==="student-point-history" || action==="class-reward-status" || action==="contribute-class-reward" || action==="effort-event"){
           const student=await requireStudent(req);
           if(!student.ok) return res.status(401).json({error:student.error});
           const preferredClassId=String(student.decoded?.studentRewardsClassId || student.decoded?.classId || "").trim();
+          if(action==="effort-event")return res.status(200).json(await awardEffortEvent(student,body));
           if(action==="student-point-history"){
             const history=await studentPointHistory(student.studentId);
             return res.status(200).json({ok:true,history});
