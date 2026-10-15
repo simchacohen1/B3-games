@@ -124,7 +124,7 @@ function receiveStudent(connection){
       // connection per signed-in student name, rather than one per PeerJS ID.
       const duplicate=Array.from(members.values()).find(existing=>existing.name.toLocaleLowerCase()===name.toLocaleLowerCase());
       if(!duplicate&&members.size>=12){send(connection,{type:'full'});connection.close();return}
-      const previousAccess=duplicate?{allowed:duplicate.allowed,writeAllowed:duplicate.writeAllowed,color:duplicate.color}:null;
+      const previousAccess=duplicate?{allowed:duplicate.allowed,writeAllowed:duplicate.writeAllowed,color:duplicate.color,studentId:duplicate.studentId}:null;
       if(duplicate){
         // Remove the stale entry before closing its connection; its close
         // callback cannot subsequently remove the replacement.
@@ -132,7 +132,7 @@ function receiveStudent(connection){
         send(duplicate.connection,{type:'removed'});
         duplicate.connection.close();
       }
-      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,color:previousAccess?.color||C.colors[colorIndex++%C.colors.length],allowed:previousAccess?.allowed||false,writeAllowed:previousAccess?.writeAllowed||false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);window.ClassPointerPdf?.studentJoined(member);window.ClassPointerBoards?.studentJoined(member);return;
+      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,studentId:C.validId?.(message.studentId)?message.studentId:(previousAccess?.studentId||null),color:previousAccess?.color||C.colors[colorIndex++%C.colors.length],allowed:previousAccess?.allowed||false,writeAllowed:previousAccess?.writeAllowed||false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);window.ClassPointerPdf?.studentJoined(member);window.ClassPointerBoards?.studentJoined(member);return;
     }
     if(!member||members.get(member.id)!==member)return;
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
@@ -337,7 +337,7 @@ function joinClass(event){
   peer.on('open',()=>{
     if(peer!==current)return;
     teacherConnection=peer.connect(room,{reliable:true});const connection=teacherConnection;
-    connection.on('open',()=>{if(teacherConnection===connection)send(connection,{type:'join',name})});
+    connection.on('open',()=>{if(teacherConnection===connection){let studentId=null;try{const saved=JSON.parse(sessionStorage.getItem('classPointerDashboardJoin')||'null');if(window.ClassPointerDashboardCore.handoff(saved,room))studentId=saved.studentId}catch(_){}send(connection,{type:'join',name,studentId})}});
     connection.on('data',message=>{
       if(teacherConnection!==connection||!message)return;
       if(window.ClassPointerBoards?.fromTeacher(message))return;
