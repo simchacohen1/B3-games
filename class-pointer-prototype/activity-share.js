@@ -64,6 +64,8 @@
       // Teacher directs only this student's verified class; reject stale requests.
       const request=session?.destinationRequest;
       const supported=request&&['screens','boards'].includes(request.mode);
+      if(session?.screenSharingDenied?.[id]===true&&(!supported||request.mode==='screens'))return;
+      if(supported&&request.mode==='boards'&&session?.whiteboardDenied?.[id]===true)return;
       const at=supported?request.at:session?.shareRequest?.at;
       if(!Number.isFinite(at)||(!supported&&at<loadedAt-6000)||at>Date.now()+60000||Date.now()-at>45000)return;
       const marker=session.roomId+':'+at+':'+(supported?request.mode:'screens');
@@ -96,7 +98,8 @@
         return;
       }
       const next=current(snapshot.val());
-      const shareable=next?.studentScreenSharing===true?next:null;
+      // An unchecked boy must not be sent to share, and an existing share stops immediately.
+      const shareable=next?.studentScreenSharing===true&&next?.screenSharingDenied?.[id]!==true?next:null;
       if(!shareable||!active||shareable.roomId!==active.roomId){if(stream)stop()}
       active=shareable;holder.style.display=active?'flex':'none';
       if(next)routeTeacherRequest(next);
