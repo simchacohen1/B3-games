@@ -740,7 +740,7 @@ async function submit(answer,answers,feedback){
 }
 (async()=>{try{
   await API.ready;
-  if(API.preview){await refresh();if(!noStory)message(window.B3Guest&&window.B3Guest.isGuest()?'Guest preview - practice stays in this tab, nothing is saved.':'Teacher demonstration - practice stays in this tab.')}
+  if(API.preview){await refresh();if(!noStory)message(window.B3Guest&&window.B3Guest.isGuest()?'Guest preview - practice stays in this tab, nothing is saved.':'Teacher practice — word progress saves privately to your account.')}
   else {
   if(sessionStorage.getItem('yiddishSessionClass')!==sessionStorage.getItem('b3Games_studentClass'))sessionStorage.removeItem('yiddishSession');
   if(sessionStorage.getItem('yiddishSession')){await refresh();if(!noStory)message('Progress connected ✓')}
