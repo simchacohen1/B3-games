@@ -29,7 +29,7 @@ async function migratePasscodes(store,deletePublic,now,{dryRun=false}={}){
   ...Object.keys(membersByStudent),
   ...Object.keys(priv||{})
  ].filter(key));
- const updates={},conflicts=[];
+ const updates={},conflicts=[],unmatched=[];
  let copied=0,alreadyPrivate=0,cleared=0;
  for(const id of ids){
   const profile=students?.[id]?.profile||null;
@@ -39,6 +39,9 @@ async function migratePasscodes(store,deletePublic,now,{dryRun=false}={}){
   const publicCodes=[profile?.passcode,old?.passcode,...memberRows.map(row=>row.member.passcode)]
    .map(clean).filter(Boolean);
   const distinct=[...new Set(publicCodes)];
+  // A class member without a central or legacy student record cannot be
+  // matched by the current sign-in flow. Flag it before deleting the fallback.
+  if(!profile&&!old&&memberRows.length&&publicCodes.length)unmatched.push(id);
   // Do not choose arbitrarily between different public PINs. Doing so could
   // change the credential a student needs to sign in.
   if(!saved&&distinct.length>1){conflicts.push(id);continue;}
@@ -60,11 +63,11 @@ async function migratePasscodes(store,deletePublic,now,{dryRun=false}={}){
   }
  }
  // Preview does not write or expose passcode values.
- if(dryRun)return {ok:true,dryRun:true,copied,alreadyPrivate,cleared,conflicts};
+ if(dryRun)return {ok:true,dryRun:true,copied,alreadyPrivate,cleared,conflicts,unmatched};
  // Never start a destructive cleanup if any student has ambiguous credentials.
- if(deletePublic&&conflicts.length)fail(409,'Cannot remove public passcodes: '+conflicts.length+' students have conflicting saved credentials. Run the preview and resolve those students first.');
+ if(deletePublic&&(conflicts.length||unmatched.length))fail(409,'Cannot remove public passcodes: '+conflicts.length+' students have conflicting credentials and '+unmatched.length+' class-only records need a central profile. Review the preview and resolve these records first.');
  if(Object.keys(updates).length)await store.update(updates);
- return {ok:true,copied,alreadyPrivate,cleared,conflicts};
+ return {ok:true,copied,alreadyPrivate,cleared,conflicts,unmatched};
 }
 
 async function manageStudents(store,identity,body,now=Date.now()){
