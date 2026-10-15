@@ -41,7 +41,7 @@ test('a different or unverified identity cannot claim another teacher invitation
 });
 test('owner direct-add flow does not activate an unassigned invitation',()=>{
  assert.match(ownerUi,/role:"teacher",active:false,updatedAt/);
- assert.match(ownerUi,/active:true},uid=teacherData\[t\]\?\.claimedUid/);
+ assert.ok(ownerUi.includes('[root+"/teacherInvites/"+t+"/active"]:true'));
  assert.match(ownerUi,/updates\[root\+"\/teachers\/"\+uid\+"\/active"\]=true/);
 });
 test('last-class unassignment deactivates both invitation and claimed teacher',()=>{
