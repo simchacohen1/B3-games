@@ -19,7 +19,7 @@ function fixture({ready=Promise.resolve(),publish=async()=>{},makePeer=true}={})
   const $=id=>{if(!items.has(id))items.set(id,{disabled:false,hidden:false,textContent:'',value:''});return items.get(id)};
   const candidate={on:(key,fn)=>{events[key]=fn}};
   const ctx=vm.createContext({
-    isTeacher:true,started:false,openingClass:false,peer:null,joinTimer:null,members:new Map(),
+    isTeacher:true,started:false,openingClass:false,closingClass:false,endPromise:Promise.resolve(),peer:null,joinTimer:null,members:new Map(),
     window:{ClassPointerDashboard:{ready,publish}},
     $,
     makePeer:()=>{calls.push('makePeer');return makePeer?candidate:null},
@@ -81,3 +81,4 @@ test('missing peer connectivity shows retry without enabling the classroom',asyn
   assert.equal(f.$('startClass').hidden,false);
   assert.equal(f.$('startClass').disabled,false);
 });
+

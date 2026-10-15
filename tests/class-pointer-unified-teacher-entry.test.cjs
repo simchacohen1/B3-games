@@ -80,6 +80,8 @@ test('student classroom has no duplicate sharing banner; restart stays visible',
   assert.match(activity,/Do not cover it with a second floating share prompt/);
   assert.match(activity,/if\(\/\\\/class-pointer-prototype\\\/classroom\\\.html\$\/\.test\(location\.pathname\)\)return/);
   assert.match(classroom,/startButton\.hidden=true/);
-  assert.match(classroom,/startClass'\)\.hidden=false/);
+  assert.match(classroom,/button\.disabled=true;button\.hidden=false;button\.textContent='Ending class…'/);
+  assert.match(classroom,/button\.disabled=false;button\.textContent='↻ Start another class'/);
   assert.match(css,/#startClass:not\(\[hidden\]\)\{display:inline-flex!important/);
 });
+

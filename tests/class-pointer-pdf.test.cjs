@@ -48,7 +48,9 @@ test('chunks are rebuilt into the exact file and bad chunks are refused',()=>{
 });
 test('classroom.js keeps its permission checks when a PDF is open',()=>{
   const src=require('fs').readFileSync(__dirname+'/../class-pointer-prototype/classroom.js','utf8');
-  assert.ok(src.includes("C.canWrite(state.mode,member)"));assert.ok(src.includes("C.canPoint(state.mode,member)"));
+  assert.match(src,/function selected\(member\)\{return !!member\?\.admitted&&member.allowed===true&&state.mode==='selected'\}/);
+  assert.match(src,/message.type==='highlight'&&live\(\)&&selected\(member\)&&state.tools/);
+  assert.match(src,/message.type==='point'&&live\(\)&&selected\(member\)&&state.tools.pointer/);
   assert.ok(src.includes('function live(){return state.sharing||state.pdf===true}'));
   assert.ok(!/message\.type==='point'&&state\.sharing/.test(src));
 });

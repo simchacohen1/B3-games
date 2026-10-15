@@ -137,7 +137,10 @@ test('screen and whiteboard checkboxes are independent; rechecking restores rout
   s.emit({[room]:session});
   assert.equal(s.destination,null);
   s.emit({[room]:{...session,screenSharingDenied:{}}});
-  assert.match(s.destination||'',/class-pointer-prototype\/dashboard\.html$/);
+  assert.equal(s.destination,null,'screen requests stay in the learning activity');
+  assert.equal(s.holder.style.display,'flex','rechecking restores the consent prompt');
+  assert.match(s.holder.children[1].textContent,/teacher requested your screen/);
+  assert.equal(s.holder.children[0].disabled,undefined,'capture remains student-controlled');
   const w=await studentFixture();
   w.emit({[room]:{...session,destinationRequest:{mode:'boards',at:now},studentScreenSharing:false,
     screenSharingDenied:{'test-boy':true},whiteboardDenied:{}}});
@@ -155,3 +158,4 @@ test('connected share revocation closes the media connection rather than hiding 
   assert.match(backend,/session\.screenSharingDenied\?\.\[studentId\]===true/);
   assert.match(backend,/session\.screenSharingDenied\?\.\[ticket\.studentId\]===true/);
 });
+

@@ -321,3 +321,4 @@ body.teacher-view #connectionStatus{margin:3px 0;padding:5px 9px;font-size:13px}
 /* Keep the restart control visible when the classroom has ended; the compact
    teacher workspace otherwise hides its original action buttons. */
 body.teacher-view .session-controls>#startClass:not([hidden]){display:inline-flex!important;align-items:center;background:#1d4ed8;color:white}
+

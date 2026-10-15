@@ -83,3 +83,4 @@ exports.classPointerShareAuth=onRequest({
   return res.status(code).json({error:code===500?'Screen sharing authorization unavailable.':err.message});
  }
 });
+

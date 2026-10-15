@@ -52,3 +52,12 @@ test('date navigation selects daily cards, can return to Today, and makes every 
  assert.match(html,/mix-blend-mode:multiply/);assert.match(source,/globalCompositeOperation='multiply'/);
  assert.match(html,/game-gate.js" data-game-id="sefer-hamitzvos"/);
 });
+
+test('mitzvah artwork comes before tools and Hebrew phrases keep correct mitzvah numbers',()=>{
+ const html=fs.readFileSync('sefer-hamitzvos/index.html','utf8');
+ assert.ok(html.indexOf('id="workspace"')<html.indexOf('id="colorControls"'),'artwork should be shown before the tools');
+ assert.match(html,/N265:'לא תחמוד'/);
+ assert.match(html,/N266:'לא תתאוה'/);
+ assert.match(html,/P225:'גלות'/);
+ assert.match(html,/const refLabel=ref=>.*Lo Saaseh /);
+});
