@@ -86,3 +86,27 @@ test('every persistent teacher practice integration loads the guarded helper',()
     assert.match(html,/teacher-practice\\.js/,file);
   }
 });
+
+test('teacher can save a Chazara jump and its attempts without student writes',async()=>{
+  const {api,db,writes}=harness();
+  const practice=await api.open(db,{uid:'teacherA'},access,'chazara');
+  const view=practice.dbAdapter(db);
+  await view.ref(practice.path('chazara/settings/jumpKey')).set('18_25');
+  await view.ref('posukPractice/chazara/students/teacher_preview/reviews/18_25').update({count:1});
+  assert.deepEqual(writes.map(w=>w.name),[
+    practice.path('chazara/settings/jumpKey'),
+    practice.path('chazara/student/reviews/18_25')
+  ]);
+});
+test('teacher practice cannot access another teacher private profile',async()=>{
+  const {api,db,writes}=harness();
+  const practice=await api.open(db,{uid:'teacherA'},access,'chazara');
+  const other='teacherPractice/b3-2026/teacherB/et/chazara/settings/jumpKey';
+  await assert.rejects(practice.dbAdapter(db).ref(other).set('18_25'),/cannot edit shared/);
+  assert.equal(writes.length,0);
+});
+test('Shorashim teacher content follows the authorized practice class, not a student session',()=>{
+  const code=fs.readFileSync(path.join(__dirname,'..','shorashim/app.js'),'utf8');
+  assert.match(code,/const selected=teacherPractice\.classId/);
+  assert.doesNotMatch(code,/const selected=new URLSearchParams\(location.search\).*b3Games_studentClass/);
+});
