@@ -497,6 +497,38 @@ header p{color:#64748b}
 @media(max-width:850px){.layout{flex-wrap:wrap}.students-panel{position:static;flex:1 1 100%;max-height:220px}.main-panel{flex:1 1 100%}.report-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.report-filters>div:first-child{grid-column:span 2;grid-row:auto}.report-filters>div:nth-child(6),.report-filters>div:nth-child(10){grid-column:span 2}#reportSummary>.attempt{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:480px){.wrap{padding:10px}.main-panel{padding:14px}.report-filters{grid-template-columns:1fr}.report-filters>div:first-child,.report-filters>div:nth-child(6),.report-filters>div:nth-child(10){grid-column:span 1}#reportSummary>.attempt{grid-template-columns:1fr 1fr}}
 
+
+/* Reports-first organization: three skill views and accessible drilldowns */
+.layout:has(#reportSkillTabs)>.students-panel{display:none}
+.layout:has(#reportSkillTabs)>.main-panel{flex:1 1 100%}
+#reportSkillTabs{display:flex;align-items:center;gap:8px;margin:4px 0 14px;flex-wrap:wrap}
+#reportSkillTabs button{border:1px solid #cad7e4;border-radius:9px;background:#fff;color:#33516d;padding:12px 19px;font:700 .94rem Quicksand,sans-serif;cursor:pointer}
+#reportSkillTabs button[aria-selected="true"]{background:#234d72;color:white;border-color:#234d72}
+#reportSkillTabs button:focus-visible{outline:3px solid #81bafa;outline-offset:2px}
+#mainContent:has(#reportSkillTabs)>.report-filters{grid-template-columns:repeat(4,minmax(0,1fr));padding:12px;gap:10px!important;margin:8px 0 12px!important}
+#mainContent:has(#reportSkillTabs)>.report-filters>div{grid-column:auto;grid-row:auto}
+#mainContent:has(#reportSkillTabs)>.report-filters>div:nth-child(1),
+#mainContent:has(#reportSkillTabs)>.report-filters>div:nth-child(5),
+#mainContent:has(#reportSkillTabs)>.report-filters>div:nth-child(6),
+#mainContent:has(#reportSkillTabs)>.report-filters>div:nth-child(8),
+#mainContent:has(#reportSkillTabs)>.report-filters>div:nth-child(9),
+#mainContent:has(#reportSkillTabs)>.report-filters>div:nth-child(10){display:none}
+#reportAdvanced{border:1px solid #d8e2eb;border-radius:10px;padding:8px 12px;margin:0 0 12px;background:#f8fafc}
+#reportAdvanced>summary{cursor:pointer;font-weight:700;color:#2b5478}
+#reportAdvanced[open] .report-filters{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));padding:12px;margin:10px 0!important}
+#reportAdvanced[open] .report-filters>div{display:block!important;grid-column:auto!important;grid-row:auto!important}
+#reportAdvanced[open] .report-filters>div:nth-child(1){grid-column:span 2!important}
+#reportAdvanced[open] .report-filters>div:nth-child(6),#reportAdvanced[open] .report-filters>div:nth-child(10){grid-column:span 2!important}
+#mainContent:has(#reportSkillTabs) #reportSummary>.attempt{display:flex!important;gap:10px;margin:0 0 12px!important}
+#mainContent:has(#reportSkillTabs) #reportSummary>.attempt>.row{flex:0 1 180px;padding:12px!important}
+#mainContent:has(#reportSkillTabs) .report-student-detail{border:1px solid #dce5ed;border-radius:12px;margin:0 0 7px;overflow:hidden;background:white}
+#mainContent:has(#reportSkillTabs) .report-student-detail>summary{display:flex;align-items:center;justify-content:space-between;gap:15px;cursor:pointer;padding:12px 16px;font-weight:700;color:#203b56}
+#mainContent:has(#reportSkillTabs) .report-student-detail>summary:hover{background:#f1f6fb}
+#mainContent:has(#reportSkillTabs) .report-student-detail>summary .report-student-score{font-weight:800;color:#234d72}
+#mainContent:has(#reportSkillTabs) .report-student-detail>.report-detail-content{padding:8px 14px 14px}
+#mainContent:has(#reportSkillTabs) .report-student-detail .empty-msg{padding:8px 0;text-align:left}
+@media(max-width:750px){#mainContent:has(#reportSkillTabs)>.report-filters{grid-template-columns:repeat(2,minmax(0,1fr))}#reportAdvanced[open] .report-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
 </style>
 </head>
 <body>
@@ -1870,6 +1902,7 @@ async function loadReportsTab(){
 
     mainEl.innerHTML = `
       <h2>🧾 Reports</h2>
+      <div id="reportSkillTabs" role="tablist" aria-label="Report skill"><button type="button" role="tab" data-skill="reading" aria-selected="true">📖 Reading</button><button type="button" role="tab" data-skill="translation" aria-selected="false">🗣️ Translation</button><button type="button" role="tab" data-skill="comprehension" aria-selected="false">🧠 Comprehension</button></div>
       <div class="report-filters" style="display:flex;flex-wrap:wrap;gap:14px;align-items:start;margin-bottom:14px;">
         <div>
           <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Student(s)</label>
@@ -1932,7 +1965,7 @@ async function loadReportsTab(){
           <select id="reportViewMode">
             <option value="flat">Flat List</option>
             <option value="byPosuk">By Posuk (full roster)</option>
-            <option value="byStudent">By Student (full roster)</option>
+            <option value="byStudent" selected>By Student (full roster)</option>
           </select>
         </div>
       </div>
@@ -1944,6 +1977,29 @@ async function loadReportsTab(){
       <div id="reportSummary"></div>
       <div id="reportResults"></div>`;
 
+    const reportSkillButtons = [...document.querySelectorAll('#reportSkillTabs button')];
+    const scoreSelect = document.getElementById('reportScoreTypeFilter');
+    scoreSelect.value = 'reading';
+    reportSkillButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        scoreSelect.value = button.dataset.skill;
+        reportSkillButtons.forEach(b => b.setAttribute('aria-selected', String(b === button)));
+        renderReportResults();
+      });
+    });
+    // Keep all existing filters; advanced controls are revealed only on demand.
+    const filters = mainEl.querySelector('.report-filters');
+    const advanced = document.createElement('details');
+    advanced.id = 'reportAdvanced';
+    advanced.innerHTML = '<summary>More filters and report options</summary>';
+    filters.after(advanced);
+    const advancedIndices = [0,4,5,7,8,9];
+    [...filters.children].filter((_,i) => advancedIndices.includes(i)).forEach(el => advanced.append(el));
+    // Put the advanced controls in their own compact grid without copying input IDs.
+    const advancedGrid = document.createElement('div');
+    advancedGrid.className = 'report-filters';
+    [...advanced.children].filter(el => el.tagName !== 'SUMMARY').forEach(el => advancedGrid.append(el));
+    advanced.append(advancedGrid);
     // "All Students" and the individual checkboxes are mutually exclusive:
     // checking "All" clears the individual picks, and picking any individual
     // student clears "All" so the filter reflects only what's actually checked.
@@ -2466,7 +2522,9 @@ async function renderByStudentView(resultsEl, summaryEl, filters){
   const showComprehensionCol = scoreType === 'all' || scoreType === 'comprehension';
 
   resultsEl.innerHTML = reportExportStudentGroups.map(g => {
-    let html = `<div class="posuk-group"><h3>${g.name}</h3>`;
+    const scores = g.rows.map(r => scoreType === 'reading' ? r.hebrewScore : scoreType === 'translation' ? r.translationScore : r.comprehensionScore).filter(v => typeof v === 'number');
+    const average = scores.length ? Math.round(scores.reduce((a,b) => a+b,0)/scores.length)+'%' : 'Not started';
+    let html = `<details class="report-student-detail"><summary><span>${g.name}</span><span class="report-student-score">${average} · ${g.rows.length} pesukim ▾</span></summary><div class="report-detail-content">`;
     if(g.rows.length === 0){
       html += `<div class="empty-msg">${g.hadAnyMatch ? 'No results match these filters for this student.' : 'No activity matching these filters.'}</div>`;
     }else{
@@ -2489,7 +2547,7 @@ async function renderByStudentView(resultsEl, summaryEl, filters){
       });
       html += '</tbody></table>';
     }
-    html += '</div>';
+    html += '</div></details>';
     return html;
   }).join('');
 }
