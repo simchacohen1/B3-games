@@ -1,0 +1,40 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Existing rules, preserved exactly so current activities continue to work.
+    // SECURITY DEBT: these three locations are currently PUBLIC read and write.
+    match /posukPractice/{studentId}/{fileName} {
+      allow read, write: if true;
+    }
+
+    match /classGallery/{postId}/{fileName} {
+      allow read, write: if true;
+    }
+
+    match /shorashim-recordings/{studentId}/{date}/{fileName} {
+      allow read, write: if true;
+    }
+
+    // NEW: each authenticated teacher owns a private PDF folder by Firebase UID.
+    // No other user's UID, nor an anonymous visitor, can list/get/change it.
+    match /pointerPdfLibrary/{teacherUid}/{fileId} {
+      allow get, list, delete: if request.auth != null
+        && request.auth.uid == teacherUid;
+
+      allow create: if request.auth != null
+        && request.auth.uid == teacherUid
+        && fileId.matches('[-a-zA-Z0-9]+[.]pdf')
+        && request.resource.size <= 50 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+
+      // Rename/remember-page updates only: file bytes cannot be replaced.
+      allow update: if request.auth != null
+        && request.auth.uid == teacherUid
+        && resource.size == request.resource.size
+        && resource.md5Hash == request.resource.md5Hash
+        && request.resource.contentType == 'application/pdf';
+    }
+  }
+}
