@@ -39,6 +39,7 @@ exports.classPointerShareAuth=onRequest({
    });
    if(denied)error(429,'Too many sharing attempts. Try later.');
    if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active===false)error(403,'Student not in this class.');
+   if(session.screenSharingDenied?.[studentId]===true)error(403,'Your teacher has turned off your screen sharing.');
    const profile=(await db.ref('b3Games/students/'+studentId+'/profile').once('value')).val();
    if(!profile||profile.active===false)error(403,'Inactive student.');
    const code=await readPasscode(p=>(db.ref(p).once('value')).then(s=>s.val()),studentId,{allowLegacyDefault:true});
@@ -66,6 +67,7 @@ exports.classPointerShareAuth=onRequest({
      return null;
    });
    if(!used.committed||!ticket)error(403,'Sharing ticket expired, used, or belongs to another class.');
+   if(session.screenSharingDenied?.[ticket.studentId]===true)error(403,'Your teacher has turned off your screen sharing.');
    const [profileSnap,memberSnap]=await Promise.all([
      db.ref('b3Games/students/'+ticket.studentId+'/profile').once('value'),
      db.ref(base+'/members/'+ticket.studentId).once('value')
