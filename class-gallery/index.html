@@ -1767,8 +1767,9 @@ function latestStudentSessions(raw){
   };
   if(combined){
     ['et','wt','all'].forEach(classId=>Object.entries(raw?.[classId]||{}).forEach(([studentId,sessions])=>collect(studentId,sessions,classId,`${classId}:${studentId}`)));
-  }else if(presenceProfile){
-    Object.entries(raw||{}).forEach(([studentId,sessions])=>collect(studentId,sessions,presenceProfile.classId,studentId));
+  }else if(galleryClassId){
+    // Teacher sessions may not have a student profile. The gallery class is authoritative.
+    Object.entries(raw||{}).forEach(([studentId,sessions])=>collect(studentId,sessions,galleryClassId,studentId));
   }
   return result;
 }
