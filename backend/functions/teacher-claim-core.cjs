@@ -12,6 +12,7 @@ async function claimTeacher(store,identity,workspaceId='b3-2026',now=Date.now())
  if(!entry)fail(403,'No active teacher invitation matches this Google account.');
  const [inviteId,invite]=entry;
  const classIds=Object.fromEntries(Object.entries(invite.classIds||{}).filter(([id,granted])=>id!=='*'&&granted===true));
+ if(!Object.keys(classIds).length)fail(403,'A class must be assigned before teacher access is enabled.');
  const record={uid:identity.uid,email,displayName:invite.name||existing?.displayName||email,role:'teacher',active:true,classIds,inviteId,claimedAt:existing?.claimedAt||now,updatedAt:now};
  await store.update({
   [root+'/teachers/'+identity.uid]:record,

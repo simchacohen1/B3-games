@@ -438,6 +438,7 @@
       if (teacher && teacher.active === false) return { authorized:false, role:"", classIds:[] };
       if (teacher && teacher.active !== false) {
         const classIds = teacher.classIds ? Object.keys(teacher.classIds).filter(function(k){return k !== "*" && teacher.classIds[k] === true;}) : [];
+        if (!classIds.length) return { authorized:false, role:"", classIds:[] };
         return { authorized:true, role:"teacher", classIds:classIds };
       }
 
@@ -454,6 +455,7 @@
         if (inviteEntry && user.emailVerified === true) {
           const invite = inviteEntry.value;
           const classIds = invite.classIds ? Object.keys(invite.classIds).filter(function(k){return k !== "*" && invite.classIds[k] === true;}) : [];
+          if (!classIds.length) return { authorized:false, role:"", classIds:[] };
           return user.getIdToken().then(function(token){
             return fetch("https://us-central1-b3-games.cloudfunctions.net/funTorahTeacherClaim",{
               method:"POST",signal:AbortSignal.timeout(10000),headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:"{}"
@@ -461,10 +463,13 @@
           }).then(async function(response){
             if(!response.ok){const error=new Error("Teacher account linking is awaiting backend deployment.");error.status=response.status;throw error;}
             const claimed=await response.json();
-            return {authorized:claimed.authorized===true,role:"teacher",classIds:(claimed.classIds||[]).filter(id=>id!=="*"),inviteId:inviteEntry.id};
+            const verifiedClassIds = Array.isArray(claimed.classIds) ? claimed.classIds.filter(id=>id!=="*" && typeof id==="string" && id.length>0) : [];
+            if(claimed.authorized!==true || !verifiedClassIds.length) return {authorized:false,role:"",classIds:[]};
+            return {authorized:true,role:"teacher",classIds:verifiedClassIds,inviteId:inviteEntry.id};
           }).catch(function(error){
-            if(error.status&&error.status!==404&&error.status!==503)return {authorized:false,role:"",classIds:[]};
-            return {authorized:true,role:"teacher",classIds:classIds,inviteId:inviteEntry.id,claimPending:true,claimError:error.message};
+            // A failed or unavailable verifier must never authorize a new teacher.
+            console.warn("Teacher verification unavailable; access denied.",error);
+            return {authorized:false,role:"",classIds:[]};
           });
         }
         return { authorized:false, role:"", classIds:[] };

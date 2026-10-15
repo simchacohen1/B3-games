@@ -1767,8 +1767,9 @@ function latestStudentSessions(raw){
   };
   if(combined){
     ['et','wt','all'].forEach(classId=>Object.entries(raw?.[classId]||{}).forEach(([studentId,sessions])=>collect(studentId,sessions,classId,`${classId}:${studentId}`)));
-  }else if(presenceProfile){
-    Object.entries(raw||{}).forEach(([studentId,sessions])=>collect(studentId,sessions,presenceProfile.classId,studentId));
+  }else if(galleryClassId){
+    // Teacher sessions may not have a student profile. The gallery class is authoritative.
+    Object.entries(raw||{}).forEach(([studentId,sessions])=>collect(studentId,sessions,galleryClassId,studentId));
   }
   return result;
 }
@@ -1835,7 +1836,7 @@ function startLivePresence(){
   if(!scene||(!presenceProfile&&!teacherPresenceViewer)||!presenceRoot||!livePresenceEnabled||presenceStarted)return;
   presenceStarted=true;
   const combined=isLegacyB3Class&&(teacherPresenceViewer||tagOptedIn);
-  presenceClassRef=combined?presenceRoot:presenceRoot.child(presenceProfile.classId);
+  presenceClassRef=combined?presenceRoot:presenceRoot.child(galleryClassId);
   if(!teacherPresenceViewer||(isTeacher&&tagOptedIn)){
     const ownParent=teacherPresenceViewer&&legacyGallery?presenceRoot.child('all'):presenceRoot.child(galleryClassId);
     presenceOwnRef=ownParent.child(currentTagStudentKey()).child(presenceSessionId);presenceOwnRef.onDisconnect().remove();
@@ -2373,7 +2374,7 @@ openPowerShop=function(){
 };
 document.getElementById('powerShopBtn').onclick=openPowerShop;
 </script>
-<script src="../back-nav.js" data-href="../index.html" data-label="← Fun Torah Tools"></script><script defer src="../class-pointer-prototype/activity-share.js?v=20261014-send1"></script>
+<script src="../back-nav.js" data-href="../index.html" data-label="← Fun Torah Tools"></script><script defer src="../class-pointer-prototype/activity-share.js?v=20261015-sharefix1"></script>
 </body>
 </html>
 

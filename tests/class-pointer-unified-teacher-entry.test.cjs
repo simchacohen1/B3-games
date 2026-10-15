@@ -42,11 +42,13 @@ function fixture(initial='boards'){
   return {async ready(){await authCallback({uid:'teacher'},true,{authorized:true,role:'teacher',classIds:['et','wt']})},buttons,modes,elements,get navigation(){return navigation}};
 }
 
-test('all three homepage tiles use one class-and-mode chooser',()=>{
+test('one homepage Pointer tile opens the class-and-mode chooser',()=>{
   const index=read('index.html'),html=read('class-pointer-prototype/dashboard.html');
   for(const mode of ['lesson','screens','boards'])assert.match(html,new RegExp('data-classroom-mode="'+mode+'"'));
-  for(const tag of ['Class Pointer — Start a lesson','Send Class to Share Screen','Send Class to Whiteboards'])assert.ok(index.includes(tag));
+  assert.match(index,/<span class="card-title">Classroom Pointer<\/span>/);
   assert.match(index,/class-pointer-prototype\/dashboard\.html\?teacher=1/);
+  assert.equal((index.match(/class="teacher-tool-card" href="class-pointer-prototype\/dashboard\.html\?teacher=1"/g)||[]).length,1);
+  for(const removed of ['Send Class to Share Screen','Send Class to Whiteboards'])assert.ok(!index.includes(removed));
 });
 
 test('the chosen mode may change without losing ET/WT class authorization',async()=>{

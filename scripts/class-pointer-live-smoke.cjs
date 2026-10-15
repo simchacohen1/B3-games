@@ -6,7 +6,7 @@ const crypto=require('node:crypto');
 const {chromium}=require('playwright');
 const root='https://funtorahtools.com/';
 const overlay=process.env.POINTER_CANDIDATE_OVERLAY==='1';
-const paths=['class-pointer-prototype/dashboard.html','class-pointer-prototype/dashboard.js','class-pointer-prototype/dashboard-session.js','class-pointer-prototype/classroom.html','class-pointer-prototype/classroom.js','class-pointer-prototype/classroom.css','class-pointer-prototype/student-boards.js','class-pointer-prototype/student-boards.css','class-pointer-prototype/teacher-toolbar.js','class-pointer-prototype/activity-share.js'];
+const paths=['class-pointer-prototype/dashboard.html','class-pointer-prototype/dashboard.js','class-pointer-prototype/dashboard-session.js','class-pointer-prototype/classroom.html','class-pointer-prototype/classroom.js','class-pointer-prototype/classroom.css','class-pointer-prototype/controls-redesign.css','class-pointer-prototype/student-boards.js','class-pointer-prototype/student-boards.css','class-pointer-prototype/teacher-toolbar.js','class-pointer-prototype/activity-share.js'];
 const hash=s=>crypto.createHash('sha256').update(s).digest('hex');
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 (async()=>{

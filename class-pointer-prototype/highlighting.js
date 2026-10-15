@@ -12,14 +12,22 @@ window.createClassHighlighter=function(options){
   function segmentDistance(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,len=dx*dx+dy*dy;if(!len)return Math.hypot(p.x-a.x,p.y-a.y);const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/len));return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy))}
   function hits(stroke,p){const first=stroke.points[0],last=stroke.points[stroke.points.length-1],threshold=Math.max(0.012,(stroke.size||0.016)*0.9);
     if(stroke.tool==='box'){const minX=Math.min(first.x,last.x),maxX=Math.max(first.x,last.x),minY=Math.min(first.y,last.y),maxY=Math.max(first.y,last.y);return p.x>=minX&&p.x<=maxX&&p.y>=minY&&p.y<=maxY}
+    if(['rectangle','ellipse','triangle','text'].includes(stroke.tool))return p.x>=Math.min(first.x,last.x)-threshold&&p.x<=Math.max(first.x,last.x)+threshold&&p.y>=Math.min(first.y,last.y)-threshold&&p.y<=Math.max(first.y,last.y)+threshold;
     if(stroke.tool==='underline')return segmentDistance(p,first,{x:last.x,y:first.y})<=threshold;
     for(let i=1;i<stroke.points.length;i++)if(segmentDistance(p,stroke.points[i-1],stroke.points[i])<=threshold)return true;return false;
   }
   function hideOwner(){clearTimeout(labelTimer);ownerLabel.hidden=true}
   function showOwner(event,linger=false){if(draft){hideOwner();return}const p=point(event);if(!p){hideOwner();return}const stroke=strokes.find(item=>hits(item,p));if(!stroke){hideOwner();return}const name=options.ownerName?.(stroke.owner)|| (stroke.owner==='teacher'?'Teacher':'Student');ownerLabel.textContent=name;const rect=$('stage').getBoundingClientRect();ownerLabel.style.left=(event.clientX-rect.left+12)+'px';ownerLabel.style.top=(event.clientY-rect.top+12)+'px';ownerLabel.hidden=false;clearTimeout(labelTimer);if(linger)labelTimer=setTimeout(hideOwner,1800)}
   function path(stroke,w,h,color){
-    const first=stroke.points[0],last=stroke.points[stroke.points.length-1],width=stroke.size*w*(stroke.tool==='pen'?0.45:1);
+    const first=stroke.points[0],last=stroke.points[stroke.points.length-1],width=stroke.size*w*(['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(stroke.tool)?0.45:1);
     if(stroke.tool==='box')return svg('rect',{x:Math.min(first.x,last.x)*w,y:Math.min(first.y,last.y)*h,width:Math.abs(last.x-first.x)*w,height:Math.abs(last.y-first.y)*h,fill:color});
+    const x1=first.x*w,y1=first.y*h,x2=last.x*w,y2=last.y*h,x=Math.min(x1,x2),y=Math.min(y1,y2),sw=Math.abs(x2-x1),sh=Math.abs(y2-y1),ink={'stroke':color,'stroke-width':width,'fill':'none','stroke-linecap':'round','stroke-linejoin':'round'};
+    if(stroke.tool==='rectangle')return svg('rect',{x,y,width:sw,height:sh,...ink});
+    if(stroke.tool==='ellipse')return svg('ellipse',{cx:x+sw/2,cy:y+sh/2,rx:sw/2,ry:sh/2,...ink});
+    if(stroke.tool==='triangle')return svg('polygon',{points:`${x+sw/2},${y} ${x+sw},${y+sh} ${x},${y+sh}`,...ink});
+    if(stroke.tool==='line')return svg('line',{x1,y1,x2,y2,...ink});
+    if(stroke.tool==='pen-arrow'){const g=svg('g');g.appendChild(svg('line',{x1,y1,x2,y2,...ink}));const a=Math.atan2(y2-y1,x2-x1),r=Math.max(width*4,10);g.appendChild(svg('path',{d:`M${x2-r*Math.cos(a-0.5)} ${y2-r*Math.sin(a-0.5)} L${x2} ${y2} L${x2-r*Math.cos(a+0.5)} ${y2-r*Math.sin(a+0.5)}`,...ink}));return g;}
+    if(stroke.tool==='text'){const t=svg('text',{x:x1,y:y1,'font-size':Math.max(16,stroke.size*w*2.4),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text)?'rtl':'ltr'});t.textContent=stroke.text||'';return t;}
     const points=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
     return svg('path',{d:points.map((p,i)=>(i?'L':'M')+p.x*w+' '+p.y*h).join(' '),fill:'none',stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round'});
   }
@@ -34,7 +42,7 @@ window.createClassHighlighter=function(options){
       const older=entries.slice(0,index).filter(s=>s.owner!==stroke.owner);
       let mask=null;if(older.length){mask='mask-'+stroke.id;const m=svg('mask',{id:mask,maskUnits:'userSpaceOnUse',x:0,y:0,width:b.width,height:b.height});m.appendChild(svg('rect',{width:b.width,height:b.height,fill:'white'}));older.forEach(s=>m.appendChild(path(s,b.width,b.height,'black')));defs.appendChild(m)}
       // Transparency is applied once per owner group, so a person's overlapping marks stay one flat layer instead of darkening.
-      const kind=['pencil','crayon','pen'].includes(stroke.tool)?stroke.tool:'highlight',key=stroke.owner+'|'+kind;
+      const kind=['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight'),key=stroke.owner+'|'+kind;
       let group=owners.get(key);if(!group){group=svg('g',{'data-owner':stroke.owner,'data-tool':kind,opacity:kind==='pen'?'1':kind==='pencil'?'0.94':kind==='crayon'?'0.78':'0.32'});owners.set(key,group);layer.appendChild(group)}
       const mark=path(stroke,b.width,b.height,stroke.color);mark.dataset.strokeTool=stroke.tool;mark.dataset.stroke=stroke.id;if(mask)mark.setAttribute('mask','url(#'+mask+')');group.appendChild(mark);
     });
@@ -46,6 +54,10 @@ window.createClassHighlighter=function(options){
   }
   $('stage').addEventListener('pointerdown',event=>{
     if(!options.sharing()||!options.allowed()||event.button!==0||(!drawing()&&!erasing()))return;const p=point(event);if(!p)return;
+    if(tool()==='text'&&!erasing()){
+      event.preventDefault();event.stopPropagation();const text=window.prompt('Text for the lesson (Hebrew or English):','');if(!text?.trim())return;const color=$(options.teacher?'teacherColor':'studentColor').value||options.color();
+      const stroke={tool:'text',color,size:Number($(options.teacher?'teacherSize':'studentSize').value),points:[p,{x:Math.min(1,p.x+0.2),y:Math.min(1,p.y+0.06)}],text};if(C.cleanStroke(stroke))options.submit(stroke);return;
+    }
     if(erasing()){event.preventDefault();hideOwner();const hit=[...strokes].reverse().find(s=>s.owner===options.owner()&&hits(s,p));if(hit)options.edit('erase',hit.id);return;}
     event.preventDefault();dragId=event.pointerId;const color=$(options.teacher?'teacherColor':'studentColor').value||options.color();
     draft={tool:tool(),color,size:Number($(options.teacher?'teacherSize':'studentSize').value),points:[p,p]};$('stage').setPointerCapture(dragId);render();

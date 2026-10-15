@@ -2,19 +2,20 @@
   'use strict';
   const colors=['#57b8ff','#ff7979','#75df9a','#dca0ff','#ffa65c','#7ce4dc'];
   const tools=['target','arrow','star','heart','paw','sparkle'];
-  const highlightTools=['highlight','pencil','crayon','underline','box','pen'];
+  const highlightTools=['highlight','pencil','crayon','underline','box','pen','line','pen-arrow','rectangle','ellipse','triangle','text'];
   // Dark ink colors read well on the whiteboard. They are allowed for pointers and marks, but are not class colors.
   const inkColors=['#1f2937','#1d4ed8'];
   function cleanStroke(value){
     if(!value||!highlightTools.includes(value.tool)||!Array.isArray(value.points)||value.points.length<2||value.points.length>256||!value.points.every(validPoint))return null;
-    return{tool:value.tool,color:pointStyle(value).color||'#ffcc00',size:[0.008,0.016,0.028].includes(value.size)?value.size:0.016,points:value.points.map(({x,y})=>({x,y}))};
+    const text=value.tool==='text'?String(value.text||'').replace(/[\u0000-\u001f\u007f]/g,'').slice(0,240):'';if(value.tool==='text'&&!text.trim())return null;
+    return{tool:value.tool,color:pointStyle(value).color||'#ffcc00',size:[0.008,0.016,0.028].includes(value.size)?value.size:0.016,points:value.points.map(({x,y})=>({x,y})),...(value.tool==='text'?{text}:{})};
   }
   class HighlightStore{
     constructor(){this.strokes=[];this.sequence=0}
     add(owner,value){const stroke=cleanStroke(value);if(!stroke)return false;
       // Highlights keep the original limits (40 per person, 240 per class). Pen writing needs more lines: 150 per person, 400 marks in total.
-      const mine=this.strokes.filter(s=>s.owner===owner),pen=stroke.tool==='pen';
-      if(this.strokes.length>=400||(pen?mine.filter(s=>s.tool==='pen').length>=150:(mine.filter(s=>s.tool!=='pen').length>=40||this.strokes.filter(s=>s.tool!=='pen').length>=240)))return false;this.strokes.push({...stroke,owner,id:'h'+(++this.sequence)});return true}
+      const mine=this.strokes.filter(s=>s.owner===owner),pen=['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(stroke.tool);
+      if(this.strokes.length>=400||(pen?mine.filter(s=>['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(s.tool)).length>=150:(mine.filter(s=>s.tool!=='pen').length>=40||this.strokes.filter(s=>s.tool!=='pen').length>=240)))return false;this.strokes.push({...stroke,owner,id:'h'+(++this.sequence)});return true}
     edit(owner,action,id){if(action==='erase'){const i=this.strokes.findIndex(s=>s.owner===owner&&s.id===id);if(i>=0)this.strokes.splice(i,1);return}if(action==='clear'){this.strokes=this.strokes.filter(s=>s.owner!==owner);return}if(action==='undo'){const i=this.strokes.findLastIndex(s=>s.owner===owner);if(i>=0)this.strokes.splice(i,1)}}
     reset(){this.strokes=[]}
   }

@@ -1918,10 +1918,9 @@ async function loadReportsTab(){
       slugToClass[slug] = (info && info.classSection) || '';
     });
 
-    const studentCheckboxes = Object.entries(studentsMap)
+    const studentOptions = Object.entries(studentsMap)
       .sort((a,b) => a[1].localeCompare(b[1]))
-      .map(([id, name]) => `<label class="report-student-label" data-class="${slugToClass[id] || ''}" style="display:block;font-size:0.85rem;font-weight:400;margin:2px 0;">
-        <input type="checkbox" class="report-student-cb" value="${id}"> ${name}</label>`).join('');
+      .map(([id, name]) => `<option value="${id}" data-class="${slugToClass[id] || ''}">${escapeHtml(name)}</option>`).join('');
     const parshaOptions = Object.keys(PARSHA_CONFIG)
       .map(n => `<option value="${n}">${n}</option>`).join('');
 
@@ -1930,12 +1929,11 @@ async function loadReportsTab(){
       <div id="reportSkillTabs" role="tablist" aria-label="Report skill"><button type="button" role="tab" data-skill="reading" aria-selected="true">📖 Reading</button><button type="button" role="tab" data-skill="translation" aria-selected="false">🗣️ Translation</button><button type="button" role="tab" data-skill="comprehension" aria-selected="false">🧠 Comprehension</button></div>
       <div class="report-filters" style="display:flex;flex-wrap:wrap;gap:14px;align-items:start;margin-bottom:14px;">
         <div>
-          <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Student(s)</label>
-          <div id="reportStudentBox" style="border:1px solid #d8c9a0;border-radius:10px;padding:8px 10px;max-height:130px;overflow-y:auto;min-width:170px;background:#fffbf2;">
-            <label style="display:block;font-size:0.85rem;font-weight:600;margin:0 0 4px;">
-              <input type="checkbox" id="reportStudentAll" checked> All Students</label>
-            ${studentCheckboxes}
-          </div>
+          <label for="reportStudentFilter" style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Student</label>
+          <select id="reportStudentFilter" style="min-width:180px;">
+            <option value="all">All Students</option>
+            ${studentOptions}
+          </select>
         </div>
         <div>
           <label style="display:block;font-size:0.8rem;color:var(--ink-soft);margin-bottom:3px;">Class</label>
@@ -2020,7 +2018,7 @@ async function loadReportsTab(){
     advanced.innerHTML = '<summary>More filters · Students, Pesukim, Dates & Views</summary><div class="report-advanced-grid"></div>';
     reportFiltersEl.insertAdjacentElement('afterend', advanced);
     const sections = [...reportFiltersEl.children];
-    [0,4,5,6,7,8,9].forEach(i => { if(sections[i]) advanced.querySelector('.report-advanced-grid').appendChild(sections[i]); });
+    [4,5,6,7,8,9].forEach(i => { if(sections[i]) advanced.querySelector('.report-advanced-grid').appendChild(sections[i]); });
     const skillSelect = document.getElementById('reportScoreTypeFilter');
     skillSelect.value = 'reading';
     skillSelect.closest('div').classList.add('report-skill-hidden');
@@ -2039,44 +2037,26 @@ async function loadReportsTab(){
     const results = document.getElementById('reportResults');
     reportFiltersEl.after(summary);
     summary.after(results);
-    // "All Students" and the individual checkboxes are mutually exclusive:
-    // checking "All" clears the individual picks, and picking any individual
-    // student clears "All" so the filter reflects only what's actually checked.
-    const allBox = document.getElementById('reportStudentAll');
-    const studentCbs = () => [...document.querySelectorAll('.report-student-cb')];
-    allBox.onchange = () => {
-      if(allBox.checked) studentCbs().forEach(cb => cb.checked = false);
-      renderReportResults();
-    };
-    studentCbs().forEach(cb => {
-      cb.onchange = () => {
-        if(cb.checked) allBox.checked = false;
-        // If nothing ends up checked, fall back to "All" so the filter never goes empty.
-        if(!studentCbs().some(c => c.checked)) allBox.checked = true;
-        renderReportResults();
-      };
-    });
-
-    // Class filter: a convenience that checks exactly the students in the
-    // chosen class (unchecking everyone else), or restores "All Students"
-    // when set back to "All Classes". The teacher can still fine-tune with
-    // the individual checkboxes afterward — this just sets a starting point.
-    document.getElementById('reportClassFilter').onchange = (e) => {
-      const cls = e.target.value;
-      if(cls === 'all'){
-        allBox.checked = true;
-        studentCbs().forEach(cb => cb.checked = false);
-        renderReportResults();
-        return;
-      }
-      allBox.checked = false;
-      studentCbs().forEach(cb => {
-        const label = cb.closest('.report-student-label');
-        cb.checked = !!(label && label.dataset.class === cls);
+    // The selected class determines which students are available in the visible filter.
+    // Keep an explicit student choice if it belongs to the newly selected class.
+    const studentFilter = document.getElementById('reportStudentFilter');
+    const classFilter = document.getElementById('reportClassFilter');
+    const updateStudentOptions = () => {
+      const cls = classFilter.value;
+      [...studentFilter.options].forEach(option => {
+        if(option.value === 'all') return;
+        option.hidden = cls !== 'all' && option.dataset.class !== cls;
+        option.disabled = option.hidden;
       });
-      if(!studentCbs().some(c => c.checked)) allBox.checked = true;
+      const chosen = studentFilter.selectedOptions[0];
+      if(!chosen || chosen.disabled) studentFilter.value = 'all';
+    };
+    classFilter.onchange = () => {
+      updateStudentOptions();
       renderReportResults();
     };
+    studentFilter.onchange = renderReportResults;
+    updateStudentOptions();
 
     populatePerekFilter('all');
     // Every filter here regenerates the report immediately on change — the
@@ -2221,9 +2201,14 @@ function getSelectedPosukNums(){
 }
 
 function getSelectedStudentIds(){
-  const allBox = document.getElementById('reportStudentAll');
-  if(allBox.checked) return null; // null = no student filter, show everyone
-  return [...document.querySelectorAll('.report-student-cb')].filter(cb => cb.checked).map(cb => cb.value);
+  const student = document.getElementById('reportStudentFilter')?.value;
+  if(student && student !== 'all') return [student];
+  const cls = document.getElementById('reportClassFilter')?.value;
+  if(cls && cls !== 'all'){
+    return [...document.querySelectorAll('#reportStudentFilter option[data-class]')]
+      .filter(option => option.dataset.class === cls).map(option => option.value);
+  }
+  return null; // No class or student selected: show everyone.
 }
 
 // Shared summary-stats calculation used by the on-screen report, the CSV

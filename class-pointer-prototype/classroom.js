@@ -25,7 +25,7 @@ function ownMember(){return state.members.find(member=>member.id==='student:'+pe
 function selected(member){return !!member?.admitted&&member.allowed===true&&state.mode==='selected'}
 function toolAllowed(tool,member=ownMember()){return isTeacher||selected(member)&&state.tools?.[tool]===true}
 function allowed(){return toolAllowed('pointer')}
-function writingAllowed(tool){return toolAllowed(tool==='pen'?'pen':'highlight')}
+function writingAllowed(tool){return toolAllowed(['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(tool)?'pen':'highlight')}
 function pointerPermission(){
   const mayPoint=allowed(),mayWrite=writingAllowed('highlight')||writingAllowed('pen');$('stage').style.cursor=navigating?'default':mayPoint?'crosshair':'not-allowed';
   if(!mayPoint)cancelHover();if(!mayWrite)highlighter?.cancel()
@@ -137,7 +137,7 @@ function receiveStudent(connection){
     }
     if(!member||members.get(member.id)!==member)return;
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
-    if(message.type==='highlight'&&live()&&selected(member)&&state.tools?.[message.stroke?.tool==='pen'?'pen':'highlight']){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
+    if(message.type==='highlight'&&live()&&selected(member)&&state.tools?.[['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(message.stroke?.tool)?'pen':'highlight']){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
     if(message.type==='edit-highlights'&&member.admitted){if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}return}
     if(message.type==='video-ready'&&member.admitted){member.videoReady=true;clearTimeout(member.mediaTimer)}
     if(message.type==='pointer-hide'&&member.admitted){clearStudentHover(member);delete state.points[member.id];member.lastPoint=0;publish()}
@@ -159,11 +159,17 @@ function peerError(error){
     kind==='webrtc'?'The browser could not connect to the teacher. Ask the school to allow WebRTC connections.':
     kind==='browser-incompatible'?'This browser does not support the classroom connection. Open this page in Chrome or Edge.':
     'The classroom connection failed'+(typeof kind==='string'&&/^[a-z-]+$/.test(kind)?' ('+kind+')':'')+'. Try joining again.';
+  // Temporary PeerJS signalling interruptions should not end a functioning lesson.
+  if(['network','socket-error','socket-closed','server-error'].includes(kind)&&(started||admitted)){
+    status('Classroom connection interrupted. Trying to reconnect; your current lesson may still work.');
+    if(peer&&!peer.destroyed&&peer.disconnected){try{peer.reconnect()}catch{}}
+    return;
+  }
   fail(message);if(!started&&!admitted){if(isTeacher){endClass();fail(message)}else{leaveClass();fail(message)}}
 }
 function makePeer(id){
   if(typeof Peer==='undefined'){fail('The classroom connection library could not load. Refresh or ask the school to allow this page.');return null}
-  const instance=new Peer(id||'class-pointer-student-'+crypto.randomUUID());instance.on('error',peerError);
+  const instance=new Peer(id||'class-pointer-student-'+crypto.randomUUID());instance.on('error',peerError);instance.on('open',()=>{clearError();if(started||admitted)status('Classroom connection restored.');});
   instance.on('disconnected',()=>{status('Connection service interrupted. Existing lesson connections may still work.');if(!instance.destroyed)instance.reconnect()});return instance;
 }
 async function startClass(){
