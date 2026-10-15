@@ -159,11 +159,17 @@ function peerError(error){
     kind==='webrtc'?'The browser could not connect to the teacher. Ask the school to allow WebRTC connections.':
     kind==='browser-incompatible'?'This browser does not support the classroom connection. Open this page in Chrome or Edge.':
     'The classroom connection failed'+(typeof kind==='string'&&/^[a-z-]+$/.test(kind)?' ('+kind+')':'')+'. Try joining again.';
+  // Temporary PeerJS signalling interruptions should not end a functioning lesson.
+  if(['network','socket-error','socket-closed','server-error'].includes(kind)&&(started||admitted)){
+    status('Classroom connection interrupted. Trying to reconnect; your current lesson may still work.');
+    if(peer&&!peer.destroyed&&peer.disconnected){try{peer.reconnect()}catch{}}
+    return;
+  }
   fail(message);if(!started&&!admitted){if(isTeacher){endClass();fail(message)}else{leaveClass();fail(message)}}
 }
 function makePeer(id){
   if(typeof Peer==='undefined'){fail('The classroom connection library could not load. Refresh or ask the school to allow this page.');return null}
-  const instance=new Peer(id||'class-pointer-student-'+crypto.randomUUID());instance.on('error',peerError);
+  const instance=new Peer(id||'class-pointer-student-'+crypto.randomUUID());instance.on('error',peerError);instance.on('open',()=>{clearError();if(started||admitted)status('Classroom connection restored.');});
   instance.on('disconnected',()=>{status('Connection service interrupted. Existing lesson connections may still work.');if(!instance.destroyed)instance.reconnect()});return instance;
 }
 async function startClass(){
