@@ -547,6 +547,13 @@ document.addEventListener('keydown', e => {
 
 function mustSitOut(data, name) { return false; }
 
+// Early keyboard presses never carry into the live buzzer window.
+let buzzSpaceHeld = false;
+document.addEventListener('keyup', e => { if (e.code === 'Space') buzzSpaceHeld = false; });
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !e.repeat) buzzSpaceHeld = true;
+}, true);
+
 function buzzIn() {
   if(teacherPreview){renderGameSnapshot({val:()=>({...lastData,buzzedBy:myName})});playBuzzSound();return;}
   if (masterBlocked || !myName) return;
@@ -598,17 +605,17 @@ function updateBuzzAvailability() {
   }
   if (lastData.narrationLocked) {
     buzzBtn.disabled = true;
-    countdownEl.textContent = 'Listen to the question and colored choices…';
+    countdownEl.textContent = 'WAIT! Listen to the question and colored choices…';
     if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
   } else if (lockedUntil && now < lockedUntil) {
     buzzBtn.disabled = true;
     const secsLeft = Math.ceil((lockedUntil - now) / 1000);
-    countdownEl.textContent = 'Get ready… ' + secsLeft;
+    countdownEl.textContent = 'GET READY… ' + secsLeft;
     if (!countdownInterval) {
       countdownInterval = setInterval(updateBuzzAvailability, 250);
     }
   } else {
-    countdownEl.textContent = '';
+    countdownEl.textContent = 'BUZZ NOW!';
     if (countdownInterval) {
       clearInterval(countdownInterval);
       countdownInterval = null;
