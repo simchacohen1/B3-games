@@ -62,12 +62,30 @@
   }
   const indexCache = new Map();
   const chapterCache = new Map();
+  // Use Sefaria's canonical Parasha structure, not a hand-maintained list of
+  // chapter numbers. This includes Parshios spanning multiple perakim.
+  function parshaRangesFromIndex(book, data) {
+    const nodes = data?.alt_structs?.Parasha?.nodes || [];
+    return nodes.map(node => {
+      const ref = String(node.wholeRef || "");
+      if (!ref.startsWith(book + " ")) return null;
+      const match = ref.slice(book.length + 1).match(/^(\d+):(\d+)-(?:(\d+):)?(\d+)$/);
+      if (!match) return null;
+      const fromChapter = Number(match[1]), fromVerse = Number(match[2]);
+      const toChapter = match[3] ? Number(match[3]) : fromChapter;
+      const toVerse = Number(match[4]);
+      if (fromChapter < 1 || fromVerse < 1 || toChapter < fromChapter ||
+          (toChapter === fromChapter && toVerse < fromVerse)) return null;
+      const name = String(node.sharedTitle || "").trim();
+      return name ? { name, book, fromChapter, fromVerse, toChapter, toVerse, ref } : null;
+    }).filter(Boolean);
+  }
   async function getBookIndex(book) {
     if (indexCache.has(book)) return indexCache.get(book);
     const data = await sefariaJson(api + "/api/v2/raw/index/" + encodeURIComponent(book));
     const chapters = Number(data?.schema?.lengths?.[0]);
     if (!Number.isInteger(chapters) || chapters < 1) throw new Error("Sefaria did not return valid perek information.");
-    const result = { chapters };
+    const result = { chapters, parshios: parshaRangesFromIndex(book, data) };
     indexCache.set(book, result);
     return result;
   }
@@ -516,23 +534,52 @@
   }
   async function chumashSources(form, status, count) {
     const book = form.book.value;
-    const chapter = Number(form.chapter.value), from = Number(form.from.value), to = Number(form.to.value);
-    if (!bookNames.includes(book) || !chapter || !from || !to || to < from) throw new Error("Choose a valid sefer, perek, and pasuk range.");
-    const chapterData = await getChapter(book, chapter);
-    if (chapter > (await getBookIndex(book)).chapters || to > chapterData.verses.length) throw new Error("Choose a perek and pasuk range that exists in this sefer.");
-    const verseRows = [];
-    for (let verse = from; verse <= to; verse++) {
-      const text = chapterData.verses[verse - 1];
-      if (!text) continue;
-      const ref = book + " " + chapter + ":" + verse;
-      verseRows.push({ ref, displayRef: books[book].label + " " + chapter + ":" + verse, text });
+    if (!bookNames.includes(book)) throw new Error("Choose a valid Chumash sefer.");
+    const index = await getBookIndex(book);
+    const wholeParsha = form.range?.value === "parsha";
+    let firstChapter, lastChapter, firstVerse, lastVerse, parsha;
+    if (wholeParsha) {
+      parsha = index.parshios.find(item => item.name === form.parsha?.value);
+      if (!parsha) throw new Error("Choose a Parsha from the selected sefer.");
+      ({ fromChapter: firstChapter, toChapter: lastChapter,
+         fromVerse: firstVerse, toVerse: lastVerse } = parsha);
+    } else {
+      firstChapter = lastChapter = Number(form.chapter.value);
+      firstVerse = Number(form.from.value);
+      lastVerse = Number(form.to.value);
     }
-    if (!verseRows.length) throw new Error("Sefaria returned no English text for the selected pesukim.");
+    if (![firstChapter,lastChapter,firstVerse,lastVerse].every(Number.isInteger) ||
+        firstChapter < 1 || lastChapter > index.chapters || lastChapter < firstChapter ||
+        firstVerse < 1 || lastVerse < 1 ||
+        (firstChapter === lastChapter && lastVerse < firstVerse)) {
+      throw new Error("Choose a valid perek and pasuk range.");
+    }
+    const verseRows = [];
+    for (let chapter = firstChapter; chapter <= lastChapter; chapter++) {
+      if (wholeParsha) status.textContent = "Loading " + parsha.name + ": perek " +
+        chapter + " of " + lastChapter + "…";
+      const chapterData = await getChapter(book, chapter);
+      const from = chapter === firstChapter ? firstVerse : 1;
+      const to = chapter === lastChapter ? lastVerse : chapterData.verses.length;
+      if (from > chapterData.verses.length || to > chapterData.verses.length) {
+        throw new Error("Sefaria returned an incomplete pasuk range for " + books[book].label + " " + chapter + ".");
+      }
+      for (let verse = from; verse <= to; verse++) {
+        const text = chapterData.verses[verse - 1];
+        if (!text) continue;
+        const ref = book + " " + chapter + ":" + verse;
+        verseRows.push({ ref, displayRef: books[book].label + " " + chapter + ":" + verse, text });
+      }
+    }
+    if (!verseRows.length) throw new Error("Sefaria returned no English text for the selected Torah section.");
     const includeRashi = form.rashi.checked;
     const sourcePool = [];
     const rashiByRef = new Map();
     if (includeRashi) {
-      for (const source of evenlyPick(verseRows, Math.min(verseRows.length, count))) {        status.textContent = "Checking Rashi for " + source.displayRef + "…";
+      // Avoid hundreds of network requests when a Parsha covers many perakim.
+      const rashiLimit = wholeParsha ? Math.min(count, 12) : count;
+      for (const source of evenlyPick(verseRows, Math.min(verseRows.length, rashiLimit))) {
+        status.textContent = "Checking Rashi for " + source.displayRef + "…";
         try {
           const rashi = await getText("Rashi on " + source.ref);
           if (rashi.text) rashiByRef.set(source.ref, { ...rashi, displayRef: "Rashi on " + source.displayRef, isRashi: true });
@@ -544,12 +591,10 @@
       const rashi = rashiByRef.get(source.ref);
       if (rashi) sourcePool.push(rashi);
     }
-    // Pass all source candidates to makeItems. It fills the requested count
-    // after parsing and deduplication instead of losing slots to skipped rows.
     sourcePool.baseSourceCount = verseRows.length;
-    const selected = sourcePool;
-    selected.distractors = verseRows;
-    return selected;
+    sourcePool.distractors = verseRows;
+    sourcePool.rangeLabel = wholeParsha ? parsha.name + " (" + parsha.ref + ")" : books[book].label + " " + firstChapter + ":" + firstVerse + "–" + lastVerse;
+    return sourcePool;
   }
   const kitzurBook = "Kitzur Shulchan Arukh";
   const kitzurCache = new Map();
@@ -600,6 +645,8 @@
       '<fieldset class="sg-group"><legend>1. Choose the source</legend><div class="sg-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end">' +
       '<label>Source type<select id="sgType" class="select"><option value="chumash">Chumash</option><option value="halacha">Kitzur Shulchan Aruch</option></select></label>' +
       '<label>Sefer<select id="sgBook" class="select">' + bookNames.map(b => '<option value="' + b + '">' + books[b].label + '</option>').join("") + '</select></label>' +
+      '<label>Chumash range<select id="sgRangeType" class="select"><option value="pesukim">Perek / pesukim</option><option value="parsha">Entire Parsha</option></select></label>' +
+      '<label>Parsha<select id="sgParsha" class="select"><option value="">Loading Parshios…</option></select></label>' +
       '<label>Perek<select id="sgChapter" class="select"><option>Loading…</option></select></label>' +
       '<label>First pasuk<select id="sgFrom" class="select"><option>Loading…</option></select></label>' +
       '<label>Last pasuk<select id="sgTo" class="select"><option>Loading…</option></select></label>' +
@@ -607,7 +654,7 @@
       '<label>First se’if<select id="sgSeifFrom" class="select"><option>Loading…</option></select></label>' +
       '<label>Last se’if<select id="sgSeifTo" class="select"><option>Loading…</option></select></label>' +
       '</div></fieldset><fieldset class="sg-group"><legend>2. Choose question options</legend><div class="sg-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end">' +
-      '<label>Number of questions<select id="sgCount" class="select">' + Array.from({length:33},(_,i)=>'<option value="' + (i+1) + '"' + (i===9?' selected':'') + '>' + (i+1) + '</option>').join("") + '</select></label>' +
+      '<label>Number of questions<select id="sgCount" class="select">' + Array.from({length:100},(_,i)=>'<option value="' + (i+1) + '"' + (i===9?' selected':'') + '>' + (i+1) + '</option>').join("") + '</select></label>' +
       '<label><input id="sgRashi" type="checkbox"> Include Rashi</label>' +
       '<label>Question style<select id="sgMode" class="select"><option value="mc">Multiple choice</option><option value="open">Open answer</option></select></label>' +
       '</div></fieldset><div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
@@ -665,10 +712,13 @@
     const type = card.querySelector("#sgType");
     const updateFields = () => {
       const halacha = type.value === "halacha";
+      const parsha = !halacha && card.querySelector("#sgRangeType").value === "parsha";
       card.querySelector("#sgBook").parentElement.hidden = halacha;
-      card.querySelector("#sgChapter").parentElement.hidden = halacha;
-      card.querySelector("#sgFrom").parentElement.hidden = halacha;
-      card.querySelector("#sgTo").parentElement.hidden = halacha;
+      card.querySelector("#sgRangeType").parentElement.hidden = halacha;
+      card.querySelector("#sgParsha").parentElement.hidden = !parsha;
+      ["#sgChapter","#sgFrom","#sgTo"].forEach(id => {
+        card.querySelector(id).parentElement.hidden = halacha || parsha;
+      });
       ["#sgSiman","#sgSeifFrom","#sgSeifTo"].forEach(id => { card.querySelector(id).parentElement.hidden = !halacha; });
       card.querySelector("#sgRashi").parentElement.hidden = halacha;
     };
@@ -677,13 +727,20 @@
     const fromSelect = card.querySelector("#sgFrom");
     const toSelect = card.querySelector("#sgTo");
     const status = card.querySelector("#sgStatus");
+    const parshaSelect = card.querySelector("#sgParsha");
     async function updateChapters() {
+      const requestedBook = bookSelect.value;
       try {
-        status.textContent = "Loading perek list from Sefaria…";
-        const { chapters } = await getBookIndex(bookSelect.value);
+        status.textContent = "Loading perakim and Parshios from Sefaria…";
+        const { chapters, parshios } = await getBookIndex(requestedBook);
+        if (requestedBook !== bookSelect.value) return;
         optionsFor(chapterSelect, Array.from({length:chapters},(_,i)=>i+1), 1);
-        await updateVerses();
-      } catch (error) { status.textContent = error.message || "Could not load perakim."; }
+        optionsFor(parshaSelect, parshios.map(p => p.name), parshios[0]?.name);
+        if (card.querySelector("#sgRangeType").value === "parsha") {
+          if (!parshios.length) status.textContent = "Sefaria returned no Parsha boundaries for this sefer.";
+          else status.textContent = "Choose a Parsha from " + books[requestedBook].label + ".";
+        } else await updateVerses();
+      } catch (error) { status.textContent = error.message || "Could not load perakim or Parshios."; }
     }
     async function updateVerses() {
       try {
@@ -695,7 +752,17 @@
       } catch (error) { status.textContent = error.message || "Could not load pasuk range."; }
     }
     bookSelect.addEventListener("change", updateChapters);
-    chapterSelect.addEventListener("change", updateVerses);    const simanSelect = card.querySelector("#sgSiman");
+    chapterSelect.addEventListener("change", updateVerses);
+    card.querySelector("#sgRangeType").addEventListener("change", () => {
+      updateFields();
+      if (card.querySelector("#sgRangeType").value === "parsha") {
+        status.textContent = "Choose the entire Parsha, then a question count.";
+      } else updateVerses();
+    });
+    parshaSelect.addEventListener("change", () => {
+      status.textContent = "Ready to generate questions from Parshas " + parshaSelect.value + ".";
+    });
+    const simanSelect = card.querySelector("#sgSiman");
     const seifFromSelect = card.querySelector("#sgSeifFrom");
     const seifToSelect = card.querySelector("#sgSeifTo");
     async function updateSeifim() {
@@ -727,7 +794,7 @@
         const mode = card.querySelector("#sgMode").value;
         const requestedCount = Number(card.querySelector("#sgCount").value) || 10;
         const sources = type.value === "chumash" ? await chumashSources({
-          book:card.querySelector("#sgBook"),chapter:card.querySelector("#sgChapter"),
+          book:card.querySelector("#sgBook"),range:card.querySelector("#sgRangeType"),parsha:card.querySelector("#sgParsha"),chapter:card.querySelector("#sgChapter"),
           from:card.querySelector("#sgFrom"),to:card.querySelector("#sgTo"),
           rashi:card.querySelector("#sgRashi")
         },status,requestedCount) : await halachaSources({siman:simanSelect,from:seifFromSelect,to:seifToSelect},status,requestedCount);
@@ -739,7 +806,7 @@
         if (items.skipped?.duplicate) reasons.push(items.skipped.duplicate + " duplicate question" + (items.skipped.duplicate === 1 ? " was" : "s were") + " skipped");
         if (mode !== "open" && items.skipped?.choices) reasons.push(items.skipped.choices + " question" + (items.skipped.choices === 1 ? " lacked" : "s lacked") + " three distinct answer choices");
         const previousDraftNote = !items.length && !review.hidden ? " No new drafts were made; the previous review drafts remain unchanged." : "";
-        const resultMessage = items.length + " of " + requestedCount + " requested questions ready" +
+        const resultMessage = (sources.rangeLabel ? sources.rangeLabel + ": " : "") + items.length + " of " + requestedCount + " requested questions ready" +
           (shortfall ? ". " + (reasons.length ? reasons.join("; ") + "." : "The selected range provided " + sources.length + " source text" + (sources.length === 1 ? "" : "s") + ", and each source can produce at most one question.") : "") +
           (type.value === "halacha" ? " (one per se’if, with no repeats)" : "") +
           previousDraftNote + " Review them below; your current set is unchanged.";
@@ -755,7 +822,7 @@
       } finally { button.disabled = false; }
     });
   }
-  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, questionAndAnswer, questionRecord, shortChoice, phrase, cleanText, localizeText, displayRef, evenlyPick, distribute, repairText, choiceKind, plausibleOptions });
+  window.FunTorahSefariaGeneratorCore = Object.freeze({ makeItems, questionAndAnswer, questionRecord, shortChoice, phrase, cleanText, localizeText, displayRef, evenlyPick, distribute, repairText, choiceKind, plausibleOptions, parshaRangesFromIndex, chumashSources });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", inject, { once: true });
   else inject();
 })();
