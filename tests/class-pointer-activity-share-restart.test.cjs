@@ -109,8 +109,8 @@ test('per-student denial is checked by backend on ticket issue and verification'
   const src=read('backend/functions/class-pointer-share-auth.js');
   assert.match(src,/action==='permissions'/);
   assert.match(src,/permission\?\.screenSharingDenied===true/);
-  // TEMPORARY compatibility: the live site still writes denials to the public session record; every read must be OR'd with the private policy.\n  for (const line of src.split(/\\r?\\n/).filter(l => /session\\.(screenSharingDenied|whiteboardDenied)/.test(l))) assert.match(line, /permission\\??\\.(screenSharing|whiteboard)Denied===true\\|\\|/);
-});
+  // TEMPORARY compatibility: the live site still writes denials to the public session record; every read must be OR'd with the private policy.
+  for (const line of src.split(/\r?\n/).filter(l => /session\.(screenSharingDenied|whiteboardDenied)/.test(l))) assert.match(line, /permission\??\.(screenSharing|whiteboard)Denied===true\|\|/);});
 test('restart is gated on cleanup, never races with prior Firebase session removal',()=>{
   const src=read('class-pointer-prototype/classroom.js');
   const session=read('class-pointer-prototype/dashboard-session.js');
