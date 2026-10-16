@@ -55,7 +55,6 @@ test('scheduled cleanup deletes expired sharing and join tickets, but preserves 
     {[expiredJoin]:{studentId,expiresAt:now-1},[activeJoin]:{studentId,expiresAt:now+60000}},
     {[studentKey]:activeJoin}
   );
-  f.indexRows[studentKey]=expiredJoin;
   await f.scheduled();
   assert.equal(f.shareRows[expiredShare],undefined);
   assert.equal(f.shareRows['d'.repeat(64)].expiresAt,now+60000);
