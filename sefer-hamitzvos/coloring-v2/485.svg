@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200"><rect width="1200" height="1200" fill="white"/><g fill="white" stroke="#161616" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"><rect x="20" y="20" width="1160" height="1160" rx="18" stroke-width="16"/>
+<!-- COURT HOUSE: ruling cannot be cancelled in exchange for money -->
+<path d="M52 460 L600 127 L1148 460 Z" stroke-width="14"/>
+<path d="M112 451 H1088 M80 496 H1120" stroke-width="14"/>
+<path d="M142 496 V998 H253 V496 M945 496 V998 H1056 V496" stroke-width="10"/>
+<path d="M153 540 H242 M153 947 H242 M956 540 H1045 M956 947 H1045" stroke-width="6"/>
+<path d="M290 494 V735 M913 494 V735" stroke-width="10"/>
+<rect x="95" y="987" width="1010" height="48" rx="8" stroke-width="10"/>
+<!-- vaulted hall windows -->
+<path d="M343 450 V323 Q343 277 388 277 Q433 277 433 323 V450 Z M765 450 V323 Q765 277 810 277 Q855 277 855 323 V450 Z" stroke-width="8"/>
+<path d="M389 292 V438 M811 292 V438" stroke-width="5"/>
+<path d="M503 311 Q601 283 697 311" stroke-width="6" fill="none"/>
+<!-- Judges at desk -->
+<rect x="275" y="653" width="652" height="252" rx="22" stroke-width="13"/>
+<path d="M290 727 H913 M337 795 H868 M354 857 H848" stroke-width="7" fill="none"/>
+<path d="M354 654 Q332 572 380 543 Q412 520 452 553 Q487 583 472 654 M542 654 Q520 560 577 525 Q631 498 671 542 Q697 581 684 654 M749 654 Q724 557 772 536 Q823 515 861 555 Q885 583 868 654" stroke-width="11"/>
+<!-- left judge beard, hat -->
+<ellipse cx="403" cy="490" rx="43" ry="55" stroke-width="8"/>
+<path d="M362 478 Q359 432 404 424 Q454 428 449 477 Z" stroke-width="9"/>
+<path d="M376 519 Q390 578 410 562 Q434 559 439 518" stroke-width="7"/>
+<path d="M374 478 Q406 468 432 479 M376 503 L389 503 M419 503 L431 503" stroke-width="5"/>
+<!-- central judge -->
+<ellipse cx="606" cy="470" rx="50" ry="62" stroke-width="9"/>
+<path d="M547 452 Q551 398 610 402 Q666 407 663 450 Z" stroke-width="9"/>
+<path d="M557 509 Q585 588 606 565 Q637 580 651 508" stroke-width="8"/>
+<path d="M565 468 H580 M625 468 H639 M595 501 Q610 508 621 496" stroke-width="4" fill="none"/>
+<!-- right judge -->
+<ellipse cx="802" cy="489" rx="43" ry="54" stroke-width="8"/>
+<path d="M758 471 Q764 419 804 421 Q849 422 849 472 Z" stroke-width="9"/>
+<path d="M764 520 Q784 579 808 566 Q829 571 844 521" stroke-width="6"/>
+<path d="M771 488 H785 M822 488 H835" stroke-width="5" fill="none"/>
+<!-- Legal scroll on bench -->
+<path d="M537 703 Q600 685 668 702 L669 735 Q600 719 538 735 Z"/>
+<path d="M546 716 H649" stroke-width="5"/>
+<!-- foreground man offering a bag of coins -->
+<path d="M124 1120 L149 820 Q150 744 202 726 Q267 699 307 759 L330 1123 Z" stroke-width="12"/>
+<ellipse cx="225" cy="669" rx="48" ry="59" stroke-width="9"/>
+<path d="M173 651 Q178 611 227 609 Q276 616 272 651 Z" stroke-width="8"/>
+<path d="M202 711 Q215 752 239 741 Q256 735 262 704" stroke-width="6"/>
+<path d="M167 806 Q267 779 374 817 Q396 838 379 860 Q366 875 337 858 L242 852" stroke-width="12"/>
+<path d="M269 771 Q288 814 298 849" stroke-width="5" fill="none"/>
+<path d="M191 902 L184 1083 M295 926 L302 1083" fill="none" stroke-width="5"/>
+<!-- Bag with coins, unmistakable rejected ransom -->
+<path d="M365 848 Q330 800 356 761 Q380 729 410 751 Q430 724 457 756 Q480 741 503 772 Q529 805 509 848 Z" stroke-width="11"/>
+<path d="M380 756 Q411 776 479 754 M365 847 Q416 875 510 847" fill="none" stroke-width="7"/>
+<circle cx="395" cy="808" r="23" stroke-width="6"/><circle cx="450" cy="812" r="25" stroke-width="6"/><circle cx="424" cy="780" r="21" stroke-width="6"/>
+<path d="M392 789 V827 M382 802 L408 814 M449 790 V831 M434 802 L468 815" fill="none" stroke-width="5"/>
+<!-- judge's large open palm gestures NO -->
+<path d="M684 629 Q715 604 728 584 L754 542 Q767 528 779 545 L770 577 Q809 538 822 555 Q824 572 797 590 Q843 556 851 577 Q853 593 811 609 Q854 581 863 602 Q861 615 819 639 Q850 626 861 645 Q859 661 803 685 Q751 711 699 688 Z" stroke-width="11"/>
+<path d="M699 684 Q673 696 665 722" stroke-width="11" fill="none"/>
+<!-- crossed-out ransom symbol -->
+<circle cx="460" cy="939" r="100" stroke-width="13"/>
+<path d="M387 866 L534 1012" stroke-width="17"/>
+<!-- courtyard stones -->
+<path d="M39 1101 Q72 1080 114 1099 M366 1090 Q414 1073 466 1092 M564 1091 Q617 1072 653 1092 M738 1102 Q794 1072 860 1100 M980 1112 Q1018 1093 1070 1112" fill="none" stroke-width="5"/>
+</g></svg>
