@@ -26,7 +26,7 @@ function receiverFixture(){
     window,document,location:{search:'?dashboard=teacher&class=pointer-test'},
     URLSearchParams,URL,MutationObserver:class{observe(){}},
     firebase:{auth:()=>({currentUser:{getIdToken:async()=> 'teacher-token'}})},
-    fetch:async()=>({ok:true,status:200,json:async()=>({ok:true,studentId:'student-a',studentName:'Student A'})}),
+    fetch:async(_url,options)=>{const token=JSON.parse(options.body).token,studentId=token[0]==='a'?'student-a':'student-b';return{ok:true,status:200,json:async()=>({ok:true,studentId,studentName:studentId==='student-a'?'Student A':'Student B'})}},
     console:{warn(){}}
   });
   vm.runInContext(read('class-pointer-prototype/activity-screen-teacher.js'),context);
@@ -35,7 +35,7 @@ function receiverFixture(){
 function callFor(student='student-a'){
   const listeners=new Map();
   return{
-    metadata:{kind:'activity-screen',token:'a'.repeat(64)},
+    metadata:{kind:'activity-screen',token:(student==='student-a'?'a':'b').repeat(64)},
     closed:0,answered:0,
     on(event,handler){listeners.set(event,handler)},
     answer(){this.answered++},
