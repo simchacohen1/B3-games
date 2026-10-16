@@ -36,7 +36,7 @@ async function activityFixture({capture}={}){
   const window={
     firebase,B3_FIREBASE_CONFIG:{},
     FunTorahStudentClass:{resolve:async()=>({workspaceId:'b3-2026',classId:'et'})},
-    addEventListener(){}
+    open(){return null},addEventListener(){}
   };
   const navigator={mediaDevices:{getDisplayMedia(){
     captureCount++;
