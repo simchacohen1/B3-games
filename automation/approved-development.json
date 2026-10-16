@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "enabled": false,
+  "repository": "simchacohen1/B3-games",
+  "owner": "simchacohen1",
+  "approvalLabel": "owner-approved-for-development",
+  "timezone": "America/New_York",
+  "teachingWindow": { "weekdays": [1, 2, 3, 4, 5], "start": "08:45", "end": "15:35" },
+  "maxConcurrentTasks": 1,
+  "pilotIssue": 107,
+  "tasks": {
+    "107": {
+      "scopeId": "posuk-translation-grading-v1",
+      "scope": "Audit and improve Posuk Practice translation grading using synthetic fixtures; preserve reading, Understand, retry and dispute behavior. Inspect existing translation-grading branch and PR work before coding. Draft PR only; teacher review required before accuracy claims.",
+      "existingBranch": "fix/posuk-translation-name-evidence-20261015"
+    }
+  }
+}
