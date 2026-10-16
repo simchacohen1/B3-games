@@ -30,3 +30,12 @@
 6. Revocation: teacher denies student 1 screen sharing and removes student 1 from the test class; within one minute the teacher page disconnects the student, and a new ticket request is refused.
 7. Clean up: end the lesson, delete the test class in Owner Admin.
 Record results (pass/fail with screenshots) on Issue #51.
+
+## Local real-browser test (run 2026-10-16, no deployment, no Firebase, no internet)
+`e2e/pointer-join-ticket-two-browser.spec.cjs` drives real Chromium contexts (teacher, students, an outsider) through the real `classroom.html`, `classroom.js`, `join-auth.js` and PeerJS/WebRTC, with a local PeerJS signaling server, the real `classPointerShareAuth` handler on an in-memory database, a stub Firebase object and made-up people. Run: install the `peer` package somewhere (not a repo dependency), then `PEER_MODULE=<path to node_modules/peer> npx playwright test e2e/pointer-join-ticket-two-browser.spec.cjs --project=chromium` (skipped when `PEER_MODULE` is not set). Result: **5 of 5 pass** (about 1.6 min):
+1. a legitimate student joins and the roster shows the server's name, not what the page claimed;
+2. outsiders who know the public room id (no ticket, invented ticket, a real ticket stolen and replayed from another connection, malformed ticket) receive nothing, are disconnected and never reach the roster;
+3. wrong passcode, a WT student pointing at the ET room, and a student who is not signed in cannot join;
+4. teacher screen sharing still reaches an admitted student;
+5. reloading a student gets a fresh ticket and replaces (not duplicates) the old connection; after the student is removed from the class the teacher page drops them within a minute.
+**Negative control:** the same outsider test against the page as it was before the fix fails (the outsider with no ticket receives the lesson messages). Not covered: real Firebase, real Google sign-in, real networks/NAT, real student devices, the website as served from GitHub Pages.
