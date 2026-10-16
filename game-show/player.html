@@ -547,14 +547,19 @@ document.addEventListener('keydown', e => {
 
 function mustSitOut(data, name) { return false; }
 
-// Early keyboard presses never carry into the live buzzer window.
-let buzzSpaceHeld = false;
-document.addEventListener('keyup', e => { if (e.code === 'Space') buzzSpaceHeld = false; });
-document.addEventListener('keydown', e => {
-  if (e.code === 'Space' && !e.repeat) buzzSpaceHeld = true;
+// Ignore clicks whose press started before the buzzer opened.
+let earlyPress = false;
+document.getElementById('buzzBtn').addEventListener('pointerdown', () => {
+  earlyPress = document.getElementById('buzzBtn').disabled ||
+    !lastData || lastData.narrationLocked || serverNow() < (lastData.buzzUnlockAt || 0);
+}, true);
+document.getElementById('buzzBtn').addEventListener('pointerup', () => {
+  // Keep the flag through the click event; reset after it has been dispatched.
+  setTimeout(() => { earlyPress = false; }, 0);
 }, true);
 
 function buzzIn() {
+  if (earlyPress) return;
   if(teacherPreview){renderGameSnapshot({val:()=>({...lastData,buzzedBy:myName})});playBuzzSound();return;}
   if (masterBlocked || !myName) return;
   if (!lastData || lastData.roundActive !== true) return;
