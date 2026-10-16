@@ -26,3 +26,17 @@ The current `index.html` is deliberately an **isolated design prototype**. Its d
 10. Publish behind a disabled feature flag or limited test class; verify on production with test users before broad release.
 
 **Out of scope for this initial prototype:** live assignments, student file uploads, teacher approvals, automatic completion tracking, and persistent live reminders.
+
+## Homework Portal (phase 2, built 2026-10-16, NOT deployed)
+
+- `prototype.html`: the original design prototype, kept unchanged.
+- `student.html`: signed-in students (existing sessionStorage sign-in) see their own homework, save progress/drafts (also kept locally so a dropped connection loses nothing), and hand in.
+- `teacher.html`: verified Google teacher picks an assigned class, gives homework to the whole class or chosen students, edits/deletes, sees handed-in/approved/late counts, approves (optional 1-5 stars + note) or sends back with a note.
+- Backend: `backend/functions/homework-core.cjs` (all authorization; uses `homework-policy.cjs`, a tested copy of `assignment-policy.js`) and `homework.js` (function `homeworkPortal`, registered in `index.js`). The `assignmentCenter` database tree has no client rules, so browsers cannot read or write it directly.
+- Tests: `node --test tests/homework-portal.test.cjs assignment-center/assignment-policy.test.js`.
+- Still needed before going live: owner approval to deploy `homeworkPortal`; a test class; entry links from the student home and Teacher Home (not added, to avoid overlapping other work); file/audio/photo/video uploads (hand-ins are text notes for now); automatic completion from other tools.
+
+### Update 2026-10-16 (b)
+- Homework is a per-class tool: Owner Admin > Class Tools > "Homework" (`toolGrants.homework`). The backend refuses classes where it is off.
+- Links: Teacher Home shows "Homework" for classes that have it; the student home bar shows "My Homework (n)" via `home-link.js`.
+- Release steps, rollback and cost: `RELEASE-PLAN.md`. Messaging plans (`MESSAGING.md`, message-*.js, messages.html) are untouched.
