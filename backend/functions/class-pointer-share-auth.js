@@ -153,8 +153,11 @@ exports.classPointerShareAuth=onRequest({
    // Wrong passcodes are counted per student and per address; a correct one clears the student's count.
    const now=Date.now(),sPath='b3Private/classPointerJoinLimits/s_'+sha(studentId).slice(0,32),iPath='b3Private/classPointerJoinLimits/i_'+sha(req.ip||'unknown').slice(0,32);
    const [sRow,iRow]=await Promise.all([db.ref(sPath).once('value').then(s=>s.val()),db.ref(iPath).once('value').then(s=>s.val())]);
-   const bump=(path,max,windowMs)=>db.ref(path).transaction(cur=>{const r=cur&&now-cur.start<windowMs?cur:{start:now,count:0};const count=r.count+1;return {start:r.start,count,until:count>=max?now+windowMs:0}});
-   const fail=async(code,message)=>{if((sRow?.until>now)||(iRow?.until>now))error(429,'Too many wrong passcodes. Please wait a few minutes.');await Promise.all([bump(sPath,8,900000),bump(iPath,40,3600000)]);error(code,message)};
+   // A student-specific lock blocks every attempt, preventing a passcode oracle. A shared-address
+   // lock only rejects incorrect attempts below, so one classroom cannot lock out its classmates.
+   if(sRow?.until>now)error(429,'Too many wrong passcodes. Please wait a few minutes.');
+   const bump=(path,max,windowMs)=>db.ref(path).transaction(cur=>{const r=cur&&now-cur.start<windowMs?cur:{start:now,count:0};const count=r.count+1;return {start:now,count,until:count>=max?now+windowMs:0}});
+   const fail=async(code,message)=>{if(iRow?.until>now)error(429,'Too many wrong passcodes. Please wait a few minutes.');await Promise.all([bump(sPath,8,900000),bump(iPath,40,3600000)]);error(code,message)};
    const profile=await stillMember(studentId);
    if(!profile)error(403,'Student not in this class.');
    // The shared default passcode is never accepted for joining a lesson.
