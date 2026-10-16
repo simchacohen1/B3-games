@@ -52,7 +52,7 @@ exports.classPointerShareAuth=onRequest({
    if(!profile.val()||profile.val().active===false)error(403,'Inactive student.');
    if(!code.passcode||!equal(code.passcode,body.pin)){await recordFailure(guard);error(401,'Please sign in again.');}
    const permission=(await db.ref('b3Private/classPointerSharePermissions/'+workspaceId+'/'+classId+'/'+room+'/'+studentId).once('value')).val()||{};
-   return res.json({ok:true,screenSharingDenied:permission.screenSharingDenied===true,whiteboardDenied:permission.whiteboardDenied===true});
+   return res.json({ok:true,screenSharingDenied:permission.screenSharingDenied===true||session.screenSharingDenied?.[studentId]===true,whiteboardDenied:permission.whiteboardDenied===true||session.whiteboardDenied?.[studentId]===true});
   }
   if(action==='issue'){
    if(session.studentScreenSharing!==true)error(403,'Screen sharing is not enabled for this class.');
@@ -60,7 +60,8 @@ exports.classPointerShareAuth=onRequest({
    const guard=failurePaths(studentId);
    await assertNotLimited(guard);
    const permission=(await db.ref('b3Private/classPointerSharePermissions/'+workspaceId+'/'+classId+'/'+room+'/'+studentId).once('value')).val();
-   if(permission?.screenSharingDenied===true)error(403,'Your teacher has turned off your screen sharing.');
+   // The website currently live still records a teacher's denial on the public session record; the new one uses the private record. Honor both.
+   if(permission?.screenSharingDenied===true||session.screenSharingDenied?.[studentId]===true)error(403,'Your teacher has turned off your screen sharing.');
    const profile=(await db.ref('b3Games/students/'+studentId+'/profile').once('value')).val();
    if(!profile||profile.active===false)error(403,'Inactive student.');
    const code=await readPasscode(p=>(db.ref(p).once('value')).then(s=>s.val()),studentId,{allowLegacyDefault:false});
@@ -113,7 +114,7 @@ exports.classPointerShareAuth=onRequest({
    const ticket=used.committed?used.snapshot.val():null;
    if(!ticket)error(403,'Sharing ticket expired, used, or belongs to another class.');
    const permission=(await db.ref('b3Private/classPointerSharePermissions/'+workspaceId+'/'+classId+'/'+room+'/'+ticket.studentId).once('value')).val();
-   if(permission?.screenSharingDenied===true)error(403,'Your teacher has turned off your screen sharing.');
+   if(permission?.screenSharingDenied===true||session.screenSharingDenied?.[ticket.studentId]===true)error(403,'Your teacher has turned off your screen sharing.');
    const [profileSnap,memberSnap]=await Promise.all([
      db.ref('b3Games/students/'+ticket.studentId+'/profile').once('value'),
      db.ref(base+'/members/'+ticket.studentId).once('value')

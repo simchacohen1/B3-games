@@ -162,7 +162,8 @@ test('connected share revocation closes the media connection rather than hiding 
   assert.match(activity,/if\(!shareable\|\|!active\|\|shareable.roomId!==active.roomId\)\{if\(stream\)stop\(\)\}/);
   assert.match(backend,/classPointerSharePermissions/);
   assert.match(backend,/permission\?\.screenSharingDenied===true/);
-  assert.doesNotMatch(backend,/session\.screenSharingDenied/);
+  // TEMPORARY compatibility (the live website still writes denials to the public session record): every read of the public denial map must be OR'd with the private record.
+  for (const line of backend.split(/\r?\n/).filter(l => /session\.(screenSharingDenied|whiteboardDenied)/.test(l))) assert.match(line, /permission\??\.(screenSharing|whiteboard)Denied===true\|\|/);
   assert.match(activity,/action:'permissions'/);
   assert.match(activity,/permissionRevision/);
   assert.doesNotMatch(activity,/ref\('b3Private\/classPointerSharePermissions/);
