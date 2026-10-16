@@ -26,7 +26,7 @@ service firebase.storage {
       allow create: if request.auth != null
         && request.auth.uid == teacherUid
         && fileId.matches('[-a-zA-Z0-9]+[.]pdf')
-        && request.resource.size <= 50 * 1024 * 1024
+        && request.resource.size <= 500 * 1024 * 1024
         && request.resource.contentType == 'application/pdf';
 
       // Rename/remember-page updates only: file bytes cannot be replaced.

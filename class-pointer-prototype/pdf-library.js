@@ -26,11 +26,13 @@
     const oldControls=panel.querySelector('.session-controls');
     if(oldControls)oldControls.after(trigger);else panel.prepend(trigger);
   }
+  const MAX_PDF_BYTES=500*1024*1024;
   const dialog=document.createElement('dialog');dialog.id='pointerPdfLibraryDialog';dialog.className='pointer-library-dialog';
-  dialog.innerHTML='<div class="pointer-library-header"><h2>My PDF Library</h2><button type="button" id="pointerLibraryClose">✕</button></div><p>Only you can browse these saved PDFs. Students see a file only when you present it.</p><div class="pointer-library-actions"><button id="pointerLibrarySave" type="button">Save current PDF</button><span id="pointerLibraryStatus" role="status"></span></div><div id="pointerLibraryItems"></div>';
+  dialog.innerHTML='<div class="pointer-library-header"><h2>My PDF Library</h2><button type="button" id="pointerLibraryClose">✕</button></div><p>Only you can browse these saved PDFs. Students see a file only when you present it.</p><div class="pointer-library-actions"><button id="pointerLibrarySave" type="button">Save current PDF</button><span id="pointerLibraryStatus" role="status"></span></div><div class="pointer-library-upload-meter"><progress id="pointerLibraryProgress" value="0" max="100" aria-label="PDF upload progress" hidden></progress><span id="pointerLibraryProgressLabel" aria-live="polite" hidden></span></div><div id="pointerLibraryItems"></div>';
   document.body.append(dialog);
   const close=dialog.querySelector('#pointerLibraryClose'),save=dialog.querySelector('#pointerLibrarySave'),status=dialog.querySelector('#pointerLibraryStatus'),items=dialog.querySelector('#pointerLibraryItems');
-  const style=document.createElement('style');style.textContent='.pointer-library-dialog{max-width:min(660px,94vw);width:660px;max-height:82vh;overflow:auto;border:1px solid #c9d4e4;border-radius:16px;padding:18px;box-shadow:0 15px 60px #10223a66;color:#172d49;background:#fff}.pointer-library-dialog::backdrop{background:#101d3888}.pointer-library-header,.pointer-library-row,.pointer-library-actions{display:flex;align-items:center;gap:12px;justify-content:space-between}.pointer-library-row{border-top:1px solid #e4e9f1;padding:12px 0;flex-wrap:wrap}.pointer-library-row strong{overflow-wrap:anywhere;flex:1;min-width:160px}.pointer-library-row button{white-space:nowrap}.pointer-library-actions{justify-content:flex-start;flex-wrap:wrap;margin:14px 0}.pointer-library-dialog button{cursor:pointer}';document.head.append(style);
+  const progress=dialog.querySelector('#pointerLibraryProgress'),progressLabel=dialog.querySelector('#pointerLibraryProgressLabel');
+  const style=document.createElement('style');style.textContent='.pointer-library-dialog{max-width:min(660px,94vw);width:660px;max-height:82vh;overflow:auto;border:1px solid #c9d4e4;border-radius:16px;padding:18px;box-shadow:0 15px 60px #10223a66;color:#172d49;background:#fff}.pointer-library-dialog::backdrop{background:#101d3888}.pointer-library-header,.pointer-library-row,.pointer-library-actions{display:flex;align-items:center;gap:12px;justify-content:space-between}.pointer-library-row{border-top:1px solid #e4e9f1;padding:12px 0;flex-wrap:wrap}.pointer-library-row strong{overflow-wrap:anywhere;flex:1;min-width:160px}.pointer-library-row button{white-space:nowrap}.pointer-library-actions{justify-content:flex-start;flex-wrap:wrap;margin:14px 0}.pointer-library-dialog button{cursor:pointer}.pointer-library-upload-meter{display:flex;align-items:center;gap:10px;margin:6px 0}.pointer-library-upload-meter progress{width:min(260px,55vw);height:14px;accent-color:#1d5cb2}.pointer-library-upload-meter [hidden]{display:none}';document.head.append(style);
   const auth=()=>window.firebase?.auth?.().currentUser||null;
   const storage=()=>window.firebase?.storage?.()||null;
   async function teacherPrefix(){
@@ -58,22 +60,22 @@
     }
     if(!response.ok)throw Error('Private PDF download failed (HTTP '+response.status+'). Check your Firebase Storage permissions. Your saved PDF has not been deleted.');
     const length=Number(response.headers.get('content-length')||'0');
-    if(length>50*1024*1024)throw Error('This saved PDF is larger than the 50 MB library limit.');
+    if(length>MAX_PDF_BYTES)throw Error('This saved PDF is larger than the 500 MB library limit.');
     const blob=await response.blob();
-    if(blob.size>50*1024*1024)throw Error('This PDF is too large to open from the library.');
+    if(blob.size>MAX_PDF_BYTES)throw Error('This PDF is too large to open from the library (500 MB maximum).');
     return blob;
   }
   const errorText=e=>e?.code==='storage/unauthorized'?'Library access was denied. Please sign in as your teacher account.':(e?.message||'Library unavailable. Check Firebase Storage and its security rules.');
   let currentFile=null,activeId=null,openedPage=1;
   const setStatus=s=>{status.textContent=s};
-  async function refresh(){
+  async function refresh(successMessage=''){
     items.replaceChildren();setStatus('Loading…');
     try{
       const own=await teacherPrefix();
       const result=await own.listAll();
       const entries=await Promise.all(result.items.map(async ref=>({ref,meta:await ref.getMetadata()})));
       entries.sort((a,b)=>new Date(b.meta.updated)-new Date(a.meta.updated));
-      if(!entries.length){items.textContent='No saved PDFs yet.';setStatus('');return}
+      if(!entries.length){items.textContent='No saved PDFs yet.';setStatus(successMessage);return}
       for(const {ref,meta} of entries){
         const row=document.createElement('div');row.className='pointer-library-row';
         const name=document.createElement('strong');name.textContent=meta.customMetadata?.displayName||meta.name.replace(/\.pdf$/i,'');
@@ -91,7 +93,7 @@
         remove.onclick=async()=>{if(!confirm('Delete "'+name.textContent+'" from your private library?'))return;try{await ref.delete();if(activeId===meta.name)activeId=null;await refresh()}catch(e){setStatus(errorText(e))}};
         row.append(name,open,rename,remove);items.append(row);
       }
-      setStatus('');
+      setStatus(successMessage);
     }catch(e){setStatus(errorText(e))}
   }
   trigger.onclick=()=>{dialog.showModal();refresh()};
@@ -101,14 +103,24 @@
     if(!currentFile){setStatus('Open a PDF from your computer first.');return}
     const displayName=(prompt('Save as:',currentFile.name.replace(/\.pdf$/i,''))||'').trim();
     if(!displayName)return;
-    if(currentFile.size>50*1024*1024){setStatus('The library supports files up to 50 MB. Larger PDFs can still be presented without saving.');return}
-    save.disabled=true;setStatus('Saving…');
+    if(currentFile.size>MAX_PDF_BYTES){setStatus('The library supports PDFs up to 500 MB. You can still present larger PDFs without saving.');return}
+    save.disabled=true;
+    progress.hidden=false;progressLabel.hidden=false;progress.value=0;
+    progressLabel.textContent='0%';setStatus('Uploading PDF…');
     try{
       const id=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)) + '.pdf';
       const ref=(await teacherPrefix()).child(id);
-      await ref.put(currentFile,{contentType:'application/pdf',customMetadata:{displayName:displayName.slice(0,100),lastPage:String(Math.max(1,window.ClassPointerPdf.currentPage()+1))}});
-      activeId=id;setStatus('Saved privately.');await refresh();
-    }catch(e){setStatus(errorText(e))}finally{save.disabled=false}
+      const upload=ref.put(currentFile,{contentType:'application/pdf',customMetadata:{displayName:displayName.slice(0,100),lastPage:String(Math.max(1,window.ClassPointerPdf.currentPage()+1))}});
+      await new Promise((resolve,reject)=>upload.on('state_changed',snapshot=>{
+        const total=snapshot.totalBytes||currentFile.size;
+        const percent=total?Math.min(100,Math.floor(snapshot.bytesTransferred*100/total)):0;
+        progress.value=percent;
+        progressLabel.textContent=percent+'% ('+(snapshot.bytesTransferred/1048576).toFixed(1)+' of '+(total/1048576).toFixed(1)+' MB)';
+        setStatus('Uploading PDF… '+percent+'%');
+      },reject,resolve));
+      progress.value=100;progressLabel.textContent='100% — upload complete';
+      activeId=id;await refresh('Saved privately.');
+    }catch(e){setStatus(errorText(e));progressLabel.textContent='Upload not completed';}finally{save.disabled=false}
   };
   let pageTimer;
   window.PointerPdfLibrary={
