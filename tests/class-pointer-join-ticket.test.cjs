@@ -154,15 +154,17 @@ test('reconnection: every reconnect asks for a fresh ticket for its new connecti
   assert.equal((await f.verify(two, 'teacher-et', 'et', ROOM, 'peer-second-02')).statusCode, 200);
 });
 
-test('guessing is limited: 8 wrong passcodes pause that student, others and other rooms unaffected', async () => {
+test('rate limits reject wrong passcodes but preserve valid joins for the student and classmates', async () => {
   const f = fixture();
-  for (let i = 0; i < 8; i++) assert.equal((await f.issue('avi', '000' + i, 'et', ROOM, PEER, '1.1.1.' + i)).statusCode, 401);
-  assert.equal((await f.issue('avi', '1111', 'et', ROOM, PEER, '9.9.9.9')).statusCode, 429);   // even the right passcode waits
-  assert.equal((await f.issue('benny', '2222', 'et', ROOM, PEER, '9.9.9.9')).statusCode, 200);  // classmate is fine
-  const g = fixture();
-  let hit = null;
-  for (let i = 0; i < 60 && hit === null; i++) if ((await g.issue(i % 2 ? 'avi' : 'benny', 'bad' + i, 'et', ROOM, PEER, '7.7.7.7')).statusCode === 429) hit = i;
-  assert.ok(hit !== null && hit <= 41);
+  for (let i = 0; i < 8; i++) assert.equal((await f.issue('avi', '000' + i, 'et', ROOM, PEER, 'shared-school-ip')).statusCode, 401);
+  // A correct passcode still works after wrong attempts reached the student limit.
+  assert.equal((await f.issue('avi', '1111', 'et', ROOM, PEER, 'shared-school-ip')).statusCode, 200);
+
+  // A shared-address lock applies to further wrong guesses, not to valid classmates.
+  const crypto = require('node:crypto'), ipPath = 'b3Private/classPointerJoinLimits/i_' + crypto.createHash('sha256').update('shared-school-ip').digest('hex').slice(0, 32);
+  f.rows.set(ipPath, { start: Date.now(), count: 40, until: Date.now() + 3600000 });
+  assert.equal((await f.issue('benny', 'wrong', 'et', ROOM, PEER, 'shared-school-ip')).statusCode, 429);
+  assert.equal((await f.issue('benny', '2222', 'et', ROOM, PEER, 'shared-school-ip')).statusCode, 200);
 });
 
 test('the lesson page refuses unverified joins and the student page asks for a ticket first', () => {
