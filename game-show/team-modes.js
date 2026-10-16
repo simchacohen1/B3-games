@@ -192,7 +192,7 @@
     function speakAndRelease(q,token) {
       if(!token)return;
       const status=document.getElementById("soundStatus");
-      const content=spokenQuestion(q);
+      const content="Alright contestants, here we go! "+spokenQuestion(q)+" Get ready to buzz in!";
       if(!content){releaseNarration(token);return;}
       cancelSpeech();
       status.textContent="🎤 Game-show host is reading Red, Blue, Green, Yellow. Buzzers locked.";
