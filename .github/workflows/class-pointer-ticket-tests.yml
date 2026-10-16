@@ -1,0 +1,16 @@
+name: Class Pointer ticket regression
+on:
+  push:
+    branches:
+      - fix/pointer-student-share-flow-oct16
+  workflow_dispatch:
+jobs:
+  ticket-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run ticket regression tests
+        run: node --test tests/class-pointer-share-ticket-retry.test.cjs
