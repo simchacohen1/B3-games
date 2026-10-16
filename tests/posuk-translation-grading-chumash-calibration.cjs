@@ -40,11 +40,11 @@ const anchors = [
   },
   {
     book: 'Leviticus', ref: 'Leviticus 1:1',
-    hebrew: 'וַיִּקְרָא אֶל־מֹשֶׁה',
-    sourceTranslation: 'The LORD called to Moses.',
+    hebrew: 'וַיִּקְרָא אֶל־מֹשֶׁה וַיְדַבֵּר יְהֹוָה אֵלָיו',
+    sourceTranslation: 'The LORD called to Moses and spoke to him.',
     sourceName: 'Revised JPS, 2023', sourceUrl: 'https://www.sefaria.org/Leviticus.1.1?lang=bi&with=Translations',
-    paraphrase: 'Hashem called out to Moses.',
-    wrong: 'Moses called out to the LORD.',
+    paraphrase: 'Hashem called to Moses and spoke to him.',
+    wrong: 'Moses called to the LORD and spoke to Him.',
   },
   {
     book: 'Numbers', ref: 'Numbers 1:1',
