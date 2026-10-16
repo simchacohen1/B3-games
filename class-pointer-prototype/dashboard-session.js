@@ -72,7 +72,10 @@
     const context=await ready;
     if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
     await writeSession(ref,async()=>{
-      await context.db.ref(permissionPath(ref.key)).set(permissionRows(policy));
+      const rows=permissionRows(policy);
+      await context.db.ref(permissionPath(ref.key)).set(rows);
+      const denied=Object.entries(rows).filter(([,row])=>row.screenSharingDenied===true).map(([id])=>id);
+      window.ClassPointerActivityShares?.revokeStudents(denied);
       return ref.update({permissionRevision:firebase.database.ServerValue.TIMESTAMP});
     });
   },
@@ -108,7 +111,10 @@
     await writeSession(ref,async()=>{
       // Publish private student policy before the class-visible broadcast so
       // recipients never act on stale permission state.
-      await context.db.ref(permissionPath(ref.key)).set(permissionRows(policy));
+      const rows=permissionRows(policy);
+      await context.db.ref(permissionPath(ref.key)).set(rows);
+      const denied=Object.entries(rows).filter(([,row])=>row.screenSharingDenied===true).map(([id])=>id);
+      window.ClassPointerActivityShares?.revokeStudents(denied);
       return ref.update({
         studentScreenSharing:mode==='screens',
         permissionRevision:firebase.database.ServerValue.TIMESTAMP,
@@ -119,7 +125,10 @@
     const ref=activeRef;if(!ref)return;
     const context=await ready;
     if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
-    await writeSession(ref,()=>ref.child('studentScreenSharing').set(enabled===true));
+    await writeSession(ref,async()=>{
+      await ref.child('studentScreenSharing').set(enabled===true);
+      if(enabled!==true)window.ClassPointerActivityShares?.closeAll();
+    });
   },async end(){
     revision++;
     const ref=activeRef,policyRef=activePolicyRef;
