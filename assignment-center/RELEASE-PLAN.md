@@ -62,3 +62,9 @@ Recommendation: merge Homework after PR 84 (or resolve the two lines then); I wi
 - Production (b3-games) is already on pay-as-you-go with 19 functions. One more function: no monthly fee; usage beyond the free allowance is billed per call, and class homework use is tiny. Expected extra: $0, at most pennies. Only the Firebase console can confirm the current plan and free usage, which I cannot see.
 - Staging: upgrading `fun-torah-tools-staging` to Blaze is needed to deploy a function or Storage there. Blaze has no fixed fee but needs a card and bills usage; an unused staging project should cost about $0. That upgrade is the owner's decision. Free alternative already done: local emulator checks.
 - Nothing in Homework uses AI, speech or file storage.
+
+---
+## Update 2026-10-16 (d): synthetic test class (owner instruction: never use real ET/WT students)
+- Fixture: `tests/fixtures/synthetic-class.cjs`: class "Synthetic Test Class A/B" and a switched-off class, 7 made-up students ("Avi Synthetic" ...), made-up passcodes, 3 made-up teachers. Automated tests use only this.
+- Added `tests/homework-synthetic-privacy.test.cjs`: only the assigned student and teachers of that class see homework; other classes, wrong passcode, switched-off class refused; no passcodes in responses; hostile ids/field types always end in a clean 4xx and change nothing.
+- For the live test (after owner approval): create a real class named like "Synthetic Test Class" with 2-3 made-up students and a throwaway teacher Google account in the Owner Admin screens, turn Homework on for that class only, and delete the class afterward (Owner Admin > Delete class). Creating it writes to production, so it waits for the owner.
