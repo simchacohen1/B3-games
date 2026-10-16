@@ -36,7 +36,8 @@ function loadCleanup(shareRows={},joinRows={},indexRows={}){
   const admin={apps:[{}],initializeApp(){},database:()=>db};
   const file=path.join(__dirname,'../backend/functions/class-pointer-share-ticket-cleanup.js');
   const source=fs.readFileSync(file,'utf8');
-  const sandbox={module:{exports:{}},exports:{},Date,Number,Object,console,require:name=>{
+  const moduleExports={};
+  const sandbox={module:{exports:moduleExports},exports:moduleExports,Date,Number,Object,console,require:name=>{
     if(name==='firebase-functions/v2/scheduler')return{onSchedule:(_options,handler)=>{scheduled=handler;return handler}};
     if(name==='firebase-admin')return admin;
     if(name==='node:crypto')return crypto;
