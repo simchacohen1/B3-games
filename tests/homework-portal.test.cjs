@@ -17,7 +17,7 @@ const seed = () => ({
     admins: {},
     workspaces: { 'b3-2026': {
       classes: {
-        et: { name: 'ET', members: { s1: { active: true }, s2: { active: true }, s3: { active: false } } },
+        et: { name: 'ET', toolGrants: { homework: true }, members: { s1: { active: true }, s2: { active: true }, s3: { active: false } } },
         wt: { name: 'WT', members: { s9: { active: true } } }
       },
       teachers: { t1: { active: true, classIds: { et: true } } }
@@ -67,7 +67,7 @@ test('student sees only own work and needs the correct passcode', async () => {
   assert.equal(ok.assignments[0].late, false);
   assert.equal((await list(store, 's1', 'Sam One', '1111', 1500)).assignments[0].late, true);
   await assert.rejects(list(store, 's1', 'Sam One', '2222', 600), { code: 401 });
-  assert.equal((await list(store, 's9', 'Wes Nine', '9999', 600)).assignments.length, 0);
+  await assert.rejects(list(store, 's9', 'Wes Nine', '9999', 600), { code: 403 }); // homework not turned on for wt
 });
 
 test('selected-students assignment is hidden from others', async () => {
@@ -123,6 +123,44 @@ test('edit and delete', async () => {
   await homeworkApi(store, T(), { action: 'delete', classId: 'et', assignmentId: id }, 10);
   l = await homeworkApi(store, T(), { action: 'teacherList', classId: 'et' }, 10);
   assert.equal(l.assignments.length, 0);
+});
+
+test('access: other classes, other students, switched-off class', async () => {
+  const store = await setup();
+  const id = defId(store);
+  // student claims a class they are not in, or someone else's id with own passcode
+  // asking for another class just returns their own class (never wt's data)
+  assert.equal((await homeworkApi(store, {}, { action: 'studentList', studentId: 's1', studentName: 'Sam One', pin: '1111', classId: 'wt' }, 1)).assignments[0].id, id);
+  await assert.rejects(homeworkApi(store, {}, { action: 'studentList', ...stu('s2', 'Dan Two', '1111') }, 1), { code: 401 });
+  await assert.rejects(homeworkApi(store, {}, { action: 'studentList', ...stu('s1', 'Dan Two', '1111') }, 1), { code: 401 });
+  // removed (inactive) student has no passcode access
+  await assert.rejects(list(store, 's3', 'Old Three', '1111', 1), { code: 401 });
+  // a student in another (switched-on) class sees none of this class's homework
+  store.data.b3Games.workspaces['b3-2026'].classes.wt.toolGrants = { homework: true };
+  assert.equal((await list(store, 's9', 'Wes Nine', '9999', 1)).assignments.length, 0);
+  // teacher: inactive, class flagged false, or switched-off class
+  store.data.b3Games.workspaces['b3-2026'].teachers.t1.classIds.et = false;
+  await assert.rejects(homeworkApi(store, T(), { action: 'teacherList', classId: 'et' }, 1), { code: 403 });
+  store.data.b3Games.workspaces['b3-2026'].teachers.t1.classIds.et = true;
+  store.data.b3Games.workspaces['b3-2026'].teachers.t1.active = false;
+  await assert.rejects(homeworkApi(store, T(), { action: 'teacherList', classId: 'et' }, 1), { code: 403 });
+  store.data.b3Games.workspaces['b3-2026'].teachers.t1.active = true;
+  delete store.data.b3Games.workspaces['b3-2026'].classes.et.toolGrants;
+  await assert.rejects(homeworkApi(store, T(), { action: 'teacherList', classId: 'et' }, 1), { code: 403 });
+  await assert.rejects(list(store, 's1', 'Sam One', '1111', 1), { code: 403 });
+  assert.ok(id);
+});
+
+test('teacher cannot review a student from another class; owner needs the class switched on', async () => {
+  const store = await setup();
+  const id = defId(store);
+  await assert.rejects(homeworkApi(store, T(), { action: 'approve', classId: 'et', assignmentId: id, studentId: 's9' }, 1), { code: 404 });
+  await assert.rejects(homeworkApi(store, T(), { action: 'delete', classId: 'et', assignmentId: '../../x' }, 1), { code: 404 });
+  const owner = { identity: { uid: 'o', email: 'simcha5770@gmail.com', email_verified: true, firebase: { sign_in_provider: 'google.com' } } };
+  await homeworkApi(store, owner, { action: 'teacherList', classId: 'et' }, 1);
+  await assert.rejects(homeworkApi(store, owner, { action: 'teacherList', classId: 'wt' }, 1), { code: 403 });
+  const emailLogin = { identity: { ...owner.identity, firebase: { sign_in_provider: 'password' } } };
+  await assert.rejects(homeworkApi(store, emailLogin, { action: 'teacherList', classId: 'et' }, 1), { code: 403 });
 });
 
 test('functions copy of the policy matches the tested original', () => {

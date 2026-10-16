@@ -24,6 +24,7 @@ async function teacherAccess(store, identity, classId) {
   if (!key(classId)) fail(400, 'Choose a class.');
   const cls = await store.get('b3Games/workspaces/' + WS + '/classes/' + classId);
   if (!cls || cls.active === false) fail(403, 'This class is not available.');
+  if (cls.toolGrants?.homework !== true) fail(403, 'Homework is not turned on for this class.');
   const admin = await store.get('b3Games/admins/' + identity.uid);
   const owner = String(identity.email || '').toLowerCase() === OWNER_EMAIL || !!(admin && admin.active !== false);
   if (!owner) {
@@ -121,7 +122,7 @@ async function teacherDo(store, identity, body, now, newId) {
 
   if (body.action === 'delete') {
     await store.set(base(classId) + '/definitions/' + def.id, null);
-    for (const sid of Object.keys(members)) await store.set(recordPath(classId, sid, def.id), null);
+    for (const sid of Object.keys(cls.members || {})) if (key(sid)) await store.set(recordPath(classId, sid, def.id), null);
     return { ok: true };
   }
   if (body.action === 'edit') {
@@ -166,6 +167,8 @@ async function studentDo(store, body, now) {
   const ctx = ctxFor(classId, sid, sid, 'student');
   const scope = scopeOf(classId, sid);
   if (!policy.authorized(actor, scope, ctx, 'read')) fail(403, 'Not allowed.');
+  const cls = await store.get('b3Games/workspaces/' + WS + '/classes/' + classId);
+  if (!cls || cls.active === false || cls.toolGrants?.homework !== true) fail(403, 'Homework is not turned on for your class.');
   const defs = (await store.get(base(classId) + '/definitions')) || {};
   const mine = def => def.audience === 'all' || (Array.isArray(def.audience) && def.audience.includes(sid));
 

@@ -35,3 +35,8 @@ The current `index.html` is deliberately an **isolated design prototype**. Its d
 - Backend: `backend/functions/homework-core.cjs` (all authorization; uses `homework-policy.cjs`, a tested copy of `assignment-policy.js`) and `homework.js` (function `homeworkPortal`, registered in `index.js`). The `assignmentCenter` database tree has no client rules, so browsers cannot read or write it directly.
 - Tests: `node --test tests/homework-portal.test.cjs assignment-center/assignment-policy.test.js`.
 - Still needed before going live: owner approval to deploy `homeworkPortal`; a test class; entry links from the student home and Teacher Home (not added, to avoid overlapping other work); file/audio/photo/video uploads (hand-ins are text notes for now); automatic completion from other tools.
+
+### Update 2026-10-16 (b)
+- Homework is a per-class tool: Owner Admin > Class Tools > "Homework" (`toolGrants.homework`). The backend refuses classes where it is off.
+- Links: Teacher Home shows "Homework" for classes that have it; the student home bar shows "My Homework (n)" via `home-link.js`.
+- Release steps, rollback and cost: `RELEASE-PLAN.md`. Messaging plans (`MESSAGING.md`, message-*.js, messages.html) are untouched.
