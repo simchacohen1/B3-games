@@ -61,7 +61,7 @@ async function activityFixture({capture,persistent=false,sessionStorageValues:in
   }
   await vm.runInNewContext(read('class-pointer-prototype/activity-share.js'),{
     window,document,location,URL,sessionStorage,firebase,fetch,navigator,
-    Peer:FakePeer,crypto:{randomUUID:()=> 'synthetic-peer-id'},AbortSignal,Date,console
+    Peer:FakePeer,crypto:{randomUUID:()=> 'synthetic-peer-id'},AbortSignal,Date,setTimeout,clearTimeout,console
   });
   assert.ok(listener,'authenticated session should subscribe to teacher requests');
   assert.ok(holder,'activity sharing invitation must exist');
