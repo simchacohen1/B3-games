@@ -107,3 +107,25 @@
 .gimkit-mode-bar{height:11px;background:#e5e1f4;border-radius:999px;overflow:hidden}.gimkit-mode-bar i{display:block;height:100%;background:linear-gradient(90deg,#6849df,#9a82f0);border-radius:999px}
 .gimkit-mode-choice>b{font-size:11px;color:#5139bd;white-space:nowrap}.gimkit-mode-note{margin:10px 0 0;font-size:10px;line-height:1.45;color:#667085}.gimkit-last-winner{margin:8px 0 0;font-size:11px;color:#0f7657}
 @media(max-width:700px){.gimkit-mode-choice{grid-template-columns:24px 1fr}.gimkit-mode-choice>b{grid-column:2}.gimkit-mode-choice-main{grid-template-columns:1fr}.gimkit-mode-race-head{align-items:flex-start;flex-direction:column}}
+
+
+/* Student portal: prevent a fixed-width points card from widening the page. */
+.studentportal,.studentmain,.studentwelcome{min-width:0;max-width:100%}
+.studentwelcome{grid-template-columns:auto minmax(0,1fr) minmax(0,460px)}
+.studentwelcome>div{min-width:0}
+.studentbalance-breakdown{min-width:0;width:100%;max-width:100%}
+.student-point-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
+.student-point-metrics>span{min-width:0;padding:10px}
+.student-point-metrics strong{overflow-wrap:anywhere}
+@media(max-width:900px){
+  .studentwelcome{grid-template-columns:auto minmax(0,1fr)}
+  .studentbalance-breakdown{grid-column:1/-1}
+}
+@media(max-width:600px){
+  .studentportal>header{gap:10px;padding:12px}
+  .studentportal>header .brand{min-width:0;font-size:17px}
+  .studentportal>header nav{order:3;flex:0 0 100%;width:100%;min-width:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;overflow:visible}
+  .studentportal>header nav button{min-width:0;padding:10px 3px;font-size:13px;white-space:normal}
+  .studentmain{padding:20px 12px 50px}
+  .student-point-metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
