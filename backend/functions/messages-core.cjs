@@ -146,13 +146,25 @@ async function sendMessage(store, actor, studentId, body, now) {
   if (hasVoice && (typeof body.voice !== 'object' || msgText.length > LIMITS.textChars)) fail(400, 'Bad voice message.');
   const tp = threadPath(actor.classId, studentId);
 
-  // Repeat tap or reconnect retry: return the message already saved.
+  // Repeat tap or reconnect retry: claim this client id atomically, so two devices or a retry
+  // that races the first attempt can never both create a message.
   const dedupePath = tp + '/dedupe/' + sha(actor.role + ':' + actor.id + ':' + clientId).slice(0, 40);
-  const seen = await store.get(dedupePath);
-  if (seen) {
-    const m = await store.get(tp + '/messages/' + seen);
+  const claim = await store.tx(dedupePath, cur => cur ? undefined : 'pending');
+  if (claim.committed === false) {
+    const seen = await store.get(dedupePath);
+    const m = seen && seen !== 'pending' ? await store.get(tp + '/messages/' + seen) : null;
     if (m) return { ok: true, message: publicMessage(m), duplicate: true };
+    fail(409, 'That message is still sending. Please wait a moment.');
   }
+  try {
+    return await sendClaimed(store, actor, studentId, body, now, { tp, dedupePath, clientId, hasVoice, msgText });
+  } catch (e) { // free the claim so a retry can try again
+    await store.set(dedupePath, null);
+    throw e;
+  }
+}
+
+async function sendClaimed(store, actor, studentId, body, now, { tp, dedupePath, hasVoice, msgText }) {
   let replyTo = null;
   if (body.replyTo != null) {
     if (!key(body.replyTo) || !(await store.get(tp + '/messages/' + body.replyTo))) fail(404, 'The message you replied to was not found.');
