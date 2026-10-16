@@ -24,9 +24,32 @@ exports.classPointerShareAuth=onRequest({
   const base='b3Games/workspaces/'+workspaceId+'/classes/'+classId;
   const [classSnap,sessionSnap]=await Promise.all([db.ref(base).once('value'),db.ref(base+'/classPointerSessions/'+room).once('value')]);
   const cls=classSnap.val(),session=sessionSnap.val();
-  if(!cls||cls.active===false||!session||session.roomId!==room||session.studentScreenSharing!==true||Date.now()-session.createdAt>14400000||session.createdAt>Date.now()+60000)error(403,'Screen sharing is not enabled for this class.');
+  if(!cls||cls.active===false||!session||session.roomId!==room||Date.now()-session.createdAt>14400000||session.createdAt>Date.now()+60000)error(403,'Class Pointer is not active for this class.');
   if(!['et','wt'].includes(classId)&&cls.toolGrants?.['class-pointer']!==true)error(403,'Class Pointer is disabled for this class.');
+  if(action==='permissions'){
+   const request=session.destinationRequest;
+   if(!(request&&['screens','boards'].includes(request.mode))&&!(session.studentScreenSharing===true&&Number.isFinite(session.shareRequest?.at)))error(403,'There is no active student activity request.');
+   if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active===false)error(403,'Student not in this class.');
+   const fingerprint=crypto.createHash('sha256').update(String(req.ip||'unknown')+'|'+studentId).digest('hex');
+   const limit=db.ref('b3Private/classPointerShareLimits/'+fingerprint);
+   let denied=false;
+   await limit.transaction(previous=>{
+    const now=Date.now(),row=previous&&previous.until>now?previous:{count:0,until:now+600000};
+    if(row.count>=40){denied=true;return undefined}
+    return {count:row.count+1,until:row.until};
+   });
+   if(denied)error(429,'Too many permission checks. Try again later.');
+   const [profile,code]=await Promise.all([
+    db.ref('b3Games/students/'+studentId+'/profile').once('value'),
+    readPasscode(p=>db.ref(p).once('value').then(s=>s.val()),studentId,{allowLegacyDefault:true})
+   ]);
+   if(!profile.val()||profile.val().active===false)error(403,'Inactive student.');
+   if(!equal(code.passcode,body.pin))error(401,'Please sign in again.');
+   const permission=(await db.ref('b3Private/classPointerSharePermissions/'+workspaceId+'/'+classId+'/'+room+'/'+studentId).once('value')).val()||{};
+   return res.json({ok:true,screenSharingDenied:permission.screenSharingDenied===true,whiteboardDenied:permission.whiteboardDenied===true});
+  }
   if(action==='issue'){
+   if(session.studentScreenSharing!==true)error(403,'Screen sharing is not enabled for this class.');
    // Bound passcode attempts at this endpoint, independently of sign-in limits.
    const fingerprint=crypto.createHash('sha256').update(String(req.ip||'unknown')).digest('hex');
    const limit=db.ref('b3Private/classPointerShareLimits/'+fingerprint);
@@ -39,7 +62,8 @@ exports.classPointerShareAuth=onRequest({
    });
    if(denied)error(429,'Too many sharing attempts. Try later.');
    if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active===false)error(403,'Student not in this class.');
-   if(session.screenSharingDenied?.[studentId]===true)error(403,'Your teacher has turned off your screen sharing.');
+   const permission=(await db.ref('b3Private/classPointerSharePermissions/'+workspaceId+'/'+classId+'/'+room+'/'+studentId).once('value')).val();
+   if(permission?.screenSharingDenied===true)error(403,'Your teacher has turned off your screen sharing.');
    const profile=(await db.ref('b3Games/students/'+studentId+'/profile').once('value')).val();
    if(!profile||profile.active===false)error(403,'Inactive student.');
    const code=await readPasscode(p=>(db.ref(p).once('value')).then(s=>s.val()),studentId,{allowLegacyDefault:true});
@@ -50,6 +74,7 @@ exports.classPointerShareAuth=onRequest({
    return res.json({ok:true,token,studentName:String(profile.name||'Student').slice(0,32)});
   }
   if(action==='verify'){
+   if(session.studentScreenSharing!==true)error(403,'Screen sharing is not enabled for this class.');
    const auth=String(req.headers.authorization||'').match(/^Bearer (.+)$/);
    if(!auth)error(401,'Teacher sign-in required.');
    const claims=await admin.auth().verifyIdToken(auth[1]);
@@ -82,7 +107,8 @@ exports.classPointerShareAuth=onRequest({
    });
    const ticket=used.committed?used.snapshot.val():null;
    if(!ticket)error(403,'Sharing ticket expired, used, or belongs to another class.');
-   if(session.screenSharingDenied?.[ticket.studentId]===true)error(403,'Your teacher has turned off your screen sharing.');
+   const permission=(await db.ref('b3Private/classPointerSharePermissions/'+workspaceId+'/'+classId+'/'+room+'/'+ticket.studentId).once('value')).val();
+   if(permission?.screenSharingDenied===true)error(403,'Your teacher has turned off your screen sharing.');
    const [profileSnap,memberSnap]=await Promise.all([
      db.ref('b3Games/students/'+ticket.studentId+'/profile').once('value'),
      db.ref(base+'/members/'+ticket.studentId).once('value')

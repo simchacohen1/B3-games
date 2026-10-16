@@ -68,7 +68,7 @@
     fallback.style.cssText='border:1px solid #1d4ed8;background:white;color:#1d4ed8;border-radius:9px;padding:8px 10px;cursor:pointer;font:700 13px system-ui';
     fallback.addEventListener('click',()=>location.assign(new URL('class-pointer-prototype/dashboard.html',root).href));
     holder.append(btn,label,fallback);document.body.appendChild(holder);
-    let active=null,peer=null,call=null,stream=null,busy=false;
+    let active=null,peer=null,call=null,stream=null,busy=false,latestSession=null,permission={},permissionKey='',permissionRequest=0,permissionReady=false;
     // Centered, teacher-triggered consent prompt. Browser capture remains user initiated.
     const promptOverlay=document.createElement('div');
     promptOverlay.id='fttShareRequestOverlay';
@@ -90,19 +90,39 @@
     choose.addEventListener('click',event=>{if(active&&!busy)return beginShare(event)});
 
     const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
+    async function watchPermission(session){
+      const request=session?.destinationRequest,at=request?.at||session?.shareRequest?.at;
+      const hasRequest=(request&&['screens','boards'].includes(request.mode))||(session?.studentScreenSharing===true&&Number.isFinite(at));
+      if(!hasRequest){permissionKey='';permission={};permissionReady=false;refreshSessionState();return}
+      const key=session.roomId+':'+String(session.permissionRevision||'')+':'+String(at||'');
+      if(permissionKey===key&&permissionReady)return;
+      permissionKey=key;permission={};permissionReady=false;const current=++permissionRequest;
+      try{
+        const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({action:'permissions',studentId:id,pin,classId,room:session.roomId}),signal:AbortSignal.timeout(10000)});
+        const result=await response.json();
+        if(!response.ok||!result?.ok)throw Error(result?.error||'Could not check your sharing permissions.');
+        if(current!==permissionRequest||latestSession?.roomId!==session.roomId||permissionKey!==key)return;
+        permission={screenSharingDenied:result.screenSharingDenied===true,whiteboardDenied:result.whiteboardDenied===true};permissionReady=true;
+      }catch{
+        if(current===permissionRequest&&permissionKey===key){permission={};permissionReady=false;status('Could not check sharing permissions. Ask your teacher to resend.');}
+      }
+      refreshSessionState();
+    }
     function routeTeacherRequest(session){
+      if(!permissionReady)return;
       // Teacher directs only this student's verified class; reject stale requests.
       const request=session?.destinationRequest;
       const supported=request&&['screens','boards'].includes(request.mode);
       const at=supported?request.at:session?.shareRequest?.at;
       if(!Number.isFinite(at)||(!supported&&at<loadedAt-6000)||at>Date.now()+60000||Date.now()-at>45000)return;
       // Per-student exclusions belong to the active authenticated class.
-      if(supported&&request.mode==='boards'&&session.whiteboardDenied?.[id]===true)return;
-      if((!supported||request.mode==='screens')&&session.screenSharingDenied?.[id]===true)return;
+      if(supported&&request.mode==='boards'&&permission?.whiteboardDenied===true)return;
+      if((!supported||request.mode==='screens')&&permission?.screenSharingDenied===true)return;
       // Don't consume a request while student screen-sharing permission is disabled.
       // Board requests are separate and must still navigate to individual boards.
       if((!supported||request.mode==='screens')&&(!active||active.roomId!==session.roomId))return;
-      const marker=session.roomId+':'+at+':'+(supported?request.mode:'screens');
+      const marker=session.roomId+':'+at+':'+String(session.permissionRevision||'')+':'+(supported?request.mode:'screens');
       if(stream)return;
       try{
         if(sessionStorage.getItem(inviteKey)===marker)return;
@@ -127,25 +147,31 @@
       hidePrompt();
     }
     function status(text){label.textContent=text}
+    function refreshSessionState(){
+      const next=latestSession;
+      if(!permissionReady){if(stream)stop();active=null;holder.style.display='none';hidePrompt();return}
+      const shareable=next?.studentScreenSharing===true&&permission?.screenSharingDenied!==true?next:null;
+      if(!shareable||!active||shareable.roomId!==active.roomId){if(stream)stop()}
+      active=shareable;holder.style.display=active?'flex':'none';
+      if(!active)hidePrompt();
+      if(next)routeTeacherRequest(next);
+    }
     function current(rows){
       return Object.entries(rows||{}).filter(([key,v])=>v&&v.roomId===key&&/^class-pointer-[a-f0-9-]{36}$/.test(key)
         &&Number.isFinite(v.createdAt)&&Date.now()-v.createdAt<14400000&&Date.now()-v.createdAt>=-60000)
         .sort((a,b)=>b[1].createdAt-a[1].createdAt)[0]?.[1]||null;
     }
-    sessions.on('value',snapshot=>{
+    sessions.on('value',async snapshot=>{
       // Student switching must never reuse another boy's classroom invitation.
       if(sessionStorage.getItem('b3Games_studentId')!==id){
         if(stream)stop();
-        active=null;holder.style.display='none';hidePrompt();
+        latestSession=null;active=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;holder.style.display='none';hidePrompt();
         return;
       }
       const next=current(snapshot.val());
-      const shareable=next?.studentScreenSharing===true&&next?.screenSharingDenied?.[id]!==true?next:null;
-      if(!shareable||!active||shareable.roomId!==active.roomId){if(stream)stop()}
-      active=shareable;holder.style.display=active?'flex':'none';
-      if(!active)hidePrompt();
-      if(next)routeTeacherRequest(next);
-    },()=>{active=null;holder.style.display='none';stop()});
+      latestSession=next;
+      if(next)await watchPermission(next);else{permissionKey='';permissionRequest++;permission={};permissionReady=false;refreshSessionState()}
+    },()=>{latestSession=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;active=null;holder.style.display='none';stop()});
     async function beginShare(){
       if(stream){stop();return}
       if(busy||!active)return;

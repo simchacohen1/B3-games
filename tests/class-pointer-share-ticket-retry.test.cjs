@@ -13,7 +13,7 @@ function fixture(){
   const rows=new Map([
     [base,{active:true,members:{arik:{active:true}}}],
     [base+'/members/arik',{active:true}],
-    [base+'/classPointerSessions/'+room,{roomId:room,createdAt:Date.now(),studentScreenSharing:true,teacherUid:'teacher-et'}],
+    [base+'/classPointerSessions/'+room,{roomId:room,createdAt:Date.now(),studentScreenSharing:true,teacherUid:'teacher-et',destinationRequest:{mode:'screens',at:Date.now()}}],
     ['b3Games/workspaces/b3-2026/teachers/teacher-et',{active:true,classIds:{et:true}}],
     ['b3Games/students/arik/profile',{name:'Arik',active:true}]
   ]);
@@ -71,6 +71,30 @@ test('an inactive teacher cannot verify an issued ticket',async()=>{
   f.rows.set('b3Games/workspaces/b3-2026/teachers/teacher-et',{active:false,classIds:{et:true}});
   const result=await f.post({action:'verify',classId:'et',room:f.room,token:issue.body.token},'teacher-et');
   assert.equal(result.statusCode,403);
+});
+test('screen-sharing denial is read from the private per-student policy on issue and verify',async()=>{
+  const f=fixture(),policy='b3Private/classPointerSharePermissions/b3-2026/et/'+f.room+'/arik';
+  f.rows.set(policy,{screenSharingDenied:true});
+  const deniedIssue=await f.post({action:'issue',studentId:'arik',pin:'123456',classId:'et',room:f.room});
+  assert.equal(deniedIssue.statusCode,403);
+  f.rows.delete(policy);
+  const issue=await f.post({action:'issue',studentId:'arik',pin:'123456',classId:'et',room:f.room});
+  assert.equal(issue.statusCode,200);
+  f.rows.set(policy,{screenSharingDenied:true});
+  const deniedVerify=await f.post({action:'verify',classId:'et',room:f.room,token:issue.body.token},'teacher-et');
+  assert.equal(deniedVerify.statusCode,403);
+  assert.match(deniedVerify.body.error,/turned off your screen sharing/);
+});
+test('student permission check verifies the PIN and returns only that student’s private flags',async()=>{
+  const f=fixture();
+  f.rows.set('b3Private/classPointerSharePermissions/b3-2026/et/'+f.room+'/arik',{screenSharingDenied:true});
+  f.rows.set('b3Private/classPointerSharePermissions/b3-2026/et/'+f.room+'/peer',{screenSharingDenied:false,whiteboardDenied:true});
+  const allowed=await f.post({action:'permissions',studentId:'arik',pin:'123456',classId:'et',room:f.room});
+  assert.equal(allowed.statusCode,200,JSON.stringify(allowed.body));
+  assert.deepEqual({...allowed.body},{ok:true,screenSharingDenied:true,whiteboardDenied:false});
+  const badPin=await f.post({action:'permissions',studentId:'arik',pin:'wrong',classId:'et',room:f.room});
+  assert.equal(badPin.statusCode,401);
+  assert.equal(Object.keys(allowed.body).some(key=>key==='peer'||key==='whiteboardDenied'&&allowed.body.whiteboardDenied!==false),false);
 });
 test('an ET ticket cannot be replayed against the WT class session',async()=>{
   const f=fixture(),issue=await f.post({action:'issue',studentId:'arik',pin:'123456',classId:'et',room:f.room});

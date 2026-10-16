@@ -1,5 +1,5 @@
 {
-  "description": "Exact reviewed permission expressions in the October 15, 2026 repository rules. This is a drift tripwire, not a security clearance: existing public grants are unsafe and must be removed in a separate verified migration. Any rules change must update this baseline in the same reviewed PR.",
+  "description": "Exact reviewed permission expressions in the October 16, 2026 repository rules. This is a drift tripwire, not a security clearance: existing public grants are unsafe and must be removed in a separate verified migration. Any rules change must update this baseline in the same reviewed PR.",
   "permissions": [
     {
       "path": "/",
@@ -490,6 +490,11 @@
       "path": "/tentTrailTrivia",
       "permission": ".write",
       "expression": true
+    },
+    {
+      "path": "/b3Private/classPointerSharePermissions/$workspaceId/$classId/$roomId",
+      "permission": ".write",
+      "expression": "auth != null && ((auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && (($classId == 'et' || $classId == 'wt') || root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/class-pointer').val() == true)))"
     }
   ]
 }
