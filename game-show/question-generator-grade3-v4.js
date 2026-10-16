@@ -534,23 +534,52 @@
   }
   async function chumashSources(form, status, count) {
     const book = form.book.value;
-    const chapter = Number(form.chapter.value), from = Number(form.from.value), to = Number(form.to.value);
-    if (!bookNames.includes(book) || !chapter || !from || !to || to < from) throw new Error("Choose a valid sefer, perek, and pasuk range.");
-    const chapterData = await getChapter(book, chapter);
-    if (chapter > (await getBookIndex(book)).chapters || to > chapterData.verses.length) throw new Error("Choose a perek and pasuk range that exists in this sefer.");
-    const verseRows = [];
-    for (let verse = from; verse <= to; verse++) {
-      const text = chapterData.verses[verse - 1];
-      if (!text) continue;
-      const ref = book + " " + chapter + ":" + verse;
-      verseRows.push({ ref, displayRef: books[book].label + " " + chapter + ":" + verse, text });
+    if (!bookNames.includes(book)) throw new Error("Choose a valid Chumash sefer.");
+    const index = await getBookIndex(book);
+    const wholeParsha = form.range?.value === "parsha";
+    let firstChapter, lastChapter, firstVerse, lastVerse, parsha;
+    if (wholeParsha) {
+      parsha = index.parshios.find(item => item.name === form.parsha?.value);
+      if (!parsha) throw new Error("Choose a Parsha from the selected sefer.");
+      ({ fromChapter: firstChapter, toChapter: lastChapter,
+         fromVerse: firstVerse, toVerse: lastVerse } = parsha);
+    } else {
+      firstChapter = lastChapter = Number(form.chapter.value);
+      firstVerse = Number(form.from.value);
+      lastVerse = Number(form.to.value);
     }
-    if (!verseRows.length) throw new Error("Sefaria returned no English text for the selected pesukim.");
+    if (![firstChapter,lastChapter,firstVerse,lastVerse].every(Number.isInteger) ||
+        firstChapter < 1 || lastChapter > index.chapters || lastChapter < firstChapter ||
+        firstVerse < 1 || lastVerse < 1 ||
+        (firstChapter === lastChapter && lastVerse < firstVerse)) {
+      throw new Error("Choose a valid perek and pasuk range.");
+    }
+    const verseRows = [];
+    for (let chapter = firstChapter; chapter <= lastChapter; chapter++) {
+      if (wholeParsha) status.textContent = "Loading " + parsha.name + ": perek " +
+        chapter + " of " + lastChapter + "…";
+      const chapterData = await getChapter(book, chapter);
+      const from = chapter === firstChapter ? firstVerse : 1;
+      const to = chapter === lastChapter ? lastVerse : chapterData.verses.length;
+      if (from > chapterData.verses.length || to > chapterData.verses.length) {
+        throw new Error("Sefaria returned an incomplete pasuk range for " + books[book].label + " " + chapter + ".");
+      }
+      for (let verse = from; verse <= to; verse++) {
+        const text = chapterData.verses[verse - 1];
+        if (!text) continue;
+        const ref = book + " " + chapter + ":" + verse;
+        verseRows.push({ ref, displayRef: books[book].label + " " + chapter + ":" + verse, text });
+      }
+    }
+    if (!verseRows.length) throw new Error("Sefaria returned no English text for the selected Torah section.");
     const includeRashi = form.rashi.checked;
     const sourcePool = [];
     const rashiByRef = new Map();
     if (includeRashi) {
-      for (const source of evenlyPick(verseRows, Math.min(verseRows.length, count))) {        status.textContent = "Checking Rashi for " + source.displayRef + "…";
+      // Avoid hundreds of network requests when a Parsha covers many perakim.
+      const rashiLimit = wholeParsha ? Math.min(count, 12) : count;
+      for (const source of evenlyPick(verseRows, Math.min(verseRows.length, rashiLimit))) {
+        status.textContent = "Checking Rashi for " + source.displayRef + "…";
         try {
           const rashi = await getText("Rashi on " + source.ref);
           if (rashi.text) rashiByRef.set(source.ref, { ...rashi, displayRef: "Rashi on " + source.displayRef, isRashi: true });
@@ -562,12 +591,10 @@
       const rashi = rashiByRef.get(source.ref);
       if (rashi) sourcePool.push(rashi);
     }
-    // Pass all source candidates to makeItems. It fills the requested count
-    // after parsing and deduplication instead of losing slots to skipped rows.
     sourcePool.baseSourceCount = verseRows.length;
-    const selected = sourcePool;
-    selected.distractors = verseRows;
-    return selected;
+    sourcePool.distractors = verseRows;
+    sourcePool.rangeLabel = wholeParsha ? parsha.name + " (" + parsha.ref + ")" : books[book].label + " " + firstChapter + ":" + firstVerse + "–" + lastVerse;
+    return sourcePool;
   }
   const kitzurBook = "Kitzur Shulchan Arukh";
   const kitzurCache = new Map();
