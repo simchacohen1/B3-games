@@ -92,13 +92,27 @@ function dailyRotationPool(){return activeChazaraKeys().filter(baseCanReview)}
 function dailyLimitReached(key){return Number(todayCounts()[key]||0)>=MAX_DAILY_CHazaras}
 function rotationAllows(key){const pool=dailyRotationPool();if(pool.length<=1)return true;if(!pool.includes(key))return false;const counts=todayCounts(),min=Math.min(...pool.map(k=>Number(counts[k]||0)));return Number(counts[key]||0)===min}
 function canReview(key){return baseCanReview(key)&&!dailyLimitReached(key)&&rotationAllows(key)}
+// Refresh the authoritative event list immediately before accepting a review.
+// Event listeners may lag behind a recently completed review, especially across tabs.
+async function refreshDailyRotation(key){
+  const snap=await db.ref(EVENTS+sid).once('value');
+  chazaraEvents=snap.val()||{};
+  if(!canReview(key)){
+    showNotice(reviewLockReason(key)||'Please finish the other pesukim before repeating this one.');
+    render();
+    return false;
+  }
+  return true;
+}
+let lastRotationDate=dayKey();
+setInterval(()=>{const today=dayKey();if(today!==lastRotationDate){lastRotationDate=today;render()}},15000);
 function reviewLockReason(key){if(!baseCanReview(key))return '100% Understand needed after 10';if(dailyLimitReached(key))return 'Maximum 2 Chazaras for this Posuk today';if(!rotationAllows(key))return 'Review the other pesukim first';return ''}
 async function askNormalReview(key){return new Promise(resolve=>{const box=$('confirmBox');$('confirmQuestion').textContent='Did you read and translate '+R(key)+' correctly?';box.classList.remove('hidden');let done=false;const finish=v=>{if(done)return;done=true;box.classList.add('hidden');$('confirmYes').onclick=null;$('confirmNo').onclick=null;resolve(v)};$('confirmYes').onclick=()=>finish(true);$('confirmNo').onclick=()=>finish(false)})}
 async function requestPoints(source,eventId){if(teacherPreview)return null;try{const response=await fetch(POINT_REQUEST_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:sid,source,eventId}),signal:AbortSignal.timeout(15000)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||('HTTP '+response.status));if(eventId&&data.requestId)await db.ref(EVENTS+sid+'/'+eventId).update({pointRequestId:data.requestId,pointRequestStatus:data.status||'pending',pointRequestSyncedAt:firebase.database.ServerValue.TIMESTAMP});if(data.status==='pending'&&Number(data.amount)>0)showNotice('⭐ '+data.amount+' point'+(Number(data.amount)===1?'':'s')+' sent to your teacher for approval.');return data}catch(e){console.warn('Point request will be retried later',e);return null}}
 async function requestRemovalPoints(eventId){if(teacherPreview)return null;try{const response=await fetch(POINT_REQUEST_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:sid,source:'chazara-remove',eventId})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||('HTTP '+response.status));await db.ref(EVENTS+sid+'/'+eventId).update({removalPointSynced:true,removalPointRequestId:data.requestId||null,removalPointRequestStatus:data.status||data.action||'none',removalPointSyncedAt:firebase.database.ServerValue.TIMESTAMP});return data}catch(e){console.warn('Point removal will be retried later',e);return null}}
 async function retryPendingPointSyncs(){try{const snap=await db.ref(EVENTS+sid).once('value');const events=snap.val()||{};for(const [id,e] of Object.entries(events)){if(!e||e.reviewApplied!==true)continue;if(e.removed===true){if(!isRejectedEvent(e)&&e.removalPointSynced!==true)await requestRemovalPoints(id)}else if(isRejectedEvent(e)){continue}else if(!e.pointRequestId){await requestPoints(e.recorded?'chazara-recording':'chazara',id)}}}catch(e){console.warn(e)}}
 async function incrementReview(key){const ref=db.ref(ROOT+sid+'/reviews/'+key),now=Date.now();let out=null;await ref.transaction(cur=>{const c=(cur&&Number(cur.count))||0;out={count:c+1,lastAt:now};return out});d.reviews[key]=out;d.reviewDays[dayKey(now)]=true;await db.ref(ROOT+sid).update({goal:GOAL,name:sname,updatedAt:firebase.database.ServerValue.TIMESTAMP,['reviewDays/'+dayKey(now)]:true});render();return out.count}
-async function normalReview(key){if(recorderState||reviewSubmitting||!canReview(key))return;const yes=await askNormalReview(key);if(!yes)return;if(!canReview(key)){showNotice(reviewLockReason(key)||'That Posuk is not available for another Chazara right now.');render();return}reviewSubmitting=true;try{const eventRef=db.ref(EVENTS+sid).push();const nextCount=(Number(d.reviews[key]?.count)||0)+1;const [perek,posuk]=key.split('_').map(Number);await eventRef.set({id:eventRef.key,studentId:sid,studentName:sname,workspaceClassId:sessionStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[key]?.practiceKey||null,recorded:false,points:1,reviewApplied:false,removed:false,chazaraDate:dayKey(),createdAt:firebase.database.ServerValue.TIMESTAMP,reviewNumber:nextCount});await incrementReview(key);await eventRef.update({reviewApplied:true});chazaraEvents[eventRef.key]={id:eventRef.key,studentId:sid,studentName:sname,workspaceClassId:sessionStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[key]?.practiceKey||null,recorded:false,points:1,reviewApplied:true,removed:false,chazaraDate:dayKey(),createdAt:Date.now(),reviewNumber:nextCount};showCheer();await requestPoints('chazara',eventRef.key)}catch(e){console.error(e);alert('Could not save this Chazara. Please try again.')}finally{reviewSubmitting=false;render()}}
+async function normalReview(key){if(recorderState||reviewSubmitting||!canReview(key))return;const yes=await askNormalReview(key);if(!yes)return;if(!canReview(key)){showNotice(reviewLockReason(key)||'That Posuk is not available for another Chazara right now.');render();return}reviewSubmitting=true;try{if(!await refreshDailyRotation(key))return;const eventRef=db.ref(EVENTS+sid).push();const nextCount=(Number(d.reviews[key]?.count)||0)+1;const [perek,posuk]=key.split('_').map(Number);await eventRef.set({id:eventRef.key,studentId:sid,studentName:sname,workspaceClassId:sessionStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[key]?.practiceKey||null,recorded:false,points:1,reviewApplied:false,removed:false,chazaraDate:dayKey(),createdAt:firebase.database.ServerValue.TIMESTAMP,reviewNumber:nextCount});await incrementReview(key);await eventRef.update({reviewApplied:true});chazaraEvents[eventRef.key]={id:eventRef.key,studentId:sid,studentName:sname,workspaceClassId:sessionStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[key]?.practiceKey||null,recorded:false,points:1,reviewApplied:true,removed:false,chazaraDate:dayKey(),createdAt:Date.now(),reviewNumber:nextCount};showCheer();await requestPoints('chazara',eventRef.key)}catch(e){console.error(e);alert('Could not save this Chazara. Please try again.')}finally{reviewSubmitting=false;render()}}
 async function activeEventsForStudent(){const snap=await db.ref(EVENTS+sid).once('value');chazaraEvents=snap.val()||{};return Object.entries(chazaraEvents).map(([id,e])=>({id,...e})).filter(e=>e&&e.reviewApplied===true&&e.removed!==true&&!isRejectedEvent(e))}
 async function recomputeReviewDays(events){const days={};for(const e of events){const k=eventDay(e);if(k)days[k]=true}d.reviewDays=days;await db.ref(ROOT+sid+'/reviewDays').set(days)}
 function eventKey(e){return K(Number(e.perek),Number(e.posuk))}
@@ -251,9 +265,11 @@ async function finishRecording(st){
   const blob=new Blob(st.chunks,{type:st.recorder.mimeType||'audio/webm'}),soundDetected=st.peak>.018&&st.voiced>=Math.max(4,Math.floor(st.frames*.04));
   if(durationMs<5000||!soundDetected){resetRecordingUI(st,'Please try again.');recorderState=null;return}
   if(!canReview(st.key)){resetRecordingUI(st,reviewLockReason(st.key)||'That Posuk is not available for another Chazara right now.');recorderState=null;render();return}
+  reviewSubmitting=true;
   let saved=false,writeStarted=false,eventId;
   const step=(work,label)=>{st.status.textContent=label+'…';return ChazaraRecordingSave.deadline(work,30000,label)};
   try{
+    if(!await refreshDailyRotation(st.key)){resetRecordingUI(st,reviewLockReason(st.key));return}
     const eventRef=db.ref(EVENTS+sid).push();eventId=eventRef.key;
     const [perek,posuk]=st.key.split('_').map(Number),path='posukPractice/'+sid+'/chazara_'+perek+'_'+posuk+'_'+eventId+'.'+extFor(blob.type);
     st.status.textContent='Saving audio…';
@@ -284,7 +300,7 @@ async function finishRecording(st){
   }catch(error){
     console.error('Recorded Chazara save failed',error);resetRecordingUI(st,'Save did not finish. Your audio is available below.');preserveRecording(blob,st.key,error,writeStarted);
   }finally{
-    recorderState=null;render();renderRecordings();
+    recorderState=null;reviewSubmitting=false;render();renderRecordings();
   }
   // The recording is already saved. Point syncing must never hold its UI open.
   if(saved){showCheer();showNotice('Recording saved. Sending points for teacher approval…');requestPoints('chazara-recording',eventId)}
