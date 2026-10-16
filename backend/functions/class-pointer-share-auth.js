@@ -31,9 +31,15 @@ exports.classPointerShareAuth=onRequest({
   // be locked out by its own successful sharing, and one student cannot spend the class's allowance.
   const sha=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
   const failurePaths=id=>({s:'b3Private/classPointerJoinLimits/s_'+sha(id).slice(0,32),i:'b3Private/classPointerJoinLimits/i_'+sha(req.ip||'unknown').slice(0,32)});
-  const assertNotLimited=async g=>{
-   const now=Date.now(),[a,b]=await Promise.all([db.ref(g.s).once('value').then(x=>x.val()),db.ref(g.i).once('value').then(x=>x.val())]);
-   if(a?.until>now||b?.until>now)error(429,'Too many wrong passcodes. Please wait a few minutes.');
+  const assertStudentNotLimited=async g=>{
+   const row=(await db.ref(g.s).once('value')).val();
+   if(row?.until>Date.now())error(429,'Too many wrong passcodes. Please wait a few minutes.');
+  };
+  const addressIsLimited=async g=>(await db.ref(g.i).once('value')).val()?.until>Date.now();
+  const rejectWrongPasscode=async g=>{
+   if(await addressIsLimited(g))error(429,'Too many wrong passcodes. Please wait a few minutes.');
+   await recordFailure(g);
+   error(401,'Please sign in again.');
   };
   const recordFailure=async g=>{
    const now=Date.now(),bump=(path,max,windowMs)=>db.ref(path).transaction(cur=>{const r=cur&&now-cur.start<windowMs?cur:{start:now,count:0};const count=r.count+1;return {start:r.start,count,until:count>=max?now+windowMs:0}});
@@ -44,13 +50,13 @@ exports.classPointerShareAuth=onRequest({
    if(!(request&&['screens','boards'].includes(request.mode))&&!(session.studentScreenSharing===true&&Number.isFinite(session.shareRequest?.at)))error(403,'There is no active student activity request.');
    if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active===false)error(403,'Student not in this class.');
    const guard=failurePaths(studentId);
-   await assertNotLimited(guard);
+   await assertStudentNotLimited(guard);
    const [profile,code]=await Promise.all([
     db.ref('b3Games/students/'+studentId+'/profile').once('value'),
     readPasscode(p=>db.ref(p).once('value').then(s=>s.val()),studentId,{allowLegacyDefault:false})
    ]);
    if(!profile.val()||profile.val().active===false)error(403,'Inactive student.');
-   if(!code.passcode||!equal(code.passcode,body.pin)){await recordFailure(guard);error(401,'Please sign in again.');}
+   if(!code.passcode||!equal(code.passcode,body.pin))await rejectWrongPasscode(guard);
    const permission=(await db.ref('b3Private/classPointerSharePermissions/'+workspaceId+'/'+classId+'/'+room+'/'+studentId).once('value')).val()||{};
    return res.json({ok:true,screenSharingDenied:permission.screenSharingDenied===true||session.screenSharingDenied?.[studentId]===true,whiteboardDenied:permission.whiteboardDenied===true||session.whiteboardDenied?.[studentId]===true});
   }
@@ -58,14 +64,14 @@ exports.classPointerShareAuth=onRequest({
    if(session.studentScreenSharing!==true)error(403,'Screen sharing is not enabled for this class.');
    if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active===false)error(403,'Student not in this class.');
    const guard=failurePaths(studentId);
-   await assertNotLimited(guard);
+   await assertStudentNotLimited(guard);
    const permission=(await db.ref('b3Private/classPointerSharePermissions/'+workspaceId+'/'+classId+'/'+room+'/'+studentId).once('value')).val();
    // The website currently live still records a teacher's denial on the public session record; the new one uses the private record. Honor both.
    if(permission?.screenSharingDenied===true||session.screenSharingDenied?.[studentId]===true)error(403,'Your teacher has turned off your screen sharing.');
    const profile=(await db.ref('b3Games/students/'+studentId+'/profile').once('value')).val();
    if(!profile||profile.active===false)error(403,'Inactive student.');
    const code=await readPasscode(p=>(db.ref(p).once('value')).then(s=>s.val()),studentId,{allowLegacyDefault:false});
-   if(!code.passcode||!equal(code.passcode,body.pin)){await recordFailure(guard);error(401,'Please sign in again.');}
+   if(!code.passcode||!equal(code.passcode,body.pin))await rejectWrongPasscode(guard);
    // A student's own allowance of successful tickets (25 per 10 minutes), independent of classmates.
    let busy=false;
    await db.ref('b3Private/classPointerShareLimits/ok_'+sha(studentId).slice(0,32)).transaction(previous=>{
@@ -158,12 +164,12 @@ exports.classPointerShareAuth=onRequest({
    if(!validId(studentId)||typeof body.pin!=='string'||!body.pin||body.pin.length>100||!peerOk(body.peerId))error(400,'Invalid join request.');
    // Wrong passcodes share the budget described above (per student and per address).
    const guard=failurePaths(studentId),now=Date.now();
-   await assertNotLimited(guard);
+   await assertStudentNotLimited(guard);
    const profile=await stillMember(studentId);
    if(!profile)error(403,'Student not in this class.');
    // The shared default passcode is never accepted for joining a lesson.
    const code=await readPasscode(p=>(db.ref(p).once('value')).then(s=>s.val()),studentId,{allowLegacyDefault:false});
-   if(!code.passcode||!equal(code.passcode,body.pin)){await recordFailure(guard);error(401,'Please sign in again.');}
+   if(!code.passcode||!equal(code.passcode,body.pin))await rejectWrongPasscode(guard);
    await db.ref(guard.s).set(null);
    const token=crypto.randomBytes(32).toString('hex'),digest=sha(token);
    // One outstanding join ticket per student: a new one replaces the old, so tickets never pile up.
