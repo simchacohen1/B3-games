@@ -7,7 +7,7 @@ const path=require('node:path');
 const base=path.resolve(__dirname,'..');
 const source=fs.readFileSync(path.join(base,'class-pointer-prototype/pdf-library.js'),'utf8');
 
-function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=false,fetchFails=false}={}){
+function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=false,fetchFails=false,promptName=null,uploadFails=false}={}){
   const elements={};
   class E{
     constructor(tag='div'){this.tag=tag;this.children=[];this.textContent='';this.style={};this.disabled=false;}
@@ -28,7 +28,7 @@ function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=fals
   showPdf.textContent='Show a PDF';presentMenu.closestElement=presentWrap;presentMenu.querySelectorAll=()=>[showPdf];
   dock.querySelector=q=>q==='#tbShareMenu'?presentMenu:null;
   presentWrap.querySelector=q=>q==='[data-menu="tbShareMenu"]'?presentToggle:null;
-  let listed=0,fetches=[],loaded=[],page=[];
+  let listed=0,fetches=[],loaded=[],page=[],uploads=[];
   const pdf={name:'Private worksheet.pdf',bucket:'test-bucket',fullPath:'pointerPdfLibrary/teacherA/abc.pdf',
     getDownloadURL(){throw Error('Public download token must never be requested')},
     async getMetadata(){return {name:'abc.pdf',updated:'2026-10-15',customMetadata:{displayName:'Private worksheet',lastPage:'4'}}},
@@ -37,7 +37,12 @@ function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=fals
   };
   const storage={ref(p){return {
     async listAll(){listed++;return {items:[pdf]}},
-    child(id){return {...pdf,name:id,async put(){return {}}}}
+    child(id){return {...pdf,name:id,put(file,metadata){uploads.push({file,metadata});return {on(event,next,reject,resolve){
+      assert.equal(event,'state_changed');
+      next({bytesTransferred:Math.floor(file.size/2),totalBytes:file.size});
+      if(uploadFails){reject(Error('Upload failed'));return}
+      next({bytesTransferred:file.size,totalBytes:file.size});resolve();
+    }}}}}
   }}};
   const auth={currentUser:{uid,async getIdToken(){return 'signed-in-ID-token'}}};
   const w={ClassPointerBridge:{isTeacher:teacher},ClassPointerDashboard:{ready:authorized?Promise.resolve({user:{uid}}):Promise.reject(Error('Teacher class access denied'))},
@@ -46,10 +51,10 @@ function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=fals
   const doc={getElementById:(id)=>id==='teacherPanel'?panel:id==='openPdf'?openPdf:id==='teacherDock'&&dockAvailable?dock:null,
     createElement:(tag)=>new E(tag),body,head};
   const context={window:w,document:doc,location:{href:'https://site.example/class-pointer-prototype/classroom.html?dashboard='+ (teacher?'teacher':'student')+'&class=et'},
-    URL,File,Blob,crypto:{randomUUID(){return 'test-id'}},prompt:()=>null,confirm:()=>true,clearTimeout,setTimeout,
+    URL,File,Blob,crypto:{randomUUID(){return 'test-id'}},prompt:()=>promptName,confirm:()=>true,clearTimeout,setTimeout,
     fetch:async(url,opts)=>{fetches.push({url,opts});if(fetchFails)throw Error('Failed to fetch');return {ok:true,status:200,headers:{get:()=>String(100)},blob:async()=>new Blob(['%PDF-1.7\n'])}}};
   vm.runInNewContext(source,context);
-  return {w,doc,openPdf,dock,presentMenu,presentWrap,showPdf,presentToggle,elements,get listed(){return listed},get fetches(){return fetches},loaded,page};
+  return {w,doc,openPdf,dock,presentMenu,presentWrap,showPdf,presentToggle,elements,get listed(){return listed},get fetches(){return fetches},uploads,loaded,page};
 }
 
 test('student page does not initialize the private library',()=>{
@@ -115,13 +120,46 @@ test('private PDF CORS example only allows known site origins and GET',()=>{
   assert.ok(cors[0].maxAgeSeconds<=3600);
 });
 
+test('500 MB library accepts a 263 MB PDF and reports upload progress',async()=>{
+  const h=harness({promptName:'Children Chumash Vayeira'});
+  const size=263*1024*1024;
+  h.w.PointerPdfLibrary.onOpened({name:'Children Chumash Vayeira.pdf',size});
+  await h.elements['#pointerLibrarySave'].onclick();
+  assert.equal(h.uploads.length,1);
+  assert.equal(h.uploads[0].file.size,size);
+  assert.equal(h.uploads[0].metadata.contentType,'application/pdf');
+  assert.equal(h.elements['#pointerLibraryProgress'].value,100);
+  assert.equal(h.elements['#pointerLibraryProgress'].hidden,false);
+  assert.match(h.elements['#pointerLibraryProgressLabel'].textContent,/100%/);
+  assert.equal(h.elements['#pointerLibraryStatus'].textContent,'Saved privately.');
+  assert.equal(h.elements['#pointerLibrarySave'].disabled,false);
+});
+
+test('oversized PDF is refused and cannot start an upload',async()=>{
+  const h=harness({promptName:'Too big'});
+  h.w.PointerPdfLibrary.onOpened({name:'Giant.pdf',size:500*1024*1024+1});
+  await h.elements['#pointerLibrarySave'].onclick();
+  assert.equal(h.uploads.length,0);
+  assert.match(h.elements['#pointerLibraryStatus'].textContent,/500 MB/);
+});
+
+test('failed upload does not display success or leave Save disabled',async()=>{
+  const h=harness({promptName:'Failed upload',uploadFails:true});
+  h.w.PointerPdfLibrary.onOpened({name:'Worksheet.pdf',size:10*1024*1024});
+  await h.elements['#pointerLibrarySave'].onclick();
+  assert.equal(h.uploads.length,1);
+  assert.match(h.elements['#pointerLibraryStatus'].textContent,/Upload failed/);
+  assert.equal(h.elements['#pointerLibraryProgressLabel'].textContent,'Upload not completed');
+  assert.equal(h.elements['#pointerLibrarySave'].disabled,false);
+});
+
 test('Storage rules are an unmerged fragment; unrelated production Storage is not overwritten',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(base,'firebase.json'),'utf8'));
   assert.equal(config.storage,undefined);
   assert.equal(fs.existsSync(path.join(base,'storage.rules')),false);
   const fragment=fs.readFileSync(path.join(base,'security/pointer-pdf-library.rules.example'),'utf8');
   assert.match(fragment,/request.auth.uid == teacherUid/);
-  assert.match(fragment,/request.resource.size <= 50 \* 1024 \* 1024/);
+  assert.match(fragment,/request.resource.size <= 500 \* 1024 \* 1024/);
   assert.match(fragment,/allow get, list, delete/);
   assert.ok(!/getDownloadURL\s*\(/.test(source));
 });
@@ -144,7 +182,7 @@ test('proposed merged Storage rules preserve user-confirmed existing paths and n
   assert.match(pdf,/allow get, list, delete: if request.auth != null\s*&& request.auth.uid == teacherUid;/);
   assert.match(pdf,/allow create: if request.auth != null\s*&& request.auth.uid == teacherUid/);
   assert.match(pdf,/allow update: if request.auth != null\s*&& request.auth.uid == teacherUid/);
-  assert.match(pdf,/request.resource.size <= 50 \* 1024 \* 1024/);
+  assert.match(pdf,/request.resource.size <= 500 \* 1024 \* 1024/);
   assert.match(pdf,/request.resource.contentType == 'application\/pdf'/);
   assert.match(pdf,/resource.md5Hash == request.resource.md5Hash/);
   assert.ok(!pdf.includes('if true'),'New private PDF rule must never allow public access');
