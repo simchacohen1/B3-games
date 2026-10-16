@@ -1445,7 +1445,11 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     try{r=await studentAuthCall({action:"login",name:typed,pin:enteredPin});}
     catch(e){return{ok:false,reason:e.message,status:e.status}}
     let classId;
-    try{classId=await resolvedStudentClass(r.id,{id:r.id,name:r.name,active:true,classId:r.classId||legacyMigrationClass(r.id)});}
+    if(Array.isArray(r.classChoices)&&r.classChoices.length){
+      studentClassChoices=r.classChoices;
+      const stored=sessionStorage.getItem("b3Games_studentId")===r.id?sessionStorage.getItem("b3Games_studentClass"):"";
+      classId=(studentClassChoices.find(c=>c.id===stored)||studentClassChoices.find(c=>c.id===r.classId)||studentClassChoices[0]).id;
+    }else try{classId=await resolvedStudentClass(r.id,{id:r.id,name:r.name,active:true,classId:r.classId||legacyMigrationClass(r.id)});}
     catch(e){return{ok:false,reason:e.message||"The connection is slow. Please try again."}}
     if(!classId)return{ok:false,reason:"Your class is not assigned yet. Ask your teacher."};
     return{ok:true,id:r.id,name:r.name,classId};
@@ -1454,12 +1458,25 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   let studentClassWatch=null,studentProfileWatch=null,studentMembershipWatch=null;
   let studentAccessRevoked=false;
   async function enterStudent(r){
+    if(!isStudentPreview){
+      const pin=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
+      if(!pin)throw new Error("Please sign in again so your student access can be secured.");
+      const credential=await studentAuthCall({action:"login",name:r.name,pin,classId:r.classId});
+      if(!credential.customToken||!window.firebase?.auth)throw new Error("Could not secure your student sign-in. Please try again.");
+      await firebase.auth().signInWithCustomToken(credential.customToken);
+    }
     if(studentClassWatch)studentClassWatch.off();
     if(studentProfileWatch)studentProfileWatch.off();
     if(studentMembershipWatch)studentMembershipWatch.off();
     studentAccessRevoked=false;
     myStudentId=r.id;myStudentName=r.name;myClassId=r.classId;myClassRecord=null;
-    try{myClassRecord=(await readOnce("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId,8000)).val()||null;}catch(e){}
+    try{
+      const classPath="b3Games/workspaces/"+workspaceId+"/classes/"+myClassId;
+      const fields=["name","active","siteEnabled","access","toolGrants"];
+      const snapshots=await Promise.all([...fields.map(field=>readOnce(classPath+"/"+field,8000)),readOnce(classPath+"/members/"+myStudentId,8000)]);
+      myClassRecord=Object.fromEntries(fields.map((field,i)=>[field,snapshots[i].val()]));
+      myClassRecord.members={[myStudentId]:snapshots[fields.length].val()};
+    }catch(e){}
     if(!isStudentPreview){
       sessionStorage.setItem("b3Games_studentId",myStudentId);
       sessionStorage.setItem("b3Games_studentName",myStudentName);
@@ -1475,8 +1492,15 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     chooser.replaceChildren(...studentClassChoices.map(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;return o;}));
     chooser.value=myClassId;chooser.classList.toggle("hidden",studentClassChoices.length<2);
     chooser.onchange=()=>enterStudent({id:myStudentId,name:myStudentName,classId:chooser.value});
-    if(studentClassWatch)studentClassWatch.off();if(studentProfileWatch)studentProfileWatch.off();if(studentMembershipWatch)studentMembershipWatch.off();studentClassWatch=db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+myClassId);
-    studentClassWatch.on("value",snap=>{myClassRecord=snap.val();if(!myClassRecord||myClassRecord.active===false||!myClassRecord.members?.[myStudentId]||myClassRecord.members[myStudentId].active===false){studentAccessRevoked=true;showLogin();return;}renderStudentAccess();});
+    if(studentClassWatch)studentClassWatch.off();if(studentProfileWatch)studentProfileWatch.off();if(studentMembershipWatch)studentMembershipWatch.off();
+    const classPath="b3Games/workspaces/"+workspaceId+"/classes/"+myClassId;
+    const classRefs=[...(["name","active","siteEnabled","access","toolGrants"].map(field=>({field,ref:db.ref(classPath+"/"+field)}))),{field:"member",ref:db.ref(classPath+"/members/"+myStudentId)}];
+    studentClassWatch={off(){classRefs.forEach(x=>x.ref.off());}};
+    classRefs.forEach(({field,ref})=>ref.on("value",snap=>{
+      if(field==="member")myClassRecord.members={[myStudentId]:snap.val()};else myClassRecord[field]=snap.val();
+      if(myClassRecord.active===false||!myClassRecord.members?.[myStudentId]||myClassRecord.members[myStudentId].active===false){studentAccessRevoked=true;showLogin();return;}
+      renderStudentAccess();
+    }));
     studentProfileWatch=db.ref("b3Games/students/"+myStudentId+"/profile");
     let seenPasscodeUpdate;
     studentProfileWatch.on("value",async snap=>{const v=snap.val();if(v?.active===false){studentAccessRevoked=true;showLogin();return;}
@@ -1562,7 +1586,10 @@ const active=(members[id]?.active!==false&&profile.active!==false);
           showLogin();setLoginMsg("Please sign in once more so all your activities open automatically.");return;
         }
       }
-      const restoredClassId=await resolvedStudentClass(id,d);
+      const identity=await studentAuthCall({action:"login",name:d.name||sessionStorage.getItem("b3Games_studentName")||id,pin:String(sessionStorage.getItem("b3Games_classPin")||"")});
+      studentClassChoices=Array.isArray(identity.classChoices)?identity.classChoices:[];
+      const storedClassId=sessionStorage.getItem("b3Games_studentClass");
+      const restoredClassId=(studentClassChoices.find(c=>c.id===storedClassId)||studentClassChoices.find(c=>c.id===identity.classId)||studentClassChoices[0]||{}).id||await resolvedStudentClass(id,d);
       if(isAuthorizedTeacher)return;
       if(!restoredClassId){showLogin();return;}
       await enterStudent({id:id,name:d.name?String(d.name):(sessionStorage.getItem("b3Games_studentName")||"Student"),classId:restoredClassId});

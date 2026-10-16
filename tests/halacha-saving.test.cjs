@@ -33,5 +33,5 @@ test('student token endpoint validates passcode, requested student and active cl
  assert.match(server,/student\.id!==studentId/);
  assert.match(server,/!enrolled\|\|!cls\|\|cls\.active===false/);
  assert.match(server,/studentTools\.allowed\(cls,studentId,'halacha'\)/);
- assert.match(server,/createCustomToken\(uid,\{b3StudentId:studentId,b3ClassId:classId\}\)/);
+ assert.match(server,/createCustomToken\(uid,\{b3StudentId:studentId,b3ClassId:classId,b3StudentRole:'student'\}\)/);
 });

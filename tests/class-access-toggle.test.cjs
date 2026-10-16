@@ -2,7 +2,7 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const vm = require('node:vm'), fs = require('node:fs');
 function setup() {
   let saved = JSON.stringify({games:{halacha:true,yiddish:false},classGames:{et:{halacha:false},wt:{halacha:false}},classAccess:{et:{mode:'locked'}}}), writes = 0;
-  const context = {window:{},console,Intl,Date,localStorage:{getItem:()=>saved,setItem:(key,value)=>{saved=value;writes++;}}};
+  const context = {window:{},console,Intl,Date,document:{readyState:'complete',addEventListener(){}},localStorage:{getItem:()=>saved,setItem:(key,value)=>{saved=value;writes++;}}};
   vm.runInNewContext(fs.readFileSync('site-settings.js','utf8'),context);
   return {api:context.window.B3SiteSettings,read:()=>JSON.parse(saved),writes:()=>writes};
 }

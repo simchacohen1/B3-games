@@ -1,0 +1,7 @@
+{
+  "database": { "rules": "firebase-rules.hardened.json" },
+  "emulators": {
+    "database": { "port": 9000 },
+    "singleProjectMode": true
+  }
+}
