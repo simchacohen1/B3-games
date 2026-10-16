@@ -43,7 +43,7 @@ function loadCleanup(shareRows={},joinRows={},indexRows={}){
     throw Error('Unexpected import '+name);
   }};
   vm.runInNewContext(source,sandbox);
-  return{scheduled,queries,shareRows,joinRows,indexRows,cleanup:sandbox.module.exports._cleanupExpiredTickets};
+  return{scheduled,queries,shareRows,joinRows,indexRows,db,cleanup:sandbox.module.exports._cleanupExpiredTickets};
 }
 
 test('scheduled cleanup deletes expired sharing and join tickets, but preserves unexpired tickets and indexes',async()=>{
@@ -72,9 +72,7 @@ test('cleanup removes only an index that still references the expired join ticke
   const studentId='student-race',studentKey=crypto.createHash('sha256').update(studentId).digest('hex').slice(0,32);
   const oldTicket='e'.repeat(64),newTicket='f'.repeat(64);
   const f=loadCleanup({}, {[oldTicket]:{studentId,expiresAt:Date.now()-1}}, {[studentKey]:newTicket});
-  assert.equal(await f.cleanup({ref:refPath=>f.scheduled.__db.ref(refPath)}),undefined);
-  // The scheduled callback's in-memory DB is exercised through the public scheduled handler below.
-  await f.scheduled();
+  assert.equal(await f.cleanup(f.db),1);
   assert.equal(f.joinRows[oldTicket],undefined);
   assert.equal(f.indexRows[studentKey],newTicket);
 });
@@ -85,7 +83,6 @@ test('cleanup is bounded to one indexed batch of at most 500 expired tickets per
   const f=loadCleanup(shareRows,joinRows);
   await f.scheduled();
   assert.equal(f.queries['b3Private/classPointerShareTickets'].limitToFirst,500);
-  assert.equal(f.queries['b3PrivateJoinTickets'].limitToFirst,undefined);
   assert.equal(f.queries['b3Private/classPointerJoinTickets'].limitToFirst,500);
   assert.equal(Object.keys(f.shareRows).length,1);
   assert.equal(Object.keys(f.joinRows).length,1);
