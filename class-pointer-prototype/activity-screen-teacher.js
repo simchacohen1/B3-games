@@ -29,8 +29,8 @@
   }
   function close(call){try{call.close()}catch{}}
   function clear(call){
-    const node=screens.get(call);
-    if(node){node.remove();screens.delete(call)}
+    const screen=screens.get(call);
+    if(screen){screen.card.remove();screens.delete(call)}
     tray.hidden=!screens.size;
   }
   async function incomingCall(call){
@@ -56,14 +56,19 @@
       const dismiss=document.createElement('button');dismiss.textContent='Close view';dismiss.type='button';
       dismiss.onclick=()=>{close(call);clear(call)};
       const priorFailure=document.getElementById('activityScreenFailure');if(priorFailure)priorFailure.hidden=true;
-      card.append(heading,video,dismiss);tray.appendChild(card);tray.hidden=false;screens.set(call,card);
-      call.on('stream',stream=>{if(screens.has(call)){video.srcObject=stream;video.play().catch(()=>{})}});
+      card.append(heading,video,dismiss);tray.appendChild(card);tray.hidden=false;screens.set(call,{card,video,studentId:verified.studentId});
+      call.on('stream',stream=>{const screen=screens.get(call);if(screen){screen.video.srcObject=stream;screen.video.play().catch(()=>{})}});
       call.on('close',()=>clear(call));call.on('error',()=>clear(call));
       call.answer();
     }catch(e){console.warn('Class Pointer activity screen rejected:',e?.message||e);reportFailure(e?.message||'Unknown connection error');close(call)}
     return true;
   }
-  window.ClassPointerActivityShares={incomingCall,closeAll(){
+  window.ClassPointerActivityShares={incomingCall,revokeStudents(studentIds){
+    const denied=new Set(Array.isArray(studentIds)?studentIds:[]);
+    for(const [call,screen] of screens){
+      if(denied.has(screen.studentId)){close(call);clear(call)}
+    }
+  },closeAll(){
     for(const call of Array.from(screens.keys())){close(call);clear(call)}
   }};
 })();
