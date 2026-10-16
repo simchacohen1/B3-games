@@ -24,7 +24,18 @@
     let id=sessionStorage.getItem('b3Games_studentId');
     let pin=sessionStorage.getItem('b3Games_classPin');
     if(!id||!pin){
-      await new Promise(resolve=>window.addEventListener('fttStudentSignedIn',resolve,{once:true}));
+      // Some tools initialize the student session after this deferred script runs.
+      // Listen for the homepage event and for same-tab session initialization;
+      // never copy student credentials into persistent cross-tab storage.
+      await new Promise(resolve=>{
+        let checks=0;
+        const timer=setInterval(()=>{
+          if(sessionStorage.getItem('b3Games_studentId')&&sessionStorage.getItem('b3Games_classPin'))finish();
+          else if(++checks>=120)finish();
+        },500);
+        function finish(){clearInterval(timer);window.removeEventListener('fttStudentSignedIn',finish);resolve()}
+        window.addEventListener('fttStudentSignedIn',finish,{once:true});
+      });
       id=sessionStorage.getItem('b3Games_studentId');
       pin=sessionStorage.getItem('b3Games_classPin');
     }
