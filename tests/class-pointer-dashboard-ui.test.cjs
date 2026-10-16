@@ -35,7 +35,7 @@ test('student can keep the screen stream alive in its own window while navigatin
   const windowPage=read('class-pointer-prototype/student-share-window.html');
   assert.match(boards,/window\.open\(url\.href,'classPointerStudentShare'/);
   assert.match(activity,/openPersistentShareWindow/);
-  assert.match(activity,/persistentShareWindow\)\{beginShare/);
+  assert.match(activity,/persistentShareWindow\)return beginShare/);
   assert.match(windowPage,/sessionStorage\.removeItem\(key\)/);
   assert.match(windowPage,/Keep this window open while you visit Shorashim or another activity/);
 });
