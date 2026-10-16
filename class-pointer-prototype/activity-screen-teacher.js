@@ -12,6 +12,15 @@
   tray.id='activityScreenTray';tray.dataset.stageUi='true';tray.hidden=true;
   tray.style.cssText='position:absolute;right:12px;bottom:52px;z-index:8;display:flex;gap:10px;flex-wrap:wrap;max-width:min(90%,700px);max-height:55%;overflow:auto;pointer-events:auto';
   stage.appendChild(tray);
+  const help=document.createElement('div');
+  help.id='activityScreenHelp';help.dataset.stageUi='true';
+  help.style.cssText='position:absolute;right:12px;bottom:52px;z-index:7;max-width:320px;padding:10px 14px;background:#eaf3ff;color:#15345b;border-radius:10px;font:600 13px system-ui;pointer-events:none';
+  help.textContent='Students sharing from Shorashim or another activity appear here after they accept the request. They do not need to join Pointer.';
+  help.hidden=true;stage.appendChild(help);
+  const observer=new MutationObserver(()=>{help.hidden=!tray.hidden||document.getElementById('endClass')?.disabled!==false});
+  observer.observe(tray,{attributes:true,attributeFilter:['hidden']});
+  const lessonButton=document.getElementById('endClass');if(lessonButton)observer.observe(lessonButton,{attributes:true,attributeFilter:['disabled']});
+
   function close(call){try{call.close()}catch{}}
   function clear(call){
     const node=screens.get(call);
