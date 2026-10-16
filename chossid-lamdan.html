@@ -32,7 +32,7 @@ h1{color:var(--blue);margin-bottom:4px}.small{font-size:13px;color:var(--muted)}
 input,textarea,button{font:inherit}input,textarea{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px}input[type=number]{width:85px}
 button{border:0;border-radius:9px;padding:11px 16px;font-weight:800;cursor:pointer}.good{background:var(--good);color:#fff}.secondary{background:#e8f1f7;color:var(--ink)}
 .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}.status{font-weight:700}.back{color:var(--blue);text-decoration:none;font-weight:700}
-.banner{background:#eef7fd;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.banner{background:#eef7fd;border:1px solid var(--line);border-radius:10px;padding:10px 12px}.nigri-grid{display:grid;grid-template-columns:130px 1fr;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:12px 0}.nigri-grid label{background:#edf5fa;border-bottom:1px solid var(--line);padding:10px;font-weight:700}.nigri-grid .field{border-bottom:1px solid var(--line);padding:6px}.nigri-grid label:last-of-type,.nigri-grid .field:last-child{border-bottom:0}.nigri-grid input,.nigri-grid textarea{margin:0}.nigri-grid input[readonly],.nigri-grid textarea[readonly]{background:#f8fbfd}
 @media(max-width:700px){th:nth-child(3),td:nth-child(3){min-width:260px}}
 </style></head>
 <body><div class="wrap">
@@ -40,7 +40,14 @@ button{border:0;border-radius:9px;padding:11px 16px;font-weight:800;cursor:point
 <h1>A Chossid is a Lamdan — Weekly Marks</h1>
 <div class="banner">These are reviewable drafts. Edit any score or comment before syncing. Nothing is saved to Nigri until you press the green button.</div>
 <div class="card">
-<label><b>Week ending</b><input id="date" type="date" style="max-width:190px;margin-left:8px"></label>
+<h2 style="margin-top:0">Nigri Mark Details</h2>
+<div class="small">This is exactly how the mark will be labeled when you sync. Grade changes automatically for ET and WT.</div>
+<div class="nigri-grid">
+  <label>Date</label><div class="field"><input id="date" type="date"></div>
+  <label>Topic</label><div class="field"><input id="topicPreview" type="text" value="A Chossid is a Lamdan" readonly></div>
+  <label>Name</label><div class="field"><input id="namePreview" type="text" value="Parshas Noach"></div>
+  <label>Description</label><div class="field"><textarea id="descriptionPreview" rows="2">Weekly A Chossid is a Lamdan mark for Parshas Noach.</textarea></div>
+</div>
 </div>
 <div id="classes"></div>
 </div>
@@ -81,7 +88,7 @@ function render(){
  const host=document.getElementById('classes');host.innerHTML='';
  data.classes.forEach(cls=>{
   const card=document.createElement('div');card.className='card';card.dataset.classId=cls.id;
-  card.innerHTML='<h2>'+esc(cls.label)+'</h2><table><thead><tr><th>Student</th><th>Mark</th><th>Comment</th></tr></thead><tbody>'+
+  card.innerHTML='<h2>'+esc(cls.label)+'</h2><div class="nigri-grid"><label>Grade</label><div class="field"><input type="text" value="'+esc(cls.label)+'" readonly></div></div><table><thead><tr><th>Student</th><th>Mark</th><th>Comment</th></tr></thead><tbody>'+
   cls.students.map((s,i)=>'<tr><td><b>'+esc(s[0])+'</b></td><td><input type="number" min="0" max="100" value="'+(s[1]??'')+'" data-mark="'+i+'"></td><td><textarea rows="2" data-comment="'+i+'">'+esc(s[2])+'</textarea></td></tr>').join('')+
   '</tbody></table><div class="actions"><button class="good" onclick="syncClass(\''+cls.id+'\',this)">Sync '+esc(cls.label)+' to Nigri</button><span class="status" id="status-'+cls.id+'"></span></div>';
   host.appendChild(card);
@@ -94,7 +101,7 @@ async function syncClass(id,btn){
  const missing=students.filter(s=>s.mark===null||!Number.isFinite(s.mark));
  if(missing.length){status.textContent='Enter a mark for every student before syncing.';return;}
  const date=document.getElementById('date').value;
- const body={class_section:cls.label,topic:'A Chossid is a Lamdan',test_name:'Parshas Noach',type:'test',date,description:'Weekly A Chossid is a Lamdan mark for Parshas Noach.',students};
+ const body={class_section:cls.label,topic:document.getElementById('topicPreview').value.trim()||'A Chossid is a Lamdan',test_name:document.getElementById('namePreview').value.trim()||'Parshas Noach',type:'test',date,description:document.getElementById('descriptionPreview').value.trim(),students};
  if(!confirm('Save '+cls.label+' A Chossid is a Lamdan marks to Nigri?'))return;
  btn.disabled=true;status.textContent='Syncing…';
  try{
