@@ -274,7 +274,7 @@
   // The teacher may pause ("block") one student; then that student sees a short message instead.
   // =====================================================================
   if(!isTeacher){
-    let on=false,mode='boards',blocked=false,board=emptyBoard(),drawer=null,stream=null,call=null;
+    let on=false,mode='boards',blocked=false,board=emptyBoard(),drawer=null,stream=null,call=null,shareWindow=null;
     const view=el('div','boards-view student-board');view.id='myBoard';view.dataset.stageUi='true';view.hidden=true;view.setAttribute('aria-label','My whiteboard');
     const bar=el('div','boards-bar'),title=el('strong','boards-title'),drawGroup=el('span','boards-group');
     const focus=el('div','boards-focus'),surface=el('div','board-fit'),canvas=el('canvas');
@@ -290,7 +290,7 @@
     // Screens mode panel.
     const sharePanel=el('div','board-panel'),shareText=el('p','board-panel-text'),shareNote=el('p','board-panel-note'),preview=el('video','board-preview');
     preview.muted=true;preview.autoplay=true;preview.playsInline=true;preview.hidden=true;
-    const shareBtn=button('🖥 Share entire screen','Choose Entire screen in the browser preview picker',()=>stream?stopShare(true):startShare('screen'),'board-share-btn');
+    const shareBtn=button('🖥 Share entire screen','Open a separate sharing window so sharing continues while you visit other activities',()=>stream?stopShare(true):openShareWindow(),'board-share-btn');
     sharePanel.append(shareText,shareBtn,preview,shareNote);
     // Paused panel.
     const pausedPanel=el('div','board-panel');pausedPanel.append(el('p','board-panel-text','⏸ Your teacher paused this for you.'),el('p','board-panel-note','Please wait. Your teacher can turn it back on.'));
@@ -301,12 +301,20 @@
       title.textContent=mode==='screens'?'🖥 Share my screen':'📝 My board';
       drawGroup.hidden=!boardsOn;surface.hidden=!boardsOn;sharePanel.hidden=!screensOn;pausedPanel.hidden=!(on&&blocked);
       editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';
-      shareText.textContent=stream?'✅ Your entire screen is being shared with your teacher.':'Choose Entire Screen. Your browser will ask you to approve sharing, and you can stop at any time.';
-      shareBtn.textContent=stream?'⏹ Stop sharing':'🖥 Share entire screen';shareBtn.classList.toggle('sharing',!!stream);
+      shareText.textContent=stream?'✅ Your screen is being shared from this Pointer page.':'Open the separate sharing window to approve Entire Screen. Keep it open while you visit other activities.';
+      shareBtn.textContent=stream?'⏹ Stop sharing':(shareWindow&&!shareWindow.closed?'↗ Sharing window open':'🖥 Share entire screen');shareBtn.classList.toggle('sharing',!!stream||!!(shareWindow&&!shareWindow.closed));
       preview.hidden=!stream;if(stream&&preview.srcObject!==stream){preview.srcObject=stream;preview.play().catch(()=>{})}if(!stream)preview.srcObject=null;
       full.textContent=expanded()?'⤢ Exit full screen':'⛶ Full screen';
     }
     const redraw=scheduler(()=>{if(view.hidden)return;ui();if(!surface.hidden){fit(focus,surface);paint(canvas,board,drawer?.draft())}});
+    function openShareWindow(){
+      if(shareWindow&&!shareWindow.closed){shareWindow.focus?.();return}
+      const url=new URL('student-share-window.html?pointerShare=1',location.href);
+      shareWindow=window.open(url.href,'classPointerStudentShare','popup,width=560,height=740');
+      if(shareWindow){shareNote.textContent='Sharing window opened. Approve Entire Screen there and leave it open while visiting activities.';shareWindow.focus?.();return}
+      shareNote.textContent='Your browser blocked the separate window. You can share from this page, but navigation will stop sharing.';
+      void startShare('screen');
+    }
     function act(op){if(!on||mode!=='boards'||blocked)return;if(applyOp(board,op,'student'))B.sendTeacher(op);redraw()}
     drawer=attachDrawing(canvas,{by:'student',tools,enabled:()=>on&&mode==='boards'&&!blocked,board:()=>board,apply:act,send:op=>{if(on&&mode==='boards'&&!blocked)B.sendTeacher(op)},redraw});
 
