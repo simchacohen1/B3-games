@@ -5352,6 +5352,33 @@ function startTranslationSilenceDetector(stream, idx){
   }
 }
 
+// Microphone permission prompts can remain unanswered indefinitely. Fail safely
+// and close a stream if the browser grants permission after the timeout.
+function requestRecordingMicrophone(timeoutMs=15000){
+  return new Promise((resolve,reject)=>{
+    let settled=false;
+    const timeout=setTimeout(()=>{
+      if(settled)return;
+      settled=true;
+      const err=new Error('Microphone request timed out');err.name='TimeoutError';
+      reject(err);
+    },timeoutMs);
+    let request;
+    try{request=navigator.mediaDevices.getUserMedia({audio:true});}
+    catch(err){clearTimeout(timeout);settled=true;reject(err);return;}
+    Promise.resolve(request).then(stream=>{
+      if(settled){stream.getTracks().forEach(t=>t.stop());return;}
+      settled=true;clearTimeout(timeout);resolve(stream);
+    },err=>{if(settled)return;settled=true;clearTimeout(timeout);reject(err);});
+  });
+}
+function recordingMicrophoneError(err){
+  if(err&&err.name==='NotAllowedError')return 'Microphone blocked. Allow microphone access in your browser settings, then tap the piece again.';
+  if(err&&err.name==='NotFoundError')return 'No microphone was found. Connect a microphone and try again.';
+  if(err&&err.name==='NotReadableError')return 'The microphone is busy or unavailable. Close other apps using it and try again.';
+  if(err&&err.name==='TimeoutError')return 'Still waiting for microphone permission. Check your browser permission prompt, then tap again.';
+  return 'Could not start the microphone. Check microphone permission and try again.';
+}
 async function startTranslationPillRecording(idx){
   if(translationPillPhase!=='arming'||translationHoldTargetIndex!==idx) return;
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined'){
@@ -5359,7 +5386,7 @@ async function startTranslationPillRecording(idx){
     translationPillPhase='idle';translationHoldTargetIndex=null;renderCurrentChunk();return;
   }
   try{
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const stream=await requestRecordingMicrophone();
     if(translationPillPhase!=='arming'||translationHoldTargetIndex!==idx){stream.getTracks().forEach(t=>t.stop());return;}
     let opts={audioBitsPerSecond:32000};
     const types=['audio/webm;codecs=opus','audio/mp4','audio/aac','audio/ogg;codecs=opus'];
@@ -5387,9 +5414,15 @@ async function startTranslationPillRecording(idx){
     };
     translationRecorder.start();
   }catch(err){
-    console.error(err);translationPillPhase='idle';translationHoldTargetIndex=null;
-    alert('Could not access the microphone. Please allow microphone permission.');
-    document.getElementById('translationStatus').textContent='Microphone permission needed';renderCurrentChunk();
+    console.error('Translation microphone startup failed:',err);
+    if(translationHoldStartTimer){clearTimeout(translationHoldStartTimer);translationHoldStartTimer=null;}
+    if(translationMaxTimer){clearTimeout(translationMaxTimer);translationMaxTimer=null;}
+    stopTranslationSilenceDetector();
+    if(translationStream){translationStream.getTracks().forEach(t=>t.stop());translationStream=null;}
+    translationRecorder=null;translationSessionActive=false;
+    translationPillPhase='idle';translationHoldTargetIndex=null;translationPendingArmIdx=null;
+    document.getElementById('translationStatus').textContent=recordingMicrophoneError(err);
+    renderCurrentChunk();
   }
 }
 
