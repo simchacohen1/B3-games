@@ -7,19 +7,26 @@ const path=require('node:path');
 const base=path.resolve(__dirname,'..');
 const source=fs.readFileSync(path.join(base,'class-pointer-prototype/pdf-library.js'),'utf8');
 
-function harness({teacher=true,authorized=true,uid='teacherA'}={}){
+function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=false}={}){
   const elements={};
   class E{
     constructor(tag='div'){this.tag=tag;this.children=[];this.textContent='';this.style={};this.disabled=false;}
     after(value){this.afterElement=value;}
     append(...xs){this.children.push(...xs)}
     replaceChildren(...xs){this.children=[...xs]}
-    addEventListener(){}
+    addEventListener(type,handler){this.listeners??={};this.listeners[type]=handler}
+    click(){this.listeners?.click?.();this.onclick?.()}
+    closest(){return this.closestElement||null}
+    querySelectorAll(){return []}
     showModal(){this.open=true}
     close(){this.open=false}
     querySelector(q){return elements[q]||(elements[q]=new E('button'))}
   }
   const openPdf=new E('button'),panel=new E('section'),body=new E('body'),head=new E('head');
+  const dock=new E('div'),presentMenu=new E('div'),presentWrap=new E('div'),showPdf=new E('button'),presentToggle=new E('button');
+  showPdf.textContent='Show a PDF';presentMenu.closestElement=presentWrap;presentMenu.querySelectorAll=()=>[showPdf];
+  dock.querySelector=q=>q==='#tbShareMenu'?presentMenu:null;
+  presentWrap.querySelector=q=>q==='[data-menu="tbShareMenu"]'?presentToggle:null;
   let listed=0,fetches=[],loaded=[],page=[];
   const pdf={name:'Private worksheet.pdf',bucket:'test-bucket',fullPath:'pointerPdfLibrary/teacherA/abc.pdf',
     getDownloadURL(){throw Error('Public download token must never be requested')},
@@ -35,13 +42,13 @@ function harness({teacher=true,authorized=true,uid='teacherA'}={}){
   const w={ClassPointerBridge:{isTeacher:teacher},ClassPointerDashboard:{ready:authorized?Promise.resolve({user:{uid}}):Promise.reject(Error('Teacher class access denied'))},
     firebase:{auth:()=>auth,storage:()=>storage},
     ClassPointerPdf:{async openFile(file){loaded.push(file);return true},goToPage(i){page.push(i)},currentPage(){return 3}}};
-  const doc={getElementById:(id)=>id==='teacherPanel'?panel:id==='openPdf'?openPdf:null,
+  const doc={getElementById:(id)=>id==='teacherPanel'?panel:id==='openPdf'?openPdf:id==='teacherDock'&&dockAvailable?dock:null,
     createElement:(tag)=>new E(tag),body,head};
   const context={window:w,document:doc,location:{href:'https://site.example/class-pointer-prototype/classroom.html?dashboard='+ (teacher?'teacher':'student')+'&class=et'},
     URL,File,Blob,crypto:{randomUUID(){return 'test-id'}},prompt:()=>null,confirm:()=>true,clearTimeout,setTimeout,
     fetch:async(url,opts)=>{fetches.push({url,opts});return {ok:true,status:200,headers:{get:()=>String(100)},blob:async()=>new Blob(['%PDF-1.7\n'])}}};
   vm.runInNewContext(source,context);
-  return {w,doc,openPdf,elements,get listed(){return listed},get fetches(){return fetches},loaded,page};
+  return {w,doc,openPdf,dock,presentMenu,presentWrap,showPdf,presentToggle,elements,get listed(){return listed},get fetches(){return fetches},loaded,page};
 }
 
 test('student page does not initialize the private library',()=>{
@@ -49,6 +56,21 @@ test('student page does not initialize the private library',()=>{
   assert.equal(h.openPdf.afterElement,undefined);
   assert.equal(h.w.PointerPdfLibrary,undefined);
 });
+test('PDF Library button is visible in teaching dock and Present menu',()=>{
+  const h=harness({dockAvailable:true});
+  const trigger=h.presentWrap.afterElement;
+  assert.equal(trigger.id,'pointerPdfLibrary');
+  assert.equal(trigger.textContent,'📚 PDF Library');
+  assert.ok(trigger.className.includes('tb-btn'));
+  assert.equal(h.openPdf.afterElement,undefined,'do not insert under hidden session controls');
+  const presentOption=h.showPdf.afterElement;
+  assert.equal(presentOption.textContent,'📚 My PDF Library');
+  h.presentMenu.hidden=false;
+  presentOption.click();
+  assert.equal(h.presentMenu.hidden,true);
+  assert.equal(h.elements['#pointerLibraryStatus'].textContent,'Loading…');
+});
+
 test('unauthorized teacher URL cannot list stored PDFs',async()=>{
   const h=harness({authorized:false});
   h.openPdf.afterElement.onclick();
