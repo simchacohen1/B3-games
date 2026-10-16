@@ -178,15 +178,16 @@
         ? (Number(document.getElementById("delaySeconds")?.value) || 10) * 1000 : 0;
       gameRef.transaction(current => {
         if (!current || current.roundToken !== token || !current.narrationLocked) return;
-        const unlockAt = serverNow() + delay;
+        // Always give every child a visible 3-second ready countdown after narration.
+        // A longer teacher-configured delay still takes precedence.
+        const unlockAt = serverNow() + Math.max(3000, delay);
         current.narrationLocked = false;
         current.buzzUnlockAt = unlockAt;
         current.buzzOpenAt = unlockAt;
         return current;
       }, (err, committed) => {
         if (err) document.getElementById("soundStatus").textContent = "Could not open buzzers after reading. Use the stop-reading button.";
-        else if (committed) document.getElementById("soundStatus").textContent = delay
-          ? "Reading complete. Buzzer countdown started." : "Reading complete. Buzzers open!";
+        else if (committed) document.getElementById("soundStatus").textContent = "Reading complete. Three-second (or longer) buzzer countdown started.";
       });
     }
     function speakAndRelease(q,token) {
