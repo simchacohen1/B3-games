@@ -162,7 +162,8 @@ test('student connection IDs are generated locally without a server ID request',
 test('activity share request waits for permission and shows dismissible centered consent once',()=>{
  const script=fs.readFileSync(require.resolve('../class-pointer-prototype/activity-share.js'),'utf8');
  assert.match(script,/cancel\.addEventListener\('click'/);
- assert.match(script,/choose\.addEventListener\('click',event=>\{if\(active&&!busy\)return beginShare\(event\)\}/);
+ assert.match(script,/persistentShareWindow\)\{beginShare\(event\);return\}/);
+ assert.match(script,/if\(!openPersistentShareWindow\(\)\)beginShare\(event\)/);
  const start=script.indexOf('function routeTeacherRequest(session)');
  const end=script.indexOf('function stop()',start);
  assert.ok(start>0&&end>start,'student request handler is present');
