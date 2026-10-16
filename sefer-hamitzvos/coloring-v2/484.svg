@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+<rect width="1200" height="1200" fill="#fff"/>
+<g fill="#fff" stroke="#171717" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<rect x="20" y="20" width="1160" height="1160" rx="18" stroke-width="16"/>
+
+<!-- Scenery and refuge city; hills, trees, and walls -->
+<path d="M37 490 Q160 385 283 451 Q381 354 481 407 Q540 334 611 383" stroke-width="6"/>
+<path d="M34 615 Q131 542 245 592 Q350 494 488 552" stroke-width="6"/>
+<path d="M33 752 Q177 708 343 730"/>
+<path d="M670 790 L670 278 L731 278 L731 226 L781 226 L781 279 L838 279 L838 227 L888 227 L888 279 L954 279 L954 226 L1016 226 L1016 279 L1078 279 L1078 226 L1142 226 L1142 817 Z"/>
+<rect x="692" y="345" width="434" height="36" rx="7"/>
+<path d="M722 790 V522 Q722 432 813 432 L985 432 Q1080 432 1080 529 V790 Z" stroke-width="13"/>
+<path d="M768 789 V532 Q768 481 822 481 L981 481 Q1033 481 1033 530 V789" stroke-width="5"/>
+<path d="M870 483 V785 M809 503 L809 779 M991 501 L991 779" stroke-width="5"/>
+<path d="M714 416 H1105 M721 605 H1084 M690 707 H724 M1080 704 H1142" stroke-width="4"/>
+<path d="M702 470 H721 M1083 470 H1129 M705 548 H722 M1084 548 H1128" stroke-width="5"/>
+<rect x="809" y="304" width="221" height="112" rx="12" stroke-width="11"/>
+<path d="M826 391 L1010 391"/>
+<text x="917" y="371" text-anchor="middle" fill="#181818" stroke="none" font-size="44" font-weight="bold" font-family="serif" direction="rtl">עיר מקלט</text>
+<!-- Wall stones -->
+<path d="M700 312 V345 M770 311 V344 M851 310 V344 M941 309 V344 M1031 308 V345 M1112 311 V346" stroke-width="4"/>
+<path d="M703 402 H790 M1053 402 H1127 M690 657 H722 M1083 659 H1140" stroke-width="4"/>
+<!-- Tall tree -->
+<path d="M151 781 L169 352 L188 344 L207 789 Z" stroke-width="10"/>
+<path d="M170 456 Q100 431 74 373 M185 518 Q275 466 289 378 M177 584 Q108 572 70 528" fill="none" stroke-width="14"/>
+<path d="M79 383 Q11 380 58 316 Q25 272 80 253 Q70 199 128 203 Q155 162 199 194 Q249 174 259 228 Q329 229 305 280 Q353 315 300 348 Q287 401 232 375 Q171 426 131 383 Z" stroke-width="9"/>
+<path d="M111 263 Q137 293 115 321 M212 233 Q194 274 221 310 M258 329 Q223 317 208 352" fill="none" stroke-width="5"/>
+<!-- Path to city, shrubs and cobbles -->
+<path d="M430 1173 Q490 998 686 866 Q743 824 839 793 M845 1175 Q806 1030 916 913 Q952 861 1004 806" fill="none" stroke-width="11"/>
+<path d="M36 961 Q98 909 151 941 Q213 894 265 951 Q291 917 329 965 M1021 1018 Q1068 970 1138 1002" stroke-width="8"/>
+<path d="M500 1073 Q533 1035 580 1044 M640 992 Q681 965 716 983 M771 892 Q803 861 844 873" fill="none" stroke-width="5"/>
+
+<!-- Walking traveler, dignified head covering, robe and bag -->
+<path d="M308 1020 L345 702 Q365 655 428 661 L468 697 L491 1059 Q399 1118 298 1060 Z" stroke-width="12"/>
+<path d="M351 727 Q340 821 333 951 M457 738 L461 1013 M351 976 Q415 1002 470 970" fill="none" stroke-width="5"/>
+<path d="M366 643 Q355 595 373 568 Q405 536 434 572 Q461 600 444 639 L421 661 L386 661 Z" stroke-width="9"/>
+<path d="M359 587 Q367 539 404 537 Q441 533 456 590 Q406 578 359 587 Z" stroke-width="9"/>
+<path d="M361 588 Q399 558 452 589" fill="none" stroke-width="5"/>
+<path d="M370 632 Q392 660 421 644" fill="none" stroke-width="5"/>
+<path d="M341 732 Q288 763 293 850 Q307 863 322 853 L370 787" stroke-width="12"/>
+<path d="M478 720 Q515 770 503 823 Q491 838 472 824 L454 766" stroke-width="12"/>
+<path d="M285 832 Q291 856 307 860 Q326 855 320 828" stroke-width="5"/>
+<rect x="266" y="782" width="50" height="79" rx="15" stroke-width="8"/>
+<path d="M307 764 Q271 701 320 683 L357 694" stroke-width="8" fill="none"/>
+<path d="M371 1053 L366 1116 L409 1122 L419 1071 M440 1076 L441 1124 L486 1114 L475 1057" stroke-width="10"/>
+<path d="M365 1112 Q348 1142 367 1149 L419 1149 Q440 1140 414 1118 M437 1118 Q431 1141 458 1148 L497 1142 Q507 1132 483 1115" stroke-width="7"/>
+
+<!-- Welcoming elder at gate -->
+<path d="M990 810 Q959 796 957 749 Q959 697 1002 678 Q1044 689 1065 739 L1073 816 Q1045 848 990 810 Z" stroke-width="10"/>
+<ellipse cx="1018" cy="648" rx="41" ry="49" stroke-width="9"/>
+<path d="M975 636 Q983 600 1022 597 Q1060 604 1065 639 Z" stroke-width="9"/>
+<path d="M1000 680 Q1018 731 1046 680 Q1037 746 1008 750 Q988 713 1000 680 Z" stroke-width="7"/>
+<circle cx="1004" cy="644" r="3" fill="#111" stroke="none"/><circle cx="1038" cy="644" r="3" fill="#111" stroke="none"/>
+<path d="M958 748 Q921 753 886 789 Q868 805 878 821 Q892 830 906 821 L959 796" stroke-width="11"/>
+<path d="M1066 749 L1118 830 Q1126 853 1103 862 Q1084 857 1073 834 L1039 794" stroke-width="10"/>
+<path d="M984 814 L976 1077 Q1015 1101 1082 1078 L1073 807" stroke-width="10"/>
+<path d="M1001 837 V1023 M1052 830 V1030" fill="none" stroke-width="5"/>
+<path d="M978 1071 L977 1120 L1023 1125 L1031 1088 M1045 1083 L1048 1126 L1090 1123 L1080 1079" stroke-width="9"/>
+</g></svg>
