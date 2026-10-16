@@ -7,7 +7,7 @@ const path=require('node:path');
 const base=path.resolve(__dirname,'..');
 const source=fs.readFileSync(path.join(base,'class-pointer-prototype/pdf-library.js'),'utf8');
 
-function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=false}={}){
+function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=false,fetchFails=false}={}){
   const elements={};
   class E{
     constructor(tag='div'){this.tag=tag;this.children=[];this.textContent='';this.style={};this.disabled=false;}
@@ -47,7 +47,7 @@ function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=fals
     createElement:(tag)=>new E(tag),body,head};
   const context={window:w,document:doc,location:{href:'https://site.example/class-pointer-prototype/classroom.html?dashboard='+ (teacher?'teacher':'student')+'&class=et'},
     URL,File,Blob,crypto:{randomUUID(){return 'test-id'}},prompt:()=>null,confirm:()=>true,clearTimeout,setTimeout,
-    fetch:async(url,opts)=>{fetches.push({url,opts});return {ok:true,status:200,headers:{get:()=>String(100)},blob:async()=>new Blob(['%PDF-1.7\n'])}}};
+    fetch:async(url,opts)=>{fetches.push({url,opts});if(fetchFails)throw Error('Failed to fetch');return {ok:true,status:200,headers:{get:()=>String(100)},blob:async()=>new Blob(['%PDF-1.7\n'])}}};
   vm.runInNewContext(source,context);
   return {w,doc,openPdf,dock,presentMenu,presentWrap,showPdf,presentToggle,elements,get listed(){return listed},get fetches(){return fetches},loaded,page};
 }
@@ -94,6 +94,27 @@ test('authorized teacher lists and reopens using Firebase ID token, never a publ
   assert.equal(h.loaded.length,1);
   assert.equal(h.page[0],3);
 });
+test('private-download network/CORS failures explain next step and leave saved file untouched',async()=>{
+  const h=harness({fetchFails:true});
+  h.elements['.session-controls'].afterElement.onclick();
+  await new Promise(setImmediate);
+  const row=h.elements['#pointerLibraryItems'].children[0];
+  await row.children[1].onclick();
+  assert.match(h.elements['#pointerLibraryStatus'].textContent,/Cloud Storage bucket CORS setting/);
+  assert.match(h.elements['#pointerLibraryStatus'].textContent,/GET from https:\/\/funtorahtools.com/);
+  assert.equal(h.elements['#pointerLibraryItems'].children.length,1);
+  assert.equal(h.loaded.length,0);
+});
+
+test('private PDF CORS example only allows known site origins and GET',()=>{
+  const cors=JSON.parse(fs.readFileSync(path.join(base,'security/pointer-pdf-library-cors.example.json'),'utf8'));
+  assert.equal(cors.length,1);
+  assert.deepEqual(cors[0].method,['GET']);
+  assert.ok(cors[0].origin.includes('https://funtorahtools.com'));
+  assert.ok(!cors[0].origin.includes('*'));
+  assert.ok(cors[0].maxAgeSeconds<=3600);
+});
+
 test('Storage rules are an unmerged fragment; unrelated production Storage is not overwritten',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(base,'firebase.json'),'utf8'));
   assert.equal(config.storage,undefined);
