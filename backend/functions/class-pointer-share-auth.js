@@ -55,6 +55,15 @@ exports.classPointerShareAuth=onRequest({
    const claims=await admin.auth().verifyIdToken(auth[1]);
    // The published session belongs to this exact Firebase-authenticated teacher.
    if(session.teacherUid!==claims.uid)error(403,'This session belongs to another teacher.');
+   const [adminSnap,teacherSnap]=await Promise.all([
+     db.ref('b3Games/admins/'+claims.uid).once('value'),
+     db.ref('b3Games/workspaces/'+workspaceId+'/teachers/'+claims.uid).once('value')
+   ]);
+   const adminRecord=adminSnap.val(),teacherRecord=teacherSnap.val();
+   const bootstrapAdmin=claims.email_verified===true&&String(claims.email||'').toLowerCase()==='simcha5770@gmail.com';
+   const activeAdmin=!!adminRecord&&adminRecord.active!==false;
+   const assignedTeacher=teacherRecord?.active===true&&teacherRecord.classIds?.[classId]===true;
+   if(!bootstrapAdmin&&!activeAdmin&&!assignedTeacher)error(403,'Teacher is no longer active or assigned to this class.');
    const token=String(body.token||'');
    if(!/^[a-f0-9]{64}$/.test(token))error(400,'Invalid sharing ticket.');
    const digest=crypto.createHash('sha256').update(token).digest('hex');
@@ -64,7 +73,7 @@ exports.classPointerShareAuth=onRequest({
    const ticketRef=db.ref('b3Private/classPointerShareTickets/'+digest);
    const now=Date.now();
    const used=await ticketRef.transaction(row=>{
-     if(!row||row.expiresAt<now||row.room!==room||row.classId!==classId)return;
+     if(!row||row.expiresAt<=now||row.room!==room||row.classId!==classId)return;
      if(row.verifiedBy){
        if(row.verifiedBy!==claims.uid||!Number.isFinite(row.verifiedAt)||now-row.verifiedAt>30000)return;
        return row;

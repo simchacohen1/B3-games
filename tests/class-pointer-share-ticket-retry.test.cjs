@@ -14,6 +14,7 @@ function fixture(){
     [base,{active:true,members:{arik:{active:true}}}],
     [base+'/members/arik',{active:true}],
     [base+'/classPointerSessions/'+room,{roomId:room,createdAt:Date.now(),studentScreenSharing:true,teacherUid:'teacher-et'}],
+    ['b3Games/workspaces/b3-2026/teachers/teacher-et',{active:true,classIds:{et:true}}],
     ['b3Games/students/arik/profile',{name:'Arik',active:true}]
   ]);
   const ref=path=>({
@@ -58,20 +59,34 @@ test('a ticket cannot be verified by a different teacher',async()=>{
   const result=await f.post({action:'verify',classId:'et',room:f.room,token:issue.body.token},'other-teacher');
   assert.equal(result.statusCode,403);
 });
+test('a teacher whose class assignment was revoked cannot verify an issued ticket',async()=>{
+  const f=fixture(),issue=await f.post({action:'issue',studentId:'arik',pin:'123456',classId:'et',room:f.room});
+  f.rows.set('b3Games/workspaces/b3-2026/teachers/teacher-et',{active:true,classIds:{et:false}});
+  const result=await f.post({action:'verify',classId:'et',room:f.room,token:issue.body.token},'teacher-et');
+  assert.equal(result.statusCode,403);
+  assert.match(result.body.error,/no longer active or assigned/);
+});
+test('an inactive teacher cannot verify an issued ticket',async()=>{
+  const f=fixture(),issue=await f.post({action:'issue',studentId:'arik',pin:'123456',classId:'et',room:f.room});
+  f.rows.set('b3Games/workspaces/b3-2026/teachers/teacher-et',{active:false,classIds:{et:true}});
+  const result=await f.post({action:'verify',classId:'et',room:f.room,token:issue.body.token},'teacher-et');
+  assert.equal(result.statusCode,403);
+});
 test('an ET ticket cannot be replayed against the WT class session',async()=>{
   const f=fixture(),issue=await f.post({action:'issue',studentId:'arik',pin:'123456',classId:'et',room:f.room});
   const base='b3Games/workspaces/b3-2026/classes/wt';
   f.rows.set(base,{active:true,members:{arik:{active:true}}});
   f.rows.set(base+'/members/arik',{active:true});
   f.rows.set(base+'/classPointerSessions/'+f.room,{roomId:f.room,createdAt:Date.now(),studentScreenSharing:true,teacherUid:'teacher-et'});
+  f.rows.set('b3Games/workspaces/b3-2026/teachers/teacher-et',{active:true,classIds:{et:true,wt:false}});
   const result=await f.post({action:'verify',classId:'wt',room:f.room,token:issue.body.token},'teacher-et');
   assert.equal(result.statusCode,403);
 });
-test('expired tickets remain invalid',async()=>{
+test('tickets are invalid at and after their expiry time',async()=>{
   const f=fixture(),issue=await f.post({action:'issue',studentId:'arik',pin:'123456',classId:'et',room:f.room});
   const crypto=require('node:crypto'),digest=crypto.createHash('sha256').update(issue.body.token).digest('hex');
   const path='b3Private/classPointerShareTickets/'+digest;
-  f.rows.get(path).expiresAt=Date.now()-1;
+  f.rows.get(path).expiresAt=Date.now();
   const result=await f.post({action:'verify',classId:'et',room:f.room,token:issue.body.token},'teacher-et');
   assert.equal(result.statusCode,403);
 });
