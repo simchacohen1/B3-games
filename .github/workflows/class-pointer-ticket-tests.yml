@@ -35,6 +35,6 @@ jobs:
       - name: Install Chromium for simulated media test
         run: npx playwright install --with-deps chromium
       - name: Run authorization and simulated connection tests
-        run: node --test tests/class-pointer-join-ticket.test.cjs tests/class-pointer-share-ticket-retry.test.cjs tests/class-pointer-ticket-cleanup.test.cjs tests/class-pointer-session-rules.test.cjs tests/class-pointer-activity-screen-e2e.test.cjs tests/class-pointer-sharing-cache.test.cjs
+        run: node --test tests/class-pointer-join-ticket.test.cjs tests/class-pointer-share-ticket-retry.test.cjs tests/class-pointer-ticket-cleanup.test.cjs tests/class-pointer-session-rules.test.cjs tests/class-pointer-activity-screen-e2e.test.cjs tests/class-pointer-sharing-cache.test.cjs tests/class-pointer-dashboard-ui.test.cjs
       - name: Run browser screen receiver test
         run: npx playwright test e2e/class-pointer-activity-screen.spec.cjs --project=chromium --workers=1
