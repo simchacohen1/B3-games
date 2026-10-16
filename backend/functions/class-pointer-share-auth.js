@@ -117,6 +117,89 @@ exports.classPointerShareAuth=onRequest({
    if(!profile||profile.active===false||!member||member.active===false)error(403,'Student no longer belongs to this class.');
    return res.json({ok:true,studentId:ticket.studentId,studentName:String(profile.name||'Student').slice(0,32)});
   }
+  // ---- Join tickets: only a verified class member may connect to the teacher's room. ----
+  // The room id is public (the session is published so classmates can find it), so joining
+  // must not depend on knowing it. A student proves their own passcode here, and gets a
+  // 90-second ticket bound to this class, session, student and the student's own PeerJS id.
+  // The teacher page verifies the ticket (signed in as the session owner) before accepting
+  // the connection, and takes the student's id and name only from the verified result.
+  const peerOk=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{8,80}$/.test(s);
+  const sha=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
+  const teacherSessionOwner=async()=>{
+   const auth=String(req.headers.authorization||'').match(/^Bearer (.+)$/);
+   if(!auth)error(401,'Teacher sign-in required.');
+   const claims=await admin.auth().verifyIdToken(auth[1]);
+   if(session.teacherUid!==claims.uid)error(403,'This session belongs to another teacher.');
+   const [adminSnap,teacherSnap]=await Promise.all([
+    db.ref('b3Games/admins/'+claims.uid).once('value'),
+    db.ref('b3Games/workspaces/'+workspaceId+'/teachers/'+claims.uid).once('value')
+   ]);
+   const adminRecord=adminSnap.val(),teacherRecord=teacherSnap.val();
+   const bootstrapAdmin=claims.email_verified===true&&String(claims.email||'').toLowerCase()==='simcha5770@gmail.com';
+   const activeAdmin=!!adminRecord&&adminRecord.active!==false;
+   const assignedTeacher=teacherRecord?.active===true&&teacherRecord.classIds?.[classId]===true;
+   if(!bootstrapAdmin&&!activeAdmin&&!assignedTeacher)error(403,'Teacher is no longer active or assigned to this class.');
+   return claims;
+  };
+  const stillMember=async id=>{
+   if(!validId(id)||!cls.members?.[id]||cls.members[id].active===false)return null;
+   const [profileSnap,memberSnap]=await Promise.all([db.ref('b3Games/students/'+id+'/profile').once('value'),db.ref(base+'/members/'+id).once('value')]);
+   const profile=profileSnap.val(),member=memberSnap.val();
+   if(!profile||profile.active===false||!member||member.active===false)return null;
+   return profile;
+  };
+  if(action==='joinIssue'){
+   if(!validId(studentId)||typeof body.pin!=='string'||!body.pin||body.pin.length>100||!peerOk(body.peerId))error(400,'Invalid join request.');
+   // Wrong passcodes are counted per student and per address; a correct one clears the student's count.
+   const now=Date.now(),sPath='b3Private/classPointerJoinLimits/s_'+sha(studentId).slice(0,32),iPath='b3Private/classPointerJoinLimits/i_'+sha(req.ip||'unknown').slice(0,32);
+   const [sRow,iRow]=await Promise.all([db.ref(sPath).once('value').then(s=>s.val()),db.ref(iPath).once('value').then(s=>s.val())]);
+   if((sRow?.until>now)||(iRow?.until>now))error(429,'Too many wrong passcodes. Please wait a few minutes.');
+   const bump=(path,max,windowMs)=>db.ref(path).transaction(cur=>{const r=cur&&now-cur.start<windowMs?cur:{start:now,count:0};const count=r.count+1;return {start:r.start,count,until:count>=max?now+windowMs:0}});
+   const fail=async(code,message)=>{await Promise.all([bump(sPath,8,900000),bump(iPath,40,3600000)]);error(code,message)};
+   const profile=await stillMember(studentId);
+   if(!profile)error(403,'Student not in this class.');
+   // The shared default passcode is never accepted for joining a lesson.
+   const code=await readPasscode(p=>(db.ref(p).once('value')).then(s=>s.val()),studentId,{allowLegacyDefault:false});
+   if(!code.passcode||!equal(code.passcode,body.pin))await fail(401,'Please sign in again.');
+   if(sRow)await db.ref(sPath).set(null);
+   const token=crypto.randomBytes(32).toString('hex'),digest=sha(token);
+   // One outstanding join ticket per student: a new one replaces the old, so tickets never pile up.
+   const indexRef=db.ref('b3Private/classPointerJoinTicketIndex/'+sha(studentId).slice(0,32));
+   const previous=(await indexRef.once('value')).val();
+   if(typeof previous==='string'&&/^[a-f0-9]{64}$/.test(previous))await db.ref('b3Private/classPointerJoinTickets/'+previous).set(null);
+   await db.ref('b3Private/classPointerJoinTickets/'+digest).set({studentId,classId,room,peerId:body.peerId,createdAt:now,expiresAt:now+90000});
+   await indexRef.set(digest);
+   return res.json({ok:true,token,studentName:String(profile.name||'Student').slice(0,32)});
+  }
+  if(action==='joinVerify'){
+   const claims=await teacherSessionOwner();
+   const token=String(body.token||'');
+   if(!/^[a-f0-9]{64}$/.test(token)||!peerOk(body.peerId))error(400,'Invalid join ticket.');
+   const ticketRef=db.ref('b3Private/classPointerJoinTickets/'+sha(token)),now=Date.now();
+   // One student connection per ticket: a stolen ticket does not work from another connection,
+   // and a repeat check by the same teacher for the same connection is allowed for 30 seconds.
+   const used=await ticketRef.transaction(row=>{
+    if(!row||row.expiresAt<=now||row.room!==room||row.classId!==classId||row.peerId!==body.peerId)return;
+    if(row.verifiedBy){
+     if(row.verifiedBy!==claims.uid||!Number.isFinite(row.verifiedAt)||now-row.verifiedAt>30000)return;
+     return row;
+    }
+    return {...row,verifiedBy:claims.uid,verifiedAt:now};
+   });
+   const ticket=used.committed?used.snapshot.val():null;
+   if(!ticket)error(403,'Join ticket expired, already used, or not for this class and connection.');
+   const profile=await stillMember(ticket.studentId);
+   if(!profile)error(403,'Student no longer belongs to this class.');
+   return res.json({ok:true,studentId:ticket.studentId,studentName:String(profile.name||'Student').slice(0,32)});
+  }
+  if(action==='joinRecheck'){
+   // Teacher page asks every minute whether connected students are still allowed (removed, blocked, class switched off).
+   await teacherSessionOwner();
+   const ids=Array.isArray(body.studentIds)?body.studentIds.filter(validId).slice(0,16):[];
+   const allowed=[];
+   for(const id of ids)if(await stillMember(id))allowed.push(id);
+   return res.json({ok:true,allowed});
+  }
   error(400,'Unknown action.');
  }catch(err){
   const code=Number.isInteger(err.code)?err.code:500;
