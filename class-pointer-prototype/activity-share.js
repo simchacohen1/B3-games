@@ -98,8 +98,8 @@
     // window keeps the PeerJS call alive if this activity page is redirected.
     choose.addEventListener('click',event=>{
       if(!active||busy)return;
-      if(persistentShareWindow){beginShare(event);return}
-      if(!openPersistentShareWindow())beginShare(event);
+      if(persistentShareWindow)return beginShare(event);
+      if(!openPersistentShareWindow())return beginShare(event);
     });
 
     const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
