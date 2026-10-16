@@ -7,9 +7,9 @@ const path=require('node:path');
 const read=name=>fs.readFileSync(path.join(__dirname,'..',name),'utf8');
 const room='class-pointer-12345678-1234-1234-1234-123456789abc';
 
-async function activityFixture({capture}={}){
+async function activityFixture({capture,persistent=false,sessionStorageValues:initialStorage,openWindow=()=>null,validTicket=false}={}){
   let listener,policy={},holder,overlay,navigation=null,captureCount=0,stopCount=0,requests=0;
-  const sessionStorageValues=new Map([['b3Games_studentId','test-boy'],['b3Games_classPin','test-pin']]);
+  const sessionStorageValues=initialStorage||new Map([['b3Games_studentId','test-boy'],['b3Games_classPin','test-pin']]);
   const sessionStorage={
     getItem:k=>sessionStorageValues.get(k)||null,
     setItem:(k,v)=>sessionStorageValues.set(k,v)
@@ -29,14 +29,21 @@ async function activityFixture({capture}={}){
   const db={ref:path=>({on:(_event,cb)=>{if(path.includes('/classPointerSessions'))listener=cb},off(){}})};
   const firebase={apps:[{}],database:()=>db};
   const location={
-    href:'https://funtorahtools.com/shorashim/index.html',
+    href:'https://funtorahtools.com/shorashim/index.html'+(persistent?'?pointerShare=1':''),
     pathname:'/shorashim/index.html',
     assign(url){navigation=url}
   };
+  const windowEvents={},peerCalls=[];
+  class FakePeer{
+    constructor(id){this.id=id}
+    once(event,callback){if(event==='open')callback()}
+    call(target,stream,options){const media={target,stream,options,closed:false,on(){},close(){this.closed=true}};peerCalls.push(media);return media}
+    destroy(){this.destroyed=true}
+  }
   const window={
-    firebase,B3_FIREBASE_CONFIG:{},
+    firebase,B3_FIREBASE_CONFIG:{},Peer:FakePeer,
     FunTorahStudentClass:{resolve:async()=>({workspaceId:'b3-2026',classId:'et'})},
-    open(){return null},addEventListener(){}
+    open(...args){return openWindow(...args)},addEventListener(type,fn){windowEvents[type]=fn}
   };
   const navigator={mediaDevices:{getDisplayMedia(){
     captureCount++;
@@ -49,11 +56,12 @@ async function activityFixture({capture}={}){
     const body=JSON.parse(options?.body||'{}');
     if(body.action==='permissions')return{ok:true,json:async()=>({ok:true,...policy})};
     requests++;
+    if(body.action==='issue'&&validTicket)return{ok:true,json:async()=>({ok:true,token:'synthetic-ticket'})};
     throw new TypeError('Failed to fetch');
   }
   await vm.runInNewContext(read('class-pointer-prototype/activity-share.js'),{
     window,document,location,URL,sessionStorage,firebase,fetch,navigator,
-    AbortSignal,Date,console
+    Peer:FakePeer,crypto:{randomUUID:()=> 'synthetic-peer-id'},AbortSignal,Date,console
   });
   assert.ok(listener,'authenticated session should subscribe to teacher requests');
   assert.ok(holder,'activity sharing invitation must exist');
@@ -72,7 +80,9 @@ async function activityFixture({capture}={}){
     get navigation(){return navigation},
     get captureCount(){return captureCount},
     get stopCount(){return stopCount},
-    get requests(){return requests}
+    get requests(){return requests},sessionStorageValues,peerCalls,
+    pagehide(){windowEvents.pagehide?.()},
+    get peerClosed(){return peerCalls[0]?.closed===true}
   };
 }
 
@@ -90,6 +100,28 @@ test('screen request stays on activity, with explicit browser permission and sam
   assert.equal(a.fallback.hidden,false);
   a.fallback.listeners.click();
   assert.match(a.navigation,/class-pointer-prototype\/dashboard.html/);
+});
+test('screen sharing continues in the persistent window when the activity page navigates away',async()=>{
+  const popup={closed:false,focus(){}};
+  let openedUrl='';
+  const parent=await activityFixture({openWindow:(url)=>{openedUrl=url;return popup}});
+  await parent.emit('screens');
+  await parent.choose.listeners.click();
+  assert.match(openedUrl,/student-share-window\.html\?pointerShare=1/);
+  assert.equal(parent.captureCount,0,'the activity page leaves capture to the persistent window');
+  const copied=new Map(parent.sessionStorageValues);
+  for(const key of copied.keys())if(key.startsWith('fttPointerShareInvite:'))copied.delete(key);
+  const child=await activityFixture({persistent:true,sessionStorageValues:copied,validTicket:true});
+  await child.emit('screens');
+  assert.equal(child.overlay.style.display,'flex','the separate window re-prompts for explicit approval');
+  await child.choose.listeners.click();
+  assert.equal(child.captureCount,1);
+  assert.equal(child.peerCalls.length,1);
+  assert.equal(child.peerCalls[0].target,room);
+  assert.equal(child.peerCalls[0].options.metadata.token,'synthetic-ticket');
+  parent.pagehide();
+  assert.equal(child.stopCount,0,'unloading the activity page does not stop the capture window');
+  assert.equal(child.peerClosed,false,'the teacher call remains connected');
 });
 test('whiteboard request still opens the private classroom board',async()=>{
   const a=await activityFixture();
