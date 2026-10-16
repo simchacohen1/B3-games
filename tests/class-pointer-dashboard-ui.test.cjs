@@ -29,6 +29,16 @@ test('student activity chooser reuses the existing screen and whiteboard actions
   assert.match(ui,/getElementById\('cpShareEnabled'\)/);
 });
 
+test('student can keep the screen stream alive in its own window while navigating activities',()=>{
+  const boards=read('class-pointer-prototype/student-boards.js');
+  const activity=read('class-pointer-prototype/activity-share.js');
+  const windowPage=read('class-pointer-prototype/student-share-window.html');
+  assert.match(boards,/window\.open\(url\.href,'classPointerStudentShare'/);
+  assert.match(activity,/openPersistentShareWindow/);
+  assert.match(activity,/persistentShareWindow\)\{beginShare/);
+  assert.match(windowPage,/sessionStorage\.removeItem\(key\)/);
+  assert.match(windowPage,/Keep this window open while you visit Shorashim or another activity/);
+});
 test('student screen sharing asks for Entire Screen and contains no browser-tab share control',()=>{
   const boards=read('class-pointer-prototype/student-boards.js');
   const activity=read('class-pointer-prototype/activity-share.js');
