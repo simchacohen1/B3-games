@@ -42,7 +42,14 @@ test('teacher publishes and removes only its own random room and registers disco
  const context=vm.createContext({window:{ClassPointerDashboardCore:C,B3_APP_CONTEXT:{workspaceId:'b3-2026'},B3SiteSettings:{onAuthStateChanged:callback=>auth=callback}},location:{href:'https://example.test/classroom.html?dashboard=teacher&class=one'},URL,firebase:{database,auth:()=>({currentUser:{uid:'test-teacher'}})}});
  vm.runInContext(source('dashboard-session.js'),context);await auth({uid:'test-teacher'},true,{authorized:true,role:'teacher',classIds:[classId]});
  await context.window.ClassPointerDashboard.publish(room);await context.window.ClassPointerDashboard.requestScreenSharing();await context.window.ClassPointerDashboard.end();
- assert.equal(writes[0][0],'disconnect');assert.equal(writes[1][0],'set');assert.equal(writes[2][0],'update');assert.equal(writes[3][0],'remove');assert.equal(writes[2][2].studentScreenSharing,true);assert.equal(writes[2][2].shareRequest.at,database.ServerValue.TIMESTAMP);for(const write of writes)assert.ok(write[1].endsWith('/classPointerSessions/'+room));assert.equal(writes[1][2].teacherUid,'test-teacher');
+ const sessionPath='b3Games/workspaces/b3-2026/classes/one/classPointerSessions/'+room;
+ const policyPath='b3Private/classPointerSharePermissions/b3-2026/one/'+room;
+ assert.deepEqual(writes.filter(([op])=>op==='disconnect').map(([,path])=>path),[sessionPath,policyPath]);
+ assert.equal(writes.find(([op,path])=>op==='set'&&path===sessionPath)[2].teacherUid,'test-teacher');
+ const request=writes.find(([op,path])=>op==='update'&&path===sessionPath)[2];
+ assert.equal(request.studentScreenSharing,true);assert.equal(request.shareRequest.at,database.ServerValue.TIMESTAMP);
+ assert.deepEqual(writes.filter(([op])=>op==='remove').map(([,path])=>path),[sessionPath,policyPath]);
+ assert.deepEqual(writes.filter(([op])=>op==='cancel').map(([,path])=>path),[sessionPath,policyPath]);
 });
 
 test('Class Pointer joins during global and class game locks',async()=>{

@@ -3,9 +3,10 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const room='class-pointer-12345678-1234-1234-1234-123456789abc';
 async function fixture(){
  let auth,releaseWrite,failRemoval=false;const operations=[];
- const ref=path=>({child:key=>ref(path+'/'+key),once:async()=>({val:()=>({active:true,toolGrants:{'class-pointer':true}})}),
+ const ref=path=>({key:path.split('/').pop(),child:key=>ref(path+'/'+key),once:async()=>({val:()=>({active:true,toolGrants:{'class-pointer':true}})}),
  onDisconnect:()=>({remove:async()=>{},cancel:async()=>{operations.push(['cancel',path])}}),
- set:async()=>{},update:async value=>{operations.push(['update',path,value]);await new Promise(resolve=>releaseWrite=resolve)},
+ set:async value=>{operations.push(['set',path,value]);if(path.startsWith('b3Private/classPointerSharePermissions/'))await new Promise(resolve=>releaseWrite=resolve)},
+ update:async value=>{operations.push(['update',path,value])},
  remove:async()=>{operations.push(['remove',path]);if(failRemoval)throw Error('offline')}});
  const database=()=>({ref});database.ServerValue={TIMESTAMP:{'.sv':'timestamp'}};
  const window={B3_APP_CONTEXT:{workspaceId:'b3-2026'},B3SiteSettings:{onAuthStateChanged:fn=>auth=fn}};
@@ -17,23 +18,28 @@ async function fixture(){
 }
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 test('End drains an in-flight permission write and drops queued writes before removing WT session',async()=>{
- const f=await fixture();const first=f.dashboard.updateActivityPermissions({screens:{boy:true}});await tick();
+ const f=await fixture();const first=f.dashboard.requestStudentDestination('screens',{screens:{boy:true}});await tick();
  const queued=f.dashboard.setStudentScreenSharing(true);await tick();
  const ending=f.dashboard.end();await tick();
  assert.equal(f.operations.filter(([op])=>op==='remove').length,0,'must wait for the in-flight write');
  await assert.rejects(()=>f.dashboard.publish(room),/still ending/);
  f.release();await Promise.all([first,queued,ending]);
- assert.deepEqual(f.operations.map(([op])=>op),['update','remove','cancel']);
- assert.ok(f.operations.every(([,path])=>path.includes('/classes/wt/classPointerSessions/'+room)));
+ assert.deepEqual(f.operations.map(([op])=>op),['set','set','update','remove','remove','cancel','cancel']);
+ assert.ok(f.operations[0][1].includes('/classes/wt/classPointerSessions/'+room));
+ assert.equal(f.operations[1][1],'b3Private/classPointerSharePermissions/b3-2026/wt/'+room);
+ assert.ok(f.operations[2][1].includes('/classes/wt/classPointerSessions/'+room));
+ assert.ok(f.operations.slice(3).every(([,path])=>path.includes(room)));
  const before=f.operations.length;await f.dashboard.setStudentScreenSharing(false);
  assert.equal(f.operations.length,before,'removed rooms receive no late child writes');
 });
 test('failed deletion retains the exact previous session reference for retry',async()=>{
  const f=await fixture();f.fail();await assert.rejects(()=>f.dashboard.end(),/offline/);
  f.recover();await f.dashboard.end();
- assert.equal(f.operations.filter(([op])=>op==='remove').length,2);
- assert.equal(f.operations[0][1],f.operations[1][1]);
- assert.equal(f.operations.at(-1)[0],'cancel');
+ const removals=f.operations.filter(([op])=>op==='remove');
+ assert.equal(removals.length,4);
+ assert.equal(removals[0][1],removals[2][1]);
+ assert.equal(removals[1][1],removals[3][1]);
+ assert.equal(f.operations.filter(([op])=>op==='cancel').length,2);
 });
 
 test('teacher can End and Restart three times; duplicate clicks never overlap cleanup',async()=>{

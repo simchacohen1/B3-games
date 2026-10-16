@@ -28,6 +28,9 @@
               "resources": {
                 ".write": true
               },
+              "classPointerSessions": {
+                ".write": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && (($classId == 'et' || $classId == 'wt') || root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/class-pointer').val() == true))"
+              },
               "access": {
                 ".write": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)"
               },
@@ -237,6 +240,25 @@
       "privateAuth": {
         ".read": "auth != null && auth.token.email == 'simcha5770@gmail.com'",
         ".write": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+      }
+    },
+    "b3Private": {
+      ".read": false,
+      ".write": false,
+      "classPointerShareTickets": {
+        ".indexOn": ["expiresAt"]
+      },
+      "classPointerJoinTickets": {
+        ".indexOn": ["expiresAt"]
+      },
+      "classPointerSharePermissions": {
+        "$workspaceId": {
+          "$classId": {
+            "$roomId": {
+              ".write": "auth != null && ((auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && (($classId == 'et' || $classId == 'wt') || root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/class-pointer').val() == true)))"
+            }
+          }
+        }
       }
     },
     ".read": false,

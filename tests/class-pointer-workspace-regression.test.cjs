@@ -33,12 +33,14 @@ test('class picker preserves authorization checks',()=>{
  assert.match(s,/C\.permitted\(access,id,classRow\)/);
 });
 
-test('student capture prefers a browser tab but requires the browser permission chooser',()=>{
+test('student capture requires Entire Screen and offers a persistent share window',()=>{
  const s=read('student-boards.js');
  assert.match(s,/getDisplayMedia\(/);
- assert.match(s,/preferCurrentTab:true/);
- assert.match(s,/surfaceSwitching:'include'/);
+ assert.match(s,/displaySurface:'monitor'/);
+ assert.match(s,/surfaceSwitching:'exclude'/);
  assert.match(s,/getVideoTracks\(\)\[0\]/);
+ assert.match(s,/window\.open\(url\.href,'classPointerStudentShare'/);
+ assert.doesNotMatch(s,/Share a browser tab/);
 });
 
 test('activity sharing requires a verified student before opening a screen button',()=>{
