@@ -8,6 +8,7 @@
 const crypto = require('node:crypto');
 const policy = require('./homework-policy.cjs');
 const { resolveStudent } = require('./student-login-core.cjs');
+const { guarded } = require('./auth-attempts.cjs');
 
 const WS = 'b3-2026';
 const OWNER_EMAIL = 'simcha5770@gmail.com';
@@ -58,7 +59,8 @@ const scopeOf = (classId, studentId) => ({ workspaceId: WS, classId, studentId }
 const recordPath = (classId, sid, aid) => policy.assignmentPath(scopeOf(classId, sid), aid);
 const newRecord = (def, now) => ({ assignmentId: def.id, status: 'assigned', draft: '', progress: 0, createdAt: now, updatedAt: now });
 const isLate = (def, rec, now) => def.dueAt != null && now > def.dueAt && !['submitted', 'approved'].includes(rec.status);
-const targets = (def, members) => def.audience === 'all' ? Object.keys(members) : (def.audience || []).filter(s => members[s]);
+const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+const targets = (def, members) => def.audience === 'all' ? Object.keys(members) : (def.audience || []).filter(s => has(members, s));
 
 function present(def, rec, now) {
   return {
@@ -76,6 +78,7 @@ async function teacherDo(store, identity, body, now, newId) {
   const { cls, id: actorId } = await teacherAccess(store, identity, classId);
   const members = await activeMembers(store, cls);
   const defs = (await store.get(base(classId) + '/definitions')) || {};
+  const allRecords = (await store.get(base(classId) + '/students')) || {};
   const teacher = { id: actorId, role: 'teacher', authenticated: true };
 
   if (body.action === 'teacherList') {
@@ -84,7 +87,7 @@ async function teacherDo(store, identity, body, now, newId) {
       const students = {};
       const counts = { assigned: 0, in_progress: 0, submitted: 0, approved: 0, returned: 0, missing: 0 };
       for (const sid of targets(def, members)) {
-        const rec = (await store.get(recordPath(classId, sid, def.id))) || newRecord(def, now);
+        const rec = allRecords[sid]?.assignments?.[def.id] || newRecord(def, now);
         counts[rec.status]++;
         const late = isLate(def, rec, now);
         if (late) counts.missing++;
@@ -106,7 +109,7 @@ async function teacherDo(store, identity, body, now, newId) {
     if (Object.keys(defs).length >= 300) fail(429, 'Too many assignments in this class. Delete old ones first.');
     let audience = 'all';
     if (Array.isArray(body.studentIds) && body.studentIds.length) {
-      audience = [...new Set(body.studentIds)].filter(s => members[s]);
+      audience = [...new Set(body.studentIds)].filter(s => key(s) && has(members, s));
       if (!audience.length) fail(400, 'Choose students who are in this class.');
     }
     const id = newId();
@@ -117,8 +120,8 @@ async function teacherDo(store, identity, body, now, newId) {
     return { ok: true, id };
   }
 
-  const def = defs[body.assignmentId];
-  if (!key(body.assignmentId) || !def) fail(404, 'That assignment was not found.');
+  const def = key(body.assignmentId) && has(defs, body.assignmentId) ? defs[body.assignmentId] : null;
+  if (!def) fail(404, 'That assignment was not found.');
 
   if (body.action === 'delete') {
     await store.set(base(classId) + '/definitions/' + def.id, null);
@@ -136,7 +139,7 @@ async function teacherDo(store, identity, body, now, newId) {
   }
   if (body.action === 'approve' || body.action === 'return') {
     const sid = body.studentId;
-    if (!key(sid) || !members[sid]) fail(404, 'That student is not in this class.');
+    if (!key(sid) || !has(members, sid)) fail(404, 'That student is not in this class.');
     const feedback = text(body.feedback, 500);
     if (body.action === 'return' && !feedback) fail(400, 'Write a short note so the student knows what to fix.');
     let stars = null;
@@ -159,8 +162,9 @@ async function teacherDo(store, identity, body, now, newId) {
 }
 
 // ---- student actions -------------------------------------------------------
-async function studentDo(store, body, now) {
-  const student = await resolveStudent(store.get, { b3StudentId: body.studentId, name: body.studentName, pin: body.pin, classId: body.classId });
+async function studentDo(store, body, now, ip) {
+  const student = await guarded(store, { ip, studentKey: body.studentName || body.studentId }, now,
+    () => resolveStudent(store.get, { b3StudentId: body.studentId, name: body.studentName, pin: body.pin, classId: body.classId }));
   const sid = student.id, classId = student.classId;
   if (!key(sid) || !key(classId)) fail(403, 'Choose your class and sign in again.');
   const actor = { id: sid, role: 'student', authenticated: true };
@@ -186,8 +190,8 @@ async function studentDo(store, body, now) {
       openCount: out.filter(a => OPEN.includes(a.status)).length };
   }
 
-  const def = defs[body.assignmentId];
-  if (!key(body.assignmentId) || !def || !mine(def)) fail(404, 'That assignment was not found.');
+  const def = key(body.assignmentId) && has(defs, body.assignmentId) ? defs[body.assignmentId] : null;
+  if (!def || !mine(def)) fail(404, 'That assignment was not found.');
   const path = recordPath(classId, sid, def.id);
   const minutes = v => {
     if (v == null || v === '') return null;
@@ -203,7 +207,7 @@ async function studentDo(store, body, now) {
       const rec = cur || newRecord(def, now);
       if (['submitted', 'approved'].includes(rec.status)) { error = true; return undefined; }
       const next = { ...rec, draft, updatedAt: now };
-      if (progress !== null) next.progress = Math.max(rec.progress || 0, progress);
+      if (progress !== null) next.progress = progress;
       if (rec.status === 'assigned') next.status = 'in_progress';
       return next;
     });
@@ -220,7 +224,7 @@ async function studentDo(store, body, now) {
         const next = policy.transition(rec.status === 'assigned' ? { ...rec, status: 'in_progress' } : rec,
           'submit', actor, scope, ctx, now);
         return { ...next, answer, draft: '', submittedAt: now, feedback: '', stars: null,
-          progress: progress === null ? rec.progress || 0 : Math.max(rec.progress || 0, progress) };
+          progress: progress === null ? rec.progress || 0 : progress };
       } catch (e) { error = e; return undefined; }
     });
     if (error) fail(409, 'This work was already handed in.');
@@ -236,7 +240,7 @@ async function homeworkApi(store, auth, body, now = Date.now(), newId = () => cr
     if (!auth || !auth.identity) fail(401, 'Teacher sign-in required.');
     return teacherDo(store, auth.identity, body, now, newId);
   }
-  if (['studentList', 'save', 'submit'].includes(a)) return studentDo(store, body, now);
+  if (['studentList', 'save', 'submit'].includes(a)) return studentDo(store, body, now, auth && auth.ip);
   fail(400, 'Unknown action.');
 }
 module.exports = { homeworkApi };

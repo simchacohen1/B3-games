@@ -32,11 +32,11 @@ if(!auth.studentId||!auth.pin){
 }
 document.getElementById('who').textContent=auth.studentName;
 function say(box,msg,good){box.textContent=msg;box.className='msg '+(good?'good':'err')}
-// Unsaved typing is kept on this device so a dropped connection never loses work.
+// Unsaved typing is kept in this browser tab only (cleared when the tab closes) so a dropped connection never loses work.
 function draftKey(id){return 'homeworkDraft_'+auth.studentId+'_'+id}
-function loadLocal(id){try{return localStorage.getItem(draftKey(id))||''}catch(e){return ''}}
-function saveLocal(id,v){try{localStorage.setItem(draftKey(id),v)}catch(e){}}
-function clearLocal(id){try{localStorage.removeItem(draftKey(id))}catch(e){}}
+function loadLocal(id){try{return sessionStorage.getItem(draftKey(id))||''}catch(e){return ''}}
+function saveLocal(id,v){try{sessionStorage.setItem(draftKey(id),v)}catch(e){}}
+function clearLocal(id){try{sessionStorage.removeItem(draftKey(id))}catch(e){}}
 function call(body){return H.call(Object.assign({},auth,body))}
 
 function render(data){
@@ -70,7 +70,7 @@ function card(a){
     mins=el('input');mins.type='number';mins.min='0';mins.max='1440';mins.value=a.progress||0;c.append(mins);
   }
   c.append(el('label',a.targetMinutes?'Short note (optional)':'What I did / my answer'));
-  var ta=el('textarea');ta.maxLength=2000;ta.value=loadLocal(a.id)||a.draft||'';c.append(ta);
+  var ta=el('textarea');ta.maxLength=2000;ta.value=loadLocal(a.id)||a.draft||(a.status==='returned'?a.answer:'')||'';c.append(ta);
   ta.addEventListener('input',function(){saveLocal(a.id,ta.value)});
   var msg=el('div',null,'msg');
   var save=el('button','Save for later','sec'),sub=el('button','Hand in');
