@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Messages – Teacher</title>
+<script src="../guest-mode.js" data-guest="block"></script>
+<link rel="stylesheet" href="messages.css?v=20261016">
+</head><body>
+<header><strong>💬 Messages – Teacher</strong><span><span id="who"></span> <button class="msg-btn sec" id="signout" style="display:none">Sign out</button></span></header>
+<main>
+<div id="signin" class="card"><p>Sign in with your teacher Google account.</p><button class="msg-btn" id="go">Sign in with Google</button><div id="signinMsg" class="msg-status bad"></div></div>
+<div id="app" style="display:none">
+  <div class="card"><label for="cls"><strong>Class</strong></label> <select id="cls"></select> <span id="ro" class="muted"></span></div>
+  <div class="layout">
+    <aside class="panel"><h2>Students</h2><div id="people"></div></aside>
+    <section class="panel"><h2 id="heading">Choose a student</h2><div id="chat"><p class="muted" style="padding:14px">Pick a student on the left. Only students in your classes appear here.</p></div></section>
+  </div>
+</div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="../firebase-config.js"></script>
+<script src="homework-common.js"></script>
+<script src="messages-ui.js?v=20261016"></script>
+<script>
+(function(){'use strict';
+var H=window.HomeworkCommon,el=H.el,$=function(i){return document.getElementById(i)};
+var WS=(window.B3_APP_CONTEXT&&window.B3_APP_CONTEXT.workspaceId)||'b3-2026',OWNER='simcha5770@gmail.com';
+if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+var auth=firebase.auth(),db=firebase.database();
+var state={classId:'',student:null,chat:null,poll:null};
+async function api(body){var t=await auth.currentUser.getIdToken();return H.callTo(H.MESSAGES_API,Object.assign({classId:state.classId},body),t)}
+$('go').onclick=function(){auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(e){$('signinMsg').textContent=e.message})};
+$('signout').onclick=function(){auth.signOut()};
+auth.onAuthStateChanged(async function(u){
+  if(!u){$('signin').style.display='';$('app').style.display='none';$('signout').style.display='none';$('who').textContent='';return}
+  $('signin').style.display='none';$('signout').style.display='';$('who').textContent=u.email||'';
+  try{
+    var owner=String(u.email||'').toLowerCase()===OWNER,ids=[];
+    var all=(await db.ref('b3Games/workspaces/'+WS+'/classes').once('value')).val()||{};
+    if(owner)ids=Object.keys(all);
+    else{var t=(await db.ref('b3Games/workspaces/'+WS+'/teachers/'+u.uid).once('value')).val();
+      ids=Object.keys((t&&t.active!==false&&t.classIds)||{}).filter(function(k){return t.classIds[k]===true})}
+    ids=ids.filter(function(k){return all[k]&&all[k].active!==false&&all[k].toolGrants&&all[k].toolGrants.messages===true});
+    if(!ids.length){$('signin').style.display='';$('app').style.display='none';$('signinMsg').textContent='Messages are not turned on for any class on this account.';return}
+    $('cls').replaceChildren();ids.forEach(function(k){var o=el('option',all[k].name||k);o.value=k;$('cls').append(o)});
+    var want=new URLSearchParams(location.search).get('class');$('cls').value=ids.indexOf(want)>=0?want:ids[0];
+    state.classId=$('cls').value;$('app').style.display='';loadInbox();
+    clearInterval(state.poll);state.poll=setInterval(function(){if(document.visibilityState==='visible')loadInbox(true)},60000);
+  }catch(e){$('signin').style.display='';$('signinMsg').textContent=e.message}
+});
+$('cls').onchange=function(){state.classId=$('cls').value;closeChat();loadInbox()};
+function closeChat(){if(state.chat)state.chat.stop();state.chat=null;state.student=null;$('heading').textContent='Choose a student';$('chat').replaceChildren(el('p','Pick a student on the left.','muted'))}
+async function loadInbox(quiet){
+  try{
+    var r=await api({action:'inbox'});$('ro').textContent=r.readOnly?'(read-only owner view)':'';
+    var box=$('people');box.replaceChildren();
+    if(!r.students.length)box.append(el('p','No students in this class.','muted'));
+    r.students.forEach(function(s){
+      var b=el('button',null,'person'+(state.student&&state.student.studentId===s.studentId?' on':''));b.type='button';
+      var left=el('span');left.append(el('strong',s.name),el('small',s.lastPreview||'No messages yet'));b.append(left);
+      if(s.unread)b.append(el('span',String(s.unread),'dot'));
+      b.onclick=function(){openChat(s,r.readOnly)};box.append(b);
+    });
+  }catch(e){if(!quiet)$('people').replaceChildren(el('p',e.message,'msg-status bad'))}
+}
+function openChat(s,readOnly){
+  if(state.chat)state.chat.stop();
+  state.student=s;$('heading').textContent=s.name;
+  var box=$('chat');
+  state.chat=window.HomeworkMessages.mount(box,{role:'teacher',readOnly:readOnly,call:function(b){return api(Object.assign({studentId:s.studentId},b)).then(function(r){if(b.action==='list'||b.action==='send')loadInbox(true);return r})}});
+  loadInbox(true);
+}
+})();
+</script>
+<script src="../back-nav.js" data-href="../teacher-home.html" data-label="← Teacher Home"></script></body></html>
