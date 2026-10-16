@@ -68,3 +68,14 @@ Recommendation: merge Homework after PR 84 (or resolve the two lines then); I wi
 - Fixture: `tests/fixtures/synthetic-class.cjs`: class "Synthetic Test Class A/B" and a switched-off class, 7 made-up students ("Avi Synthetic" ...), made-up passcodes, 3 made-up teachers. Automated tests use only this.
 - Added `tests/homework-synthetic-privacy.test.cjs`: only the assigned student and teachers of that class see homework; other classes, wrong passcode, switched-off class refused; no passcodes in responses; hostile ids/field types always end in a clean 4xx and change nothing.
 - For the live test (after owner approval): create a real class named like "Synthetic Test Class" with 2-3 made-up students and a throwaway teacher Google account in the Owner Admin screens, turn Homework on for that class only, and delete the class afterward (Owner Admin > Delete class). Creating it writes to production, so it waits for the owner.
+
+---
+## Update 2026-10-16 (e): independent review (security + functionality) and what was done
+Two independent read-only reviewers examined both PRs. **Fixed in this PR:** wrong-passcode guessing (new limiter `auth-attempts.cjs`: 8 wrong tries per student per 15 min, 40 per address per hour, brief lock; tests added); ids like `__proto__`/`constructor` accepted as student or assignment ids; `<` `>` kept in teacher-written titles/details (now stripped); student drafts moved from localStorage to sessionStorage; teacher list was one database read per student per assignment (now one read per class); students can correct a mistyped minutes number before hand-in; returned work pre-fills the earlier answer; editing no longer shows goal-minutes/audience fields it cannot change; review table scrolls on phones, buttons carry the student's name.
+
+**Still open (owner decisions or follow-ups, none is a code blocker for a synthetic-class test):**
+1. The limiter is only on the two NEW endpoints. The shared student sign-in used by every older tool has no such limit, and every call reads the whole student list (cost and speed). Changing the shared sign-in needs the owner's explicit OK (CLAUDE.md rule); measure the size of `b3Games/students` first.
+2. Students whose old record has no passcode accept the shared default; check live data before any real use.
+3. Deploy only from an up-to-date `main` (this branch is behind main); deploy only `functions:homeworkPortal` (and later `messagesPortal`); never run a rules deploy from these branches.
+4. Confirm in the Firebase console that Storage rules deny browsers access to `assignmentCenter/**` (needed for voice).
+5. Smaller follow-ups: late hand-ins are not flagged for the teacher; creating an assignment twice on a network retry makes a duplicate; unsaved minutes reset when the tab refreshes; only whole-class or chosen-student audiences (no edit of audience); `<`/`>` are stripped from messages and notes (harmless, but "1 < 2" loses characters).
