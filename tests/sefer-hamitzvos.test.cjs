@@ -8,19 +8,25 @@ function gate(data={},stored={},tool="yiddish"){
  vm.runInNewContext(source,ctx);return ctx.window.testGate;
 }
 const tool='sefer-hamitzvos';
-function records(classId='new_class') {return {
+function records(classId='new_class') {const cls={active:true,members:{child:{active:true}},toolGrants:{[tool]:true}};return {
  '/b3Games/students/child/profile.json':{active:true},
  '/b3Games/students/child/memberships.json':{a:{workspaceId:'b3-2026',classId,active:true}},
- ['/b3Games/workspaces/b3-2026/classes/'+classId+'.json']:{active:true,members:{child:{active:true}},toolGrants:{[tool]:true}}
+ ['/b3Games/workspaces/b3-2026/classes/'+classId+'.json']:cls,
+ ['/b3Games/workspaces/b3-2026/classes/'+classId+'/active.json']:true,
+ ['/b3Games/workspaces/b3-2026/classes/'+classId+'/members/child.json']:{active:true},
+ ['/b3Games/workspaces/b3-2026/classes/'+classId+'/name.json']:'Synthetic Class',
+ ['/b3Games/workspaces/b3-2026/classes/'+classId+'/siteEnabled.json']:true,
+ ['/b3Games/workspaces/b3-2026/classes/'+classId+'/access.json']:null,
+ ['/b3Games/workspaces/b3-2026/classes/'+classId+'/toolGrants.json']:{[tool]:true}
 };}
 test('Sefer HaMitzvos direct links enforce and refresh class grants, individual restrictions and emergency locks',async()=>{
- const data=records(),cls=data['/b3Games/workspaces/b3-2026/classes/new_class.json'],g=gate(data,{},tool);
+ const data=records(),cls=data['/b3Games/workspaces/b3-2026/classes/new_class.json'],classPath='/b3Games/workspaces/b3-2026/classes/new_class',g=gate(data,{},tool);
  await g.resolveStudentClass();g.decide({});assert.equal(g.overlay(),null);
- cls.toolGrants[tool]=false;await g.resolveStudentClass();g.decide({});assert.ok(g.overlay());
- cls.toolGrants[tool]=true;cls.members.child.toolAccess={[tool]:false};await g.resolveStudentClass();g.decide({});assert.ok(g.overlay());
- delete cls.members.child.toolAccess;await g.resolveStudentClass();g.decide({siteEnabled:false});assert.ok(g.overlay());
+ data[classPath+'/toolGrants.json'][tool]=false;await g.resolveStudentClass();g.decide({});assert.ok(g.overlay());
+ data[classPath+'/toolGrants.json'][tool]=true;data[classPath+'/members/child.json'].toolAccess={[tool]:false};await g.resolveStudentClass();g.decide({});assert.ok(g.overlay());
+ delete data[classPath+'/members/child.json'].toolAccess;await g.resolveStudentClass();g.decide({siteEnabled:false});assert.ok(g.overlay());
  g.decide({});assert.equal(g.overlay(),null);
- cls.access={mode:'locked'};await g.resolveStudentClass();g.decide({});assert.ok(g.overlay());
+ data[classPath+'/access.json']={mode:'locked'};await g.resolveStudentClass();g.decide({});assert.ok(g.overlay());
 });
 test('Sefer HaMitzvos preserves ET lock, tool switch and teacher exceptions',async()=>{
  const g=gate(records('et'),{b3Games_studentClass:'et'},tool);await g.resolveStudentClass();

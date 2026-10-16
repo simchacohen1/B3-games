@@ -201,6 +201,8 @@ function subscribe(){
   db.ref(`${ROOT}/redemptionsByStudent/${state.studentId}`).on('value',s=>{if(state.root){state.root.redemptions=s.val()||{};render()}});
   db.ref(`${ROOT}/classRewardContributionsByStudent/${state.studentId}`).on('value',s=>{if(state.root){state.root.contributions=s.val()||{};render()}},()=>{});
   db.ref(`${ROOT}/refundRequests/${state.studentId}`).on('value',s=>{if(state.root){state.root.refundRequests=s.val()||{};render()}},()=>{});
+  const classId=String(state.student?.classId||'');
+  if(classId)db.ref(`${ROOT}/classRewardCatalog`).on('value',s=>{if(state.root){state.root.classRewardCatalog=s.val()||{};render()}},()=>{});
   db.ref(`${ROOT}/rewards`).on('value',s=>{if(state.root){state.root.rewards=s.val()||{};render()}},()=>{});
   db.ref(`${ROOT}/settings/rewardStoreEnabled`).on('value',s=>{if(state.root){state.root.settings.rewardStoreEnabled=s.val();if(!state.teacherStore)state.storeOpen=s.val()===true||String(s.val())==='true';render()}},()=>{});
 }

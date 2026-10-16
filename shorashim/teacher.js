@@ -699,24 +699,11 @@ async function mergeDuplicateWord(duplicateId){
   if(Number(duplicate.commonness||0)>Number(keeper.commonness||0))keeper.commonness=duplicate.commonness;
 
   const oldKey=`shorashim:${duplicate.id}`, newKey=`shorashim:${keeper.id}`;
-  const changedStudentIds=[];
-  for(const [studentId,student] of Object.entries(state.students||{})){
-    if(!student||!student.cards||!student.cards[oldKey])continue;
-    const oldCard=student.cards[oldKey], newCard=student.cards[newKey];
-    if(!newCard){
-      student.cards[newKey]={...oldCard,itemKey:newKey,itemId:keeper.id};
-    }else{
-      const times=[newCard.learnedAt,oldCard.learnedAt].filter(Boolean);
-      if(times.length)newCard.learnedAt=Math.min(...times);
-    }
-    delete student.cards[oldKey];
-    changedStudentIds.push(studentId);
-  }
+  const changedStudentIds=Object.entries(state.students||{}).filter(([,student])=>student?.cards?.[oldKey]).map(([studentId])=>studentId);
   state.catalog.shorashim=list.filter(x=>x.id!==duplicate.id);
   status('☁️ Merging duplicate…','syncing');
-  const studentWrites=legacyScoped()
-    ?changedStudentIds.filter(id=>scopedStudentIds.includes(id)).map(id=>db.ref(`${ROOT}/students/${id}`).set(state.students[id]))
-    :[db.ref(`${SPACE}/students`).set(state.students)];
+  const scopedChanges=legacyScoped()?changedStudentIds.filter(id=>scopedStudentIds.includes(id)):changedStudentIds;
+  const studentWrites=scopedChanges.map(studentId=>db.ref(`${SPACE}/students/${studentId}`).transaction(student=>B3ShorashimProgressMerge.mergeStudentCards(student,oldKey,newKey,keeper.id)));
   await Promise.all([db.ref(`${SPACE}/catalog`).set(state.catalog),...studentWrites]);
   renderCatalog();
   status(`☁️ Duplicate merged • ${duplicate.front}`);

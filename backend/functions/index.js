@@ -2682,8 +2682,13 @@ exports.funTorahManageStudents = require("./student-management").funTorahManageS
 exports.funTorahStudentAuth = require("./student-auth").funTorahStudentAuth;
 // Weekly Quiz student reads and scoring are server-authorized to keep answer keys private.
 exports.weeklyQuizStudent = require("./weekly-quiz-student").weeklyQuizStudent;
+const gameShowStudent=require("./game-show-student-questions");
+exports.gameShowStudentQuestions=gameShowStudent.gameShowStudentQuestions;
+exports.gameShowStudentAction=gameShowStudent.gameShowStudentAction;
 // Server-verified student screenshot submissions, pending teacher approval.
 exports.classGallerySubmit = require("./class-gallery-submit").classGallerySubmit;
+exports.classGalleryRead=require('./class-gallery-read').classGalleryRead;
+exports.privateMediaUrl=require('./private-media-url').privateMediaUrl;
 // Student Rewards for every teacher (class-scoped, server-checked).
 exports.studentRewardsTeacher = require("./rewards-teacher").studentRewardsTeacher;
 

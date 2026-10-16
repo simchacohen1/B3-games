@@ -609,6 +609,7 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="../private-media.js?v=20261015-private"></script>
 <script src="../firebase-config.js"></script>
 <script src="../site-settings.js?v=20261008-owner-demo"></script>
 
@@ -811,16 +812,16 @@ function bestAttemptForSkill(attempts, skill){
 // This also suppresses old orphaned disputes created before student-side
 // deletion began clearing dispute metadata.
 function hasReviewableHebrewDispute(record){
-  return !!record && !!record.hebrewAudioURL && record.hebrewDisputeStatus === 'pending';
+  return !!record && !!(record.hebrewAudioURL||record.hebrewAudioStoragePath) && record.hebrewDisputeStatus === 'pending';
 }
 function hasReviewableComprehensionDispute(record){
-  return !!record && !!record.comprehensionAudioURL && record.comprehensionDisputeStatus === 'pending';
+  return !!record && !!(record.comprehensionAudioURL||record.comprehensionAudioStoragePath) && record.comprehensionDisputeStatus === 'pending';
 }
 function hasReviewableQuestionDispute(q){
-  return !!q && !!q.audioURL && q.disputeStatus === 'pending';
+  return !!q && !!(q.audioURL||q.audioStoragePath) && q.disputeStatus === 'pending';
 }
 function hasReviewableTranslationDispute(c){
-  return !!c && !!c.audioURL && c.disputeStatus === 'pending';
+  return !!c && !!(c.audioURL||c.audioStoragePath) && c.disputeStatus === 'pending';
 }
 function hasPendingDispute(record){
   if(!record) return false;
@@ -1624,7 +1625,7 @@ async function loadChazaraRecordings(){
     const rows=[];
     Object.entries(root).forEach(([sid,events]) => {
       Object.entries(events || {}).forEach(([eventId,e]) => {
-        if(!e || e.recorded !== true || !e.audioURL || e.removed === true) return;
+        if(!e || e.recorded !== true || !(e.audioURL||e.storagePath) || e.removed === true) return;
         rows.push({sid,eventId,...e});
       });
     });
@@ -1646,7 +1647,7 @@ async function loadChazaraRecordings(){
         <div class="chazara-recording-head"><strong>${name} · ${ref}</strong><span class="chazara-points">${pointLabel}</span></div>
         <div class="chazara-meta">${when}${seconds ? ' · ' + formatDuration(seconds) : ''} · Review #${Number(e.reviewNumber)||'—'}</div>
         ${waveformHtml(e.waveform)}
-        <audio controls preload="metadata" src="${e.audioURL}"></audio>
+        ${B3PrivateMedia.audioMarkup(e.storagePath,e.audioURL)}
       </div>`;
     }).join('');
     mainEl.innerHTML = html;
@@ -3587,12 +3588,12 @@ function renderPosukDetail(posukKey){
       // this attempt is missing hebrewAudioURL/hebrewScore — otherwise a
       // disputed attempt with thin data silently disappears from every tab
       // with no way for the teacher to ever find or resolve it.
-      return !!a.hebrewAudioURL || typeof effHebrewScore(a) === 'number' || !!a.hebrewDisputeStatus;
+      return !!(a.hebrewAudioURL || a.hebrewAudioStoragePath) || typeof effHebrewScore(a) === 'number' || !!a.hebrewDisputeStatus;
     }
     if(studentActiveTab === 'translate'){
       return translationChunkEntries(a.translationChunkResults).length > 0;
     }
-    return questionResultEntries(a.questionResults).length > 0 || !!a.comprehensionAudioURL;
+    return questionResultEntries(a.questionResults).length > 0 || !!(a.comprehensionAudioURL || a.comprehensionAudioStoragePath);
   });
 
   let html = `<div class="posuk-group">
@@ -3635,10 +3636,10 @@ function renderPosukDetail(posukKey){
               '<strong>' + (i + 1) + '.</strong>' +
               '<span dir="rtl" style="font-family:\'Noto Serif Hebrew\',serif;">' + escapeHtml(p.text || '') + '</span>' +
               '<span class="comp-badge">' + (typeof p.score === 'number' ? p.score + '%' : '—') + '</span>' +
-              (p.audioURL ? '<audio controls src="' + p.audioURL + '"></audio>' : '') +
+              ((p.audioURL||p.audioStoragePath) ? B3PrivateMedia.audioMarkup(p.audioStoragePath,p.audioURL) : '') +
             '</div>').join('') + '</div>';
-      }else if(a.hebrewAudioURL){
-        hebrewCardHtml += '<audio controls src="' + a.hebrewAudioURL + '"></audio>';
+      }else if(a.hebrewAudioURL||a.hebrewAudioStoragePath){
+        hebrewCardHtml += B3PrivateMedia.audioMarkup(a.hebrewAudioStoragePath,a.hebrewAudioURL);
       }
       if(a.hebrewTranscript){
         hebrewCardHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + a.hebrewTranscript + '"</span>';
@@ -3654,7 +3655,7 @@ function renderPosukDetail(posukKey){
         const effVerdict = c.finalVerdict || c.verdict;
         let chunkHtml = '<span class="comp-badge">' + (effVerdict === 'correct' ? '✅' : '💡') + '</span>' +
           '<span dir="rtl" style="font-family:\'Noto Serif Hebrew\',serif;">' + (c.chunkHebrew || '') + '</span>';
-        if(c.audioURL) chunkHtml += '<audio controls src="' + c.audioURL + '"></audio>';
+        if(c.audioURL||c.audioStoragePath) chunkHtml += B3PrivateMedia.audioMarkup(c.audioStoragePath,c.audioURL);
         if(c.transcript) chunkHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + c.transcript + '"</span>';
         lines += `<div class="comp-result ${effVerdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:4px;">${chunkHtml}</div>`;
         lines += renderTranslationChunkDisputeSection(a, posukKey, chunkIdx, c);
@@ -3670,7 +3671,7 @@ function renderPosukDetail(posukKey){
           const qVerdict = q.finalVerdict || q.verdict;
           let qHtml = '<span class="comp-badge">' + (qVerdict === 'correct' ? '✅ Correct' : '💡 Try again') + '</span>';
           if(q.question) qHtml += '<span style="font-weight:700;">' + q.question + '</span>';
-          if(q.audioURL) qHtml += '<audio controls src="' + q.audioURL + '"></audio>';
+          if(q.audioURL||q.audioStoragePath) qHtml += B3PrivateMedia.audioMarkup(q.audioStoragePath,q.audioURL);
           if(q.transcript) qHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + q.transcript + '"</span>';
           if(q.feedback) qHtml += '<span style="width:100%;font-size:0.82rem;">' + q.feedback + '</span>';
           lines += `<div class="comp-result ${qVerdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:4px;">${qHtml}</div>`;
@@ -3680,13 +3681,13 @@ function renderPosukDetail(posukKey){
 
       // The old/freehand explanation is a bonus/legacy comprehension item,
       // so it belongs here—but never in Reading or Translation.
-      if(a.comprehensionAudioURL){
+      if(a.comprehensionAudioURL||a.comprehensionAudioStoragePath){
         const cVerdict = effComprehensionVerdict(a);
         const vi = VERDICT_INFO[cVerdict] || { label: cVerdict || '' };
         lines += `<div class="top-line"><span>🌟 Bonus / freehand explanation</span></div>`;
         let compCardHtml = '<span class="comp-badge">' + vi.label + '</span>';
         if(a.comprehensionFeedback) compCardHtml += '<span>' + a.comprehensionFeedback + '</span>';
-        compCardHtml += '<audio controls src="' + a.comprehensionAudioURL + '"></audio>';
+        compCardHtml += B3PrivateMedia.audioMarkup(a.comprehensionAudioStoragePath,a.comprehensionAudioURL);
         if(a.comprehensionTranscript){
           compCardHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + a.comprehensionTranscript + '"</span>';
         }
@@ -3747,7 +3748,7 @@ function renderPosukDetail(posukKey){
    resolved ones get a quiet confirmation note; no dispute means nothing. */
 function renderDisputeSection(a, posukKey, skill){
   if(skill === 'hebrew'){
-    if(!a.hebrewAudioURL) return '';
+    if(!a.hebrewAudioURL&&!a.hebrewAudioStoragePath) return '';
     if(hasReviewableHebrewDispute(a)){
       return `<div class="dispute-banner">⚠️ Student disputes this score — review the recording.</div>
         <div class="finalize-row" id="finalizeHebrew_${a.attemptId}">
@@ -3767,7 +3768,7 @@ function renderDisputeSection(a, posukKey, skill){
     return '';
   }
   // comprehension
-  if(!a.comprehensionAudioURL) return '';
+  if(!a.comprehensionAudioURL&&!a.comprehensionAudioStoragePath) return '';
   const labelMap = { excellent: '🌟 Excellent', correct: '✅ Got it', partial: '🤔 Almost', incorrect: '💡 Try again' };
   if(hasReviewableComprehensionDispute(a)){
     const options = Object.entries(labelMap).map(([key,label]) =>
@@ -3796,7 +3797,7 @@ function renderDisputeSection(a, posukKey, skill){
 function renderQuestionDisputeSection(a, posukKey, questionIdx, q){
   // If the recording was deleted, the dispute goes with it. Do not show
   // an orphaned pending/resolved dispute from older saved data.
-  if(!q || !q.audioURL) return '';
+  if(!q || !(q.audioURL||q.audioStoragePath)) return '';
   if(hasReviewableQuestionDispute(q)){
     const original = q.verdict === 'correct' ? '✅ Correct' : '💡 Try again';
     return `<div class="dispute-banner">⚠️ Student disputes this question — computer originally marked: ${original}</div>
@@ -3820,7 +3821,7 @@ function renderQuestionDisputeSection(a, posukKey, questionIdx, q){
 // single overall score to dispute).
 function renderTranslationChunkDisputeSection(a, posukKey, chunkIdx, c){
   // Same rule as question disputes: no recording means no dispute.
-  if(!c || !c.audioURL) return '';
+  if(!c || !(c.audioURL||c.audioStoragePath)) return '';
   if(hasReviewableTranslationDispute(c)){
     return `<div class="dispute-banner">⚠️ Student disputes this piece</div>
       <div class="finalize-row" id="finalizeChunk_${a.attemptId}_${chunkIdx}">
@@ -4101,6 +4102,7 @@ async function renderClassPosukGrid(val){
     return;
   }
   const audioField = classActiveSkill === 'reading' ? 'hebrewAudioURL' : 'comprehensionAudioURL';
+  const pathField = classActiveSkill === 'reading' ? 'hebrewAudioStoragePath' : 'comprehensionAudioStoragePath';
 
   // Only list perakim someone has actually recorded (listing all 50 made the
   // tab look empty and was slow — each perek length is fetched from Sefaria).
@@ -4257,7 +4259,7 @@ function renderClassPosukDetail(posukKey, bodyEl){
       translationChunkValues(a.translationChunkResults).forEach(c => {
         let chunkHtml = '<span class="comp-badge">' + (c.verdict === 'correct' ? '✅' : '💡') + '</span>' +
           '<span dir="rtl" style="font-family:\'Noto Serif Hebrew\',serif;">' + c.chunkHebrew + '</span>';
-        if(c.audioURL) chunkHtml += '<audio controls src="' + c.audioURL + '"></audio>';
+        if(c.audioURL||c.audioStoragePath) chunkHtml += B3PrivateMedia.audioMarkup(c.audioStoragePath,c.audioURL);
         if(c.transcript) chunkHtml += '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.8rem;">"' + c.transcript + '"</span>';
         lines += `<div class="comp-result ${c.verdict === 'correct' ? 'correct' : 'incorrect'}" style="margin-top:4px;">${chunkHtml}</div>`;
       });
@@ -4268,11 +4270,11 @@ function renderClassPosukDetail(posukKey, bodyEl){
       const a = entry.latest;
       const dateStr = new Date(a.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
       let lines = `<div class="top-line"><strong>${entry.name}</strong><span class="summary-meta">${dateStr}</span></div>`;
-      if(a[audioField]){
+      if(a[audioField]||a[pathField]){
         const info = skillInfo(a, classActiveSkill);
         lines += `<div class="top-line">
           <span>${skillLabel} — <span class="score-pill">${info ? info.label : '—'}</span> <span class="dur" id="dur_${entry.studentId}_${durKey}">⏱ …</span></span>
-          <audio controls src="${a[audioField]}"></audio>
+          ${B3PrivateMedia.audioMarkup(a[pathField],a[audioField])}
         </div>`;
         if(classActiveSkill === 'comprehension' && a.comprehensionFeedback){
           lines += `<div class="summary-meta" style="margin-top:2px;">${a.comprehensionFeedback}</div>`;

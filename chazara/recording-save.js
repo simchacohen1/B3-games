@@ -24,7 +24,7 @@
       // in progress. Allow up to five minutes before treating an upload as
       // genuinely stalled.
       await deadline(task,ms,'Audio upload',()=>task.cancel());
-      return await deadline(ref.getDownloadURL(),30000,'Audio link');
+      return ref.fullPath||await deadline(ref.getDownloadURL(),30000,'Audio link');
     }finally{if(unsubscribe)unsubscribe()}
   }
   const api={deadline,upload};
