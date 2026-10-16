@@ -14,3 +14,19 @@
 **Deploy order (needs owner approval, not done):** 1. backend `classPointerShareAuth` (new actions; the old page keeps working) 2. website. A new page against the old backend fails closed ("Unknown action") and nobody can join, so never publish the page first. Test first with a synthetic class: teacher signed in, one student, one student from another class, one removed student.
 
 **Known limits:** a student who is not signed in to Fun Torah Tools can no longer join a signed-in lesson by typing a name (they must open Class Pointer from their home page). A modified student page that is already connected is only dropped at the next minute check or when removed from the class. The public room id still exposes that a lesson is live (moving session data off the public tree is step P1 in `security/POINTER-AND-RTDB-MIGRATION.md`, PR #141).
+
+## Live two-browser test runbook (prepared 2026-10-16; NOT run; needs the owner's go-ahead for each cloud step)
+
+**Preconditions:** (1) Codex has reviewed PR #142 together with #124/#134 and confirmed the combined branch is ready; (2) the owner has created, in Owner Admin, a throwaway class "Synthetic Pointer Test" (Class Pointer switched on) with two made-up students and made-up passcodes, a second throwaway class without those students, and one throwaway Google account invited as its teacher; (3) the owner signs in as that teacher himself (the assistant never enters passwords or creates accounts). Never use ET/WT students.
+
+**Deploy (owner-approved scope only, Command Prompt, from a clean checkout of the combined branch after `npm --prefix backend/functions ci`):** `firebase deploy --only functions:classPointerShareAuth --project b3-games`. Nothing else: no website, no database rules, no other functions. Rollback: redeploy the previous commit of that one function.
+
+**Test with the website served locally from the same branch** (so production pages are not changed): teacher page `classroom.html?dashboard=teacher&class=<test class>` in browser A (signed-in throwaway teacher), student pages in browsers B and C (separate profiles), an outsider in browser D (no sign-in).
+1. Legitimate join: student 1 opens Class Pointer from the home page and appears on the teacher roster with the server's name.
+2. Unauthorized: browser D reads the room id from the page/database and connects with a hand-made `join`; student 2 with a wrong passcode; a student of the other class; a reused or expired ticket; a ticket replayed from another connection. All must be refused and receive nothing.
+3. ET/WT/third-class isolation: a student of another class cannot get a ticket for this room; an ET or WT lesson room (if any exist) does not accept the test students.
+4. Screen sharing: teacher shares a tab; student 1 receives it; student 1 shares an activity screen and the teacher sees it (existing flow).
+5. Reconnection: reload student 1's page; it gets a fresh ticket and rejoins; the old connection is gone.
+6. Revocation: teacher denies student 1 screen sharing and removes student 1 from the test class; within one minute the teacher page disconnects the student, and a new ticket request is refused.
+7. Clean up: end the lesson, delete the test class in Owner Admin.
+Record results (pass/fail with screenshots) on Issue #51.
