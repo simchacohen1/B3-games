@@ -30,11 +30,31 @@
 <title>Our Wall of Learning</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-storage-compat.js"></script>
+<script>window.firebase&&firebase.storage||document.write('<script src="../vendor/firebase/12.15.0/firebase-storage-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
+<script>window.__galleryFirebaseVersionMismatch=!!window.firebase&&String(window.firebase.SDK_VERSION||"")!=="12.15.0"</script>
 <script src="../firebase-config.js"></script>
+<script>
+  window.__galleryBootIssue = "";
+  try {
+    if (!window.firebase || !firebase.database || !firebase.storage || !firebase.auth || window.__galleryFirebaseVersionMismatch) {
+      window.__galleryBootIssue = "Firebase could not load on this device or network.";
+    } else if (!window.B3_FIREBASE_CONFIG) {
+      window.__galleryBootIssue = "The gallery Firebase configuration could not load.";
+    } else if (!firebase.apps.length) {
+      firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+    }
+  } catch (err) {
+    console.error("Gallery Firebase startup failed:", err);
+    window.__galleryBootIssue = "The gallery could not connect to Firebase.";
+  }
+</script>
 <script src="../site-settings.js?v=20261008-owner-demo"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
 <script src="access.js?v=20261007-gallery-lock"></script>
@@ -52,19 +72,6 @@
   }
 </script>
 <script>
-  window.__galleryBootIssue = "";
-  try {
-    if (!window.firebase) {
-      window.__galleryBootIssue = "Firebase could not load on this device or network.";
-    } else if (!window.B3_FIREBASE_CONFIG) {
-      window.__galleryBootIssue = "The gallery Firebase configuration could not load.";
-    } else {
-      firebase.initializeApp(window.B3_FIREBASE_CONFIG);
-    }
-  } catch (err) {
-    console.error("Gallery Firebase startup failed:", err);
-    window.__galleryBootIssue = "The gallery could not connect to Firebase.";
-  }
 </script>
 <style>
 :root{
