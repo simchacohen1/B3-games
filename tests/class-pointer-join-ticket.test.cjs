@@ -36,9 +36,12 @@ function fixture() {
     once: async () => ({ val: () => { const v = rows.get(path); return v === undefined ? null : JSON.parse(JSON.stringify(v)); } }),
     set: async value => { if (value === null) rows.delete(path); else rows.set(path, JSON.parse(JSON.stringify(value))); },
     transaction: async callback => {
-      const before = rows.get(path) ?? null, after = callback(before === null ? null : JSON.parse(JSON.stringify(before)));
+      const before = rows.get(path) ?? null;
+      // like the real database: the function first runs on an empty local copy (aborting there ends the transaction), then again on the real value
+      const first = callback(null); let after = first;
+      if (first !== undefined && before !== null) after = callback(JSON.parse(JSON.stringify(before)));
       if (after === undefined) return { committed: false, snapshot: { val: () => before } };
-      rows.set(path, after);
+      if (after === null) rows.delete(path); else rows.set(path, after);
       return { committed: true, snapshot: { val: () => after } };
     }
   });

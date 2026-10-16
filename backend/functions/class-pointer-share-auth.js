@@ -104,6 +104,7 @@ exports.classPointerShareAuth=onRequest({
    const ticketRef=db.ref('b3Private/classPointerShareTickets/'+digest);
    const now=Date.now();
    const used=await ticketRef.transaction(row=>{
+     if(row===null)return row; // first pass can be an empty local copy; let the database retry with the real value
      if(!row||row.expiresAt<=now||row.room!==room||row.classId!==classId)return;
      if(row.verifiedBy){
        if(row.verifiedBy!==claims.uid||!Number.isFinite(row.verifiedAt)||now-row.verifiedAt>30000)return;
@@ -181,6 +182,7 @@ exports.classPointerShareAuth=onRequest({
    // One student connection per ticket: a stolen ticket does not work from another connection,
    // and a repeat check by the same teacher for the same connection is allowed for 30 seconds.
    const used=await ticketRef.transaction(row=>{
+    if(row===null)return row; // first pass can be an empty local copy; let the database retry with the real value
     if(!row||row.expiresAt<=now||row.room!==room||row.classId!==classId||row.peerId!==body.peerId)return;
     if(row.verifiedBy){
      if(row.verifiedBy!==claims.uid||!Number.isFinite(row.verifiedAt)||now-row.verifiedAt>30000)return;
