@@ -74,14 +74,14 @@ test('PDF Library button is visible in teaching dock and Present menu',()=>{
 
 test('unauthorized teacher URL cannot list stored PDFs',async()=>{
   const h=harness({authorized:false});
-  h.openPdf.afterElement.onclick();
+  h.elements['.session-controls'].afterElement.onclick();
   await new Promise(setImmediate);
   assert.equal(h.listed,0);
   assert.match(h.elements['#pointerLibraryStatus'].textContent,/Teacher class access denied/);
 });
 test('authorized teacher lists and reopens using Firebase ID token, never a public URL',async()=>{
   const h=harness();
-  h.openPdf.afterElement.onclick();
+  h.elements['.session-controls'].afterElement.onclick();
   await new Promise(setImmediate);
   assert.equal(h.listed,1);
   const row=h.elements['#pointerLibraryItems'].children[0];
