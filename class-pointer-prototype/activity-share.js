@@ -77,7 +77,7 @@
     promptPanel.setAttribute('role','dialog');promptPanel.setAttribute('aria-modal','true');
     promptPanel.setAttribute('aria-label','Teacher screen sharing request');
     promptPanel.style.cssText='width:min(420px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:24px;padding:clamp(20px,4vw,42px);box-shadow:0 24px 85px #0007;text-align:center;color:#12345a;box-sizing:border-box';
-    promptPanel.innerHTML='<div style="font-size:48px" aria-hidden="true">🖥️</div><h2 style="font-size:clamp(27px,4vw,38px);margin:8px 0 12px">Your teacher would like to see your screen</h2><p style="font-size:19px;line-height:1.45">Choose what you want to share in the next window. You can stop sharing whenever you want.</p><p style="font-size:15px;line-height:1.5">Press the blue button, select a tab, window, or screen in your browser, then press <strong>Share</strong>.</p>';
+    promptPanel.innerHTML='<div style="font-size:48px" aria-hidden="true">🖥️</div><h2 style="font-size:clamp(27px,4vw,38px);margin:8px 0 12px">Your teacher would like to see your screen</h2><p style="font-size:19px;line-height:1.45">Choose Entire Screen in the browser picker. You can stop sharing whenever you want.</p><p style="font-size:15px;line-height:1.5">Press the blue button, select <strong>Entire Screen</strong>, then press <strong>Share</strong>.</p>';
     const choose=document.createElement('button');choose.type='button';choose.textContent='Choose What to Share';
     choose.style.cssText='display:block;width:100%;background:#205af0;color:white;border:0;border-radius:14px;padding:18px;font:bold 22px system-ui;cursor:pointer;margin-top:18px';
     const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Not now';cancel.style.cssText='display:block;width:100%;padding:12px;margin-top:10px;background:#fff;border:1px solid #9baecb;border-radius:12px;color:#213654;font:700 16px system-ui;cursor:pointer';
@@ -182,9 +182,12 @@
         if(!navigator.mediaDevices?.getDisplayMedia)throw Error('Use Chrome or Edge on a computer.');
         // Capture must be called synchronously from the user click, before any await.
         const capturePromise=navigator.mediaDevices.getDisplayMedia({
-          video:{frameRate:{ideal:5,max:8}},audio:false
+          video:{displaySurface:'monitor',frameRate:{ideal:5,max:8}},audio:false,
+          selfBrowserSurface:'exclude',surfaceSwitching:'exclude',monitorTypeSurfaces:'include'
         });
         captured=await capturePromise;
+        const displaySurface=captured.getVideoTracks()[0]?.getSettings?.().displaySurface;
+        if(displaySurface&&displaySurface!=='monitor')throw Error('Please choose Entire Screen in the browser picker.');
         if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
         status('Connecting to teacher…');
         // A missing, blocked or unavailable Cloud Function can surface as a
