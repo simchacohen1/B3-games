@@ -58,15 +58,21 @@ exports.classPointerShareAuth=onRequest({
    const token=String(body.token||'');
    if(!/^[a-f0-9]{64}$/.test(token))error(400,'Invalid sharing ticket.');
    const digest=crypto.createHash('sha256').update(token).digest('hex');
-   // Consume the one-time ticket atomically: two simultaneous attempts cannot reuse it.
+   // Verify atomically. A repeated call from the *same session owner* during
+   // connection setup is idempotent; a different teacher or class cannot replay it.
+   // Retain the short-lived record rather than deleting it before media connects.
    const ticketRef=db.ref('b3Private/classPointerShareTickets/'+digest);
-   let ticket=null;
+   const now=Date.now();
    const used=await ticketRef.transaction(row=>{
-     if(!row||row.expiresAt<Date.now()||row.room!==room||row.classId!==classId)return;
-     ticket=row;
-     return null;
+     if(!row||row.expiresAt<now||row.room!==room||row.classId!==classId)return;
+     if(row.verifiedBy){
+       if(row.verifiedBy!==claims.uid||!Number.isFinite(row.verifiedAt)||now-row.verifiedAt>30000)return;
+       return row;
+     }
+     return {...row,verifiedBy:claims.uid,verifiedAt:now};
    });
-   if(!used.committed||!ticket)error(403,'Sharing ticket expired, used, or belongs to another class.');
+   const ticket=used.committed?used.snapshot.val():null;
+   if(!ticket)error(403,'Sharing ticket expired, used, or belongs to another class.');
    if(session.screenSharingDenied?.[ticket.studentId]===true)error(403,'Your teacher has turned off your screen sharing.');
    const [profileSnap,memberSnap]=await Promise.all([
      db.ref('b3Games/students/'+ticket.studentId+'/profile').once('value'),
