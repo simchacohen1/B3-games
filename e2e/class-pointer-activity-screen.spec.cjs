@@ -3,7 +3,8 @@ const {test,expect}=require('@playwright/test');
 const path=require('node:path');
 const fs=require('node:fs');
 
-test('synthetic Shorashim display capture is authorized and rendered by teacher',async({page})=>{
+test('synthetic Shorashim display capture is authorized and rendered by teacher',async({page,browserName})=>{
+  test.skip(browserName!=='chromium','Synthetic canvas capture video dimensions are only asserted in Chromium');
   await page.route('https://share.test/**',route=>{
     const url=new URL(route.request().url());
     if(url.pathname.endsWith('/activity-screen-teacher.js'))return route.fulfill({status:200,contentType:'text/javascript',body:fs.readFileSync(path.join(__dirname,'..','class-pointer-prototype','activity-screen-teacher.js'),'utf8')});
