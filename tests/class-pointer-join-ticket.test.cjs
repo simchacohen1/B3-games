@@ -154,19 +154,23 @@ test('reconnection: every reconnect asks for a fresh ticket for its new connecti
   assert.equal((await f.verify(two, 'teacher-et', 'et', ROOM, 'peer-second-02')).statusCode, 200);
 });
 
-test('rate limits reject wrong passcodes but preserve valid joins for the student and classmates', async () => {
+test('student lock blocks correct PINs while shared-address lock only blocks wrong PINs', async () => {
   const f = fixture();
   for (let i = 0; i < 8; i++) assert.equal((await f.issue('avi', '000' + i, 'et', ROOM, PEER, 'shared-school-ip')).statusCode, 401);
-  // A correct passcode still works after wrong attempts reached the student limit.
-  assert.equal((await f.issue('avi', '1111', 'et', ROOM, PEER, 'shared-school-ip')).statusCode, 200);
+  assert.equal((await f.issue('avi', '1111', 'et', ROOM, PEER, 'shared-school-ip')).statusCode, 429);
+  assert.equal((await f.issue('avi', '1111', 'et', ROOM, PEER, 'different-ip')).statusCode, 429);
 
-  // A shared-address lock applies to further wrong guesses, not to valid classmates.
+  // A shared-address limit must not block a correct classmate on the same school network.
   const crypto = require('node:crypto'), ipPath = 'b3Private/classPointerJoinLimits/i_' + crypto.createHash('sha256').update('shared-school-ip').digest('hex').slice(0, 32);
   f.rows.set(ipPath, { start: Date.now(), count: 40, until: Date.now() + 3600000 });
   assert.equal((await f.issue('benny', 'wrong', 'et', ROOM, PEER, 'shared-school-ip')).statusCode, 429);
   assert.equal((await f.issue('benny', '2222', 'et', ROOM, PEER, 'shared-school-ip')).statusCode, 200);
-});
 
+  // Student lock expires after its window.
+  const studentPath = 'b3Private/classPointerJoinLimits/s_' + crypto.createHash('sha256').update('avi').digest('hex').slice(0, 32);
+  f.rows.set(studentPath, { start: Date.now() - 900001, count: 8, until: Date.now() - 1 });
+  assert.equal((await f.issue('avi', '1111', 'et', ROOM, PEER, 'different-ip')).statusCode, 200);
+});
 test('the lesson page refuses unverified joins and the student page asks for a ticket first', () => {
   const classroom = fs.readFileSync(__dirname + '/../class-pointer-prototype/classroom.js', 'utf8').replace(/\r\n/g, '\n');
   const html = fs.readFileSync(__dirname + '/../class-pointer-prototype/classroom.html', 'utf8');
