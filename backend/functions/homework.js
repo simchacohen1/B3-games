@@ -19,7 +19,11 @@ exports.homeworkPortal=onRequest({region:'us-central1',cors:['https://simchacohe
     return ref.transaction(cur=>cur===null&&snap.val()!==null?cur:fn(cur));}
   };
   const token=String(req.headers.authorization||'').replace(/^Bearer /,'');
-  const auth=token?{identity:await admin.auth().verifyIdToken(token,true)}:{};
+  let auth={};
+  if(token){
+   try{auth={identity:await admin.auth().verifyIdToken(token,true)};}
+   catch(e){return res.status(401).json({error:'Please sign in again.'});}
+  }
   res.json(await homeworkApi(store,auth,req.body||{}));
  }catch(error){
   const code=Number.isInteger(error.code)&&error.code>=400&&error.code<600?error.code:500;
