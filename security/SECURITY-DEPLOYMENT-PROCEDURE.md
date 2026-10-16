@@ -1,38 +1,48 @@
 # Firebase security change procedure
 
-This is a deployment checklist for the local security work. It has not been run against production. The candidate rules live in `firebase-rules.hardened.json`; the normal Firebase config still points to `firebase-rules.json`.
+This is a deployment checklist for the local security work. It has not been run against production. The candidate configuration is `firebase.security-deploy.json`, which explicitly selects `firebase-rules.hardened.json` and `storage-rules.hardened.rules`; the standard `firebase.json` still points to the legacy Realtime Database rules. Never deploy by relying on the standard config until its target files have been deliberately reviewed.
 
 ## Before any production change
 
 1. Select a maintenance window and pause student activity so ET/WT attempts, Chazara events, recordings, rewards, and quiz answers are not changing during the backup and cutover.
-2. Capture the current Realtime Database rules and deployment inventory for project `b3-games`. Record the Realtime Database instance ID, all active function names, regions, generations, runtimes, and trigger URLs. Save the exports to an encrypted, access controlled backup location. Never commit them or paste student exports into tickets or logs.
-3. Export a complete Realtime Database backup with an authorized Admin SDK account into the encrypted backup location. Verify the export can be parsed and its checksum matches. Limit access to the owner and the specifically assigned recovery operator. Do not use a local, unencrypted student-data export.
-4. Record the source commit and build artifact for every function that will be replaced. The deployed function source was not proven to match this repository during the earlier inspection, so confirm the deployed revision and secrets/runtime configuration before replacing a function.
-5. Confirm the existing ET and WT membership records and tool grants using aggregate counts and synthetic fixtures only. Do not copy or use student names, records, or passcodes in test fixtures.
+2. Export the currently deployed Realtime Database rules and Storage rules. Record project ID, RTDB instance ID, bucket name, rules revisions, and the complete Cloud Functions inventory (name, region, generation, runtime, trigger, URL, and relevant non-secret configuration). Store these beside the backup in encrypted, access controlled storage; do not commit or paste data exports into tickets or logs.
+3. Export a complete Realtime Database backup using an authorized Admin SDK account to the encrypted backup location. Include any external or secondary RTDB instances used by ET/WT. Verify the backup parses, record byte size and SHA-256 checksum, and restrict access to the owner and named recovery operator.
+4. Back up Firebase Storage objects and metadata, including names, generations, content types, sizes, checksums, and custom metadata. Use a versioned, encrypted destination with object versioning or an equivalent immutable copy. Verify the object inventory and checksums without opening recordings or media.
+5. Restore the RTDB backup into a separate emulator or isolated non-production project, then compare record counts by path and verify the restored rules remain the captured rules. Restore a sample of Storage objects into an isolated bucket and confirm generation, metadata, and checksums. Keep student media contents out of routine inspection.
+6. Record the source commit and build artifact for every function that will be replaced. The deployed function source was not proven to match this repository during the earlier inspection, so confirm the deployed revision, runtime, secrets, environment variables, service accounts, and trigger configuration before replacing a function. Export function configuration without exporting secret values.
+7. Confirm ET and WT membership counts and tool-grant counts using aggregate counts and synthetic fixtures only. Do not copy or use student names, records, recordings, or passcodes in test fixtures.
 
 ## Local and emulator validation
 
 1. Use Java 21 or newer with the Firebase CLI. Temurin Java 21 is installed locally and the database emulator has been run against the isolated demo project.
-2. Run `node --test tests/weekly-quiz-student.test.cjs tests/hardened-rules-static.test.cjs tests/teacher-class-rosters.test.cjs` and the feature regression suites covering Posuk Practice, Chazara, Rewards, Shorashim, teacher class access, and ET/WT.
-3. Run `firebase emulators:exec --config firebase.security-test.json --project demo-b3-security --only database "node --test tests/security-rules-emulator.test.cjs"`. This uses an isolated `demo-` project ID and synthetic class/student records only.
-4. Verify the emulator proves: anonymous reads/writes fail for student paths; students cannot directly read Weekly Quiz answer keys, response correctness, or completions; a student can use only their own ID; teachers read only assigned classes; a teacher assigned to one class cannot read another; and ET/WT paths preserve legitimate student and teacher access.
-5. Review the function unit tests for server-scored answers, score release, assignment checks, and membership revalidation before promoting the candidate rules.
+2. Run the local Node regression suite while excluding browser tests that navigate to the live website. Run targeted security tests for Game Show answer stripping and active membership, private media URL authorization, Shorashim concurrent merges, Rewards, Posuk Practice, Chazara, Gallery, and ET/WT teacher scoping.
+3. Run the Realtime Database emulator with `firebase emulators:exec --config firebase.security-test.json --project demo-b3-security --only database "node --test tests/security-rules-emulator.test.cjs"` and Storage emulator with the same config and `--only storage`. The `demo-` project uses synthetic records and files only.
+4. Verify the emulator proves: anonymous reads/writes fail on student data; students cannot read Weekly Quiz correctness or Game Show answer keys; students can write only their own progress and submissions; Gallery students see approved posts and their own submissions; teachers read only actively assigned classes; and ET/WT access works independently for assigned teachers.
+5. Review function tests for verified ID tokens, server side answer filtering/scoring, class membership and active assignment checks, safe media URL issuance, and request body validation. Verify function URLs and the frontend configuration point to the intended `b3-games` project before any deployment.
 
 ## Safe deployment order after explicit approval
 
-1. Freeze writes and confirm a fresh encrypted backup, rules export, rollback commit, and maintenance contact.
-2. Deploy the compatible student-authentication, Weekly Quiz student API, and point-award functions first. Verify function health and synthetic requests before changing the website.
-3. Publish the website code that signs students in with the returned class scoped token and sends authenticated requests for Posuk Practice, Chazara, Rewards, and Weekly Quiz. Verify the published artifact and a synthetic test account before opening student access.
-4. Apply the restrictive Realtime Database rules only after the website is confirmed to use those authenticated flows and the full direct-path emulator suite passes. The candidate rules must be reviewed against every feature before this step; changing rules too early will interrupt legacy direct database flows.
-5. Verify anonymous access is denied on student profile, roster, Posuk attempts, Chazara, Shorashim, Gallery, and quiz-result paths. Verify ET and WT students, teachers, and two teachers assigned to separate classes can use only their own class.
-6. Reopen student activity and monitor permission-denied counts, failed sign-ins, failed point requests, and function errors. Do not log request bodies, passcodes, recordings, or student records.
+1. Freeze writes. Reconfirm fresh encrypted RTDB and Storage backups, rules/config exports, object inventory and checksums, successful isolated restore drills, rollback commit, and maintenance contact.
+2. Validate `firebase.security-deploy.json`, `.firebaserc`, functions source, runtime, regions, bucket and database IDs, and environment configuration against the approved project. Use explicit `--project b3-games --config firebase.security-deploy.json` on each later deployment command; do not run it now without separate approval.
+3. Deploy compatible backend functions first: student authentication/token issuance, Rewards and Posuk/Chazara actions, Game Show student question/action endpoints, Gallery scoped reads, and private media URL issuance. Verify function health and synthetic requests without live student data.
+4. Publish the website frontend after the endpoints are ready. Confirm student login, ET/WT class selection, teacher class selection, recordings, Gallery approval, Game Show question display/buzz, and Rewards workflows with synthetic test accounts. Keep student activity paused.
+5. Deploy the Realtime Database rules from `firebase-rules.hardened.json` only after the updated frontend is serving and emulator tests pass. Confirm teacher and owner workflows immediately with synthetic accounts.
+6. Deploy Storage rules from `storage-rules.hardened.rules`. Verify owner-only Posuk/Chazara reads, matching-class uploads, Gallery media visibility only after approval through the signed URL endpoint, size/type checks, and teacher media access after assignment verification.
+7. Run the post-deployment smoke checklist with synthetic accounts: anonymous and cross-student data reads denied; rewards balances cannot be directly changed; Game Show answers remain filtered; ET and WT students function independently; two teachers cannot cross classes; active assignment revocation blocks the next backend request; new recordings play for the student and assigned teacher; approved Gallery media displays for classmates.
+8. Reopen student activity only after all checks pass. Monitor permission-denied counts, failed sign-ins, failed submissions, function errors, and Storage errors. Do not log request bodies, passcodes, recording contents, or student records.
 
 ## Rollback
 
 1. If function behavior fails before the rules change, restore the previously recorded function source/build and keep student activity paused until smoke checks pass.
 2. If the website fails after function deployment, restore the previous website artifact. The old website can still authenticate, but new point requests may fail closed until a compatible site is restored.
 3. If a rules issue blocks legitimate ET/WT work, pause student activity, fix the candidate and rerun emulator tests. Restore previous rules only with explicit owner authorization and a time limited exposure plan; the previous rules reopen public access. Prefer a corrected restrictive ruleset over reverting to permissive rules.
-4. Restore database contents only if the data is actually corrupted or lost, and only from the verified encrypted backup with explicit approval. Rules rollback does not require restoring database contents.
+4. If Storage rules block legitimate uploads or playback, pause activity and restore only the captured Storage rules after explicit owner authorization; review the temporary exposure and immediately correct the restrictive candidate.
+5. Restore database contents only if data is actually corrupted or lost, from the verified encrypted backup into the correct instance after explicit approval. Rules rollback does not require restoring database contents.
+6. Restore Storage objects only if they are actually missing or corrupted. Restore object generations and metadata from the verified backup after explicit approval; do not overwrite newer valid recordings or Gallery media during recovery.
+
+## Existing download URL migration blocker
+
+Firebase Storage download URLs contain bearer tokens. Tightening Storage rules does not revoke a token URL already saved in Realtime Database or copied elsewhere. The updated student pages save new Posuk and Chazara audio by private Storage path, and new Gallery media uses the authorized short-lived URL endpoint, but historical `audioURL` and `videoUrl` values can remain usable until their object tokens are rotated. Before claiming that all historical recordings and Gallery files are private, inventory tokenized objects from metadata only, migrate database references to object paths, rotate the download tokens, and verify playback through authenticated endpoints. Keep the object bytes and generations unchanged. This production metadata and database migration requires separate explicit approval, a fresh backup, a restore check, and a tested rollback plan.
 
 ## Multi-teacher and ET/WT data safeguards
 

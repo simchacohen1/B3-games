@@ -1,0 +1,41 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedStudent(studentId) {
+      return request.auth != null
+        && request.auth.token.b3StudentRole == 'student'
+        && request.auth.token.b3StudentId == studentId
+        && request.auth.token.b3ClassId is string;
+    }
+    function imageOrAudio() {
+      return request.resource == null
+        || request.resource.size < 15 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*|audio/.*|video/.*');
+    }
+    match /posukPractice/{studentId}/{file=**} {
+      allow read: if signedStudent(studentId);
+      allow create, update: if signedStudent(studentId) && imageOrAudio();
+      allow delete: if signedStudent(studentId);
+    }
+    match /shorashimLearning/students/{studentId}/drawings/{file=**} {
+      allow read: if signedStudent(studentId);
+      allow create, update: if signedStudent(studentId) && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if signedStudent(studentId);
+    }
+    match /shorashim-recordings/{studentId}/{file=**} {
+      allow read: if signedStudent(studentId);
+      allow create, update: if signedStudent(studentId) && request.resource.size < 15 * 1024 * 1024
+        && request.resource.contentType.matches('audio/.*');
+      allow delete: if signedStudent(studentId);
+    }
+    match /classGallery/{classId}/{studentId}/{postId}/{file=**} {
+      allow read: if signedStudent(studentId) && request.auth.token.b3ClassId == classId;
+      allow create, update: if signedStudent(studentId) && request.auth.token.b3ClassId == classId
+        && request.resource.size < 25 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*|audio/.*|video/.*');
+      allow delete: if signedStudent(studentId) && request.auth.token.b3ClassId == classId;
+    }
+    match /{file=**} { allow read, write: if false; }
+  }
+}

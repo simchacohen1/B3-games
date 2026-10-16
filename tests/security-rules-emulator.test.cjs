@@ -22,7 +22,7 @@ test.before(async()=>{
       'b3Games/students/synthetic_one/memberships/b3-2026_alpha':{workspaceId:'b3-2026',classId:'alpha',active:true},
       'b3Games/students/synthetic_two/profile':{name:'Synthetic Two',active:true,classId:'beta'},
       'b3Games/students/synthetic_two/memberships/b3-2026_beta':{workspaceId:'b3-2026',classId:'beta',active:true},
-      'b3Games/workspaces/b3-2026/classes/alpha':{active:true,members:{synthetic_one:{active:true}},toolGrants:{chazara:true}},
+      'b3Games/workspaces/b3-2026/classes/alpha':{active:true,members:{synthetic_one:{active:true},synthetic_friend:{active:true}},toolGrants:{chazara:true}},
       'b3Games/workspaces/b3-2026/classes/beta':{active:true,members:{synthetic_two:{active:true}},toolGrants:{chazara:true}},
       'b3Games/workspaces/b3-2026/teachers/teacher_alpha':{active:true,classIds:{alpha:true}},
       'b3Games/workspaces/b3-2026/teachers/teacher_beta':{active:true,classIds:{beta:true}},
@@ -33,12 +33,27 @@ test.before(async()=>{
       'b3Games/workspaces/b3-2026/teachers/teacher_et':{active:true,classIds:{et:true}},
       'b3Games/workspaces/b3-2026/teachers/teacher_wt':{active:true,classIds:{wt:true}},
       'b3Games/workspaces/b3-2026/teachers/teacher_inactive':{active:false,classIds:{et:true}},
+      'b3Games/workspaces/b3-2026/teachers/teacher_multi':{active:true,classIds:{alpha:true}},
       'posukPractice/shorashimLearning/students/synthetic_one':{name:'Synthetic One',cards:{}},
       'posukPractice/shorashimLearning/students/synthetic_two':{name:'Synthetic Two',cards:{}},
       'posukPractice/shorashimLearning/recordingEvents/synthetic_one/event_one':{type:'start',at:1},
       'posukPractice/shorashimLearning/recordingEvents/synthetic_two/event_two':{type:'start',at:2},
       'posukPractice/shorashimLearning/leaderboards/match/8/synthetic_one':{wins:3},
       'posukPractice/shorashimLearning/leaderboards/match/8/synthetic_two':{wins:4},
+      'posukPractice/settings/classPracticeLimits/alpha':{allowAll:true},
+      'classGallery/posts/post_alpha':{studentId:'synthetic_one',classId:'alpha',status:'pending',title:'Synthetic alpha'},
+      'classGallery/posts/post_beta':{studentId:'synthetic_two',classId:'beta',status:'pending',title:'Synthetic beta'},
+      'b3Games/workspaces/b3-2026/classes/alpha/resources/gallery/posts/modern_pending':{studentId:'synthetic_friend',classId:'alpha',status:'pending',title:'Synthetic private post'},
+      'rashiLetters/matchRooms/1234':{host:'synthetic_one',hostName:'Synthetic One',classId:'alpha',state:'lobby',createdAt:1,questions:[],players:{synthetic_one:{name:'Synthetic One',score:0,q:0}}},
+      'questionSets/vayeira18':{title:'Synthetic legacy',questions:[{q:'Synthetic question',ans:'private answer'}]},
+      'questionSets/classes/alpha/set':{title:'Synthetic alpha',questions:[{q:'Synthetic alpha question',ans:'private answer'}]},
+      'questionSets/classes/beta/set':{title:'Synthetic beta',questions:[{q:'Synthetic beta question',ans:'private answer'}]},
+      'questionSets/classes/alpha/live':{roundActive:true,qIndex:0,scores:{'Synthetic One':0}},
+      'studentRewards/students/reward_one':{id:'reward_one',b3StudentId:'synthetic_one',classId:'b3_alpha',rewardBalance:5},
+      'studentRewards/students/reward_two':{id:'reward_two',b3StudentId:'synthetic_two',classId:'b3_beta',rewardBalance:7},
+      'studentRewards/classes/b3_alpha':{id:'b3_alpha',name:'Synthetic Alpha',active:true,b3ClassId:'alpha'},
+      'studentRewards/classes/b3_beta':{id:'b3_beta',name:'Synthetic Beta',active:true,b3ClassId:'beta'},
+      'studentRewards/refundRequests/reward_one/old':{status:'pending',amount:2},
       'b3Quiz/classes/alpha/quizzes/quiz_one':{title:'Synthetic Quiz'},
       'b3Quiz/classes/alpha/launches/launch_shared':{classId:'alpha',targetStudents:null,started:true,quizSnapshot:{questions:[{correctIndex:1}]}},
       'b3Quiz/classes/alpha/launches/launch_targeted':{classId:'alpha',targetStudents:{synthetic_two:true},started:true,quizSnapshot:{questions:[{correctIndex:0}]}},
@@ -163,4 +178,77 @@ testEmulator('Weekly Quiz teacher reads and student launch access stay class sco
   await fails(set(ref(alphaStudent,'b3Quiz/classes/alpha/responses/launch_shared/synthetic_one/0'),{choiceIndex:1,correct:true}));
   await fails(get(ref(alphaStudent,'b3Quiz/classes/alpha/completions/launch_shared/synthetic_one')));
   await fails(set(ref(alphaStudent,'b3Quiz/classes/alpha/completions/launch_shared/synthetic_one'),{correct:1,total:1,pct:100}));
+});
+
+testEmulator('Posuk Practice limits require an active teacher assignment',async()=>{
+  const alpha=db('teacher_alpha',{email:'alpha@example.test',email_verified:true});
+  const inactive=db('teacher_inactive',{email:'inactive@example.test',email_verified:true});
+  await succeeds(set(ref(alpha,'posukPractice/settings/classPracticeLimits/alpha'),{allowAll:false,max:5}));
+  await fails(set(ref(alpha,'posukPractice/settings/classPracticeLimits/beta'),{allowAll:false,max:5}));
+  await fails(set(ref(inactive,'posukPractice/settings/classPracticeLimits/alpha'),{allowAll:false,max:5}));
+});
+
+testEmulator('Gallery reads are class scoped and students cannot overwrite a peer post',async()=>{
+  const one=db('student-one',{b3StudentId:'synthetic_one',b3ClassId:'alpha',b3StudentRole:'student'});
+  const teacher=db('teacher_alpha',{email:'alpha@example.test',email_verified:true});
+  await fails(get(ref(one,'classGallery/posts/post_alpha')));
+  await fails(get(ref(one,'classGallery/posts/post_beta')));
+  await fails(get(ref(one,'b3Games/workspaces/b3-2026/classes/alpha/resources/gallery/posts')));
+  await fails(get(ref(one,'b3Games/workspaces/b3-2026/classes/alpha/resources/gallery/posts/modern_pending')));
+  await succeeds(set(ref(one,'b3Games/workspaces/b3-2026/classes/alpha/resources/gallery/posts/own_new'),{studentId:'synthetic_one',classId:'alpha',status:'pending',title:'Synthetic own post'}));
+  await fails(set(ref(one,'b3Games/workspaces/b3-2026/classes/alpha/resources/gallery/posts/forged'),{studentId:'synthetic_friend',classId:'alpha',status:'pending',title:'Synthetic forged post'}));
+  await succeeds(get(ref(teacher,'classGallery/posts/post_alpha')));
+  await fails(get(ref(teacher,'classGallery/posts/post_beta')));
+  await succeeds(get(ref(teacher,'b3Games/workspaces/b3-2026/classes/alpha/resources/gallery/posts/modern_pending')));
+  await fails(set(ref(one,'classGallery/posts/post_beta'),{studentId:'synthetic_one',classId:'alpha',status:'pending'}));
+  await fails(set(ref(one,'classGallery/posts/post_alpha'),{studentId:'synthetic_one',classId:'alpha',status:'approved'}));
+});
+
+testEmulator('Rashi progress and match rooms remain inside the authenticated class',async()=>{
+  const one=db('student-one',{b3StudentId:'synthetic_one',b3ClassId:'alpha',b3StudentRole:'student'});
+  const beta=db('student-two',{b3StudentId:'synthetic_two',b3ClassId:'beta',b3StudentRole:'student'});
+  const friend=db('student-friend',{b3StudentId:'synthetic_friend',b3ClassId:'alpha',b3StudentRole:'student'});
+  const teacher=db('teacher_alpha',{email:'alpha@example.test',email_verified:true});
+  await succeeds(get(ref(teacher,'rashiLetters/progress/synthetic_one')));
+  await fails(get(ref(teacher,'rashiLetters/progress/synthetic_two')));
+  await succeeds(get(ref(one,'rashiLetters/matchRooms/1234')));
+  await succeeds(get(ref(friend,'rashiLetters/matchRooms/1234')));
+  await fails(get(ref(beta,'rashiLetters/matchRooms/1234')));
+  await fails(set(ref(beta,'rashiLetters/matchRooms/1234'),{host:'synthetic_two',classId:'beta',players:{synthetic_two:{name:'Synthetic Two'}}}));
+  await succeeds(set(ref(one,'rashiLetters/matchRooms/new_room'),{host:'synthetic_one',hostName:'Synthetic One',classId:'alpha',state:'lobby',createdAt:2,questions:[],players:{synthetic_one:{name:'Synthetic One',score:0,q:0}}}));
+  await succeeds(set(ref(friend,'rashiLetters/matchRooms/1234/players/synthetic_friend'),{name:'Synthetic Friend',score:0,q:0}));
+  await fails(set(ref(friend,'rashiLetters/matchRooms/1234/players/synthetic_one/score'),100));
+  await fails(set(ref(friend,'rashiLetters/matchRooms/new_room/state'),'ended'));
+});
+
+testEmulator('Game Show answer keys stay teacher only and students cannot alter live scores',async()=>{
+  const one=db('student-one',{b3StudentId:'synthetic_one',b3ClassId:'alpha',b3StudentRole:'student'});
+  const teacher=db('teacher_alpha',{email:'alpha@example.test',email_verified:true});
+  const etTeacher=db('teacher_et',{email:'et@example.test',email_verified:true});
+  const betaTeacher=db('teacher_beta',{email:'beta@example.test',email_verified:true});
+  await fails(get(ref(one,'questionSets/classes/alpha/set')));
+  await fails(get(ref(one,'questionSets/vayeira18')));
+  await succeeds(get(ref(teacher,'questionSets/classes/alpha/set')));
+  await succeeds(get(ref(etTeacher,'questionSets/vayeira18')));
+  await fails(get(ref(betaTeacher,'questionSets/classes/alpha/set')));
+  await succeeds(get(ref(one,'questionSets/classes/alpha/live')));
+  await fails(set(ref(one,'questionSets/classes/alpha/live/scores/Synthetic One'),100));
+  await fails(set(ref(one,'questionSets/classes/alpha/live/buzzedBy'),'Synthetic One'));
+  await succeeds(set(ref(teacher,'questionSets/classes/alpha/live/roundActive'),false));
+});
+
+testEmulator('Student Rewards own paths work while peer data and direct awards stay private',async()=>{
+  const one=db('student-one',{b3StudentId:'synthetic_one',b3ClassId:'alpha',b3StudentRole:'student',studentRewardsStudentId:'reward_one',studentRewardsClassId:'b3_alpha'});
+  const two=db('student-two',{b3StudentId:'synthetic_two',b3ClassId:'beta',b3StudentRole:'student',studentRewardsStudentId:'reward_two',studentRewardsClassId:'b3_beta'});
+  const owner=db('owner',{email:'simcha5770@gmail.com',email_verified:true});
+  await succeeds(get(ref(one,'studentRewards/students/reward_one')));
+  await fails(get(ref(one,'studentRewards/students/reward_two')));
+  await succeeds(get(ref(one,'studentRewards/rewards')));
+  await fails(get(ref(one,'studentRewards')));
+  await fails(set(ref(one,'studentRewards/students/reward_one/rewardBalance'),999));
+  await succeeds(set(ref(one,'studentRewards/refundRequests/reward_one/new'),{status:'pending',amount:2}));
+  await fails(set(ref(two,'studentRewards/refundRequests/reward_one/other'),{status:'pending',amount:2}));
+  await succeeds(set(ref(one,'studentRewards/refundRequests/reward_one/old'),null));
+  await succeeds(get(ref(owner,'studentRewards/students')));
+  await fails(get(ref(owner,'studentRewards/privateAuth')));
 });

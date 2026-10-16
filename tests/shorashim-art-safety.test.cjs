@@ -34,5 +34,5 @@ assert.deepEqual(JSON.parse(JSON.stringify(merged.prefix)), current.prefix, 'oth
 
 const bulk = source.slice(source.indexOf('async function fillArtForShorashim'), source.indexOf('function mergeCatalogWithoutReplacingPictures'));
 assert.match(bulk, /!sanitizeClassArt\(i\.art\)\.length/, 'bulk process only targets missing art');
-assert.match(bulk, /teacherApproved!==true/, 'bulk process skips approved catalog entries');
+assert.doesNotMatch(bulk, /teacherApproved!==true/, 'approved entries with missing art may receive safe fallback art');
 console.log('Shorashim art safety tests passed.');

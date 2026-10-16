@@ -33,6 +33,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="recording-save.js?v=20261002-fast-save"></script>
 <script src="../firebase-config.js"></script>
+<script src="../private-media.js?v=20261015-private"></script>
 <script src="../guest-mode.js?v=20261011-guest"></script>
 <script src="../game-gate.js?v=20261008-owner-demo" data-game-id="chazara" data-back-href="../index.html"></script>
 </head>
@@ -143,8 +144,8 @@ function recordingCard(e,status){
   left.innerHTML=`<div class="recording-title">${R(eventKey(e))}${badge}</div><div class="recording-meta">${e.createdAt?new Date(Number(e.createdAt)).toLocaleString():''}${e.durationMs?' · '+(Number(e.durationMs)/1000).toFixed(1)+' sec':''}</div>`;
   const del=document.createElement('button');del.type='button';del.className='recording-delete';del.textContent='Delete';del.onclick=async()=>{del.disabled=true;del.textContent='Deleting…';try{await removeChazaraEvent(e.id)}catch(err){console.error(err);alert('Could not delete that recording. Please try again.')}finally{del.disabled=false;del.textContent='Delete'}};
   row.append(left,del);
-  const audioSrc=e.audioURL||e.audioDataURL;
-  if(audioSrc){const audio=document.createElement('audio');audio.controls=true;audio.preload='metadata';audio.src=audioSrc;audio.addEventListener('play',()=>document.querySelectorAll('#recordingsList audio').forEach(a=>{if(a!==audio)a.pause()}));row.appendChild(audio)}
+  const audioSrc=e.audioDataURL||e.audioURL;
+  if(e.storagePath||audioSrc){const audio=document.createElement('audio');audio.controls=true;audio.preload='metadata';if(audioSrc)audio.src=audioSrc;if(e.storagePath)B3PrivateMedia.setSource(audio,e.storagePath).catch(err=>console.warn('Recording access failed:',err.message));audio.addEventListener('play',()=>document.querySelectorAll('#recordingsList audio').forEach(a=>{if(a!==audio)a.pause()}));row.appendChild(audio)}
   return row;
 }
 function renderRecordingGroup(target,rows,status){
@@ -275,7 +276,7 @@ async function finishRecording(st){
       if(blob.size>5*1024*1024)throw Object.assign(new Error('This recording is too large to save. Please make a shorter recording.'),{cause:err});
       audioDataURL=await blobToDataURL(blob);
     }
-    const event={id:eventId,studentId:sid,studentName:sname,workspaceClassId:sessionStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[st.key]?.practiceKey||null,recorded:true,points:2,reviewApplied:false,removed:false,chazaraDate:dayKey(),durationMs,soundDetected:true,peakRms:Number(st.peak.toFixed(4)),waveform:compactWave(st.samples),audioURL:url||null,audioDataURL:audioDataURL||null,storagePath:storagePath||null,storageFallback:Boolean(audioDataURL),storageErrorCode:storageError?.code||null,mimeType:blob.type||null,sizeBytes:blob.size,createdAt:firebase.database.ServerValue.TIMESTAMP,reviewNumber:(Number(d.reviews[st.key]?.count)||0)+1};
+    const event={id:eventId,studentId:sid,studentName:sname,workspaceClassId:sessionStorage.getItem("b3Games_studentClass")||null,perek,posuk,posukKey:unlocked[st.key]?.practiceKey||null,recorded:true,points:2,reviewApplied:false,removed:false,chazaraDate:dayKey(),durationMs,soundDetected:true,peakRms:Number(st.peak.toFixed(4)),waveform:compactWave(st.samples),audioURL:null,audioDataURL:audioDataURL||null,storagePath:storagePath||null,storageFallback:Boolean(audioDataURL),storageErrorCode:storageError?.code||null,mimeType:blob.type||null,sizeBytes:blob.size,createdAt:firebase.database.ServerValue.TIMESTAMP,reviewNumber:(Number(d.reviews[st.key]?.count)||0)+1};
     writeStarted=true;
     await step(eventRef.set(event),'Saving recording');
     await step(incrementReview(st.key),'Saving Chazara count');
