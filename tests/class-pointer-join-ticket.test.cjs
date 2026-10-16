@@ -2,6 +2,7 @@
 // Join tickets for Classroom Pointer: SYNTHETIC data only, in-memory database, no Firebase.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const source = fs.readFileSync(__dirname + '/../backend/functions/class-pointer-share-auth.js', 'utf8');
@@ -36,9 +37,12 @@ function fixture() {
     once: async () => ({ val: () => { const v = rows.get(path); return v === undefined ? null : JSON.parse(JSON.stringify(v)); } }),
     set: async value => { if (value === null) rows.delete(path); else rows.set(path, JSON.parse(JSON.stringify(value))); },
     transaction: async callback => {
-      const before = rows.get(path) ?? null, after = callback(before === null ? null : JSON.parse(JSON.stringify(before)));
+      const before = rows.get(path) ?? null;
+      // like the real database: the function first runs on an empty local copy (aborting there ends the transaction), then again on the real value
+      const first = callback(null); let after = first;
+      if (first !== undefined && before !== null) after = callback(JSON.parse(JSON.stringify(before)));
       if (after === undefined) return { committed: false, snapshot: { val: () => before } };
-      rows.set(path, after);
+      if (after === null) rows.delete(path); else rows.set(path, after);
       return { committed: true, snapshot: { val: () => after } };
     }
   });
@@ -154,23 +158,17 @@ test('reconnection: every reconnect asks for a fresh ticket for its new connecti
   assert.equal((await f.verify(two, 'teacher-et', 'et', ROOM, 'peer-second-02')).statusCode, 200);
 });
 
-test('student lock blocks correct PINs while shared-address lock only blocks wrong PINs', async () => {
+test('guessing is limited: 8 wrong passcodes pause that student, others and other rooms unaffected', async () => {
   const f = fixture();
-  for (let i = 0; i < 8; i++) assert.equal((await f.issue('avi', '000' + i, 'et', ROOM, PEER, 'shared-school-ip')).statusCode, 401);
-  assert.equal((await f.issue('avi', '1111', 'et', ROOM, PEER, 'shared-school-ip')).statusCode, 429);
-  assert.equal((await f.issue('avi', '1111', 'et', ROOM, PEER, 'different-ip')).statusCode, 429);
-
-  // A shared-address limit must not block a correct classmate on the same school network.
-  const crypto = require('node:crypto'), ipPath = 'b3Private/classPointerJoinLimits/i_' + crypto.createHash('sha256').update('shared-school-ip').digest('hex').slice(0, 32);
-  f.rows.set(ipPath, { start: Date.now(), count: 40, until: Date.now() + 3600000 });
-  assert.equal((await f.issue('benny', 'wrong', 'et', ROOM, PEER, 'shared-school-ip')).statusCode, 429);
-  assert.equal((await f.issue('benny', '2222', 'et', ROOM, PEER, 'shared-school-ip')).statusCode, 200);
-
-  // Student lock expires after its window.
-  const studentPath = 'b3Private/classPointerJoinLimits/s_' + crypto.createHash('sha256').update('avi').digest('hex').slice(0, 32);
-  f.rows.set(studentPath, { start: Date.now() - 900001, count: 8, until: Date.now() - 1 });
-  assert.equal((await f.issue('avi', '1111', 'et', ROOM, PEER, 'different-ip')).statusCode, 200);
+  for (let i = 0; i < 8; i++) assert.equal((await f.issue('avi', '000' + i, 'et', ROOM, PEER, '1.1.1.' + i)).statusCode, 401);
+  assert.equal((await f.issue('avi', '1111', 'et', ROOM, PEER, '9.9.9.9')).statusCode, 429);   // even the right passcode waits
+  assert.equal((await f.issue('benny', '2222', 'et', ROOM, PEER, '9.9.9.9')).statusCode, 200);  // classmate is fine
+  const g = fixture();
+  let hit = null;
+  for (let i = 0; i < 60 && hit === null; i++) if ((await g.issue(i % 2 ? 'avi' : 'benny', 'bad' + i, 'et', ROOM, PEER, '7.7.7.7')).statusCode === 429) hit = i;
+  assert.ok(hit !== null && hit <= 41);
 });
+
 test('the lesson page refuses unverified joins and the student page asks for a ticket first', () => {
   const classroom = fs.readFileSync(__dirname + '/../class-pointer-prototype/classroom.js', 'utf8').replace(/\r\n/g, '\n');
   const html = fs.readFileSync(__dirname + '/../class-pointer-prototype/classroom.html', 'utf8');
@@ -212,4 +210,70 @@ test('teacher-side gate: malformed tickets are dropped without a server call and
   sandbox.location.search = '';
   vm.runInNewContext(fs.readFileSync(__dirname + '/../class-pointer-prototype/join-auth.js', 'utf8'), sandbox);
   assert.equal(sandbox.ClassPointerJoinGate.required, false);
+});
+
+// ---- screen-share ticket limits (review findings 2 and 3) ----
+function withSharing(f) {
+  const key = 'b3Games/workspaces/b3-2026/classes/et/classPointerSessions/' + ROOM;
+  f.rows.set(key, { ...f.rows.get(key), studentScreenSharing: true, destinationRequest: { mode: 'screens', at: Date.now() }, shareRequest: { at: Date.now() } });
+  return f;
+}
+const share = (f, id, pin, ip) => f.post({ action: 'issue', studentId: id, pin, classId: 'et', room: ROOM }, null, ip);
+const hashedLimit = (kind, value) => 'b3Private/classPointerJoinLimits/' + kind + '_' + crypto.createHash('sha256').update(String(value)).digest('hex').slice(0, 32);
+test('a shared-address lock blocks incorrect passcodes but not valid students', async () => {
+  const f = withSharing(fixture()), ip = '8.8.8.8';
+  f.rows.set(hashedLimit('i', ip), { start: Date.now(), count: 40, until: Date.now() + 3600000 });
+  assert.equal((await share(f, 'avi', '1111', ip)).statusCode, 200, 'valid screen-share ticket remains available');
+  assert.equal((await f.post({ action: 'permissions', studentId: 'avi', pin: '1111', classId: 'et', room: ROOM }, null, ip)).statusCode, 200, 'valid permission check remains available');
+  assert.equal((await f.issue('benny', '2222', 'et', ROOM, 'student-peer-0002', ip)).statusCode, 200, 'valid class join remains available');
+  assert.equal((await share(f, 'avi', 'wrong', ip)).statusCode, 429, 'wrong activity-share passcodes are rejected');
+  assert.equal((await f.post({ action: 'permissions', studentId: 'avi', pin: 'wrong', classId: 'et', room: ROOM }, null, ip)).statusCode, 429, 'wrong permission passcodes are rejected');
+  assert.equal((await f.issue('benny', 'wrong', 'et', ROOM, 'student-peer-0002', ip)).statusCode, 429, 'wrong join passcodes are rejected');
+});
+test('a per-student lock still blocks every action, including a correct passcode', async () => {
+  const f = withSharing(fixture()), id = 'avi', ip = '9.9.9.9';
+  f.rows.set(hashedLimit('s', id), { start: Date.now(), count: 8, until: Date.now() + 900000 });
+  assert.equal((await share(f, id, '1111', ip)).statusCode, 429);
+  assert.equal((await f.post({ action: 'permissions', studentId: id, pin: '1111', classId: 'et', room: ROOM }, null, ip)).statusCode, 429);
+  assert.equal((await f.issue(id, '1111', 'et', ROOM, PEER, ip)).statusCode, 429);
+});
+test('one student guessing wrong cannot lock classmates out of screen sharing (shared school address)', async () => {
+  const f = withSharing(fixture());
+  let blocked = null;
+  for (let i = 0; i < 30; i++) { const r = await share(f, 'avi', 'bad' + i, '5.5.5.5'); if (r.statusCode === 429 && blocked === null) blocked = i; }
+  assert.equal(blocked, 8, 'the guessing student is paused after 8 wrong tries');
+  assert.equal((await share(f, 'benny', '2222', '5.5.5.5')).statusCode, 200, 'a classmate on the same address still gets a ticket');
+  assert.equal((await share(f, 'avi', '1111', '6.6.6.6')).statusCode, 429, 'even the right passcode waits for the guesser');
+});
+test('successful screen-share tickets do not use up the address allowance', async () => {
+  const f = withSharing(fixture());
+  for (let i = 0; i < 12; i++) { assert.equal((await share(f, 'avi', '1111', '5.5.5.5')).statusCode, 200); assert.equal((await share(f, 'benny', '2222', '5.5.5.5')).statusCode, 200); }
+  let hit = null; for (let i = 0; i < 20 && hit === null; i++) if ((await share(f, 'avi', '1111', '5.5.5.5')).statusCode === 429) hit = i;
+  assert.ok(hit !== null, 'one student cannot request tickets forever');
+  assert.equal((await share(f, 'benny', '2222', '5.5.5.5')).statusCode, 200, 'but a classmate is unaffected');
+});
+test('the shared default passcode is refused for screen sharing and permission checks; permission guessing is limited', async () => {
+  const f = withSharing(fixture());
+  assert.equal((await share(f, 'legacy', '5770')).statusCode, 401);
+  const perm = (id, pin) => f.post({ action: 'permissions', studentId: id, pin, classId: 'et', room: ROOM }, null, '4.4.4.4');
+  assert.equal((await perm('legacy', '5770')).statusCode, 401);
+  assert.equal((await perm('avi', '1111')).statusCode, 200);
+  for (let i = 0; i < 8; i++) assert.equal((await perm('benny', 'x' + i)).statusCode, 401);
+  assert.equal((await perm('benny', '2222')).statusCode, 429);
+  assert.equal((await perm('avi', '1111')).statusCode, 200);
+});
+
+test('compatibility: a denial recorded on the public session record (website currently live) is still enforced by the server', async () => {
+  const f = withSharing(fixture());
+  const key = 'b3Games/workspaces/b3-2026/classes/et/classPointerSessions/' + ROOM;
+  f.rows.set(key, { ...f.rows.get(key), screenSharingDenied: { avi: true } });
+  assert.equal((await share(f, 'avi', '1111', '3.3.3.3')).statusCode, 403);          // issue refuses the denied student
+  assert.equal((await share(f, 'benny', '2222', '3.3.3.3')).statusCode, 200);         // classmate unaffected
+  const permission = await f.post({ action: 'permissions', studentId: 'avi', pin: '1111', classId: 'et', room: ROOM }, null, '3.3.3.3');
+  assert.equal(permission.body.screenSharingDenied, true);
+  // a ticket issued before the denial is also refused at verify
+  const g = withSharing(fixture());
+  const ticket = (await share(g, 'avi', '1111', '3.3.3.3')).body.token;
+  g.rows.set(key, { ...g.rows.get(key), screenSharingDenied: { avi: true } });
+  assert.equal((await g.post({ action: 'verify', classId: 'et', room: ROOM, token: ticket }, 'teacher-et')).statusCode, 403);
 });
