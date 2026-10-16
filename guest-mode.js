@@ -15,6 +15,46 @@
 (function () {
   "use strict";
   var FLAG = "b3Games_guest";
+
+  // Keep the live weekly Lamdan draft current even when an older browser draft exists.
+  // The weekly-quiz Lamdan page stores drafts in localStorage, so seed only the
+  // current week's two class keys and leave all other saved drafts untouched.
+  if (/\/weekly-quiz\/chossid-lamdan\.html$/i.test(location.pathname)) {
+    try {
+      var lamdanKey = "b3-chossid-lamdan-drafts-v1";
+      var lamdanDrafts = JSON.parse(localStorage.getItem(lamdanKey) || "{}") || {};
+      lamdanDrafts["et|2026-10-15"] = {
+        name: "Parshas Noach",
+        description: "Weekly A Chossid is a Lamdan mark for Parshas Noach.",
+        students: {
+          "Chaikin Mayer Chaim": {mark:"100", comment:"Outstanding week — excellent participation, effort, and responsibility!"},
+          "Gourarie Yossi": {mark:"98", comment:"Excellent practice and participation this week!"},
+          "Huebner Sholom DovBer": {mark:"91", comment:"Nice participation and effort this week!"},
+          "Lapine Moshe": {mark:"90", comment:"Good effort and participation this week!"},
+          "Notik Kehos": {mark:"99", comment:"Strong Chazara effort and class involvement!"},
+          "Oirechman Yisroel": {mark:"99", comment:"Excellent effort and participation this week!"},
+          "Raichman Moshe Tuvia": {mark:"93", comment:"Good class involvement and effort this week!"},
+          "Rosenfeld Avrohom": {mark:"98", comment:"Strong Chazara effort and participation this week!"},
+          "Rozmarin Levi": {mark:"97", comment:"Excellent Shorashim work and effort this week!"},
+          "Traxler Arik": {mark:"93", comment:"Active participation and good effort this week!"}
+        }
+      };
+      lamdanDrafts["wt|2026-10-15"] = {
+        name: "Parshas Noach",
+        description: "Weekly A Chossid is a Lamdan mark for Parshas Noach.",
+        students: {
+          "Greenberg Ari": {mark:"100", comment:"Outstanding week — excellent participation, effort, and responsibility!"},
+          "Rosenfeld Zev": {mark:"90", comment:"Good class involvement and effort this week!"},
+          "Schtroks Levi": {mark:"98", comment:"Strong Chazara effort and participation this week!"},
+          "Simmonds Yisroel Aryeh": {mark:"99", comment:"Excellent Shorashim and Chazara effort this week!"},
+          "Vogel Leibel": {mark:"94", comment:"Very involved in class and showed good effort this week!"},
+          "Wolf Yisroel Arye Leib": {mark:"100", comment:"Outstanding effort and responsibility this week!"}
+        }
+      };
+      localStorage.setItem(lamdanKey, JSON.stringify(lamdanDrafts));
+    } catch (e) {}
+  }
+
   var loader = document.currentScript;
   var rootBase = loader && loader.src ? new URL("./", loader.src) : new URL("./", location.href);
   var homeHref = new URL("index.html", rootBase).href;
