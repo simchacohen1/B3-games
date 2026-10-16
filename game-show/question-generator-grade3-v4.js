@@ -62,12 +62,30 @@
   }
   const indexCache = new Map();
   const chapterCache = new Map();
+  // Use Sefaria's canonical Parasha structure, not a hand-maintained list of
+  // chapter numbers. This includes Parshios spanning multiple perakim.
+  function parshaRangesFromIndex(book, data) {
+    const nodes = data?.alt_structs?.Parasha?.nodes || [];
+    return nodes.map(node => {
+      const ref = String(node.wholeRef || "");
+      if (!ref.startsWith(book + " ")) return null;
+      const match = ref.slice(book.length + 1).match(/^(\d+):(\d+)-(?:(\d+):)?(\d+)$/);
+      if (!match) return null;
+      const fromChapter = Number(match[1]), fromVerse = Number(match[2]);
+      const toChapter = match[3] ? Number(match[3]) : fromChapter;
+      const toVerse = Number(match[4]);
+      if (fromChapter < 1 || fromVerse < 1 || toChapter < fromChapter ||
+          (toChapter === fromChapter && toVerse < fromVerse)) return null;
+      const name = String(node.sharedTitle || "").trim();
+      return name ? { name, book, fromChapter, fromVerse, toChapter, toVerse, ref } : null;
+    }).filter(Boolean);
+  }
   async function getBookIndex(book) {
     if (indexCache.has(book)) return indexCache.get(book);
     const data = await sefariaJson(api + "/api/v2/raw/index/" + encodeURIComponent(book));
     const chapters = Number(data?.schema?.lengths?.[0]);
     if (!Number.isInteger(chapters) || chapters < 1) throw new Error("Sefaria did not return valid perek information.");
-    const result = { chapters };
+    const result = { chapters, parshios: parshaRangesFromIndex(book, data) };
     indexCache.set(book, result);
     return result;
   }
