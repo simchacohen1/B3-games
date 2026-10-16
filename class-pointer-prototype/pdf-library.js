@@ -48,8 +48,15 @@
     const user=auth();
     const token=await user.getIdToken();
     const url='https://firebasestorage.googleapis.com/v0/b/'+encodeURIComponent(ref.bucket)+'/o/'+encodeURIComponent(ref.fullPath)+'?alt=media';
-    const response=await fetch(url,{headers:{Authorization:'Firebase '+token},cache:'no-store'});
-    if(!response.ok)throw Error('Private PDF download failed ('+response.status+'). Check your Storage access and CORS settings.');
+    let response;
+    try{
+      response=await fetch(url,{headers:{Authorization:'Firebase '+token},cache:'no-store'});
+    }catch(error){
+      // An interrupted fetch can have multiple causes, but a missing bucket CORS
+      // GET origin is common for authenticated Firebase Storage browser downloads.
+      throw Error('Could not download this PDF securely. Check the Cloud Storage bucket CORS setting: allow GET from https://funtorahtools.com. Your saved PDF has not been deleted.');
+    }
+    if(!response.ok)throw Error('Private PDF download failed (HTTP '+response.status+'). Check your Firebase Storage permissions. Your saved PDF has not been deleted.');
     const length=Number(response.headers.get('content-length')||'0');
     if(length>50*1024*1024)throw Error('This saved PDF is larger than the 50 MB library limit.');
     const blob=await response.blob();
