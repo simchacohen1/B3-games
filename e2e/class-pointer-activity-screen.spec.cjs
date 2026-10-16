@@ -19,6 +19,8 @@ test('synthetic Shorashim display capture is authorized and rendered by teacher'
     document.getElementById('joinLink').value='https://share.test/class-pointer-prototype/classroom.html?room='+room;
     window.__room=room;
     window.__calls={};
+    // Exercise the activity-page fallback; popup persistence is covered by its own synthetic test.
+    window.open=()=>null;
     window.firebase={apps:[{}],database(){return {ref(path){return {on(_event,callback){window.__sessionCallback=callback;window.__sessionPath=path}}}}},auth(){return {currentUser:{getIdToken:async()=> 'teacher-id-token'}}}};
     window.B3_FIREBASE_CONFIG={};
     window.FunTorahStudentClass={resolve:async()=>({workspaceId:'b3-2026',classId:'et'})};
@@ -68,7 +70,7 @@ test('synthetic Shorashim display capture is authorized and rendered by teacher'
     roomId:window.__room,createdAt:Date.now(),teacherUid:'teacher-et',studentScreenSharing:true,shareRequest:{at:Date.now()}
   }})}));
   await expect(page.getByRole('dialog',{name:'Teacher screen sharing request'})).toBeVisible();
-  await page.getByRole('button',{name:'Choose What to Share'}).click();
+  await page.getByRole('button',{name:'Open Sharing Window'}).click();
   await expect(page.locator('#activityScreenTray video')).toHaveCount(1);
   await expect.poll(()=>page.evaluate(()=>!!window.__calls.media?.answered)).toBe(true);
   await expect.poll(()=>page.evaluate(()=>!!document.querySelector('#activityScreenTray video')?.srcObject)).toBe(true);
