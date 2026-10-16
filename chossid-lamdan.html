@@ -94,7 +94,7 @@ async function syncClass(id,btn){
  const missing=students.filter(s=>s.mark===null||!Number.isFinite(s.mark));
  if(missing.length){status.textContent='Enter a mark for every student before syncing.';return;}
  const date=document.getElementById('date').value;
- const body={class_section:cls.label,topic:'A Chossid is a Lamdan',test_name:'A Chossid is a Lamdan — Parshas Noach',type:'test',date,description:'A Chossid is a Lamdan weekly mark for Parshas Noach.',students};
+ const body={class_section:cls.label,topic:'A Chossid is a Lamdan',test_name:'Parshas Noach',type:'test',date,description:'Weekly A Chossid is a Lamdan mark for Parshas Noach.',students};
  if(!confirm('Save '+cls.label+' A Chossid is a Lamdan marks to Nigri?'))return;
  btn.disabled=true;status.textContent='Syncing…';
  try{
