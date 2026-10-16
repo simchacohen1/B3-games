@@ -12,7 +12,7 @@ const room='class-pointer-12345678-1234-1234-1234-123456789abc';
 const sessionPath=(classId)=>`b3Games/workspaces/b3-2026/classes/${classId}/classPointerSessions/${room}`;
 
 test('Realtime Database enforces assigned teacher, class grant, and ET/WT isolation for Class Pointer sessions',async()=>{
-  const env=await initializeTestEnvironment({projectId,database:{host:'127.0.0.1',port:9000,rules:JSON.stringify(rules)}});
+  const env=await initializeTestEnvironment({projectId,database:{host:'127.0.0.1',port:9000,rules:JSON.stringify({rules})}});
   try{
     await env.withSecurityRulesDisabled(async context=>{
       const db=context.database();
