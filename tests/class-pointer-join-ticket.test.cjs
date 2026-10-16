@@ -2,6 +2,7 @@
 // Join tickets for Classroom Pointer: SYNTHETIC data only, in-memory database, no Firebase.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const source = fs.readFileSync(__dirname + '/../backend/functions/class-pointer-share-auth.js', 'utf8');
@@ -215,6 +216,24 @@ function withSharing(f) {
   return f;
 }
 const share = (f, id, pin, ip) => f.post({ action: 'issue', studentId: id, pin, classId: 'et', room: ROOM }, null, ip);
+const hashedLimit = (kind, value) => 'b3Private/classPointerJoinLimits/' + kind + '_' + crypto.createHash('sha256').update(String(value)).digest('hex').slice(0, 32);
+test('a shared-address lock blocks incorrect passcodes but not valid students', async () => {
+  const f = withSharing(fixture()), ip = '8.8.8.8';
+  f.rows.set(hashedLimit('i', ip), { start: Date.now(), count: 40, until: Date.now() + 3600000 });
+  assert.equal((await share(f, 'avi', '1111', ip)).statusCode, 200, 'valid screen-share ticket remains available');
+  assert.equal((await f.post({ action: 'permissions', studentId: 'avi', pin: '1111', classId: 'et', room: ROOM }, null, ip)).statusCode, 200, 'valid permission check remains available');
+  assert.equal((await f.issue('benny', '2222', 'et', ROOM, 'student-peer-0002', ip)).statusCode, 200, 'valid class join remains available');
+  assert.equal((await share(f, 'avi', 'wrong', ip)).statusCode, 429, 'wrong activity-share passcodes are rejected');
+  assert.equal((await f.post({ action: 'permissions', studentId: 'avi', pin: 'wrong', classId: 'et', room: ROOM }, null, ip)).statusCode, 429, 'wrong permission passcodes are rejected');
+  assert.equal((await f.issue('benny', 'wrong', 'et', ROOM, 'student-peer-0002', ip)).statusCode, 429, 'wrong join passcodes are rejected');
+});
+test('a per-student lock still blocks every action, including a correct passcode', async () => {
+  const f = withSharing(fixture()), id = 'avi', ip = '9.9.9.9';
+  f.rows.set(hashedLimit('s', id), { start: Date.now(), count: 8, until: Date.now() + 900000 });
+  assert.equal((await share(f, id, '1111', ip)).statusCode, 429);
+  assert.equal((await f.post({ action: 'permissions', studentId: id, pin: '1111', classId: 'et', room: ROOM }, null, ip)).statusCode, 429);
+  assert.equal((await f.issue(id, '1111', 'et', ROOM, PEER, ip)).statusCode, 429);
+});
 test('one student guessing wrong cannot lock classmates out of screen sharing (shared school address)', async () => {
   const f = withSharing(fixture());
   let blocked = null;
