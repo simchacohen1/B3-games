@@ -47,27 +47,27 @@ button{border:0;border-radius:9px;padding:11px 16px;font-weight:800;cursor:point
 <script>
 const SYNC_URL='https://nigrisync.onrender.com/sync-marks',SYNC_KEY='1qaz2wsx';
 const DEFAULT_DATA={
- date:'2026-10-08',
+ date:'2026-10-15',
  classes:[
   {id:'et',label:'B3 ET',students:[
-   ['Chaikin Mayer Chaim',99,'Excellent week — keep up the great work!'],
-   ['Gourarie Yossi',95,'Great participation this week — keep it up!'],
-   ['Huebner Sholom DovBer',92,'Nice job this week — your participation really added to the class!'],
-   ['Lapine Moshe',91,'Good work this week — you put in strong effort and participated nicely!'],
-   ['Notik Kehos',98,'Excellent effort and participation — great job!'],
-   ['Oirechman Yisroel',97,'Great energy and participation this week!'],
-   ['Raichman Moshe Tuvia',96,'Very nice participation and effort — keep it up!'],
-   ['Rosenfeld Avrohom',97,'Great job this week — strong effort and participation!'],
-   ['Rozmarin Levi',95,'Nice work this week — keep up the good effort!'],
-   ['Traxler Arik',90,'Good effort this week — keep working on staying focused!']
+   ['Chaikin Mayer Chaim','',''],
+   ['Gourarie Yossi','',''],
+   ['Huebner Sholom DovBer','',''],
+   ['Lapine Moshe','',''],
+   ['Notik Kehos','',''],
+   ['Oirechman Yisroel','',''],
+   ['Raichman Moshe Tuvia','',''],
+   ['Rosenfeld Avrohom','',''],
+   ['Rozmarin Levi','',''],
+   ['Traxler Arik','','']
   ]},
   {id:'wt',label:'B3 WT',students:[
-   ['Greenberg Ari',98,'Excellent week — great participation and effort!'],
-   ['Rosenfeld Zev',86,'Keep working hard and getting more involved — you can do it!'],
-   ['Schtroks Levi',98,'Excellent involvement and effort this week!'],
-   ['Simmonds Yisroel Aryeh',95,'Nice steady work this week — keep it up!'],
-   ['Vogel Leibel',92,'Good job this week — keep working on staying focused and consistent!'],
-   ['Wolf Yisroel Arye Leib',97,'Great effort and responsibility this week!']
+   ['Greenberg Ari','',''],
+   ['Rosenfeld Zev','',''],
+   ['Schtroks Levi','',''],
+   ['Simmonds Yisroel Aryeh','',''],
+   ['Vogel Leibel','',''],
+   ['Wolf Yisroel Arye Leib','','']
   ]}
  ]
 };
@@ -76,13 +76,13 @@ function decodePayload(){
  const p=new URLSearchParams(location.search).get('p'); if(!p)return DEFAULT_DATA;
  try{const b=p.replace(/-/g,'+').replace(/_/g,'/');const txt=decodeURIComponent(escape(atob(b)));const j=JSON.parse(txt);return j&&j.classes?j:DEFAULT_DATA}catch(e){console.warn('Bad prefill payload',e);return DEFAULT_DATA}
 }
-const data=decodePayload(); document.getElementById('date').value=data.date||'2026-10-08';
+const data=decodePayload(); document.getElementById('date').value=data.date||'2026-10-15';
 function render(){
  const host=document.getElementById('classes');host.innerHTML='';
  data.classes.forEach(cls=>{
   const card=document.createElement('div');card.className='card';card.dataset.classId=cls.id;
   card.innerHTML='<h2>'+esc(cls.label)+'</h2><table><thead><tr><th>Student</th><th>Mark</th><th>Comment</th></tr></thead><tbody>'+
-  cls.students.map((s,i)=>'<tr><td><b>'+esc(s[0])+'</b></td><td><input type="number" min="0" max="100" value="'+Number(s[1])+'" data-mark="'+i+'"></td><td><textarea rows="2" data-comment="'+i+'">'+esc(s[2])+'</textarea></td></tr>').join('')+
+  cls.students.map((s,i)=>'<tr><td><b>'+esc(s[0])+'</b></td><td><input type="number" min="0" max="100" value="'+(s[1]??'')+'" data-mark="'+i+'"></td><td><textarea rows="2" data-comment="'+i+'">'+esc(s[2])+'</textarea></td></tr>').join('')+
   '</tbody></table><div class="actions"><button class="good" onclick="syncClass(\''+cls.id+'\',this)">Sync '+esc(cls.label)+' to Nigri</button><span class="status" id="status-'+cls.id+'"></span></div>';
   host.appendChild(card);
  });
@@ -90,9 +90,11 @@ function render(){
 async function syncClass(id,btn){
  const cls=data.classes.find(c=>c.id===id),card=document.querySelector('[data-class-id="'+id+'"]'),status=document.getElementById('status-'+id);
  const rows=[...card.querySelectorAll('tbody tr')];
- const students=rows.map((r,i)=>({name:cls.students[i][0],mark:Number(r.querySelector('[data-mark]').value),attendance:'present',comment:r.querySelector('[data-comment]').value.trim()||undefined}));
+ const students=rows.map((r,i)=>{const raw=r.querySelector('[data-mark]').value.trim();return{name:cls.students[i][0],mark:raw===''?null:Number(raw),attendance:'present',comment:r.querySelector('[data-comment]').value.trim()||undefined}});
+ const missing=students.filter(s=>s.mark===null||!Number.isFinite(s.mark));
+ if(missing.length){status.textContent='Enter a mark for every student before syncing.';return;}
  const date=document.getElementById('date').value;
- const body={class_section:cls.label,topic:'A Chossid is a Lamdan',test_name:'A Chossid is a Lamdan — Week Ending '+date,type:'classwork',date,description:'Weekly A Chossid is a Lamdan mark for effort and responsibility.',students};
+ const body={class_section:cls.label,topic:'A Chossid is a Lamdan',test_name:'A Chossid is a Lamdan — Week Ending '+date,type:'test',date,description:'Weekly A Chossid is a Lamdan mark for effort and responsibility.',students};
  if(!confirm('Save '+cls.label+' A Chossid is a Lamdan marks to Nigri?'))return;
  btn.disabled=true;status.textContent='Syncing…';
  try{
