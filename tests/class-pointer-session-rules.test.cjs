@@ -37,5 +37,5 @@ test('per-student permission rows remain unreadable in Firebase and are served b
   assert.match(endpoint,/action==='permissions'/);
   assert.match(endpoint,/equal\(code\.passcode,body\.pin\)/);
   assert.match(endpoint,/classPointerSharePermissions\/[^\n]+studentId/);
-  // TEMPORARY compatibility: the live site still writes denials to the public session record; every read must be OR'd with the private policy.\n  for (const line of endpoint.split(/\\r?\\n/).filter(l => /session\\.(screenSharingDenied|whiteboardDenied)/.test(l))) assert.match(line, /permission\\??\\.(screenSharing|whiteboard)Denied===true\\|\\|/);
-});
+  // TEMPORARY compatibility: the live site still writes denials to the public session record; every read must be OR'd with the private policy.
+  for (const line of endpoint.split(/\r?\n/).filter(l => /session\.(screenSharingDenied|whiteboardDenied)/.test(l))) assert.match(line, /permission\??\.(screenSharing|whiteboard)Denied===true\|\|/);});
