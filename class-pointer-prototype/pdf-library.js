@@ -4,8 +4,28 @@
   const panel=document.getElementById('teacherPanel');
   // Never initialize the library on student pages, even though both panels exist in the HTML.
   if(!panel||new URL(location.href).searchParams.get('dashboard')!=='teacher'||!window.ClassPointerBridge?.isTeacher)return;
-  const trigger=document.createElement('button');trigger.id='pointerPdfLibrary';trigger.type='button';trigger.textContent='📚 My PDF Library';trigger.title='Your private saved lesson PDFs';
-  document.getElementById('openPdf')?.after(trigger);
+  const trigger=document.createElement('button');trigger.id='pointerPdfLibrary';trigger.type='button';trigger.textContent='📚 PDF Library';trigger.title='Open your private saved lesson PDFs';
+  // The redesigned teacher workspace hides old .session-controls buttons. Put
+  // this action in the visible teaching dock, beside Present, including fullscreen.
+  const dock=document.getElementById('teacherDock');
+  const presentMenu=dock?.querySelector('#tbShareMenu');
+  const presentWrap=presentMenu?.closest('.tb-menu-wrap');
+  if(presentWrap){
+    trigger.className='tb-btn pointer-pdf-library-trigger';
+    presentWrap.after(trigger);
+    const menuItem=document.createElement('button');menuItem.type='button';menuItem.textContent='📚 My PDF Library';
+    menuItem.addEventListener('click',()=>{
+      presentMenu.hidden=true;
+      presentWrap.querySelector('[data-menu="tbShareMenu"]')?.setAttribute('aria-expanded','false');
+      trigger.click();
+    });
+    const showPdf=Array.from(presentMenu.querySelectorAll('button')).find(btn=>btn.textContent?.trim()==='Show a PDF');
+    if(showPdf)showPdf.after(menuItem);else presentMenu.append(menuItem);
+  }else{
+    // Fallback stays visible even if the toolbar fails to initialize.
+    const oldControls=panel.querySelector('.session-controls');
+    if(oldControls)oldControls.after(trigger);else panel.prepend(trigger);
+  }
   const dialog=document.createElement('dialog');dialog.id='pointerPdfLibraryDialog';dialog.className='pointer-library-dialog';
   dialog.innerHTML='<div class="pointer-library-header"><h2>My PDF Library</h2><button type="button" id="pointerLibraryClose">✕</button></div><p>Only you can browse these saved PDFs. Students see a file only when you present it.</p><div class="pointer-library-actions"><button id="pointerLibrarySave" type="button">Save current PDF</button><span id="pointerLibraryStatus" role="status"></span></div><div id="pointerLibraryItems"></div>';
   document.body.append(dialog);
