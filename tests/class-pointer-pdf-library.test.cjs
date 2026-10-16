@@ -16,6 +16,7 @@ function harness({teacher=true,authorized=true,uid='teacherA',dockAvailable=fals
     replaceChildren(...xs){this.children=[...xs]}
     addEventListener(type,handler){this.listeners??={};this.listeners[type]=handler}
     click(){this.listeners?.click?.();this.onclick?.()}
+    setAttribute(name,value){this[name]=value}
     closest(){return this.closestElement||null}
     querySelectorAll(){return []}
     showModal(){this.open=true}
