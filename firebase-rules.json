@@ -247,6 +247,15 @@
       ".write": false,
       "classPointerShareTickets": {
         ".indexOn": ["expiresAt"]
+      },
+      "classPointerSharePermissions": {
+        "$workspaceId": {
+          "$classId": {
+            "$roomId": {
+              ".write": "auth != null && ((auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && (($classId == 'et' || $classId == 'wt') || root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/class-pointer').val() == true)))"
+            }
+          }
+        }
       }
     },
     ".read": false,

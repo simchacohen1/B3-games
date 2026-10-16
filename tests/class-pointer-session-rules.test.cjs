@@ -27,3 +27,15 @@ test('session rules do not grant students access to write sharing sessions',()=>
   assert.equal(rules.b3Games.students['$studentId'].classPointerSessions,undefined);
   assert.doesNotMatch(classPointerRule,/b3StudentId/);
 });
+
+test('per-student permission rows remain unreadable in Firebase and are served by the authenticated endpoint',()=>{
+  const permissions=rules.b3Private.classPointerSharePermissions['$workspaceId']['$classId']['$roomId'];
+  assert.ok(permissions['.write'].includes("teachers/' + auth.uid + '/active').val() == true"));
+  assert.equal(permissions['.read'],undefined);
+  assert.equal(permissions['$studentId'],undefined);
+  const endpoint=fs.readFileSync(__dirname+'/../backend/functions/class-pointer-share-auth.js','utf8');
+  assert.match(endpoint,/action==='permissions'/);
+  assert.match(endpoint,/equal\(code\.passcode,body\.pin\)/);
+  assert.match(endpoint,/classPointerSharePermissions\/[^\n]+studentId/);
+  assert.doesNotMatch(endpoint,/session\.screenSharingDenied|session\.whiteboardDenied/);
+});

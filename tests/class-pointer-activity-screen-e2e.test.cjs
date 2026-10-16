@@ -50,14 +50,16 @@ test('Shorashim screen capture reaches the authenticated teacher receiver and re
   }
 
   // Model the live class session as the Firebase listener exposes it to the student.
-  const database={ref:path=>({on(_event,callback){assert.match(path,/\/classes\/et\/classPointerSessions$/);sessionListener=callback}})};
+  const database={ref:path=>({on(_event,callback){assert.match(path,/\/classes\/et\/classPointerSessions$/);sessionListener=callback},off(){}})};
   const studentFirebase={apps:[{}],database:()=>database};
   const studentWindow={firebase:studentFirebase,Peer,B3_FIREBASE_CONFIG:{},FunTorahStudentClass:{resolve:async()=>({workspaceId:'b3-2026',classId:'et'})},addEventListener(){}};
   const studentDocument={currentScript:{src:'https://funtorahtools.com/class-pointer-prototype/activity-share.js'},head:{appendChild(){}},body:{children:[],appendChild(node){this.children.push(node)}},createElement:element};
   const studentSession=new Map([['b3Games_studentId','arik'],['b3Games_classPin','123456']]);
   const studentFetch=async(url,options)=>{
     if(String(url).includes('funTorahStudentAuth'))return {ok:true,json:async()=>({ok:true})};
-    issued=JSON.parse(options.body);
+    const body=JSON.parse(options.body);
+    if(body.action==='permissions')return{ok:true,json:async()=>({ok:true})};
+    issued=body;
     return {ok:true,json:async()=>({ok:true,token:'a'.repeat(64),studentName:'Arik'})};
   };
   const studentContext={window:studentWindow,document:studentDocument,location:{href:'https://funtorahtools.com/shorashim/index.html',pathname:'/shorashim/index.html'},URL,sessionStorage:{getItem:key=>studentSession.get(key)||null,setItem:(key,value)=>studentSession.set(key,value)},firebase:studentFirebase,fetch:studentFetch,navigator:{mediaDevices:{getDisplayMedia:()=>Promise.resolve(captured)}},AbortSignal,Date,setTimeout,clearTimeout,setInterval,clearInterval,crypto:require('node:crypto').webcrypto,Peer,console};
@@ -79,7 +81,7 @@ test('Shorashim screen capture reaches the authenticated teacher receiver and re
     window:teacherWindow,document:teacherDocument,location:{search:'?dashboard=teacher&class=et'},URLSearchParams,URL,MutationObserver:class{observe(){}},firebase:teacherFirebase,fetch:teacherFetch,console
   });
 
-  sessionListener({val:()=>({[room]:{roomId:room,createdAt:now,teacherUid:'teacher-et',studentScreenSharing:true,shareRequest:{at:now}}})});
+  await sessionListener({val:()=>({[room]:{roomId:room,createdAt:now,teacherUid:'teacher-et',studentScreenSharing:true,shareRequest:{at:now}}})});
   const holder=studentDocument.body.children.find(node=>node.id==='fttActivityScreenShare');
   const overlay=studentDocument.body.children.find(node=>node.id==='fttShareRequestOverlay');
   assert.equal(overlay.style.display,'flex','the student receives the request while remaining on Shorashim');
