@@ -5,9 +5,10 @@
 (function () {
   'use strict';
   var API = 'https://us-central1-b3-games.cloudfunctions.net/homeworkPortal';
+  var MSG_API = 'https://us-central1-b3-games.cloudfunctions.net/messagesPortal';
   var bar = document.getElementById('studentBar');
   if (!bar) return;
-  var done = '';
+  var done = '', doneMsg = '';
   function ss(k) { try { return sessionStorage.getItem(k) || ''; } catch (e) { return ''; } }
   async function check() {
     var id = ss('b3Games_studentId'), cls = ss('b3Games_studentClass'), pin = ss('b3Games_classPin');
@@ -33,6 +34,31 @@
       if (res.ok && data.openCount > 0) a.textContent = '📚 My Homework (' + data.openCount + ')';
     } catch (e) { /* the link stays; the homework page shows any error */ }
   }
-  new MutationObserver(check).observe(bar, { attributes: true, attributeFilter: ['class'] });
-  window.addEventListener('load', check);
+  // Messages: separate switch (toolGrants.messages); shows an unread count only, never message text.
+  async function checkMessages() {
+    var id = ss('b3Games_studentId'), cls = ss('b3Games_studentClass'), pin = ss('b3Games_classPin');
+    if (bar.classList.contains('hidden') || !id || !cls || !pin || sessionStorage.getItem('b3Games_guest')) return;
+    var key = id + '|' + cls;
+    if (doneMsg === key) return;
+    doneMsg = key;
+    var old = document.getElementById('messagesStudentLink');
+    if (old) old.remove();
+    try {
+      var ws = (window.B3_APP_CONTEXT && window.B3_APP_CONTEXT.workspaceId) || 'b3-2026';
+      var on = (await firebase.database().ref('b3Games/workspaces/' + ws + '/classes/' + cls + '/toolGrants/messages').once('value')).val();
+      if (on !== true) return;
+      var a = document.createElement('a');
+      a.id = 'messagesStudentLink';
+      a.href = 'assignment-center/messages-student.html';
+      a.style.cssText = 'padding:10px 14px;border-radius:8px;background:#6d28d9;color:white;font-weight:700;text-decoration:none';
+      a.textContent = '💬 Messages';
+      bar.appendChild(a);
+      var res = await fetch(MSG_API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'unread', studentId: id, studentName: ss('b3Games_studentName'), pin: pin, classId: cls }) });
+      var data = await res.json().catch(function () { return {}; });
+      if (res.ok && data.unread > 0) a.textContent = '💬 Messages (' + data.unread + ' new)';
+    } catch (e) { /* the link stays; the messages page shows any error */ }
+  }
+  new MutationObserver(function () { check(); checkMessages(); }).observe(bar, { attributes: true, attributeFilter: ['class'] });
+  window.addEventListener('load', function () { check(); checkMessages(); });
 })();

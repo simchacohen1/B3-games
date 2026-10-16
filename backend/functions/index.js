@@ -2696,3 +2696,6 @@ exports.classPointerShareAuth = require('./class-pointer-share-auth').classPoint
 
 // Homework Portal (not deployed until the owner approves)
 exports.homeworkPortal = require("./homework").homeworkPortal;
+
+// Teacher-student messaging (not deployed until the owner approves)
+exports.messagesPortal = require("./messages").messagesPortal;

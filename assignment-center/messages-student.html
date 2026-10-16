@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>My Messages</title>
+<link rel="stylesheet" href="messages.css?v=20261016">
+</head><body>
+<header><strong>💬 Messages with my teacher</strong><span><span id="who"></span> <a href="../index.html">Back to games</a></span></header>
+<main>
+<div id="gate" class="card muted">Loading…</div>
+<div id="chat" class="panel" style="display:none"></div>
+<p class="muted" style="font-size:13px">Only you and your teachers can see this chat. Voice messages are kept for one year. Be kind and respectful.</p>
+</main>
+<script src="homework-common.js"></script>
+<script src="messages-ui.js?v=20261016"></script>
+<script>
+(function(){'use strict';
+var H=window.HomeworkCommon;
+function ss(k){try{return sessionStorage.getItem(k)||''}catch(e){return ''}}
+var auth={studentId:ss('b3Games_studentId'),studentName:ss('b3Games_studentName'),pin:ss('b3Games_classPin'),classId:ss('b3Games_studentClass')};
+var gate=document.getElementById('gate');
+if(!auth.studentId||!auth.pin){gate.replaceChildren();var a=document.createElement('a');a.href='../index.html';a.textContent='Go to sign-in';gate.append('Please sign in first. ',a);return}
+document.getElementById('who').textContent=auth.studentName;
+H.callTo(H.MESSAGES_API,Object.assign({action:'unread'},auth)).then(function(){
+  gate.style.display='none';var box=document.getElementById('chat');box.style.display='';
+  window.HomeworkMessages.mount(box,{role:'student',call:function(b){return H.callTo(H.MESSAGES_API,Object.assign({},auth,b))}});
+}).catch(function(e){gate.textContent=(e.status===401||e.status===403)?e.message:'Messages could not load. '+e.message});
+})();
+</script></body></html>
