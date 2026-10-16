@@ -86,18 +86,21 @@
       card.innerHTML='<h3>Game modes</h3><p class="hint">Choose each mode independently. Team contestants rotate through the class roster.</p>'+
         '<label class="setting"><span class="label"><b>Team Mode</b><span>Two balanced teams; one contestant per team each round.</span></span><span class="ctrl"><input type="checkbox" class="switch" id="teamModeToggle" aria-label="Team Mode"></span></label>'+
         '<label class="setting"><span class="label"><b>Multiple Choice</b><span>Students choose from the answers you add to each question.</span></span><span class="ctrl"><input type="checkbox" class="switch" id="multipleChoiceToggle" aria-label="Multiple Choice"></span></label>'+
-        '<label class="setting"><span class="label"><b>Read question and colored choices aloud</b><span>Teacher reads Red, Blue, Green, Yellow. Buzzers stay locked until the reading ends.</span></span><span class="ctrl"><input type="checkbox" class="switch" id="readChoicesToggle" aria-label="Read question and colored choices aloud"></span></label>'+
+        '<label class="setting"><span class="label"><b>Read question and colored choices aloud</b><span>Natural game-show announcer with browser fallback; buzzers lock until reading ends.</span></span><span class="ctrl"><input type="checkbox" class="switch" id="readChoicesToggle" aria-label="Read question and colored choices aloud"></span></label>'+
+        '<label class="setting"><span class="label"><b>Play a little music during announcements</b><span>Original gentle game-show jingle; off by default</span></span><span class="ctrl"><input type="checkbox" class="switch" id="regularJingleToggle" aria-label="Music during game show announcements"></span></label>'+
         '<button class="btn" type="button" id="stopNarrationBtn">Stop reading and open buzzers</button>'+
         '<div id="teamModeSummary" class="status-line" aria-live="polite"></div>';
       buzzerCard.insertAdjacentElement("afterend",card);
       const save=()=>gameRef.update({
         teamMode:document.getElementById("teamModeToggle").checked,
         multipleChoice:document.getElementById("multipleChoiceToggle").checked,
-        readChoices:document.getElementById("readChoicesToggle").checked
+        readChoices:document.getElementById("readChoicesToggle").checked,
+        regularJingle:document.getElementById("regularJingleToggle").checked
       }).catch(()=>{document.getElementById("teamModeSummary").textContent="Could not save game modes.";});
       document.getElementById("teamModeToggle").addEventListener("change",save);
       document.getElementById("multipleChoiceToggle").addEventListener("change",save);
       document.getElementById("readChoicesToggle").addEventListener("change",save);
+      document.getElementById("regularJingleToggle").addEventListener("change",save);
     }
 
     // Extend the existing question editor without changing legacy questions.
@@ -153,8 +156,12 @@
     }
 
     let currentSpeech = null;
+    let cloudSpeechToken = null;
     let narrationTimeout = null;
     function cancelSpeech() {
+      cloudSpeechToken = null;
+      window.GameShowPartyAudio?.stopSpeech();
+      window.GameShowPartyAudio?.music(false);
       if (narrationTimeout) clearTimeout(narrationTimeout);
       narrationTimeout = null;
       currentSpeech = null;
@@ -165,6 +172,8 @@
       if (narrationTimeout) clearTimeout(narrationTimeout);
       narrationTimeout = null;
       currentSpeech = null;
+      cloudSpeechToken = null;
+      window.GameShowPartyAudio?.music(false);
       const delay = document.getElementById("delayToggle")?.checked
         ? (Number(document.getElementById("delaySeconds")?.value) || 10) * 1000 : 0;
       gameRef.transaction(current => {
@@ -180,39 +189,39 @@
           ? "Reading complete. Buzzer countdown started." : "Reading complete. Buzzers open!";
       });
     }
-    function speakAndRelease(q, token) {
-      if (!token) return;
-      const status = document.getElementById("soundStatus");
-      const content = spokenQuestion(q);
-      if (!content || !window.speechSynthesis || !window.SpeechSynthesisUtterance) {
-        status.textContent = "Speech is not available in this browser. Opening the buzzers.";
-        releaseNarration(token);
+    function speakAndRelease(q,token) {
+      if(!token)return;
+      const status=document.getElementById("soundStatus");
+      const content="Alright contestants, here we go! "+spokenQuestion(q)+" Get ready to buzz in!";
+      if(!content){releaseNarration(token);return;}
+      cancelSpeech();
+      status.textContent="🎤 Game-show host is reading Red, Blue, Green, Yellow. Buzzers locked.";
+      const engine=window.GameShowPartyAudio;
+      if(engine) {
+        const localToken={token};cloudSpeechToken=localToken;
+        if(document.getElementById("regularJingleToggle")?.checked)engine.music(true);
+        narrationTimeout=setTimeout(()=>{
+          if(cloudSpeechToken!==localToken)return;
+          cancelSpeech();status.textContent="Announcer timed out. Opening buzzers.";
+          releaseNarration(token);
+        },90000);
+        engine.speak(content).then(()=>{
+          if(cloudSpeechToken===localToken)releaseNarration(token);
+        }).catch(()=>{
+          if(cloudSpeechToken===localToken)releaseNarration(token);
+        });
         return;
       }
-      cancelSpeech();
-      try {
-        const utterance = new SpeechSynthesisUtterance(content);
-        utterance.lang = "en-US";
-        utterance.rate = 0.88;
-        currentSpeech = utterance;
-        utterance.onend = () => { if (currentSpeech === utterance) releaseNarration(token); };
-        utterance.onerror = () => {
-          if (currentSpeech !== utterance) return;
-          status.textContent = "Audio could not finish. Opening buzzers.";
-          releaseNarration(token);
-        };
-        status.textContent = "Reading question and Red, Blue, Green, Yellow. Buzzers locked.";
-        narrationTimeout = setTimeout(() => {
-          if (currentSpeech !== utterance) return;
-          cancelSpeech();
-          status.textContent = "Reading timed out; buzzers will open.";
-          releaseNarration(token);
-        }, 90000);
-        window.speechSynthesis.speak(utterance);
-      } catch (_) {
-        status.textContent = "Audio could not start. Opening buzzers.";
-        releaseNarration(token);
+      if(!window.speechSynthesis || !window.SpeechSynthesisUtterance){
+        status.textContent="Voice unavailable. Opening buzzers.";releaseNarration(token);return;
       }
+      const utterance=new SpeechSynthesisUtterance(content);
+      utterance.lang="en-US";utterance.rate=1.02;
+      currentSpeech=utterance;
+      utterance.onend=()=>{if(currentSpeech===utterance)releaseNarration(token);};
+      utterance.onerror=()=>{if(currentSpeech===utterance)releaseNarration(token);};
+      narrationTimeout=setTimeout(()=>{if(currentSpeech===utterance){cancelSpeech();releaseNarration(token);}},90000);
+      try{window.speechSynthesis.speak(utterance);}catch(_){releaseNarration(token);}
     }
     document.getElementById("stopNarrationBtn")?.addEventListener("click", () => {
       cancelSpeech();
@@ -283,6 +292,8 @@
       if(team)team.checked=!!data.teamMode;if(mc)mc.checked=!!data.multipleChoice;
       const reader=document.getElementById("readChoicesToggle");
       if(reader)reader.checked=!!data.readChoices;
+      const jingle=document.getElementById("regularJingleToggle");
+      if(jingle)jingle.checked=!!data.regularJingle;
       renderTeacherChoices(data);
       const summary=document.getElementById("teamModeSummary");
       if(summary){
