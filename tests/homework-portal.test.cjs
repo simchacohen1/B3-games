@@ -77,14 +77,14 @@ test('selected-students assignment is hidden from others', async () => {
   assert.equal((await list(store, 's2', 'Dan Two', '2222', 800)).assignments.length, 2);
 });
 
-test('progress saves and never goes backwards; submit, return, resubmit, approve', async () => {
+test('progress saves (a typo can be corrected before hand-in); submit, return, resubmit, approve', async () => {
   const store = await setup();
   const id = defId(store);
   const s = (action, extra) => homeworkApi(store, {}, { action, ...stu('s1', 'Sam One', '1111'), assignmentId: id, ...extra }, 900);
   await s('save', { draft: 'half done', progress: 6 });
   await s('save', { draft: 'still', progress: 3 });
   let l = (await list(store, 's1', 'Sam One', '1111', 900)).assignments[0];
-  assert.equal(l.status, 'in_progress'); assert.equal(l.progress, 6); assert.equal(l.draft, 'still');
+  assert.equal(l.status, 'in_progress'); assert.equal(l.progress, 3); assert.equal(l.draft, 'still');
   await s('submit', { answer: 'Done', progress: 10 });
   await s('submit', { answer: 'Done', progress: 10 });
   await assert.rejects(s('save', { draft: 'x' }), { code: 409 });
@@ -166,4 +166,29 @@ test('teacher cannot review a student from another class; owner needs the class 
 test('functions copy of the policy matches the tested original', () => {
   assert.equal(fs.readFileSync(__dirname + '/../backend/functions/homework-policy.cjs', 'utf8'),
     fs.readFileSync(__dirname + '/../assignment-center/assignment-policy.js', 'utf8'));
+});
+
+test('wrong-passcode limiter: guessing is stopped, success resets, lock is short, per-address cap', async () => {
+  const store = await setup();
+  const bad = (t, ip) => homeworkApi(store, ip ? { ip } : {}, { action: 'studentList', ...stu('s1', 'Sam One', '0000') }, t);
+  const good = (t, ip) => homeworkApi(store, ip ? { ip } : {}, { action: 'studentList', ...stu('s1', 'Sam One', '1111') }, t);
+  const T0 = 10_000_000;
+  for (let i = 0; i < 7; i++) await assert.rejects(bad(T0 + i), { code: 401 });
+  await good(T0 + 10);                                    // correct passcode clears the count
+  for (let i = 0; i < 8; i++) await assert.rejects(bad(T0 + 100 + i), { code: 401 });
+  await assert.rejects(good(T0 + 200), { code: 429 });     // locked, even for the right passcode
+  await assert.rejects(bad(T0 + 201), { code: 429 });
+  await good(T0 + 16 * 60000);                             // lock is only 15 minutes
+  // a different student is not affected by someone else's guesses
+  await homeworkApi(store, {}, { action: 'studentList', ...stu('s2', 'Dan Two', '2222') }, T0 + 300);
+  // one address cannot spray guesses across many names
+  const T1 = T0 + 3 * 3600000;
+  let hit = null;
+  for (let i = 0; i < 60 && !hit; i++) {
+    try { await homeworkApi(store, { ip: '9.9.9.9' }, { action: 'studentList', studentId: 'x' + i, studentName: 'Nobody' + i, pin: '1', classId: 'et' }, T1 + i); }
+    catch (e) { if (e.code === 429) hit = i; }
+  }
+  assert.ok(hit !== null && hit <= 41);
+  await assert.rejects(good(T1 + 100, '9.9.9.9'), { code: 429 });
+  await good(T1 + 100, '8.8.8.8');
 });

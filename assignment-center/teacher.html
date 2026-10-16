@@ -10,7 +10,7 @@ main{max-width:980px;margin:20px auto;padding:0 14px 60px}
 .badge.late{background:#fde8e8;color:#a31a1a}.badge.ok{background:#e1f6e5;color:#1c6b30}.badge.wait{background:#fff1d6;color:#8a5a00}
 label{display:block;font-weight:600;margin:12px 0 4px}input,select,textarea{font:inherit;width:100%;padding:10px;border:1px solid #bfcfdf;border-radius:8px}textarea{min-height:70px}
 button{font:inherit;border:0;border-radius:9px;padding:9px 15px;font-weight:600;cursor:pointer;background:#18588f;color:#fff;margin:6px 6px 0 0}button.sec{background:#fff;color:#18588f;border:1px solid #18588f}button.bad{background:#a31a1a}
-table{width:100%;border-collapse:collapse;margin-top:8px}td,th{text-align:left;padding:8px;border-bottom:1px solid #e1e8ef;vertical-align:top}
+.tablewrap{overflow-x:auto}table{width:100%;border-collapse:collapse;margin-top:8px;min-width:560px}td,th{text-align:left;padding:8px;border-bottom:1px solid #e1e8ef;vertical-align:top}
 .msg{min-height:20px;margin-top:6px;font-weight:600}.err{color:#a31a1a}.good{color:#1c6b30}.row{display:flex;gap:12px;flex-wrap:wrap}.row>div{flex:1;min-width:150px}
 .students{max-height:150px;overflow:auto;border:1px solid #bfcfdf;border-radius:8px;padding:8px}.students label{font-weight:400;margin:2px 0}
 .filters button.on{background:#18588f;color:#fff}
@@ -28,9 +28,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <div id="minWrap"><label for="mins">Goal minutes (optional)</label><input id="mins" type="number" min="1" max="240"></div></div>
     <label for="title">Title</label><input id="title" maxlength="120" placeholder="e.g. Shorashim practice">
     <label for="details">Instructions</label><textarea id="details" maxlength="1200"></textarea>
-    <label>Who gets it?</label><label style="font-weight:400"><input type="radio" name="aud" value="all" checked style="width:auto"> The whole class</label>
+    <div id="audBox"><label>Who gets it?</label><label style="font-weight:400"><input type="radio" name="aud" value="all" checked style="width:auto"> The whole class</label>
     <label style="font-weight:400"><input type="radio" name="aud" value="some" style="width:auto"> Only some students</label>
-    <div class="students" id="studentPick" style="display:none"></div>
+    <div class="students" id="studentPick" style="display:none"></div></div>
     <button id="save">Give homework</button><button class="sec" id="cancelEdit" style="display:none">Cancel edit</button><div id="formMsg" class="msg"></div></div>
   <div class="card"><div class="filters" id="filters"></div><div id="summary" class="muted"></div></div>
   <div id="list"></div>
@@ -51,7 +51,7 @@ var state={classId:'',data:null,editing:null,filter:'all'};
 function say(box,m,good){box.textContent=m;box.className='msg '+(good?'good':'err')}
 async function api(body){var t=await auth.currentUser.getIdToken();return H.call(Object.assign({classId:state.classId},body),t)}
 Object.keys(H.TYPES).forEach(function(k){var o=el('option',H.TYPES[k]);o.value=k;$('type').append(o)});
-function syncType(){$('minWrap').style.display=$('type').value==='shorashim'?'':'none'}
+function syncType(){$('minWrap').style.display=($('type').value==='shorashim'&&!state.editing)?'':'none';var aud=document.getElementById('audBox');if(aud)aud.style.display=state.editing?'none':''}
 $('type').onchange=syncType;syncType();
 
 $('go').onclick=function(){auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(e){say($('signinMsg'),e.message)})};
@@ -135,7 +135,7 @@ function renderList(){
       if(s.status==='submitted'){
         var fb=el('input');fb.placeholder='Note to student';fb.maxLength=500;
         var stars=el('select');[['','No stars'],['5','★★★★★'],['4','★★★★'],['3','★★★'],['2','★★'],['1','★']].forEach(function(o){var op=el('option',o[1]);op.value=o[0];stars.append(op)});
-        var ok=el('button','Approve'),back=el('button','Send back','sec'),em=el('div',null,'msg');
+        var ok=el('button','Approve'),back=el('button','Send back','sec');ok.setAttribute('aria-label','Approve work by '+s.name);back.setAttribute('aria-label','Send back work by '+s.name);fb.setAttribute('aria-label','Note to '+s.name);stars.setAttribute('aria-label','Stars for '+s.name);var em=el('div',null,'msg');em.setAttribute('aria-live','polite');
         var go=async function(action,btn){btn.disabled=true;try{await api({action:action,assignmentId:a.id,studentId:id,feedback:fb.value,stars:stars.value});await load()}catch(e){say(em,e.message);btn.disabled=false}};
         ok.onclick=function(){go('approve',ok)};back.onclick=function(){go('return',back)};
         rv.append(fb,stars,ok,back,em);

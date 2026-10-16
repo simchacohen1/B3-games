@@ -25,7 +25,9 @@ function cleanDefinition(d){
     d.title.length>120||typeof d.details!=='string'||d.details.length>1200||
     (d.dueAt!==null&&d.dueAt!==undefined&&
       (!Number.isSafeInteger(d.dueAt)||d.dueAt<0)))throw Error('Invalid assignment');
-  return {type:d.type,title:d.title.trim(),details:d.details.trim(),dueAt:d.dueAt??null};
+  const clean=x=>x.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f<>]/g,'').trim();
+  const title=clean(d.title);if(!title)throw Error('Invalid assignment');
+  return {type:d.type,title,details:clean(d.details),dueAt:d.dueAt??null};
 }
 function assignmentPath(s,id){
   if(!s||![s.workspaceId,s.classId,s.studentId,id].every(validId))throw Error('Invalid scope');
