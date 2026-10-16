@@ -106,7 +106,7 @@
         const result=await played;
         if(token!==sequence)return false;
         currentAudio=null;
-        return result;
+        return result || await sayBrowser(text,token);
       }
       return await sayBrowser(text,token);
     } catch (_) {
