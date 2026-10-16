@@ -1,6 +1,6 @@
 # Class Pointer PDF Library — Firebase Storage rollout
 
-**Status:** PR #99 remains a draft. The user provided the three currently deployed Firebase Storage rules on October 15, 2026. We prepared an additive fourth rule. Neither the site code nor the merged Storage rules have been published.
+**Status (October 16, 2026):** The original private PDF Library was published, and the user confirmed saving/reopening and restoring the last page. They also published its Storage rules. The 500 MB upgrade requires the one-line Storage Rules update documented in `POINTER-PDF-LIBRARY-500MB.md`; the code and updated source-control rules candidate are being prepared separately.
 
 ## User-provided baseline and proposed replacement
 
@@ -9,7 +9,7 @@ The complete copy/paste candidate is `security/pointer-pdf-library-merged-storag
 - `/classGallery/{postId}/{fileName}`: `allow read, write: if true`
 - `/shorashim-recordings/{studentId}/{date}/{fileName}`: `allow read, write: if true`
 
-A fourth match applies solely to `/pointerPdfLibrary/{teacherUid}/{fileId}`. It requires Firebase Auth UID equal to the folder's `teacherUid` for get/list/delete, limits creates to PDF content type and 50 MB, and limits updates to unchanged file bytes. No broad public read/write permission overlaps the PDF path in the **provided** baseline.
+A fourth match applies solely to `/pointerPdfLibrary/{teacherUid}/{fileId}`. It requires Firebase Auth UID equal to the folder's `teacherUid` for get/list/delete, limits creates to PDF content type and 500 MB, and limits updates to unchanged file bytes. No broad public read/write permission overlaps the PDF path in the **provided** baseline.
 
 **Important existing vulnerability:** each of the three existing paths has public read and write (`if true`). These are not private and can be abused if their paths are known. Do not quietly harden them in this PDF feature PR because that could break existing class activities; schedule an independent security migration with teacher/student authorization and regression coverage. The newly added PDF rule is owner-isolated; its `request.auth.uid == teacherUid` does **not**, by itself, certify a user has the teacher role. Student users with Firebase Auth could create a separate personal prefix, but cannot read teacher-owned prefixes. The Classroom UI additionally awaits `ClassPointerDashboard.ready` for an authorized teacher.
 
