@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200"><rect width="1200" height="1200" fill="#fff"/><g fill="#fff" stroke="#161616" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"><rect x="20" y="20" width="1160" height="1160" rx="18" stroke-width="16"/>
+<!-- Justice must be decided in a court before a sentence: no violence -->
+<path d="M55 467 L599 149 L1145 467 Z" stroke-width="14"/>
+<path d="M95 469 H1105 M134 514 H1066" stroke-width="13"/>
+<rect x="116" y="511" width="80" height="448" rx="12" stroke-width="10"/><rect x="1004" y="511" width="80" height="448" rx="12" stroke-width="10"/>
+<path d="M140 564 H185 M140 925 H185 M1022 565 H1071 M1022 925 H1071" fill="none" stroke-width="6"/>
+<path d="M247 513 V761 M955 513 V761" stroke-width="7"/>
+<!-- COURT decision scales -->
+<path d="M603 282 V588 M528 323 H678 M552 596 H653 M581 581 H625" stroke-width="14" fill="none"/>
+<circle cx="603" cy="320" r="17"/>
+<path d="M527 324 L485 419 L571 419 Z M679 324 L635 419 L724 419 Z" stroke-width="6"/>
+<path d="M460 420 Q527 454 588 420 Q570 495 524 497 Q484 494 460 420 Z" stroke-width="8"/>
+<path d="M607 420 Q679 459 749 420 Q732 494 679 498 Q629 490 607 420 Z" stroke-width="8"/>
+<!-- three judges on raised dais -->
+<rect x="270" y="671" width="666" height="244" rx="18" stroke-width="14"/>
+<path d="M283 730 H924 M333 797 H880 M364 866 H847" fill="none" stroke-width="8"/>
+<path d="M320 672 Q327 578 366 567 Q432 533 477 603 L484 672 M501 671 Q512 569 567 560 Q628 531 690 605 L702 670 M717 672 Q725 580 789 567 Q857 539 895 617 L905 672" stroke-width="10"/>
+<!-- judge left -->
+<ellipse cx="405" cy="521" rx="46" ry="56" stroke-width="9"/><path d="M357 511 Q362 464 405 461 Q450 463 456 510 Z" stroke-width="10"/>
+<path d="M371 553 Q396 621 417 602 Q436 609 448 552" stroke-width="7"/><path d="M374 520 H387 M424 520 H438" fill="none" stroke-width="5"/>
+<!-- judge middle -->
+<ellipse cx="603" cy="515" rx="47" ry="59" stroke-width="9"/><path d="M550 500 Q562 447 602 448 Q653 450 658 505 Z" stroke-width="9"/>
+<path d="M564 544 Q584 618 604 599 Q639 603 646 544" stroke-width="8"/>
+<path d="M570 519 H582 M622 519 H636" fill="none" stroke-width="5"/>
+<!-- judge right -->
+<ellipse cx="809" cy="520" rx="46" ry="57" stroke-width="9"/><path d="M758 507 Q769 460 809 459 Q852 462 862 510 Z" stroke-width="10"/>
+<path d="M777 554 Q801 616 817 603 Q848 607 854 553" stroke-width="7"/>
+<path d="M774 521 H789 M827 521 H843" fill="none" stroke-width="5"/>
+<!-- Open evidence scroll in foreground of judges -->
+<path d="M512 700 Q604 671 698 701 V747 Q604 725 515 748 Z" stroke-width="8"/>
+<path d="M528 718 Q594 700 664 715 M541 736 Q600 717 677 736" fill="none" stroke-width="4"/>
+<!-- witness, standing and pointing towards scroll -->
+<path d="M121 1135 L160 872 Q167 793 221 787 Q283 784 306 864 L338 1135 Z" stroke-width="12"/>
+<ellipse cx="233" cy="722" rx="52" ry="63" stroke-width="9"/>
+<path d="M172 715 Q181 654 229 655 Q277 662 287 717 Z" stroke-width="9"/>
+<path d="M199 762 Q218 819 237 799 Q264 811 279 759" stroke-width="7"/>
+<path d="M280 842 Q321 817 372 797 L462 747 Q487 745 492 764 Q493 781 468 796 L368 862 Q324 896 288 888" stroke-width="12"/>
+<path d="M184 891 L179 1096 M274 900 L280 1096" fill="none" stroke-width="6"/>
+<path d="M177 1131 H234 M276 1131 H339" fill="none" stroke-width="8"/>
+<!-- Person waiting for due process, standing calmly with uncovered hands -->
+<path d="M812 1135 L822 876 Q828 817 889 798 Q947 795 980 874 L1025 1135 Z" stroke-width="12"/>
+<ellipse cx="907" cy="743" rx="50" ry="62" stroke-width="9"/>
+<path d="M854 727 Q854 673 904 670 Q964 675 962 726 Z" stroke-width="9"/>
+<path d="M870 781 Q901 832 928 818 Q950 808 952 775" stroke-width="8"/>
+<path d="M833 866 Q793 911 803 1000 Q814 1021 830 1004 L855 931 M972 864 Q1002 914 994 999 Q981 1014 968 995 L951 933" stroke-width="10"/>
+<path d="M848 929 L847 1103 M953 930 L961 1105" fill="none" stroke-width="6"/>
+<path d="M826 1133 H880 M957 1133 H1019" fill="none" stroke-width="8"/>
+<!-- Walkway and paving beneath court -->
+<path d="M37 1084 Q99 1058 146 1082 M377 1108 Q447 1080 516 1106 M540 1049 Q615 1021 686 1047 M678 1124 Q729 1100 780 1121 M1043 1072 Q1090 1050 1150 1073" fill="none" stroke-width="5"/>
+</g></svg>
