@@ -3,6 +3,17 @@ on:
   push:
     branches:
       - fix/pointer-student-share-flow-oct16
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/class-pointer-ticket-tests.yml'
+      - 'backend/functions/class-pointer-share-auth.js'
+      - 'backend/functions/class-pointer-share-ticket-cleanup.js'
+      - 'firebase-rules.json'
+      - 'tests/class-pointer-*.test.cjs'
+      - 'tests/class-pointer-session-rules-emulator.cjs'
+      - 'e2e/class-pointer-activity-screen.spec.cjs'
   workflow_dispatch:
 jobs:
   ticket-tests:
@@ -24,6 +35,6 @@ jobs:
       - name: Install Chromium for simulated media test
         run: npx playwright install --with-deps chromium
       - name: Run authorization and simulated connection tests
-        run: node --test tests/class-pointer-share-ticket-retry.test.cjs tests/class-pointer-ticket-cleanup.test.cjs tests/class-pointer-session-rules.test.cjs tests/class-pointer-activity-screen-e2e.test.cjs tests/class-pointer-sharing-cache.test.cjs
+        run: node --test tests/class-pointer-join-ticket.test.cjs tests/class-pointer-share-ticket-retry.test.cjs tests/class-pointer-ticket-cleanup.test.cjs tests/class-pointer-session-rules.test.cjs tests/class-pointer-activity-screen-e2e.test.cjs tests/class-pointer-sharing-cache.test.cjs
       - name: Run browser screen receiver test
         run: npx playwright test e2e/class-pointer-activity-screen.spec.cjs --project=chromium --workers=1
