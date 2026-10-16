@@ -32,6 +32,7 @@ jobs:
           node --check class-pointer-prototype/activity-screen-teacher.js
           node --check class-pointer-prototype/classroom.js
           node --check class-pointer-prototype/student-boards.js
+          node --check class-pointer-prototype/teacher-dashboard.js
           node --check backend/functions/class-pointer-share-auth.js
       - name: Classroom Pointer regression tests
         run: node --test tests/class-pointer*.test.cjs
