@@ -207,3 +207,36 @@ test('teacher-side gate: malformed tickets are dropped without a server call and
   vm.runInNewContext(fs.readFileSync(__dirname + '/../class-pointer-prototype/join-auth.js', 'utf8'), sandbox);
   assert.equal(sandbox.ClassPointerJoinGate.required, false);
 });
+
+// ---- screen-share ticket limits (review findings 2 and 3) ----
+function withSharing(f) {
+  const key = 'b3Games/workspaces/b3-2026/classes/et/classPointerSessions/' + ROOM;
+  f.rows.set(key, { ...f.rows.get(key), studentScreenSharing: true, destinationRequest: { mode: 'screens', at: Date.now() }, shareRequest: { at: Date.now() } });
+  return f;
+}
+const share = (f, id, pin, ip) => f.post({ action: 'issue', studentId: id, pin, classId: 'et', room: ROOM }, null, ip);
+test('one student guessing wrong cannot lock classmates out of screen sharing (shared school address)', async () => {
+  const f = withSharing(fixture());
+  let blocked = null;
+  for (let i = 0; i < 30; i++) { const r = await share(f, 'avi', 'bad' + i, '5.5.5.5'); if (r.statusCode === 429 && blocked === null) blocked = i; }
+  assert.equal(blocked, 8, 'the guessing student is paused after 8 wrong tries');
+  assert.equal((await share(f, 'benny', '2222', '5.5.5.5')).statusCode, 200, 'a classmate on the same address still gets a ticket');
+  assert.equal((await share(f, 'avi', '1111', '6.6.6.6')).statusCode, 429, 'even the right passcode waits for the guesser');
+});
+test('successful screen-share tickets do not use up the address allowance', async () => {
+  const f = withSharing(fixture());
+  for (let i = 0; i < 12; i++) { assert.equal((await share(f, 'avi', '1111', '5.5.5.5')).statusCode, 200); assert.equal((await share(f, 'benny', '2222', '5.5.5.5')).statusCode, 200); }
+  let hit = null; for (let i = 0; i < 20 && hit === null; i++) if ((await share(f, 'avi', '1111', '5.5.5.5')).statusCode === 429) hit = i;
+  assert.ok(hit !== null, 'one student cannot request tickets forever');
+  assert.equal((await share(f, 'benny', '2222', '5.5.5.5')).statusCode, 200, 'but a classmate is unaffected');
+});
+test('the shared default passcode is refused for screen sharing and permission checks; permission guessing is limited', async () => {
+  const f = withSharing(fixture());
+  assert.equal((await share(f, 'legacy', '5770')).statusCode, 401);
+  const perm = (id, pin) => f.post({ action: 'permissions', studentId: id, pin, classId: 'et', room: ROOM }, null, '4.4.4.4');
+  assert.equal((await perm('legacy', '5770')).statusCode, 401);
+  assert.equal((await perm('avi', '1111')).statusCode, 200);
+  for (let i = 0; i < 8; i++) assert.equal((await perm('benny', 'x' + i)).statusCode, 401);
+  assert.equal((await perm('benny', '2222')).statusCode, 429);
+  assert.equal((await perm('avi', '1111')).statusCode, 200);
+});
