@@ -1640,6 +1640,13 @@ WHAT COUNTS AS CORRECT: the transcript must be a faithful translation of this ex
 - Do NOT penalize a student for splitting one accepted translation into two separate short statements instead of one smooth sentence (e.g. saying "and he said to him" and then separately "Hashem," instead of "and Hashem said to him, as one phrase) â€” that still counts as fully correct as long as all the required words/meaning are present somewhere in what he said.
 - Synonyms are fine as long as the specific meaning is preserved (e.g. "appeared" vs "revealed Himself to").
 
+GRADING DECISION PROCEDURE:
+1. Identify all required semantic units in THIS Hebrew chunk: actor, action, object, recipient, tense, number, negation, and pronouns. Never infer missing units from context.
+2. Treat each reference translation as an independent valid interpretation ONLY for the words corresponding to the exact Hebrew chunk. Never splice unrelated words from multiple sources together into an invented acceptable answer.
+3. Compare the actual transcript with each valid interpretation. Synonyms and natural English word order are fine, but all essential meaning must match one interpretation. Changed referents, pronouns replaced with names, tense, singular/plural, negation, reversed actor/recipient, or omitted essential content are wrong.
+4. Speech-recognition alternatives can repair only locally plausible mishearings grounded in the actual recording. Name hints or the answer key cannot prove a student spoke a missing word.
+5. Never accept a vague thematic similarity in place of accurate translation. If transcript evidence is genuinely ambiguous, ask for a repeat rather than inventing what the student said.
+
 WHAT COUNTS AS INCORRECT: a real, coherent word choice that changes who/what is being referred to, the tense, or the core meaning â€” not a speech-recognition artifact, and not just a different but equally valid word order or sentence split.
 
 PROPER NOUNS / PLACE NAMES: if the accepted translations list treats a Hebrew word or phrase as an untranslated proper name (e.g. "Mamre," "Elonei Mamre"), also accept the student saying that same name even if they additionally or instead give its literal English meaning (e.g. "the oaks/terebinths/plains of Mamre") or vice versa â€” both refer to the identical place, and a 3rd grader should not be marked wrong for translating a place name literally instead of transliterating it, or the reverse.
