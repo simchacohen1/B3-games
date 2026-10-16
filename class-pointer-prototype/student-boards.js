@@ -392,6 +392,7 @@
   }
   function excluded(m,kind){const id=personId(m);return !!id&&denied[kind].has(id)}
   function savePolicy(){
+    document.dispatchEvent(new Event('classpointer:sharing-state'));
     const p=policy();
     permissionsWrite=permissionsWrite.catch(()=>{}).then(()=>window.ClassPointerDashboard?.updateActivityPermissions(p));
     permissionsWrite.catch(error=>B.fail('Could not update student sharing permissions: '+(error?.message||'Try again.')));
@@ -750,6 +751,7 @@
   }
   function toggleBlock(m){
     const key=keyFor(m);if(blocked.has(key))blocked.delete(key);else blocked.add(key);
+    document.dispatchEvent(new Event('classpointer:sharing-state'));
     drawer?.cancel();sendMode(m);syncTiles();dirty(m.id);
     B.status(blocked.has(key)?m.name+' is paused.':m.name+' is allowed again.');
   }
@@ -766,6 +768,11 @@
   controls();renderPermissions();void loadPermissionsRoster();
 
   window.ClassPointerBoards={
+    canReceiveActivityScreen(studentId){
+      return B.started()&&on&&mode==='screens'&&typeof studentId==='string'&&!!studentId
+        &&!denied.screens.has(studentId)
+        &&!admitted().some(m=>personId(m)===studentId&&isBlocked(m));
+    },
     fromStudent(m,message){
       if(!on)return;
       if(message.type==='board-screen'){if(message.sharing!==true){closeScreen(m);dirty(m.id)}return}

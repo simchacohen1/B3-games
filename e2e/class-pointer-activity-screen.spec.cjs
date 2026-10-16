@@ -19,6 +19,7 @@ test('synthetic Shorashim display capture is authorized and rendered by teacher'
     document.getElementById('joinLink').value='https://share.test/class-pointer-prototype/classroom.html?room='+room;
     window.__room=room;
     window.__calls={};
+    window.ClassPointerBoards={canReceiveActivityScreen:id=>id==='arik'};
     window.firebase={apps:[{}],database(){return {ref(path){return {on(_event,callback){window.__sessionCallback=callback;window.__sessionPath=path}}}}},auth(){return {currentUser:{getIdToken:async()=> 'teacher-id-token'}}}};
     window.B3_FIREBASE_CONFIG={};
     window.FunTorahStudentClass={resolve:async()=>({workspaceId:'b3-2026',classId:'et'})};

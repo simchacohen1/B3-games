@@ -281,3 +281,59 @@ test('screen exclusions close active video, preserve classmates, and remain inde
   await expect(page.getByLabel('Screen sharing for Ari', {exact:true}).first()).toBeChecked();
   await expect(page.getByLabel('Board sharing for Ari', {exact:true}).first()).toBeChecked();
 });
+
+test('activity screens obey the actual teacher checklist and mode switches immediately', async ({ page }) => {
+  // Load only a synthetic origin and local scripts; no Firebase or PeerJS access.
+  await page.route('**/*', route => route.abort());
+  await page.route('https://pointer-synthetic.test/**', route => route.fulfill({
+    contentType: 'text/html', body: '<!doctype html><html><body></body></html>'
+  }));
+  await page.goto('https://pointer-synthetic.test/?dashboard=teacher&class=et');
+  await openBoard(page, true);
+  await page.locator('#studentBoards').click();
+  await page.evaluate(() => {
+    const join = document.createElement('input'); join.id = 'joinLink';
+    join.value = 'https://pointer-synthetic.test/?room=class-pointer-12345678-1234-1234-1234-123456789abc';
+    const end = document.createElement('button'); end.id = 'endClass';
+    document.body.append(join, end);
+    const user = {uid: 'synthetic-teacher', getIdToken: async () => 'synthetic-token'};
+    (window as any).firebase = {auth: () => ({currentUser: user})};
+    (window as any).fetch = async (_url: string, options: any) => {
+      const id = JSON.parse(options.body).token[0] === 'a' ? 'a' : 'b';
+      return {ok:true, status:200, json:async () => ({ok:true, studentId:id, studentName:id==='a'?'Ari':'Levi'})};
+    };
+    (window as any).__activityCalls = {};
+    (window as any).__receiveActivity = async (id: string) => {
+      const handlers: Record<string, Function[]> = {};
+      const call = {
+        metadata: {kind:'activity-screen',token:id.repeat(64)}, closed:false, answered:false,
+        on(type: string, fn: Function) {(handlers[type] ??= []).push(fn);},
+        answer() {this.answered = true;},
+        close() {this.closed = true; for (const fn of handlers.close || []) fn();},
+      };
+      (window as any).__activityCalls[id] = call;
+      await (window as any).ClassPointerActivityShares.incomingCall(call);
+    };
+  });
+  await page.addScriptTag({path:'class-pointer-prototype/activity-screen-teacher.js'});
+  await page.evaluate(async () => {
+    await (window as any).__receiveActivity('a');
+    await (window as any).__receiveActivity('b');
+  });
+  await expect(page.locator('#activityScreenTray video')).toHaveCount(2);
+  await page.getByLabel('Screen sharing for Ari', {exact:true}).first().uncheck();
+  await expect(page.locator('#activityScreenTray video')).toHaveCount(1);
+  expect(await page.evaluate(() => (window as any).__activityCalls.a.closed)).toBe(true);
+  expect(await page.evaluate(() => (window as any).__activityCalls.b.closed)).toBe(false);
+  await page.getByLabel('Screen sharing for Ari', {exact:true}).first().check();
+  await page.evaluate(() => (window as any).__receiveActivity('a'));
+  await expect(page.locator('#activityScreenTray video')).toHaveCount(2);
+  await page.getByRole('button', {name:'📝 Whiteboards',exact:true}).click();
+  await expect(page.locator('#activityScreenTray video')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__activityCalls.b.closed)).toBe(true);
+  await page.getByRole('button', {name:'🖥 Screens',exact:true}).click();
+  await page.evaluate(() => (window as any).__receiveActivity('a'));
+  await expect(page.locator('#activityScreenTray video')).toHaveCount(1);
+  await page.getByRole('button', {name:'✕ Close boards',exact:true}).click();
+  await expect(page.locator('#activityScreenTray video')).toHaveCount(0);
+});

@@ -151,11 +151,11 @@ test('screen and whiteboard checkboxes are independent; rechecking restores rout
 
 test('connected share revocation closes the media connection rather than hiding just its tile',()=>{
   const student=source('student-boards.js');
-  const activity=source('activity-share.js');
   const backend=fs.readFileSync(__dirname+'/../backend/functions/class-pointer-share-auth.js','utf8');
   assert.match(student,/if\(!on\|\|excluded\(m,mode\)\)\{closeScreen\(m\);/);
   assert.match(student,/if\(!on\|\|mode!=='screens'\|\|blocked\)stopShare\(false\)/);
-  assert.match(activity,/if\(!shareable\|\|!active\|\|shareable.roomId!==active.roomId\)\{if\(stream\)stop\(\)\}/);
+  // Activity revocation (including a pending picker) is exercised behaviorally
+  // in class-pointer-sharing-lifecycle.test.cjs rather than pinning a code shape.
   assert.match(backend,/session\.screenSharingDenied\?\.\[studentId\]===true/);
   assert.match(backend,/session\.screenSharingDenied\?\.\[ticket\.studentId\]===true/);
 });

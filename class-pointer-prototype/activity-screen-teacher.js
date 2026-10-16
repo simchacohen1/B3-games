@@ -7,7 +7,10 @@
   const classId=query.get('class');
   const endpoint='https://us-central1-b3-games.cloudfunctions.net/classPointerShareAuth';
   const stage=document.getElementById('stage');
+  // Track pending authorization as well as answered calls. End/Restart must
+  // invalidate both, even when an old network response arrives in a new lesson.
   const screens=new Map();
+  let generation=0;
   const tray=document.createElement('aside');
   tray.id='activityScreenTray';tray.dataset.stageUi='true';tray.hidden=true;
   tray.style.cssText='position:absolute;right:12px;bottom:52px;z-index:8;display:flex;gap:10px;flex-wrap:wrap;max-width:min(90%,700px);max-height:55%;overflow:auto;pointer-events:auto';
@@ -29,25 +32,50 @@
   }
   function close(call){try{call.close()}catch{}}
   function clear(call){
-    const node=screens.get(call);
-    if(node){node.remove();screens.delete(call)}
-    tray.hidden=!screens.size;
+    const entry=screens.get(call);
+    if(entry){
+      if(entry.video)entry.video.srcObject=null;
+      entry.card?.remove();screens.delete(call);
+    }
+    tray.hidden=!Array.from(screens.values()).some(entry=>entry.card);
   }
+  function room(){
+    try{return new URL(document.getElementById('joinLink')?.value).searchParams.get('room')}catch{return null}
+  }
+  function current(entry){
+    return screens.get(entry.call)===entry&&entry.generation===generation&&entry.room===room()
+      &&document.getElementById('endClass')?.disabled===false
+      &&firebase.auth().currentUser?.uid===entry.user.uid;
+  }
+  function permitted(entry){
+    return current(entry)&&window.ClassPointerBoards?.canReceiveActivityScreen(entry.studentId)===true;
+  }
+  document.addEventListener('classpointer:sharing-state',()=>{
+    for(const [call,entry] of Array.from(screens)){
+      // A pending call has no verified identity yet; cancel it on policy changes.
+      if(!entry.studentId||!permitted(entry)){clear(call);close(call)}
+    }
+  });
   async function incomingCall(call){
     if(call.metadata?.kind!=='activity-screen')return false;
     const token=call.metadata?.token;
     if(typeof token!=='string'||!/^[a-f0-9]{64}$/.test(token)){close(call);return true}
+    let entry;
     try{
       const user=firebase.auth().currentUser;
       if(!user)throw Error('Teacher sign-in missing');
-      const idToken=await user.getIdToken();
-      const room=document.getElementById('joinLink')?.value;
-      const peerRoom=room?new URL(room).searchParams.get('room'):null;
+      const peerRoom=room();
       if(!peerRoom||document.getElementById('endClass').disabled)throw Error('Lesson is closed');
-      const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+idToken},body:JSON.stringify({action:'verify',room:peerRoom,classId,token})});
+      entry={call,user,room:peerRoom,generation,studentId:null};screens.set(call,entry);
+      call.on('close',()=>clear(call));call.on('error',()=>{clear(call);close(call)});
+      const idToken=await user.getIdToken();
+      if(!current(entry)){clear(call);close(call);return true}
+      const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+idToken},body:JSON.stringify({action:'verify',room:peerRoom,classId,token}),signal:AbortSignal.timeout(15000)});
       const verified=await response.json();
+      if(!current(entry)){clear(call);close(call);return true}
       if(!response.ok||!verified.ok)throw Error(response.status===403?'Authorization rejected the student sharing ticket (403). Check class and session; the ticket may be expired or already used.':'Sharing authorization failed (HTTP '+response.status+').');
-      if(document.getElementById('endClass').disabled)throw Error('Lesson ended');
+      entry.studentId=verified.studentId;
+      if(typeof entry.studentId!=='string'||!permitted(entry))throw Error('Student screen sharing is no longer allowed.');
       const card=document.createElement('div');
       card.style.cssText='background:#172033;color:white;padding:8px;border-radius:12px;width:min(320px,75vw);box-shadow:0 8px 28px #0006';
       const heading=document.createElement('strong');heading.textContent=verified.studentName+' · Live activity screen';
@@ -56,14 +84,20 @@
       const dismiss=document.createElement('button');dismiss.textContent='Close view';dismiss.type='button';
       dismiss.onclick=()=>{close(call);clear(call)};
       const priorFailure=document.getElementById('activityScreenFailure');if(priorFailure)priorFailure.hidden=true;
-      card.append(heading,video,dismiss);tray.appendChild(card);tray.hidden=false;screens.set(call,card);
-      call.on('stream',stream=>{if(screens.has(call)){video.srcObject=stream;video.play().catch(()=>{})}});
-      call.on('close',()=>clear(call));call.on('error',()=>clear(call));
+      entry.card=card;entry.video=video;
+      card.append(heading,video,dismiss);tray.appendChild(card);tray.hidden=false;
+      call.on('stream',stream=>{if(permitted(entry)){video.srcObject=stream;video.play().catch(()=>{})}else{clear(call);close(call)}});
       call.answer();
-    }catch(e){console.warn('Class Pointer activity screen rejected:',e?.message||e);reportFailure(e?.message||'Unknown connection error');close(call)}
+    }catch(e){
+      // Canceled calls must not display stale errors in the next lesson.
+      if(!entry||current(entry)){console.warn('Class Pointer activity screen rejected:',e?.message||e);reportFailure(e?.message||'Unknown connection error')}
+      clear(call);close(call);
+    }
     return true;
   }
   window.ClassPointerActivityShares={incomingCall,closeAll(){
-    for(const call of Array.from(screens.keys())){close(call);clear(call)}
+    generation++;
+    for(const call of Array.from(screens.keys())){clear(call);close(call)}
+    const notice=document.getElementById('activityScreenFailure');if(notice)notice.hidden=true;
   }};
 })();

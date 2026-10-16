@@ -68,15 +68,15 @@ test('Shorashim screen capture reaches the authenticated teacher receiver and re
   const stage=element('main'),joinLink=element('input'),endClass=element('button');
   joinLink.value='https://funtorahtools.com/class-pointer-prototype/classroom.html?room='+room;
   const teacherNodes={stage,joinLink,endClass};
-  const teacherDocument={createElement:element,getElementById:id=>teacherNodes[id]||null};
-  const teacherWindow={};
+  const teacherDocument={createElement:element,getElementById:id=>teacherNodes[id]||null,addEventListener(){}};
+  const teacherWindow={ClassPointerBoards:{canReceiveActivityScreen:id=>id==='arik'}};
   const teacherFirebase={auth:()=>({currentUser:{getIdToken:async()=> 'teacher-id-token'}})};
   const teacherFetch=async(_url,options)=>{
     verified={...JSON.parse(options.body),authorization:options.headers.Authorization};
     return {ok:true,status:200,json:async()=>({ok:true,studentId:'arik',studentName:'Arik'})};
   };
   vm.runInNewContext(read('class-pointer-prototype/activity-screen-teacher.js'),{
-    window:teacherWindow,document:teacherDocument,location:{search:'?dashboard=teacher&class=et'},URLSearchParams,URL,MutationObserver:class{observe(){}},firebase:teacherFirebase,fetch:teacherFetch,console
+    window:teacherWindow,document:teacherDocument,location:{search:'?dashboard=teacher&class=et'},URLSearchParams,URL,AbortSignal,MutationObserver:class{observe(){}},firebase:teacherFirebase,fetch:teacherFetch,console
   });
 
   sessionListener({val:()=>({[room]:{roomId:room,createdAt:now,teacherUid:'teacher-et',studentScreenSharing:true,shareRequest:{at:now}}})});

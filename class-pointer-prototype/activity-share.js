@@ -68,7 +68,7 @@
     fallback.style.cssText='border:1px solid #1d4ed8;background:white;color:#1d4ed8;border-radius:9px;padding:8px 10px;cursor:pointer;font:700 13px system-ui';
     fallback.addEventListener('click',()=>location.assign(new URL('class-pointer-prototype/dashboard.html',root).href));
     holder.append(btn,label,fallback);document.body.appendChild(holder);
-    let active=null,peer=null,call=null,stream=null,busy=false;
+    let active=null,peer=null,call=null,stream=null,pendingCapture=null,busy=false,generation=0;
     // Centered, teacher-triggered consent prompt. Browser capture remains user initiated.
     const promptOverlay=document.createElement('div');
     promptOverlay.id='fttShareRequestOverlay';
@@ -118,8 +118,11 @@
       showPrompt();
     }
     function stop(){
-      const prior=stream;stream=null;try{call?.close()}catch{}call=null;
-      try{peer?.destroy()}catch{}peer=null;
+      generation++;
+      const prior=stream||pendingCapture,oldCall=call,oldPeer=peer;
+      stream=null;pendingCapture=null;call=null;peer=null;
+      try{oldCall?.close()}catch{}
+      try{oldPeer?.destroy()}catch{}
       prior?.getTracks().forEach(t=>t.stop());
       btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';
       label.textContent='';
@@ -135,13 +138,13 @@
     sessions.on('value',snapshot=>{
       // Student switching must never reuse another boy's classroom invitation.
       if(sessionStorage.getItem('b3Games_studentId')!==id){
-        if(stream)stop();
+        stop();
         active=null;holder.style.display='none';hidePrompt();
         return;
       }
       const next=current(snapshot.val());
       const shareable=next?.studentScreenSharing===true&&next?.screenSharingDenied?.[id]!==true?next:null;
-      if(!shareable||!active||shareable.roomId!==active.roomId){if(stream)stop()}
+      if((shareable?.roomId||null)!==(active?.roomId||null))stop();
       active=shareable;holder.style.display=active?'flex':'none';
       if(!active)hidePrompt();
       if(next)routeTeacherRequest(next);
@@ -150,8 +153,11 @@
       if(stream){stop();return}
       if(busy||!active)return;
       const lesson=active;
+      const attempt=generation;
       busy=true;btn.disabled=true;choose.disabled=true;
       let captured=null;
+      const current=()=>attempt===generation&&active?.roomId===lesson.roomId&&captured?.active
+        &&sessionStorage.getItem('b3Games_studentId')===id&&sessionStorage.getItem('b3Games_classPin')===pin;
       try{
         if(!navigator.mediaDevices?.getDisplayMedia)throw Error('Use Chrome or Edge on a computer.');
         // Capture must be called synchronously from the user click, before any await.
@@ -159,7 +165,8 @@
           video:{frameRate:{ideal:5,max:8}},audio:false
         });
         captured=await capturePromise;
-        if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
+        if(!current())throw Error('The lesson ended or sharing permission changed.');
+        pendingCapture=captured;
         status('Connecting to teacher…');
         // A missing, blocked or unavailable Cloud Function can surface as a
         // generic "Failed to fetch" after the student approves screen capture.
@@ -182,8 +189,9 @@
           if(response.status===404||response.status>=500)error.code='ACTIVITY_SHARE_NETWORK';
           throw error;
         }
-        if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
+        if(!current())throw Error('The lesson ended or sharing permission changed.');
         if(!window.Peer)await load(new URL('class-pointer-prototype/vendor/peerjs-1.5.5.min.js',root).href);
+        if(!current())throw Error('The lesson ended or sharing permission changed.');
         const connection=new Peer('class-pointer-activity-'+crypto.randomUUID());
         peer=connection;
         await new Promise((resolve,reject)=>{
@@ -191,18 +199,19 @@
           connection.once('open',()=>{clearTimeout(timeout);resolve()});
           connection.once('error',e=>{clearTimeout(timeout);reject(e)});
         });
-        if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
+        if(!current())throw Error('The lesson ended or sharing permission changed.');
         const media=connection.call(lesson.roomId,captured,{metadata:{kind:'activity-screen',token:ticket.token}});
         if(!media)throw Error('The teacher is not connected.');
-        call=media;stream=captured;
-        captured.getVideoTracks()[0]?.addEventListener('ended',stop,{once:true});
-        media.on('close',stop);media.on('error',stop);
+        call=media;stream=captured;pendingCapture=null;
+        captured.getVideoTracks()[0]?.addEventListener('ended',()=>{if(stream===captured)stop()},{once:true});
+        const ended=()=>{if(call===media)stop()};
+        media.on('close',ended);media.on('error',ended);
         btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';
         status('Sharing started — ask your teacher to confirm');
         hidePrompt();
       }catch(error){
         promptStatus.textContent=error?.name==='NotAllowedError'?'Sharing canceled. Please try again.':(error.message||'Could not share. Please try again.');
-        captured?.getTracks().forEach(t=>t.stop());
+        if(captured!==pendingCapture&&captured!==stream)captured?.getTracks().forEach(t=>t.stop());
         // A failure must release media/peer resources without erasing the error or reopening a blocking dialog.
         stop();
         const networkFailure=error?.code==='ACTIVITY_SHARE_NETWORK';
