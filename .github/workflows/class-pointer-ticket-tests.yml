@@ -13,4 +13,4 @@ jobs:
         with:
           node-version: '22'
       - name: Run ticket regression tests
-        run: node --test tests/class-pointer-share-ticket-retry.test.cjs
+        run: node --test tests/class-pointer-share-ticket-retry.test.cjs tests/class-pointer-activity-screen-e2e.test.cjs

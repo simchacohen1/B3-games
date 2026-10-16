@@ -12,6 +12,7 @@ function fixture(){
   const base='b3Games/workspaces/b3-2026/classes/et';
   const rows=new Map([
     [base,{active:true,members:{arik:{active:true}}}],
+    [base+'/members/arik',{active:true}],
     [base+'/classPointerSessions/'+room,{roomId:room,createdAt:Date.now(),studentScreenSharing:true,teacherUid:'teacher-et'}],
     ['b3Games/students/arik/profile',{name:'Arik',active:true}]
   ]);
@@ -55,6 +56,15 @@ test('same teacher can verify a screen ticket twice during connection setup',asy
 test('a ticket cannot be verified by a different teacher',async()=>{
   const f=fixture(),issue=await f.post({action:'issue',studentId:'arik',pin:'123456',classId:'et',room:f.room});
   const result=await f.post({action:'verify',classId:'et',room:f.room,token:issue.body.token},'other-teacher');
+  assert.equal(result.statusCode,403);
+});
+test('an ET ticket cannot be replayed against the WT class session',async()=>{
+  const f=fixture(),issue=await f.post({action:'issue',studentId:'arik',pin:'123456',classId:'et',room:f.room});
+  const base='b3Games/workspaces/b3-2026/classes/wt';
+  f.rows.set(base,{active:true,members:{arik:{active:true}}});
+  f.rows.set(base+'/members/arik',{active:true});
+  f.rows.set(base+'/classPointerSessions/'+f.room,{roomId:f.room,createdAt:Date.now(),studentScreenSharing:true,teacherUid:'teacher-et'});
+  const result=await f.post({action:'verify',classId:'wt',room:f.room,token:issue.body.token},'teacher-et');
   assert.equal(result.statusCode,403);
 });
 test('expired tickets remain invalid',async()=>{
