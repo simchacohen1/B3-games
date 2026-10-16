@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>My Homework</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#172b4d;background:#f2f6fb}*{box-sizing:border-box}body{margin:0}
+header{background:#123762;color:#fff;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}header strong{font-size:22px}
+header a{color:#fff}main{max-width:760px;margin:20px auto;padding:0 14px 60px}
+.card{background:#fff;border:1px solid #dce5ee;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 3px 10px #102b4510}
+.card h3{margin:0 0 4px}.muted{color:#5b6b7b}.badge{display:inline-block;border-radius:14px;padding:3px 10px;font-size:13px;background:#eaf2fa;color:#174e7e;margin-right:6px}
+.badge.late{background:#fde8e8;color:#a31a1a}.badge.ok{background:#e1f6e5;color:#1c6b30}.badge.retry{background:#fff1d6;color:#8a5a00}
+textarea,input{font:inherit;width:100%;padding:10px;border:1px solid #bfcfdf;border-radius:8px;margin-top:6px}textarea{min-height:80px}
+button{font:inherit;border:0;border-radius:9px;padding:10px 16px;font-weight:600;cursor:pointer;background:#18588f;color:#fff;margin:8px 8px 0 0}button.sec{background:#fff;color:#18588f;border:1px solid #18588f}button:disabled{opacity:.5}
+.note{padding:10px 12px;border-left:4px solid #c98b14;background:#fff7dd;border-radius:6px;margin-top:8px}
+.msg{min-height:20px;margin-top:6px;font-weight:600}.err{color:#a31a1a}.good{color:#1c6b30}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #eea62b;outline-offset:2px}
+</style></head><body>
+<header><strong>📚 My Homework</strong><span><span id="who"></span> <a href="../index.html">Back to games</a></span></header>
+<main>
+<div id="status" class="card muted">Loading your homework…</div>
+<div id="list"></div>
+</main>
+<script src="homework-common.js"></script>
+<script>
+(function(){'use strict';
+var H=window.HomeworkCommon,el=H.el;
+function ss(k){try{return sessionStorage.getItem(k)||''}catch(e){return ''}}
+var auth={studentId:ss('b3Games_studentId'),studentName:ss('b3Games_studentName'),pin:ss('b3Games_classPin'),classId:ss('b3Games_studentClass')};
+var statusBox=document.getElementById('status'),listBox=document.getElementById('list');
+if(!auth.studentId||!auth.pin){
+  statusBox.textContent='';
+  statusBox.append(el('strong','Please sign in first. '),el('a','Go to sign-in')); statusBox.lastChild.href='../index.html';
+  return;
+}
+document.getElementById('who').textContent=auth.studentName;
+function say(box,msg,good){box.textContent=msg;box.className='msg '+(good?'good':'err')}
+// Unsaved typing is kept on this device so a dropped connection never loses work.
+function draftKey(id){return 'homeworkDraft_'+auth.studentId+'_'+id}
+function loadLocal(id){try{return localStorage.getItem(draftKey(id))||''}catch(e){return ''}}
+function saveLocal(id,v){try{localStorage.setItem(draftKey(id),v)}catch(e){}}
+function clearLocal(id){try{localStorage.removeItem(draftKey(id))}catch(e){}}
+function call(body){return H.call(Object.assign({},auth,body))}
+
+function render(data){
+  listBox.replaceChildren();
+  statusBox.style.display='none';
+  if(!data.assignments.length){statusBox.style.display='';statusBox.textContent='No homework right now. Enjoy! 🎉';return}
+  var intro=el('div',data.openCount?('You have '+data.openCount+' to finish.'):'All caught up! 🎉','card');
+  listBox.append(intro);
+  data.assignments.forEach(function(a){listBox.append(card(a))});
+}
+function card(a){
+  var c=el('div',null,'card');
+  c.append(el('h3',a.title));
+  var meta=el('div');
+  var b=el('span',H.STATUS[a.status]||a.status,'badge'+(a.status==='approved'?' ok':a.status==='returned'?' retry':''));
+  meta.append(b,el('span',H.TYPES[a.type]||a.type,'badge'));
+  if(a.dueAt!=null)meta.append(el('span',(a.late?'Late – was due ':'Due ')+H.when(a.dueAt),'badge'+(a.late?' late':'')));
+  c.append(meta);
+  if(a.details)c.append(el('p',a.details));
+  if(a.targetMinutes)c.append(el('p','Goal: '+a.targetMinutes+' minutes · done so far: '+a.progress,'muted'));
+  if(a.status==='returned'&&a.feedback)c.append(el('div','Teacher says: '+a.feedback,'note'));
+  if(a.status==='approved'){
+    if(a.stars)c.append(el('p','★'.repeat(a.stars)+'☆'.repeat(5-a.stars)));
+    if(a.feedback)c.append(el('p','Teacher says: '+a.feedback,'note'));
+    return c;
+  }
+  if(a.status==='submitted'){c.append(el('p','Handed in. Your teacher will look at it.','muted'));if(a.answer)c.append(el('p','You wrote: '+a.answer,'muted'));return c}
+  var mins=null;
+  if(a.targetMinutes){
+    c.append(el('label','Minutes I practiced'));
+    mins=el('input');mins.type='number';mins.min='0';mins.max='1440';mins.value=a.progress||0;c.append(mins);
+  }
+  c.append(el('label',a.targetMinutes?'Short note (optional)':'What I did / my answer'));
+  var ta=el('textarea');ta.maxLength=2000;ta.value=loadLocal(a.id)||a.draft||'';c.append(ta);
+  ta.addEventListener('input',function(){saveLocal(a.id,ta.value)});
+  var msg=el('div',null,'msg');
+  var save=el('button','Save for later','sec'),sub=el('button','Hand in');
+  save.type=sub.type='button';
+  var mv=function(){return mins?Math.max(0,parseInt(mins.value,10)||0):undefined};
+  save.onclick=async function(){
+    save.disabled=true;
+    try{await call({action:'save',assignmentId:a.id,draft:ta.value,progress:mv()});clearLocal(a.id);say(msg,'Saved ✓',true)}
+    catch(e){say(msg,e.message)}finally{save.disabled=false}
+  };
+  sub.onclick=async function(){
+    sub.disabled=true;
+    try{await call({action:'submit',assignmentId:a.id,answer:ta.value,progress:mv()});clearLocal(a.id);await refresh();}
+    catch(e){say(msg,e.message);sub.disabled=false}
+  };
+  c.append(save,sub,msg);
+  return c;
+}
+async function refresh(){
+  try{render(await call({action:'studentList'}))}
+  catch(e){
+    statusBox.style.display='';
+    if(e.status===401||e.status===403)statusBox.textContent='Please sign in again from the main page. ('+e.message+')';
+    else statusBox.textContent=e.message;
+  }
+}
+refresh();
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&!listBox.querySelector('textarea:focus'))refresh()});
+})();
+</script></body></html>
