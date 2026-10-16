@@ -35,6 +35,7 @@ exports.messagesPortal=onRequest({region:'us-central1',cors:['https://simchacohe
    try{auth={identity:await admin.auth().verifyIdToken(token,true)};}
    catch(e){return res.status(401).json({error:'Please sign in again.'});}
   }
+  auth.ip=req.ip;
   res.json(await messagesApi(store,auth,req.body||{}));
  }catch(error){
   const code=Number.isInteger(error.code)&&error.code>=400&&error.code<600?error.code:500;

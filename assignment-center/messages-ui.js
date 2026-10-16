@@ -4,7 +4,7 @@
  * - Every send has a client id, so a repeat tap or a retry after a dropped connection never duplicates. */
 (function (root) {
   'use strict';
-  var MAX_SECONDS = 60;
+  var MAX_SECONDS = 60, MAX_BYTES = 480 * 1024; // server accepts 512 KB
   function el(tag, text, cls) { var n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; }
   function newId() {
     var a = new Uint8Array(9); (root.crypto || {}).getRandomValues ? root.crypto.getRandomValues(a) : a.forEach(function (_, i) { a[i] = Math.random() * 256; });
@@ -38,7 +38,8 @@
     var replyBar = el('div', null, 'msg-replybar'); replyBar.style.display = 'none';
     var compose = el('div', null, 'msg-compose');
     var input = el('textarea'); input.maxLength = 1000; input.rows = 2; input.placeholder = 'Type a message'; input.setAttribute('aria-label', 'Message');
-    var send = el('button', 'Send', 'msg-btn'); send.type = 'button';
+    var send = el('button', 'Send', 'msg-btn');
+    status.setAttribute('aria-live', 'polite'); send.type = 'button';
     var mic = el('button', '🎙 Voice', 'msg-btn sec'); mic.type = 'button';
     var recBox = el('div', null, 'msg-rec'); recBox.style.display = 'none';
     compose.append(input, send, mic);
@@ -88,7 +89,11 @@
       };
       wrap.append(btn); return wrap;
     }
-    function render() {
+    var lastSig = '';
+    function render(force) {
+      var sig = state.messages.map(function (m) { return m.id + (m.voiceExpired ? 'x' : ''); }).join(',') + '|' + state.pending.map(function (p) { return p.clientId + (p.failed ? 'f' : ''); }).join(',') + '|' + state.studentReadAt + '|' + state.teacherReadAt + '|' + state.hasMore;
+      if (!force && sig === lastSig) return;
+      lastSig = sig;
       var nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
       list.replaceChildren();
       if (!state.messages.length && !state.pending.length) list.append(el('p', 'No messages yet. Say hello!', 'msg-muted'));
@@ -160,7 +165,8 @@
       catch (e) { say(e && e.name === 'NotAllowedError' ? 'The microphone is blocked. Allow it in your browser settings, then try again.' : 'No microphone was found.', true); return; }
       var chunks = [], t0 = Date.now(), mr = new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 24000 });
       rec = { mr: mr, cancelled: false };
-      mr.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+      var total = 0;
+      mr.ondataavailable = function (e) { if (e.data && e.data.size) { chunks.push(e.data); total += e.data.size; if (total >= MAX_BYTES && mr.state === 'recording') mr.stop(); } };
       mr.onstop = function () {
         stream.getTracks().forEach(function (t) { t.stop(); }); clearInterval(tick);
         compose.style.display = ''; recBox.style.display = 'none'; recBox.replaceChildren();
@@ -168,9 +174,10 @@
         var seconds = Math.max(1, Math.min(MAX_SECONDS, Math.round((Date.now() - t0) / 1000)));
         var blob = new Blob(chunks, { type: mime.split(';')[0] }); rec = null;
         if (!blob.size) { say('Nothing was recorded. Try again.', true); return; }
+        if (blob.size > MAX_BYTES + 32 * 1024) { say('That recording is too long to send. Please record a shorter message.', true); return; }
         review(blob, seconds);
       };
-      mr.start(); compose.style.display = 'none'; recBox.style.display = '';
+      mr.start(1000); compose.style.display = 'none'; recBox.style.display = '';
       var clock0 = el('strong', '🔴 Recording 0:00'); var stop = el('button', 'Stop', 'msg-btn'); var cancel = el('button', 'Cancel', 'msg-btn sec'); stop.type = cancel.type = 'button';
       recBox.replaceChildren(clock0, stop, cancel);
       var tick = setInterval(function () { var s = Math.round((Date.now() - t0) / 1000); clock0.textContent = '🔴 Recording ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); if (s >= MAX_SECONDS) mr.stop(); }, 250);

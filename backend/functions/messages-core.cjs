@@ -11,6 +11,7 @@
 const crypto = require('node:crypto');
 const policy = require('./messages-policy.cjs');
 const { resolveStudent } = require('./student-login-core.cjs');
+const { guarded } = require('./auth-attempts.cjs');
 
 const WS = 'b3-2026';
 const OWNER_EMAIL = 'simcha5770@gmail.com';
@@ -24,6 +25,7 @@ const LIMITS = {
   messagesPerHour: 60,             // per sender per conversation
   minGapMs: 700,
   retentionMs: 365 * DAY,
+  threadMessages: 3000,
   pageDefault: 30, pageMax: 50
 };
 const MIME_EXT = { 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a' };
@@ -51,13 +53,13 @@ async function classFor(store, classId) {
   return cls;
 }
 async function memberOk(store, cls, studentId) {
-  if (!key(studentId) || !cls.members?.[studentId] || cls.members[studentId].active === false) return null;
+  if (!key(studentId) || !cls.members || !Object.prototype.hasOwnProperty.call(cls.members, studentId) || cls.members[studentId]?.active === false) return null;
   const profile = await store.get('b3Games/students/' + studentId + '/profile');
   if (!profile || profile.active === false) return null;
   return profile;
 }
 
-async function actorFor(store, auth, body) {
+async function actorFor(store, auth, body, now) {
   if (auth && auth.identity) { // adult: verified Google account
     const id = auth.identity;
     if (!id.uid || id.email_verified !== true || id.firebase?.sign_in_provider !== 'google.com')
@@ -72,10 +74,11 @@ async function actorFor(store, auth, body) {
     return { role: 'teacher', id: id.uid, owner, readOnly: !assigned, classId, cls,
       name: text(id.name || String(id.email || '').split('@')[0] || 'Teacher', 60) };
   }
-  const st = await resolveStudent(store.get, { b3StudentId: body.studentId, name: body.studentName, pin: body.pin, classId: body.classId });
+  const st = await guarded(store, { ip: auth && auth.ip, studentKey: body.studentName || body.studentId }, now,
+    () => resolveStudent(store.get, { b3StudentId: body.studentId, name: body.studentName, pin: body.pin, classId: body.classId }));
   if (!key(st.id) || !key(st.classId)) fail(403, 'Choose your class and sign in again.');
   const cls = await classFor(store, st.classId);
-  if (!cls.members?.[st.id] || cls.members[st.id].active === false) fail(403, 'Not allowed.');
+  if (!cls.members || !Object.prototype.hasOwnProperty.call(cls.members, st.id) || cls.members[st.id]?.active === false) fail(403, 'Not allowed.');
   return { role: 'student', id: st.id, classId: st.classId, cls, studentId: st.id, name: text(st.profile?.name || 'Student', 60) };
 }
 
@@ -109,6 +112,8 @@ async function purgeExpired(store, actor, studentId, messages, now) {
       const mp = threadPath(actor.classId, studentId) + '/messages/' + m.id;
       await store.set(mp + '/voice', null);
       await store.set(mp + '/voiceExpired', true);
+      const freed = m.voice.bytes || 0;
+      await store.tx(threadPath(actor.classId, studentId) + '/meta/voiceBytes', cur => Math.max(0, (cur || 0) - freed));
       m.voice = null; m.voiceExpired = true;
     }
   }
@@ -149,10 +154,11 @@ async function sendMessage(store, actor, studentId, body, now) {
   // Repeat tap or reconnect retry: claim this client id atomically, so two devices or a retry
   // that races the first attempt can never both create a message.
   const dedupePath = tp + '/dedupe/' + sha(actor.role + ':' + actor.id + ':' + clientId).slice(0, 40);
-  const claim = await store.tx(dedupePath, cur => cur ? undefined : 'pending');
+  // A claim left behind by a crash expires after a minute so the child can simply try again.
+  const claim = await store.tx(dedupePath, cur => (cur && !(typeof cur === 'object' && now - (cur.at || 0) > 60000)) ? undefined : { pending: true, at: now });
   if (claim.committed === false) {
     const seen = await store.get(dedupePath);
-    const m = seen && seen !== 'pending' ? await store.get(tp + '/messages/' + seen) : null;
+    const m = typeof seen === 'string' ? await store.get(tp + '/messages/' + seen) : null;
     if (m) return { ok: true, message: publicMessage(m), duplicate: true };
     fail(409, 'That message is still sending. Please wait a moment.');
   }
@@ -188,14 +194,24 @@ async function sendClaimed(store, actor, studentId, body, now, { tp, dedupePath,
   // Limits for this sender in this conversation (atomic).
   let refusal = null;
   await store.tx(tp + '/meta/rate/' + actor.role + '_' + sha(actor.id).slice(0, 16), cur => {
-    const r = cur && now - cur.windowStart < 3600000 ? cur : { windowStart: now, count: 0, last: 0, voiceDay: 0, dayStart: now };
-    const day = now - (r.dayStart || 0) < DAY ? r : { ...r, dayStart: now, voiceDay: 0 };
+    const b = cur || { windowStart: now, count: 0, last: 0, voiceDay: 0, dayStart: now };
+    const hourOk = now - b.windowStart < 3600000, dayOk = now - (b.dayStart || b.windowStart) < DAY;
+    // the hour window and the day window roll over independently
+    const r = { windowStart: hourOk ? b.windowStart : now, count: hourOk ? b.count : 0, last: b.last || 0 };
+    const day = { dayStart: dayOk ? (b.dayStart || b.windowStart) : now, voiceDay: dayOk ? (b.voiceDay || 0) : 0 };
     if (now - (r.last || 0) < LIMITS.minGapMs) { refusal = [429, 'Please wait a moment before sending again.']; return undefined; }
     if (r.count >= LIMITS.messagesPerHour) { refusal = [429, 'Too many messages this hour. Please try again later.']; return undefined; }
     if (voice && day.voiceDay >= LIMITS.voicePerDay) { refusal = [429, 'Too many voice messages today.']; return undefined; }
-    return { ...day, windowStart: r.windowStart, count: r.count + 1, last: now, voiceDay: (day.voiceDay || 0) + (voice ? 1 : 0) };
+    return { ...day, windowStart: r.windowStart, count: r.count + 1, last: now, voiceDay: day.voiceDay + (voice ? 1 : 0) };
   });
   if (refusal) fail(refusal[0], refusal[1]);
+
+  let capped = false; // keeps one chat from growing without limit
+  await store.tx(tp + '/meta/total', cur => {
+    if ((cur || 0) >= LIMITS.threadMessages) { capped = true; return undefined; }
+    return (cur || 0) + 1;
+  });
+  if (capped) fail(413, 'This conversation is full. Please ask your teacher.');
 
   if (voice) { // reserve thread storage first so concurrent uploads cannot overshoot the cap
     let full = false;
@@ -224,7 +240,10 @@ async function sendClaimed(store, actor, studentId, body, now, { tp, dedupePath,
       [unreadField]: ((cur || {})[unreadField] || 0) + 1 }));
     return { ok: true, message: publicMessage(record) };
   } catch (e) { // roll back the reservation so a failed upload does not eat the quota
-    if (voice) await store.tx(tp + '/meta/voiceBytes', cur => Math.max(0, (cur || 0) - voice.bytes));
+    if (voice) {
+      await store.tx(tp + '/meta/voiceBytes', cur => Math.max(0, (cur || 0) - voice.bytes));
+      if (voice.path) { try { await store.delFile(voice.path); } catch (x) { /* nothing was stored */ } }
+    }
     throw e;
   }
 }
@@ -277,7 +296,7 @@ async function messagesApi(store, auth, body, now = Date.now()) {
   if (!body || typeof body !== 'object') fail(400, 'Bad request.');
   const action = body.action;
   if (!['inbox', 'list', 'send', 'read', 'voice', 'report', 'unread'].includes(action)) fail(400, 'Unknown action.');
-  const actor = await actorFor(store, auth, body);
+  const actor = await actorFor(store, auth, body, now);
   if (action === 'inbox') return inbox(store, actor);
   let studentId;
   if (actor.role === 'student') studentId = actor.id;

@@ -248,3 +248,37 @@ test('policy copy in functions matches the tested original', () => {
   assert.equal(fs.readFileSync(__dirname + '/../backend/functions/messages-policy.cjs', 'utf8'),
     fs.readFileSync(__dirname + '/../assignment-center/message-policy.js', 'utf8'));
 });
+
+test('review fixes: voice-per-day cap survives the hourly reset; expiry frees storage quota', async () => {
+  const store = makeStore(seed());
+  const base = 1_900_000_000_000;
+  for (let i = 0; i < LIMITS.voicePerDay; i++) await call(store, {}, { action: 'send', ...S1(), clientId: cid(), voice: voice() }, base + i * 3_700_000 % (20 * 3_700_000) * 0 + i * 3_700_000 / 20);
+  await assert.rejects(call(store, {}, { action: 'send', ...S1(), clientId: cid(), voice: voice() }, base + 3_700_000), { code: 429 }); // new hour, same day
+  const tp = store.data.assignmentCenter.workspaces['b3-2026'].classes.et.threads.s1;
+  assert.ok(tp.meta.voiceBytes > 0);
+  await call(store, {}, { action: 'list', ...S1() }, base + 400 * 86_400_000);
+  assert.equal(tp.meta.voiceBytes, 0);
+});
+
+test('review fixes: a stale "still sending" claim expires; a full conversation is refused', async () => {
+  const store = makeStore(seed());
+  const id = cid();
+  await call(store, {}, { action: 'send', ...S1(), clientId: 'seed0', text: 'init' });
+  const tp = store.data.assignmentCenter.workspaces['b3-2026'].classes.et.threads.s1;
+  const sha = require('node:crypto').createHash('sha256').update('student:s1:' + id).digest('hex').slice(0, 40);
+  tp.dedupe[sha] = { pending: true, at: 1 }; // left behind by a crash long ago
+  const ok = await call(store, {}, { action: 'send', ...S1(), clientId: id, text: 'retry works' });
+  assert.equal(ok.message.text, 'retry works');
+  tp.dedupe[sha] = { pending: true, at: Date.now() + 10 ** 12 }; // fresh claim: still in progress elsewhere
+  await assert.rejects(call(store, {}, { action: 'send', ...S1(), clientId: id, text: 'x' }, Date.now() + 10 ** 12), { code: 409 });
+  tp.meta.total = LIMITS.threadMessages;
+  await assert.rejects(call(store, {}, { action: 'send', ...S1(), clientId: cid(), text: 'full' }), { code: 413 });
+});
+
+test('review fixes: wrong-passcode limiter also protects Messages', async () => {
+  const store = makeStore(seed());
+  const T0 = 20_000_000;
+  for (let i = 0; i < 8; i++) await assert.rejects(call(store, {}, { action: 'unread', ...stu('s1', 'Sam One', '0000') }, T0 + i), { code: 401 });
+  await assert.rejects(call(store, {}, { action: 'unread', ...S1() }, T0 + 100), { code: 429 });
+  await call(store, {}, { action: 'unread', ...S1() }, T0 + 16 * 60000);
+});
