@@ -28,15 +28,15 @@
         description: "Weekly A Chossid is a Lamdan mark for Parshas Noach.",
         students: {
           "Chaikin Mayer Chaim": {mark:"100", comment:"Outstanding week — excellent participation, effort, and responsibility!"},
-          "Gourarie Yossi": {mark:"98", comment:"Excellent practice and participation this week!"},
-          "Huebner Sholom DovBer": {mark:"91", comment:"Nice participation and effort this week!"},
-          "Lapine Moshe": {mark:"90", comment:"Good effort and participation this week!"},
-          "Notik Kehos": {mark:"99", comment:"Strong Chazara effort and class involvement!"},
-          "Oirechman Yisroel": {mark:"99", comment:"Excellent effort and participation this week!"},
-          "Raichman Moshe Tuvia": {mark:"93", comment:"Good class involvement and effort this week!"},
-          "Rosenfeld Avrohom": {mark:"98", comment:"Strong Chazara effort and participation this week!"},
-          "Rozmarin Levi": {mark:"97", comment:"Excellent Shorashim work and effort this week!"},
-          "Traxler Arik": {mark:"93", comment:"Active participation and good effort this week!"}
+          "Gourarie Yossi": {mark:"98", comment:"Excellent participation and effort this week!"},
+          "Huebner Sholom DovBer": {mark:"95", comment:"Very nice participation and effort this week!"},
+          "Lapine Moshe": {mark:"94", comment:"Very good effort and participation this week!"},
+          "Notik Kehos": {mark:"99", comment:"Excellent class involvement and effort this week!"},
+          "Oirechman Yisroel": {mark:"99", comment:"Excellent participation and effort this week!"},
+          "Raichman Moshe Tuvia": {mark:"96", comment:"Great class involvement and effort this week!"},
+          "Rosenfeld Avrohom": {mark:"98", comment:"Excellent participation and effort this week!"},
+          "Rozmarin Levi": {mark:"97", comment:"Great effort and participation this week!"},
+          "Traxler Arik": {mark:"95", comment:"Very nice participation and effort this week!"}
         }
       };
       lamdanDrafts["wt|2026-10-15"] = {
@@ -44,11 +44,11 @@
         description: "Weekly A Chossid is a Lamdan mark for Parshas Noach.",
         students: {
           "Greenberg Ari": {mark:"100", comment:"Outstanding week — excellent participation, effort, and responsibility!"},
-          "Rosenfeld Zev": {mark:"90", comment:"Good class involvement and effort this week!"},
-          "Schtroks Levi": {mark:"98", comment:"Strong Chazara effort and participation this week!"},
-          "Simmonds Yisroel Aryeh": {mark:"99", comment:"Excellent Shorashim and Chazara effort this week!"},
-          "Vogel Leibel": {mark:"94", comment:"Very involved in class and showed good effort this week!"},
-          "Wolf Yisroel Arye Leib": {mark:"100", comment:"Outstanding effort and responsibility this week!"}
+          "Rosenfeld Zev": {mark:"94", comment:"Very good class involvement and effort this week!"},
+          "Schtroks Levi": {mark:"98", comment:"Excellent participation and effort this week!"},
+          "Simmonds Yisroel Aryeh": {mark:"99", comment:"Excellent effort and class involvement this week!"},
+          "Vogel Leibel": {mark:"96", comment:"Great participation and effort this week!"},
+          "Wolf Yisroel Arye Leib": {mark:"100", comment:"Outstanding week — excellent effort and responsibility!"}
         }
       };
       localStorage.setItem(lamdanKey, JSON.stringify(lamdanDrafts));
