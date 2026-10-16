@@ -163,7 +163,7 @@ test('activity share request waits for permission and shows dismissible centered
  const script=fs.readFileSync(require.resolve('../class-pointer-prototype/activity-share.js'),'utf8');
  assert.match(script,/cancel\.addEventListener\('click'/);
  assert.match(script,/persistentShareWindow\)return beginShare\(event\)/);
- assert.match(script,/if\(!openPersistentShareWindow\(\)\)beginShare\(event\)/);
+ assert.match(script,/if\(!openPersistentShareWindow\(\)\)return beginShare\(event\)/);
  const start=script.indexOf('function routeTeacherRequest(session)');
  const end=script.indexOf('function stop()',start);
  assert.ok(start>0&&end>start,'student request handler is present');
