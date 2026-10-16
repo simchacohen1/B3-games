@@ -4,6 +4,7 @@
 // student's id and name.
 const crypto=require('node:crypto');
 const {PRIVATE,clean,key,equal,readPasscode,passcodeWrites}=require('./student-passcodes.cjs');
+const {guarded}=require('./auth-attempts.cjs');
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code});};
 const normalize=s=>String(s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'');
 const hash=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
@@ -15,7 +16,19 @@ async function rateLimit(store,ip,now){
  if(blocked)fail(429,'Too many sign-in attempts. Try again in 10 minutes.');
 }
 
+// Wrong passcodes are counted per student (name typed, or id for 'verify') as well as per address,
+// so one passcode cannot be guessed at by trying every number. A correct sign-in clears the count.
 async function studentAuth(store,body,ip='unknown',now=Date.now()){
+ const action=String(body?.action||'');
+ let studentKey='';
+ if(action==='login'||action==='choosePin')studentKey=clean(body?.name);
+ else if(action==='verify')studentKey='id:'+clean(body?.studentId);
+ if(!normalize(studentKey))return studentAuthChecked(store,body,ip,now);
+ const limiterStore={get:store.get,tx:store.tx,set:(path,value)=>store.update({[path]:value})};
+ return guarded(limiterStore,{ip,studentKey},now,()=>studentAuthChecked(store,body,ip,now));
+}
+
+async function studentAuthChecked(store,body,ip='unknown',now=Date.now()){
  const get=store.get;
  const action=String(body?.action||'');
  if(action==='login'||action==='choosePin'){
