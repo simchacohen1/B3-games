@@ -248,6 +248,9 @@
       "classPointerShareTickets": {
         ".indexOn": ["expiresAt"]
       },
+      "classPointerJoinTickets": {
+        ".indexOn": ["expiresAt"]
+      },
       "classPointerSharePermissions": {
         "$workspaceId": {
           "$classId": {
