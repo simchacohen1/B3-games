@@ -465,7 +465,7 @@
 
       <section class="card">
         <h3>Questions</h3>
-        <p class="hint">Type questions, or paste two columns (question, answer) from a spreadsheet.</p>
+        <p class="hint">Type questions, paste six columns for Multiple Choice, or paste the original two-column question and answer format.</p>
         <div class="row">
           <button class="btn btn-primary" id="editBtn" onclick="openEditor()">Edit questions</button>
           <button class="btn btn-ghost btn-sm" id="syncBtn" onclick="syncQuestionsToDatabase()">Restore built-in questions</button>
@@ -559,8 +559,8 @@
 
     <div class="paste-section">
       <h3>Paste from a spreadsheet</h3>
-      <div class="paste-hint">Copy two columns (Question, then Answer) from Google Sheets or Excel, one question per line. Questions made with Claude or ChatGPT paste in the same way.</div>
-      <textarea id="pasteBox" placeholder="What does &#39;Vayeira&#39; mean?	Hashem appeared&#10;How many malachim came to Avrohom?	Three"></textarea>
+      <div class="paste-hint">For Multiple Choice paste 6 columns: Question, Red, Blue, Green, Yellow, Correct. Correct can be a color, A–D, 1–4, or the answer text. The first header row is optional. Old 2-column Question / Answer pastes still work. Copy from Sheets, Excel, ChatGPT or Claude.</div>
+      <textarea id="pasteBox" placeholder="Question&#9;Red&#9;Blue&#9;Green&#9;Yellow&#9;Correct&#10;How many malochim came to Avrohom?&#9;Two&#9;Four&#9;Three&#9;Five&#9;Green"></textarea>
       <div class="paste-btn-row">
         <button class="btn btn-sm btn-primary" onclick="loadPasted(false)">Add to list</button>
         <button class="btn btn-sm btn-bad" onclick="loadPasted(true)">Replace whole list</button>
@@ -1671,47 +1671,28 @@ function addQuestionRow() {
   document.getElementById('editorList').appendChild(createQuestionRow('', ''));
 }
 
-// Parses pasted spreadsheet text. Each line = one question. Splits on the
-// first TAB if present (normal when pasting two columns from a spreadsheet),
-// otherwise falls back to splitting on the first comma.
+// Parse spreadsheets with the shared, independently tested importer.
 function parsePastedText(text) {
-  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-  const rows = [];
-  lines.forEach(line => {
-    let q, ans;
-    if (line.includes('\t')) {
-      const idx = line.indexOf('\t');
-      q = line.slice(0, idx).trim();
-      ans = line.slice(idx + 1).trim();
-    } else if (line.includes(',')) {
-      const idx = line.indexOf(',');
-      q = line.slice(0, idx).trim();
-      ans = line.slice(idx + 1).trim();
-    } else {
-      q = line;
-      ans = '';
-    }
-    if (q) rows.push({ q, ans });
-  });
-  return rows;
+  return window.GameShowPasteImport.parsePastedText(text).rows;
 }
-
 function loadPasted(replace) {
-  const text = document.getElementById('pasteBox').value;
-  const rows = parsePastedText(text);
-  if (rows.length === 0) {
-    alert("Nothing to load - paste some questions first (Question, then Tab or comma, then Answer, one per line).");
+  const box = document.getElementById('pasteBox');
+  const parsed = window.GameShowPasteImport.parsePastedText(box.value);
+  if (parsed.errors.length) {
+    alert("Nothing imported. Fix the spreadsheet first:\n" +
+      parsed.errors.slice(0, 5).join("\n") +
+      (parsed.errors.length > 5 ? "\n…and " + (parsed.errors.length - 5) + " more rows." : ""));
     return;
   }
-  if (replace) {
-    const sure = confirm("Replace every question currently in the editor below with the " + rows.length + " pasted questions?");
-    if (!sure) return;
-    document.getElementById('editorList').innerHTML = '';
+  if (!parsed.rows.length) {
+    alert("Nothing to import. Paste 6 columns (Question, Red, Blue, Green, Yellow, Correct) or the original 2 columns (Question, Answer).");
+    return;
   }
-  rows.forEach(r => {
-    document.getElementById('editorList').appendChild(createQuestionRow(r.q, r.ans));
-  });
-  document.getElementById('pasteBox').value = '';
+  if (replace && !confirm("Replace every question in the editor with " + parsed.rows.length + " pasted questions?")) return;
+  const list = document.getElementById('editorList');
+  if (replace) list.replaceChildren();
+  parsed.rows.forEach(row => list.appendChild(createQuestionRow(row.q, row.ans, row.choices, row.correctIndex)));
+  box.value = '';
 }
 
 function saveEditor() {
@@ -1751,6 +1732,7 @@ window.getCurrentQuestionSet = () => questions.map(item => ({ ...item }));
 window.saveQuestionSet = saveQuestionSet;
 </script>
 
+<script src="paste-import.js?v=20261016-mc6"></script>
 <script src="team-modes.js?v=20261015-colored-choices1"></script>
 <script src="question-generator-grade3-v4.js?v=20261015-believable-choices1"></script>
 <script src="question-library.js?v=20261013-share-library2"></script>
