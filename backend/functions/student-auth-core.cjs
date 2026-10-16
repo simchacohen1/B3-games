@@ -18,11 +18,11 @@ async function rateLimit(store,ip,now){
 async function studentAuth(store,body,ip='unknown',now=Date.now()){
  const get=store.get;
  const action=String(body?.action||'');
+ if(action==='login'||action==='choosePin'||action==='verify')await rateLimit(store,ip,now);
  if(action==='login'||action==='choosePin'){
   const typed=clean(body.name),pin=clean(body.pin);
   if(!normalize(typed))fail(400,'Please type your name.');
   if(!pin||pin.length>100)fail(400,'Please enter your passcode.');
-  await rateLimit(store,ip,now);
   const [central,legacyRows]=await Promise.all([get('b3Games/students'),get('posukPractice/allowedStudents')]);
   const sameName=(id,row)=>normalize(row?.name)===normalize(typed)||normalize(id)===normalize(typed);
   const ids=new Set();

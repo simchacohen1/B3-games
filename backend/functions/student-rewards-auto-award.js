@@ -5,6 +5,8 @@ const rtdb = admin.database();
 
 const teacherClassScope=require("./teacher-class-scope");
 const rewardsStore=require('./rewards-store.cjs');
+const studentTools=require('./student-tool-policy.js');
+const {authorizePracticeStudent}=require('./student-practice-auth.cjs');
 const SR_ROOT = "studentRewards";
 const ADMIN_EMAIL = "simcha5770@gmail.com";
 const POINTS = Object.freeze({
@@ -96,7 +98,8 @@ function reasonFor(source,perek,posuk){
 
 
 function isShorashimRequest(item){return ["shorashim-recording","shorashim-no-hints"].includes(String(item?.source||""));}
-function isReviewableRequest(item){return isChazaraRequest(item)||isShorashimRequest(item);}
+function isMilestoneRequest(item){return ['reading100','translation100','understand100'].includes(String(item?.source||''));}
+function isReviewableRequest(item){return isChazaraRequest(item)||isShorashimRequest(item)||isMilestoneRequest(item);}
 function isChazaraRequest(item){
   return ["chazara","chazara-recording"].includes(String(item?.source || ""));
 }
@@ -161,6 +164,16 @@ async function requireStudent(req){
     console.warn("Student token verification failed",err);
     return {ok:false,error:"Student sign-in expired. Please sign in again."};
   }
+}
+
+async function requirePracticeStudent(req,source){
+  const result=await authorizePracticeStudent({
+    authorization:req.headers.authorization,
+    verifyToken:token=>admin.auth().verifyIdToken(token),
+    get:async path=>(await rtdb.ref(path).get()).val(),source,studentTools
+  });
+  if(!result.ok&&result.status===401)console.warn('Practice student token was missing or invalid.');
+  return result;
 }
 
 async function studentPointHistory(studentId){
@@ -692,7 +705,7 @@ async function listPendingChazaraRequests(scope){
     // Read once and filter in code (no ".indexOn": "practiceStudentId" rule).
     const allRequests=(await rtdb.ref(`${SR_ROOT}/pointRequests`).get()).val()||{};
     for(const studentId of Object.keys(scope.students)){
-      for(const [id,item] of Object.entries(allRequests))if(item?.practiceStudentId===studentId&&item.status==='pending'&&isChazaraRequest(item)&&teacherClassScope.recordAllowed(scope,studentId,item))rows.push({id,...item});
+      for(const [id,item] of Object.entries(allRequests))if(item?.practiceStudentId===studentId&&item.status==='pending'&&isReviewableRequest(item)&&teacherClassScope.recordAllowed(scope,studentId,item))rows.push({id,...item});
     }
     return rows.sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
   }
@@ -707,7 +720,7 @@ async function listPendingChazaraRequests(scope){
   const rows=[];
   snap.forEach(child=>{
     const item=child.val() || {};
-    if(item.status === "pending" && isChazaraRequest(item)) rows.push({id:child.key,...item});
+    if(item.status === "pending" && isReviewableRequest(item)) rows.push({id:child.key,...item});
   });
   rows.sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0));
   return rows;
@@ -718,7 +731,7 @@ async function approvePendingRequest(requestId,reviewedBy){
   const existing=await ref.get();
   if(!existing.exists()) return {ok:false,error:"Point request not found."};
   const before=existing.val() || {};
-  if(!isReviewableRequest(before)) return {ok:false,error:"Only recording and Chazara requests can be approved here."};
+  if(!isReviewableRequest(before)) return {ok:false,error:"This point request is not reviewable here."};
   if(before.status !== "pending") return {ok:true,alreadyHandled:true,status:before.status};
 
   // A Realtime Database transaction can call the updater first with null when
@@ -766,42 +779,26 @@ async function rejectPendingRequest(requestId,reviewedBy){
   const snap=await ref.get();
   if(!snap.exists()) return {ok:false,error:"Point request not found."};
   const item=snap.val() || {};
-  if(!isReviewableRequest(item)) return {ok:false,error:"Only recording and Chazara requests can be rejected here."};
+  if(!isReviewableRequest(item)) return {ok:false,error:"This point request is not reviewable here."};
   if(item.status !== "pending") return {ok:true,alreadyHandled:true,status:item.status};
   await ref.update({status:"rejected",reviewedBy,reviewedAt:Date.now()});
   await mirrorChazaraPointStatus(item,"rejected");
   return {ok:true,status:"rejected"};
 }
 
+// Used only after a verified teacher action has already authorized the entry.
 async function awardMilestoneImmediately({requestId,rewardStudentId,studentId,source,amount,reason,record,reviewedBy}){
-  const ref=rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`);
-  const info=await studentInfo(rewardStudentId);
+  const ref=rtdb.ref(`${SR_ROOT}/pointRequests/${requestId}`),info=await studentInfo(rewardStudentId);
   const claimId=`${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  const seed={
-    id:requestId,status:"processing",automatic:true,amount,source,reason,
-    practiceStudentId:studentId,rewardStudentId,studentName:info.name,classId:info.classId,
-    createdAt:Date.now(),claimId,...record
-  };
-  const tx=await ref.transaction(cur=>cur ? undefined : seed);
-  if(!tx.committed){
-    const existing=(await ref.get()).val() || {};
-    return {ok:true,newlyAwarded:false,requestId,status:existing.status || "approved",amount:Number(existing.actualAmount ?? existing.amount ?? amount)};
-  }
+  const seed={id:requestId,status:'processing',automatic:true,amount,source,reason,practiceStudentId:studentId,rewardStudentId,studentName:info.name,classId:info.classId,createdAt:Date.now(),claimId,...record};
+  const tx=await ref.transaction(cur=>cur?undefined:seed);
+  if(!tx.committed){const existing=(await ref.get()).val()||{};return{ok:true,newlyAwarded:false,requestId,status:existing.status||'approved',amount:Number(existing.actualAmount??existing.amount??amount)}}
   let applied=0;
-  const balRef=rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`);
-  const bal=await balRef.transaction(cur=>{
-    const old=Number(cur || 0);
-    const next=Math.max(0,old+amount);
-    applied=next-old;
-    return next;
-  });
-  if(!bal.committed){
-    await ref.update({status:"error",lastError:"Balance update did not commit"});
-    return {ok:false,error:"Could not add the reward points."};
-  }
-  const balanceAfter=Number(bal.snapshot.val() || 0);
-  await ref.update({status:"approved",actualAmount:applied,balanceAfter,approvedAutomatically:true,reviewedBy:reviewedBy||"Verified Posuk Practice",reviewedAt:Date.now()});
-  return {ok:true,newlyAwarded:true,requestId,status:"approved",amount:applied,balanceAfter};
+  const bal=await rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`).transaction(cur=>{const old=Number(cur||0),next=Math.max(0,old+amount);applied=next-old;return next});
+  if(!bal.committed){await ref.update({status:'error',lastError:'Balance update did not commit'});return{ok:false,error:'Could not add the reward points.'}}
+  const balanceAfter=Number(bal.snapshot.val()||0);
+  await ref.update({status:'approved',actualAmount:applied,balanceAfter,approvedAutomatically:true,reviewedBy:reviewedBy||'Verified teacher action',reviewedAt:Date.now()});
+  return{ok:true,newlyAwarded:true,requestId,status:'approved',amount:applied,balanceAfter};
 }
 
 async function resolveRewardStudentId(posukStudentId){
@@ -1395,9 +1392,11 @@ exports.studentRewardsAutoAward = onRequest(
         return res.status(400).json({error:"Unknown teacher action."});
       }
 
-      const studentId=String(body.studentId||"").trim();
       const source=String(body.source||"").trim();
-      if(!studentId) return res.status(400).json({error:"Missing student."});
+      const practiceStudent=await requirePracticeStudent(req,source);
+      if(!practiceStudent.ok)return res.status(practiceStudent.status||401).json({error:practiceStudent.error});
+      const studentId=practiceStudent.studentId;
+      if(body.studentId&&String(body.studentId)!==studentId)return res.status(403).json({error:'Student identity does not match the signed-in account.'});
 
       let approved=await rtdb.ref(`b3Games/students/${studentId}/profile`).get();
       if(!approved.exists())approved=await rtdb.ref(`posukPractice/allowedStudents/${studentId}`).get();
@@ -1441,12 +1440,6 @@ exports.studentRewardsAutoAward = onRequest(
         requestId=safeKey(`chazara_${studentId}_${eventId}`);
         reason=reasonFor(source,e.perek,e.posuk);
         record={eventId,perek:e.perek||null,posuk:e.posuk||null,workspaceClassId:e.workspaceClassId||null,recorded:e.recorded===true};
-      }
-
-      if(source === "reading100" || source === "translation100" || source === "understand100"){
-        const result=await awardMilestoneImmediately({requestId,rewardStudentId,studentId,source,amount,reason,record});
-        if(!result.ok) return res.status(409).json({error:result.error});
-        return res.status(200).json({ok:true,awarded:result.newlyAwarded,status:result.status,requestId,amount:result.amount,balanceAfter:result.balanceAfter});
       }
 
       const result=await createPendingRequest({requestId,rewardStudentId,studentId,source,amount,reason,record});

@@ -1459,6 +1459,7 @@
 
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
@@ -1559,14 +1560,14 @@ const SYNTHESIZE_SPEECH_URL = "https://us-central1-b3-games.cloudfunctions.net/s
 
 /* =========================================================
    STUDENT REWARDS — verified Posuk Practice rewards
-   Reaching 100% in Reading, Translation, or Understanding is verified by the
-   backend and awarded immediately. Each reward is paid only once per Posuk.
+   Reaching 100% in Reading, Translation, or Understanding creates a
+   teacher-reviewed request. Each request is recorded once per Posuk.
    ========================================================= */
 const STUDENT_REWARDS_AUTO_AWARD_URL = "https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
 // Wake the point service on page load so the reward popup is not delayed by a cold start.
 fetch(STUDENT_REWARDS_AUTO_AWARD_URL, { mode: 'no-cors' }).catch(() => {});
 
-function showRewardToast(points){
+function showRewardToast(points,pending=false){
   if(!points) return;
   let el = document.getElementById('rewardPointsToast');
   if(!el){
@@ -1576,7 +1577,7 @@ function showRewardToast(points){
     el.onclick = () => { el.style.opacity = '0'; el.style.pointerEvents = 'none'; };
     document.body.appendChild(el);
   }
-  el.textContent = '🎉 Great job! You earned ' + points + ' point' + (points === 1 ? '' : 's') + '!';
+  el.textContent = pending ? '⭐ Your ' + points + ' point request was sent to your teacher.' : '🎉 Great job! You earned ' + points + ' point' + (points === 1 ? '' : 's') + '!';
   el.style.opacity = '1';
   el.style.pointerEvents = 'auto';
   clearTimeout(showRewardToast._timer);
@@ -1587,13 +1588,17 @@ async function requestVerifiedAward(source, awardPosukKey, evidencePosukKey){
   if(teacherPreview)return 0;
   if(!studentId || !awardPosukKey || !evidencePosukKey) return 0;
   try{
+    const user=window.firebase&&firebase.auth&&firebase.auth().currentUser;
+    if(!user)return 0;
+    const idToken=await user.getIdToken();
     const response = await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+idToken},
       body:JSON.stringify({ studentId, source, awardPosukKey, evidencePosukKey })
     });
     const data = await response.json().catch(()=>({}));
     if(!response.ok) throw new Error(data.error || ('Point request service returned ' + response.status));
+    if(data.status==='pending'&&data.requested)showRewardToast(Number(data.amount||0),true);
     return data.awarded && data.status === 'approved' ? Number(data.amount || 0) : 0;
   }catch(err){
     // Practice itself must never fail just because the point-request service
@@ -2364,7 +2369,10 @@ const DEFAULT_STUDENT_PASSCODE = '5770';
 async function studentRecord(path){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
   try{
-    const response=await fetch(firebaseConfig.databaseURL+'/'+path+'.json',{signal:controller.signal,cache:'no-store'});
+    const user=window.firebase&&firebase.auth&&firebase.auth().currentUser;
+    const idToken=user?await user.getIdToken():'';
+    const headers=idToken?{Authorization:'Bearer '+idToken}:{};
+    const response=await fetch(firebaseConfig.databaseURL+'/'+path+'.json',{signal:controller.signal,cache:'no-store',headers});
     if(!response.ok)throw new Error('Student account could not be checked.');
     return await response.json();
   }finally{clearTimeout(timer);}
@@ -2388,6 +2396,7 @@ async function checkAccess(name,pin,idHint=''){
   const id=String(data.id||'').trim();
   if(!data.ok||!id)return {ok:false,reason:'Check your name and passcode. Sign in from the main site if needed.'};
   if(idHint&&idHint!==id)return {ok:false,reason:'Check your name and passcode. Sign in from the main site if needed.'};
+  if(data.customToken&&window.firebase&&firebase.auth)await firebase.auth().signInWithCustomToken(data.customToken);
   const profile=await studentRecord('b3Games/students/'+encodeURIComponent(id)+'/profile').catch(()=>null);
   if(profile&&profile.active===false)return {ok:false,reason:'Your account is turned off. Ask your teacher.'};
   return {ok:true,slug:id,accessVersion:Number(profile&&profile.passcodeUpdatedAt)||0};

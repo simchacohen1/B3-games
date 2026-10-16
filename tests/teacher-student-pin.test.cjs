@@ -1,14 +1,55 @@
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
 const html=fs.readFileSync(__dirname+'/../index.html','utf8');
-const src=html.slice(html.indexOf('  async function authorizedTeacherStudentSession('),html.indexOf('  function switchStudent(){'));
-function fixture({acting=true,user=true,authorized=true,pinChange=true,expired=false,wrongClass=false}={}){
- const saved=new Map([['b3Games_studentId','family_boy'],['b3Games_studentClass','family_friends'],['b3Games_classPin','test-only-pin']]);
- let opened=0,login=0,calls=[];const nodes={};
- const ctx={isAuthorizedTeacher:false,isStudentPreview:false,previewStudentId:'',settingsApi:{getActingStudent:()=>acting?{id:'family_boy',classId:wrongClass?'et':'family_friends'}:null},sessionStorage:{getItem:k=>saved.get(k)||null,removeItem:k=>saved.delete(k)},window:{firebase:{auth:()=>({currentUser:user?{getIdToken:async()=> 'test-only-token'}:null})}},db:{ref:()=>({once:async()=>({exists:()=>true,val:()=>({name:'Family Boy',active:true})})})},studentAuthCall:async()=>{if(expired)throw {status:401};return{ok:true,requiresPinChange:pinChange}},fetch:async(url,options)=>{calls.push(JSON.parse(options.body));return{ok:authorized,json:async()=>({passcodes:{family_boy:'test-only-pin'}})}},AbortSignal,el:id=>(nodes[id]??={value:''}),showChecking(){},showLogin(){login++;},setLoginMsg(){},isGuest:()=>false,resolvedStudentClass:async()=> 'family_friends',enterStudent:async()=>opened++,console};
- vm.runInNewContext(src+';globalThis.restore=restoreStudent;',ctx);return{run:()=>ctx.restore(),saved,get opened(){return opened},get login(){return login},calls};
+
+function fixture({teacher=false,profile={name:'Synthetic Student',active:true},pin='synthetic-pin',verifyError=null}={}){
+  const start=html.indexOf('  async function restoreStudent(){');
+  const end=html.indexOf('  function switchStudent(){',start);
+  const saved=new Map([['b3Games_studentId','synthetic_student'],['b3Games_studentName','Synthetic Student'],['b3Games_studentClass','alpha'],['b3Games_classPin',pin]]);
+  const calls=[],entered=[],messages=[];let reads=0,loginShown=0;
+  const ctx={
+    isAuthorizedTeacher:teacher,isStudentPreview:false,isGuest:()=>false,previewStudentId:'',
+    sessionStorage:{getItem:key=>saved.get(key)||null,removeItem:key=>saved.delete(key)},
+    db:{ref:path=>({once:async()=>{reads++;return{exists:()=>!!profile,val:()=>profile};}})},
+    studentAuthCall:async body=>{calls.push(body);if(body.action==='verify'&&verifyError)throw verifyError;if(body.action==='login')return{ok:true,id:'synthetic_student',name:'Synthetic Student',classId:'alpha',classChoices:[{id:'alpha',name:'Alpha'}]};return{ok:true};},
+    studentClassChoices:[],resolvedStudentClass:async()=>'',enterStudent:async identity=>entered.push(identity),
+    showChecking(){},showLogin(){loginShown++;},setLoginMsg:message=>messages.push(message),
+    el:id=>({value:''}),console
+  };
+  vm.runInNewContext(html.slice(start,end)+';this.restore=restoreStudent;',ctx);
+  return{run:()=>ctx.restore(),saved,calls,entered,messages,get reads(){return reads;},get loginShown(){return loginShown;}};
 }
-test('authorized teacher can open a Family and Friends student before initial PIN choice',async()=>{const f=fixture();await f.run();assert.equal(f.opened,1);assert.equal(f.saved.get('b3Games_classPin'),'test-only-pin');assert.deepEqual(f.calls,[{action:'list',classId:'family_friends'}]);});
-test('real students still need to choose their own PIN',async()=>{const f=fixture({acting:false});await f.run();assert.equal(f.opened,0);assert.equal(f.login,1);assert.equal(f.saved.has('b3Games_classPin'),false);assert.equal(f.calls.length,0);});
-test('an acting flag cannot replace server authorization',async()=>{for(const opts of [{authorized:false},{user:false},{wrongClass:true}]){const f=fixture(opts);await f.run();assert.equal(f.opened,0);assert.equal(f.login,1);}});
-test('teacher student view cannot revive an expired passcode',async()=>{const f=fixture({expired:true});await f.run();assert.equal(f.opened,0);assert.equal(f.calls.length,0);});
-test('accounts with completed PIN setup use the original restoration flow',async()=>{const f=fixture({pinChange:false});await f.run();assert.equal(f.opened,1);assert.equal(f.calls.length,0);});
+
+test('saved student session is verified server-side and restored into its active class',async()=>{
+  const f=fixture();await f.run();
+  assert.deepEqual(JSON.parse(JSON.stringify(f.calls)),[
+    {action:'verify',studentId:'synthetic_student',pin:'synthetic-pin'},
+    {action:'login',name:'Synthetic Student',pin:'synthetic-pin'}
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.entered)),[{id:'synthetic_student',name:'Synthetic Student',classId:'alpha'}]);
+  assert.equal(f.saved.get('b3Games_classPin'),'synthetic-pin');
+});
+
+test('expired saved passcode is cleared and never restores student access',async()=>{
+  const f=fixture({verifyError:{status:401}});await f.run();
+  assert.equal(f.saved.has('b3Games_classPin'),false);
+  assert.equal(f.entered.length,0);
+  assert.equal(f.loginShown,1);
+  assert.match(f.messages.at(-1),/sign in once more/i);
+});
+
+test('blocked student profile is refused before class access is restored',async()=>{
+  const f=fixture({profile:{name:'Synthetic Student',active:false}});await f.run();
+  assert.equal(f.entered.length,0);
+  assert.equal(f.loginShown,1);
+});
+
+test('authorized teacher session does not restore an acting student from browser flags',async()=>{
+  const f=fixture({teacher:true});await f.run();
+  assert.equal(f.reads,0);
+  assert.equal(f.calls.length,0);
+  assert.equal(f.entered.length,0);
+});

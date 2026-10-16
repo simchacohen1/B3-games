@@ -290,9 +290,22 @@
     return String(c || "").trim();
   }
 
-  function fetchJson(url) {
-    var sep = url.indexOf("?") >= 0 ? "&" : "?";
-    var target = url + sep + "_=" + Date.now();
+  async function fetchJson(url) {
+    var params = new URLSearchParams();
+    params.set("_", String(Date.now()));
+    // Firebase's REST API accepts Firebase ID tokens using the `auth` query
+    // parameter. Use the current signed-in user's token so private rules can
+    // authorize this gate's narrow reads. Public settings continue to work
+    // before authentication is available.
+    try {
+      var auth = window.firebase && window.firebase.auth && window.firebase.auth();
+      var user = auth && auth.currentUser;
+      if (user && typeof user.getIdToken === "function") params.set("auth", await user.getIdToken());
+    } catch (_) {
+      // Firebase may not have initialized yet; public gate settings can still
+      // load, and a later auth-state callback will retry protected reads.
+    }
+    var target = url + (url.indexOf("?") >= 0 ? "&" : "?") + params.toString();
 
     // Never allow a Firebase request to hang forever. A hung request used to
     // leave the entire page hidden because the gate was waiting for a decision.
@@ -339,9 +352,19 @@
       if(legacy&&legacy.active!==false&&["et","wt"].includes(legacy.classId))studentClassId=legacy.classId;
     }
     if(!studentClassId)return "";
-    assignedClass=await fetchJson(DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(studentClassId)+".json");
-    var member=assignedClass&&assignedClass.members&&assignedClass.members[studentId];
-    if(!assignedClass||assignedClass.active===false||!member||member.active===false){studentClassId="";return "";}
+    var classPath=DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(studentClassId);
+    var classFields=await Promise.all([
+      fetchJson(classPath+"/name.json"),
+      fetchJson(classPath+"/active.json"),
+      fetchJson(classPath+"/siteEnabled.json"),
+      fetchJson(classPath+"/access.json"),
+      fetchJson(classPath+"/toolGrants.json"),
+      fetchJson(classPath+"/members/"+encodeURIComponent(studentId)+".json")
+    ]);
+    var member=classFields[5];
+    assignedClass={name:classFields[0],active:classFields[1],siteEnabled:classFields[2],access:classFields[3],toolGrants:classFields[4],members:{}};
+    assignedClass.members[studentId]=member;
+    if(assignedClass.active===false||!member||member.active===false){studentClassId="";return "";}
     studentActive=true;
     return studentClassId;
   }
@@ -556,7 +579,13 @@
       if(storedTeacherBypass())return;
       if(verifiedTeacherAccess?.authorized){
         var selected=new URLSearchParams(location.search).get("class")||getStoredClass();
-        teacherClassRecord=(verifiedTeacherAccess.classIds||[]).includes(selected)?await fetchJson(DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(selected)+".json"):null;
+        var teacherClassPath=DATABASE_URL+"/b3Games/workspaces/"+encodeURIComponent(WORKSPACE_ID)+"/classes/"+encodeURIComponent(selected);
+        teacherClassRecord=(verifiedTeacherAccess.classIds||[]).includes(selected)?{
+          active:await fetchJson(teacherClassPath+"/active.json"),
+          siteEnabled:await fetchJson(teacherClassPath+"/siteEnabled.json"),
+          access:await fetchJson(teacherClassPath+"/access.json"),
+          toolGrants:await fetchJson(teacherClassPath+"/toolGrants.json")
+        }:null;
         return;
       }
       await resolveStudentClass();

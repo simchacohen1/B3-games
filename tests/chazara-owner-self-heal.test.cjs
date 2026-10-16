@@ -9,7 +9,12 @@ function setup(){
  const rtdb={ref:p=>({get:async()=>snap(at(p)),update:async v=>{updates.push([p,v])},orderByChild(){throw new Error('Index not defined')}})};
  const ctx={rtdb,SR_ROOT:'studentRewards',POINTS:{chazara:1,'chazara-recording':2},safeKey:v=>String(v).replace(/[^A-Za-z0-9_-]/g,'-'),reasonFor:()=>'r',normalizeName:v=>String(v||'').toLowerCase().replace(/[^a-z0-9]/g,''),
   teacherClassScope:{recordAllowed:(s,id,r)=>s.owner&&!s.selected?!!s.students[id]:s.students[id]&&(r.workspaceClassId||'et')===s.students[id].classId},verifyChazara:async()=>({ok:true}),
-  createPendingRequest:async r=>{created.push(r);tree.studentRewards.pointRequests[r.requestId]={status:'pending',practiceStudentId:r.studentId,source:r.source};return {status:'pending'}},isChazaraRequest:()=>true,console:{error(...a){throw a[1]}},Object,Number,Date,String};
+  createPendingRequest:async r=>{created.push(r);tree.studentRewards.pointRequests[r.requestId]={status:'pending',practiceStudentId:r.studentId,source:r.source};return {status:'pending'}},
+  isChazaraRequest:item=>['chazara','chazara-recording'].includes(String(item?.source||'')),
+  isShorashimRequest:item=>['shorashim-recording','shorashim-no-hints'].includes(String(item?.source||'')),
+  isMilestoneRequest:item=>['reading100','translation100','understand100'].includes(String(item?.source||'')),
+  isReviewableRequest:item=>['chazara','chazara-recording','shorashim-recording','shorashim-no-hints','reading100','translation100','understand100'].includes(String(item?.source||'')),
+  console:{error(...a){throw a[1]}},Object,Number,Date,String};
  vm.createContext(ctx);vm.runInContext(code,ctx);return {ctx,created,updates};
 }
 test('owner All-classes view recreates missing requests without needing a database index',async()=>{const x=setup();await x.ctx.listPendingChazaraRequests(null);assert.equal(x.created.length,1);assert.equal(x.created[0].rewardStudentId,'rw1');assert.equal(x.created[0].amount,2);assert.ok(x.updates.some(([p,v])=>p.endsWith('/e1')&&v.pointRequestStatus==='pending'))});
