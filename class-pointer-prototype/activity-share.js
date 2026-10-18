@@ -106,6 +106,15 @@
     async function watchPermission(session){
       const request=session?.destinationRequest,at=request?.at||session?.shareRequest?.at;
       const hasRequest=(request&&['screens','boards'].includes(request.mode))||(session?.studentScreenSharing===true&&Number.isFinite(at));
+      if(!hasRequest&&session?.studentScreenSharing===true){
+        // The teacher has enabled screen sharing for this class but has not sent a
+        // request: the student may start sharing himself (button only, no pop-up).
+        // The sharing service still refuses a student the teacher has turned off,
+        // and the browser still asks the student to choose what to share.
+        const key=session.roomId+':enabled:'+String(session.permissionRevision||'');
+        if(permissionKey===key&&permissionReady)return;
+        permissionRequest++;permissionKey=key;permission={};permissionReady=true;refreshSessionState();return;
+      }
       if(!hasRequest){permissionKey='';permission={};permissionReady=false;refreshSessionState();return}
       const key=session.roomId+':'+String(session.permissionRevision||'')+':'+String(at||'');
       if(permissionKey===key&&permissionReady)return;
@@ -222,6 +231,7 @@
         if(!response.ok||!ticket?.ok){
           const error=new Error(ticket?.error||'Screen sharing is not allowed.');
           if(response.status===404||response.status>=500)error.code='ACTIVITY_SHARE_NETWORK';
+          if(response.status===403&&/turned off your screen sharing/i.test(ticket?.error||''))error.code='ACTIVITY_SHARE_DENIED';
           throw error;
         }
         if(active?.roomId!==lesson.roomId||!captured.active)throw Error('The lesson ended or sharing permission changed.');
@@ -251,6 +261,8 @@
         status(error?.name==='NotAllowedError'?'Sharing canceled.':error.message||'Could not share.');
         if(networkFailure)fallback.hidden=false;
         hidePrompt();
+        // The teacher has turned this student off: hide the button until the teacher changes it.
+        if(error?.code==='ACTIVITY_SHARE_DENIED'){permission={...permission,screenSharingDenied:true};refreshSessionState()}
       }
       finally{busy=false;btn.disabled=false;choose.disabled=false}
     }
@@ -258,4 +270,3 @@
     window.addEventListener('pagehide',stop);
   }catch(error){console.warn('Class Pointer activity sharing unavailable',error)}
 })();
-

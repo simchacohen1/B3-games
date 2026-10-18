@@ -31,7 +31,8 @@
   function showNote(text){note.textContent=text||'';note.hidden=!text}
 
   // ---------- Teacher controls (inside the lesson so they also work in full screen) ----------
-  let nav=null,pageInput=null,pageTotal=null,zoomLabel=null,twoBtn=null,flipBtn=null,shiftBtn=null;
+  let nav=null,pageInput=null,pageTotal=null,zoomLabel=null,twoBtn=null,flipBtn=null,shiftBtn=null,movePicturesBtn=null;
+  let boardSize=null,boardPictures=[],pictureEdits=[],pictureBar=null,boardUpdate=Promise.resolve();
   if(isTeacher){
     nav=el('div','pdfNav');nav.hidden=true;nav.dataset.stageUi='true';nav.setAttribute('role','toolbar');nav.setAttribute('aria-label','PDF controls');
     const button=(label,title,onClick,cls)=>{const b=el('button',null,cls||'pdf-btn',label);b.type='button';b.title=title;b.addEventListener('click',onClick);nav.appendChild(b);return b};
@@ -52,6 +53,7 @@
     flipBtn=button('⇄ Flip sides','Swap which side the first page of each pair is on',()=>changeLayout({rtl:!layoutOpts.rtl}),'pdf-btn pdf-spread-only');
     shiftBtn=button('◧ Page 1 alone','Show page 1 by itself and start the pairs at page 2',()=>changeLayout({shift:!layoutOpts.shift}),'pdf-btn pdf-spread-only');
     nav.appendChild(el('span',null,'pdf-sep'));
+    movePicturesBtn=button('🖼 Move pictures','Move, resize or remove pictures pasted on the whiteboard',()=>editBoardPictures(),'pdf-btn pdf-board-pictures');movePicturesBtn.hidden=true;
     button('✕ Close PDF','Close the PDF for everyone',()=>closePdf(),'pdf-btn pdf-close');
     const toggle=button('▾ Hide','Hide these buttons (for example while sharing this tab on Zoom)',()=>{const min=nav.classList.toggle('min');toggle.textContent=min?'▴ '+navWord()+' controls':'▾ Hide'},'pdf-btn pdf-toggle');
     ['pointerdown','pointermove','pointerup','pointercancel','click','dblclick','wheel'].forEach(type=>nav.addEventListener(type,event=>event.stopPropagation()));
@@ -112,6 +114,7 @@
     nav.setAttribute('aria-label',navWord()+' controls');
     if(nav.classList.contains('min'))nav.querySelector('.pdf-toggle').textContent='▴ '+navWord()+' controls';
     nav.querySelectorAll('.pdf-jump,.pdf-two,.pdf-spread-only').forEach(node=>node.hidden=webMode);
+    if(movePicturesBtn)movePicturesBtn.hidden=!(isBoardOpen()&&boardPictures.length&&!pictureEdits.length);
     nav.querySelectorAll('button').forEach(node=>{if(node.title==='Previous page'||node.title==='Next page'||node.title==='Jump to this page')node.hidden=webMode;if(node.classList.contains('pdf-close')){node.textContent='✕ Close '+navWord().toLowerCase().replace('pdf','PDF');node.title='Close the '+navWord().toLowerCase().replace('pdf','PDF')+' for everyone'}});
     pageTotal.textContent=' of '+lay.count;pageInput.max=String(lay.count);
     if(document.activeElement!==pageInput)pageInput.value=String(currentPage()+1);
@@ -328,8 +331,9 @@
       closePdf(true);const committed=opening;if(B.sharing())B.stopSharing();
       await loadWebDoc(data);if(opening!==committed)return;
       bytes=data;docName=board?P.cleanName(opts.name||'Whiteboard'):'Browser tab snapshot';docLabel=board?'whiteboard':'webpage';docId=crypto.randomUUID();
+      boardSize=board?{w:width,h:height}:null;
       showNote('');B.resetMarks();B.setPdf(true,board?'whiteboard':'webpage');updateControls();
-      B.status(board?(opts.status||'Whiteboard open.'):'Static tab snapshot open. Zoom, drag and highlight here without changing the original tab.');
+      B.status(board?(opts.status||'Whiteboard open.')+' Paste a screenshot with Ctrl+V to put it on the board.':'Static tab snapshot open. Zoom, drag and highlight here without changing the original tab.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
       return true;
     }catch(error){showNote('');B.fail(error.message||'Could not open the captured tab.');return false}
@@ -352,6 +356,7 @@
     B.clearError();showNote(big?'Opening a large PDF… this can take a little while.':'Opening '+file.name+'…');
     try{
       if(B.sharing())B.stopSharing();
+      dropBoardPictures();
       const data=new Uint8Array(await file.arrayBuffer());
       const ok=await loadDoc(data,big);if(!ok)return false;
       paged=big;bytes=big?null:data;docName=P.cleanName(file.name.replace(/\.pdf$/i,''));docId=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());
@@ -372,7 +377,7 @@
     opening++;
     const had=!!doc;
     if(had)for(const member of B.members().values())B.send(member.connection,{type:'pdf-close'});
-    docId=null;bytes=null;unload(true);strokes=[];
+    dropBoardPictures();docId=null;bytes=null;unload(true);strokes=[];
     window.PointerPdfLibrary?.onClosed();
     if(had||!quiet)B.setPdf(false);
     if(had)$('placeholder').hidden=B.sharing();
@@ -560,6 +565,163 @@
     else if(event.key==='Home'||event.key==='End'){event.preventDefault();scroller.scrollTop=event.key==='Home'?0:H}
   });
 
+
+  // ---------- Whiteboard pictures: the teacher pastes a screenshot or copied image ----------
+  // Pictures become part of the shared whiteboard background, so every student receives them
+  // through the normal lesson transfer. Pen marks stay on top (same 0..1 board positions).
+  // Before a picture is shown to the class the teacher can move and resize it here; the
+  // 🖼 Move pictures button brings placed pictures back for moving, resizing or removing.
+  const MAX_PICTURE_BYTES=15*1024*1024,MAX_PICTURES=12;
+  function isBoardOpen(){return isTeacher&&webMode&&docLabel==='whiteboard'&&!!docId&&!!boardSize&&!scroller.hidden}
+  function dropBoardPictures(){
+    for(const item of pictureEdits)item.el.remove();
+    pictureEdits=[];boardPictures=[];boardSize=null;if(pictureBar)pictureBar.hidden=true;
+  }
+  function loadPicture(blob){
+    return new Promise((resolve,reject)=>{
+      const url=URL.createObjectURL(blob),image=new Image();
+      image.onload=()=>{URL.revokeObjectURL(url);image.naturalWidth&&image.naturalHeight?resolve(image):reject(Error('empty'))};
+      image.onerror=()=>{URL.revokeObjectURL(url);reject(Error('This picture could not be read.'))};
+      image.src=url;
+    });
+  }
+  function composeBoard(){
+    const c=document.createElement('canvas');c.width=boardSize.w;c.height=boardSize.h;
+    const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+    ctx.imageSmoothingQuality='high';
+    for(const p of boardPictures)ctx.drawImage(p.image,p.x*c.width,p.y*c.height,p.w*c.width,p.h*c.height);
+    for(const quality of [0.9,0.8,0.65,0.5]){
+      const url=c.toDataURL('image/jpeg',quality);
+      if(url.length*0.75<Web.MAX_BYTES*0.9){c.width=0;return url}
+    }
+    c.width=0;throw Error('These pictures are too large for the whiteboard. Remove one and try again.');
+  }
+  function snapshotPayload(dataUrl,width,height){
+    const h=Math.max(100,Math.round(Web.WIDTH*height/width));
+    const html='<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;overflow:hidden}img{display:block;width:1000px;height:'+h+'px}</style></head><body><img alt="Whiteboard" src="'+dataUrl+'"></body></html>';
+    const data=new TextEncoder().encode(JSON.stringify({html:Web.prepare(html,null),width:Web.WIDTH,height:h}));
+    if(data.length>Web.MAX_BYTES)throw Error('These pictures are too large for the whiteboard. Remove one and try again.');
+    return data;
+  }
+  // Replace the whiteboard background for everyone while keeping marks, zoom and scroll.
+  function publishBoard(){
+    boardUpdate=boardUpdate.catch(()=>{}).then(async()=>{
+      if(!isBoardOpen())return;
+      const token=opening,data=snapshotPayload(composeBoard(),boardSize.w,boardSize.h),view=currentView();
+      await loadWebDoc(data);
+      if(token!==opening)return;
+      zoom=view.zoom;relayout();scroller.scrollTop=view.top*H;scroller.scrollLeft=view.left*W;
+      bytes=data;docId=crypto.randomUUID();updateControls();
+      for(const member of B.members().values())if(member.admitted)deliver(member);
+      scheduleViewSend(true);
+    }).catch(error=>B.fail(error?.message||'Could not update the whiteboard.'));
+    return boardUpdate;
+  }
+  function placeEditElement(item){
+    item.el.style.left=(item.x*100)+'%';item.el.style.top=(item.y*100)+'%';
+    item.el.style.width=(item.w*100)+'%';item.el.style.height=(item.h*100)+'%';
+  }
+  function showPictureBar(){
+    if(!pictureBar){
+      pictureBar=el('div',null,'board-picture-bar');pictureBar.dataset.stageUi='true';pictureBar.setAttribute('role','toolbar');pictureBar.setAttribute('aria-label','Picture placement');
+      const text=el('span',null,'board-picture-help','Drag the picture to move it. Drag a corner to resize it.');
+      const done=el('button',null,'board-picture-done','✓ Show to class');done.type='button';done.title='Place the pictures on the whiteboard for everyone (Enter)';
+      done.addEventListener('click',()=>finishPictureEdit());
+      pictureBar.append(text,done);
+      ['pointerdown','pointermove','pointerup','pointercancel','click','dblclick','wheel'].forEach(type=>pictureBar.addEventListener(type,event=>event.stopPropagation()));
+      stage.appendChild(pictureBar);
+    }
+    pictureBar.hidden=false;pictureBar.querySelector('.board-picture-done').focus({preventScroll:true});
+  }
+  function startPictureEdit(image,frame){
+    const item={image,...frame,el:el('div',null,'board-picture-edit')};
+    item.el.dataset.stageUi='true';item.el.setAttribute('role','group');item.el.setAttribute('aria-label','Pasted picture. Drag to move; drag a corner to resize.');
+    // The decoded picture itself is shown (its temporary file link is already released).
+    image.alt='';image.draggable=false;item.el.appendChild(image);
+    for(const corner of ['nw','ne','sw','se']){const handle=el('span',null,'board-picture-handle '+corner);handle.dataset.corner=corner;item.el.appendChild(handle)}
+    const remove=el('button',null,'board-picture-remove','✕');remove.type='button';remove.title='Remove this picture';remove.setAttribute('aria-label','Remove this picture');
+    remove.addEventListener('click',event=>{event.stopPropagation();item.el.remove();pictureEdits=pictureEdits.filter(other=>other!==item);if(!pictureEdits.length)finishPictureEdit()});
+    item.el.appendChild(remove);
+    let drag=null;
+    item.el.addEventListener('pointerdown',event=>{
+      event.stopPropagation();
+      if(event.button!==0||event.target===remove)return;
+      event.preventDefault();
+      const r=content.getBoundingClientRect();
+      drag={id:event.pointerId,corner:event.target.dataset?.corner||null,x:event.clientX,y:event.clientY,start:{x:item.x,y:item.y,w:item.w,h:item.h},rw:r.width,rh:r.height};
+      item.el.setPointerCapture(event.pointerId);item.el.classList.add('dragging');
+      for(const other of pictureEdits)other.el.classList.toggle('selected',other===item);
+    });
+    item.el.addEventListener('pointermove',event=>{
+      event.stopPropagation();
+      if(!drag||drag.id!==event.pointerId)return;
+      const dx=(event.clientX-drag.x)/drag.rw,dy=(event.clientY-drag.y)/drag.rh,s=drag.start,clamp=P.clamp;
+      if(!drag.corner){item.x=clamp(s.x+dx,-s.w*0.8,1-s.w*0.2);item.y=clamp(s.y+dy,-s.h*0.8,1-s.h*0.2)}
+      else{
+        // Corners resize and keep the picture's shape (worked out in screen pixels).
+        const sw=s.w*drag.rw,sh=s.h*drag.rh,aspect=sh/sw;
+        const growX=(drag.corner.includes('w')?-1:1)*(event.clientX-drag.x),growY=(drag.corner.includes('n')?-1:1)*(event.clientY-drag.y)/aspect;
+        const wpx=clamp(sw+Math.max(growX,growY),24,drag.rw*3),w=wpx/drag.rw,h=wpx*aspect/drag.rh;
+        item.w=w;item.h=h;item.x=drag.corner.includes('w')?s.x+s.w-w:s.x;item.y=drag.corner.includes('n')?s.y+s.h-h:s.y;
+      }
+      placeEditElement(item);
+    });
+    const end=event=>{if(drag&&(!event||drag.id===event.pointerId)){drag=null;item.el.classList.remove('dragging')}};
+    item.el.addEventListener('pointerup',event=>{event.stopPropagation();end(event)});
+    item.el.addEventListener('pointercancel',end);item.el.addEventListener('lostpointercapture',()=>end());
+    ['click','dblclick','wheel'].forEach(type=>item.el.addEventListener(type,event=>event.stopPropagation()));
+    placeEditElement(item);content.appendChild(item.el);pictureEdits.push(item);
+    for(const other of pictureEdits)other.el.classList.toggle('selected',other===item);
+    showPictureBar();updateControls();
+    B.status('Picture added. Move or resize it, then press ✓ Show to class. Students see it after that.');
+  }
+  function finishPictureEdit(){
+    if(!pictureEdits.length){if(pictureBar)pictureBar.hidden=true;updateControls();return}
+    for(const item of pictureEdits){item.el.remove();boardPictures.push({image:item.image,x:item.x,y:item.y,w:item.w,h:item.h})}
+    pictureEdits=[];if(pictureBar)pictureBar.hidden=true;
+    publishBoard().then(()=>{updateControls();if(isBoardOpen())B.status('Picture is on the whiteboard for everyone. Use ✒️ Pen to write on it, or 🖼 Move pictures to change it.')});
+  }
+  function editBoardPictures(){
+    if(!isBoardOpen()||!boardPictures.length)return;
+    const items=boardPictures;boardPictures=[];
+    for(const p of items)startPictureEdit(p.image,{x:p.x,y:p.y,w:p.w,h:p.h});
+    publishBoard();
+    B.status('Move, resize or remove the pictures, then press ✓ Show to class.');
+  }
+  async function pastePicture(blob){
+    if(!isBoardOpen())return;
+    if(boardPictures.length+pictureEdits.length>=MAX_PICTURES){B.fail('This whiteboard already has '+MAX_PICTURES+' pictures. Remove one first.');return}
+    if(blob.size>MAX_PICTURE_BYTES){B.fail('That picture is too large. Copy a smaller screenshot.');return}
+    let image;try{image=await loadPicture(blob)}catch(error){B.fail(error.message||'This picture could not be read.');return}
+    if(!isBoardOpen())return;
+    // Fit inside 60% of the visible part of the board, centered where the teacher is looking.
+    const r=content.getBoundingClientRect(),v=scroller.getBoundingClientRect();
+    const visible={x:Math.max(0,(v.left-r.left)/r.width),y:Math.max(0,(v.top-r.top)/r.height),w:Math.min(1,v.width/r.width),h:Math.min(1,v.height/r.height)};
+    const ratio=image.naturalHeight/image.naturalWidth*(r.width/r.height);
+    let w=Math.min(visible.w*0.6,image.naturalWidth/boardSize.w),h=w*ratio;
+    if(h>visible.h*0.6){h=visible.h*0.6;w=h/ratio}
+    startPictureEdit(image,{x:visible.x+(visible.w-w)/2,y:visible.y+(visible.h-h)/2,w,h});
+  }
+  if(isTeacher){
+    document.addEventListener('paste',event=>{
+      if(!isBoardOpen()||!event.clipboardData)return;
+      if(event.target?.closest?.('input,textarea,select,[contenteditable],dialog[open]'))return;
+      const item=Array.from(event.clipboardData.items||[]).find(entry=>entry.kind==='file'&&/^image\/(png|jpeg|gif|webp|bmp)$/.test(entry.type));
+      const file=item?.getAsFile();
+      if(!file)return;
+      event.preventDefault();event.stopImmediatePropagation();
+      void pastePicture(file);
+    },true);
+    document.addEventListener('keydown',event=>{
+      if(!pictureEdits.length||event.target?.closest?.('input,textarea,select,[contenteditable]'))return;
+      if(event.key==='Enter'){event.preventDefault();finishPictureEdit()}
+      else if((event.key==='Delete'||event.key==='Backspace')){
+        const item=pictureEdits.find(other=>other.el.classList.contains('selected'));
+        if(item){event.preventDefault();item.el.remove();pictureEdits=pictureEdits.filter(other=>other!==item);if(!pictureEdits.length)finishPictureEdit()}
+      }
+    });
+  }
+
   // ---------- Wiring ----------
   if(isTeacher){
     const file=$('pdfFile'),open=$('openPdf');
@@ -575,6 +737,7 @@
     active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,
     openFile,currentPage,goToPage,
     studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
-    close:closePdf,openSnapshot,reset:studentReset,isOpen:()=>!!lay
+    close:closePdf,openSnapshot,reset:studentReset,isOpen:()=>!!lay,
+    pastePicture,boardPictureCount:()=>boardPictures.length+pictureEdits.length
   };
 })();

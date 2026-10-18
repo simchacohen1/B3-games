@@ -28,6 +28,8 @@
         if(!user||!authorized||!C.validId(classId))throw Error('Open Class Pointer from Teacher Tools and sign in with your teacher account.');
         const db=firebase.database(),ref=db.ref('b3Games/workspaces/'+ws+'/classes/'+classId),row=(await ref.once('value')).val();
         if(!C.permitted(access,classId,row))throw Error('Class Pointer is not enabled for this teacher and class.');
+        // Remember the last authorized class so Teacher Tools reopens it directly next time.
+        try{localStorage.setItem('classPointerLastTeacherClass',classId)}catch{}
         // Class selection is navigation, never a silent session transfer.
         const picker=typeof document==='undefined'?null:document.getElementById('pointerClassChoice');
         if(picker){
