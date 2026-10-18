@@ -45,3 +45,31 @@ main:has(.section.on .hal-a-panel.hal-a-collapsed){max-width:1600px}
 .section:has(.hal-a-panel.hal-a-collapsed) .spread{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 @media(max-width:800px){.hal-a-panel{padding:12px}.hal-a-phrase-list{grid-template-columns:1fr}.hal-a-full-text{font-size:22px;padding:12px;max-height:55vh}.hal-a-choices{grid-template-columns:1fr}.section:has(.hal-a-panel.hal-a-collapsed) .work{grid-template-columns:1fr}}
 @media print{.hal-a-heading>.hal-a-btn,.hal-a-choices,.hal-a-prompts,.hal-a-teacher-notes{display:none!important}.hal-a-collapsed .hal-a-body{display:block!important}.hal-a-full-text{max-height:none;overflow:visible}}
+
+/* Approved Halacha scrapbook reference — Oct 18: pastel teaching cards and spacious studio. */
+.section#a .hal-a-panel{background:transparent;border:0;box-shadow:none;padding:0;margin:10px 0 16px;color:#142b55}
+.section#a .hal-a-heading{padding:10px 8px 16px}
+.section#a .hal-a-heading h2{font-size:clamp(25px,3vw,38px);color:#102b66;letter-spacing:.01em}
+.section#a .hal-a-heading>.hal-a-btn{background:#e7f3ff;color:#17335c;border:1px solid #92c7fa;padding:14px 22px;border-radius:12px}
+.section#a .hal-a-source{padding:18px;border:1px solid #a8d5fc;border-radius:15px;background:linear-gradient(110deg,#edf6ff,#e2f2fb)}
+.section#a .hal-a-source:before{content:"💡  What's this seif about?";display:block;font-weight:900;font-size:clamp(19px,2vw,26px);color:#102b66;margin:0 0 12px}
+.section#a .hal-a-reading{background:#fffefa;border:1px solid #b9daf5;margin:0 0 16px}
+.section#a .hal-a-reading>summary{background:#f2f8fe;color:#142b55}
+.section#a .hal-a-full-text{background:#fff;line-height:1.85}
+.section#a .hal-a-source>h3{background:linear-gradient(100deg,#fff8dd,#fff2cb);border:1px solid #efd68a;border-radius:12px 12px 0 0;padding:13px 17px;margin:15px 0 0;font-size:23px}
+.section#a .hal-a-source>h3:before{content:"🔑  "}
+.section#a .hal-a-phrase-list{padding:14px;background:#fff9e9;border:1px solid #efd68a;border-top:0;border-radius:0 0 14px 14px}
+.section#a .hal-a-phrase{background:linear-gradient(135deg,#e5f6e8,#eaf5ff);border:1px solid #b4d9c4;box-shadow:none}
+.section#a .hal-a-scenarios{background:#edf8f2;border:1px solid #c9e5d7;padding:18px}
+.section#a .hal-a-scenarios h3:before{content:"🖼️  "}
+.section#a .hal-a-choices{grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px}
+.section#a .hal-a-choice{background:#fff;border:1px solid #d2e2dc;border-radius:12px;padding:8px}
+.section#a .hal-a-choice:hover{border-color:#7baea2}
+.section#a .hal-a-choice-label{font-size:13px}
+.section#a .hal-a-prompts{background:#fff2f6;border:1px solid #f6c7d9;padding:18px}
+.section#a .hal-a-prompts h3:before{content:"🎨  "}
+.section#a .work{background:#fff1f5;border:1px solid #f4c9d7;border-radius:16px;padding:12px;gap:12px}
+.section#a .book{background:#fff;border:1px solid #e3e9f0;border-radius:12px}
+.section#a .hal-a-panel.hal-a-collapsed{background:#edf5ff;border:1px solid #b5d9f5;padding:10px 14px}
+@media(max-width:800px){.section#a .hal-a-source{padding:12px}.section#a .hal-a-choices{grid-template-columns:repeat(2,minmax(0,1fr))}.section#a .work{padding:7px}}
+@media(max-width:520px){.section#a .hal-a-choices{grid-template-columns:1fr}}
