@@ -10,6 +10,9 @@ const fs = require('node:fs');
 const ALLOWED_NEW = [
   ['b3Private'],
   ['b3Games', 'workspaces', '$workspaceId', 'classes', '$classId', 'classPointerSessions'],
+  // Not Pointer: already on main since a804b7e (2026-10-11, owner) but never published to the live database.
+  // Approved by the owner on 2026-10-18 to go live together with the Pointer additive step.
+  ['b3Games', 'workspaces', '$workspaceId', 'classes', '$classId', 'halachaAccess'],
 ];
 
 function stripComments(text) { // the console allows // and /* */ comments; remove them outside strings

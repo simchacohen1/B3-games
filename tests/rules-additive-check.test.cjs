@@ -28,6 +28,17 @@ test('an unapproved new top-level node is caught', () => {
   const c = candidate(); c.rules.somethingNew = { '.read': true };
   assert.ok(compare(live(), c).some(p => p.startsWith('ADDED') && p.includes('/somethingNew')));
 });
+test('live rules that predate the Halacha Siman rule are accepted: only Pointer + halachaAccess are added', () => {
+  const l = live();
+  delete l.rules.b3Games.workspaces.$workspaceId.classes.$classId.halachaAccess;
+  assert.deepEqual(compare(l, candidate()), []);
+});
+test('another unapproved addition next to halachaAccess is still caught', () => {
+  const l = live();
+  delete l.rules.b3Games.workspaces.$workspaceId.classes.$classId.halachaAccess;
+  const c = candidate(); c.rules.b3Games.workspaces.$workspaceId.classes.$classId.somethingElse = { '.write': true };
+  assert.ok(compare(l, c).some(p => p.startsWith('ADDED') && p.includes('/somethingElse')));
+});
 test('console-style comments in a saved live rules file are tolerated', () => {
   const text = '// saved from console\n{"rules": {/* x */ ".read": false, "a": {"b": "has // inside"}}}';
   assert.deepEqual(parse(text), { rules: { '.read': false, a: { b: 'has // inside' } } });
