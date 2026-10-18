@@ -1,0 +1,106 @@
+/* Pointer visual polish — presentation only.
+   Kept separate from sharing, permissions, and drawing behavior. */
+:root{
+  --cp-ink:#172b4b;
+  --cp-muted:#4b607d;
+  --cp-line:#cbd9ec;
+  --cp-soft:#f2f6fc;
+  --cp-focus:#2563eb;
+}
+body.teacher-view .app-header{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:16px 20px;
+  border-radius:18px;
+  background:linear-gradient(120deg,#f5f9ff,#eaf2ff);
+  border:1px solid var(--cp-line);
+}
+body.teacher-view .app-header h1{letter-spacing:-.025em}
+body.teacher-view .app-header p{color:var(--cp-muted)}
+body.teacher-view .cp-workspace-tabs{
+  background:#eaf1fb;
+  border-color:var(--cp-line);
+  box-shadow:inset 0 1px 2px #152e4910;
+}
+body.teacher-view .cp-workspace-tab{
+  transition:background-color .14s ease,box-shadow .14s ease;
+}
+body.teacher-view .cp-workspace-tab[aria-selected="true"]{
+  box-shadow:0 3px 9px #1b416c1b;
+}
+body.teacher-view #teacherDock:not(.floating){
+  background:#fff;
+  border:1px solid var(--cp-line);
+  box-shadow:0 5px 18px #1e3a5f12;
+}
+body.teacher-view #teacherDock .tb-group{
+  border-color:#d7e2f0;
+}
+body.teacher-view #teacherDock .tb-btn{
+  min-height:42px;
+  border-radius:9px;
+  font-weight:650;
+}
+body.teacher-view #teacherDock .tb-btn[aria-pressed="true"],
+body.teacher-view #teacherDock .tb-mode[aria-pressed="true"]{
+  outline:2px solid #86aff8;
+  outline-offset:-2px;
+  box-shadow:0 2px 7px #1b54a123;
+}
+body.teacher-view #teacherDock .tb-btn:hover:not(:disabled),
+body.teacher-view .cp-workspace-tab:hover:not(:disabled){
+  filter:brightness(.97);
+}
+body.teacher-view #teacherDock button:focus-visible,
+body.teacher-view #teacherPanel button:focus-visible,
+body.teacher-view #teacherPanel select:focus-visible{
+  outline:3px solid var(--cp-focus);
+  outline-offset:2px;
+}
+body.teacher-view #teacherDock button:disabled{
+  opacity:.48;
+  cursor:not-allowed;
+}
+body.teacher-view #teacherDock .tb-ico{font-size:1.15em}
+body.teacher-view #teacherDock .tb-menu{
+  border:1px solid var(--cp-line);
+  border-radius:12px;
+  box-shadow:0 14px 36px #172b4b30;
+}
+body.teacher-view #teacherDock .tb-menu button{
+  min-height:39px;
+}
+body.teacher-view #teacherDock #tbStudentsMenu{
+  border-color:var(--cp-line);
+  box-shadow:0 18px 50px #1327443d;
+}
+body.teacher-view #teacherDock #tbStudentsMenu::before{
+  color:var(--cp-ink);
+  letter-spacing:.015em;
+}
+body.teacher-view #teacherDock #tbStudentsMenu .permission-tools{
+  border:1px solid #d9e6f6;
+  border-radius:12px;
+}
+body.teacher-view #teacherDock #tbStudentsMenu .permission-tools label{
+  border-radius:9px;
+}
+body.teacher-view #teacherDock #tbStudentsMenu .roster-row{
+  box-shadow:0 2px 7px #24456a0c;
+}
+body.teacher-view #teacherDock #tbStudentsBtn[aria-expanded="true"]{
+  box-shadow:0 2px 8px #245fd235;
+}
+body.teacher-view #connectionStatus{
+  border-radius:9px;
+  padding:9px 12px;
+}
+@media(max-width:820px){
+  body.teacher-view .app-header{padding:12px;gap:10px}
+  body.teacher-view #teacherDock:not(.floating){gap:5px;padding:6px}
+  body.teacher-view #teacherDock .tb-btn{min-height:40px}
+}
+@media(prefers-reduced-motion:reduce){
+  body.teacher-view .cp-workspace-tab{transition:none}
+}
