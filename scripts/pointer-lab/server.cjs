@@ -57,6 +57,18 @@ const SHIM = `
 `;
 
 
+
+// the shared game gate adds missing Firebase pieces at run time from gstatic; fetch them here so they also talk to the emulators
+const gcache = {};
+app.get('/_gstatic/*', async (req, res) => {
+  const rest = req.path.slice('/_gstatic/'.length);
+  if (!/^[0-9.]+\/firebase-[a-z-]+\.js$/.test(rest)) return res.status(400).send('bad path');
+  try {
+    if (!gcache[rest]) { const r = await fetch('https://www.gstatic.com/firebasejs/' + rest); if (!r.ok) throw new Error('HTTP ' + r.status); gcache[rest] = (await r.text()) + SHIM; }
+    res.type('text/javascript').send(gcache[rest]);
+  } catch (e) { res.status(502).send('// lab could not fetch ' + rest + ': ' + e.message); }
+});
+
 // One-click lab sign-in for the teacher (and an owner/admin test account) so no Google pop-up is needed.
 app.get('/_lab/login', (req, res) => {
   res.type('html').send(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pointer Lab sign-in</title>
@@ -81,7 +93,8 @@ document.getElementById('o').onclick=()=>go('simcha5770@gmail.com').catch(e=>doc
 
 // One-click lab sign-in for a made-up student (does exactly what the home page does after the passcode check).
 app.get('/_lab/student', (req, res) => {
-  const who = req.query.who === 'B' ? { name: 'Pointer Test Student B', pin: '2222' } : { name: 'Pointer Test Student A', pin: '1111' };
+  const PEOPLE = { A: { name: 'Pointer Test Student A', pin: '1111' }, B: { name: 'Pointer Test Student B', pin: '2222' }, C: { name: 'Other Class Student C', pin: '3333' }, D: { name: 'Removed Student D', pin: '4444' } };
+  const who = PEOPLE[req.query.who] || PEOPLE.A;
   const go = String(req.query.go || '/index.html').replace(/[^A-Za-z0-9_./?=&-]/g, '');
   res.type('html').send(`<!doctype html><meta charset="utf-8"><title>Pointer Lab student sign-in</title><p id="m">Signing in as ${who.name}…</p>
 <script src="/vendor/firebase/12.15.0/firebase-app-compat.js"></script><script src="/vendor/firebase/12.15.0/firebase-auth-compat.js"></script><script src="/vendor/firebase/12.15.0/firebase-database-compat.js"></script><script src="/firebase-config.js"></script>
@@ -99,10 +112,16 @@ app.get('/_lab/student', (req, res) => {
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.wasm': 'application/wasm', '.pdf': 'application/pdf' };
 const rewrite = text => text
+  // game-gate.js adds missing SDK pieces as "gstatic/firebasejs/"+sdk+"/firebase-..."; serve those through /_gstatic so they use the emulators too
+  .split('"https://www.gstatic.com/firebasejs/"+sdk').join('"/_gstatic/"+sdk')
+  // pages that carry their own copy of the Firebase settings must use the lab's fake key, or their sign-in would not match the one the lab created
+  .replace(/AIzaSy[A-Za-z0-9_-]{33}/g, 'lab-fake-api-key')
   .replace(/https:\/\/us-central1-b3-games\.cloudfunctions\.net\//g, '/_fn/')
   // only the version we vendor is served locally; older SDKs (v8 pages such as Rashi Letters) load from gstatic and are pointed at the emulator in the page below
   .replace(/https:\/\/www\.gstatic\.com\/firebasejs\/12\.[0-9.]+\//g, '/vendor/firebase/12.15.0/')
   // the real project's database address becomes the lab's (the SDK shim sends SDK calls to the emulator; SHIM_FETCH sends REST calls there)
+  // every other SDK version (10.x, 8.x) is fetched through /_gstatic so its auth and database also use the emulators
+  .replace(/https:\/\/www\.gstatic\.com\/firebasejs\/([0-9][0-9.]*)\//g, '/_gstatic/$1/')
   .replace(/https:\/\/b3-games-default-rtdb\.firebaseio\.com/g, 'https://' + DB_NS + '.firebaseio.com');
 // plain REST reads (game gate, Shorashim, ...) go to the emulator, never to the real project
 const SHIM_FETCH = `
