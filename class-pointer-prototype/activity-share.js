@@ -80,12 +80,11 @@
     const btn=document.createElement('button');btn.type='button';btn.textContent='🖥 Share My Screen';
     btn.style.cssText='background:#1d4ed8;color:#fff;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;font:inherit';
     const label=document.createElement('span');label.setAttribute('role','status');label.style.cssText='font-size:12px;color:#1e3a8a;max-width:180px';
-    // Fall back to the classroom's established screen-sharing path if the
-    // optional Cloud Function for sharing within activities is unavailable.
+    // Screen-sharing errors must never send a student into the retired Pointer page.
     const fallback=document.createElement('button');fallback.type='button';
-    fallback.textContent='Open Class Pointer';fallback.hidden=true;
+    fallback.textContent='Try again';fallback.hidden=true;
     fallback.style.cssText='border:1px solid #1d4ed8;background:white;color:#1d4ed8;border-radius:9px;padding:8px 10px;cursor:pointer;font:700 13px system-ui';
-    fallback.addEventListener('click',()=>location.assign(new URL('class-pointer-prototype/dashboard.html',root).href));
+    fallback.addEventListener('click',()=>void beginShare());
     holder.append(btn,label,fallback);document.body.appendChild(holder);
     let active=null,peer=null,call=null,stream=null,busy=false,latestSession=null,permission={},permissionKey='',permissionRequest=0,permissionReady=false;
     // Centered, teacher-triggered consent prompt. Browser capture remains user initiated.
@@ -374,12 +373,12 @@
             body:JSON.stringify({action:'issue',studentId:id,pin,classId,room:lesson.roomId}),
             signal:AbortSignal.timeout(15000)});
         }catch{
-          const error=new Error('Activity sharing service unavailable. Open Class Pointer to share your screen instead.');
+          const error=new Error('Activity sharing service unavailable. Please retry or ask your teacher.');
           error.code='ACTIVITY_SHARE_NETWORK';throw error;
         }
         let ticket;
         try{ticket=await response.json()}catch{
-          const error=new Error('Activity sharing service returned an invalid response. Open Class Pointer instead.');
+          const error=new Error('Activity sharing service returned an invalid response. Please retry or ask your teacher.');
           error.code='ACTIVITY_SHARE_NETWORK';throw error;
         }
         if(!response.ok||!ticket?.ok){
