@@ -3,8 +3,8 @@ const C=window.ClassPointerCore,$=id=>document.getElementById(id);
 const room=new URL(location.href).searchParams.get('room'),isTeacher=!room;   const entry=new URL(location.href).searchParams.get('dashboard');
    if((isTeacher&&entry!=='teacher')||(!isTeacher&&entry!=='student')){document.body.innerHTML='<main style="padding:2rem;font:1rem system-ui">Open Class Pointer from Fun Torah Tools.</main>';throw Error('Class Pointer must be opened from the dashboard.')}
 const members=new Map();
-// Students connected from another Fun Torah Tools page (Shorashim, Chazara, …): shown as joined, but they
-// receive no lesson data until they open Class Pointer itself. Kept apart from lesson members on purpose.
+// Students stay in Shorashim and other Fun Torah Tools pages. Their authenticated
+// presence connections can receive embedded whiteboard messages without navigating.
 const presence=new Map();
 // Students the teacher deliberately removed from this class session are not let back in automatically.
 const removedKey='classPointerRemoved:'+(new URL(location.href).searchParams.get('class')||'');
@@ -189,7 +189,13 @@ function receiveStudent(connection){
   let joinPending=false;
   connection.on('data',message=>{
     if(!message||typeof message!=='object')return;
-    if(member?.presence){if(message.type==='lesson-retry'&&message.id===activityPresentationId&&Date.now()-(member.lastLessonRetry||0)>2000){member.lastLessonRetry=Date.now();sendActivityLesson(member)}if(message.type==='where'&&presence.get(member.id)===member){member.activity=cleanActivity(message.activity);roster()}return}
+    if(member?.presence){
+      if(presence.get(member.id)!==member)return;
+      if(message.type==='lesson-retry'&&message.id===activityPresentationId&&Date.now()-(member.lastLessonRetry||0)>2000){member.lastLessonRetry=Date.now();sendActivityLesson(member)}
+      if(message.type==='where'){member.activity=cleanActivity(message.activity);roster()}
+      if(typeof message.type==='string'&&message.type.startsWith('board-'))window.ClassPointerBoards?.fromStudent(member,message);
+      return;
+    }
     if(message.type==='join'&&!member){
       const gate=window.ClassPointerJoinGate;
       if(message.presence===true){
@@ -235,20 +241,21 @@ function admitPresence(connection,verified,activity){
   // A boy may have several tabs open: each keeps its own connection (closing one never disconnects
   // the others), and the Students panel still lists him once.
   if(Array.from(presence.values()).filter(entry=>entry.studentId===studentId).length>=6||presence.size>=120){send(connection,{type:'full'});setTimeout(()=>connection.close(),300);return null}
-  const entry={id:'presence:'+connection.peer,presence:true,studentId,name,activity:cleanActivity(activity),connection,connectedAt:Date.now()};
-  presence.set(entry.id,entry);send(connection,{type:'present'});sendActivityLesson(entry);roster();
+  const entry={id:'presence:'+connection.peer,presence:true,admitted:true,studentId,name,activity:cleanActivity(activity),connection,connectedAt:Date.now()};
+  presence.set(entry.id,entry);send(connection,{type:'present'});sendActivityLesson(entry);
+  window.ClassPointerBoards?.studentJoined(entry);roster();
   return entry;
 }
 function dropPresence(entry,notice){
   if(presence.get(entry.id)!==entry)return;
-  presence.delete(entry.id);closeActivityCall(entry);
+  presence.delete(entry.id);closeActivityCall(entry);window.ClassPointerBoards?.studentLeft(entry);
   if(notice){send(entry.connection,{type:notice});setTimeout(()=>{try{entry.connection.close()}catch{}},300)}
   roster();
 }
 function removeStudentDeliberately(entry){
   // Only this path tells a student he was removed, and it keeps him out until the teacher allows him back.
   if(entry.studentId){removedStudents.add(entry.studentId);saveRemoved();window.ClassPointerActivityShares?.revokeStudents([entry.studentId])}
-  for(const other of Array.from(presence.values()))if(other===entry||(entry.studentId&&other.studentId===entry.studentId)){send(other.connection,{type:'removed'});closeActivityCall(other);presence.delete(other.id);setTimeout(()=>{try{other.connection.close()}catch{}},300)}
+  for(const other of Array.from(presence.values()))if(other===entry||(entry.studentId&&other.studentId===entry.studentId)){send(other.connection,{type:'removed'});closeActivityCall(other);presence.delete(other.id);window.ClassPointerBoards?.studentLeft(other);setTimeout(()=>{try{other.connection.close()}catch{}},300)}
   for(const other of Array.from(members.values()))if(other===entry||(entry.studentId&&other.studentId===entry.studentId)){send(other.connection,{type:'removed'});removeMember(other);setTimeout(()=>{try{other.connection.close()}catch{}},300)}
   roster();
 }
@@ -671,7 +678,7 @@ if(highlighter){const baseReceive=highlighter.receive;highlighter.receive=next=>
 window.ClassPointerBridge={isTeacher,send,fail,
   sendTeacher:message=>send(teacherConnection,message),started:()=>started,
   // Student → teacher screen (Student boards, Screens mode). One-way: the teacher answers without sending video back.
-  callTeacher:stream=>!isTeacher&&peer&&teacherConnection?.open?peer.call(room,stream,{metadata:{kind:'student-screen'}}):null,clearError,status,live,allowed,writingAllowed,submitStroke,redraw:drawPointers,members:()=>members,sharing:()=>state.sharing,stopSharing,
+  callTeacher:stream=>!isTeacher&&peer&&teacherConnection?.open?peer.call(room,stream,{metadata:{kind:'student-screen'}}):null,clearError,status,live,allowed,writingAllowed,submitStroke,redraw:drawPointers,members:()=>members,presence:()=>presence,sharing:()=>state.sharing,stopSharing,
   navigating:()=>navigating,
   highlights:()=>highlightStore.strokes,
   owner:()=>isTeacher?'teacher':'student:'+peer?.id,ownColor:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
