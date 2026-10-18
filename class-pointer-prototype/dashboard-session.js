@@ -22,6 +22,36 @@
     sessionWrites=pending;
     return pending;
   }
+  // ---------- Teacher sign-in guard ----------
+  // Firebase keeps ONE signed-in account per browser profile, shared by every tab. If a student (or
+  // another account) signs in in another tab of this same browser, this page's teacher session is
+  // replaced. Every change below first checks it is still the teacher who opened the lesson; if not,
+  // nothing is written and the teacher is asked to sign in again.
+  const SIGNIN_CHANGED='Your teacher sign-in changed in this browser (often because a student signed in in another tab). Sign in again as the teacher; nothing was changed.';
+  let teacherUid=null,banner=null;
+  function bannerNode(){
+    if(banner||typeof document==='undefined'||!document.body)return banner;
+    banner=document.createElement('div');banner.id='cpTeacherSignInBanner';banner.setAttribute('role','alert');banner.hidden=true;
+    banner.style.cssText='position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:2147483000;max-width:min(680px,calc(100% - 24px));display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 16px;border-radius:14px;background:#fff7e6;color:#5c3a00;border:2px solid #f5b800;box-shadow:0 12px 36px #0004;font:600 15px system-ui';
+    const text=document.createElement('span');text.className='cp-signin-text';text.style.cssText='flex:1 1 300px';
+    const again=document.createElement('button');again.type='button';again.textContent='Sign in again as teacher';
+    again.style.cssText='min-height:44px;padding:0 16px;border:0;border-radius:10px;background:#1d4ed8;color:#fff;font:800 15px system-ui;cursor:pointer';
+    again.addEventListener('click',()=>{again.disabled=true;Promise.resolve(window.B3SiteSettings?.signInWithGoogle?.()).catch(()=>{}).finally(()=>{again.disabled=false;checkTeacher()})});
+    banner.append(text,again);document.body.appendChild(banner);return banner;
+  }
+  function teacherSessionChanged(){
+    const node=bannerNode();if(!node)return;
+    const user=firebase.auth?.().currentUser;
+    node.querySelector('.cp-signin-text').textContent=user?SIGNIN_CHANGED:'You are signed out in this browser. Sign in again as the teacher to keep changing permissions; nothing was changed.';
+    node.hidden=false;
+  }
+  function checkTeacher(){
+    if(!teacherUid)return;
+    const user=firebase.auth?.().currentUser;
+    if(user&&user.uid===teacherUid){if(banner)banner.hidden=true;return}
+    teacherSessionChanged();
+  }
+  try{firebase.auth?.().onAuthStateChanged?.(()=>checkTeacher())}catch{}
   const ready=new Promise((resolve,reject)=>{
     window.B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
       try{
@@ -47,6 +77,7 @@
             window.ClassPointerDashboard?.end().finally(()=>location.assign('classroom.html?dashboard=teacher&class='+encodeURIComponent(picker.value)));
           });
         }
+        if(!teacherUid)teacherUid=user.uid;
         resolve({db,ref,user,row});
       }catch(error){reject(error)}
     });
@@ -72,7 +103,7 @@
   async updateActivityPermissions(policy){
     const ref=activeRef;if(!ref)return;
     const context=await ready;
-    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
+    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid){teacherSessionChanged();throw Error(SIGNIN_CHANGED)};
     await writeSession(ref,async()=>{
       const rows=permissionRows(policy);
       await context.db.ref(permissionPath(ref.key)).set(rows);
@@ -86,7 +117,7 @@
     const current=++revision;
     const context=await ready;
     if(!C.validRoom(room))throw Error('The classroom connection is not ready.');
-    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Sign in again before starting the class.');
+    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid){teacherSessionChanged();throw Error(SIGNIN_CHANGED)};
     const ref=context.ref.child('classPointerSessions/'+room);activeRef=ref;
     const policyRef=context.db.ref(permissionPath(room));activePolicyRef=policyRef;
     await Promise.all([ref.onDisconnect().remove(),policyRef.onDisconnect().remove()]);
@@ -96,7 +127,7 @@
   },async requestScreenSharing(){
     const ref=activeRef;if(!ref)throw Error('Open a classroom before sending students.');
     const context=await ready;
-    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
+    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid){teacherSessionChanged();throw Error(SIGNIN_CHANGED)};
     // An authenticated, class-scoped live session is the only broadcast source.
     // Keep the existing session and use a server timestamp so stale prompts cannot replay.
     await writeSession(ref,()=>ref.update({
@@ -107,7 +138,7 @@
     if(!['screens','boards'].includes(mode))throw Error('Choose screens or whiteboards.');
     const ref=activeRef;if(!ref)throw Error('Open a classroom before sending students.');
     const context=await ready;
-    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
+    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid){teacherSessionChanged();throw Error(SIGNIN_CHANGED)};
     // A live class session is authorized and scoped to the teacher's assigned class.
     // Use a server timestamp: existing student pages reject old requests.
     await writeSession(ref,async()=>{
@@ -126,7 +157,7 @@
   },async setStudentScreenSharing(enabled){
     const ref=activeRef;if(!ref)return;
     const context=await ready;
-    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)throw Error('Teacher authentication expired.');
+    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid){teacherSessionChanged();throw Error(SIGNIN_CHANGED)};
     await writeSession(ref,async()=>{
       await ref.child('studentScreenSharing').set(enabled===true);
       if(enabled!==true)window.ClassPointerActivityShares?.closeAll();

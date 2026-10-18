@@ -16,13 +16,13 @@ test.skip(({ browserName }) => browserName !== 'chromium', 'Classroom Pointer te
 const shot = async (page: Page, name: string) => { if (process.env.POINTER_SHOTS) await page.screenshot({ path: path.join(process.env.POINTER_SHOTS, name + '.png') }); };
 const STUB_EMPTY = ['site-settings.js', 'dashboard-session.js', 'firebase-config.js', 'guest-mode.js'];
 
-async function wire(context: BrowserContext, opts: { student?: any; session?: any } = {}) {
+async function wire(context: BrowserContext, opts: { student?: any; session?: any; realSession?: boolean } = {}) {
   await context.route('**/*', route => {
     const url = new URL(route.request().url());
     if (url.origin === BASE) {
       const p = decodeURIComponent(url.pathname);
       if (p === '/activity-test.html') return route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body><main>Synthetic activity</main><script defer src="/class-pointer-prototype/activity-share.js"></script></body></html>' });
-      if (STUB_EMPTY.some(n => p.endsWith('/' + n))) return route.fulfill({ contentType: 'text/javascript', body: '' });
+      if (STUB_EMPTY.some(n => p.endsWith('/' + n)) && !(opts.realSession && p.endsWith('/dashboard-session.js'))) return route.fulfill({ contentType: 'text/javascript', body: '' });
       const file = path.join(ROOT, p);
       if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return route.fulfill({ status: 404, body: '' });
       return route.fulfill({ contentType: MIME[path.extname(file)] || 'application/octet-stream', body: fs.readFileSync(file) });
@@ -31,7 +31,7 @@ async function wire(context: BrowserContext, opts: { student?: any; session?: an
     if (url.href.startsWith(SHARE_API) || url.href.startsWith(STUDENT_API)) return route.fallback();
     return route.abort();
   });
-  await context.addInitScript(({ student, session }) => {
+  await context.addInitScript(({ student, session, realSession }) => {
     // Stand-in PeerJS: opens at once, never contacts a signaling server.
     class FakePeer {
       id: string; handlers: Record<string, Function[]> = {}; open = false; destroyed = false; disconnected = false;
@@ -48,21 +48,28 @@ async function wire(context: BrowserContext, opts: { student?: any; session?: an
     const noop = () => {};
     const ref = (p: string): any => ({
       child: (c: string) => ref(p + '/' + c), set: async () => {}, update: async () => {}, remove: async () => {}, off: noop,
-      once: async () => ({ val: () => null }), onDisconnect: () => ({ remove: async () => {}, set: async () => {}, cancel: async () => {} }),
+      once: async () => ({ val: () => (/\/classes\/pointer_test$/.test(p) ? { name: 'Pointer Test', active: true, toolGrants: { 'class-pointer': true }, members: {} } : null) }), onDisconnect: () => ({ remove: async () => {}, set: async () => {}, cancel: async () => {} }),
       on: (_e: string, cb: Function) => { if (session && p.includes('/classPointerSessions')) { (window as any).__sessionCallback = cb; setTimeout(() => cb({ val: () => ({ [session.roomId]: session }) }), 0); } },
     });
-    (window as any).firebase = { apps: [{}], initializeApp: noop, auth: () => ({ currentUser: { uid: 'synthetic-teacher' }, onAuthStateChanged: (cb: Function) => cb({ uid: 'synthetic-teacher' }) }), database: Object.assign(() => ({ ref }), { ServerValue: { TIMESTAMP: 0 } }), storage: () => ({ ref }) };
+    // One shared sign-in per browser profile, like Firebase: tests can switch it to simulate another tab signing in.
+    const authListeners: Function[] = [];
+    const auth = { currentUser: { uid: 'synthetic-teacher', getIdToken: async () => 'synthetic-teacher' } as any, onAuthStateChanged: (cb: Function) => { authListeners.push(cb); cb(auth.currentUser); return noop; } };
+    (window as any).__switchAccount = (uid: string | null) => { auth.currentUser = uid ? { uid, getIdToken: async () => uid } : null; authListeners.forEach(cb => cb(auth.currentUser)); };
+    (window as any).__writes = [];
+    const writeLog = (op: string, p: string, v?: any) => (window as any).__writes.push({ op, p, v, uid: auth.currentUser?.uid || null });
+    (window as any).firebase = { apps: [{}], initializeApp: noop, auth: () => auth, database: Object.assign(() => ({ ref: (p: string) => { const r = ref(p); return { ...r, child: (c: string) => (window as any).firebase.database().ref(p + '/' + c), set: async (v: any) => writeLog('set', p, v), update: async (v: any) => writeLog('update', p, v), remove: async () => writeLog('remove', p) }; } }), { ServerValue: { TIMESTAMP: 0 } }), storage: () => ({ ref }) };
     (window as any).B3_FIREBASE_CONFIG = {}; (window as any).B3_APP_CONTEXT = { workspaceId: 'b3-2026' };
-    (window as any).B3SiteSettings = { onAuthStateChanged: noop };
+    (window as any).B3SiteSettings = { onAuthStateChanged: realSession ? (cb: Function) => setTimeout(() => cb({ uid: 'synthetic-teacher' }, true, { authorized: true, role: 'teacher', classIds: ['pointer_test'] }), 0) : noop,
+      signInWithGoogle: async () => { (window as any).__switchAccount('synthetic-teacher'); } };
     (window as any).FunTorahStudentClass = { resolve: async () => ({ workspaceId: 'b3-2026', classId: 'pointer_test' }) };
-    if (!student) {
+    if (!student && !realSession) {
       (window as any).ClassPointerDashboard = {
         ready: Promise.resolve({}),
         students: async () => [{ id: 'pt1', name: 'Pointer Test Student One' }, { id: 'pt2', name: 'Pointer Test Student Two' }],
         updateActivityPermissions: async () => {}, publish: async () => {}, requestScreenSharing: async () => {},
         requestStudentDestination: async () => {}, setStudentScreenSharing: async () => {}, end: async () => {},
       };
-    } else {
+    } else if (student) {
       sessionStorage.setItem('b3Games_studentId', student.id); sessionStorage.setItem('b3Games_classPin', student.pin);
       (window as any).__displayMediaCalls = 0;
       Object.defineProperty(navigator.mediaDevices, 'getDisplayMedia', { configurable: true, value: async () => {
@@ -73,7 +80,7 @@ async function wire(context: BrowserContext, opts: { student?: any; session?: an
         return stream;
       } });
     }
-  }, { student: opts.student || null, session: opts.session || null });
+  }, { student: opts.student || null, session: opts.session || null, realSession: !!opts.realSession });
 }
 
 async function openTeacher(page: Page) {
@@ -278,7 +285,9 @@ test('a permitted student can start sharing himself once the teacher enables scr
   const share = s.page.locator('#fttActivityScreenShare button', { hasText: 'Share My Screen' });
   await expect(share).toBeVisible({ timeout: 15000 });
   await expect(s.page.getByRole('dialog', { name: 'Teacher screen sharing request' })).toBeHidden();
-  expect(s.calls).not.toContain('permissions');
+  // His own permission is checked first; the sharing service now in use answers "no request" and the
+  // button still appears (the service refuses a turned-off student when he shares).
+  expect(s.calls).toContain('permissions');
   await share.click();
   await expect.poll(() => s.page.evaluate(() => (window as any).__displayMediaCalls)).toBe(1);
   await expect.poll(() => s.calls.includes('issue')).toBe(true);
@@ -293,4 +302,100 @@ test('a student the teacher turned off is refused by the sharing service and the
   await expect(share).toBeHidden();
   await expect(s.page.locator('#fttActivityScreenShare [role="status"]')).toHaveText(/turned off your screen sharing/);
   await s.context.close();
+});
+
+// ---------- Live-testing fixes ----------
+async function fakeScreenCall(page: Page, token: string) {
+  return page.evaluate(async (token) => {
+    const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 360;
+    const ctx = canvas.getContext('2d')!; ctx.fillStyle = token[0] === 'a' ? '#16a34a' : '#dc2626'; ctx.fillRect(0, 0, 640, 360);
+    const stream = canvas.captureStream(5); const listeners: Record<string, Function> = {};
+    const call: any = { metadata: { kind: 'activity-screen', token }, closed: false, on: (e: string, f: Function) => { listeners[e] = f; },
+      answer() { setTimeout(() => listeners.stream?.(stream), 10); }, close() { if (this.closed) return; this.closed = true; listeners.close?.(); } };
+    (window as any).__calls = [...((window as any).__calls || []), call];
+    await (window as any).ClassPointerActivityShares.incomingCall(call);
+    return (window as any).__calls.length - 1;
+  }, token);
+}
+test('one student sharing from two tabs gets one tile; a tile enlarges and returns to the gallery without disconnecting', async ({ browser }) => {
+  const context = await browser.newContext(); await wire(context);
+  // Server verification: the token decides the student (a… = Avi, b… = Benny).
+  await context.route(SHARE_API, route => {
+    const body = JSON.parse(route.request().postData() || '{}');
+    const avi = String(body.token)[0] === 'a';
+    return route.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ ok: true, studentId: avi ? 'pt1' : 'pt2', studentName: avi ? 'Pointer Test Student One' : 'Pointer Test Student Two' }) });
+  });
+  const page = await context.newPage(); const errors = await openTeacher(page);
+  const first = await fakeScreenCall(page, 'a'.repeat(64)), second = await fakeScreenCall(page, 'a'.repeat(63) + 'b');
+  await fakeScreenCall(page, 'b'.repeat(64));
+  const tiles = page.locator('#activityScreenTray .cp-activity-screen');
+  await expect(tiles).toHaveCount(2);
+  await expect(tiles.nth(0).locator('strong')).toHaveText('Pointer Test Student One · Live screen');
+  await expect(tiles.nth(1).locator('strong')).toHaveText('Pointer Test Student Two · Live screen');
+  // His second tab stops sharing: his tile stays, showing the tab that is still sharing.
+  await page.evaluate((i) => (window as any).__calls[i].close(), second);
+  await expect(tiles).toHaveCount(2);
+  await expect.poll(() => tiles.nth(0).locator('video').evaluate((v: HTMLVideoElement) => v.videoWidth)).toBe(640);
+  expect(await page.evaluate((i) => (window as any).__calls[i].closed, first)).toBe(false);
+  // Click the screen: it fills most of the lesson area, keeping its shape.
+  await tiles.nth(0).locator('video').click();
+  const stage = (await page.locator('#stage').boundingBox())!, big = (await tiles.nth(0).locator('video').boundingBox())!;
+  expect(big.width * big.height).toBeGreaterThan(stage.width * stage.height * 0.6);
+  expect(await tiles.nth(0).locator('video').evaluate((v: HTMLVideoElement) => getComputedStyle(v).objectFit)).toBe('contain');
+  await expect(tiles.nth(1)).toBeHidden();
+  await shot(page, 'screen-enlarged');
+  await page.getByRole('button', { name: '◀ Back to gallery' }).click();
+  await expect(tiles.nth(1)).toBeVisible();
+  expect((await tiles.nth(0).locator('video').boundingBox())!.width).toBeLessThan(big.width / 2);
+  // Nothing was disconnected by enlarging or going back.
+  expect(await page.evaluate(() => (window as any).__calls.filter((c: any) => c.closed).length)).toBe(1);
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
+test('a changed teacher sign-in is detected, nothing is written under the wrong account, and signing in again resumes', async ({ browser }) => {
+  const context = await browser.newContext(); await wire(context, { realSession: true });
+  const page = await context.newPage(); const errors = await openTeacher(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__writes.some((w: any) => w.op === 'set' && /classPointerSessions/.test(w.p)))).toBe(true);
+  // Another tab of the same browser signs in a student: this tab's shared sign-in changes.
+  await page.evaluate(() => (window as any).__switchAccount('student-pt1'));
+  const banner = page.locator('#cpTeacherSignInBanner');
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText('Sign in again as the teacher');
+  const before = await page.evaluate(() => (window as any).__writes.length);
+  const result = await page.evaluate(() => (window as any).ClassPointerDashboard.setStudentScreenSharing(true).then(() => 'written', (e: Error) => e.message));
+  expect(result).toContain('Sign in again as the teacher');
+  expect(await page.evaluate(() => (window as any).__writes.length)).toBe(before);
+  expect(await page.evaluate(() => (window as any).__writes.filter((w: any) => w.uid !== 'synthetic-teacher').length)).toBe(0);
+  await shot(page, 'teacher-signin-banner');
+  // Sign in again as the same teacher: the banner goes away and changes work again.
+  await banner.getByRole('button', { name: 'Sign in again as teacher' }).click();
+  await expect(banner).toBeHidden();
+  expect(await page.evaluate(() => (window as any).ClassPointerDashboard.setStudentScreenSharing(true).then(() => 'written', (e: Error) => e.message))).toBe('written');
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
+test('the Share button disappears for a student as soon as the teacher turns him off', async ({ browser }) => {
+  const room = 'class-pointer-' + '1234abcd-1234-4abc-8abc-1234567890ab';
+  let denied = false;
+  const session = { roomId: room, createdAt: Date.now(), teacherUid: 'synthetic-teacher', studentScreenSharing: true, permissionRevision: 1 };
+  const context = await browser.newContext();
+  await wire(context, { student: { id: 'pt1', pin: 'synthetic' }, session });
+  await context.route(STUDENT_API, route => route.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ ok: true }) }));
+  await context.route(SHARE_API, route => {
+    const body = JSON.parse(route.request().postData() || '{}');
+    // Updated sharing service: answers a student's own permission once sharing is enabled.
+    const result = body.action === 'permissions' ? { ok: true, screenSharingDenied: denied } : { ok: false, error: 'not in this test' };
+    return route.fulfill({ status: result.ok ? 200 : 403, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(result) });
+  });
+  const page = await context.newPage();
+  await page.goto(BASE + '/activity-test.html');
+  const share = page.locator('#fttActivityScreenShare button', { hasText: 'Share My Screen' });
+  await expect(share).toBeVisible({ timeout: 15000 });
+  denied = true;
+  await page.evaluate((s) => (window as any).__sessionCallback({ val: () => ({ [s.roomId]: { ...s, permissionRevision: 2 } }) }), session);
+  await expect(share).toBeHidden();
+  expect(await page.evaluate(() => (window as any).__displayMediaCalls)).toBe(0);
+  await context.close();
 });

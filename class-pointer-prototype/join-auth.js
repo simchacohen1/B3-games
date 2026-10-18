@@ -55,8 +55,10 @@
         const ended=document.getElementById('endClass');if(ended&&ended.disabled){clearInterval(timer);return}
         const members=getMembers().filter(m=>m.studentId);if(!members.length)return;
         const room=currentRoom();if(!room)return;
-        const data=await post({action:'joinRecheck',room,classId,studentIds:members.map(m=>m.studentId)},await teacherToken());
-        const ok=new Set(data.allowed);members.forEach(m=>{if(!ok.has(m.studentId))onRevoked(m)});
+        // The server checks at most 16 students per request, so larger classes are checked in groups.
+        const ids=Array.from(new Set(members.map(m=>m.studentId))),ok=new Set();
+        for(let i=0;i<ids.length;i+=16){const data=await post({action:'joinRecheck',room,classId,studentIds:ids.slice(i,i+16)},await teacherToken());(data.allowed||[]).forEach(id=>ok.add(id))}
+        members.forEach(m=>{if(!ok.has(m.studentId))onRevoked(m)});
       }catch{/* a network blip must not disconnect the class */}
     },60000);
   }

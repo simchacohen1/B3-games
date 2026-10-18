@@ -236,6 +236,101 @@ test('activity-page screen sharing reaches the teacher over real PeerJS and rest
   await context.close(); await t.context.close();
 });
 
+// ---------- Live-testing fixes: one tile per student, background connection, quiet reconnects ----------
+const rosterList = page => page.evaluate(() => window.ClassPointerRoster.list());
+async function activityTab(context, label) {
+  const page = await context.newPage();
+  page.on('pageerror', e => console.log(label + ' pageerror:', e.message));
+  await page.goto(BASE + '/activity-test.html');
+  return page;
+}
+function enableSharing(room) {
+  const session = { roomId: room, createdAt: Date.now(), teacherUid: 'teacher-et', studentScreenSharing: true };
+  backend.rows.set('b3Games/workspaces/b3-2026/classes/et/classPointerSessions/' + room, session);
+  return session;
+}
+
+test('a boy signed in on two tabs is listed once, shares into one tile, and closing one tab keeps the other', async ({ browser }) => {
+  const t = await startTeacher(browser);
+  const session = enableSharing(t.room);
+  const context = await browser.newContext();
+  await wire(context, { student: AVI, extra: 'canvas', session });
+  const tabA = await activityTab(context, 'tabA'), tabB = await activityTab(context, 'tabB');
+  // Both tabs connect in the background; the teacher lists him once, as joined.
+  await expect.poll(async () => (await rosterList(t.page)).filter(r => r.studentId === 'avi').length, { timeout: 30000 }).toBe(1);
+  expect((await rosterList(t.page)).find(r => r.studentId === 'avi')).toMatchObject({ admitted: true, presence: true, name: 'Avi Synthetic' });
+  // Share from both tabs: still one tile, under his verified name.
+  for (const tab of [tabA, tabB]) {
+    const share = tab.locator('#fttActivityScreenShare button', { hasText: 'Share My Screen' });
+    await expect(share).toBeVisible({ timeout: 20000 });
+    await share.click();
+    await expect.poll(() => tab.evaluate(() => document.querySelector('#fttActivityScreenShare button').textContent), { timeout: 30000 }).toContain('Stop Sharing');
+  }
+  await expect.poll(() => t.page.locator('#activityScreenTray .cp-activity-screen').count(), { timeout: 20000 }).toBe(1);
+  await expect(t.page.locator('#activityScreenTray .cp-activity-screen strong')).toHaveText('Avi Synthetic · Live screen');
+  await expect.poll(() => t.page.locator('#activityScreenTray video').evaluate(v => v.videoWidth), { timeout: 15000 }).toBe(320);
+  // Tab B closes: his tile stays (tab A is still sharing) and he stays joined.
+  await tabB.close();
+  await t.page.waitForTimeout(4000);
+  expect(await t.page.locator('#activityScreenTray .cp-activity-screen').count()).toBe(1);
+  await expect.poll(() => t.page.locator('#activityScreenTray video').evaluate(v => v.videoWidth), { timeout: 15000 }).toBe(320);
+  expect((await rosterList(t.page)).filter(r => r.studentId === 'avi').length).toBe(1);
+  // Enlarge the real incoming video, then go back to the gallery without disconnecting.
+  await t.page.locator('#activityScreenTray video').click();
+  const stageBox = await t.page.locator('#stage').boundingBox(), big = await t.page.locator('#activityScreenTray video').boundingBox();
+  expect(big.width * big.height).toBeGreaterThan(stageBox.width * stageBox.height * 0.5);
+  await t.page.getByRole('button', { name: '◀ Back to gallery' }).click();
+  const small = await t.page.locator('#activityScreenTray video').boundingBox();
+  expect(small.width).toBeLessThan(big.width / 2);
+  await expect.poll(() => t.page.locator('#activityScreenTray video').evaluate(v => v.videoWidth)).toBe(320);
+  expect(await tabA.evaluate(() => document.querySelector('#fttActivityScreenShare button').textContent)).toContain('Stop Sharing');
+  await context.close(); await t.context.close();
+});
+
+test('lesson page joins with no Join button, reconnects after an interruption, and a second tab is not called a removal', async ({ browser }) => {
+  const t = await startTeacher(browser);
+  const s = await joinStudent(browser, t.room, AVI);
+  await expect.poll(() => roster(t.page), { timeout: 25000 }).toContain('Avi Synthetic — admitted');
+  await expect(s.page.locator('#joinForm')).toBeHidden();
+  await expect(s.page.locator('#joinClass')).toBeHidden();
+  // The teacher side drops the connection (network blip): the student reconnects on his own.
+  await t.page.evaluate(() => { for (const c of Object.values(window.__peerConnections || {})) c.close(); });
+  await t.page.evaluate(() => window.ClassPointerBridge.members().forEach(m => m.connection.close()));
+  await expect.poll(() => roster(t.page), { timeout: 30000 }).toContain('Avi Synthetic — admitted');
+  await expect(s.page.locator('#error')).toBeHidden();
+  // Same boy opens the lesson in a second tab: the first tab is told quietly, never "removed".
+  const second = await s.context.newPage();
+  await second.addInitScript(({ room, student }) => sessionStorage.setItem('classPointerDashboardJoin', JSON.stringify({ room, name: student.name, studentId: student.id, classId: student.classId, at: Date.now() })), { room: t.room, student: AVI });
+  await second.goto(BASE + '/class-pointer-prototype/classroom.html?dashboard=student&room=' + encodeURIComponent(t.room));
+  await expect.poll(() => s.page.locator('#connectionStatus').textContent(), { timeout: 30000 }).toContain('open in another tab');
+  expect(await s.page.locator('#error').evaluate(e => e.hidden ? '' : e.textContent)).not.toContain('removed');
+  await expect.poll(() => t.page.evaluate(() => window.ClassPointerRoster.list().filter(r => r.studentId === 'avi').length)).toBe(1);
+  await second.close(); await s.context.close(); await t.context.close();
+});
+
+test('only a deliberate removal shows the removal message, it is not bypassed, and Allow back restores him', async ({ browser }) => {
+  const t = await startTeacher(browser);
+  const s = await joinStudent(browser, t.room, AVI);
+  await expect.poll(() => roster(t.page), { timeout: 25000 }).toContain('Avi Synthetic — admitted');
+  await t.page.evaluate(() => { const m = window.ClassPointerRoster.list().find(r => r.studentId === 'avi'); window.ClassPointerRoster.remove(m.id); });
+  await expect(s.page.locator('#error')).toHaveText('Your teacher removed you from the class.', { timeout: 15000 });
+  // Reloading or a background connection from an activity does not get him back in.
+  await s.page.reload();
+  await s.page.waitForTimeout(5000);
+  expect(await roster(t.page)).not.toContain('Avi Synthetic');
+  const context = await browser.newContext();
+  await wire(context, { student: AVI, session: enableSharing(t.room) });
+  const tab = await activityTab(context, 'removed-activity');
+  await tab.waitForTimeout(8000);
+  expect((await rosterList(t.page)).some(r => r.studentId === 'avi')).toBe(false);
+  expect(await t.page.evaluate(() => window.ClassPointerRoster.removedIds())).toEqual(['avi']);
+  // The teacher allows him back: his next connection is accepted.
+  await t.page.evaluate(() => window.ClassPointerRoster.allowBack('avi'));
+  const again = await joinStudent(browser, t.room, AVI);
+  await expect.poll(() => roster(t.page), { timeout: 25000 }).toContain('Avi Synthetic — admitted');
+  await again.context.close(); await context.close(); await s.context.close(); await t.context.close();
+});
+
 test('reconnecting asks for a fresh ticket; a removed student cannot rejoin and is dropped by the minute check', async ({ browser }) => {
   const t = await startTeacher(browser);
   let s = await joinStudent(browser, t.room, AVI);
