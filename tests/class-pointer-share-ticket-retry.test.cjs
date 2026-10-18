@@ -114,3 +114,33 @@ test('tickets are invalid at and after their expiry time',async()=>{
   const result=await f.post({action:'verify',classId:'et',room:f.room,token:issue.body.token},'teacher-et');
   assert.equal(result.statusCode,403);
 });
+// Sharing enabled with no teacher request: a student may share on his own, so his own permission must be answerable.
+test('permission check answers once sharing is enabled, without a teacher request',async()=>{
+  const f=fixture(),key='b3Games/workspaces/b3-2026/classes/et/classPointerSessions/'+f.room;
+  f.rows.set(key,{roomId:f.room,createdAt:Date.now(),studentScreenSharing:true,teacherUid:'teacher-et'});
+  const ask=()=>f.post({action:'permissions',studentId:'arik',pin:'123456',classId:'et',room:f.room});
+  let r=await ask();
+  assert.equal(r.statusCode,200,JSON.stringify(r.body));
+  assert.equal(r.body.screenSharingDenied,false);
+  // An authorized student can still share.
+  assert.equal((await f.post({action:'issue',studentId:'arik',pin:'123456',classId:'et',room:f.room})).statusCode,200);
+  // The teacher turns him off: the check says so, and sharing is refused.
+  f.rows.set('b3Private/classPointerSharePermissions/b3-2026/et/'+f.room+'/arik',{screenSharingDenied:true});
+  r=await ask();
+  assert.equal(r.statusCode,200);
+  assert.equal(r.body.screenSharingDenied,true);
+  assert.equal((await f.post({action:'issue',studentId:'arik',pin:'123456',classId:'et',room:f.room})).statusCode,403);
+  // Wrong passcode still gets nothing.
+  assert.equal((await f.post({action:'permissions',studentId:'arik',pin:'wrong',classId:'et',room:f.room})).statusCode,401);
+});
+test('permission check still refuses when sharing is off and there is no request, or the boy is not in the class',async()=>{
+  const f=fixture(),key='b3Games/workspaces/b3-2026/classes/et/classPointerSessions/'+f.room;
+  f.rows.set(key,{roomId:f.room,createdAt:Date.now(),studentScreenSharing:false,teacherUid:'teacher-et'});
+  const off=await f.post({action:'permissions',studentId:'arik',pin:'123456',classId:'et',room:f.room});
+  assert.equal(off.statusCode,403);
+  assert.match(off.body.error,/no active student activity request/);
+  f.rows.set(key,{roomId:f.room,createdAt:Date.now(),studentScreenSharing:true,teacherUid:'teacher-et'});
+  const outsider=await f.post({action:'permissions',studentId:'wes',pin:'123456',classId:'et',room:f.room});
+  assert.equal(outsider.statusCode,403);
+  assert.equal(outsider.body.screenSharingDenied,undefined);
+});

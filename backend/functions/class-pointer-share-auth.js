@@ -44,7 +44,7 @@ exports.classPointerShareAuth=onRequest({
   };
   if(action==='permissions'){
    const request=session.destinationRequest;
-   if(!(request&&['screens','boards'].includes(request.mode))&&!(session.studentScreenSharing===true&&Number.isFinite(session.shareRequest?.at)))error(403,'There is no active student activity request.');
+   if(!(request&&['screens','boards'].includes(request.mode))&&session.studentScreenSharing!==true)error(403,'There is no active student activity request.');
    if(!validId(studentId)||!validId(body.pin)||!cls.members?.[studentId]||cls.members[studentId].active===false)error(403,'Student not in this class.');
    const guard=failurePaths(studentId);
    await assertStudentNotLimited(guard);
