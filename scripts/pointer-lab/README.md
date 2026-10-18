@@ -12,3 +12,11 @@ The emulator forgets everything when it stops; run the seed again after a restar
 
 ## Why it exists
 The new teacher page writes private permission rows and session records that only the new database rules allow, and the join tickets only exist in the new backend, so none of it can be tried against production without deploying. The lab lets the owner try the whole Pointer flow by hand with no deploy. It found a real bug the unit tests missed: Realtime Database runs a transaction function first on an empty local copy, so `verify` aborted (a valid ticket looked expired); fixed in `class-pointer-share-auth.js` (`if(row===null)return row;`) for both `joinVerify` and the existing share-ticket `verify`.
+
+## Checks (all run against the running lab; made-up data only)
+- `check-share.cjs`: teacher shares a screen and then is "hidden"; the student must still get moving video (the black-screen fix).
+- `check-persistent-share.cjs`: persistent sharing window: student shares, navigates to another activity, the teacher tile keeps updating (real Edge via `LAB_CHANNEL`).
+- `check-pages.cjs`: signs in a made-up student and opens eleven student pages, flagging "Having trouble checking access" and sign-in locks (use it to compare rule sets: start the lab with `LAB_RULES=firebase-rules.json` and again with the default).
+- `verify-rules.cjs`: 25 database-rule checks (strangers, token students, assigned teacher).
+- Convenience routes: `/_lab/login` (teacher), `/_lab/student?who=A|B&go=/path` (made-up student, signs in like the home page does).
+Lab notes: database REST calls from pages go through `/_rtdb` (same origin) to the emulator; Firebase v8 pages (Rashi Letters, Chazara, ...) load their SDK from the internet and are pointed at the emulator; `LAB_RULES` selects the rules file.

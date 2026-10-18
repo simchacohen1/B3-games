@@ -26,6 +26,15 @@ const FUNCTIONS = {
 };
 const app = express();
 app.disable('x-powered-by');
+// Realtime Database REST (game gate and other pages read it with plain fetch): forwarded to the emulator, same origin as the page
+app.all('/_rtdb/*', express.text({ type: '*/*', limit: '1mb' }), async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query); qs.set('ns', DB_NS);
+    const hasBody = !['GET', 'HEAD', 'OPTIONS'].includes(req.method) && typeof req.body === 'string' && req.body.length;
+    const r = await fetch('http://127.0.0.1:9000/' + req.params[0] + '?' + qs.toString(), { method: req.method, headers: { 'Content-Type': req.get('content-type') || 'application/json' }, body: hasBody ? req.body : undefined });
+    res.status(r.status).set('Content-Type', r.headers.get('content-type') || 'application/json').set('Cache-Control', 'no-store').send(await r.text());
+  } catch (e) { res.status(502).json({ error: 'Lab database is not reachable: ' + e.message }); }
+});
 app.use('/_fn/:name', express.json({ limit: '1mb' }), (req, res) => {
   const make = FUNCTIONS[req.params.name];
   if (!make) return res.status(501).json({ error: 'This function is not part of the lab.' });
@@ -91,13 +100,15 @@ app.get('/_lab/student', (req, res) => {
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.wasm': 'application/wasm', '.pdf': 'application/pdf' };
 const rewrite = text => text
   .replace(/https:\/\/us-central1-b3-games\.cloudfunctions\.net\//g, '/_fn/')
-  .replace(/https:\/\/www\.gstatic\.com\/firebasejs\/[0-9.]+\//g, '/vendor/firebase/12.15.0/')
+  // only the version we vendor is served locally; older SDKs (v8 pages such as Rashi Letters) load from gstatic and are pointed at the emulator in the page below
+  .replace(/https:\/\/www\.gstatic\.com\/firebasejs\/12\.[0-9.]+\//g, '/vendor/firebase/12.15.0/')
   // the real project's database address becomes the lab's (the SDK shim sends SDK calls to the emulator; SHIM_FETCH sends REST calls there)
   .replace(/https:\/\/b3-games-default-rtdb\.firebaseio\.com/g, 'https://' + DB_NS + '.firebaseio.com');
 // plain REST reads (game gate, Shorashim, ...) go to the emulator, never to the real project
 const SHIM_FETCH = `
 ;(function(){
-  var FROM='https://${DB_NS}.firebaseio.com', TO='http://${DB_NS}.localhost:9000';
+  // same-origin proxy (/_rtdb) so every browser (Edge, Chrome) can reach the emulator without special host names or cross-origin rules
+  var FROM='https://${DB_NS}.firebaseio.com', TO=location.origin+'/_rtdb';
   var f=window.fetch; if(f&&!f.__lab){ var w=function(u,o){ if(typeof u==='string'&&u.indexOf(FROM)===0)u=TO+u.slice(FROM.length); return f.call(this,u,o); }; w.__lab=true; window.fetch=w; }
   var open=XMLHttpRequest.prototype.open; if(!open.__lab){ XMLHttpRequest.prototype.open=function(m,u){ var a=[].slice.call(arguments); if(typeof u==='string'&&u.indexOf(FROM)===0)a[1]=TO+u.slice(FROM.length); return open.apply(this,a); }; XMLHttpRequest.prototype.open.__lab=true; }
 })();
@@ -121,6 +132,16 @@ app.use((req, res) => {
   let body = fs.readFileSync(file, 'utf8');
   if (/\/firebase-config\.js$/.test(p)) body = labConfig(body);
   body = rewrite(body);
+  if (ext === '.html') {
+    // plain REST/XHR reads (game gate etc.) go to the emulator on every page, whatever SDK it uses
+    const head = /<head[^>]*>/i;
+    body = head.test(body) ? body.replace(head, m => m + '<script>' + SHIM_FETCH + '</script>') : '<script>' + SHIM_FETCH + '</script>' + body;
+    if (/firebasejs\/8\.[0-9.]+\/firebase-database\.js/.test(body)) {
+      // Firebase v8 pages: send database calls to the emulator (same idea as SHIM for the newer SDK)
+      const V8 = '<script>(function(){var o=firebase.database;var w=function(){var d=o.apply(this,arguments);if(!d.__lab){d.__lab=1;try{d.useEmulator("127.0.0.1",9000)}catch(e){}}return d};for(var k in o)try{w[k]=o[k]}catch(e){}firebase.database=w})();</script>';
+      body = body.replace(/(<script[^>]*firebasejs\/8\.[0-9.]+\/firebase-database\.js[^>]*><\/script>)/, m => m + V8);
+    }
+  }
   if (/\/vendor\/firebase\/12\.15\.0\/firebase-(auth|database)-compat\.js$/.test(p)) body += SHIM;
   if (/\/vendor\/firebase\/12\.15\.0\/firebase-app-compat\.js$/.test(p)) body += SHIM_FETCH;
   res.type(MIME[ext]).send(body);
