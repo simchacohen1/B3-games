@@ -34,7 +34,7 @@ function init(){
  controls.hidden=true;controls.classList.add('teacher-dashboard-source');
  panel.prepend(actions);
  document.getElementById('tbStudentsBtn')?.closest('.tb-menu-wrap')?.classList.add('teacher-dashboard-menu-trigger');
- document.getElementById('teacherDock')?.querySelector('[data-menu="tbShareMenu"]')?.closest('.tb-menu-wrap')?.remove();
+ document.getElementById('teacherDock')?.querySelector('[data-menu="tbShareMenu"]')?.closest('.tb-menu-wrap')?.classList.add('teacher-dashboard-share-trigger');
  const emptyActions=document.querySelector('.lesson-actions');if(emptyActions&&!emptyActions.children.length)emptyActions.hidden=true;
  document.body.classList.add('cp-compact-workspace');
  const stage=document.getElementById('stage');
