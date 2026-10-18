@@ -152,6 +152,7 @@ function init(){
  });
 
  /* ---------- Students table ---------- */
+ const WHERE='flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--cp-muted,#4a5672);font-weight:500';
  const R=()=>window.ClassPointerRoster,S=()=>window.ClassPointerSharingPermissions;
  function rows(){
   const live=R()?.list()||[];
@@ -186,6 +187,14 @@ function init(){
    dot.setAttribute('role','img');dot.setAttribute('aria-label',m?.admitted?'Joined':m?'Waiting':'Not joined');
    const name=el('span','cp-name-text',row.name);name.title=row.name;
    nameCell.append(dot,name);
+   // Connected from another Fun Torah Tools page: joined, working in that activity.
+   if(m?.presence){const where=el('span','cp-where',m.activity?'in '+m.activity:'in an activity');where.style.cssText=WHERE;where.title=row.name+' is connected from '+(m.activity||'another activity');nameCell.append(where);dot.setAttribute('aria-label','Joined from '+(m.activity||'another activity'))}
+   const wasRemoved=!m&&!!row.id&&(R()?.removedIds?.()||[]).includes(row.id);
+   if(wasRemoved){
+    const back=el('button','cp-mini-btn','Allow back');back.type='button';back.setAttribute('aria-label','Allow '+row.name+' back into the class');
+    back.title='You removed '+row.name+'. Allow him to connect again.';
+    back.addEventListener('click',()=>R()?.allowBack(row.id));const gone=el('span','cp-where','Removed');gone.style.cssText=WHERE;nameCell.append(gone,back);
+   }
    if(m&&!m.admitted){
     const admit=el('button','cp-mini-btn','Admit');admit.type='button';admit.setAttribute('aria-label','Admit '+row.name);
     admit.addEventListener('click',()=>R()?.admit(m.id));nameCell.append(admit);
@@ -427,6 +436,8 @@ function init(){
    set('top',Math.round(Math.max(8,Math.min(t.top,window.innerHeight-h-8)))+'px');
   }
  }
+ // Gallery: an obvious way back from one student's enlarged screen or board (sharing continues).
+ for(const b of document.querySelectorAll('#boardsView .boards-bar button'))if(b.textContent.trim()==='◀ All students'){b.textContent='◀ Back to gallery';b.title='Back to all students (sharing continues)'}
  if(dockEl)new MutationObserver(placeRailMenus).observe(dockEl,{subtree:true,attributes:true,attributeFilter:['hidden','class']});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
