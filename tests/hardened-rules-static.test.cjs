@@ -3,6 +3,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const rules=JSON.parse(fs.readFileSync('firebase-rules.hardened.json','utf8')).rules;
+const firebaseConfig=JSON.parse(fs.readFileSync('firebase.json','utf8'));
 function publicGrants(node,path=''){
   const grants=[];
   for(const [key,value] of Object.entries(node||{})){
@@ -20,6 +21,18 @@ test('hardened candidate has no public writes or student-data read grants',()=>{
   assert.deepEqual(grants.filter(x=>x.permission==='.read').map(x=>x.path).sort(),[
     '/b3Games/siteSettings','/studentRewards/settings/studentWebsiteEnabled'
   ]);
+});
+test('default Firebase CLI configuration selects the hardened Realtime Database rules',()=>{
+  assert.equal(firebaseConfig.database.rules,'firebase-rules.hardened.json');
+});
+test('Class Pointer sessions are class-scoped and reject unlisted student permission data',()=>{
+  const sessions=rules.b3Games.workspaces.$workspaceId.classes.$classId.classPointerSessions;
+  assert.match(sessions['.read'],/b3StudentId != null/);
+  assert.match(sessions['.read'],/b3ClassId == \$classId/);
+  assert.match(sessions['.write'],/classIds\/' \+ \$classId/);
+  assert.equal(sessions.$roomId.$other['.validate'],false);
+  assert.equal(sessions.$roomId.screenSharingDenied,undefined);
+  assert.equal(sessions.$roomId.whiteboardDenied,undefined);
 });
 test('student work rules bind access to the signed student ID',()=>{
   assert.match(rules.posukPractice.attempts.$studentId['.write'],/auth\.token\.b3StudentId == \$studentId/);

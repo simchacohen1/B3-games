@@ -8,12 +8,13 @@ const {get,ref,set}=require('firebase/database');
 const projectId='demo-b3-security';
 const rules=fs.readFileSync('firebase-rules.hardened.json','utf8');
 const emulatorEnabled=process.env.B3_RUN_RTDB_EMULATOR_TESTS==='1';
+const emulatorPort=Number(process.env.FIREBASE_DATABASE_EMULATOR_PORT||9100);
 const testEmulator=emulatorEnabled?test:test.skip;
 let env;
 
 test.before(async()=>{
   if(!emulatorEnabled)return;
-  env=await initializeTestEnvironment({projectId,database:{host:'127.0.0.1',port:9000,rules}});
+  env=await initializeTestEnvironment({projectId,database:{host:'127.0.0.1',port:emulatorPort,rules}});
   await env.clearDatabase();
   await env.withSecurityRulesDisabled(async context=>{
     const db=context.database();
@@ -22,18 +23,23 @@ test.before(async()=>{
       'b3Games/students/synthetic_one/memberships/b3-2026_alpha':{workspaceId:'b3-2026',classId:'alpha',active:true},
       'b3Games/students/synthetic_two/profile':{name:'Synthetic Two',active:true,classId:'beta'},
       'b3Games/students/synthetic_two/memberships/b3-2026_beta':{workspaceId:'b3-2026',classId:'beta',active:true},
-      'b3Games/workspaces/b3-2026/classes/alpha':{active:true,members:{synthetic_one:{active:true},synthetic_friend:{active:true}},toolGrants:{chazara:true}},
-      'b3Games/workspaces/b3-2026/classes/beta':{active:true,members:{synthetic_two:{active:true}},toolGrants:{chazara:true}},
+      'b3Games/workspaces/b3-2026/classes/alpha':{active:true,members:{synthetic_one:{active:true},synthetic_friend:{active:true}},toolGrants:{chazara:true,'class-pointer':true},classPointerSessions:{'class-pointer-alpha':{roomId:'class-pointer-alpha',teacherUid:'teacher_alpha',createdAt:1700000000000,studentScreenSharing:true}}},
+      'b3Games/workspaces/b3-2026/classes/beta':{active:true,members:{synthetic_two:{active:true}},toolGrants:{chazara:true,'class-pointer':true},classPointerSessions:{'class-pointer-beta':{roomId:'class-pointer-beta',teacherUid:'teacher_beta',createdAt:1700000000000,studentScreenSharing:true}}},
       'b3Games/workspaces/b3-2026/teachers/teacher_alpha':{active:true,classIds:{alpha:true}},
       'b3Games/workspaces/b3-2026/teachers/teacher_beta':{active:true,classIds:{beta:true}},
-      'b3Games/workspaces/b3-2026/classes/et':{active:true,members:{synthetic_et:{active:true}},toolGrants:{chazara:true}},
-      'b3Games/workspaces/b3-2026/classes/wt':{active:true,members:{synthetic_wt:{active:true}},toolGrants:{chazara:true}},
+      'b3Games/workspaces/b3-2026/classes/et':{active:true,members:{synthetic_et:{active:true}},toolGrants:{chazara:true},classPointerSessions:{'class-pointer-et':{roomId:'class-pointer-et',teacherUid:'teacher_et',createdAt:1700000000000,studentScreenSharing:true}}},
+      'b3Games/workspaces/b3-2026/classes/wt':{active:true,members:{synthetic_wt:{active:true}},toolGrants:{chazara:true},classPointerSessions:{'class-pointer-wt':{roomId:'class-pointer-wt',teacherUid:'teacher_wt',createdAt:1700000000000,studentScreenSharing:true}}},
       'b3Games/students/synthetic_et/profile':{name:'Synthetic East',active:true,classId:'et'},
       'b3Games/students/synthetic_wt/profile':{name:'Synthetic West',active:true,classId:'wt'},
       'b3Games/workspaces/b3-2026/teachers/teacher_et':{active:true,classIds:{et:true}},
       'b3Games/workspaces/b3-2026/teachers/teacher_wt':{active:true,classIds:{wt:true}},
       'b3Games/workspaces/b3-2026/teachers/teacher_inactive':{active:false,classIds:{et:true}},
       'b3Games/workspaces/b3-2026/teachers/teacher_multi':{active:true,classIds:{alpha:true}},
+      'b3Games/workspaces/b3-2026/teacherInvites':{
+        alpha_example_test:{email:'alpha@example.test',active:true,classIds:{alpha:true}},
+        beta_example_test:{email:'beta@example.test',active:true,classIds:{beta:true}},
+        pending_example_test:{email:'pending@example.test',active:false,classIds:{}}
+      },
       'posukPractice/shorashimLearning/students/synthetic_one':{name:'Synthetic One',cards:{}},
       'posukPractice/shorashimLearning/students/synthetic_two':{name:'Synthetic Two',cards:{}},
       'posukPractice/shorashimLearning/recordingEvents/synthetic_one/event_one':{type:'start',at:1},
@@ -153,6 +159,51 @@ testEmulator('ET and WT students and teachers remain isolated from the other tra
   await succeeds(get(ref(wtTeacher,'posukPractice/attempts/synthetic_wt')));
   await fails(get(ref(wtTeacher,'posukPractice/attempts/synthetic_et')));
   await fails(get(ref(inactiveTeacher,'posukPractice/attempts/synthetic_et')));
+});
+
+testEmulator('unauthorized users cannot enumerate teacher invitations',async()=>{
+  const anonymous=env.unauthenticatedContext().database();
+  const alpha=db('teacher_alpha',{email:'alpha@example.test',email_verified:true});
+  const beta=db('teacher_beta',{email:'beta@example.test',email_verified:true});
+  const owner=db('owner',{email:'simcha5770@gmail.com',email_verified:true});
+  const invites='b3Games/workspaces/b3-2026/teacherInvites';
+  await fails(get(ref(anonymous,'b3Games')));
+  await fails(get(ref(anonymous,invites)));
+  await fails(get(ref(alpha,invites)));
+  await succeeds(get(ref(alpha,invites+'/alpha_example_test')));
+  await fails(get(ref(alpha,invites+'/beta_example_test')));
+  await fails(get(ref(beta,invites+'/alpha_example_test')));
+  await succeeds(get(ref(owner,invites)));
+  await fails(set(ref(alpha,invites+'/alpha_example_test/active'),false));
+});
+
+testEmulator('Class Pointer session metadata is readable only inside its active assigned class',async()=>{
+  const anonymous=env.unauthenticatedContext().database();
+  const alphaTeacher=db('teacher_alpha',{email:'alpha@example.test',email_verified:true});
+  const betaTeacher=db('teacher_beta',{email:'beta@example.test',email_verified:true});
+  const inactiveTeacher=db('teacher_inactive',{email:'inactive@example.test',email_verified:true});
+  const alphaStudent=db('student-one',{b3StudentId:'synthetic_one',b3ClassId:'alpha',b3StudentRole:'student'});
+  const betaStudent=db('student-two',{b3StudentId:'synthetic_two',b3ClassId:'beta',b3StudentRole:'student'});
+  const etStudent=db('student-et',{b3StudentId:'synthetic_et',b3ClassId:'et',b3StudentRole:'student'});
+  const wtTeacher=db('teacher_wt',{email:'wt@example.test',email_verified:true});
+  const alphaPath='b3Games/workspaces/b3-2026/classes/alpha/classPointerSessions/class-pointer-alpha';
+  const betaPath='b3Games/workspaces/b3-2026/classes/beta/classPointerSessions/class-pointer-beta';
+  const etPath='b3Games/workspaces/b3-2026/classes/et/classPointerSessions/class-pointer-et';
+  const wtPath='b3Games/workspaces/b3-2026/classes/wt/classPointerSessions/class-pointer-wt';
+  await fails(get(ref(anonymous,alphaPath)));
+  await succeeds(get(ref(alphaTeacher,alphaPath)));
+  await succeeds(get(ref(alphaStudent,alphaPath)));
+  await fails(get(ref(alphaStudent,betaPath)));
+  await fails(get(ref(betaTeacher,alphaPath)));
+  await fails(get(ref(inactiveTeacher,etPath)));
+  await succeeds(get(ref(etStudent,etPath)));
+  await fails(get(ref(etStudent,wtPath)));
+  await succeeds(set(ref(alphaTeacher,alphaPath+'/shareRequest'),{at:Date.now()}));
+  await succeeds(set(ref(alphaTeacher,alphaPath+'/studentScreenSharing'),false));
+  await fails(set(ref(betaTeacher,alphaPath+'/studentScreenSharing'),false));
+  await fails(set(ref(alphaStudent,alphaPath+'/studentScreenSharing'),false));
+  await succeeds(get(ref(wtTeacher,wtPath)));
+  await fails(set(ref(wtTeacher,wtPath+'/screenSharingDenied/synthetic_et'),true));
 });
 
 testEmulator('teachers cannot write student profile or rewards balance',async()=>{

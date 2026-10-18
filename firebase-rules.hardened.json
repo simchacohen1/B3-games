@@ -38,10 +38,41 @@
           "teachers": {
             "$uid": { ".read": "auth != null && (auth.uid == $uid || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)", ".write": "auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true" }
           },
+          "teacherInvites": {
+            ".read": "auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true",
+            ".write": "auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true",
+            "$inviteId": {
+              ".read": "auth != null && auth.token.email_verified == true && auth.token.email != null && auth.token.email == data.child('email').val()"
+            }
+          },
           "classes": {
             "$classId": {
               ".read": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)",
               ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)",
+              "classPointerSessions": {
+                ".read": "auth != null && ((auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && (($classId == 'et' || $classId == 'wt') || root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/class-pointer').val() == true)) || (auth.token.b3StudentRole == 'student' && auth.token.b3StudentId != null && auth.token.b3ClassId == $classId && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/members/' + auth.token.b3StudentId + '/active').val() == true && root.child('b3Games/students/' + auth.token.b3StudentId + '/profile/active').val() != false && (($classId == 'et' || $classId == 'wt') || root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/class-pointer').val() == true)))",
+                ".write": "auth != null && ((auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || (root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/active').val() != false && (($classId == 'et' || $classId == 'wt') || root.child('b3Games/workspaces/' + $workspaceId + '/classes/' + $classId + '/toolGrants/class-pointer').val() == true)))",
+                "$roomId": {
+                  ".validate": "newData.hasChildren(['roomId', 'teacherUid', 'createdAt']) && newData.child('roomId').val() == $roomId && newData.child('teacherUid').isString() && newData.child('createdAt').isNumber()",
+                  "roomId": { ".validate": "newData.isString() && newData.val() == $roomId" },
+                  "teacherUid": { ".validate": "newData.isString() && (newData.val() == auth.uid || data.exists() && newData.val() == data.val())" },
+                  "createdAt": { ".validate": "newData.isNumber()" },
+                  "studentScreenSharing": { ".validate": "newData.isBoolean()" },
+                  "permissionRevision": { ".validate": "newData.isNumber()" },
+                  "shareRequest": {
+                    ".validate": "newData.hasChild('at')",
+                    "at": { ".validate": "newData.isNumber()" },
+                    "$other": { ".validate": false }
+                  },
+                  "destinationRequest": {
+                    ".validate": "newData.hasChildren(['mode', 'at']) && (newData.child('mode').val() == 'screens' || newData.child('mode').val() == 'boards')",
+                    "mode": { ".validate": "newData.isString() && (newData.val() == 'screens' || newData.val() == 'boards')" },
+                    "at": { ".validate": "newData.isNumber()" },
+                    "$other": { ".validate": false }
+                  },
+                  "$other": { ".validate": false }
+                }
+              },
               "members": {
                 "$studentId": { ".read": "auth != null && (auth.token.b3StudentId == $studentId && auth.token.b3ClassId == $classId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true || root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/active').val() == true && root.child('b3Games/workspaces/' + $workspaceId + '/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)", ".write": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)" }
               },

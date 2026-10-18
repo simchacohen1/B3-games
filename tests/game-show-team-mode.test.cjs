@@ -145,5 +145,9 @@ test('question-generator uses category-matched distractors and shows no duplicat
   assert.match(generator, /return rows\.length === 4 \? rows : \[\]/);
   assert.match(generator, /correctIndex: shuffledOptions\.findIndex\(row => row\.correct\)/);
   assert.equal((teacherSource.match(/src="question-generator-grade3-v4\.js/g) || []).length, 1);
-  assert.match(player, /current\.narrationLocked \|\| serverNow\(\)/);
+  assert.match(player, /lastData\.narrationLocked \|\| serverNow\(\) < \(lastData\.buzzUnlockAt/);
+  assert.match(player, /fetch\(GAME_SHOW_ACTION_URL/);
+  const studentActions = fs.readFileSync(path.join(root, 'backend/functions/game-show-student-questions.js'), 'utf8');
+  assert.match(studentActions, /canAcceptStudentBuzz\(current,now\)/);
+  assert.match(studentActions, /current\.narrationLocked!==true/);
 });

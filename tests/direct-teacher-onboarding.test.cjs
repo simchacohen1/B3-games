@@ -53,6 +53,12 @@ test('new teacher verification failure always denies client access',()=>{
  assert.doesNotMatch(settings,/claimPending:true/);
  assert.match(settings,/A failed or unavailable verifier must never authorize a new teacher/);
 });
+test('new teacher access reads only the verified teacher invitation addressed to that email',()=>{
+ assert.match(settings,/const inviteId = email\.replace\(\/\[\^a-z0-9\]\+\/g,"_"\)/);
+ assert.match(settings,/ref\(WORKSPACE_ROOT_KEY \+ "\/teacherInvites\/" \+ inviteId\)/);
+ assert.doesNotMatch(settings,/ref\(WORKSPACE_ROOT_KEY\s*\+\s*["']\/teacherInvites["']\s*\)\.once/);
+ assert.match(settings,/String\(invite\.email \|\| ""\)\.trim\(\)\.toLowerCase\(\) !== email/);
+});
 
 test('custom Fun Torah Tools domains are allowed to call the teacher claim function',()=>{
  assert.match(claimEndpoint,/https:\/\/funtorahtools\.com/);

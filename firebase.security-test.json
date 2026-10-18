@@ -2,7 +2,7 @@
   "database": { "rules": "firebase-rules.hardened.json" },
   "storage": { "rules": "storage-rules.hardened.rules" },
   "emulators": {
-    "database": { "port": 9000 },
+    "database": { "port": 9100 },
     "storage": { "port": 9199 },
     "singleProjectMode": true
   }
