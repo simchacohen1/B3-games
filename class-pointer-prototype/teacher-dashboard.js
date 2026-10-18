@@ -373,7 +373,7 @@ function init(){
   wasExpanded=expanded;
   menuHome?.classList.toggle('teacher-dashboard-menu-trigger',!expanded);
   if(expanded){stage.append(sidebar);sidebar.classList.add('cp-drawer-overlay');sidebar.dataset.stageUi='true';setOverlay(false)}
-  else{setOverlay(false);sidebar.classList.remove('cp-drawer-overlay');delete sidebar.dataset.stageUi;panelHome.after(sidebar)}
+  else{setOverlay(false);sidebar.classList.remove('cp-drawer-overlay');delete sidebar.dataset.stageUi;for(const prop of ['left','right','top','bottom'])sidebar.style.removeProperty(prop);panelHome.after(sidebar)}
  }
  if(stage)new MutationObserver(syncExpanded).observe(stage,{attributes:true,attributeFilter:['class']});
  document.addEventListener('fullscreenchange',syncExpanded);
@@ -384,6 +384,27 @@ function init(){
   setOverlay(!sidebar.classList.contains('cp-overlay-open'));
  },true);
  closeDrawer.addEventListener('click',e=>{if(sidebar.classList.contains('cp-drawer-overlay')){e.stopImmediatePropagation();setOverlay(false)}},true);
+
+ // Drag the full-screen Students panel by its header without altering any student permissions.
+ let drawerDrag=null;
+ drawerHead.addEventListener('pointerdown',event=>{
+  if(!isExpanded()||!sidebar.classList.contains('cp-overlay-open')||event.button!==0||event.target.closest('button,select,input'))return;
+  const bounds=stage.getBoundingClientRect(),pane=sidebar.getBoundingClientRect();
+  drawerDrag={id:event.pointerId,dx:event.clientX-pane.left,dy:event.clientY-pane.top,bounds};
+  drawerHead.setPointerCapture?.(event.pointerId);event.preventDefault();
+ });
+ drawerHead.addEventListener('pointermove',event=>{
+  if(!drawerDrag||drawerDrag.id!==event.pointerId)return;
+  const b=stage.getBoundingClientRect(),w=sidebar.offsetWidth,h=sidebar.offsetHeight;
+  const left=Math.max(0,Math.min(b.width-w,event.clientX-b.left-drawerDrag.dx));
+  const top=Math.max(0,Math.min(b.height-h,event.clientY-b.top-drawerDrag.dy));
+  sidebar.style.setProperty('left',left+'px','important');
+  sidebar.style.setProperty('top',top+'px','important');
+  sidebar.style.setProperty('right','auto','important');
+  sidebar.style.setProperty('bottom','auto','important');
+ });
+ for(const type of ['pointerup','pointercancel'])drawerHead.addEventListener(type,()=>{drawerDrag=null});
+
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sidebar.classList.contains('cp-overlay-open')){setOverlay(false);studentsDockBtn?.focus()}});
 
  /* ---------- Left rail: its pop-up menus open beside the rail instead of being cut off inside it ---------- */
