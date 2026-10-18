@@ -74,6 +74,12 @@
     });
     return;
   }
+  // Students use their existing Fun Torah Tools activities. The verified
+  // classroom presence and individual boards now live on those pages.
+  // Keep this legacy student entry as a safe return to the student dashboard.
+  location.replace(new URL('../index.html',location.href).href);
+  return;
+  /* Legacy entry retained temporarily for compatibility with older links.
   try{
     const id=sessionStorage.getItem('b3Games_studentId'),pin=sessionStorage.getItem('b3Games_classPin');
     if(!C.validId(id)||!pin)throw Error('Sign in on the Fun Torah Tools dashboard, then click Class Pointer.');
@@ -104,4 +110,5 @@
       Date.now()-lastEnter<20000?setTimeout(enter,8000):enter();
     },()=>message('Could not find your lesson. Refresh to try again.'));
   }catch(error){message(error.message||'Could not open the classroom. Please try again.')}
+  */
 })();
