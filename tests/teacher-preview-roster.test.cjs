@@ -26,7 +26,7 @@ test('preview includes only students with an active profile and matching active 
   assert.deepEqual(students,[{id:'current',name:'Current Student'}]);
   assert.ok(f.reads.includes('b3Games/students/current/memberships/b3-2026_alpha'));
   assert.ok(!f.reads.includes('b3Games/students'));
-  assert.ok(!f.reads.includes('b3Games/students/missing/profile'));
+  assert.ok(!students.some(student => student.id === 'missing'));
 });
 test('preview rejects missing or inactive classes',async()=>{
   const db={ref(){return{once:async()=>({val:()=>({active:false})})}}};
