@@ -1,0 +1,42 @@
+# Classroom Pointer: release verification checklist, deployment sequence and rollback
+
+Prepared 2026-10-18 by Claude from the isolated Pointer lab. **Nothing in this file has been done in production.** Each deploy/merge step needs the owner's separate approval.
+
+## 1. What is being released (and what is not)
+- **Pointer candidate: PR #124** (head `2fac2d4` at the time of writing): join tickets, teacher verification, permission revoke, the black-screen fix, the ticket-verify fix. It adds server code (`classPointerShareAuth`, ticket clean-up), database rules (`classPointerSessions` write rule and a `b3Private` block) and website files.
+- **Public-read hardening: PR #147** (`firebase-rules.hardened.json` and the student/teacher token reads). It is a separate release. **As pushed (`f161c94`) it breaks the product** (see 3); it is releasable only with the two rules fixes in branch `verify/pointer-plus-147-20261017` (or Codex's equivalent).
+- **Open design decision (owner): PR #149** removes the persistent student "sharing window". Three Pointer Node tests fail on #149 as pushed, one of which (`screen sharing continues in the persistent window when the activity page navigates away`) is the "sharing continues while the student moves between activities" requirement. Either keep the persistent window (preferred, it is the working design) or accept that the student must press Share again on each page.
+
+## 2. Evidence so far (all isolated: emulators and synthetic class "Pointer Test", no production data)
+| Check | Result |
+|---|---|
+| Owner in real Edge: teacher starts, student joins, student shares entire screen, teacher sees it live and while the student navigates | **worked** (tag `pointer-lab-verified-20261017`, commit `4217672`) |
+| Black teaching screen when the teacher switches tabs | reproduced and fixed (`viewport.js`), `scripts/pointer-lab/check-share.cjs` |
+| Join tickets: unauthorized, stolen, reused, expired, ET/WT/third class, reconnect, revoke (real browsers, real PeerJS) | 5/5 (`e2e/pointer-join-ticket-two-browser.spec.cjs`) + 12 unit tests |
+| Ticket `verify` aborting on the database's empty first pass (looked like "403 ticket expired") | fixed; most likely cause of the production 403 in activity-screen sharing |
+| #147 rules vs the product, run with `scripts/pointer-lab/verify-rules.cjs` | **as pushed: 19 of 25 pass** (students cannot read own class name/active/toolGrants/access/siteEnabled; teacher cannot write `b3Private/classPointerSharePermissions`). **With the two fixes: 25 of 25.** Codex's own 16 rules-emulator scenarios: 16 of 16 also with the fixes |
+| Full Node suite on #147 + #124 + fixes | 561 tests, 554 pass; the 7 failures are test files that need packages not installed in the scratch tree (`@firebase/rules-unit-testing`, `firebase-functions`, Playwright) and pass where they are installed |
+| Existing student pages A/B (same code, current rules vs hardened rules) | same behaviour in the lab; note the lab cannot fully exercise the activity pages (Shorashim/Posuk/Gematria stay at their own sign-in gate) so this is NOT a full regression pass |
+
+## 3. The two rules bugs in #147 (fixed on the verification branch)
+1. `firebase-rules.hardened.json` lacked #124's `b3Private` block, so a teacher got `PERMISSION_DENIED` writing `b3Private/classPointerSharePermissions/...` and could not start a class.
+2. The `resources` node was never closed, so `access`, `toolGrants`, `name`, `active`, `siteEnabled`, `posukPracticeLimit`, `halachaAccess` sat at `classes/$classId/resources/...`; a signed-in student could read only `members/<me>`, the home page showed "No activities are available" and its live class watcher threw.
+Re-verify any new #147 head with: start the lab from that checkout (`scripts\pointer-lab\start-lab.cmd`) and run `node scripts/pointer-lab/verify-rules.cjs` (must print 25 of 25), then `check-share.cjs`.
+
+## 4. Safe deployment sequence (each step approved separately; do not skip the checks)
+**Step 0, before anything:** (a) export the Realtime Database (Firebase console > Realtime Database > three dots > Export JSON) and store it outside the repository; (b) copy the currently live database rules text from the console into a file (this is the rollback file); (c) note the live `classPointerShareAuth` revision (Google Cloud console > Cloud Run > `classpointershareauth` > Revisions); (d) confirm the synthetic class "Pointer Test" (teacher + two students) exists and no real class is used for the live check; (e) record the exact commit SHA to deploy.
+**Step 1, backend function only** (Command Prompt, not PowerShell, from a clean checkout of that SHA, after `npm --prefix backend/functions ci`): `firebase deploy --only functions:classPointerShareAuth,functions:cleanupClassPointerShareTickets --project b3-games` (use the actual exported names). Never `--only database` or hosting here, never `funTorahTeacherClaim` or `funTorahManageStudents`. Smoke: an anonymous POST with a valid-format unknown room returns 403 "Class Pointer is not active for this class". Expected effect on the current website: none (old pages use `issue`/`verify`, which keep working; students with only the old shared default passcode can no longer share a screen).
+**Step 2, database rules, additive only:** deploy #124's `firebase-rules.json` (adds the `classPointerSessions` write rule and the `b3Private` block; reads stay as they are today). First diff it against the saved live rules; any difference other than those two additions stops the deploy. Run from the repository root: `firebase deploy --only database --project b3-games`.
+**Step 3, website:** merge #124 to `main` (GitHub Pages publishes automatically, about a minute; use Ctrl+Shift+R). Do this only after steps 1 and 2 are confirmed, because the new teacher page writes the private permission rows.
+**Step 4, live check with the synthetic class (owner + assistant):** teacher starts; Student A and B join (names come from the server); a stranger who knows the room id is refused (assistant can try with the lab-style script); teacher shares a browser tab and switches to it (students still see it moving); Student A shares Entire Screen and the teacher sees it, also after Student A moves between pages; teacher turns screen sharing off for B (B's share stops within a minute); end and restart; no unexpected 403 in the teacher or student pages.
+**Step 5 (separate release, later): hardened rules (#147 with the two fixes).** Only after Step 4 passes and the new pages are live and cached. Diff against the saved live rules, deploy the rules, then re-run the Step 4 checks plus: student home shows class name and tool tiles, a teacher sees only own classes, a stranger cannot read `b3Games/students` or class lists, Game Show/Weekly Quiz/Shorashim/Posuk Practice/Rashi/Chazara/Gematria open for a synthetic student. This is the step most likely to break an existing page, so keep the previous rules file ready and watch for "Please sign in again" locks.
+
+## 5. Rollback (fastest first)
+- **Function:** Cloud Run console > `classpointershareauth` > Revisions > send 100% of traffic to the revision noted in Step 0(c) (instant). Or redeploy the previous commit with the same single-function command.
+- **Database rules:** redeploy the file saved in Step 0(b) with `firebase deploy --only database --project b3-games` (instant). Rules changes do not touch data.
+- **Website:** revert the merge commit on `main` in GitHub Desktop and push (Pages republishes in about a minute).
+- **Data:** nothing in this release rewrites existing data; tickets and permission rows expire or are removed when a lesson ends. The Step 0(a) export is the safety net.
+- Rollback order if the live check fails: website first (if pages misbehave), then rules, then function.
+
+## 6. Still not verified (be honest in the release note)
+Real Entire Screen picker for students on activity pages inside the lab; deployed function authorization (the production 403 is expected to be fixed by the ticket-verify fix but can only be confirmed after Step 1); a full pass of every existing student/teacher page under the hardened rules (the lab cannot fully drive the activity pages); the migration-access CI workflow stays red for reasons unrelated to Pointer.

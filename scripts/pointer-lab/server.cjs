@@ -70,10 +70,38 @@ document.getElementById('o').onclick=()=>go('simcha5770@gmail.com').catch(e=>doc
 </script></body>`);
 });
 
+// One-click lab sign-in for a made-up student (does exactly what the home page does after the passcode check).
+app.get('/_lab/student', (req, res) => {
+  const who = req.query.who === 'B' ? { name: 'Pointer Test Student B', pin: '2222' } : { name: 'Pointer Test Student A', pin: '1111' };
+  const go = String(req.query.go || '/index.html').replace(/[^A-Za-z0-9_./?=&-]/g, '');
+  res.type('html').send(`<!doctype html><meta charset="utf-8"><title>Pointer Lab student sign-in</title><p id="m">Signing in as ${who.name}…</p>
+<script src="/vendor/firebase/12.15.0/firebase-app-compat.js"></script><script src="/vendor/firebase/12.15.0/firebase-auth-compat.js"></script><script src="/vendor/firebase/12.15.0/firebase-database-compat.js"></script><script src="/firebase-config.js"></script>
+<script>
+(async()=>{try{
+  firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+  const r=await fetch('/_fn/funTorahStudentAuth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'login',name:${JSON.stringify(who.name)},pin:${JSON.stringify(who.pin)}})});
+  const d=await r.json(); if(!r.ok||!d.ok) throw new Error(d.error||'sign-in failed');
+  if(d.customToken) await firebase.auth().signInWithCustomToken(d.customToken);
+  sessionStorage.setItem('b3Games_studentId',d.id);sessionStorage.setItem('b3Games_studentName',d.name);sessionStorage.setItem('b3Games_studentClass',d.classId);sessionStorage.setItem('b3Games_classPin',${JSON.stringify(who.pin)});
+  location.href=${JSON.stringify(go)};
+}catch(e){document.getElementById('m').textContent=String(e.message||e)}})();
+</script>`);
+});
+
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.wasm': 'application/wasm', '.pdf': 'application/pdf' };
 const rewrite = text => text
   .replace(/https:\/\/us-central1-b3-games\.cloudfunctions\.net\//g, '/_fn/')
-  .replace(/https:\/\/www\.gstatic\.com\/firebasejs\/[0-9.]+\//g, '/vendor/firebase/12.15.0/');
+  .replace(/https:\/\/www\.gstatic\.com\/firebasejs\/[0-9.]+\//g, '/vendor/firebase/12.15.0/')
+  // the real project's database address becomes the lab's (the SDK shim sends SDK calls to the emulator; SHIM_FETCH sends REST calls there)
+  .replace(/https:\/\/b3-games-default-rtdb\.firebaseio\.com/g, 'https://' + DB_NS + '.firebaseio.com');
+// plain REST reads (game gate, Shorashim, ...) go to the emulator, never to the real project
+const SHIM_FETCH = `
+;(function(){
+  var FROM='https://${DB_NS}.firebaseio.com', TO='http://${DB_NS}.localhost:9000';
+  var f=window.fetch; if(f&&!f.__lab){ var w=function(u,o){ if(typeof u==='string'&&u.indexOf(FROM)===0)u=TO+u.slice(FROM.length); return f.call(this,u,o); }; w.__lab=true; window.fetch=w; }
+  var open=XMLHttpRequest.prototype.open; if(!open.__lab){ XMLHttpRequest.prototype.open=function(m,u){ var a=[].slice.call(arguments); if(typeof u==='string'&&u.indexOf(FROM)===0)a[1]=TO+u.slice(FROM.length); return open.apply(this,a); }; XMLHttpRequest.prototype.open.__lab=true; }
+})();
+`;
 function labConfig(text) {
   return text
     .replace(/apiKey:\s*"[^"]*"/, 'apiKey: "lab-fake-api-key"')
@@ -94,6 +122,7 @@ app.use((req, res) => {
   if (/\/firebase-config\.js$/.test(p)) body = labConfig(body);
   body = rewrite(body);
   if (/\/vendor\/firebase\/12\.15\.0\/firebase-(auth|database)-compat\.js$/.test(p)) body += SHIM;
+  if (/\/vendor\/firebase\/12\.15\.0\/firebase-app-compat\.js$/.test(p)) body += SHIM_FETCH;
   res.type(MIME[ext]).send(body);
 });
 app.listen(PORT, '127.0.0.1', () => console.log('Pointer lab running at http://localhost:' + PORT + '/  (repo: ' + REPO + ')'));
