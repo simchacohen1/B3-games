@@ -661,7 +661,8 @@
   const admitted=()=>{
     const joined=Array.from(B.members().values()).filter(m=>m.admitted);
     const seen=new Set(joined.map(m=>m.studentId||m.name.toLocaleLowerCase()));
-    const remote=Array.from(B.presence?.().values()||[]).filter(m=>m.admitted&&m.connection?.open).sort((a,b)=>b.connectedAt-a.connectedAt);
+    const remote=Array.from(B.presence?.().values()||[]).filter(m=>m.admitted&&m.connection?.open)
+      .sort((a,b)=>Number(a.activity==='Screen sharing window')-Number(b.activity==='Screen sharing window')||b.connectedAt-a.connectedAt);
     for(const m of remote){const key=m.studentId||m.name.toLocaleLowerCase();if(!seen.has(key)){seen.add(key);joined.push(m)}}
     return joined;
   };
