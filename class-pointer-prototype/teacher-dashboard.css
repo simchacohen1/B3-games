@@ -165,3 +165,17 @@ body.cp-simple.teacher-view .cp-workspace-tab{white-space:normal;font-size:13px;
 .cp-joined{flex-basis:100%;order:10}
 body.cp-simple #stage:has(.cp-source-picker:not([hidden])){aspect-ratio:auto;min-height:620px}
 }
+
+/* Full-screen left rail: text-only buttons become icons so nothing spills out of the rail. */
+#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"],
+#stage .teacher-dock.floating.dock-left #pointerPdfLibrary{font-size:0!important;width:44px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap}
+#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"]::before{content:"\1F5A5";font-size:17px}
+#stage .teacher-dock.floating.dock-left #pointerPdfLibrary::before{content:"\1F4DA";font-size:17px}
+#stage.tb-docked-left > #placeholder{left:56px!important;width:calc(100% - 56px)!important;box-sizing:border-box}
+
+/* Full screen: Students panel as an overlay inside the lesson, opened from the 👥 rail button. */
+#stage .cp-permissions-sidebar.cp-drawer-overlay{display:none!important;position:absolute!important;top:12px!important;bottom:12px!important;right:12px!important;left:auto!important;width:min(360px,calc(100% - 80px))!important;margin:0!important;overflow:auto;z-index:40;box-shadow:0 12px 36px #0006;cursor:default}
+#stage.tb-docked-left .cp-permissions-sidebar.cp-drawer-overlay{left:66px!important;right:auto!important}
+#stage .cp-permissions-sidebar.cp-drawer-overlay.cp-overlay-open{display:block!important}
+#stage .teacher-dock .cp-dock-active{background:var(--cp-blue,#2563eb)!important;color:#fff!important}
+#stage .teacher-dock.floating.dock-left{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}

@@ -354,21 +354,55 @@ function init(){
   shapesMenu.prepend(box);
  }
 
- /* ---------- Full screen keeps the original roster inside the floating toolbar ---------- */
+ /* ---------- Full screen: the same Students panel opens over the lesson from the 👥 button ---------- */
+ const panelHome=document.createComment('students-panel-home');sidebar.before(panelHome);
+ for(const type of ['pointerdown','pointermove','pointerup','pointercancel','click','dblclick','wheel'])sidebar.addEventListener(type,e=>{if(sidebar.classList.contains('cp-drawer-overlay'))e.stopPropagation()});
+ sidebar.addEventListener('pointerenter',()=>{if(sidebar.classList.contains('cp-drawer-overlay'))stage?.dispatchEvent(new PointerEvent('pointerleave'))});
+ const studentsDockBtn=$('tbStudentsBtn');
  let wasExpanded=false;
+ function isExpanded(){return !!stage&&(stage.classList.contains('lesson-fullscreen')||document.fullscreenElement===stage)}
+ function setOverlay(open){
+  sidebar.classList.toggle('cp-overlay-open',open);
+  studentsDockBtn?.setAttribute('aria-expanded',String(open));
+  studentsDockBtn?.classList.toggle('cp-dock-active',open);
+  if(open)queueRender();
+ }
  function syncExpanded(){
-  const expanded=stage?.classList.contains('lesson-fullscreen')||document.fullscreenElement===stage;
+  const expanded=isExpanded();
   if(expanded===wasExpanded)return;
   wasExpanded=expanded;
-  if(menu&&menuHome){
-   menu.classList.toggle('teacher-dashboard-roster',!expanded);
-   menuHome.classList.toggle('teacher-dashboard-menu-trigger',!expanded);
-   if(expanded)menuHome.append(menu);else sidebar.insertBefore(menu,menuSlot);
-   menu.hidden=expanded;
-  }
+  menuHome?.classList.toggle('teacher-dashboard-menu-trigger',!expanded);
+  if(expanded){stage.append(sidebar);sidebar.classList.add('cp-drawer-overlay');sidebar.dataset.stageUi='true';setOverlay(false)}
+  else{setOverlay(false);sidebar.classList.remove('cp-drawer-overlay');delete sidebar.dataset.stageUi;panelHome.after(sidebar)}
  }
  if(stage)new MutationObserver(syncExpanded).observe(stage,{attributes:true,attributeFilter:['class']});
  document.addEventListener('fullscreenchange',syncExpanded);
+ studentsDockBtn?.addEventListener('click',e=>{
+  if(!isExpanded())return;
+  e.preventDefault();e.stopImmediatePropagation();
+  if(menu)menu.hidden=true;
+  setOverlay(!sidebar.classList.contains('cp-overlay-open'));
+ },true);
+ closeDrawer.addEventListener('click',e=>{if(sidebar.classList.contains('cp-drawer-overlay')){e.stopImmediatePropagation();setOverlay(false)}},true);
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sidebar.classList.contains('cp-overlay-open')){setOverlay(false);studentsDockBtn?.focus()}});
+
+ /* ---------- Left rail: its pop-up menus open beside the rail instead of being cut off inside it ---------- */
+ const dockEl=$('teacherDock');
+ function placeRailMenus(){
+  if(!dockEl)return;
+  const rail=dockEl.classList.contains('dock-left')&&dockEl.classList.contains('floating');
+  for(const m of dockEl.querySelectorAll('.tb-menu')){
+   const props=['position','left','top','right','max-height','overflow','margin-left'];
+   if(!rail||m.hidden){if(m.dataset.cpRail){for(const k of props)m.style.removeProperty(k);delete m.dataset.cpRail}continue}
+   const trigger=dockEl.querySelector('[data-menu="'+m.id+'"]');if(!trigger)continue;
+   const d=dockEl.getBoundingClientRect(),t=trigger.getBoundingClientRect(),set=(k,v)=>m.style.setProperty(k,v,'important');
+   m.dataset.cpRail='1';set('position','fixed');set('right','auto');set('margin-left','0');set('left',Math.round(d.right+6)+'px');
+   set('max-height',(window.innerHeight-16)+'px');set('overflow','auto');
+   const h=m.getBoundingClientRect().height;
+   set('top',Math.round(Math.max(8,Math.min(t.top,window.innerHeight-h-8)))+'px');
+  }
+ }
+ if(dockEl)new MutationObserver(placeRailMenus).observe(dockEl,{subtree:true,attributes:true,attributeFilter:['hidden','class']});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
