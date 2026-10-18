@@ -30,7 +30,7 @@ test('drawing, eraser, undo, redo and shape fill use the saved bitmap',async()=>
  assert.ok(await p.evaluate(()=>S.a_draw[0].startsWith('data:image/png')));assert.deepEqual(errors,[]);await p.close();
 });
 test('text, Torah stickers, picture actions and backgrounds persist with undo',async()=>{
- const {page:p,errors}=await open();await p.getByRole('button',{name:'Add text box'}).click();await p.locator('#a .tb-text').fill('My mitzvah');await p.getByRole('button',{name:'Torah',exact:true}).click();assert.equal(await p.locator('#a .studio-sticker img').getAttribute('alt'),'Torah');
+ const {page:p,errors}=await open();await p.getByRole('button',{name:'Add text box'}).click();await p.locator('#a .tb-text').fill('My mitzvah');await p.locator('#a .studio-more-stickers>summary').click();await p.getByRole('button',{name:'Torah',exact:true}).click();assert.equal(await p.locator('#a .studio-sticker img').getAttribute('alt'),'Torah');
  await p.evaluate(()=>openCustomizer(document.querySelector('#a .studio-sticker')));await p.getByRole('button',{name:'Flip picture',exact:true}).click();assert.equal(await p.locator('#a .studio-sticker img').evaluate(e=>e.style.transform),'scaleX(-1)');await p.getByRole('button',{name:'Copy',exact:false}).last().click();assert.equal(await p.locator('#a .studio-sticker').count(),2);await p.getByRole('button',{name:'Done',exact:false}).click();
  await p.getByRole('button',{name:'Sky',exact:false}).click();assert.equal(await p.locator('#a .page').first().getAttribute('data-studio-bg'),'sky');await p.locator('#a [data-history=undo]').click();assert.equal(await p.locator('#a .page').first().getAttribute('data-studio-bg'),'');await p.reload();await p.getByRole('button',{name:/סימן א/}).click();assert.equal(await p.locator('#a .tb-text').textContent(),'My mitzvah');assert.equal(await p.locator('#a .studio-sticker').count(),2);assert.deepEqual(errors,[]);await p.screenshot({path:process.env.HALACHA_TEST_SCREENSHOT||'/tmp/halacha-studio.png',fullPage:true});await p.close();
 });
@@ -58,4 +58,67 @@ test('text box gets a contextual toolbar with familiar formatting and direct edi
  const {page:p,errors}=await open();await p.getByRole('button',{name:'Add text box'}).click();assert.ok(await p.locator('.studio-context').isVisible());assert.ok(await p.locator('#a .book>.studio-context').count());
  await p.locator('#a .tb-text').fill('My Torah idea');await p.getByRole('button',{name:'Bold',exact:true}).click();await p.getByRole('button',{name:'Align center',exact:true}).click();await p.getByLabel('Text size',{exact:true}).fill('30');await p.getByLabel('Text size',{exact:true}).press('Tab');await p.locator('#pcText').selectOption('#e53935');await p.locator('#pcBg').selectOption('transparent');
  const style=await p.locator('#a .textbox').evaluate(e=>({size:e.style.fontSize,weight:e.style.fontWeight,align:e.style.textAlign,color:e.style.color,clear:e.classList.contains('clear')}));assert.deepEqual(style,{size:'30px',weight:'700',align:'center',color:'rgb(229, 57, 53)',clear:true});assert.equal(await p.locator('#studioPieceText').count(),0);if(process.env.HALACHA_TEST_SCREENSHOT)await p.screenshot({path:process.env.HALACHA_TEST_SCREENSHOT,fullPage:true});await p.reload();await p.getByRole('button',{name:/סימן א/}).click();assert.equal(await p.locator('#a .tb-text').textContent(),'My Torah idea');assert.equal(await p.locator('#a .textbox').evaluate(e=>e.style.fontSize),'30px');assert.deepEqual(errors,[]);await p.close();
+});
+
+test('Seif Aleph lesson is complete, RTL, ordered for the weekly plan, and independently collapsible',async()=>{
+ const {page:p,errors}=await open();
+ const order=await p.locator('#tabs button').evaluateAll(nodes=>nodes.map(n=>n.dataset.id).filter(id=>['a','c','b','f','d','e'].includes(id)));
+ assert.deepEqual(order.slice(0,6),['a','c','b','f','d','e']);
+ if(process.env.HALACHA_LESSON_SCREENSHOT)await p.screenshot({path:process.env.HALACHA_LESSON_SCREENSHOT,fullPage:true});
+ const text=p.locator('#a .hal-a-full-text');
+ assert.equal(await text.getAttribute('dir'),'rtl');
+ const source=await text.textContent();
+ assert.ok(source.length>650,'complete Hebrew source should be present');
+ assert.ok(source.includes('וְיֵבוֹשׁ מִמֶּנּוּ'));
+ assert.ok(source.includes('אוֹרַח חַיִּים סָעִיף א'));
+ assert.doesNotMatch(source,/\.\.\./);
+ const phrases=await p.locator('#a .hal-a-phrase>summary').allTextContents();
+ assert.match(phrases[0],/שִׁוִיתִי.*לְנֶגְדִּי.*תָמִיד/);
+ assert.match(phrases[1],/מְלֹא.*הָאָרֶץ.*כְּבוֹדוֹ/);
+ await p.locator('#a .hal-a-reading>summary').click();
+ assert.equal(await p.locator('#a .hal-a-reading').evaluate(e=>e.open),false);
+ await p.locator('#a .hal-a-reading>summary').click();
+ const book=p.locator('#a .book');const before=await book.evaluate(e=>e.getBoundingClientRect().width);
+ await p.getByRole('button',{name:/Hide Activity/}).click();
+ assert.equal(await p.locator('#a .hal-a-body').isVisible(),false);
+ const after=await book.evaluate(e=>e.getBoundingClientRect().width);assert.ok(after>before);
+ if(process.env.HALACHA_COLLAPSED_SCREENSHOT)await p.screenshot({path:process.env.HALACHA_COLLAPSED_SCREENSHOT,fullPage:true});
+ await p.getByRole('button',{name:/Show \/ Review Activity/}).click();
+ assert.equal(await p.locator('#a .hal-a-body').isVisible(),true);
+ const notes=p.locator('#a .hal-a-teacher-notes');assert.equal(await notes.isVisible(),false);
+ assert.deepEqual(errors,[]);await p.close();
+ const {page:t,errors:teacherErrors}=await open('?teacherView=halacha-synthetic');
+ await t.evaluate(()=>{setHalachaMode(true);openSiman('א')});
+ assert.equal(await t.locator('#a .hal-a-teacher-notes').isVisible(),true);
+ assert.equal(await t.getByRole('button',{name:'Add text box'}).isEnabled(),false);
+ if(process.env.HALACHA_TEACHER_SCREENSHOT)await t.screenshot({path:process.env.HALACHA_TEACHER_SCREENSHOT,fullPage:true});
+ assert.deepEqual(teacherErrors,[]);await t.close();
+});
+
+test('picture practice retries, title ideas are editable, themed stickers and pasted pictures persist',async()=>{
+ const {page:p,errors}=await open('',false,'halacha-seif-a-synthetic');
+ const wrong=p.getByRole('button',{name:/leaves his toys scattered/});
+ await wrong.click();assert.match(await p.locator('#a .hal-a-feedback').textContent(),/Try again/);
+ const correct=p.getByRole('button',{name:/puts his toys away carefully/});
+ await correct.click();assert.match(await p.locator('#a .hal-a-feedback').textContent(),/Yes!/);
+ assert.equal(await p.locator('#a .scrap').count(),0,'answering does not auto-fill the scrapbook');
+ await p.getByRole('button',{name:'Does It Matter How I Behave When Nobody Is Watching?'}).click();
+ const title=p.locator('#a .tb-text').last();assert.equal(await title.getAttribute('contenteditable'),'true');
+ await title.fill('My own edited title');
+ assert.equal(await p.getByRole('button',{name:'Home',exact:true}).count(),1);
+ assert.equal(await p.getByRole('button',{name:'Shofar',exact:true}).count(),0);
+ await p.getByRole('button',{name:'Home',exact:true}).click();
+ assert.equal(await p.locator('#a .studio-sticker img[alt="Home"]').count(),1);
+ const position=await title.evaluate(e=>({left:e.closest('.scrap').style.left,top:e.closest('.scrap').style.top}));
+ await p.getByRole('button',{name:'Photo album',exact:false}).click();
+ assert.deepEqual(await title.evaluate(e=>({left:e.closest('.scrap').style.left,top:e.closest('.scrap').style.top})),position);
+ assert.equal(await p.locator('#a .page').first().getAttribute('data-studio-bg'),'photo');
+ await p.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=16;canvas.height=16;const ctx=canvas.getContext('2d');ctx.fillStyle='#3b82f6';ctx.fillRect(0,0,16,16);canvas.toBlob(blob=>{const transfer=new DataTransfer();transfer.items.add(new File([blob],'pasted-screenshot.png',{type:'image/png'}));document.querySelector('#a .work').dispatchEvent(new ClipboardEvent('paste',{bubbles:true,clipboardData:transfer}));},'image/png')});
+ await p.waitForFunction(()=>document.querySelectorAll('#a .scrap img[src^="data:image/png"]').length>0);
+ await p.reload();await p.getByRole('button',{name:/סימן א/}).click();
+ assert.equal(await p.locator('#a .tb-text').last().textContent(),'My own edited title');
+ assert.equal(await p.locator('#a .studio-sticker img[alt="Home"]').count(),1);
+ assert.equal(await p.locator('#a .page').first().getAttribute('data-studio-bg'),'photo');
+ assert.ok(await p.locator('#a .scrap img[src^="data:image/png"]').count()>0);
+ assert.deepEqual(errors,[]);await p.close();
 });
