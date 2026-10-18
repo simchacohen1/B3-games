@@ -11,7 +11,6 @@
   const loadedAt=Date.now();
   const src=document.currentScript?.src||'';
   const root=new URL('../',src);
-  const persistentShareWindow=new URL(location.href).searchParams.get('pointerShare')==='1';
   const endpoint='https://us-central1-b3-games.cloudfunctions.net/classPointerShareAuth';
   const studentAuth='https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth';
   const ws='b3-2026';
@@ -78,8 +77,8 @@
     promptPanel.setAttribute('role','dialog');promptPanel.setAttribute('aria-modal','true');
     promptPanel.setAttribute('aria-label','Teacher screen sharing request');
     promptPanel.style.cssText='width:min(420px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:24px;padding:clamp(20px,4vw,42px);box-shadow:0 24px 85px #0007;text-align:center;color:#12345a;box-sizing:border-box';
-    promptPanel.innerHTML='<div style="font-size:48px" aria-hidden="true">🖥️</div><h2 style="font-size:clamp(27px,4vw,38px);margin:8px 0 12px">Your teacher would like to see your screen</h2><p style="font-size:19px;line-height:1.45">Open the sharing window to keep sharing while you visit other activities. You can stop sharing at any time.</p><p style="font-size:15px;line-height:1.5">In that window, press the blue button, select <strong>Entire Screen</strong>, then press <strong>Share</strong>.</p>';
-    const choose=document.createElement('button');choose.type='button';choose.textContent=persistentShareWindow?'Choose Entire Screen':'Open Sharing Window';
+    promptPanel.innerHTML='<div style="font-size:48px" aria-hidden="true">🖥️</div><h2 style="font-size:clamp(27px,4vw,38px);margin:8px 0 12px">Your teacher requested your screen</h2><p style="font-size:19px;line-height:1.45">Click Share My Screen, then choose <strong>Entire Screen</strong> in your browser. Your screen stays private until you approve. You can stop sharing at any time.</p>';
+    const choose=document.createElement('button');choose.type='button';choose.textContent='Share My Screen';
     choose.style.cssText='display:block;width:100%;background:#205af0;color:white;border:0;border-radius:14px;padding:18px;font:bold 22px system-ui;cursor:pointer;margin-top:18px';
     const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Not now';cancel.style.cssText='display:block;width:100%;padding:12px;margin-top:10px;background:#fff;border:1px solid #9baecb;border-radius:12px;color:#213654;font:700 16px system-ui;cursor:pointer';
     const promptStatus=document.createElement('p');promptStatus.setAttribute('role','status');promptStatus.style.cssText='color:#ad2438;font-size:15px;margin:12px 0 0';
@@ -87,20 +86,9 @@
     const showPrompt=()=>{promptStatus.textContent='';holder.style.display='none';promptOverlay.style.display='flex';choose.focus?.()};
     const hidePrompt=()=>{promptOverlay.style.display='none';holder.style.display=active?'flex':'none'};
     cancel.addEventListener('click',()=>{hidePrompt();promptStatus.textContent='';});
-    function openPersistentShareWindow(){
-      const url=new URL('class-pointer-prototype/student-share-window.html?pointerShare=1',root);
-      const popup=window.open(url.href,'classPointerStudentShare','popup,width=560,height=740');
-      if(!popup)return false;
-      status('Sharing window opened. Leave it open while you visit other activities.');
-      hidePrompt();popup.focus?.();return true;
-    }
-    // Capture remains tied to a deliberate click in the separate window. That
-    // window keeps the PeerJS call alive if this activity page is redirected.
-    choose.addEventListener('click',event=>{
-      if(!active||busy)return;
-      if(persistentShareWindow)return beginShare(event);
-      if(!openPersistentShareWindow())return beginShare(event);
-    });
+    // Keep the browser permission gesture on the student's current page.
+    // The native picker opens directly from this explicit consent button.
+    choose.addEventListener('click',event=>{if(active&&!busy)return beginShare(event)});
 
     const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
     async function watchPermission(session){
@@ -240,7 +228,7 @@
         captured.getVideoTracks()[0]?.addEventListener('ended',stop,{once:true});
         media.on('close',stop);media.on('error',stop);
         btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';
-        status('Sharing started — ask your teacher to confirm');
+        status('Sharing your screen with the teacher');
         hidePrompt();
       }catch(error){
         promptStatus.textContent=error?.name==='NotAllowedError'?'Sharing canceled. Please try again.':(error.message||'Could not share. Please try again.');
