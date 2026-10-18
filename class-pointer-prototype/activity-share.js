@@ -85,7 +85,10 @@
     fallback.textContent='Try again';fallback.hidden=true;
     fallback.style.cssText='border:1px solid #1d4ed8;background:white;color:#1d4ed8;border-radius:9px;padding:8px 10px;cursor:pointer;font:700 13px system-ui';
     fallback.addEventListener('click',()=>void beginShare());
-    holder.append(btn,label,fallback);document.body.appendChild(holder);
+    holder.append(btn,label,fallback);
+    const shareArea=persistentShareWindow&&typeof document.querySelector==='function'?document.querySelector('#fttShareControlArea'):null;
+    if(shareArea){holder.style.position='static';holder.style.boxShadow='none';holder.style.padding='16px';shareArea.appendChild(holder)}
+    else document.body.appendChild(holder);
     let active=null,peer=null,call=null,stream=null,busy=false,latestSession=null,permission={},permissionKey='',permissionRequest=0,permissionReady=false;
     // Centered, teacher-triggered consent prompt. Browser capture remains user initiated.
     const promptOverlay=document.createElement('div');
@@ -231,7 +234,7 @@
             if(admitted)window.ClassPointerBoards?.fromTeacher(message);
             return;
           }
-          if(message.type==='lesson-presentation'){announceLesson(message);return}
+          if(message.type==='lesson-presentation'){if(!persistentShareWindow)announceLesson(message);return}
           if(message.type==='removed'){try{sessionStorage.setItem('classPointerRemovedRoom',room)}catch{}stopPresence();showRemovedNotice();return}
           // Already connected in the lesson or another window, or the lesson ended: check again later.
           if(['elsewhere','replaced','full'].includes(message.type)){stopPresence();schedulePresence(60000);return}
