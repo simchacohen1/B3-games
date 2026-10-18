@@ -240,7 +240,7 @@
         captured.getVideoTracks()[0]?.addEventListener('ended',stop,{once:true});
         media.on('close',stop);media.on('error',stop);
         btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';
-        status('Sharing started — ask your teacher to confirm');
+        status('Sharing your screen with the teacher');
         hidePrompt();
       }catch(error){
         promptStatus.textContent=error?.name==='NotAllowedError'?'Sharing canceled. Please try again.':(error.message||'Could not share. Please try again.');
