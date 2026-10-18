@@ -98,8 +98,8 @@ test('screen request stays on activity, with explicit browser permission and sam
   assert.equal(a.stopCount,1); // permission granted but capture is stopped after network failure
   assert.match(a.label.textContent,/service unavailable/);
   assert.equal(a.fallback.hidden,false);
-  a.fallback.listeners.click();
-  assert.match(a.navigation,/class-pointer-prototype\/dashboard.html/);
+  assert.equal(a.fallback.textContent,'Try again');
+  assert.equal(a.navigation,null,'the retired student Pointer page must never open');
 });
 test('screen sharing continues in the persistent window when the activity page navigates away',async()=>{
   const popup={closed:false,focus(){}};
@@ -123,13 +123,13 @@ test('screen sharing continues in the persistent window when the activity page n
   assert.equal(child.stopCount,0,'unloading the activity page does not stop the capture window');
   assert.equal(child.peerClosed,false,'the teacher call remains connected');
 });
-test('whiteboard request still opens the private classroom board',async()=>{
+test('whiteboard request stays on the learning activity for embedded delivery',async()=>{
   const a=await activityFixture();
   await a.emit('boards');
-  assert.match(a.navigation,/class-pointer-prototype\/dashboard.html/);
+  assert.equal(a.navigation,null);
   assert.equal(a.captureCount,0);
 });
-test('denied students cannot receive screen prompts or whiteboard navigation',async()=>{
+test('denied students cannot receive screen prompts or whiteboard redirects',async()=>{
   const a=await activityFixture();
   await a.emit('screens',{screens:{'test-boy':true}});
   assert.equal(a.navigation,null);
