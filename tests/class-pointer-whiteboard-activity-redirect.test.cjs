@@ -25,9 +25,9 @@ function fixture({mode='boards',sharing=true,denied=false,ageMs=1000}={}){
   return{send:()=>fn(session),get assigned(){return assigned},get prompted(){return prompted},saved};
 }
 
-test('whiteboard request from Shorashim redirects even while screen sharing',()=>{
+test('whiteboard request from Shorashim never redirects, even while screen sharing',()=>{
   const f=fixture({mode:'boards',sharing:true});f.send();
-  assert.equal(f.assigned,'https://funtorahtools.com/class-pointer-prototype/dashboard.html');
+  assert.equal(f.assigned,'');
   assert.equal(f.prompted,0);
 });
 test('screen requests still do not interrupt an active share',()=>{
