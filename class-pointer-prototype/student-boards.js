@@ -11,7 +11,7 @@
 (function(){
   const B=window.ClassPointerBridge;
   if(!B)return;
-  const $=id=>document.getElementById(id),stage=$('stage'),isTeacher=B.isTeacher;
+  const $=id=>id==='stage'&&B.embedded?B.embeddedStage:document.getElementById(id),stage=$('stage'),isTeacher=B.isTeacher;
   const PALETTE=[['#1f2937','Black'],['#1d4ed8','Blue'],['#c62828','Red'],['#2e7d32','Green'],['#7b1fa2','Purple'],['#ef6c00','Orange']];
   const COLORS=PALETTE.map(item=>item[0]);
   const SIZES=[[0.003,'Thin',5],[0.006,'Medium',9],[0.012,'Thick',14],[0.03,'Color',22]];
@@ -286,7 +286,22 @@
       button('🗑 Clear','Clear everything I drew',()=>{if(board.strokes.some(s=>s.by==='student')&&confirm('Clear everything you drew on your board?'))act({type:'board-clear'})},'danger'));
     const editWord=wordEditor(bar,()=>board,text=>act({type:'board-text',text}),tools);
     const full=button('⛶ Full screen','Full screen',()=>(expanded()?$('exitFullScreenLesson'):$('fullScreenLesson'))?.click());
-    bar.append(el('span','boards-spacer'),full);
+    bar.append(el('span','boards-spacer'));
+    if(!B.embedded)bar.append(full);
+    else{
+      const back=button('↩ Back to Activity','Hide the whiteboard without losing your drawing',()=>{
+        stage.style.display='none';returnBoard.hidden=false;
+      });
+      const returnBoard=button('📝 Show My Whiteboard','Return to your whiteboard',()=>{
+        if(on&&mode==='boards'&&!blocked){stage.style.display='block';returnBoard.hidden=true;redraw()}
+      });
+      returnBoard.hidden=true;
+      returnBoard.style.cssText='position:fixed;bottom:16px;left:16px;z-index:2147483635;background:#245ce4;color:white;border:2px solid white;border-radius:12px;padding:12px 18px;font:700 15px system-ui;box-shadow:0 6px 22px #0004';
+      document.body.append(returnBoard);bar.append(back);
+      stage.addEventListener('classpointer:board-state',()=>{
+        if(!on||mode!=='boards'||blocked)returnBoard.hidden=true;
+      });
+    }
     // Screens mode panel.
     const sharePanel=el('div','board-panel'),shareText=el('p','board-panel-text'),shareNote=el('p','board-panel-note'),preview=el('video','board-preview');
     preview.muted=true;preview.autoplay=true;preview.playsInline=true;preview.hidden=true;
@@ -354,7 +369,7 @@
     }
     function show(next){
       view.hidden=!next;document.body.classList.toggle('boards-on',next);
-      if(B.embedded)stage.style.display=next?'block':'none';
+      if(B.embedded){stage.style.display=next?'block':'none';stage.dispatchEvent(new Event('classpointer:board-state'))}
       if(next)stage.dispatchEvent(new PointerEvent('pointerleave'));
       redraw();
     }
