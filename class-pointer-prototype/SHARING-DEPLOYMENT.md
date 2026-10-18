@@ -1,7 +1,7 @@
 # Classroom Pointer activity screen sharing — deployment and acceptance
 
 Source: `simchacohen1/B3-games`. Firebase project: `b3-games`.
-This feature uses GitHub Pages for HTML/JS and a separately deployed Firebase Cloud Function for short-lived, class-scoped sharing authorizations.
+This feature uses GitHub Pages for HTML/JS and separately deployed Firebase Cloud Functions for short-lived, class-scoped sharing authorizations and scheduled expiry cleanup.
 
 ## Deploy the backend (teacher/owner action on a computer with Firebase CLI)
 
@@ -10,7 +10,9 @@ In a **current checkout** of the repository, using PowerShell:
 git pull --ff-only
 .\deploy-class-pointer.ps1
 ```
-If the CLI asks you to authenticate, run `firebase login` and rerun the script. The script runs Node syntax checks and the Classroom Pointer tests, installs locked dependencies and deploys **only** `functions:classPointerShareAuth` to Firebase project `b3-games`. It does not deploy database rules, change other functions, or modify student progress. Keep credentials out of GitHub.
+If the CLI asks you to authenticate, run `firebase login` and rerun the script. The script runs Node syntax and Class Pointer security checks, installs locked dependencies and deploys **only** `functions:classPointerShareAuth` and `functions:cleanupClassPointerShareTickets` to Firebase project `b3-games`. It does not deploy database rules, change other functions, or modify student progress. Keep credentials out of GitHub.
+
+The `firebase-rules.json` change must be reviewed against the currently deployed rules and deployed separately with `firebase deploy --only database --project b3-games`. This updates the complete Realtime Database ruleset, so review the full diff and run the security-rules emulator suite before doing so. The new rule grants session writes only to the bootstrap owner, an active administrator, or a teacher whose active workspace record explicitly assigns the exact class. ET and WT remain separate class paths. The `b3Private/classPointerShareTickets` data remains unreadable and unwritable from clients; the expiry index is only for the Admin SDK cleanup query.
 
 ## Live teacher + student acceptance
 

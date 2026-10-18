@@ -8,6 +8,7 @@ const clock=()=>Date.now();
 function sessionFixture(){
   const writes=[];let authChanged;
   const ref=path=>({
+    key:path.split('/').pop(),
     child:key=>ref(path+'/'+key),
     once:async()=>({val:()=>({active:true,toolGrants:{'class-pointer':true}})}),
     onDisconnect:()=>({remove:async()=>{},cancel:async()=>{}}),
@@ -44,7 +45,7 @@ test('teacher broadcasts selected mode only inside their authenticated active se
   await assert.rejects(()=>dashboard.requestStudentDestination('unapproved'));
 });
 async function studentFixture(){
-  let subscribe,goTo=null,sessionPath='',shareHolder,shareOverlay;
+  let subscribe,goTo=null,sessionPath='',shareHolder,shareOverlay,policy={},permissionRevision=0;const permissionRequests=[];
   const stored=new Map([['b3Games_studentId','test-boy'],['b3Games_classPin','12345']]);
   const makeElement=tag=>({
     tag,style:{cssText:''},textContent:'',children:[],
@@ -56,30 +57,33 @@ async function studentFixture(){
     createElement:makeElement,head:{appendChild(){}},
     body:{appendChild:v=>{if(v.id==='fttActivityScreenShare')shareHolder=v;if(v.id==='fttShareRequestOverlay')shareOverlay=v}}
   };
-  const db={ref:path=>{sessionPath=path;return{on:(kind,cb)=>{subscribe=cb}}}};
+  const db={ref:path=>({on:(kind,cb)=>{if(path.includes('/classPointerSessions')){sessionPath=path;subscribe=cb}},off(){}})};
   const firebase={apps:[{}],database:()=>db};
   const location={href:'https://funtorahtools.com/shorashim/index.html',pathname:'/shorashim/index.html',assign:url=>{goTo=url}};
   const context=vm.createContext({
     window:{firebase,B3_FIREBASE_CONFIG:{},addEventListener(){},FunTorahStudentClass:{resolve:async()=>({workspaceId:'b3-2026',classId:'et'})}},
-    document,location,firebase,URL,Date,console,
+    document,location,firebase,URL,Date,AbortSignal,console,
     sessionStorage:{getItem:key=>stored.get(key)||null,setItem:(key,v)=>stored.set(key,v)},
-    fetch:async()=>({ok:true,json:async()=>({ok:true})}),
+    fetch:async(_url,options)=>{const body=JSON.parse(options.body||'{}');if(body.action==='permissions'){permissionRequests.push(body);return{ok:true,json:async()=>({ok:true,...policy})}}return{ok:true,json:async()=>({ok:true})}},
   });
   vm.runInContext(source('activity-share.js'),context);
   for(let i=0;i<20&&!subscribe;i++)await new Promise(resolve=>setImmediate(resolve));
   assert.ok(subscribe,'student class subscription should be established');
-  return {emit:record=>subscribe({val:()=>record}),get destination(){return goTo},get sessionPath(){return sessionPath},holder:shareHolder,overlay:shareOverlay};
+  return {emit:async(record,permissions={})=>{policy=permissions;const rows={...record},row=rows[room];if(row)rows[room]={...row,permissionRevision:++permissionRevision};await subscribe({val:()=>rows})},get destination(){return goTo},get sessionPath(){return sessionPath},get permissionRequests(){return permissionRequests},holder:shareHolder,overlay:shareOverlay};
 }
 test('signed-in student follows whiteboard request without requiring screen-sharing permission',async()=>{
   const s=await studentFixture(),now=clock();
   assert.equal(s.sessionPath,'b3Games/workspaces/b3-2026/classes/et/classPointerSessions');
-  s.emit({[room]:{roomId:room,createdAt:now,studentScreenSharing:false,destinationRequest:{mode:'boards',at:now}}});
+  await s.emit({[room]:{roomId:room,createdAt:now,studentScreenSharing:false,destinationRequest:{mode:'boards',at:now}}});
+  assert.equal(s.permissionRequests.length,1,'student should fetch only its permission row via the authenticated endpoint');
+  assert.deepEqual(JSON.parse(JSON.stringify(s.permissionRequests[0])),{action:'permissions',studentId:'test-boy',pin:'12345',classId:'et',room});
+  assert.doesNotMatch(s.sessionPath,/b3Private/);
   assert.equal(s.destination,'https://funtorahtools.com/class-pointer-prototype/dashboard.html');
   assert.equal(s.holder.style.display,'none');
 });
 test('expired class destination commands do not redirect students',async()=>{
   const s=await studentFixture(),now=clock();
-  s.emit({[room]:{roomId:room,createdAt:now,studentScreenSharing:false,destinationRequest:{mode:'boards',at:now-60000}}});
+  await s.emit({[room]:{roomId:room,createdAt:now,studentScreenSharing:false,destinationRequest:{mode:'boards',at:now-60000}}});
   assert.equal(s.destination,null);
 });
 test('teacher controls offer both class destinations',()=>{
@@ -103,48 +107,48 @@ test('teacher policy excludes only the requested pupils for each activity',async
   const updates=f.writes.filter(([op])=>op==='update');
   assert.equal(updates.length,3);
   for(const [,path] of updates)assert.match(path,/\/classes\/et\/classPointerSessions\//);
-  const [, ,screens]=updates[0], [,,permissionChange]=updates[1], [,,boards]=updates[2];
+  const [, ,screens]=updates[0], [,,boards]=updates[2];
   assert.equal(screens.destinationRequest.mode,'screens');
-  assert.equal(screens.screenSharingDenied['boy-one'],true);
-  assert.equal(screens.screenSharingDenied['boy-two'],undefined);
-  assert.equal(screens.whiteboardDenied['boy-three'],true);
-  assert.equal(permissionChange.screenSharingDenied['boy-one'],true);
-  assert.equal(permissionChange.whiteboardDenied['boy-three'],true);
+  assert.equal(screens.screenSharingDenied,undefined);
+  assert.equal(screens.whiteboardDenied,undefined);
+  const policies=f.writes.filter(([op,path])=>op==='set'&&path.startsWith('b3Private/classPointerSharePermissions/'));
+  assert.equal(policies.length,3);
+  assert.deepEqual(JSON.parse(JSON.stringify(policies[0][2])),{'boy-one':{screenSharingDenied:true},'boy-three':{whiteboardDenied:true}});
+  for(const [,path] of policies)assert.equal(path,'b3Private/classPointerSharePermissions/b3-2026/et/'+room);
+  for(const [, ,value] of policies.slice(1))assert.deepEqual(JSON.parse(JSON.stringify(value)),JSON.parse(JSON.stringify(policies[0][2])));
   assert.equal(boards.destinationRequest.mode,'boards');
   assert.equal(boards.studentScreenSharing,false);
-  assert.equal(boards.screenSharingDenied['boy-one'],true);
-  assert.equal(boards.whiteboardDenied['boy-three'],true);
+  assert.equal(boards.screenSharingDenied,undefined);
+  assert.equal(boards.whiteboardDenied,undefined);
 });
 
 test('unchecked student receives neither screen nor whiteboard redirect',async()=>{
   const now=clock();
   const s=await studentFixture();
-  s.emit({[room]:{roomId:room,createdAt:now,studentScreenSharing:true,
-    destinationRequest:{mode:'screens',at:now},screenSharingDenied:{'test-boy':true}}});
+  await s.emit({[room]:{roomId:room,createdAt:now,studentScreenSharing:true,
+    destinationRequest:{mode:'screens',at:now}}},{screenSharingDenied:true});
   assert.equal(s.destination,null,'unchecked student must not open screen sharing');
   assert.equal(s.holder.style.display,'none');
   const w=await studentFixture();
-  w.emit({[room]:{roomId:room,createdAt:now,studentScreenSharing:false,
-    destinationRequest:{mode:'boards',at:now},whiteboardDenied:{'test-boy':true}}});
+  await w.emit({[room]:{roomId:room,createdAt:now,studentScreenSharing:false,
+    destinationRequest:{mode:'boards',at:now}}},{whiteboardDenied:true});
   assert.equal(w.destination,null,'unchecked student must not open whiteboards');
 });
 
 test('screen and whiteboard checkboxes are independent; rechecking restores routing',async()=>{
   const now=clock(),s=await studentFixture();
-  const session={roomId:room,createdAt:now,studentScreenSharing:true,
-    destinationRequest:{mode:'screens',at:now},screenSharingDenied:{'test-boy':true},
-    whiteboardDenied:{'test-boy':true}};
-  s.emit({[room]:session});
+  const session={roomId:room,createdAt:now,studentScreenSharing:true,destinationRequest:{mode:'screens',at:now}};
+  await s.emit({[room]:session},{screenSharingDenied:true,whiteboardDenied:true});
   assert.equal(s.destination,null);
-  s.emit({[room]:{...session,screenSharingDenied:{}}});
+  await s.emit({[room]:session},{});
   assert.equal(s.destination,null,'screen requests stay in the learning activity');
   assert.equal(s.holder.style.display,'none','centered consent temporarily replaces the floating control');
   assert.equal(s.overlay.style.display,'flex','rechecking restores the centered consent prompt');
   assert.match(s.overlay.children[0].innerHTML,/Your teacher would like to see your screen/);
   assert.equal(s.holder.children[0].disabled,undefined,'capture remains student-controlled');
   const w=await studentFixture();
-  w.emit({[room]:{...session,destinationRequest:{mode:'boards',at:now},studentScreenSharing:false,
-    screenSharingDenied:{'test-boy':true},whiteboardDenied:{}}});
+  await w.emit({[room]:{...session,destinationRequest:{mode:'boards',at:now},studentScreenSharing:false}},
+    {screenSharingDenied:true,whiteboardDenied:false});
   assert.match(w.destination||'',/class-pointer-prototype\/dashboard\.html$/,
     'a student blocked from screens can still use his board');
 });
@@ -156,7 +160,11 @@ test('connected share revocation closes the media connection rather than hiding 
   assert.match(student,/if\(!on\|\|excluded\(m,mode\)\)\{closeScreen\(m\);/);
   assert.match(student,/if\(!on\|\|mode!=='screens'\|\|blocked\)stopShare\(false\)/);
   assert.match(activity,/if\(!shareable\|\|!active\|\|shareable.roomId!==active.roomId\)\{if\(stream\)stop\(\)\}/);
-  assert.match(backend,/session\.screenSharingDenied\?\.\[studentId\]===true/);
-  assert.match(backend,/session\.screenSharingDenied\?\.\[ticket\.studentId\]===true/);
+  assert.match(backend,/classPointerSharePermissions/);
+  assert.match(backend,/permission\?\.screenSharingDenied===true/);
+  // TEMPORARY compatibility: the live site still writes denials to the public session record; every read must be OR'd with the private policy.
+  for (const line of backend.split(/\r?\n/).filter(l => /session\.(screenSharingDenied|whiteboardDenied)/.test(l))) assert.match(line, /permission\??\.(screenSharing|whiteboard)Denied===true\|\|/);  assert.match(activity,/action:'permissions'/);
+  assert.match(activity,/permissionRevision/);
+  assert.doesNotMatch(activity,/ref\('b3Private\/classPointerSharePermissions/);
 });
 

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Class Pointer Screen Sharing</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#172033;background:#f4f7fb}
+*{box-sizing:border-box}
+body{margin:0;padding:18px}
+main{max-width:540px;margin:5vh auto;padding:26px;background:#fff;border:1px solid #dce4ef;border-radius:18px;box-shadow:0 12px 35px #1720331a}
+h1{margin:0 0 10px;color:#17395b}
+p{line-height:1.55;color:#526075}
+</style>
+<script>
+/* A new same-origin window inherits this tab's sessionStorage. The invitation
+   is re-evaluated here so the sharing prompt can live beyond page navigation. */
+try{for(let i=sessionStorage.length-1;i>=0;i--){const key=sessionStorage.key(i);if(key&&key.startsWith('fttPointerShareInvite:'))sessionStorage.removeItem(key)}}catch{}
+try{if(window.opener)window.opener=null}catch{}
+</script>
+<script defer src="activity-share.js?v=20261016-persistent1"></script>
+</head>
+<body>
+<main>
+<h1>Class Pointer screen sharing</h1>
+<p>Keep this window open while you visit Shorashim or another activity. Choose <strong>Entire Screen</strong> in the browser prompt. You can stop sharing at any time from the blue sharing control in this window.</p>
+<p role="status">Waiting for your teacher's screen-sharing request…</p>
+</main>
+</body>
+</html>

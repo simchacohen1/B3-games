@@ -162,7 +162,8 @@ test('student connection IDs are generated locally without a server ID request',
 test('activity share request waits for permission and shows dismissible centered consent once',()=>{
  const script=fs.readFileSync(require.resolve('../class-pointer-prototype/activity-share.js'),'utf8');
  assert.match(script,/cancel\.addEventListener\('click'/);
- assert.match(script,/choose\.addEventListener\('click',event=>\{if\(active&&!busy\)return beginShare\(event\)\}/);
+ assert.match(script,/persistentShareWindow\)return beginShare\(event\)/);
+ assert.match(script,/if\(!openPersistentShareWindow\(\)\)return beginShare\(event\)/);
  const start=script.indexOf('function routeTeacherRequest(session)');
  const end=script.indexOf('function stop()',start);
  assert.ok(start>0&&end>start,'student request handler is present');
@@ -170,7 +171,7 @@ test('activity share request waits for permission and shows dismissible centered
  const now=Date.now(),roomId='class-pointer-00000000-0000-0000-0000-000000000000';
  const context=vm.createContext({
    id:'student-a',loadedAt:now-2000,active:null,stream:null,inviteKey:'share:class',
-   Date,Number,sessionStorage:{getItem:k=>handled.get(k),setItem:(k,v)=>handled.set(k,v)},
+   Date,Number,permissionReady:true,permission:{},sessionStorage:{getItem:k=>handled.get(k),setItem:(k,v)=>handled.set(k,v)},
    location:{assign:url=>visible.push('navigate:'+url)},root:new URL('https://example.test/'),
    showPrompt:()=>visible.push('prompt')
  });
@@ -185,7 +186,8 @@ test('activity share request waits for permission and shows dismissible centered
  assert.deepEqual(visible,['prompt'],'enabled invitation opens centered consent');
  vm.runInContext('routeTeacherRequest(request)',context);
  assert.deepEqual(visible,['prompt'],'same invitation does not trap a student in repeated popups');
- context.request={...request,destinationRequest:{mode:'screens',at:now+1},screenSharingDenied:{'student-a':true}};
+ context.permission={screenSharingDenied:true};
+ context.request={...request,destinationRequest:{mode:'screens',at:now+1}};
  vm.runInContext('routeTeacherRequest(request)',context);
  assert.deepEqual(visible,['prompt'],'denied students receive no invitation');
 });
