@@ -36,6 +36,6 @@ test('Sefer HaMitzvos preserves ET lock, tool switch and teacher exceptions',asy
 });
 test('all 613 original and coloring card pairs exist and page uses the shared gate',()=>{
  for(let n=1;n<=613;n++){const id=String(n).padStart(3,'0');for(const file of ['original/'+id+'.jpg','coloring/'+id+'.png'])assert.ok(fs.statSync('sefer-hamitzvos/'+file).size>0,file);}
- const html=fs.readFileSync('sefer-hamitzvos/index.html','utf8');assert.match(html,/src="..\/game-gate.js" data-game-id="sefer-hamitzvos"/);
+ const html=fs.readFileSync('sefer-hamitzvos/index.html','utf8');assert.match(html,/src="..\/game-gate.js(?:\?[^\"]*)?" data-game-id="sefer-hamitzvos"/);
  const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];new vm.Script(script);
 });
