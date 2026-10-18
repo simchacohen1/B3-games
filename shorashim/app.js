@@ -24,7 +24,7 @@ const SHORASHIM_BASE_ROOT = 'posukPractice/shorashimLearning';
 // Every other class gets its own separate lists, students and leaderboards
 // under classes/<classId>, and starts empty until its teacher adds words.
 let CLOUD_ROOT = SHORASHIM_BASE_ROOT;
-let classSpaceId = '';
+let classSpaceId = '', resolvedStudentClassId='';
 const LEGACY_CLASS_IDS = ['et','wt'];
 function emptyCatalog(){return {shorashim:[],prefix:[],suffix:[]};}
 async function resolveStudentSpace(studentId){
@@ -37,6 +37,7 @@ async function resolveStudentSpace(studentId){
     const match=valid.find(m=>m.classId===stored)||valid.find(m=>LEGACY_CLASS_IDS.includes(m.classId))||valid[0];
     classId=match?String(match.classId):'';
   }catch(err){console.warn('Could not read class membership',err);}
+  resolvedStudentClassId=classId;
   const isClassSpace=!!classId&&!LEGACY_CLASS_IDS.includes(classId)&&/^[A-Za-z0-9_-]{1,100}$/.test(classId);
   const nextRoot=isClassSpace?`${SHORASHIM_BASE_ROOT}/classes/${classId}`:SHORASHIM_BASE_ROOT;
   classSpaceId=isClassSpace?classId:'';
@@ -79,7 +80,18 @@ function recomputeSiteOpen(){
 let studentSiteWatchRef=null;
 function startStudentSiteWatcher(){
   if(studentSiteWatchRef)studentSiteWatchRef.off();
-  studentSiteWatchRef=cloudDb.ref(`${CLOUD_ROOT}/settings/studentSiteOpen`);
+  let path=`${CLOUD_ROOT}/settings/studentSiteOpen`;
+  if(!classSpaceId&&LEGACY_CLASS_IDS.includes(resolvedStudentClassId)){
+    const classPath=`${SHORASHIM_BASE_ROOT}/classes/${resolvedStudentClassId}/settings/studentSiteOpen`;
+    const classRef=cloudDb.ref(classPath),baseRef=cloudDb.ref(`${SHORASHIM_BASE_ROOT}/settings/studentSiteOpen`);
+    let classValue,baseValue,ready=0;
+    const apply=()=>{if(ready<2)return;ownSettingOpen=classValue!==undefined?classValue!==false:baseValue!==false;ownWatcherReady=true;recomputeSiteOpen();};
+    classRef.on('value',snap=>{classValue=snap.exists()?snap.val():undefined;ready++;apply();},()=>{classValue=undefined;ready++;apply();});
+    baseRef.on('value',snap=>{baseValue=snap.val();ready++;apply();},()=>{baseValue=true;ready++;apply();});
+    studentSiteWatchRef={off(){classRef.off();baseRef.off();}};
+    return;
+  }
+  studentSiteWatchRef=cloudDb.ref(path);
   studentSiteWatchRef.on('value',snap=>{
     ownSettingOpen = snap.exists()?snap.val():true;
     ownWatcherReady = true;
@@ -622,7 +634,10 @@ async function toggleShorashimRecording(){
         await existingRef.set({eventId,mode,points,status:'recorded',createdAt:firebase.database.ServerValue.TIMESTAMP});
 
         const source=reviewNoHints?'shorashim-no-hints':'shorashim-recording';
-        const awardResp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:cloudStudentId,source,eventId})});
+        const user=window.firebase&&firebase.auth&&firebase.auth().currentUser;
+        if(!user)throw new Error('Please sign in again from the Fun Torah Tools home page.');
+        const idToken=await user.getIdToken();
+        const awardResp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+idToken},body:JSON.stringify({studentId:cloudStudentId,source,eventId})});
         const awardData=await awardResp.json().catch(()=>({}));
         if(!awardResp.ok)throw new Error('Your recording is saved. Ask your teacher to connect its points request. '+(awardData.error||''));
         await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${eventId}`).update({pointRequestId:awardData.requestId||null,pointRequestStatus:awardData.status||'pending'});

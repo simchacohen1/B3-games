@@ -2680,8 +2680,15 @@ exports.funTorahTeacherClaim = require("./teacher-claim").funTorahTeacherClaim;
 exports.funTorahManageStudents = require("./student-management").funTorahManageStudents;
 // Server-side student sign-in (passcodes never reach the browser).
 exports.funTorahStudentAuth = require("./student-auth").funTorahStudentAuth;
+// Weekly Quiz student reads and scoring are server-authorized to keep answer keys private.
+exports.weeklyQuizStudent = require("./weekly-quiz-student").weeklyQuizStudent;
+const gameShowStudent=require("./game-show-student-questions");
+exports.gameShowStudentQuestions=gameShowStudent.gameShowStudentQuestions;
+exports.gameShowStudentAction=gameShowStudent.gameShowStudentAction;
 // Server-verified student screenshot submissions, pending teacher approval.
 exports.classGallerySubmit = require("./class-gallery-submit").classGallerySubmit;
+exports.classGalleryRead=require('./class-gallery-read').classGalleryRead;
+exports.privateMediaUrl=require('./private-media-url').privateMediaUrl;
 // Student Rewards for every teacher (class-scoped, server-checked).
 exports.studentRewardsTeacher = require("./rewards-teacher").studentRewardsTeacher;
 
@@ -2693,3 +2700,4 @@ exports.studentReportChatGPTRead = require("./student-report-chatgpt-read").stud
 
 // Class-scoped, expiring permissions for embedded Classroom Pointer sharing.
 exports.classPointerShareAuth = require('./class-pointer-share-auth').classPointerShareAuth;
+exports.cleanupClassPointerShareTickets = require('./class-pointer-share-ticket-cleanup').cleanupClassPointerShareTickets;

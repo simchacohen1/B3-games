@@ -1,11 +1,13 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
-function gate(data={},stored={},tool="yiddish"){
+function gate(data={},stored={},tool="yiddish",signedIn=true){
  const elements=new Map(),storage=new Map(Object.entries({b3Games_studentId:'child',b3Games_studentClass:'new_class',...stored}));
- function element(){return {style:{},dataset:{},parentNode:{removeChild(){}},appendChild(){},contains(){return false},querySelector(){return {textContent:''}},remove(){},set innerHTML(v){this.html=v}}}
- const document={currentScript:{src:'https://example.test/game-gate.js',getAttribute:k=>k==='data-game-id'?tool:null},head:element(),documentElement:element(),body:element(),scripts:[],readyState:'complete',createElement:element,getElementById:id=>elements.get(id),querySelectorAll:()=>[],addEventListener(){}};
- const ctx={document,window:{B3StudentTools:require('../backend/functions/student-tool-policy.js'),addEventListener(){}},location:{search:''},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},URL,URLSearchParams,Intl,Date,console,setTimeout:()=>1,clearTimeout(){},setInterval(){},fetch:async url=>({ok:true,json:async()=>data[new URL(url).pathname]??null})};
- let source=fs.readFileSync('game-gate.js','utf8').replace(/\r\n/g,'\n');source=source.replace(/  (?:if \(!isGuestPreview\(\)\) )?watchTeacherAccess\(\);\s*checkNow\(\);/,`  window.testGate={resolveStudentClass,decide,state:()=>({studentClassId,studentActive}),overlay:()=>overlay,setTeacher:v=>verifiedTeacherAccess=v};`);
- vm.runInNewContext(source,ctx);return ctx.window.testGate;
+ function element(){return {style:{},dataset:{},parentNode:{removeChild(){}},appendChild(){},setAttribute(){},contains(){return false},querySelector(){return {textContent:''}},remove(){},set innerHTML(v){this.html=v}}}
+ const document={currentScript:{src:'https://example.test/game-gate.js',getAttribute:k=>k==='data-game-id'?tool:null},head:element(),documentElement:element(),body:element(),scripts:[],readyState:'complete',createElement:element,getElementById:id=>elements.get(id),querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){}};
+ const firebase={auth:()=>({currentUser:signedIn?{getIdToken:async()=>'synthetic-id-token'}:null})};
+ const readRest=url=>{const path=new URL(url).pathname.replace(/\.json$/,'');if(Object.prototype.hasOwnProperty.call(data,path+'.json'))return data[path+'.json'];const parent=Object.keys(data).map(k=>k.replace(/\.json$/,'')).filter(k=>path.startsWith(k+'/')).sort((a,b)=>b.length-a.length)[0];if(!parent)return data[path]??null;return path.slice(parent.length+1).split('/').reduce((value,key)=>value&&value[key],data[parent+'.json']);};
+ const ctx={document,window:{firebase,B3StudentTools:require('../backend/functions/student-tool-policy.js'),addEventListener(){}},firebase,location:{search:''},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},URL,URLSearchParams,Intl,Date,console,setTimeout:()=>1,clearTimeout(){},setInterval(){},fetch:async url=>{const parsed=new URL(url);if(!signedIn&&parsed.pathname.includes('/b3Games/students/'))return{ok:false,status:401,json:async()=>null};return{ok:true,json:async()=>readRest(url)}}};
+ let source=fs.readFileSync('game-gate.js','utf8').replace(/\r\n/g,'\n');source=source.replace(/  (?:if \(!isGuestPreview\(\)\) )?watchTeacherAccess\(\);\s*checkNow\(\);/,`  window.testGate={resolveStudentClass,decide:settings=>{teacherCheckPending=false;decide(settings);},state:()=>({studentClassId,studentActive}),overlay:()=>overlay,setTeacher:v=>verifiedTeacherAccess=v,ready:markAuthReady};`);
+ vm.runInNewContext(source,ctx);ctx.window.testGate.ready();return ctx.window.testGate;
 }
 const base={
  '/b3Games/students/child/profile.json':{name:'Child',active:true},
@@ -32,4 +34,23 @@ test('legacy class exceptions cannot bypass individual restrictions',async()=>{
  const data=structuredClone(base);data['/b3Games/students/child/memberships.json'].a.classId='et';
  data['/b3Games/workspaces/b3-2026/classes/et.json']={active:true,members:{child:{active:true,toolAccess:{yiddish:false}}}};
  const g=gate(data,{b3Games_studentClass:'et'});await g.resolveStudentClass();g.decide({classAccess:{et:{mode:'open'}},studentGameOverrides:{child:{yiddish:true}}});assert.ok(g.overlay());
+});
+
+test('class-level denial is enforced for each activity affected by strict Firebase rules',async()=>{
+ const tools=['rashi-letters','chazara','gematria','shorashim','weekly-quiz','halacha','yiddish','sefer-hamitzvos'];
+ for(const tool of tools){
+  const data=structuredClone(base);
+  data['/b3Games/workspaces/b3-2026/classes/new_class.json'].toolGrants={[tool]:false};
+  const g=gate(data,{},tool);
+  await g.resolveStudentClass();g.decide({});
+  assert.ok(g.overlay(),tool+' must remain blocked when its class grant is false');
+ }
+});
+
+test('signed-out users cannot read protected student records for any affected activity',async()=>{
+ const tools=['rashi-letters','chazara','gematria','shorashim','weekly-quiz','halacha','yiddish','sefer-hamitzvos'];
+ for(const tool of tools){
+  const g=gate(structuredClone(base),{},tool,false);
+  await assert.rejects(g.resolveStudentClass(),/HTTP 401/,tool+' must fail closed without Firebase auth');
+ }
 });

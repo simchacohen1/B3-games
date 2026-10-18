@@ -32,6 +32,7 @@
 <title>Game Show - Play</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800;900&display=swap" rel="stylesheet">
@@ -271,6 +272,9 @@ let serverOffset = 0;
 db.ref('.info/serverTimeOffset').on('value', snap => { serverOffset = Number(snap.val()) || 0; });
 function serverNow() { return Date.now() + serverOffset; }
 const gameRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/live' : "tentTrailTrivia");
+const gameShowAuth=firebase.auth();
+const GAME_SHOW_QUESTIONS_URL='https://us-central1-b3-games.cloudfunctions.net/gameShowStudentQuestions';
+const GAME_SHOW_ACTION_URL='https://us-central1-b3-games.cloudfunctions.net/gameShowStudentAction';
 
 // Questions live in the database (teacher.html is the master copy). This
 // screen just reads them live - you never need to edit this file for
@@ -281,13 +285,19 @@ const setRef = db.ref(CLASS_SPACE ? 'questionSets/classes/' + GS_CLASS + '/set' 
 let questions = [];
 let questionsReady = false;
 
-setRef.on('value', snap => {
-  const data = snap.val();
-  if (data && data.questions) {
-    questions = window.GameShowTextEncoding.repairQuestions(data.questions).questions;
-    questionsReady = true;
-  }
-});
+async function loadStudentQuestions(){
+  try{
+    const user=gameShowAuth.currentUser;
+    if(!user)throw new Error('Sign in on Fun Torah Tools first.');
+    const token=await user.getIdToken();
+    const response=await fetch(GAME_SHOW_QUESTIONS_URL,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||'Could not load questions.');
+    questions=window.GameShowTextEncoding.repairQuestions(data.questions||[]).questions;
+    questionsReady=questions.length>0;
+  }catch(error){console.warn('Game Show questions unavailable:',error);questionsReady=false;}
+}
+gameShowAuth.onAuthStateChanged(user=>{if(user)loadStudentQuestions();else{questions=[];questionsReady=false;}});
 
 let myName = "";
 let myStudentId = "";
@@ -362,7 +372,6 @@ function enterGame(displayName, studentId) {
   sessionStorage.setItem('posukPractice_studentId', studentId);
 
   document.getElementById('signedInName').textContent = displayName;
-  gameRef.child('scores').child(myName).transaction(current => current || 0);
   applyMasterBlocked();
 
   renderScoreboard(lastData && lastData.scores);
@@ -553,32 +562,12 @@ function buzzIn() {
   if (!lastData || lastData.roundActive !== true) return;
   if (lockedUntil && serverNow() < lockedUntil) return;
   if (lastData && (lastData.buzzedBy || lastData.narrationLocked || serverNow() < (lastData.buzzUnlockAt || 0))) return;
-  // A root transaction keeps winner and streak together even when students
-  // buzz simultaneously or another tab has newer state.
-  gameRef.transaction(current => {
-    if (!current || current.roundActive !== true || current.buzzedBy || current.narrationLocked || serverNow() < (current.buzzUnlockAt || 0)) return;
-    if (current.buzzerDelayOn && serverNow() < (current.buzzUnlockAt || 0)) return;
-    if (current.revealDelayOn) {
-      if (current.buzzPool && current.buzzPool[myName]) return;
-      current.buzzPool = current.buzzPool || {};
-      current.buzzPool[myName] = serverNow();
-    } else {
-      const round = String(current.buzzOpenAt || 0) + ':' + (current.qIndex || 0);
-      if (current.lastWinnerRound !== round) {
-        current.lastWinnerStreak = current.lastWinner === myName ? (current.lastWinnerStreak || 0) + 1 : 1;
-        current.lastWinner = myName;
-        current.lastWinnerRound = round;
-      }
-      current.buzzedBy = myName;
-      current.selectedPlayer = myName;
-      current.answeredPlayers = current.answeredPlayers || {};
-      current.answeredPlayers[myName] = true;
-    }
-    return current;
-  }, (error, committed) => {
-    if (error) document.getElementById('status').textContent = 'Could not buzz in. Please try again.';
-    else if (committed && !lastData?.revealDelayOn) playBuzzSound();
-  });
+  // The authenticated server action performs the transaction so students
+  // cannot write shared Game Show answer state directly.
+  gameShowAuth.currentUser?.getIdToken().then(token=>fetch(GAME_SHOW_ACTION_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'buzz'}),cache:'no-store'})).then(async response=>{
+    if(!response?.ok){const result=await response?.json().catch(()=>({}));document.getElementById('status').textContent=result?.error||'Could not buzz in. Please try again.';}
+    else if(!lastData?.revealDelayOn)playBuzzSound();
+  }).catch(()=>{document.getElementById('status').textContent='Could not buzz in. Please try again.';});
 }
 
 let lockedUntil = 0;
@@ -727,7 +716,7 @@ function renderGameSnapshot(snapshot){
 </script>
 
 <script src="team-modes.js?v=20261015-colored-choices1"></script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261015-sharefix1"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261017-directshare1"></script>
 </body>
 </html>
 

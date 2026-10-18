@@ -42,16 +42,19 @@
       const entries = Object.entries(cls.members || {}).filter(([studentId, member]) =>
         SAFE_ID.test(studentId) && member && member.active !== false);
       const checked = await Promise.all(entries.map(async ([studentId, member]) => {
-        const student = (await db.ref("b3Games/students/" + studentId).once("value")).val();
-        const profile = student?.profile;
-        const membership = student?.memberships?.["b3-2026_" + id];
+        const [profileSnap, membershipSnap] = await Promise.all([
+          db.ref("b3Games/students/" + studentId + "/profile").once("value"),
+          db.ref("b3Games/students/" + studentId + "/memberships/b3-2026_" + id).once("value")
+        ]);
+        const profile = profileSnap.val();
+        const membership = membershipSnap.val();
         // Require both sides of an active class membership: a removed student
         // may retain their central profile for other classes or past work.
         if (!profile || profile.active === false || !membership || membership.active === false || membership.classId !== id) return null;
-        return String(profile.name || member.name || "").trim() || null;
+        return { id: studentId, name: String(profile.name || member.name || "").trim() || studentId };
       }));
-      const students = checked.filter(Boolean).sort((a, b) => a.localeCompare(b));
-      return { id, name: String(cls.name || id), students };
+      const activeRows = checked.filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+      return { id, name: String(cls.name || id), students: activeRows.map(row => row.name), studentIds: activeRows.map(row => row.id) };
     }));
     const classes = rows.filter(Boolean);
     if (requested && classes.length === 0) throw new Error("This class is unavailable.");

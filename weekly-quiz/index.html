@@ -25,12 +25,13 @@
 </script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="../game-gate.js?v=20261008-owner-demo" data-game-id="weekly-quiz"></script>
+  <script src="../game-gate.js?v=20261017-auth-gate" data-game-id="weekly-quiz"></script>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>B3 Weekly Quiz</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
   /* ===== B3 Weekly Quiz — Student (2026-10 redesign) ===== */
@@ -278,8 +279,7 @@ let launchData=null;
 let myResponses={};
 let selectedChoice=null;
 let displayedQuestion=0;
-let classLaunchRef=null, personalLaunchRef=null, launchRef=null, responseRef=null;
-let historyLaunchRef=null, historyCompletionRef=null;
+let classLaunchRef=null, personalLaunchRef=null, launchPollTimer=null, refreshActiveLaunch=null;
 let allLaunches={}, allCompletions={};
 let markingComplete=false;
 
@@ -291,6 +291,20 @@ const forcedLaunchId=new URLSearchParams(window.location.search).get('launch')||
 // B3's own classes (et/wt) use b3Quiz directly; any other class has its own
 // quizzes and results under b3Quiz/classes/<id>. Set once the student's class is known.
 let QROOT='b3Quiz';
+const STUDENT_WEEKLY_QUIZ_URL='https://us-central1-b3-games.cloudfunctions.net/weeklyQuizStudent';
+function waitForStudentAuth(){
+  const auth=firebase.auth();if(auth.currentUser)return Promise.resolve(auth.currentUser);
+  return new Promise(resolve=>{let stop=()=>{};stop=auth.onAuthStateChanged(user=>{stop();resolve(user);},()=>{stop();resolve(null);});});
+}
+async function callStudentQuiz(action,payload={}){
+  const user=await waitForStudentAuth();
+  if(!user)throw new Error('Please sign in again to open your quiz.');
+  const token=await user.getIdToken();
+  const response=await fetch(STUDENT_WEEKLY_QUIZ_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Object.assign(new Error(data.error||'Could not load this quiz. Try again.'),{status:response.status});
+  return data;
+}
 const CLASS_ROSTERS={
   et:{label:'East Track',students:['chaim_chaikin','yossi_gourarie','sholom_huebner','moshe_lapine','kehos_notik','yisroel_oirechman','moshe_raichman','avrohom_rosenfeld','levi_rozmarin','arik_traxler','simcha_cohen']},
   wt:{label:'West Track',students:['ari_greenberg','zev_rosenfeld','levi_schtroks','yisroel_aryeh_simmonds','leibel_vogel','leib_wolf','simcha_cohen']}
@@ -486,8 +500,8 @@ function switchStudent(reload=true){
 }
 
 function detachLaunchListeners(){
-  if(classLaunchRef)classLaunchRef.off();if(personalLaunchRef)personalLaunchRef.off();if(launchRef)launchRef.off();if(responseRef)responseRef.off();
-  classLaunchRef=personalLaunchRef=launchRef=responseRef=null;
+  if(classLaunchRef)classLaunchRef.off();if(personalLaunchRef)personalLaunchRef.off();if(launchPollTimer)clearInterval(launchPollTimer);
+  classLaunchRef=personalLaunchRef=null;launchPollTimer=null;refreshActiveLaunch=null;
 }
 
 function listenForLaunches(){
@@ -498,25 +512,27 @@ function listenForLaunches(){
   personalLaunchRef.on('value',s=>{personalLaunchId=s.val()||'';chooseActiveLaunch();});
 }
 
-function listenForHistory(){
-  if(historyLaunchRef)historyLaunchRef.off();
-  if(historyCompletionRef)historyCompletionRef.off();
-  historyLaunchRef=db.ref(QROOT+'/launches');
-  historyCompletionRef=db.ref(QROOT+'/completions');
-  historyLaunchRef.on('value',s=>{allLaunches=s.val()||{};renderPastQuizzes();});
-  historyCompletionRef.on('value',s=>{allCompletions=s.val()||{};renderPastQuizzes();});
+async function listenForHistory(){
+  try{
+    const result=await callStudentQuiz('history');
+    allLaunches=result.launches||{};allCompletions={};
+    for(const [id,completion] of Object.entries(result.completions||{}))allCompletions[id]={[myStudentId]:completion};
+    renderPastQuizzes();
+  }catch(error){console.warn('Could not load quiz history:',error);}
 }
 
 function chooseActiveLaunch(){
   const id=forcedLaunchId||personalLaunchId||classLaunchId||'';
   if(id===activeLaunchId)return;
-  if(launchRef)launchRef.off();if(responseRef)responseRef.off();launchRef=responseRef=null;
+  if(launchPollTimer)clearInterval(launchPollTimer);launchPollTimer=null;refreshActiveLaunch=null;
   activeLaunchId=id;launchData=null;myResponses={};selectedChoice=null;displayedQuestion=0;
   if(!id){render();return;}
-  launchRef=db.ref(QROOT+'/launches/'+id);
-  responseRef=db.ref(QROOT+'/responses/'+id+'/'+myStudentId);
-  launchRef.on('value',s=>{launchData=s.val();render();});
-  responseRef.on('value',s=>{myResponses=s.val()||{};render();});
+  let refreshCount=0;
+  const refresh=async()=>{
+    try{const result=await callStudentQuiz('launch',{launchId:id});if(activeLaunchId!==id)return;launchData=result.launch||null;myResponses=result.responses||{};if(result.completion)allCompletions[id]={[myStudentId]:result.completion};if(allLaunches[id])allLaunches[id]=launchData;render();if(++refreshCount%12===0)await listenForHistory();}
+    catch(error){console.warn('Could not refresh quiz:',error);}
+  };
+  refreshActiveLaunch=refresh;refresh();launchPollTimer=setInterval(refresh,2500);
 }
 
 function getQuestions(){return launchData&&launchData.quizSnapshot?asArray(launchData.quizSnapshot.questions):[];}
@@ -660,23 +676,16 @@ async function submitAnswer(){
   const qs=getQuestions(),q=qs[displayedQuestion],mode=launchData&&launchData.mode||'paced',st=studentEffectiveQuestionState(displayedQuestion,mode);if(!st.open||responseFor(displayedQuestion))return;
   if(teacherPreview){myResponses[displayedQuestion]={choiceIndex:selectedChoice,correct:Number(selectedChoice)===Number(q.correctIndex)};render();return;}
   // Never permit another submission for a finished attempt.
-  const finished=await db.ref(QROOT+'/completions/'+activeLaunchId+'/'+myStudentId).once('value');
-  if(finished.exists()){render();return;}
-  const ref=db.ref(QROOT+'/responses/'+activeLaunchId+'/'+myStudentId+'/'+displayedQuestion);
-  const correct=Number(selectedChoice)===Number(q.correctIndex);
-  const answer={name:myName,choiceIndex:selectedChoice,originalCorrect:correct,correct,adjusted:false,submittedAt:firebase.database.ServerValue.TIMESTAMP};
-  try{await ref.set(answer);}catch(e){console.error(e);const s=document.getElementById('answerStatus');s.textContent='Could not save your answer. Try again.';s.className='status bad';}
+  try{await callStudentQuiz('answer',{launchId:activeLaunchId,questionIndex:displayedQuestion,choiceIndex:selectedChoice});if(refreshActiveLaunch)await refreshActiveLaunch();}
+  catch(e){console.error(e);const s=document.getElementById('answerStatus');s.textContent=e.message||'Could not save your answer. Try again.';s.className='status bad';}
 }
 
 async function markCompletion(){
   if(teacherPreview)return;
   if(markingComplete||!activeLaunchId||!myStudentId)return;markingComplete=true;
   try{
-    const ref=db.ref(QROOT+'/completions/'+activeLaunchId+'/'+myStudentId),existing=await ref.once('value');
-    if(!existing.exists()){
-      const qs=getQuestions(),score=scoreFromResponses(qs,myResponses);
-      await ref.set({name:myName,completedAt:firebase.database.ServerValue.TIMESTAMP,correct:score.correct,total:score.total,pct:score.pct});
-    }
+    await callStudentQuiz('complete',{launchId:activeLaunchId});
+    await listenForHistory();
   }catch(e){console.warn(e);}finally{markingComplete=false;}
 }
 
@@ -699,14 +708,16 @@ function renderPastQuizzes(){
   }).join('');
 }
 async function openPastQuiz(launchId){
-  const launch=allLaunches&&allLaunches[launchId];if(!launch||!myStudentId)return;
-  const snap=launch.quizSnapshot||{},questions=asArray(snap.questions),review=document.getElementById('reviewCard');
-  document.getElementById('reviewTitle').textContent=snap.title||'Weekly Quiz';
-  document.getElementById('reviewMeta').textContent=fmtDate((allCompletions[launchId]&&allCompletions[launchId][myStudentId]||{}).completedAt||launch.createdAt)+(launch.retakeOf?' • Retake '+(launch.attemptNumber||2):'');
+  if(!myStudentId)return;
+  const review=document.getElementById('reviewCard');
   document.getElementById('reviewQuestions').innerHTML='<div class="past-meta">Loading your answers…</div>';review.classList.remove('hidden');
   review.scrollIntoView({behavior:'smooth',block:'start'});
   try{
-    const rs=await db.ref(QROOT+'/responses/'+launchId+'/'+myStudentId).once('value'),responses=rs.val()||{},score=scoreFromResponses(questions,responses),released=launch.showScore===true;
+    const result=await callStudentQuiz('review',{launchId}),launch=result.launch;
+    if(!launch)throw new Error('This quiz review is not available.');
+    const snap=launch.quizSnapshot||{},questions=asArray(snap.questions),responses=result.responses||{},completion=result.completion||{},score=scoreFromResponses(questions,responses),released=launch.showScore===true;
+    document.getElementById('reviewTitle').textContent=snap.title||'Weekly Quiz';
+    document.getElementById('reviewMeta').textContent=fmtDate(completion.completedAt||launch.createdAt)+(launch.retakeOf?' • Retake '+(launch.attemptNumber||2):'');
     const scoreEl=document.getElementById('reviewScore'),notice=document.getElementById('reviewNotice');
     if(released){scoreEl.textContent=score.correct+' / '+score.total+' — '+score.pct+'%';scoreEl.classList.remove('hidden');notice.textContent='This review is read-only. Green answers were correct; red answers were incorrect.';notice.className='status good';}
     else{scoreEl.textContent='';scoreEl.classList.add('hidden');notice.textContent='Your answers are saved. Your teacher has not released the score/right-wrong review yet.';notice.className='status';}
@@ -729,7 +740,7 @@ restoreLogin().catch(error=>console.warn('Could not restore quiz session:',error
   applyMasterBlocked();
 });
 </script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261015-sharefix1"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261017-directshare1"></script>
 </body>
 </html>
 

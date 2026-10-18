@@ -117,9 +117,7 @@ function receiveStudent(connection){
   if(!started||members.has('student:'+connection.peer)){connection.close();return}
   let member=null;
   const handshake=setTimeout(()=>{if(!member)connection.close()},15000);
-  connection.on('data',message=>{
-    if(!message||typeof message!=='object')return;
-    if(message.type==='join'&&!member){
+  const admitJoin=message=>{
       const name=C.cleanName(message.name);if(!name){connection.close();return}
       // Browser tabs and reconnects get new PeerJS IDs. Keep only one live
       // connection per signed-in student name, rather than one per PeerJS ID.
@@ -134,6 +132,23 @@ function receiveStudent(connection){
         duplicate.connection.close();
       }
       clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,studentId:window.ClassPointerDashboardCore?.validId(message.studentId)?message.studentId:(previousAccess?.studentId||null),color:previousAccess?.color||C.colors[colorIndex++%C.colors.length],allowed:previousAccess?.allowed||false,writeAllowed:previousAccess?.writeAllowed||false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);window.ClassPointerPdf?.studentJoined(member);window.ClassPointerBoards?.studentJoined(member);return;
+  };
+  let joinPending=false;
+  connection.on('data',message=>{
+    if(!message||typeof message!=='object')return;
+    if(message.type==='join'&&!member){
+      const gate=window.ClassPointerJoinGate;
+      if(gate&&gate.required){
+        // The room id is public, so nobody is admitted on their own say-so. The server must confirm a
+        // short-lived ticket for this class, this lesson and this very connection; the student's id and
+        // name come only from that answer.
+        if(joinPending)return;
+        joinPending=true;
+        gate.verify(message.ticket,connection.peer).then(verified=>{joinPending=false;if(!verified||member||!connection.open||!started){connection.close();return}admitJoin({...message,name:verified.studentName,studentId:verified.studentId})}).catch(()=>{joinPending=false;connection.close()});
+        return;
+      }
+      admitJoin(message);
+      return;
     }
     if(!member||members.get(member.id)!==member)return;
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
@@ -201,7 +216,8 @@ async function startClass(){
     if(new URL(location.href).searchParams.get('sendEveryoneShare')==='1')void requestEveryoneToShare();
     if(new URL(location.href).searchParams.get('sendEveryoneBoards')==='1')document.dispatchEvent(new Event('classpointer:send-to-whiteboards'));
   });
-  peer.on('connection',receiveStudent);peer.on('call',call=>{if(call.metadata?.kind==='activity-screen'){if(window.ClassPointerActivityShares)void window.ClassPointerActivityShares.incomingCall(call);else call.close();return}if(!window.ClassPointerBoards?.incomingCall(call))call.close()});
+  peer.on('connection',receiveStudent);
+  if(window.ClassPointerJoinGate?.required)window.ClassPointerJoinGate.watch(()=>Array.from(members.values()),m=>{send(m.connection,{type:'removed'});removeMember(m);try{m.connection.close()}catch{}});peer.on('call',call=>{if(call.metadata?.kind==='activity-screen'){if(window.ClassPointerActivityShares)void window.ClassPointerActivityShares.incomingCall(call);else call.close();return}if(!window.ClassPointerBoards?.incomingCall(call))call.close()});
 }
 async function requestEveryoneToShare(){
   if(!isTeacher||!started)return;
@@ -372,7 +388,12 @@ function joinClass(event){
   peer.on('open',()=>{
     if(peer!==current)return;
     teacherConnection=peer.connect(room,{reliable:true});const connection=teacherConnection;
-    connection.on('open',()=>{if(teacherConnection===connection){let studentId=null;try{const saved=JSON.parse(sessionStorage.getItem('classPointerDashboardJoin')||'null');if(window.ClassPointerDashboardCore.handoff(saved,room))studentId=saved.studentId}catch(_){}send(connection,{type:'join',name,studentId})}});
+    connection.on('open',async()=>{if(teacherConnection!==connection)return;let studentId=null,classId=null;try{const saved=JSON.parse(sessionStorage.getItem('classPointerDashboardJoin')||'null');if(window.ClassPointerDashboardCore.handoff(saved,room)){studentId=saved.studentId;classId=saved.classId}}catch(_){}
+      if(!studentId){try{studentId=sessionStorage.getItem('b3Games_studentId')||null;classId=sessionStorage.getItem('b3Games_studentClass')||null}catch(_){}}
+      let ticket=null;
+      // Ask the school server to confirm this student (own passcode, active in this class) before connecting.
+      if(studentId&&classId&&window.ClassPointerJoinAuth){try{ticket=(await window.ClassPointerJoinAuth.issue({room,classId,studentId,peerId:current.id})).ticket}catch(error){if(teacherConnection===connection){leaveClass();fail(error.message||'The school could not confirm you for this class.')}return}}
+      if(teacherConnection!==connection)return;send(connection,{type:'join',name,studentId,ticket})});
     connection.on('data',message=>{
       if(teacherConnection!==connection||!message)return;
       if(window.ClassPointerBoards?.fromTeacher(message))return;
