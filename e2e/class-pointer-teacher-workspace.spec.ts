@@ -357,10 +357,15 @@ test('a changed teacher sign-in is detected, nothing is written under the wrong 
   const context = await browser.newContext(); await wire(context, { realSession: true });
   const page = await context.newPage(); const errors = await openTeacher(page);
   await expect.poll(() => page.evaluate(() => (window as any).__writes.some((w: any) => w.op === 'set' && /classPointerSessions/.test(w.p)))).toBe(true);
+  await page.evaluate(()=> (document.getElementById('openWhiteboard') as HTMLButtonElement).click());
+  await expect.poll(()=>page.evaluate(()=>!!(window as any).ClassPointerPdf.presentationStream()?.active)).toBe(true);
+  await page.evaluate(()=>{(window as any).__logoutStream=(window as any).ClassPointerPdf.presentationStream()});
   // Another tab of the same browser signs in a student: this tab's shared sign-in changes.
   await page.evaluate(() => (window as any).__switchAccount('student-pt1'));
   const banner = page.locator('#cpTeacherSignInBanner');
   await expect(banner).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).__logoutStream.getVideoTracks()[0].readyState)).toBe('ended');
+  await expect(page.locator('#shareScreen')).toBeDisabled();
   await expect(banner).toContainText('Sign in again as the teacher');
   const before = await page.evaluate(() => (window as any).__writes.length);
   const result = await page.evaluate(() => (window as any).ClassPointerDashboard.setStudentScreenSharing(true).then(() => 'written', (e: Error) => e.message));
@@ -398,4 +403,20 @@ test('the Share button disappears for a student as soon as the teacher turns him
   await expect(share).toBeHidden();
   expect(await page.evaluate(() => (window as any).__displayMediaCalls)).toBe(0);
   await context.close();
+});
+
+test('My Screen whiteboard supplies live frames with published pictures and pen while switching modes preserves board work', async ({ browser }) => {
+  const context=await browser.newContext();await wire(context);const page=await context.newPage();const errors=await openTeacher(page);
+  await page.evaluate(()=> (document.getElementById('openWhiteboard') as HTMLButtonElement).click());
+  await expect.poll(()=>page.evaluate(()=>!!(window as any).ClassPointerPdf.presentationStream()?.active)).toBe(true);
+  await page.evaluate(async()=>{const video=document.createElement('video');video.id='testPresentation';video.muted=true;video.srcObject=(window as any).ClassPointerPdf.presentationStream();document.body.append(video);await video.play()});
+  await expect.poll(()=>page.locator('#testPresentation').evaluate((v:HTMLVideoElement)=>v.videoWidth)).toBeGreaterThan(0);
+  await pasteRedPicture(page);await page.getByRole('button',{name:'✓ Show to class'}).click();
+  // Sample every pixel from the actual video, rather than only inspecting source canvas state.
+  await expect.poll(()=>page.locator('#testPresentation').evaluate((v:HTMLVideoElement)=>{const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;const ctx=c.getContext('2d')!;ctx.drawImage(v,0,0);const pixels=ctx.getImageData(0,0,c.width,c.height).data;let red=0;for(let i=0;i<pixels.length;i+=4)if(pixels[i]>180&&pixels[i+1]<90&&pixels[i+2]<120)red++;return red})).toBeGreaterThan(100);
+  const box=(await page.locator('#pdfContent').boundingBox())!;await page.mouse.move(box.x+40,box.y+40);await page.mouse.down();await page.mouse.move(box.x+180,box.y+70,{steps:8});await page.mouse.up();await expect.poll(()=>inkCount(page)).toBeGreaterThan(0);const marks=await inkCount(page);
+  await page.getByRole('button',{name:'Student screens',exact:true}).click();await page.getByRole('button',{name:'My screen',exact:true}).click();
+  expect(await inkCount(page)).toBe(marks);expect(await page.evaluate(()=>(window as any).ClassPointerPdf.boardPictureCount())).toBe(1);
+  await page.evaluate(()=>{(window as any).__testBoardStream=(window as any).ClassPointerPdf.presentationStream();(window as any).ClassPointerPdf.close(true)});
+  expect(await page.evaluate(()=>(window as any).__testBoardStream.getVideoTracks()[0].readyState)).toBe('ended');expect(errors).toEqual([]);await context.close();
 });

@@ -117,6 +117,42 @@ function favorTextDetail(call){
   };
   tune();setTimeout(tune,500);
 }
+// One-way lesson transport for server-verified activity presence connections.
+let activityLessonStream=null,activityPresentationId=null,activityPresentationEnabled=true,activityTeacherAuthorized=true,activityTeacherEpoch=0;
+function closeActivityCall(entry){const old=entry.lessonCall;entry.lessonCall=null;try{old?.close()}catch{}}
+function sendActivityLesson(entry){
+  closeActivityCall(entry);
+  if(!started||!activityTeacherAuthorized||!activityPresentationEnabled||!activityLessonStream||presence.get(entry.id)!==entry)return;
+  send(entry.connection,{type:'lesson-presentation',id:activityPresentationId,active:true});
+  try{entry.lessonCall=peer.call(entry.connection.peer,activityLessonStream,{metadata:{kind:'activity-lesson',presentationId:activityPresentationId}});favorTextDetail(entry.lessonCall)}catch{send(entry.connection,{type:'lesson-presentation',id:activityPresentationId,active:false})}
+}
+function setActivityLesson(stream){
+  activityLessonStream=stream;if(stream)activityPresentationId=crypto.randomUUID();
+  for(const entry of presence.values()){
+    closeActivityCall(entry);
+    if(stream&&activityPresentationEnabled)sendActivityLesson(entry);
+    else send(entry.connection,{type:'lesson-presentation',id:activityPresentationId,active:false});
+  }
+}
+document.addEventListener('class-pointer-teacher-signed-out',()=>{
+  if(!isTeacher)return;activityTeacherAuthorized=false;activityTeacherEpoch++;stopSharing();window.ClassPointerPdf?.close(true);
+  $('shareScreen').disabled=true;$('openBrowserTab').disabled=true;$('openWhiteboard').disabled=true;
+});
+document.addEventListener('class-pointer-teacher-restored',()=>{
+  if(!isTeacher)return;activityTeacherAuthorized=true;
+  $('shareScreen').disabled=!started||!activityTeacherAuthorized;$('openBrowserTab').disabled=!started||!activityTeacherAuthorized;$('openWhiteboard').disabled=!started;
+});
+document.addEventListener('class-pointer-document-presentation',event=>{if(isTeacher)setActivityLesson(event.detail?.stream||null)});
+document.addEventListener('class-pointer-workspace',event=>{
+  if(!isTeacher||event.detail==='students')return;
+  const enabled=event.detail==='teach';
+  if(enabled&&!activityPresentationEnabled&&activityLessonStream)activityPresentationId=crypto.randomUUID();
+  activityPresentationEnabled=enabled;
+  for(const entry of presence.values()){
+    if(activityPresentationEnabled)sendActivityLesson(entry);
+    else{closeActivityCall(entry);send(entry.connection,{type:'lesson-presentation',id:activityPresentationId,active:false})}
+  }
+});
 function callStudent(member){
   member.call?.close();clearTimeout(member.mediaTimer);if(!screen||!member.admitted)return;
   const call=peer.call(member.peerId,screen,{metadata:{generation}});member.call=call;favorTextDetail(call);
@@ -153,7 +189,7 @@ function receiveStudent(connection){
   let joinPending=false;
   connection.on('data',message=>{
     if(!message||typeof message!=='object')return;
-    if(member?.presence){if(message.type==='where'&&presence.get(member.id)===member){member.activity=cleanActivity(message.activity);roster()}return}
+    if(member?.presence){if(message.type==='lesson-retry'&&message.id===activityPresentationId&&Date.now()-(member.lastLessonRetry||0)>2000){member.lastLessonRetry=Date.now();sendActivityLesson(member)}if(message.type==='where'&&presence.get(member.id)===member){member.activity=cleanActivity(message.activity);roster()}return}
     if(message.type==='join'&&!member){
       const gate=window.ClassPointerJoinGate;
       if(message.presence===true){
@@ -200,19 +236,19 @@ function admitPresence(connection,verified,activity){
   // the others), and the Students panel still lists him once.
   if(Array.from(presence.values()).filter(entry=>entry.studentId===studentId).length>=6||presence.size>=120){send(connection,{type:'full'});setTimeout(()=>connection.close(),300);return null}
   const entry={id:'presence:'+connection.peer,presence:true,studentId,name,activity:cleanActivity(activity),connection,connectedAt:Date.now()};
-  presence.set(entry.id,entry);send(connection,{type:'present'});roster();
+  presence.set(entry.id,entry);send(connection,{type:'present'});sendActivityLesson(entry);roster();
   return entry;
 }
 function dropPresence(entry,notice){
   if(presence.get(entry.id)!==entry)return;
-  presence.delete(entry.id);
+  presence.delete(entry.id);closeActivityCall(entry);
   if(notice){send(entry.connection,{type:notice});setTimeout(()=>{try{entry.connection.close()}catch{}},300)}
   roster();
 }
 function removeStudentDeliberately(entry){
   // Only this path tells a student he was removed, and it keeps him out until the teacher allows him back.
   if(entry.studentId){removedStudents.add(entry.studentId);saveRemoved();window.ClassPointerActivityShares?.revokeStudents([entry.studentId])}
-  for(const other of Array.from(presence.values()))if(other===entry||(entry.studentId&&other.studentId===entry.studentId)){send(other.connection,{type:'removed'});presence.delete(other.id);setTimeout(()=>{try{other.connection.close()}catch{}},300)}
+  for(const other of Array.from(presence.values()))if(other===entry||(entry.studentId&&other.studentId===entry.studentId)){send(other.connection,{type:'removed'});closeActivityCall(other);presence.delete(other.id);setTimeout(()=>{try{other.connection.close()}catch{}},300)}
   for(const other of Array.from(members.values()))if(other===entry||(entry.studentId&&other.studentId===entry.studentId)){send(other.connection,{type:'removed'});removeMember(other);setTimeout(()=>{try{other.connection.close()}catch{}},300)}
   roster();
 }
@@ -277,7 +313,7 @@ async function startClass(){
     if(new URL(location.href).searchParams.get('sendEveryoneBoards')==='1')document.dispatchEvent(new Event('classpointer:send-to-whiteboards'));
   });
   peer.on('connection',receiveStudent);
-  if(window.ClassPointerJoinGate?.required)window.ClassPointerJoinGate.watch(()=>Array.from(members.values()).concat(Array.from(presence.values())),m=>{send(m.connection,{type:'removed'});if(m.presence)presence.delete(m.id);else removeMember(m);roster();try{m.connection.close()}catch{}});peer.on('call',call=>{if(call.metadata?.kind==='activity-screen'){if(window.ClassPointerActivityShares)void window.ClassPointerActivityShares.incomingCall(call);else call.close();return}if(!window.ClassPointerBoards?.incomingCall(call))call.close()});
+  if(window.ClassPointerJoinGate?.required)window.ClassPointerJoinGate.watch(()=>Array.from(members.values()).concat(Array.from(presence.values())),m=>{send(m.connection,{type:'removed'});if(m.presence){closeActivityCall(m);presence.delete(m.id)}else removeMember(m);roster();try{m.connection.close()}catch{}});peer.on('call',call=>{if(call.metadata?.kind==='activity-screen'){if(window.ClassPointerActivityShares)void window.ClassPointerActivityShares.incomingCall(call);else call.close();return}if(!window.ClassPointerBoards?.incomingCall(call))call.close()});
 }
 async function requestEveryoneToShare(){
   if(!isTeacher||!started)return;
@@ -286,11 +322,12 @@ async function requestEveryoneToShare(){
   document.dispatchEvent(new Event('classpointer:send-to-screens'));
 }
 function stopSharing(){
+  if(isTeacher)setActivityLesson(null);
   cancelHover();highlighter?.cancel();highlightStore.reset();publishHighlights();generation++;
   const oldViewport=viewportController;viewportController=null;const oldScreen=screen;screen=null;
   oldViewport?.stop();oldScreen?.getTracks().forEach(track=>track.stop());
   for(const member of members.values()){clearStudentHover(member);member.call?.close();member.call=null;member.videoReady=false;clearTimeout(member.mediaTimer)}
-  resetTabControls();state.sharing=false;state.points={};$('lesson').srcObject=null;$('placeholder').hidden=false;$('stopScreen').disabled=true;$('shareScreen').disabled=!started;$('openBrowserTab').disabled=!started;publish();
+  resetTabControls();state.sharing=false;state.points={};$('lesson').srcObject=null;$('placeholder').hidden=false;$('stopScreen').disabled=true;$('shareScreen').disabled=!started||!activityTeacherAuthorized;$('openBrowserTab').disabled=!started||!activityTeacherAuthorized;publish();
 }
 function resetOverlaysForViewChange(){
   cancelHover();highlighter?.cancel();state.points={};highlightStore.reset();publishHighlights();publish();
@@ -336,7 +373,8 @@ async function zoomTab(direction){
   updateTabControls();
 }
 async function captureBrowserTab(){
-  if(!started)return;
+  if(!started||!activityTeacherAuthorized)return;
+  const captureEpoch=activityTeacherEpoch;
   if(!navigator.mediaDevices?.getDisplayMedia){fail('Use Chrome or Edge on a computer to capture a tab, window, or screen.');return}
   clearError();$('openBrowserTab').disabled=true;
   let stream=null,video=null;
@@ -347,6 +385,7 @@ async function captureBrowserTab(){
       try{controller=new CaptureController();opts.controller=controller}catch(_){controller=null}
     }
     stream=await navigator.mediaDevices.getDisplayMedia(opts);
+    if(!started||!activityTeacherAuthorized||captureEpoch!==activityTeacherEpoch)return;
     // Chrome/Edge may otherwise switch focus to the source tab after Share.
     try{controller?.setFocusBehavior?.('focus-capturing-application')}catch(_){try{controller?.setFocusBehavior?.('no-focus-change')}catch(__){}}
     const track=stream.getVideoTracks()[0];
@@ -357,6 +396,7 @@ async function captureBrowserTab(){
       const timer=setTimeout(()=>reject(Error('The selected source did not provide a picture.')),7000);
       video.addEventListener('loadeddata',()=>{clearTimeout(timer);resolve()},{once:true});
     });
+    if(!started||!activityTeacherAuthorized||captureEpoch!==activityTeacherEpoch)return;
     if(!video.videoWidth||!video.videoHeight)throw Error('The selected source is not ready to capture.');
     const width=Math.min(1800,video.videoWidth),height=Math.round(width*video.videoHeight/video.videoWidth);
     const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
@@ -371,11 +411,12 @@ async function captureBrowserTab(){
       requestAnimationFrame(()=>{try{window.focus()}catch(_){}});
     }
   }catch(error){fail(error.name==='NotAllowedError'?'Capture was canceled.':error.message||'Could not capture the selected source.')}
-  finally{stream?.getTracks().forEach(t=>t.stop());if(video)video.srcObject=null;$('openBrowserTab').disabled=!started}
+  finally{stream?.getTracks().forEach(t=>t.stop());if(video)video.srcObject=null;$('openBrowserTab').disabled=!started||!activityTeacherAuthorized}
 }
 async function shareScreen(preferTab=false){
+  if(!activityTeacherAuthorized)return;
   clearError();window.ClassPointerPdf?.close(true);if(!navigator.mediaDevices?.getDisplayMedia){fail('Use Chrome or Edge on a computer to share your teaching screen.');return}
-  $('shareScreen').disabled=true;$('openBrowserTab').disabled=true;const currentPeer=peer;let captured=null,processor=null,outgoing=null;
+  $('shareScreen').disabled=true;$('openBrowserTab').disabled=true;const currentPeer=peer,captureEpoch=activityTeacherEpoch;let captured=null,processor=null,outgoing=null;
   try{
     // Keep the teacher on the Class Pointer page after picking a tab/window to share (Chrome/Edge 109+).
     let captureController=null;captureControl=null;
@@ -387,17 +428,17 @@ async function shareScreen(preferTab=false){
     if(preferTab&&captured.getVideoTracks()[0]?.getSettings?.().displaySurface!=='browser'){
       captured.getTracks().forEach(track=>track.stop());captured=null;
       fail('Choose a browser tab in the sharing picker, not a window or entire screen.');
-      $('shareScreen').disabled=!started;$('openBrowserTab').disabled=!started;return;
+      $('shareScreen').disabled=!started||!activityTeacherAuthorized;$('openBrowserTab').disabled=!started||!activityTeacherAuthorized;return;
     }
-    if(peer!==currentPeer||!started){captured.getTracks().forEach(track=>track.stop());return}
+    if(peer!==currentPeer||!started||!activityTeacherAuthorized||captureEpoch!==activityTeacherEpoch){captured.getTracks().forEach(track=>track.stop());return}
     if(window.ClassPointerViewport?.create){
       processor=await window.ClassPointerViewport.create({rawStream:captured,stage:$('stage'),lesson:$('lesson'),onBeforeViewChange:resetOverlaysForViewChange,onStatus:status,onError:fail});
-      if(peer!==currentPeer||!started){processor?.stop();return}
+      if(peer!==currentPeer||!started||!activityTeacherAuthorized||captureEpoch!==activityTeacherEpoch){processor?.stop();captured?.getTracks().forEach(track=>track.stop());return}
       viewportController=processor;outgoing=processor.stream||captured;
     }else outgoing=captured;
     screen=outgoing;generation++;state.sharing=true;state.points={};$('lesson').srcObject=screen;$('placeholder').hidden=true;$('stopScreen').disabled=false;
     setupTabControls(captureController,captured);captured.getVideoTracks()[0]?.addEventListener('ended',()=>{if(screen===outgoing)stopSharing()},{once:true});
-    await $('lesson').play();if(screen!==outgoing)return;document.dispatchEvent(new Event('class-pointer-capture-ready'));publish();for(const member of members.values())if(member.admitted)callStudent(member);
+    await $('lesson').play();if(screen!==outgoing)return;document.dispatchEvent(new Event('class-pointer-capture-ready'));setActivityLesson(screen);publish();for(const member of members.values())if(member.admitted)callStudent(member);
     status(preferTab?'Browser tab is sharing. Use Scroll tab and Tab A−/A+ when supported; hold Shift to navigate without marking.':viewportController?.active?'Teaching screen is sharing. Use Choose shared area, Zoom +, and Move view to focus the lesson.':'Teaching screen is sharing. Move your mouse over the picture to point as Teacher.');
   }catch(error){
     if(peer!==currentPeer||(error.name==='AbortError'&&!screen)){processor?.stop();captured?.getTracks().forEach(track=>track.stop());return}
@@ -414,7 +455,7 @@ function endClass(){
   clearTimeout(joinTimer);started=false;openingClass=false;stopSharing();
   for(const member of members.values()){send(member.connection,{type:'ended'});member.connection.close()}
   members.clear();
-  for(const entry of presence.values()){send(entry.connection,{type:'ended'});try{entry.connection.close()}catch{}}
+  for(const entry of presence.values()){closeActivityCall(entry);send(entry.connection,{type:'ended'});try{entry.connection.close()}catch{}}
   presence.clear();
   const oldPeer=peer;peer=null;oldPeer?.destroy();
   state={sharing:false,mode:'selected',tools:{pointer:true,highlight:false,pen:false},members:[],points:{}};

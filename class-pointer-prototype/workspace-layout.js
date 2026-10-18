@@ -29,6 +29,7 @@
     function activate(id){
       const launch=document.getElementById('studentBoards');
       if((id==='screens'||id==='whiteboards')&&(!launch||launch.disabled))return;
+      document.dispatchEvent(new CustomEvent('class-pointer-workspace',{detail:id}));
       for(const [key,button] of buttons)button.setAttribute('aria-selected',String(key===id));
       if(id==='students'){
         const menu=document.getElementById('tbStudentsMenu');
