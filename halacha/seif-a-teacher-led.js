@@ -16,14 +16,29 @@
   ];
   const scenes = [
     {
-      label: 'A boy puts his toys away carefully at home, even when he is alone.',
-      correct: true,
-      svg: '<svg viewBox="0 0 240 150" role="img" aria-hidden="true"><rect x="13" y="15" width="214" height="122" rx="16" fill="#fff8e9"/><path d="M29 113h182" stroke="#c89a5b" stroke-width="5" stroke-linecap="round"/><rect x="39" y="38" width="53" height="49" rx="7" fill="#d8f1ff" stroke="#70a9c7" stroke-width="4"/><path d="M65 39v47M40 62h51" stroke="#70a9c7" stroke-width="3"/><circle cx="137" cy="52" r="18" fill="#f3c69b"/><path d="M119 50q0-27 24-25q17 2 17 24q-12-10-41 1" fill="#382f2b"/><path d="M125 72q12-10 25 0l11 35h-49z" fill="#477db4"/><path d="M133 103 123 122m25-19 13 19" stroke="#334b68" stroke-width="8" stroke-linecap="round"/><path d="m116 89-20 21m47-18 20 16" stroke="#f3c69b" stroke-width="7" stroke-linecap="round"/><rect x="82" y="105" width="36" height="22" rx="4" fill="#eaa84b"/><rect x="91" y="97" width="20" height="12" rx="3" fill="#ec6c68"/><path d="m82 106 18-8 18 8" fill="none" stroke="#a75c35" stroke-width="3"/></svg>'
+      label: 'A boy is learning from a sefer.',
+      src: 'assets/storybook/learning.webp',
+      correct: false
     },
     {
-      label: 'A boy leaves his toys scattered and speaks unkindly when no grown-up is watching.',
+      label: 'A boy is walking respectfully outside.',
+      src: 'assets/storybook/walking.webp',
       correct: false,
-      svg: '<svg viewBox="0 0 240 150" role="img" aria-hidden="true"><rect x="13" y="15" width="214" height="122" rx="16" fill="#f2f5fb"/><path d="M29 113h182" stroke="#aebbd0" stroke-width="5" stroke-linecap="round"/><rect x="39" y="38" width="53" height="49" rx="7" fill="#d8f1ff" stroke="#70a9c7" stroke-width="4"/><path d="M65 39v47M40 62h51" stroke="#70a9c7" stroke-width="3"/><circle cx="137" cy="52" r="18" fill="#f3c69b"/><path d="M119 50q0-27 24-25q17 2 17 24q-12-10-41 1" fill="#382f2b"/><path d="M125 72q12-10 25 0l11 35h-49z" fill="#a277b6"/><path d="M133 103 123 122m25-19 13 19" stroke="#46526a" stroke-width="8" stroke-linecap="round"/><path d="m116 89-20 12m47-9 20 12" stroke="#f3c69b" stroke-width="7" stroke-linecap="round"/><path d="m73 107 11-9 12 12-9 9zM166 116l11-10 11 12-10 9z" fill="#ec6c68" stroke="#a8464c" stroke-width="2"/><path d="m104 87 18-13" stroke="#db605c" stroke-width="3" stroke-linecap="round"/><path d="M113 78q8-8 15 0" fill="none" stroke="#db605c" stroke-width="3"/></svg>'
+    },
+    {
+      label: 'A boy is helping at home by cleaning the table.',
+      src: 'assets/storybook/helping-at-home.webp',
+      correct: false
+    },
+    {
+      label: 'Two boys are having a kind, respectful conversation.',
+      src: 'assets/storybook/respectful-conversation.webp',
+      correct: false
+    },
+    {
+      label: 'A boy pauses to remember the lesson while alone in his bedroom.',
+      src: 'assets/storybook/remembering-while-alone.webp',
+      correct: true
     }
   ];
   // Kitzur Shulchan Aruch 1:1, transcribed in full with nekudos from Beit Chabad.
@@ -83,7 +98,8 @@
     reading.append(readingTitle, fullText);
     source.appendChild(reading);
 
-    source.append(make('h3', '', 'Important phrases — tap a word to see its meaning'));
+    source.append(make('h3', '', 'Key Terms'));
+    source.append(make('p', 'hal-a-note', 'Important phrases — tap a word to see its meaning.'));
     const phraseList = make('div', 'hal-a-phrase-list');
     for (const phrase of phrases) {
       const details = make('details', 'hal-a-phrase');
@@ -112,9 +128,9 @@
 
     const quiz = make('section', 'hal-a-scenarios');
     quiz.setAttribute('aria-labelledby', 'hal-a-question-title');
-    const qTitle = make('h3', '', 'Which picture shows the lesson?');
+    const qTitle = make('h3', '', 'Examples from Daily Life');
     qTitle.id = 'hal-a-question-title';
-    quiz.append(qTitle, make('p', 'hal-a-note', 'We try to act thoughtfully at home and at school, even when we are alone.'));
+    quiz.append(qTitle, make('p', 'hal-a-question', 'Which picture shows the boy remembering the lesson when he is alone?'), make('p', 'hal-a-note', 'Look for the boy who pauses to remember what is right when nobody else is in the room.'));
     const feedback = make('p', 'hal-a-feedback', '');
     feedback.setAttribute('role', 'status');
     feedback.setAttribute('aria-live', 'polite');
@@ -122,8 +138,8 @@
     scenes.forEach((scene, index) => {
       const choice = button('', () => {
         feedback.textContent = scene.correct
-          ? '✓ Yes! We remember the lesson even when nobody else is watching.'
-          : 'Try again. Which picture shows careful behavior when the boy is alone?';
+          ? '✓ Yes! He remembers the lesson when he is alone.'
+          : 'Try again. Find the boy alone in his bedroom, remembering the lesson.';
         feedback.classList.toggle('correct', scene.correct);
         choices.querySelectorAll('button').forEach(item => item.removeAttribute('aria-pressed'));
         choice.setAttribute('aria-pressed', String(scene.correct));
@@ -131,8 +147,12 @@
       choice.classList.add('hal-a-choice');
       choice.setAttribute('aria-label', scene.label);
       choice.setAttribute('aria-pressed', 'false');
-      const art = make('span', 'hal-a-scene-art');
-      art.innerHTML = scene.svg;
+      const art = document.createElement('img');
+      art.className = 'hal-a-scene-art';
+      art.src = scene.src;
+      art.alt = '';
+      art.loading = 'eager';
+      art.decoding = 'async';
       choice.append(art, make('span', 'hal-a-choice-label', `Picture ${index + 1}`));
       choices.appendChild(choice);
     });

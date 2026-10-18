@@ -7,7 +7,7 @@ test.before(async()=>{browser=await chromium.launch({headless:true,executablePat
 test.after(async()=>browser?.close());
 async function open(query='',legacy=false,student=''){
  const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.route('**/*',route=>{let u=new URL(route.request().url());if(u.origin==='http://studio.test'&&u.pathname.startsWith('/halacha/')&&!u.pathname.endsWith('gallery.js')){const file=path.join(root,u.pathname.endsWith('/')?u.pathname+'index.html':u.pathname);return route.fulfill({body:fs.readFileSync(file),contentType:file.endsWith('.html')?'text/html':file.endsWith('.css')?'text/css':'application/javascript'});}return route.fulfill({body:'',contentType:'application/javascript'});});
+ await page.route('**/*',route=>{let u=new URL(route.request().url());if(u.origin==='http://studio.test'&&u.pathname.startsWith('/halacha/')&&!u.pathname.endsWith('gallery.js')){const file=path.join(root,u.pathname.endsWith('/')?u.pathname+'index.html':u.pathname),mime=file.endsWith('.html')?'text/html':file.endsWith('.css')?'text/css':file.endsWith('.webp')?'image/webp':file.endsWith('.png')?'image/png':'application/javascript';return route.fulfill({body:fs.readFileSync(file),contentType:mime});}return route.fulfill({body:'',contentType:'application/javascript'});});
  if(student)await page.addInitScript(id=>sessionStorage.setItem('b3Games_studentId',id),student);
  if(legacy)await page.addInitScript(()=>{
   const c=document.createElement('canvas');c.width=400;c.height=700;const ctx=c.getContext('2d');ctx.fillStyle='#e53935';ctx.fillRect(30,30,100,100);
@@ -29,9 +29,9 @@ test('drawing, eraser, undo, redo and shape fill use the saved bitmap',async()=>
  await stroke(p,'rect',220,430,320,530);await p.locator('#a [data-color="#e53935"]').first().click();await stroke(p,'fill',270,480,270,480);assert.deepEqual((await pixel(p,270,480)).slice(0,3),[229,57,53]);assert.equal((await pixel(p,190,480))[3],0);
  assert.ok(await p.evaluate(()=>S.a_draw[0].startsWith('data:image/png')));assert.deepEqual(errors,[]);await p.close();
 });
-test('text, Torah stickers, picture actions and backgrounds persist with undo',async()=>{
- const {page:p,errors}=await open();await p.getByRole('button',{name:'Add text box'}).click();await p.locator('#a .tb-text').fill('My mitzvah');await p.locator('#a .studio-more-stickers>summary').click();await p.getByRole('button',{name:'Torah',exact:true}).click();assert.equal(await p.locator('#a .studio-sticker img').getAttribute('alt'),'Torah');
- await p.evaluate(()=>openCustomizer(document.querySelector('#a .studio-sticker')));await p.getByRole('button',{name:'Flip picture',exact:true}).click();assert.equal(await p.locator('#a .studio-sticker img').evaluate(e=>e.style.transform),'scaleX(-1)');await p.getByRole('button',{name:'Copy',exact:false}).last().click();assert.equal(await p.locator('#a .studio-sticker').count(),2);await p.getByRole('button',{name:'Done',exact:false}).click();
+test('text, matching storybook stickers, picture actions and backgrounds persist with undo',async()=>{
+ const {page:p,errors}=await open();await p.getByRole('button',{name:'Add text box'}).click();await p.locator('#a .tb-text').fill('My mitzvah');await p.getByRole('button',{name:'Sefer',exact:true}).click();assert.equal(await p.locator('#a .studio-sticker .storybook-sticker-art').count(),1);
+ await p.evaluate(()=>openCustomizer(document.querySelector('#a .studio-sticker')));await p.getByRole('button',{name:'Copy',exact:false}).last().click();assert.equal(await p.locator('#a .studio-sticker').count(),2);await p.getByRole('button',{name:'Done',exact:false}).click();
  await p.getByRole('button',{name:'Sky',exact:false}).click();assert.equal(await p.locator('#a .page').first().getAttribute('data-studio-bg'),'sky');await p.locator('#a [data-history=undo]').click();assert.equal(await p.locator('#a .page').first().getAttribute('data-studio-bg'),'');await p.reload();await p.getByRole('button',{name:/סימן א/}).click();assert.equal(await p.locator('#a .tb-text').textContent(),'My mitzvah');assert.equal(await p.locator('#a .studio-sticker').count(),2);assert.deepEqual(errors,[]);await p.screenshot({path:process.env.HALACHA_TEST_SCREENSHOT||'/tmp/halacha-studio.png',fullPage:true});await p.close();
 });
 test('teacher student-work inspection is read only',async()=>{
@@ -49,7 +49,8 @@ test('reset is reversible and student account autosave retains the existing path
  await p.waitForFunction(()=>window.testWrites.length>0);
  assert.equal(await p.evaluate(()=>window.testWrites.at(-1).path),'b3Games/students/studio-test-only/halacha/siman1');
  assert.ok(await p.evaluate(()=>window.testWrites.at(-1).value.state.a_scrap_pages[0].includes('Keep my work')));
- assert.ok(await p.evaluate(()=>window.testWrites.at(-1).value.state.a_draw[0].startsWith('data:image/png')));
+ await p.waitForFunction(()=>window.testWrites.some(entry=>entry.value.state.a_draw?.[0]?.startsWith('data:image/png')));
+ assert.ok(await p.evaluate(()=>window.testWrites.some(entry=>entry.value.state.a_draw?.[0]?.startsWith('data:image/png'))));
  await p.evaluate(()=>resetScrapbookPage('a'));assert.equal(await p.locator('#a .scrap').count(),0);
  await p.locator('#a [data-history=undo]').click();await p.waitForFunction(()=>!document.querySelector('#a .draw-layer')._loading);
  assert.equal(await p.locator('#a .tb-text').textContent(),'Keep my work');assert.ok((await pixel(p,100,450))[3]>0);assert.deepEqual(errors,[]);await p.close();
@@ -64,6 +65,11 @@ test('Seif Aleph lesson is complete, RTL, ordered for the weekly plan, and indep
  const {page:p,errors}=await open();
  const order=await p.locator('#tabs button').evaluateAll(nodes=>nodes.map(n=>n.dataset.id).filter(id=>['a','c','b','f','d','e'].includes(id)));
  assert.deepEqual(order.slice(0,6),['a','c','b','f','d','e']);
+ assert.equal(await p.locator('#a .hal-a-source h3').textContent(),'Key Terms');
+ assert.equal(await p.locator('#a .hal-a-scenarios h3').textContent(),'Examples from Daily Life');
+ assert.equal(await p.locator('#a .studio-stickers').count(),1);
+ await p.waitForFunction(()=>[...document.querySelectorAll('#a .hal-a-choice img')].length===5&&[...document.querySelectorAll('#a .hal-a-choice img')].every(img=>img.complete&&img.naturalWidth>500));
+ await p.evaluate(()=>Promise.all([...document.querySelectorAll('#a .hal-a-choice img')].map(img=>img.decode())));
  if(process.env.HALACHA_LESSON_SCREENSHOT)await p.screenshot({path:process.env.HALACHA_LESSON_SCREENSHOT,fullPage:true});
  const text=p.locator('#a .hal-a-full-text');
  assert.equal(await text.getAttribute('dir'),'rtl');
@@ -89,26 +95,47 @@ test('Seif Aleph lesson is complete, RTL, ordered for the weekly plan, and indep
  assert.deepEqual(errors,[]);await p.close();
  const {page:t,errors:teacherErrors}=await open('?teacherView=halacha-synthetic');
  await t.evaluate(()=>{setHalachaMode(true);openSiman('א')});
+ await t.waitForFunction(()=>[...document.querySelectorAll('#a .hal-a-choice img')].length===5&&[...document.querySelectorAll('#a .hal-a-choice img')].every(img=>img.complete&&img.naturalWidth>500));
+ await t.evaluate(()=>Promise.all([...document.querySelectorAll('#a .hal-a-choice img')].map(img=>img.decode())));
  assert.equal(await t.locator('#a .hal-a-teacher-notes').isVisible(),true);
  assert.equal(await t.getByRole('button',{name:'Add text box'}).isEnabled(),false);
  if(process.env.HALACHA_TEACHER_SCREENSHOT)await t.screenshot({path:process.env.HALACHA_TEACHER_SCREENSHOT,fullPage:true});
  assert.deepEqual(teacherErrors,[]);await t.close();
 });
 
-test('picture practice retries, title ideas are editable, themed stickers and pasted pictures persist',async()=>{
+test('five storybook scene choices, illustrated stickers, theme, paste and scrapbook persist',async()=>{
  const {page:p,errors}=await open('',false,'halacha-seif-a-synthetic');
- const wrong=p.getByRole('button',{name:/leaves his toys scattered/});
+ const sceneImages=p.locator('#a .hal-a-choice img');assert.equal(await sceneImages.count(),5);
+ for(let i=0;i<5;i++)assert.ok(await sceneImages.nth(i).evaluate(img=>img.complete&&img.naturalWidth>500),`scene ${i+1} should load as a full quality illustration`);
+ assert.equal(await p.locator('#a .hal-a-choice').count(),5);
+ if(process.env.HALACHA_SCENES_SCREENSHOT)await p.locator('#a .hal-a-scenarios').screenshot({path:process.env.HALACHA_SCENES_SCREENSHOT});
+ const wrong=p.getByRole('button',{name:/walking respectfully outside/});
  await wrong.click();assert.match(await p.locator('#a .hal-a-feedback').textContent(),/Try again/);
- const correct=p.getByRole('button',{name:/puts his toys away carefully/});
+ const correct=p.getByRole('button',{name:/alone in his bedroom/});
  await correct.click();assert.match(await p.locator('#a .hal-a-feedback').textContent(),/Yes!/);
  assert.equal(await p.locator('#a .scrap').count(),0,'answering does not auto-fill the scrapbook');
  await p.getByRole('button',{name:'Does It Matter How I Behave When Nobody Is Watching?'}).click();
  const title=p.locator('#a .tb-text').last();assert.equal(await title.getAttribute('contenteditable'),'true');
  await title.fill('My own edited title');
- assert.equal(await p.getByRole('button',{name:'Home',exact:true}).count(),1);
+ assert.equal(await p.getByRole('button',{name:'House',exact:true}).count(),1);
  assert.equal(await p.getByRole('button',{name:'Shofar',exact:true}).count(),0);
- await p.getByRole('button',{name:'Home',exact:true}).click();
- assert.equal(await p.locator('#a .studio-sticker img[alt="Home"]').count(),1);
+ assert.equal(await p.getByRole('button',{name:'Shtender',exact:true}).count(),1);
+ const stickerArt=p.locator('#a .studio-stickers button img.storybook-sticker-art');assert.equal(await stickerArt.count(),12);
+ const stickerSources=await stickerArt.evaluateAll(images=>images.map(image=>image.getAttribute('src')));assert.equal(new Set(stickerSources).size,12,'each picker sticker should use its own image asset');
+ for(let i=0;i<12;i++)assert.ok(await stickerArt.nth(i).evaluate(image=>image.complete&&image.naturalWidth>500),`sticker ${i+1} should load as a standalone image`);
+ await p.getByRole('button',{name:'Sefer',exact:true}).click();
+ assert.equal(await p.locator('#a .studio-sticker .storybook-sticker-art[alt="Sefer"]').count(),1);
+ const sticker=p.locator('#a .studio-sticker').first();await sticker.evaluate(e=>{e.style.left='100px';e.style.top='100px';});
+ const start=await sticker.evaluate(e=>({left:parseFloat(e.style.left),top:parseFloat(e.style.top)}));
+ const bounds=await sticker.boundingBox();await p.mouse.move(bounds.x+40,bounds.y+40);await p.mouse.down();await p.mouse.move(bounds.x+85,bounds.y+65,{steps:8});await p.mouse.up();
+ const moved=await sticker.evaluate(e=>({left:parseFloat(e.style.left),top:parseFloat(e.style.top)}));assert.ok(moved.left>start.left&&moved.top>start.top,'storybook sticker should drag on the canvas');
+ await p.evaluate(()=>openCustomizer(document.querySelector('#a .studio-sticker')));
+ const beforeResize=await sticker.evaluate(e=>parseFloat(e.style.width)||e.getBoundingClientRect().width);
+ const resize=sticker.locator('.resize-handle,.resize-handle *,[data-resize]');
+ if(await resize.count()){const rb=await resize.last().boundingBox();await p.mouse.move(rb.x+4,rb.y+4);await p.mouse.down();await p.mouse.move(rb.x+35,rb.y+35,{steps:5});await p.mouse.up();}
+ const afterResize=await sticker.evaluate(e=>parseFloat(e.style.width)||e.getBoundingClientRect().width);assert.ok(afterResize>=beforeResize,'storybook sticker remains resizable');
+ if(process.env.HALACHA_STICKER_SCREENSHOT)await p.locator('#a .studio-stickers').screenshot({path:process.env.HALACHA_STICKER_SCREENSHOT});
+ if(process.env.HALACHA_STICKER_CANVAS_SCREENSHOT)await p.locator('#a .book').screenshot({path:process.env.HALACHA_STICKER_CANVAS_SCREENSHOT});
  const position=await title.evaluate(e=>({left:e.closest('.scrap').style.left,top:e.closest('.scrap').style.top}));
  await p.getByRole('button',{name:'Photo album',exact:false}).click();
  assert.deepEqual(await title.evaluate(e=>({left:e.closest('.scrap').style.left,top:e.closest('.scrap').style.top})),position);
@@ -117,8 +144,10 @@ test('picture practice retries, title ideas are editable, themed stickers and pa
  await p.waitForFunction(()=>document.querySelectorAll('#a .scrap img[src^="data:image/png"]').length>0);
  await p.reload();await p.getByRole('button',{name:/סימן א/}).click();
  assert.equal(await p.locator('#a .tb-text').last().textContent(),'My own edited title');
- assert.equal(await p.locator('#a .studio-sticker img[alt="Home"]').count(),1);
+ assert.equal(await p.locator('#a .studio-sticker .storybook-sticker-art[alt="Sefer"]').count(),1);
  assert.equal(await p.locator('#a .page').first().getAttribute('data-studio-bg'),'photo');
  assert.ok(await p.locator('#a .scrap img[src^="data:image/png"]').count()>0);
+ assert.deepEqual(await p.locator('#a .studio-sticker').first().evaluate(e=>({left:parseFloat(e.style.left),top:parseFloat(e.style.top)})),moved,'sticker position should persist after refresh');
+ assert.ok(await p.locator('#a .studio-sticker').first().evaluate((e,size)=>(parseFloat(e.style.width)||e.getBoundingClientRect().width)>=size,afterResize),'sticker size should persist after refresh');
  assert.deepEqual(errors,[]);await p.close();
 });

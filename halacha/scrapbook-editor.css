@@ -17,3 +17,7 @@
 .studio-more-stickers>summary{padding:6px 2px;color:#34567d;font-size:12px;font-weight:800;cursor:pointer}
 .studio-custom-bg{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px;border:1px solid #dce7f3;border-radius:10px;background:#fff;color:#34567d;font-size:12px;font-weight:800}
 .studio-custom-bg input{width:42px;height:32px;border:0;padding:0;background:transparent;cursor:pointer}
+.storybook-sticker-art{display:block;width:100%;height:100%;min-height:40px;object-fit:contain}
+.studio-stickers button>.storybook-sticker-art{width:88px;height:88px;margin:0 auto}
+.studio-sticker .storybook-sticker-art{min-height:0}
+@media(max-width:650px){.studio-stickers button>.storybook-sticker-art{width:76px;height:76px}}
