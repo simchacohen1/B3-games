@@ -34,23 +34,10 @@ test('students from Fun Torah Tools never see a Join button and reconnect on the
   assert.match(classroom,/if\(kind==='peer-unavailable'\)\{goWaiting\(/);
 });
 
-test('the waiting page does not send a removed student back into the same lesson',async()=>{
-  let listener,redirect;const nodes=new Map(),element=id=>{if(!nodes.has(id))nodes.set(id,{textContent:''});return nodes.get(id)};
-  const store=new Map([['b3Games_studentId','pt1'],['b3Games_classPin','synthetic'],['classPointerRemovedRoom',ROOM]]);
-  const row={name:'Pointer Test',active:true,toolGrants:{'class-pointer':true},members:{pt1:{active:true}}};
-  const db={ref:p=>({child:k=>db.ref(p+'/'+k),once:async()=>({val:()=>p.endsWith('/profile')?{name:'Pointer Test Student One'}:row}),on:(_e,cb)=>{listener=cb}})};
-  const context=vm.createContext({window:{B3_APP_CONTEXT:{workspaceId:'b3-2026'},FunTorahStudentClass:{resolve:async()=>({workspaceId:'b3-2026',classId:'pointer_test'})}},firebase:{apps:[{}],database:()=>db},
-    document:{getElementById:element},location:{href:'https://example.test/dashboard.html',replace:v=>redirect=v},URL,AbortSignal,
-    sessionStorage:{getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v)},fetch:async()=>({ok:true,json:async()=>({ok:true})})});
-  vm.runInContext(read('class-pointer-prototype/dashboard-core.js'),context);
-  await vm.runInContext(read('class-pointer-prototype/dashboard.js'),context);
-  listener({val:()=>({[ROOM]:{roomId:ROOM,createdAt:Date.now()}})});
-  assert.equal(redirect,undefined);
-  assert.match(element('message').textContent,/removed you/);
-  // A new lesson (different room) is joined normally.
-  const next=ROOM.replace('abc','abd');
-  listener({val:()=>({[next]:{roomId:next,createdAt:Date.now()}})});
-  assert.match(redirect,/dashboard=student&room=/);
+test('retired student entry never reopens the old separate Pointer classroom',()=>{
+  const dashboard=read('class-pointer-prototype/dashboard.js');
+  assert.match(dashboard,/location\.replace\(new URL\('\.\.\/index\.html'/);
+  assert.doesNotMatch(dashboard,/classroom\.html\?dashboard=student&room=/);
 });
 
 test('class membership recheck covers every connected student (server checks 16 per request)',async()=>{
