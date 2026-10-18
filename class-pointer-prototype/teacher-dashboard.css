@@ -174,7 +174,7 @@ body.cp-simple #stage:has(.cp-source-picker:not([hidden])){aspect-ratio:auto;min
 #stage.tb-docked-left > #placeholder{left:56px!important;width:calc(100% - 56px)!important;box-sizing:border-box}
 
 /* Full screen: Students panel as an overlay inside the lesson, opened from the 👥 rail button. */
-#stage .cp-permissions-sidebar.cp-drawer-overlay{display:none!important;position:absolute!important;top:12px!important;bottom:12px!important;right:12px!important;left:auto!important;width:min(360px,calc(100% - 80px))!important;margin:0!important;overflow:auto;z-index:40;box-shadow:0 12px 36px #0006;cursor:default}
+#stage .cp-permissions-sidebar.cp-drawer-overlay{display:none!important;position:absolute!important;top:12px!important;bottom:12px!important;right:12px!important;left:auto!important;width:min(360px,calc(100% - 80px));margin:0!important;overflow:auto;z-index:40;box-shadow:0 12px 36px #0006;cursor:default}
 #stage.tb-docked-left .cp-permissions-sidebar.cp-drawer-overlay{left:66px!important;right:auto!important}
 #stage .cp-permissions-sidebar.cp-drawer-overlay.cp-overlay-open{display:block!important}
 #stage .teacher-dock .cp-dock-active{background:var(--cp-blue,#2563eb)!important;color:#fff!important}
@@ -184,18 +184,65 @@ body.cp-simple #stage:has(.cp-source-picker:not([hidden])){aspect-ratio:auto;min
    Keep the actual live screen/whiteboard tiles visible, not a duplicate toolbar. */
 body.teacher-view.cp-simple .boards-view > .boards-bar:first-child{display:none!important}
 /* Give the floating full-screen Students drawer a larger, readable surface.
-   The teacher can resize it without affecting permissions. */
+   The teacher can resize it (bottom-right corner) without affecting permissions.
+   Width/height deliberately avoid !important: the browser's resize handle writes
+   plain inline sizes, which an !important stylesheet value would silently override. */
 #stage .cp-permissions-sidebar.cp-drawer-overlay{
-  width:clamp(340px,36vw,650px)!important;
-  max-width:calc(100% - 76px)!important;
-  height:min(76vh,760px)!important;
+  width:clamp(340px,36vw,650px);
+  max-width:calc(100% - 24px)!important;
+  height:min(76vh,760px);
   max-height:calc(100% - 24px)!important;
   bottom:auto!important;
   resize:both!important;
-  min-width:320px!important;
+  min-width:300px!important;
   min-height:220px!important;
 }
+#stage .cp-permissions-sidebar.cp-drawer-overlay #roster,
+#stage .cp-permissions-sidebar.cp-drawer-overlay .sharing-permissions-roster{max-height:none!important}
 #stage .cp-permissions-sidebar.cp-drawer-overlay .cp-drawer-head{cursor:move;touch-action:none}
 #stage .cp-permissions-sidebar.cp-drawer-overlay button,
 #stage .cp-permissions-sidebar.cp-drawer-overlay select{min-height:38px}
 #stage .cp-permissions-sidebar.cp-drawer-overlay .cp-level{font-size:15px;min-height:42px}
+
+/* ---------- Full screen: larger, clearer Present controls ----------
+   Present is the teacher's main action, so in full screen it is a solid blue
+   button with a readable label, and its menu uses big rows with icons. */
+#stage .teacher-dock.floating .teacher-dashboard-share-trigger,
+#stage .teacher-dock.floating .tb-menu-wrap:has(>[data-menu="tbShareMenu"]){width:100%;justify-content:center}
+#stage .teacher-dock.floating [data-menu="tbShareMenu"]{min-height:46px;width:100%;padding:8px 14px;border:0;border-radius:12px;background:#1d4ed8;color:#fff;font-size:16px!important;font-weight:800;justify-content:center;box-shadow:0 3px 10px #1d4ed855}
+#stage .teacher-dock.floating [data-menu="tbShareMenu"]:hover,
+#stage .teacher-dock.floating [data-menu="tbShareMenu"][aria-expanded="true"]{background:#1e40af;color:#fff}
+#stage .teacher-dock.floating [data-menu="tbShareMenu"]:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+#stage .teacher-dock.floating #tbShareMenu{min-width:320px;padding:12px;gap:6px;border-radius:16px}
+#stage .teacher-dock.floating #tbShareMenu>strong{font-size:17px;padding:2px 6px 6px;color:#12305f}
+#stage .teacher-dock.floating #tbShareMenu>button{min-height:52px;padding:10px 14px;font-size:17px;font-weight:700;border:1px solid #dbe3f2;background:#f8fafc;border-radius:12px;gap:12px}
+#stage .teacher-dock.floating #tbShareMenu>button:hover:enabled{background:#e8effd;border-color:#93b4f5}
+#stage .teacher-dock.floating #tbShareMenu>button:disabled{opacity:.45}
+#stage .teacher-dock.floating #tbShareMenu>button[data-source]::before{font-size:22px;width:28px;text-align:center;flex:none}
+#tbShareMenu>button[data-source="shareScreen"]::before{content:"\1F5A5"}
+#tbShareMenu>button[data-source="openBrowserTab"]::before{content:"\1F4F7"}
+#tbShareMenu>button[data-source="openPdf"]::before{content:"\1F4C4"}
+#tbShareMenu>button[data-source="openWebpage"]::before{content:"\1F310"}
+#tbShareMenu>button[data-source="openWhiteboard"]::before{content:"\1F4DD"}
+#tbShareMenu>button[data-source="stopScreen"]::before{content:"\23F9"}
+#stage .teacher-dock.floating #tbShareMenu>button[data-source="stopScreen"]:enabled{color:#b4232f}
+/* Left rail: keep Present large enough to find, with its label under the icon. */
+#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"]{width:48px!important;height:56px!important;min-height:0;padding:2px 0!important;flex-direction:column;gap:1px;background:#1d4ed8!important;color:#fff!important;border-radius:10px}
+#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"]::before{font-size:22px!important;line-height:1}
+#stage .teacher-dock.floating.dock-left [data-menu="tbShareMenu"]::after{content:"Present";font-size:11px;font-weight:800;line-height:1.1}
+
+/* Teacher whiteboard: pasted pictures waiting to be placed (move / resize). */
+#pdfContent .board-picture-edit{position:absolute;z-index:3;box-sizing:border-box;outline:3px dashed #2563eb;outline-offset:2px;cursor:move;touch-action:none;background:#fff;box-shadow:0 8px 26px #0f172a40}
+#pdfContent .board-picture-edit.selected{outline-style:solid}
+#pdfContent .board-picture-edit img{display:block;width:100%;height:100%;pointer-events:none;-webkit-user-select:none;user-select:none}
+#pdfContent .board-picture-handle{position:absolute;width:20px;height:20px;background:#fff;border:3px solid #2563eb;border-radius:50%;box-sizing:border-box;touch-action:none}
+#pdfContent .board-picture-handle.nw{left:-12px;top:-12px;cursor:nwse-resize}
+#pdfContent .board-picture-handle.ne{right:-12px;top:-12px;cursor:nesw-resize}
+#pdfContent .board-picture-handle.sw{left:-12px;bottom:-12px;cursor:nesw-resize}
+#pdfContent .board-picture-handle.se{right:-12px;bottom:-12px;cursor:nwse-resize}
+#pdfContent .board-picture-remove{position:absolute;top:-16px;left:50%;transform:translateX(-50%);width:32px;height:32px;min-height:0;padding:0;border:0;border-radius:50%;background:#b4232f;color:#fff;font:700 16px/32px system-ui;cursor:pointer;box-shadow:0 2px 8px #0005}
+.board-picture-bar{position:absolute;z-index:12;top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;max-width:calc(100% - 24px);padding:10px 12px 10px 16px;background:#101827f0;color:#fff;border-radius:14px;box-shadow:0 10px 30px #0006;font:600 15px system-ui}
+.board-picture-bar[hidden]{display:none}
+.board-picture-bar .board-picture-done{min-height:44px;padding:0 18px;border:0;border-radius:11px;background:#16a34a;color:#fff;font:800 16px system-ui;cursor:pointer;white-space:nowrap}
+.board-picture-bar .board-picture-done:hover{background:#15803d}
+@media(max-width:640px){.board-picture-bar .board-picture-help{display:none}}
