@@ -261,6 +261,27 @@
       return loadOneScript(new URL("vendor/firebase/12.15.0/"+m[1],rootBase).href);
     });
   }
+  function waitForFirebaseAuthState(auth) {
+    if (auth && typeof auth.authStateReady === "function") return auth.authStateReady();
+    if (!auth || typeof auth.onAuthStateChanged !== "function") return Promise.resolve();
+    // Firebase v8 does not expose authStateReady(). Its first observer callback
+    // is the signal that persisted auth has been restored (including null for a
+    // signed-out browser). Do not let private REST reads race that restoration.
+    return new Promise(function(resolve, reject) {
+      var unsubscribe = null, finished = false;
+      function finish(error) {
+        if (finished) return;
+        finished = true;
+        if (unsubscribe) unsubscribe();
+        if (error) reject(error); else resolve();
+      }
+      try {
+        unsubscribe = auth.onAuthStateChanged(function() { finish(); }, finish);
+        // Some SDK/test implementations invoke the initial callback inline.
+        if (finished && unsubscribe) unsubscribe();
+      } catch (error) { finish(error); }
+    });
+  }
   async function watchTeacherAccess() {
     try {
       // Let the page's own Firebase scripts finish before supplying missing ones.
@@ -275,6 +296,7 @@
       if(!window.firebase.database) await loadAuthScript(base+"database"+suffix);
       if(!window.B3_FIREBASE_CONFIG) await loadAuthScript(new URL("firebase-config.js",rootBase).href);
       if(!window.B3SiteSettings) await loadAuthScript(new URL("site-settings.js?v=20261008-owner-demo",rootBase).href);
+      await waitForFirebaseAuthState(window.firebase.auth());
       markAuthReady();
       window.B3SiteSettings.onAuthStateChanged(function(user,authorized,access){
         markAuthReady();
