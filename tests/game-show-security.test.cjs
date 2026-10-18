@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {safeQuestion,isActiveStudentAccess,canAcceptStudentBuzz}=require('../backend/functions/game-show-student-questions.js');
+const {safeQuestion,isActiveStudentAccess,canAcceptStudentBuzz}=require('../backend/functions/game-show-student-questions-core.cjs');
 
 function snap(value){return{exists:()=>value!==null,child:path=>({val:()=>path.split('/').reduce((v,k)=>v?.[k],value)})};}
 
