@@ -102,32 +102,104 @@
       if(!openPersistentShareWindow())return beginShare(event);
     });
 
+    // ---------- Background class connection ----------
+    // While the teacher has Classroom Pointer open, a signed-in student is connected to his own class
+    // from whichever Fun Torah Tools page he is on, so he shows as joined without pressing anything.
+    // The teacher's page admits him only with a fresh server-issued ticket for this class and lesson,
+    // gives him no lesson data here, and a deliberate removal by the teacher stops it.
+    let presencePeer=null,presenceConn=null,presenceTimer=null,presenceDelay=0,presenceTarget='',presenceFailures=0;
+    const later=(fn,ms)=>typeof setTimeout==='function'?setTimeout(fn,ms):0,cancelLater=t=>{if(t&&typeof clearTimeout==='function')clearTimeout(t)};
+    const removedRoom=()=>{try{return sessionStorage.getItem('classPointerRemovedRoom')||''}catch{return''}};
+    function activityName(){
+      if(persistentShareWindow)return 'Screen sharing window';
+      const path=location.pathname.replace(/\/index\.html$/,'/');
+      if(path==='/'||/\/B3-games\/$/.test(path))return 'Home page';
+      return String(document.title||'').split(/\s[|·–-]\s/)[0].trim().slice(0,40)||'Another activity';
+    }
+    function stopPresence(){
+      cancelLater(presenceTimer);presenceTimer=null;
+      const conn=presenceConn;presenceConn=null;try{conn?.close()}catch{}
+      const old=presencePeer;presencePeer=null;try{old?.destroy()}catch{}
+    }
+    function schedulePresence(ms){cancelLater(presenceTimer);presenceTimer=later(connectPresence,ms)}
+    // Give up after repeated failures until the teacher's lesson changes; never retry in a tight loop.
+    function retryPresence(){if(!latestSession)return;stopPresence();if(++presenceFailures>6)return;presenceDelay=Math.min(60000,(presenceDelay||2000)*2);schedulePresence(presenceDelay)}
+    function showRemovedNotice(){
+      const note=document.createElement('div');note.setAttribute('role','status');
+      note.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483641;padding:12px 18px;border-radius:12px;background:#fff2ef;color:#8a2119;border:1px solid #e4a69e;font:700 15px system-ui,sans-serif;box-shadow:0 6px 24px #0003';
+      note.textContent='Your teacher removed you from the class.';document.body.appendChild(note);later(()=>note.remove(),9000);
+    }
+    async function connectPresence(){
+      presenceTimer=null;
+      const session=latestSession;
+      if(!session||sessionStorage.getItem('b3Games_studentId')!==id){stopPresence();return}
+      const room=session.roomId;
+      if(removedRoom()===room||(presenceConn&&presenceConn.peer===room))return;
+      stopPresence();
+      try{
+        if(!window.Peer)await load(new URL('class-pointer-prototype/vendor/peerjs-1.5.5.min.js',root).href);
+        const own=new Peer('class-pointer-student-'+crypto.randomUUID());
+        if(typeof own.on!=='function'||typeof own.connect!=='function'){try{own.destroy?.()}catch{}return}
+        presencePeer=own;
+        await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('timeout')),15000);own.once('open',()=>{clearTimeout(t);resolve()});own.once('error',e=>{clearTimeout(t);reject(e)})});
+        if(presencePeer!==own||latestSession?.roomId!==room)return;
+        own.on('error',error=>{if(presencePeer!==own)return;if(error?.type==='peer-unavailable'){stopPresence();return}retryPresence()});
+        own.on('disconnected',()=>{if(presencePeer===own&&!own.destroyed){try{own.reconnect()}catch{}}});
+        const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'joinIssue',room,classId,studentId:id,pin,peerId:own.id}),signal:AbortSignal.timeout(15000)});
+        const ticket=await response.json().catch(()=>({}));
+        if(presencePeer!==own)return;
+        // Not in this class or signed out: stop quietly. Server trouble: try again later.
+        if(!response.ok||!ticket.ok){if(response.status>=400&&response.status<500){stopPresence();return}throw Error('ticket')}
+        const conn=own.connect(room,{reliable:true});presenceConn=conn;
+        conn.on('open',()=>{if(presenceConn===conn)conn.send({type:'join',presence:true,ticket:ticket.token,activity:activityName(),name:ticket.studentName})});
+        conn.on('data',message=>{
+          if(presenceConn!==conn||!message||typeof message!=='object')return;
+          if(message.type==='present'){presenceDelay=0;presenceFailures=0;return}
+          if(message.type==='removed'){try{sessionStorage.setItem('classPointerRemovedRoom',room)}catch{}stopPresence();showRemovedNotice();return}
+          // Already connected in the lesson or another window, or the lesson ended: check again later.
+          if(['elsewhere','replaced','full'].includes(message.type)){stopPresence();schedulePresence(60000);return}
+          if(message.type==='ended'){stopPresence()}
+        });
+        const lost=()=>{if(presenceConn===conn){presenceConn=null;retryPresence()}};
+        conn.on('close',lost);conn.on('error',lost);
+      }catch{if(latestSession?.roomId===room)retryPresence()}
+    }
+    function followSession(next){
+      if(!next){presenceTarget='';presenceDelay=0;stopPresence();return}
+      if(next.roomId!==presenceTarget){presenceTarget=next.roomId;presenceDelay=0;presenceFailures=0;schedulePresence(400)}
+    }
+    window.addEventListener('pagehide',stopPresence);
+
     const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
     async function watchPermission(session){
       const request=session?.destinationRequest,at=request?.at||session?.shareRequest?.at;
       const hasRequest=(request&&['screens','boards'].includes(request.mode))||(session?.studentScreenSharing===true&&Number.isFinite(at));
-      if(!hasRequest&&session?.studentScreenSharing===true){
-        // The teacher has enabled screen sharing for this class but has not sent a
-        // request: the student may start sharing himself (button only, no pop-up).
-        // The sharing service still refuses a student the teacher has turned off,
-        // and the browser still asks the student to choose what to share.
-        const key=session.roomId+':enabled:'+String(session.permissionRevision||'');
-        if(permissionKey===key&&permissionReady)return;
-        permissionRequest++;permissionKey=key;permission={};permissionReady=true;refreshSessionState();return;
-      }
-      if(!hasRequest){permissionKey='';permission={};permissionReady=false;refreshSessionState();return}
-      const key=session.roomId+':'+String(session.permissionRevision||'')+':'+String(at||'');
+      // Sharing enabled without a request: the student may start sharing himself.
+      const enabledOnly=!hasRequest&&session?.studentScreenSharing===true;
+      if(!hasRequest&&!enabledOnly){permissionKey='';permission={};permissionReady=false;refreshSessionState();return}
+      const key=session.roomId+':'+String(session.permissionRevision||'')+':'+(enabledOnly?'enabled':String(at||''));
       if(permissionKey===key&&permissionReady)return;
-      permissionKey=key;permission={};permissionReady=false;const current=++permissionRequest;
+      // Until his own permission is confirmed the button is hidden, so a teacher's change hides it at once.
+      // (A share already running is not interrupted while the check is in progress.)
+      const keep=permission;permissionKey=key;permission={};permissionReady=false;const current=++permissionRequest;
+      if(!stream)holder.style.display='none';else{permission=keep;permissionReady=true}
       try{
         const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({action:'permissions',studentId:id,pin,classId,room:session.roomId}),signal:AbortSignal.timeout(10000)});
         const result=await response.json();
-        if(!response.ok||!result?.ok)throw Error(result?.error||'Could not check your sharing permissions.');
         if(current!==permissionRequest||latestSession?.roomId!==session.roomId||permissionKey!==key)return;
-        permission={screenSharingDenied:result.screenSharingDenied===true,whiteboardDenied:result.whiteboardDenied===true};permissionReady=true;
+        if(response.ok&&result?.ok){
+          permission={screenSharingDenied:result.screenSharingDenied===true,whiteboardDenied:result.whiteboardDenied===true};permissionReady=true;
+        }else if(enabledOnly&&response.status===403&&/no active student activity request/i.test(result?.error||'')){
+          // The sharing service in use does not answer this question without a request yet; it still
+          // refuses a student the teacher turned off when he tries to share.
+          permission={};permissionReady=true;
+        }else throw Error(result?.error||'Could not check your sharing permissions.');
       }catch{
-        if(current===permissionRequest&&permissionKey===key){permission={};permissionReady=false;status('Could not check sharing permissions. Ask your teacher to resend.');}
+        if(current===permissionRequest&&permissionKey===key){
+          if(enabledOnly){permission={};permissionReady=true}
+          else{permission={};permissionReady=false;status('Could not check sharing permissions. Ask your teacher to resend.');}
+        }
       }
       refreshSessionState();
     }
@@ -188,10 +260,12 @@
       if(sessionStorage.getItem('b3Games_studentId')!==id){
         if(stream)stop();
         latestSession=null;active=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;holder.style.display='none';hidePrompt();
+        followSession(null);
         return;
       }
       const next=current(snapshot.val());
       latestSession=next;
+      followSession(next);
       if(next)await watchPermission(next);else{permissionKey='';permissionRequest++;permission={};permissionReady=false;refreshSessionState()}
     },()=>{latestSession=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;active=null;holder.style.display='none';stop()});
     async function beginShare(){
