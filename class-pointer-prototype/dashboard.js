@@ -38,8 +38,8 @@
           if(!C.permitted(access,id,row))continue;
           const name=String(row.name||id);
           const btn=document.createElement('button');
-          btn.type='button';btn.className='class-launch-button';btn.dataset.classId=id;
-          classChoices.push({btn,name});
+          btn.type='button';btn.className='class-launch-button';btn.setAttribute('data-class-id',id);
+          classChoices.push({btn,name,id});
           btn.textContent=(mode==='boards'?'📝 ':mode==='screens'?'🖥 ':'👆 ')+name;
           btn.setAttribute('aria-label',(mode==='boards'?'Send to Whiteboards':mode==='screens'?'View Student Screens':'Start classroom')+' for '+name);
           btn.addEventListener('click',()=>{
@@ -58,10 +58,9 @@
         // The class picker remains available on the workspace itself.
         if(mode==='lesson'&&classChoices.length){
           let saved='';try{saved=localStorage.getItem('classPointerLastTeacherClass')||''}catch{}
-          const authorized=Array.from(buttons.children);
-          const chosen=authorized.find(button=>button.dataset.classId===saved)
-            ||authorized.find(button=>button.dataset.classId==='et')||authorized[0];
-          if(chosen){chosen.click();return}
+          // Only classes this teacher is authorized for are in classChoices.
+          const chosen=classChoices.find(choice=>choice.id===saved)||classChoices.find(choice=>choice.id==='et')||classChoices[0];
+          if(chosen){message('Opening '+chosen.name+'…');chosen.btn.click();return}
         }
         message(buttons.childElementCount
           ?(mode==='lesson'?'Nothing starts until you choose a class.':'Only the class you select will receive the request; screen sharing still requires each student’s browser permission.')
@@ -92,4 +91,3 @@
     },()=>message('Could not find your lesson. Refresh to try again.'));
   }catch(error){message(error.message||'Could not open the classroom. Please try again.')}
 })();
-
