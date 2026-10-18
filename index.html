@@ -1458,7 +1458,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       studentClassChoices=classId?[{id:classId,name:classId.toUpperCase()}]:[];
     }
     if(!classId)return{ok:false,reason:"Your class is not assigned yet. Ask your teacher."};
-    return{ok:true,id:r.id,name:r.name,classId};
+    return{ok:true,id:r.id,name:r.name,classId,customToken:r.classId===classId?r.customToken:""};
   }
 
   let studentClassWatch=null,studentProfileWatch=null,studentMembershipWatch=null;
@@ -1467,9 +1467,29 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(!isStudentPreview){
       const pin=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
       if(!pin)throw new Error("Please sign in again so your student access can be secured.");
-      const credential=await studentAuthCall({action:"login",name:r.name,pin,classId:r.classId});
-      if(!credential.customToken||!window.firebase?.auth)throw new Error("Could not secure your student sign-in. Please try again.");
-      await firebase.auth().signInWithCustomToken(credential.customToken);
+      let customToken=r.customToken;
+      // Reuse the token returned by the initial passcode check when it matches
+      // the selected class. This avoids a redundant second function request.
+      if(!customToken){
+        const credential=await studentAuthCall({action:"login",name:r.name,pin,classId:r.classId});
+        customToken=credential.customToken;
+      }
+      if(!customToken||!window.firebase?.auth)throw new Error("Could not secure your student sign-in. Please try again.");
+      try{
+        await firebase.auth().signInWithCustomToken(customToken);
+      }catch(e){
+        if(e?.code!=="auth/network-request-failed")throw e;
+        // Firebase can lose the connection while exchanging an otherwise
+        // valid custom token. Retry once after a short pause for transient drops.
+        await new Promise(resolve=>setTimeout(resolve,800));
+        try{await firebase.auth().signInWithCustomToken(customToken);}
+        catch(retryError){
+          if(retryError?.code==="auth/network-request-failed"){
+            throw new Error("Your passcode was accepted, but Firebase sign-in was interrupted. Please try again.");
+          }
+          throw retryError;
+        }
+      }
     }
     if(studentClassWatch)studentClassWatch.off();
     if(studentProfileWatch)studentProfileWatch.off();
