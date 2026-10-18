@@ -1,6 +1,6 @@
 'use strict';
 /* Class-scoped activity sharing: keep a student on his learning page for
-   screen requests; whiteboard commands still enter the classroom.
+   screen requests and teacher-controlled individual whiteboards.
    Browser screen capture always requires an explicit student click. */
 (async function(){
   if(window.__classPointerActivityShareLoaded)return;
@@ -55,6 +55,21 @@
     const scope=await window.FunTorahStudentClass.resolve(firebase.database(),id);
     const classId=scope.classId;
     if(scope.workspaceId!==ws||!/^[A-Za-z0-9_-]{1,100}$/.test(classId||''))return;
+    // Mount the existing student whiteboard inside the current activity.
+    const boardStage=document.createElement('div');
+    boardStage.id='fttEmbeddedPointerStage';
+    boardStage.style.cssText='position:fixed;inset:0;z-index:2147483636;display:none;background:#e8eef7';
+    document.body.append(boardStage);
+    const boardCss=document.createElement('link');boardCss.rel='stylesheet';
+    boardCss.href=new URL('class-pointer-prototype/student-boards.css?v=20261018-embedded1',root).href;
+    document.head.append(boardCss);
+    window.ClassPointerBridge={isTeacher:false,embedded:true,embeddedStage:boardStage,
+      sendTeacher:message=>{
+        if(admitted&&presenceConn?.open&&latestSession?.roomId===presenceTarget){
+          try{presenceConn.send(message)}catch{}
+        }
+      },status:()=>{},callTeacher:null};
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261018-embedded1',root).href);
     const sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
     holder.id='fttActivityScreenShare';
@@ -89,7 +104,8 @@
     cancel.addEventListener('click',()=>{hidePrompt();promptStatus.textContent='';});
     function openPersistentShareWindow(){
       const url=new URL('class-pointer-prototype/student-share-window.html?pointerShare=1',root);
-      const popup=window.open(url.href,'classPointerStudentShare','popup,width=560,height=740');
+      // Keep capture alive in an ordinary tab instead of the old large popup.
+      const popup=window.open(url.href,'classPointerStudentShare');
       if(!popup)return false;
       status('Sharing window opened. Leave it open while you visit other activities.');
       hidePrompt();popup.focus?.();return true;
@@ -169,6 +185,7 @@
       if(pendingLessonCall?.metadata?.presentationId===lessonId){const waiting=pendingLessonCall;pendingLessonCall=null;cancelLater(pendingLessonTimer);acceptLesson(waiting)}
     }
     function stopPresence(){
+      window.ClassPointerBoards?.reset?.();
       clearLesson();cancelLater(presenceTimer);presenceTimer=null;
       const conn=presenceConn;presenceConn=null;try{conn?.close()}catch{}
       const old=presencePeer;presencePeer=null;try{old?.destroy()}catch{}
@@ -208,6 +225,10 @@
         conn.on('data',message=>{
           if(presenceConn!==conn||!message||typeof message!=='object')return;
           if(message.type==='present'){admitted=true;presenceDelay=0;presenceFailures=0;return}
+          if(typeof message.type==='string'&&message.type.startsWith('board-')){
+            if(admitted)window.ClassPointerBoards?.fromTeacher(message);
+            return;
+          }
           if(message.type==='lesson-presentation'){announceLesson(message);return}
           if(message.type==='removed'){try{sessionStorage.setItem('classPointerRemovedRoom',room)}catch{}stopPresence();showRemovedNotice();return}
           // Already connected in the lesson or another window, or the lesson ended: check again later.
@@ -271,7 +292,7 @@
       if(supported&&request.mode==='boards'&&permission?.whiteboardDenied===true)return;
       if((!supported||request.mode==='screens')&&permission?.screenSharingDenied===true)return;
       // Don't consume a request while student screen-sharing permission is disabled.
-      // Board requests are separate and must still navigate to individual boards.
+      // Board requests are handled on this page over the verified presence connection.
       if((!supported||request.mode==='screens')&&(!active||active.roomId!==session.roomId))return;
       const marker=session.roomId+':'+at+':'+String(session.permissionRevision||'')+':'+(supported?request.mode:'screens');
       // An active Shorashim screen share must not block a teacher's whiteboard redirect.
@@ -281,12 +302,9 @@
         if(sessionStorage.getItem(inviteKey)===marker)return;
         sessionStorage.setItem(inviteKey,marker);
       }catch{return}
-      // Screen sharing is available here, without leaving Shorashim or Chumash.
-      // Only whiteboard mode must navigate into the student's individual board.
-      if(supported&&request.mode==='boards'){
-        location.assign(new URL('class-pointer-prototype/dashboard.html',root).href);
-        return;
-      }
+      // Both features stay on this learning activity. Embedded whiteboards
+      // are driven by authenticated board-mode messages, not redirects.
+      if(supported&&request.mode==='boards')return;
       // Keep the large consent window for teacher screen-sharing requests.
       showPrompt();
     }
