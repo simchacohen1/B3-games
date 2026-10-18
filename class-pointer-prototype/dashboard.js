@@ -38,11 +38,12 @@
           if(!C.permitted(access,id,row))continue;
           const name=String(row.name||id);
           const btn=document.createElement('button');
-          btn.type='button';btn.className='class-launch-button';
+          btn.type='button';btn.className='class-launch-button';btn.dataset.classId=id;
           classChoices.push({btn,name});
           btn.textContent=(mode==='boards'?'📝 ':mode==='screens'?'🖥 ':'👆 ')+name;
           btn.setAttribute('aria-label',(mode==='boards'?'Send to Whiteboards':mode==='screens'?'View Student Screens':'Start classroom')+' for '+name);
           btn.addEventListener('click',()=>{
+            try{localStorage.setItem('classPointerLastTeacherClass',id)}catch{}
             buttons.querySelectorAll('button').forEach(button=>button.disabled=true);
             const target=new URL('classroom.html',location.href);
             target.searchParams.set('dashboard','teacher');target.searchParams.set('class',id);
@@ -51,6 +52,16 @@
             location.assign(target.href);
           });
           buttons.appendChild(btn);
+        }
+        // Open the teacher workspace directly for the regular classroom entry.
+        // Use a previously selected authorized class; otherwise prefer ET, then the first authorized class.
+        // The class picker remains available on the workspace itself.
+        if(mode==='lesson'&&classChoices.length){
+          let saved='';try{saved=localStorage.getItem('classPointerLastTeacherClass')||''}catch{}
+          const authorized=Array.from(buttons.children);
+          const chosen=authorized.find(button=>button.dataset.classId===saved)
+            ||authorized.find(button=>button.dataset.classId==='et')||authorized[0];
+          if(chosen){chosen.click();return}
         }
         message(buttons.childElementCount
           ?(mode==='lesson'?'Nothing starts until you choose a class.':'Only the class you select will receive the request; screen sharing still requires each student’s browser permission.')
