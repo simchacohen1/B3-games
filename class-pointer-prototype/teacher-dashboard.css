@@ -182,7 +182,7 @@ body.cp-simple #stage:has(.cp-source-picker:not([hidden])){aspect-ratio:auto;min
 
 /* Classroom Pointer cleanup: the Students drawer owns participant controls.
    Keep the actual live screen/whiteboard tiles visible, not a duplicate toolbar. */
-body.teacher-view.cp-simple .boards-view .boards-bar{display:none!important}
+body.teacher-view.cp-simple .boards-view > .boards-bar:first-child{display:none!important}
 /* Give the floating full-screen Students drawer a larger, readable surface.
    The teacher can resize it without affecting permissions. */
 #stage .cp-permissions-sidebar.cp-drawer-overlay{
