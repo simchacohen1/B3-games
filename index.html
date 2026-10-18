@@ -1558,7 +1558,8 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   async function restoreStudent(){
     if(isAuthorizedTeacher)return;
     if(isGuest()&&!isStudentPreview){renderStudentAccess();return;}
-    const id=isStudentPreview?previewStudentId:(sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId"));
+    const actingStudent=settingsApi.getActingStudent?.();
+    const id=isStudentPreview?previewStudentId:(actingStudent?.id||sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId"));
     if(!id){showLogin();return;}
     showChecking();
     try{
@@ -1573,6 +1574,16 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       }
       if(isAuthorizedTeacher)return;
       if(d.active===false){showLogin();return;}
+      if(actingStudent){
+        const classId=actingStudent.classId;
+        const clsSnap=await readOnce("b3Games/workspaces/"+workspaceId+"/classes/"+classId);
+        const cls=clsSnap.val();
+        const member=cls?.members?.[id];
+        if(!cls||cls.active===false||!member||member.active===false){showLogin();return;}
+        studentClassChoices=[{id:classId,name:String(cls.name||actingStudent.className||classId)}];
+        await enterStudent({id,name:String(d.name||actingStudent.name),classId});
+        return;
+      }
       // Every activity reuses the passcode saved at homepage sign-in. If it is
       // missing or out of date, ask once here instead of inside each activity.
       if(!isStudentPreview){
