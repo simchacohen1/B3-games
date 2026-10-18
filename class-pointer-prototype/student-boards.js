@@ -290,7 +290,7 @@
     // Screens mode panel.
     const sharePanel=el('div','board-panel'),shareText=el('p','board-panel-text'),shareNote=el('p','board-panel-note'),preview=el('video','board-preview');
     preview.muted=true;preview.autoplay=true;preview.playsInline=true;preview.hidden=true;
-    const shareBtn=button('🖥 Share entire screen','Open a separate sharing window so sharing continues while you visit other activities',()=>stream?stopShare(true):openShareWindow(),'board-share-btn');
+    const shareBtn=button('🖥 Share My Screen','Open the persistent Share My Screen / Stop Sharing window; your screen continues to share as you visit other activities',()=>stream?stopShare(true):openShareWindow(),'board-share-btn');
     sharePanel.append(shareText,shareBtn,preview,shareNote);
     // Paused panel.
     const pausedPanel=el('div','board-panel');pausedPanel.append(el('p','board-panel-text','⏸ Your teacher paused this for you.'),el('p','board-panel-note','Please wait. Your teacher can turn it back on.'));
@@ -301,8 +301,8 @@
       title.textContent=mode==='screens'?'🖥 Share my screen':'📝 My board';
       drawGroup.hidden=!boardsOn;surface.hidden=!boardsOn;sharePanel.hidden=!screensOn;pausedPanel.hidden=!(on&&blocked);
       editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';
-      shareText.textContent=stream?'✅ Your screen is being shared from this Pointer page.':'Open the separate sharing window to approve Entire Screen. Keep it open while you visit other activities.';
-      shareBtn.textContent=stream?'⏹ Stop sharing':(shareWindow&&!shareWindow.closed?'↗ Sharing window open':'🖥 Share entire screen');shareBtn.classList.toggle('sharing',!!stream||!!(shareWindow&&!shareWindow.closed));
+      shareText.textContent=stream?'✅ Your screen is being shared from this Pointer page.':'Use Share My Screen to open the same blue Share / red Stop Sharing controls used in your activities. Choose Entire Screen and keep that window open.';
+      shareBtn.textContent=stream?'⏹ Stop Sharing':(shareWindow&&!shareWindow.closed?'↗ Sharing window open':'🖥 Share My Screen');shareBtn.classList.toggle('sharing',!!stream||!!(shareWindow&&!shareWindow.closed));
       preview.hidden=!stream;if(stream&&preview.srcObject!==stream){preview.srcObject=stream;preview.play().catch(()=>{})}if(!stream)preview.srcObject=null;
       full.textContent=expanded()?'⤢ Exit full screen':'⛶ Full screen';
     }
