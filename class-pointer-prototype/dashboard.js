@@ -79,36 +79,4 @@
   // Keep this legacy student entry as a safe return to the student dashboard.
   location.replace(new URL('../index.html',location.href).href);
   return;
-  /* Legacy entry retained temporarily for compatibility with older links.
-  try{
-    const id=sessionStorage.getItem('b3Games_studentId'),pin=sessionStorage.getItem('b3Games_classPin');
-    if(!C.validId(id)||!pin)throw Error('Sign in on the Fun Torah Tools dashboard, then click Class Pointer.');
-    const response=await fetch('https://us-central1-b3-games.cloudfunctions.net/funTorahStudentAuth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'verify',studentId:id,pin}),signal:AbortSignal.timeout(15000)});
-    if(!response.ok||!(await response.json()).ok)throw Error('Your sign-in needs to be renewed. Go back to Fun Torah Tools and sign in.');
-    const scope=await window.FunTorahStudentClass.resolve(db,id);
-    if(scope.workspaceId!==ws||!C.validId(scope.classId))throw Error('Your account is not assigned to a class. Ask your teacher.');
-    const ref=classes.child(scope.classId),[profileSnap,classSnap]=await Promise.all([db.ref('b3Games/students/'+id+'/profile').once('value'),ref.once('value')]);
-    const profile=profileSnap.val(),row=classSnap.val(),member=row?.members?.[id];
-    if(!profile||profile.active===false||!row||row.active===false||!member||member.active===false)throw Error('Your class access is unavailable. Ask your teacher.');
-    if(!['et','wt'].includes(scope.classId)&&row.toolGrants?.['class-pointer']!==true)throw Error('Class Pointer is not enabled for your class yet.');
-    const name=String(profile.name||'').trim().slice(0,32);if(!name)throw Error('Your account needs a student name. Ask your teacher.');
-    $('welcome').textContent='Hello, '+name+'.';message('Waiting for your teacher to start '+(row.name||'your class')+'. Keep this page open.');
-    let joining=false;
-    const sessions=ref.child('classPointerSessions');
-    let lastEnter=0;try{lastEnter=Number(sessionStorage.getItem('classPointerLastEnter'))||0}catch{}
-    sessions.on('value',snapshot=>{
-      const session=C.latest(snapshot.val());if(!session||joining)return;
-      // A student the teacher removed from this lesson is not sent back into it.
-      let removedRoom='';try{removedRoom=sessionStorage.getItem('classPointerRemovedRoom')||''}catch{}
-      if(removedRoom===session.roomId){message('Your teacher removed you from this lesson.');return}
-      joining=true;message('Your teacher’s lesson is open. Connecting…');
-      const enter=()=>{
-        try{sessionStorage.setItem('classPointerLastEnter',String(Date.now()));sessionStorage.setItem('classPointerDashboardJoin',JSON.stringify({room:session.roomId,name,studentId:id,classId:scope.classId,at:Date.now()}));location.replace('classroom.html?dashboard=student&room='+encodeURIComponent(session.roomId))}
-        catch{joining=false;message('Allow browser storage, then refresh to join with your saved name.')}
-      };
-      // If the lesson page just sent him back here, pause briefly instead of bouncing.
-      Date.now()-lastEnter<20000?setTimeout(enter,8000):enter();
-    },()=>message('Could not find your lesson. Refresh to try again.'));
-  }catch(error){message(error.message||'Could not open the classroom. Please try again.')}
-  */
 })();
