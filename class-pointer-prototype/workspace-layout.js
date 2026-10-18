@@ -36,12 +36,14 @@
       }else if(id==='screens'||id==='whiteboards'){
         const boards=document.getElementById('studentBoards');
         if(boards&&!boards.disabled){
-          /* Open the existing Screens/Whiteboards workspace. Teacher chooses
-             screen or board mode there; do not silently change class mode. */
+          /* Selecting Student whiteboards also sends the selected, authorized
+             class to their own boards. The existing broadcaster enforces class
+             scope and each student's whiteboard permission. */
           if(boards.getAttribute('aria-pressed')!=='true')boards.click();
           const gallery=document.getElementById('boardsView');
           const chooser=[...gallery?.querySelectorAll('button')||[]].find(b=>b.textContent.trim()===(id==='screens'?'🖥 Screens':'📝 Whiteboards'));
           if(chooser)chooser.click();
+          if(id==='whiteboards')document.dispatchEvent(new Event('classpointer:send-to-whiteboards'));
         }
       }else{
         if(launch?.getAttribute('aria-pressed')==='true')launch.click();
