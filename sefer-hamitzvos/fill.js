@@ -8,13 +8,25 @@
   if(x<0||y<0||x>=width||y>=height)return {reason:'outside'};
   const threshold=Number.isFinite(options.threshold)?options.threshold:232;
   const open=index=>{const i=index*4;return data[i+3]>0&&data[i]>=threshold&&data[i+1]>=threshold&&data[i+2]>=threshold;};
+  // A two-pixel guard around dark outline pixels closes hairline gaps in artwork.
+  // Without it, one bucket tap can flood through a broken line into adjacent objects.
+  const blocked=new Uint8Array(total);
+  for(let py=0;py<height;py++)for(let px=0;px<width;px++){
+   const i=(py*width+px)*4;
+   if(data[i+3]>0&&(data[i]<threshold||data[i+1]<threshold||data[i+2]<threshold)){
+    for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+     const xx=px+dx,yy=py+dy;
+     if(xx>=0&&yy>=0&&xx<width&&yy<height)blocked[yy*width+xx]=1;
+    }
+   }
+  }
   const start=y*width+x;
-  if(!open(start))return {reason:'border'};
+  if(blocked[start]||!open(start))return {reason:'border'};
   if(width!==bufferWidth||height!==bufferHeight){bufferWidth=width;bufferHeight=height;queue=new Int32Array(total);seen=new Uint32Array(total);generation=0;}
   generation=(generation+1)>>>0;if(generation===0){seen.fill(0);generation=1;}
   let head=0,tail=0,touchesEdge=false;
   queue[tail++]=start;seen[start]=generation;
-  const enqueue=next=>{if(seen[next]===generation||!open(next))return;seen[next]=generation;queue[tail++]=next;};
+  const enqueue=next=>{if(seen[next]===generation||blocked[next]||!open(next))return;seen[next]=generation;queue[tail++]=next;};
   while(head<tail){
    const index=queue[head++],px=index%width,py=(index/width)|0;
    if(px===0||py===0||px===width-1||py===height-1)touchesEdge=true;
