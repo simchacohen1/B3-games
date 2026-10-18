@@ -61,3 +61,19 @@ test('teacher gate resolves only the selected class access fields',()=>{
   assert.match(source,/teacherClassPath\+"\/toolGrants\.json"/);
   assert.doesNotMatch(source,/classes\/"\+encodeURIComponent\(selected\)\+"\.json/);
 });
+
+test('all affected student activities load the corrected authenticated gate version',()=>{
+  for(const path of [
+    'rashi-letters/student.html',
+    'chazara/index.html',
+    'gematria/index.html',
+    'shorashim/index.html',
+    'weekly-quiz/index.html',
+    'halacha/index.html',
+    'yiddish/index.html',
+    'sefer-hamitzvos/index.html'
+  ]){
+    const html=fs.readFileSync(path,'utf8');
+    assert.match(html,/game-gate\.js\?v=20261017-auth-gate/,path+' must not use the stale access gate');
+  }
+});
