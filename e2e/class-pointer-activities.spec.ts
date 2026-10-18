@@ -244,7 +244,7 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
 test('screen exclusions close active video, preserve classmates, and remain independent of boards', async ({ page }) => {
   await openBoard(page, true);
   await page.locator('#studentBoards').click();
-  await expect(page.locator('.board-tile')).toHaveCount(2);
+  await expect(page.locator('.board-tile')).toHaveCount(0);
   await page.evaluate(() => {
     const events: Record<string, Function> = {};
     const call = {
@@ -260,7 +260,11 @@ test('screen exclusions close active video, preserve classmates, and remain inde
     events.stream(stream);
   });
   expect(await page.evaluate(() => (window as any).__accepted)).toBe(true);
+  await expect(page.locator('.board-tile')).toHaveCount(1);
   await expect.poll(() => page.locator('.board-tile video').evaluateAll((videos: HTMLVideoElement[]) => videos.filter(v => v.srcObject).length)).toBe(1);
+  const initial=await page.locator('.board-tile').first().boundingBox();
+  expect(initial!.width).toBeGreaterThan(700);
+  expect(initial!.height).toBeGreaterThan(380);
   await page.getByLabel('Screen sharing for Ari', {exact:true}).first().uncheck();
   expect(await page.evaluate(() => (window as any).__closed)).toBe(true);
   await expect(page.getByLabel('Screen sharing for Levi', {exact:true}).first()).toBeChecked();
