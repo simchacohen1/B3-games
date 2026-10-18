@@ -323,7 +323,7 @@
     function openShareWindow(){
       if(shareWindow&&!shareWindow.closed){shareWindow.focus?.();return}
       const url=new URL('student-share-window.html?pointerShare=1',location.href);
-      shareWindow=window.open(url.href,'classPointerStudentShare','popup,width=560,height=740');
+      shareWindow=window.open(url.href,'classPointerStudentShare');
       if(shareWindow){shareNote.textContent='Sharing window opened. Approve Entire Screen there and leave it open while visiting activities.';shareWindow.focus?.();return}
       shareNote.textContent='Your browser blocked the separate window. You can share from this page, but navigation will stop sharing.';
       void startShare('screen');
