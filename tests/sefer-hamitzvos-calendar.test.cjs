@@ -11,7 +11,7 @@ test('verified yesterday, today and tomorrow use the correct daily mitzvos and c
 test('all 613 mitzvos map once, repeats reuse cards, and multi-mitzvah days retain every item',()=>{
  const map=calendar.cardMap(days);assert.equal(Object.keys(map).length,613);assert.equal(new Set(Object.values(map)).size,613);
  assert.deepEqual(calendar.lesson('2026-10-16',days).mitzvos,calendar.lesson('2026-10-17',days).mitzvos);
- assert.deepEqual(calendar.lesson('2026-10-18',days).mitzvos,['P236','N289','N296']);
+ assert.deepEqual(calendar.lesson('2026-10-18',days).mitzvos,['P236','N289','N295']);
  assert.deepEqual(calendar.lesson('2026-02-07',days).mitzvos,['P1','N1','P2']);
 });
 test('calendar shifts across Hebrew month, civil year, leap day and both DST changes',()=>{
@@ -48,7 +48,7 @@ test('date navigation selects daily cards, can return to Today, and makes every 
  els.get('tomorrow').onclick();assert.equal(els.get('outline').src,'coloring-v2/481.png?v=20261016-october');
  els.get('tomorrow').onclick();assert.equal(els.get('outline').src,'coloring-v2/481.png?v=20261016-october');
  els.get('tomorrow').onclick();assert.equal(els.get('dayCards').children.length,3);
- els.get('dayCards').children[2].onclick();assert.equal(Number(els.get('card').value),calendar.cardMap(days).N296);
+ els.get('dayCards').children[2].onclick();assert.equal(Number(els.get('card').value),calendar.cardMap(days).N295);
  assert.match(html,/mix-blend-mode:multiply/);assert.match(source,/globalCompositeOperation='multiply'/);
  assert.match(html,/game-gate.js" data-game-id="sefer-hamitzvos"/);
 });
@@ -65,8 +65,8 @@ test('mitzvah artwork comes before tools and Hebrew phrases keep correct mitzvah
 test('October 19–23 cards map to their verified mitzvos and new coloring pages',()=>{
  const map=calendar.cardMap(days);
  const expected=[
-  ['2026-10-18',['P236','N289','N296'],[481,482,483]],
-  ['2026-10-19',['P225','N295','N292'],[484,485,486]],
+  ['2026-10-18',['P236','N289','N295'],[481,482,483]],
+  ['2026-10-19',['P225','N296','N292'],[484,485,486]],
   ['2026-10-20',['P247','N293','N297','P182'],[487,488,489,490]],
   ['2026-10-21',['P181','N309','N298','P184'],[491,492,493,494]],
   ['2026-10-22',['N299','P202','P203','N270'],[495,496,497,498]],
