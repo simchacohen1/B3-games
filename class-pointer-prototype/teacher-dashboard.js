@@ -373,7 +373,7 @@ function init(){
   wasExpanded=expanded;
   menuHome?.classList.toggle('teacher-dashboard-menu-trigger',!expanded);
   if(expanded){stage.append(sidebar);sidebar.classList.add('cp-drawer-overlay');sidebar.dataset.stageUi='true';setOverlay(false)}
-  else{setOverlay(false);sidebar.classList.remove('cp-drawer-overlay');delete sidebar.dataset.stageUi;for(const prop of ['left','right','top','bottom'])sidebar.style.removeProperty(prop);panelHome.after(sidebar)}
+  else{setOverlay(false);sidebar.classList.remove('cp-drawer-overlay');delete sidebar.dataset.stageUi;for(const prop of ['left','right','top','bottom','width','height'])sidebar.style.removeProperty(prop);panelHome.after(sidebar)}
  }
  if(stage)new MutationObserver(syncExpanded).observe(stage,{attributes:true,attributeFilter:['class']});
  document.addEventListener('fullscreenchange',syncExpanded);
@@ -406,6 +406,10 @@ function init(){
  for(const type of ['pointerup','pointercancel'])drawerHead.addEventListener(type,()=>{drawerDrag=null});
 
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sidebar.classList.contains('cp-overlay-open')){setOverlay(false);studentsDockBtn?.focus()}});
+
+ // Present menu rows get a stable name so full screen can show a clear icon beside each choice.
+ const presentSources={'Show my screen to students':'shareScreen','Capture a tab, window or screen':'openBrowserTab','Show a PDF':'openPdf','Show a web page':'openWebpage','Show a whiteboard':'openWhiteboard','Stop presenting':'stopScreen'};
+ document.querySelectorAll('#tbShareMenu>button').forEach(button=>{const id=presentSources[button.textContent.trim()];if(id&&!button.dataset.source)button.dataset.source=id});
 
  /* ---------- Left rail: its pop-up menus open beside the rail instead of being cut off inside it ---------- */
  const dockEl=$('teacherDock');
