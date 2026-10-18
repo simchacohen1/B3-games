@@ -39,3 +39,15 @@ body.teacher-view #teacherDock:not(.floating){font-size:12px;gap:3px;padding:5px
 body.teacher-view #teacherDock .tb-btn{padding:7px;font-size:12px}
 }
 @media(max-width:999px){.cp-permissions-sidebar{margin:10px 0}.cp-permissions-sidebar #roster{max-height:180px!important}body.teacher-view .cp-workspace-tab{white-space:normal;font-size:12px}}
+
+/* Fill the remaining viewport after controls wrap at the current screen width. */
+@media(min-width:1000px){
+body.teacher-view.cp-compact-workspace main{height:100dvh;min-height:550px;display:flex;flex-direction:column;gap:0}
+body.teacher-view.cp-compact-workspace main>*{flex-shrink:0}
+body.teacher-view.cp-compact-workspace #stage:not(.lesson-fullscreen):not(:fullscreen){flex:1 1 0;min-height:180px;height:auto}
+body.teacher-view.cp-compact-workspace .lesson-actions:empty{display:none}
+}
+body.teacher-view .cp-permissions-sidebar #tbStudentsMenu{width:100%!important;min-width:0!important;max-height:none!important;overflow:visible!important}
+body.teacher-view .cp-permissions-sidebar #tbStudentsMenu .permission-tools{display:flex;flex-wrap:wrap;white-space:normal}
+body.teacher-view .cp-permissions-sidebar #tbStudentsMenu .permission-tools label{font-size:13px;padding:6px;min-width:0}
+body.teacher-view .cp-permissions-sidebar #tbStudentsMenu .pointer-bulk-actions{display:flex;flex-wrap:wrap;gap:6px}
