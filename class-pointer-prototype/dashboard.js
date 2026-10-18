@@ -6,7 +6,10 @@
   const message=text=>{$('message').textContent=text};
   if(query.get('teacher')==='1'){
     let mode=query.get('sendEveryoneBoards')==='1'?'boards':query.get('sendEveryoneShare')==='1'?'screens':'lesson';
-    $('teacherChoice').hidden=false;
+    // The regular entry opens a class by itself. Keep the class chooser hidden until we know it must be shown,
+    // so it never flashes on screen before the redirect.
+    let settled=mode!=='lesson';
+    $('teacherChoice').hidden=!settled;
     $('classChoice').hidden=true;$('openTeacher').hidden=true;
     document.querySelector('label[for="classChoice"]')?.setAttribute('hidden','');
     const buttons=$('teacherClassButtons'),classChoices=[];
@@ -16,13 +19,14 @@
       mode=next;
       modeCards.forEach(btn=>btn.setAttribute('aria-pressed',String(btn.getAttribute('data-classroom-mode')===mode)));
       const label=mode==='boards'?'Send to Whiteboards':mode==='screens'?'View Student Screens':'Start classroom';
-      $('welcome').textContent='Choose a class for '+label+'.';
+      if(settled)$('welcome').textContent='Choose a class for '+label+'.';
       classChoices.forEach(({btn,name})=>{
         btn.textContent=(mode==='boards'?'📝 ':mode==='screens'?'🖥 ':'👆 ')+name;
         btn.setAttribute('aria-label',label+' for '+name);
       });
       if(buttons.childElementCount)message(mode==='lesson'?'The class starts after you choose it.':'Only the class you select will receive the request; screen sharing still requires each student’s browser permission.');
     }
+    function reveal(){if(settled)return;settled=true;$('teacherChoice').hidden=false;setMode(mode)}
     modeCards.forEach(btn=>btn.addEventListener('click',()=>setMode(btn.getAttribute('data-classroom-mode'))));
     setMode(mode);
     $('teacherSignIn').onclick=()=>window.B3SiteSettings.signInWithGoogle().catch(()=>message('Could not sign in. Please try again.'));
@@ -30,7 +34,7 @@
     window.B3SiteSettings.onAuthStateChanged(async(user,authorized,access)=>{
       const current=++generation;
       buttons.replaceChildren();classChoices.length=0;$('teacherSignIn').hidden=!!authorized;
-      if(!authorized){message('Sign in with your teacher account to select a class.');return}
+      if(!authorized){reveal();message('Sign in with your teacher account to select a class.');return}
       try{
         const rows=access.role==='admin'?(await classes.once('value')).val()||{}:Object.fromEntries(await Promise.all((access.classIds||[]).filter(C.validId).map(async id=>[id,(await classes.child(id).once('value')).val()])));
         if(current!==generation)return;
@@ -62,10 +66,11 @@
           const chosen=classChoices.find(choice=>choice.id===saved)||classChoices.find(choice=>choice.id==='et')||classChoices[0];
           if(chosen){message('Opening '+chosen.name+'…');chosen.btn.click();return}
         }
+        reveal();
         message(buttons.childElementCount
           ?(mode==='lesson'?'Nothing starts until you choose a class.':'Only the class you select will receive the request; screen sharing still requires each student’s browser permission.')
           :'No classes with Class Pointer enabled are assigned to you.');
-      }catch{if(current===generation)message('Could not load your classes. Refresh to try again.')}
+      }catch{reveal();if(current===generation)message('Could not load your classes. Refresh to try again.')}
     });
     return;
   }

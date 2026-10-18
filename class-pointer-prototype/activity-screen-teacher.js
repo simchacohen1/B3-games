@@ -41,6 +41,8 @@
     notice.hidden=false;
   }
   function close(call){try{call.close()}catch{}}
+  // Tell the Student Screens gallery (student-boards.js) that a student's live screen changed.
+  function notify(){document.dispatchEvent(new CustomEvent('classpointer:activity-screens'))}
 
   // ---------- Enlarged view: one student's screen fills the lesson area ----------
   // Only the layout changes; every connection stays open.
@@ -66,6 +68,7 @@
     const latest=entry.calls[entry.calls.length-1];
     const stream=latest?.stream||null;
     if(entry.video.srcObject!==stream){entry.video.srcObject=stream;if(stream)entry.video.play?.().catch?.(()=>{})}
+    notify();
   }
   function tileFor(studentId,name){
     let entry=students.get(studentId);
@@ -100,6 +103,7 @@
       else{entry.card.remove();students.delete(studentId);if(focused===studentId)focused=null}
     }
     setFocus(focused);
+    notify();
   }
   function closeStudent(studentId){
     const entry=students.get(studentId);if(!entry)return;
@@ -139,6 +143,12 @@
     enlarge:studentId=>{if(!students.has(studentId))return false;setFocus(studentId);return true},
     showAll:()=>setFocus(null),
     count:()=>students.size,
+    // The newest live MediaStream this verified student is sharing (null when none). The large Student Screens
+    // viewer in student-boards.js uses this, because these students are not joined to Pointer.
+    streamFor:studentId=>{
+      const entry=typeof studentId==='string'?students.get(studentId):null;
+      return entry?.calls[entry.calls.length-1]?.stream||null;
+    },
     revokeStudents(studentIds){
       const denied=new Set(Array.isArray(studentIds)?studentIds:[]);
       for(const id of Array.from(students.keys()))if(denied.has(id))closeStudent(id);
