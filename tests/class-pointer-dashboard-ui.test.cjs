@@ -5,28 +5,16 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 
-test('teacher dashboard exposes four sections and keeps roster and permission controls visible',()=>{
-  const html=read('class-pointer-prototype/classroom.html');
+test('compact dashboard keeps existing permission controls and teaching material actions',()=>{
   const ui=read('class-pointer-prototype/teacher-dashboard.js');
   const css=read('class-pointer-prototype/teacher-dashboard.css');
-  for(const name of ['Classroom','Sharing','Student Activities','Display & Tools'])assert.ok(ui.includes("section('"+name+"'"),name+' section is present');
-  assert.match(html,/teacher-dashboard\.css/);
-  assert.match(html,/teacher-dashboard\.js/);
-  assert.match(ui,/getElementById\('tbStudentsMenu'\)/);
-  assert.match(ui,/getElementById\('tbStudentsBtn'\)/);
-  assert.match(ui,/studentMenu\.hidden=false/);
-  assert.match(css,/teacher-dashboard-roster\[hidden\]\{display:block/);
-  assert.match(ui,/teacherActivitiesButton/);
-  assert.match(ui,/showModal\(\)/);
-});
-
-test('student activity chooser reuses the existing screen and whiteboard actions',()=>{
-  const ui=read('class-pointer-prototype/teacher-dashboard.js');
-  assert.match(ui,/Send to Screen Sharing/);
-  assert.match(ui,/Send to Whiteboards/);
-  assert.match(ui,/getElementById\('openWhiteboard'\)/);
-  assert.match(ui,/getElementById\('studentBoards'\)/);
-  assert.match(ui,/getElementById\('cpShareEnabled'\)/);
+  const tabs=read('class-pointer-prototype/workspace-layout.js');
+  for(const id of ['tbStudentsMenu','shareScreen','openWhiteboard','openPdf','openWebpage','cpShareEnabled'])assert.ok(ui.includes(id));
+  for(const name of ['My Teaching Area','Student Screens','Student Whiteboards'])assert.ok(tabs.includes(name));
+  assert.doesNotMatch(ui,/Choose Student Activity|teacherActivitiesButton/);
+  assert.match(ui,/On my teaching area/);
+  assert.match(ui,/Pointer, Highlight or Pen/);
+  assert.match(css,/position:fixed/);
 });
 
 test('activity requests move screen capture into a persistent, student-approved sharing window',()=>{
