@@ -29,23 +29,27 @@ test('student activity chooser reuses the existing screen and whiteboard actions
   assert.match(ui,/getElementById\('cpShareEnabled'\)/);
 });
 
-test('student screen sharing stays in the activity page and starts from an explicit consent click',()=>{
+test('activity requests move screen capture into a persistent, student-approved sharing window',()=>{
   const activity=read('class-pointer-prototype/activity-share.js');
-  assert.match(activity,/Your teacher requested your screen/);
-  assert.match(activity,/Share My Screen/);
-  assert.match(activity,/choose <strong>Entire Screen<\/strong>/);
-  assert.match(activity,/choose\.addEventListener\('click',event=>\{if\(active&&!busy\)return beginShare\(event\)\}\)/);
-  assert.doesNotMatch(activity,/window\.open\(/);
-  assert.doesNotMatch(activity,/persistentShareWindow/);
+  assert.match(activity,/Your teacher would like to see your screen/);
+  assert.match(activity,/Open Sharing Window/);
+  assert.match(activity,/Choose Entire Screen/);
+  assert.match(activity,/student-share-window\.html\?pointerShare=1/);
+  assert.match(activity,/if\(!openPersistentShareWindow\(\)\)return beginShare\(event\)/);
+  assert.match(activity,/persistentShareWindow/);
+  assert.match(activity,/navigator\.mediaDevices\.getDisplayMedia/);
 });
-test('student screen sharing asks for Entire Screen and contains no browser-tab share control',()=>{
+test('persistent screen sharing asks for Entire Screen and contains no browser-tab share control',()=>{
   const boards=read('class-pointer-prototype/student-boards.js');
   const activity=read('class-pointer-prototype/activity-share.js');
+  const shareWindow=read('class-pointer-prototype/student-share-window.html');
   assert.match(boards,/displaySurface:'monitor'/);
   assert.match(boards,/surface!=='monitor'/);
   assert.doesNotMatch(boards,/Share a browser tab/);
   assert.doesNotMatch(boards,/startShare\('tab'\)/);
-  assert.match(activity,/choose <strong>Entire Screen<\/strong>/);
+  assert.match(activity,/select <strong>Entire Screen<\/strong>/);
+  assert.match(shareWindow,/Keep this window open while you visit Shorashim or another activity/);
+  assert.match(shareWindow,/Choose <strong>Entire Screen<\/strong>/);
   assert.match(activity,/displaySurface:'monitor'/);
   assert.match(activity,/displaySurface&&displaySurface!=='monitor'/);
 });
