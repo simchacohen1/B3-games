@@ -298,9 +298,7 @@
       returnBoard.hidden=true;
       returnBoard.style.cssText='position:fixed;bottom:16px;left:16px;z-index:2147483635;background:#245ce4;color:white;border:2px solid white;border-radius:12px;padding:12px 18px;font:700 15px system-ui;box-shadow:0 6px 22px #0004';
       document.body.append(returnBoard);bar.append(back);
-      stage.addEventListener('classpointer:board-state',()=>{
-        if(!on||mode!=='boards'||blocked)returnBoard.hidden=true;
-      });
+      stage.addEventListener('classpointer:board-state',()=>{returnBoard.hidden=true});
     }
     // Screens mode panel.
     const sharePanel=el('div','board-panel'),shareText=el('p','board-panel-text'),shareNote=el('p','board-panel-note'),preview=el('video','board-preview');
