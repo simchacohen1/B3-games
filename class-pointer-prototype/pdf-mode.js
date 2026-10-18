@@ -33,6 +33,51 @@
   // ---------- Teacher controls (inside the lesson so they also work in full screen) ----------
   let nav=null,pageInput=null,pageTotal=null,zoomLabel=null,twoBtn=null,flipBtn=null,shiftBtn=null,movePicturesBtn=null;
   let boardSize=null,boardPictures=[],pictureEdits=[],pictureBar=null,boardUpdate=Promise.resolve();
+  // A read-only video of the teacher board lets activity pages watch without
+  // navigating away or participating in the document editing protocol.
+  let boardPresentation=null,boardPresentationTimer=null,boardBackground=null;
+  function stopBoardPresentation(){
+    if(boardPresentationTimer!==null)clearInterval(boardPresentationTimer);
+    boardPresentationTimer=null;
+    const old=boardPresentation;boardPresentation=null;boardBackground=null;
+    old?.getTracks().forEach(track=>track.stop());
+    if(old)document.dispatchEvent(new CustomEvent('class-pointer-document-presentation',{detail:{stream:null}}));
+  }
+  function paintBoardPresentation(canvas){
+    if(!isBoardOpen()||!W||!H)return;
+    const width=Math.max(1,Math.round(scroller.clientWidth)),height=Math.max(1,Math.round(scroller.clientHeight));
+    const scale=Math.min(1,1920/width,1080/height);
+    canvas.width=Math.max(1,Math.round(width*scale));canvas.height=Math.max(1,Math.round(height*scale));
+    const ctx=canvas.getContext('2d');if(!ctx)return;
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.scale(scale,scale);ctx.translate(-scroller.scrollLeft,-scroller.scrollTop);
+    const left=(lay?.lefts[0]||0)*W,top=(lay?.tops[0]||0)*W,pw=(lay?.widths[0]||1)*W,ph=(lay?.heights[0]||H/W)*W;
+    if(boardBackground?.complete&&boardBackground.naturalWidth)ctx.drawImage(boardBackground,left,top,pw,ph);
+    for(const picture of boardPictures)ctx.drawImage(picture.image,picture.x*W,picture.y*H,picture.w*W,picture.h*H);
+    // Match the document ink's coordinate system, widths and opacity.
+    const all=draft?[...strokes,{...draft,owner:B.owner()}]:strokes;
+    for(const stroke of all){
+      if(!stroke.points?.length)continue;
+      const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
+      ctx.globalAlpha=stroke.tool==='pen'?1:stroke.tool==='pencil'?0.94:stroke.tool==='crayon'?0.78:0.32;
+      ctx.strokeStyle=ctx.fillStyle=stroke.color;ctx.lineWidth=stroke.size*W*(stroke.tool==='pen'?0.45:1);ctx.lineCap=ctx.lineJoin='round';
+      if(stroke.tool==='box'){ctx.fillRect(Math.min(first.x,last.x)*W,Math.min(first.y,last.y)*H,Math.abs(last.x-first.x)*W,Math.abs(last.y-first.y)*H);continue}
+      const pts=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
+      ctx.beginPath();pts.forEach((point,index)=>{ctx[index?'lineTo':'moveTo'](point.x*W,point.y*H)});ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+  function startBoardPresentation(dataUrl){
+    stopBoardPresentation();
+    if(!isTeacher||!isBoardOpen())return;
+    const canvas=document.createElement('canvas');if(typeof canvas.captureStream!=='function')return;
+    boardBackground=new Image();boardBackground.src=dataUrl;
+    paintBoardPresentation(canvas);
+    try{boardPresentation=canvas.captureStream(8)}catch{return}
+    boardPresentationTimer=setInterval(()=>paintBoardPresentation(canvas),125);
+    document.dispatchEvent(new CustomEvent('class-pointer-document-presentation',{detail:{stream:boardPresentation}}));
+  }
+  if(isTeacher)window.addEventListener('pagehide',stopBoardPresentation);
   if(isTeacher){
     nav=el('div','pdfNav');nav.hidden=true;nav.dataset.stageUi='true';nav.setAttribute('role','toolbar');nav.setAttribute('aria-label','PDF controls');
     const button=(label,title,onClick,cls)=>{const b=el('button',null,cls||'pdf-btn',label);b.type='button';b.title=title;b.addEventListener('click',onClick);nav.appendChild(b);return b};
@@ -333,12 +378,14 @@
       bytes=data;docName=board?P.cleanName(opts.name||'Whiteboard'):'Browser tab snapshot';docLabel=board?'whiteboard':'webpage';docId=crypto.randomUUID();
       boardSize=board?{w:width,h:height}:null;
       showNote('');B.resetMarks();B.setPdf(true,board?'whiteboard':'webpage');updateControls();
+      if(board)startBoardPresentation(dataUrl);
       B.status(board?(opts.status||'Whiteboard open.')+' Paste a screenshot with Ctrl+V to put it on the board.':'Static tab snapshot open. Zoom, drag and highlight here without changing the original tab.');
       for(const member of B.members().values())if(member.admitted)deliver(member);
       return true;
     }catch(error){showNote('');B.fail(error.message||'Could not open the captured tab.');return false}
   }
   function unload(hide){
+    if(hide)stopBoardPresentation();
     loadToken++;rendered.forEach(item=>item.task?.cancel());rendered.clear();
     pageEls.forEach(node=>node.remove());pageEls=[];
     try{doc?.destroy()}catch(_){}doc=null;lay=null;draft=null;dragId=null;W=H=0;webMode=false;
@@ -574,6 +621,7 @@
   const MAX_PICTURE_BYTES=15*1024*1024,MAX_PICTURES=12;
   function isBoardOpen(){return isTeacher&&webMode&&docLabel==='whiteboard'&&!!docId&&!!boardSize&&!scroller.hidden}
   function dropBoardPictures(){
+    stopBoardPresentation();
     for(const item of pictureEdits)item.el.remove();
     pictureEdits=[];boardPictures=[];boardSize=null;if(pictureBar)pictureBar.hidden=true;
   }
@@ -738,6 +786,7 @@
     openFile,currentPage,goToPage,
     studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
     close:closePdf,openSnapshot,reset:studentReset,isOpen:()=>!!lay,
-    pastePicture,boardPictureCount:()=>boardPictures.length+pictureEdits.length
+    pastePicture,boardPictureCount:()=>boardPictures.length+pictureEdits.length,
+    presentationStream:()=>boardPresentation
   };
 })();

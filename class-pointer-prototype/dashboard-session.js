@@ -48,8 +48,10 @@
   function checkTeacher(){
     if(!teacherUid)return;
     const user=firebase.auth?.().currentUser;
-    if(user&&user.uid===teacherUid){if(banner)banner.hidden=true;return}
+    if(user&&user.uid===teacherUid){if(banner)banner.hidden=true;document.dispatchEvent(new Event('class-pointer-teacher-restored'));return}
     teacherSessionChanged();
+    // Revoke live lesson transport immediately when this browser loses its teacher identity.
+    document.dispatchEvent(new Event('class-pointer-teacher-signed-out'));
   }
   try{firebase.auth?.().onAuthStateChanged?.(()=>checkTeacher())}catch{}
   const ready=new Promise((resolve,reject)=>{

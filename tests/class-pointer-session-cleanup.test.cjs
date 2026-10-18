@@ -49,7 +49,7 @@ test('teacher can End and Restart three times; duplicate clicks never overlap cl
  const items=new Map(),peers=[],errors=[];let finishCleanup,ends=0;
  const $=id=>{if(!items.has(id))items.set(id,{hidden:false,disabled:false,value:'',textContent:''});return items.get(id)};
  const window={ClassPointerDashboard:{ready:Promise.resolve(),publish:async()=>{},end:()=>{ends++;return new Promise(resolve=>finishCleanup=resolve)}},ClassPointerBoards:{endClass(){}},ClassPointerActivityShares:{closeAll(){}},ClassPointerPdf:{close(){}}};
- const context=vm.createContext({isTeacher:true,started:false,openingClass:false,closingClass:false,endPromise:Promise.resolve(),peer:null,joinTimer:null,members:new Map(),state:{},window,$,
+ const context=vm.createContext({isTeacher:true,started:false,openingClass:false,closingClass:false,endPromise:Promise.resolve(),peer:null,joinTimer:null,members:new Map(),presence:new Map(),defaultLevel:'none',nameLevels:new Map(),state:{},window,$,
  makePeer:()=>{const events={};const p={events,on:(name,fn)=>events[name]=fn,destroy(){this.destroyed=true}};peers.push(p);return p},
  clearError(){},status(){},fail:message=>errors.push(message),stopSharing(){},roster(){},send(){},receiveStudent(){},
  clearTimeout(){},setTimeout:()=>1,crypto:{randomUUID:()=>String(peers.length)},URL,location:{href:'https://example.test/classroom.html?dashboard=teacher&class=wt'}});

@@ -116,8 +116,60 @@
       if(path==='/'||/\/B3-games\/$/.test(path))return 'Home page';
       return String(document.title||'').split(/\s[|·–-]\s/)[0].trim().slice(0,40)||'Another activity';
     }
+    // Teacher media sits above the activity; its DOM, answers and scroll stay intact.
+    let admitted=false,lessonId='',lessonActive=false,lessonCall=null,pendingLessonCall=null,pendingLessonTimer=null,lessonRetryTimer=null,lessonReceiveTimer=null,lessonRetries=0;
+    const lessonOverlay=document.createElement('section');lessonOverlay.id='fttTeacherLessonOverlay';
+    lessonOverlay.setAttribute('aria-label','Teacher lesson');
+    lessonOverlay.style.cssText='position:fixed;inset:0;z-index:2147483638;background:#071426;display:none;flex-direction:column;font:700 16px system-ui,sans-serif;color:white';
+    const lessonToolbar=document.createElement('div');lessonToolbar.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:#102748';
+    const lessonStatus=document.createElement('span');lessonStatus.setAttribute('role','status');lessonStatus.textContent='Connecting to your teacher…';
+    const back=document.createElement('button');back.type='button';back.textContent='Back to Activity';
+    back.style.cssText='padding:10px 16px;border:0;border-radius:9px;background:white;color:#102748;font:inherit;cursor:pointer';
+    const lessonVideo=document.createElement('video');lessonVideo.autoplay=true;lessonVideo.muted=true;lessonVideo.playsInline=true;
+    lessonVideo.style.cssText='display:block;width:100%;flex:1;min-height:0;object-fit:contain;background:#071426';
+    const reopen=document.createElement('button');reopen.type='button';reopen.id='fttShowTeacherLesson';reopen.textContent='Show Lesson';
+    reopen.style.cssText='display:none;position:fixed;left:14px;bottom:14px;z-index:2147483638;padding:12px 18px;border:2px solid white;border-radius:12px;background:#1d4ed8;color:white;font:700 16px system-ui;cursor:pointer';
+    lessonToolbar.append(lessonStatus,back);lessonOverlay.append(lessonToolbar,lessonVideo);document.body.appendChild(lessonOverlay);document.body.appendChild(reopen);
+    back.addEventListener('click',()=>{lessonOverlay.style.display='none';reopen.style.display=lessonActive?'block':'none'});
+    reopen.addEventListener('click',()=>{if(lessonActive){lessonOverlay.style.display='flex';reopen.style.display='none';lessonVideo.play?.().catch(()=>{})}});
+    function closeLessonCall(){cancelLater(lessonReceiveTimer);lessonReceiveTimer=null;const old=lessonCall;lessonCall=null;try{old?.close()}catch{}lessonVideo.srcObject=null}
+    function clearLesson(){
+      admitted=false;lessonActive=false;lessonId='';cancelLater(pendingLessonTimer);cancelLater(lessonRetryTimer);pendingLessonTimer=null;lessonRetryTimer=null;
+      const waiting=pendingLessonCall;pendingLessonCall=null;try{waiting?.close()}catch{}closeLessonCall();lessonOverlay.style.display='none';reopen.style.display='none';
+    }
+    function retryLesson(){
+      if(!admitted||!lessonActive||!presenceConn?.open||lessonRetryTimer||lessonRetries>=6)return;
+      lessonStatus.textContent='Reconnecting to your teacher…';
+      lessonRetryTimer=later(()=>{lessonRetryTimer=null;if(admitted&&lessonActive&&presenceConn?.open){lessonRetries++;presenceConn.send({type:'lesson-retry',id:lessonId});lessonReceiveTimer=later(retryLesson,15000)}},1500);
+    }
+    function acceptLesson(incoming){
+      if(!admitted||!lessonActive||incoming.peer!==presenceTarget||incoming.metadata?.presentationId!==lessonId){try{incoming.close()}catch{}return}
+      cancelLater(lessonRetryTimer);lessonRetryTimer=null;closeLessonCall();lessonCall=incoming;
+      incoming.on('stream',media=>{
+        if(lessonCall!==incoming)return;cancelLater(lessonReceiveTimer);lessonReceiveTimer=null;
+        lessonVideo.srcObject=media;lessonStatus.textContent='Your teacher’s lesson';lessonVideo.play?.().catch(()=>{lessonStatus.textContent='Press Show Lesson to view your teacher';reopen.style.display='block'});
+        media.getVideoTracks?.().forEach(track=>track.addEventListener('ended',()=>{if(lessonCall===incoming){closeLessonCall();retryLesson()}},{once:true}));
+      });
+      const lost=()=>{if(lessonCall===incoming){closeLessonCall();retryLesson()}};
+      incoming.on('close',lost);incoming.on('error',lost);
+      // Receiving needs no camera, microphone or screen capture permission.
+      try{incoming.answer();if(!lessonVideo.srcObject)lessonReceiveTimer=later(()=>{if(lessonCall===incoming){closeLessonCall();retryLesson()}},15000)}catch{lost()}
+    }
+    function incomingLesson(incoming){
+      if(incoming.peer!==presenceTarget||incoming.metadata?.kind!=='activity-lesson'||typeof incoming.metadata?.presentationId!=='string'||incoming.metadata.presentationId.length>120){try{incoming.close()}catch{}return}
+      if(admitted&&lessonActive&&incoming.metadata.presentationId===lessonId){acceptLesson(incoming);return}
+      // Signalling may beat the reliable announcement. Never answer before admission.
+      try{pendingLessonCall?.close()}catch{}pendingLessonCall=incoming;cancelLater(pendingLessonTimer);
+      pendingLessonTimer=later(()=>{if(pendingLessonCall===incoming){pendingLessonCall=null;try{incoming.close()}catch{}}},5000);
+    }
+    function announceLesson(message){
+      if(!admitted||typeof message.id!=='string'||!message.id||message.id.length>120||typeof message.active!=='boolean')return;
+      if(!message.active){if(message.id===lessonId){lessonActive=false;cancelLater(lessonRetryTimer);lessonRetryTimer=null;cancelLater(pendingLessonTimer);const waiting=pendingLessonCall;pendingLessonCall=null;try{waiting?.close()}catch{}closeLessonCall();lessonOverlay.style.display='none';reopen.style.display='none'}return}
+      if(lessonId!==message.id||!lessonActive){closeLessonCall();lessonId=message.id;lessonActive=true;lessonRetries=0;cancelLater(lessonRetryTimer);lessonRetryTimer=null;lessonReceiveTimer=later(retryLesson,15000);lessonStatus.textContent='Connecting to your teacher…';lessonOverlay.style.display='flex';reopen.style.display='none'}
+      if(pendingLessonCall?.metadata?.presentationId===lessonId){const waiting=pendingLessonCall;pendingLessonCall=null;cancelLater(pendingLessonTimer);acceptLesson(waiting)}
+    }
     function stopPresence(){
-      cancelLater(presenceTimer);presenceTimer=null;
+      clearLesson();cancelLater(presenceTimer);presenceTimer=null;
       const conn=presenceConn;presenceConn=null;try{conn?.close()}catch{}
       const old=presencePeer;presencePeer=null;try{old?.destroy()}catch{}
     }
@@ -141,6 +193,7 @@
         const own=new Peer('class-pointer-student-'+crypto.randomUUID());
         if(typeof own.on!=='function'||typeof own.connect!=='function'){try{own.destroy?.()}catch{}return}
         presencePeer=own;
+        own.on('call',incoming=>{if(presencePeer!==own){try{incoming.close()}catch{}return}incomingLesson(incoming)});
         await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('timeout')),15000);own.once('open',()=>{clearTimeout(t);resolve()});own.once('error',e=>{clearTimeout(t);reject(e)})});
         if(presencePeer!==own||latestSession?.roomId!==room)return;
         own.on('error',error=>{if(presencePeer!==own)return;if(error?.type==='peer-unavailable'){stopPresence();return}retryPresence()});
@@ -154,7 +207,8 @@
         conn.on('open',()=>{if(presenceConn===conn)conn.send({type:'join',presence:true,ticket:ticket.token,activity:activityName(),name:ticket.studentName})});
         conn.on('data',message=>{
           if(presenceConn!==conn||!message||typeof message!=='object')return;
-          if(message.type==='present'){presenceDelay=0;presenceFailures=0;return}
+          if(message.type==='present'){admitted=true;presenceDelay=0;presenceFailures=0;return}
+          if(message.type==='lesson-presentation'){announceLesson(message);return}
           if(message.type==='removed'){try{sessionStorage.setItem('classPointerRemovedRoom',room)}catch{}stopPresence();showRemovedNotice();return}
           // Already connected in the lesson or another window, or the lesson ended: check again later.
           if(['elsewhere','replaced','full'].includes(message.type)){stopPresence();schedulePresence(60000);return}
@@ -169,6 +223,9 @@
       if(next.roomId!==presenceTarget){presenceTarget=next.roomId;presenceDelay=0;presenceFailures=0;schedulePresence(400)}
     }
     window.addEventListener('pagehide',stopPresence);
+    const identityTimer=typeof setInterval==='function'?setInterval(()=>{if(sessionStorage.getItem('b3Games_studentId')!==id){stopPresence();stop();clearInterval(identityTimer)}},1000):null;
+    identityTimer?.unref?.();
+    window.addEventListener('pagehide',()=>{if(identityTimer)clearInterval(identityTimer)},{once:true});
 
     const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
     async function watchPermission(session){
@@ -269,7 +326,7 @@
       latestSession=next;
       followSession(next);
       if(next)await watchPermission(next);else{permissionKey='';permissionRequest++;permission={};permissionReady=false;refreshSessionState()}
-    },()=>{latestSession=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;active=null;holder.style.display='none';stop()});
+    },()=>{stopPresence();latestSession=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;active=null;holder.style.display='none';stop()});
     async function beginShare(){
       if(stream){stop();return}
       if(busy||!active)return;
