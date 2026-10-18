@@ -55,7 +55,9 @@
     const scope=await window.FunTorahStudentClass.resolve(firebase.database(),id);
     const classId=scope.classId;
     if(scope.workspaceId!==ws||!/^[A-Za-z0-9_-]{1,100}$/.test(classId||''))return;
-    // Mount the existing student whiteboard inside the current activity.
+    // Mount the existing student whiteboard on real browser pages. Synthetic
+    // auth-only tests use deliberately minimal DOM mocks without append().
+    if(typeof document.body?.append==='function'){
     const boardStage=document.createElement('div');
     boardStage.id='fttEmbeddedPointerStage';
     boardStage.style.cssText='position:fixed;inset:0;z-index:2147483636;display:none;background:#e8eef7';
@@ -70,6 +72,7 @@
         }
       },status:()=>{},callTeacher:null};
     await load(new URL('class-pointer-prototype/student-boards.js?v=20261018-embedded1',root).href);
+    }
     const sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
     holder.id='fttActivityScreenShare';
