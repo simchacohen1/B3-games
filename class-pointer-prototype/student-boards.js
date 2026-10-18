@@ -500,8 +500,61 @@
     sendActivity({kind:'word',text:value,instruction:instructionInput.value});
   });
   const sendImage=button('🖼 Coloring page','Upload a picture or coloring page for every student to color',()=>imageFile.click());
+  // Explicit clipboard action for teachers: preview before replacing each student's
+  // common background. Every boy's own drawing layer remains independent.
+  const pasteAll=button('📋 Paste to All Boards','Paste copied words or an image on every student whiteboard',()=>void readClipboardForClass());
+  const pastePreview=el('div','boards-paste-preview');pastePreview.hidden=true;
+  pastePreview.setAttribute('role','dialog');pastePreview.setAttribute('aria-label','Preview paste to all whiteboards');
+  pastePreview.style.cssText='position:fixed;inset:0;z-index:2147483500;background:#0b1837a8;display:none;align-items:center;justify-content:center;padding:18px';
+  const previewPanel=el('div','boards-paste-panel');previewPanel.style.cssText='background:white;color:#142642;border-radius:15px;padding:18px;max-width:min(650px,95vw);max-height:85vh;overflow:auto;box-shadow:0 16px 55px #0005';
+  const previewTitle=el('h3',null,'Send to every whiteboard?'),previewBody=el('div','boards-paste-content');
+  previewBody.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;max-height:55vh;overflow:auto;margin:12px 0';
+  const confirmPaste=button('✓ Send to all boards','Replace the common background on every student board',()=>void commitPaste());
+  const cancelPaste=button('Cancel','Close the paste preview',()=>closePreview());
+  previewPanel.append(previewTitle,previewBody,confirmPaste,cancelPaste);pastePreview.append(previewPanel);stage.appendChild(pastePreview);
+  let pendingPaste=null;
+  function closePreview(){pendingPaste=null;pastePreview.hidden=true;pastePreview.style.display='none';previewBody.replaceChildren()}
+  function showPaste(value){
+    pendingPaste=value;previewBody.replaceChildren();
+    if(value.kind==='word')previewBody.append(el('p',null,value.text));
+    else{
+      const img=el('img');img.src=URL.createObjectURL(value.file);img.alt='Copied picture preview';img.style.cssText='max-width:100%;max-height:45vh;object-fit:contain';
+      img.addEventListener('load',()=>URL.revokeObjectURL(img.src),{once:true});
+      previewBody.append(img);
+    }
+    pastePreview.hidden=false;pastePreview.style.display='flex';confirmPaste.focus();
+  }
+  async function commitPaste(){
+    const item=pendingPaste;if(!item)return;
+    closePreview();
+    if(item.kind==='image')await sendImageFile(item.file);
+    else{wordInput.value=item.text;sendActivity({kind:'word',text:item.text,instruction:instructionInput.value})}
+  }
+  async function readClipboardForClass(){
+    if(!on||mode!=='boards'){B.status('Open Student whiteboards before pasting.');return}
+    try{
+      if(navigator.clipboard?.read){
+        const entries=await navigator.clipboard.read();
+        for(const entry of entries){
+          const kind=entry.types.find(t=>/^image\/(png|jpeg|webp|gif)$/.test(t));
+          if(kind){showPaste({kind:'image',file:await entry.getType(kind)});return}
+          if(entry.types.includes('text/plain')){
+            const text=(await (await entry.getType('text/plain')).text()).trim();
+            if(text){showPaste({kind:'word',text:text.slice(0,80)});return}
+          }
+        }
+      }
+      if(navigator.clipboard?.readText){
+        const text=(await navigator.clipboard.readText()).trim();
+        if(text){showPaste({kind:'word',text:text.slice(0,80)});return}
+      }
+      B.status('Nothing to paste. Copy a picture or some text first.');
+    }catch(error){
+      B.status('Clipboard access was blocked. Click the whiteboard area and press Ctrl+V to paste instead.');
+    }
+  }
   const removeActivity=button('✕ Blank boards','Remove the shared word or picture and clear the current drawings',()=>sendActivity(null));
-  activityBar.append(el('strong',null,'Send to all boards:'),wordInput,instructionInput,sendWord,sendImage,removeActivity,imageFile,activityLabel,el('span','boards-paste-hint','📋 Ctrl+V here to send copied text or pictures'));
+  activityBar.append(el('strong',null,'Send to all boards:'),wordInput,instructionInput,sendWord,sendImage,pasteAll,removeActivity,imageFile,activityLabel,el('span','boards-paste-hint','📋 Ctrl+V here to send copied text or pictures'));
   wordInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendWord.click()}});
   imageFile.addEventListener('change',async()=>{
     const file=imageFile.files?.[0];imageFile.value='';
