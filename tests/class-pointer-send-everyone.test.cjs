@@ -71,14 +71,14 @@ async function studentFixture(){
   assert.ok(subscribe,'student class subscription should be established');
   return {emit:async(record,permissions={})=>{policy=permissions;const rows={...record},row=rows[room];if(row)rows[room]={...row,permissionRevision:++permissionRevision};await subscribe({val:()=>rows})},get destination(){return goTo},get sessionPath(){return sessionPath},get permissionRequests(){return permissionRequests},holder:shareHolder,overlay:shareOverlay};
 }
-test('signed-in student follows whiteboard request without requiring screen-sharing permission',async()=>{
+test('signed-in student receives embedded whiteboard request without requiring screen permission',async()=>{
   const s=await studentFixture(),now=clock();
   assert.equal(s.sessionPath,'b3Games/workspaces/b3-2026/classes/et/classPointerSessions');
   await s.emit({[room]:{roomId:room,createdAt:now,studentScreenSharing:false,destinationRequest:{mode:'boards',at:now}}});
   assert.equal(s.permissionRequests.length,1,'student should fetch only its permission row via the authenticated endpoint');
   assert.deepEqual(JSON.parse(JSON.stringify(s.permissionRequests[0])),{action:'permissions',studentId:'test-boy',pin:'12345',classId:'et',room});
   assert.doesNotMatch(s.sessionPath,/b3Private/);
-  assert.equal(s.destination,'https://funtorahtools.com/class-pointer-prototype/dashboard.html');
+  assert.equal(s.destination,null,'whiteboards stay on the active student page');
   assert.equal(s.holder.style.display,'none');
 });
 test('expired class destination commands do not redirect students',async()=>{
@@ -149,8 +149,7 @@ test('screen and whiteboard checkboxes are independent; rechecking restores rout
   const w=await studentFixture();
   await w.emit({[room]:{...session,destinationRequest:{mode:'boards',at:now},studentScreenSharing:false}},
     {screenSharingDenied:true,whiteboardDenied:false});
-  assert.match(w.destination||'',/class-pointer-prototype\/dashboard\.html$/,
-    'a student blocked from screens can still use his board');
+  assert.equal(w.destination,null,'board is delivered over authenticated presence without navigation');
 });
 
 test('connected share revocation closes the media connection rather than hiding just its tile',()=>{
