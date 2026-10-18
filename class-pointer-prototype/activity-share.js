@@ -217,7 +217,9 @@
       // Board requests are separate and must still navigate to individual boards.
       if((!supported||request.mode==='screens')&&(!active||active.roomId!==session.roomId))return;
       const marker=session.roomId+':'+at+':'+String(session.permissionRevision||'')+':'+(supported?request.mode:'screens');
-      if(stream)return;
+      // An active Shorashim screen share must not block a teacher's whiteboard redirect.
+      // Screen-sharing requests still keep their existing consent/active-stream guard.
+      if(stream&&(!supported||request.mode!=='boards'))return;
       try{
         if(sessionStorage.getItem(inviteKey)===marker)return;
         sessionStorage.setItem(inviteKey,marker);
