@@ -35,3 +35,15 @@ test('out-of-bounds taps are rejected',()=>{
  const image=canvas(5,5);
  assert.equal(traceRegion(image.data,5,5,-1,2).reason,'outside');
 });
+
+test('high resolution page keeps narrow outline gaps from joining adjacent sections',()=>{
+ const image=canvas(160,160);
+ box(image,10,10,75,145);
+ box(image,75,10,150,145);
+ // Shared divider has one white pixel gap.
+ const i=(77*160+75)*4;
+ image.data.data[i]=image.data.data[i+1]=image.data.data[i+2]=255;
+ const result=traceRegion(image.data,160,160,30,70);
+ assert.ok(result.pixels&&result.pixels.length>0);
+ assert.ok([...result.pixels].every(index=>index%160<75),'paint must not spill across the divider');
+});
