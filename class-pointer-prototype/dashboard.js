@@ -84,10 +84,19 @@
     $('welcome').textContent='Hello, '+name+'.';message('Waiting for your teacher to start '+(row.name||'your class')+'. Keep this page open.');
     let joining=false;
     const sessions=ref.child('classPointerSessions');
+    let lastEnter=0;try{lastEnter=Number(sessionStorage.getItem('classPointerLastEnter'))||0}catch{}
     sessions.on('value',snapshot=>{
-      const session=C.latest(snapshot.val());if(!session||joining)return;joining=true;
-      try{sessionStorage.setItem('classPointerDashboardJoin',JSON.stringify({room:session.roomId,name,studentId:id,classId:scope.classId,at:Date.now()}));location.replace('classroom.html?dashboard=student&room='+encodeURIComponent(session.roomId))}
-      catch{joining=false;message('Allow browser storage, then refresh to join with your saved name.')}
+      const session=C.latest(snapshot.val());if(!session||joining)return;
+      // A student the teacher removed from this lesson is not sent back into it.
+      let removedRoom='';try{removedRoom=sessionStorage.getItem('classPointerRemovedRoom')||''}catch{}
+      if(removedRoom===session.roomId){message('Your teacher removed you from this lesson.');return}
+      joining=true;message('Your teacher’s lesson is open. Connecting…');
+      const enter=()=>{
+        try{sessionStorage.setItem('classPointerLastEnter',String(Date.now()));sessionStorage.setItem('classPointerDashboardJoin',JSON.stringify({room:session.roomId,name,studentId:id,classId:scope.classId,at:Date.now()}));location.replace('classroom.html?dashboard=student&room='+encodeURIComponent(session.roomId))}
+        catch{joining=false;message('Allow browser storage, then refresh to join with your saved name.')}
+      };
+      // If the lesson page just sent him back here, pause briefly instead of bouncing.
+      Date.now()-lastEnter<20000?setTimeout(enter,8000):enter();
     },()=>message('Could not find your lesson. Refresh to try again.'));
   }catch(error){message(error.message||'Could not open the classroom. Please try again.')}
 })();
