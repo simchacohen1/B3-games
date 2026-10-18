@@ -511,7 +511,7 @@
   previewBody.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;max-height:55vh;overflow:auto;margin:12px 0';
   const confirmPaste=button('✓ Send to all boards','Replace the common background on every student board',()=>void commitPaste());
   const cancelPaste=button('Cancel','Close the paste preview',()=>closePreview());
-  previewPanel.append(previewTitle,previewBody,confirmPaste,cancelPaste);pastePreview.append(previewPanel);document.body.appendChild(pastePreview);
+  previewPanel.append(previewTitle,previewBody,confirmPaste,cancelPaste);pastePreview.append(previewPanel);stage.appendChild(pastePreview);
   let pendingPaste=null;
   function closePreview(){pendingPaste=null;pastePreview.hidden=true;pastePreview.style.display='none';previewBody.replaceChildren()}
   function showPaste(value){
