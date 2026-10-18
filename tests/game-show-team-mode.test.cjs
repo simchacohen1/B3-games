@@ -149,5 +149,6 @@ test('question-generator uses category-matched distractors and shows no duplicat
   assert.match(player, /fetch\(GAME_SHOW_ACTION_URL/);
   const studentActions = fs.readFileSync(path.join(root, 'backend/functions/game-show-student-questions.js'), 'utf8');
   assert.match(studentActions, /canAcceptStudentBuzz\(current,now\)/);
-  assert.match(studentActions, /current\.narrationLocked!==true/);
+  const studentActionCore = fs.readFileSync(path.join(root, 'backend/functions/game-show-student-questions-core.cjs'), 'utf8');
+  assert.match(studentActionCore, /current\.narrationLocked!==true/);
 });
