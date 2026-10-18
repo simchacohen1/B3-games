@@ -126,7 +126,7 @@ test('the large viewer picks up a screen that starts while it is already open, a
   f.tile.click();
   await wait(()=>f.video.srcObject===f.shared,'open viewer did not pick up the new screen');
   call.emit('close');
-  await wait(()=>f.tile===undefined&&f.video.srcObject===null,'stopped share removes its gallery tile');
+  await wait(()=>f.tile?.removed===true&&f.video.srcObject===null,'stopped share removes its gallery tile');
 });
 
 test('Back to gallery returns to every student and keeps the screen live',async()=>{
