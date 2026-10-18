@@ -412,7 +412,7 @@ body > .subtitle::after {
   <div id="studentBar" class="student-bar hidden">
     <div><strong id="studentNameLabel"></strong><br><span id="studentClassLabel"></span></div>
     <button id="switchStudentBtn" type="button">Switch student</button>
-    <a id="classPointerStudentLink" href="class-pointer-prototype/dashboard.html" style="padding:10px 14px;border-radius:8px;background:#2563eb;color:white;font-weight:700;text-decoration:none">👆 Class Pointer</a>
+    <a id="classPointerStudentLink" href="class-pointer-prototype/dashboard.html" class="hidden" style="display:none!important" aria-hidden="true" tabindex="-1">👆 Class Pointer</a>
   </div>
 
   <div id="loginCard" class="login-card">
@@ -1326,7 +1326,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
 
 
   function renderStudentAccess(){
-    el("classPointerStudentLink").classList.toggle("hidden",isAuthorizedTeacher||isStudentPreview);
+    el("classPointerStudentLink").classList.add("hidden"); // Student Pointer is now embedded in their activities.
     queueMicrotask(renderStudentNudges);
     queueMicrotask(renderCardLocks);
     setTeacherToolPairVisibility();
@@ -2270,7 +2270,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   });
 })();
 </script>
-<script defer src="class-pointer-prototype/activity-share.js?v=20261018-myscreen175"></script>
+<script defer src="class-pointer-prototype/activity-share.js?v=20261018-embedded1"></script>
 </body>
 </html>
 

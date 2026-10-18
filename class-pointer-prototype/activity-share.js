@@ -1,6 +1,6 @@
 'use strict';
 /* Class-scoped activity sharing: keep a student on his learning page for
-   screen requests; whiteboard commands still enter the classroom.
+   screen requests and teacher-controlled individual whiteboards.
    Browser screen capture always requires an explicit student click. */
 (async function(){
   if(window.__classPointerActivityShareLoaded)return;
@@ -55,6 +55,24 @@
     const scope=await window.FunTorahStudentClass.resolve(firebase.database(),id);
     const classId=scope.classId;
     if(scope.workspaceId!==ws||!/^[A-Za-z0-9_-]{1,100}$/.test(classId||''))return;
+    // Mount the existing student whiteboard on real browser pages. Synthetic
+    // auth-only tests use deliberately minimal DOM mocks without append().
+    if(typeof document.body?.append==='function'){
+    const boardStage=document.createElement('div');
+    boardStage.id='fttEmbeddedPointerStage';
+    boardStage.style.cssText='position:fixed;inset:0;z-index:2147483636;display:none;background:#e8eef7';
+    document.body.append(boardStage);
+    const boardCss=document.createElement('link');boardCss.rel='stylesheet';
+    boardCss.href=new URL('class-pointer-prototype/student-boards.css?v=20261018-embedded1',root).href;
+    document.head.append(boardCss);
+    window.ClassPointerBridge={isTeacher:false,embedded:true,embeddedStage:boardStage,
+      sendTeacher:message=>{
+        if(admitted&&presenceConn?.open&&latestSession?.roomId===presenceTarget){
+          try{presenceConn.send(message)}catch{}
+        }
+      },status:()=>{},callTeacher:null};
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261018-embedded1',root).href);
+    }
     const sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
     const holder=document.createElement('div');
     holder.id='fttActivityScreenShare';
@@ -62,13 +80,15 @@
     const btn=document.createElement('button');btn.type='button';btn.textContent='🖥 Share My Screen';
     btn.style.cssText='background:#1d4ed8;color:#fff;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;font:inherit';
     const label=document.createElement('span');label.setAttribute('role','status');label.style.cssText='font-size:12px;color:#1e3a8a;max-width:180px';
-    // Fall back to the classroom's established screen-sharing path if the
-    // optional Cloud Function for sharing within activities is unavailable.
+    // Screen-sharing errors must never send a student into the retired Pointer page.
     const fallback=document.createElement('button');fallback.type='button';
-    fallback.textContent='Open Class Pointer';fallback.hidden=true;
+    fallback.textContent='Try again';fallback.hidden=true;
     fallback.style.cssText='border:1px solid #1d4ed8;background:white;color:#1d4ed8;border-radius:9px;padding:8px 10px;cursor:pointer;font:700 13px system-ui';
-    fallback.addEventListener('click',()=>location.assign(new URL('class-pointer-prototype/dashboard.html',root).href));
-    holder.append(btn,label,fallback);document.body.appendChild(holder);
+    fallback.addEventListener('click',()=>void beginShare());
+    holder.append(btn,label,fallback);
+    const shareArea=persistentShareWindow&&typeof document.querySelector==='function'?document.querySelector('#fttShareControlArea'):null;
+    if(shareArea){holder.style.position='static';holder.style.boxShadow='none';holder.style.padding='16px';shareArea.appendChild(holder)}
+    else document.body.appendChild(holder);
     let active=null,peer=null,call=null,stream=null,busy=false,latestSession=null,permission={},permissionKey='',permissionRequest=0,permissionReady=false;
     // Centered, teacher-triggered consent prompt. Browser capture remains user initiated.
     const promptOverlay=document.createElement('div');
@@ -89,7 +109,8 @@
     cancel.addEventListener('click',()=>{hidePrompt();promptStatus.textContent='';});
     function openPersistentShareWindow(){
       const url=new URL('class-pointer-prototype/student-share-window.html?pointerShare=1',root);
-      const popup=window.open(url.href,'classPointerStudentShare','popup,width=560,height=740');
+      // Keep capture alive in an ordinary tab instead of the old large popup.
+      const popup=window.open(url.href,'classPointerStudentShare');
       if(!popup)return false;
       status('Sharing window opened. Leave it open while you visit other activities.');
       hidePrompt();popup.focus?.();return true;
@@ -169,6 +190,7 @@
       if(pendingLessonCall?.metadata?.presentationId===lessonId){const waiting=pendingLessonCall;pendingLessonCall=null;cancelLater(pendingLessonTimer);acceptLesson(waiting)}
     }
     function stopPresence(){
+      window.ClassPointerBoards?.reset?.();
       clearLesson();cancelLater(presenceTimer);presenceTimer=null;
       const conn=presenceConn;presenceConn=null;try{conn?.close()}catch{}
       const old=presencePeer;presencePeer=null;try{old?.destroy()}catch{}
@@ -208,7 +230,11 @@
         conn.on('data',message=>{
           if(presenceConn!==conn||!message||typeof message!=='object')return;
           if(message.type==='present'){admitted=true;presenceDelay=0;presenceFailures=0;return}
-          if(message.type==='lesson-presentation'){announceLesson(message);return}
+          if(typeof message.type==='string'&&message.type.startsWith('board-')){
+            if(admitted)window.ClassPointerBoards?.fromTeacher(message);
+            return;
+          }
+          if(message.type==='lesson-presentation'){if(!persistentShareWindow)announceLesson(message);return}
           if(message.type==='removed'){try{sessionStorage.setItem('classPointerRemovedRoom',room)}catch{}stopPresence();showRemovedNotice();return}
           // Already connected in the lesson or another window, or the lesson ended: check again later.
           if(['elsewhere','replaced','full'].includes(message.type)){stopPresence();schedulePresence(60000);return}
@@ -271,7 +297,7 @@
       if(supported&&request.mode==='boards'&&permission?.whiteboardDenied===true)return;
       if((!supported||request.mode==='screens')&&permission?.screenSharingDenied===true)return;
       // Don't consume a request while student screen-sharing permission is disabled.
-      // Board requests are separate and must still navigate to individual boards.
+      // Board requests are handled on this page over the verified presence connection.
       if((!supported||request.mode==='screens')&&(!active||active.roomId!==session.roomId))return;
       const marker=session.roomId+':'+at+':'+String(session.permissionRevision||'')+':'+(supported?request.mode:'screens');
       // An active Shorashim screen share must not block a teacher's whiteboard redirect.
@@ -281,12 +307,9 @@
         if(sessionStorage.getItem(inviteKey)===marker)return;
         sessionStorage.setItem(inviteKey,marker);
       }catch{return}
-      // Screen sharing is available here, without leaving Shorashim or Chumash.
-      // Only whiteboard mode must navigate into the student's individual board.
-      if(supported&&request.mode==='boards'){
-        location.assign(new URL('class-pointer-prototype/dashboard.html',root).href);
-        return;
-      }
+      // Both features stay on this learning activity. Embedded whiteboards
+      // are driven by authenticated board-mode messages, not redirects.
+      if(supported&&request.mode==='boards')return;
       // Keep the large consent window for teacher screen-sharing requests.
       showPrompt();
     }
@@ -353,12 +376,12 @@
             body:JSON.stringify({action:'issue',studentId:id,pin,classId,room:lesson.roomId}),
             signal:AbortSignal.timeout(15000)});
         }catch{
-          const error=new Error('Activity sharing service unavailable. Open Class Pointer to share your screen instead.');
+          const error=new Error('Activity sharing service unavailable. Please retry or ask your teacher.');
           error.code='ACTIVITY_SHARE_NETWORK';throw error;
         }
         let ticket;
         try{ticket=await response.json()}catch{
-          const error=new Error('Activity sharing service returned an invalid response. Open Class Pointer instead.');
+          const error=new Error('Activity sharing service returned an invalid response. Please retry or ask your teacher.');
           error.code='ACTIVITY_SHARE_NETWORK';throw error;
         }
         if(!response.ok||!ticket?.ok){

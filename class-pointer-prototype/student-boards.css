@@ -105,3 +105,6 @@ body.boards-on #studentDock{display:none!important}
 .board-share-choices .board-share-btn{flex:1 1 210px;max-width:290px;font-size:16px!important;min-height:54px!important;padding:10px 14px!important}
 .board-share-choices .board-share-tab{background:linear-gradient(135deg,#0d857f,#1672c5)!important}
 .board-share-choices .board-share-btn.sharing{background:#8f2630!important}
+
+/* Activity-page overlay must respect hidden controls without classroom.css. */
+#fttEmbeddedPointerStage [hidden]{display:none!important}

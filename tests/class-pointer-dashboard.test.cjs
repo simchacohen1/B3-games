@@ -27,13 +27,13 @@ function studentFixture({verified=true,enabled=true,classEnabled=true,classLocke
  vm.runInContext(source('dashboard-core.js'),context);
  return {run:()=>vm.runInContext(source('dashboard.js'),context),element,get listener(){return listener},get redirect(){return redirect},get stored(){return stored},get request(){return request}};
 }
-test('dashboard verifies existing sign-in, reads canonical name and joins only its class lesson without a PIN in the handoff',async()=>{
- const f=studentFixture();await f.run();assert.equal(f.request.action,'verify');assert.equal(f.element('welcome').textContent,'Hello, Canonical Boy.');
- f.listener({val:()=>({[room]:{roomId:room,createdAt:Date.now()}})});
- assert.equal(f.stored.name,'Canonical Boy');assert.equal(f.stored.classId,'one');assert.equal(f.stored.pin,undefined);assert.match(f.redirect,/dashboard=student&room=/);
-});
-test('dashboard does not join when sign-in, grant or membership is unavailable',async()=>{
- for(const options of [{verified:false},{granted:false},{member:false}]){const f=studentFixture(options);await f.run();assert.equal(f.listener,undefined);assert.equal(f.redirect,undefined);assert.ok(f.element('message').textContent)}
+test('student Pointer entry returns to the student dashboard without opening a separate classroom',async()=>{
+  for(const options of [{},{verified:false},{granted:false},{member:false}]){
+    const f=studentFixture(options);await f.run();
+    assert.equal(f.redirect,'https://example.test/index.html');
+    assert.equal(f.listener,undefined,'students stay in their regular activity pages');
+    assert.equal(f.request,undefined,'no Pointer-only authentication flow');
+  }
 });
 test('teacher publishes and removes only its own random room and registers disconnect cleanup first',async()=>{
  const writes=[],C=core(),classId='one';let auth;
@@ -52,10 +52,9 @@ test('teacher publishes and removes only its own random room and registers disco
  assert.deepEqual(writes.filter(([op])=>op==='cancel').map(([,path])=>path),[sessionPath,policyPath]);
 });
 
-test('Class Pointer joins during global and class game locks',async()=>{
- for(const options of [{enabled:false},{classEnabled:false},{classLocked:true},{enabled:false,classEnabled:false,classLocked:true}]){
-  const f=studentFixture(options);await f.run();assert.equal(typeof f.listener,'function');
-  f.listener({val:()=>({[room]:{roomId:room,createdAt:Date.now()}})});
-  assert.match(f.redirect,/dashboard=student&room=/);
- }
+test('student Pointer cannot unexpectedly reopen during global or class locks',async()=>{
+  for(const options of [{enabled:false},{classEnabled:false},{classLocked:true},{enabled:false,classEnabled:false,classLocked:true}]){
+    const f=studentFixture(options);await f.run();assert.equal(f.redirect,'https://example.test/index.html');
+    assert.equal(f.listener,undefined);
+  }
 });

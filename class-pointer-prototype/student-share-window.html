@@ -13,7 +13,7 @@
 :root{font-family:system-ui,sans-serif;color:#172033;background:#f4f7fb}
 *{box-sizing:border-box}
 body{margin:0;padding:18px}
-main{max-width:540px;margin:5vh auto;padding:26px;background:#fff;border:1px solid #dce4ef;border-radius:18px;box-shadow:0 12px 35px #1720331a}
+main{max-width:530px;margin:12vh auto;padding:24px;background:#fff;border:1px solid #dce4ef;border-radius:18px;box-shadow:0 12px 35px #1720331a}
 h1{margin:0 0 10px;color:#17395b}
 p{line-height:1.55;color:#526075}
 </style>
@@ -23,13 +23,13 @@ p{line-height:1.55;color:#526075}
 try{for(let i=sessionStorage.length-1;i>=0;i--){const key=sessionStorage.key(i);if(key&&key.startsWith('fttPointerShareInvite:'))sessionStorage.removeItem(key)}}catch{}
 try{if(window.opener)window.opener=null}catch{}
 </script>
-<script defer src="activity-share.js?v=20261018-myscreen175"></script>
+<script defer src="activity-share.js?v=20261018-embedded1"></script>
 </head>
 <body>
 <main>
-<h1>Class Pointer screen sharing</h1>
-<p>Keep this window open while you visit Shorashim or another activity. Choose <strong>Entire Screen</strong> in the browser prompt. You can stop sharing at any time from the blue sharing control in this window.</p>
-<p role="status">Once your teacher enables screen sharing, use the blue Share My Screen button in this window. Your browser will ask you to choose Entire Screen.</p>
+<h1>Share My Screen</h1>
+<p>Keep this window open while you visit Shorashim or another activity. Choose <strong>Entire Screen</strong> in your browser. The screen will keep sharing as you change activities in your other tab.</p>
+<div id="fttShareControlArea"></div><p role="status">Start or stop sharing here. No separate Class Pointer student page is needed.</p>
 </main>
 </body>
 </html>

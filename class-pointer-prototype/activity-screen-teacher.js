@@ -49,7 +49,7 @@
   function setFocus(studentId){
     focused=studentId&&students.has(studentId)?studentId:null;
     tray.style.cssText=focused?TRAY_BIG:TRAY;
-    tray.hidden=!students.size;
+    tray.hidden=!students.size||!!(document.getElementById('boardsView')&&!document.getElementById('boardsView').hidden);
     for(const [id,entry] of students){
       const big=id===focused;
       entry.card.hidden=!!focused&&!big;
@@ -62,6 +62,8 @@
     if(focused)students.get(focused).enlarge.focus?.({preventScroll:true});
   }
   document.addEventListener?.('keydown',event=>{if(event.key==='Escape'&&focused){event.stopPropagation();setFocus(null)}},true);
+  // The adaptive gallery owns the full lesson area; avoid a duplicate floating tray on top.
+  document.addEventListener?.('classpointer:sharing-state',()=>setFocus(null));
 
   // Show the newest live screen this student is sharing (another tab's share replaces the picture, not the tile).
   function showLatest(entry){
@@ -135,7 +137,7 @@
       const later=()=>(typeof queueMicrotask==='function'?queueMicrotask:fn=>fn())(()=>clear(call));
       call.on('close',later);call.on('error',later);
       call.answer();
-      tray.hidden=false;
+      tray.hidden=!!(document.getElementById('boardsView')&&!document.getElementById('boardsView').hidden);
     }catch(e){console.warn('Class Pointer activity screen rejected:',e?.message||e);reportFailure(e?.message||'Unknown connection error');close(call)}
     return true;
   }

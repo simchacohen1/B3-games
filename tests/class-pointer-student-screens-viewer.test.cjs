@@ -75,10 +75,10 @@ async function viewerFixture(){
   vm.runInContext(read('class-pointer-prototype/activity-screen-teacher.js'),ctx);
   toggle.click(); // teacher opens Student Screens (mode: screens)
   const find=(cls)=>dom.created.find(node=>node.className===cls);
-  const tile=find('board-tile'),box=find('board-screen-large'),grid=find('boards-grid');
+  const box=find('board-screen-large'),grid=find('boards-grid');
   const video=box.children[0],note=box.children[1];
   const back=dom.created.find(node=>node.tag==='button'&&/Back to gallery/.test(node.textContent));
-  const tileVideo=tile.children.find(node=>node.tag==='video'),tileNote=tile.children.find(node=>node.className==='board-note');
+  const tile=()=>find('board-tile'),tileVideo=()=>tile()?.children.find(node=>node.tag==='video'),tileNote=()=>tile()?.children.find(node=>node.className==='board-note');
   const focusPane=find('boards-focus'),gridBar=dom.created.find(node=>node.className==='boards-bar'&&node.children.some(child=>child.className==='boards-modes'));
   // A boy's screen arrives through the authenticated Shorashim receiver.
   class Call{
@@ -94,12 +94,12 @@ async function viewerFixture(){
     call.emit('stream',shared);
     return call;
   }
-  return{window,member,tile,tileVideo,tileNote,box,video,note,grid,back,focusPane,gridBar,startSharing,shared,endClass,stage};
+  return{window,member,get tile(){return tile()},get tileVideo(){return tileVideo()},get tileNote(){return tileNote()},box,video,note,grid,back,focusPane,gridBar,startSharing,shared,endClass,stage};
 }
 
 test('gallery tile shows a Shorashim screen, not "Waiting", once the boy shares',async()=>{
   const f=await viewerFixture();
-  await wait(()=>/Waiting for his screen/.test(f.tileNote.textContent),'tile should wait before he shares');
+  assert.equal(f.tile,undefined,'no tiny waiting tiles before a student shares');
   await f.startSharing();
   await wait(()=>f.tileVideo.srcObject===f.shared,'gallery tile did not receive the Shorashim screen');
   assert.equal(f.tileVideo.hidden,false);
@@ -121,12 +121,12 @@ test('clicking a boy enlarges his actual Shorashim screen in the large viewer',a
 
 test('the large viewer picks up a screen that starts while it is already open, and shows Waiting when it stops',async()=>{
   const f=await viewerFixture();
-  f.tile.click();
-  await wait(()=>f.note.hidden===false&&/Waiting for Arik/.test(f.note.textContent),'viewer should wait before he shares');
   const call=await f.startSharing();
+  await wait(()=>!!f.tile,'live student gets a tile');
+  f.tile.click();
   await wait(()=>f.video.srcObject===f.shared,'open viewer did not pick up the new screen');
   call.emit('close');
-  await wait(()=>f.video.srcObject===null&&f.note.hidden===false,'viewer did not return to Waiting when sharing stopped');
+  await wait(()=>f.tile?.removed===true&&f.video.srcObject===null,'stopped share removes its gallery tile');
 });
 
 test('Back to gallery returns to every student and keeps the screen live',async()=>{

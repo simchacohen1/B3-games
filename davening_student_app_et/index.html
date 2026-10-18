@@ -186,7 +186,7 @@ document.addEventListener('keydown',e=>{if(['INPUT','SELECT'].includes(document.
 const volume=document.getElementById('volume'),volLabel=document.getElementById('volLabel');function applyVolume(){audio.volume=Number(volume.value)/100;volLabel.textContent=volume.value+'%';try{localStorage.setItem('daveningVolume_ET',volume.value)}catch(e){}}try{const sv=localStorage.getItem('daveningVolume_ET');if(sv!==null)volume.value=sv}catch(e){}volume.oninput=applyVolume;applyVolume();
 index=firstIncludedIndex();load(index,false);
 </script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261018-myscreen175"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261018-embedded1"></script>
 </body>
 </html>
 
