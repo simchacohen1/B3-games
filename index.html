@@ -1449,8 +1449,14 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       studentClassChoices=r.classChoices;
       const stored=sessionStorage.getItem("b3Games_studentId")===r.id?sessionStorage.getItem("b3Games_studentClass"):"";
       classId=(studentClassChoices.find(c=>c.id===stored)||studentClassChoices.find(c=>c.id===r.classId)||studentClassChoices[0]).id;
-    }else try{classId=await resolvedStudentClass(r.id,{id:r.id,name:r.name,active:true,classId:r.classId||legacyMigrationClass(r.id)});}
-    catch(e){return{ok:false,reason:e.message||"The connection is slow. Please try again."}}
+    }else{
+      // Older auth-function deployments return the selected class but not the
+      // full classChoices list. Use that trusted server result so sign-in does
+      // not depend on an unauthenticated Firebase roster read timing out.
+      const stored=sessionStorage.getItem("b3Games_studentId")===r.id?sessionStorage.getItem("b3Games_studentClass"):"";
+      classId=stored||r.classId||legacyMigrationClass(r.id);
+      studentClassChoices=classId?[{id:classId,name:classId.toUpperCase()}]:[];
+    }
     if(!classId)return{ok:false,reason:"Your class is not assigned yet. Ask your teacher."};
     return{ok:true,id:r.id,name:r.name,classId};
   }
