@@ -30,7 +30,7 @@
   }
   function image(file, alt, cls) {
     var im = node('img', cls || '');
-    im.src = file;
+    im.src = file + '?v=20261018-art2';
     im.alt = alt;
     im.loading = 'lazy';
     im.decoding = 'async';
@@ -83,7 +83,7 @@
       b.setAttribute('aria-label', 'Add ' + label + ' sticker to scrapbook');
       b.addEventListener('click', function () {
         if (isReadonly() || typeof window.add !== 'function') return;
-        var tag = '<img alt="' + htmlEscape(label) + '" src="' + file + '">';
+        var tag = '<img alt="' + htmlEscape(label) + '" src="' + file + '?v=20261018-art2">';
         var piece = window.add('a', 'photo', tag, 0);
         if (piece) {
           piece.classList.add('studio-sticker', 'clear', 'hal-illustrated-piece');
