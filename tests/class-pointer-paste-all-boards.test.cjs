@@ -16,6 +16,7 @@ test('Paste action uses browser clipboard and includes Ctrl+V fallback',()=>{
   assert.match(s,/press Ctrl\+V to paste instead/);
 });
 test('Paste accepts common images but not untrusted HTML',()=>{
-  assert.match(s,/image\\\/\(png\|jpeg\|webp\|gif\)/);
+  assert.match(s,/entry\.types\.find/);
+  assert.match(s,/png\|jpeg\|webp\|gif/);
   assert.doesNotMatch(s,/clipboard\.readHTML|clipboard\.write/);
 });
