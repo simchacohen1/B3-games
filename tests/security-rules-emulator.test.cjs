@@ -23,8 +23,8 @@ test.before(async()=>{
       'b3Games/students/synthetic_one/memberships/b3-2026_alpha':{workspaceId:'b3-2026',classId:'alpha',active:true},
       'b3Games/students/synthetic_two/profile':{name:'Synthetic Two',active:true,classId:'beta'},
       'b3Games/students/synthetic_two/memberships/b3-2026_beta':{workspaceId:'b3-2026',classId:'beta',active:true},
-      'b3Games/workspaces/b3-2026/classes/alpha':{active:true,members:{synthetic_one:{active:true},synthetic_friend:{active:true}},toolGrants:{chazara:true,'class-pointer':true},classPointerSessions:{'class-pointer-alpha':{roomId:'class-pointer-alpha',teacherUid:'teacher_alpha',createdAt:1700000000000,studentScreenSharing:true}}},
-      'b3Games/workspaces/b3-2026/classes/beta':{active:true,members:{synthetic_two:{active:true}},toolGrants:{chazara:true,'class-pointer':true},classPointerSessions:{'class-pointer-beta':{roomId:'class-pointer-beta',teacherUid:'teacher_beta',createdAt:1700000000000,studentScreenSharing:true}}},
+      'b3Games/workspaces/b3-2026/classes/alpha':{name:'Synthetic Alpha',active:true,members:{synthetic_one:{active:true},synthetic_friend:{active:true}},toolGrants:{chazara:true,'class-pointer':true},classPointerSessions:{'class-pointer-alpha':{roomId:'class-pointer-alpha',teacherUid:'teacher_alpha',createdAt:1700000000000,studentScreenSharing:true}}},
+      'b3Games/workspaces/b3-2026/classes/beta':{name:'Synthetic Beta',active:true,members:{synthetic_two:{active:true}},toolGrants:{chazara:true,'class-pointer':true},classPointerSessions:{'class-pointer-beta':{roomId:'class-pointer-beta',teacherUid:'teacher_beta',createdAt:1700000000000,studentScreenSharing:true}}},
       'b3Games/workspaces/b3-2026/teachers/teacher_alpha':{active:true,classIds:{alpha:true}},
       'b3Games/workspaces/b3-2026/teachers/teacher_beta':{active:true,classIds:{beta:true}},
       'b3Games/workspaces/b3-2026/classes/et':{active:true,members:{synthetic_et:{active:true}},toolGrants:{chazara:true},classPointerSessions:{'class-pointer-et':{roomId:'class-pointer-et',teacherUid:'teacher_et',createdAt:1700000000000,studentScreenSharing:true}}},
@@ -33,8 +33,9 @@ test.before(async()=>{
       'b3Games/students/synthetic_wt/profile':{name:'Synthetic West',active:true,classId:'wt'},
       'b3Games/workspaces/b3-2026/teachers/teacher_et':{active:true,classIds:{et:true}},
       'b3Games/workspaces/b3-2026/teachers/teacher_wt':{active:true,classIds:{wt:true}},
-      'b3Games/workspaces/b3-2026/teachers/teacher_inactive':{active:false,classIds:{et:true}},
+      'b3Games/workspaces/b3-2026/teachers/teacher_inactive':{active:false,classIds:{et:true,alpha:true,wt:true}},
       'b3Games/workspaces/b3-2026/teachers/teacher_multi':{active:true,classIds:{alpha:true}},
+      'b3Games/workspaces/b3-2026/teachers/teacher_unassigned':{active:true,classIds:{beta:true}},
       'b3Games/workspaces/b3-2026/teacherInvites':{
         alpha_example_test:{email:'alpha@example.test',active:true,classIds:{alpha:true}},
         beta_example_test:{email:'beta@example.test',active:true,classIds:{beta:true}},
@@ -204,6 +205,52 @@ testEmulator('Class Pointer session metadata is readable only inside its active 
   await fails(set(ref(alphaStudent,alphaPath+'/studentScreenSharing'),false));
   await succeeds(get(ref(wtTeacher,wtPath)));
   await fails(set(ref(wtTeacher,wtPath+'/screenSharingDenied/synthetic_et'),true));
+});
+
+testEmulator('assigned students can read their class name and tool grants, but not another class settings',async()=>{
+  const alphaStudent=db('student-one',{b3StudentId:'synthetic_one',b3ClassId:'alpha',b3StudentRole:'student'});
+  const betaStudent=db('student-two',{b3StudentId:'synthetic_two',b3ClassId:'beta',b3StudentRole:'student'});
+  const anonymous=env.unauthenticatedContext().database();
+  const base='b3Games/workspaces/b3-2026/classes/';
+  const alphaName=await get(ref(alphaStudent,base+'alpha/name'));
+  const alphaTools=await get(ref(alphaStudent,base+'alpha/toolGrants'));
+  assert.equal(alphaName.val(),'Synthetic Alpha');
+  assert.equal(alphaTools.val()['class-pointer'],true);
+  const betaName=await get(ref(betaStudent,base+'beta/name'));
+  const betaTools=await get(ref(betaStudent,base+'beta/toolGrants'));
+  assert.equal(betaName.val(),'Synthetic Beta');
+  assert.equal(betaTools.val()['class-pointer'],true);
+  await fails(get(ref(alphaStudent,base+'beta/name')));
+  await fails(get(ref(alphaStudent,base+'beta/toolGrants')));
+  await fails(get(ref(anonymous,base+'alpha/name')));
+  const classRule=JSON.parse(rules).rules.b3Games.workspaces['$workspaceId'].classes['$classId'];
+  assert.ok(classRule.name,'class name rules must be attached directly to the class record');
+  assert.ok(classRule.toolGrants,'tool-grant rules must be attached directly to the class record');
+  assert.equal(classRule.resources.name,undefined,'class metadata must not be nested under resources');
+  assert.equal(classRule.resources.toolGrants,undefined,'class metadata must not be nested under resources');
+});
+
+testEmulator('assigned teachers can start sessions and write private share settings only for their class',async()=>{
+  const alphaTeacher=db('teacher_alpha',{email:'alpha@example.test',email_verified:true});
+  const betaTeacher=db('teacher_beta',{email:'beta@example.test',email_verified:true});
+  const unassigned=db('teacher_unassigned',{email:'unassigned@example.test',email_verified:true});
+  const inactive=db('teacher_inactive',{email:'inactive@example.test',email_verified:true});
+  const noGrantTeacher=db('teacher_no_grant',{email:'no-grant@example.test',email_verified:true});
+  const student=db('student-one',{b3StudentId:'synthetic_one',b3ClassId:'alpha',b3StudentRole:'student'});
+  const room='class-pointer-12345678-1234-1234-1234-123456789abc';
+  const sessionPath='b3Games/workspaces/b3-2026/classes/alpha/classPointerSessions/'+room;
+  const alphaPermissions='b3Private/classPointerSharePermissions/b3-2026/alpha/'+room;
+  const betaPermissions='b3Private/classPointerSharePermissions/b3-2026/beta/'+room;
+  const noGrantPermissions='b3Private/classPointerSharePermissions/b3-2026/no-grant/'+room;
+  await succeeds(set(ref(alphaTeacher,sessionPath),{roomId:room,teacherUid:'teacher_alpha',createdAt:Date.now(),studentScreenSharing:false}));
+  await succeeds(set(ref(alphaTeacher,alphaPermissions),{synthetic_one:{screenSharingDenied:true,whiteboardDenied:false}}));
+  await fails(set(ref(betaTeacher,alphaPermissions),{synthetic_one:{screenSharingDenied:false}}));
+  await fails(set(ref(unassigned,alphaPermissions),{synthetic_one:{screenSharingDenied:false}}));
+  await fails(set(ref(inactive,alphaPermissions),{synthetic_one:{screenSharingDenied:false}}));
+  await fails(set(ref(noGrantTeacher,noGrantPermissions),{synthetic_one:{screenSharingDenied:false}}));
+  await fails(set(ref(student,alphaPermissions),{synthetic_one:{screenSharingDenied:false}}));
+  await fails(get(ref(student,alphaPermissions+'/synthetic_one')));
+  await fails(set(ref(alphaTeacher,betaPermissions),{synthetic_two:{screenSharingDenied:true}}));
 });
 
 testEmulator('teachers cannot write student profile or rewards balance',async()=>{
