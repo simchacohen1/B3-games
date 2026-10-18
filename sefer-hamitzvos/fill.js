@@ -8,15 +8,18 @@
   if(x<0||y<0||x>=width||y>=height)return {reason:'outside'};
   const threshold=Number.isFinite(options.threshold)?options.threshold:232;
   const open=index=>{const i=index*4;return data[i+3]>0&&data[i]>=threshold&&data[i+1]>=threshold&&data[i+2]>=threshold;};
-  // A two-pixel guard around dark outline pixels closes hairline gaps in artwork.
-  // Without it, one bucket tap can flood through a broken line into adjacent objects.
+  // Protect against tiny breaks in full-resolution artwork without erasing the
+  // interiors of small shapes in thumbnails and tiny canvases.
+  const radius=Number.isInteger(options.guardRadius)?Math.max(0,Math.min(2,options.guardRadius)):(Math.min(width,height)>=128?2:0);
   const blocked=new Uint8Array(total);
-  for(let py=0;py<height;py++)for(let px=0;px<width;px++){
-   const i=(py*width+px)*4;
-   if(data[i+3]>0&&(data[i]<threshold||data[i+1]<threshold||data[i+2]<threshold)){
-    for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
-     const xx=px+dx,yy=py+dy;
-     if(xx>=0&&yy>=0&&xx<width&&yy<height)blocked[yy*width+xx]=1;
+  if(radius){
+   for(let py=0;py<height;py++)for(let px=0;px<width;px++){
+    const i=(py*width+px)*4;
+    if(data[i+3]>0&&(data[i]<threshold||data[i+1]<threshold||data[i+2]<threshold)){
+     for(let dy=-radius;dy<=radius;dy++)for(let dx=-radius;dx<=radius;dx++){
+      const xx=px+dx,yy=py+dy;
+      if(xx>=0&&yy>=0&&xx<width&&yy<height)blocked[yy*width+xx]=1;
+     }
     }
    }
   }
