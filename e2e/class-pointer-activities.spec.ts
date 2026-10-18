@@ -207,7 +207,7 @@ test('paste Ctrl+V to everyone and edit Hebrew text independently per student', 
     await expect(levi.getByLabel('Edit Hebrew text')).toHaveValue('בראשית');
 
     // A pasted image from another application opens the coloring activity.
-    await teacher.getByRole('button', { name: '◀ All students' }).click();
+    await teacher.getByRole('button', { name: '◀ Back to gallery' }).click();
     teacher.on('dialog', async dialog => await dialog.accept());
     await teacher.evaluate(async () => {
       const c = document.createElement('canvas'); c.width = 80; c.height = 60;
