@@ -1,27 +1,53 @@
-.teacher-dashboard{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0 22px}
-.teacher-dashboard-section{min-width:0;padding:18px;border:1px solid #dce4ef;border-radius:14px;background:#f8faff}
-.teacher-dashboard-section:first-child{grid-column:1/-1}
-.teacher-dashboard-section h2{margin:0 0 4px;color:#17395b;font-size:19px}
-.teacher-dashboard-description{margin:0 0 12px;color:#59697e;font-size:14px}
-.teacher-dashboard-content{display:flex;align-items:center;flex-wrap:wrap;gap:9px}
-.teacher-dashboard-content>button,.teacher-dashboard-content>.pointer-class-picker{margin:0}
-.teacher-dashboard-primary{min-height:46px;padding:12px 18px;background:#2557d6;color:#fff;border:0}
-.teacher-dashboard-note{flex-basis:100%;margin:2px 0 0;font-size:13px}
-.teacher-dashboard-roster{position:static!important;inset:auto!important;display:block!important;visibility:visible!important;transform:none!important;width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;padding:14px!important;border:1px solid #dce4ef!important;border-radius:12px!important;background:#fff!important;box-shadow:none!important}
+/* Color identifies each job; only the teacher desktop receives this layout. */
+.teacher-dashboard-source,.teacher-dashboard-menu-trigger{display:none!important}
+.cp-permissions-sidebar{background:#f3edff;border:1px solid #d9c7f3;border-radius:14px;padding:12px;box-sizing:border-box}
+.cp-permissions-sidebar h2{margin:-12px -12px 12px;padding:14px;background:#7942bd;color:white;border-radius:13px 13px 0 0;font-size:18px}
+.cp-permissions-sidebar .pointer-class-picker{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.cp-permissions-sidebar select{min-width:0;max-width:100%}
+.teacher-dashboard-roster{position:static!important;inset:auto!important;display:block!important;visibility:visible!important;transform:none!important;width:100%!important;min-width:0!important;max-width:none!important;max-height:none!important;overflow:visible!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;resize:none!important}
 .teacher-dashboard-roster[hidden]{display:block!important}
-.teacher-dashboard-roster .sharing-permissions{margin-top:12px}
-.teacher-dashboard-menu-trigger{display:none!important}
-.teacher-dashboard-source{display:none!important}
-.teacher-dashboard-section .pointer-class-picker{display:flex;align-items:center;gap:8px}
-.teacher-dashboard-section .pointer-class-picker select{min-width:210px}
-.teacher-activities-dialog{width:min(520px,calc(100vw - 28px));max-height:min(80vh,680px);padding:22px;border:1px solid #d4deec;border-radius:18px;box-shadow:0 22px 70px #17203344}
-.teacher-activities-dialog::backdrop{background:#17203388}
-.teacher-activities-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.teacher-activities-header h2{margin:0;color:#17395b}
-.teacher-activities-choices{display:grid;gap:10px;margin-top:16px}
-.teacher-activity-choice{min-height:52px;text-align:left;background:#f3f7ff;border-color:#dce4ef}
-.teacher-activity-choice:hover:enabled{background:#e4edff}
-.teacher-dashboard-section #studentBoards{background:#e9f1ff;color:#1b4382}
-.teacher-dashboard-section #cpShareEnabled[aria-pressed="true"]{background:#e5f8ed;color:#166534}
-.teacher-dashboard-section #stopScreen{border-color:#d99090;color:#8f1d2c}
-@media(max-width:720px){.teacher-dashboard{grid-template-columns:1fr}.teacher-dashboard-section:first-child{grid-column:auto}.teacher-dashboard-section{padding:14px}}
+.cp-permission-help{font-size:12px;line-height:1.4;margin:6px 0;color:#503070}
+.cp-permissions-sidebar .permission-tools{display:flex;flex-wrap:wrap;gap:8px;background:white;padding:10px;border-radius:10px}
+.cp-permissions-sidebar .permission-tools strong{flex-basis:100%}
+.cp-permissions-sidebar .sharing-permissions{background:#fff8ec!important;border-color:#efca8b!important;padding:8px!important}
+.cp-permissions-sidebar .sharing-permissions-roster{max-height:24dvh!important;overflow:auto}
+.cp-permissions-sidebar #roster{max-height:24dvh!important;overflow:auto}
+.cp-student-sharing{border-top:1px solid #d9c7f3;margin-top:12px;padding-top:10px}
+.cp-student-sharing p{font-size:12px}
+.cp-teaching-actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px;background:#eaf4ff;border:1px solid #b8d9fb;border-radius:12px;padding:8px}
+.cp-teaching-actions button{font-size:13px;padding:8px 10px;margin:0}
+.cp-teaching-actions #shareScreen{background:#0869db;color:white;border-color:#0869db}
+.cp-teaching-actions #openWhiteboard{background:#fff1db;border-color:#f4b754;color:#794408}
+body.teacher-view .cp-workspace-tabs{grid-template-columns:repeat(3,minmax(0,1fr));background:transparent;padding:0;border:0;gap:8px}
+body.teacher-view .cp-workspace-tab{color:white!important;border:2px solid transparent!important;min-height:48px;font-size:15px}
+body.teacher-view .cp-workspace-tab[data-workspace=teach]{background:#0869db!important}
+body.teacher-view .cp-workspace-tab[data-workspace=screens]{background:#20843b!important}
+body.teacher-view .cp-workspace-tab[data-workspace=whiteboards]{background:#bc590b!important}
+body.teacher-view .cp-workspace-tab[aria-selected=true]{box-shadow:inset 0 -4px #ffffffb0,0 2px 5px #17203325}
+body.teacher-view #tbFullscreen{display:none}
+@media(min-width:1000px){
+body.teacher-view.cp-compact-workspace{--cp-sidebar:300px}
+body.teacher-view.cp-compact-workspace main{max-width:none;padding:12px 16px 12px calc(var(--cp-sidebar) + 36px)}
+body.teacher-view .cp-permissions-sidebar{position:fixed;left:12px;top:12px;bottom:12px;width:var(--cp-sidebar);overflow:auto;z-index:8}
+body.teacher-view .app-header{margin:0 0 8px;gap:8px}
+body.teacher-view .app-header h1{font-size:23px;margin:0}
+body.teacher-view .app-header p{margin:2px 0;font-size:12px}
+body.teacher-view .app-header p:last-child{display:none}
+body.teacher-view #teacherPanel{margin:0}
+body.teacher-view #stage:not(.lesson-fullscreen):not(:fullscreen){height:calc(100dvh - 285px);min-height:260px;aspect-ratio:auto}
+body.teacher-view #teacherDock:not(.floating){font-size:12px;gap:3px;padding:5px}
+body.teacher-view #teacherDock .tb-btn{padding:7px;font-size:12px}
+}
+@media(max-width:999px){.cp-permissions-sidebar{margin:10px 0}.cp-permissions-sidebar #roster{max-height:180px!important}body.teacher-view .cp-workspace-tab{white-space:normal;font-size:12px}}
+
+/* Fill the remaining viewport after controls wrap at the current screen width. */
+@media(min-width:1000px){
+body.teacher-view.cp-compact-workspace main{height:100dvh;min-height:550px;display:flex;flex-direction:column;gap:0}
+body.teacher-view.cp-compact-workspace main>*{flex-shrink:0}
+body.teacher-view.cp-compact-workspace #stage:not(.lesson-fullscreen):not(:fullscreen){flex:1 1 0;min-height:180px;height:auto}
+body.teacher-view.cp-compact-workspace .lesson-actions:empty{display:none}
+}
+body.teacher-view .cp-permissions-sidebar #tbStudentsMenu{width:100%!important;min-width:0!important;max-height:none!important;overflow:visible!important}
+body.teacher-view .cp-permissions-sidebar #tbStudentsMenu .permission-tools{display:flex;flex-wrap:wrap;white-space:normal}
+body.teacher-view .cp-permissions-sidebar #tbStudentsMenu .permission-tools label{font-size:13px;padding:6px;min-width:0}
+body.teacher-view .cp-permissions-sidebar #tbStudentsMenu .pointer-bulk-actions{display:flex;flex-wrap:wrap;gap:6px}

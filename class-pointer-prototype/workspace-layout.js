@@ -10,15 +10,14 @@
     tabs.className='cp-workspace-tabs';
     tabs.setAttribute('aria-label','Classroom sections');
     const items=[
-      ['teach','✏️','Teach'],
-      ['screens','🖥️','Screens'],
-      ['whiteboards','🎨','Whiteboards'],
-      ['students','👥','Students']
+      ['teach','✏️','My Teaching Area'],
+      ['screens','🖥️','Student Screens'],
+      ['whiteboards','🎨','Student Whiteboards']
     ];
     const buttons=new Map();
     for(const [id,icon,name] of items){
       const b=document.createElement('button');
-      b.type='button';b.className='cp-workspace-tab';
+      b.type='button';b.className='cp-workspace-tab';b.dataset.workspace=id;
       b.innerHTML='<span class="cp-tab-icon" aria-hidden="true">'+icon+'</span><span>'+name+'</span>';
       b.setAttribute('aria-selected',String(id==='teach'));
       b.setAttribute('aria-label',name);
@@ -45,6 +44,7 @@
           if(chooser)chooser.click();
         }
       }else{
+        if(launch?.getAttribute('aria-pressed')==='true')launch.click();
         document.querySelector('.tb-mode[data-mode="point"]')?.click();
       }
     }
@@ -57,7 +57,7 @@
       if(menu){
         menu.setAttribute('aria-label','Student permissions');
         const handle=menu.querySelector('.tb-roster-handle');
-        if(handle&&handle.textContent!=='⠿ Student permissions — drag to reposition')handle.textContent='⠿ Student permissions — drag to reposition';
+        if(handle&&handle.textContent!=='Student permissions')handle.textContent='Student permissions';
       }
     }
     organize();
