@@ -427,6 +427,7 @@
     permissionsPanels.push(list);return outer;
   }
   function renderPermissions(){
+    document.dispatchEvent(new CustomEvent('classpointer:sharing-permissions'));
     const students=classStudents.length?classStudents:admitted().map(m=>({id:personId(m),name:m.name})).filter(m=>m.id);
     for(const list of permissionsPanels){
       list.replaceChildren();
@@ -767,6 +768,16 @@
   new ResizeObserver(()=>{if(!on)return;layoutGrid();if(focusId)dirty(focusId)}).observe(stage);
   controls();renderPermissions();void loadPermissionsRoster();
 
+  // Read/write access for the teacher's Students table (teacher-dashboard.js).
+  window.ClassPointerSharingPermissions={
+    students:()=>(classStudents.length?classStudents:admitted().map(m=>({id:personId(m),name:m.name})).filter(m=>m.id)).map(p=>({id:p.id,name:p.name})),
+    loaded:()=>classStudents.length>0,
+    personId:m=>personId(m),
+    allowed:(id,kind)=>!!id&&!denied[kind]?.has(id),
+    set:(id,kind,on)=>{if(denied[kind])updatePermission(id,kind,!!on)},
+    bulk:(kind,on)=>{if(denied[kind])bulkPermission(kind,!!on)},
+    load:()=>loadPermissionsRoster()
+  };
   window.ClassPointerBoards={
     fromStudent(m,message){
       if(!on)return;

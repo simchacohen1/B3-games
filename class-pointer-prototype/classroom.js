@@ -23,7 +23,8 @@ function clearError(){$('error').hidden=true}
 function send(connection,message){if(connection?.open){try{connection.send(message)}catch{fail('The connection was interrupted. Please rejoin the class.')}}}
 function ownMember(){return state.members.find(member=>member.id==='student:'+peer?.id)}
 function selected(member){return !!member?.admitted&&member.allowed===true&&state.mode==='selected'}
-function toolAllowed(tool,member=ownMember()){return isTeacher||selected(member)&&state.tools?.[tool]===true}
+function memberTools(member){return member?.tools||state.tools}
+function toolAllowed(tool,member=ownMember()){return isTeacher||selected(member)&&memberTools(member)?.[tool]===true}
 function allowed(){return toolAllowed('pointer')}
 function writingAllowed(tool){return toolAllowed(['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(tool)?'pen':'highlight')}
 function pointerPermission(){
@@ -63,11 +64,12 @@ function drawPointers(){
   for(const [id,node] of pointerNodes)if(!visible.has(id)){node.remove();pointerNodes.delete(id)}
 }
 function publish(){
-  state.members=Array.from(members.values()).filter(member=>member.admitted).map(({id,name,color,allowed})=>({id,name,color,admitted:true,allowed,tools:state.tools}));
+  state.members=Array.from(members.values()).filter(member=>member.admitted).map(member=>({id:member.id,name:member.name,color:member.color,admitted:true,allowed:member.allowed,tools:memberTools(member)}));
   for(const member of members.values())if(member.admitted)send(member.connection,{type:'state',state});
   drawPointers();pointerPermission();
 }
 function roster(){
+  document.dispatchEvent(new CustomEvent('classpointer:roster'));
   const list=$('roster');list.replaceChildren();
   if(!members.size){list.textContent=started?'No students yet. Send the join link to one student.':'Start a class to receive join requests.';return}
   for(const member of members.values()){
@@ -76,7 +78,7 @@ function roster(){
     else{
       const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=member.allowed;
       input.setAttribute('aria-label','Select '+member.name);
-      input.addEventListener('change',()=>{member.allowed=input.checked;if(!member.allowed){clearStudentHover(member);delete state.points[member.id]}publish();roster()});
+      input.addEventListener('change',()=>{member.allowed=input.checked;if(member.allowed)member.tools={...state.tools};if(!member.allowed){clearStudentHover(member);delete state.points[member.id]}publish();roster()});
       label.append(input,document.createTextNode(' Select'));row.appendChild(label);
     }
     const remove=document.createElement('button');remove.textContent=member.admitted?'Remove '+member.name:'Decline '+member.name;
@@ -91,7 +93,7 @@ function removeMember(member){
 function clearStudentHover(member){clearTimeout(member.pointTimer);member.pointTimer=null;member.pendingPoint=null}
 function commitStudentHover(member){
   member.pointTimer=null;const point=member.pendingPoint;member.pendingPoint=null;
-  if(!point||members.get(member.id)!==member||!live()||!selected(member)||!state.tools.pointer)return;
+  if(!point||members.get(member.id)!==member||!live()||!selected(member)||!memberTools(member)?.pointer)return;
   member.lastPoint=Date.now();state.points[member.id]=point;publish();
 }
 function favorTextDetail(call){
@@ -123,7 +125,7 @@ function receiveStudent(connection){
       // connection per signed-in student name, rather than one per PeerJS ID.
       const duplicate=Array.from(members.values()).find(existing=>existing.name.toLocaleLowerCase()===name.toLocaleLowerCase());
       if(!duplicate&&members.size>=12){send(connection,{type:'full'});connection.close();return}
-      const previousAccess=duplicate?{allowed:duplicate.allowed,writeAllowed:duplicate.writeAllowed,color:duplicate.color,studentId:duplicate.studentId}:null;
+      const previousAccess=duplicate?{allowed:duplicate.allowed,writeAllowed:duplicate.writeAllowed,tools:duplicate.tools,color:duplicate.color,studentId:duplicate.studentId}:null;
       if(duplicate){
         // Remove the stale entry before closing its connection; its close
         // callback cannot subsequently remove the replacement.
@@ -131,7 +133,7 @@ function receiveStudent(connection){
         send(duplicate.connection,{type:'removed'});
         duplicate.connection.close();
       }
-      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,studentId:window.ClassPointerDashboardCore?.validId(message.studentId)?message.studentId:(previousAccess?.studentId||null),color:previousAccess?.color||C.colors[colorIndex++%C.colors.length],allowed:previousAccess?.allowed||false,writeAllowed:previousAccess?.writeAllowed||false,admitted:true,connection,lastPoint:0};members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);window.ClassPointerPdf?.studentJoined(member);window.ClassPointerBoards?.studentJoined(member);return;
+      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,studentId:window.ClassPointerDashboardCore?.validId(message.studentId)?message.studentId:(previousAccess?.studentId||null),color:previousAccess?.color||C.colors[colorIndex++%C.colors.length],allowed:previousAccess?.allowed||false,writeAllowed:previousAccess?.writeAllowed||false,tools:previousAccess?.tools||null,admitted:true,connection,lastPoint:0};if(!previousAccess)applyLevel(member,savedLevel(name));members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);window.ClassPointerPdf?.studentJoined(member);window.ClassPointerBoards?.studentJoined(member);return;
   };
   let joinPending=false;
   connection.on('data',message=>{
@@ -152,11 +154,11 @@ function receiveStudent(connection){
     }
     if(!member||members.get(member.id)!==member)return;
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
-    if(message.type==='highlight'&&live()&&selected(member)&&state.tools?.[['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(message.stroke?.tool)?'pen':'highlight']){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
+    if(message.type==='highlight'&&live()&&selected(member)&&memberTools(member)?.[['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(message.stroke?.tool)?'pen':'highlight']){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
     if(message.type==='edit-highlights'&&member.admitted){if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}return}
     if(message.type==='video-ready'&&member.admitted){member.videoReady=true;clearTimeout(member.mediaTimer)}
     if(message.type==='pointer-hide'&&member.admitted){clearStudentHover(member);delete state.points[member.id];member.lastPoint=0;publish()}
-    if(message.type==='point'&&live()&&selected(member)&&state.tools.pointer&&C.validPoint(message.point)){
+    if(message.type==='point'&&live()&&selected(member)&&memberTools(member)?.pointer&&C.validPoint(message.point)){
       // Identity comes from this connection, never from a student-supplied name or ID.
       member.pendingPoint={x:message.point.x,y:message.point.y,...C.pointStyle(message.point)};
       const delay=75-(Date.now()-member.lastPoint);
@@ -357,6 +359,7 @@ function endClass(){
   const oldPeer=peer;peer=null;oldPeer?.destroy();
   state={sharing:false,mode:'selected',tools:{pointer:true,highlight:false,pen:false},members:[],points:{}};
   for(const [id,tool] of [['allowPointer','pointer'],['allowHighlight','highlight'],['allowPen','pen']])$(id).checked=state.tools[tool];
+  defaultLevel='none';nameLevels.clear();
   $('accessMode').value='selected';$('spotlight').checked=false;
   const button=$('startClass');
   button.disabled=true;button.hidden=false;button.textContent='Ending class…';
@@ -449,13 +452,42 @@ $('stage').addEventListener('click',event=>{
   if(state.sharing&&$('lesson').paused)$('lesson').play().catch(()=>fail('Video playback could not resume. Leave and rejoin the class.'));
   pointAt(event,true);
 });
+// Per-student levels for the Students table: none, point, highlight (point+highlight), pen (all three).
+// Levels are remembered by name for students who have not joined yet; "Everyone" sets the default.
+const LEVELS=['none','point','highlight','pen'];
+let defaultLevel='none';const nameLevels=new Map();
+function levelTools(level){return{pointer:level!=='none',highlight:level==='highlight'||level==='pen',pen:level==='pen'}}
+function levelOf(member){if(!member.allowed)return 'none';const t=memberTools(member)||{};return t.pen?'pen':t.highlight?'highlight':t.pointer?'point':'none'}
+function savedLevel(name){return nameLevels.get(String(name).toLocaleLowerCase())||defaultLevel}
+function applyLevel(member,level){
+  member.allowed=level!=='none';member.tools=levelTools(level);
+  if(!member.allowed){clearStudentHover(member);delete state.points[member.id]}
+}
+if(isTeacher)window.ClassPointerRoster={
+  levels:LEVELS.slice(),
+  everyone:()=>defaultLevel,
+  list:()=>Array.from(members.values()).map(m=>({id:m.id,name:m.name,studentId:m.studentId||null,admitted:!!m.admitted,color:m.color,level:levelOf(m)})),
+  levelForName(name){const key=String(name).toLocaleLowerCase();const m=Array.from(members.values()).find(x=>x.admitted&&x.name.toLocaleLowerCase()===key);return m?levelOf(m):savedLevel(name)},
+  setLevelForName(name,level){
+    if(!LEVELS.includes(level))return;const key=String(name).toLocaleLowerCase();nameLevels.set(key,level);
+    for(const m of members.values())if(m.admitted&&m.name.toLocaleLowerCase()===key)applyLevel(m,level);
+    state.mode='selected';$('accessMode').value='selected';publish();roster();
+  },
+  setAll(level){
+    if(!LEVELS.includes(level))return;defaultLevel=level;nameLevels.clear();
+    for(const m of members.values())if(m.admitted)applyLevel(m,level);
+    state.mode='selected';$('accessMode').value='selected';publish();roster();
+  },
+  admit(id){const m=members.get(id);if(!m||m.admitted)return;Array.from($('roster').querySelectorAll('button')).find(b=>b.textContent==='Admit '+m.name)?.click()},
+  remove(id){const m=members.get(id);if(!m)return;send(m.connection,{type:'removed'});m.connection.close();removeMember(m)}
+};
 function setAllPointerAccess(enabled){
   if(!isTeacher)return;
   state.mode='selected';
   $('accessMode').value='selected';
   for(const member of members.values()){
     if(!member.admitted)continue;
-    member.allowed=enabled;
+    member.allowed=enabled;if(enabled)member.tools={...state.tools};
     if(!enabled){
       clearStudentHover(member);
       delete state.points[member.id];
@@ -465,7 +497,7 @@ function setAllPointerAccess(enabled){
 }
 $('pointerSelectAll')?.addEventListener('click',()=>setAllPointerAccess(true));
 $('pointerClearAll')?.addEventListener('click',()=>setAllPointerAccess(false));
-for(const [id,tool] of [['allowPointer','pointer'],['allowHighlight','highlight'],['allowPen','pen']]){$(id)?.addEventListener('change',()=>{state.tools[tool]=$(id).checked;if(!state.tools.pointer){for(const member of members.values()){clearStudentHover(member);delete state.points[member.id]}}publish()})}
+for(const [id,tool] of [['allowPointer','pointer'],['allowHighlight','highlight'],['allowPen','pen']]){$(id)?.addEventListener('change',()=>{state.tools[tool]=$(id).checked;for(const member of members.values())if(member.allowed)member.tools={...state.tools};if(!state.tools.pointer){for(const member of members.values()){clearStudentHover(member);delete state.points[member.id]}}publish()})}
 $('accessMode').addEventListener('change',()=>{
   state.mode=$('accessMode').value;for(const member of members.values())if(!C.canPoint(state.mode,member)){clearStudentHover(member);delete state.points[member.id];member.writeAllowed=false}publish();roster();
 });
