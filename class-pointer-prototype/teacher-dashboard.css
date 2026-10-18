@@ -179,3 +179,23 @@ body.cp-simple #stage:has(.cp-source-picker:not([hidden])){aspect-ratio:auto;min
 #stage .cp-permissions-sidebar.cp-drawer-overlay.cp-overlay-open{display:block!important}
 #stage .teacher-dock .cp-dock-active{background:var(--cp-blue,#2563eb)!important;color:#fff!important}
 #stage .teacher-dock.floating.dock-left{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+
+/* Classroom Pointer cleanup: the Students drawer owns participant controls.
+   Keep the actual live screen/whiteboard tiles visible, not a duplicate toolbar. */
+body.teacher-view.cp-simple .boards-view .boards-bar{display:none!important}
+/* Give the floating full-screen Students drawer a larger, readable surface.
+   The teacher can resize it without affecting permissions. */
+#stage .cp-permissions-sidebar.cp-drawer-overlay{
+  width:clamp(340px,36vw,650px)!important;
+  max-width:calc(100% - 76px)!important;
+  height:min(76vh,760px)!important;
+  max-height:calc(100% - 24px)!important;
+  bottom:auto!important;
+  resize:both!important;
+  min-width:320px!important;
+  min-height:220px!important;
+}
+#stage .cp-permissions-sidebar.cp-drawer-overlay .cp-drawer-head{cursor:move;touch-action:none}
+#stage .cp-permissions-sidebar.cp-drawer-overlay button,
+#stage .cp-permissions-sidebar.cp-drawer-overlay select{min-height:38px}
+#stage .cp-permissions-sidebar.cp-drawer-overlay .cp-level{font-size:15px;min-height:42px}
