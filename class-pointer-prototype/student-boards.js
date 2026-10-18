@@ -657,7 +657,7 @@
   }
   function boardFor(m){const key=keyFor(m);let b=boards.get(key);if(!b){b=emptyBoard();boards.set(key,b)}return b}
   const isBlocked=m=>blocked.has(keyFor(m));
-  const focusMember=()=>focusId?B.members().get(focusId)||null:null;
+  const focusMember=()=>focusId?admitted().find(m=>m.id===focusId)||null:null;
   const focusBoard=()=>{const m=focusMember();return m?boardFor(m):null};
   const focusWord=wordEditor(focusBar,()=>focusBoard(),text=>act({type:'board-text',text}),tools);
   function closeScreen(m){const c=m.screenCall;m.screenCall=null;m.screenStream=null;try{c?.close()}catch(_){}}
@@ -685,7 +685,7 @@
   function flush(){
     frame=0;
     if(!view.hidden)for(const id of dirtySet){
-      const m=B.members().get(id);if(!m)continue;
+      const m=admitted().find(entry=>entry.id===id);if(!m)continue;
       const disabled=excluded(m,mode),paused=isBlocked(m)||disabled,screens=mode==='screens',tile=tiles.get(id),live=screens?streamOf(m):null;
       if(tile&&!grid.hidden){
         tile.node.classList.toggle('blocked',paused);tile.node.classList.toggle('screen',screens);
@@ -765,7 +765,7 @@
     B.status(item?.kind==='word'?'The word is on every boy\'s board. Their answers appear live.':item?.kind==='image'?'The coloring page is on every boy\'s board. Watch them color in real time.':'All boards are blank.');
   }
   function setFocus(id){
-    drawer?.cancel();focusId=id&&B.members().get(id)?id:null;const m=focusMember();
+    drawer?.cancel();focusId=id&&admitted().some(m=>m.id===id)?id:null;const m=focusMember();
     focusBar.hidden=!m;gridBar.hidden=!!m;activityBar.hidden=!!m||mode!=='boards';focus.hidden=!m;focusWord.root.hidden=!m||mode!=='boards'||activity?.kind!=='word';if(m)who.textContent=m.name+(mode==='screens'?'’s screen':'’s board');
     if(!m)setVideo(screenVideo,null);
     controls();gridSize='';syncTiles();if(m)dirty(m.id);else dirtyAll();
