@@ -1,0 +1,35 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { compare, parse, stripComments } = require('../scripts/rules-additive-check.cjs');
+
+// Snapshot of the rules on main (the live baseline) before the Pointer release.
+const live = () => parse(fs.readFileSync('tests/fixtures/firebase-rules.main-20261017.json', 'utf8'));
+const candidate = () => JSON.parse(fs.readFileSync('firebase-rules.json', 'utf8'));
+
+test('firebase-rules.json is the main/live baseline plus only the approved Pointer additions', () => {
+  assert.deepEqual(compare(live(), candidate()), []);
+});
+test('the additive-step CLI config deploys firebase-rules.json, never the hardened file', () => {
+  const cfg = JSON.parse(fs.readFileSync('firebase.pointer-additive.json', 'utf8'));
+  assert.equal(cfg.database.rules, 'firebase-rules.json');
+  assert.deepEqual(Object.keys(cfg), ['database']);
+});
+test('a changed existing rule is caught', () => {
+  const c = candidate(); c.rules.b3Games.siteSettings = { '.read': false };
+  assert.ok(compare(live(), c).some(p => p.startsWith('CHANGED') || p.startsWith('REMOVED')));
+});
+test('a removed public read is caught (that belongs to the separate hardened step)', () => {
+  const c = candidate(); delete c.rules.b3Games['.read'];
+  assert.ok(compare(live(), c).some(p => p.includes('REMOVED') && p.includes('/b3Games/.read')));
+});
+test('an unapproved new top-level node is caught', () => {
+  const c = candidate(); c.rules.somethingNew = { '.read': true };
+  assert.ok(compare(live(), c).some(p => p.startsWith('ADDED') && p.includes('/somethingNew')));
+});
+test('console-style comments in a saved live rules file are tolerated', () => {
+  const text = '// saved from console\n{"rules": {/* x */ ".read": false, "a": {"b": "has // inside"}}}';
+  assert.deepEqual(parse(text), { rules: { '.read': false, a: { b: 'has // inside' } } });
+  assert.equal(stripComments('"//keep"'), '"//keep"');
+});
