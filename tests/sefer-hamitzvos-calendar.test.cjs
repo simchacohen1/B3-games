@@ -50,7 +50,7 @@ test('date navigation selects daily cards, can return to Today, and makes every 
  els.get('tomorrow').onclick();assert.equal(els.get('dayCards').children.length,3);
  els.get('dayCards').children[2].onclick();assert.equal(Number(els.get('card').value),calendar.cardMap(days).N296);
  assert.match(html,/mix-blend-mode:multiply/);assert.match(source,/globalCompositeOperation='multiply'/);
- assert.match(html,/game-gate.js" data-game-id="sefer-hamitzvos"/);
+ assert.match(html,/game-gate.js(?:\?[^\"]*)?" data-game-id="sefer-hamitzvos"/);
 });
 
 test('mitzvah artwork comes before tools and Hebrew phrases keep correct mitzvah numbers',()=>{

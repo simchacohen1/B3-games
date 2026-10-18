@@ -4,7 +4,7 @@ function gate(data={},stored={},tool="yiddish"){
  function element(){return {style:{},dataset:{},parentNode:{removeChild(){}},appendChild(){},setAttribute(){},contains(){return false},querySelector(){return {textContent:''}},remove(){},set innerHTML(v){this.html=v}}}
  const document={currentScript:{src:'https://example.test/game-gate.js',getAttribute:k=>k==='data-game-id'?tool:null},head:element(),documentElement:element(),body:element(),scripts:[],readyState:'complete',createElement:element,getElementById:id=>elements.get(id),querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){}};
  const ctx={document,window:{B3StudentTools:require('../backend/functions/student-tool-policy.js'),addEventListener(){}},location:{search:''},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},URL,URLSearchParams,Intl,Date,console,setTimeout:()=>1,clearTimeout(){},setInterval(){},fetch:async url=>({ok:true,json:async()=>data[new URL(url).pathname]??null})};
- let source=fs.readFileSync('game-gate.js','utf8').replace(/\r\n/g,'\n');source=source.replace(/  (?:if \(!isGuestPreview\(\)\) )?watchTeacherAccess\(\);\s*checkNow\(\);/,`  window.testGate={resolveStudentClass,decide,state:()=>({studentClassId,studentActive}),overlay:()=>overlay,setTeacher:v=>verifiedTeacherAccess=v};`);
+ let source=fs.readFileSync('game-gate.js','utf8').replace(/\r\n/g,'\n');source=source.replace(/  (?:if \(!isGuestPreview\(\)\) )?watchTeacherAccess\(\);\s*checkNow\(\);/,`  markAuthReady(); window.testGate={resolveStudentClass,decide,state:()=>({studentClassId,studentActive}),overlay:()=>overlay,setTeacher:v=>verifiedTeacherAccess=v};`);
  vm.runInNewContext(source,ctx);return ctx.window.testGate;
 }
 const tool='sefer-hamitzvos';
@@ -36,6 +36,6 @@ test('Sefer HaMitzvos preserves ET lock, tool switch and teacher exceptions',asy
 });
 test('all 613 original and coloring card pairs exist and page uses the shared gate',()=>{
  for(let n=1;n<=613;n++){const id=String(n).padStart(3,'0');for(const file of ['original/'+id+'.jpg','coloring/'+id+'.png'])assert.ok(fs.statSync('sefer-hamitzvos/'+file).size>0,file);}
- const html=fs.readFileSync('sefer-hamitzvos/index.html','utf8');assert.match(html,/src="..\/game-gate.js" data-game-id="sefer-hamitzvos"/);
+ const html=fs.readFileSync('sefer-hamitzvos/index.html','utf8');assert.match(html,/src="..\/game-gate.js(?:\?[^\"]*)?" data-game-id="sefer-hamitzvos"/);
  const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];new vm.Script(script);
 });
