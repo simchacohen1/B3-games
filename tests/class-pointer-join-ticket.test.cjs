@@ -37,9 +37,12 @@ function fixture() {
     once: async () => ({ val: () => { const v = rows.get(path); return v === undefined ? null : JSON.parse(JSON.stringify(v)); } }),
     set: async value => { if (value === null) rows.delete(path); else rows.set(path, JSON.parse(JSON.stringify(value))); },
     transaction: async callback => {
-      const before = rows.get(path) ?? null, after = callback(before === null ? null : JSON.parse(JSON.stringify(before)));
+      const before = rows.get(path) ?? null;
+      // like the real database: the function first runs on an empty local copy (aborting there ends the transaction), then again on the real value
+      const first = callback(null); let after = first;
+      if (first !== undefined && before !== null) after = callback(JSON.parse(JSON.stringify(before)));
       if (after === undefined) return { committed: false, snapshot: { val: () => before } };
-      rows.set(path, after);
+      if (after === null) rows.delete(path); else rows.set(path, after);
       return { committed: true, snapshot: { val: () => after } };
     }
   });
@@ -258,4 +261,19 @@ test('the shared default passcode is refused for screen sharing and permission c
   for (let i = 0; i < 8; i++) assert.equal((await perm('benny', 'x' + i)).statusCode, 401);
   assert.equal((await perm('benny', '2222')).statusCode, 429);
   assert.equal((await perm('avi', '1111')).statusCode, 200);
+});
+
+test('compatibility: a denial recorded on the public session record (website currently live) is still enforced by the server', async () => {
+  const f = withSharing(fixture());
+  const key = 'b3Games/workspaces/b3-2026/classes/et/classPointerSessions/' + ROOM;
+  f.rows.set(key, { ...f.rows.get(key), screenSharingDenied: { avi: true } });
+  assert.equal((await share(f, 'avi', '1111', '3.3.3.3')).statusCode, 403);          // issue refuses the denied student
+  assert.equal((await share(f, 'benny', '2222', '3.3.3.3')).statusCode, 200);         // classmate unaffected
+  const permission = await f.post({ action: 'permissions', studentId: 'avi', pin: '1111', classId: 'et', room: ROOM }, null, '3.3.3.3');
+  assert.equal(permission.body.screenSharingDenied, true);
+  // a ticket issued before the denial is also refused at verify
+  const g = withSharing(fixture());
+  const ticket = (await share(g, 'avi', '1111', '3.3.3.3')).body.token;
+  g.rows.set(key, { ...g.rows.get(key), screenSharingDenied: { avi: true } });
+  assert.equal((await g.post({ action: 'verify', classId: 'et', room: ROOM, token: ticket }, 'teacher-et')).statusCode, 403);
 });
