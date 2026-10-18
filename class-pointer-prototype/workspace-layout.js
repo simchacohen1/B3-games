@@ -10,9 +10,9 @@
     tabs.className='cp-workspace-tabs';
     tabs.setAttribute('aria-label','Classroom sections');
     const items=[
-      ['teach','✏️','My Teaching Area'],
-      ['screens','🖥️','Student Screens'],
-      ['whiteboards','🎨','Student Whiteboards']
+      ['teach','✏️','My screen'],
+      ['screens','🖥️','Student screens'],
+      ['whiteboards','🎨','Student whiteboards']
     ];
     const buttons=new Map();
     for(const [id,icon,name] of items){

@@ -10,10 +10,10 @@ test('compact dashboard keeps existing permission controls and teaching material
   const css=read('class-pointer-prototype/teacher-dashboard.css');
   const tabs=read('class-pointer-prototype/workspace-layout.js');
   for(const id of ['tbStudentsMenu','shareScreen','openWhiteboard','openPdf','openWebpage','cpShareEnabled'])assert.ok(ui.includes(id));
-  for(const name of ['My Teaching Area','Student Screens','Student Whiteboards'])assert.ok(tabs.includes(name));
+  for(const name of ['My screen','Student screens','Student whiteboards'])assert.ok(tabs.includes(name));
   assert.doesNotMatch(ui,/Choose Student Activity|teacherActivitiesButton/);
-  assert.match(ui,/On my teaching area/);
-  assert.match(ui,/Pointer, Highlight or Pen/);
+  assert.match(ui,/Can use on my screen/);
+  assert.match(ui,/What are you teaching from\?/);
   assert.match(css,/position:fixed/);
 });
 
