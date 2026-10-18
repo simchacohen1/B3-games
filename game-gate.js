@@ -28,6 +28,13 @@
   var POLL_INTERVAL_MS = 30000;
   var FETCH_TIMEOUT_MS = 4500;
   var FIRST_LOAD_FAILSAFE_MS = 5500;
+  var authReadyResolve;
+  var authReadyPromise = new Promise(function (resolve) { authReadyResolve = resolve; });
+  function markAuthReady() {
+    if (!authReadyResolve) return;
+    authReadyResolve();
+    authReadyResolve = null;
+  }
 
   var scriptEl = document.currentScript;
   var gameId = scriptEl && (scriptEl.getAttribute("data-game-id") || scriptEl.getAttribute("data-b3-tool-id"));
@@ -268,13 +275,16 @@
       if(!window.firebase.database) await loadAuthScript(base+"database"+suffix);
       if(!window.B3_FIREBASE_CONFIG) await loadAuthScript(new URL("firebase-config.js",rootBase).href);
       if(!window.B3SiteSettings) await loadAuthScript(new URL("site-settings.js?v=20261008-owner-demo",rootBase).href);
+      markAuthReady();
       window.B3SiteSettings.onAuthStateChanged(function(user,authorized,access){
+        markAuthReady();
         teacherCheckPending=false;
         verifiedTeacherAccess=authorized?access:null;
         if(resolveGalleryTeacherClass())return;
         checkNow();
       });
     } catch(error){
+      markAuthReady();
       teacherCheckPending=false;
       console.warn("Teacher access could not be verified",error);
       checkNow();
@@ -298,7 +308,14 @@
     // authorize this gate's narrow reads. Public settings continue to work
     // before authentication is available.
     try {
+      // Do not race this against a short timer: the protected profile and
+      // membership reads below must never fall back to anonymous requests
+      // just because Firebase's scripts or persisted auth state initialize
+      // more slowly than the page. watchTeacherAccess resolves this promise
+      // after initialization (or its catch path if initialization fails).
+      await authReadyPromise;
       var auth = window.firebase && window.firebase.auth && window.firebase.auth();
+      if (auth && typeof auth.authStateReady === "function") await auth.authStateReady();
       var user = auth && auth.currentUser;
       if (user && typeof user.getIdToken === "function") params.set("auth", await user.getIdToken());
     } catch (_) {
