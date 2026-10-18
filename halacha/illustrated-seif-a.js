@@ -88,6 +88,8 @@
         if (piece) {
           piece.classList.add('studio-sticker', 'clear', 'hal-illustrated-piece');
           piece.style.width = '150px';
+          // The base add() saves immediately; also save the final size and style.
+          if (typeof window.persist === 'function') window.persist('a');
         }
       });
       all.appendChild(b);
