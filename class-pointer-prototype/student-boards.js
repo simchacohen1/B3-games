@@ -568,7 +568,7 @@
   // Focus bar: one student large.
   const focusBar=el('div','boards-bar'),who=el('strong','boards-title'),drawGroup=el('span','boards-group');focusBar.hidden=true;
   const focusBlock=button('','',()=>{const m=focusMember();if(m)toggleBlock(m)});
-  focusBar.append(button('◀ All students','Back to all students',()=>setFocus(null)),who,focusBlock,drawGroup);
+  focusBar.append(button('◀ Back to gallery','Back to all students (sharing continues)',()=>setFocus(null)),who,focusBlock,drawGroup);
   const focus=el('div','boards-focus'),surface=el('div','board-fit'),canvas=el('canvas');focus.hidden=true;
   canvas.setAttribute('aria-label','Student board. Your marks appear on the student’s screen.');
   surface.appendChild(canvas);
@@ -610,24 +610,32 @@
   function dirty(id){dirtySet.add(id);if(!frame)frame=requestAnimationFrame(flush)}
   function dirtyAll(){for(const id of tiles.keys())dirtySet.add(id);if(focusId)dirtySet.add(focusId);if(!frame)frame=requestAnimationFrame(flush)}
   function setVideo(video,stream){if(video.srcObject!==stream){video.srcObject=stream||null;if(stream)video.play().catch(()=>{})}}
+  // A student's live screen. A boy who joined Pointer shares by a direct call (m.screenStream). A boy sharing from
+  // Shorashim or another activity is not joined to Pointer: his verified screen is held by activity-screen-teacher.js.
+  function streamOf(m){
+    if(m.screenStream)return m.screenStream;
+    const shares=window.ClassPointerActivityShares;if(!shares?.streamFor)return null;
+    const id=personId(m);
+    return (id&&shares.streamFor(id))||(m.studentId&&shares.streamFor(m.studentId))||null;
+  }
   function flush(){
     frame=0;
     if(!view.hidden)for(const id of dirtySet){
       const m=B.members().get(id);if(!m)continue;
-      const disabled=excluded(m,mode),paused=isBlocked(m)||disabled,screens=mode==='screens',tile=tiles.get(id);
+      const disabled=excluded(m,mode),paused=isBlocked(m)||disabled,screens=mode==='screens',tile=tiles.get(id),live=screens?streamOf(m):null;
       if(tile&&!grid.hidden){
         tile.node.classList.toggle('blocked',paused);tile.node.classList.toggle('screen',screens);
         tile.block.textContent=paused?'✅':'🚫';tile.block.title=(paused?'Allow ':'Pause ')+m.name;tile.block.setAttribute('aria-label',tile.block.title);
-        tile.note.textContent=disabled?'Not selected for '+(screens?'screen sharing':'whiteboard'):paused?'⏸ Paused':screens&&!m.screenStream?'Waiting for his screen…':'';
-        tile.canvas.hidden=screens;tile.video.hidden=!screens||paused||!m.screenStream;
-        setVideo(tile.video,screens&&!paused?m.screenStream:null);
+        tile.note.textContent=disabled?'Not selected for '+(screens?'screen sharing':'whiteboard'):paused?'⏸ Paused':screens&&!live?'Waiting for his screen…':'';
+        tile.canvas.hidden=screens;tile.video.hidden=!screens||paused||!live;
+        setVideo(tile.video,screens&&!paused?live:null);
         if(!screens){const b=boardFor(m);paint(tile.canvas,b,null);tile.node.classList.toggle('drawing',!paused&&!!b.drafts.student)}else tile.node.classList.remove('drawing');
       }
       if(id===focusId){
         focusBlock.textContent=paused?'✅ Allow':'🚫 Pause';focusBlock.title=(paused?'Allow ':'Pause ')+m.name;
         drawGroup.hidden=screens||paused;surface.hidden=screens||paused;screenBox.hidden=!screens||paused;pausedBox.hidden=!paused;
         focusWord.update();focusWord.root.hidden=screens||paused||activity?.kind!=='word';
-        if(screens&&!paused){setVideo(screenVideo,m.screenStream);screenVideo.hidden=!m.screenStream;screenNote.hidden=!!m.screenStream;screenNote.textContent='Waiting for '+m.name+' to share his screen…'}
+        if(screens&&!paused){setVideo(screenVideo,live);screenVideo.hidden=!live;screenNote.hidden=!!live;screenNote.textContent='Waiting for '+m.name+' to share his screen…'}
         else setVideo(screenVideo,null);
         if(!surface.hidden){fit(focus,surface);paint(canvas,boardFor(m),drawer?.draft())}
       }
@@ -763,6 +771,8 @@
 
   document.addEventListener('classpointer:send-to-whiteboards',()=>void sendEveryone('boards'));
   document.addEventListener('classpointer:send-to-screens',()=>void sendEveryone('screens'));
+  // A boy sharing from Shorashim (or another activity) connected, changed or stopped: refresh the tiles and the large viewer.
+  document.addEventListener('classpointer:activity-screens',()=>{if(on)dirtyAll()});
   toggle?.addEventListener('click',()=>setOn(!on));
   setInterval(()=>{if(toggle)toggle.disabled=!on&&!B.started();if(on)syncTiles()},700);
   new ResizeObserver(()=>{if(!on)return;layoutGrid();if(focusId)dirty(focusId)}).observe(stage);
@@ -824,4 +834,3 @@
     }catch(error){B.fail(error?.message||'Could not open the whiteboard.')}
   });
 })();
-
