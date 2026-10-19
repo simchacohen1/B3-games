@@ -40,7 +40,7 @@ async function canReadMedia(db,identity,path){
     db.ref(`b3Games/workspaces/b3-2026/teachers/${identity.uid}`).get(),
     db.ref(`b3Games/workspaces/b3-2026/classes/${classId}`).get()
   ]);
-  return teacher.child('active').val()===true&&teacher.child('classIds/'+classId).val()===true&&cls.exists()&&cls.child('active').val()!==false&&cls.child('members/'+ownerId+'/active').val()!==false;
+  return teacher.child('active').val()===true&&teacher.child('classIds/'+classId).val()===true&&cls.exists()&&cls.child('active').val()!==false&&cls.child('members/'+ownerId).exists()&&cls.child('members/'+ownerId+'/active').val()!==false;
 }
 exports.canReadMedia=canReadMedia;
 
