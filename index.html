@@ -1593,15 +1593,22 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     finally{btn.disabled=false;}
   }
 
+  let actingStudentRestoreInFlight=false;
   async function restoreStudent(){
     if(isAuthorizedTeacher)return;
     if(isGuest()&&!isStudentPreview){renderStudentAccess();return;}
     const actingStudent=settingsApi.getActingStudent?.();
     const id=isStudentPreview?previewStudentId:(actingStudent?.id||sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId"));
     if(!id){showLogin();return;}
+    // Firebase fires onAuthStateChanged again as the dedicated student tab
+    // signs in. Do not start a second login or overwrite a ready student.
+    if(actingStudent&&(actingStudentRestoreInFlight||
+        (myStudentId===id&&myClassId===actingStudent.classId&&!studentAccessRevoked)))return;
     showChecking();
     try{
       if(actingStudent&&!isStudentPreview){
+        actingStudentRestoreInFlight=true;
+        try {
         // The separate student tab has no teacher Firebase credentials.
         // Authenticate its copied, server-verified student passcode before
         // attempting any Firebase database reads.
@@ -1614,6 +1621,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
         studentClassChoices=[{id:actingStudent.classId,name:actingStudent.className}];
         await enterStudent({id,name:identity.name||actingStudent.name,classId:actingStudent.classId,customToken:identity.customToken});
         return;
+        } finally { actingStudentRestoreInFlight=false; }
       }
       let snap=await db.ref("b3Games/students/"+id+"/profile").once("value");
       let d=snap.val()||{};
