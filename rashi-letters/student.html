@@ -882,7 +882,8 @@ function goStep(idx){
   mode='continue'; unitIndex=guidedIndex; phase=guidedPhase; streak=0; attemptsThisStep=0; retryQuestion=null;
   document.getElementById('modeGate').style.display='none';
   document.getElementById('similarScreen').style.display='none';
-  document.getElementById('alphabetLabScreen').style.display='none';
+  const alphabetScreen = document.getElementById('alphabetLabScreen');
+  if(alphabetScreen) alphabetScreen.style.display='none';
   document.getElementById('app').style.display='block';
   renderQuestion();
 }
@@ -925,7 +926,8 @@ function showModeGate(){
   document.getElementById('completeScreen').classList.remove('show');
   document.getElementById('practiceCompleteScreen').style.display = 'none';
   document.getElementById('similarScreen').style.display = 'none';
-  document.getElementById('alphabetLabScreen').style.display = 'none';
+  const alphabetScreen = document.getElementById('alphabetLabScreen');
+  if(alphabetScreen) alphabetScreen.style.display = 'none';
   if(typeof leaveRoom==='function') leaveRoom();
   document.getElementById('modeGate').style.display = 'block';
   renderLetterGrid();
