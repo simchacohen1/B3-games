@@ -95,8 +95,12 @@
       all.appendChild(b);
     });
     shelf.appendChild(all);
+    // Keep the new illustrated choices visible before the long style/options list.
+    // Do not replace the older sticker tray or alter its saved piece keys.
+    var pageStyles = aside.querySelector('.studio-backgrounds');
     var old = aside.querySelector('.studio-stickers');
-    if (old) aside.insertBefore(shelf, old);
+    if (pageStyles) aside.insertBefore(shelf, pageStyles);
+    else if (old) aside.insertBefore(shelf, old);
     else aside.appendChild(shelf);
   }
   if (document.readyState === 'loading') {

@@ -19,7 +19,7 @@
 .section#a .hal-sticker-button span {color:#244b67;font-size:11px;font-weight:700;text-align:center}
 .section#a .hal-sticker-button:disabled {opacity:.5;cursor:not-allowed}
 .section#a .hal-illustrated-piece img {display:block;width:100%;height:auto;pointer-events:none}
-@media(max-width:1200px) {
+@media(max-width:1000px) {
  .section#a .hal-story-grid {grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media(max-width:700px) {
