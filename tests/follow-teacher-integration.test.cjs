@@ -175,5 +175,5 @@ test('failed Chazara audio remains protected until student acknowledges download
   assert.equal(recovery.attributes['data-ftt-unsaved'],undefined);
   assert.equal(acknowledgment.disabled,true);
   const listener=fs.readFileSync(path.join(ROOT,'follow-teacher/student.js'),'utf8');
-  assert.match(listener,/\\[data-ftt-unsaved="true"\\]/);
+  assert.ok(listener.includes('[data-ftt-unsaved="true"]'),'Follow Teacher checks unsaved work marker');
 });
