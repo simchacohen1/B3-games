@@ -62,7 +62,7 @@ test('word bank waits for Firebase to restore the signed-in student before synci
   assert.equal(await api.authFor(),user);
 });
 
-test('all 613 Maimonides P/N entries have three mitzvah-scoped matching words', () => {
+test('all 613 Maimonides P/N entries have directly related, reference-scoped matching words', () => {
   const context=vm.createContext({window:{}});context.window=context;
   vm.runInContext(fs.readFileSync(path.join(root,'word-bank/mitzvah-titles.js'),'utf8'),context);
   vm.runInContext(fs.readFileSync(path.join(root,'word-bank/sefer-vocabulary-catalog.js'),'utf8'),context);
@@ -71,12 +71,26 @@ test('all 613 Maimonides P/N entries have three mitzvah-scoped matching words', 
   for(const prefix of ['P','N'])for(let n=1;n<=(prefix==='P'?248:365);n++){
     const ref=prefix+n,words=catalog.forRef(ref);
     assert.ok(titles[ref]&&!titles[ref].startsWith('Mitzvah '),`missing title ${ref}`);
-    assert.ok(words.length>=3&&words.length<=5,`wrong word count ${ref}`);
+    assert.ok(words.length>=1&&words.length<=3,`wrong word count ${ref}`);
+    assert.equal(new Set(words.map(word=>word.id)).size,words.length,`duplicate word ${ref}`);
     assert.ok(words.every(word=>word.hebrew&&word.english&&word.source==='sefer-hamitzvos'),`incomplete vocabulary ${ref}`);
   }
-  assert.equal(catalog.topic(titles.P1,'P1'),'faith');
-  assert.equal(catalog.topic(titles.N1,'N1'),'idols');
-  assert.equal(Object.values(titles).filter((title, index) => catalog.topic(title, Object.keys(titles)[index]).startsWith('general')).length,0);
+  // Prevent the erroneous scraped, shifted number-to-title table from returning.
+  assert.equal(titles.P223,'The Suspected Adulteress');
+  assert.match(titles.P225,/City of Refuge/);
+  assert.equal(titles.P227,'Execution by Strangulation');
+  assert.match(titles.N265,/Coveted Item/);
+  assert.equal(titles.N266,'Coveting');
+  assert.match(titles.N296,/Inadvertent Murderer/);
+  const vocab=ref=>catalog.forRef(ref).map(word=>word.hebrew);
+  assert.ok(vocab('P225').includes('עִיר מִקְלָט'));
+  assert.ok(vocab('P225').includes('גָּלוּת'));
+  assert.ok(vocab('P225').includes('בֵּית דִּין'));
+  assert.ok(vocab('P182').includes('עָרֵי מִקְלָט'));
+  assert.ok(vocab('N265').includes('לֹא תַחְמֹד'));
+  assert.ok(vocab('N266').includes('לֹא תִתְאַוֶּה'));
+  // Never invent generic words to pad a lesson to three matches.
+  assert.deepEqual(Array.from(vocab('P15')),['מְזוּזָה']);
 });
 
 test('every existing Halacha lesson has at least three lesson-specific terms', () => {
