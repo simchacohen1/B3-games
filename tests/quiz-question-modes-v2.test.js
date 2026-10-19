@@ -41,3 +41,11 @@ test('unsupported mode is invalid',()=>{
 test('highlight coordinates reject overlaps',()=>{
   assert.notDeepEqual(validate({mode:'highlight_text',q:'Find',passage:'123456',spans:[{start:0,end:3},{start:2,end:5}]}),[]);
 });
+
+const {empty} = require('../weekly-quiz/question-modes-student.js');
+test('student answer shapes cover all supported modes',()=>{
+ for(const mode of MODES) assert.equal(typeof empty(mode),'object');
+ assert.deepEqual(empty('multi_select'),{indices:[]});
+ assert.deepEqual(empty('fill_gaps'),{values:{}});
+ assert.deepEqual(empty('essay'),{text:''});
+});
