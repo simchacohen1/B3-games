@@ -391,7 +391,9 @@ test('teacher can cycle My screen, Student screens and Student whiteboards repea
     await expect(page.locator('#boardsView')).toBeVisible();
     await expect(screens).toHaveAttribute('aria-selected','true');
     await expect(page.locator('.board-tile')).toHaveCount(1);
-    expect(await page.locator('.board-tile video').evaluate((v:HTMLVideoElement,_)=>v.srcObject===(window as any).__persistentStudentStream)).toBe(true);
+    // Tile creation precedes the animation frame that reattaches its video.
+    // Verify the actual MediaStream, not merely that a tile was created.
+    await expect.poll(()=>page.locator('.board-tile video').evaluate((v:HTMLVideoElement)=>v.srcObject===(window as any).__persistentStudentStream)).toBe(true);
     await expect.poll(()=>page.evaluate(()=>(window as any).__destinationCalls.filter((mode:string)=>mode==='screens').length)).toBe(cycle+2);
   }
   expect(await page.evaluate(()=>(window as any).__sharingFlags)).not.toContain(false);
