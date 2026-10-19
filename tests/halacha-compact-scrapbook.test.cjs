@@ -39,8 +39,8 @@ test('new image, script and styles have fresh versions and all gallery actions a
   new vm.Script(art);
   assert.match(index,/illustrated-seif-a\.js\?v=20261019-chabad1/);
   assert.match(index,/illustrated-seif-a\.css\?v=20261019-compact1/);
-  assert.match(index,/seif-a-teacher-led\.js\?v=20261019-compact1/);
-  assert.match(lesson,/seif-a-teacher-led\.css\?v=20261019-compact1/);
+  assert.match(index,/seif-a-teacher-led\.js\?v=20261019-highlight1/);
+  assert.match(lesson,/seif-a-teacher-led\.css\?v=20261019-highlight1/);
   assert.match(art,/20261019-chabad1/);
   assert.match(art,/useImage\.type = 'button'/);
   assert.match(art,/useWords\.type = 'button'/);
