@@ -199,6 +199,28 @@ const stickerNames={torah:'Torah',tzedakah:'Tzedakah',challah:'Challah',kiddush:
 Object.assign(stickerNames,{home:'Home',chair:'Chair',table:'Table',plant:'Plant',toybox:'Toy box',window:'Window'});
 const stickerSrc=k=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><defs><linearGradient id="gold" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#fff0b4"/><stop offset=".4" stop-color="#edbf53"/><stop offset=".65" stop-color="#ffda76"/><stop offset="1" stop-color="#bc842f"/></linearGradient><linearGradient id="velvet"><stop stop-color="#182c58"/><stop offset=".4" stop-color="#345487"/><stop offset=".75" stop-color="#223760"/><stop offset="1" stop-color="#11284d"/></linearGradient><linearGradient id="silver"><stop stop-color="#7f94ad"/><stop offset=".22" stop-color="#f7fbff"/><stop offset=".45" stop-color="#ccd9e5"/><stop offset=".6" stop-color="#fff"/><stop offset="1" stop-color="#8d9fb8"/></linearGradient><linearGradient id="wood"><stop stop-color="#936134"/><stop offset=".45" stop-color="#dab178"/><stop offset="1" stop-color="#86502d"/></linearGradient><linearGradient id="teal"><stop stop-color="#318f86"/><stop offset=".4" stop-color="#60c7b4"/><stop offset="1" stop-color="#328e80"/></linearGradient><linearGradient id="bread" x1="0" y1="0" x2=".3" y2="1"><stop stop-color="#ffe09a"/><stop offset=".45" stop-color="#e9ac50"/><stop offset="1" stop-color="#be7937"/></linearGradient><linearGradient id="book"><stop stop-color="#85314d"/><stop offset=".45" stop-color="#bd5b6d"/><stop offset="1" stop-color="#87334d"/></linearGradient><linearGradient id="horn" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#f9dfb1"/><stop offset=".5" stop-color="#d3a56c"/><stop offset="1" stop-color="#a97946"/></linearGradient><linearGradient id="water" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b7eff9"/><stop offset="1" stop-color="#59add2"/></linearGradient><linearGradient id="rose" x1="0" y1="0" x2=".6" y2="1"><stop stop-color="#ffb0bc"/><stop offset=".5" stop-color="#ed7e99"/><stop offset="1" stop-color="#cc577c"/></linearGradient><filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="2" flood-color="#344766" flood-opacity=".2"/></filter></defs>'+svgBody[k]+'</svg>');
 window.studioSticker=(id,key)=>{if(readonly()||!svgBody[key])return;const e=add(id,'photo','<img alt="'+stickerNames[key]+'" src="'+stickerSrc(key)+'">',studioTarget(id));e.classList.add('studio-sticker','clear');e.style.width='160px';persist(id);};
+// The same illustrated picture-sticker collection is available in every
+// Halacha lesson, on either of the student's two scrapbook pages.
+const halachaPictureStickers=[
+ ['bed-window','Bedroom'],['book','Sefer'],['boy-walking','Chayol'],['globe','World'],
+ ['heart','Heart'],['house','Home'],['lamp','Study lamp'],['shtender','Shtender'],
+ ['speech','Kind words'],['table-chair','Table & chair'],['thought','Think'],['toybox','Toy box']
+];
+const halachaPictureLookup=new Map(halachaPictureStickers);
+window.studioPictureSticker=(id,key)=>{
+ if(readonly()||!halachaPictureLookup.has(key))return;
+ const target=window.studioTarget(id);
+ const src='art/stickers/'+key+'.jpg?v=20261019-illustrated-library1';
+ // Keep both scrapbook pages and their existing saved state. Only append the
+ // image to the specific page chosen in the sidebar, never auto-seed pages.
+ const piece=add(id,'photo','<img alt="'+halachaPictureLookup.get(key)+'" src="'+src+'">',target);
+ if(!piece)return;
+ piece.classList.add('studio-sticker','hal-illustrated-piece');
+ piece.style.width='145px';
+ if(typeof persist==='function')persist(id);
+ const message=document.querySelector('#'+id+' .studio-sticker-status');
+ if(message)message.textContent='Added '+halachaPictureLookup.get(key)+' to Page '+(target+1)+' ✓';
+};
 window.studioTarget=id=>+(document.querySelector('#'+id+' .studio-target')?.value||0);
 window.studioText=id=>{
  if(readonly())return;pages(id).forEach((p,i)=>studioMode(id,i,'select'));
@@ -232,7 +254,15 @@ function upgrade(id){
  const stickerButton=k=>`<button title="${stickerNames[k]}" onclick="studioSticker('${id}','${k}')"><img alt="" src="${stickerSrc(k)}"><span>${stickerNames[k]}</span></button>`;
  const primaryStickers=stickerKeys.filter(k=>svgBody[k]).map(stickerButton).join('');
  const moreStickers=Object.keys(svgBody).filter(k=>!stickerKeys.includes(k)).map(stickerButton).join('');
- const stickers=document.createElement('div');stickers.className='studio-stickers';stickers.innerHTML='<b>Pictures for this lesson</b><div>'+primaryStickers+'</div><details class="studio-more-stickers"><summary>More decorations</summary><div>'+moreStickers+'</div></details>';themes.after(stickers);
+ const stickers=document.createElement('div');stickers.className='studio-stickers';
+ const illustrated=halachaPictureStickers.map(([key,name])=>
+  '<button type="button" data-illustrated-sticker="'+key+'" title="Add '+name+' to selected scrapbook page"><img alt="" loading="lazy" src="art/stickers/'+key+'.jpg?v=20261019-illustrated-library1"><span>'+name+'</span></button>'
+ ).join('');
+ stickers.innerHTML='<b>Illustrated stickers — every lesson</b><p class="studio-sticker-guide">Choose Page 1 or 2 above, then tap a picture.</p><div class="studio-picture-library">'+illustrated+'</div><p class="studio-sticker-status" role="status" aria-live="polite"></p><details class="studio-more-stickers"><summary>More drawings and decorations</summary><div>'+primaryStickers+moreStickers+'</div></details>';
+ themes.before(stickers); // Keep the illustrated choices visible above the page-style controls.
+ stickers.querySelectorAll('[data-illustrated-sticker]').forEach(b=>
+  b.addEventListener('click',()=>window.studioPictureSticker(id,b.dataset.illustratedSticker))
+ );
  const textBtn=side.querySelector('[onclick^="addTextBox"]');if(textBtn)textBtn.setAttribute('onclick',`studioText('${id}')`);
  const addRow=textBtn&&textBtn.closest('.step');if(addRow)actions.after(addRow);
  const help=side.querySelector('p:last-child');if(help)help.innerHTML='<small>Pick Move to edit pieces. Drag the blue dots to resize. Click a piece to change its style. Fill colors your drawings; stickers keep their own colors.</small>';

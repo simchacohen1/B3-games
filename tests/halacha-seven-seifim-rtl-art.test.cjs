@@ -48,6 +48,6 @@ test('all six other seifim have distinct professional picture and sticker action
  assert.match(gallery,/window\.add\(id,'photo'/);
  assert.match(gallery,/window\.persist\(id\)/);
  assert.match(gallery,/readonly\(\)/);
- assert.match(html,/illustrated-siman-a-extra\.js\?v=20261019-short-peyos4/);
+ assert.match(html,/illustrated-siman-a-extra\.js\?v=20261019-two-fixed-pictures5/);
  assert.match(html,/illustrated-siman-a-extra\.css\?v=20261019-alef-scenes2/);
 });
