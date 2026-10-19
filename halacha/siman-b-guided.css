@@ -27,3 +27,11 @@
 .section .hal-b-guide button:disabled{opacity:.5;cursor:default}
 @media(max-width:650px){.section .hal-b-guide{padding:8px}.section .hal-b-top h2{font-size:17px}.section .hal-b-phrases{grid-template-columns:1fr}.section .hal-b-sources{grid-template-columns:1fr}}
 @media print{.hal-b-guide{display:none!important}}
+
+
+/* Hebrew learning cards are laid out in their correct reading order: first at RIGHT. */
+.section .hal-b-phrases{direction:rtl}
+.section .hal-b-phrase-card{direction:ltr}
+.section .hal-b-phrase-card>strong{direction:rtl}
+.section#b .hal-b-phrases,.section#c .hal-b-phrases{grid-auto-flow:row;direction:rtl}
+.section#b .hal-b-phrase-card strong,.section#c .hal-b-phrase-card strong{text-align:right}
