@@ -7,7 +7,7 @@
  */
 (function(root){
  'use strict';
- const rules=[/city of refuge/i,"עִיר מִקְלָט","city of refuge"],
+ const rules=[[/city of refuge/i,"עִיר מִקְלָט","city of refuge"],
   [/exil|banish/i,"גָּלוּת","exile"],
   [/inadvertent|unintentional|accidental/i,"שׁוֹגֵג","unintentional"],
   [/murder|killer/i,"רוֹצֵחַ","killer"],
@@ -172,7 +172,7 @@
   [/wine|inebriat|drunk/i,"יַיִן","wine"],
   [/bread/i,"לֶחֶם","bread"],
   [/water/i,"מַיִם","water"],
-  [/circumvent|avoid|neglect/i,"בִּטּוּל","neglect"];
+  [/circumvent|avoid|neglect/i,"בִּטּוּל","neglect"]];
  const overrides={
   "P225": [
     [
