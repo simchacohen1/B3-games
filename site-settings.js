@@ -390,6 +390,44 @@
   let firebaseDb = null;
   let firebaseAuth = null;
   let activeMode = "local-preview";
+  let rememberedTeacherAuth = null;
+  let teacherRestore = null;
+  let teacherSignOutVersion = 0;
+
+  // A separate Firebase app remembers Google credentials. The default app
+  // remains tab-scoped so a passcode login cannot replace a teacher elsewhere.
+  function getRememberedTeacherAuth() {
+    if (!rememberedTeacherAuth) {
+      let app;
+      try { app = window.firebase.app("FTTRememberedTeacher"); }
+      catch (_) { app = window.firebase.initializeApp(getConfiguredFirebaseOptions(), "FTTRememberedTeacher"); }
+      rememberedTeacherAuth = app.auth();
+    }
+    return rememberedTeacherAuth;
+  }
+
+  function isStudentTab() {
+    return Boolean(sessionStorage.getItem("b3Games_studentId") || sessionStorage.getItem("b3ActingAsStudent"));
+  }
+
+  function restoreTeacher(services) {
+    if (isStudentTab()) return Promise.resolve(false);
+    if (!teacherRestore) teacherRestore = (async function () {
+      const signOutVersion = teacherSignOutVersion;
+      const savedAuth = getRememberedTeacherAuth();
+      await savedAuth.authStateReady();
+      const saved = savedAuth.currentUser;
+      if (!saved || isStudentTab() || services.auth.currentUser) return false;
+      // Restore Firebase identity before reading protected teacher records.
+      // onAuthStateChanged still checks current authorization before granting UI access.
+      if (isStudentTab() || services.auth.currentUser || signOutVersion !== teacherSignOutVersion) return false;
+      await services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION);
+      if (isStudentTab() || services.auth.currentUser || signOutVersion !== teacherSignOutVersion) return false;
+      await services.auth.updateCurrentUser(saved);
+      return true;
+    })().finally(function () { teacherRestore = null; });
+    return teacherRestore;
+  }
 
   function ensureFirebase() {
     const config = getConfiguredFirebaseOptions();
@@ -881,24 +919,26 @@
     const provider = new window.firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
 
-    // Keep a teacher's Google login in this tab. A student tab must never replace it.
-    return services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION)
-      .then(function () { return services.auth.signInWithPopup(provider); }).catch(function (error) {
+    const savedAuth = getRememberedTeacherAuth();
+    return savedAuth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL)
+      .then(function () { return savedAuth.signInWithPopup(provider); }).catch(function (error) {
       const code = error && error.code ? error.code : "";
       if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request" || code === "auth/operation-not-supported-in-this-environment") {
-        return services.auth.signInWithRedirect(provider).then(function () { return null; });
+        return savedAuth.signInWithRedirect(provider).then(function () { return null; });
       }
       throw error;
     }).then(function (result) {
       // Redirect sign-in leaves this page and returns later, so there is no
       // immediate result object in that branch. onAuthStateChanged will finish it.
       if (!result) return null;
-      return readUserAccess(result.user).then(function(access){
+      return services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION)
+        .then(function () { return services.auth.updateCurrentUser(result.user); })
+        .then(function () { return readUserAccess(result.user); }).then(function(access){
         currentAccess = access;
         if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
         else showToolVersions(access);
         if (!access.authorized) {
-          return services.auth.signOut().then(function () {
+          return savedAuth.signOut().then(function () { return services.auth.signOut(); }).then(function () {
             const error = new Error("This Google account is not authorized for Fun Torah Tools.");
             error.code = "b3/unauthorized-user";
             throw error;
@@ -910,9 +950,10 @@
   }
 
   function signOut() {
+    teacherSignOutVersion++;
     const services = ensureFirebase();
     if (!services || !services.auth) return Promise.resolve();
-    return services.auth.signOut();
+    return getRememberedTeacherAuth().signOut().then(function () { return services.auth.signOut(); });
   }
 
 
@@ -965,8 +1006,10 @@
       endAuthChecking();
       return function unsubscribe() {};
     }
-    return services.auth.onAuthStateChanged(function (user) {
+    return services.auth.onAuthStateChanged(async function (user) {
       if (!user) {
+        try { if (await restoreTeacher(services)) return; }
+        catch (error) { console.warn("Could not restore teacher sign-in:", error); }
         currentAccess = { authorized:false, role:"", classIds:[] };
         setSignedInHint(false);
         callback(null, false, currentAccess);
