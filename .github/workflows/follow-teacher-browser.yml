@@ -1,0 +1,27 @@
+name: Follow Teacher browser checks
+on:
+  pull_request:
+    paths:
+      - 'follow-teacher/**'
+      - 'e2e/follow-teacher.spec.ts'
+      - 'game-gate.js'
+      - 'teacher-home.html'
+      - 'index.html'
+      - '.github/workflows/follow-teacher-browser.yml'
+  push:
+    branches: ['feat/follow-teacher-live-integration-150']
+permissions:
+  contents: read
+jobs:
+  real-browser-follow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Test teacher controls and student navigation
+        run: npx playwright test e2e/follow-teacher.spec.ts --project=chromium --reporter=line
