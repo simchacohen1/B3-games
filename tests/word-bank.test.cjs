@@ -91,6 +91,11 @@ test('all 613 Maimonides P/N entries have directly related, reference-scoped mat
   assert.ok(vocab('N266').includes('לֹא תִתְאַוֶּה'));
   // Never invent generic words to pad a lesson to three matches.
   assert.deepEqual(Array.from(vocab('P15')),['מְזוּזָה']);
+  // Generic substring traps must not attach unrelated topics to a mitzvah.
+  assert.ok(!vocab('N3').includes('מֶלֶךְ'), 'making idols does not concern a king');
+  assert.ok(!vocab('N235').includes('מְנוּחָה'), 'interest does not concern rest');
+  assert.ok(!vocab('P236').includes('מִשְׁפָּחָה'), 'personal injury does not concern family');
+  assert.ok(!vocab('N6').includes('אֶחָד'), 'unique modes of idol worship do not teach Hashem is One');
 });
 
 test('every existing Halacha lesson has at least three lesson-specific terms', () => {
