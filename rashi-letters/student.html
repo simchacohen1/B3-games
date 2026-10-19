@@ -1608,12 +1608,24 @@ const PRACTICE_WORDS = [
 const baseLetters = w => w.normalize('NFD').replace(/[֑-ׇ]/g,'').split('');
 let wordLevel = 2, wordGame = null;
 function unlockedLetters(){
-  // Word practice is independent of prior mission completion.
-  return new Set(PRACTICE_WORDS.flatMap(baseLetters));
+  // Progress, not menu access, determines which letters a student has learned.
+  if(chainFlags.alphabetDone) return new Set(ALL_LETTERS);
+  const known=new Set();
+  if(chainFlags.similarDone) SIMILAR.forEach(ch=>known.add(ch));
+  const completed=Math.min(guidedIndex,UNITS.length);
+  UNITS.slice(0,completed).forEach(u=>(u.type==='single'?[u.correct]:u.pair).forEach(ch=>baseLetters(ch).forEach(c=>known.add(c))));
+  return known;
 }
 function wordsFor(level){
-  const ok=unlockedLetters();
-  return PRACTICE_WORDS.filter(w=>{ const b=baseLetters(w); return b.length===level && b.every(c=>ok.has(c)); });
+  const known=unlockedLetters();
+  const candidates=PRACTICE_WORDS.filter(w=>baseLetters(w).length===level);
+  // Prefer fully learned words; if there are too few for a playable round,
+  // introduce only the minimum number of unfamiliar letters needed.
+  const unfamiliarCount=w=>baseLetters(w).filter(ch=>!known.has(ch)).length;
+  const ranked=candidates.map(w=>({word:w,missing:unfamiliarCount(w)}));
+  ranked.sort((a,b)=>a.missing-b.missing);
+  const maxMissing=ranked[Math.min(5,ranked.length-1)]?.missing ?? 0;
+  return ranked.filter(item=>item.missing<=maxMissing).map(item=>item.word);
 }
 function startWords(level){
   wordLevel=level;
