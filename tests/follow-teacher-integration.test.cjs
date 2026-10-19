@@ -46,7 +46,7 @@ function harness(overrides={}) {
     console:{warn(){}},URL,Date,
     addEventListener(){},dispatchEvent:()=>true
   };
-  ctx.window=ctx;
+  ctx.window=ctx;ctx.top=ctx;
   vm.runInNewContext(fs.readFileSync(path.join(ROOT,'follow-teacher/student.js'),'utf8'),ctx);
   const state={
     workspaceId:'b3-2026',classId:'et',studentId:'boy1',teacherUid:'teacher1',
