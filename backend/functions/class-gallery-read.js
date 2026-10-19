@@ -12,7 +12,7 @@ function visibleGalleryPosts(rows,classId,studentId,canReview){
 }
 exports.visibleGalleryPosts=visibleGalleryPosts;
 
-exports.classGalleryRead=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io'],maxInstances:20,memory:'256MiB'},async(req,res)=>{
+exports.classGalleryRead=onRequest({region:'us-central1',cors:['https://funtorahtools.com','https://www.funtorahtools.com','https://simchacohen1.github.io'],maxInstances:20,memory:'256MiB'},async(req,res)=>{
   res.set('Cache-Control','no-store');
   if(req.method!=='GET')return res.status(405).json({error:'Use GET.'});
   try{
