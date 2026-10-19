@@ -17,15 +17,12 @@ test('compact dashboard keeps existing permission controls and teaching material
   assert.match(css,/position:fixed/);
 });
 
-test('activity requests move screen capture into a persistent, student-approved sharing window',()=>{
+test('activity screen-sharing uses the small button without a duplicate consent dialog',()=>{
   const activity=read('class-pointer-prototype/activity-share.js');
-  assert.match(activity,/Your teacher would like to see your screen/);
-  assert.match(activity,/Open Sharing Window/);
-  assert.match(activity,/Choose Entire Screen/);
-  assert.match(activity,/student-share-window\.html\?pointerShare=1/);
-  assert.match(activity,/if\(!openPersistentShareWindow\(\)\)return beginShare\(event\)/);
-  assert.match(activity,/persistentShareWindow/);
+  assert.doesNotMatch(activity,/fttShareRequestOverlay|Open Sharing Window|Your teacher would like to see your screen/);
+  assert.match(activity,/btn\.addEventListener\('click',beginShare\)/);
   assert.match(activity,/navigator\.mediaDevices\.getDisplayMedia/);
+  assert.match(activity,/permission\?\.screenSharingDenied!==true/);
 });
 test('persistent screen sharing asks for Entire Screen and contains no browser-tab share control',()=>{
   const boards=read('class-pointer-prototype/student-boards.js');
@@ -35,7 +32,7 @@ test('persistent screen sharing asks for Entire Screen and contains no browser-t
   assert.match(boards,/surface!=='monitor'/);
   assert.doesNotMatch(boards,/Share a browser tab/);
   assert.doesNotMatch(boards,/startShare\('tab'\)/);
-  assert.match(activity,/select <strong>Entire Screen<\/strong>/);
+  assert.match(activity,/Please choose Entire Screen in the browser picker/);
   assert.match(shareWindow,/Keep this window open while you visit Shorashim or another activity/);
   assert.match(shareWindow,/Choose <strong>Entire Screen<\/strong>/);
   assert.match(activity,/displaySurface:'monitor'/);
