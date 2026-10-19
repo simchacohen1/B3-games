@@ -7,6 +7,11 @@
   const valid = C.validId;
   if (!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG);
   const db = firebase.database(), auth = firebase.auth();
+  let serverOffset = 0;
+  db.ref('.info/serverTimeOffset').on('value', snap => {
+    serverOffset = Number(snap.val()) || 0;
+  });
+  const clock = () => Date.now() + serverOffset;
 
   let teacher = null, assigned = [], current = '', classRow = null, stateRef = null;
   let unlisten = null, heartbeat = null, currentState = null, ownRevision = null;
@@ -36,7 +41,7 @@
   function mode() {return document.querySelector('input[name=mode]:checked')?.value || C.MODES.INDEPENDENT;}
   function renderState(state) {
     currentState = state;
-    const validState = state && C.fresh(state, Date.now());
+    const validState = state && C.fresh(state, clock());
     const msg = !validState || state.mode === C.MODES.INDEPENDENT
       ? 'Independent — students can choose their activities.'
       : state.mode === C.MODES.LOCKED
@@ -90,12 +95,12 @@
           throw Error('Shorashim is not enabled for this class.');
       }
       const targets = m === C.MODES.INDEPENDENT ? 'all' : selected();
-      if (currentState && C.fresh(currentState, Date.now()) &&
+      if (currentState && C.fresh(currentState, clock()) &&
           currentState.mode !== C.MODES.INDEPENDENT &&
           currentState.teacherUid !== teacher.user.uid)
         throw Error('Another teacher currently controls this class. Ask them to unlock first.');
       q('apply').disabled = q('unlock').disabled = true;
-      const now = Date.now(), revision = crypto.randomUUID();
+      const now = clock(), revision = crypto.randomUUID();
       const row = C.propose({workspaceId:WS,classId:current,teacherUid:teacher.user.uid,
         mode:m,destination,targets,revision,issuedAt:now,heartbeatAt:now,
         expiresAt:now + C.MAX_HEARTBEAT_AGE_MS});
@@ -115,7 +120,7 @@
                 active.mode === C.MODES.INDEPENDENT) {
               clearInterval(heartbeat);heartbeat=null;ownRevision=null;return;
             }
-            const time = Date.now();
+            const time = clock();
             await ref.update({issuedAt:time,heartbeatAt:time,expiresAt:time + C.MAX_HEARTBEAT_AGE_MS});
           } catch (e) {
             clearInterval(heartbeat);heartbeat=null;ownRevision=null;
