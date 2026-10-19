@@ -85,5 +85,12 @@ function insert(id) {
  panel.appendChild(status);
  guide.insertBefore(panel,guide.firstChild);
 }
+// The account may rebuild every lesson after the initial page load.
+ // Reattach the professional pictures every time each section is rendered.
+const previousRender = render;
+render = function (lesson) {
+  previousRender(lesson);
+  if (lesson && data[lesson.id]) insert(lesson.id);
+};
 Object.keys(data).forEach(insert);
 })();
