@@ -1,7 +1,22 @@
 'use strict';
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {visibleGalleryPosts}=require('../backend/functions/class-gallery-read.js');
+const fs=require('node:fs');
+const path=require('node:path');
+// Evaluate only the gallery module with harmless Firebase stubs so pure visibility
+// tests run in CI without installing or initializing the production Admin SDK.
+function loadGalleryModule(){
+  const file=path.join(__dirname,'../backend/functions/class-gallery-read.js');
+  const mod={exports:{}};
+  const mockRequire=name=>{
+    if(name==='firebase-functions/v2/https')return {onRequest:()=>({})};
+    if(name==='firebase-admin')return {apps:[],initializeApp(){}};
+    throw Error('Unexpected dependency in gallery test: '+name);
+  };
+  new Function('require','module','exports',fs.readFileSync(file,'utf8'))(mockRequire,mod,mod.exports);
+  return mod.exports;
+}
+const {visibleGalleryPosts}=loadGalleryModule();
 
 test('Gallery student response includes approved classmates and own pending posts only',()=>{
   const rows={
