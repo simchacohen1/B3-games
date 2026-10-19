@@ -27,7 +27,8 @@
     gematria: Object.freeze({label: 'Gematria', path: '/gematria/'}),
     'weekly-quiz': Object.freeze({label: 'Weekly Quiz', path: '/weekly-quiz/'}),
     'game-show': Object.freeze({label: 'Game Show', path: '/game-show/player.html'}),
-    'student-rewards': Object.freeze({label: 'Student Rewards', path: '/student-rewards/student.html'})
+    'student-rewards': Object.freeze({label: 'Student Rewards', path: '/student-rewards/student.html'}),
+    'class-gallery': Object.freeze({label: 'Class Gallery', path: '/class-gallery/'})
   });
   const MAX_HEARTBEAT_AGE_MS = 90 * 1000;
   const MAX_LEASE_MS = 10 * 60 * 1000;
