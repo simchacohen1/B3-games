@@ -23,7 +23,7 @@ test('Shivisi restores gallery at top and never remembers stale hidden state',()
  assert.doesNotMatch(aleph,/sessionStorage\.getItem\(\x60halacha-learning-hidden/);
  assert.doesNotMatch(aleph,/sessionStorage\.setItem\('halacha-learning-hidden/);
  assert.match(art,/lessonBody\.insertBefore\(gallery, lessonBody\.firstChild\)/);
- assert.match(html,/seif-a-teacher-led\.js\?v=20261019-shivisi-visible2/);
+ assert.match(html,/seif-a-teacher-led\.js\?v=20261019-shivisi-visible3/);
 });
 test('Hebrew phrases and matching cards read right to left',()=>{
  assert.match(rtl,/\.hal-b-phrases\{direction:rtl\}/);
@@ -43,6 +43,6 @@ test('all six other seifim have distinct professional picture and sticker action
  assert.match(gallery,/window\.add\(id,'photo'/);
  assert.match(gallery,/window\.persist\(id\)/);
  assert.match(gallery,/readonly\(\)/);
- assert.match(html,/illustrated-siman-a-extra\.js\?v=20261019-alef-scenes2/);
+ assert.match(html,/illustrated-siman-a-extra\.js\?v=20261019-alef-scenes3/);
  assert.match(html,/illustrated-siman-a-extra\.css\?v=20261019-alef-scenes2/);
 });
