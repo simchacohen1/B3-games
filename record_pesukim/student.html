@@ -2401,7 +2401,12 @@ async function checkAccess(name,pin,idHint=''){
   const id=String(data.id||'').trim();
   if(!data.ok||!id)return {ok:false,reason:'Check your name and passcode. Sign in from the main site if needed.'};
   if(idHint&&idHint!==id)return {ok:false,reason:'Check your name and passcode. Sign in from the main site if needed.'};
-  if(data.customToken&&window.firebase&&firebase.auth)await firebase.auth().signInWithCustomToken(data.customToken);
+  if(data.customToken&&window.firebase&&firebase.auth){
+    // Tab-only session: the default persistence is browser-wide and would
+    // replace a teacher's login in every other tab.
+    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION);
+    await firebase.auth().signInWithCustomToken(data.customToken);
+  }
   const profile=await studentRecord('b3Games/students/'+encodeURIComponent(id)+'/profile').catch(()=>null);
   if(profile&&profile.active===false)return {ok:false,reason:'Your account is turned off. Ask your teacher.'};
   return {ok:true,slug:id,accessVersion:Number(profile&&profile.passcodeUpdatedAt)||0};

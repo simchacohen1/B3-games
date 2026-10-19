@@ -7,7 +7,7 @@ const html=fs.readFileSync(__dirname+'/../index.html','utf8');
 
 function fixture({teacher=false,profile={name:'Synthetic Student',active:true},pin='synthetic-pin',verifyError=null}={}){
   const start=html.indexOf('  async function restoreStudent(){');
-  const end=html.indexOf('  function switchStudent(){',start);
+  const end=html.indexOf('  async function switchStudent(',start);
   const saved=new Map([['b3Games_studentId','synthetic_student'],['b3Games_studentName','Synthetic Student'],['b3Games_studentClass','alpha'],['b3Games_classPin',pin]]);
   const calls=[],entered=[],messages=[];let reads=0,loginShown=0;
   const ctx={

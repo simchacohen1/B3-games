@@ -403,7 +403,7 @@ body > .subtitle::after {
 <script src="follow-teacher/core.js?v=20261019-follow2"></script>
 <script src="follow-teacher/student.js?v=20261019-follow2"></script>
 <script src="guest-mode.js?v=20261011-guest"></script>
-<script src="site-settings.js?v=20261008-owner-demo"></script>
+<script src="site-settings.js?v=20261019-session-isolation"></script>
 <script defer src="audio-mode.js?v=20261011-audio-mode"></script>
 </head>
 <body>
@@ -1680,10 +1680,10 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_classPin","posukPractice_studentId","posukPractice_studentName","weeklyQuiz_classId"].forEach(k=>sessionStorage.removeItem(k));
     myStudentId=myStudentName=myClassId="";
     el("studentNameInput").value="";el("classPinInput").value="";setLoginMsg("");showLogin();
-    // Student tabs use the default Firebase app. Do NOT call the teacher
-    // settings signOut(): that would also erase the remembered Google login.
-    if(!isAuthorizedTeacher && firebase.auth().currentUser){
-      try { await firebase.auth().signOut(); }
+    // Ends only this student's Firebase session. The teacher's remembered
+    // Google login is untouched and this tab will not adopt it.
+    if(!isAuthorizedTeacher){
+      try { await settingsApi.endStudentSession(); }
       catch(error){
         console.warn("Could not sign out student Firebase session:",error);
         setLoginMsg("Could not fully sign out. Please retry before another student signs in.");

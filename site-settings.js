@@ -410,19 +410,35 @@
     return Boolean(sessionStorage.getItem("b3Games_studentId") || sessionStorage.getItem("b3ActingAsStudent"));
   }
 
+  // A tab where a student pressed "Switch student" must not quietly turn into
+  // the teacher's tab just because the teacher's Google login is remembered
+  // on this computer. Only pressing Teacher Sign-in in this tab lifts this.
+  const NO_RESTORE_KEY = "b3NoTeacherRestore";
+  function teacherRestoreBlocked() {
+    try { return sessionStorage.getItem(NO_RESTORE_KEY) === "1"; } catch (_) { return false; }
+  }
+
+  // Teachers sign in with Google; students sign in with a custom token and
+  // have no provider. A student identity must never keep a teacher tab from
+  // restoring the teacher (it can leak in via browser-wide LOCAL persistence).
+  function isGoogleUser(user) {
+    return Boolean(user && Array.isArray(user.providerData) &&
+      user.providerData.some(function (p) { return p && p.providerId === "google.com"; }));
+  }
+
   function restoreTeacher(services) {
-    if (isStudentTab()) return Promise.resolve(false);
+    if (isStudentTab() || teacherRestoreBlocked()) return Promise.resolve(false);
     if (!teacherRestore) teacherRestore = (async function () {
       const signOutVersion = teacherSignOutVersion;
       const savedAuth = getRememberedTeacherAuth();
       await savedAuth.authStateReady();
       const saved = savedAuth.currentUser;
-      if (!saved || isStudentTab() || services.auth.currentUser) return false;
+      if (!saved || isStudentTab() || teacherRestoreBlocked() || isGoogleUser(services.auth.currentUser)) return false;
       // Restore Firebase identity before reading protected teacher records.
       // onAuthStateChanged still checks current authorization before granting UI access.
-      if (isStudentTab() || services.auth.currentUser || signOutVersion !== teacherSignOutVersion) return false;
+      if (isStudentTab() || isGoogleUser(services.auth.currentUser) || signOutVersion !== teacherSignOutVersion) return false;
       await services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION);
-      if (isStudentTab() || services.auth.currentUser || signOutVersion !== teacherSignOutVersion) return false;
+      if (isStudentTab() || teacherRestoreBlocked() || isGoogleUser(services.auth.currentUser) || signOutVersion !== teacherSignOutVersion) return false;
       await services.auth.updateCurrentUser(saved);
       return true;
     })().finally(function () { teacherRestore = null; });
@@ -919,6 +935,7 @@
     const provider = new window.firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
 
+    try { sessionStorage.removeItem(NO_RESTORE_KEY); } catch (_) {}
     const savedAuth = getRememberedTeacherAuth();
     return savedAuth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL)
       .then(function () { return savedAuth.signInWithPopup(provider); }).catch(function (error) {
@@ -956,6 +973,16 @@
     return getRememberedTeacherAuth().signOut().then(function () { return services.auth.signOut(); });
   }
 
+
+  // Ends only the STUDENT's session in this tab. The teacher's remembered
+  // Google login is untouched, and this tab will not adopt it automatically.
+  async function endStudentSession() {
+    try { sessionStorage.setItem(NO_RESTORE_KEY, "1"); } catch (_) {}
+    try { STUDENT_STORAGE_KEYS.forEach(function (k) { sessionStorage.removeItem(k); }); sessionStorage.removeItem(ACTING_KEY); } catch (_) {}
+    const services = ensureFirebase();
+    const user = services && services.auth && services.auth.currentUser;
+    if (user && !isGoogleUser(user)) await services.auth.signOut();
+  }
 
   // Verified teachers can switch between dashboards and student demonstrations.
   function showToolVersions(access) {
@@ -1007,6 +1034,12 @@
       return function unsubscribe() {};
     }
     return services.auth.onAuthStateChanged(async function (user) {
+      // A student identity sitting in a non-student tab is not this tab's
+      // identity: let the remembered teacher replace it.
+      if (user && !isGoogleUser(user) && !isStudentTab() && !teacherRestoreBlocked()) {
+        try { if (await restoreTeacher(services)) return; }
+        catch (error) { console.warn("Could not restore teacher sign-in:", error); }
+      }
       if (!user) {
         try { if (await restoreTeacher(services)) return; }
         catch (error) { console.warn("Could not restore teacher sign-in:", error); }
@@ -1334,6 +1367,7 @@
     dayKeys: DAY_KEYS.slice(),
     getMode: function () { ensureFirebase(); return activeMode; },
     getActingStudent: getActingStudent,
+    endStudentSession: endStudentSession,
     listStudentsForActing: listStudentsForActing,
     startActingAsStudent: startActingAsStudent,
     stopActingAsStudent: stopActingAsStudent,
