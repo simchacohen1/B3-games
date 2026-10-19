@@ -1,0 +1,76 @@
+/* Mitzvah-specific concept groups for the 613-count Sefer HaMitzvos cycle.
+   Each group is selected from the English title of the matching P/N entry.
+   Terms are brief, vowelled Hebrew concepts suitable for a guided lesson. */
+(function(root){
+ const groups={
+  faith:[['אֱמוּנָה','faith'],['אֶחָד','one'],['הַשֵּׁם','Hashem']],
+  idols:[['עֲבוֹדָה זָרָה','idol worship'],['אֱמוּנָה','faith'],['אֱמֶת','truth']],
+  tefillah:[['תְּפִלָּה','prayer'],['שְׁמַע','Shema'],['בְּרָכָה','blessing']],
+  tefillin:[['תְּפִלִּין','tefillin'],['רֹאשׁ','head'],['יָד','arm']],
+  torah:[['תּוֹרָה','Torah'],['לִמּוּד','learning'],['סֵפֶר','book']],
+  social:[['אַהֲבָה','love'],['חֶסֶד','kindness'],['כָּבוֹד','respect']],
+  shabbat:[['שַׁבָּת','Shabbat'],['מְנוּחָה','rest'],['מְלָאכָה','prohibited work']],
+  holidays:[['יוֹם טוֹב','holiday'],['מוֹעֵד','festival'],['שִׂמְחָה','joy']],
+  passover:[['פֶּסַח','Passover'],['מַצָּה','matzah'],['חָמֵץ','chametz']],
+  temple:[['בֵּית הַמִּקְדָּשׁ','Beis Hamikdash'],['קָרְבָּן','offering'],['כֹּהֵן','Kohen']],
+  priest:[['כֹּהֵן','Kohen'],['עֲבוֹדָה','service'],['בִּגְדֵי כְּהֻנָּה','priestly garments']],
+  offering:[['קָרְבָּן','offering'],['מִזְבֵּחַ','altar'],['עֲבוֹדָה','service']],
+  kashrut:[['כָּשֵׁר','kosher'],['אָסוּר','forbidden'],['סִימָן','sign']],
+  agriculture:[['שָׂדֶה','field'],['תְּרוּמָה','Terumah'],['מַעֲשֵׂר','tithe']],
+  justice:[['בֵּית דִּין','court'],['דַּיָּן','judge'],['עֵד','witness']],
+  property:[['מָמוֹן','money/property'],['גְּנֵבָה','theft'],['הֲשָׁבָה','returning']],
+  lending:[['הַלְוָאָה','loan'],['רִבִּית','interest'],['צְדָקָה','tzedakah']],
+  speech:[['לָשׁוֹן','speech'],['אֱמֶת','truth'],['כָּבוֹד','respect']],
+  family:[['מִשְׁפָּחָה','family'],['קְדֻשָּׁה','holiness'],['דִּין','halachah']],
+  purity:[['טָהֳרָה','purity'],['טֻמְאָה','ritual impurity'],['מִקְוֶה','mikvah']],
+  vows:[['נֶדֶר','vow'],['שְׁבוּעָה','oath'],['קִיּוּם','keeping a promise']],
+  animals:[['בְּהֵמָה','animal'],['צִפּוֹר','bird'],['דָּם','blood']],
+  slavery:[['עֶבֶד','servant'],['שָׂכָר','wages'],['חֵרוּת','freedom']],
+  king:[['מֶלֶךְ','king'],['מִשְׁפָּט','justice'],['עַם','people']],
+  war:[['מִלְחָמָה','war'],['צָבָא','army'],['שָׁלוֹם','peace']],
+  land:[['אֶרֶץ יִשְׂרָאֵל','Land of Israel'],['נַחֲלָה','inheritance'],['שָׁכֵן','neighbor']],
+  tzaraas:[['צָרַעַת','tzaraat'],['כֹּהֵן','Kohen'],['טָהוֹר','pure']],
+  calendar:[['לוּחַ הַשָּׁנָה','calendar'],['חֹדֶשׁ','month'],['סְפִירָה','counting']],
+  sacred:[['קֹדֶשׁ','holiness'],['הַקְדָּשָׁה','dedication'],['חֵפֶץ','object']],
+  mezuzah:[['מְזוּזָה','mezuzah'],['מְזוּזוֹת','doorposts'],['בַּיִת','home']],
+  tzitzit:[['צִיצִית','tzitzit'],['בֶּגֶד','garment'],['פְּתִיל','thread']],
+  nazir:[['נָזִיר','Nazirite'],['נֶדֶר','vow'],['קְדֻשָּׁה','holiness']],
+  firstborn:[['בְּכוֹר','firstborn'],['פִּדְיוֹן','redemption'],['קָרְבָּן','offering']],
+  produce:[['לֶקֶט','fallen stalks'],['שִׁכְחָה','forgotten sheaves'],['פֵּאָה','field corner']],
+  jubilee:[['יוֹבֵל','Jubilee'],['שְׁמִטָּה','Sabbatical year'],['מְנוּחָה','rest']],
+  omer:[['סְפִירַת הָעֹמֶר','counting the Omer'],['יוֹם','day'],['חַג','holiday']],
+  commerce:[['מִסְחָר','business'],['מִדָּה','measure'],['אֱמֶת','honesty']],
+  clothing:[['בֶּגֶד','garment'],['צֶמֶר','wool'],['פִּשְׁתִּים','linen']],
+  confession:[['תְּשׁוּבָה','teshuvah'],['וִדּוּי','confession'],['חֵטְא','mistake'],['מְחִילָה','forgiveness']],
+  generalP:[['מִצְוָה','mitzvah'],['תּוֹרָה','Torah'],['לַעֲשׂוֹת','to do']],
+  generalN:[['מִצְוָה','mitzvah'],['תּוֹרָה','Torah'],['לֹא לַעֲשׂוֹת','not to do']]
+ };
+ const tests=[
+  ['mezuzah',/mezuzah/i],['tzitzit',/tzitzit/i],['calendar',/months and years|calendar|new month/i],
+  ['omer',/omer/i],['confession',/confess|repent/i],['nazir',/nazirite/i],['firstborn',/firstborn/i],['produce',/forgotten sheaves|fallen stalks|fallen grapes|grape clusters/i],
+  ['jubilee',/jubilee|sabbatical year/i],['commerce',/transaction|honest measurement|measurement|commerce|business/i],['clothing',/cross-dress|clothing|wool and linen|shaving|sideburn|scarring|tattoo|hair/i],
+  ['sacred',/sanctified object|sanctified objects|dedicated object|cherem|selling sanctified/i],
+  ['faith',/belief|believ|know (there|that)|unity|loving g-d|fear(ing)? g-d|g-d.s name|divine name|cursing g.{0,2}d|desecrating.*name|testing g.{0,2}d|heeding a prophet/i],
+  ['idols',/idol|idolat|false prophet|sorcer|witch|astrolog|omen|magic|divination|medium|\bov\b|yid.?oni|yi.?doni|molech|heathen|inciter|soothsaying|kneeling stones|worship|ornamental statuette|incantation|communication with the dead|consulting yid|consulting ov/i],
+  ['tefillin',/tefillin|phylacter/i],['tefillah',/prayer|shema|bless|grace after meals|kiddush|havdalah|shofar|trumpet|empty-handed/i],
+  ['torah',/torah|scroll|study|teach|scripture|learning|story of the exodus|exodus/i],['shabbat',/shabbat|sabbath/i],
+  ['passover',/passover|chametz|matzah|matsa|pesach/i],['holidays',/sukkot|sukkah|shavuot|rosh hashanah|yom kippur|festival|holiday|new month|new moon|shemini atzeret|omer/i],
+  ['priest',/high priest|priest|koh(en|anim)|levite|levi|holy foods|sacred portions|terumah|serving while inebriated/i],['offering',/offering|sacrifice|altar|incense|showbread|first harvest|sacrificial|perpetual fire|red heifer/i],['temple',/temple|sanctuary|ark|menorah/i],
+  ['kashrut',/kosher|non-kosher|unclean animal|forbidden animal|blood|meat|food|eating|chametz|fish|fowl|bird|locust/i],
+  ['agriculture',/field|crop|harvest|grain|vineyard|tree|fruit|tithe|terumah|first fruit|gleaning|corner of|planting|seeds|grapes|land during|jubilee|sabbatical/i],
+  ['justice',/court|judge|witness|testimony|judg(e|ment)|punish|penalty|fine|execution|death penalty|evidence|litigant|trial|bribery|murder|ransom|criminal|verdict|hanging|seducer|rapist|claims|majority decision|justice|advice|independent judicial|judicial system|indigent defendant|flogging|attacker|decapitated calf|hazard|removing hazards/i],
+  ['property',/theft|steal|rob|damage|property|lost object|lost article|lost item|returning|found object|deposit|guarding|watchman|guardian|renter|borrower|thief|restitution|paid guardian|abduction|transactions|withholding monies|plotting to acquire|coveted item|coveting|wanton destruction|perpetuity|unbalanced measure/i],
+  ['lending',/loan|lend|lending|interest|debt|charity|poor|tzedakah|pledge|collateral|money owed/i],
+  ['speech',/gossip|slander|embarrass|reprove|curse|swear|oath|vow|false|\blie\b|speech|words|verbal obligation|shaming|misleading advice|cursing one.s fellow/i],
+  ['vows',/vow|oath|swear/i],['purity',/purif|impur|mikvah|leper|tzaraat|menstrual|corpse|ritual bath|burying the dead|ritual purity/i],
+  ['animals',/animal|beast|bestiality|bird|mother bird|slaughter|kosher sign|fish|insect|worm|sciatic nerve|forbidden fats|flesh of a condemned ox|unredeemed firstborn|creeping land creatures/i],
+  ['slavery',/slave|servant|worker|wage|laborer|employee|master|bondsman/i],
+  ['king',/king|monarch|leader|ruler|half shekel|employ|measurement|oil of anointment|oil of anoint/i],['war',/war|enemy|army|battle|siege|soldier|amalek|seven nations|canaanite|treaties with/i],
+  ['land',/land of israel|inheritance|boundary|border|neighbor|dwelling|settling|city|house|home|city of refuge|refuge/i],
+  ['family',/marry|marriage|divorc|wife|husband|widow|family|parent|mother|father|incest|brother|sister|daughter|son|circumcision|adultery|reproduction|newly married|beautiful captive|suspected adulteress|out of wedlock|menstruating|homosexual|castrat|prostitute|provocative behavior/i],
+  ['social',/love|loving|hate|revenge|grudge|kindness|honor|respect|oppress|convert|proselyte|friend|emulat|assembling the jewish|clinging to the sages|clinging to those|reproving|burying the dead|rejecting an (egyptian|edomite)/i]
+ ];
+ function topic(title,ref){for(const [key,re] of tests)if(re.test(title))return key;return ref[0]==='P'?'generalP':'generalN'}
+ function make(ref){const title=root.FTT_MITZVAH_TITLES[ref]||'';const topicKey=topic(title,ref);return groups[topicKey].map((pair,i)=>({id:'word:'+pair[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('he'),hebrew:pair[0],english:pair[1],source:'sefer-hamitzvos',topic:topicKey}))}
+ root.FTTSeferVocabulary={groups,topic,forRef:make,title:ref=>'Sefer HaMitzvos · '+ref};
+})(typeof window==='object'?window:globalThis);
