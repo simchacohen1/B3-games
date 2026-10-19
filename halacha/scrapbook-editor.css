@@ -46,3 +46,14 @@
 }
 @media print{.section[data-studio] .book:has(> .studio-draw-rail){display:block}.section[data-studio] .studio-draw-rail{display:none!important}}
 body.exporting .studio-draw-rail{display:none!important}
+
+/* Illustrated picture-sticker library is shared by every scrapbook lesson. */
+.section[data-studio] .studio-stickers .studio-sticker-guide{font-size:12px;line-height:1.3;color:#41617d;margin:5px 0 8px}
+.section[data-studio] .studio-stickers .studio-picture-library{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.section[data-studio] .studio-stickers .studio-picture-library button{background:#fff;border:1px solid #cbdde9;border-radius:11px;padding:5px;cursor:pointer;min-width:0}
+.section[data-studio] .studio-stickers .studio-picture-library img{width:100%;height:83px;object-fit:contain;background:#fff;border-radius:8px}
+.section[data-studio] .studio-stickers .studio-picture-library span{font-size:12px;display:block;margin-top:4px;font-weight:750;text-align:center;color:#325770}
+.section[data-studio] .studio-stickers .studio-picture-library button:focus-visible{outline:3px solid #e5ae52;outline-offset:2px}
+.section[data-studio] .studio-sticker-status{color:#24694e;font-size:12px;font-weight:800;min-height:0;margin:4px 0}
+.section[data-studio] .studio-stickers .studio-more-stickers>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+@media(max-width:650px){.section[data-studio] .studio-stickers .studio-picture-library img{height:65px}}
