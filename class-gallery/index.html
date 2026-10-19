@@ -2028,6 +2028,14 @@ document.getElementById('closeAvatarBtn').onclick=()=>closeAvatarChooser(true);
 document.getElementById('useAvatarBtn').onclick=()=>closeAvatarChooser(true);
 document.getElementById('avatarOverlay').addEventListener('click',e=>{if(e.target.id==='avatarOverlay')closeAvatarChooser(true);});
 
+/* Follow the Teacher must not interrupt an open gallery submission or upload. */
+document.addEventListener('ftt:before-follow-navigation', event => {
+  const form = document.getElementById('projectForm');
+  const overlay = document.getElementById('overlay');
+  if ((overlay && overlay.classList.contains('show')) ||
+      (form && form.querySelector('#submitBtn')?.disabled)) event.preventDefault();
+});
+
 /* ---------- submission modal ---------- */
 document.getElementById('classSelect').addEventListener('change',e=>{const s=document.getElementById('studentName'),roster=ROSTERS[e.target.value];s.innerHTML=roster?'<option value="">Choose your name...</option>'+roster.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join(''):'<option value="">Choose your class first...</option>';});
 const overlay=document.getElementById('overlay');document.getElementById('openModalBtn').onclick=()=>{if(isGuestGallery){window.B3Guest.unlock('Sign in to unlock','Pinning your own project is for signed-in students. These are sample projects from made-up students.');return;}overlay.classList.add('show')};document.getElementById('closeModalBtn').onclick=()=>overlay.classList.remove('show');document.getElementById('cancelBtn').onclick=()=>overlay.classList.remove('show');overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.classList.remove('show')});
