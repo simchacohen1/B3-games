@@ -268,7 +268,7 @@ test('new follow command is rechecked after an earlier permission check is in fl
   }});
   await h.ctx.FTTFollowStudent.start({workspaceId:'b3-2026',classId:'et',studentId:'boy1'});
   const send=h.listeners.get('b3Games/workspaces/b3-2026/classes/et/access/followTeacher');
-  send({val:()=>({...h.state,revision:'old',mode:'independent'})});
+  send({val:()=>({...h.state,revision:'old',mode:'locked'})});
   await settle();
   send({val:()=>({...h.state,revision:'new',destination:'shorashim'})});
   release();
