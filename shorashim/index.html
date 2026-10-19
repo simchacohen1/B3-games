@@ -1189,11 +1189,11 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   .perek-choice strong{font-size:clamp(23px,2.8vw,29px)}
   .perek-choice .perek-progress{font-size:15px;font-weight:800;color:#475569}
   .perek-choice-hint{text-align:center;color:#475569;font-size:15px;font-weight:700;margin:20px 0}
-  .perek-choice-grid{max-width:1150px;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .hero-grid.two.perek-choice-grid{max-width:1150px;grid-template-columns:repeat(3,minmax(0,1fr))}
   .perek-choice .perek-number{flex:0 0 auto}
   .booklet-week-wrap{display:flex;flex-direction:column;gap:7px;font-weight:800;margin:14px 0;color:#172033}
   .booklet-week-wrap select{font-size:17px;font-weight:700;width:100%;border:2px solid #c7d2fe}
-  @media(max-width:900px){.perek-choice-grid{grid-template-columns:1fr}}
+  @media(max-width:900px){.hero-grid.two.perek-choice-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -1277,7 +1277,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
         <section id="shorashimPerekScreen" class="screen">
           <div class="section-head">
             <button class="backBtn ghost">← Home</button>
-            <div><div class="eyebrow">Learn new Shorashim</div><h2>Choose a Perek</h2></div>
+            <div><div class="eyebrow">Learn new Shorashim</div><h2>Choose a Shorashim List</h2></div>
           </div>
           <div class="hero-grid two perek-choice-grid" aria-label="Choose Shorashim Perek">
             <button type="button" class="feature-card learn perek-choice" data-learning-perek="18">
@@ -1297,7 +1297,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
               <span class="perek-progress">180 words</span>
             </button>
           </div>
-          <p class="perek-choice-hint">Choose either perek. You can learn the words in any order.</p>
+          <p class="perek-choice-hint">Choose a list. No words need to be learned in order.</p>
         </section>
 
         <section id="affixHomeScreen" class="screen">
