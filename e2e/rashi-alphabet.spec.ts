@@ -32,6 +32,7 @@ async function startLab(page: Page) {
     w.updateRewardHud = () => {};
     w.rewardBurst = () => {};
     w.beep = () => {};
+    w.logAttempt = async () => {};
     w.markMastered = (key: string) => { w.passedKeys.push(key); };
     w.goNextStep = () => { w.nextStepInvoked = true; };
     w.showModeGate = () => {};
