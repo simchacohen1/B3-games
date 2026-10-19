@@ -147,3 +147,33 @@ test('class explicitly marked inactive never moves student',async()=>{
   await fire(h,h.state);await runTimers(h);
   assert.equal(h.navigations.length,0);
 });
+
+
+test('failed Chazara audio remains protected until student acknowledges downloading it',()=>{
+  const source=fs.readFileSync(path.join(ROOT,'chazara/index.html'),'utf8');
+  const begin=source.indexOf('function preserveRecording(');
+  const end=source.indexOf('\nasync function finishRecording(',begin);
+  assert.ok(begin>=0 && end>begin,'Chazara recovery function exists');
+  const nodes=[], inserted=[];
+  const document={createElement(tag){
+    const node={tag,attributes:{},children:[],style:{},setAttribute(k,v){this.attributes[k]=v},
+      removeAttribute(k){delete this.attributes[k]},append(...parts){this.children.push(...parts)}};
+    nodes.push(node);return node;
+  }};
+  const context={document,URL:{createObjectURL:()=> 'blob:test'},
+    extFor:()=> 'webm',
+    $:()=>({parentElement:{insertBefore(node){inserted.push(node)}}})};
+  vm.runInNewContext(source.slice(begin,end),context);
+  context.preserveRecording({type:'audio/webm'},'18_5',new Error('Save failed'),false);
+  assert.equal(inserted.length,1);
+  const recovery=inserted[0];
+  assert.equal(recovery.attributes['data-ftt-unsaved'],'true');
+  const acknowledgment=recovery.children.find(node=>node.tag==='button');
+  assert.ok(acknowledgment,'Recovery must offer an explicit acknowledgment');
+  assert.match(acknowledgment.textContent,/downloaded/i);
+  acknowledgment.onclick();
+  assert.equal(recovery.attributes['data-ftt-unsaved'],undefined);
+  assert.equal(acknowledgment.disabled,true);
+  const listener=fs.readFileSync(path.join(ROOT,'follow-teacher/student.js'),'utf8');
+  assert.match(listener,/\\[data-ftt-unsaved="true"\\]/);
+});
