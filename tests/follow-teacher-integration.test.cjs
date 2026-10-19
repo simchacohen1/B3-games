@@ -31,7 +31,7 @@ function harness(overrides={}) {
   const navigations=[];
   const elements=[];
   const body={appendChild:node=>elements.push(node)};
-  const document={body,createElement:()=>({
+  const document={body,querySelector:()=>overrides.busy?{className:'rec-panel'}:null,createElement:()=>({
     style:{},dataset:{},remove(){},setAttribute(){},textContent:''
   })};
   const storage={getItem:key=>stored.get(key)||null,setItem:(key,v)=>stored.set(key,v)};
@@ -102,6 +102,11 @@ test('free mode records revision to avoid second navigation',async()=>{
   await runTimers(h);
   assert.equal(h.navigations.length,1);
   assert.ok(h.stored.get('fttFollowTeacherLastApplied').includes('rev1'));
+});
+test('active Chazara recording blocks automatic redirect until saving finishes',async()=>{
+  const h=harness({busy:true});
+  await fire(h,h.state);await runTimers(h);
+  assert.equal(h.navigations.length,0);
 });
 test('activity can veto a redirect to finish saving work',async()=>{
   const h=harness();h.ctx.dispatchEvent=()=>false;
