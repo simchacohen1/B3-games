@@ -162,7 +162,7 @@
       checking = false;
       if (rerunRequested) {
         rerunRequested = false;
-        queueMicrotask(() => void evaluate());
+        Promise.resolve().then(() => evaluate());
       }
     }
   }
