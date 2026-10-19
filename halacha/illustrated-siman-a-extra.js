@@ -4,12 +4,12 @@
 (function(){
 'use strict';
 const data={
- b:{file:'modeh-ani',title:'A New Morning',description:'I wake up and thank Hashem for returning my neshama.',stickers:[['bed-window','My bedroom'],['heart','Gratitude'],['book','Siddur']]},
+ b:{file:'modeh-ani',title:'A New Morning',description:'I wake up and thank Hashem for returning my neshama.',stickers:[['bed-window','My bedroom'],['heart','Gratitude'],['book','Sefer']]},
  c:{file:'four-middos',title:'Four Middos for a Chayol',description:'I use courage, care, energy and a strong heart to serve Hashem.',stickers:[['heart','Courage'],['boy-walking','Run to a mitzvah'],['book','Learn the middos']]},
  d:{file:'zerizus',title:'Getting Up with Zerizus',description:'I can overcome excuses and start the day with energy.',stickers:[['bed-window','My bedroom'],['thought','My choice'],['boy-walking','Ready to go']]},
  e:{file:'night-learning',title:'Torah Learning at Night',description:'A quiet moment to learn with care and concentration.',stickers:[['lamp','Study lamp'],['book','Sefer'],['shtender','Shtender']]},
  a6:{file:'tehillim',title:'Reading Carefully from a Sefer',description:'I read Tehillim and pesukim carefully from the text.',stickers:[['book','Tehillim'],['shtender','Shtender'],['thought','Careful words']]},
- a7:{file:'shomea-tefillah',title:'Davening with Care',description:'I remember to use the correct words of the tefillah.',stickers:[['book','Siddur'],['heart','Tefillah'],['speech','My words']]}
+ a7:{file:'shomea-tefillah',title:'Davening with Care',description:'I remember to use the correct words of the tefillah.',stickers:[['book','Sefer'],['heart','Tefillah'],['speech','My words']]}
 };
 const photos='art/seifim/';
 const stickers='art/stickers/';
