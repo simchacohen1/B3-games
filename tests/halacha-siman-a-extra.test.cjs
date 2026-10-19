@@ -60,7 +60,7 @@ test('Hebrew teaching material and artwork appear right to left, and starter nev
  new vm.Script(artwork);
  assert.match(artwork,/grid\.dir='rtl'/);
  assert.match(artwork,/Object\.keys\(packs\)\.forEach\(install\)/);
- for(const seif of ['b','c','d','e','a6','a7','f'])assert.match(artwork,new RegExp('\\\\b'+seif+':\\\\{title:'));
+ for(const seif of ['b','c','d','e','a6','a7','f'])assert.ok(artwork.includes(seif+':{title:'),seif+' should have illustrated lesson artwork');
  assert.match(artwork,/const hasPieces=pages\.some/);
  assert.match(artwork,/if\(hasPieces&&!confirm/);
  assert.match(artwork,/window\.persist/);
