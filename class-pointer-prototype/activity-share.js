@@ -125,7 +125,7 @@
     const toolButtons=new Map();let lessonLevel='none',lessonTool='point',lessonMarks={points:{},strokes:[],members:[]},lessonDraft=null;
     const lessonStage=document.createElement('div');
     lessonStage.style.cssText='position:relative;flex:1;min-height:0;overflow:hidden;touch-action:auto';
-    const markLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    const markLayer=typeof document.createElementNS==='function'?document.createElementNS('http://www.w3.org/2000/svg','svg'):document.createElement('svg');
     markLayer.style.cssText='position:absolute;pointer-events:none;overflow:visible';
     markLayer.setAttribute('viewBox','0 0 1000 1000');
     const pointerLayer=document.createElement('div');
@@ -148,7 +148,7 @@
     }
     undo.addEventListener('click',()=>{if(admitted&&presenceConn?.open&&allowedMode(lessonTool))presenceConn.send({type:'edit-highlights',action:'undo'})});
     drawTools.append(undo,viewOnly);
-    const ns='http://www.w3.org/2000/svg',svg=(name,attrs)=>{const el=document.createElementNS(ns,name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));return el};
+    const ns='http://www.w3.org/2000/svg',svg=(name,attrs)=>{const el=typeof document.createElementNS==='function'?document.createElementNS(ns,name):document.createElement(name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));return el};
     function picture(){
       const rect=lessonStage.getBoundingClientRect(),width=lessonVideo.videoWidth,height=lessonVideo.videoHeight;
       if(!width||!height||!rect.width||!rect.height)return{left:0,top:0,width:rect.width,height:rect.height};
