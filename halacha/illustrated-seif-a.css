@@ -47,3 +47,8 @@
 .section#a .hal-lesson-text-piece .tb-text{font-size:clamp(14px,1.7vw,20px);line-height:1.4;white-space:normal;overflow-wrap:anywhere}
 @media(max-width:1000px){.section#a .hal-story-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:650px){.section#a .hal-story-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.section#a .hal-story-use{font-size:11px}}
+
+
+/* Shivisi pictures remain easy to see immediately on entering the lesson. */
+.section#a .hal-a-body>.hal-story-gallery{padding:8px 0 12px;margin:0 0 10px;border-bottom:2px solid #e1eced}
+.section#a .hal-story-grid{grid-auto-flow:row}
