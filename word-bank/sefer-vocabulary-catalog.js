@@ -768,5 +768,5 @@
    }
    return result;
  }
- root.FTTSeferVocabulary={topic,forRef,title:ref=>'Sefer HaMitzvos · '+ref};
+ root.FTTSeferVocabulary={topic,forRef,title:ref=>'Sefer HaMitzvos · '+ref+' · '+(root.FTT_MITZVAH_TITLES[ref]||'')};
 })(typeof window==='object'?window:globalThis);
