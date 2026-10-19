@@ -1189,6 +1189,11 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   .perek-choice strong{font-size:clamp(23px,2.8vw,29px)}
   .perek-choice .perek-progress{font-size:15px;font-weight:800;color:#475569}
   .perek-choice-hint{text-align:center;color:#475569;font-size:15px;font-weight:700;margin:20px 0}
+  .perek-choice-grid{max-width:1150px;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .perek-choice .perek-number{flex:0 0 auto}
+  .booklet-week-wrap{display:flex;flex-direction:column;gap:7px;font-weight:800;margin:14px 0;color:#172033}
+  .booklet-week-wrap select{font-size:17px;font-weight:700;width:100%;border:2px solid #c7d2fe}
+  @media(max-width:900px){.perek-choice-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -1285,6 +1290,12 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
               <strong>Perek 19 Shorashim</strong>
               <span class="perek-progress">See your words</span>
             </button>
+            <button type="button" class="feature-card learn perek-choice" data-learning-perek="booklet">
+              <span class="perek-number" aria-hidden="true">📘</span>
+              <strong>3rd Grade Shoroshim Booklet</strong>
+              <span>30 weeks • 6 words each</span>
+              <span class="perek-progress">180 words</span>
+            </button>
           </div>
           <p class="perek-choice-hint">Choose either perek. You can learn the words in any order.</p>
         </section>
@@ -1311,7 +1322,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
               <div class="eyebrow">Learn and customize</div>
               <h2 id="learnHeading">Learn New Shorashim</h2>
             </div>
-            <button type="button" id="changeLearningPerekBtn" class="ghost hidden">← Change Perek</button>
+            <button type="button" id="changeLearningPerekBtn" class="ghost hidden">← Change List</button>
             <div class="session-status" id="sessionStatus">Cards save as you go</div>
           </div>
 
@@ -1329,6 +1340,41 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
                   <span id="availableCount" class="pill"></span>
                 </div>
                 <p class="mini-note">Choose any word in any order. All available words are open; select a learned card any time to edit it.</p>
+                <label id="bookletWeekWrap" class="booklet-week-wrap hidden" for="bookletWeekSelect">Booklet week
+                  <select id="bookletWeekSelect" aria-label="Choose booklet week">
+                    <option value="all">All 30 Weeks</option>
+                    <option value="1">Week 1</option>
+                    <option value="2">Week 2</option>
+                    <option value="3">Week 3</option>
+                    <option value="4">Week 4</option>
+                    <option value="5">Week 5</option>
+                    <option value="6">Week 6</option>
+                    <option value="7">Week 7</option>
+                    <option value="8">Week 8</option>
+                    <option value="9">Week 9</option>
+                    <option value="10">Week 10</option>
+                    <option value="11">Week 11</option>
+                    <option value="12">Week 12</option>
+                    <option value="13">Week 13</option>
+                    <option value="14">Week 14</option>
+                    <option value="15">Week 15</option>
+                    <option value="16">Week 16</option>
+                    <option value="17">Week 17</option>
+                    <option value="18">Week 18</option>
+                    <option value="19">Week 19</option>
+                    <option value="20">Week 20</option>
+                    <option value="21">Week 21</option>
+                    <option value="22">Week 22</option>
+                    <option value="23">Week 23</option>
+                    <option value="24">Week 24</option>
+                    <option value="25">Week 25</option>
+                    <option value="26">Week 26</option>
+                    <option value="27">Week 27</option>
+                    <option value="28">Week 28</option>
+                    <option value="29">Week 29</option>
+                    <option value="30">Week 30</option>
+                  </select>
+                </label>
                 <div id="wordList" class="word-list"></div>
               </aside>
 
@@ -1462,7 +1508,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
                 <button type="button" class="review-track-btn" data-review-track="prefix" aria-pressed="false"><span class="track-title">➡️ Prefixes</span><span class="track-progress">No learned cards yet</span></button>
                 <button type="button" class="review-track-btn" data-review-track="suffix" aria-pressed="false"><span class="track-title">🔚 Suffixes</span><span class="track-progress">No learned cards yet</span></button>
               </div>
-              <div class="review-perek-filter" aria-label="Filter Shorashim by Perek"><b>Shorashim unit:</b><button type="button" class="perek-filter-btn active" data-review-perek="all">All Learned</button><button type="button" class="perek-filter-btn" data-review-perek="18">Perek י״ח</button><button type="button" class="perek-filter-btn" data-review-perek="19">Perek י״ט</button></div>
+              <div class="review-perek-filter" aria-label="Filter Shorashim by Perek"><b>Shorashim unit:</b><button type="button" class="perek-filter-btn active" data-review-perek="all">All Learned</button><button type="button" class="perek-filter-btn" data-review-perek="18">Perek י״ח</button><button type="button" class="perek-filter-btn" data-review-perek="19">Perek י״ט</button><button type="button" class="perek-filter-btn" data-review-perek="booklet">3rd Grade Booklet</button></div>
               <div class="review-setup-top"><label>List view <select id="reviewSort"><option value="learned">Order learned</option><option value="alpha">Alphabetical</option><option value="manual">My custom order</option></select></label><span id="reviewSelectionCount" class="pill"></span></div>
               <div class="button-row"><button id="selectAllReview" class="ghost small">Select all</button><button id="clearReviewSelection" class="ghost small">Clear selection</button></div>
               <input type="checkbox" id="reviewNoHints" class="hidden" aria-hidden="true">
@@ -1590,7 +1636,8 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-  <script src="app.js?v=20261019-perek-choice"></script>
+  <script src="booklet-3rd-grade.js?v=20261019-import-1"></script>
+  <script src="app.js?v=20261019-booklet-1"></script>
   <script src="review-categories.js?v=20260917-picturefix1"></script>
   <script src="../student-class.js?v=20261007-shared-account-v2"></script>
   <script src="../b3-race.js?v=20261007"></script>
