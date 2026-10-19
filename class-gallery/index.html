@@ -2029,7 +2029,7 @@ document.getElementById('useAvatarBtn').onclick=()=>closeAvatarChooser(true);
 document.getElementById('avatarOverlay').addEventListener('click',e=>{if(e.target.id==='avatarOverlay')closeAvatarChooser(true);});
 
 /* Follow the Teacher must not interrupt an open gallery submission or upload. */
-document.addEventListener('ftt:before-follow-navigation', event => {
+window.addEventListener('ftt:before-follow-navigation', event => {
   const form = document.getElementById('projectForm');
   const overlay = document.getElementById('overlay');
   if ((overlay && overlay.classList.contains('show')) ||

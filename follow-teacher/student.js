@@ -5,7 +5,7 @@
   const C = root.FTTFollowTeacherCore;
   if (!C) return;
 
-  let active = null, generation = 0, checking = false;
+  let active = null, generation = 0, checking = false, rerunRequested = false;
   const appliedKey = 'fttFollowTeacherLastApplied';
   let banner = null;
   let policySignature = '';
@@ -91,7 +91,8 @@
 
   async function evaluate() {
     const run = active;
-    if (!run || checking) return;
+    if (!run) return;
+    if (checking) { rerunRequested = true; return; }
     checking = true;
     try {
       const state = run.state;
@@ -157,7 +158,13 @@
       console.warn('Follow Teacher could not check student access', e);
       notice('');
       if (run) clearTimeout(run.redirectTimer);
-    } finally { checking = false; }
+    } finally {
+      checking = false;
+      if (rerunRequested) {
+        rerunRequested = false;
+        Promise.resolve().then(() => evaluate());
+      }
+    }
   }
 
   async function start({workspaceId, classId, studentId}) {
