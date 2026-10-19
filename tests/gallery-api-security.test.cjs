@@ -65,3 +65,11 @@ test('Gallery new student posts are attributed to the signed-in student, not a s
   assert.match(source,/studentName=isTeacher\?/);
   assert.match(source,/sessionStorage\.getItem\('b3Games_studentName'\)/);
 });
+
+ test('Legacy approved posts resolve exact B3 class labels without exposing pending work',()=>{
+  const rows={oldET:{className:'B3 ET',status:'approved'},oldWT:{className:'B3 WT',status:'approved'},pending:{className:'B3 ET',status:'pending'},rejected:{className:'B3 ET',status:'rejected'},explicit:{classId:'wt',className:'B3 ET',status:'approved'},unknown:{className:'Other',status:'approved'}};
+  assert.deepEqual(Object.keys(visibleGalleryPosts(rows,'et','student',false)),['oldET']);
+  assert.deepEqual(Object.keys(visibleGalleryPosts(rows,'wt','student',false)),['oldWT','explicit']);
+  assert.deepEqual(Object.keys(visibleGalleryPosts(rows,'et',undefined,true)),['oldET','pending','rejected']);
+  assert.deepEqual(Object.keys(visibleGalleryPosts(rows,'et',undefined,false)),['oldET']);
+ });
