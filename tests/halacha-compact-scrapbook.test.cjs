@@ -16,7 +16,8 @@ test('complete original Kitzur is preserved, closed by default and opens when st
   assert.match(lesson,/שִׁוִיתִי/);
   assert.match(lesson,/וְיֵבוֹשׁ/);
   assert.match(lesson,/reading\.append\(readingTitle, fullText\)/);
-  assert.doesNotMatch(lesson,/reading\.open = true/);
+  // Source must start closed but may open when a child clicks 'Find in the seif'.
+  assert.match(lesson,/reading\.open = true/);
 });
 test('lesson is compact and provides picture and scrapbook jump controls',()=>{
   assert.match(lesson,/hal-a-jumps/);
