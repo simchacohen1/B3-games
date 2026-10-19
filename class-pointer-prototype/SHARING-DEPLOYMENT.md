@@ -18,10 +18,10 @@ The `firebase-rules.json` change must be reviewed against the currently deployed
 
 1. Open Teacher Tools > Class Pointer, select the correct class, and confirm the teaching area opens within the Edge window without hiding tabs or address bar.
 2. Open **Student Screens** in **Screens** mode. The classroom's `studentScreenSharing` flag should become true.
-3. Have a signed-in student open Shorashim (or Chumash recording). **Share My Screen** should appear *in that activity*, without another login. Click it and choose the activity tab in the browser permission dialog.
+3. Have a signed-in student open Shorashim (or Chumash recording). **Share My Screen** should appear *in that activity*, without another login. Click that button directly and choose **Entire Screen** in the browser's permission dialog; there is no separate invitation popup or share tab.
 4. The teacher should see a video titled with the student’s verified name. The boy can continue working in his original activity.
 5. Click **Stop Sharing** in the activity. The teacher view should stop.
-6. Disable Student Screens or switch to Whiteboards. The Share My Screen button should disappear and any active activity stream should close.
+6. Switch from **Student Screens** to **Student Whiteboards**: the student's whiteboard should appear above his current activity without opening another tab. The approved screen capture may continue, but its video is shown to the teacher only in Student Screens. Switching views alone must not require a new consent click. An explicit sharing disable, Stop Sharing, or class end stops capture.
 7. Have a boy assigned to a different class try to access this session; he must not receive sharing permission.
 8. Re-enable sharing and verify pointer, highlighting, pen, eraser, spotlight, PDF, webpage, whiteboard, student permission toggles, existing board work and session end still work.
 
