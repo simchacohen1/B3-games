@@ -5,6 +5,7 @@ const C=window.StudentRewardsCommon;
 C.ensureFirebase();
 const {db,auth}=C.ensureFirebase({student:true});
 const ROOT=C.ROOT;
+window.addEventListener('ftt:before-follow-navigation',e=>{if(state.busy)e.preventDefault();});
 let teacherPreview=false;
 const teacherAccountReady=new Promise(resolve=>{
   const deadline=Date.now()+10000;

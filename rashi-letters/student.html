@@ -29,7 +29,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="../guest-mode.js?v=20261011-guest"></script>
-<script src="../game-gate.js?v=20261017-auth-gate" data-game-id="rashi-letters"></script>
+<script src="../game-gate.js?v=20261019-follow-all" data-game-id="rashi-letters"></script>
 <title>Rashi Letters</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
@@ -527,6 +527,8 @@ const MAX_QUESTIONS_PER_STEP = 5;
 let soundOn = true, starsThisVisit = 0, coinsThisVisit = 0, guidedIndex = 0, guidedPhase = 'letter', questionTimer = null, viewVersion = 0;
 let studentName = null;
 let studentId = null;
+let rashiFollowPending=false;
+window.addEventListener('ftt:before-follow-navigation',e=>{if(rashiFollowPending)e.preventDefault();});
 let unitIndex = 0;
 let phase = 'letter'; // 'letter' | 'word'
 let streak = 0; // correct answers earned in the current step; mistakes do not erase them
@@ -1159,7 +1161,8 @@ async function handleAnswer(letter, btnEl){
     }
   }
 
-  try{await Promise.all(writes);}catch(e){if(version===viewVersion)fb.textContent+=' Progress could not save. Check your connection.';}
+  rashiFollowPending=true;
+  try{await Promise.all(writes);rashiFollowPending=false;}catch(e){if(version===viewVersion)fb.textContent+=' Progress could not save. Check your connection.';}
   if(version!==viewVersion) return;
 
   if(practiceFinished){
