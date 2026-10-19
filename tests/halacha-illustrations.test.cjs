@@ -13,8 +13,8 @@ const file=kind=>path.join(root,'art',kind);
 test('Halacha illustration enhancement loads without replacing original lesson/save scripts',()=>{
   assert.match(html,/seif-a-teacher-led\.js/);
   assert.match(html,/scrapbook-editor\.js/);
-  assert.match(html,/illustrated-seif-a\.js\?v=20261018-art3/);
-  assert.match(html,/illustrated-seif-a\.css\?v=20261018-art3/);
+  assert.match(html,/illustrated-seif-a\.js\?v=20261019-chabad1/);
+  assert.match(html,/illustrated-seif-a\.css\?v=20261019-compact1/);
   new vm.Script(script);
 });
 
@@ -60,4 +60,13 @@ test('illustrated stickers remain visible before the long scrapbook background c
   const style=fs.readFileSync(path.join(root,'illustrated-seif-a.css'),'utf8');
   assert.match(style,/grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
   assert.match(style,/@media\(max-width:1000px\)/);
+});
+
+test('Halacha lesson images and caption text can enter scrapbook without teacher writes',()=>{
+  assert.match(script,/addPicture\(SCENE_BASE \+ item\.file/);
+  assert.match(script,/addWords\(item\.caption\)/);
+  assert.match(script,/hal-a-quiz-details/);
+  assert.match(script,/window\.add\('a', 'textbox'/);
+  assert.match(script,/isReadonly\(\)/);
+  assert.match(script,/20261019-chabad1/);
 });
