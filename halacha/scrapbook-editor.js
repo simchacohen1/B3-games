@@ -259,7 +259,7 @@ function upgrade(id){
   '<button type="button" data-illustrated-sticker="'+key+'" title="Add '+name+' to selected scrapbook page"><img alt="" loading="lazy" src="art/stickers/'+key+'.jpg?v=20261019-illustrated-library1"><span>'+name+'</span></button>'
  ).join('');
  stickers.innerHTML='<b>Illustrated stickers — every lesson</b><p class="studio-sticker-guide">Choose Page 1 or 2 above, then tap a picture.</p><div class="studio-picture-library">'+illustrated+'</div><p class="studio-sticker-status" role="status" aria-live="polite"></p><details class="studio-more-stickers"><summary>More drawings and decorations</summary><div>'+primaryStickers+moreStickers+'</div></details>';
- themes.after(stickers);
+ themes.before(stickers); // Keep the illustrated choices visible above the page-style controls.
  stickers.querySelectorAll('[data-illustrated-sticker]').forEach(b=>
   b.addEventListener('click',()=>window.studioPictureSticker(id,b.dataset.illustratedSticker))
  );
