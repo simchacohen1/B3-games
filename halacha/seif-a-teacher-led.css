@@ -105,3 +105,12 @@ main:has(.section.on .hal-a-panel.hal-a-collapsed){max-width:1600px}
 .section#a .work{scroll-margin-top:75px}
 .section#a .hal-story-gallery{scroll-margin-top:75px}
 @media(max-width:670px){.section#a .hal-a-heading{position:relative}.section#a .hal-a-jumps{margin-left:0}.section#a .hal-a-heading h2{width:100%}.section#a .hal-a-jumps .hal-a-btn{padding:6px 8px}}
+
+/* Text-markers correspond directly to the two important phrases in the printed seif. */
+.section#a .hal-a-source-mark{font-weight:950;border-radius:5px;padding:0 3px;box-decoration-break:clone;-webkit-box-decoration-break:clone;color:#132d4b}
+.section#a .hal-a-mark-shivisi{background:#d6ecff;box-shadow:inset 0 -3px #4b9cdb}
+.section#a .hal-a-mark-melo{background:#fff2bd;box-shadow:inset 0 -3px #d5a443}
+.section#a .hal-a-source-found{outline:3px solid #ed8d27;outline-offset:3px}
+.section#a .hal-a-find-source{font-size:12px;padding:6px 9px;background:#eaf5ff;color:#214d78;border:1px solid #b9d7f0;border-radius:8px;cursor:pointer}
+.section#a .hal-a-phrase:nth-child(1)>summary{background:#e3f2ff;border-radius:7px}
+.section#a .hal-a-phrase:nth-child(2)>summary{background:#fff4d2;border-radius:7px}
