@@ -426,12 +426,24 @@
       user.providerData.some(function (p) { return p && p.providerId === "google.com"; }));
   }
 
+  // The compat Firebase build used here has no authStateReady(); its first
+  // observer callback fires once stored credentials have been loaded.
+  function waitForAuthState(auth) {
+    if (typeof auth.authStateReady === "function") return auth.authStateReady();
+    return new Promise(function (resolve) {
+      let off = function () {}, done = false;
+      const finish = function () { if (done) return; done = true; try { off(); } catch (_) {} resolve(); };
+      off = auth.onAuthStateChanged(finish, finish);
+      if (done) off();
+    });
+  }
+
   function restoreTeacher(services) {
     if (isStudentTab() || teacherRestoreBlocked()) return Promise.resolve(false);
     if (!teacherRestore) teacherRestore = (async function () {
       const signOutVersion = teacherSignOutVersion;
       const savedAuth = getRememberedTeacherAuth();
-      await savedAuth.authStateReady();
+      await waitForAuthState(savedAuth);
       const saved = savedAuth.currentUser;
       if (!saved || isStudentTab() || teacherRestoreBlocked() || isGoogleUser(services.auth.currentUser)) return false;
       // Restore Firebase identity before reading protected teacher records.
