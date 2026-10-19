@@ -32,12 +32,9 @@
         auth.currentUser.uid !== teacher.user.uid) throw Error('Your teacher sign-in changed. Please sign in again.');
     if (!valid(current) || !assigned.includes(current)) throw Error('Choose an assigned class.');
   }
-  function selected() {
-    if (q('allStudents').checked) return 'all';
-    const ids = [...q('studentList').querySelectorAll('input[type=checkbox]:checked')].map(input => input.value);
-    if (!ids.length) throw Error('Choose a student or select Entire class.');
-    return ids;
-  }
+  // Until the private student-targeting path is hardened, never broadcast
+  // individual student identifiers under the publicly readable class path.
+  function selected() {return 'all';}
   function mode() {return document.querySelector('input[name=mode]:checked')?.value || C.MODES.INDEPENDENT;}
   function renderState(state) {
     currentState = state;
@@ -60,18 +57,6 @@
     if (myGeneration !== generation) return;
     if (!row || row.active === false) throw Error('This class is disabled.');
     classRow = row; current = id; q('classSelect').value = id;
-    const list = q('studentList');
-    list.replaceChildren();
-    for (const [studentId, member] of Object.entries(row.members || {})) {
-      if (!valid(studentId) || member?.active === false) continue;
-      const label = document.createElement('label');
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox'; checkbox.value = studentId;
-      const display = document.createElement('span');
-      display.textContent = ' ' + String(member?.name || studentId);
-      label.append(checkbox, display);
-      list.appendChild(label);
-    }
     stateRef = db.ref('b3Games/workspaces/' + WS + '/classes/' + id + '/access/followTeacher');
     const listener = snapshot => {
       if (myGeneration !== generation) return;
@@ -135,9 +120,6 @@
     finally {q('apply').disabled = q('unlock').disabled = false;}
   }
 
-  q('allStudents').addEventListener('change', () => {
-    q('studentList').classList.toggle('hidden', q('allStudents').checked);
-  });
   q('apply').addEventListener('click', () => void publish());
   q('unlock').addEventListener('click', () => void publish(C.MODES.INDEPENDENT));
   q('classSelect').addEventListener('change', () => {
