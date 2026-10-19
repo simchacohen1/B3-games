@@ -2717,7 +2717,11 @@ function startPracticeLimitListener(){
 }
 async function applyPracticeLimitChange(){
   {
-    classPracticeLimit = normalizedPracticeWindow(effectiveRawLimit());
+    const nextLimit = normalizedPracticeWindow(effectiveRawLimit());
+    // Firebase may repeat a value on reconnect, or update the shared default
+    // while this class uses an override. Neither should erase a recording.
+    if(practiceScopeReady && JSON.stringify(nextLimit) === JSON.stringify(classPracticeLimit)) return;
+    classPracticeLimit = nextLimit;
     practiceScopeReady = true;
     const fetchMsgEl = document.getElementById('fetchMsg');
     if(classPracticeLimit && fetchMsgEl.textContent.startsWith('📖 Your teacher has not opened')) fetchMsgEl.textContent = '';
@@ -4933,7 +4937,10 @@ function promiseWithTimeout(promise, ms, label){
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+const translationPieceCache = new Map();
 async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
+  const cacheKey = JSON.stringify([currentSefer, part.key, part.text, part.translation || '']);
+  if(translationPieceCache.has(cacheKey)) return translationPieceCache.get(cacheKey);
   const chunkRef = db.ref('posukPractice/translationChunks/' + part.key);
   try{
     const snap = await promiseWithTimeout(chunkRef.once('value'), 10000, 'Translation cache');
@@ -4941,6 +4948,7 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
     // Keep every existing translation-piece breakdown. Kehot is accepted at grading time,
     // so old cached pieces do NOT need to be regenerated just because grading sources changed.
     if(snap.exists() && snap.val() && Array.isArray(snap.val().levels) && snap.val().levels.length){
+      translationPieceCache.set(cacheKey, snap.val().levels);
       return snap.val().levels;
     }
   }catch(err){
@@ -4971,6 +4979,9 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
     if(!res.ok) throw new Error('Chunk generation request failed: ' + res.status);
     const data = await res.json();
     if(!data.levels || !Array.isArray(data.levels) || !data.levels.length) throw new Error('No levels returned');
+    // Keep successful pieces for this visit too, including when returning
+    // to a posuk. Failed requests remain retryable.
+    translationPieceCache.set(cacheKey, data.levels);
     // The protected backend caches this result for subsequent students.
     return data.levels;
   }catch(err){
