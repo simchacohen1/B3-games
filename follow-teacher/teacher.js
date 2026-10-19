@@ -64,6 +64,8 @@
     if (myGeneration !== generation) return;
     if (!row || row.active === false) throw Error('This class is disabled.');
     classRow = row; current = id;
+    const pointerLink = q('openClassPointer');
+    if (pointerLink) pointerLink.href = '../class-pointer-prototype/classroom.html?dashboard=teacher&followTeacherWhiteboard=1&class=' + encodeURIComponent(id);
     q('destination').replaceChildren(...Object.entries(C.DESTINATIONS).filter(([tool]) =>
       (['et','wt'].includes(id) || row.toolGrants?.[tool] === true) &&
       settings.games?.[tool] !== false && settings.classGames?.[id]?.[tool] !== false).map(([tool,entry]) => {
