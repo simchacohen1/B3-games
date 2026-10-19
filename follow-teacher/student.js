@@ -104,6 +104,14 @@
           if (active !== run || !C.fresh(run.state, Date.now() + (run.serverOffset || 0)) ||
               run.state.revision !== state.revision) return;
           if (!(await permitted(run))) {notice(''); return;}
+          // Chazara's recording panel persists through upload and point-save.
+          // Never tear down an active recording or pending save. Other activities
+          // can use data-ftt-unsaved="true" or veto the event below.
+          const busy = document.querySelector?.('.record-bar.recording, .rec-panel, [data-ftt-unsaved="true"], [data-follow-unsaved="true"]');
+          if (busy) {
+            notice('Finish recording and saving your work before following the teacher.', true);
+            return;
+          }
           // Activities may cancel this event to finish saving current work.
           const leaving = new CustomEvent('ftt:before-follow-navigation', {
             cancelable: true, detail: {destination: decision.destination, mode: decision.mode}
