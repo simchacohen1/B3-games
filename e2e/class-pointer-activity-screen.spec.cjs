@@ -80,7 +80,7 @@ test('student shares directly from small activity button without an extra popup,
     }})}),requestAt);
     await expect(page.getByRole('dialog',{name:'Teacher screen sharing request'})).toHaveCount(0);
     await expect(page.locator('#fttActivityScreenShare')).toBeVisible();
-    await page.getByRole('button',{name:'🖥 Share My Screen'}).click();
+    await page.locator('#fttActivityScreenShare button').first().click();
     await expect.poll(()=>page.evaluate(()=>window.__calls.at(-1)?.answered===true)).toBe(true);
     await expect.poll(()=>page.evaluate(()=>document.querySelector('#activityScreenTray video')?.videoWidth||0)).toBe(320);
     const initialFrame=await page.locator('#activityScreenTray video').evaluate(video=>{
@@ -105,7 +105,7 @@ test('student shares directly from small activity button without an extra popup,
     roomId:window.__room,createdAt:Date.now(),teacherUid:'teacher-et',studentScreenSharing:true,shareRequest:{at}
   }})}),finalRequestAt);
   await expect(page.getByRole('dialog',{name:'Teacher screen sharing request'})).toHaveCount(0);
-  await page.getByRole('button',{name:'🖥 Share My Screen'}).click();
+  await page.locator('#fttActivityScreenShare button').first().click();
   await expect.poll(()=>page.evaluate(()=>window.__calls.at(-1)?.answered===true)).toBe(true);
   await expect.poll(()=>page.evaluate(()=>document.querySelector('#activityScreenTray video')?.videoWidth||0)).toBe(320);
   await page.evaluate(()=>window.ClassPointerActivityShares.closeAll());
