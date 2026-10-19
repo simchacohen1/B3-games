@@ -122,3 +122,30 @@ test('picture practice retries, title ideas are editable, themed stickers and pa
  assert.ok(await p.locator('#a .scrap img[src^="data:image/png"]').count()>0);
  assert.deepEqual(errors,[]);await p.close();
 });
+
+
+test('opening selected-piece controls never squeezes scrapbook pages into the drawing rail',async()=>{
+ const {page:p,errors}=await open();
+ for(const width of [1277,900]){
+  await p.setViewportSize({width,height:900});
+  const before=await p.locator('#a .page').first().boundingBox();
+  await p.getByRole('button',{name:'Add text box'}).click();
+  assert.ok(await p.locator('#a .book>.studio-context.show').isVisible());
+  const bounds=await p.evaluate(()=>{
+   const r=selector=>document.querySelector('#a '+selector).getBoundingClientRect();
+   const first=r('.page'),pages=r('.spread'),rail=r('.studio-draw-rail'),toolbar=r('.book>.studio-context.show');
+   return {pageWidth:first.width,spreadLeft:pages.left,spreadRight:pages.right,railLeft:rail.left,
+    railTop:rail.top,pageTop:first.top,toolbarWidth:toolbar.width};
+  });
+  assert.ok(bounds.pageWidth>250,'page stays readable with editing controls at '+width+'px');
+  assert.ok(Math.abs(bounds.pageWidth-before.width)<2,'opening toolbar does not resize existing artwork');
+  assert.ok(bounds.spreadRight<=bounds.railLeft+2,'drawing rail stays beside pages');
+  assert.ok(Math.abs(bounds.railTop-bounds.pageTop)<2,'drawing rail is aligned with pages');
+  assert.ok(bounds.toolbarWidth>bounds.pageWidth,'editing controls use full book width');
+  await p.getByRole('button',{name:'Done editing'}).click();
+  const closed=await p.locator('#a .page').first().boundingBox();
+  assert.ok(Math.abs(closed.width-before.width)<2,'closing toolbar does not resize artwork');
+ }
+ assert.deepEqual(errors,[]);
+ await p.close();
+});
