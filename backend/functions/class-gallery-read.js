@@ -6,13 +6,15 @@ if(!admin.apps.length)admin.initializeApp();
 function visibleGalleryPosts(rows,classId,studentId,canReview){
   const out={};
   for(const [id,row] of Object.entries(rows||{})){
-    if(row?.classId===classId&&(canReview||row.status==='approved'||row.studentId===studentId))out[id]=row;
+    // Pre-login ET/WT records have className but no classId. Never override an explicit classId.
+    const rowClass=row?.classId||({'B3 ET':'et','B3 WT':'wt'}[row?.className]);
+    if(rowClass===classId&&(canReview||row.status==='approved'||(studentId&&row.studentId===studentId)))out[id]=row;
   }
   return out;
 }
 exports.visibleGalleryPosts=visibleGalleryPosts;
 
-exports.classGalleryRead=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io'],maxInstances:20,memory:'256MiB'},async(req,res)=>{
+exports.classGalleryRead=onRequest({region:'us-central1',cors:['https://funtorahtools.com','https://www.funtorahtools.com','https://simchacohen1.github.io'],maxInstances:20,memory:'256MiB'},async(req,res)=>{
   res.set('Cache-Control','no-store');
   if(req.method!=='GET')return res.status(405).json({error:'Use GET.'});
   try{
@@ -28,9 +30,9 @@ exports.classGalleryRead=onRequest({region:'us-central1',cors:['https://simchaco
     ]);
     const owner=String(identity.email||'').toLowerCase()==='simcha5770@gmail.com'&&identity.email_verified===true;
     const isTeacher=identity.firebase?.sign_in_provider==='google.com'&&teacher.child('active').val()===true&&teacher.child('classIds/'+classId).val()===true;
-    const isMember=identity.b3StudentRole==='student'&&identity.b3ClassId===classId&&member?.exists()&&member.child('active').val()===true;
+    const isMember=identity.b3StudentRole==='student'&&identity.b3ClassId===classId&&member?.exists()&&member.child('active').val()!==false;
     const allowed=owner||adminRow.val()===true||isMember||isTeacher;
-    if(!allowed||!cls.exists()||cls.child('active').val()!==true)return res.status(403).json({error:'Active class access required.'});
+    if(!allowed||!cls.exists()||cls.child('active').val()===false)return res.status(403).json({error:'Active class access required.'});
     const legacy=['et','wt'].includes(classId),path=legacy?'classGallery/posts':`b3Games/workspaces/b3-2026/classes/${classId}/resources/gallery/posts`;
     const snap=await db.ref(path).get(),rows=snap.val()||{};
     const posts=visibleGalleryPosts(rows,classId,identity.b3StudentId,isTeacher||owner||adminRow.val()===true);

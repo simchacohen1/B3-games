@@ -1,12 +1,25 @@
 'use strict';
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {canReadMedia}=require('../backend/functions/private-media-url.js');
+const fs=require('node:fs');
+const path=require('node:path');
+function loadMediaModule(){
+  const mod={exports:{}};
+  const mockRequire=name=>{
+    if(name==='firebase-functions/v2/https')return {onRequest:()=>({})};
+    if(name==='firebase-admin')return {apps:[],initializeApp(){}};
+    throw Error('Unexpected dependency in media test: '+name);
+  };
+  new Function('require','module','exports',fs.readFileSync(path.join(__dirname,'../backend/functions/private-media-url.js'),'utf8'))(mockRequire,mod,mod.exports);
+  return mod.exports;
+}
+const {canReadMedia}=loadMediaModule();
 
 function database(rows){return{ref:path=>({get:async()=>{
   let value=rows[path];
   if(value===undefined){const parent=Object.keys(rows).filter(key=>path.startsWith(key+'/')).sort((a,b)=>b.length-a.length)[0];if(parent)value=path.slice(parent.length+1).split('/').reduce((v,k)=>v?.[k],rows[parent]);}
-  return{val:()=>value??null,exists:()=>value!==undefined,child:key=>({val:()=>key.split('/').reduce((v,k)=>v?.[k],value)})};
+  const snap=v=>({val:()=>v??null,exists:()=>v!==undefined&&v!==null,child:key=>snap(key.split('/').reduce((row,k)=>row?.[k],v))});
+  return snap(value);
 }})}}
 
 test('private media requires an active own class member for Posuk recordings',async()=>{

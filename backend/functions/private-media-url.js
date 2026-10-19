@@ -2,7 +2,7 @@
 const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
 if(!admin.apps.length)admin.initializeApp();
-const SAFE_PATH=/^[A-Za-z0-9_./-]{1,600}$/;
+const SAFE_PATH=/^[^\x00-\x1f\x7f\\?#]{1,600}$/u; // Uploaded filenames may include spaces or Hebrew.
 
 async function canReadMedia(db,identity,path){
   const parts=path.split('/');
@@ -23,7 +23,7 @@ async function canReadMedia(db,identity,path){
       db.ref(`b3Games/workspaces/b3-2026/classes/${classId}`).get(),
       db.ref(`b3Games/workspaces/b3-2026/classes/${classId}/members/${studentId}`).get()
     ]);
-    if(studentClass.child('active').val()!==true||membership.child('active').val()!==true)return false;
+    if(!studentClass.exists()||!membership.exists()||studentClass.child('active').val()===false||membership.child('active').val()===false)return false;
     if(studentId===ownerId)return true;
     if(!galleryPostId)return false;
     let post=await db.ref(`b3Games/workspaces/b3-2026/classes/${classId}/resources/gallery/posts/${galleryPostId}`).get();
@@ -40,11 +40,11 @@ async function canReadMedia(db,identity,path){
     db.ref(`b3Games/workspaces/b3-2026/teachers/${identity.uid}`).get(),
     db.ref(`b3Games/workspaces/b3-2026/classes/${classId}`).get()
   ]);
-  return teacher.child('active').val()===true&&teacher.child('classIds/'+classId).val()===true&&cls.child('active').val()===true&&cls.child('members/'+ownerId+'/active').val()===true;
+  return teacher.child('active').val()===true&&teacher.child('classIds/'+classId).val()===true&&cls.exists()&&cls.child('active').val()!==false&&cls.child('members/'+ownerId).exists()&&cls.child('members/'+ownerId+'/active').val()!==false;
 }
 exports.canReadMedia=canReadMedia;
 
-exports.privateMediaUrl=onRequest({region:'us-central1',cors:['https://simchacohen1.github.io'],maxInstances:20,memory:'256MiB'},async(req,res)=>{
+exports.privateMediaUrl=onRequest({region:'us-central1',cors:['https://funtorahtools.com','https://www.funtorahtools.com','https://simchacohen1.github.io'],maxInstances:20,memory:'256MiB'},async(req,res)=>{
   res.set('Cache-Control','no-store');
   if(req.method!=='POST')return res.status(405).json({error:'Use POST.'});
   try{
@@ -54,7 +54,7 @@ exports.privateMediaUrl=onRequest({region:'us-central1',cors:['https://simchacoh
     if(!SAFE_PATH.test(path)||path.includes('..')||path.startsWith('/'))return res.status(400).json({error:'Invalid media path.'});
     const db=admin.database();
     if(!await canReadMedia(db,identity,path))return res.status(403).json({error:'You do not have access to this recording.'});
-    const bucket=admin.storage().bucket(),file=bucket.file(path),[exists]=await file.exists();
+    const bucket=admin.storage().bucket('b3-games.firebasestorage.app'),file=bucket.file(path),[exists]=await file.exists();
     if(!exists)return res.status(404).json({error:'Recording not found.'});
     const [url]=await file.getSignedUrl({action:'read',expires:Date.now()+5*60*1000});
     return res.status(200).json({url,expiresInSeconds:300});

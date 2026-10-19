@@ -2015,7 +2015,29 @@ function applyGalleryPosts(data){const rows=Object.keys(data||{}).map(id=>({id,.
 if(dbRef){
   if(isGuestGallery)dbRef.on('value',snapshot=>applyGalleryPosts(snapshot.val()||{}),err=>console.error('Gallery demo read failed:',err));
   else{
-    const loadScopedPosts=async()=>{try{const user=firebase.auth().currentUser;if(!user)return;const token=await user.getIdToken(),r=await fetch('https://us-central1-b3-games.cloudfunctions.net/classGalleryRead?classId='+encodeURIComponent(galleryClassId),{headers:{Authorization:'Bearer '+token},cache:'no-store'}),j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Gallery access denied.');applyGalleryPosts(j.posts||{})}catch(err){console.error('Gallery read failed:',err)}};
+    const showGalleryReadError=(message)=>{
+      let notice=document.getElementById('galleryReadError');
+      if(!notice){
+        notice=document.createElement('div');
+        notice.id='galleryReadError';
+        notice.setAttribute('role','alert');
+        notice.style.cssText='position:fixed;z-index:9998;top:72px;left:16px;right:16px;max-width:700px;margin:auto;padding:14px 18px;border:2px solid #b44f47;border-radius:12px;background:#fffaf1;color:#602b29;font:700 15px/1.5 Arial,sans-serif;box-shadow:0 8px 22px #0004;text-align:center';
+        document.body.append(notice);
+      }
+      notice.textContent='Class Gallery could not load saved posts. Your work may still be saved; do not resubmit yet. '+message;
+    };
+    const loadScopedPosts=async()=>{
+      try{
+        const user=firebase.auth().currentUser;
+        if(!user){showGalleryReadError('Please sign in from Fun Torah Tools, then try again.');return;}
+        const token=await user.getIdToken();
+        const r=await fetch('https://us-central1-b3-games.cloudfunctions.net/classGalleryRead?classId='+encodeURIComponent(galleryClassId),{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+        const j=await r.json().catch(()=>({}));
+        if(!r.ok)throw new Error(r.status===404?'The gallery service is unavailable. Please tell your teacher.':(j.error||'Could not connect to your classroom.'));
+        document.getElementById('galleryReadError')?.remove();
+        applyGalleryPosts(j.posts||{});
+      }catch(err){console.error('Gallery read failed:',err);showGalleryReadError(err?.message||'Please tell your teacher.');}
+    };
     B3SiteSettings.onAuthStateChanged(loadScopedPosts);setInterval(loadScopedPosts,10000);
   }
   setInterval(()=>{if(!document.hidden)applyGalleryPosts(Object.fromEntries(posts.map(({id,...row})=>[id,row])))},4*60*1000);
@@ -2038,10 +2060,22 @@ window.addEventListener('ftt:before-follow-navigation', event => {
 
 /* ---------- submission modal ---------- */
 document.getElementById('classSelect').addEventListener('change',e=>{const s=document.getElementById('studentName'),roster=ROSTERS[e.target.value];s.innerHTML=roster?'<option value="">Choose your name...</option>'+roster.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join(''):'<option value="">Choose your class first...</option>';});
-const overlay=document.getElementById('overlay');document.getElementById('openModalBtn').onclick=()=>{if(isGuestGallery){window.B3Guest.unlock('Sign in to unlock','Pinning your own project is for signed-in students. These are sample projects from made-up students.');return;}overlay.classList.add('show')};document.getElementById('closeModalBtn').onclick=()=>overlay.classList.remove('show');document.getElementById('cancelBtn').onclick=()=>overlay.classList.remove('show');overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.classList.remove('show')});
+const overlay=document.getElementById('overlay');
+function bindStudentGalleryIdentity(){
+  const classPicker=document.getElementById('classSelect'),namePicker=document.getElementById('studentName');
+  if(isTeacher){classPicker.disabled=false;namePicker.disabled=false;return true;}
+  const studentName=String(sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName')||storedPresenceName||'').trim();
+  if(!presenceStudentId||!studentName){alert('Please sign in as a student first.');return false;}
+  const className=galleryClassId==='et'?'B3 ET':galleryClassId==='wt'?'B3 WT':galleryClassId;
+  classPicker.replaceChildren(new Option(className,className,true,true));
+  namePicker.replaceChildren(new Option(studentName,studentName,true,true));
+  classPicker.disabled=true;namePicker.disabled=true;
+  return true;
+}
+document.getElementById('openModalBtn').onclick=()=>{if(isGuestGallery){window.B3Guest.unlock('Sign in to unlock','Pinning your own project is for signed-in students. These are sample projects from made-up students.');return;}if(!bindStudentGalleryIdentity())return;overlay.classList.add('show')};document.getElementById('closeModalBtn').onclick=()=>overlay.classList.remove('show');document.getElementById('cancelBtn').onclick=()=>overlay.classList.remove('show');overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.classList.remove('show')});
 document.getElementById('projectForm').addEventListener('submit',async e=>{
   e.preventDefault();const submit=document.getElementById('submitBtn'),status=document.getElementById('statusMsg');submit.disabled=true;status.textContent='Pinning...';status.style.color='#5b4632';
-  const className=document.getElementById('classSelect').value,studentName=document.getElementById('studentName').value.trim(),title=document.getElementById('title').value.trim(),category=document.getElementById('category').value,galleryRoom=document.getElementById('galleryRoom').value||'hallway',description=document.getElementById('description').value.trim(),link=document.getElementById('link').value.trim(),photo=document.getElementById('photo').files[0],audio=document.getElementById('audio').files[0],video=document.getElementById('video').files[0];
+  const className=isTeacher?document.getElementById('classSelect').value:(galleryClassId==='et'?'B3 ET':galleryClassId==='wt'?'B3 WT':galleryClassId),studentName=isTeacher?document.getElementById('studentName').value.trim():String(sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName')||storedPresenceName||'').trim(),title=document.getElementById('title').value.trim(),category=document.getElementById('category').value,galleryRoom=document.getElementById('galleryRoom').value||'hallway',description=document.getElementById('description').value.trim(),link=document.getElementById('link').value.trim(),photo=document.getElementById('photo').files[0],audio=document.getElementById('audio').files[0],video=document.getElementById('video').files[0];
   try{let image=null;if(photo)image=await resizeImage(photo,800);const newRef=dbRef.push(),id=newRef.key;let audioStoragePath=null,videoStoragePath=null;if(audio){status.textContent='Uploading audio... 0%';audioStoragePath=await uploadToStorage(audio,`classGallery/${galleryClassId}/${presenceStudentId}/${id}/audio-${audio.name}`,p=>status.textContent=`Uploading audio... ${p}%`)}if(video){status.textContent='Uploading video... 0%';videoStoragePath=await uploadToStorage(video,`classGallery/${galleryClassId}/${presenceStudentId}/${id}/video-${video.name}`,p=>status.textContent=`Uploading video... ${p}%`)}await newRef.set({studentId:presenceStudentId,workspaceId:galleryWorkspaceId,classId:galleryClassId,studentName,className,title,category,galleryRoom,description,link,image,audioUrl:null,videoUrl:null,audioStoragePath,videoStoragePath,status:'pending',createdAt:new Date().toISOString()});status.textContent='Sent to your teacher for approval!';status.style.color='#427250';setTimeout(()=>{document.getElementById('projectForm').reset();document.getElementById('studentName').innerHTML='<option value="">Choose your class first...</option>';status.textContent='';overlay.classList.remove('show');submit.disabled=false},650);}catch(err){console.error(err);status.textContent='Save failed: '+(err?.message||'unknown error');status.style.color='#b34e47';submit.disabled=false;}
 });
 
