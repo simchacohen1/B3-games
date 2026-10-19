@@ -29,27 +29,13 @@
     function activate(id){
       const launch=document.getElementById('studentBoards');
       if((id==='screens'||id==='whiteboards')&&(!launch||launch.disabled))return;
+      // Use the real gallery state machine, not repeated clicks on hidden
+      // toggles. Hiding a workspace must preserve screen capture and board data.
+      const navigate=window.ClassPointerBoards?.navigateWorkspace;
+      if(!navigate||navigate(id)!==true)return;
       document.dispatchEvent(new CustomEvent('class-pointer-workspace',{detail:id}));
       for(const [key,button] of buttons)button.setAttribute('aria-selected',String(key===id));
-      if(id==='students'){
-        const menu=document.getElementById('tbStudentsMenu');
-        if(menu?.hidden)document.getElementById('tbStudentsBtn')?.click();
-      }else if(id==='screens'||id==='whiteboards'){
-        const boards=document.getElementById('studentBoards');
-        if(boards&&!boards.disabled){
-          /* Selecting Student whiteboards also sends the selected, authorized
-             class to their own boards. The existing broadcaster enforces class
-             scope and each student's whiteboard permission. */
-          if(boards.getAttribute('aria-pressed')!=='true')boards.click();
-          const gallery=document.getElementById('boardsView');
-          const chooser=[...gallery?.querySelectorAll('button')||[]].find(b=>b.textContent.trim()===(id==='screens'?'🖥 Screens':'📝 Whiteboards'));
-          if(chooser)chooser.click();
-          if(id==='whiteboards')document.dispatchEvent(new Event('classpointer:send-to-whiteboards'));
-        }
-      }else{
-        if(launch?.getAttribute('aria-pressed')==='true')launch.click();
-        document.querySelector('.tb-mode[data-mode="point"]')?.click();
-      }
+      if(id==='teach')document.querySelector('.tb-mode[data-mode="point"]')?.click();
     }
     // Primary tabs replace the extra quick-launch buttons, not their underlying functions.
     // Keep their original DOM nodes for existing code and observers.
