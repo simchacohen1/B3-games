@@ -9,7 +9,7 @@ Integration PR: [#194](https://github.com/simchacohen1/B3-games/pull/194).
 whole class to the selected activity once and does not prevent leaving afterward.
 **Follow Locked** sends the whole class to the selected activity and redirects them back
 if they visit another gated FTT activity, until the teacher presses Unlock or
-the live session expires. The explicit destination catalog covers Shorashim, Chazara, Posuk Practice, Rashi Letters, Halacha, Sefer HaMitzvos, Yiddish, Gematria, Weekly Quiz, Game Show and Student Rewards. Synchronized quiz question steps are future work. It does not share screens, request browser permissions
+the live session expires. The explicit destination catalog covers Shorashim, Chazara, Posuk Practice, Rashi Letters, Halacha, Sefer HaMitzvos, Yiddish, Gematria, Weekly Quiz, Game Show, Student Rewards and Class Gallery. Synchronized quiz question steps are future work. It does not share screens, request browser permissions
 or perform remote control.
 
 Teacher controls: `follow-teacher/teacher.html?class=et`, linked from the
@@ -72,4 +72,4 @@ The shared gate asks the authenticated student listener for a destination-only c
 
 Chazara recording panels and failed-save recovery remain protected. Posuk Practice vetoes navigation with live recorders, captured unsaved audio, grading and saves. Halacha and Sefer HaMitzvos veto while account saves are pending or failed. Weekly Quiz holds an unsubmitted selected answer; Student Rewards holds in-flight operations. Activities may also use data-ftt-unsaved or cancel ftt:before-follow-navigation.
 
-Class Gallery is excluded pending its separate repair and verified submission protection. Teacher/admin pages, Classroom Pointer and screen-sharing windows are never teacher destinations. Their code and consent flow are unchanged. Live authenticated checks are required before calling this complete; see Issue #150.
+Class Gallery is a destination, with its open submission modal and active uploads protected by the follow-navigation veto. Its separate gallery repair and live submission verification remain outstanding. Teacher/admin pages, Classroom Pointer and screen-sharing windows are never teacher destinations. Their code and consent flow are unchanged. Live authenticated checks are required before calling this complete; see Issue #150.
