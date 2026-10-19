@@ -69,7 +69,8 @@ test('teacher can send a single class to student screen sharing while the browse
   assert.match(session,/requestScreenSharing/);
   assert.match(session,/shareRequest:\{at:firebase\.database\.ServerValue\.TIMESTAMP\}/);
   assert.match(activity,/shareRequest\?\.at/);
-  assert.match(activity,/sessionStorage\.setItem\(inviteKey,marker\)/);
+  assert.match(activity,/btn\.addEventListener\('click',beginShare\)/);
+  assert.doesNotMatch(activity,/fttShareRequestOverlay|Open Sharing Window/);
   assert.doesNotMatch(activity,/location\.assign\(new URL\(/);
   assert.match(activity,/ClassPointerBoards\?\.fromTeacher\(message\)/);
   assert.match(activity,/getDisplayMedia\(/);

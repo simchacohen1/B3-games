@@ -8,7 +8,6 @@
   // The student classroom already has its working central share control in Screens mode.
   // Do not cover it with a second floating share prompt.
   if(/\/class-pointer-prototype\/classroom\.html$/.test(location.pathname))return;
-  const loadedAt=Date.now();
   const src=document.currentScript?.src||'';
   const root=new URL('../',src);
   const persistentShareWindow=new URL(location.href).searchParams.get('pointerShare')==='1';
@@ -90,39 +89,8 @@
     if(shareArea){holder.style.position='static';holder.style.boxShadow='none';holder.style.padding='16px';shareArea.appendChild(holder)}
     else document.body.appendChild(holder);
     let active=null,peer=null,call=null,stream=null,busy=false,latestSession=null,permission={},permissionKey='',permissionRequest=0,permissionReady=false;
-    // Centered, teacher-triggered consent prompt. Browser capture remains user initiated.
-    const promptOverlay=document.createElement('div');
-    promptOverlay.id='fttShareRequestOverlay';
-    promptOverlay.style.cssText='position:fixed;inset:0;z-index:2147483639;background:rgba(8,24,49,.65);display:none;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;font-family:system-ui,sans-serif';
-    const promptPanel=document.createElement('div');
-    promptPanel.setAttribute('role','dialog');promptPanel.setAttribute('aria-modal','true');
-    promptPanel.setAttribute('aria-label','Teacher screen sharing request');
-    promptPanel.style.cssText='width:min(420px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:24px;padding:clamp(20px,4vw,42px);box-shadow:0 24px 85px #0007;text-align:center;color:#12345a;box-sizing:border-box';
-    promptPanel.innerHTML='<div style="font-size:48px" aria-hidden="true">🖥️</div><h2 style="font-size:clamp(27px,4vw,38px);margin:8px 0 12px">Your teacher would like to see your screen</h2><p style="font-size:19px;line-height:1.45">Open the sharing window to keep sharing while you visit other activities. You can stop sharing at any time.</p><p style="font-size:15px;line-height:1.5">In that window, press the blue button, select <strong>Entire Screen</strong>, then press <strong>Share</strong>.</p>';
-    const choose=document.createElement('button');choose.type='button';choose.textContent=persistentShareWindow?'Choose Entire Screen':'Open Sharing Window';
-    choose.style.cssText='display:block;width:100%;background:#205af0;color:white;border:0;border-radius:14px;padding:18px;font:bold 22px system-ui;cursor:pointer;margin-top:18px';
-    const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Not now';cancel.style.cssText='display:block;width:100%;padding:12px;margin-top:10px;background:#fff;border:1px solid #9baecb;border-radius:12px;color:#213654;font:700 16px system-ui;cursor:pointer';
-    const promptStatus=document.createElement('p');promptStatus.setAttribute('role','status');promptStatus.style.cssText='color:#ad2438;font-size:15px;margin:12px 0 0';
-    promptPanel.append(choose,cancel,promptStatus);promptOverlay.append(promptPanel);document.body.appendChild(promptOverlay);
-    const showPrompt=()=>{promptStatus.textContent='';holder.style.display='none';promptOverlay.style.display='flex';choose.focus?.()};
-    const hidePrompt=()=>{promptOverlay.style.display='none';holder.style.display=active?'flex':'none'};
-    cancel.addEventListener('click',()=>{hidePrompt();promptStatus.textContent='';});
-    function openPersistentShareWindow(){
-      const url=new URL('class-pointer-prototype/student-share-window.html?pointerShare=1',root);
-      // Keep capture alive in an ordinary tab instead of the old large popup.
-      const popup=window.open(url.href,'classPointerStudentShare');
-      if(!popup)return false;
-      status('Sharing window opened. Leave it open while you visit other activities.');
-      hidePrompt();popup.focus?.();return true;
-    }
-    // Capture remains tied to a deliberate click in the separate window. That
-    // window keeps the PeerJS call alive if this activity page is redirected.
-    choose.addEventListener('click',event=>{
-      if(!active||busy)return;
-      if(persistentShareWindow)return beginShare(event);
-      if(!openPersistentShareWindow())return beginShare(event);
-    });
-
+    // A student's click on the small Share My Screen button opens the browser picker.
+    // Teacher requests must not create a second consent dialog or sharing tab.
     // ---------- Background class connection ----------
     // While the teacher has Classroom Pointer open, a signed-in student is connected to his own class
     // from whichever Fun Torah Tools page he is on, so he shows as joined without pressing anything.
@@ -253,7 +221,6 @@
     identityTimer?.unref?.();
     window.addEventListener('pagehide',()=>{if(identityTimer)clearInterval(identityTimer)},{once:true});
 
-    const inviteKey='fttPointerShareInvite:'+ws+':'+classId;
     async function watchPermission(session){
       const request=session?.destinationRequest,at=request?.at||session?.shareRequest?.at;
       const hasRequest=(request&&['screens','boards'].includes(request.mode))||(session?.studentScreenSharing===true&&Number.isFinite(at));
@@ -286,33 +253,6 @@
       }
       refreshSessionState();
     }
-    function routeTeacherRequest(session){
-      if(!permissionReady)return;
-      // Teacher directs only this student's verified class; reject stale requests.
-      const request=session?.destinationRequest;
-      const supported=request&&['screens','boards'].includes(request.mode);
-      const at=supported?request.at:session?.shareRequest?.at;
-      if(!Number.isFinite(at)||(!supported&&at<loadedAt-6000)||at>Date.now()+60000||Date.now()-at>45000)return;
-      // Per-student exclusions belong to the active authenticated class.
-      if(supported&&request.mode==='boards'&&permission?.whiteboardDenied===true)return;
-      if((!supported||request.mode==='screens')&&permission?.screenSharingDenied===true)return;
-      // Don't consume a request while student screen-sharing permission is disabled.
-      // Board requests are handled on this page over the verified presence connection.
-      if((!supported||request.mode==='screens')&&(!active||active.roomId!==session.roomId))return;
-      const marker=session.roomId+':'+at+':'+String(session.permissionRevision||'')+':'+(supported?request.mode:'screens');
-      // An active Shorashim screen share must not block a teacher's whiteboard redirect.
-      // Screen-sharing requests still keep their existing consent/active-stream guard.
-      if(stream&&(!supported||request.mode!=='boards'))return;
-      try{
-        if(sessionStorage.getItem(inviteKey)===marker)return;
-        sessionStorage.setItem(inviteKey,marker);
-      }catch{return}
-      // Both features stay on this learning activity. Embedded whiteboards
-      // are driven by authenticated board-mode messages, not redirects.
-      if(supported&&request.mode==='boards')return;
-      // Keep the large consent window for teacher screen-sharing requests.
-      showPrompt();
-    }
     function stop(){
       const prior=stream;stream=null;try{call?.close()}catch{}call=null;
       try{peer?.destroy()}catch{}peer=null;
@@ -320,17 +260,14 @@
       btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';
       label.textContent='';
       fallback.hidden=true;
-      hidePrompt();
     }
     function status(text){label.textContent=text}
     function refreshSessionState(){
       const next=latestSession;
-      if(!permissionReady){if(stream)stop();active=null;holder.style.display='none';hidePrompt();return}
+      if(!permissionReady){if(stream)stop();active=null;holder.style.display='none';return}
       const shareable=next?.studentScreenSharing===true&&permission?.screenSharingDenied!==true?next:null;
       if(!shareable||!active||shareable.roomId!==active.roomId){if(stream)stop()}
       active=shareable;holder.style.display=active?'flex':'none';
-      if(!active)hidePrompt();
-      if(next)routeTeacherRequest(next);
     }
     function current(rows){
       return Object.entries(rows||{}).filter(([key,v])=>v&&v.roomId===key&&/^class-pointer-[a-f0-9-]{36}$/.test(key)
@@ -341,7 +278,7 @@
       // Student switching must never reuse another boy's classroom invitation.
       if(sessionStorage.getItem('b3Games_studentId')!==id){
         if(stream)stop();
-        latestSession=null;active=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;holder.style.display='none';hidePrompt();
+        latestSession=null;active=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;holder.style.display='none';
         followSession(null);
         return;
       }
@@ -354,7 +291,7 @@
       if(stream){stop();return}
       if(busy||!active)return;
       const lesson=active;
-      busy=true;btn.disabled=true;choose.disabled=true;
+      busy=true;btn.disabled=true;
       let captured=null;
       try{
         if(!navigator.mediaDevices?.getDisplayMedia)throw Error('Use Chrome or Edge on a computer.');
@@ -407,20 +344,17 @@
         media.on('close',stop);media.on('error',stop);
         btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';
         status('Sharing your screen with the teacher');
-        hidePrompt();
       }catch(error){
-        promptStatus.textContent=error?.name==='NotAllowedError'?'Sharing canceled. Please try again.':(error.message||'Could not share. Please try again.');
         captured?.getTracks().forEach(t=>t.stop());
         // A failure must release media/peer resources without erasing the error or reopening a blocking dialog.
         stop();
         const networkFailure=error?.code==='ACTIVITY_SHARE_NETWORK';
         status(error?.name==='NotAllowedError'?'Sharing canceled.':error.message||'Could not share.');
         if(networkFailure)fallback.hidden=false;
-        hidePrompt();
         // The teacher has turned this student off: hide the button until the teacher changes it.
         if(error?.code==='ACTIVITY_SHARE_DENIED'){permission={...permission,screenSharingDenied:true};refreshSessionState()}
       }
-      finally{busy=false;btn.disabled=false;choose.disabled=false}
+      finally{busy=false;btn.disabled=false}
     }
     btn.addEventListener('click',beginShare);
     window.addEventListener('pagehide',stop);

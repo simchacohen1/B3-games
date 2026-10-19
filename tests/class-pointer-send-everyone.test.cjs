@@ -142,9 +142,9 @@ test('screen and whiteboard checkboxes are independent; rechecking restores rout
   assert.equal(s.destination,null);
   await s.emit({[room]:session},{});
   assert.equal(s.destination,null,'screen requests stay in the learning activity');
-  assert.equal(s.holder.style.display,'none','centered consent temporarily replaces the floating control');
-  assert.equal(s.overlay.style.display,'flex','rechecking restores the centered consent prompt');
-  assert.match(s.overlay.children[0].innerHTML,/Your teacher would like to see your screen/);
+  assert.equal(s.holder.style.display,'flex','rechecking exposes the small Share My Screen button');
+  assert.equal(s.overlay,undefined,'no second consent dialog is created');
+  assert.equal(s.holder.children[0].textContent,'🖥 Share My Screen');
   assert.equal(s.holder.children[0].disabled,undefined,'capture remains student-controlled');
   const w=await studentFixture();
   await w.emit({[room]:{...session,destinationRequest:{mode:'boards',at:now},studentScreenSharing:false}},

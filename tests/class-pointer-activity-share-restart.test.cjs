@@ -8,7 +8,7 @@ const read=name=>fs.readFileSync(path.join(__dirname,'..',name),'utf8');
 const room='class-pointer-12345678-1234-1234-1234-123456789abc';
 
 async function activityFixture({capture,persistent=false,sessionStorageValues:initialStorage,openWindow=()=>null,validTicket=false}={}){
-  let listener,policy={},holder,overlay,navigation=null,captureCount=0,stopCount=0,requests=0;
+  let listener,policy={},holder,navigation=null,captureCount=0,stopCount=0,requests=0;
   const sessionStorageValues=initialStorage||new Map([['b3Games_studentId','test-boy'],['b3Games_classPin','test-pin']]);
   const sessionStorage={
     getItem:k=>sessionStorageValues.get(k)||null,
@@ -24,7 +24,7 @@ async function activityFixture({capture,persistent=false,sessionStorageValues:in
     currentScript:{src:'https://funtorahtools.com/class-pointer-prototype/activity-share.js'},
     createElement:element,
     head:{appendChild(){}},
-    body:{appendChild(node){if(node.id==='fttActivityScreenShare')holder=node;if(node.id==='fttShareRequestOverlay')overlay=node}}
+    body:{appendChild(node){if(node.id==='fttActivityScreenShare')holder=node}}
   };
   const db={ref:path=>({on:(_event,cb)=>{if(path.includes('/classPointerSessions'))listener=cb},off(){}})};
   const firebase={apps:[{}],database:()=>db};
@@ -66,7 +66,6 @@ async function activityFixture({capture,persistent=false,sessionStorageValues:in
   assert.ok(listener,'authenticated session should subscribe to teacher requests');
   assert.ok(holder,'activity sharing invitation must exist');
   const [shareButton,label,fallback]=holder.children;
-  const [choose,cancel]=overlay.children[0].children;
   const emit=async(mode,denied={})=>{
     const now=Date.now();
     policy={screenSharingDenied:denied.screens?.['test-boy']===true,whiteboardDenied:denied.boards?.['test-boy']===true};
@@ -76,7 +75,7 @@ async function activityFixture({capture,persistent=false,sessionStorageValues:in
     }})});
   };
   return {
-    emit,shareButton,label,fallback,overlay,choose,cancel,
+    emit,shareButton,label,fallback,
     get navigation(){return navigation},
     get captureCount(){return captureCount},
     get stopCount(){return stopCount},
@@ -86,42 +85,39 @@ async function activityFixture({capture,persistent=false,sessionStorageValues:in
   };
 }
 
-test('screen request stays on activity, with explicit browser permission and same-class fallback',async()=>{
+test('screen request shows only the existing Share My Screen button and requires a student click',async()=>{
   const a=await activityFixture();
   await a.emit('screens');
   assert.equal(a.navigation,null);
-  assert.equal(a.overlay.style.display,'flex','teacher request opens centered consent');
+  assert.equal(a.shareButton.textContent,'🖥 Share My Screen');
+  assert.equal(a.captureCount,0,'teacher cannot start browser capture without a student click');
   assert.equal(a.fallback.hidden,true);
-  await a.choose.listeners.click();
+  await a.emit('screens'); // Repeated teacher selection must not require dismissing a new modal.
+  assert.equal(a.captureCount,0);
+  await a.shareButton.listeners.click();
   assert.equal(a.captureCount,1);
   assert.equal(a.requests,1);
-  assert.equal(a.stopCount,1); // permission granted but capture is stopped after network failure
+  assert.equal(a.stopCount,1); // capture stopped when the backend is unavailable
   assert.match(a.label.textContent,/service unavailable/);
   assert.equal(a.fallback.hidden,false);
   assert.equal(a.fallback.textContent,'Try again');
   assert.equal(a.navigation,null,'the retired student Pointer page must never open');
 });
-test('screen sharing continues in the persistent window when the activity page navigates away',async()=>{
-  const popup={closed:false,focus(){}};
-  let openedUrl='';
-  const parent=await activityFixture({openWindow:(url)=>{openedUrl=url;return popup}});
-  await parent.emit('screens');
-  await parent.choose.listeners.click();
-  assert.match(openedUrl,/student-share-window\.html\?pointerShare=1/);
-  assert.equal(parent.captureCount,0,'the activity page leaves capture to the persistent window');
-  const copied=new Map(parent.sessionStorageValues);
-  for(const key of copied.keys())if(key.startsWith('fttPointerShareInvite:'))copied.delete(key);
-  const child=await activityFixture({persistent:true,sessionStorageValues:copied,validTicket:true});
-  await child.emit('screens');
-  assert.equal(child.overlay.style.display,'flex','the separate window re-prompts for explicit approval');
-  await child.choose.listeners.click();
-  assert.equal(child.captureCount,1);
-  assert.equal(child.peerCalls.length,1);
-  assert.equal(child.peerCalls[0].target,room);
-  assert.equal(child.peerCalls[0].options.metadata.token,'synthetic-ticket');
-  parent.pagehide();
-  assert.equal(child.stopCount,0,'unloading the activity page does not stop the capture window');
-  assert.equal(child.peerClosed,false,'the teacher call remains connected');
+
+test('student shares directly in the activity without opening a separate tab',async()=>{
+  let opened=0;
+  const a=await activityFixture({validTicket:true,openWindow:()=>{opened++;return{closed:false}}});
+  await a.emit('screens');
+  await a.shareButton.listeners.click();
+  assert.equal(opened,0,'the extra sharing tab must not open');
+  assert.equal(a.captureCount,1);
+  assert.equal(a.peerCalls.length,1);
+  assert.equal(a.peerCalls[0].target,room);
+  assert.equal(a.peerCalls[0].options.metadata.token,'synthetic-ticket');
+  assert.equal(a.shareButton.textContent,'⏹ Stop Sharing');
+  a.pagehide();
+  assert.equal(a.stopCount,1,'leaving the activity stops this page capture');
+  assert.equal(a.peerClosed,true);
 });
 test('whiteboard request stays on the learning activity for embedded delivery',async()=>{
   const a=await activityFixture();

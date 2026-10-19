@@ -3,7 +3,7 @@ const {test,expect}=require('@playwright/test');
 const path=require('node:path');
 const fs=require('node:fs');
 
-test('synthetic screen sharing falls back safely when the persistent window popup is blocked, then stops and restarts',async({page,browserName})=>{
+test('student shares directly from small activity button without an extra popup, and can stop and restart',async({page,browserName})=>{
   test.skip(browserName!=='chromium','Synthetic canvas capture video dimensions are only asserted in Chromium');
   await page.route('https://share.test/**',route=>{
     const url=new URL(route.request().url());
@@ -22,9 +22,8 @@ test('synthetic screen sharing falls back safely when the persistent window popu
     window.firebase={apps:[{}],database(){return {ref(path){return {on(_event,callback){window.__sessionCallback=callback;window.__sessionPath=path}}}}},auth(){return {currentUser:{getIdToken:async()=> 'teacher-id-token'}}}};
     window.B3_FIREBASE_CONFIG={};
     window.FunTorahStudentClass={resolve:async()=>({workspaceId:'b3-2026',classId:'et'})};
-    // Browsers may block an unrequested popup. The app must keep the student's
-    // explicit consent and offer the same picker from the current page.
-    window.open=()=>null;
+    // The activity must not open a second tab or popup to ask for sharing.
+    window.__openCount=0;window.open=()=>{window.__openCount++;return null};
     window.fetch=async(url,options)=>{
       const body=options?.body?JSON.parse(options.body):{};
       if(String(url).includes('funTorahStudentAuth'))return {ok:true,status:200,json:async()=>({ok:true})};
@@ -79,8 +78,9 @@ test('synthetic screen sharing falls back safely when the persistent window popu
     await page.evaluate(at=>window.__sessionCallback({val:()=>({[window.__room]:{
       roomId:window.__room,createdAt:Date.now(),teacherUid:'teacher-et',studentScreenSharing:true,shareRequest:{at}
     }})}),requestAt);
-    await expect(page.getByRole('dialog',{name:'Teacher screen sharing request'})).toBeVisible();
-    await page.getByRole('button',{name:'Open Sharing Window'}).click();
+    await expect(page.getByRole('dialog',{name:'Teacher screen sharing request'})).toHaveCount(0);
+    await expect(page.locator('#fttActivityScreenShare')).toBeVisible();
+    await page.getByRole('button',{name:'🖥 Share My Screen'}).click();
     await expect.poll(()=>page.evaluate(()=>window.__calls.at(-1)?.answered===true)).toBe(true);
     await expect.poll(()=>page.evaluate(()=>document.querySelector('#activityScreenTray video')?.videoWidth||0)).toBe(320);
     const initialFrame=await page.locator('#activityScreenTray video').evaluate(video=>{
@@ -104,8 +104,8 @@ test('synthetic screen sharing falls back safely when the persistent window popu
   await page.evaluate(at=>window.__sessionCallback({val:()=>({[window.__room]:{
     roomId:window.__room,createdAt:Date.now(),teacherUid:'teacher-et',studentScreenSharing:true,shareRequest:{at}
   }})}),finalRequestAt);
-  await expect(page.getByRole('dialog',{name:'Teacher screen sharing request'})).toBeVisible();
-  await page.getByRole('button',{name:'Open Sharing Window'}).click();
+  await expect(page.getByRole('dialog',{name:'Teacher screen sharing request'})).toHaveCount(0);
+  await page.getByRole('button',{name:'🖥 Share My Screen'}).click();
   await expect.poll(()=>page.evaluate(()=>window.__calls.at(-1)?.answered===true)).toBe(true);
   await expect.poll(()=>page.evaluate(()=>document.querySelector('#activityScreenTray video')?.videoWidth||0)).toBe(320);
   await page.evaluate(()=>window.ClassPointerActivityShares.closeAll());
@@ -120,6 +120,7 @@ test('synthetic screen sharing falls back safely when the persistent window popu
     activeCalls:window.__calls.filter(call=>!call.closed).length
   }));
   expect(result.issued).toBe(4);
+  expect(await page.evaluate(()=>window.__openCount)).toBe(0);
   expect(result.activeCalls).toBe(0);
   expect(result.permissionCheck).toEqual({action:'permissions',studentId:'arik',pin:'123456',classId:'et',room:'class-pointer-12345678-1234-1234-1234-123456789abc'});
   expect(result.verified).toHaveLength(4);

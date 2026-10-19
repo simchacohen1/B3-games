@@ -84,7 +84,8 @@ test('Shorashim screen capture reaches the authenticated teacher receiver and re
   await sessionListener({val:()=>({[room]:{roomId:room,createdAt:now,teacherUid:'teacher-et',studentScreenSharing:true,shareRequest:{at:now}}})});
   const holder=studentDocument.body.children.find(node=>node.id==='fttActivityScreenShare');
   const overlay=studentDocument.body.children.find(node=>node.id==='fttShareRequestOverlay');
-  assert.equal(overlay.style.display,'flex','the student receives the request while remaining on Shorashim');
+  assert.equal(overlay,undefined,'the old full-page share request is absent');
+  assert.equal(holder.style.display,'flex','the small Share My Screen button appears on Shorashim');
   await holder.children[0].listeners.click();
   await waitFor(()=>answered,'teacher did not answer the authenticated PeerJS media call; student status: '+holder.children[1].textContent+'; authorization: '+JSON.stringify(verified));
   await waitFor(()=>{
