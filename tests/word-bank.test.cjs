@@ -53,6 +53,15 @@ test('mastery is tracked separately from collection and practice', () => {
   assert.equal(api.list()[0].mastered,true);
 });
 
+test('word bank waits for Firebase to restore the signed-in student before syncing', async () => {
+  const {context,api}=loadBrowserCore();
+  context.setTimeout=(fn,ms)=>setTimeout(fn,ms);
+  context.clearTimeout=id=>clearTimeout(id);
+  const user={getIdTokenResult:async()=>({claims:{b3StudentId:'student-a',b3ClassId:'et'}})};
+  context.firebase={apps:[{auth:()=>({currentUser:null,onAuthStateChanged:callback=>{setTimeout(()=>callback(user),5);return ()=>{}}})}]};
+  assert.equal(await api.authFor(),user);
+});
+
 test('all 613 Maimonides P/N entries have three mitzvah-scoped matching words', () => {
   const context=vm.createContext({window:{}});context.window=context;
   vm.runInContext(fs.readFileSync(path.join(root,'word-bank/mitzvah-titles.js'),'utf8'),context);
