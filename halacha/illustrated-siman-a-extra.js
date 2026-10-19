@@ -13,7 +13,7 @@ const data={
 };
 const photos='art/seifim/';
 const stickers='art/stickers/';
-const cache='?v=20261019-short-peyos4';
+const cache='?v=20261019-two-fixed-pictures5';
 const esc=s=>String(s).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const readonly=()=>typeof HALACHA_TEACHER_VIEW!=='undefined'&&!!HALACHA_TEACHER_VIEW;
 const make=(tag,klass,text)=>{const e=document.createElement(tag);e.className=klass||'';if(text!==undefined)e.textContent=text;return e;};
