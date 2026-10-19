@@ -249,7 +249,13 @@ function preserveRecording(blob,key,error,writeStarted){
   const note=document.createElement('p');note.textContent=(error?.code==='storage/unauthorized'?'Audio upload permission was denied. ':error?.message||'The recording could not be saved.')+(writeStarted?' Check your recordings and count before recording this Posuk again; part of the save may have reached the server.':' Your audio is still available below.');
   const link=document.createElement('a'),url=URL.createObjectURL(blob);link.href=url;link.download='chazara_'+key+'.'+extFor(blob.type);link.textContent='Download this recording';
   const audio=document.createElement('audio');audio.controls=true;audio.src=url;audio.style.display='block';
-  box.append(title,note,audio,link);$('grid').parentElement.insertBefore(box,$('grid'));
+  // Keep the recovery copy in place while Follow Teacher is asking this student to move.
+  // The audio exists only as a page-local blob until the student downloads it.
+  box.setAttribute('data-ftt-unsaved','true');
+  const acknowledged=document.createElement('button');acknowledged.type='button';
+  acknowledged.textContent='I downloaded my recording — allow teacher navigation';
+  acknowledged.onclick=()=>{box.removeAttribute('data-ftt-unsaved');acknowledged.disabled=true;acknowledged.textContent='Recording saved — ready to continue';};
+  box.append(title,note,audio,link,acknowledged);$('grid').parentElement.insertBefore(box,$('grid'));
 }
 async function finishRecording(st){
   const durationMs=Math.round(performance.now()-st.start);stopMediaTracks(st);
