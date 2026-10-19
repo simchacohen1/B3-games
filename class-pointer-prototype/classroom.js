@@ -322,7 +322,7 @@ async function startClass(){
     // This uses the existing classroom document viewer, not the student-board broadcast.
     if(new URL(location.href).searchParams.get('followTeacherWhiteboard')==='1') {
       const whiteboard=$('openWhiteboard');
-      if(whiteboard && !whiteboard.disabled) whiteboard.click();
+      if(whiteboard) { whiteboard.disabled=false; whiteboard.click(); }
     }
     if(new URL(location.href).searchParams.get('sendEveryoneShare')==='1')void requestEveryoneToShare();
     if(new URL(location.href).searchParams.get('sendEveryoneBoards')==='1')document.dispatchEvent(new Event('classpointer:send-to-whiteboards'));
