@@ -6,7 +6,7 @@ const vm=require('node:vm');
 
 const app=fs.readFileSync('shorashim/app.js','utf8');
 const html=fs.readFileSync('shorashim/index.html','utf8');
-const fn=name=>{const line=app.split('\\n').find(x=>x.startsWith('function '+name+'('));assert.ok(line,name+' exists');return line;};
+const fn=name=>{const line=app.split(/\r?\n/).find(x=>x.startsWith('function '+name+'('));assert.ok(line,name+' exists');return line;};
 
 test('unlearned later roots and affixes are selectable without prior cards',()=>{
   const catalog={shorashim:[{id:'first',front:'ראשון'},{id:'later',front:'אחרון'},{id:'hidden',hidden:true}],prefix:[{id:'p1'},{id:'p2'}]};
@@ -30,8 +30,8 @@ test('word list does not label or disable future available words',()=>{
   vm.runInContext(fn('renderWordList'),ctx);
   ctx.renderWordList();
   assert.equal(nodes.wordList.children.length,2);
-  for(const btn of nodes.wordList.children){assert.equal(btn.disabled,true===false);assert.match(btn.innerHTML,/Choose • Learn/);assert.doesNotMatch(btn.className,/locked/);}
+  for(const btn of nodes.wordList.children){assert.notEqual(btn.disabled,true);assert.match(btn.innerHTML,/Choose • Learn/);assert.doesNotMatch(btn.className,/locked/);}
   assert.match(html,/Choose any word in any order/);
   assert.doesNotMatch(html,/New items unlock strictly in order/);
-  assert.match(html,/app\\.js\\?v=20261019-free-choice/);
+  assert.match(html,/app\.js\?v=20261019-free-choice/);
 });
