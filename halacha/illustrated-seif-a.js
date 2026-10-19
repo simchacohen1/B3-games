@@ -30,7 +30,7 @@
   }
   function image(file, alt, cls) {
     var im = node('img', cls || '');
-    im.src = file + '?v=20261018-art2';
+    im.src = file + '?v=20261019-chabad1';
     im.alt = alt;
     im.loading = 'lazy';
     im.decoding = 'async';
@@ -38,6 +38,31 @@
   }
   function isReadonly() {
     return typeof HALACHA_TEACHER_VIEW !== 'undefined' && !!HALACHA_TEACHER_VIEW;
+  }
+  function sayAdded(label) {
+    var status = document.querySelector('.hal-art-status');
+    if (status) status.textContent = 'Added ' + label + ' to your scrapbook ✓';
+  }
+  function addPicture(file, label) {
+    if (isReadonly() || typeof window.add !== 'function') return;
+    var markup = '<img src="' + file + '?v=20261019-chabad1" alt="' + htmlEscape(label) + '">';
+    var piece = window.add('a', 'photo', markup, 0);
+    if (piece) {
+      piece.classList.add('hal-illustrated-piece', 'studio-sticker');
+      piece.style.width = '175px';
+      if (typeof window.persist === 'function') window.persist('a');
+      sayAdded(label + ' picture');
+    }
+  }
+  function addWords(words) {
+    if (isReadonly() || typeof window.add !== 'function') return;
+    var piece = window.add('a', 'textbox', '<div class="tb-text" contenteditable="true">' + htmlEscape(words) + '</div>', 0);
+    if (piece) {
+      piece.classList.add('hal-lesson-text-piece');
+      piece.style.width = '260px';
+      if (typeof window.persist === 'function') window.persist('a');
+      sayAdded('words');
+    }
   }
   function installArt() {
     var section = document.getElementById('a');
@@ -58,15 +83,44 @@
       info.appendChild(node('strong', '', item.title));
       info.appendChild(node('span', '', item.caption));
       card.appendChild(info);
+      var actions = node('div', 'hal-story-actions');
+      var useImage = node('button', 'hal-story-use', '＋ Picture');
+      useImage.type = 'button';
+      useImage.disabled = isReadonly();
+      useImage.setAttribute('aria-label', 'Add ' + item.title + ' picture to scrapbook');
+      useImage.addEventListener('click', function () { addPicture(SCENE_BASE + item.file + '.jpg', item.title); });
+      var useWords = node('button', 'hal-story-use', '＋ Words');
+      useWords.type = 'button';
+      useWords.disabled = isReadonly();
+      useWords.setAttribute('aria-label', 'Add ' + item.caption + ' to scrapbook');
+      useWords.addEventListener('click', function () { addWords(item.caption); });
+      actions.append(useImage, useWords);
+      card.appendChild(actions);
       grid.appendChild(card);
     });
     gallery.appendChild(grid);
     galleryHost.insertBefore(gallery, galleryHost.firstChild);
+    var status = node('p', 'hal-art-status');
+    status.setAttribute('role','status');
+    status.setAttribute('aria-live','polite');
+    gallery.appendChild(status);
     // Maintain the existing correct/incorrect choice controls and their feedback.
     var choices = galleryHost.querySelectorAll('.hal-a-choice .hal-a-scene-art');
     if (choices.length >= 2) {
       choices[0].replaceChildren(image(SCENE_BASE + 'helping.jpg', 'A boy helping carefully at home'));
       choices[1].replaceChildren(image(SCENE_BASE + 'messy.jpg', 'A boy leaving toys scattered'));
+      var qHolder = galleryHost.querySelector('.hal-a-quiz-details');
+      if (qHolder) {
+        var pictureRow = node('div', 'hal-story-actions');
+        [['helping','Picture 1'], ['messy','Picture 2']].forEach(function (pair) {
+          var button = node('button', 'hal-story-use', '＋ Use ' + pair[1] + ' in scrapbook');
+          button.type = 'button';
+          button.disabled = isReadonly();
+          button.addEventListener('click', function () { addPicture(SCENE_BASE + pair[0] + '.jpg', pair[1]); });
+          pictureRow.appendChild(button);
+        });
+        qHolder.appendChild(pictureRow);
+      }
     }
     var shelf = node('section', 'hal-sticker-shelf');
     shelf.setAttribute('aria-label', 'Illustrated scrapbook stickers');
@@ -83,7 +137,7 @@
       b.setAttribute('aria-label', 'Add ' + label + ' sticker to scrapbook');
       b.addEventListener('click', function () {
         if (isReadonly() || typeof window.add !== 'function') return;
-        var tag = '<img alt="' + htmlEscape(label) + '" src="' + file + '?v=20261018-art2">';
+        var tag = '<img alt="' + htmlEscape(label) + '" src="' + file + '?v=20261019-chabad1">';
         var piece = window.add('a', 'photo', tag, 0);
         if (piece) {
           piece.classList.add('studio-sticker', 'clear', 'hal-illustrated-piece');

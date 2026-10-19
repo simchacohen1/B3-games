@@ -47,42 +47,64 @@
       window.add(ROOT_ID, 'textbox', `<div class="tb-text" contenteditable="true" data-ph="Edit your title">${escapeText(title)}</div>`);
     }
   }
+  function addScrapbookText(value, rightToLeft) {
+    if (typeof HALACHA_TEACHER_VIEW !== 'undefined' && HALACHA_TEACHER_VIEW) return;
+    if (typeof window.add !== 'function') return;
+    const phrase = escapeText(String(value || '').trim());
+    if (!phrase) return;
+    const rtl = rightToLeft ? ' dir="rtl" lang="he"' : '';
+    const e = window.add(ROOT_ID, 'textbox', '<div class="tb-text" contenteditable="true"'+rtl+'>'+phrase+'</div>');
+    if (e) {
+      e.classList.add('hal-lesson-text-piece');
+      e.style.width = '280px';
+      if (typeof window.persist === 'function') window.persist(ROOT_ID);
+    }
+  }
   function start() {
     const section = document.getElementById(ROOT_ID);
     if (!section || section.querySelector('.hal-a-panel')) return;
     if (!document.querySelector('link[data-hal-a-style]')) {
       const stylesheet = document.createElement('link');
       stylesheet.rel = 'stylesheet';
-      stylesheet.href = 'seif-a-teacher-led.css?v=20261018-2';
+      stylesheet.href = 'seif-a-teacher-led.css?v=20261019-compact1';
       stylesheet.dataset.halAStyle = 'true';
       document.head.appendChild(stylesheet);
     }
     const panel = make('section', 'hal-a-panel');
     panel.setAttribute('aria-label', 'Learn Siman Aleph Seif Aleph with your teacher');
     const heading = make('div', 'hal-a-heading');
-    const title = make('h2', '', 'סִימָן א׳ · סְעִיף א׳ — Learn Together');
-    const hide = button('Hide Activity · Make room for my scrapbook', () => {
+    const title = make('h2', '', 'סִימָן א׳ · סְעִיף א׳');
+    const hide = button('Hide lesson', () => {
       const collapsed = panel.classList.toggle('hal-a-collapsed');
-      hide.textContent = collapsed ? 'Show / Review Activity' : 'Hide Activity · Make room for my scrapbook';
+      hide.textContent = collapsed ? 'Show lesson' : 'Hide Activity · Make room for my scrapbook';
       hide.setAttribute('aria-expanded', String(!collapsed));
       try { sessionStorage.setItem('halacha-learning-hidden:a:' + (document.body.classList.contains('teacherMode') ? 'teacher' : 'student'), String(collapsed)); } catch (_) {}
     });
     hide.setAttribute('aria-expanded', 'true');
-    heading.append(title, hide);
+    const jumps = make('nav', 'hal-a-jumps');
+    jumps.setAttribute('aria-label', 'Jump to Halacha section');
+    jumps.append(
+      button('🖼 Pictures', () => section.querySelector('.hal-story-gallery, .hal-a-scenarios')?.scrollIntoView({behavior:'smooth',block:'start'})),
+      button('🎨 Scrapbook', () => section.querySelector('.work')?.scrollIntoView({behavior:'smooth',block:'start'}))
+    );
+    heading.append(title, jumps, hide);
     panel.appendChild(heading);
 
     const body = make('div', 'hal-a-body');
     const source = make('div', 'hal-a-source');
     const reading = document.createElement('details');
     reading.className = 'hal-a-reading';
-    reading.open = true;
-    const readingTitle = make('summary', '', 'Read the complete seif with your teacher');
+    reading.open = false;
+    const readingTitle = make('summary', '', '📖 Full Kitzur text — click to read');
     const fullText = make('p', 'hal-a-full-text', sourceText);
     fullText.lang = 'he';
     fullText.dir = 'rtl';
     reading.append(readingTitle, fullText);
+    source.appendChild(make('p', 'hal-a-short-intro', 'Remembering Hashem helps us speak and behave carefully — at home, outside and when alone.'));
     source.appendChild(reading);
-
+    const useThought = button('＋ Put this idea in my scrapbook', () => addScrapbookText('Remembering Hashem helps me act with care wherever I am.'));
+    useThought.classList.add('hal-a-add-text');
+    source.appendChild(useThought);
     source.append(make('h3', '', 'Important phrases — tap a word to see its meaning'));
     const phraseList = make('div', 'hal-a-phrase-list');
     for (const phrase of phrases) {
@@ -105,6 +127,9 @@
         words.appendChild(chip);
       }
       details.appendChild(words);
+      const savePhrase = button('＋ Add this phrase to my scrapbook', () => addScrapbookText(phrase.he, true));
+      savePhrase.classList.add('hal-a-add-text');
+      details.appendChild(savePhrase);
       phraseList.appendChild(details);
     }
     source.appendChild(phraseList);
@@ -114,7 +139,9 @@
     quiz.setAttribute('aria-labelledby', 'hal-a-question-title');
     const qTitle = make('h3', '', 'Which picture shows the lesson?');
     qTitle.id = 'hal-a-question-title';
-    quiz.append(qTitle, make('p', 'hal-a-note', 'We try to act thoughtfully at home and at school, even when we are alone.'));
+    const quizBody = make('details', 'hal-a-quiz-details');
+    quizBody.appendChild(make('summary', '', '❓ Try a picture question'));
+    quizBody.append(qTitle, make('p', 'hal-a-note', 'We try to act thoughtfully at home and at school, even when we are alone.'));
     const feedback = make('p', 'hal-a-feedback', '');
     feedback.setAttribute('role', 'status');
     feedback.setAttribute('aria-live', 'polite');
@@ -136,11 +163,12 @@
       choice.append(art, make('span', 'hal-a-choice-label', `Picture ${index + 1}`));
       choices.appendChild(choice);
     });
-    quiz.append(choices, feedback);
+    quizBody.append(choices, feedback);
+    quiz.appendChild(quizBody);
     body.appendChild(quiz);
 
-    const prompt = make('section', 'hal-a-prompts');
-    prompt.append(make('h3', '', 'Choose a scrapbook title'));
+    const prompt = make('details', 'hal-a-prompts');
+    prompt.appendChild(make('summary', '', '✏️ Add a title to my scrapbook'));
     prompt.append(make('p', 'hal-a-note', 'Pick a title and edit it on your page, or write your own. Your artwork stays yours to create.'));
     const menu = make('div', 'hal-a-prompt-grid');
     ideas.forEach(idea => menu.appendChild(button(idea, () => addTitle(idea))));

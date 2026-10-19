@@ -73,3 +73,35 @@ main:has(.section.on .hal-a-panel.hal-a-collapsed){max-width:1600px}
 .section#a .hal-a-panel.hal-a-collapsed{background:#edf5ff;border:1px solid #b5d9f5;padding:10px 14px}
 @media(max-width:800px){.section#a .hal-a-source{padding:12px}.section#a .hal-a-choices{grid-template-columns:repeat(2,minmax(0,1fr))}.section#a .work{padding:7px}}
 @media(max-width:520px){.section#a .hal-a-choices{grid-template-columns:1fr}}
+
+/* Compact teacher-led lesson: keep the workspace visible without hiding actual content. */
+.section#a .hal-a-panel{margin:3px 0 8px}
+.section#a .hal-a-heading{position:sticky;top:0;z-index:28;display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;background:#f9fcfffa;border:1px solid #d7e8f6;border-radius:11px;box-shadow:0 2px 8px #2447650f}
+.section#a .hal-a-heading h2{font-size:clamp(17px,1.8vw,23px);margin:0;line-height:1.25}
+.section#a .hal-a-heading>.hal-a-btn{font-size:13px;padding:7px 10px;border-radius:9px;min-width:0}
+.section#a .hal-a-jumps{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.section#a .hal-a-jumps .hal-a-btn{font-size:13px;padding:7px 10px;white-space:nowrap}
+.section#a .hal-a-source{padding:10px 12px}
+.section#a .hal-a-source:before{font-size:17px;margin:0 0 6px}
+.section#a .hal-a-short-intro{margin:0 0 6px;color:#263e58;line-height:1.4;font-size:15px}
+.section#a .hal-a-reading{margin:5px 0 7px}
+.section#a .hal-a-reading>summary{font-size:15px;padding:9px 12px}
+.section#a .hal-a-full-text{font-size:23px;line-height:1.75;padding:12px 16px}
+.section#a .hal-a-add-text{padding:6px 9px;font-size:12px;background:#eef8ff;border:1px solid #b9d7f0;color:#20516f;border-radius:8px}
+.section#a .hal-a-source>h3{font-size:17px;padding:8px 11px;margin:9px 0 0}
+.section#a .hal-a-phrase-list{padding:8px;gap:8px}
+.section#a .hal-a-phrase{padding:0 9px 8px}
+.section#a .hal-a-phrase>summary{font-size:19px;padding:7px 0;line-height:1.5}
+.section#a .hal-a-words .hal-a-btn{font-size:14px;padding:6px 8px}
+.section#a .hal-a-scenarios{padding:10px 12px;margin-top:8px}
+.section#a .hal-a-quiz-details{margin-top:7px;border-top:1px solid #c3decf;padding:8px 0 0}
+.section#a .hal-a-quiz-details>summary,.section#a .hal-a-prompts>summary{cursor:pointer;font-size:15px;font-weight:850;color:#194a68;padding:6px;list-style-position:inside}
+.section#a .hal-a-quiz-details h3{font-size:17px;margin:9px 0 5px}
+.section#a .hal-a-prompts{margin-top:8px;padding:9px 12px}
+.section#a .hal-a-prompts>summary{color:#63466d}
+.section#a .hal-a-prompts .hal-a-prompt-grid{margin-top:8px}
+.section#a .hal-a-prompts .hal-a-btn{font-size:13px;padding:7px 9px}
+.section#a .hal-a-collapsed .hal-a-heading{padding:4px 8px}
+.section#a .work{scroll-margin-top:75px}
+.section#a .hal-story-gallery{scroll-margin-top:75px}
+@media(max-width:670px){.section#a .hal-a-heading{position:relative}.section#a .hal-a-jumps{margin-left:0}.section#a .hal-a-heading h2{width:100%}.section#a .hal-a-jumps .hal-a-btn{padding:6px 8px}}
