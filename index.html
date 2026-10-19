@@ -400,6 +400,8 @@ body > .subtitle::after {
 <script src="firebase-config.js?v=20261001-teacherauth"></script>
 <script src="backend/functions/student-tool-policy.js"></script>
 <script src="student-tool-controls.js"></script>
+<script src="follow-teacher/core.js?v=20261019-follow1"></script>
+<script src="follow-teacher/student.js?v=20261019-follow1"></script>
 <script src="guest-mode.js?v=20261011-guest"></script>
 <script src="site-settings.js?v=20261008-owner-demo"></script>
 <script defer src="audio-mode.js?v=20261011-audio-mode"></script>
@@ -478,6 +480,7 @@ body > .subtitle::after {
       <a class="teacher-tool-card" href="admin.html?tab=students"><span class="card-icon">🎛️</span><span class="card-title">Student tool access</span></a>
       <a class="teacher-tool-card" href="student-rewards/teacher.html" ><span class="card-icon">✓</span><span class="card-title">Daily Points</span></a>
       <a class="teacher-tool-card" href="class-pointer-prototype/dashboard.html?teacher=1" ><span class="card-icon">👆</span><span class="card-title">Classroom Pointer</span></a>
+      <a class="teacher-tool-card" href="follow-teacher/teacher.html" target="_blank" rel="noopener"><span class="card-icon">👣</span><span class="card-title">Follow the Teacher</span></a>
       <a class="teacher-tool-card" href="game-show/teacher.html" ><span class="card-icon">🏆</span><span class="card-title">Game Show — Host</span></a>
       <a class="teacher-tool-card" href="record_pesukim/teacher.html" ><span class="card-icon">📜</span><span class="card-title">Posuk Practice Scroll — Teacher Dashboard</span></a>
       <a class="teacher-tool-card" href="shorashim/teacher.html?v=20260917-correct-dashboard" ><span class="card-icon">🌳</span><span class="card-title">Shorashim — Teacher Dashboard</span></a>
@@ -1515,6 +1518,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       sessionStorage.setItem("weeklyQuiz_classId",myClassId);
       // Wake the class-wide Classroom Pointer listener after the first login.
       window.dispatchEvent(new Event("fttStudentSignedIn"));
+      // Student's verified Firebase token is required for follow navigation.
+      void window.FTTFollowStudent?.start({workspaceId,classId:myClassId,studentId:myStudentId})
+        .catch(error=>console.warn("Follow Teacher unavailable",error));
     }
     let chooser=el("activeStudentClass");
     if(!chooser){chooser=document.createElement("select");chooser.id="activeStudentClass";chooser.setAttribute("aria-label","Active class");el("studentBar").appendChild(chooser);}
@@ -1637,6 +1643,7 @@ const active=(members[id]?.active!==false&&profile.active!==false);
   }
 
   function switchStudent(){
+    window.FTTFollowStudent?.stop();
     resetPinForm();
     studentAccessRevoked=false;
     if(studentMembershipWatch)studentMembershipWatch.off();

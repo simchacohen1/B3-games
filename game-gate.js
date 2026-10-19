@@ -373,6 +373,22 @@
     });
   }
 
+  let followLoader=null;
+  function startFollowTeacherListener(classId,studentId) {
+    if (!classId || !studentId || isGuestPreview() || verifiedTeacherAccess?.authorized) return;
+    if (!followLoader) {
+      followLoader = loadOneScript(new URL("follow-teacher/core.js?v=20261019-follow1",rootBase).href)
+        .then(()=>loadOneScript(new URL("follow-teacher/student.js?v=20261019-follow1",rootBase).href))
+        .catch(error=>{followLoader=null;throw error;});
+    }
+    followLoader.then(()=>{
+      if (studentActive && studentClassId===classId &&
+          getStoredStudentId()===studentId) {
+        return window.FTTFollowStudent?.start({workspaceId:WORKSPACE_ID,classId,studentId});
+      }
+    }).catch(error=>console.warn("Follow Teacher not available",error));
+  }
+
   async function resolveStudentClass() {
     var studentId=getStoredStudentId(), storedClass=getStoredClass();
     studentActive=false;assignedClass=null;studentClassId="";
@@ -405,6 +421,9 @@
     assignedClass.members[studentId]=member;
     if(assignedClass.active===false||!member||member.active===false){studentClassId="";return "";}
     studentActive=true;
+    // Follow Teacher is an optional, class-scoped navigation listener.
+    // It starts only after the shared gate has resolved an active student.
+    void startFollowTeacherListener(studentClassId, studentId);
     return studentClassId;
   }
 

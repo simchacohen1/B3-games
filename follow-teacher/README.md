@@ -1,68 +1,68 @@
-# Follow the Teacher — phase 1 foundation
+# Follow the Teacher — class-scoped navigation
 
-Tracking issue: [#150](https://github.com/simchacohen1/B3-games/issues/150).
+Tracking: [Issue #150](https://github.com/simchacohen1/B3-games/issues/150).
+Integration PR: [#194](https://github.com/simchacohen1/B3-games/pull/194).
 
-**Status:** Isolated navigation decision engine and safety tests only. No teacher
-control has been exposed in production, no student has been redirected, and no
-Firebase rules/functions or student data has been changed.
+## Initial supported release
 
-## Intended UI
+**Independent** lets students choose allowed tools. **Follow Once** sends the
+whole class to Shorashim once and does not prevent leaving afterward.
+**Follow Locked** sends the whole class to Shorashim and redirects them back
+if they visit another gated FTT activity, until the teacher presses Unlock or
+the live session expires. Other destinations and synchronized quiz question
+steps are future work. It does not share screens, request browser permissions
+or perform remote control.
 
-A compact control in Teacher Tools for each *assigned* class:
+Teacher controls: `follow-teacher/teacher.html?class=et`, linked from the
+owner's Teacher Tools and assigned class cards in Teacher Center.
 
-- **Independent** (default): students navigate their own enabled activities.
-- **Follow — Free afterward**: teacher chooses Shorashim and presses **Send**
-  (whole class or selected students). It navigates eligible students once,
-  after which they may leave.
-- **Follow — Locked**: teacher chooses Shorashim and presses **Follow & Lock**.
-  Students remain on Shorashim until **Unlock** or expiry; when new permitted
-  destinations are implemented, a teacher can switch pages in the same session.
-- Clear **Following teacher · Shorashim** status on students' pages. A student
-  trying another FTT link sees a short explanation. Do not silently discard
-  student work; integrate with the activity's save/leave lifecycle.
-- **Unlock all** is always visible to the teacher and returns to Independent.
+Student listener: `follow-teacher/student.js`, started only after the
+homepage's student custom-token sign-in or an authenticated student
+session resolved by `game-gate.js`. It checks the Firebase token's student
+ID and class claims and rechecks active class membership, profile and
+Shorashim permissions before each navigation. It never navigates teacher
+previews or embedded iframes.
 
-The navigation modes are not screen sharing, remote control, browser tab focus,
-or permission to see a student's computer.
+The navigation state lives at
+`b3Games/workspaces/<workspace>/classes/<class>/access/followTeacher`.
+It uses the existing teacher-scoped access write rule, so this frontend
+change requires **no Firebase rules or Cloud Functions deployment**.
+Teacher identity in the class-visible state is a SHA-256 pseudonym, not
+the actual Firebase user ID. Sessions renew from the teacher's control
+page every 20 seconds and expire safely after 90 seconds without an
+active heartbeat. Firebase server time offsets account for client clock skew.
 
-## State contract
+Students see a brief warning before being moved. Automatic navigation
+is postponed while a Chazara recording or upload is active; additional
+activities can set `data-ftt-unsaved="true"` or cancel the
+`ftt:before-follow-navigation` event while saving.
 
-The proposed state contains `version, workspaceId, classId, teacherUid,
-mode, destination, revision, targets, issuedAt, heartbeatAt, expiresAt`.
-`targets` is `all` or explicit student IDs in the selected class.
-The client must never authoritatively decide teacher class access:
-an authenticated service/rule must validate the user's assigned class,
-selected student memberships, allowed destination and revocation.
+## Privacy gate
 
-The only enabled destination in this foundation is `shorashim`. No arbitrary
-URL, cross-site redirect, or teacher-supplied JavaScript is allowed.
+The existing RTDB ancestor `b3Games/.read=true` in
+`firebase-rules.json` is a separate, unresolved privacy issue (#20).
+**Student-specific targeting is deliberately disabled in this initial
+integration** because listing selected students in the class-visible state
+could reveal private teacher decisions. The policy engine supports it for a
+future private, server-validated delivery path; do not turn the UI on until
+the relevant private rules and server checks are deployed and verified.
+No names, passcodes or targeted student IDs are written by this feature.
 
-The pure engine in `core.js` refuses requests without verified student context,
-class match, per-student tool authorization, current heartbeat and valid expiry.
-Teacher sessions must renew their heartbeat while active; a missing heartbeat
-fails open to Independent after **90 seconds**. The maximum lease is 10 minutes.
-A revision key lets Free send once per tab without repeated redirection.
-Locked checks must run both during live updates and on direct activity loads.
-A mode change to Independent immediately clears the lock.
+## Verification before considering the release complete
 
-## Required integration before merging
+- `node --test tests/follow-teacher.test.cjs tests/follow-teacher-integration.test.cjs`
+- Focused real-Chromium test:
+  `npx playwright test e2e/follow-teacher.spec.ts --project=chromium`
+- Check CI relative to the contemporary `main` branch rather than
+  attributing old migration/Playwright failures to this feature.
+- Test with one **real signed-in teacher** and a **dedicated test student**
+  in ET, WT and a separately assigned teacher class.
+- Confirm consent for screen sharing is entirely unchanged.
+- Check a direct activity URL while Locked, an active Chazara recording
+  while navigation is requested, class switch, teacher sign-out and
+  disconnected teacher expiry.
+- Verify successful Pages deployment and actual authenticated live behavior.
+  This document and automated tests alone do not establish live success.
 
-1. Implement verified, class-scoped navigation writes and student reads in
-   Firebase, with emulator tests for teacher assigned/unassigned/revoked,
-   admin, student own/other class, anonymous and multi-tab access. Reconcile
-   with the existing RTDB privacy/security migration (#20); do not bypass it.
-2. Add teacher control to Teacher Tools, bound to the **selected class**,
-   not all classes. Avoid altering working Classroom Pointer permission code.
-3. Load a student navigation listener through the common access gate plus
-   homepage, *after* verified student sign-in and activity authorization.
-   Track the last applied Free revision in sessionStorage. Never redirect
-   during unsaved work without a safe save/leave strategy.
-4. Test two classes (ET and WT), a third teacher class, selected students,
-   direct URLs, disconnected/rejoining students, multiple tabs, switching
-   teacher accounts, expiry, lock removal, and an ongoing student activity.
-5. Run `node --test tests/follow-teacher.test.cjs`, browser tests and Firebase
-   Emulator rules tests. Compare against current `main`. Obtain explicit
-   production approval before merging/deploying. Real teacher/student checks
-   are required before marking issue #150 complete.
-
-No production writes/changes occur from this branch automatically.
+Do not mark issue #150 fully complete until more destinations, safe
+individual targeting and end-to-end live verification are delivered.
