@@ -24,7 +24,8 @@ test('student screens default to screens but whiteboard choice remains',()=>{
 });
 test('teacher screen permission is disabled when closing the viewer',()=>{
  const s=read('student-boards.js');
- assert.match(s,/setStudentScreenSharing\(on&&mode==='screens'\)/);
+ assert.match(s,/if\(!on\|\|mode==='screens'\)window\.ClassPointerDashboard\?\.setStudentScreenSharing\(screenPermissionEnabled\)/);
+ assert.match(s,/screenPermissionEnabled=next\?\(screenPermissionEnabled\|\|mode==='screens'\):false/);
  assert.match(s,/Do not send an asynchronous child update here/);
 });
 test('class picker preserves authorization checks',()=>{

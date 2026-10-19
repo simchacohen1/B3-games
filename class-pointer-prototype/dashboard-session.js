@@ -151,7 +151,10 @@
       const denied=Object.entries(rows).filter(([,row])=>row.screenSharingDenied===true).map(([id])=>id);
       window.ClassPointerActivityShares?.revokeStudents(denied);
       return ref.update({
-        studentScreenSharing:mode==='screens',
+        // Moving to whiteboards changes what is displayed, not the student's
+        // already approved Entire Screen capture. Only an explicit Disable
+        // student sharing or the class ending may revoke that permission.
+        ...(mode==='screens'?{studentScreenSharing:true}:{}),
         permissionRevision:firebase.database.ServerValue.TIMESTAMP,
         destinationRequest:{mode,at:firebase.database.ServerValue.TIMESTAMP}
       });
