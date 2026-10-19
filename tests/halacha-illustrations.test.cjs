@@ -13,8 +13,8 @@ const file=kind=>path.join(root,'art',kind);
 test('Halacha illustration enhancement loads without replacing original lesson/save scripts',()=>{
   assert.match(html,/seif-a-teacher-led\.js/);
   assert.match(html,/scrapbook-editor\.js/);
-  assert.match(html,/illustrated-seif-a\.js\?v=20261018-art2/);
-  assert.match(html,/illustrated-seif-a\.css\?v=20261018-art2/);
+  assert.match(html,/illustrated-seif-a\.js\?v=20261018-art3/);
+  assert.match(html,/illustrated-seif-a\.css\?v=20261018-art3/);
   new vm.Script(script);
 });
 
