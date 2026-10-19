@@ -39,7 +39,7 @@ test('teacher broadcasts selected mode only inside their authenticated active se
     assert.deepEqual(JSON.parse(JSON.stringify(row.destinationRequest.at)),{'.sv':'timestamp'});
   }
   assert.equal(requests[0][2].destinationRequest.mode,'boards');
-  assert.equal(requests[0][2].studentScreenSharing,false);
+  assert.equal(requests[0][2].studentScreenSharing,undefined,'whiteboards must not revoke existing screen-sharing consent');
   assert.equal(requests[1][2].destinationRequest.mode,'screens');
   assert.equal(requests[1][2].studentScreenSharing,true);
   await assert.rejects(()=>dashboard.requestStudentDestination('unapproved'));
@@ -117,7 +117,7 @@ test('teacher policy excludes only the requested pupils for each activity',async
   for(const [,path] of policies)assert.equal(path,'b3Private/classPointerSharePermissions/b3-2026/et/'+room);
   for(const [, ,value] of policies.slice(1))assert.deepEqual(JSON.parse(JSON.stringify(value)),JSON.parse(JSON.stringify(policies[0][2])));
   assert.equal(boards.destinationRequest.mode,'boards');
-  assert.equal(boards.studentScreenSharing,false);
+  assert.equal(boards.studentScreenSharing,undefined,'switching to whiteboards preserves existing screen captures');
   assert.equal(boards.screenSharingDenied,undefined);
   assert.equal(boards.whiteboardDenied,undefined);
 });
