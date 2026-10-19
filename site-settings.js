@@ -418,8 +418,9 @@
       await savedAuth.authStateReady();
       const saved = savedAuth.currentUser;
       if (!saved || isStudentTab() || services.auth.currentUser) return false;
-      const access = await readUserAccess(saved);
-      if (!access.authorized || isStudentTab() || services.auth.currentUser || signOutVersion !== teacherSignOutVersion) return false;
+      // Restore Firebase identity before reading protected teacher records.
+      // onAuthStateChanged still checks current authorization before granting UI access.
+      if (isStudentTab() || services.auth.currentUser || signOutVersion !== teacherSignOutVersion) return false;
       await services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION);
       if (isStudentTab() || services.auth.currentUser || signOutVersion !== teacherSignOutVersion) return false;
       await services.auth.updateCurrentUser(saved);
@@ -930,20 +931,20 @@
       // Redirect sign-in leaves this page and returns later, so there is no
       // immediate result object in that branch. onAuthStateChanged will finish it.
       if (!result) return null;
-      return readUserAccess(result.user).then(function(access){
+      return services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION)
+        .then(function () { return services.auth.updateCurrentUser(result.user); })
+        .then(function () { return readUserAccess(result.user); }).then(function(access){
         currentAccess = access;
         if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
         else showToolVersions(access);
         if (!access.authorized) {
-          return savedAuth.signOut().then(function () {
+          return savedAuth.signOut().then(function () { return services.auth.signOut(); }).then(function () {
             const error = new Error("This Google account is not authorized for Fun Torah Tools.");
             error.code = "b3/unauthorized-user";
             throw error;
           });
         }
-        return services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION)
-          .then(function () { return services.auth.updateCurrentUser(result.user); })
-          .then(function () { return result.user; });
+        return result.user;
       });
     });
   }
