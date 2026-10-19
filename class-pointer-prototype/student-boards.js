@@ -419,6 +419,8 @@
   function updatePermission(id,kind,allowed){
     if(!id)return;
     if(allowed)denied[kind].delete(id);else denied[kind].add(id);
+    // Allowing from the Students panel also lifts a tile Pause for him.
+    if(allowed&&kind==='screens')for(const m of admitted())if(personId(m)===id)blocked.delete(keyFor(m));
     renderPermissions();
     for(const m of admitted())if(personId(m)===id){if(on)sendMode(m);dirty(m.id)}
     if(on)syncTiles();
@@ -874,6 +876,9 @@
   function toggleBlock(m){
     const key=keyFor(m);if(blocked.has(key))blocked.delete(key);else blocked.add(key);
     drawer?.cancel();sendMode(m);syncTiles();dirty(m.id);
+    // A student sharing from Shorashim or another activity is not joined to Pointer, so hiding his video is not enough:
+    // record the pause as a screen-sharing permission so his browser stops capturing and the teacher stops receiving.
+    if(mode==='screens'){const person=personId(m);if(person)updatePermission(person,'screens',!blocked.has(key))}
     B.status(blocked.has(key)?m.name+' is paused.':m.name+' is allowed again.');
   }
   // The teacher writes on the board that is open large; the same change goes to that student.
