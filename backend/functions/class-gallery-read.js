@@ -28,9 +28,9 @@ exports.classGalleryRead=onRequest({region:'us-central1',cors:['https://funtorah
     ]);
     const owner=String(identity.email||'').toLowerCase()==='simcha5770@gmail.com'&&identity.email_verified===true;
     const isTeacher=identity.firebase?.sign_in_provider==='google.com'&&teacher.child('active').val()===true&&teacher.child('classIds/'+classId).val()===true;
-    const isMember=identity.b3StudentRole==='student'&&identity.b3ClassId===classId&&member?.exists()&&member.child('active').val()===true;
+    const isMember=identity.b3StudentRole==='student'&&identity.b3ClassId===classId&&member?.exists()&&member.child('active').val()!==false;
     const allowed=owner||adminRow.val()===true||isMember||isTeacher;
-    if(!allowed||!cls.exists()||cls.child('active').val()!==true)return res.status(403).json({error:'Active class access required.'});
+    if(!allowed||!cls.exists()||cls.child('active').val()===false)return res.status(403).json({error:'Active class access required.'});
     const legacy=['et','wt'].includes(classId),path=legacy?'classGallery/posts':`b3Games/workspaces/b3-2026/classes/${classId}/resources/gallery/posts`;
     const snap=await db.ref(path).get(),rows=snap.val()||{};
     const posts=visibleGalleryPosts(rows,classId,identity.b3StudentId,isTeacher||owner||adminRow.val()===true);
