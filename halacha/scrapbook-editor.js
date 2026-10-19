@@ -222,6 +222,16 @@ window.studioPictureSticker=(id,key)=>{
  if(message)message.textContent='Added '+halachaPictureLookup.get(key)+' to Page '+(target+1)+' ✓';
 };
 window.studioTarget=id=>+(document.querySelector('#'+id+' .studio-target')?.value||0);
+// Delegated listener survives restored scrapbook DOM, which can replace the
+// illustrated sticker buttons after account data loads. One click adds once.
+document.addEventListener('click',ev=>{
+ const target=ev.target;
+ const btn=target && target.closest && target.closest('.studio-picture-library [data-illustrated-sticker]');
+ if(!btn)return;
+ const section=btn.closest('.section');
+ if(section)window.studioPictureSticker(section.id,btn.dataset.illustratedSticker);
+});
+
 window.studioText=id=>{
  if(readonly())return;pages(id).forEach((p,i)=>studioMode(id,i,'select'));
  const e=add(id,'textbox','<div class="tb-move">✥ Move</div><div class="tb-text" contenteditable="true" data-ph="Type your idea…"></div>',studioTarget(id));e.querySelector('.tb-text').focus();
@@ -260,9 +270,7 @@ function upgrade(id){
  ).join('');
  stickers.innerHTML='<b>Illustrated stickers — every lesson</b><p class="studio-sticker-guide">Choose Page 1 or 2 above, then tap a picture.</p><div class="studio-picture-library">'+illustrated+'</div><p class="studio-sticker-status" role="status" aria-live="polite"></p><details class="studio-more-stickers"><summary>More drawings and decorations</summary><div>'+primaryStickers+moreStickers+'</div></details>';
  themes.before(stickers); // Keep the illustrated choices visible above the page-style controls.
- stickers.querySelectorAll('[data-illustrated-sticker]').forEach(b=>
-  b.addEventListener('click',()=>window.studioPictureSticker(id,b.dataset.illustratedSticker))
- );
+ // Click handling is delegated globally to survive cloud re-renders.
  const textBtn=side.querySelector('[onclick^="addTextBox"]');if(textBtn)textBtn.setAttribute('onclick',`studioText('${id}')`);
  const addRow=textBtn&&textBtn.closest('.step');if(addRow)actions.after(addRow);
  const help=side.querySelector('p:last-child');if(help)help.innerHTML='<small>Pick Move to edit pieces. Drag the blue dots to resize. Click a piece to change its style. Fill colors your drawings; stickers keep their own colors.</small>';
