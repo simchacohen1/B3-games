@@ -1755,81 +1755,50 @@ function normalizeDivineNames(text){
     .replace(/\bGod\b/gi, 'Hashem');
 }
 
+function normalizeQuestionHebrewToken(word){
+  return String(word||'').replace(/[\u0591-\u05BD\u05BF\u05C1-\u05C2\u05C4-\u05C5\u05C7]/g,'').replace(/\u05C3/g,'').trim();
+}
+function answerPhraseWordSets(phrase, pasukText){
+  const phraseWords=String(phrase||'').trim().split(/\s+/).map(normalizeQuestionHebrewToken).filter(Boolean);
+  const words=String(pasukText||'').trim().split(/\s+/).map(normalizeQuestionHebrewToken).filter(Boolean);
+  if(!phraseWords.length||phraseWords.length>words.length)return [];
+  const sets=[];
+  for(let start=0;start<=words.length-phraseWords.length;start++){
+    if(phraseWords.every((word,index)=>word===words[start+index])){
+      sets.push(Array.from({length:phraseWords.length},(_,offset)=>start+offset));
+    }
+  }
+  return sets;
+}
 async function getGeneratedQuestionsForPart(part){
   if(!part || !part.translation || !part.translation.trim()) return [];
-  const cacheKey = generatedQuestionCacheKey(part);
-
-  // Fastest path: this page session already loaded the shared set.
-  if(generatedQuestionMemoryCache.has(cacheKey)){
-    return generatedQuestionMemoryCache.get(cacheKey);
-  }
-
-  // Next-fastest path: this browser has seen the posuk before.
-  const localItems = readLocalGeneratedQuestions(cacheKey, part.posukNum);
-  if(localItems){
-    generatedQuestionMemoryCache.set(cacheKey, localItems);
-    return localItems;
-  }
-
-  // If two UI paths ask for the same posuk while it is still loading, share
-  // one promise instead of doing duplicate Firebase reads / AI generation.
-  if(generatedQuestionPromiseCache.has(cacheKey)){
-    return generatedQuestionPromiseCache.get(cacheKey);
-  }
-
-  const loadPromise = (async () => {
-    const ref = db.ref('posukPractice/generatedQuestions/' + cacheKey);
-
-    try{
-      const snap = await ref.once('value');
-      const cached = snap.val();
-      if(cached && Array.isArray(cached.items) && cached.items.length){
-        const items = normalizeGeneratedItems(cached.items, part.posukNum);
-        if(items.length){
-          generatedQuestionMemoryCache.set(cacheKey, items);
-          saveLocalGeneratedQuestions(cacheKey, cached.items);
-          return items;
-        }
-      }
-    }catch(err){
-      console.warn('Could not read generated-question cache', err);
-    }
-
-    if(!GENERATE_COMPREHENSION_QUESTIONS_URL || GENERATE_COMPREHENSION_QUESTIONS_URL.indexOf('PASTE') === 0) return [];
-
-    const res = await B3PaidApi.fetch(GENERATE_COMPREHENSION_QUESTIONS_URL, {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body:JSON.stringify({
-        posukText: part.text || '',
-        posukTranslation: part.translation || '',
-        classroomReferenceTranslation: await getClassroomReferenceForPart(part),
-        perekNum: currentPerekNum,
-        posukNum: part.posukNum,
-        questionLimit: 5
-      })
-    });
-    if(!res.ok) throw new Error('Question generation request failed');
-    const data = await res.json();
-    const rawItems = Array.isArray(data.items) ? data.items.filter(x => x && x.question) : [];
-    if(!rawItems.length) return [];
-
-    // The server stores the shared AI cache; students cannot overwrite it.
-    const items = normalizeGeneratedItems(rawItems, part.posukNum);
-    generatedQuestionMemoryCache.set(cacheKey, items);
-    saveLocalGeneratedQuestions(cacheKey, rawItems);
-    return items;
-  })();
-
-  generatedQuestionPromiseCache.set(cacheKey, loadPromise);
+  const workspace=String(window.B3SiteSettings&&window.B3SiteSettings.workspaceId||'').replace(/[.#$\[\]\/]/g,'_');
+  const safeSefer=String(currentSefer||'Bereishis').replace(/[.#$\[\]\/]/g,'_');
+  const key=(part.key||safeSefer+'_'+currentPerekNum+'_'+part.posukNum)+'_teacherapproved_v1';
+  if(generatedQuestionMemoryCache.has(key)) return generatedQuestionMemoryCache.get(key);
+  if(!workspace||!Number(currentPerekNum)||!Number(part.posukNum)) return [];
   try{
-    return await loadPromise;
-  }finally{
-    generatedQuestionPromiseCache.delete(cacheKey);
+    const snap=await db.ref('posukPractice/approvedQuestionBanks/'+workspace+'/'+safeSefer+'/'+currentPerekNum+'/'+part.posukNum).once('value');
+    const record=snap.val();
+    const items=(record&&Array.isArray(record.items)?record.items:[]).map(item=>{
+      const phrases=Array.isArray(item.answerPhrases)?item.answerPhrases:[];
+      const answerWordSets=phrases.flatMap(phrase=>answerPhraseWordSets(phrase,part.text||''));
+      return {
+        question:normalizeDivineNames(item.question||''),
+        expectedAnswer:'',
+        sourceFact:'',
+        answerWordSets:answerWordSets,
+        posukNum:Number(part.posukNum),
+        generated:false
+      };
+    }).filter(item=>item.question&&item.answerWordSets.length);
+    if(items.length) generatedQuestionMemoryCache.set(key,items);
+    return items;
+  }catch(err){
+    console.warn('Could not read approved question bank',err);
+    return [];
   }
 }
-
-
 
 /* =========================================================
    PARSHA / PEREK / POSUK MAP (Sefaria "Genesis" chapters)
@@ -3486,7 +3455,7 @@ async function completeGeneratedComprehensionQuestions(loadToken){
       else hadFailure = true;
     }catch(err){
       hadFailure = true;
-      console.error('Could not generate comprehension questions for posuk', part.posukNum, err);
+      console.error('Could not load approved comprehension questions for posuk', part.posukNum, err);
     }
   }
   if(loadToken !== generatedQuestionLoadToken) return;
@@ -3502,14 +3471,11 @@ async function completeGeneratedComprehensionQuestions(loadToken){
     }else{
     comprehensionQuestionLoadFailed = true;
     const msg = document.getElementById('comprehensionGradingMsg');
-      msg.textContent = hadFailure ? 'Could not prepare reliable questions. Tap retry.' : 'No clear questions could be made from this pasuk. Please use the bonus explanation.';
+      msg.textContent = hadFailure ? 'Could not load approved questions. Tap retry.' : 'Your teacher has not uploaded approved questions for this pasuk yet.';
     const retry = document.getElementById('comprehensionRetryBtn');
-    retry.textContent = '🔁 Retry questions';
+    retry.textContent = '🔁 Check for questions';
       retry.classList.toggle('hidden', !hadFailure);
-      if(!hadFailure){
-        comprehensionMode = 'freehand-only';
-        renderComprehensionQuestionUI();
-      }
+      // Keep students in the tap-to-answer flow; wait for a teacher-approved bank.
   }
 }
 
