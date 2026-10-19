@@ -99,7 +99,11 @@
       grid.appendChild(card);
     });
     gallery.appendChild(grid);
-    galleryHost.insertBefore(gallery, galleryHost.firstChild);
+    // Present the artwork at the TOP of the learning panel, not buried
+    // beneath the Hebrew source and phrase cards. Preserve the quiz below.
+    var lessonBody = lesson.querySelector('.hal-a-body');
+    if (lessonBody) lessonBody.insertBefore(gallery, lessonBody.firstChild);
+    else galleryHost.insertBefore(gallery, galleryHost.firstChild);
     var status = node('p', 'hal-art-status');
     status.setAttribute('role','status');
     status.setAttribute('aria-live','polite');
