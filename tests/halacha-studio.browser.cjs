@@ -37,6 +37,24 @@ test('text, Torah stickers, picture actions and backgrounds persist with undo',a
 test('teacher student-work inspection is read only',async()=>{
  const {page:p,errors}=await open('?teacherView=demo',true);const before=await p.evaluate(()=>JSON.stringify(S));assert.equal(await p.getByRole('button',{name:'Add text box'}).isEnabled(),false);await p.evaluate(()=>{studioSticker('a','torah');studioText('a');studioBackground('a','sky');studioMode('a',0,'pen');});assert.equal(await p.evaluate(()=>JSON.stringify(S)),before);assert.equal(await p.locator('#a .tb-text').getAttribute('contenteditable'),'false');assert.deepEqual(errors,[]);await p.close();
 });
+test('each Halacha seif shows five title ideas without opening the Words tab',async()=>{
+ const {page:p,errors}=await open('?teacherView=title-visibility-test');
+ for(const lesson of await p.evaluate(()=>lessons.map(l=>({id:l.id,title:l.title})))){
+  await p.evaluate(id=>show(id),lesson.id);
+  const info=await p.locator('#'+lesson.id+' .hal-title-guidance').evaluate(e=>({
+   visible:e.getClientRects().length>0,open:e.open,
+   choices:e.querySelectorAll('.hal-title-choice').length,
+   outsideHiddenTabs:!e.closest('.studio-shelf-pane'),
+   hasCustom:e.querySelector('.hal-title-input')!==null
+  }));
+  assert.equal(info.visible,true,lesson.id+' title suggestions should be visible');
+  assert.equal(info.open,true,lesson.id+' title suggestions should be expanded');
+  assert.equal(info.choices,5,lesson.id+' should offer five relevant title suggestions');
+  assert.equal(info.outsideHiddenTabs,true,lesson.id+' should not hide titles behind supply tabs');
+  assert.equal(info.hasCustom,true,lesson.id+' should allow composing a custom title');
+ }
+ assert.deepEqual(errors,[]);await p.close();
+});
 test('student Siman locks, all lessons and existing exports remain available',async()=>{
  const {page:p}=await open();assert.equal(await p.locator('.section[data-studio]').count(),await p.evaluate(()=>lessons.length));assert.ok(await p.evaluate(()=>lessons.length===32));assert.equal(await p.evaluate(()=>isSimanUnlocked('ב')),false);await p.evaluate(()=>openSiman('ב'));assert.equal(await p.locator('.section.on').getAttribute('id'),'a');await p.getByRole('button',{name:'Print / PDF / Slides'}).click();assert.ok(await p.locator('#exportDlg').isVisible());assert.ok((await p.locator('.expSec').count())>=6);await p.close();
 });
