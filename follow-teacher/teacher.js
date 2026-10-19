@@ -12,6 +12,12 @@
     serverOffset = Number(snap.val()) || 0;
   });
   const clock = () => Date.now() + serverOffset;
+  async function publicTeacherKey(uid) {
+    // Keep the teacher's actual Firebase UID out of the class-visible record.
+    const bytes = await crypto.subtle.digest('SHA-256',
+      new TextEncoder().encode('FTT-follow-v1:' + uid));
+    return Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2,'0')).join('');
+  }
 
   let teacher = null, assigned = [], current = '', classRow = null, stateRef = null;
   let unlisten = null, heartbeat = null, currentState = null, ownRevision = null;
@@ -82,11 +88,11 @@
       const targets = m === C.MODES.INDEPENDENT ? 'all' : selected();
       if (currentState && C.fresh(currentState, clock()) &&
           currentState.mode !== C.MODES.INDEPENDENT &&
-          currentState.teacherUid !== teacher.user.uid)
+          currentState.teacherUid !== teacher.publicKey)
         throw Error('Another teacher currently controls this class. Ask them to unlock first.');
       q('apply').disabled = q('unlock').disabled = true;
       const now = clock(), revision = crypto.randomUUID();
-      const row = C.propose({workspaceId:WS,classId:current,teacherUid:teacher.user.uid,
+      const row = C.propose({workspaceId:WS,classId:current,teacherUid:teacher.publicKey,
         mode:m,destination,targets,revision,issuedAt:now,heartbeatAt:now,
         expiresAt:now + C.MAX_HEARTBEAT_AGE_MS});
       // RTDB security rules permit class access writes only to an assigned,
@@ -95,13 +101,13 @@
       clearInterval(heartbeat); heartbeat = null;
       ownRevision = m === C.MODES.INDEPENDENT ? null : revision;
       if (ownRevision) {
-        const ref = stateRef, classId = current, uid = teacher.user.uid;
+        const ref = stateRef, classId = current, uid = teacher.user.uid, publicKey = teacher.publicKey;
         heartbeat = setInterval(async () => {
           try {
             if (!auth.currentUser || auth.currentUser.uid !== uid ||
                 current !== classId || stateRef !== ref) {clearInterval(heartbeat);heartbeat=null;return;}
             const snapshot = await ref.once('value'), active = snapshot.val();
-            if (!active || active.revision !== revision || active.teacherUid !== uid ||
+            if (!active || active.revision !== revision || active.teacherUid !== publicKey ||
                 active.mode === C.MODES.INDEPENDENT) {
               clearInterval(heartbeat);heartbeat=null;ownRevision=null;return;
             }
@@ -139,7 +145,7 @@
         ? Object.keys((await db.ref('b3Games/workspaces/' + WS + '/classes').once('value')).val() || {})
         : (access.classIds || []);
       assigned = [...new Set(classes.filter(valid))];
-      teacher = {user,access};
+      teacher = {user,access,publicKey:await publicTeacherKey(user.uid)};
       if (!assigned.length) throw Error('No classes are assigned to your teacher account.');
       q('classSelect').replaceChildren(...assigned.map(id => {
         const option = document.createElement('option');option.value=id;option.textContent=id.toUpperCase();return option;
