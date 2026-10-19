@@ -22,6 +22,11 @@ test('seven actual Kitzur seifim appear in the correct order without an eighth',
 test('Shivisi restores gallery at top and never remembers stale hidden state',()=>{
  assert.doesNotMatch(aleph,/sessionStorage\.getItem\(\x60halacha-learning-hidden/);
  assert.doesNotMatch(aleph,/sessionStorage\.setItem\('halacha-learning-hidden/);
+ // Saved-account restores call render() again; every illustrated layer must
+ // reinstall into the new DOM without changing scrapbook storage.
+ assert.match(aleph,/const originalRender = render/);
+ assert.match(art,/var previousRender = render/);
+ assert.match(gallery,/const previousRender = render/);
  assert.match(art,/lessonBody\.insertBefore\(gallery, lessonBody\.firstChild\)/);
  assert.match(html,/seif-a-teacher-led\.js\?v=20261019-shivisi-visible3/);
 });
