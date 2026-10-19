@@ -360,7 +360,226 @@ const TORAH_UMESORAH_REFERENCE = {
     12: "And he said, \"Do not stretch out your hand to the youth, and do not do anything to him, because now I know that you are a G-d-fearing person, and you did not withhold your son, your only one, from Me.\"",
     13: "And Avrohom lifted his eyes and he saw, and behold, a ram! afterwards caught in the bushes by its horns, and Avrohom went and he took the ram and he brought it up for an offering instead of his son.",
     14: "And Avrohom called the name of that place \"HaShem will see\" as it will be said today, \"on [this] mountain HaShem will be seen.\"",
-    15: "And an angel of Ha…33075 tokens truncated…rrect translation, assume the student said the name.
+    15: "And an angel of HaShem called to Avrohom a second time from the heaven.",
+    16: "And he said, \"I have sworn by Me,\" says HaShem, \"That since you did this thing, and you did not hold back your son, your only one â€”\"",
+    17: "\"That I will surely bless you and I will surely increase your children like the stars of the heaven and like the sand that is on the shore of the sea, and your children will inherit the gate of their enemies.\"",
+    18: "\"And they will bless themselves by your children, all the nations of the earth, since you listened to My voice.\"",
+    19: "And Avrohom returned to his young men and they got up and they went together to Be'er Shevah, and Avrohom stayed in Be'er Shevah.",
+    20: "And it was after these things and it was told to Avrohom saying, \"Behold, Milcoh has given birth, also she, [to] sons for your brother Nochor.\"",
+    21: "Utz, his firstborn, and Buz, his brother, and Kimuel, the father of Arom.",
+    22: "And Kesed and Chazoh and Pildosh and Yidlof and B'suel.\"",
+    23: "And B'suel fathered Rivkoh; these eight Milcoh gave birth to for Nochor, the brother of Avrohom.",
+    24: "And his secondary wife â€” and her name was R'umoh â€” and she also gave birth to Tevach and Gacham and Tachash and Ma'achoh."
+  },
+  23: {
+    1: "And the life of Soroh was one hundred years and twenty years and seven years â€” the years of the life of Soroh.",
+    2: "And Soroh died in Kiryas Arba, which is Chevron, in the land of C'na'an. And Avrohom came to say a hesped (eulogy) for Soroh, and to cry for her.",
+    3: "And Avrohom got up from before the face of his dead one, and he spoke to the children of Chais, saying:",
+    4: "\"I am a stranger and a resident with you. Give to me possession of a burial place with you and I will bury my dead one from before me.\"",
+    5: "And the children of Chais answered Avrohom, saying to him,",
+    6: "\"Hear us, my master; you are a prince of HaShem in our midst. In the chosen of our burial places bury your dead one; a man from us, his burial place, he will not hold back from you from burying your dead one.\"",
+    7: "And Avrohom got up and he bowed to the people of the land of the children of Chais.",
+    8: "And he spoke with them saying, \"If it is your will to bury my dead one from before me, hear me,\"",
+    9: "\"and plead for me with Ephron, the son of Tzochar, that he should give to me the 'double cave' that is his; that is at the edge of his field, for full price he should give it to me in your midst for a possession of a burial place.\"",
+    10: "And Ephron was sitting among the children of Chais; and Ephron the Chiti answered Avrohom in the ears of the children of Chais, for all who come in the gate of his city, saying,",
+    11: "\"No, my master, listen to me! The field â€” I have given to you; and the cave that is in it â€” to you I have given it. Before the eyes of the children of my people I have given it to you; bury your dead one.\"",
+    12: "And Avrohom bowed in front of the people of the land.",
+    13: "And he spoke to Ephron in the ears of the people of the land saying, \"But if you would only listen to me! I have given the money of the field â€” take [it] from me and I will bury my dead one there.\"",
+    14: "And Ephron answered Avrohom, saying to him,",
+    15: "\"My master, listen to me! Land [worth] four hundred silver shekels, between me and between you â€” what is it? and bury your dead one.\"",
+    16: "And Avrohom listened to Ephron, and Avrohom weighed out to Ephron the silver that he spoke in the ears of the children of Chais â€” four hundred silver shekels acceptable to [all] merchants.",
+    17: "And the field of Ephron arose, that was in Machpailoh that was before Mamreh â€” the field, and the cave which was in it, and all the trees that were in the field that were in all its boundary around [it] â€”",
+    18: "to Avrohom, as a purchase, before the eyes of the children of Chais among all who come in the gate of his city.",
+    19: "And after that Avrohom buried Soroh his wife, into the cave of the field of Machpailoh before Mamrai, which is Chevron, in the land of C'na'an.",
+    20: "And the field arose, and the cave which was in it, to Avrohom for a possession of a burial place from the children of Chais."
+  },
+  24: {
+    1: "And Avrohom was old, advanced in years, and HaShem blessed Avrohom with everything.",
+    2: "And Avrohom said to his servant, the elder of his house, who ruled over all that he had, \"Place now your hand under my thigh.\"",
+    3: "\"And I will make you swear by HaShem, the G-d of the heavens and the G-d of the earth, that you shall not take a wife for my son from the daughters of the C'na'ani that I live among them.\"",
+    4: "\"But, to my land and to my birthplace you shall go, and you shall take a wife for my son, for Yitzchok.\"",
+    5: "And the servant said to him, \"Perhaps the woman will not want to go after me to this land. Shall I bring back your son to the land that you went out from there?\"",
+    6: "And Avrohom said to him, \"Watch yourself that you do not bring back my son to there.\"",
+    7: "\"HaShem, the G-d of the heavens, Who took me from the house of my father and from the land of my birth, and Who spoke about me, and Who swore to me saying, 'To your children I will give this land,' He will send His angel before you, and you shall take a wife for my son from there.\"",
+    8: "\"But if the woman will not want to go after you, then you will be free from this oath of mine. Only, my son you shall not bring back there.\"",
+    9: "And the servant placed his hand under the thigh of Avrohom, his master, and he swore to him about this matter.",
+    10: "And the servant took ten camels of the camels of his master and he went, and all the good of his master [was] in his hand, and he got up and he went to Aram Naharayim, to the city of Nochor.",
+    11: "And he made the camels kneel outside the city, by a well of water, at evening time, at the time [when] the women who draw water come out.",
+    12: "And he said, \"HaShem, the G-d of my master Avrohom, please, make it happen before me today, and do kindness with my master Avrohom.\"",
+    13: "\"Behold, I am standing by the spring of water and the daughters of the people of the city are going out to draw water.\"",
+    14: "\"And it should be, the young girl that I will say to her, 'Please tip your pitcher and I will drink,' and she will say, 'Drink, and also your camels I will give to drink,' her You have chosen for Your servant, for Yitzchok. And may I know through her that You have done kindness with my master.\"",
+    15: "And it was, he had not yet finished to speak, and behold, Rivkoh was going out, that was born to Besuel, the son of Milcoh, the wife of Nochor, the brother of Avrohom, and her pitcher [was] on her shoulder.",
+    16: "And the young girl [was] of a very good appearance; never married, and a man had not known her. And she went down to the spring and she filled her pitcher and she came up.",
+    17: "And the servant ran towards her and he said, \"Let me sip, please, a little water from your pitcher.\"",
+    18: "And she said, \"Drink, my master.\" And she hurried and she lowered her pitcher onto her hand and she gave him to drink.",
+    19: "When she finished to give him to drink, then she said, \"Also for your camels I will draw [water] until they will have finished to drink.\"",
+    20: "And she hurried and she emptied her pitcher into the trough, and she ran again to the well to draw [water], and she drew [water] for all his camels.",
+    21: "And the man was wondering about her, keeping silent to know had HaShem made successful his way or if not.",
+    22: "And it was when the camels finished to drink, then the man took a golden nose ring, its weight was a beka, and two bracelets [for] on her hands, ten gold shekels was their weight.",
+    23: "And he said, \"Whose daughter are you? Please tell me.…29075 tokens truncated…              index,
+                question: String(item?.question || ""),
+                expectedAnswer: String(item?.expectedAnswer || ""),
+                sourceFact: String(item?.sourceFact || ""),
+                answerWordSets: item?.answerWordSets,
+              })),
+            }) }],
+            output_config: {
+              format: {
+                type: "json_schema",
+                schema: {
+                  type: "object",
+                  properties: { approvedIndices: { type: "array", items: { type: "integer" } } },
+                  required: ["approvedIndices"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          }),
+        });
+        if (!reviewResponse.ok) {
+          console.error("Independent question review failed:", reviewResponse.status, await reviewResponse.text());
+          res.status(502).json({ error: "Could not verify generated questions" });
+          return;
+        }
+        const reviewData = await reviewResponse.json();
+        const reviewText = (reviewData.content || []).find((block) => block.type === "text")?.text || "";
+        try {
+          approvedIndices = JSON.parse(reviewText.replace(/```json|```/g, "").trim()).approvedIndices || [];
+        } catch (err) {
+          console.error("Could not parse independent question review:", reviewText);
+          res.status(502).json({ error: "Could not verify generated questions" });
+          return;
+        }
+      }
+
+      const seen = new Set();
+      const approved = new Set(approvedIndices.map(Number).filter((index) => Number.isInteger(index) && index >= 0 && index < candidates.length));
+      const items = candidates
+        .filter((_, index) => approved.has(index))
+        .map((item) => ({
+          sourceFact: String(item?.sourceFact || "").trim(),
+          question: applyFrumBiblicalNames(String(item?.question || "").trim()),
+          expectedAnswer: applyFrumBiblicalNames(String(item?.expectedAnswer || "").trim()),
+          answerWordSets: Array.isArray(item?.answerWordSets)
+            ? item.answerWordSets.map((set) => Array.isArray(set) ? [...new Set(set.map(Number).filter(Number.isInteger))].sort((a, b) => a - b) : []).filter((set) => set.length).slice(0, 3)
+            : [],
+        }))
+        .filter((item) => item.question && item.expectedAnswer && item.sourceFact && item.answerWordSets.length &&
+          item.answerWordSets.every((set) =>
+            set.every((index, position) => index >= 0 && index < String(posukText || '').trim().split(/\s+/).filter(Boolean).length &&
+              (position === 0 || index === set[position - 1] + 1))))
+        .filter((item) => {
+          const key = item.question.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, questionLimit);
+
+      res.status(200).json({ items });
+    } catch (err) {
+      console.error("generateComprehensionQuestions error:", err);
+      res.status(500).json({ error: "Something went wrong generating questions." });
+    }
+  })
+);
+
+/**
+ * gradeQuestionAnswer â€” Firebase Cloud Function (2nd gen, HTTPS)
+ *
+ * Purpose: primary comprehension grading. A 3rd grader is asked ONE short,
+ * explicit-detail question about a posuk (e.g. "To whom did Hashem
+ * appear?") and answers it out loud in a sentence or two. This grades that
+ * one answer against the posuk's accepted English translation (the
+ * definitive "answer key," same trust-the-translation approach
+ * gradeComprehension already uses) â€” much narrower in scope than
+ * gradeComprehension's whole-posuk explanation, since here there's just
+ * one specific fact being asked for.
+ *
+ * REQUEST FORMAT: multipart/form-data:
+ *   - audio            (file, required) â€” the recording to transcribe
+ *   - question         (required) â€” the question the student was asked
+ *   - posukTranslation (required) â€” accepted English translation of the
+ *                        posuk this question is about (the answer key)
+ *   - posukText        (optional) â€” Hebrew, for reference only
+ *
+ * RESPONSE: { verdict: "correct" | "incorrect", feedback, transcript }
+ *   Two-tier, same reasoning as gradeTranslationChunk: a single factual
+ *   question is either answered correctly or it isn't.
+ *
+ * SETUP: same secrets/deploy pattern as the other grading functions:
+ *   firebase deploy --only functions:gradeQuestionAnswer
+ */
+exports.gradeQuestionAnswer = onRequest(
+  { secrets: [ANTHROPIC_API_KEY], cors: PAID_ORIGINS, maxInstances: 5, minInstances: 0, region: "us-central1", memory: "512MiB" },
+  paidHandler("gradeQuestionAnswer", "grading", async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Use POST" });
+      return;
+    }
+
+    let fields, audioBuffer, audioFilename;
+    try {
+      ({ fields, audioBuffer, audioFilename } = await parseMultipart(req));
+    } catch (err) {
+      console.error("Multipart parse error:", err);
+      res.status(400).json({ error: "Could not read the uploaded recording." });
+      return;
+    }
+
+    if (!audioBuffer || !audioBuffer.length) {
+      res.status(400).json({ error: "audio is required" });
+      return;
+    }
+
+    const { question, expectedAnswer, posukTranslation, posukText, perekNum, posukNum, endPosukNum } = fields;
+    let classroomReferenceTranslation = fields.classroomReferenceTranslation || '';
+    if (!classroomReferenceTranslation.trim() && perekNum && posukNum) {
+      classroomReferenceTranslation = fetchPosukPracticeTorahUmesorahReference(perekNum, posukNum, endPosukNum || posukNum);
+    }
+    let kehotReferenceTranslation = fields.kehotReferenceTranslation || '';
+    if (!kehotReferenceTranslation.trim() && perekNum && posukNum) {
+      try {
+        kehotReferenceTranslation = await fetchPosukPracticeKehotReference(perekNum, posukNum, endPosukNum || posukNum);
+      } catch (err) {
+        console.warn('Could not fetch Kehot reference server-side for question grading', err);
+      }
+    }
+    if (!question || !question.trim() || !posukTranslation || !posukTranslation.trim()) {
+      res.status(400).json({ error: "question and posukTranslation are required" });
+      return;
+    }
+
+    let transcript;
+    try {
+      transcript = await transcribeAudio(
+        audioBuffer,
+        audioFilename,
+        [expectedAnswer, question, posukTranslation, classroomReferenceTranslation, kehotReferenceTranslation].filter(Boolean)
+      );
+    } catch (err) {
+      console.error("Speech-to-Text error:", err);
+      res.status(502).json({ error: "Could not understand the recording. Please try again." });
+      return;
+    }
+
+    if (!transcript) {
+      res.status(200).json({ verdict: "no_speech", transcript: "" });
+      return;
+    }
+
+    const systemPrompt = `You are grading a 3rd-grade boy's SPOKEN answer to ONE short, explicit-detail question about a posuk (verse) from Chumash (Torah) â€” for example "To whom did Hashem appear?" His words were transcribed by speech recognition, so expect transcription errors, especially on Hebrew/Torah proper names.
+
+PROPER NOUNS (names of people and places) — TOP PRIORITY, applies before any scoring rule below:
+The student's answer is transcribed by speech recognition, which often mishears Biblical names (for example, "Sodom" may appear as "Saddam", or "Avraham" as "Abraham" or "a bro ham"). When the correct translation includes a name of a person or a place, be EXTREMELY lenient:
+- Count the name as correct if the transcribed word sounds even roughly similar to the real name, or if it is a different spelling of it.
+- Never deduct points for a proper noun that was garbled, misspelled, or replaced by a similar-sounding word.
+- If a word in the student's answer sits in the same spot as a name in the correct translation, assume the student said the name.
 - Only mark a name wrong if the student clearly said a different name or skipped that part of the posuk entirely.
 
 FUNDAMENTAL ASSUMPTION â€” the student is always trying to give a correct answer, not nonsense: if the transcript looks garbled or doesn't parse as a clean sentence, actively work backward from the accepted translation below and ask whether a plausible speech-recognition mishearing (homophone, mangled name, dropped/slurred word) could turn a correct answer into this fragment. If you can construct a plausible path from a correct answer to this transcript, grade it as CORRECT â€” do not penalize transcription artifacts.
