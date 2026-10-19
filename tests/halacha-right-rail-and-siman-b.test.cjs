@@ -22,7 +22,7 @@ test('drawing controls occupy a separate right-hand rail, never the canvas',()=>
  assert.match(editor,/window\.studioRailMode=/);
  assert.match(editor,/window\.studioRailColor=/);
  assert.match(editor,/window\.studioRailSize=/);
- assert.match(html,/scrapbook-editor\.js\?v=20261019-right-rail1/);
+ assert.match(html,/scrapbook-editor\.js\?v=20261019-rtl-art2/);
  assert.match(html,/scrapbook-editor\.css\?v=20261019-right-rail1/);
 });
 test('drawings still use their original separate page canvases and saving keys',()=>{
@@ -39,7 +39,7 @@ test('Seif Aleph highlights the original phrases directly in the source',()=>{
  assert.match(seifA,/🔎 Find in the seif/);
  assert.match(seifA,/reading\.open = false/);
  assert.match(seifA,/seif-a-teacher-led\.css\?v=20261019-highlight1/);
- assert.match(html,/seif-a-teacher-led\.js\?v=20261019-highlight1/);
+ assert.match(html,/seif-a-teacher-led\.js\?v=20261019-shivisi-visible3/);
 });
 test('teacher transcription contains all nine complete and distinct Siman Beis seifim',()=>{
  const environment={window:{}};
