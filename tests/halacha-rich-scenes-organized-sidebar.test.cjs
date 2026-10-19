@@ -32,9 +32,15 @@ test('left-side supplies have keyboard-accessible short tabs and preserve saved 
  assert.match(organizer,/lastTab\.get\(id\)/);
  assert.match(organizer,/previousRender\(lesson\)/);
  assert.match(organizer,/studio-picture-library/);
+ // Title suggestions stay in the visible sidebar even when Pictures is active.
+ assert.match(organizer,/titleIdeas = side.querySelector\(':scope > \.hal-title-guidance'\)/);
+ assert.match(organizer,/titleIdeas\.open = true/);
+ assert.match(organizer,/new Set\(\[header, intro, actions, titleIdeas, quickStep, tabs, holder\]\)/);
+ assert.doesNotMatch(organizer,/panes\.words\.appendChild\(el\);\s*\} else if \(el.matches\('\.lesson-vocab'\)\)/);
+ assert.match(html,/studio-sidebar-organizer\.js\?v=20261019-title-ideas-restored1/);
  assert.match(css,/\.studio-shelf-pane\[hidden\]\{display:none!important\}/);
  assert.doesNotMatch(organizer,/resetScrapbookPage|localStorage\.clear|removeItem|S\[/);
- assert.match(html,/studio-sidebar-organizer\.js\?v=20261019-organized2/);
+ assert.match(html,/studio-sidebar-organizer\.js\?v=20261019-title-ideas-restored1/);
  assert.match(html,/studio-sidebar-organizer\.css\?v=20261019-organized2/);
  assert.match(html,/illustrated-siman-a-extra\.js\?v=20261019-two-fixed-pictures5-gallery6/);
 });
