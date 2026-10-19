@@ -1,6 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync('site-settings.js','utf8');
-function setup({tab={},saved=true,active=null}={}){
+function setup({tab={},saved=true,active=null,noReady=false}={}){
  const data=new Map(Object.entries(tab));
  const storage={getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,String(v)),removeItem:k=>data.delete(k)};
  const teacher={uid:'teacher',email:'simcha5770@gmail.com',providerData:[{providerId:'google.com'}]};
@@ -11,6 +11,7 @@ function setup({tab={},saved=true,active=null}={}){
  firebase.auth.Auth={Persistence:{LOCAL:'LOCAL',SESSION:'SESSION'}};
  firebase.auth.GoogleAuthProvider=class{setCustomParameters(){}};
  const window={firebase,B3_FIREBASE_CONFIG:Object.fromEntries(['apiKey','authDomain','databaseURL','projectId','storageBucket','messagingSenderId','appId'].map(k=>[k,'test']))};
+ if(noReady){delete savedAuth.authStateReady;savedAuth.onAuthStateChanged=cb=>{queueMicrotask(()=>cb(savedAuth.currentUser));return ()=>{}}}
  vm.runInNewContext(source,{window,firebase,sessionStorage:storage,localStorage:{getItem:()=>null,setItem(){},removeItem(){}},document:{readyState:'loading',addEventListener(){},getElementsByTagName:()=>[]},location:{href:'https://example.test/'},URL,console,Intl,Date});
  return {api:window.B3SiteSettings,auth,savedAuth,teacher,data};
 }
@@ -57,4 +58,8 @@ test('student custom-token sign-ins use tab-only SESSION persistence',()=>{
  assert.match(idx.slice(j-300,j),/Persistence\.SESSION/);
  assert.match(idx,/endStudentSession\(\)/);
  assert.doesNotMatch(idx.slice(idx.indexOf('async function switchStudent'),idx.indexOf('function timeParts')),/B3SiteSettings\.signOut|settingsApi\.signOut/);
+});
+test('restore works with the compat Firebase build that has no authStateReady()',async()=>{
+ const t=setup({noReady:true});t.api.onAuthStateChanged(()=>{});await settle();
+ assert.equal(t.auth.currentUser,t.teacher);
 });
