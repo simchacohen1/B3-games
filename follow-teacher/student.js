@@ -29,6 +29,7 @@
       active.ref.off('value', active.handler);
       clearInterval(active.timer);
       clearTimeout(active.redirectTimer);
+      if (active.offsetRef) active.offsetRef.off('value', active.offsetHandler);
       active = null;
     }
     notice('');
@@ -70,7 +71,7 @@
     checking = true;
     try {
       const state = run.state;
-      if (!state || !C.fresh(state, Date.now()) ||
+      if (!state || !C.fresh(state, Date.now() + (run.serverOffset || 0)) ||
           state.mode === C.MODES.INDEPENDENT) {
         notice('');
         clearTimeout(run.redirectTimer);
@@ -83,7 +84,7 @@
         studentAuthorized: true, workspaceId: run.workspaceId,
         classId: run.classId, studentId: run.studentId,
         currentUrl: location.href, allowedTools: {shorashim: true},
-        lastAppliedKey, now: Date.now()
+        lastAppliedKey, now: Date.now() + (run.serverOffset || 0)
       });
       if (decision.action === 'none') { notice(''); clearTimeout(run.redirectTimer); return; }
       if (decision.action === 'stay') {
@@ -100,7 +101,7 @@
         notice('Your teacher is bringing the class to Shorashim. Save your work now.', decision.mode === C.MODES.LOCKED);
         run.redirectTimer = setTimeout(async () => {
           run.redirectTimer = null;
-          if (active !== run || !C.fresh(run.state, Date.now()) ||
+          if (active !== run || !C.fresh(run.state, Date.now() + (run.serverOffset || 0)) ||
               run.state.revision !== state.revision) return;
           if (!(await permitted(run))) {notice(''); return;}
           // Activities may cancel this event to finish saving current work.
@@ -138,6 +139,12 @@
     const run = {uid:user.uid,db,ref,workspaceId,classId,studentId,
       state:null,redirectTimer:null,pendingKey:''};
     active = run;
+    run.offsetRef = db.ref('.info/serverTimeOffset');
+    run.offsetHandler = snap => {
+      run.serverOffset = Number(snap.val()) || 0;
+      void evaluate();
+    };
+    run.offsetRef.on('value', run.offsetHandler);
     const serial = ++generation;
     run.handler = snapshot => {
       if (active !== run || serial !== generation) return;
