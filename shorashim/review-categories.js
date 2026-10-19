@@ -36,7 +36,7 @@
   function cardsForReviewTrack(track = reviewTrack, s = student(), applyPerekFilter = true) {
     let cards = learnedCards(s, track, false).filter(c => !!getItem(c.itemKey));
     if (track === 'shorashim' && applyPerekFilter && typeof reviewPerekFilter !== 'undefined' && reviewPerekFilter !== 'all') {
-      cards = cards.filter(c => itemPerek(getItem(c.itemKey)) === Number(reviewPerekFilter));
+      cards = cards.filter(c => reviewPerekFilter === 'booklet' ? !!getItem(c.itemKey)?.bookletWeek : itemPerek(getItem(c.itemKey)) === Number(reviewPerekFilter));
     }
     return cards;
   }
