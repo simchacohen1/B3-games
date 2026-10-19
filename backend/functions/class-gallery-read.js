@@ -6,7 +6,9 @@ if(!admin.apps.length)admin.initializeApp();
 function visibleGalleryPosts(rows,classId,studentId,canReview){
   const out={};
   for(const [id,row] of Object.entries(rows||{})){
-    if(row?.classId===classId&&(canReview||row.status==='approved'||row.studentId===studentId))out[id]=row;
+    // Pre-login ET/WT records have className but no classId. Never override an explicit classId.
+    const rowClass=row?.classId||({'B3 ET':'et','B3 WT':'wt'}[row?.className]);
+    if(rowClass===classId&&(canReview||row.status==='approved'||(studentId&&row.studentId===studentId)))out[id]=row;
   }
   return out;
 }
