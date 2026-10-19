@@ -76,9 +76,10 @@
     const title = make('h2', '', 'סִימָן א׳ · סְעִיף א׳');
     const hide = button('Hide lesson', () => {
       const collapsed = panel.classList.toggle('hal-a-collapsed');
-      hide.textContent = collapsed ? 'Show lesson' : 'Hide Activity · Make room for my scrapbook';
+      hide.textContent = collapsed ? 'Show lesson' : 'Hide lesson';
       hide.setAttribute('aria-expanded', String(!collapsed));
-      try { sessionStorage.setItem('halacha-learning-hidden:a:' + (document.body.classList.contains('teacherMode') ? 'teacher' : 'student'), String(collapsed)); } catch (_) {}
+      // Do not persist a hidden state. The artwork and learning must be
+      // visible again at the start of every lesson visit, especially for teachers.
     });
     hide.setAttribute('aria-expanded', 'true');
     const jumps = make('nav', 'hal-a-jumps');
@@ -224,14 +225,8 @@
     panel.appendChild(body);
     const anchor = section.querySelector('.work');
     section.insertBefore(panel, anchor || section.firstChild);
-    try {
-      const mode = document.body.classList.contains('teacherMode') ? 'teacher' : 'student';
-      if (sessionStorage.getItem(`halacha-learning-hidden:a:${mode}`) === 'true') {
-        panel.classList.add('hal-a-collapsed');
-        hide.textContent = 'Show / Review Activity';
-        hide.setAttribute('aria-expanded', 'false');
-      }
-    } catch (_) {}
+    // Earlier versions remembered "hide lesson" and caused the pictures to
+    // disappear on subsequent visits. Deliberately start open every time.
   }
   function escapeText(value) {
     return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
