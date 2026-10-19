@@ -74,6 +74,6 @@ test('all affected student activities load the corrected authenticated gate vers
     'sefer-hamitzvos/index.html'
   ]){
     const html=fs.readFileSync(path,'utf8');
-    assert.match(html,/game-gate\.js\?v=20261017-auth-gate/,path+' must not use the stale access gate');
+    assert.match(html,/game-gate\.js\?v=20261019-follow-all/,path+' must not use the stale access gate');
   }
 });

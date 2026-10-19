@@ -424,7 +424,7 @@
     studentActive=true;
     // Follow Teacher is an optional, class-scoped navigation listener.
     // It starts only after the shared gate has resolved an active student.
-    await startFollowTeacherListener(studentClassId, studentId);
+    void startFollowTeacherListener(studentClassId, studentId);
     return studentClassId;
   }
 
@@ -652,6 +652,7 @@
         return;
       }
       await resolveStudentClass();
+      if (studentActive) await startFollowTeacherListener(studentClassId, getStoredStudentId());
       followActivityOpen = !!(studentActive && await window.FTTFollowStudent?.allowsLockedActivity(gameId));
     }).then(function () {
       return fetchJson(DATABASE_URL + "/" + SETTINGS_PATH + ".json");

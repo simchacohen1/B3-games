@@ -88,7 +88,7 @@ test('verified student follows Locked teacher to Shorashim without screen captur
 
 const destinations = Object.entries(require('../follow-teacher/core.js').DESTINATIONS) as [string,{label:string,path:string}][];
 for (const classId of ['et','wt']) for (const [destination, entry] of destinations) {
-  test(`${classId}: locked student follows to ${entry.label}, then Unlock allows leaving`,async({page})=>{
+  test(`${classId}: locked student follows to ${entry.label}, then Unlock revokes the lock exception`,async({page})=>{
     const now=Date.now();
     const state={version:1,workspaceId:'b3-2026',classId,teacherUid:'teacher1',
       mode:'locked',destination,revision:'expanded',targets:'all',
@@ -143,4 +143,50 @@ test('unsaved work defers navigation; latest Unlock cancels it',async({page})=>{
   expect(page.url()).toContain('/chazara/');
   await page.evaluate(()=>(window as any).__unlock());
   await expect(page.locator('#fttFollowTeacherNotice')).toHaveCount(0);
+});
+
+for(const classId of ['et','wt']) test(`${classId}: actual shared gate opens only selected activity while locked, then closes on Unlock`,async({page})=>{
+  const gate=fs.readFileSync(path.join(ROOT,'game-gate.js'),'utf8');
+  const policy=fs.readFileSync(path.join(ROOT,'backend/functions/student-tool-policy.js'),'utf8');
+  const ws='b3Games/workspaces/b3-2026/classes/'+classId;
+  const data:any={
+    'b3Games/students/testBoy/profile':{active:true},
+    'b3Games/students/testBoy/profile/active':true,
+    'b3Games/students/testBoy/memberships':{test:{workspaceId:'b3-2026',classId,active:true}},
+    [ws+'/name']:classId,[ws+'/active']:true,[ws+'/members/testBoy']:{active:true},
+    [ws+'/access']:{mode:'locked'},[ws+'/siteEnabled']:false,
+    'b3Games/siteSettings':{siteEnabled:false,classAccess:{et:{mode:'locked'},wt:{mode:'locked'}}}
+  };
+  await page.route('https://b3-games-default-rtdb.firebaseio.com/**',route=>{
+    const key=new URL(route.request().url()).pathname.slice(1).replace(/\.json$/,'');
+    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data[key]??null)});
+  });
+  await page.route('http://localhost:8099/**',route=>{
+    const pathname=new URL(route.request().url()).pathname;
+    const scripts:Record<string,string>={'/game-gate.js':gate,'/follow-teacher/core.js':core,'/follow-teacher/student.js':student};
+    if(pathname.endsWith('.js'))return route.fulfill({status:200,contentType:'text/javascript',body:scripts[pathname]||''});
+    const tool=pathname.startsWith('/halacha')?'halacha':'gematria';
+    return route.fulfill({status:200,contentType:'text/html',body:`<!doctype html><html><head><script src="/game-gate.js" data-game-id="${tool}"></script></head><body><h1>Learning</h1></body></html>`});
+  });
+  await page.addInitScript(({classId,data,ws,policy})=>{
+    sessionStorage.setItem('b3Games_studentId','testBoy');sessionStorage.setItem('b3Games_studentClass',classId);
+    const state={workspaceId:'b3-2026',classId,teacherUid:'teacher1',mode:'locked',destination:'halacha',revision:'gate',targets:'all',issuedAt:Date.now()-5000,heartbeatAt:Date.now()-1000,expiresAt:Date.now()+60000};
+    let callback:Function=()=>{};
+    const snap=(v:any)=>({val:()=>v,exists:()=>v!=null,child:(p:string)=>snap(p.split('/').reduce((o:any,k:string)=>o?.[k],v))});
+    const user={uid:'testBoy',getIdToken:async()=>'synthetic-test-token',getIdTokenResult:async()=>({claims:{b3StudentRole:'student',b3StudentId:'testBoy',b3ClassId:classId}})};
+    const auth={currentUser:user,authStateReady:async()=>{},onAuthStateChanged:(fn:Function)=>{queueMicrotask(()=>fn(user));return()=>{};}};
+    (window as any).B3_FIREBASE_CONFIG={};
+    (window as any).B3SiteSettings={onAuthStateChanged:(fn:Function)=>queueMicrotask(()=>fn(user,false,null))};
+    (window as any).firebase={SDK_VERSION:'12.15.0',apps:[{}],auth:()=>auth,database:()=>({ref:(url:string)=>({
+      on:(_event:string,fn:Function)=>{if(url.endsWith('/followTeacher'))callback=fn;queueMicrotask(()=>fn(snap(url.endsWith('/followTeacher')?state:url==='.info/serverTimeOffset'?0:data[url])));},off:()=>{},once:async()=>snap(data[url])
+    })})};
+    (window as any).__unlock=()=>callback(snap({...state,mode:'independent'}));
+    // Install the actual student tool permission policy before the gate runs.
+    new Function(policy)();
+  },{classId,data,ws,policy});
+  await page.goto('http://localhost:8099/halacha/');
+  await expect.poll(()=>page.evaluate(()=>(window as any).FTTFollowStudent?.allowsLockedActivity('halacha'))).toBe(true);
+  await expect(page.locator('#b3-gate-overlay')).toHaveCount(0);
+  await page.evaluate(()=>(window as any).__unlock());
+  await expect(page.locator('#b3-gate-overlay')).toBeVisible();
 });

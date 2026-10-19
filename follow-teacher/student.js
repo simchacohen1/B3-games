@@ -111,7 +111,7 @@
         return;
       }
       if (!(await permitted(run, state.destination))) { notice(''); clearTimeout(run.redirectTimer); return; }
-      if (active !== run) return;
+      if (active !== run || run.state !== state) return;
       const lastAppliedKey = sessionStorage.getItem(appliedKey) || '';
       const decision = C.decide(state, {
         studentAuthorized: true, workspaceId: run.workspaceId,
@@ -196,6 +196,9 @@
     run.handler = snapshot => {
       if (active !== run || serial !== generation) return;
       run.state = snapshot.val();
+      clearTimeout(run.redirectTimer); run.redirectTimer=null;
+      policyChanged(run);
+      if (!run.state || run.state.mode === C.MODES.INDEPENDENT) notice('');
       void evaluate();
     };
     ref.on('value', run.handler, e => {
