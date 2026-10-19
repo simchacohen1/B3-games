@@ -1,0 +1,31 @@
+
+/* Hebrew and visual reading order: first element of each row sits at right. */
+.section .hal-b-phrases,.section .hal-b-phrase-card,.section .hal-hebrew-order{direction:rtl}
+.section .hal-b-meaning{direction:ltr;text-align:right}
+.section .hal-b-phrase-actions{direction:ltr}
+.section .hal-hebrew-order .slot{text-align:center;direction:rtl}
+.section .matchgrid.m4{direction:rtl;display:flex;flex-flow:row wrap;justify-content:flex-start}
+.section .matchgrid.m4 button{flex:1 1 125px;min-width:110px;max-width:210px}
+.section .hal-extra-gallery{border:1px solid #cfdfef;border-radius:15px;padding:12px;margin:12px 0;background:linear-gradient(135deg,#fff9e9,#edf8ff)}
+.section .hal-extra-gallery h3{font-size:19px;color:#20446b;margin:0 0 4px}
+.section .hal-extra-explain{font-size:13px;color:#526779;margin:0 0 12px}
+.section .hal-extra-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;direction:rtl}
+.section .hal-extra-tile{margin:0;min-width:0;border:1px solid #cddfe7;border-radius:13px;background:#fff;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 4px 12px #1234}
+.section .hal-extra-visual{height:125px;display:grid;place-items:center;background:#fff8ed}
+.section .hal-extra-picture{width:100%;height:100%;object-fit:contain}
+.section .hal-extra-animal{font-size:80px;filter:drop-shadow(0 4px 4px #3344)}
+.section .hal-extra-tile figcaption{flex:1;display:grid;gap:5px;text-align:center;padding:8px}
+.section .hal-extra-tile figcaption strong{direction:rtl;font:900 22px/1.5 "Noto Serif Hebrew","Times New Roman",serif;color:#173d62}
+.section .hal-extra-tile figcaption span{font-size:12px;color:#4e6879}
+.section .hal-extra-actions{display:flex;gap:5px;padding:7px;direction:ltr}
+.section .hal-extra-actions button,.section .hal-extra-make{flex:1;border:1px solid #a9cfbc;border-radius:8px;padding:7px;background:#eefdf5;color:#255844;font-weight:800;cursor:pointer}
+.section .hal-extra-actions button:disabled,.section .hal-extra-make:disabled{opacity:.5;cursor:not-allowed}
+.section .hal-extra-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:11px}
+.section .hal-extra-make{flex:0 1 auto;background:#eaf2ff;border-color:#b9d1f1;color:#245687}
+.section .hal-extra-status{font-size:12px;color:#27734c;font-weight:800}
+.section .hal-extra-piece img{display:block;width:100%;height:auto;pointer-events:none}
+.section .hal-extra-animal-on-page{display:block;text-align:center;font-size:90px;line-height:1.4}
+.section .hal-extra-words .tb-text{direction:rtl;text-align:right;font-size:20px}
+@media(max-width:1000px){.section .hal-extra-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:530px){.section .hal-extra-visual{height:98px}.section .hal-extra-animal{font-size:64px}.section .hal-extra-actions{flex-direction:column}}
+@media print{.hal-extra-gallery{display:none!important}}
