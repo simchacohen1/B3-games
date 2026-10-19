@@ -39,7 +39,7 @@ test('Seif Aleph highlights the original phrases directly in the source',()=>{
  assert.match(seifA,/🔎 Find in the seif/);
  assert.match(seifA,/reading\.open = false/);
  assert.match(seifA,/seif-a-teacher-led\.css\?v=20261019-highlight1/);
- assert.match(html,/seif-a-teacher-led\.js\?v=20261019-shivisi-visible2/);
+ assert.match(html,/seif-a-teacher-led\.js\?v=20261019-shivisi-visible3/);
 });
 test('teacher transcription contains all nine complete and distinct Siman Beis seifim',()=>{
  const environment={window:{}};
