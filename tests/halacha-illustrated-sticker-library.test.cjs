@@ -20,15 +20,15 @@ test('all illustrated picture stickers are available from every lesson, on chose
  assert.match(editor,/const target=window\.studioTarget\(id\)/);
  assert.match(editor,/add\(id,'photo',[^\n]+,target\)/);
  assert.match(editor,/persist\(id\)/);
- assert.match(editor,/sticker(s)?\.querySelectorAll\('\[data-illustrated-sticker\]'\)/);
+ assert.match(editor,/document\.addEventListener\('click'/);
  assert.match(editor,/readonly\(\)/);
  assert.match(css,/\.studio-picture-library/);
  assert.match(css,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
 });
 test('new gallery remains optional: no automatic new pieces seeded into existing student pages',()=>{
  assert.match(editor,/const target=window\.studioTarget\(id\)/);
- assert.match(editor,/sticker(s)?\.querySelectorAll\('\[data-illustrated-sticker\]'\)/);
- assert.match(editor,/b\.addEventListener\('click'/);
+ assert.match(editor,/target\.closest && target\.closest/);
+ assert.match(editor,/window\.studioPictureSticker\(section\.id,btn\.dataset\.illustratedSticker\)/);
  assert.match(editor,/halachaPictureLookup\.has\(key\)/);
  assert.match(editor,/if\(readonly\(\)\|\|!halachaPictureLookup\.has\(key\)\)return/);
 });
@@ -36,6 +36,6 @@ test('corrected images are present and cache versions force a fresh download',()
  for(const f of ['modeh-ani','four-middos'])assert.ok(fs.statSync('halacha/art/seifim/'+f+'.jpg').size>20000);
  assert.match(art,/const cache='\?v=20261019-two-fixed-pictures5'/);
  assert.match(html,/illustrated-siman-a-extra\.js\?v=20261019-two-fixed-pictures5/);
- assert.match(html,/scrapbook-editor\.js\?v=20261019-all-stickers1/);
+ assert.match(html,/scrapbook-editor\.js\?v=20261019-sticker-click2/);
  assert.match(html,/scrapbook-editor\.css\?v=20261019-all-stickers1/);
 });
