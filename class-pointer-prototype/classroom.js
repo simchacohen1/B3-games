@@ -73,8 +73,9 @@ function drawPointers(){
   for(const [id,node] of pointerNodes)if(!visible.has(id)){node.remove();pointerNodes.delete(id)}
 }
 function publish(){
-  state.members=Array.from(members.values()).filter(member=>member.admitted).map(member=>({id:member.id,name:member.name,color:member.color,admitted:true,allowed:member.allowed,tools:memberTools(member)}));
+  state.members=[...members.values(),...presence.values()].filter(member=>member.admitted).map(member=>({id:member.id,name:member.name,color:member.color||'#57b8ff',admitted:true,allowed:member.allowed,tools:memberTools(member)}));
   for(const member of members.values())if(member.admitted)send(member.connection,{type:'state',state});
+  for(const member of presence.values())if(member.admitted){send(member.connection,{type:'lesson-tools',level:levelOf(member)});send(member.connection,{type:'lesson-marks',points:state.points,strokes:highlightStore.strokes,members:state.members})}
   drawPointers();pointerPermission();
 }
 function roster(){
@@ -102,7 +103,7 @@ function removeMember(member){
 function clearStudentHover(member){clearTimeout(member.pointTimer);member.pointTimer=null;member.pendingPoint=null}
 function commitStudentHover(member){
   member.pointTimer=null;const point=member.pendingPoint;member.pendingPoint=null;
-  if(!point||members.get(member.id)!==member||!live()||!selected(member)||!memberTools(member)?.pointer)return;
+  if(!point||(member.presence?presence.get(member.id):members.get(member.id))!==member||!live()||!selected(member)||!memberTools(member)?.pointer)return;
   member.lastPoint=Date.now();state.points[member.id]=point;publish();
 }
 function favorTextDetail(call){
@@ -193,8 +194,9 @@ function receiveStudent(connection){
       if(presence.get(member.id)!==member)return;
       if(message.type==='lesson-retry'&&message.id===activityPresentationId&&Date.now()-(member.lastLessonRetry||0)>2000){member.lastLessonRetry=Date.now();sendActivityLesson(member)}
       if(message.type==='where'){member.activity=cleanActivity(message.activity);roster()}
-      if(typeof message.type==='string'&&message.type.startsWith('board-'))window.ClassPointerBoards?.fromStudent(member,message);
-      return;
+      if(typeof message.type==='string'&&message.type.startsWith('board-')){window.ClassPointerBoards?.fromStudent(member,message);return}
+      // The same authenticated, permission-checked drawing pipeline serves embedded students.
+      if(!['point','pointer-hide','highlight','edit-highlights'].includes(message.type))return;
     }
     if(message.type==='join'&&!member){
       const gate=window.ClassPointerJoinGate;
@@ -217,10 +219,10 @@ function receiveStudent(connection){
       admitJoin(message);
       return;
     }
-    if(!member||members.get(member.id)!==member)return;
+    if(!member||(member.presence?presence.get(member.id):members.get(member.id))!==member)return;
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
     if(message.type==='highlight'&&live()&&selected(member)&&memberTools(member)?.[['pen','line','pen-arrow','rectangle','ellipse','triangle','text'].includes(message.stroke?.tool)?'pen':'highlight']){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
-    if(message.type==='edit-highlights'&&member.admitted){if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}return}
+    if(message.type==='edit-highlights'&&member.admitted&&(!member.presence||selected(member)&&memberTools(member)?.highlight||selected(member)&&memberTools(member)?.pen)){if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}return}
     if(message.type==='video-ready'&&member.admitted){member.videoReady=true;clearTimeout(member.mediaTimer)}
     if(message.type==='pointer-hide'&&member.admitted){clearStudentHover(member);delete state.points[member.id];member.lastPoint=0;publish()}
     if(message.type==='point'&&live()&&selected(member)&&memberTools(member)?.pointer&&C.validPoint(message.point)){
@@ -242,13 +244,13 @@ function admitPresence(connection,verified,activity){
   // the others), and the Students panel still lists him once.
   if(Array.from(presence.values()).filter(entry=>entry.studentId===studentId).length>=6||presence.size>=120){send(connection,{type:'full'});setTimeout(()=>connection.close(),300);return null}
   const entry={id:'presence:'+connection.peer,presence:true,admitted:true,studentId,name,activity:cleanActivity(activity),connection,connectedAt:Date.now()};
-  presence.set(entry.id,entry);send(connection,{type:'present'});sendActivityLesson(entry);
+  applyLevel(entry,savedLevel(name));presence.set(entry.id,entry);send(connection,{type:'present'});send(connection,{type:'lesson-tools',level:levelOf(entry)});send(connection,{type:'lesson-marks',points:state.points,strokes:highlightStore.strokes,members:state.members});sendActivityLesson(entry);
   window.ClassPointerBoards?.studentJoined(entry);roster();
   return entry;
 }
 function dropPresence(entry,notice){
   if(presence.get(entry.id)!==entry)return;
-  presence.delete(entry.id);closeActivityCall(entry);window.ClassPointerBoards?.studentLeft(entry);
+  presence.delete(entry.id);delete state.points[entry.id];highlightStore.edit(entry.id,'clear');publishHighlights();publish();closeActivityCall(entry);window.ClassPointerBoards?.studentLeft(entry);
   if(notice){send(entry.connection,{type:notice});setTimeout(()=>{try{entry.connection.close()}catch{}},300)}
   roster();
 }
@@ -615,12 +617,12 @@ if(isTeacher)window.ClassPointerRoster={
   levelForName(name){const key=String(name).toLocaleLowerCase();const m=Array.from(members.values()).find(x=>x.admitted&&x.name.toLocaleLowerCase()===key);return m?levelOf(m):savedLevel(name)},
   setLevelForName(name,level){
     if(!LEVELS.includes(level))return;const key=String(name).toLocaleLowerCase();nameLevels.set(key,level);
-    for(const m of members.values())if(m.admitted&&m.name.toLocaleLowerCase()===key)applyLevel(m,level);
+    for(const m of [...members.values(),...presence.values()])if(m.admitted&&m.name.toLocaleLowerCase()===key)applyLevel(m,level);
     state.mode='selected';$('accessMode').value='selected';publish();roster();
   },
   setAll(level){
     if(!LEVELS.includes(level))return;defaultLevel=level;nameLevels.clear();
-    for(const m of members.values())if(m.admitted)applyLevel(m,level);
+    for(const m of [...members.values(),...presence.values()])if(m.admitted)applyLevel(m,level);
     state.mode='selected';$('accessMode').value='selected';publish();roster();
   },
   admit(id){const m=members.get(id);if(!m||m.admitted)return;Array.from($('roster').querySelectorAll('button')).find(b=>b.textContent==='Admit '+m.name)?.click()},
@@ -632,7 +634,8 @@ function setAllPointerAccess(enabled){
   if(!isTeacher)return;
   state.mode='selected';
   $('accessMode').value='selected';
-  for(const member of members.values()){
+  defaultLevel=enabled?(state.tools.pen?'pen':state.tools.highlight?'highlight':'point'):'none';nameLevels.clear();
+  for(const member of [...members.values(),...presence.values()]){
     if(!member.admitted)continue;
     member.allowed=enabled;if(enabled)member.tools={...state.tools};
     if(!enabled){
@@ -644,7 +647,7 @@ function setAllPointerAccess(enabled){
 }
 $('pointerSelectAll')?.addEventListener('click',()=>setAllPointerAccess(true));
 $('pointerClearAll')?.addEventListener('click',()=>setAllPointerAccess(false));
-for(const [id,tool] of [['allowPointer','pointer'],['allowHighlight','highlight'],['allowPen','pen']]){$(id)?.addEventListener('change',()=>{state.tools[tool]=$(id).checked;for(const member of members.values())if(member.allowed)member.tools={...state.tools};if(!state.tools.pointer){for(const member of members.values()){clearStudentHover(member);delete state.points[member.id]}}publish()})}
+for(const [id,tool] of [['allowPointer','pointer'],['allowHighlight','highlight'],['allowPen','pen']]){$(id)?.addEventListener('change',()=>{state.tools[tool]=$(id).checked;for(const member of [...members.values(),...presence.values()])if(member.allowed)member.tools={...state.tools};if(!state.tools.pointer){for(const member of [...members.values(),...presence.values()]){clearStudentHover(member);delete state.points[member.id]}}publish()})}
 $('accessMode').addEventListener('change',()=>{
   state.mode=$('accessMode').value;for(const member of members.values())if(!C.canPoint(state.mode,member)){clearStudentHover(member);delete state.points[member.id];member.writeAllowed=false}publish();roster();
 });
@@ -663,7 +666,7 @@ $('sendEveryoneShare')?.addEventListener('click',requestEveryoneToShare);
 if($('tabScroll')){$('tabScroll').addEventListener('click',toggleTabScroll);$('tabZoomIn').addEventListener('click',()=>zoomTab(1));$('tabZoomOut').addEventListener('click',()=>zoomTab(-1))}
 $('joinForm').addEventListener('submit',joinClass);$('leaveClass').addEventListener('click',leaveClass);
 new ResizeObserver(drawPointers).observe($('stage'));$('lesson').addEventListener('loadedmetadata',drawPointers);$('lesson').addEventListener('resize',drawPointers);
-function publishHighlights(){highlighter?.receive(highlightStore.strokes);for(const member of members.values())if(member.admitted)send(member.connection,{type:'highlights',strokes:highlightStore.strokes})}
+function publishHighlights(){highlighter?.receive(highlightStore.strokes);for(const member of members.values())if(member.admitted)send(member.connection,{type:'highlights',strokes:highlightStore.strokes});for(const member of presence.values())if(member.admitted)send(member.connection,{type:'lesson-marks',points:state.points,strokes:highlightStore.strokes,members:state.members})}
 function submitStroke(stroke){if(isTeacher){if(highlightStore.add('teacher',stroke))publishHighlights();else fail('Highlight limit reached. Undo or clear some highlights.')}else if(writingAllowed(stroke.tool))send(teacherConnection,{type:'highlight',stroke})}
 function live(){return state.sharing||state.pdf===true}
 if(window.createClassHighlighter)highlighter=window.createClassHighlighter({
