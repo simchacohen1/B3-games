@@ -1667,16 +1667,30 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     }catch(e){console.warn(e);showLogin();}
   }
 
-  function switchStudent(){
+  async function switchStudent(){
+    // Clear the student identity first so auth callbacks cannot restore the
+    // previous student while Firebase finishes signing out.
     window.FTTFollowStudent?.stop();
     resetPinForm();
-    studentAccessRevoked=false;
+    studentAccessRevoked=true;
     if(studentMembershipWatch)studentMembershipWatch.off();
     if(studentClassWatch)studentClassWatch.off();
     if(studentProfileWatch)studentProfileWatch.off();
+    studentMembershipWatch=studentClassWatch=studentProfileWatch=null;
     ["b3Games_studentId","b3Games_studentName","b3Games_studentClass","b3Games_classPin","posukPractice_studentId","posukPractice_studentName","weeklyQuiz_classId"].forEach(k=>sessionStorage.removeItem(k));
     myStudentId=myStudentName=myClassId="";
     el("studentNameInput").value="";el("classPinInput").value="";setLoginMsg("");showLogin();
+    // Student tabs use the default Firebase app. Do NOT call the teacher
+    // settings signOut(): that would also erase the remembered Google login.
+    if(!isAuthorizedTeacher && firebase.auth().currentUser){
+      try { await firebase.auth().signOut(); }
+      catch(error){
+        console.warn("Could not sign out student Firebase session:",error);
+        setLoginMsg("Could not fully sign out. Please retry before another student signs in.");
+        return;
+      }
+    }
+    studentAccessRevoked=false;
   }
 
   function timeParts(value){
