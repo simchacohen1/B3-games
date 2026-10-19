@@ -788,7 +788,7 @@
   }
   function setOn(next){
     if(next&&!B.started())return;
-    on=next;suspended=false;drawer?.cancel();focusId=null;gridSize='';
+    on=next;suspended=false;if(!next)++workspaceRevision;drawer?.cancel();focusId=null;gridSize='';
     screenPermissionEnabled=next?(screenPermissionEnabled||mode==='screens'):false;
     for(const m of admitted())sendMode(m);
     view.hidden=!on;
@@ -932,7 +932,7 @@
       // The enclosing classroom ends by deleting the entire Firebase session.
       // Do not send an asynchronous child update here: it could recreate an
       // orphan studentScreenSharing flag after the session is removed.
-      boards.clear();blocked.clear();denied.screens.clear();denied.boards.clear();classStudents=[];permissionsLoad=null;renderPermissions();chooseActivity(null,dirtyAll);mode='screens';controls();
+      boards.clear();blocked.clear();denied.screens.clear();denied.boards.clear();classStudents=[];permissionsLoad=null;renderPermissions();chooseActivity(null,dirtyAll);mode='screens';suspended=false;screenPermissionEnabled=false;++workspaceRevision;controls();
       for(const tile of tiles.values()){tile.video.srcObject=null;tile.node.remove()}tiles.clear();
       if(on){on=false;focusId=null;view.hidden=true}
       if(toggle){toggle.setAttribute('aria-pressed','false');toggle.textContent='🖥 Student Screens';toggle.disabled=true}
