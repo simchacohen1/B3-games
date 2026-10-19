@@ -133,6 +133,8 @@
   }
 
   async function start({workspaceId, classId, studentId}) {
+    // Never redirect a teacher preview, embedded lesson, or another iframe.
+    if (window.top !== window) return;
     if (![workspaceId,classId,studentId].every(C.validId)) {stop(); return;}
     const auth = root.firebase?.auth?.();
     if (!auth?.currentUser) {stop(); return;}
