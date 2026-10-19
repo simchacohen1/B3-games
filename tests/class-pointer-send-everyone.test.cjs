@@ -156,7 +156,7 @@ test('connected share revocation closes the media connection rather than hiding 
   const student=source('student-boards.js');
   const activity=source('activity-share.js');
   const backend=fs.readFileSync(__dirname+'/../backend/functions/class-pointer-share-auth.js','utf8');
-  assert.match(student,/if\(!on\|\|excluded\(m,mode\)\)\{closeScreen\(m\);/);
+  assert.match(student,/if\(!on\|\|suspended\|\|excluded\(m,mode\)\)\{if\(!on\|\|excluded\(m,mode\)\)closeScreen\(m\);/);
   assert.match(student,/if\(!on\|\|mode!=='screens'\|\|blocked\)stopShare\(false\)/);
   assert.match(activity,/if\(!shareable\|\|!active\|\|shareable.roomId!==active.roomId\)\{if\(stream\)stop\(\)\}/);
   assert.match(backend,/classPointerSharePermissions/);
