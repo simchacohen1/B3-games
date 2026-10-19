@@ -5,7 +5,7 @@ const source=window.HalachaSimanBSource;
 if(!Array.isArray(source)||source.length!==9)return;
 const groups={
  s2a:{title:'Why We Wash & Our Tzitzis',intro:'We start each day ready to serve Hashem.',seifim:[1,2],phrases:[
-  {seif:1,word:'בְּרִיָּה חֲדָשָׁה',meaning:'like a new person'},
+  {seif:1,word:'בְרִיָּה חֲדָשָׁה',meaning:'like a new person'},
   {seif:1,word:'שָׁלֹשׁ פְּעָמִים מַיִם בְּסֵרוּגִים',meaning:'three times, alternating'},
   {seif:2,word:'הַטַּלִּית קָטָן',meaning:'the tallis katan'}],prompt:'I begin my morning with נטילת ידים and ציצית.'},
  s2b:{title:'The Order of Morning Washing',intro:'Learn the order and how to handle the washing water.',seifim:[3,4,5],phrases:[
