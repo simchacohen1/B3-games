@@ -56,7 +56,8 @@
       db.ref(classRoot + '/active').once('value'),
       db.ref('b3Games/siteSettings').once('value')
     ]);
-    if (!access.exists() || access.val() === false ||
+    // A class record with no `active` flag (live ET/WT) is active; only an explicit false blocks.
+    if (access.val() === false ||
         !member.exists() || member.child('active').val() === false ||
         profile.val() === false || member.child('toolAccess/shorashim').val() === false) return false;
     if (!['et', 'wt'].includes(classId) && enabled.val() !== true) return false;

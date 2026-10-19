@@ -131,3 +131,19 @@ test('homepage, activity gate and teacher interfaces include Follow Teacher',()=
     child.execFileSync(process.execPath,['--check',path.join(ROOT,file)]);
   }
 });
+
+test('live ET shape (no class active flag, member stored as true, no toolGrants) still follows',async()=>{
+  const h=harness({values:{
+    'b3Games/workspaces/b3-2026/classes/et/members/boy1':true,
+    'b3Games/workspaces/b3-2026/classes/et/active':null,
+    'b3Games/workspaces/b3-2026/classes/et/toolGrants/shorashim':null,
+    'b3Games/siteSettings':{games:{shorashim:true},classGames:{et:{shorashim:true}}}
+  }});
+  await fire(h,h.state);await runTimers(h);
+  assert.deepEqual(h.navigations,['https://funtorahtools.com/shorashim/']);
+});
+test('class explicitly marked inactive never moves student',async()=>{
+  const h=harness({values:{'b3Games/workspaces/b3-2026/classes/et/active':false}});
+  await fire(h,h.state);await runTimers(h);
+  assert.equal(h.navigations.length,0);
+});

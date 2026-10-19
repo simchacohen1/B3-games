@@ -377,8 +377,8 @@
   function startFollowTeacherListener(classId,studentId) {
     if (!classId || !studentId || isGuestPreview() || verifiedTeacherAccess?.authorized) return;
     if (!followLoader) {
-      followLoader = loadOneScript(new URL("follow-teacher/core.js?v=20261019-follow1",rootBase).href)
-        .then(()=>loadOneScript(new URL("follow-teacher/student.js?v=20261019-follow1",rootBase).href))
+      followLoader = loadOneScript(new URL("follow-teacher/core.js?v=20261019-follow2",rootBase).href)
+        .then(()=>loadOneScript(new URL("follow-teacher/student.js?v=20261019-follow2",rootBase).href))
         .catch(error=>{followLoader=null;throw error;});
     }
     followLoader.then(()=>{
