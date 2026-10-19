@@ -43,11 +43,28 @@
     }
     return target;
   }
+  function authReady(auth) {
+    if (auth.currentUser) return Promise.resolve(auth.currentUser);
+    return new Promise(resolve => {
+      let finished = false, unsubscribe = () => {};
+      const done = user => {
+        if (finished) return;
+        finished = true; clearTimeout(timer);
+        try { unsubscribe(); } catch (_) { }
+        resolve(user || null);
+      };
+      const timer = setTimeout(() => done(auth.currentUser), 5000);
+      try { unsubscribe = auth.onAuthStateChanged(done, () => done(null)); }
+      catch (_) { done(null); }
+    });
+  }
   async function authFor(ctx = context(), teacher = false) {
     try {
       if (!root.firebase) return null;
-      for (const app of root.firebase.apps || []) {
-        const user = app.auth && app.auth().currentUser;
+      const apps = root.firebase.apps || [], readyUsers = await Promise.all(apps.map(async app => {
+        try { return app.auth ? await authReady(app.auth()) : null; } catch (_) { return null; }
+      }));
+      for (const user of readyUsers) {
         if (!user || !user.getIdTokenResult) continue;
         try {
           const token = await user.getIdTokenResult(), claims = token.claims || {};
@@ -115,5 +132,5 @@
     return Object.values(readLocal(ctx).words).filter(word => source === 'all' || (word.sources || [word.source]).includes(source))
       .sort((a, b) => a.hebrew.localeCompare(b.hebrew, 'he'));
   }
-  root.FTTWordBank = { context, collect, list, recordAnswer, read: readLocal, sync, request, teacherRequest, mergeBank, storageKey };
+  root.FTTWordBank = { context, collect, list, recordAnswer, read: readLocal, sync, request, teacherRequest, mergeBank, storageKey, authFor };
 })(typeof window === 'object' ? window : globalThis);
