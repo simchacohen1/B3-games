@@ -319,7 +319,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
       <button class="btn continue-btn" id="continueBtn">▶ Continue my quest</button>
     </div>
     <div class="mode-gate-section">
-      <h3>Your Rashi path — master each step to unlock the next:</h3>
+      <h3>Choose any Rashi activity — all levels are open:</h3>
       <div class="letter-grid" id="letterGrid"></div>
     </div>
     <div class="mode-gate-section hidden" id="modeTypeSection">
@@ -375,7 +375,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 
   <div class="card" id="similarScreen">
     <div class="sim-head"><h2>Look-alike letters</h2><button class="menu-link" id="simMenuBtn">⬅ Menu</button></div>
-    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them! <b>Get 7 of 8 in 🎯 Match it to unlock the next step.</b></p>
+    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them! <b>Try to get 7 of 8 in 🎯 Match it!</b></p>
     <div class="sim-tabs">
       <button class="sim-tab" data-sim="explore">👀 Side by side</button>
       <button class="sim-tab" data-sim="match">🎯 Match it</button>
@@ -864,7 +864,7 @@ function stepMastered(idx){
   return !!chainFlags[flagKey(st)];   // no free passes: Look-alike and word steps must be mastered by everyone
 }
 // A step is open if it's already mastered (missions stay finished) or everything before it is mastered.
-function stepUnlocked(idx){ if(stepMastered(idx)) return true; for(let j=0;j<idx;j++) if(!stepMastered(j)) return false; return true; }
+function stepUnlocked(idx){ return idx>=0 && idx<STEPS.length; }
 function firstUnmasteredBefore(idx){ for(let j=0;j<idx;j++) if(!stepMastered(j)) return j; return idx; }
 function currentStep(){ return STEPS.findIndex((_,j)=>!stepMastered(j)); }
 function stepIndexOf(k,v){ return STEPS.findIndex(st=>st.k===k && (k==='similar' || st.n===v || st.i===v)); }
@@ -1608,10 +1608,8 @@ const PRACTICE_WORDS = [
 const baseLetters = w => w.normalize('NFD').replace(/[֑-ׇ]/g,'').split('');
 let wordLevel = 2, wordGame = null;
 function unlockedLetters(){
-  const set=new Set(SIMILAR);
-  const done = Math.min(typeof guidedIndex==='number'?guidedIndex:0, UNITS.length);
-  UNITS.slice(0,done).forEach(u=>(u.type==='single'?[u.correct]:u.pair).forEach(ch=>baseLetters(ch).forEach(c=>set.add(c))));
-  return set;
+  // Word practice is independent of prior mission completion.
+  return new Set(PRACTICE_WORDS.flatMap(baseLetters));
 }
 function wordsFor(level){
   const ok=unlockedLetters();
@@ -1636,7 +1634,7 @@ function renderWords(){
     const go=el('button','btn','Go there →'); go.onclick=()=>goStep(firstUnmasteredBefore(si)); area.appendChild(go); return;
   }
   if(g.pool.length<4){
-    area.append(el('p','prompt','Finish more missions to unlock '+g.level+'-letter words!'), el('p','sim-intro','These words use letters from missions you haven’t done yet. Try 2-letter words first.'));
+    area.append(el('p','prompt','There are not enough words available for this level.'), el('p','sim-intro','Try another word length.'));
     return;
   }
   if(g.round>=g.order.length){
