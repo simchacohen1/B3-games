@@ -354,3 +354,46 @@ test('gallery sizes one live screen large and shrinks automatically as streams j
   });
   await expect(page.locator('.board-tile')).toHaveCount(0);
 });
+
+
+test('teacher can cycle My screen, Student screens and Student whiteboards repeatedly without losing live capture',async({page})=>{
+  await openBoard(page,true);
+  await page.evaluate(()=>{
+    const teacher=document.createElement('div');teacher.id='teacherPanel';document.body.append(teacher);
+    const dock=document.createElement('div');dock.id='teacherDock';document.body.append(dock);
+    const src=document.createElement('canvas');src.width=480;src.height=270;
+    const stream=src.captureStream(2);
+    (window as any).__persistentStudentStream=stream;
+    (window as any).ClassPointerActivityShares={
+      streamFor:(id:string)=>id==='a'?stream:null,closeAll:()=>{throw Error('Switched tabs must not close capture')}
+    };
+    (window as any).__sharingFlags=[];
+    (window as any).__destinationCalls=[];
+    (window as any).ClassPointerDashboard.setStudentScreenSharing=async(on:boolean)=>(window as any).__sharingFlags.push(on);
+    (window as any).ClassPointerDashboard.requestStudentDestination=async(mode:string)=>(window as any).__destinationCalls.push(mode);
+  });
+  await page.addScriptTag({path:'class-pointer-prototype/workspace-layout.js'});
+  const screens=page.getByRole('button',{name:'Student screens',exact:true});
+  const boards=page.getByRole('button',{name:'Student whiteboards',exact:true});
+  const teach=page.getByRole('button',{name:'My screen',exact:true});
+  await screens.click();
+  await expect(page.locator('#boardsView')).toBeVisible();
+  await expect(page.locator('.board-tile')).toHaveCount(1);
+  for(let cycle=0;cycle<3;cycle++){
+    await boards.click();
+    await expect(page.locator('.board-tile')).toHaveCount(2);
+    await expect(boards).toHaveAttribute('aria-selected','true');
+    await expect.poll(()=>page.evaluate(()=>(window as any).__destinationCalls.filter((mode:string)=>mode==='boards').length)).toBe(cycle+1);
+    await teach.click();
+    await expect(page.locator('#boardsView')).toBeHidden();
+    await expect(teach).toHaveAttribute('aria-selected','true');
+    await screens.click();
+    await expect(page.locator('#boardsView')).toBeVisible();
+    await expect(screens).toHaveAttribute('aria-selected','true');
+    await expect(page.locator('.board-tile')).toHaveCount(1);
+    expect(await page.locator('.board-tile video').evaluate((v:HTMLVideoElement,_)=>v.srcObject===(window as any).__persistentStudentStream)).toBe(true);
+    await expect.poll(()=>page.evaluate(()=>(window as any).__destinationCalls.filter((mode:string)=>mode==='screens').length)).toBe(cycle+2);
+  }
+  expect(await page.evaluate(()=>(window as any).__sharingFlags)).not.toContain(false);
+  await page.evaluate(()=>(window as any).__persistentStudentStream.getTracks().forEach((track:MediaStreamTrack)=>track.stop()));
+});
