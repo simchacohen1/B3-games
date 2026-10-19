@@ -189,8 +189,14 @@ async function loadDashboard(){
     }).join('');
     const overallPct = totalAttempts ? Math.round((totalCorrect/totalAttempts)*100) : null;
     const phase = rec.currentPhase === 'word' ? 'word' : 'letter';
+    const lab = rec.alphabetLab || {};
+    const masterCount = rec.alphabetDone ? 27 : Object.values(lab.mastered || {}).filter(Boolean).length;
+    const weak = Object.entries(lab.stats || {}).filter(([,stat]) => stat && stat.attempts >= 2 && (stat.correct || 0)/stat.attempts < 0.7)
+      .map(([letter]) => letter).slice(0,5);
     return {
       slug, name: rec.name || slug,
+      masterCount, alphabetStarted:!!rec.alphabetDone || !!Object.keys(lab.stats||{}).length,
+      troubleLetters:weak, confusingMastered:!!rec.confusionDone,
       currentUnit: (typeof rec.currentUnitIndex === 'number') ? Math.min(rec.currentUnitIndex+1, UNITS.length) : 1,
       phase,
       overallPct, unitCells, lastActive: rec.lastActive
@@ -203,7 +209,7 @@ async function loadDashboard(){
   }
 
   let html = '<table><thead><tr>' +
-    '<th>Student</th><th>Unit</th><th>Phase</th><th>Accuracy</th><th>Letters</th><th>Last active</th>' +
+    '<th>Student</th><th>Alef-Beis</th><th>Tricky pairs</th><th>Unit</th><th>Phase</th><th>Accuracy</th><th>Letters</th><th>Last active</th>' +
     '</tr></thead><tbody>';
   rows.forEach(r => {
     const accClass = accuracyClass(r.overallPct);
@@ -212,6 +218,9 @@ async function loadDashboard(){
       : '<span class="phase-tag">Letter</span>';
     html += '<tr>' +
       '<td>' + escapeHtml(r.name) + '</td>' +
+      '<td>' + (r.alphabetStarted ? r.masterCount + ' / 27' : 'Not started') +
+        (r.troubleLetters.length ? '<br><small>Needs practice: ' + escapeHtml(r.troubleLetters.join(' · ')) + '</small>' : '') + '</td>' +
+      '<td>' + (r.confusingMastered ? '✓ Mastered' : 'Not yet') + '</td>' +
       '<td>' + r.currentUnit + ' / ' + UNITS.length + '</td>' +
       '<td>' + phaseTag + '</td>' +
       '<td class="' + accClass + '">' + (r.overallPct !== null ? r.overallPct + '%' : '—') + '</td>' +
