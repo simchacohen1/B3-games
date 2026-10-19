@@ -32,11 +32,10 @@ a{color:#1e40af}.hidden{display:none!important}
 <div id="gate" class="card">Checking your teacher account…</div>
 <div id="app" class="hidden">
 <div class="card"><label for="classSelect">Teaching class</label><select id="classSelect"></select>
-<p id="state" role="status">Independent — students can choose their activities.</p></div>
+<p id="state" role="status">Students are free to choose their activities.</p></div>
 <div class="card"><h2>1. Choose a mode</h2>
-<label class="mode"><input type="radio" name="mode" value="independent" checked><div><strong>Independent</strong><span>Students choose their own permitted tools.</span></div></label>
-<label class="mode"><input type="radio" name="mode" value="free"><div><strong>Follow once — Free afterward</strong><span>Send students to the selected activity once. They may leave afterward.</span></div></label>
-<label class="mode"><input type="radio" name="mode" value="locked"><div><strong>Follow Teacher — Locked</strong><span>Keep them on the selected activity until you unlock, change the mode or close this tab and the session expires.</span></div></label>
+<label class="mode"><input type="radio" name="mode" value="free" checked><div><strong>Follow once — Free afterward</strong><span>Send students to the selected activity once. They may leave afterward.</span></div></label>
+<label class="mode"><input type="radio" name="mode" value="locked"><div><strong>Follow Teacher — Locked</strong><span>Keep them on the selected activity until you unlock or close this tab and the session expires.</span></div></label>
 <label for="destination">Destination</label><select id="destination"></select>
 </div>
 <div class="card"><h2>2. Who follows</h2>
@@ -44,7 +43,7 @@ a{color:#1e40af}.hidden{display:none!important}
 <p>Individual student targeting will be added after its private access rules are verified.</p>
 </div>
 <div class="card"><div class="actions">
-<button id="apply" type="button">Apply mode</button>
+<button id="apply" type="button">Send students</button>
 <button id="unlock" type="button" class="stop">Unlock everyone</button>
 </div>
 <p id="status" role="status" aria-live="polite"></p>
