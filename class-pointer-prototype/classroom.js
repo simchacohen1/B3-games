@@ -634,7 +634,8 @@ function setAllPointerAccess(enabled){
   if(!isTeacher)return;
   state.mode='selected';
   $('accessMode').value='selected';
-  for(const member of members.values()){
+  defaultLevel=enabled?(state.tools.pen?'pen':state.tools.highlight?'highlight':'point'):'none';nameLevels.clear();
+  for(const member of [...members.values(),...presence.values()]){
     if(!member.admitted)continue;
     member.allowed=enabled;if(enabled)member.tools={...state.tools};
     if(!enabled){
@@ -646,7 +647,7 @@ function setAllPointerAccess(enabled){
 }
 $('pointerSelectAll')?.addEventListener('click',()=>setAllPointerAccess(true));
 $('pointerClearAll')?.addEventListener('click',()=>setAllPointerAccess(false));
-for(const [id,tool] of [['allowPointer','pointer'],['allowHighlight','highlight'],['allowPen','pen']]){$(id)?.addEventListener('change',()=>{state.tools[tool]=$(id).checked;for(const member of members.values())if(member.allowed)member.tools={...state.tools};if(!state.tools.pointer){for(const member of members.values()){clearStudentHover(member);delete state.points[member.id]}}publish()})}
+for(const [id,tool] of [['allowPointer','pointer'],['allowHighlight','highlight'],['allowPen','pen']]){$(id)?.addEventListener('change',()=>{state.tools[tool]=$(id).checked;for(const member of [...members.values(),...presence.values()])if(member.allowed)member.tools={...state.tools};if(!state.tools.pointer){for(const member of [...members.values(),...presence.values()]){clearStudentHover(member);delete state.points[member.id]}}publish()})}
 $('accessMode').addEventListener('change',()=>{
   state.mode=$('accessMode').value;for(const member of members.values())if(!C.canPoint(state.mode,member)){clearStudentHover(member);delete state.points[member.id];member.writeAllowed=false}publish();roster();
 });
