@@ -5515,10 +5515,16 @@ function gradeSingleTranslationSegment(idx, level){
       if(!res.ok) throw new Error('Grading request failed');
       const data = await res.json();
       if(data.verdict === 'no_speech'){
-        translationGradedResults[idx] = { verdict:'incorrect', feedback:"Didn't catch that piece — try recording again.", transcript:'', evidenceSaved:false };
-      } else {
-        translationGradedResults[idx] = { verdict: data.verdict, feedback: data.feedback || '', transcript: data.transcript || '', evidenceSaved:false, tries: ((translationGradedResults[idx] && translationGradedResults[idx].tries) || 0) + 1 };
+        // No speech is not a wrong translation. Keep the audio for a retry.
+        delete translationGradedResults[idx];
+        showTranslationSummary(level);
+        renderCurrentChunk();
+        return;
       }
+      if(data.verdict !== 'correct' && data.verdict !== 'incorrect'){
+        throw new Error('Unexpected translation grading verdict');
+      }
+      translationGradedResults[idx] = { verdict: data.verdict, feedback: data.feedback || '', transcript: data.transcript || '', evidenceSaved:false, tries: ((translationGradedResults[idx] && translationGradedResults[idx].tries) || 0) + 1 };
 
       // Save this individual piece now, not only after the entire posuk is
       // finished. A dispute button is only shown after this succeeds.
@@ -5530,7 +5536,9 @@ function gradeSingleTranslationSegment(idx, level){
       }
     }catch(err){
       console.error('gradeTranslationChunk error', err);
-      translationGradedResults[idx] = { verdict:'incorrect', feedback:'Could not check this piece — check your internet.', transcript:'', evidenceSaved:false };
+      // A network/API failure is not evidence that the student's translation is wrong.
+      // Keep any earlier valid grade, and leave an ungraded recording retryable.
+      if(!translationGradedResults[idx]) delete translationGradedResults[idx];
     }
     // Show the live score/breakdown card as soon as THIS piece is graded.
     // If its evidence could not be saved, the dispute control stays hidden
@@ -5601,7 +5609,7 @@ function showTranslationSummary(level){
     '</div>';
 
   if(attempted < total){
-    html += '<div class="translation-review-note">' + (total - attempted) + ' piece(s) were not recorded.</div>';
+    html += '<div class="translation-review-note">' + (total - attempted) + ' piece(s) still need successful grading.</div>';
   }
 
   // Free up object URLs from a previous render before making new ones.
