@@ -57,3 +57,23 @@ body.exporting .studio-draw-rail{display:none!important}
 .section[data-studio] .studio-sticker-status{color:#24694e;font-size:12px;font-weight:800;min-height:0;margin:4px 0}
 .section[data-studio] .studio-stickers .studio-more-stickers>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 @media(max-width:650px){.section[data-studio] .studio-stickers .studio-picture-library img{height:65px}}
+
+
+/* Keep the selected-piece toolbar above both full-size scrapbook pages.
+   Without explicit grid placement, prepending the toolbar into .book sends
+   .spread into the narrow drawing-rail column and squeezes saved artwork. */
+.section[data-studio] .book:has(> .studio-draw-rail){
+  grid-template-areas:"pages rail";
+}
+.section[data-studio] .book:has(> .studio-context.show):has(> .studio-draw-rail){
+  grid-template-areas:"context context" "pages rail";
+}
+.section[data-studio] .book > .spread{
+  grid-area:pages;
+  min-width:0;
+}
+.section[data-studio] .book > .studio-draw-rail{grid-area:rail}
+.section[data-studio] .book > .studio-context.show{
+  grid-area:context;
+  min-width:0;
+}
