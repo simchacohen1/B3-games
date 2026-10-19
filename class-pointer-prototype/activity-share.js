@@ -277,7 +277,9 @@
         own.on('call',incoming=>{if(presencePeer!==own){try{incoming.close()}catch{}return}incomingLesson(incoming)});
         await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('timeout')),15000);own.once('open',()=>{clearTimeout(t);resolve()});own.once('error',e=>{clearTimeout(t);reject(e)})});
         if(presencePeer!==own||latestSession?.roomId!==room)return;
-        own.on('error',error=>{if(presencePeer!==own)return;if(error?.type==='peer-unavailable'){stopPresence();return}retryPresence()});
+        // The teacher's room may not be registered yet (student page opened as the lesson starts):
+        // retry with backoff instead of giving up until a reload.
+        own.on('error',()=>{if(presencePeer!==own)return;retryPresence()});
         own.on('disconnected',()=>{if(presencePeer===own&&!own.destroyed){try{own.reconnect()}catch{}}});
         const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'joinIssue',room,classId,studentId:id,pin,peerId:own.id}),signal:AbortSignal.timeout(15000)});
         const ticket=await response.json().catch(()=>({}));
