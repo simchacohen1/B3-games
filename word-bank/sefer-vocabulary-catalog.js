@@ -1,76 +1,846 @@
-/* Mitzvah-specific concept groups for the 613-count Sefer HaMitzvos cycle.
-   Each group is selected from the English title of the matching P/N entry.
-   Terms are brief, vowelled Hebrew concepts suitable for a guided lesson. */
+/* Sefer HaMitzvos direct-reference vocabulary.
+ * IMPORTANT: Every displayed Hebrew term must be directly anchored to the
+ * numbered mitzvah's verified title/subject. Never pad with broad topic words.
+ * A title with no approved word has an empty matching activity, not guesses.
+ * To add vocabulary, add an explicit title-anchored match or a reviewed
+ * numbered-ref override. This is a safety constraint, not a target count.
+ */
 (function(root){
- const groups={
-  faith:[['אֱמוּנָה','faith'],['אֶחָד','one'],['הַשֵּׁם','Hashem']],
-  idols:[['עֲבוֹדָה זָרָה','idol worship'],['אֱמוּנָה','faith'],['אֱמֶת','truth']],
-  tefillah:[['תְּפִלָּה','prayer'],['שְׁמַע','Shema'],['בְּרָכָה','blessing']],
-  tefillin:[['תְּפִלִּין','tefillin'],['רֹאשׁ','head'],['יָד','arm']],
-  torah:[['תּוֹרָה','Torah'],['לִמּוּד','learning'],['סֵפֶר','book']],
-  social:[['אַהֲבָה','love'],['חֶסֶד','kindness'],['כָּבוֹד','respect']],
-  shabbat:[['שַׁבָּת','Shabbat'],['מְנוּחָה','rest'],['מְלָאכָה','prohibited work']],
-  holidays:[['יוֹם טוֹב','holiday'],['מוֹעֵד','festival'],['שִׂמְחָה','joy']],
-  passover:[['פֶּסַח','Passover'],['מַצָּה','matzah'],['חָמֵץ','chametz']],
-  temple:[['בֵּית הַמִּקְדָּשׁ','Beis Hamikdash'],['קָרְבָּן','offering'],['כֹּהֵן','Kohen']],
-  priest:[['כֹּהֵן','Kohen'],['עֲבוֹדָה','service'],['בִּגְדֵי כְּהֻנָּה','priestly garments']],
-  offering:[['קָרְבָּן','offering'],['מִזְבֵּחַ','altar'],['עֲבוֹדָה','service']],
-  kashrut:[['כָּשֵׁר','kosher'],['אָסוּר','forbidden'],['סִימָן','sign']],
-  agriculture:[['שָׂדֶה','field'],['תְּרוּמָה','Terumah'],['מַעֲשֵׂר','tithe']],
-  justice:[['בֵּית דִּין','court'],['דַּיָּן','judge'],['עֵד','witness']],
-  property:[['מָמוֹן','money/property'],['גְּנֵבָה','theft'],['הֲשָׁבָה','returning']],
-  lending:[['הַלְוָאָה','loan'],['רִבִּית','interest'],['צְדָקָה','tzedakah']],
-  speech:[['לָשׁוֹן','speech'],['אֱמֶת','truth'],['כָּבוֹד','respect']],
-  family:[['מִשְׁפָּחָה','family'],['קְדֻשָּׁה','holiness'],['דִּין','halachah']],
-  purity:[['טָהֳרָה','purity'],['טֻמְאָה','ritual impurity'],['מִקְוֶה','mikvah']],
-  vows:[['נֶדֶר','vow'],['שְׁבוּעָה','oath'],['קִיּוּם','keeping a promise']],
-  animals:[['בְּהֵמָה','animal'],['צִפּוֹר','bird'],['דָּם','blood']],
-  slavery:[['עֶבֶד','servant'],['שָׂכָר','wages'],['חֵרוּת','freedom']],
-  king:[['מֶלֶךְ','king'],['מִשְׁפָּט','justice'],['עַם','people']],
-  war:[['מִלְחָמָה','war'],['צָבָא','army'],['שָׁלוֹם','peace']],
-  land:[['אֶרֶץ יִשְׂרָאֵל','Land of Israel'],['נַחֲלָה','inheritance'],['שָׁכֵן','neighbor']],
-  tzaraas:[['צָרַעַת','tzaraat'],['כֹּהֵן','Kohen'],['טָהוֹר','pure']],
-  calendar:[['לוּחַ הַשָּׁנָה','calendar'],['חֹדֶשׁ','month'],['סְפִירָה','counting']],
-  sacred:[['קֹדֶשׁ','holiness'],['הַקְדָּשָׁה','dedication'],['חֵפֶץ','object']],
-  mezuzah:[['מְזוּזָה','mezuzah'],['מְזוּזוֹת','doorposts'],['בַּיִת','home']],
-  tzitzit:[['צִיצִית','tzitzit'],['בֶּגֶד','garment'],['פְּתִיל','thread']],
-  nazir:[['נָזִיר','Nazirite'],['נֶדֶר','vow'],['קְדֻשָּׁה','holiness']],
-  firstborn:[['בְּכוֹר','firstborn'],['פִּדְיוֹן','redemption'],['קָרְבָּן','offering']],
-  produce:[['לֶקֶט','fallen stalks'],['שִׁכְחָה','forgotten sheaves'],['פֵּאָה','field corner']],
-  jubilee:[['יוֹבֵל','Jubilee'],['שְׁמִטָּה','Sabbatical year'],['מְנוּחָה','rest']],
-  omer:[['סְפִירַת הָעֹמֶר','counting the Omer'],['יוֹם','day'],['חַג','holiday']],
-  commerce:[['מִסְחָר','business'],['מִדָּה','measure'],['אֱמֶת','honesty']],
-  clothing:[['בֶּגֶד','garment'],['צֶמֶר','wool'],['פִּשְׁתִּים','linen']],
-  confession:[['תְּשׁוּבָה','teshuvah'],['וִדּוּי','confession'],['חֵטְא','mistake'],['מְחִילָה','forgiveness']],
-  generalP:[['מִצְוָה','mitzvah'],['תּוֹרָה','Torah'],['לַעֲשׂוֹת','to do']],
-  generalN:[['מִצְוָה','mitzvah'],['תּוֹרָה','Torah'],['לֹא לַעֲשׂוֹת','not to do']]
- };
- const tests=[
-  ['mezuzah',/mezuzah/i],['tzitzit',/tzitzit/i],['calendar',/months and years|calendar|new month/i],
-  ['omer',/omer/i],['confession',/confess|repent/i],['nazir',/nazirite/i],['firstborn',/firstborn/i],['produce',/forgotten sheaves|fallen stalks|fallen grapes|grape clusters/i],
-  ['jubilee',/jubilee|sabbatical year/i],['commerce',/transaction|honest measurement|measurement|commerce|business/i],['clothing',/cross-dress|clothing|wool and linen|shaving|sideburn|scarring|tattoo|hair/i],
-  ['sacred',/sanctified object|sanctified objects|dedicated object|cherem|selling sanctified/i],
-  ['faith',/belief|believ|know (there|that)|unity|loving g-d|fear(ing)? g-d|g-d.s name|divine name|cursing g.{0,2}d|desecrating.*name|testing g.{0,2}d|heeding a prophet/i],
-  ['idols',/idol|idolat|false prophet|sorcer|witch|astrolog|omen|magic|divination|medium|\bov\b|yid.?oni|yi.?doni|molech|heathen|inciter|soothsaying|kneeling stones|worship|ornamental statuette|incantation|communication with the dead|consulting yid|consulting ov/i],
-  ['tefillin',/tefillin|phylacter/i],['tefillah',/prayer|shema|bless|grace after meals|kiddush|havdalah|shofar|trumpet|empty-handed/i],
-  ['torah',/torah|scroll|study|teach|scripture|learning|story of the exodus|exodus/i],['shabbat',/shabbat|sabbath/i],
-  ['passover',/passover|chametz|matzah|matsa|pesach/i],['holidays',/sukkot|sukkah|shavuot|rosh hashanah|yom kippur|festival|holiday|new month|new moon|shemini atzeret|omer/i],
-  ['priest',/high priest|priest|koh(en|anim)|levite|levi|holy foods|sacred portions|terumah|serving while inebriated/i],['offering',/offering|sacrifice|altar|incense|showbread|first harvest|sacrificial|perpetual fire|red heifer/i],['temple',/temple|sanctuary|ark|menorah/i],
-  ['kashrut',/kosher|non-kosher|unclean animal|forbidden animal|blood|meat|food|eating|chametz|fish|fowl|bird|locust/i],
-  ['agriculture',/field|crop|harvest|grain|vineyard|tree|fruit|tithe|terumah|first fruit|gleaning|corner of|planting|seeds|grapes|land during|jubilee|sabbatical/i],
-  ['justice',/court|judge|witness|testimony|judg(e|ment)|punish|penalty|fine|execution|death penalty|evidence|litigant|trial|bribery|murder|ransom|criminal|verdict|hanging|seducer|rapist|claims|majority decision|justice|advice|independent judicial|judicial system|indigent defendant|flogging|attacker|decapitated calf|hazard|removing hazards/i],
-  ['property',/theft|steal|rob|damage|property|lost object|lost article|lost item|returning|found object|deposit|guarding|watchman|guardian|renter|borrower|thief|restitution|paid guardian|abduction|transactions|withholding monies|plotting to acquire|coveted item|coveting|wanton destruction|perpetuity|unbalanced measure/i],
-  ['lending',/loan|lend|lending|interest|debt|charity|poor|tzedakah|pledge|collateral|money owed/i],
-  ['speech',/gossip|slander|embarrass|reprove|curse|swear|oath|vow|false|\blie\b|speech|words|verbal obligation|shaming|misleading advice|cursing one.s fellow/i],
-  ['vows',/vow|oath|swear/i],['purity',/purif|impur|mikvah|leper|tzaraat|menstrual|corpse|ritual bath|burying the dead|ritual purity/i],
-  ['animals',/animal|beast|bestiality|bird|mother bird|slaughter|kosher sign|fish|insect|worm|sciatic nerve|forbidden fats|flesh of a condemned ox|unredeemed firstborn|creeping land creatures/i],
-  ['slavery',/slave|servant|worker|wage|laborer|employee|master|bondsman/i],
-  ['king',/king|monarch|leader|ruler|half shekel|employ|measurement|oil of anointment|oil of anoint/i],['war',/war|enemy|army|battle|siege|soldier|amalek|seven nations|canaanite|treaties with/i],
-  ['land',/land of israel|inheritance|boundary|border|neighbor|dwelling|settling|city|house|home|city of refuge|refuge/i],
-  ['family',/marry|marriage|divorc|wife|husband|widow|family|parent|mother|father|incest|brother|sister|daughter|son|circumcision|adultery|reproduction|newly married|beautiful captive|suspected adulteress|out of wedlock|menstruating|homosexual|castrat|prostitute|provocative behavior/i],
-  ['social',/love|loving|hate|revenge|grudge|kindness|honor|respect|oppress|convert|proselyte|friend|emulat|assembling the jewish|clinging to the sages|clinging to those|reproving|burying the dead|rejecting an (egyptian|edomite)/i]
- ];
- function topic(title,ref){for(const [key,re] of tests)if(re.test(title))return key;return ref[0]==='P'?'generalP':'generalN'}
- function make(ref){const title=root.FTT_MITZVAH_TITLES[ref]||'';const topicKey=topic(title,ref);return groups[topicKey].map((pair,i)=>({id:'word:'+pair[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('he'),hebrew:pair[0],english:pair[1],source:'sefer-hamitzvos',topic:topicKey}))}
- root.FTTSeferVocabulary={groups,topic,forRef:make,title:ref=>'Sefer HaMitzvos · '+ref};
+ 'use strict';
+ const rules=[[/city of refuge/i,"עִיר מִקְלָט","city of refuge"],
+  [/exil|banish/i,"גָּלוּת","exile"],
+  [/inadvertent|unintentional|accidental/i,"שׁוֹגֵג","unintentional"],
+  [/murder|killer/i,"רוֹצֵחַ","killer"],
+  [/covet|plotting to acquire/i,"לֹא תַחְמֹד","do not covet"],
+  [/desir(e|ing) another|desire.*belong/i,"לֹא תִתְאַוֶּה","do not desire another's possession"],
+  [/property|possessions|owner|thief|steal|robbery/i,"רְכוּשׁ","property"],
+  [/idol|idolat|false god|foreign theolog|worship.*other/i,"עֲבוֹדָה זָרָה","idol worship"],
+  [/false prophet|prophec/i,"נְבִיא שֶׁקֶר","false prophet"],
+  [/prophet/i,"נָבִיא","prophet"],
+  [/sorc(er|ery)|witchcraft|divination|omen|astrolog|incantation|soothsaying|magic/i,"כִּשּׁוּף","sorcery"],
+  [/inciter|inciting/i,"מֵסִית","inciter"],
+  [/temple|sanctuary|beis hamikdash/i,"בֵּית הַמִּקְדָּשׁ","Beis Hamikdash"],
+  [/\bark\b/i,"אֲרוֹן הַבְּרִית","holy ark"],
+  [/menorah/i,"מְנוֹרָה","menorah"],
+  [/altar/i,"מִזְבֵּחַ","altar"],
+  [/incense/i,"קְטֹרֶת","incense"],
+  [/showbread/i,"לֶחֶם הַפָּנִים","showbread"],
+  [/anoint/i,"שֶׁמֶן הַמִּשְׁחָה","anointing oil"],
+  [/bless(ing|ings)|grace after meals/i,"בְּרָכָה","blessing"],
+  [/prayer|pray/i,"תְּפִלָּה","prayer"],
+  [/shema\b/i,"שְׁמַע יִשְׂרָאֵל","Shema"],
+  [/tefillin|phylacter/i,"תְּפִלִּין","tefillin"],
+  [/mezuzah/i,"מְזוּזָה","mezuzah"],
+  [/tzitzit|fringes/i,"צִיצִית","tzitzis"],
+  [/shofar/i,"שׁוֹפָר","shofar"],
+  [/trumpet/i,"חֲצוֹצְרוֹת","trumpets"],
+  [/torah|scripture/i,"תּוֹרָה","Torah"],
+  [/scroll|book/i,"סֵפֶר","scroll/book"],
+  [/stud(y|ying)|teach(ing)?|learning/i,"לִמּוּד","learning"],
+  [/shabbat|sabbath/i,"שַׁבָּת","Shabbos"],
+  [/work|labor/i,"מְלָאכָה","work"],
+  [/\brest(ing)?\b/i,"מְנוּחָה","rest"],
+  [/kiddush/i,"קִדּוּשׁ","Kiddush"],
+  [/havdalah/i,"הַבְדָּלָה","Havdalah"],
+  [/passover|pesach|paschal/i,"פֶּסַח","Pesach"],
+  [/matza(h)?/i,"מַצָּה","matzah"],
+  [/chametz|leaven/i,"חָמֵץ","chametz"],
+  [/sukkah|sukkot/i,"סֻכָּה","sukkah"],
+  [/shavuot/i,"שָׁבוּעוֹת","Shavuos"],
+  [/rosh hashanah/i,"רֹאשׁ הַשָּׁנָה","Rosh Hashanah"],
+  [/yom kippur/i,"יוֹם כִּפּוּר","Yom Kippur"],
+  [/shemini atzeret/i,"שְׁמִינִי עֲצֶרֶת","Shemini Atzeres"],
+  [/festival|holiday/i,"יוֹם טוֹב","Yom Tov"],
+  [/omer/i,"עֹמֶר","Omer"],
+  [/count(ing)?/i,"סְפִירָה","counting"],
+  [/month|new moon|rosh chodesh/i,"חֹדֶשׁ","month"],
+  [/year/i,"שָׁנָה","year"],
+  [/fast(ing)?/i,"צוֹם","fast"],
+  [/rejoic(ing|e)|joy/i,"שִׂמְחָה","joy"],
+  [/offering|sacrifice|sacrificial/i,"קָרְבָּן","offering"],
+  [/sin offering/i,"קָרְבַּן חַטָּאת","sin offering"],
+  [/guilt offering/i,"קָרְבַּן אָשָׁם","guilt offering"],
+  [/burnt offering/i,"קָרְבַּן עוֹלָה","burnt offering"],
+  [/meal offering/i,"מִנְחָה","meal offering"],
+  [/priest|kohen|high priest/i,"כֹּהֵן","Kohen"],
+  [/high priest/i,"כֹּהֵן גָּדוֹל","Kohen Gadol"],
+  [/levite/i,"לֵוִי","Levi"],
+  [/priestly garment|priest.s robe|breastplate|apron/i,"בִּגְדֵי כְּהֻנָּה","priestly garments"],
+  [/purif|ritual purity/i,"טָהֳרָה","ritual purity"],
+  [/impur|unclean|defil/i,"טֻמְאָה","ritual impurity"],
+  [/mikvah|immersi|ritual pool/i,"מִקְוֶה","mikvah"],
+  [/tzaraat|metzora|leper/i,"צָרַעַת","tzaraas"],
+  [/red heifer/i,"פָּרָה אֲדֻמָּה","red heifer"],
+  [/corpse|dead|bury|burial|funeral/i,"מֵת","deceased person"],
+  [/vow|pledge/i,"נֶדֶר","vow"],
+  [/oath|swear|swearing/i,"שְׁבוּעָה","oath"],
+  [/confess(ing|ion)?/i,"וִדּוּי","confession"],
+  [/repent|teshuva/i,"תְּשׁוּבָה","repentance"],
+  [/\bsins?\b/i,"חֵטְא","sin"],
+  [/theft|steal|thief/i,"גְּנֵבָה","theft"],
+  [/return(ing)? .*lost|lost (article|item|object)/i,"הֲשָׁבַת אֲבֵדָה","returning lost property"],
+  [/restitution/i,"תַּשְׁלוּמִין","compensation"],
+  [/damage|injury|goring|attacker/i,"נֶזֶק","damage"],
+  [/fire|arson/i,"אֵשׁ","fire"],
+  [/grazing animal|herd/i,"בְּהֵמָה","domestic animal"],
+  [/ox|bull/i,"שׁוֹר","ox"],
+  [/animal|beast|cattle/i,"בְּהֵמָה","animal"],
+  [/bird|fowl/i,"עוֹף","bird"],
+  [/fish/i,"דָּג","fish"],
+  [/insect|locust|grasshopper/i,"חָגָב","locust"],
+  [/blood/i,"דָּם","blood"],
+  [/meat|flesh/i,"בָּשָׂר","meat"],
+  [/slaughter/i,"שְׁחִיטָה","shechitah"],
+  [/kosher/i,"כָּשֵׁר","kosher"],
+  [/fat(s)?\b/i,"חֵלֶב","fat"],
+  [/cooking|boil/i,"בִּשּׁוּל","cooking"],
+  [/eating|consum(ing|ption)|food/i,"אֲכִילָה","eating"],
+  [/firstborn/i,"בְּכוֹר","firstborn"],
+  [/redeem|redemption/i,"פִּדְיוֹן","redemption"],
+  [/dough|challah/i,"חַלָּה","challah"],
+  [/tithe/i,"מַעֲשֵׂר","tithe"],
+  [/terumah|priestly portion/i,"תְּרוּמָה","terumah"],
+  [/first fruit/i,"בִּכּוּרִים","first fruits"],
+  [/field|crop|harvest|grain|wheat/i,"שָׂדֶה","field"],
+  [/vineyard|grape/i,"כֶּרֶם","vineyard"],
+  [/fruit|tree/i,"פְּרִי","fruit"],
+  [/sheave/i,"עֹמֶר","sheaf"],
+  [/forgotten sheaves/i,"שִׁכְחָה","forgotten sheaves"],
+  [/fallen stalk/i,"לֶקֶט","fallen stalks"],
+  [/field.s (corner|edge)|edges of the fields/i,"פֵּאָה","field corner"],
+  [/sabbatical|shemitta|shemitah/i,"שְׁמִטָּה","Shemitah"],
+  [/jubilee/i,"יוֹבֵל","Yovel"],
+  [/land of israel|eretz yisrael/i,"אֶרֶץ יִשְׂרָאֵל","Eretz Yisrael"],
+  [/jerusalem/i,"יְרוּשָׁלַיִם","Yerushalayim"],
+  [/inheritance|hereditary/i,"נַחֲלָה","inheritance"],
+  [/\bcit(?:y|ies)\b|walled cit/i,"עִיר","city"],
+  [/home|house|houses|dwelling/i,"בַּיִת","house"],
+  [/boundary|border/i,"גְּבוּל","boundary"],
+  [/judge|judgment|judicial|court|trial/i,"בֵּית דִּין","court"],
+  [/witness|testimony|evidence/i,"עֵד","witness"],
+  [/verdict|decision/i,"פְּסַק דִּין","ruling"],
+  [/execution|punish|death penalty|capital offense/i,"עֹנֶשׁ","punishment"],
+  [/flogg(ing)?/i,"מַלְקוֹת","lashes"],
+  [/bribe/i,"שֹׁחַד","bribe"],
+  [/ransom/i,"כֹּפֶר","ransom"],
+  [/fine\b/i,"קְנָס","fine"],
+  [/loan|lend|borrower|lending/i,"הַלְוָאָה","loan"],
+  [/interest/i,"רִבִּית","interest"],
+  [/debt/i,"חוֹב","debt"],
+  [/poor|charity|tzedakah/i,"צְדָקָה","tzedakah"],
+  [/measure|weight|scale/i,"מִדָּה","measure"],
+  [/business|transaction|buy|sell|selling|sale/i,"מִקָּח וּמִמְכָּר","buying and selling"],
+  [/lost|deposit|watchman|guard(ian|ing)?|custody/i,"שְׁמִירָה","guarding"],
+  [/servant|slave|bondsman|maidservant/i,"עֶבֶד","servant"],
+  [/wage|employee|worker|laborer/i,"שָׂכָר","wages"],
+  [/\bking\b|\bmonarch\b/i,"מֶלֶךְ","king"],
+  [/army|battle|\bwar\b|siege/i,"מִלְחָמָה","war"],
+  [/amalek/i,"עֲמָלֵק","Amalek"],
+  [/egypt/i,"מִצְרַיִם","Egypt"],
+  [/canaanite|seven nations/i,"שֶׁבַע עֲמָמִים","seven nations"],
+  [/marry|married|marriage|husband|wife|widow/i,"נִשּׂוּאִין","marriage"],
+  [/divorce/i,"גֵּט","get (divorce document)"],
+  [/circumcision/i,"בְּרִית מִילָה","bris milah"],
+  [/brother|sister|father|mother|parent|daughter|\bson\b/i,"מִשְׁפָּחָה","family"],
+  [/levirate|yibbum/i,"יִבּוּם","yibbum"],
+  [/beautiful captive/i,"יְפַת תֹּאַר","beautiful captive"],
+  [/sotah|suspected adulteress/i,"סוֹטָה","sotah"],
+  [/kindness/i,"חֶסֶד","kindness"],
+  [/love|loving/i,"אַהֲבָה","love"],
+  [/hatred|hate/i,"שִׂנְאָה","hatred"],
+  [/revenge|vengeance/i,"נְקָמָה","revenge"],
+  [/grudge/i,"נְטִירָה","holding a grudge"],
+  [/respect|honor|honoring/i,"כָּבוֹד","honor"],
+  [/reprov|rebuk/i,"תּוֹכֵחָה","rebuke"],
+  [/slander|gossip/i,"לָשׁוֹן הָרָע","slander"],
+  [/curse|cursing/i,"קְלָלָה","curse"],
+  [/truth|false testimony|deceit|dishonest/i,"שֶׁקֶר","falsehood"],
+  [/hol(y|iness)|sanctif|sacred/i,"קֹדֶשׁ","holiness"],
+  [/g-d|hashem|divine/i,"הַשֵּׁם","Hashem"],
+  [/belief|believ/i,"אֱמוּנָה","faith"],
+  [/\bunity\b|one g-d/i,"אֶחָד","one"],
+  [/fear|reverence/i,"יִרְאָה","fear/reverence"],
+  [/nazirite/i,"נָזִיר","nazir"],
+  [/hair|shav(e|ing)|sideburn/i,"שֵׂעָר","hair"],
+  [/cloth|garment|clothes|robe|wearing/i,"בֶּגֶד","garment"],
+  [/wool/i,"צֶמֶר","wool"],
+  [/linen/i,"פִּשְׁתִּים","linen"],
+  [/tattoo/i,"כְּתוֹבֶת קַעֲקַע","tattoo"],
+  [/\boil\b/i,"שֶׁמֶן","oil"],
+  [/salt/i,"מֶלַח","salt"],
+  [/honey/i,"דְּבַשׁ","honey"],
+  [/wine|inebriat|drunk/i,"יַיִן","wine"],
+  [/bread/i,"לֶחֶם","bread"],
+  [/water/i,"מַיִם","water"],
+  [/circumvent|avoid|neglect/i,"בִּטּוּל","neglect"]];
+ const overrides={
+  "P225": [
+    [
+      "עִיר מִקְלָט",
+      "city of refuge"
+    ],
+    [
+      "גָּלוּת",
+      "exile"
+    ],
+    [
+      "בֵּית דִּין",
+      "Jewish court"
+    ]
+  ],
+  "N265": [
+    [
+      "לֹא תַחְמֹד",
+      "do not covet"
+    ],
+    [
+      "חֶמְדָּה",
+      "coveting"
+    ],
+    [
+      "רְכוּשׁ הַזּוּלָת",
+      "another person's possessions"
+    ]
+  ],
+  "N266": [
+    [
+      "לֹא תִתְאַוֶּה",
+      "do not desire another's possessions"
+    ],
+    [
+      "תַּאֲוָה",
+      "desire"
+    ],
+    [
+      "רְכוּשׁ הַזּוּלָת",
+      "another person's possessions"
+    ]
+  ],
+  "N4": [
+    [
+      "פֶּסֶל",
+      "statue"
+    ]
+  ],
+  "N7": [
+    [
+      "מֹלֶךְ",
+      "Molech"
+    ]
+  ],
+  "N8": [
+    [
+      "אוֹב",
+      "Ov"
+    ]
+  ],
+  "N9": [
+    [
+      "יִדְּעֹנִי",
+      "Yidoni"
+    ]
+  ],
+  "N11": [
+    [
+      "בֵּית עֲבוֹדָה זָרָה",
+      "place of idol worship"
+    ]
+  ],
+  "N12": [
+    [
+      "אֶבֶן מַשְׂכִּית",
+      "kneeling stone"
+    ],
+    [
+      "הִשְׁתַּחֲוָאָה",
+      "bowing"
+    ]
+  ],
+  "N23": [
+    [
+      "עִיר הַנִּדַּחַת",
+      "apostate city"
+    ],
+    [
+      "עֲבוֹדָה זָרָה",
+      "idol worship"
+    ]
+  ],
+  "N24": [
+    [
+      "עִיר הַנִּדַּחַת",
+      "apostate city"
+    ],
+    [
+      "עֲבוֹדָה זָרָה",
+      "idol worship"
+    ]
+  ],
+  "N30": [
+    [
+      "חֻקּוֹת הַגּוֹיִם",
+      "practices of other nations"
+    ]
+  ],
+  "N36": [
+    [
+      "שְׁאֵלַת אוֹב",
+      "consulting an Ov"
+    ]
+  ],
+  "N37": [
+    [
+      "שְׁאֵלַת יִדְּעֹנִי",
+      "consulting a Yidoni"
+    ]
+  ],
+  "N40": [
+    [
+      "לֹא יִלְבַּשׁ",
+      "do not cross-dress"
+    ],
+    [
+      "בְּגָדִים",
+      "clothing"
+    ]
+  ],
+  "N45": [
+    [
+      "שְׂרִיטָה",
+      "scarring"
+    ]
+  ],
+  "N54": [
+    [
+      "אֲדוֹמִי",
+      "Edomite"
+    ]
+  ],
+  "N57": [
+    [
+      "בַּל תַּשְׁחִית",
+      "do not destroy needlessly"
+    ],
+    [
+      "הַשְׁחָתָה",
+      "destruction"
+    ]
+  ],
+  "N63": [
+    [
+      "חִלּוּל הַשֵּׁם",
+      "desecrating Hashem's Name"
+    ]
+  ],
+  "N64": [
+    [
+      "לֹא תְנַסּוּ",
+      "do not test Hashem"
+    ]
+  ],
+  "N65": [
+    [
+      "בֵּית הַמִּקְדָּשׁ",
+      "Beis Hamikdash"
+    ],
+    [
+      "אִסּוּר הַשְׁחָתָה",
+      "prohibition against destroying"
+    ]
+  ],
+  "N157": [
+    [
+      "מוֹצָא שְׂפָתֶיךָ",
+      "what you promise"
+    ],
+    [
+      "הֲפָרַת הַבְטָחָה",
+      "breaking a promise"
+    ]
+  ],
+  "N176": [
+    [
+      "שְׁרָצִים",
+      "creeping creatures"
+    ]
+  ],
+  "N183": [
+    [
+      "גִּיד הַנָּשֶׁה",
+      "sciatic nerve"
+    ]
+  ],
+  "N215": [
+    [
+      "כִּלְאַיִם",
+      "forbidden mixtures"
+    ],
+    [
+      "זְרָעִים",
+      "seeds"
+    ]
+  ],
+  "N243": [
+    [
+      "גְּנֵבַת נֶפֶשׁ",
+      "kidnapping"
+    ]
+  ],
+  "N247": [
+    [
+      "עֹשֶׁק",
+      "withholding money owed"
+    ],
+    [
+      "שָׂכָר",
+      "wages"
+    ]
+  ],
+  "N250": [
+    [
+      "יֹשֶׁר",
+      "honesty"
+    ],
+    [
+      "מִשָּׂא וּמַתָּן",
+      "commerce"
+    ]
+  ],
+  "N251": [
+    [
+      "אוֹנָאַת דְּבָרִים",
+      "hurtful words"
+    ]
+  ],
+  "N252": [
+    [
+      "אוֹנָאַת דְּבָרִים",
+      "hurtful words"
+    ],
+    [
+      "גֵּר",
+      "convert"
+    ]
+  ],
+  "N273": [
+    [
+      "מִשְׁפַּט צֶדֶק",
+      "just judgment"
+    ],
+    [
+      "בֵּית דִּין",
+      "court"
+    ]
+  ],
+  "N275": [
+    [
+      "בַּעַל דִּין",
+      "litigant"
+    ],
+    [
+      "מַשּׂוֹא פָּנִים",
+      "favoritism"
+    ]
+  ],
+  "N277": [
+    [
+      "בַּעַל דִּין",
+      "litigant"
+    ],
+    [
+      "דַּל",
+      "poor person"
+    ]
+  ],
+  "N278": [
+    [
+      "בַּעַל דִּין",
+      "litigant"
+    ],
+    [
+      "דַּיָּן",
+      "judge"
+    ]
+  ],
+  "N280": [
+    [
+      "גֵּר",
+      "convert"
+    ],
+    [
+      "יָתוֹם",
+      "orphan"
+    ],
+    [
+      "מִשְׁפַּט צֶדֶק",
+      "just judgment"
+    ]
+  ],
+  "N281": [
+    [
+      "בַּעַל דִּין",
+      "litigant"
+    ],
+    [
+      "דַּיָּן",
+      "judge"
+    ]
+  ],
+  "N298": [
+    [
+      "מִכְשׁוֹל",
+      "hazard"
+    ],
+    [
+      "מַעֲקֶה",
+      "safety railing"
+    ]
+  ],
+  "N299": [
+    [
+      "עֵצָה רָעָה",
+      "bad advice"
+    ],
+    [
+      "לִפְנֵי עִוֵּר",
+      "do not mislead another"
+    ]
+  ],
+  "N303": [
+    [
+      "הַלְבָּנַת פָּנִים",
+      "public shaming"
+    ]
+  ],
+  "N340": [
+    [
+      "אִסּוּר עֲרָיוֹת",
+      "prohibited relationships"
+    ],
+    [
+      "דּוֹדָה",
+      "aunt"
+    ]
+  ],
+  "N341": [
+    [
+      "אִסּוּר עֲרָיוֹת",
+      "prohibited relationships"
+    ],
+    [
+      "דּוֹדָה",
+      "aunt"
+    ]
+  ],
+  "N346": [
+    [
+      "נִדָּה",
+      "niddah"
+    ],
+    [
+      "אִסּוּר עֲרָיוֹת",
+      "prohibited relationships"
+    ]
+  ],
+  "N347": [
+    [
+      "נִאוּף",
+      "adultery"
+    ]
+  ],
+  "N348": [
+    [
+      "רְבִיעָה",
+      "forbidden relations with an animal"
+    ],
+    [
+      "בְּהֵמָה",
+      "animal"
+    ]
+  ],
+  "N349": [
+    [
+      "רְבִיעָה",
+      "forbidden relations with an animal"
+    ],
+    [
+      "בְּהֵמָה",
+      "animal"
+    ]
+  ],
+  "N350": [
+    [
+      "מִשְׁכַּב זָכָר",
+      "prohibited male relations"
+    ]
+  ],
+  "N352": [
+    [
+      "אִסּוּר עֲרָיוֹת",
+      "prohibited relationships"
+    ],
+    [
+      "מִשְׁפָּחָה",
+      "family"
+    ]
+  ],
+  "N353": [
+    [
+      "פְּרִיצוּת",
+      "immodest behavior"
+    ]
+  ],
+  "N355": [
+    [
+      "אִסּוּר זְנוּת",
+      "prohibited relations outside marriage"
+    ]
+  ],
+  "N358": [
+    [
+      "גֵּט",
+      "divorce document"
+    ],
+    [
+      "אֹנֶס",
+      "coercion"
+    ]
+  ],
+  "N359": [
+    [
+      "מוֹצִיא שֵׁם רָע",
+      "one who defames"
+    ],
+    [
+      "גֵּט",
+      "divorce document"
+    ]
+  ],
+  "N360": [
+    [
+      "סְרִיס",
+      "castrated man"
+    ]
+  ],
+  "N361": [
+    [
+      "סֵרוּס",
+      "castration"
+    ]
+  ],
+  "P6": [
+    [
+      "חֲכָמִים",
+      "sages"
+    ],
+    [
+      "דְּבֵקוּת",
+      "clinging to"
+    ]
+  ],
+  "P8": [
+    [
+      "לָלֶכֶת בִּדְרָכָיו",
+      "to follow Hashem's ways"
+    ]
+  ],
+  "P16": [
+    [
+      "הַקְהֵל",
+      "gathering the Jewish people"
+    ],
+    [
+      "קָהָל",
+      "assembly"
+    ]
+  ],
+  "P94": [
+    [
+      "דִּבּוּר",
+      "speech"
+    ],
+    [
+      "קִיּוּם הַבְטָחָה",
+      "keeping a promise"
+    ]
+  ],
+  "P171": [
+    [
+      "מַחֲצִית הַשֶּׁקֶל",
+      "half-shekel"
+    ]
+  ],
+  "P177": [
+    [
+      "בַּעַל דִּין",
+      "litigant"
+    ],
+    [
+      "מִשְׁפַּט צֶדֶק",
+      "fair judgment"
+    ]
+  ],
+  "P181": [
+    [
+      "עֶגְלָה עֲרוּפָה",
+      "decapitated calf"
+    ]
+  ],
+  "P182": [
+    [
+      "עָרֵי מִקְלָט",
+      "cities of refuge"
+    ]
+  ],
+  "P193": [
+    [
+      "מַחֲנֶה",
+      "camp"
+    ],
+    [
+      "יָתֵד",
+      "camp latrine peg"
+    ]
+  ],
+  "P194": [
+    [
+      "הֲשָׁבַת גְּזֵלָה",
+      "returning stolen property"
+    ]
+  ],
+  "P212": [
+    [
+      "פְּרוּ וּרְבוּ",
+      "be fruitful and multiply"
+    ]
+  ],
+  "P218": [
+    [
+      "אֹנֶס",
+      "coercion"
+    ],
+    [
+      "בֵּית דִּין",
+      "Jewish court"
+    ]
+  ],
+  "P220": [
+    [
+      "מְפַתֶּה",
+      "seducer"
+    ],
+    [
+      "בֵּית דִּין",
+      "Jewish court"
+    ]
+  ],
+  "P230": [
+    [
+      "תְּלִיָּה",
+      "hanging"
+    ]
+  ],
+  "P246": [
+    [
+      "טַעֲנוֹת",
+      "legal claims"
+    ],
+    [
+      "בֵּית דִּין",
+      "Jewish court"
+    ]
+  ],
+  "N232": [
+    [
+      "עָנִי",
+      "person in need"
+    ],
+    [
+      "צְדָקָה",
+      "tzedakah"
+    ]
+  ],
+  "N239": [
+    [
+      "מַשְׁכּוֹן",
+      "collateral"
+    ],
+    [
+      "בַּעַל חוֹב",
+      "debtor"
+    ]
+  ],
+  "N270": [
+    [
+      "עֶזְרָה",
+      "help"
+    ],
+    [
+      "נִזְקָק",
+      "person in need"
+    ]
+  ],
+  "N297": [
+    [
+      "פִּקּוּחַ נֶפֶשׁ",
+      "saving a life"
+    ],
+    [
+      "הַצָּלָה",
+      "rescue"
+    ]
+  ],
+  "P114": [
+    [
+      "עֲרָכִין",
+      "vowed valuation"
+    ],
+    [
+      "עֵרֶךְ",
+      "value"
+    ]
+  ],
+  "P169": [
+    [
+      "אַרְבַּעַת הַמִּינִים",
+      "the four species"
+    ],
+    [
+      "אֶתְרוֹג",
+      "esrog"
+    ],
+    [
+      "לוּלָב",
+      "lulav"
+    ]
+  ],
+  "P196": [
+    [
+      "הַעֲנָקָה",
+      "gifts at release"
+    ],
+    [
+      "עֶבֶד עִבְרִי",
+      "Jewish bondsman"
+    ]
+  ]
+};
+ const idOf=he=>'word:'+he.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('he');
+ function topic(title){return title?'direct':'unreviewed';}
+ function forRef(ref){
+   const title=String(root.FTT_MITZVAH_TITLES&&root.FTT_MITZVAH_TITLES[ref]||'');
+   if(!title)return [];
+   const direct=overrides[ref];
+   const pairs=direct||rules.filter(row=>row[0].test(title)).map(row=>row.slice(1));
+   const seen=new Set(),result=[];
+   for(const pair of pairs){
+     const id=idOf(pair[0]);
+     if(seen.has(id))continue;
+     seen.add(id);
+     result.push({id,hebrew:pair[0],english:pair[1],source:'sefer-hamitzvos',topic:'direct'});
+     if(result.length===3)break;
+   }
+   return result;
+ }
+ root.FTTSeferVocabulary={topic,forRef,title:ref=>'Sefer HaMitzvos · '+ref+' · '+(root.FTT_MITZVAH_TITLES[ref]||'')};
 })(typeof window==='object'?window:globalThis);

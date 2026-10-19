@@ -12,7 +12,7 @@
   if(!host)return;
   pairs=activeRef?root.FTTSeferVocabulary.forRef(activeRef):[];
   host.replaceChildren();
-  if(!pairs.length){announce('Choose a mitzvah card to see its words.',false);return}
+  if(!pairs.length){announce(activeRef?'Vocabulary is being reviewed for this mitzvah.':'Choose a mitzvah card to see its words.',false);return}
   root.FTTWordBank&&root.FTTWordBank.collect({id:'sefer:'+activeRef,title:root.FTTSeferVocabulary.title(activeRef)},pairs);
   const shuffled=pairs.slice().sort(()=>Math.random()-.5);
   const shuffledEnglish=pairs.slice().sort(()=>Math.random()-.5);
