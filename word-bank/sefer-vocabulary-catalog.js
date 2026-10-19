@@ -215,6 +215,540 @@
       "רְכוּשׁ הַזּוּלָת",
       "another person's possessions"
     ]
+  ],
+  "N4": [
+    [
+      "פֶּסֶל",
+      "statue"
+    ]
+  ],
+  "N7": [
+    [
+      "מֹלֶךְ",
+      "Molech"
+    ]
+  ],
+  "N8": [
+    [
+      "אוֹב",
+      "Ov"
+    ]
+  ],
+  "N9": [
+    [
+      "יִדְּעֹנִי",
+      "Yidoni"
+    ]
+  ],
+  "N11": [
+    [
+      "בֵּית עֲבוֹדָה זָרָה",
+      "place of idol worship"
+    ]
+  ],
+  "N12": [
+    [
+      "אֶבֶן מַשְׂכִּית",
+      "kneeling stone"
+    ],
+    [
+      "הִשְׁתַּחֲוָאָה",
+      "bowing"
+    ]
+  ],
+  "N23": [
+    [
+      "עִיר הַנִּדַּחַת",
+      "apostate city"
+    ],
+    [
+      "עֲבוֹדָה זָרָה",
+      "idol worship"
+    ]
+  ],
+  "N24": [
+    [
+      "עִיר הַנִּדַּחַת",
+      "apostate city"
+    ],
+    [
+      "עֲבוֹדָה זָרָה",
+      "idol worship"
+    ]
+  ],
+  "N30": [
+    [
+      "חֻקּוֹת הַגּוֹיִם",
+      "practices of other nations"
+    ]
+  ],
+  "N36": [
+    [
+      "שְׁאֵלַת אוֹב",
+      "consulting an Ov"
+    ]
+  ],
+  "N37": [
+    [
+      "שְׁאֵלַת יִדְּעֹנִי",
+      "consulting a Yidoni"
+    ]
+  ],
+  "N40": [
+    [
+      "לֹא יִלְבַּשׁ",
+      "do not cross-dress"
+    ],
+    [
+      "בְּגָדִים",
+      "clothing"
+    ]
+  ],
+  "N45": [
+    [
+      "שְׂרִיטָה",
+      "scarring"
+    ]
+  ],
+  "N54": [
+    [
+      "אֲדוֹמִי",
+      "Edomite"
+    ]
+  ],
+  "N57": [
+    [
+      "בַּל תַּשְׁחִית",
+      "do not destroy needlessly"
+    ],
+    [
+      "הַשְׁחָתָה",
+      "destruction"
+    ]
+  ],
+  "N63": [
+    [
+      "חִלּוּל הַשֵּׁם",
+      "desecrating Hashem's Name"
+    ]
+  ],
+  "N64": [
+    [
+      "לֹא תְנַסּוּ",
+      "do not test Hashem"
+    ]
+  ],
+  "N65": [
+    [
+      "בֵּית הַמִּקְדָּשׁ",
+      "Beis Hamikdash"
+    ],
+    [
+      "אִסּוּר הַשְׁחָתָה",
+      "prohibition against destroying"
+    ]
+  ],
+  "N157": [
+    [
+      "מוֹצָא שְׂפָתֶיךָ",
+      "what you promise"
+    ],
+    [
+      "הֲפָרַת הַבְטָחָה",
+      "breaking a promise"
+    ]
+  ],
+  "N176": [
+    [
+      "שְׁרָצִים",
+      "creeping creatures"
+    ]
+  ],
+  "N183": [
+    [
+      "גִּיד הַנָּשֶׁה",
+      "sciatic nerve"
+    ]
+  ],
+  "N215": [
+    [
+      "כִּלְאַיִם",
+      "forbidden mixtures"
+    ],
+    [
+      "זְרָעִים",
+      "seeds"
+    ]
+  ],
+  "N243": [
+    [
+      "גְּנֵבַת נֶפֶשׁ",
+      "kidnapping"
+    ]
+  ],
+  "N247": [
+    [
+      "עֹשֶׁק",
+      "withholding money owed"
+    ],
+    [
+      "שָׂכָר",
+      "wages"
+    ]
+  ],
+  "N250": [
+    [
+      "יֹשֶׁר",
+      "honesty"
+    ],
+    [
+      "מִשָּׂא וּמַתָּן",
+      "commerce"
+    ]
+  ],
+  "N251": [
+    [
+      "אוֹנָאַת דְּבָרִים",
+      "hurtful words"
+    ]
+  ],
+  "N252": [
+    [
+      "אוֹנָאַת דְּבָרִים",
+      "hurtful words"
+    ],
+    [
+      "גֵּר",
+      "convert"
+    ]
+  ],
+  "N273": [
+    [
+      "מִשְׁפַּט צֶדֶק",
+      "just judgment"
+    ],
+    [
+      "בֵּית דִּין",
+      "court"
+    ]
+  ],
+  "N275": [
+    [
+      "בַּעַל דִּין",
+      "litigant"
+    ],
+    [
+      "מַשּׂוֹא פָּנִים",
+      "favoritism"
+    ]
+  ],
+  "N277": [
+    [
+      "בַּעַל דִּין",
+      "litigant"
+    ],
+    [
+      "דַּל",
+      "poor person"
+    ]
+  ],
+  "N278": [
+    [
+      "בַּעַל דִּין",
+      "litigant"
+    ],
+    [
+      "דַּיָּן",
+      "judge"
+    ]
+  ],
+  "N280": [
+    [
+      "גֵּר",
+      "convert"
+    ],
+    [
+      "יָתוֹם",
+      "orphan"
+    ],
+    [
+      "מִשְׁפַּט צֶדֶק",
+      "just judgment"
+    ]
+  ],
+  "N281": [
+    [
+      "בַּעַל דִּין",
+      "litigant"
+    ],
+    [
+      "דַּיָּן",
+      "judge"
+    ]
+  ],
+  "N298": [
+    [
+      "מִכְשׁוֹל",
+      "hazard"
+    ],
+    [
+      "מַעֲקֶה",
+      "safety railing"
+    ]
+  ],
+  "N299": [
+    [
+      "עֵצָה רָעָה",
+      "bad advice"
+    ],
+    [
+      "לִפְנֵי עִוֵּר",
+      "do not mislead another"
+    ]
+  ],
+  "N303": [
+    [
+      "הַלְבָּנַת פָּנִים",
+      "public shaming"
+    ]
+  ],
+  "N340": [
+    [
+      "אִסּוּר עֲרָיוֹת",
+      "prohibited relationships"
+    ],
+    [
+      "דּוֹדָה",
+      "aunt"
+    ]
+  ],
+  "N341": [
+    [
+      "אִסּוּר עֲרָיוֹת",
+      "prohibited relationships"
+    ],
+    [
+      "דּוֹדָה",
+      "aunt"
+    ]
+  ],
+  "N346": [
+    [
+      "נִדָּה",
+      "niddah"
+    ],
+    [
+      "אִסּוּר עֲרָיוֹת",
+      "prohibited relationships"
+    ]
+  ],
+  "N347": [
+    [
+      "נִאוּף",
+      "adultery"
+    ]
+  ],
+  "N348": [
+    [
+      "רְבִיעָה",
+      "forbidden relations with an animal"
+    ],
+    [
+      "בְּהֵמָה",
+      "animal"
+    ]
+  ],
+  "N349": [
+    [
+      "רְבִיעָה",
+      "forbidden relations with an animal"
+    ],
+    [
+      "בְּהֵמָה",
+      "animal"
+    ]
+  ],
+  "N350": [
+    [
+      "מִשְׁכַּב זָכָר",
+      "prohibited male relations"
+    ]
+  ],
+  "N352": [
+    [
+      "אִסּוּר עֲרָיוֹת",
+      "prohibited relationships"
+    ],
+    [
+      "מִשְׁפָּחָה",
+      "family"
+    ]
+  ],
+  "N353": [
+    [
+      "פְּרִיצוּת",
+      "immodest behavior"
+    ]
+  ],
+  "N355": [
+    [
+      "אִסּוּר זְנוּת",
+      "prohibited relations outside marriage"
+    ]
+  ],
+  "N358": [
+    [
+      "גֵּט",
+      "divorce document"
+    ],
+    [
+      "אֹנֶס",
+      "coercion"
+    ]
+  ],
+  "N359": [
+    [
+      "מוֹצִיא שֵׁם רָע",
+      "one who defames"
+    ],
+    [
+      "גֵּט",
+      "divorce document"
+    ]
+  ],
+  "N360": [
+    [
+      "סְרִיס",
+      "castrated man"
+    ]
+  ],
+  "N361": [
+    [
+      "סֵרוּס",
+      "castration"
+    ]
+  ],
+  "P6": [
+    [
+      "חֲכָמִים",
+      "sages"
+    ],
+    [
+      "דְּבֵקוּת",
+      "clinging to"
+    ]
+  ],
+  "P8": [
+    [
+      "לָלֶכֶת בִּדְרָכָיו",
+      "to follow Hashem's ways"
+    ]
+  ],
+  "P16": [
+    [
+      "הַקְהֵל",
+      "gathering the Jewish people"
+    ],
+    [
+      "קָהָל",
+      "assembly"
+    ]
+  ],
+  "P94": [
+    [
+      "דִּבּוּר",
+      "speech"
+    ],
+    [
+      "קִיּוּם הַבְטָחָה",
+      "keeping a promise"
+    ]
+  ],
+  "P171": [
+    [
+      "מַחֲצִית הַשֶּׁקֶל",
+      "half-shekel"
+    ]
+  ],
+  "P177": [
+    [
+      "בַּעַל דִּין",
+      "litigant"
+    ],
+    [
+      "מִשְׁפַּט צֶדֶק",
+      "fair judgment"
+    ]
+  ],
+  "P181": [
+    [
+      "עֶגְלָה עֲרוּפָה",
+      "decapitated calf"
+    ]
+  ],
+  "P182": [
+    [
+      "עָרֵי מִקְלָט",
+      "cities of refuge"
+    ]
+  ],
+  "P193": [
+    [
+      "מַחֲנֶה",
+      "camp"
+    ],
+    [
+      "יָתֵד",
+      "camp latrine peg"
+    ]
+  ],
+  "P194": [
+    [
+      "הֲשָׁבַת גְּזֵלָה",
+      "returning stolen property"
+    ]
+  ],
+  "P212": [
+    [
+      "פְּרוּ וּרְבוּ",
+      "be fruitful and multiply"
+    ]
+  ],
+  "P218": [
+    [
+      "אֹנֶס",
+      "coercion"
+    ],
+    [
+      "בֵּית דִּין",
+      "Jewish court"
+    ]
+  ],
+  "P220": [
+    [
+      "מְפַתֶּה",
+      "seducer"
+    ],
+    [
+      "בֵּית דִּין",
+      "Jewish court"
+    ]
+  ],
+  "P230": [
+    [
+      "תְּלִיָּה",
+      "hanging"
+    ]
+  ],
+  "P246": [
+    [
+      "טַעֲנוֹת",
+      "legal claims"
+    ],
+    [
+      "בֵּית דִּין",
+      "Jewish court"
+    ]
   ]
 };
  const idOf=he=>'word:'+he.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('he');
