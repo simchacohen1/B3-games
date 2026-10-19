@@ -66,7 +66,7 @@
     if (!document.querySelector('link[data-hal-a-style]')) {
       const stylesheet = document.createElement('link');
       stylesheet.rel = 'stylesheet';
-      stylesheet.href = 'seif-a-teacher-led.css?v=20261019-compact1';
+      stylesheet.href = 'seif-a-teacher-led.css?v=20261019-highlight1';
       stylesheet.dataset.halAStyle = 'true';
       document.head.appendChild(stylesheet);
     }
