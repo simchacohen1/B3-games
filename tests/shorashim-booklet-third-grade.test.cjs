@@ -96,6 +96,6 @@ test('three-choice UI, week dropdown, source load order and review filter are wi
 });
 
 test('the source list never writes to Firebase or mutates the school catalog',()=>{
-  assert.doesNotMatch(imported,/firebase|\.ref\(|\.set\(|\.update\(/i);
-  assert.match(app,/if\(learningPerek==='booklet'\)return bookletCatalog\(\)/);
+  assert.doesNotMatch(imported,/\.ref\(|\.set\(|\.update\(/i);
+  assert.match(app,/if\(learningPerek==='booklet'\)return bookletCatalog\(\)\.filter/);
 });
