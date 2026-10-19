@@ -156,6 +156,7 @@
       return{left:(rect.width-w)/2,top:(rect.height-h)/2,width:w,height:h};
     }
     function renderLessonMarks(){
+      if(typeof markLayer.replaceChildren!=='function'||typeof pointerLayer.replaceChildren!=='function')return;
       const b=picture();
       for(const layer of [markLayer,pointerLayer,hitLayer])Object.assign(layer.style,{left:b.left+'px',top:b.top+'px',width:b.width+'px',height:b.height+'px'});
       markLayer.replaceChildren();pointerLayer.replaceChildren();
