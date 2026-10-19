@@ -1482,6 +1482,9 @@ const active=(members[id]?.active!==false&&profile.active!==false);
       }
       if(!customToken||!window.firebase?.auth)throw new Error("Could not secure your student sign-in. Please try again.");
       try{
+        // A real student login must remain in this tab only; teacher tabs
+        // continue to use their own Firebase sessions.
+        await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION);
         await firebase.auth().signInWithCustomToken(customToken);
       }catch(e){
         if(e?.code!=="auth/network-request-failed")throw e;
@@ -1598,6 +1601,20 @@ const active=(members[id]?.active!==false&&profile.active!==false);
     if(!id){showLogin();return;}
     showChecking();
     try{
+      if(actingStudent&&!isStudentPreview){
+        // The separate student tab has no teacher Firebase credentials.
+        // Authenticate its copied, server-verified student passcode before
+        // attempting any Firebase database reads.
+        const pin=String(sessionStorage.getItem("b3Games_classPin")||"").trim();
+        if(!pin){showLogin();setLoginMsg("Please reopen student view from your teacher tab.");return;}
+        const identity=await studentAuthCall({action:"login",name:actingStudent.name,pin,classId:actingStudent.classId});
+        if(!identity?.customToken||identity.id!==id||identity.classId!==actingStudent.classId){
+          throw new Error("This student no longer has access to the selected class.");
+        }
+        studentClassChoices=[{id:actingStudent.classId,name:actingStudent.className}];
+        await enterStudent({id,name:identity.name||actingStudent.name,classId:actingStudent.classId,customToken:identity.customToken});
+        return;
+      }
       let snap=await db.ref("b3Games/students/"+id+"/profile").once("value");
       let d=snap.val()||{};
       if(!snap.exists()){
