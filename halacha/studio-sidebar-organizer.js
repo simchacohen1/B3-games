@@ -45,17 +45,20 @@
       panes[key] = pane;
       holder.appendChild(pane);
     });
+    // Keep the five seif-specific title suggestions immediately visible above
+    // the category tabs, as they were before the sidebar reorganization.
+    // They remain collapsible, but are open when the lesson first loads.
+    const titleIdeas = side.querySelector(':scope > .hal-title-guidance');
+    if (titleIdeas) titleIdeas.open = true;
     const anchor = quickStep || actions;
     anchor.after(tabs, holder);
-    const fixed = new Set([header, intro, actions, quickStep, tabs, holder]);
+    const fixed = new Set([header, intro, actions, titleIdeas, quickStep, tabs, holder]);
     Array.from(side.children).forEach(el => {
       if (fixed.has(el)) return;
       if (el.matches('.studio-stickers, .hal-sticker-shelf')) {
         panes.pictures.appendChild(el);
       } else if (el.matches('.studio-backgrounds, .studio-reset, .studio-custom-bg')) {
         panes.styles.appendChild(el);
-      } else if (el.matches('.hal-title-guidance')) {
-        panes.words.appendChild(el);
       } else if (el.matches('.lesson-vocab')) {
         panes.lesson.appendChild(el);
       } else if (el.matches('.step')) {
