@@ -881,7 +881,9 @@
     const provider = new window.firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
 
-    return services.auth.signInWithPopup(provider).catch(function (error) {
+    // Keep a teacher's Google login in this tab. A student tab must never replace it.
+    return services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION)
+      .then(function () { return services.auth.signInWithPopup(provider); }).catch(function (error) {
       const code = error && error.code ? error.code : "";
       if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request" || code === "auth/operation-not-supported-in-this-environment") {
         return services.auth.signInWithRedirect(provider).then(function () { return null; });
@@ -1064,7 +1066,7 @@
       .sort(function (a, b) { return a.className.localeCompare(b.className); });
   }
 
-  async function startActingAsStudent(classId, studentId) {
+  async function startActingAsStudent(classId, studentId, studentTab) {
     classId = String(classId || ""); studentId = String(studentId || "");
     if (!ACTING_ID.test(classId) || !ACTING_ID.test(studentId)) throw new Error("Choose a student.");
     const services = ensureFirebase();
@@ -1086,23 +1088,51 @@
     const pin = String((result.passcodes || {})[studentId] || "").trim();
     if (!pin) throw new Error("This student doesn't have a passcode yet. Set one in Manage Class first.");
     const name = String(member.name || studentId);
-    clearStudentStorage();
-    sessionStorage.setItem("b3Games_studentId", studentId);
-    sessionStorage.setItem("b3Games_studentName", name);
-    sessionStorage.setItem("b3Games_studentClass", classId);
-    sessionStorage.setItem("b3Games_classPin", pin);
-    sessionStorage.setItem("posukPractice_studentId", studentId);
-    sessionStorage.setItem("posukPractice_studentName", name);
-    sessionStorage.setItem("weeklyQuiz_classId", classId);
-    sessionStorage.setItem("b3Games_workspaceId", WORKSPACE_ID);
-    sessionStorage.removeItem("b3TeacherBypass");
-    sessionStorage.setItem(ACTING_KEY, JSON.stringify({ id:studentId, name:name, classId:classId, className:String(cls.name || classId.toUpperCase()), startedAt:Date.now() }));
-    location.href = SITE_BASE + "index.html?v=20261007-tab-login";
+    // The student opens in a different tab, with its own Firebase session.
+    // Migrate the teacher's existing LOCAL login to SESSION before the child
+    // signs in; otherwise Firebase would broadcast the student's identity
+    // to every teacher tab using the same browser-wide auth persistence.
+    if (studentTab) {
+      if (studentTab.closed) throw new Error("The student tab was closed. Please try again.");
+      await services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION);
+    }
+    const studentSession = studentTab ? studentTab.sessionStorage : sessionStorage;
+    if (studentTab) studentSession.clear();
+    else clearStudentStorage();
+    studentSession.setItem("b3Games_studentId", studentId);
+    studentSession.setItem("b3Games_studentName", name);
+    studentSession.setItem("b3Games_studentClass", classId);
+    studentSession.setItem("b3Games_classPin", pin);
+    studentSession.setItem("posukPractice_studentId", studentId);
+    studentSession.setItem("posukPractice_studentName", name);
+    studentSession.setItem("weeklyQuiz_classId", classId);
+    studentSession.setItem("b3Games_workspaceId", WORKSPACE_ID);
+    studentSession.removeItem("b3TeacherBypass");
+    studentSession.setItem(ACTING_KEY, JSON.stringify({ id:studentId, name:name, classId:classId, className:String(cls.name || classId.toUpperCase()), startedAt:Date.now() }));
+    if (studentTab) {
+      studentSession.setItem("b3ActAsSeparateTab", "1");
+      // Do not leave a cross-tab opener path back into the teacher dashboard.
+      studentTab.opener = null;
+      studentTab.location.replace(SITE_BASE + "index.html?v=20261019-student-tab");
+    } else {
+      location.href = SITE_BASE + "index.html?v=20261019-student-tab";
+    }
   }
 
   function stopActingAsStudent() {
+    const separateTab = sessionStorage.getItem("b3ActAsSeparateTab") === "1";
     clearStudentStorage();
     try { sessionStorage.removeItem(ACTING_KEY); } catch (e) {}
+    if (separateTab) {
+      // The teacher is still signed in in the original tab. Close only this
+      // test-student tab; never navigate it to a teacher-only page.
+      const services = ensureFirebase();
+      Promise.resolve(services && services.auth ? services.auth.signOut() : null).catch(function () {}).then(function () {
+        window.close();
+        setTimeout(function () { if (!window.closed) location.href = SITE_BASE + "index.html"; }, 150);
+      });
+      return;
+    }
     location.href = SITE_BASE + "teacher-home.html";
   }
 
@@ -1134,7 +1164,7 @@
     const field = "width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font:15px Arial,sans-serif;margin-top:6px;background:#fff;color:#1f2937";
     wrap.innerHTML = '<div style="background:#fff;color:#1f2937;border-radius:18px;padding:22px;width:100%;max-width:420px;box-shadow:0 20px 50px rgba(0,0,0,.3)">' +
       '<h2 style="margin:0 0 6px;font-size:21px">Sign in as a student</h2>' +
-      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">See Fun Torah Tools exactly as this student does. Anything you do counts as their work. This tab keeps its own student login; other tabs stay as they are. Press <strong>Exit student view</strong> to come back.</p>' +
+      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">A new student tab opens while this teacher tab stays signed in. Anything you do in the student tab counts as that student's work. Press <strong>Exit student view</strong> to close the student tab.</p>' +
       '<label style="display:block;font-weight:700;font-size:14px">Class<select id="b3ActAsClass" style="' + field + '"><option>Loading\u2026</option></select></label>' +
       '<label style="display:block;font-weight:700;font-size:14px;margin-top:12px">Student<select id="b3ActAsStudent" style="' + field + '"></select></label>' +
       '<p id="b3ActAsMsg" style="min-height:20px;margin:12px 0 0;color:#b91c1c;font-size:14px"></p>' +
@@ -1157,8 +1187,15 @@
     };
     q("b3ActAsClass").onchange = fillStudents;
     q("b3ActAsGo").onclick = function () {
+      // Open synchronously with the click so popup blockers allow the new tab.
+      const studentTab = window.open("about:blank", "_blank");
+      if (!studentTab) {
+        q("b3ActAsMsg").textContent = "Please allow pop-ups for Fun Torah Tools, then try again.";
+        return;
+      }
       q("b3ActAsGo").disabled = true; q("b3ActAsMsg").style.color = "#475569"; q("b3ActAsMsg").textContent = "Opening\u2026";
-      startActingAsStudent(q("b3ActAsClass").value, q("b3ActAsStudent").value).catch(function (e) {
+      startActingAsStudent(q("b3ActAsClass").value, q("b3ActAsStudent").value, studentTab).catch(function (e) {
+        try { studentTab.close(); } catch (_error) {}
         q("b3ActAsMsg").style.color = "#b91c1c"; q("b3ActAsMsg").textContent = e.message || "Could not open this student.";
         q("b3ActAsGo").disabled = false;
       });
