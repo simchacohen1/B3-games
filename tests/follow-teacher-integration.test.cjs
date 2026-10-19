@@ -24,7 +24,7 @@ function harness(overrides={}) {
   const db={ref(key){return {
     on(event,fn){listeners.set(key,fn);},
     off(event,fn){if(listeners.get(key)===fn)listeners.delete(key)},
-    once:async()=>snap(values[key]??null)
+    once:async()=>{ if(overrides.onRead)await overrides.onRead(key); return snap(values[key]??null); }
   }}};
   const claims=overrides.claims??{b3StudentRole:'student',b3StudentId:'boy1',b3ClassId:'et'};
   const user={uid:'studentToken1',getIdTokenResult:async()=>({claims})};
@@ -258,4 +258,21 @@ test('unsubmitted quiz choices and in-flight reward requests veto following',()=
   assert.equal(workGuard('weekly-quiz/index.html',{markingComplete:false,selectedChoice:0,responseFor:()=>({saved:true}),displayedQuestion:0}),false);
   assert.equal(workGuard('student-rewards/student.js',{state:{busy:true}}),true);
   assert.equal(workGuard('student-rewards/student.js',{state:{busy:false}}),false);
+});
+
+test('new follow command is rechecked after an earlier permission check is in flight',async()=>{
+  let release; let paused=false;
+  const hold=new Promise(resolve=>{release=resolve});
+  const h=harness({onRead:async key=>{
+    if(!paused && key.endsWith('/members/boy1')){paused=true;await hold;}
+  }});
+  await h.ctx.FTTFollowStudent.start({workspaceId:'b3-2026',classId:'et',studentId:'boy1'});
+  const send=h.listeners.get('b3Games/workspaces/b3-2026/classes/et/access/followTeacher');
+  send({val:()=>({...h.state,revision:'old',mode:'independent'})});
+  await settle();
+  send({val:()=>({...h.state,revision:'new',destination:'shorashim'})});
+  release();
+  await settle();
+  await runTimers(h);
+  assert.deepEqual(h.navigations,['https://funtorahtools.com/shorashim/']);
 });
