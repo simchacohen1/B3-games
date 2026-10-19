@@ -2,7 +2,7 @@
 const {onRequest}=require('firebase-functions/v2/https');
 const admin=require('firebase-admin');
 if(!admin.apps.length)admin.initializeApp();
-const SAFE_PATH=/^[A-Za-z0-9_./-]{1,600}$/;
+const SAFE_PATH=/^[^\x00-\x1f\x7f\\?#]{1,600}$/u; // Uploaded filenames may include spaces or Hebrew.
 
 async function canReadMedia(db,identity,path){
   const parts=path.split('/');
