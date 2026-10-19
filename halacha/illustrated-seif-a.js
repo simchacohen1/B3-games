@@ -161,6 +161,13 @@
     else if (old) aside.insertBefore(shelf, old);
     else aside.appendChild(shelf);
   }
+  // Reinstall the picture gallery and sticker shelf after restoring the
+  // teacher/student scrapbook from account. No saved pages are edited.
+  var previousRender = render;
+  render = function (lesson) {
+    previousRender(lesson);
+    if (lesson && lesson.id === 'a') installArt();
+  };
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', installArt, {once: true});
   } else {
