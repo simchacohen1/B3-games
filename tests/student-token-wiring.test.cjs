@@ -7,7 +7,9 @@ const read=path=>fs.readFileSync(path,'utf8');
 test('homepage signs student sessions into Firebase with the selected class token',()=>{
   const html=read('index.html');
   assert.match(html,/action:"login",name:r\.name,pin,classId:r\.classId/);
-  assert.match(html,/signInWithCustomToken\(credential\.customToken\)/);
+  assert.match(html,/signInWithCustomToken\(customToken\)/);
+  assert.match(html,/setPersistence\(firebase\.auth\.Auth\.Persistence\.SESSION\)/);
+  assert.match(html,/if\(actingStudent&&!isStudentPreview\)/);
 });
 test('Posuk Practice, Chazara, and Shorashim point requests send Firebase ID tokens',()=>{
   assert.match(read('record_pesukim/student.html'),/Authorization':'Bearer '\+idToken/);
