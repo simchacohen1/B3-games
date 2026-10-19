@@ -96,9 +96,27 @@
     reading.className = 'hal-a-reading';
     reading.open = false;
     const readingTitle = make('summary', '', '📖 Full Kitzur text — click to read');
-    const fullText = make('p', 'hal-a-full-text', sourceText);
+    const fullText = make('p', 'hal-a-full-text');
     fullText.lang = 'he';
     fullText.dir = 'rtl';
+    // Highlight exact words IN the source text, preserving the original nekudos.
+    const startFirst = sourceText.indexOf('שִׁוִיתִי');
+    const endFirst = sourceText.indexOf('תָמִיד', startFirst) + 'תָמִיד'.length;
+    const startSecond = sourceText.indexOf('מְלֹא כָל הָאָרֶץ כְּבוֹדוֹ');
+    const matches = [
+      { start: startFirst, end: endFirst, label: 'shivisi' },
+      { start: startSecond, end: startSecond + 'מְלֹא כָל הָאָרֶץ כְּבוֹדוֹ'.length, label: 'melo' }
+    ].filter(m => m.start >= 0 && m.end > m.start).sort((a,b)=>a.start-b.start);
+    let from = 0;
+    matches.forEach((hit) => {
+      fullText.appendChild(document.createTextNode(sourceText.slice(from,hit.start)));
+      const marked = make('mark', 'hal-a-source-mark hal-a-mark-' + hit.label, sourceText.slice(hit.start,hit.end));
+      marked.id = 'hal-a-source-' + hit.label;
+      marked.setAttribute('title', 'Important phrase from this seif');
+      fullText.appendChild(marked);
+      from = hit.end;
+    });
+    fullText.appendChild(document.createTextNode(sourceText.slice(from)));
     reading.append(readingTitle, fullText);
     source.appendChild(make('p', 'hal-a-short-intro', 'Remembering Hashem helps us speak and behave carefully — at home, outside and when alone.'));
     source.appendChild(reading);
@@ -127,6 +145,18 @@
         words.appendChild(chip);
       }
       details.appendChild(words);
+      const phraseKey = phrase.he.includes('שִׁוִיתִי') ? 'shivisi' : 'melo';
+      const findSource = button('🔎 Find in the seif', () => {
+        reading.open = true;
+        const target = fullText.querySelector('#hal-a-source-' + phraseKey);
+        if (target) {
+          target.scrollIntoView({behavior: 'smooth', block: 'center'});
+          target.classList.add('hal-a-source-found');
+          setTimeout(() => target.classList.remove('hal-a-source-found'), 1800);
+        }
+      });
+      findSource.classList.add('hal-a-find-source');
+      details.appendChild(findSource);
       const savePhrase = button('＋ Add this phrase to my scrapbook', () => addScrapbookText(phrase.he, true));
       savePhrase.classList.add('hal-a-add-text');
       details.appendChild(savePhrase);
