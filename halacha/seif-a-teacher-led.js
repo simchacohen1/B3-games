@@ -231,6 +231,13 @@
   function escapeText(value) {
     return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   }
+  // Account restore rebuilds the lesson DOM. Always reattach Shivisi's
+  // guided learning on render, without altering stored page pieces.
+  const originalRender = render;
+  render = function (lesson) {
+    originalRender(lesson);
+    if (lesson && lesson.id === 'a') start();
+  };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
 })();
