@@ -26,12 +26,52 @@ test('word list does not label or disable future available words',()=>{
   const items=[{id:'first',front:'א',english:'first'},{id:'later',front:'ב',english:'later'}], nodes={};
   const document={getElementById(id){return nodes[id]||=({innerHTML:'',textContent:'',children:[],appendChild(el){this.children.push(el)}})},createElement(){return {}}};
   const s={cards:{}};
-  const ctx=vm.createContext({currentTrack:'shorashim',student:()=>s,visibleCatalog:()=>items,keyFor:(t,id)=>t+':'+id,document,selectedItemKey:null,escapeHTML:x=>x,reviewFilterLabel:()=>'Perek',loadEditorItem:()=>{}});
+  const ctx=vm.createContext({currentTrack:'shorashim',student:()=>s,learningCatalog:()=>items,keyFor:(t,id)=>t+':'+id,document,selectedItemKey:null,escapeHTML:x=>x,reviewFilterLabel:()=>'Perek',loadEditorItem:()=>{}});
   vm.runInContext(fn('renderWordList'),ctx);
   ctx.renderWordList();
   assert.equal(nodes.wordList.children.length,2);
   for(const btn of nodes.wordList.children){assert.notEqual(btn.disabled,true);assert.match(btn.innerHTML,/Choose • Learn/);assert.doesNotMatch(btn.className,/locked/);}
   assert.match(html,/Choose any word in any order/);
   assert.doesNotMatch(html,/New items unlock strictly in order/);
-  assert.match(html,/app\.js\?v=20261019-free-choice/);
+  assert.match(html,/app\.js\?v=20261019-perek-choice/);
+});
+
+test('Perek 18 and 19 learning lists stay separate without ordering locks',()=>{
+  const items=[
+    {id:'18-first',perek:18},{id:'18-second',perek:18},
+    {id:'19-first',perek:19},{id:'19-second',perek:19},
+    {id:'19-hidden',perek:19,hidden:true}
+  ],s={cards:{}};
+  const ctx=vm.createContext({currentTrack:'shorashim',learningPerek:18,
+    visibleCatalog:()=>items.filter(x=>!x.hidden),itemPerek:x=>Number(x.perek),
+    student:()=>s,keyFor:(t,id)=>t+':'+id});
+  vm.runInContext(fn('learningCatalog'),ctx);
+  vm.runInContext(fn('nextLearningUncreated'),ctx);
+  assert.deepEqual(Array.from(ctx.learningCatalog().map(x=>x.id)),['18-first','18-second']);
+  assert.equal(ctx.nextLearningUncreated().id,'18-first');
+  ctx.learningPerek=19;
+  assert.deepEqual(Array.from(ctx.learningCatalog().map(x=>x.id)),['19-first','19-second']);
+  assert.equal(ctx.nextLearningUncreated().id,'19-first');
+  s.cards['shorashim:19-first']={learnedAt:Date.now()};
+  assert.equal(ctx.nextLearningUncreated().id,'19-second');
+  assert.equal(ctx.learningCatalog('prefix').length,4); // non-Shorashim tracks are not filtered
+});
+
+test('choosing a perek updates the menu without leaving Shorashim',()=>{
+  const screens=[],ctx=vm.createContext({currentTrack:'prefix',learningPerek:18,selectedItemKey:'prefix:p',goScreen:x=>screens.push(x)});
+  vm.runInContext(fn('chooseLearningPerek'),ctx);
+  ctx.chooseLearningPerek('19');
+  assert.equal(ctx.currentTrack,'shorashim');
+  assert.equal(ctx.learningPerek,19);
+  assert.equal(ctx.selectedItemKey,null);
+  assert.deepEqual(screens,['learnScreen']);
+  ctx.chooseLearningPerek('18');
+  assert.equal(ctx.learningPerek,18);
+  assert.deepEqual(screens,['learnScreen','learnScreen']);
+  ctx.chooseLearningPerek('22');
+  assert.deepEqual(screens,['learnScreen','learnScreen']);
+  assert.match(html,/data-go="shorashimPerekScreen" data-track="shorashim"/);
+  assert.match(html,/data-learning-perek="18"/);
+  assert.match(html,/data-learning-perek="19"/);
+  assert.match(html,/changeLearningPerekBtn/);
 });
