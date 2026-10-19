@@ -23,7 +23,7 @@ async function canReadMedia(db,identity,path){
       db.ref(`b3Games/workspaces/b3-2026/classes/${classId}`).get(),
       db.ref(`b3Games/workspaces/b3-2026/classes/${classId}/members/${studentId}`).get()
     ]);
-    if(studentClass.child('active').val()!==true||membership.child('active').val()!==true)return false;
+    if(!studentClass.exists()||!membership.exists()||studentClass.child('active').val()===false||membership.child('active').val()===false)return false;
     if(studentId===ownerId)return true;
     if(!galleryPostId)return false;
     let post=await db.ref(`b3Games/workspaces/b3-2026/classes/${classId}/resources/gallery/posts/${galleryPostId}`).get();
@@ -40,7 +40,7 @@ async function canReadMedia(db,identity,path){
     db.ref(`b3Games/workspaces/b3-2026/teachers/${identity.uid}`).get(),
     db.ref(`b3Games/workspaces/b3-2026/classes/${classId}`).get()
   ]);
-  return teacher.child('active').val()===true&&teacher.child('classIds/'+classId).val()===true&&cls.child('active').val()===true&&cls.child('members/'+ownerId+'/active').val()===true;
+  return teacher.child('active').val()===true&&teacher.child('classIds/'+classId).val()===true&&cls.exists()&&cls.child('active').val()!==false&&cls.child('members/'+ownerId+'/active').val()!==false;
 }
 exports.canReadMedia=canReadMedia;
 
