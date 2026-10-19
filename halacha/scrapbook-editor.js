@@ -256,10 +256,13 @@ function upgrade(id){
  const moreStickers=Object.keys(svgBody).filter(k=>!stickerKeys.includes(k)).map(stickerButton).join('');
  const stickers=document.createElement('div');stickers.className='studio-stickers';
  const illustrated=halachaPictureStickers.map(([key,name])=>
-  '<button type="button" title="Add '+name+' to the selected scrapbook page" onclick="studioPictureSticker(\\''+id+'\\',\\''+key+'\\')"><img alt="" loading="lazy" src="art/stickers/'+key+'.jpg?v=20261019-illustrated-library1"><span>'+name+'</span></button>'
+  '<button type="button" data-illustrated-sticker="'+key+'" title="Add '+name+' to selected scrapbook page"><img alt="" loading="lazy" src="art/stickers/'+key+'.jpg?v=20261019-illustrated-library1"><span>'+name+'</span></button>'
  ).join('');
  stickers.innerHTML='<b>Illustrated stickers — every lesson</b><p class="studio-sticker-guide">Choose Page 1 or 2 above, then tap a picture.</p><div class="studio-picture-library">'+illustrated+'</div><p class="studio-sticker-status" role="status" aria-live="polite"></p><details class="studio-more-stickers"><summary>More drawings and decorations</summary><div>'+primaryStickers+moreStickers+'</div></details>';
  themes.after(stickers);
+ stickers.querySelectorAll('[data-illustrated-sticker]').forEach(b=>
+  b.addEventListener('click',()=>window.studioPictureSticker(id,b.dataset.illustratedSticker))
+ );
  const textBtn=side.querySelector('[onclick^="addTextBox"]');if(textBtn)textBtn.setAttribute('onclick',`studioText('${id}')`);
  const addRow=textBtn&&textBtn.closest('.step');if(addRow)actions.after(addRow);
  const help=side.querySelector('p:last-child');if(help)help.innerHTML='<small>Pick Move to edit pieces. Drag the blue dots to resize. Click a piece to change its style. Fill colors your drawings; stickers keep their own colors.</small>';
