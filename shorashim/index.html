@@ -1181,6 +1181,15 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shorashim-skin.css?v=20261013-skin">
 <link rel="stylesheet" href="compact-67.css?v=20261014-67-1">
+<style id="shorashim-perek-menu-styles">
+  .perek-choice-grid{margin:26px auto 0}
+  .perek-choice{min-height:215px;align-items:center;justify-content:center;text-align:center;gap:12px;border:2px solid #c7d2fe}
+  .perek-choice:hover,.perek-choice:focus-visible{border-color:#4f46e5;background:#eef2ff;outline-offset:3px}
+  .perek-choice .perek-number{font-size:52px;line-height:1;font-weight:900;color:#4338ca}
+  .perek-choice strong{font-size:clamp(23px,2.8vw,29px)}
+  .perek-choice .perek-progress{font-size:15px;font-weight:800;color:#475569}
+  .perek-choice-hint{text-align:center;color:#475569;font-size:15px;font-weight:700;margin:20px 0}
+</style>
 </head>
 <body>
   <section id="studentSiteClosed" class="login-gate hidden">
@@ -1236,7 +1245,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
               <strong>Review Shorashim</strong>
               <span>Review what you learned — and record your Chazara for points!</span>
             </button>
-            <button class="feature-card learn" data-go="learnScreen" data-track="shorashim">
+            <button class="feature-card learn" data-go="shorashimPerekScreen" data-track="shorashim">
               <span class="feature-icon">✏️</span>
               <strong>Learn New Shorashim</strong>
               <span>Learn new roots and make picture clues.</span>
@@ -1258,6 +1267,26 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
             </button>
           </div>
           <div class="stats-grid" id="studentStats"></div>
+        </section>
+
+        <section id="shorashimPerekScreen" class="screen">
+          <div class="section-head">
+            <button class="backBtn ghost">← Home</button>
+            <div><div class="eyebrow">Learn new Shorashim</div><h2>Choose a Perek</h2></div>
+          </div>
+          <div class="hero-grid two perek-choice-grid" aria-label="Choose Shorashim Perek">
+            <button type="button" class="feature-card learn perek-choice" data-learning-perek="18">
+              <span class="perek-number" lang="he" dir="rtl">י״ח</span>
+              <strong>Perek 18 Shorashim</strong>
+              <span class="perek-progress">See your words</span>
+            </button>
+            <button type="button" class="feature-card learn perek-choice" data-learning-perek="19">
+              <span class="perek-number" lang="he" dir="rtl">י״ט</span>
+              <strong>Perek 19 Shorashim</strong>
+              <span class="perek-progress">See your words</span>
+            </button>
+          </div>
+          <p class="perek-choice-hint">Choose either perek. You can learn the words in any order.</p>
         </section>
 
         <section id="affixHomeScreen" class="screen">
@@ -1282,6 +1311,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
               <div class="eyebrow">Learn and customize</div>
               <h2 id="learnHeading">Learn New Shorashim</h2>
             </div>
+            <button type="button" id="changeLearningPerekBtn" class="ghost hidden">← Change Perek</button>
             <div class="session-status" id="sessionStatus">Cards save as you go</div>
           </div>
 
@@ -1560,7 +1590,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-  <script src="app.js?v=20261019-free-choice"></script>
+  <script src="app.js?v=20261019-perek-choice"></script>
   <script src="review-categories.js?v=20260917-picturefix1"></script>
   <script src="../student-class.js?v=20261007-shared-account-v2"></script>
   <script src="../b3-race.js?v=20261007"></script>
