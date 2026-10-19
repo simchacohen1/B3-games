@@ -33,6 +33,7 @@
 <title>Rashi Letters</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Gveret+Levin&display=swap" rel="stylesheet">
 <style>
   @font-face{
     font-family: 'Mekorot Rashi';
@@ -813,7 +814,7 @@ async function loadProgress(){
   unitIndex = (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex <= UNITS.length) ? savedIndex : 0;
   phase = (rec.currentPhase === 'word') ? 'word' : 'letter';
   streak = 0; attemptsThisStep = 0; retryQuestion = null; guidedIndex = unitIndex; guidedPhase = phase;
-  chainFlags = { similarDone:!!rec.similarDone, words2Done:!!rec.words2Done, words3Done:!!rec.words3Done, words4Done:!!rec.words4Done };
+  chainFlags = { alphabetDone:!!rec.alphabetDone, confusionDone:!!rec.confusionDone, similarDone:!!rec.similarDone, words2Done:!!rec.words2Done, words3Done:!!rec.words3Done, words4Done:!!rec.words4Done };
 }
 
 function renderLetterGrid(){
@@ -825,7 +826,9 @@ function renderLetterGrid(){
     const unlocked = stepUnlocked(idx), mastered = stepMastered(idx);
     b.className = 'letter-pick-btn' + (st.k==='similar' ? ' similar-tile' : '') + (st.k==='words' ? ' words-tile' : '') + (unlocked ? '' : ' locked') + (mastered ? ' mastered' : '');
     let glyph, label;
-    if(st.k==='similar'){ glyph='ד ל ר'; label='Look-alike letters'; }
+    if(st.k==='alphabet'){ glyph='א ב ג'; label='All 27 letters'; }
+    else if(st.k==='confusion'){ glyph='ל צ ס'; label='Tricky pairs'; }
+    else if(st.k==='similar'){ glyph='ד ל ר'; label='Look-alike letters'; }
     else if(st.k==='words'){ glyph={2:'כִּי',3:'טוֹב',4:'תּוֹרָה'}[st.n]; label=st.n+'-letter words'; }
     else { const u=UNITS[st.i]; glyph = u.id==='finalreview' ? 'שׁ / שׂ' : u.label; label = u.id==='finalreview' ? 'Final review' : 'Mission ' + (st.i+1); }
     const badge = !unlocked ? '<span class="tile-lock">🔒</span>' : (mastered ? '<span class="tile-done">✓</span>' : (idx===cur ? '<span class="start-here">'+(idx===0?'START HERE':'NEXT')+'</span>' : ''));
@@ -843,12 +846,14 @@ function renderLetterGrid(){
 }
 
 /* ---------- Locked path in "Reading Rashi Made Easy Shmeezy" order ---------- */
-const STEPS = [{k:'similar'},{k:'words',n:2},{k:'words',n:3},{k:'unit',i:0},{k:'unit',i:1},{k:'words',n:4},
+const STEPS = [{k:'alphabet'},{k:'confusion'},{k:'similar'},{k:'words',n:2},{k:'words',n:3},{k:'unit',i:0},{k:'unit',i:1},{k:'words',n:4},
   {k:'unit',i:2},{k:'unit',i:3},{k:'unit',i:4},{k:'unit',i:5},{k:'unit',i:6},{k:'unit',i:7},{k:'unit',i:8}];
 const MASTER_MATCH = 7, MASTER_WORDS = 5;
 let chainFlags = {}, pendingWordLevel = null;
-function flagKey(st){ return st.k==='similar' ? 'similarDone' : 'words'+st.n+'Done'; }
+function flagKey(st){ if(st.k==='alphabet') return 'alphabetDone'; if(st.k==='confusion') return 'confusionDone'; return st.k==='similar' ? 'similarDone' : 'words'+st.n+'Done'; }
 function stepName(st){
+  if(st.k==='alphabet') return 'Full Alef-Beis Lab';
+  if(st.k==='confusion') return 'Tricky letter pairs';
   if(st.k==='similar') return 'Look-alike letters';
   if(st.k==='words') return st.n+'-letter words';
   const u=UNITS[st.i]; return u.id==='finalreview' ? 'Final review' : 'Mission '+(st.i+1)+' ('+u.label+')';
@@ -871,11 +876,14 @@ function goStep(idx){
     showModeGate(); return;
   }
   const st=STEPS[idx];
+  if(st.k==='alphabet' || st.k==='confusion'){ window.openRashiAlphabetLab(st.k); return; }
   if(st.k==='similar'){ openSimilar(); return; }
   if(st.k==='words'){ openSimilar(); pendingWordLevel=st.n; setSimTab('words'); return; }
   mode='continue'; unitIndex=guidedIndex; phase=guidedPhase; streak=0; attemptsThisStep=0; retryQuestion=null;
   document.getElementById('modeGate').style.display='none';
   document.getElementById('similarScreen').style.display='none';
+  const alphabetScreen = document.getElementById('alphabetLabScreen');
+  if(alphabetScreen) alphabetScreen.style.display='none';
   document.getElementById('app').style.display='block';
   renderQuestion();
 }
@@ -918,6 +926,8 @@ function showModeGate(){
   document.getElementById('completeScreen').classList.remove('show');
   document.getElementById('practiceCompleteScreen').style.display = 'none';
   document.getElementById('similarScreen').style.display = 'none';
+  const alphabetScreen = document.getElementById('alphabetLabScreen');
+  if(alphabetScreen) alphabetScreen.style.display = 'none';
   if(typeof leaveRoom==='function') leaveRoom();
   document.getElementById('modeGate').style.display = 'block';
   renderLetterGrid();
@@ -1176,7 +1186,7 @@ function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.clas
 
 function openSimilar(){
   clearTimeout(questionTimer); viewVersion++;
-  ['modeGate','app','practiceCompleteScreen'].forEach(id=>document.getElementById(id).style.display='none');
+  ['modeGate','app','practiceCompleteScreen','alphabetLabScreen'].forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById('completeScreen').classList.remove('show');
   document.getElementById('similarScreen').style.display='block';
   setSimTab('explore');
@@ -1671,6 +1681,7 @@ async function logAttempt(unitId, ph, correct){
   await db.ref('rashiLetters/progress/' + studentId + '/name').set(studentName);
 }
 </script>
+<script src="alphabet-lab.js?v=20261019-full-alefbet"></script>
 <script defer src="../class-pointer-prototype/activity-share.js?v=20261018-directshare2"></script>
 </body>
 </html>
