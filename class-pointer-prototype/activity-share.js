@@ -150,7 +150,7 @@
     drawTools.append(undo,viewOnly);
     const ns='http://www.w3.org/2000/svg',svg=(name,attrs)=>{const el=typeof document.createElementNS==='function'?document.createElementNS(ns,name):document.createElement(name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));return el};
     function picture(){
-      const rect=lessonStage.getBoundingClientRect(),width=lessonVideo.videoWidth,height=lessonVideo.videoHeight;
+      const rect=typeof lessonStage.getBoundingClientRect==='function'?lessonStage.getBoundingClientRect():{width:0,height:0},width=lessonVideo.videoWidth,height=lessonVideo.videoHeight;
       if(!width||!height||!rect.width||!rect.height)return{left:0,top:0,width:rect.width,height:rect.height};
       const scale=Math.min(rect.width/width,rect.height/height),w=width*scale,h=height*scale;
       return{left:(rect.width-w)/2,top:(rect.height-h)/2,width:w,height:h};
