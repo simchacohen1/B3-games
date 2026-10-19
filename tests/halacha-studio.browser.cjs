@@ -32,7 +32,7 @@ test('drawing, eraser, undo, redo and shape fill use the saved bitmap',async()=>
 test('text, Torah stickers, picture actions and backgrounds persist with undo',async()=>{
  const {page:p,errors}=await open();await p.getByRole('button',{name:'Add text box'}).click();await p.locator('#a .tb-text').fill('My mitzvah');await p.locator('#a .studio-more-stickers>summary').click();await p.getByRole('button',{name:'Torah',exact:true}).click();assert.equal(await p.locator('#a .studio-sticker img').getAttribute('alt'),'Torah');
  await p.evaluate(()=>openCustomizer(document.querySelector('#a .studio-sticker')));await p.getByRole('button',{name:'Flip picture',exact:true}).click();assert.equal(await p.locator('#a .studio-sticker img').evaluate(e=>e.style.transform),'scaleX(-1)');await p.getByRole('button',{name:'Copy',exact:false}).last().click();assert.equal(await p.locator('#a .studio-sticker').count(),2);await p.getByRole('button',{name:'Done',exact:false}).click();
- await p.getByRole('button',{name:'Sky',exact:false}).click();assert.equal(await p.locator('#a .page').first().getAttribute('data-studio-bg'),'sky');await p.locator('#a [data-history=undo]').click();assert.equal(await p.locator('#a .page').first().getAttribute('data-studio-bg'),'');await p.reload();await p.getByRole('button',{name:/סימן א/}).click();assert.equal(await p.locator('#a .tb-text').textContent(),'My mitzvah');assert.equal(await p.locator('#a .studio-sticker').count(),2);assert.deepEqual(errors,[]);await p.screenshot({path:process.env.HALACHA_TEST_SCREENSHOT||'/tmp/halacha-studio.png',fullPage:true});await p.close();
+ await p.getByRole('tab',{name:/Page styles/}).click();await p.getByRole('button',{name:'Sky',exact:false}).click();assert.equal(await p.locator('#a .page').first().getAttribute('data-studio-bg'),'sky');await p.locator('#a [data-history=undo]').click();assert.equal(await p.locator('#a .page').first().getAttribute('data-studio-bg'),'');await p.reload();await p.getByRole('button',{name:/סימן א/}).click();assert.equal(await p.locator('#a .tb-text').textContent(),'My mitzvah');assert.equal(await p.locator('#a .studio-sticker').count(),2);assert.deepEqual(errors,[]);await p.screenshot({path:process.env.HALACHA_TEST_SCREENSHOT||'/tmp/halacha-studio.png',fullPage:true});await p.close();
 });
 test('teacher student-work inspection is read only',async()=>{
  const {page:p,errors}=await open('?teacherView=demo',true);const before=await p.evaluate(()=>JSON.stringify(S));assert.equal(await p.getByRole('button',{name:'Add text box'}).isEnabled(),false);await p.evaluate(()=>{studioSticker('a','torah');studioText('a');studioBackground('a','sky');studioMode('a',0,'pen');});assert.equal(await p.evaluate(()=>JSON.stringify(S)),before);assert.equal(await p.locator('#a .tb-text').getAttribute('contenteditable'),'false');assert.deepEqual(errors,[]);await p.close();
@@ -102,14 +102,18 @@ test('picture practice retries, title ideas are editable, themed stickers and pa
  const correct=p.getByRole('button',{name:/puts his toys away carefully/});
  await correct.click();assert.match(await p.locator('#a .hal-a-feedback').textContent(),/Yes!/);
  assert.equal(await p.locator('#a .scrap').count(),0,'answering does not auto-fill the scrapbook');
+ await p.getByRole('tab',{name:/Words/}).click();
  await p.getByRole('button',{name:'Does It Matter How I Behave When Nobody Is Watching?'}).click();
  const title=p.locator('#a .tb-text').last();assert.equal(await title.getAttribute('contenteditable'),'true');
  await title.fill('My own edited title');
+ await p.getByRole('tab',{name:/Pictures/}).click();
+ await p.locator('#a .studio-shelf-extra-pictures:has(.hal-sticker-shelf) > summary').click();
  assert.equal(await p.getByRole('button',{name:'Home',exact:true}).count(),1);
  assert.equal(await p.getByRole('button',{name:'Shofar',exact:true}).count(),0);
  await p.getByRole('button',{name:'Home',exact:true}).click();
  assert.equal(await p.locator('#a .studio-sticker img[alt="Home"]').count(),1);
  const position=await title.evaluate(e=>({left:e.closest('.scrap').style.left,top:e.closest('.scrap').style.top}));
+ await p.getByRole('tab',{name:/Page styles/}).click();
  await p.getByRole('button',{name:'Photo album',exact:false}).click();
  assert.deepEqual(await title.evaluate(e=>({left:e.closest('.scrap').style.left,top:e.closest('.scrap').style.top})),position);
  assert.equal(await p.locator('#a .page').first().getAttribute('data-studio-bg'),'photo');
