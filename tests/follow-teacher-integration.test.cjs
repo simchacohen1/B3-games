@@ -34,12 +34,12 @@ function harness(overrides={}) {
   const document={body,querySelector:()=>overrides.busy?{className:'rec-panel'}:null,createElement:()=>({
     style:{},dataset:{},remove(){},setAttribute(){},textContent:''
   })};
-  const storage={getItem:key=>stored.get(key)||null,setItem:(key,v)=>stored.set(key,v)};
+  const storage={getItem:key=>stored.get(key)||null,setItem:(key,v)=>stored.set(key,v),removeItem:key=>stored.delete(key)};
   const location={href:'https://funtorahtools.com/chazara/index.html',
     origin:'https://funtorahtools.com', assign:url=>navigations.push(url)};
   const ctx={window:null,document,location,
     firebase:{auth:()=>({currentUser:user}),database:()=>db},
-    FTTFollowTeacherCore:C,sessionStorage:storage,CustomEvent:class{constructor(type,p){this.type=type;this.cancelable=p.cancelable;}},
+    FTTFollowTeacherCore:C,sessionStorage:storage,CustomEvent:class{constructor(type,p={}){this.type=type;this.cancelable=p.cancelable;}},
     setInterval:()=>++nextTimer,clearInterval:()=>{},
     setTimeout:fn=>{const id=++nextTimer;timers.set(id,fn);return id;},
     clearTimeout:id=>timers.delete(id),
@@ -176,4 +176,49 @@ test('failed Chazara audio remains protected until student acknowledges download
   assert.equal(acknowledgment.disabled,true);
   const listener=fs.readFileSync(path.join(ROOT,'follow-teacher/student.js'),'utf8');
   assert.ok(listener.includes('[data-ftt-unsaved="true"]'),'Follow Teacher checks unsaved work marker');
+});
+
+for(const destination of Object.keys(C.DESTINATIONS)) {
+  test(`listener checks the actual ${destination} student grant`,async()=>{
+    const h=harness({values:{
+      'b3Games/workspaces/b3-2026/classes/et/members/boy1':{active:true,toolAccess:{[destination]:false}}
+    }});
+    await fire(h,{...h.state,destination});await runTimers(h);
+    assert.equal(h.navigations.length,0);
+  });
+}
+test('unlock cancels a pending redirect, even with unchanged revision',async()=>{
+  const h=harness();await fire(h,h.state);
+  await fire(h,{...h.state,mode:'independent'});await runTimers(h);
+  assert.equal(h.navigations.length,0);
+});
+test('locked-site capability permits only the current authenticated destination and expires',async()=>{
+  const h=harness();h.ctx.location.href='https://funtorahtools.com/shorashim/';
+  await fire(h,h.state);
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),true);
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('halacha'),false);
+  await fire(h,{...h.state,mode:'independent'});
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),false);
+  await fire(h,{...h.state,heartbeatAt:Date.now()-100000});
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),false);
+});
+test('Follow Once destination capability is limited to the receiving document',async()=>{
+  const h=harness();await fire(h,{...h.state,mode:'free'});await runTimers(h);
+  const applied=h.stored.get('fttFollowTeacherLastApplied');
+  h.ctx.location.href='https://funtorahtools.com/shorashim/';
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),true);
+  assert.equal(h.stored.get('fttFollowTeacherArrival'),undefined);
+  h.ctx.FTTFollowStudent.stop();
+  await fire(h,{...h.state,mode:'free'});
+  assert.equal(h.stored.get('fttFollowTeacherLastApplied'),applied);
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),false);
+});
+test('every destination loads the shared student gate, never a teacher route',()=>{
+  for(const [tool,entry] of Object.entries(C.DESTINATIONS)) {
+    const filename=entry.path.endsWith('/')?entry.path+'index.html':entry.path;
+    const html=fs.readFileSync(path.join(ROOT,filename),'utf8');
+    assert.ok(html.includes('game-gate.js'),tool);
+    assert.ok(html.includes('data-game-id="'+tool+'"'),tool);
+    assert.ok(!filename.includes('teacher'),tool);
+  }
 });

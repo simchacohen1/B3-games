@@ -85,3 +85,62 @@ test('verified student follows Locked teacher to Shorashim without screen captur
   }));
   await page.waitForURL('http://localhost:8099/shorashim/',{timeout:10000});
 });
+
+const destinations = Object.entries(require('../follow-teacher/core.js').DESTINATIONS) as [string,{label:string,path:string}][];
+for (const classId of ['et','wt']) for (const [destination, entry] of destinations) {
+  test(`${classId}: locked student follows to ${entry.label}, then Unlock allows leaving`,async({page})=>{
+    const now=Date.now();
+    const state={version:1,workspaceId:'b3-2026',classId,teacherUid:'teacher1',
+      mode:'locked',destination,revision:'expanded',targets:'all',
+      issuedAt:now-5000,heartbeatAt:now-1000,expiresAt:now+60000};
+    await page.route('http://localhost:8099/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><body><h1>Test learning activity</h1></body>'}));
+    await page.addInitScript(({core,student,state,classId})=>{
+      sessionStorage.setItem('b3Games_studentId','testBoy');sessionStorage.setItem('b3Games_studentClass',classId);
+      const ws='b3Games/workspaces/b3-2026/classes/'+classId;
+      const data:any={
+        [ws+'/access/followTeacher']:state,[ws+'/members/testBoy']:{active:true},
+        [ws+'/active']:true,'b3Games/students/testBoy/profile/active':true,
+        'b3Games/siteSettings':{siteEnabled:false,access:{et:{mode:'locked'},wt:{mode:'locked'}}}
+      };
+      const snap=(v:any)=>({val:()=>v,exists:()=>v!=null,child:(p:string)=>snap(p.split('/').reduce((o:any,k:string)=>o?.[k],v))});
+      let listener:Function=()=>{};
+      (window as any).firebase={auth:()=>({currentUser:{uid:'testBoy',getIdTokenResult:async()=>({claims:{b3StudentRole:'student',b3StudentId:'testBoy',b3ClassId:classId}})}}),database:()=>({ref:(url:string)=>({
+        on:(_ev:string,fn:Function)=>{if(url.endsWith('/followTeacher'))listener=fn;fn(snap(url==='.info/serverTimeOffset'?0:data[url]));},off:()=>{},once:async()=>snap(data[url])
+      })})};
+      (window as any).__unlock=()=>listener(snap({...state,mode:'independent'}));
+      document.addEventListener('DOMContentLoaded',()=>{
+        const a=document.createElement('script');a.textContent=core;document.body.append(a);
+        const b=document.createElement('script');b.textContent=student;document.body.append(b);
+        (window as any).FTTFollowStudent.start({workspaceId:'b3-2026',classId,studentId:'testBoy'});
+      });
+    },{core,student,state,classId});
+    await page.goto('http://localhost:8099/');
+    await page.waitForURL('http://localhost:8099'+entry.path,{timeout:10000});
+    await expect.poll(()=>page.evaluate(tool=>(window as any).FTTFollowStudent.allowsLockedActivity(tool),destination)).toBe(true);
+    expect(await page.evaluate(()=>(window as any).FTTFollowStudent.allowsLockedActivity('not-a-tool'))).toBe(false);
+    await page.evaluate(()=>(window as any).__unlock());
+    await expect.poll(()=>page.evaluate(tool=>(window as any).FTTFollowStudent.allowsLockedActivity(tool),destination)).toBe(false);
+    await expect(page.locator('#fttFollowTeacherNotice')).toHaveCount(0);
+  });
+}
+
+test('unsaved work defers navigation; latest Unlock cancels it',async({page})=>{
+  await page.route('http://localhost:8099/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<body><div data-ftt-unsaved="true">Unsent recording</div></body>'}));
+  await page.goto('http://localhost:8099/chazara/');
+  await page.evaluate(()=>{
+    sessionStorage.setItem('b3Games_studentId','testBoy');sessionStorage.setItem('b3Games_studentClass','wt');
+    const ws='b3Games/workspaces/b3-2026/classes/wt';
+    const state={workspaceId:'b3-2026',classId:'wt',teacherUid:'teacher1',mode:'locked',destination:'halacha',revision:'busy',targets:'all',issuedAt:Date.now()-5000,heartbeatAt:Date.now()-1000,expiresAt:Date.now()+60000};
+    let handler:Function=()=>{};
+    const snap=(v:any)=>({val:()=>v,exists:()=>v!=null,child:(p:string)=>snap(p.split('/').reduce((o:any,k:string)=>o?.[k],v))});
+    const data:any={[ws+'/access/followTeacher']:state,[ws+'/members/testBoy']:{active:true},[ws+'/active']:true,'b3Games/students/testBoy/profile/active':true,'b3Games/siteSettings':{}};
+    (window as any).firebase={auth:()=>({currentUser:{uid:'testBoy',getIdTokenResult:async()=>({claims:{b3StudentRole:'student',b3StudentId:'testBoy',b3ClassId:'wt'}})}}),database:()=>({ref:(url:string)=>({on:(_e:string,fn:Function)=>{if(url.endsWith('/followTeacher'))handler=fn;fn(snap(data[url]));},off:()=>{},once:async()=>snap(data[url])})})};
+    (window as any).__unlock=()=>handler(snap({...state,mode:'independent'}));
+  });
+  await page.addScriptTag({content:core});await page.addScriptTag({content:student});
+  await page.evaluate(()=>(window as any).FTTFollowStudent.start({workspaceId:'b3-2026',classId:'wt',studentId:'testBoy'}));
+  await expect(page.locator('#fttFollowTeacherNotice')).toContainText('Finish recording',{timeout:8000});
+  expect(page.url()).toContain('/chazara/');
+  await page.evaluate(()=>(window as any).__unlock());
+  await expect(page.locator('#fttFollowTeacherNotice')).toHaveCount(0);
+});

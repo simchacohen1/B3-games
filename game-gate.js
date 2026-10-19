@@ -374,14 +374,15 @@
   }
 
   let followLoader=null;
-  function startFollowTeacherListener(classId,studentId) {
+  let followActivityOpen=false;
+  async function startFollowTeacherListener(classId,studentId) {
     if (!classId || !studentId || isGuestPreview() || verifiedTeacherAccess?.authorized) return;
     if (!followLoader) {
-      followLoader = loadOneScript(new URL("follow-teacher/core.js?v=20261019-follow2",rootBase).href)
-        .then(()=>loadOneScript(new URL("follow-teacher/student.js?v=20261019-follow2",rootBase).href))
+      followLoader = loadOneScript(new URL("follow-teacher/core.js?v=20261019-follow-all",rootBase).href)
+        .then(()=>loadOneScript(new URL("follow-teacher/student.js?v=20261019-follow-all",rootBase).href))
         .catch(error=>{followLoader=null;throw error;});
     }
-    followLoader.then(()=>{
+    return followLoader.then(()=>{
       if (studentActive && studentClassId===classId &&
           getStoredStudentId()===studentId) {
         return window.FTTFollowStudent?.start({workspaceId:WORKSPACE_ID,classId,studentId});
@@ -423,7 +424,7 @@
     studentActive=true;
     // Follow Teacher is an optional, class-scoped navigation listener.
     // It starts only after the shared gate has resolved an active student.
-    void startFollowTeacherListener(studentClassId, studentId);
+    await startFollowTeacherListener(studentClassId, studentId);
     return studentClassId;
   }
 
@@ -562,7 +563,7 @@
       }
       var grantId=gameId==="class-gallery"?"gallery":gameId;
       if(!assignedClass||(assignedClass.toolGrants?.[grantId]!==true&&!(gameId==="class-gallery"&&(assignedClass.toolGrants?.tag===true||assignedClass.toolGrants?.["class-gallery"]===true)))){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
-      if(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked"){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
+      if(!followActivityOpen&&(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked")){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
       showOpen();return;
     }
 
@@ -586,6 +587,9 @@
       );
       return;
     }
+
+    // Follow grants only the authenticated, permitted destination, never other tools.
+    if (followActivityOpen) { showOpen(); return; }
 
     // A class-wide exception lets exactly one selected activity stay open for
     // every student in that ET/WT class while the site/class lock is active.
@@ -631,6 +635,7 @@
     if (isGuestPreview()) { showOpen(); return; }
     if (requestInFlight) { refreshRequested = true; return; }
     requestInFlight = true;
+    followActivityOpen = false;
 
     Promise.resolve().then(async function () {
       if(!window.B3StudentTools)await loadOneScript(new URL('backend/functions/student-tool-policy.js',rootBase).href);
@@ -647,6 +652,7 @@
         return;
       }
       await resolveStudentClass();
+      followActivityOpen = !!(studentActive && await window.FTTFollowStudent?.allowsLockedActivity(gameId));
     }).then(function () {
       return fetchJson(DATABASE_URL + "/" + SETTINGS_PATH + ".json");
     }).then(function (settings) {
@@ -688,6 +694,7 @@
     if (document.visibilityState === "visible") checkNow();
   });
   window.addEventListener("focus", checkNow);
+  window.addEventListener("ftt:follow-policy-changed", checkNow);
 
   // ---- "← Fun Torah Tools" home button -------------------------------------------
   // Every student page loads this gate, so it is the one place that can make
