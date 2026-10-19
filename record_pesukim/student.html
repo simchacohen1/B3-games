@@ -30,7 +30,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="../guest-mode.js?v=20261011-guest"></script>
-<script src="../game-gate.js?v=20261008-owner-demo" data-game-id="posuk-practice-scroll"></script>
+<script src="../game-gate.js?v=20261019-follow-all" data-game-id="posuk-practice-scroll"></script>
 <title>Posuk Practice Scroll</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
@@ -2111,6 +2111,18 @@ let translationAudioUrls = {};
 let mediaRecorder = null;
 let recordingChunks = [];
 let activeRecordingType = null; // 'hebrew' | 'translate' | 'comprehension'
+// Preserve microphone sessions, grading/uploads and captured evidence on teacher navigation.
+window.addEventListener('ftt:before-follow-navigation',event=>{
+  const recorders=[mediaRecorder,translationRecorder,chunkFixRecorder,wordFixRecorder];
+  const statuses=[...document.querySelectorAll('[id$="Status"], [id$="status"]')];
+  if(recorders.some(r=>r&&r.state!=='inactive') || document.querySelector('[title="Checking…"]') || translationSessionActive ||
+     translationPillPhase!=='idle' ||
+     Object.entries(currentAudio).some(([task,blob])=>blob&&!attemptSaved[task]) ||
+     Object.entries(translationSegments).some(([idx,segment])=>segment?.blob&&translationGradedResults[idx]?.evidenceSaved!==true) ||
+     statuses.some(el=>/captured|scoring|saving|listening|save failed|not finished saving/i.test(el.textContent)) ||
+     Object.values(comprehensionQResults||{}).some(row=>row?.saving))event.preventDefault();
+});
+
 let recordingStartedAt = null; // timestamp from when the recorder truly started, for a minimum-duration check on stop
 
 const RECORDING_READY_WARMUP_MS = 550;
@@ -2401,7 +2413,12 @@ async function checkAccess(name,pin,idHint=''){
   const id=String(data.id||'').trim();
   if(!data.ok||!id)return {ok:false,reason:'Check your name and passcode. Sign in from the main site if needed.'};
   if(idHint&&idHint!==id)return {ok:false,reason:'Check your name and passcode. Sign in from the main site if needed.'};
-  if(data.customToken&&window.firebase&&firebase.auth)await firebase.auth().signInWithCustomToken(data.customToken);
+  if(data.customToken&&window.firebase&&firebase.auth){
+    // Tab-only session: the default persistence is browser-wide and would
+    // replace a teacher's login in every other tab.
+    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION);
+    await firebase.auth().signInWithCustomToken(data.customToken);
+  }
   const profile=await studentRecord('b3Games/students/'+encodeURIComponent(id)+'/profile').catch(()=>null);
   if(profile&&profile.active===false)return {ok:false,reason:'Your account is turned off. Ask your teacher.'};
   return {ok:true,slug:id,accessVersion:Number(profile&&profile.passcodeUpdatedAt)||0};
@@ -2717,7 +2734,11 @@ function startPracticeLimitListener(){
 }
 async function applyPracticeLimitChange(){
   {
-    classPracticeLimit = normalizedPracticeWindow(effectiveRawLimit());
+    const nextLimit = normalizedPracticeWindow(effectiveRawLimit());
+    // Firebase may repeat a value on reconnect, or update the shared default
+    // while this class uses an override. Neither should erase a recording.
+    if(practiceScopeReady && JSON.stringify(nextLimit) === JSON.stringify(classPracticeLimit)) return;
+    classPracticeLimit = nextLimit;
     practiceScopeReady = true;
     const fetchMsgEl = document.getElementById('fetchMsg');
     if(classPracticeLimit && fetchMsgEl.textContent.startsWith('📖 Your teacher has not opened')) fetchMsgEl.textContent = '';
@@ -4933,7 +4954,10 @@ function promiseWithTimeout(promise, ms, label){
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+const translationPieceCache = new Map();
 async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
+  const cacheKey = JSON.stringify([currentSefer, part.key, part.text, part.translation || '']);
+  if(translationPieceCache.has(cacheKey)) return translationPieceCache.get(cacheKey);
   const chunkRef = db.ref('posukPractice/translationChunks/' + part.key);
   try{
     const snap = await promiseWithTimeout(chunkRef.once('value'), 10000, 'Translation cache');
@@ -4941,6 +4965,7 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
     // Keep every existing translation-piece breakdown. Kehot is accepted at grading time,
     // so old cached pieces do NOT need to be regenerated just because grading sources changed.
     if(snap.exists() && snap.val() && Array.isArray(snap.val().levels) && snap.val().levels.length){
+      translationPieceCache.set(cacheKey, snap.val().levels);
       return snap.val().levels;
     }
   }catch(err){
@@ -4971,6 +4996,9 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
     if(!res.ok) throw new Error('Chunk generation request failed: ' + res.status);
     const data = await res.json();
     if(!data.levels || !Array.isArray(data.levels) || !data.levels.length) throw new Error('No levels returned');
+    // Keep successful pieces for this visit too, including when returning
+    // to a posuk. Failed requests remain retryable.
+    translationPieceCache.set(cacheKey, data.levels);
     // The protected backend caches this result for subsequent students.
     return data.levels;
   }catch(err){

@@ -115,14 +115,105 @@
     const back=document.createElement('button');back.type='button';back.textContent='Back to Activity';
     back.style.cssText='padding:10px 16px;border:0;border-radius:9px;background:white;color:#102748;font:inherit;cursor:pointer';
     const lessonVideo=document.createElement('video');lessonVideo.autoplay=true;lessonVideo.muted=true;lessonVideo.playsInline=true;
-    lessonVideo.style.cssText='display:block;width:100%;flex:1;min-height:0;object-fit:contain;background:#071426';
+    lessonVideo.style.cssText='display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#071426';
     const reopen=document.createElement('button');reopen.type='button';reopen.id='fttShowTeacherLesson';reopen.textContent='Show Lesson';
     reopen.style.cssText='display:none;position:fixed;left:14px;bottom:14px;z-index:2147483638;padding:12px 18px;border:2px solid white;border-radius:12px;background:#1d4ed8;color:white;font:700 16px system-ui;cursor:pointer';
-    lessonToolbar.append(lessonStatus,back);lessonOverlay.append(lessonToolbar,lessonVideo);document.body.appendChild(lessonOverlay);document.body.appendChild(reopen);
+    // The embedded activity presence view must have its own tools: the retired Pointer page is never opened.
+    const drawTools=document.createElement('div');drawTools.id='fttLessonDrawTools';
+    drawTools.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+    const lessonModes=[['point','☝ Pointer'],['highlight','🖍 Highlight'],['pen','✎ Pen']];
+    const toolButtons=new Map();let lessonLevel='none',lessonTool='point',lessonMarks={points:{},strokes:[],members:[]},lessonDraft=null;
+    const lessonStage=document.createElement('div');
+    lessonStage.style.cssText='position:relative;flex:1;min-height:0;overflow:hidden;touch-action:auto';
+    const markLayer=typeof document.createElementNS==='function'?document.createElementNS('http://www.w3.org/2000/svg','svg'):document.createElement('svg');
+    markLayer.style.cssText='position:absolute;pointer-events:none;overflow:visible';
+    markLayer.setAttribute('viewBox','0 0 1000 1000');
+    const pointerLayer=document.createElement('div');
+    pointerLayer.style.cssText='position:absolute;pointer-events:none';
+    const hitLayer=document.createElement('div');
+    hitLayer.style.cssText='position:absolute;cursor:crosshair;touch-action:none';
+    const viewOnly=document.createElement('span');viewOnly.textContent='View only';viewOnly.style.cssText='font-size:13px;opacity:.85';
+    const undo=document.createElement('button');undo.type='button';undo.textContent='↶ Undo';undo.style.cssText='padding:7px 10px;border-radius:8px;border:1px solid #86a6df;background:#193b6c;color:white;cursor:pointer';
+    const allowedMode=mode=>lessonLevel==='pen'||mode==='point'&&lessonLevel!=='none'||mode==='highlight'&&lessonLevel==='highlight';
+    function redrawToolbar(){
+      if(!allowedMode(lessonTool))lessonTool=lessonLevel==='none'?'point':lessonLevel==='highlight'?'highlight':lessonLevel==='pen'?'pen':'point';
+      for(const [mode,button] of toolButtons){button.hidden=!allowedMode(mode);button.setAttribute('aria-pressed',String(mode===lessonTool))}
+      viewOnly.hidden=lessonLevel!=='none';undo.hidden=!['highlight','pen'].includes(lessonTool)||!allowedMode(lessonTool);
+      hitLayer.style.pointerEvents=lessonLevel==='none'?'none':'auto';
+    }
+    for(const [mode,title] of lessonModes){
+      const button=document.createElement('button');button.type='button';button.textContent=title;
+      button.style.cssText='padding:7px 10px;border-radius:8px;border:1px solid #86a6df;background:#193b6c;color:white;cursor:pointer;font:700 13px system-ui';
+      button.addEventListener('click',()=>{lessonTool=mode;redrawToolbar()});drawTools.append(button);toolButtons.set(mode,button);
+    }
+    undo.addEventListener('click',()=>{if(admitted&&presenceConn?.open&&allowedMode(lessonTool))presenceConn.send({type:'edit-highlights',action:'undo'})});
+    drawTools.append(undo,viewOnly);
+    const ns='http://www.w3.org/2000/svg',svg=(name,attrs)=>{const el=typeof document.createElementNS==='function'?document.createElementNS(ns,name):document.createElement(name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));return el};
+    function picture(){
+      const rect=typeof lessonStage.getBoundingClientRect==='function'?lessonStage.getBoundingClientRect():{width:0,height:0},width=lessonVideo.videoWidth,height=lessonVideo.videoHeight;
+      if(!width||!height||!rect.width||!rect.height)return{left:0,top:0,width:rect.width,height:rect.height};
+      const scale=Math.min(rect.width/width,rect.height/height),w=width*scale,h=height*scale;
+      return{left:(rect.width-w)/2,top:(rect.height-h)/2,width:w,height:h};
+    }
+    function renderLessonMarks(){
+      if(typeof markLayer.replaceChildren!=='function'||typeof pointerLayer.replaceChildren!=='function')return;
+      const b=picture();
+      for(const layer of [markLayer,pointerLayer,hitLayer])Object.assign(layer.style,{left:b.left+'px',top:b.top+'px',width:b.width+'px',height:b.height+'px'});
+      markLayer.replaceChildren();pointerLayer.replaceChildren();
+      for(const stroke of [...(Array.isArray(lessonMarks.strokes)?lessonMarks.strokes:[]),...(lessonDraft?[lessonDraft]:[])]){
+        if(!stroke||!Array.isArray(stroke.points)||!stroke.points.length||stroke.points.length>256)continue;
+        const points=stroke.points.filter(p=>Number.isFinite(p?.x)&&Number.isFinite(p?.y)&&p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1);
+        if(!points.length)continue;
+        const color=/^#[0-9a-fA-F]{6}$/.test(stroke.color)?stroke.color:'#57b8ff';
+        const alpha=stroke.tool==='highlight'?.4:1,width=Math.max(2,Math.min(30,(Number(stroke.size)||.016)*450));
+        const d=points.map((p,i)=>(i?'L':'M')+(p.x*1000)+' '+(p.y*1000)).join(' ');
+        const mark=svg('path',{d,stroke:color,'stroke-width':width,'stroke-linecap':'round','stroke-linejoin':'round',fill:'none',opacity:alpha});
+        markLayer.appendChild(mark);
+      }
+      for(const [id,point] of Object.entries(lessonMarks.points||{})){
+        if(!Number.isFinite(point?.x)||!Number.isFinite(point?.y)||point.x<0||point.x>1||point.y<0||point.y>1)continue;
+        const tag=document.createElement('span');tag.textContent='●';
+        const who=(lessonMarks.members||[]).find(m=>m.id===id);tag.title=who?.name||'Pointer';
+        tag.style.cssText='position:absolute;transform:translate(-50%,-50%);color:#ffcc00;font:900 26px system-ui;text-shadow:0 1px 4px #000';
+        tag.style.left=(point.x*100)+'%';tag.style.top=(point.y*100)+'%';pointerLayer.appendChild(tag);
+      }
+    }
+    const normalized=e=>{const rect=hitLayer.getBoundingClientRect();const x=(e.clientX-rect.left)/rect.width,y=(e.clientY-rect.top)/rect.height;return Number.isFinite(x)&&Number.isFinite(y)&&x>=0&&x<=1&&y>=0&&y<=1?{x,y}:null};
+    let lastPointSend=0;
+    hitLayer.addEventListener('pointerdown',e=>{
+      if(!admitted||!lessonActive||!allowedMode(lessonTool)||e.button!==0)return;
+      const p=normalized(e);if(!p)return;e.preventDefault();
+      if(lessonTool==='point'){presenceConn?.send({type:'point',point:{...p,tool:'target'}});return}
+      lessonDraft={tool:lessonTool,color:'#57b8ff',size:.016,points:[p,p]};
+      try{hitLayer.setPointerCapture(e.pointerId)}catch{}renderLessonMarks();
+    });
+    hitLayer.addEventListener('pointermove',e=>{
+      if(!admitted||!lessonActive||!allowedMode(lessonTool))return;
+      const p=normalized(e);if(!p)return;
+      if(lessonTool==='point'){if(Date.now()-lastPointSend>=75){lastPointSend=Date.now();presenceConn?.send({type:'point',point:{...p,tool:'target'}})}return}
+      if(!lessonDraft)return;
+      const pts=lessonDraft.points,last=pts[pts.length-1];
+      if(pts.length<256&&Math.hypot(p.x-last.x,p.y-last.y)>.003){pts.push(p);renderLessonMarks()}
+    });
+    function finishDrawing(e){
+      if(!lessonDraft)return;
+      const stroke=lessonDraft;lessonDraft=null;renderLessonMarks();
+      if(admitted&&lessonActive&&allowedMode(stroke.tool)&&presenceConn?.open&&stroke.points.length>=2)presenceConn.send({type:'highlight',stroke});
+    }
+    hitLayer.addEventListener('pointerup',finishDrawing);
+    hitLayer.addEventListener('pointercancel',()=>{lessonDraft=null;renderLessonMarks()});
+    hitLayer.addEventListener('pointerleave',()=>{if(lessonTool==='point'&&presenceConn?.open)presenceConn.send({type:'pointer-hide'})});
+    lessonVideo.addEventListener('loadedmetadata',renderLessonMarks);
+    if(typeof ResizeObserver==='function')new ResizeObserver(renderLessonMarks).observe(lessonStage);
+    lessonToolbar.append(lessonStatus,drawTools,back);
+    lessonStage.append(lessonVideo,markLayer,pointerLayer,hitLayer);
+    lessonOverlay.append(lessonToolbar,lessonStage);document.body.appendChild(lessonOverlay);document.body.appendChild(reopen);
+    redrawToolbar();
     back.addEventListener('click',()=>{lessonOverlay.style.display='none';reopen.style.display=lessonActive?'block':'none'});
     reopen.addEventListener('click',()=>{if(lessonActive){lessonOverlay.style.display='flex';reopen.style.display='none';lessonVideo.play?.().catch(()=>{})}});
     function closeLessonCall(){cancelLater(lessonReceiveTimer);lessonReceiveTimer=null;const old=lessonCall;lessonCall=null;try{old?.close()}catch{}lessonVideo.srcObject=null}
     function clearLesson(){
+      lessonLevel='none';lessonDraft=null;lessonMarks={points:{},strokes:[],members:[]};redrawToolbar();renderLessonMarks();
       admitted=false;lessonActive=false;lessonId='';cancelLater(pendingLessonTimer);cancelLater(lessonRetryTimer);pendingLessonTimer=null;lessonRetryTimer=null;
       const waiting=pendingLessonCall;pendingLessonCall=null;try{waiting?.close()}catch{}closeLessonCall();lessonOverlay.style.display='none';reopen.style.display='none';
     }
@@ -186,7 +277,9 @@
         own.on('call',incoming=>{if(presencePeer!==own){try{incoming.close()}catch{}return}incomingLesson(incoming)});
         await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('timeout')),15000);own.once('open',()=>{clearTimeout(t);resolve()});own.once('error',e=>{clearTimeout(t);reject(e)})});
         if(presencePeer!==own||latestSession?.roomId!==room)return;
-        own.on('error',error=>{if(presencePeer!==own)return;if(error?.type==='peer-unavailable'){stopPresence();return}retryPresence()});
+        // The teacher's room may not be registered yet (student page opened as the lesson starts):
+        // retry with backoff instead of giving up until a reload.
+        own.on('error',()=>{if(presencePeer!==own)return;retryPresence()});
         own.on('disconnected',()=>{if(presencePeer===own&&!own.destroyed){try{own.reconnect()}catch{}}});
         const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'joinIssue',room,classId,studentId:id,pin,peerId:own.id}),signal:AbortSignal.timeout(15000)});
         const ticket=await response.json().catch(()=>({}));
@@ -202,6 +295,8 @@
             if(admitted)window.ClassPointerBoards?.fromTeacher(message);
             return;
           }
+          if(message.type==='lesson-tools'){if(admitted&&['none','point','highlight','pen'].includes(message.level)){lessonLevel=message.level;lessonDraft=null;redrawToolbar();renderLessonMarks()}return}
+          if(message.type==='lesson-marks'){if(admitted&&Array.isArray(message.strokes)&&message.strokes.length<=1500){lessonMarks={points:message.points||{},strokes:message.strokes,members:Array.isArray(message.members)?message.members:[]};renderLessonMarks()}return}
           if(message.type==='lesson-presentation'){if(!persistentShareWindow)announceLesson(message);return}
           if(message.type==='removed'){try{sessionStorage.setItem('classPointerRemovedRoom',room)}catch{}stopPresence();showRemovedNotice();return}
           // Already connected in the lesson or another window, or the lesson ended: check again later.

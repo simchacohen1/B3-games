@@ -6,6 +6,7 @@ on:
       - 'tests/shorashim-recording-repair.test.cjs'
       - 'tests/shorashim-picture-costs.test.cjs'
       - 'tests/shorashim-card-transition.test.cjs'
+      - 'tests/shorashim-teacher-screenshots.test.cjs'
       - '.github/workflows/shorashim-recording.yml'
   push:
     paths:
@@ -13,6 +14,7 @@ on:
       - 'tests/shorashim-recording-repair.test.cjs'
       - 'tests/shorashim-picture-costs.test.cjs'
       - 'tests/shorashim-card-transition.test.cjs'
+      - 'tests/shorashim-teacher-screenshots.test.cjs'
       - '.github/workflows/shorashim-recording.yml'
 jobs:
   test:
@@ -23,4 +25,4 @@ jobs:
         with:
           node-version: '22'
       - name: Shorashim saving regression
-        run: node --test tests/shorashim-recording-repair.test.cjs tests/shorashim-picture-costs.test.cjs tests/shorashim-card-transition.test.cjs
+        run: node --test tests/shorashim-recording-repair.test.cjs tests/shorashim-picture-costs.test.cjs tests/shorashim-card-transition.test.cjs tests/shorashim-teacher-screenshots.test.cjs

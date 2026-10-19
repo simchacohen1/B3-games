@@ -15,7 +15,7 @@ function fixture({teacher=false,missing=false,verify}={}){
     db:{ref:()=>({once:()=>{reads++;return firstRead}})},studentAuthCall:verify||(()=>Promise.resolve({ok:true})),resolvedStudentClass:async()=> 'et',
     enterStudent:async()=>entered++,console,renderStudentAccess:()=>{classes('loginCard').classList.add('hidden');classes('gamesArea').classList.remove('hidden')}
   });
-  vm.runInContext(block('  function setLoginMsg(', '  function studentHasOverride(')+block('  async function restoreStudent(){','  function switchStudent(){'),context);
+  vm.runInContext(block('  function setLoginMsg(', '  function studentHasOverride(')+block('  async function restoreStudent(){','  async function switchStudent('),context);
   return {context,nodes:classes,saved,get reads(){return reads},get entered(){return entered},restore:()=>vm.runInContext('restoreStudent()',context),teacher:()=>{context.isAuthorizedTeacher=true;context.renderStudentAccess()},resolve:()=>resolveRead({exists:()=>true,val:()=>({name:'Old student',active:true})})};
 }
 test('a delayed old student check cannot hide an already verified teacher',async()=>{

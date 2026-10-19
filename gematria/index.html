@@ -139,7 +139,7 @@ bdi.he{unicode-bidi:isolate}.sofitList{direction:ltr;display:inline}
 <script src="../student-class.js?v=20261007-tab-login"></script>
 <script src="../b3-race.js?v=20261007"></script>
 <script src="../guest-mode.js?v=20261011-guest"></script>
-<script src="../game-gate.js?v=20261017-auth-gate" data-game-id="gematria" data-back-href="../index.html"></script>
+<script src="../game-gate.js?v=20261019-follow-all" data-game-id="gematria" data-back-href="../index.html"></script>
 </head>
 <body>
 <header>
@@ -347,14 +347,17 @@ function merge(local,remote){ // keep the best of both copies
  return o;
 }
 function setNote(t){$("saveNote").textContent=t}
+let gematriaFollowPending=false,gematriaSaveRevision=0;
+window.addEventListener('ftt:before-follow-navigation',e=>{if(gematriaFollowPending)e.preventDefault();});
 function save(){
  P.level=level;if(!teacherPreview)safeSet(LOCAL_KEY,JSON.stringify(P));
  $("starCount").textContent=P.stars;
  if(!progressRef){return}
+ gematriaFollowPending=true;const revision=++gematriaSaveRevision;
  clearTimeout(saveTimer);
  saveTimer=setTimeout(()=>{
   const payload=Object.assign({},P,{name:studentName||studentId,lastActive:firebase.database.ServerValue.TIMESTAMP});
-  progressRef.set(payload).then(()=>setNote("✓ Progress saved for your teacher")).catch(e=>{console.warn("Gematria save failed",e);setNote("Saved on this device (could not reach the server)")});
+  progressRef.set(payload).then(()=>{if(revision===gematriaSaveRevision)gematriaFollowPending=false;setNote("✓ Progress saved for your teacher")}).catch(e=>{console.warn("Gematria save failed",e);setNote("Saved on this device (could not reach the server)")});
  },1200);
 }
 function star(){P.stars++;const el=$("starCount");el.textContent=P.stars;el.parentElement.classList.remove("pop");void el.offsetWidth;el.parentElement.classList.add("pop")}

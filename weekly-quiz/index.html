@@ -29,7 +29,7 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="../game-gate.js?v=20261017-auth-gate" data-game-id="weekly-quiz"></script>
+  <script src="../game-gate.js?v=20261019-follow-all" data-game-id="weekly-quiz"></script>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -286,6 +286,7 @@ let displayedQuestion=0;
 let classLaunchRef=null, personalLaunchRef=null, launchPollTimer=null, refreshActiveLaunch=null;
 let allLaunches={}, allCompletions={};
 let markingComplete=false;
+window.addEventListener('ftt:before-follow-navigation',e=>{if(markingComplete||(selectedChoice!==null&&!responseFor(displayedQuestion)))e.preventDefault();});
 
 // A direct link from the teacher (e.g. index.html?launch=xxxx) always wins over
 // whatever launch would otherwise be chosen for this student, so a teacher can

@@ -39,7 +39,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="../firebase-config.js"></script>
-<script src="../site-settings.js?v=20261008-owner-demo"></script>
+<script src="../site-settings.js?v=20261019-restore-fix"></script>
 <script src="../student-class.js?v=20261007-tab-login"></script>
 <script src="access.js?v=20261007-gallery-lock"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.min.js"></script>
@@ -2049,6 +2049,14 @@ document.getElementById('avatarBtn').onclick=openAvatarChooser;
 document.getElementById('closeAvatarBtn').onclick=()=>closeAvatarChooser(true);
 document.getElementById('useAvatarBtn').onclick=()=>closeAvatarChooser(true);
 document.getElementById('avatarOverlay').addEventListener('click',e=>{if(e.target.id==='avatarOverlay')closeAvatarChooser(true);});
+
+/* Follow the Teacher must not interrupt an open gallery submission or upload. */
+window.addEventListener('ftt:before-follow-navigation', event => {
+  const form = document.getElementById('projectForm');
+  const overlay = document.getElementById('overlay');
+  if ((overlay && overlay.classList.contains('show')) ||
+      (form && form.querySelector('#submitBtn')?.disabled)) event.preventDefault();
+});
 
 /* ---------- submission modal ---------- */
 document.getElementById('classSelect').addEventListener('change',e=>{const s=document.getElementById('studentName'),roster=ROSTERS[e.target.value];s.innerHTML=roster?'<option value="">Choose your name...</option>'+roster.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join(''):'<option value="">Choose your class first...</option>';});

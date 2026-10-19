@@ -29,7 +29,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="../guest-mode.js?v=20261011-guest"></script>
-<script src="../game-gate.js?v=20261017-auth-gate" data-game-id="rashi-letters"></script>
+<script src="../game-gate.js?v=20261019-follow-all" data-game-id="rashi-letters"></script>
 <title>Rashi Letters</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
@@ -319,7 +319,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
       <button class="btn continue-btn" id="continueBtn">▶ Continue my quest</button>
     </div>
     <div class="mode-gate-section">
-      <h3>Your Rashi path — master each step to unlock the next:</h3>
+      <h3>Choose any Rashi activity — all levels are open:</h3>
       <div class="letter-grid" id="letterGrid"></div>
     </div>
     <div class="mode-gate-section hidden" id="modeTypeSection">
@@ -375,7 +375,7 @@ input.morph{width:100%;accent-color:#6553d6;height:28px;margin:6px 0 12px}
 
   <div class="card" id="similarScreen">
     <div class="sim-head"><h2>Look-alike letters</h2><button class="menu-link" id="simMenuBtn">⬅ Menu</button></div>
-    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them! <b>Get 7 of 8 in 🎯 Match it to unlock the next step.</b></p>
+    <p class="sim-intro">These letters look almost the same in Rashi script and in regular print. If you can read regular Hebrew, you can already read them! <b>Try to get 7 of 8 in 🎯 Match it!</b></p>
     <div class="sim-tabs">
       <button class="sim-tab" data-sim="explore">👀 Side by side</button>
       <button class="sim-tab" data-sim="match">🎯 Match it</button>
@@ -527,6 +527,8 @@ const MAX_QUESTIONS_PER_STEP = 5;
 let soundOn = true, starsThisVisit = 0, coinsThisVisit = 0, guidedIndex = 0, guidedPhase = 'letter', questionTimer = null, viewVersion = 0;
 let studentName = null;
 let studentId = null;
+let rashiFollowPending=false;
+window.addEventListener('ftt:before-follow-navigation',e=>{if(rashiFollowPending)e.preventDefault();});
 let unitIndex = 0;
 let phase = 'letter'; // 'letter' | 'word'
 let streak = 0; // correct answers earned in the current step; mistakes do not erase them
@@ -864,7 +866,7 @@ function stepMastered(idx){
   return !!chainFlags[flagKey(st)];   // no free passes: Look-alike and word steps must be mastered by everyone
 }
 // A step is open if it's already mastered (missions stay finished) or everything before it is mastered.
-function stepUnlocked(idx){ if(stepMastered(idx)) return true; for(let j=0;j<idx;j++) if(!stepMastered(j)) return false; return true; }
+function stepUnlocked(idx){ return idx>=0 && idx<STEPS.length; }
 function firstUnmasteredBefore(idx){ for(let j=0;j<idx;j++) if(!stepMastered(j)) return j; return idx; }
 function currentStep(){ return STEPS.findIndex((_,j)=>!stepMastered(j)); }
 function stepIndexOf(k,v){ return STEPS.findIndex(st=>st.k===k && (k==='similar' || st.n===v || st.i===v)); }
@@ -1159,7 +1161,8 @@ async function handleAnswer(letter, btnEl){
     }
   }
 
-  try{await Promise.all(writes);}catch(e){if(version===viewVersion)fb.textContent+=' Progress could not save. Check your connection.';}
+  rashiFollowPending=true;
+  try{await Promise.all(writes);rashiFollowPending=false;}catch(e){if(version===viewVersion)fb.textContent+=' Progress could not save. Check your connection.';}
   if(version!==viewVersion) return;
 
   if(practiceFinished){
@@ -1608,14 +1611,24 @@ const PRACTICE_WORDS = [
 const baseLetters = w => w.normalize('NFD').replace(/[֑-ׇ]/g,'').split('');
 let wordLevel = 2, wordGame = null;
 function unlockedLetters(){
-  const set=new Set(SIMILAR);
-  const done = Math.min(typeof guidedIndex==='number'?guidedIndex:0, UNITS.length);
-  UNITS.slice(0,done).forEach(u=>(u.type==='single'?[u.correct]:u.pair).forEach(ch=>baseLetters(ch).forEach(c=>set.add(c))));
-  return set;
+  // Progress, not menu access, determines which letters a student has learned.
+  if(chainFlags.alphabetDone) return new Set(ALL_LETTERS);
+  const known=new Set();
+  if(chainFlags.similarDone) SIMILAR.forEach(ch=>known.add(ch));
+  const completed=Math.min(guidedIndex,UNITS.length);
+  UNITS.slice(0,completed).forEach(u=>(u.type==='single'?[u.correct]:u.pair).forEach(ch=>baseLetters(ch).forEach(c=>known.add(c))));
+  return known;
 }
 function wordsFor(level){
-  const ok=unlockedLetters();
-  return PRACTICE_WORDS.filter(w=>{ const b=baseLetters(w); return b.length===level && b.every(c=>ok.has(c)); });
+  const known=unlockedLetters();
+  const candidates=PRACTICE_WORDS.filter(w=>baseLetters(w).length===level);
+  // Prefer fully learned words; if there are too few for a playable round,
+  // introduce only the minimum number of unfamiliar letters needed.
+  const unfamiliarCount=w=>baseLetters(w).filter(ch=>!known.has(ch)).length;
+  const ranked=candidates.map(w=>({word:w,missing:unfamiliarCount(w)}));
+  ranked.sort((a,b)=>a.missing-b.missing);
+  const maxMissing=ranked[Math.min(5,ranked.length-1)]?.missing ?? 0;
+  return ranked.filter(item=>item.missing<=maxMissing).map(item=>item.word);
 }
 function startWords(level){
   wordLevel=level;
@@ -1636,7 +1649,7 @@ function renderWords(){
     const go=el('button','btn','Go there →'); go.onclick=()=>goStep(firstUnmasteredBefore(si)); area.appendChild(go); return;
   }
   if(g.pool.length<4){
-    area.append(el('p','prompt','Finish more missions to unlock '+g.level+'-letter words!'), el('p','sim-intro','These words use letters from missions you haven’t done yet. Try 2-letter words first.'));
+    area.append(el('p','prompt','There are not enough words available for this level.'), el('p','sim-intro','Try another word length.'));
     return;
   }
   if(g.round>=g.order.length){

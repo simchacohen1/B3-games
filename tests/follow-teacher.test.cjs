@@ -106,3 +106,24 @@ test('canonical paths ignore query and normalize index but not other tools', () 
   assert.equal(C.canonicalPath('/shorashim/'), '/shorashim/');
   assert.notEqual(C.canonicalPath('/shorashim/teacher.html'), '/shorashim/');
 });
+
+for (const [tool, destination] of Object.entries(C.DESTINATIONS)) {
+  for (const classId of ['et','wt']) test(`${classId}: ${tool} supports once, locked, unlock and rejects other tools/classes`,()=>{
+    const state={...BASE,classId,destination:tool};
+    const context={...CTX,classId,allowedTools:{[tool]:true},currentUrl:'https://funtorahtools.com/'};
+    const first=C.decide({...state,mode:'free'},context);
+    assert.equal(first.destination,destination.path);
+    assert.equal(C.decide({...state,mode:'free'},{...context,lastAppliedKey:first.applyKey}).action,'none');
+    assert.equal(C.decide(state,context).action,'navigate');
+    assert.equal(C.decide(state,{...context,currentUrl:destination.path}).action,'stay');
+    assert.equal(C.decide({...state,mode:'independent'},context).action,'none');
+    assert.equal(C.decide(state,{...context,allowedTools:{[tool]:false}}).reason,'not-permitted');
+    assert.equal(C.decide(state,{...context,classId:classId==='et'?'wt':'et'}).reason,'wrong-class');
+  });
+}
+test('inherited object keys are never destinations',()=>{
+  for(const destination of ['constructor','__proto__','toString']) {
+    assert.equal(C.decide({...BASE,destination},{...CTX,allowedTools:{[destination]:true}}).reason,'not-permitted');
+    assert.throws(()=>C.propose({...BASE,destination}));
+  }
+});

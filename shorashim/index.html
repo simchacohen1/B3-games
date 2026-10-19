@@ -29,7 +29,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="../guest-mode.js?v=20261011-guest"></script>
-  <script src="../game-gate.js?v=20261017-auth-gate" data-game-id="shorashim"></script>
+  <script src="../game-gate.js?v=20261019-follow-all" data-game-id="shorashim"></script>
   <title>Shorashim Learning Lab</title>
   <style>
 :root{
@@ -1509,7 +1509,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
                 <button type="button" class="review-track-btn" data-review-track="suffix" aria-pressed="false"><span class="track-title">🔚 Suffixes</span><span class="track-progress">No learned cards yet</span></button>
               </div>
               <div class="review-perek-filter" aria-label="Filter Shorashim by Perek"><b>Shorashim unit:</b><button type="button" class="perek-filter-btn active" data-review-perek="all">All Learned</button><button type="button" class="perek-filter-btn" data-review-perek="18">Perek י״ח</button><button type="button" class="perek-filter-btn" data-review-perek="19">Perek י״ט</button><button type="button" class="perek-filter-btn" data-review-perek="booklet">3rd Grade Booklet</button></div>
-              <div class="review-setup-top"><label>List view <select id="reviewSort"><option value="learned">Order learned</option><option value="alpha">Alphabetical</option><option value="manual">My custom order</option></select></label><span id="reviewSelectionCount" class="pill"></span></div>
+              <div class="review-setup-top"><label>List view <select id="reviewSort"><option value="newest" selected>Newest learned first</option><option value="learned">Oldest learned first</option><option value="alpha">Alphabetical</option><option value="manual">My custom order</option></select></label><span id="reviewSelectionCount" class="pill"></span></div>
               <div class="button-row"><button id="selectAllReview" class="ghost small">Select all</button><button id="clearReviewSelection" class="ghost small">Clear selection</button></div>
               <input type="checkbox" id="reviewNoHints" class="hidden" aria-hidden="true">
               <div id="reviewPicker" class="review-picker"></div>
@@ -1637,8 +1637,8 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
   <script src="booklet-3rd-grade.js?v=20261019-import-1"></script>
-  <script src="app.js?v=20261019-booklet-1"></script>
-  <script src="review-categories.js?v=20260917-picturefix1"></script>
+  <script src="app.js?v=20261019-teacher-screenshots"></script>
+  <script src="review-categories.js?v=20261019-newest-review"></script>
   <script src="../student-class.js?v=20261007-shared-account-v2"></script>
   <script src="../b3-race.js?v=20261007"></script>
   <script src="friends-race.js?v=20261007-shared-account-v2"></script>

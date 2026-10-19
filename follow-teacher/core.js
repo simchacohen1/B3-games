@@ -17,7 +17,18 @@
   });
   // Expand ONLY after each activity is verified to load the shared gate.
   const DESTINATIONS = Object.freeze({
-    shorashim: Object.freeze({label: 'Shorashim', path: '/shorashim/'})
+    shorashim: Object.freeze({label: 'Shorashim', path: '/shorashim/'}),
+    chazara: Object.freeze({label: 'Chazara', path: '/chazara/'}),
+    'posuk-practice-scroll': Object.freeze({label: 'Posuk Practice', path: '/record_pesukim/student.html'}),
+    'rashi-letters': Object.freeze({label: 'Rashi Letters', path: '/rashi-letters/student.html'}),
+    halacha: Object.freeze({label: 'Halacha', path: '/halacha/'}),
+    'sefer-hamitzvos': Object.freeze({label: 'Sefer HaMitzvos', path: '/sefer-hamitzvos/'}),
+    yiddish: Object.freeze({label: 'Yiddish', path: '/yiddish/'}),
+    gematria: Object.freeze({label: 'Gematria', path: '/gematria/'}),
+    'weekly-quiz': Object.freeze({label: 'Weekly Quiz', path: '/weekly-quiz/'}),
+    'game-show': Object.freeze({label: 'Game Show', path: '/game-show/player.html'}),
+    'student-rewards': Object.freeze({label: 'Student Rewards', path: '/student-rewards/student.html'}),
+    'class-gallery': Object.freeze({label: 'Class Gallery', path: '/class-gallery/'})
   });
   const MAX_HEARTBEAT_AGE_MS = 90 * 1000;
   const MAX_LEASE_MS = 10 * 60 * 1000;
@@ -72,10 +83,10 @@
         !validId(state.teacherUid) || !validId(state.revision)) return none('wrong-class');
     if (!fresh(state, c.now)) return none('expired');
     if (!targetApplies(state.targets, c.studentId)) return none('not-selected');
-    const destination = DESTINATIONS[state.destination];
+    const destination = Object.prototype.hasOwnProperty.call(DESTINATIONS, state.destination) ? DESTINATIONS[state.destination] : null;
     if (!destination || c.allowedTools?.[state.destination] !== true) return none('not-permitted');
     const applyKey = [state.workspaceId, state.classId, state.revision, c.studentId].join(':');
-    const alreadyThere = canonicalPath(c.currentUrl) === destination.path;
+    const alreadyThere = canonicalPath(c.currentUrl) === canonicalPath(destination.path);
     if (state.mode === MODES.FREE) {
       if (c.lastAppliedKey === applyKey) return none('already-sent');
       return {action: alreadyThere ? 'stay' : 'navigate', reason: 'one-time',
@@ -94,7 +105,7 @@
                     revision, targets = 'all', issuedAt, heartbeatAt, expiresAt}) {
     if (![MODES.INDEPENDENT, MODES.FREE, MODES.LOCKED].includes(mode)) throw Error('Invalid mode');
     if (![workspaceId, classId, teacherUid, revision].every(validId)) throw Error('Invalid session identifier');
-    if (mode !== MODES.INDEPENDENT && !DESTINATIONS[destination]) throw Error('Destination is not allowed');
+    if (mode !== MODES.INDEPENDENT && !Object.prototype.hasOwnProperty.call(DESTINATIONS, destination)) throw Error('Destination is not allowed');
     if (targets !== 'all' && (!Array.isArray(targets) || !targets.length ||
         targets.length > 60 || targets.some(id => !validId(id)) ||
         new Set(targets).size !== targets.length)) throw Error('Invalid student selection');

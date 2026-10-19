@@ -390,6 +390,72 @@
   let firebaseDb = null;
   let firebaseAuth = null;
   let activeMode = "local-preview";
+  let rememberedTeacherAuth = null;
+  let teacherRestore = null;
+  let teacherSignOutVersion = 0;
+
+  // A separate Firebase app remembers Google credentials. The default app
+  // remains tab-scoped so a passcode login cannot replace a teacher elsewhere.
+  function getRememberedTeacherAuth() {
+    if (!rememberedTeacherAuth) {
+      let app;
+      try { app = window.firebase.app("FTTRememberedTeacher"); }
+      catch (_) { app = window.firebase.initializeApp(getConfiguredFirebaseOptions(), "FTTRememberedTeacher"); }
+      rememberedTeacherAuth = app.auth();
+    }
+    return rememberedTeacherAuth;
+  }
+
+  function isStudentTab() {
+    return Boolean(sessionStorage.getItem("b3Games_studentId") || sessionStorage.getItem("b3ActingAsStudent"));
+  }
+
+  // A tab where a student pressed "Switch student" must not quietly turn into
+  // the teacher's tab just because the teacher's Google login is remembered
+  // on this computer. Only pressing Teacher Sign-in in this tab lifts this.
+  const NO_RESTORE_KEY = "b3NoTeacherRestore";
+  function teacherRestoreBlocked() {
+    try { return sessionStorage.getItem(NO_RESTORE_KEY) === "1"; } catch (_) { return false; }
+  }
+
+  // Teachers sign in with Google; students sign in with a custom token and
+  // have no provider. A student identity must never keep a teacher tab from
+  // restoring the teacher (it can leak in via browser-wide LOCAL persistence).
+  function isGoogleUser(user) {
+    return Boolean(user && Array.isArray(user.providerData) &&
+      user.providerData.some(function (p) { return p && p.providerId === "google.com"; }));
+  }
+
+  // The compat Firebase build used here has no authStateReady(); its first
+  // observer callback fires once stored credentials have been loaded.
+  function waitForAuthState(auth) {
+    if (typeof auth.authStateReady === "function") return auth.authStateReady();
+    return new Promise(function (resolve) {
+      let off = function () {}, done = false;
+      const finish = function () { if (done) return; done = true; try { off(); } catch (_) {} resolve(); };
+      off = auth.onAuthStateChanged(finish, finish);
+      if (done) off();
+    });
+  }
+
+  function restoreTeacher(services) {
+    if (isStudentTab() || teacherRestoreBlocked()) return Promise.resolve(false);
+    if (!teacherRestore) teacherRestore = (async function () {
+      const signOutVersion = teacherSignOutVersion;
+      const savedAuth = getRememberedTeacherAuth();
+      await waitForAuthState(savedAuth);
+      const saved = savedAuth.currentUser;
+      if (!saved || isStudentTab() || teacherRestoreBlocked() || isGoogleUser(services.auth.currentUser)) return false;
+      // Restore Firebase identity before reading protected teacher records.
+      // onAuthStateChanged still checks current authorization before granting UI access.
+      if (isStudentTab() || isGoogleUser(services.auth.currentUser) || signOutVersion !== teacherSignOutVersion) return false;
+      await services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION);
+      if (isStudentTab() || teacherRestoreBlocked() || isGoogleUser(services.auth.currentUser) || signOutVersion !== teacherSignOutVersion) return false;
+      await services.auth.updateCurrentUser(saved);
+      return true;
+    })().finally(function () { teacherRestore = null; });
+    return teacherRestore;
+  }
 
   function ensureFirebase() {
     const config = getConfiguredFirebaseOptions();
@@ -881,24 +947,27 @@
     const provider = new window.firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
 
-    // Keep a teacher's Google login in this tab. A student tab must never replace it.
-    return services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION)
-      .then(function () { return services.auth.signInWithPopup(provider); }).catch(function (error) {
+    try { sessionStorage.removeItem(NO_RESTORE_KEY); } catch (_) {}
+    const savedAuth = getRememberedTeacherAuth();
+    return savedAuth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL)
+      .then(function () { return savedAuth.signInWithPopup(provider); }).catch(function (error) {
       const code = error && error.code ? error.code : "";
       if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request" || code === "auth/operation-not-supported-in-this-environment") {
-        return services.auth.signInWithRedirect(provider).then(function () { return null; });
+        return savedAuth.signInWithRedirect(provider).then(function () { return null; });
       }
       throw error;
     }).then(function (result) {
       // Redirect sign-in leaves this page and returns later, so there is no
       // immediate result object in that branch. onAuthStateChanged will finish it.
       if (!result) return null;
-      return readUserAccess(result.user).then(function(access){
+      return services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION)
+        .then(function () { return services.auth.updateCurrentUser(result.user); })
+        .then(function () { return readUserAccess(result.user); }).then(function(access){
         currentAccess = access;
         if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
         else showToolVersions(access);
         if (!access.authorized) {
-          return services.auth.signOut().then(function () {
+          return savedAuth.signOut().then(function () { return services.auth.signOut(); }).then(function () {
             const error = new Error("This Google account is not authorized for Fun Torah Tools.");
             error.code = "b3/unauthorized-user";
             throw error;
@@ -910,11 +979,22 @@
   }
 
   function signOut() {
+    teacherSignOutVersion++;
     const services = ensureFirebase();
     if (!services || !services.auth) return Promise.resolve();
-    return services.auth.signOut();
+    return getRememberedTeacherAuth().signOut().then(function () { return services.auth.signOut(); });
   }
 
+
+  // Ends only the STUDENT's session in this tab. The teacher's remembered
+  // Google login is untouched, and this tab will not adopt it automatically.
+  async function endStudentSession() {
+    try { sessionStorage.setItem(NO_RESTORE_KEY, "1"); } catch (_) {}
+    try { STUDENT_STORAGE_KEYS.forEach(function (k) { sessionStorage.removeItem(k); }); sessionStorage.removeItem(ACTING_KEY); } catch (_) {}
+    const services = ensureFirebase();
+    const user = services && services.auth && services.auth.currentUser;
+    if (user && !isGoogleUser(user)) await services.auth.signOut();
+  }
 
   // Verified teachers can switch between dashboards and student demonstrations.
   function showToolVersions(access) {
@@ -965,8 +1045,16 @@
       endAuthChecking();
       return function unsubscribe() {};
     }
-    return services.auth.onAuthStateChanged(function (user) {
+    return services.auth.onAuthStateChanged(async function (user) {
+      // A student identity sitting in a non-student tab is not this tab's
+      // identity: let the remembered teacher replace it.
+      if (user && !isGoogleUser(user) && !isStudentTab() && !teacherRestoreBlocked()) {
+        try { if (await restoreTeacher(services)) return; }
+        catch (error) { console.warn("Could not restore teacher sign-in:", error); }
+      }
       if (!user) {
+        try { if (await restoreTeacher(services)) return; }
+        catch (error) { console.warn("Could not restore teacher sign-in:", error); }
         currentAccess = { authorized:false, role:"", classIds:[] };
         setSignedInHint(false);
         callback(null, false, currentAccess);
@@ -1291,6 +1379,7 @@
     dayKeys: DAY_KEYS.slice(),
     getMode: function () { ensureFirebase(); return activeMode; },
     getActingStudent: getActingStudent,
+    endStudentSession: endStudentSession,
     listStudentsForActing: listStudentsForActing,
     startActingAsStudent: startActingAsStudent,
     stopActingAsStudent: stopActingAsStudent,

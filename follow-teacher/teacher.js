@@ -48,8 +48,8 @@
     const msg = !validState || state.mode === C.MODES.INDEPENDENT
       ? 'Independent — students can choose their activities.'
       : state.mode === C.MODES.LOCKED
-        ? '🔒 Follow Teacher — Locked · Shorashim'
-        : '↪ Follow once · Shorashim (free afterward)';
+        ? '🔒 Follow Teacher — Locked · ' + (C.DESTINATIONS[state.destination]?.label || 'Activity')
+        : '↪ Follow once · ' + (C.DESTINATIONS[state.destination]?.label || 'Activity') + ' (free afterward)';
     q('state').textContent = msg;
     q('state').style.background = validState && state.mode === C.MODES.LOCKED ? '#fff2cf' : '#ebf4ff';
   }
@@ -60,9 +60,15 @@
     endWatching();
     const snap = await db.ref('b3Games/workspaces/' + WS + '/classes/' + id).once('value');
     const row = snap.val();
+    const settings = (await db.ref('b3Games/siteSettings').once('value')).val() || {};
     if (myGeneration !== generation) return;
     if (!row || row.active === false) throw Error('This class is disabled.');
-    classRow = row; current = id; q('classSelect').value = id;
+    classRow = row; current = id;
+    q('destination').replaceChildren(...Object.entries(C.DESTINATIONS).filter(([tool]) =>
+      (['et','wt'].includes(id) || row.toolGrants?.[tool] === true) &&
+      settings.games?.[tool] !== false && settings.classGames?.[id]?.[tool] !== false).map(([tool,entry]) => {
+        const option=document.createElement('option'); option.value=tool; option.textContent=entry.label; return option;
+      })); q('classSelect').value = id;
     stateRef = db.ref('b3Games/workspaces/' + WS + '/classes/' + id + '/access/followTeacher');
     const listener = snapshot => {
       if (myGeneration !== generation) return;
@@ -81,9 +87,17 @@
       safeTeacher();
       const m = forceMode || mode(), destination = q('destination').value;
       if (m !== C.MODES.INDEPENDENT) {
-        if (!C.DESTINATIONS[destination]) throw Error('This destination is not supported.');
+        if (!Object.prototype.hasOwnProperty.call(C.DESTINATIONS, destination)) throw Error('This destination is not supported.');
         if (!['et','wt'].includes(current) && classRow?.toolGrants?.[destination] !== true)
-          throw Error('Shorashim is not enabled for this class.');
+          throw Error(C.DESTINATIONS[destination].label + ' is not enabled for this class.');
+      }
+      if (m !== C.MODES.INDEPENDENT) {
+        const latest = (await db.ref('b3Games/siteSettings').once('value')).val() || {};
+        const latestClass = (await db.ref('b3Games/workspaces/' + WS + '/classes/' + current).once('value')).val();
+        if (!latestClass || latestClass.active === false ||
+            (!['et','wt'].includes(current) && latestClass.toolGrants?.[destination] !== true) ||
+            latest.games?.[destination] === false || latest.classGames?.[current]?.[destination] === false)
+          throw Error('This activity is no longer enabled for the class.');
       }
       const targets = m === C.MODES.INDEPENDENT ? 'all' : selected();
       if (currentState && C.fresh(currentState, clock()) &&

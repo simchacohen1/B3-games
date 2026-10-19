@@ -36,7 +36,7 @@ test('date navigation selects daily cards, can return to Today, and makes every 
  const document={getElementById(id){if(!els.has(id))els.set(id,el());return els.get(id);},querySelectorAll(){return els.get('dayCards')?.children||[];},createElement:el};
  const storageApi={getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)};
  const FixedDate=class extends Date{constructor(...args){super(...(args.length?args:['2026-10-12T14:00:00Z']));}};
- const ctx={document,window:{FTTMitzvahCalendar:calendar,FTT_MITZVAH_DAYS:days,FTTSunTimes:sun,B3SiteSettings:{onAuthStateChanged(callback){callback({uid:"teacher"},true,{role:"teacher",authorized:true});}}},sessionStorage:storageApi,localStorage:storageApi,location:{search:''},URLSearchParams,Date:FixedDate,Intl,confirm:()=>false,setInterval(){}};
+ const ctx={document,window:{addEventListener(){},FTTMitzvahCalendar:calendar,FTT_MITZVAH_DAYS:days,FTTSunTimes:sun,B3SiteSettings:{onAuthStateChanged(callback){callback({uid:"teacher"},true,{role:"teacher",authorized:true});}}},sessionStorage:storageApi,localStorage:storageApi,location:{search:''},URLSearchParams,Date:FixedDate,Intl,confirm:()=>false,setInterval(){}};
  const html=fs.readFileSync('sefer-hamitzvos/index.html','utf8');const source=html.match(/<script>([\s\S]*?)<\/script>/)[1];vm.runInNewContext(source,ctx);
  assert.equal(els.get('outline').src,'coloring-v2/476.png?v=20261016-october');
  els.get('yesterday').onclick();assert.equal(els.get('outline').src,'coloring-v2/475.png?v=20261016-october');

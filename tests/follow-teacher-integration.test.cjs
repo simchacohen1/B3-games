@@ -24,7 +24,7 @@ function harness(overrides={}) {
   const db={ref(key){return {
     on(event,fn){listeners.set(key,fn);},
     off(event,fn){if(listeners.get(key)===fn)listeners.delete(key)},
-    once:async()=>snap(values[key]??null)
+    once:async()=>{ if(overrides.onRead)await overrides.onRead(key); return snap(values[key]??null); }
   }}};
   const claims=overrides.claims??{b3StudentRole:'student',b3StudentId:'boy1',b3ClassId:'et'};
   const user={uid:'studentToken1',getIdTokenResult:async()=>({claims})};
@@ -34,12 +34,12 @@ function harness(overrides={}) {
   const document={body,querySelector:()=>overrides.busy?{className:'rec-panel'}:null,createElement:()=>({
     style:{},dataset:{},remove(){},setAttribute(){},textContent:''
   })};
-  const storage={getItem:key=>stored.get(key)||null,setItem:(key,v)=>stored.set(key,v)};
+  const storage={getItem:key=>stored.get(key)||null,setItem:(key,v)=>stored.set(key,v),removeItem:key=>stored.delete(key)};
   const location={href:'https://funtorahtools.com/chazara/index.html',
     origin:'https://funtorahtools.com', assign:url=>navigations.push(url)};
   const ctx={window:null,document,location,
     firebase:{auth:()=>({currentUser:user}),database:()=>db},
-    FTTFollowTeacherCore:C,sessionStorage:storage,CustomEvent:class{constructor(type,p){this.type=type;this.cancelable=p.cancelable;}},
+    FTTFollowTeacherCore:C,sessionStorage:storage,CustomEvent:class{constructor(type,p={}){this.type=type;this.cancelable=p.cancelable;}},
     setInterval:()=>++nextTimer,clearInterval:()=>{},
     setTimeout:fn=>{const id=++nextTimer;timers.set(id,fn);return id;},
     clearTimeout:id=>timers.delete(id),
@@ -176,4 +176,103 @@ test('failed Chazara audio remains protected until student acknowledges download
   assert.equal(acknowledgment.disabled,true);
   const listener=fs.readFileSync(path.join(ROOT,'follow-teacher/student.js'),'utf8');
   assert.ok(listener.includes('[data-ftt-unsaved="true"]'),'Follow Teacher checks unsaved work marker');
+});
+
+for(const destination of Object.keys(C.DESTINATIONS)) {
+  test(`listener checks the actual ${destination} student grant`,async()=>{
+    const h=harness({values:{
+      'b3Games/workspaces/b3-2026/classes/et/members/boy1':{active:true,toolAccess:{[destination]:false}}
+    }});
+    await fire(h,{...h.state,destination});await runTimers(h);
+    assert.equal(h.navigations.length,0);
+  });
+}
+test('unlock cancels a pending redirect, even with unchanged revision',async()=>{
+  const h=harness();await fire(h,h.state);
+  await fire(h,{...h.state,mode:'independent'});await runTimers(h);
+  assert.equal(h.navigations.length,0);
+});
+test('locked-site capability permits only the current authenticated destination and expires',async()=>{
+  const h=harness();h.ctx.location.href='https://funtorahtools.com/shorashim/';
+  await fire(h,h.state);
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),true);
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('halacha'),false);
+  await fire(h,{...h.state,mode:'independent'});
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),false);
+  await fire(h,{...h.state,heartbeatAt:Date.now()-100000});
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),false);
+});
+test('Follow Once keeps only its permitted destination available through reloads while the command is fresh',async()=>{
+  const h=harness();await fire(h,{...h.state,mode:'free'});await runTimers(h);
+  const applied=h.stored.get('fttFollowTeacherLastApplied');
+  h.ctx.location.href='https://funtorahtools.com/shorashim/';
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),true);
+  h.ctx.FTTFollowStudent.stop();
+  await fire(h,{...h.state,mode:'free'});
+  assert.equal(h.stored.get('fttFollowTeacherLastApplied'),applied);
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),true);
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('halacha'),false);
+});
+test('every destination loads the shared student gate, never a teacher route',()=>{
+  for(const [tool,entry] of Object.entries(C.DESTINATIONS)) {
+    const filename=entry.path.endsWith('/')?entry.path+'index.html':entry.path;
+    const html=fs.readFileSync(path.join(ROOT,filename),'utf8');
+    assert.ok(html.includes('game-gate.js'),tool);
+    assert.ok(html.includes('data-game-id="'+tool+'"'),tool);
+    assert.ok(!filename.includes('teacher'),tool);
+  }
+});
+
+function workGuard(file, variables) {
+  const source=fs.readFileSync(path.join(ROOT,file),'utf8');
+  const begin=source.indexOf("window.addEventListener('ftt:before-follow-navigation'");
+  assert.ok(begin>=0,file+' has a work guard');
+  const end=source.indexOf('});',begin)+3;
+  let guard;const context={...variables,window:{addEventListener(_event,fn){guard=fn;}}};
+  vm.runInNewContext(source.slice(begin,end),context);
+  let held=false;guard({preventDefault(){held=true;}});return held;
+}
+test('Posuk work guard protects active microphone, unsaved captured audio, redo scoring and upload evidence',()=>{
+  const ready={mediaRecorder:null,translationRecorder:null,chunkFixRecorder:null,wordFixRecorder:null,
+    translationSessionActive:false,translationPillPhase:'idle',currentAudio:{},attemptSaved:{},
+    translationSegments:{},translationGradedResults:{},comprehensionQResults:{},
+    document:{querySelectorAll:()=>[],querySelector:()=>null}};
+  const file='record_pesukim/student.html';
+  assert.equal(workGuard(file,ready),false);
+  assert.equal(workGuard(file,{...ready,mediaRecorder:{state:'recording'}}),true);
+  assert.equal(workGuard(file,{...ready,currentAudio:{hebrew:{}}}),true);
+  assert.equal(workGuard(file,{...ready,currentAudio:{hebrew:{}},attemptSaved:{hebrew:true}}),false);
+  assert.equal(workGuard(file,{...ready,document:{querySelectorAll:()=>[],querySelector:()=>({})}}),true);
+  assert.equal(workGuard(file,{...ready,translationSegments:{0:{blob:{}}},translationGradedResults:{0:{audioStoragePath:'uploaded'}}}),true);
+  assert.equal(workGuard(file,{...ready,translationSegments:{0:{blob:{}}},translationGradedResults:{0:{evidenceSaved:true}}}),false);
+});
+test('scrapbook and coloring stay put through pending or failed account saves',()=>{
+  assert.equal(workGuard('halacha/index.html',{halachaDirty:true,halachaCloudLoading:false,document:{querySelector:()=>null}}),true);
+  assert.equal(workGuard('halacha/index.html',{halachaDirty:false,halachaCloudLoading:false,document:{querySelector:()=>null}}),false);
+  assert.equal(workGuard('sefer-hamitzvos/index.html',{followPaintPending:true,paintLoading:false,active:null}),true);
+  assert.equal(workGuard('sefer-hamitzvos/index.html',{followPaintPending:false,paintLoading:false,active:{}}),true);
+  assert.equal(workGuard('sefer-hamitzvos/index.html',{followPaintPending:false,paintLoading:false,active:null}),false);
+});
+test('unsubmitted quiz choices and in-flight reward requests veto following',()=>{
+  assert.equal(workGuard('weekly-quiz/index.html',{markingComplete:false,selectedChoice:0,responseFor:()=>null,displayedQuestion:0}),true);
+  assert.equal(workGuard('weekly-quiz/index.html',{markingComplete:false,selectedChoice:0,responseFor:()=>({saved:true}),displayedQuestion:0}),false);
+  assert.equal(workGuard('student-rewards/student.js',{state:{busy:true}}),true);
+  assert.equal(workGuard('student-rewards/student.js',{state:{busy:false}}),false);
+});
+
+test('new follow command is rechecked after an earlier permission check is in flight',async()=>{
+  let release; let paused=false;
+  const hold=new Promise(resolve=>{release=resolve});
+  const h=harness({onRead:async key=>{
+    if(!paused && key.endsWith('/members/boy1')){paused=true;await hold;}
+  }});
+  await h.ctx.FTTFollowStudent.start({workspaceId:'b3-2026',classId:'et',studentId:'boy1'});
+  const send=h.listeners.get('b3Games/workspaces/b3-2026/classes/et/access/followTeacher');
+  send({val:()=>({...h.state,revision:'old',mode:'locked'})});
+  await settle();
+  send({val:()=>({...h.state,revision:'new',destination:'shorashim'})});
+  release();
+  await settle();
+  await runTimers(h);
+  assert.deepEqual(h.navigations,['https://funtorahtools.com/shorashim/']);
 });
