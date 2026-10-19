@@ -4,14 +4,20 @@ on:
   pull_request:
     paths:
       - 'follow-teacher/**'
-      - 'tests/follow-teacher.test.cjs'
+      - 'tests/follow-teacher*.test.cjs'
+      - 'game-gate.js'
+      - 'teacher-home.html'
+      - 'index.html'
       - '.github/workflows/follow-teacher-tests.yml'
   push:
     branches:
       - 'feat/follow-teacher-foundation-150'
     paths:
       - 'follow-teacher/**'
-      - 'tests/follow-teacher.test.cjs'
+      - 'tests/follow-teacher*.test.cjs'
+      - 'game-gate.js'
+      - 'teacher-home.html'
+      - 'index.html'
       - '.github/workflows/follow-teacher-tests.yml'
 
 permissions:
@@ -26,4 +32,4 @@ jobs:
         with:
           node-version: '22'
       - name: Run focused navigation policy tests
-        run: node --test tests/follow-teacher.test.cjs
+        run: node --test tests/follow-teacher.test.cjs tests/follow-teacher-integration.test.cjs
