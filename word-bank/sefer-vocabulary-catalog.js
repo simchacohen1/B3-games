@@ -749,6 +749,80 @@
       "בֵּית דִּין",
       "Jewish court"
     ]
+  ],
+  "N232": [
+    [
+      "עָנִי",
+      "person in need"
+    ],
+    [
+      "צְדָקָה",
+      "tzedakah"
+    ]
+  ],
+  "N239": [
+    [
+      "מַשְׁכּוֹן",
+      "collateral"
+    ],
+    [
+      "בַּעַל חוֹב",
+      "debtor"
+    ]
+  ],
+  "N270": [
+    [
+      "עֶזְרָה",
+      "help"
+    ],
+    [
+      "נִזְקָק",
+      "person in need"
+    ]
+  ],
+  "N297": [
+    [
+      "פִּקּוּחַ נֶפֶשׁ",
+      "saving a life"
+    ],
+    [
+      "הַצָּלָה",
+      "rescue"
+    ]
+  ],
+  "P114": [
+    [
+      "עֲרָכִין",
+      "vowed valuation"
+    ],
+    [
+      "עֵרֶךְ",
+      "value"
+    ]
+  ],
+  "P169": [
+    [
+      "אַרְבַּעַת הַמִּינִים",
+      "the four species"
+    ],
+    [
+      "אֶתְרוֹג",
+      "esrog"
+    ],
+    [
+      "לוּלָב",
+      "lulav"
+    ]
+  ],
+  "P196": [
+    [
+      "הַעֲנָקָה",
+      "gifts at release"
+    ],
+    [
+      "עֶבֶד עִבְרִי",
+      "Jewish bondsman"
+    ]
   ]
 };
  const idOf=he=>'word:'+he.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('he');
