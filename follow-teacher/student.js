@@ -7,7 +7,6 @@
 
   let active = null, generation = 0, checking = false;
   const appliedKey = 'fttFollowTeacherLastApplied';
-  const arrivalKey = 'fttFollowTeacherArrival';
   let banner = null;
   let policySignature = '';
   function policyChanged(run) {
@@ -17,8 +16,6 @@
     if (signature !== policySignature) { policySignature=signature;
       window.dispatchEvent(new CustomEvent('ftt:follow-policy-changed')); }
   }
-  let gateGrant = null;
-  function clearGrant() { gateGrant = null; }
   async function allowsLockedActivity(tool) {
     const run = active, state = run?.state;
     if (!run || !state || state.destination !== tool || !Object.prototype.hasOwnProperty.call(C.DESTINATIONS, tool) ||
@@ -30,13 +27,8 @@
       classId:run.classId,studentId:run.studentId,allowedTools:{[tool]:true},
       currentUrl:location.href,now:Date.now() + (run.serverOffset || 0)});
     if (decision.action !== 'stay') return false;
-    // Follow Once grants this destination only in the receiving document.
-    // Leaving or reloading after it was consumed does not create another bypass.
-    if (state.mode === C.MODES.FREE && gateGrant?.revision !== state.revision &&
-        sessionStorage.getItem(appliedKey) === decision.applyKey &&
-        sessionStorage.getItem(arrivalKey) !== decision.applyKey) return false;
-    gateGrant = {revision:state.revision};
-    sessionStorage.removeItem(arrivalKey);
+    // The current selected activity remains available through reloads until
+    // Unlock, a new destination, revoked permission, or session expiry.
     return true;
   }
 
@@ -55,7 +47,7 @@
   }
 
   function stop() {
-    generation++; clearGrant();
+    generation++;
     if (active) {
       active.ref.off('value', active.handler);
       clearInterval(active.timer);
@@ -122,7 +114,7 @@
       if (decision.action === 'none') { notice(''); clearTimeout(run.redirectTimer); return; }
       if (decision.action === 'stay') {
         clearTimeout(run.redirectTimer);
-        if (decision.mode === C.MODES.FREE) { gateGrant = {revision:state.revision}; sessionStorage.setItem(appliedKey, decision.applyKey); }
+        if (decision.mode === C.MODES.FREE) sessionStorage.setItem(appliedKey, decision.applyKey);
         notice(decision.mode === C.MODES.LOCKED ? 'Following your teacher · ' + C.DESTINATIONS[state.destination].label : '');
         return;
       }
@@ -156,7 +148,6 @@
           }
           if (decision.mode === C.MODES.FREE) {
             sessionStorage.setItem(appliedKey, decision.applyKey);
-            sessionStorage.setItem(arrivalKey, decision.applyKey);
           }
           location.assign(new URL(decision.destination, location.origin).href);
         }, 3500);

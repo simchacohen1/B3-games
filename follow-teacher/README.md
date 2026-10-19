@@ -68,7 +68,7 @@ individual targeting and end-to-end live verification are delivered.
 
 ## Locked classroom access
 
-The shared gate asks the authenticated student listener for a destination-only capability. This bypasses the ordinary classroom/site lock only on the selected, permitted destination; tool switches and individual denials still win. Follow Once consumes its revision before leaving and carries a one-use arrival marker for the receiving document. Unlock, revoked permissions and expired sessions remove this exception. No screen-sharing APIs are used.
+The shared gate asks the authenticated student listener for a destination-only capability. This bypasses the ordinary classroom/site lock only on the selected, permitted destination; tool switches and individual denials still win. Follow Once consumes its navigation revision before leaving; the currently selected activity remains accessible through reloads while the command is fresh. This does not repeat the one-time redirect. Unlock, revoked permissions and expired sessions remove this exception. No screen-sharing APIs are used.
 
 Chazara recording panels and failed-save recovery remain protected. Posuk Practice vetoes navigation with live recorders, captured unsaved audio, grading and saves. Halacha and Sefer HaMitzvos veto while account saves are pending or failed. Weekly Quiz holds an unsubmitted selected answer; Student Rewards holds in-flight operations. Activities may also use data-ftt-unsaved or cancel ftt:before-follow-navigation.
 

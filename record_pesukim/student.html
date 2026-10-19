@@ -2115,7 +2115,7 @@ let activeRecordingType = null; // 'hebrew' | 'translate' | 'comprehension'
 window.addEventListener('ftt:before-follow-navigation',event=>{
   const recorders=[mediaRecorder,translationRecorder,chunkFixRecorder,wordFixRecorder];
   const statuses=[...document.querySelectorAll('[id$="Status"], [id$="status"]')];
-  if(recorders.some(r=>r&&r.state!=='inactive') || translationSessionActive ||
+  if(recorders.some(r=>r&&r.state!=='inactive') || document.querySelector('[title="Checking…"]') || translationSessionActive ||
      translationPillPhase!=='idle' ||
      Object.entries(currentAudio).some(([task,blob])=>blob&&!attemptSaved[task]) ||
      Object.entries(translationSegments).some(([idx,segment])=>segment?.blob&&translationGradedResults[idx]?.evidenceSaved!==true) ||

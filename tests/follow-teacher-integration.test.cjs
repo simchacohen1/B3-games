@@ -202,16 +202,16 @@ test('locked-site capability permits only the current authenticated destination 
   await fire(h,{...h.state,heartbeatAt:Date.now()-100000});
   assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),false);
 });
-test('Follow Once destination capability is limited to the receiving document',async()=>{
+test('Follow Once keeps only its permitted destination available through reloads while the command is fresh',async()=>{
   const h=harness();await fire(h,{...h.state,mode:'free'});await runTimers(h);
   const applied=h.stored.get('fttFollowTeacherLastApplied');
   h.ctx.location.href='https://funtorahtools.com/shorashim/';
   assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),true);
-  assert.equal(h.stored.get('fttFollowTeacherArrival'),undefined);
   h.ctx.FTTFollowStudent.stop();
   await fire(h,{...h.state,mode:'free'});
   assert.equal(h.stored.get('fttFollowTeacherLastApplied'),applied);
-  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),false);
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('shorashim'),true);
+  assert.equal(await h.ctx.FTTFollowStudent.allowsLockedActivity('halacha'),false);
 });
 test('every destination loads the shared student gate, never a teacher route',()=>{
   for(const [tool,entry] of Object.entries(C.DESTINATIONS)) {
@@ -221,4 +221,41 @@ test('every destination loads the shared student gate, never a teacher route',()
     assert.ok(html.includes('data-game-id="'+tool+'"'),tool);
     assert.ok(!filename.includes('teacher'),tool);
   }
+});
+
+function workGuard(file, variables) {
+  const source=fs.readFileSync(path.join(ROOT,file),'utf8');
+  const begin=source.indexOf("window.addEventListener('ftt:before-follow-navigation'");
+  assert.ok(begin>=0,file+' has a work guard');
+  const end=source.indexOf('});',begin)+3;
+  let guard;const context={...variables,window:{addEventListener(_event,fn){guard=fn;}}};
+  vm.runInNewContext(source.slice(begin,end),context);
+  let held=false;guard({preventDefault(){held=true;}});return held;
+}
+test('Posuk work guard protects active microphone, unsaved captured audio, redo scoring and upload evidence',()=>{
+  const ready={mediaRecorder:null,translationRecorder:null,chunkFixRecorder:null,wordFixRecorder:null,
+    translationSessionActive:false,translationPillPhase:'idle',currentAudio:{},attemptSaved:{},
+    translationSegments:{},translationGradedResults:{},comprehensionQResults:{},
+    document:{querySelectorAll:()=>[],querySelector:()=>null}};
+  const file='record_pesukim/student.html';
+  assert.equal(workGuard(file,ready),false);
+  assert.equal(workGuard(file,{...ready,mediaRecorder:{state:'recording'}}),true);
+  assert.equal(workGuard(file,{...ready,currentAudio:{hebrew:{}}}),true);
+  assert.equal(workGuard(file,{...ready,currentAudio:{hebrew:{}},attemptSaved:{hebrew:true}}),false);
+  assert.equal(workGuard(file,{...ready,document:{querySelectorAll:()=>[],querySelector:()=>({})}}),true);
+  assert.equal(workGuard(file,{...ready,translationSegments:{0:{blob:{}}},translationGradedResults:{0:{audioStoragePath:'uploaded'}}}),true);
+  assert.equal(workGuard(file,{...ready,translationSegments:{0:{blob:{}}},translationGradedResults:{0:{evidenceSaved:true}}}),false);
+});
+test('scrapbook and coloring stay put through pending or failed account saves',()=>{
+  assert.equal(workGuard('halacha/index.html',{halachaDirty:true,halachaCloudLoading:false,document:{querySelector:()=>null}}),true);
+  assert.equal(workGuard('halacha/index.html',{halachaDirty:false,halachaCloudLoading:false,document:{querySelector:()=>null}}),false);
+  assert.equal(workGuard('sefer-hamitzvos/index.html',{followPaintPending:true,paintLoading:false,active:null}),true);
+  assert.equal(workGuard('sefer-hamitzvos/index.html',{followPaintPending:false,paintLoading:false,active:{}}),true);
+  assert.equal(workGuard('sefer-hamitzvos/index.html',{followPaintPending:false,paintLoading:false,active:null}),false);
+});
+test('unsubmitted quiz choices and in-flight reward requests veto following',()=>{
+  assert.equal(workGuard('weekly-quiz/index.html',{markingComplete:false,selectedChoice:0,responseFor:()=>null,displayedQuestion:0}),true);
+  assert.equal(workGuard('weekly-quiz/index.html',{markingComplete:false,selectedChoice:0,responseFor:()=>({saved:true}),displayedQuestion:0}),false);
+  assert.equal(workGuard('student-rewards/student.js',{state:{busy:true}}),true);
+  assert.equal(workGuard('student-rewards/student.js',{state:{busy:false}}),false);
 });
