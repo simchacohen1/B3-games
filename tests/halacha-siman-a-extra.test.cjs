@@ -25,7 +25,7 @@ test('new Seif Vav and Zayin lessons preserve supplementary Niggel Vasser lesson
  assert.match(html,/"id":"a7"/);
  assert.match(html,/id:"f",tab:"6 · נעגל וואסער"/);
  assert.match(html,/siman-a-extra-source\.js\?v=20261019-seif2to7/);
- assert.match(html,/siman-a-extra-guided\.js\?v=20261019-seif2to7/);
+ assert.match(html,/siman-a-extra-guided\.js\?v=20261019-illustrated2/);
 });
 test('student activity retains full text collapsed while highlighting phrases in the original source',()=>{
  new vm.Script(ui);
