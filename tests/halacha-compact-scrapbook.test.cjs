@@ -16,7 +16,8 @@ test('complete original Kitzur is preserved, closed by default and opens when st
   assert.match(lesson,/שִׁוִיתִי/);
   assert.match(lesson,/וְיֵבוֹשׁ/);
   assert.match(lesson,/reading\.append\(readingTitle, fullText\)/);
-  assert.doesNotMatch(lesson,/reading\.open = true/);
+  // Source must start closed but may open when a child clicks 'Find in the seif'.
+  assert.match(lesson,/reading\.open = true/);
 });
 test('lesson is compact and provides picture and scrapbook jump controls',()=>{
   assert.match(lesson,/hal-a-jumps/);
@@ -39,8 +40,8 @@ test('new image, script and styles have fresh versions and all gallery actions a
   new vm.Script(art);
   assert.match(index,/illustrated-seif-a\.js\?v=20261019-chabad1/);
   assert.match(index,/illustrated-seif-a\.css\?v=20261019-compact1/);
-  assert.match(index,/seif-a-teacher-led\.js\?v=20261019-compact1/);
-  assert.match(lesson,/seif-a-teacher-led\.css\?v=20261019-compact1/);
+  assert.match(index,/seif-a-teacher-led\.js\?v=20261019-highlight1/);
+  assert.match(lesson,/seif-a-teacher-led\.css\?v=20261019-highlight1/);
   assert.match(art,/20261019-chabad1/);
   assert.match(art,/useImage\.type = 'button'/);
   assert.match(art,/useWords\.type = 'button'/);
