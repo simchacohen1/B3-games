@@ -49,15 +49,62 @@ function toolbar(id,i){
  <div class="studio-tool-row studio-palette">${palette.map(([n,c])=>`<button class="studio-swatch" style="--swatch:${c}" title="${n}" aria-label="${n}" data-color="${c}" aria-pressed="${n==='Blue'}" onclick="studioColor('${id}',${i},'${c}')"></button>`).join('')}<label>Size <select aria-label="Brush size" onchange="this.closest('.page').dataset.size=this.value"><option value="3">Small</option><option value="8" selected>Medium</option><option value="18">Big</option></select></label></div>
  </div>`;
 }
+/* Right-hand scrapbook drawing panel. Original page drawing layers and save format are unchanged. */
+function drawingRail(id){
+ const modes=[['select','✥ Move'],['pen','✏️ Pencil'],['marker','🖍 Marker'],['erase','⌫ Eraser'],['fill','🪣 Fill'],['line','╱ Line'],['rect','▢ Box'],['circle','◯ Circle']];
+ return '<aside class="studio-draw-rail" data-active-page="0" role="toolbar" aria-label="Drawing tools next to the scrapbook">'
+ +'<strong class="studio-rail-title">🎨 Draw</strong><span class="studio-rail-subtitle">Page</span>'
+ +'<div class="studio-rail-pages" role="group" aria-label="Choose scrapbook page">'
+ +[0,1].map(i=>'<button type="button" data-rail-page="'+i+'" aria-pressed="'+(i===0)+'" onclick="studioRailPage(\''+id+'\','+i+')">'+(i+1)+'</button>').join('')
+ +'</div><div class="studio-rail-modes" role="group" aria-label="Drawing tool">'
+ +modes.map(([mode,label])=>'<button type="button" data-rail-mode="'+mode+'" aria-pressed="'+(mode==='select')+'" onclick="studioRailMode(\''+id+'\',\''+mode+'\')">'+label+'</button>').join('')
+ +'</div><div class="studio-rail-palette" role="group" aria-label="Drawing color">'
+ +palette.map(([name,color])=>'<button type="button" class="studio-rail-swatch" data-rail-color="'+color+'" aria-label="'+name+'" title="'+name+'" aria-pressed="'+(name==='Blue')+'" style="--swatch:'+color+'" onclick="studioRailColor(\''+id+'\',\''+color+'\')"></button>').join('')
+ +'</div><label class="studio-rail-size">Size<select aria-label="Drawing size" onchange="studioRailSize(\''+id+'\',this.value)"><option value="3">Small</option><option value="8" selected>Medium</option><option value="18">Big</option></select></label>'
+ +'<p class="studio-rail-hint">Choose the page you want to draw on.</p></aside>';
+}
+function railFor(id){return document.querySelector('#'+id+' .studio-draw-rail');}
+function syncDrawingRail(id){
+ const rail=railFor(id);if(!rail)return;
+ const i=Number(rail.dataset.activePage||0),p=pageAt(id,i);if(!p)return;
+ const mode=p.classList.contains('drawing')?(p.dataset.drawMode||'pen'):'select';
+ rail.querySelectorAll('[data-rail-page]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.railPage)===i)));
+ rail.querySelectorAll('[data-rail-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.railMode===mode)));
+ rail.querySelectorAll('[data-rail-color]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.railColor===(p.dataset.pen||'#1e88e5'))));
+ rail.querySelector('.studio-rail-size select').value=String(p.dataset.size||8);
+}
+window.studioRailPage=(id,i)=>{
+ if(readonly()||!pageAt(id,i))return;
+ const rail=railFor(id);if(!rail)return;
+ pages(id).forEach((p,n)=>{if(n!==i)p.classList.remove('drawing');});
+ rail.dataset.activePage=String(i);syncDrawingRail(id);
+};
+window.studioRailMode=(id,mode)=>{
+ if(readonly())return;const rail=railFor(id);if(!rail)return;
+ const i=Number(rail.dataset.activePage||0);
+ studioMode(id,i,mode);syncDrawingRail(id);
+};
+window.studioRailColor=(id,color)=>{
+ if(readonly())return;const rail=railFor(id);if(!rail)return;
+ studioColor(id,Number(rail.dataset.activePage||0),color);syncDrawingRail(id);
+};
+window.studioRailSize=(id,size)=>{
+ if(readonly()||!['3','8','18'].includes(String(size)))return;
+ const rail=railFor(id);if(!rail)return;
+ const p=pageAt(id,Number(rail.dataset.activePage||0));if(!p)return;
+ p.dataset.size=String(size);syncDrawingRail(id);
+};
 window.studioMode=(id,i,mode)=>{
  if(readonly())return;const p=pageAt(id,i);if(!p||(p.querySelector('.draw-layer')._loading||p.querySelector('.draw-layer')._loadFailed))return;
  p.dataset.drawMode=mode;p.classList.toggle('drawing',mode!=='select');
  p.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===mode));
+ syncDrawingRail(id);
 };
 window.studioColor=(id,i,color)=>{
  if(readonly())return;const p=pageAt(id,i);p.dataset.pen=color;
  p.querySelectorAll('[data-color]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.color===color));
  if(!p.classList.contains('drawing'))studioMode(id,i,'pen');
+ syncDrawingRail(id);
 };
 function resetContext(c){const ctx=c.getContext('2d');ctx.setTransform(c.width/c.clientWidth,0,0,c.height/c.clientHeight,0,0);ctx.lineCap='round';ctx.lineJoin='round';ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';return ctx;}
 async function restoreDrawing(id,i){
@@ -194,7 +241,12 @@ function upgrade(id){
   p.querySelector('.page-tools').outerHTML=toolbar(id,i);applyBackground(id,i);
   if(readonly()){p.querySelectorAll('.tb-text').forEach(t=>t.contentEditable='false');p.querySelectorAll('.scrap').forEach(e=>{e.onpointerdown=e.onpointermove=e.onpointerup=null;});}
  });
- if(readonly())sec.querySelectorAll('.side button,.side select,.side input,.page-tools button,.page-tools select').forEach(b=>b.disabled=true);
+ const book=sec.querySelector('.book');
+ if(book&&!book.querySelector('.studio-draw-rail')){
+  book.insertAdjacentHTML('beforeend',drawingRail(id));
+  syncDrawingRail(id);
+ }
+ if(readonly())sec.querySelectorAll('.side button,.side select,.side input,.page-tools button,.page-tools select,.studio-draw-rail button,.studio-draw-rail select').forEach(b=>b.disabled=true);
  seed(id);updateHistory(id);
 }
 const originalRender=render;render=function(l){originalRender(l);upgrade(l.id);};
