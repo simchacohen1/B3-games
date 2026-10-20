@@ -51,5 +51,5 @@ test('student only treats same-bucket screenshot links as safe illustration opti
   assert.equal(ctx.isTeacherScreenshotArt('https://example.com/image.png'),false);
   assert.equal(ctx.isTeacherScreenshotArt('https://firebasestorage.googleapis.com/v0/b/b3-games.firebasestorage.app/o/shorashim-recordings%2F1.webm'),false);
   assert.match(student,/addArtToEditor\(\{kind:'illustration',value,label:'Teacher screenshot'\}\)/);
-  assert.match(studentHtml,/app\.js\?v=20261019-teacher-screenshots/);
+  assert.match(studentHtml,/app\.js\?v=202610(?:19-teacher-screenshots|20-follow-pointer1)/);
 });
