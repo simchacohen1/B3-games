@@ -71,6 +71,10 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}
 .cp-games{background:#fff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden}
 .cp-games-head{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;border-bottom:1px solid #e2e8f0;font-weight:900;color:#334155}
 .cp-games-head span{font-size:12px;color:#64748b;font-weight:700}
+.cp-bulk{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid #e2e8f0;flex-wrap:wrap}
+.cp-bulk button{flex:1;min-width:120px;border:0;border-radius:999px;padding:10px 12px;font-size:14px;font-weight:900;cursor:pointer}
+.cp-bulk button:disabled{opacity:.5;cursor:default}
+.cp-bulk .all-open{background:#dcfce7;color:#166534}.cp-bulk .all-closed{background:#fee2e2;color:#991b1b}
 .cp-row{display:grid;grid-template-columns:44px minmax(0,1fr) 132px;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid #f1f5f9}
 .cp-row:first-of-type{border-top:0}
 .cp-name{font-weight:800;font-size:16px;color:#1f2937;overflow:hidden;text-overflow:ellipsis}
@@ -84,6 +88,12 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}
 .cp-wrap.cls-et .cp-games{border-left:6px solid #2563eb}.cp-wrap.cls-wt .cp-games{border-left:6px solid #9333ea}
 .cp-wrap.cls-et .cp-modes button.on{background:#2563eb;border-color:#2563eb}.cp-wrap.cls-wt .cp-modes button.on{background:#9333ea;border-color:#9333ea}
 .cp-msg{min-height:22px;margin-top:10px;font-weight:800;color:#475569;text-align:center}
+/* embed=1: Class Access opened from the home-page padlock, locked to one class. */
+html.embed body{grid-template-columns:1fr}
+html.embed aside,html.embed .topbar,html.embed .cp-switch{display:none!important}
+html.embed .workspace{height:100vh!important}
+html.embed #adminFrame{position:absolute!important;width:1px!important;height:1px!important;opacity:0;pointer-events:none}
+html.embed .ta-panel{padding:16px 12px}
 </style>
 </head>
 <body>
@@ -119,6 +129,8 @@ const tabs={
 };
 const adminParams=new URLSearchParams(location.search);
 const requestedClassId=String(adminParams.get("class")||"").trim();
+const embedMode=adminParams.get("embed")==="1";
+if(embedMode)document.documentElement.classList.add("embed");
 let currentTab=String(adminParams.get("tab")||"access").trim()||"access";
 if(currentTab==="settings"||currentTab==="special")currentTab="access";
 if(!tabs[currentTab])currentTab="access";
@@ -188,7 +200,7 @@ async function renderTeacherAccess(msg){
 // class is locked.
 let CP_CLASSES=[{id:"et",name:"ET"},{id:"wt",name:"WT"}];
 let cpRecords={},cpClassesUnsub=false;
-let cpClass=(()=>{try{return localStorage.getItem("b3ControlClass")||"et"}catch(e){return "et"}})();
+let cpClass=(embedMode&&requestedClassId)?requestedClassId:(()=>{try{return localStorage.getItem("b3ControlClass")||"et"}catch(e){return "et"}})();
 let cpSettings=null,cpUnsub=null,cpTimer=null,cpBusy=false,cpMsg="";
 function cpClassTabs(){
  return CP_CLASSES.map(c=>'<button type="button" data-cp-class="'+cpEsc(c.id)+'" class="'+(c.id===cpClass?'on':'')+'"><span class="cp-dot"></span>'+cpEsc(c.name)+'</button>').join('');
@@ -280,12 +292,15 @@ function renderOwnerControl(){
     +(s.siteEnabled===false?'<div class="cp-emergency"><span>🚨 Emergency lock is ON — every class is locked.</span><button type="button" id="cpEmergencyOff">Turn emergency lock off</button></div>':"")
     +'<div class="cp-status '+(info.open?"open":"locked")+'"><div>'+(info.open?"✅ "+cls.toUpperCase()+" is OPEN":"🔒 "+cls.toUpperCase()+" is LOCKED")+'<small>'+cpEsc(detail)+'</small></div></div>'
     +'<div class="cp-modes">'+modes+'</div>'
-    +'<div class="cp-games"><div class="cp-games-head">Games for '+cls.toUpperCase()+'<span>Tap to open/close · ⭐ = stays open during lock (turns itself off when the lock ends)</span></div>'+(rows||'<div class="cp-row"><div></div><div class="cp-name">No games yet.</div><div></div></div>')+'</div>'
+    +'<div class="cp-games"><div class="cp-games-head">Games for '+cls.toUpperCase()+'<span>Tap to open/close · ⭐ = stays open during lock (turns itself off when the lock ends)</span></div>'+(games.length?'<div class="cp-bulk"><button type="button" class="all-open" data-cp-all="open"'+(cpBusy?" disabled":"")+'>✅ Open ALL</button><button type="button" class="all-closed" data-cp-all="closed"'+(cpBusy?" disabled":"")+'>⛔ Close ALL</button></div>':"")+(rows||'<div class="cp-row"><div></div><div class="cp-name">No games yet.</div><div></div></div>')+'</div>'
     +'<div class="cp-msg" id="cpMsg">'+cpEsc(cpMsg)+'</div></div>';
   cpBindClassTabs(panel);
   panel.querySelectorAll("[data-cp-mode]").forEach(b=>b.onclick=()=>cpSave(()=>api.updateClassMode(cls,b.dataset.cpMode),{auto:"Back on the recess schedule ✓",open:cls.toUpperCase()+" opened ✓",locked:cls.toUpperCase()+" locked ✓"}[b.dataset.cpMode]));
   panel.querySelectorAll("[data-cp-game]").forEach(b=>b.onclick=()=>{const id=b.dataset.cpGame,open=s.classGames?.[cls]?.[id]!==false,name=games.find(g=>g.id===id)?.name||id;
     cpSave(async()=>{await api.updateClassGameEnabled(cls,id,!open);if(open&&stars.includes(id))await api.setClassLockedGame(cls,id,false);},name+(open?" closed":" opened")+" for "+cls.toUpperCase()+" ✓")});
+  panel.querySelectorAll("[data-cp-all]").forEach(b=>b.onclick=()=>{const open=b.dataset.cpAll==="open";
+    if(!confirm((open?"Open":"Close")+" ALL "+games.length+" games for "+CL+"?"))return;
+    cpSave(async()=>{for(const g of games){const cur=s.classGames?.[cls]?.[g.id]!==false;if(cur!==open)await api.updateClassGameEnabled(cls,g.id,open);if(!open&&stars.includes(g.id))await api.setClassLockedGame(cls,g.id,false);}},"All games "+(open?"opened":"closed")+" for "+CL+" ✓")});
   panel.querySelectorAll("[data-cp-star]").forEach(b=>b.onclick=()=>{const id=b.dataset.cpStar,name=games.find(g=>g.id===id)?.name||id;
     if(stars.includes(id))return cpSave(()=>api.setClassLockedGame(cls,id,false),name+" will lock with the class ✓");
     cpSave(async()=>{if(s.classGames?.[cls]?.[id]===false)await api.updateClassGameEnabled(cls,id,true);await api.setClassLockedGame(cls,id,true);},name+" will stay open until this lock ends ✓");});
@@ -308,6 +323,7 @@ function renderOwnerPlatformClass(panel){
   +'<div class="cp-status '+(isOpen?"open":"locked")+'"><div>'+(isOpen?"✅ ":"🔒 ")+cpEsc(name)+(isOpen?" is OPEN":" is LOCKED")+'<small>Only this class is affected by the controls below.</small></div></div>'
   +'<div class="cp-modes"><button type="button" data-cp-new-mode="open" class="'+(mode==="open"?"on":"")+'"'+(cpBusy?" disabled":"")+'>🔓 Open this class</button><button type="button" data-cp-new-mode="locked" class="'+(mode==="locked"?"on":"")+'"'+(cpBusy?" disabled":"")+'>🔒 Lock this class</button></div>'
   +'<div class="cp-games"><div class="cp-games-head">Tools for '+cpEsc(name)+'<span>Each tool is enabled or disabled for this class independently. Only enabled tools are available to students and teachers.</span></div>'
+  +(distinct.length?'<div class="cp-bulk"><button type="button" class="all-open" data-cp-grant-all="1"'+(cpBusy?" disabled":"")+'>✅ Enable ALL</button><button type="button" class="all-closed" data-cp-grant-all="0"'+(cpBusy?" disabled":"")+'>⛔ Disable ALL</button></div>':"")
   +(rows||'<div class="cp-row">No class activities found.</div>')+'</div>'
   +'<div class="cp-msg">'+cpEsc(cpMsg)+'</div></div>';
  cpBindClassTabs(panel);
@@ -326,6 +342,12 @@ function renderOwnerPlatformClass(panel){
    if(confirm("Turn off the emergency lock for every class?"))
      cpSave(()=>cpApi().updateSiteEnabled(true),"Emergency lock off ✓");
  };
+ panel.querySelectorAll("[data-cp-grant-all]").forEach(b=>b.onclick=()=>{
+   const on=b.dataset.cpGrantAll==="1";
+   if(!confirm((on?"Enable":"Disable")+" ALL tools for "+name+"?"))return;
+   const updates={};distinct.forEach(t=>{updates[base+"/toolGrants/"+t.id]=on;});
+   cpSave(()=>db.ref().update(updates),"All tools "+(on?"enabled":"disabled")+" for "+name+" ✓");
+ });
  panel.querySelectorAll("[data-cp-grant]").forEach(b=>b.onclick=()=>{
    const tool=b.dataset.cpGrant,on=row.toolGrants?.[tool]===true;
    cpSave(()=>db.ref(base+"/toolGrants/"+tool).set(!on),
@@ -471,4 +493,3 @@ frame.addEventListener("load",()=>{
 <script src="admin-teacher-preview.js?v=20261008-1"></script>
 </body>
 </html>
-
