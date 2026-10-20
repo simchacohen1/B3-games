@@ -15,7 +15,7 @@ test('changed practice limits still refresh access',async()=>{
 });
 test('revisiting translation pieces reuses successful loads and retries failures',async()=>{
  let reads=0,available=true;const levels=[{chunks:[{hebrew:'שלום'}]}];
- const ctx={currentSefer:'Bereishis',translationLoadToken:1,promiseWithTimeout:p=>p,GENERATE_TRANSLATION_CHUNKS_URL:'',console:{error(){}},db:{ref:()=>({once:async()=>{reads++;return {exists:()=>available,val:()=>({levels})};}})}};
+ const ctx={currentSefer:'Bereishis',currentPerekNum:18,translationLoadToken:1,promiseWithTimeout:p=>p,GENERATE_TRANSLATION_CHUNKS_URL:'',console:{error(){}},db:{ref:()=>({once:async()=>{reads++;return {exists:()=>available,val:()=>({levels})};}})}};
  vm.runInNewContext(section('const translationPieceCache = new Map();','function combineTranslationLevelsForRange'),ctx);
  const part={key:'Vayeira_18_1',text:'שלום',translation:'peace'};
  assert.equal(await ctx.fetchOrGenerateTranslationLevelsForPart(part,1),levels);
@@ -29,7 +29,7 @@ test('pieces persist across visits and simultaneous requests share one read',asy
  const storage=new Map();let reads=0;
  const levels=[{chunks:[{hebrew:'שלום'}]}];
  const make=()=>{
-  const ctx={currentSefer:'Bereishis',promiseWithTimeout:p=>p,GENERATE_TRANSLATION_CHUNKS_URL:'',console,
+  const ctx={currentSefer:'Bereishis',currentPerekNum:18,promiseWithTimeout:p=>p,GENERATE_TRANSLATION_CHUNKS_URL:'',console,
    localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)},
    db:{ref:()=>({once:async()=>{reads++;return {exists:()=>true,val:()=>({levels})};}})}};
   vm.runInNewContext(section('const translationPieceCache = new Map();','function combineTranslationLevelsForRange'),ctx);

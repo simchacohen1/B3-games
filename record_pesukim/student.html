@@ -4988,6 +4988,7 @@ function fetchOrGenerateTranslationLevelsForPart(part){
   return request;
 }
 async function fetchTranslationLevelsForPart(part, cacheKey){
+  const perekNum = currentPerekNum;
   const chunkRef = db.ref('posukPractice/translationChunks/' + part.key);
   try{
     const snap = await promiseWithTimeout(chunkRef.once('value'), 10000, 'Translation cache');
@@ -5003,7 +5004,8 @@ async function fetchTranslationLevelsForPart(part, cacheKey){
 
   if(!GENERATE_TRANSLATION_CHUNKS_URL || GENERATE_TRANSLATION_CHUNKS_URL.indexOf('PASTE') === 0) return null;
   try{
-    const classroomReferenceTranslation = await getClassroomReferenceForPart(part);
+    const refs = await fetchClassroomReferenceChapter(perekNum);
+    const classroomReferenceTranslation = refs[part.posukNum - 1] || '';
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35000);
     let res;
@@ -5013,10 +5015,11 @@ async function fetchTranslationLevelsForPart(part, cacheKey){
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
+          translationCacheKey: part.key,
           posukText: part.text,
           posukTranslation: part.translation || '',
           classroomReferenceTranslation,
-          perekNum: currentPerekNum,
+          perekNum,
           posukNum: part.posukNum
         })
       });
