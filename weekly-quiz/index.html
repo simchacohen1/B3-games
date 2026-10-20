@@ -155,6 +155,19 @@
   .tts-english{direction:ltr;unicode-bidi:isolate;display:inline}
   .tts-hebrew.tts-highlight{background:#ffe66d;box-shadow:0 0 0 2px #ffe66d}
 
+  /* teacher-assigned quiz list */
+  .assigned-card{border:2px solid #9cc0e6;background:linear-gradient(180deg,#f4f9ff,#fff);padding:18px 20px}
+  .assigned-head{margin-bottom:10px}
+  .assigned-badge{display:inline-block;background:var(--blue);color:#fff;border-radius:999px;padding:6px 14px;font-weight:800;font-size:15px}
+  .assigned-list{display:grid;gap:10px}
+  .assigned-row{border:1.5px solid var(--line2);border-radius:14px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff}
+  .assigned-row.current{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,168,.15)}
+  .assigned-title{font-weight:800;font-size:17px}
+  .assigned-meta{color:var(--muted);font-size:13.5px;margin-top:2px}
+  .preview-bar{background:#fff8e1;border-color:#ecd270;padding:12px 16px;font-size:15px}
+  .preview-bar a{margin-left:8px;font-weight:700}
+  @media(max-width:600px){.assigned-row{flex-direction:column;align-items:flex-start}.assigned-row button{width:100%}}
+
   @media(max-width:600px){
     body{font-size:16px}
     .header-spacer{display:none}.brand{margin:0 0 0 auto}.subtitle{display:none}
@@ -197,6 +210,26 @@
     <div class="signed">
       <span>Hi, <b id="studentNameLabel"></b>!</span>
       <button class="secondary" onclick="location.href='../index.html'">Not you? Switch</button>
+    </div>
+
+    <div id="previewBar" class="card preview-bar hidden"></div>
+
+    <div id="assignedCard" class="card assigned-card hidden">
+      <div class="assigned-head"><span class="assigned-badge">📝 Teacher Assigned Quiz</span></div>
+      <div id="assignedList" class="assigned-list"></div>
+    </div>
+
+    <div id="loadingQuizCard" class="card waiting hidden" role="status" aria-live="polite">
+      <div class="state-ico">⏳</div>
+      <div class="big">Opening your quiz…</div>
+      <div class="sub">Getting the quiz your teacher assigned.</div>
+    </div>
+
+    <div id="quizErrorCard" class="card waiting hidden" role="alert">
+      <div class="state-ico">⚠️</div>
+      <div class="big" id="quizErrorTitle">We could not open this quiz</div>
+      <div class="sub" id="quizErrorText"></div>
+      <button class="primary" style="margin-top:18px" onclick="retryAssignedQuiz()">Try again</button>
     </div>
 
     <div id="noQuizCard" class="card waiting hidden">
@@ -301,14 +334,92 @@ function waitForStudentAuth(){
   const auth=firebase.auth();if(auth.currentUser)return Promise.resolve(auth.currentUser);
   return new Promise(resolve=>{let stop=()=>{};stop=auth.onAuthStateChanged(user=>{stop();resolve(user);},()=>{stop();resolve(null);});});
 }
-async function callStudentQuiz(action,payload={}){
+// ---- Weekly Quiz data access ----
+// Preferred path: the secure weeklyQuizStudent Cloud Function. If that function
+// is not reachable (not deployed: 404 without CORS, network failure) or the
+// student has no function-ready token, fall back to the Realtime Database
+// paths the teacher dashboard writes to (b3Quiz/...). Both paths enforce the
+// same assignment rules: the launch's classId must be the student's class and,
+// when the launch targets specific students, this student must be one of them.
+let quizBackendMode=''; // '' (unknown) | 'function' | 'direct'
+const quizError=(status,message)=>Object.assign(new Error(message),{status});
+async function callStudentQuizFunction(action,payload){
   const user=await waitForStudentAuth();
-  if(!user)throw new Error('Please sign in again to open your quiz.');
+  if(!user)throw Object.assign(new Error('No student token.'),{backendUnavailable:true});
   const token=await user.getIdToken();
-  const response=await fetch(STUDENT_WEEKLY_QUIZ_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});
+  let response;
+  try{response=await fetch(STUDENT_WEEKLY_QUIZ_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});}
+  catch(e){throw Object.assign(new Error('Quiz service unreachable.'),{backendUnavailable:true});}
   const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw Object.assign(new Error(data.error||'Could not load this quiz. Try again.'),{status:response.status});
+  if(response.status===404||response.status===401)throw Object.assign(new Error(data.error||'Quiz service unavailable.'),{backendUnavailable:true});
+  if(!response.ok)throw quizError(response.status,data.error||'Could not load this quiz. Try again.');
   return data;
+}
+async function callStudentQuiz(action,payload={}){
+  if(!teacherPreview&&quizBackendMode!=='direct'){
+    try{const data=await callStudentQuizFunction(action,payload);quizBackendMode='function';return data;}
+    catch(e){if(!e.backendUnavailable||quizBackendMode==='function')throw e;quizBackendMode='direct';}
+  }
+  return directStudentQuiz(action,payload);
+}
+function launchAssignedTo(launch,studentId,classId){
+  if(!launch||typeof launch!=='object')return false;
+  const targets=launch.targetStudents;
+  return launch.classId===classId&&(!targets||!Object.keys(targets).length||targets[studentId]===true);
+}
+async function dbGet(path){return (await db.ref(path).once('value')).val();}
+function scoreRecord(questions,answers){
+  let correct=0,answered=0;
+  questions.forEach((_,i)=>{const r=answers[i]||answers[String(i)];if(r){answered++;if(r.correct===true)correct++;}});
+  return {correct,answered,total:questions.length,pct:questions.length?Math.round(correct/questions.length*100):0};
+}
+async function directStudentQuiz(action,payload={}){
+  const sid=myStudentId,cid=myClassId,root=QROOT;
+  if(!sid||!cid)throw quizError(401,'Please sign in again to open your quiz.');
+  if(action==='history'){
+    if(teacherPreview)return {launches:{},completions:{}};
+    const launches=await dbGet(root+'/launches')||{};
+    const ids=Object.keys(launches).filter(id=>launchAssignedTo(launches[id],sid,cid));
+    const comps=await Promise.all(ids.map(id=>dbGet(root+'/completions/'+id+'/'+sid)));
+    const out={launches:{},completions:{}};
+    ids.forEach((id,i)=>{if(comps[i]){out.launches[id]={id,...launches[id]};out.completions[id]=comps[i];}});
+    return out;
+  }
+  const launchId=String(payload.launchId||'');
+  if(!/^[A-Za-z0-9_-]{1,100}$/.test(launchId))throw quizError(400,'This quiz link is not valid. Ask your teacher for a new link.');
+  const launch=await dbGet(root+'/launches/'+launchId);
+  if(!launch)throw quizError(404,'This quiz could not be found. Ask your teacher for a new link.');
+  if(!teacherPreview&&!launchAssignedTo(launch,sid,cid))throw quizError(403,'This quiz is not assigned to your class.');
+  if(action==='launch'||action==='review'){
+    if(teacherPreview)return {launch:{id:launchId,...launch},responses:{},completion:null};
+    const [responses,completion]=await Promise.all([dbGet(root+'/responses/'+launchId+'/'+sid),dbGet(root+'/completions/'+launchId+'/'+sid)]);
+    if(action==='review'&&!completion)throw quizError(403,'This quiz review is not available.');
+    return {launch:{id:launchId,...launch},responses:responses||{},completion:completion||null};
+  }
+  if(teacherPreview)throw quizError(403,'Teacher preview does not save answers.');
+  const questions=asArray(launch.quizSnapshot&&launch.quizSnapshot.questions);
+  if(action==='answer'){
+    if(launch.started!==true||launch.endedAt)throw quizError(409,'This quiz is not open yet.');
+    const qi=Number(payload.questionIndex),ci=Number(payload.choiceIndex),question=questions[qi];
+    if(!Number.isInteger(qi)||!question||!Number.isInteger(ci)||ci<0||ci>=asArray(question.choices).length)throw quizError(400,'Choose a valid answer.');
+    const state=(launch.questionStates||{})[qi]||(launch.questionStates||{})[String(qi)]||{};
+    if(!((launch.mode||'paced')==='test'||state.open===true||qi<Number(launch.activeQuestion||0)))throw quizError(409,'This question is not open yet.');
+    if(await dbGet(root+'/completions/'+launchId+'/'+sid))throw quizError(409,'This quiz has already been completed.');
+    const correct=ci===Number(question.correctIndex);
+    const answer={choiceIndex:ci,originalCorrect:correct,correct,adjusted:false,name:myName,submittedAt:firebase.database.ServerValue.TIMESTAMP};
+    const result=await db.ref(root+'/responses/'+launchId+'/'+sid+'/'+qi).transaction(current=>current===null?answer:undefined);
+    if(!result.committed)throw quizError(409,'An answer is already saved for this question.');
+    return {ok:true};
+  }
+  if(action==='complete'){
+    const answers=await dbGet(root+'/responses/'+launchId+'/'+sid)||{};
+    if(!questions.length||questions.some((_,i)=>!answers[i]&&!answers[String(i)]))throw quizError(409,'Answer every question before finishing.');
+    const record={name:myName,completedAt:firebase.database.ServerValue.TIMESTAMP,...scoreRecord(questions,answers)};
+    const ref=db.ref(root+'/completions/'+launchId+'/'+sid);
+    const result=await ref.transaction(current=>current===null?record:undefined);
+    return {ok:true,completion:result.committed?result.snapshot.val():(await ref.once('value')).val(),alreadyCompleted:!result.committed};
+  }
+  throw quizError(400,'Unknown Weekly Quiz action.');
 }
 const CLASS_ROSTERS={
   et:{label:'East Track',students:['chaim_chaikin','yossi_gourarie','sholom_huebner','moshe_lapine','kehos_notik','yisroel_oirechman','moshe_raichman','avrohom_rosenfeld','levi_rozmarin','arik_traxler','simcha_cohen']},
@@ -466,6 +577,7 @@ function enterStudent(displayName,studentId,classId){
   sessionStorage.setItem('weeklyQuiz_classId',classId);
   document.getElementById('studentNameLabel').textContent=displayName;
   applyMasterBlocked();
+  render();
   listenForLaunches();
   listenForHistory();
 }
@@ -473,13 +585,22 @@ function enterStudent(displayName,studentId,classId){
 async function restoreLogin(){
 const account=await window.B3TeacherAccountReady;
 if(account.user&&account.authorized&&!window.B3SiteSettings.getActingStudent()){
-teacherPreview=true;myName='Teacher Preview - sample quiz, answers not saved';myStudentId='teacher_preview';myClassId='et';
-activeLaunchId='teacher_preview';launchData={classId:'et',started:true,mode:'test',showScore:true,quizSnapshot:{title:'Teacher Preview Quiz',questions:[{q:'How many days are in a week?',choices:['Six','Seven','Eight'],correctIndex:1},{q:'Which day is Shabbos?',choices:['The first day','The seventh day','The third day'],correctIndex:1}]}};
-document.getElementById('studentNameLabel').textContent=myName;applyMasterBlocked();render();return;
+  // Teacher preview shows the REAL assigned quiz (the ?launch= link, or the
+  // class's active quiz) read-only. It never shows sample questions and never saves answers.
+  teacherPreview=true;
+  const params=new URLSearchParams(location.search),wanted=String(params.get('class')||'').trim();
+  myClassId=CLASS_ROSTERS[wanted]?wanted:'et';myStudentId='teacher_preview';myName='Teacher preview';
+  QROOT='b3Quiz';
+  document.getElementById('studentNameLabel').textContent='Teacher preview (answers are not saved)';
+  renderPreviewBar();applyMasterBlocked();listenForLaunches();renderPastQuizzes();return;
 }
   const id=sessionStorage.getItem('b3Games_studentId')||sessionStorage.getItem('posukPractice_studentId');
   const name=sessionStorage.getItem('b3Games_studentName')||sessionStorage.getItem('posukPractice_studentName');
-  if(!id||!name){location.href='../index.html';return;}
+  if(!id||!name){
+    // Keep the exact quiz destination through sign-in on the main page.
+    try{sessionStorage.setItem('b3StudentReturnTo','weekly-quiz/index.html'+location.search);}catch(e){}
+    location.href='../index.html';return;
+  }
   try{
     const profileSnap=await db.ref('b3Games/students/'+id+'/profile').once('value');
     let d=profileSnap.val();
@@ -513,29 +634,113 @@ function listenForLaunches(){
   detachLaunchListeners();
   classLaunchRef=db.ref(QROOT+'/settings/activeLaunchByClass/'+myClassId);
   personalLaunchRef=db.ref(QROOT+'/settings/studentActiveLaunch/'+myStudentId);
-  classLaunchRef.on('value',s=>{classLaunchId=s.val()||'';chooseActiveLaunch();});
-  personalLaunchRef.on('value',s=>{personalLaunchId=s.val()||'';chooseActiveLaunch();});
+  // personalLaunchRef is null for teacher preview (no personal assignment).
+  let classReady=false,personalReady=teacherPreview;
+  const changed=()=>{if(classReady&&personalReady)loadAssignments();};
+  classLaunchRef.on('value',s=>{classLaunchId=s.val()||'';classReady=true;changed();},e=>{console.warn('Class quiz pointer unavailable:',e);classReady=true;changed();});
+  if(teacherPreview){personalLaunchRef=null;}
+  else personalLaunchRef.on('value',s=>{personalLaunchId=s.val()||'';personalReady=true;changed();},e=>{console.warn('Personal quiz pointer unavailable:',e);personalReady=true;changed();});
 }
 
+let historyState='loading';
 async function listenForHistory(){
+  if(teacherPreview){historyState='ready';renderPastQuizzes();return;}
   try{
     const result=await callStudentQuiz('history');
-    allLaunches=result.launches||{};allCompletions={};
+    allLaunches=result.launches||{};
     for(const [id,completion] of Object.entries(result.completions||{}))allCompletions[id]={[myStudentId]:completion};
-    renderPastQuizzes();
-  }catch(error){console.warn('Could not load quiz history:',error);}
+    historyState='ready';
+  }catch(error){console.warn('Could not load quiz history:',error);historyState='error';}
+  renderPastQuizzes();renderAssigned();
 }
 
-function chooseActiveLaunch(){
-  const id=forcedLaunchId||personalLaunchId||classLaunchId||'';
-  if(id===activeLaunchId)return;
+// ---- Teacher-assigned quizzes ----
+// Every quiz the teacher currently points this student to: a direct ?launch=
+// link, an individual assignment (Take Anytime / Make-Up / retake), and the
+// class's live test. All of them are listed; none hides another.
+let assignedInfo={},userPickedLaunchId='',assignmentsLoaded=false;
+function assignedIds(){
+  return [...new Set([forcedLaunchId,personalLaunchId,classLaunchId].filter(Boolean))];
+}
+function launchCreatedAt(id,info){return Number((info&&info.launch&&info.launch.createdAt)||String(id).split('_')[0])||0;}
+function isLaunchCompleted(id){return !!(allCompletions[id]&&allCompletions[id][myStudentId]);}
+async function loadAssignments(){
+  const ids=assignedIds(),seq=(loadAssignments.seq=(loadAssignments.seq||0)+1);
+  await Promise.all(ids.map(async id=>{
+    try{const r=await callStudentQuiz('launch',{launchId:id});assignedInfo[id]={launch:r.launch||null,error:''};if(r.completion)allCompletions[id]={[myStudentId]:r.completion};}
+    catch(e){assignedInfo[id]={launch:null,error:e.message||'Could not open this quiz.',status:e.status||0};}
+  }));
+  if(seq!==loadAssignments.seq)return;
+  assignmentsLoaded=true;
+  pickActiveLaunch();renderAssigned();
+}
+function pickActiveLaunch(){
+  const ids=assignedIds();let id='';
+  if(forcedLaunchId)id=forcedLaunchId;
+  else if(userPickedLaunchId&&ids.includes(userPickedLaunchId))id=userPickedLaunchId;
+  else{
+    const usable=ids.filter(x=>assignedInfo[x]&&assignedInfo[x].launch);
+    const open=usable.filter(x=>!isLaunchCompleted(x)).sort((a,b)=>launchCreatedAt(b,assignedInfo[b])-launchCreatedAt(a,assignedInfo[a]));
+    id=open[0]||usable.sort((a,b)=>launchCreatedAt(b,assignedInfo[b])-launchCreatedAt(a,assignedInfo[a]))[0]||ids[0]||'';
+  }
+  chooseActiveLaunch(id);
+}
+function openAssignedQuiz(id){
+  userPickedLaunchId=id;chooseActiveLaunch(id);renderAssigned();
+  const target=document.getElementById('assignedCard');if(target)target.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function retryAssignedQuiz(){quizLoadError='';assignmentsLoaded=false;render();loadAssignments();listenForHistory();}
+function renderAssigned(){
+  const card=document.getElementById('assignedCard'),list=document.getElementById('assignedList');if(!card||!list)return;
+  const rows=assignedIds().map(id=>({id,info:assignedInfo[id]})).filter(r=>r.info&&r.info.launch);
+  if(!rows.length){card.classList.add('hidden');return;}
+  card.classList.remove('hidden');
+  list.innerHTML=rows.map(({id,info})=>{
+    const l=info.launch,snap=l.quizSnapshot||{},n=asArray(snap.questions).length,done=isLaunchCompleted(id);
+    const status=done?'✅ Finished':(l.started?'Ready to take':'Waiting for your teacher to start');
+    const kind=l.retakeOf?'Retake':(l.deliveryType==='live'?'Class test':(l.deliveryType==='makeup'?'Make-up test':'Assigned quiz'));
+    const current=id===activeLaunchId;
+    const label=current?(done?'Showing':'Open now'):(done?'Review':'Open quiz');
+    return '<div class="assigned-row'+(current?' current':'')+'"><div><div class="assigned-title">'+esc(snap.title||'Weekly Quiz')+'</div><div class="assigned-meta">'+esc(kind)+' • '+esc(classLabel(l.classId))+' • '+n+' question'+(n===1?'':'s')+' • '+esc(status)+'</div></div><button class="'+(current?'secondary':'primary')+'" '+(current?'disabled':'')+' onclick="openAssignedQuiz(\''+esc(id)+'\')">'+esc(label)+'</button></div>';
+  }).join('');
+}
+function renderPreviewBar(){
+  const bar=document.getElementById('previewBar');if(!bar||!teacherPreview)return;
+  const link=c=>{const p=new URLSearchParams(location.search);p.set('class',c);p.delete('launch');return '?'+p.toString();};
+  bar.innerHTML='<b>Teacher preview</b> — this is exactly what '+esc(classLabel(myClassId))+' students see. Answers are not saved.'+
+    ['et','wt'].filter(c=>c!==myClassId).map(c=>'<a href="'+esc(link(c))+'">Preview '+esc(classLabel(c))+'</a>').join('');
+  bar.classList.remove('hidden');
+}
+
+let quizLoadError='';
+function chooseActiveLaunch(id){
+  id=id||'';
+  if(id===activeLaunchId&&(launchData||launchPollTimer))return;
   if(launchPollTimer)clearInterval(launchPollTimer);launchPollTimer=null;refreshActiveLaunch=null;
-  activeLaunchId=id;launchData=null;myResponses={};selectedChoice=null;displayedQuestion=0;
+  activeLaunchId=id;launchData=null;myResponses={};selectedChoice=null;displayedQuestion=0;quizLoadError='';
   if(!id){render();return;}
-  let refreshCount=0;
+  const cached=assignedInfo[id];
+  if(cached&&cached.error&&!cached.launch){quizLoadError=cached.error;render();}
+  else if(cached&&cached.launch){launchData=cached.launch;render();}
+  else render();
+  let refreshCount=0,failures=0;
   const refresh=async()=>{
-    try{const result=await callStudentQuiz('launch',{launchId:id});if(activeLaunchId!==id)return;launchData=result.launch||null;myResponses=result.responses||{};if(result.completion)allCompletions[id]={[myStudentId]:result.completion};if(allLaunches[id])allLaunches[id]=launchData;render();if(++refreshCount%12===0)await listenForHistory();}
-    catch(error){console.warn('Could not refresh quiz:',error);}
+    try{
+      const result=await callStudentQuiz('launch',{launchId:id});if(activeLaunchId!==id)return;
+      failures=0;quizLoadError='';launchData=result.launch||null;
+      if(!teacherPreview)myResponses=result.responses||{};
+      assignedInfo[id]={launch:launchData,error:''};
+      if(result.completion)allCompletions[id]={[myStudentId]:result.completion};
+      if(allLaunches[id])allLaunches[id]=launchData;
+      render();renderAssigned();
+      if(++refreshCount%12===0)await listenForHistory();
+    }catch(error){
+      console.warn('Could not refresh quiz:',error);if(activeLaunchId!==id)return;
+      // A permanent answer (not assigned / not found) is shown right away; a
+      // network blip only shows after repeated failures so the quiz is not interrupted.
+      failures++;
+      if([400,403,404].includes(error.status)||(!launchData&&failures>=2)||failures>=6){quizLoadError=error.message||'Could not load this quiz.';render();}
+    }
   };
   refreshActiveLaunch=refresh;refresh();launchPollTimer=setInterval(refresh,2500);
 }
@@ -560,16 +765,32 @@ function studentCanVisitQuestion(i,mode){
 }
 function launchAllowsStudent(){
   if(!launchData)return false;
-  const targets=launchData.targetStudents||null;
-  if(targets&&Object.keys(targets).length)return !!targets[myStudentId];
-  return launchData.classId===myClassId;
+  if(teacherPreview)return true;
+  // The secure function already filters; the safe launch it returns omits the roster.
+  if(quizBackendMode==='function')return launchData.classId===myClassId;
+  return launchAssignedTo(launchData,myStudentId,myClassId);
 }
 
-function hideAll(){['noQuizCard','waitingCard','completeCard','quizCard'].forEach(id=>document.getElementById(id).classList.add('hidden'));}
+function hideAll(){['noQuizCard','waitingCard','completeCard','quizCard','loadingQuizCard','quizErrorCard'].forEach(id=>document.getElementById(id).classList.add('hidden'));}
+function showQuizError(title,text){
+  document.getElementById('quizErrorTitle').textContent=title;
+  document.getElementById('quizErrorText').textContent=text||'';
+  document.getElementById('quizErrorCard').classList.remove('hidden');
+}
 function render(){
   if(!myStudentId)return;hideAll();
-  if(!activeLaunchId||!launchData){document.getElementById('noQuizCard').classList.remove('hidden');renderPastQuizzes();return;}
-  if(!launchAllowsStudent()){document.getElementById('noQuizCard').classList.remove('hidden');renderPastQuizzes();return;}
+  if(!assignmentsLoaded&&!activeLaunchId){document.getElementById('loadingQuizCard').classList.remove('hidden');renderPastQuizzes();return;}
+  if(activeLaunchId&&!launchData&&quizLoadError){
+    const wrongClass=/not assigned/i.test(quizLoadError);
+    showQuizError(wrongClass?'This quiz is for a different class':'We could not open this quiz',wrongClass?'This quiz was not assigned to '+classLabel(myClassId)+'. Ask your teacher which quiz to take.':quizLoadError);
+    renderPastQuizzes();return;
+  }
+  if(activeLaunchId&&!launchData){document.getElementById('loadingQuizCard').classList.remove('hidden');renderPastQuizzes();return;}
+  if(!activeLaunchId){
+    document.querySelector('#noQuizCard .sub').textContent=teacherPreview?'No class quiz is active for '+classLabel(myClassId)+' right now.':'When your teacher gives a quiz, it will show up here.';
+    document.getElementById('noQuizCard').classList.remove('hidden');renderPastQuizzes();return;
+  }
+  if(!launchAllowsStudent()){showQuizError('This quiz is for a different class','This quiz was not assigned to '+classLabel(myClassId)+'. Ask your teacher which quiz to take.');renderPastQuizzes();return;}
   const questions=getQuestions();if(!questions.length){document.getElementById('noQuizCard').classList.remove('hidden');renderPastQuizzes();return;}
   // A completed launch is read-only, including after a refresh or direct link.
   if(allCompletions?.[activeLaunchId]?.[myStudentId]){
@@ -579,8 +800,8 @@ function render(){
   }
   if(!launchData.started){
     document.getElementById('waitingCard').classList.remove('hidden');
-    document.getElementById('waitingTitle').textContent='Quiz not started yet';
-    document.getElementById('waitingText').textContent='Please wait for your teacher.';
+    document.getElementById('waitingTitle').textContent=((launchData.quizSnapshot||{}).title||'Your quiz')+' is ready';
+    document.getElementById('waitingText').textContent='Your teacher assigned this quiz. It will open as soon as your teacher starts it — keep this page open.';
     renderPastQuizzes();
     return;
   }
@@ -689,7 +910,9 @@ async function markCompletion(){
   if(teacherPreview)return;
   if(markingComplete||!activeLaunchId||!myStudentId)return;markingComplete=true;
   try{
-    await callStudentQuiz('complete',{launchId:activeLaunchId});
+    const id=activeLaunchId,result=await callStudentQuiz('complete',{launchId:id});
+    if(result&&result.completion)allCompletions[id]={[myStudentId]:result.completion};
+    renderAssigned();
     await listenForHistory();
   }catch(e){console.warn(e);}finally{markingComplete=false;}
 }
@@ -703,7 +926,10 @@ function completedLaunchRows(){
 }
 function renderPastQuizzes(){
   const box=document.getElementById('pastQuizList');if(!box||!myStudentId)return;
+  if(teacherPreview){box.innerHTML='<div class="past-meta">Students see their own finished quizzes here.</div>';return;}
   const rows=completedLaunchRows();
+  if(!rows.length&&historyState==='loading'){box.innerHTML='<div class="past-meta">Loading your quizzes…</div>';return;}
+  if(!rows.length&&historyState==='error'){box.innerHTML='<div class="past-meta">Could not load your past quizzes. <button class="secondary" onclick="historyState=\'loading\';renderPastQuizzes();listenForHistory()">Try again</button></div>';return;}
   if(!rows.length){box.innerHTML='<div class="past-meta">No completed quizzes yet.</div>';return;}
   box.innerHTML=rows.map(({id,launch,comp})=>{
     const snap=launch.quizSnapshot||{},title=snap.title||'Weekly Quiz',retake=launch.retakeOf?' • Retake '+(launch.attemptNumber||2):'',date=fmtDate(comp.completedAt||launch.createdAt),released=launch.showScore===true;
