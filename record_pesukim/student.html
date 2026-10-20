@@ -3524,6 +3524,8 @@ async function completeGeneratedComprehensionQuestions(loadToken){
     await restoreSavedQuestionResults();
     }else{
     comprehensionQuestionLoadFailed = true;
+    document.getElementById('questionProgress').textContent = 'Questions unavailable';
+    document.getElementById('questionText').textContent = 'Could not load questions for this pasuk.';
     const msg = document.getElementById('comprehensionGradingMsg');
       msg.textContent = hadFailure ? 'Could not prepare reliable questions. Tap retry.' : 'No clear questions could be made from this pasuk. Please use the bonus explanation.';
     const retry = document.getElementById('comprehensionRetryBtn');
@@ -3808,7 +3810,7 @@ function renderComprehensionQuestionUI(){
   const total = comprehensionQuestions.length;
   const current = comprehensionQuestions[comprehensionQIndex];
   document.getElementById('questionProgress').textContent =
-    'Question ' + (comprehensionQIndex + 1) + ' of ' + total + '  ' + questionProgressDots();
+    total ? 'Question ' + (comprehensionQIndex + 1) + ' of ' + total + '  ' + questionProgressDots() : 'Preparing questions…';
   document.getElementById('questionText').textContent = current ? current.question : '';
   renderQuestionWordChoices(current, comprehensionQResults[comprehensionQIndex]);
   caption.textContent = 'Tap all the Hebrew words that answer the question.';

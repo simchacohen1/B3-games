@@ -1895,7 +1895,7 @@ QUALITY CHECK BEFORE RETURNING: For every item, inspect the exact Hebrew phrases
                           question: { type: "string" },
                           expectedAnswer: { type: "string" },
                           answerHebrewPhrases: {
-                            type: "array", minItems: 1, maxItems: 3,
+                            type: "array", minItems: 1,
                             items: { type: "string" }
                           }
                         },
@@ -2024,6 +2024,10 @@ QUALITY CHECK BEFORE RETURNING: For every item, inspect the exact Hebrew phrases
         })
         .slice(0, questionLimit);
 
+      if(!items.length){
+        res.status(422).json({ error: "No verified questions were produced. Please retry." });
+        return;
+      }
       res.status(200).json({ items });
     } catch (err) {
       console.error("generateComprehensionQuestions error:", err);

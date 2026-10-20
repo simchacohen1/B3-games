@@ -150,3 +150,15 @@ test('translation results populate the student cache, including existing private
   await handler({ ...req, headers: {}, body: { ...req.body, translationCacheKey: key } }, response());
   assert.equal(s.values.has(path), false);
 });
+test('empty comprehension results cannot permanently block generation retries',async()=>{
+ const s=student();let calls=0;
+ const req={method:'POST',ip:'test',headers,body:{posukText:'test'}};
+ const {hash}=require('../backend/functions/paid-api-core.cjs');
+ const key=hash('generateComprehensionQuestions:phrases_v7:'+JSON.stringify(req.body));
+ s.values.set('b3Private/paidApiCache/generateComprehensionQuestions/'+key,{value:{items:[]}});
+ const handler=runtime(s).paidHandler('generateComprehensionQuestions','generation',async(req,res)=>{
+  calls++;res.status(200).json({items:calls===1?[]:[{question:'Who?'}]});
+ });
+ await handler(req,response());await handler(req,response());await handler(req,response());
+ assert.equal(calls,2);
+});
