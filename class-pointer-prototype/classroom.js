@@ -39,7 +39,7 @@ const pointerIcons={
 function status(text){$('connectionStatus').textContent=text}
 function fail(text){$('error').textContent=text;$('error').hidden=false}
 function clearError(){$('error').hidden=true}
-function send(connection,message){if(connection?.open){try{connection.send(message)}catch{fail('The connection was interrupted. Please rejoin the class.')}}}
+function send(connection,message){if(connection?.open){try{if(message.type==='lesson-marks'&&window.ClassPointerPdf?.active())message=window.ClassPointerPdf.activityMarks?.(message)||message;connection.send(message)}catch{fail('The connection was interrupted. Please rejoin the class.')}}}
 function ownMember(){return state.members.find(member=>member.id==='student:'+peer?.id)}
 function selected(member){return !!member?.admitted&&member.allowed===true&&state.mode==='selected'}
 function memberTools(member){return member?.tools||state.tools}
@@ -207,6 +207,11 @@ function receiveStudent(connection){
       if(typeof message.type==='string'&&message.type.startsWith('board-')){window.ClassPointerBoards?.fromStudent(member,message);return}
       // The same authenticated, permission-checked drawing pipeline serves embedded students.
       if(!['point','pointer-hide','highlight','edit-highlights'].includes(message.type))return;
+      if(window.ClassPointerPdf?.active()&&window.ClassPointerPdf.activityPoint){
+        const toDocument=p=>window.ClassPointerPdf.activityPoint(p);
+        if(message.type==='point'&&C.validPoint(message.point))message={...message,point:toDocument(message.point)};
+        if(message.type==='highlight'&&C.cleanStroke(message.stroke))message={...message,stroke:{...message.stroke,points:message.stroke.points.map(toDocument)}};
+      }
     }
     if(message.type==='join'&&!member){
       const gate=window.ClassPointerJoinGate;
@@ -696,6 +701,7 @@ window.ClassPointerBridge={isTeacher,send,fail,
   // Student → teacher screen (Student boards, Screens mode). One-way: the teacher answers without sending video back.
   callTeacher:stream=>!isTeacher&&peer&&teacherConnection?.open?peer.call(room,stream,{metadata:{kind:'student-screen'}}):null,clearError,status,live,allowed,writingAllowed,submitStroke,redraw:drawPointers,members:()=>members,presence:()=>presence,sharing:()=>state.sharing,stopSharing,
   navigating:()=>navigating,
+  refreshActivityMarks(){for(const entry of presence.values())if(entry.admitted)send(entry.connection,{type:'lesson-marks',points:state.points,strokes:highlightStore.strokes,members:state.members})},
   highlights:()=>highlightStore.strokes,
   owner:()=>isTeacher?'teacher':'student:'+peer?.id,ownColor:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   setPdf(on,kind='pdf'){state.pdf=on;state.documentKind=on?kind:null;state.points={};if(!on){highlightStore.reset();publishHighlights()}highlighter?.render();publish()},

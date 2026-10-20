@@ -213,6 +213,7 @@
   let lastRememberedPage=0;
   function afterMove(forceSend){
     scheduleRender();updateControls();B.redraw();
+    if(isTeacher)B.refreshActivityMarks?.();
     if(isTeacher&&!webMode&&!notReady()){const page=currentPage()+1;if(page!==lastRememberedPage){lastRememberedPage=page;window.PointerPdfLibrary?.onPageChanged(page)}}
     if(isTeacher&&(forceSend||Date.now()>quietUntil))scheduleViewSend(forceSend);
   }
@@ -267,6 +268,20 @@
     }
   }
   function setStrokes(next){strokes=Array.isArray(next)?next:[];drawInk()}
+
+  // Embedded students see a video of the scrolled viewport, while PDF ink
+  // uses fractions of the entire document. Translate only at that boundary.
+  function activityPoint(point,toDocument=true){
+    if(!point||!W||!H)return point;
+    const vw=scroller.clientWidth,vh=scroller.clientHeight;
+    if(!vw||!vh)return point;
+    return {...point,x:toDocument?(scroller.scrollLeft+point.x*vw)/W:(point.x*W-scroller.scrollLeft)/vw,
+      y:toDocument?(scroller.scrollTop+point.y*vh)/H:(point.y*H-scroller.scrollTop)/vh};
+  }
+  function activityMarks(message){
+    return {...message,points:Object.fromEntries(Object.entries(message.points||{}).map(([id,p])=>[id,activityPoint(p,false)])),
+      strokes:(message.strokes||[]).map(stroke=>({...stroke,points:stroke.points.map(p=>activityPoint(p,false))}))};
+  }
 
   // ---------- Pointing and drawing (positions are fractions of the whole PDF) ----------
   function normalized(event){
@@ -814,7 +829,7 @@
     webFile?.addEventListener('change',()=>{const chosen=webFile.files?.[0];webFile.value='';if(chosen){dialog.close();openWebpage(null,chosen)}});
   }
   window.ClassPointerPdf={
-    active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,
+    active:()=>!!lay&&!scroller.hidden,box,normalized,handleMessage,setStrokes,activityPoint,activityMarks,
     openFile,currentPage,goToPage,
     studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
     close:closePdf,openSnapshot,reset:studentReset,isOpen:()=>!!lay,

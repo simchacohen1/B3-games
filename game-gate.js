@@ -30,6 +30,8 @@
   var FIRST_LOAD_FAILSAFE_MS = 5500;
   var authReadyResolve;
   var authReadyPromise = new Promise(function (resolve) { authReadyResolve = resolve; });
+  // Other student clients share this initialization instead of loading a second SDK.
+  window.B3GameGateAuthReady = authReadyPromise;
   function markAuthReady() {
     if (!authReadyResolve) return;
     authReadyResolve();
@@ -175,7 +177,12 @@
   }
 
   function showClosed(title, message) {
-    document.querySelectorAll("audio,video").forEach(function(media){try{media.pause();}catch(error){}});
+    // The independently authenticated Pointer lesson remains usable above a
+    // locked activity. Closing that activity must not freeze the teacher video.
+    document.querySelectorAll("audio,video").forEach(function(media){
+      if(media.closest('#fttTeacherLessonOverlay'))return;
+      try{media.pause();}catch(error){}
+    });
     markFirstDecision();
     reveal();
     if (!overlay) {
@@ -295,6 +302,7 @@
       if(!window.firebase.auth) await loadAuthScript(base+"auth"+suffix);
       if(!window.firebase.database) await loadAuthScript(base+"database"+suffix);
       if(!window.B3_FIREBASE_CONFIG) await loadAuthScript(new URL("firebase-config.js",rootBase).href);
+      if(!window.firebase.apps.length) window.firebase.initializeApp(window.B3_FIREBASE_CONFIG);
       if(!window.B3SiteSettings) await loadAuthScript(new URL("site-settings.js?v=20261008-owner-demo",rootBase).href);
       await waitForFirebaseAuthState(window.firebase.auth());
       markAuthReady();
