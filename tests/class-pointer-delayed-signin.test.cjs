@@ -44,3 +44,14 @@ test('access gate creates the default Firebase app before asking Auth to restore
  loadAuthScript:async()=>{},waitForFirebaseAuthState:async()=>{},markAuthReady:()=>order.push('ready'),console,checkNow(){}});
  vm.runInContext(code,context);await context.watchTeacherAccess();assert.deepEqual(order,['initialize','auth','ready']);
 });
+
+
+test('closing an activity pauses its media without freezing the independent teacher lesson',()=>{
+ const gate=fs.readFileSync('game-gate.js','utf8');
+ const code=gate.slice(gate.indexOf('  function showClosed('),gate.indexOf('  function showClosed(')+gate.slice(gate.indexOf('  function showClosed(')).indexOf('    markFirstDecision();'))+'}';
+ const paused=[];
+ const media=(id,lesson)=>({closest:selector=>selector==='#fttTeacherLessonOverlay'&&lesson,pause:()=>paused.push(id)});
+ const context=vm.createContext({document:{querySelectorAll:()=>[media('activity-video',false),media('teacher-video',true),media('activity-audio',false)]}});
+ vm.runInContext(code,context);context.showClosed('locked','locked');
+ assert.deepEqual(paused,['activity-video','activity-audio']);
+});
