@@ -4955,17 +4955,46 @@ function promiseWithTimeout(promise, ms, label){
 }
 
 const translationPieceCache = new Map();
-async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
-  const cacheKey = JSON.stringify([currentSefer, part.key, part.text, part.translation || '']);
-  if(translationPieceCache.has(cacheKey)) return translationPieceCache.get(cacheKey);
+const translationPieceRequests = new Map();
+function translationPieceKey(part){
+  return JSON.stringify([currentSefer, part.key, part.text, part.translation || '']);
+}
+function cachedTranslationPieces(part){
+  const key = translationPieceKey(part);
+  if(translationPieceCache.has(key)) return translationPieceCache.get(key);
+  try{
+    const levels = JSON.parse(localStorage.getItem('posukPractice_translationPieces_v1_' + key));
+    if(Array.isArray(levels) && levels.length){
+      translationPieceCache.set(key, levels);
+      return levels;
+    }
+  }catch(err){ /* Storage may be unavailable. */ }
+  return null;
+}
+function rememberTranslationPieces(key, levels){
+  translationPieceCache.set(key, levels);
+  try{
+    localStorage.setItem('posukPractice_translationPieces_v1_' + key, JSON.stringify(levels));
+  }catch(err){ /* Retain the memory cache if storage is full or disabled. */ }
+}
+function fetchOrGenerateTranslationLevelsForPart(part){
+  const cached = cachedTranslationPieces(part);
+  if(cached) return Promise.resolve(cached);
+  const key = translationPieceKey(part);
+  if(translationPieceRequests.has(key)) return translationPieceRequests.get(key);
+  const request = fetchTranslationLevelsForPart(part, key)
+    .finally(() => translationPieceRequests.delete(key));
+  translationPieceRequests.set(key, request);
+  return request;
+}
+async function fetchTranslationLevelsForPart(part, cacheKey){
   const chunkRef = db.ref('posukPractice/translationChunks/' + part.key);
   try{
     const snap = await promiseWithTimeout(chunkRef.once('value'), 10000, 'Translation cache');
-    if(myToken !== translationLoadToken) return null;
     // Keep every existing translation-piece breakdown. Kehot is accepted at grading time,
     // so old cached pieces do NOT need to be regenerated just because grading sources changed.
     if(snap.exists() && snap.val() && Array.isArray(snap.val().levels) && snap.val().levels.length){
-      translationPieceCache.set(cacheKey, snap.val().levels);
+      rememberTranslationPieces(cacheKey, snap.val().levels);
       return snap.val().levels;
     }
   }catch(err){
@@ -4992,13 +5021,12 @@ async function fetchOrGenerateTranslationLevelsForPart(part, myToken){
         })
       });
     }finally{ clearTimeout(timeout); }
-    if(myToken !== translationLoadToken) return null;
     if(!res.ok) throw new Error('Chunk generation request failed: ' + res.status);
     const data = await res.json();
     if(!data.levels || !Array.isArray(data.levels) || !data.levels.length) throw new Error('No levels returned');
     // Keep successful pieces for this visit too, including when returning
     // to a posuk. Failed requests remain retryable.
-    translationPieceCache.set(cacheKey, data.levels);
+    rememberTranslationPieces(cacheKey, data.levels);
     // The protected backend caches this result for subsequent students.
     return data.levels;
   }catch(err){
@@ -5031,12 +5059,6 @@ function combineTranslationLevelsForRange(partLevels){
 
 async function loadOrGenerateTranslationChunks(){
   const myToken = ++translationLoadToken;
-  translationLevels = null;
-  translationLevelIndex = 0;
-  translationChunkIndex = 0;
-  if(document.getElementById('translationPanel').classList.contains('hidden') === false){
-    renderCurrentChunk();
-  }
   if(!currentPosukKey || !currentPosukText) return;
 
   const parts = currentSelectionParts.length ? currentSelectionParts : [{
@@ -5045,6 +5067,15 @@ async function loadOrGenerateTranslationChunks(){
     translation: currentPosukTranslation,
     key: currentPosukKey
   }];
+
+  const cached = parts.map(part => ({ part, levels: cachedTranslationPieces(part) }));
+  translationLevels = currentIsRange
+    ? combineTranslationLevelsForRange(cached)
+    : cached[0].levels;
+  translationLevelIndex = translationLevels ? defaultTranslationLevelIndex(translationLevels) : 0;
+  translationChunkIndex = 0;
+  renderCurrentChunk();
+  if(translationLevels) return;
 
   const loaded = await Promise.all(parts.map(async part => {
     try{

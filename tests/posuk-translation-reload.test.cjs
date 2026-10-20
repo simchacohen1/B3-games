@@ -25,3 +25,24 @@ test('revisiting translation pieces reuses successful loads and retries failures
  assert.equal(await ctx.fetchOrGenerateTranslationLevelsForPart(other,1),levels);assert.equal(reads,3);
 });
 test('student inline scripts parse',()=>{for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))new vm.Script(m[1]);});
+test('pieces persist across visits and simultaneous requests share one read',async()=>{
+ const storage=new Map();let reads=0;
+ const levels=[{chunks:[{hebrew:'שלום'}]}];
+ const make=()=>{
+  const ctx={currentSefer:'Bereishis',promiseWithTimeout:p=>p,GENERATE_TRANSLATION_CHUNKS_URL:'',console,
+   localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)},
+   db:{ref:()=>({once:async()=>{reads++;return {exists:()=>true,val:()=>({levels})};}})}};
+  vm.runInNewContext(section('const translationPieceCache = new Map();','function combineTranslationLevelsForRange'),ctx);
+  return ctx;
+ };
+ const part={key:'Vayeira_18_1',text:'שלום',translation:'peace'};
+ const first=make();
+ await Promise.all([first.fetchOrGenerateTranslationLevelsForPart(part),first.fetchOrGenerateTranslationLevelsForPart(part)]);
+ assert.equal(reads,1);
+ const revisit=make();
+ assert.equal(JSON.stringify(revisit.cachedTranslationPieces(part)),JSON.stringify(levels));
+ await revisit.fetchOrGenerateTranslationLevelsForPart(part);
+ assert.equal(reads,1);
+ await revisit.fetchOrGenerateTranslationLevelsForPart({...part,text:'changed text'});
+ assert.equal(reads,2);
+});
