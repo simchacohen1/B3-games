@@ -41,6 +41,65 @@
   if(touchesEdge)return {reason:'open'};
   return {pixels:queue.slice(0,tail)};
  }
- const api={traceRegion};
+ // Compile an immutable mask from native-resolution artwork once per load.
+ // Separable sliding windows make closing linear in the number of pixels.
+ function morphology(input,width,height,radius,dilate){
+  const horizontal=new Uint8Array(input.length),out=new Uint8Array(input.length),span=radius*2+1;
+  for(let y=0;y<height;y++){
+   let sum=0;for(let x=-radius;x<=radius;x++)sum+=x<0||x>=width?1:input[y*width+x];
+   for(let x=0;x<width;x++){
+    horizontal[y*width+x]=dilate?Number(sum>0):Number(sum===span);
+    const left=x-radius,right=x+radius+1;
+    sum-=(left<0||left>=width?1:input[y*width+left]);sum+=(right<0||right>=width?1:input[y*width+right]);
+   }
+  }
+  for(let x=0;x<width;x++){
+   let sum=0;for(let y=-radius;y<=radius;y++)sum+=y<0||y>=height?1:horizontal[y*width+x];
+   for(let y=0;y<height;y++){
+    out[y*width+x]=dilate?Number(sum>0):Number(sum===span);
+    const top=y-radius,bottom=y+radius+1;
+    sum-=(top<0||top>=height?1:horizontal[top*width+x]);sum+=(bottom<0||bottom>=height?1:horizontal[bottom*width+x]);
+   }
+  }
+  return out;
+ }
+ function createRegionMask(imageData,width,height){
+  const data=imageData?.data,total=width*height;
+  if(!data||!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||data.length!==total*4)return null;
+  const ink=new Uint8Array(total);
+  for(let i=0;i<total;i++)ink[i]=Number(data[i*4+3]===0||data[i*4]<232||data[i*4+1]<232||data[i*4+2]<232);
+  const radius=Math.max(2,Math.round(Math.min(width,height)/180));
+  const barrier=morphology(morphology(ink,width,height,radius,true),width,height,radius,false);
+  for(let i=0;i<total;i++)if(ink[i])barrier[i]=1;
+  const labels=new Uint32Array(total),queue=new Int32Array(total);let id=0;
+  for(let start=0;start<total;start++){
+   if(barrier[start]||labels[start])continue;
+   id++;let head=0,tail=1,touchesEdge=false;queue[0]=start;labels[start]=id;
+   const add=i=>{if(!barrier[i]&&!labels[i]){labels[i]=id;queue[tail++]=i}};
+   while(head<tail){const i=queue[head++],x=i%width,y=(i/width)|0;
+    if(!x||!y||x===width-1||y===height-1)touchesEdge=true;
+    if(x)add(i-1);if(x<width-1)add(i+1);if(y)add(i-width);if(y<height-1)add(i+width);
+   }
+   if(touchesEdge||tail>total*.18)for(let n=0;n<tail;n++)barrier[queue[n]]=1;
+  }
+  for(let i=0;i<total;i++)if(barrier[i])labels[i]=0;
+  return {width,height,labels};
+ }
+ // New strokes use precomputed, immutable region labels. A missing or invalid
+ // mask fails closed; never fall back to flood-filling an ambiguous picture.
+ function regionFromMask(mask,width,height,startX,startY){
+  const data=mask&&mask.data,labels=mask&&mask.labels,total=width*height;
+  if(!mask||mask.width!==width||mask.height!==height||(!labels&&(!data||data.length!==total*4))||(labels&&labels.length!==total))return {reason:'unavailable'};
+  const x=Math.floor(startX),y=Math.floor(startY);
+  if(!Number.isFinite(x)||!Number.isFinite(y)||x<0||y<0||x>=width||y>=height)return {reason:'outside'};
+  const labelAt=i=>labels?labels[i]:data[i*4]|(data[i*4+1]<<8)|(data[i*4+2]<<16);
+  const label=labelAt(y*width+x);
+  if(!label)return {reason:'border'};
+  const pixels=[];
+  for(let i=0;i<total;i++)if(labelAt(i)===label)pixels.push(i);
+  if(!pixels.length||pixels.length>total*.18)return {reason:'open'};
+  return {pixels:Uint32Array.from(pixels),region:label};
+ }
+ const api={traceRegion,createRegionMask,regionFromMask};
  if(typeof module==='object'&&module.exports)module.exports=api;else root.FTTMitzvahFill=api;
 })(typeof window==='object'?window:globalThis);
